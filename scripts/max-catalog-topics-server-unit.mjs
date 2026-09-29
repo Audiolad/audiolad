@@ -31,17 +31,14 @@ import {
 import {
   POST as postCatalog,
   setListMaxPublishedCatalogForTests as setRouteCatalogForTests,
-  setResolveMaxNativeUserForTests as setCatalogUserForTests,
 } from "../src/app/api/max/catalog/route.ts";
 import {
   POST as postTopics,
   setListMaxCatalogTopicsForTests,
-  setResolveMaxNativeUserForTests as setTopicsUserForTests,
 } from "../src/app/api/max/catalog/topics/route.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FICTIONAL_BOT_TOKEN = "test-max-bot-token-not-real-0001";
-const USER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 function signInitData(fields, token = FICTIONAL_BOT_TOKEN) {
   const entries = Object.entries(fields).filter(([key]) => key !== "hash");
@@ -129,7 +126,8 @@ const catalogSource = readFileSync(join(repoRoot, "src/lib/max/catalog.ts"), "ut
 assert.match(topicsLib, /listTopicsWithCatalogCountsSafe/);
 assert.match(topicsLib, /catalogProductCount > 0/);
 assert.match(topicsRoute, /verifyMaxInitData/);
-assert.match(topicsRoute, /resolveMaxNativeUser/);
+assert.doesNotMatch(topicsRoute, /resolveMaxNativeUser/);
+assert.doesNotMatch(topicsRoute, /"unlinked"/);
 assert.match(topicsRoute, /"Cache-Control": "no-store"/);
 assert.doesNotMatch(topicsRoute, /catalogProductCount|description|localStorage/);
 assert.match(catalogSource, /getPublishedCatalogProducts/);
@@ -306,7 +304,6 @@ const previousToken = process.env.MAX_BOT_TOKEN;
 process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
 const catalogCalls = [];
 setListMaxPublishedCatalogForTests(null);
-setCatalogUserForTests(async () => ({ ok: true, userId: USER_A }));
 setRouteCatalogForTests(async (input) => {
   catalogCalls.push(input ?? {});
   return { ok: true, items: [] };
@@ -400,21 +397,19 @@ try {
   assert.equal((await expired.json()).reason, "expired");
   assert.equal(catalogCalls.length, beforeAuth);
 
-  setCatalogUserForTests(async () => ({ ok: true, userId: null }));
   const unlinked = await postCatalog(
     request("/api/max/catalog", { initData: currentInitData(), topic: "sleep" }),
   );
-  assert.equal(unlinked.status, 403);
-  assert.equal((await unlinked.json()).reason, "unlinked");
-  assert.equal(catalogCalls.length, beforeAuth);
+  assert.equal(unlinked.status, 200);
+  assert.equal((await unlinked.json()).ok, true);
+  assert.equal(catalogCalls.length, beforeAuth + 1);
+  assert.deepEqual(catalogCalls.at(-1), { topicKey: "sleep" });
 } finally {
-  setCatalogUserForTests(null);
   setRouteCatalogForTests(null);
   setListMaxPublishedCatalogForTests(null);
 }
 
 const topicLoads = [];
-setTopicsUserForTests(async () => ({ ok: true, userId: USER_A }));
 setListMaxCatalogTopicsForTests(async () => {
   topicLoads.push("load");
   return { ok: true, topics: [{ key: "sleep", title: "Для сна" }] };
@@ -450,21 +445,19 @@ try {
   );
   assert.equal(invalid.status, 401);
 
-  setTopicsUserForTests(async () => ({ ok: true, userId: null }));
   const unlinked = await postTopics(
     request(MAX_CATALOG_TOPICS_PATH, { initData: currentInitData() }),
   );
-  assert.equal(unlinked.status, 403);
-  assert.equal((await unlinked.json()).reason, "unlinked");
-  assert.equal(topicLoads.length, before);
+  assert.equal(unlinked.status, 200);
+  assert.equal((await unlinked.json()).ok, true);
+  assert.equal(topicLoads.length, before + 1);
 
   const foreign = await postTopics(
     request(MAX_CATALOG_TOPICS_PATH, { initData: currentInitData() }, { host: "audiolad.ru" }),
   );
   assert.equal(foreign.status, 404);
-  assert.equal(topicLoads.length, before);
+  assert.equal(topicLoads.length, before + 1);
 } finally {
-  setTopicsUserForTests(null);
   setListMaxCatalogTopicsForTests(null);
   if (previousToken === undefined) {
     delete process.env.MAX_BOT_TOKEN;

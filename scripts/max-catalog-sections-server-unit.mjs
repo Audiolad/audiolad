@@ -22,12 +22,10 @@ import {
   MAX_CATALOG_BODY_MAX_BYTES,
   POST,
   setListMaxPublishedCatalogForTests as setRouteCatalogForTests,
-  setResolveMaxNativeUserForTests,
 } from "../src/app/api/max/catalog/route.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FICTIONAL_BOT_TOKEN = "test-max-bot-token-not-real-0001";
-const USER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const SECRET_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 assert.deepEqual(
@@ -161,6 +159,7 @@ assert.equal(searchCalls[0].catalogSection, "meditations");
 assert.deepEqual(searchCalls[0].viewer, GUEST_ORDINARY_CATALOG_VIEWER);
 assert.deepEqual(Object.keys(searchCalls[0]).sort(), [
   "catalogSection",
+  "limit",
   "query",
   "viewer",
 ]);
@@ -452,7 +451,6 @@ async function readJson(response) {
 const previousToken = process.env.MAX_BOT_TOKEN;
 process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
 const catalogCalls = [];
-setResolveMaxNativeUserForTests(async () => ({ ok: true, userId: USER_A }));
 setRouteCatalogForTests(async (input) => {
   catalogCalls.push(input ?? {});
   return {
@@ -563,17 +561,16 @@ try {
   assert.equal(invalidHash.status, 401);
   assert.equal(catalogCalls.length, beforeRejectedAuth);
 
-  setResolveMaxNativeUserForTests(async () => ({ ok: true, userId: null }));
   const unlinked = await readJson(
     await POST(maxRequest({ initData: currentInitData(), section: "education" })),
   );
-  assert.equal(unlinked.status, 403);
-  assert.equal(unlinked.body.reason, "unlinked");
-  assert.equal(catalogCalls.length, beforeRejectedAuth);
+  assert.equal(unlinked.status, 200);
+  assert.equal(unlinked.body.ok, true);
+  assert.equal(catalogCalls.length, beforeRejectedAuth + 1);
+  assert.deepEqual(catalogCalls.at(-1), { section: "education" });
 
   assert.equal(MAX_CATALOG_BODY_MAX_BYTES > 0, true);
 } finally {
-  setResolveMaxNativeUserForTests(null);
   setListMaxPublishedCatalogForTests(null);
   setRouteCatalogForTests(null);
   if (previousToken === undefined) {

@@ -98,8 +98,8 @@ assert.ok(
     sectionsAt < gridAt,
 );
 assert.match(search, /activeTopicKeys=\{activeTopicKeys\}/);
-assert.match(search, /onApply=\{applyTopicKeys\}/);
-assert.match(search, /onReset=\{resetTopicKeys\}/);
+assert.match(search, /onApply=\{applyFilters\}/);
+assert.match(search, /onReset=\{resetFilters\}/);
 assert.doesNotMatch(
   search,
   /CatalogMobileFilters|buildCatalogHref|<Link|<a[\s>]|router\.push|window\.location|openLink|useRouter|useSearchParams/,
@@ -127,7 +127,7 @@ const select = search.slice(
   search.indexOf("function loadRootCatalog"),
 );
 assert.doesNotMatch(select, /setTimeout|MAX_CATALOG_SEARCH_DEBOUNCE_MS/);
-assert.match(select, /beginSearch\(normalized, section\)/);
+assert.match(select, /beginSearch\(normalized, section,/);
 assert.match(select, /loadSectionCatalog\(section\)/);
 assert.match(select, /normalizeCatalogSearchQuery\(searchInputRef\.current\)/);
 assert.doesNotMatch(select, /setSearchInput\(/);
@@ -146,7 +146,7 @@ assert.match(select, /setSectionListing\(\s*cached/);
 assert.match(select, /\? \{ status: "ready", section, items: cached \}/);
 assert.match(select, /: \{ status: "idle" \}/);
 const queryBranch = select.slice(0, select.indexOf("if (section === null"));
-assert.ok(queryBranch.indexOf("setSectionListing(") < queryBranch.indexOf("beginSearch(normalized, section)"));
+assert.ok(queryBranch.indexOf("setSectionListing(") < queryBranch.indexOf("beginSearch(normalized, section,"));
 assert.match(select, /window\.clearTimeout\(debounceRef\.current\)/);
 assert.doesNotMatch(select, /localStorage|sessionStorage|router|useSearchParams/);
 
@@ -181,8 +181,10 @@ const beginJsonAt = begin.indexOf("await response.json");
 const beginGuardAt = begin.indexOf(generationGuard, beginJsonAt);
 const beginApplyAt = begin.indexOf("setSearchItems(items)");
 assert.ok(beginGuardAt !== -1 && beginGuardAt < beginApplyAt);
-assert.match(begin, /JSON\.stringify\(\{ initData, query: normalized, section \}\)/);
-assert.match(begin, /JSON\.stringify\(\{ initData, query: normalized \}\)/);
+assert.match(
+  begin,
+  /buildMaxCatalogRequestBody\(\{[\s\S]*initData,[\s\S]*query: normalized,[\s\S]*section,/,
+);
 assert.match(begin, /setResultSection\(section\)/);
 assert.doesNotMatch(begin, /setSearchItems\(null\)/);
 assert.match(begin, /setSearchStatus\("searching"\)/);
@@ -198,11 +200,11 @@ const gridChoice = search.slice(
 );
 assert.match(
   gridChoice,
-  /searchItems !== null && searchStatus !== "idle" && resultSection === activeSection/,
+  /searchItems !== null &&\s*searchStatus !== "idle" &&\s*resultSection === activeSection/,
 );
 assert.match(
   gridChoice,
-  /usingSearchResults \? searchItems : defaultCatalog\.status === "ready"/,
+  /usingSearchResults\s*\?\s*searchItems\s*:\s*defaultCatalog\.status === "ready"/,
 );
 assert.match(
   gridChoice,
@@ -223,25 +225,25 @@ assert.doesNotMatch(restore, /fetch\(|MAX_CATALOG_PATH|setActiveSection\(/);
 assert.match(search, /В разделе пока нет аудиопродуктов\./);
 assert.match(search, /По запросу „\{resultQuery\}“ ничего не найдено\./);
 
-assert.match(home, /hidden=\{activeTab !== "catalog"\}/);
-assert.match(home, /<MaxCatalogSearch onSelectProduct=\{openCatalogProduct\} \/>/);
+assert.match(home, /hidden=\{activeTab !== "catalog" \|\| Boolean\(promoTarget\)\}/);
+assert.match(home, /<MaxCatalogSearch[\s\S]*onSelectProduct=\{openCatalogProduct\}/);
 assert.match(home, /activeTab === "catalog" \? null : \(/);
 const catalogPane = home.slice(
-  home.indexOf('hidden={activeTab !== "catalog"}'),
+  home.indexOf('hidden={activeTab !== "catalog" || Boolean(promoTarget)}'),
   home.indexOf("<MaxTabPlaceholder"),
 );
 assert.doesNotMatch(catalogPane, /AudioladHorizontalLogo/);
 const catalogHeader = home.slice(
   home.indexOf('activeTab === "catalog" ? null'),
-  home.indexOf('hidden={activeTab !== "catalog"}'),
+  home.indexOf('hidden={activeTab !== "catalog" || Boolean(promoTarget)}'),
 );
 assert.match(catalogHeader, /<AudioladHorizontalLogo/);
 assert.doesNotMatch(home, /activeTab === "catalog" \?[\s\S]{0,120}<MaxCatalogSearch/);
 const back = home.slice(
-  home.indexOf("← Назад в каталог") - 220,
+  home.indexOf("← Назад в каталог") - 260,
   home.indexOf("← Назад в каталог") + 40,
 );
-assert.match(back, /setSelected\(null\)/);
+assert.match(back, /closeProductDetail/);
 assert.doesNotMatch(back, /setActiveSection|activeSection|localStorage|sessionStorage/);
 const selectTab = home.slice(
   home.indexOf("function selectMaxTab"),

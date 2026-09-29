@@ -82,7 +82,7 @@ function playbackDeps() {
         return { ok: false, reason: "access_required" };
       }
       signs += 1;
-      assert.equal(input.userId, userId);
+      assert.equal(input.userId, linked ? userId : null);
       return { ok: true, url: "https://cdn.example/audio?token=abc", expiresIn: 3600 };
     },
   };
@@ -174,9 +174,23 @@ try {
   assert.equal(lastSignInput.productSlug, "product");
 
   linked = false;
+  const signsBeforeGuest = signs;
+  r = await POST(request(MAX_PLAYBACK_AUDIO_PATH, { playbackTicket: scopedTicket, trackId: "track-1" }));
+  assert.equal(r.status, 200);
+  const guestAudio = await r.json();
+  assert.equal(guestAudio.url, "https://cdn.example/audio?token=abc");
+  assert.equal(guestAudio.audio_path, undefined);
+  assert.equal(guestAudio.url.includes("practices/"), false);
+  assert.equal(lastSignInput.userId, null);
+  assert.equal(signs, signsBeforeGuest + 1);
+  linked = true;
+
+  linked = false;
+  entitled = false;
   r = await POST(request(MAX_PLAYBACK_AUDIO_PATH, { playbackTicket: scopedTicket, trackId: "track-1" }));
   assert.equal(r.status, 403);
-  assert.equal((await r.json()).reason, "unlinked");
+  assert.equal((await r.json()).reason, "access_required");
+  entitled = true;
   linked = true;
 
   entitled = false;

@@ -66,7 +66,7 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   strip(home),
-  /window\.location|router\.push|openLink|href=["']\/|\/my-practices|\/playlists\/|\/catalog["']/,
+  /window\.location\s*=|router\.push|openLink|href=["']\/|\/my-practices|\/playlists\/|\/catalog["']/,
 );
 assert.doesNotMatch(
   `${home}\n${nav}\n${tabs}`,
@@ -107,7 +107,7 @@ assert.match(catalogSearch, /gap-\[6px\]/);
 assert.match(catalogSearch, /-mx-4/);
 assert.match(catalogSearch, /px-\[6px\]/);
 
-const gate = home.indexOf('{activeTab === "catalog" && selected ? (');
+const gate = home.indexOf('{activeTab === "catalog" && selected && !promoTarget ? (');
 const player = home.indexOf("<MaxAudioPlayer");
 const navUse = home.indexOf("<MaxBottomNav");
 assert.ok(gate >= 0, "product detail stays on the catalog tab");

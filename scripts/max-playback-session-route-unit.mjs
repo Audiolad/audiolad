@@ -122,9 +122,83 @@ try {
   r = await POST(request({ initData: init(), authorSlug: "a", productSlug: "p" }, { "content-length": "20000" }));
   assert.equal(r.status, 413);
 
+  let guestUserId = "unset";
   setResolveMaxNativeUserForTests(async () => ({ ok: true, userId: null }));
-  r = await POST(request({ initData: init(), authorSlug: "a", productSlug: "p" }));
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
+    getPractice: async () => ({
+      practice: { id: "practice-1", slug: "product", status: "published", is_free: true },
+      error: false,
+    }),
+    loadSession: async (_supabase, _author, _slug, linkedUserId) => {
+      guestUserId = linkedUserId;
+      sessions += 1;
+      return {
+        ok: true,
+        session: {
+          practiceTitle: "Бесплатно",
+          authorName: "Анна",
+          format: "Практика",
+          tracks: [{ id: "track-free", title: "Трек", position: 1, durationSeconds: 40, coverImageUrl: null }],
+          coverImageUrl: null,
+        },
+      };
+    },
+  });
+  r = await POST(
+    request({
+      initData: init(),
+      authorSlug: "author",
+      productSlug: "product",
+      user_id: "browser-user",
+    }),
+  );
+  assert.equal(r.status, 200);
+  const guestFull = await r.json();
+  assert.equal(guestFull.playbackMode, "full");
+  assert.equal(guestFull.session.playbackMode, "full");
+  assert.equal(guestUserId, null);
+  assert.equal(JSON.stringify(guestFull).includes("browser-user"), false);
+  assert.equal(JSON.stringify(guestFull).includes("audio_path"), false);
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
+    getPractice: async () => ({ practice: { id: "practice-1" }, error: false }),
+    loadSession: async (_supabase, _author, _slug, linkedUserId) => {
+      assert.equal(linkedUserId, null);
+      return { ok: false, reason: "unavailable" };
+    },
+    resolvePreview: async () => ({
+      ok: true,
+      track: {
+        trackId: "preview-1",
+        title: "Фрагмент",
+        position: 1,
+        durationSeconds: 30,
+        coverUrl: null,
+      },
+      previewDurationSeconds: 30,
+    }),
+  });
+  r = await POST(request({ initData: init(), authorSlug: "author", productSlug: "product" }));
+  assert.equal(r.status, 200);
+  const guestPreview = await r.json();
+  assert.equal(guestPreview.playbackMode, "preview");
+  assert.equal(guestPreview.session.playbackMode, "preview");
+  assert.equal(guestPreview.session.tracks[0].trackId, "preview-1");
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
+    getPractice: async () => ({ practice: { id: "practice-1" }, error: false }),
+    loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    resolvePreview: async () => ({ ok: false, reason: "preview_unavailable" }),
+  });
+  r = await POST(request({ initData: init(), authorSlug: "author", productSlug: "product" }));
   assert.equal(r.status, 403);
+  assert.equal((await r.json()).reason, "preview_unavailable");
 
   setResolveMaxNativeUserForTests(async () => ({ ok: false, reason: "storage_unavailable" }));
   r = await POST(request({ initData: init(), authorSlug: "a", productSlug: "p" }));

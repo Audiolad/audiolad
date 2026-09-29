@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readMaxAuthenticatedPost } from "@/lib/max/authenticated-post";
+import { readMaxVerifiedPost } from "@/lib/max/authenticated-post";
 import { getMaxPlaybackSession } from "@/lib/max/playback";
 import { mintMaxPlaybackTicket } from "@/lib/max/playback-ticket";
 
@@ -18,18 +18,18 @@ function fail(reason: string, status: number) {
 
 export async function POST(request: Request) {
   try {
-    const authenticated = await readMaxAuthenticatedPost(request, [
+    const verified = await readMaxVerifiedPost(request, [
       "authorSlug",
       "productSlug",
     ]);
-    if (!authenticated.ok) {
-      return authenticated.response;
+    if (!verified.ok) {
+      return verified.response;
     }
 
-    const authorSlug = String(authenticated.body.authorSlug).trim();
-    const productSlug = String(authenticated.body.productSlug).trim();
+    const authorSlug = String(verified.body.authorSlug).trim();
+    const productSlug = String(verified.body.productSlug).trim();
     const result = await getMaxPlaybackSession(
-      authenticated.userId,
+      verified.userId,
       authorSlug,
       productSlug,
     );
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     }
 
     const ticket = mintMaxPlaybackTicket({
-      providerUserId: authenticated.providerUserId,
+      providerUserId: verified.providerUserId,
       authorSlug,
       productSlug,
     });

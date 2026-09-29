@@ -171,7 +171,7 @@ function toPreviewSession(
 }
 
 export async function getMaxPlaybackSession(
-  userId: string,
+  userId: string | null,
   authorSlug: string,
   productSlug: string,
   deps?: MaxPlaybackDeps,
@@ -229,7 +229,7 @@ export async function getMaxPlaybackSession(
 }
 
 export async function signMaxPlaybackAudio(
-  userId: string,
+  userId: string | null,
   authorSlug: string,
   productSlug: string,
   trackId: string,

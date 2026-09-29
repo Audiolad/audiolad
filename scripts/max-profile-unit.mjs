@@ -14,10 +14,14 @@ import MaxProfileModule, {
   MAX_PROFILE_CONFIRM_BODY,
   MAX_PROFILE_CONFIRM_LABEL,
   MAX_PROFILE_CONFIRM_TITLE,
+  MAX_PROFILE_GUEST_STATUS,
   MAX_PROFILE_LINKED_STATUS,
+  MAX_PROFILE_LOGIN_LABEL,
   MAX_PROFILE_LOGOUT_HELP,
   MAX_PROFILE_LOGOUT_LABEL,
+  MAX_PROFILE_SIGNUP_LABEL,
   MAX_PROFILE_TITLE,
+  MaxGuestProfile,
 } from "../src/components/max/MaxProfile.tsx";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,7 +36,7 @@ const profile = read("src/components/max/MaxProfile.tsx");
 const bridge = read("src/components/max/MaxBridgeScript.tsx");
 const placeholder = read("src/components/max/MaxTabPlaceholder.tsx");
 
-assert.match(home, /import MaxProfile from "@\/components\/max\/MaxProfile"/);
+assert.match(home, /import MaxProfile, \{ MaxGuestProfile \} from "@\/components\/max\/MaxProfile"/);
 assert.match(
   home,
   /activeTab === "profile" && !guestMode && onUnlinkAccount \? \(\s*<MaxProfile/,
@@ -76,8 +80,12 @@ assert.match(handleUnlink, /type: "UNLINK_START"/);
 assert.match(handleUnlink, /setStartTarget\(null\)/);
 assert.doesNotMatch(handleUnlink, /signOutMaxSession|router\.push|window\.location|\/profile/);
 assert.match(bridge, /onUnlinkAccount=\{handleUnlink\}/);
-assert.match(bridge, /view\.phase === "guest_unlinked" && startTarget\?\.kind === "product"/);
-assert.match(bridge, /guestMode=\{showGuestStartProduct\}/);
+assert.match(
+  bridge,
+  /view\.phase === "linked_authenticated" \|\| view\.phase === "guest_unlinked"/,
+);
+assert.match(bridge, /guestMode=\{view\.phase === "guest_unlinked"\}/);
+assert.match(home, /<MaxGuestProfile onLogin=\{onRequestLogin\} onSignup=\{onRequestSignup\} \/>/);
 
 const markup = renderToStaticMarkup(
   createElement(MaxProfile, {
@@ -101,6 +109,22 @@ const named = renderToStaticMarkup(
 assert.match(named, /Анна/);
 assert.match(named, /anna@example\.com/);
 assert.match(named, new RegExp(MAX_PROFILE_LINKED_STATUS));
+
+const guestMarkup = renderToStaticMarkup(
+  createElement(MaxGuestProfile, {
+    onLogin: () => {},
+    onSignup: () => {},
+  }),
+);
+assert.match(guestMarkup, new RegExp(MAX_PROFILE_TITLE));
+assert.match(guestMarkup, new RegExp(MAX_PROFILE_GUEST_STATUS));
+assert.match(guestMarkup, new RegExp(MAX_PROFILE_LOGIN_LABEL));
+assert.match(guestMarkup, new RegExp(MAX_PROFILE_SIGNUP_LABEL));
+assert.doesNotMatch(guestMarkup, new RegExp(MAX_PROFILE_LINKED_STATUS));
+assert.doesNotMatch(guestMarkup, new RegExp(MAX_PROFILE_LOGOUT_LABEL));
+assert.equal(MAX_PROFILE_GUEST_STATUS, "Вы используете АудиоЛад без входа");
+assert.equal(MAX_PROFILE_LOGIN_LABEL, "Войти в АудиоЛад");
+assert.equal(MAX_PROFILE_SIGNUP_LABEL, "Создать аккаунт");
 
 const confirmationSource = `${MAX_PROFILE_CONFIRM_TITLE}\n${MAX_PROFILE_CONFIRM_BODY}\n${MAX_PROFILE_CANCEL_LABEL}\n${MAX_PROFILE_CONFIRM_LABEL}`;
 assert.match(profile, /Выйти из аккаунта\?/);

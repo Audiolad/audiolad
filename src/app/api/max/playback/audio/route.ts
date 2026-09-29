@@ -46,9 +46,6 @@ export async function POST(request: Request) {
     if (!native.ok) {
       return fail("storage_unavailable", 503);
     }
-    if (!native.userId) {
-      return fail("unlinked", 403);
-    }
 
     const result = await signMaxPlaybackAudio(
       native.userId,

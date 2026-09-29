@@ -15,6 +15,13 @@ export type MaxJsonPostSuccess = {
   body: Record<string, unknown>;
 };
 
+export type MaxVerifiedPostSuccess = {
+  ok: true;
+  userId: string | null;
+  providerUserId: string;
+  body: Record<string, unknown>;
+};
+
 export type MaxAuthenticatedPostSuccess = {
   ok: true;
   userId: string;
@@ -82,10 +89,16 @@ export async function readMaxJsonPost(
   return { ok: true, body: parsed };
 }
 
-export async function readMaxAuthenticatedPost(
+/**
+ * Verified MAX Mini App POST.
+ * Host, origin, body size, bot token, and HMAC initData are required.
+ * The trusted provider user id comes only from that initData.
+ * A linked AudioLad user is attempted and may be null for a guest.
+ */
+export async function readMaxVerifiedPost(
   request: Request,
   requiredStringFields: readonly string[],
-): Promise<MaxAuthenticatedPostSuccess | MaxAuthenticatedPostFailure> {
+): Promise<MaxVerifiedPostSuccess | MaxAuthenticatedPostFailure> {
   const parsed = await readMaxJsonPost(request);
   if (!parsed.ok) {
     return parsed;
@@ -120,14 +133,31 @@ export async function readMaxAuthenticatedPost(
   if (!native.ok) {
     return fail("storage_unavailable", 503);
   }
-  if (!native.userId) {
-    return fail("unlinked", 403);
-  }
 
   return {
     ok: true,
     userId: native.userId,
     providerUserId: verified.data.user.id,
     body: parsed.body,
+  };
+}
+
+export async function readMaxAuthenticatedPost(
+  request: Request,
+  requiredStringFields: readonly string[],
+): Promise<MaxAuthenticatedPostSuccess | MaxAuthenticatedPostFailure> {
+  const verified = await readMaxVerifiedPost(request, requiredStringFields);
+  if (!verified.ok) {
+    return verified;
+  }
+  if (!verified.userId) {
+    return fail("unlinked", 403);
+  }
+
+  return {
+    ok: true,
+    userId: verified.userId,
+    providerUserId: verified.providerUserId,
+    body: verified.body,
   };
 }

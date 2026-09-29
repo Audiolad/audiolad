@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * MAX catalog: exact host/origin, HMAC, linked MAX identity, safe DTO.
+ * MAX catalog: exact host/origin, HMAC, guest-visible catalog, safe DTO.
+ * A linked AudioLad account is not required for this public read.
  */
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
@@ -13,9 +14,7 @@ import {
   MAX_CATALOG_BODY_MAX_BYTES,
   POST,
   setListMaxPublishedCatalogForTests,
-  setResolveMaxNativeUserForTests,
 } from "../src/app/api/max/catalog/route.ts";
-import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "../src/lib/max/touch-external-identity.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FICTIONAL_BOT_TOKEN = "test-max-bot-token-not-real-0001";
@@ -66,12 +65,7 @@ async function readJson(response) {
 const previousToken = process.env.MAX_BOT_TOKEN;
 process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
 
-const nativeCalls = [];
 const catalogCalls = [];
-setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
-  nativeCalls.push({ provider, providerUserId });
-  return { ok: true, userId: USER_A };
-});
 setListMaxPublishedCatalogForTests(async (input) => {
   catalogCalls.push(input ?? {});
   return {
@@ -123,19 +117,11 @@ try {
   assert.equal(success.body.initData, undefined);
   assert.equal(JSON.stringify(success.body).includes(USER_A), false);
   assert.equal(JSON.stringify(success.body).includes("101"), false);
-  assert.equal(nativeCalls.length, 1);
-  assert.deepEqual(nativeCalls[0], {
-    provider: MAX_EXTERNAL_IDENTITY_PROVIDER,
-    providerUserId: "101",
-  });
   assert.equal(catalogCalls.length, 1);
   assert.deepEqual(catalogCalls[0], {});
   assert.equal(successResponse.headers.get("cache-control"), "no-store");
 
-  const callsAfterSuccess = {
-    native: nativeCalls.length,
-    catalog: catalogCalls.length,
-  };
+  const callsAfterSuccess = catalogCalls.length;
   const invalid = await readJson(
     await POST(
       maxRequest({
@@ -145,8 +131,7 @@ try {
   );
   assert.equal(invalid.status, 401);
   assert.equal(invalid.body.reason, "invalid_hash");
-  assert.equal(nativeCalls.length, callsAfterSuccess.native);
-  assert.equal(catalogCalls.length, callsAfterSuccess.catalog);
+  assert.equal(catalogCalls.length, callsAfterSuccess);
 
   const expired = await readJson(
     await POST(
@@ -160,37 +145,17 @@ try {
   );
   assert.equal(expired.status, 401);
   assert.equal(expired.body.reason, "expired");
-  assert.equal(nativeCalls.length, callsAfterSuccess.native);
-  assert.equal(catalogCalls.length, callsAfterSuccess.catalog);
+  assert.equal(catalogCalls.length, callsAfterSuccess);
 
-  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
-    nativeCalls.push({ provider, providerUserId });
-    return { ok: true, userId: null };
-  });
   const unlinked = await readJson(
-    await POST(maxRequest({ initData: currentInitData() })),
+    await POST(maxRequest({ initData: currentInitData(), user_id: "browser-user" })),
   );
-  assert.equal(unlinked.status, 403);
-  assert.deepEqual(unlinked.body, { ok: false, reason: "unlinked" });
-  assert.equal(catalogCalls.length, callsAfterSuccess.catalog);
+  assert.equal(unlinked.status, 200);
+  assert.equal(unlinked.body.ok, true);
+  assert.equal(unlinked.body.items.length, 1);
+  assert.equal(catalogCalls.length, callsAfterSuccess + 1);
+  assert.equal(JSON.stringify(unlinked.body).includes("browser-user"), false);
 
-  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
-    nativeCalls.push({ provider, providerUserId });
-    return { ok: false, reason: "storage_unavailable" };
-  });
-  const nativeFailure = await readJson(
-    await POST(maxRequest({ initData: currentInitData() })),
-  );
-  assert.equal(nativeFailure.status, 503);
-  assert.deepEqual(nativeFailure.body, {
-    ok: false,
-    reason: "storage_unavailable",
-  });
-
-  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
-    nativeCalls.push({ provider, providerUserId });
-    return { ok: true, userId: USER_A };
-  });
   setListMaxPublishedCatalogForTests(async () => ({
     ok: false,
     reason: "storage_unavailable",
@@ -279,20 +244,14 @@ try {
   assert.equal(invalidSearch.status, 401);
   assert.equal(catalogCalls.length, callsBeforeRejectedSearch);
 
-  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
-    nativeCalls.push({ provider, providerUserId });
-    return { ok: true, userId: null };
-  });
   const unlinkedSearch = await readJson(
     await POST(maxRequest({ initData: currentInitData(), query: "сон" })),
   );
-  assert.equal(unlinkedSearch.status, 403);
-  assert.equal(catalogCalls.length, callsBeforeRejectedSearch);
+  assert.equal(unlinkedSearch.status, 200);
+  assert.equal(unlinkedSearch.body.ok, true);
+  assert.equal(catalogCalls.length, callsBeforeRejectedSearch + 1);
+  assert.deepEqual(catalogCalls.at(-1), { query: "сон" });
 
-  setResolveMaxNativeUserForTests(async (provider, providerUserId) => {
-    nativeCalls.push({ provider, providerUserId });
-    return { ok: true, userId: USER_A };
-  });
   setListMaxPublishedCatalogForTests(async () => ({
     ok: false,
     reason: "storage_unavailable",
@@ -332,8 +291,18 @@ try {
     ),
   );
   assert.equal(blockedHost.status, 404);
+
+  const blockedOrigin = await readJson(
+    await POST(
+      maxRequest(
+        { initData: currentInitData() },
+        { headers: { origin: "https://evil.example" } },
+      ),
+    ),
+  );
+  assert.equal(blockedOrigin.status, 403);
+  assert.equal(blockedOrigin.body.reason, "forbidden_origin");
 } finally {
-  setResolveMaxNativeUserForTests(null);
   setListMaxPublishedCatalogForTests(null);
   if (previousToken === undefined) {
     delete process.env.MAX_BOT_TOKEN;
@@ -351,11 +320,12 @@ const catalogSource = readFileSync(
   "utf8",
 );
 assert.match(routeSource, /verifyMaxInitData/);
-assert.match(routeSource, /resolveMaxNativeUser/);
+assert.doesNotMatch(routeSource, /resolveMaxNativeUser/);
+assert.doesNotMatch(routeSource, /"unlinked"/);
 assert.match(routeSource, /listMaxPublishedCatalog/);
 assert.ok(
   routeSource.indexOf("verifyMaxInitData(") <
-    routeSource.indexOf("resolveMaxNativeUser("),
+    routeSource.indexOf("listMaxPublishedCatalog("),
 );
 assert.doesNotMatch(routeSource, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(routeSource, /auth\.getUser|createClientFromRequest|linkExternalIdentity|auth\.admin/);

@@ -4,7 +4,8 @@ import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
 export const MAX_SHELL_STATUS_NEUTRAL = "АудиоЛад открыт внутри MAX";
 export const MAX_SHELL_STATUS_CONNECTING = "Подключение к MAX…";
-export const MAX_SHELL_STATUS_VERIFIED = "Подключение к MAX подтверждено";
+export const MAX_SHELL_STATUS_VERIFIED = "АудиоЛад открыт в MAX";
+export const MAX_SHELL_CONTINUE_WITHOUT_ACCOUNT = "Продолжить без входа";
 export const MAX_SHELL_LOGIN_CTA = "Войти в АудиоЛад";
 export const MAX_SHELL_SIGNUP_CTA = "Создать аккаунт";
 export const MAX_SHELL_SIGNUP_CREATED_LINKED = "Аккаунт создан и подключён";
@@ -92,6 +93,7 @@ export type MaxShellEvent =
   | { type: "LINK_USER_CONFLICT" }
   | { type: "LINK_SERVER_ERROR" }
   | { type: "SIGN_OUT" }
+  | { type: "RETURN_TO_APP" }
   | { type: "UNLINK_START" }
   | { type: "UNLINK_SUCCESS" }
   | { type: "UNLINK_FAILURE" };
@@ -107,6 +109,7 @@ export type MaxShellView = {
   showSwitchToLogin: boolean;
   showSwitchToSignup: boolean;
   showSignOut: boolean;
+  showContinueWithoutAccount: boolean;
   reloginNotice: string | null;
   pendingMessage: string | null;
   errorMessage: string | null;
@@ -286,6 +289,22 @@ export function reduceMaxShell(
         state.formMode === "signup" ? "first_link" : (state.formMode ?? "first_link"),
         MAX_SHELL_SERVER_ERROR,
       );
+    case "RETURN_TO_APP":
+      if (
+        state.phase === "logging_in" ||
+        state.phase === "signup_form" ||
+        state.phase === "server_error" ||
+        state.phase === "pending_confirmation"
+      ) {
+        return {
+          phase: "guest_unlinked",
+          submitting: false,
+          loginError: null,
+          signupError: null,
+          formMode: null,
+        };
+      }
+      return state;
     case "SIGN_OUT":
       if (state.phase === "linked_authenticated") {
         // A Supabase web-session sign-out does not remove external_identities.
@@ -347,6 +366,7 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
     showSwitchToLogin: false,
     showSwitchToSignup: false,
     showSignOut: false,
+    showContinueWithoutAccount: false,
     reloginNotice: null,
     pendingMessage: null,
     errorMessage: state.loginError,
@@ -373,6 +393,7 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
         statusLine: MAX_SHELL_STATUS_VERIFIED,
         showLoginForm: true,
         showSwitchToSignup: true,
+        showContinueWithoutAccount: !state.submitting,
       };
     case "signup_form":
     case "signing_up":
@@ -381,6 +402,7 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
         statusLine: MAX_SHELL_STATUS_VERIFIED,
         showSignupForm: true,
         showSwitchToLogin: true,
+        showContinueWithoutAccount: state.phase === "signup_form" && !state.submitting,
       };
     case "pending_confirmation":
       return {
@@ -388,6 +410,7 @@ export function viewMaxShell(state: MaxShellState): MaxShellView {
         statusLine: MAX_SHELL_STATUS_VERIFIED,
         showPendingConfirmation: true,
         showSwitchToLogin: true,
+        showContinueWithoutAccount: true,
         pendingMessage: MAX_SHELL_PENDING_CONFIRMATION,
       };
     case "linking":

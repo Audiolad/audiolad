@@ -9,13 +9,15 @@ import {
   MAX_PLAYBACK_SESSION_PATH,
 } from "../src/lib/max/host.ts";
 import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "../src/lib/max/touch-external-identity.ts";
-import { POST as SESSION_POST } from "../src/app/api/max/playback/session/route.ts";
+import {
+  POST as SESSION_POST,
+  setResolveMaxNativeUserForTests,
+} from "../src/app/api/max/playback/session/route.ts";
 import { POST as AUDIO_POST } from "../src/app/api/max/playback/audio/route.ts";
 import {
   POST,
   setMaxPlaybackDepsForTests,
   setMaxPlaybackTicketNowForTests,
-  setResolveMaxNativeUserForTests,
 } from "../src/app/api/max/playback/preview/route.ts";
 
 const token = "test-max-bot-token-not-real-0001";
@@ -154,8 +156,9 @@ try {
 
   linked = false;
   r = await POST(request(MAX_PLAYBACK_PREVIEW_PATH, { playbackTicket: ticket, trackId: "preview-1" }));
-  assert.equal(r.status, 403);
-  assert.equal((await r.json()).reason, "unlinked");
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("content-type"), "audio/mpeg");
+  assert.equal(lastClipTrackId, "preview-1");
   linked = true;
 
   const [version, iv, ciphertext, tag] = ticket.split(".");

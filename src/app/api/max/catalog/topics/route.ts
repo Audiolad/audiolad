@@ -6,12 +6,9 @@ import {
   isAllowedMaxSessionOrigin,
   MAX_SESSION_BODY_MAX_BYTES,
 } from "@/lib/max/session-http";
-import { MAX_EXTERNAL_IDENTITY_PROVIDER } from "@/lib/max/touch-external-identity";
-import { resolveMaxNativeUser } from "@/lib/max/session-binding";
 import { verifyMaxInitData } from "@/lib/max/verify-init-data";
 import { getHostnameFromHeaders } from "@/lib/school/host";
 
-export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setListMaxCatalogTopicsForTests } from "@/lib/max/catalog-topics";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +34,6 @@ type TopicsErrorReason =
   | "invalid_hash"
   | "expired"
   | "future"
-  | "unlinked"
   | "storage_unavailable";
 
 const PARSE_REASONS = new Set<TopicsErrorReason>([
@@ -62,7 +58,6 @@ function statusForReason(reason: TopicsErrorReason): number {
   if (reason === "storage_unavailable" || reason === "service_unavailable") {
     return 503;
   }
-  if (reason === "unlinked") return 403;
   if (reason === "invalid_hash" || reason === "expired" || reason === "future") {
     return 401;
   }
@@ -124,17 +119,6 @@ export async function POST(request: Request) {
     }
 
     return errorResponse(verified.reason, statusForReason(verified.reason));
-  }
-
-  const nativeUser = await resolveMaxNativeUser(
-    MAX_EXTERNAL_IDENTITY_PROVIDER,
-    verified.data.user.id,
-  );
-  if (!nativeUser.ok) {
-    return errorResponse("storage_unavailable", 503);
-  }
-  if (!nativeUser.userId) {
-    return errorResponse("unlinked", 403);
   }
 
   const topics = await loadMaxCatalogTopics();

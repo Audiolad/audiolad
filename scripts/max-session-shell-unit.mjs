@@ -238,6 +238,16 @@ function testStateMachineCopy() {
   assert.equal(unlinkedView.showLoginForm, false);
   assert.equal(unlinkedView.showSignupForm, false);
   assert.equal(unlinkedView.showSignOut, false);
+  const loginFromGuest = reduceMaxShell(unlinked, { type: "OPEN_LOGIN" });
+  assert.equal(loginFromGuest.phase, "logging_in");
+  assert.equal(viewMaxShell(loginFromGuest).showContinueWithoutAccount, true);
+  const backToGuest = reduceMaxShell(loginFromGuest, { type: "RETURN_TO_APP" });
+  assert.equal(backToGuest.phase, "guest_unlinked");
+  assert.equal(viewMaxShell(backToGuest).showLoginForm, false);
+  assert.equal(
+    reduceMaxShell(linkedAuth, { type: "RETURN_TO_APP" }).phase,
+    "linked_authenticated",
+  );
 
   const unlinkFailed = reduceMaxShell(unlinkStarting, { type: "UNLINK_FAILURE" });
   assert.equal(unlinkFailed.phase, "linked_authenticated");
