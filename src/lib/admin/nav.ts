@@ -24,6 +24,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     match: (path) => path === "/admin",
   },
   {
+    href: "/admin/ai-company",
+    label: "AI-компания",
+    requiredPermission: "dashboard.view",
+    match: (path) => path.startsWith("/admin/ai-company"),
+  },
+  {
     href: "/admin/author-applications",
     label: "Заявки авторов",
     requiredPermission: "authors.view",
