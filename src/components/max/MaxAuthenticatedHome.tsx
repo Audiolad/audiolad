@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
+import type { CatalogAccessFilter } from "@/lib/catalog/listing-contract";
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import {
   FEATURED_CARD_ACTIONS_CLASS,
@@ -14,6 +16,7 @@ import MaxCatalogSearch, {
   type MaxCatalogProduct,
   type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
+import MaxHome from "@/components/max/MaxHome";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
 import MaxProfile, { MaxGuestProfile } from "@/components/max/MaxProfile";
 import MaxPromoLanding from "@/components/max/MaxPromoLanding";
@@ -31,11 +34,12 @@ import {
   type MaxPromoTarget,
 } from "@/lib/max/promo-target";
 import { readMaxProductDetail, type MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
+import { MAX_HOME_SHELVES, type MaxHomeShelfId } from "@/lib/max/home";
 import {
-  MAX_INITIAL_PRIMARY_TAB,
   MAX_PRIMARY_TABS,
   MAX_SHELL_CONTENT_BOTTOM_PADDING,
   MAX_TAB_BAR_HEIGHT_PX,
+  resolveInitialMaxPrimaryTab,
   type MaxPrimaryTab,
 } from "@/lib/max/primary-tabs";
 import {
@@ -64,6 +68,40 @@ type MaxPlaybackState =
 
 export { formatMaxDuration } from "@/lib/max/format-duration";
 
+function initialMaxSelectedProduct(
+  startTarget: MaxResolvedStartTarget | null | undefined,
+): MaxSelectedProduct | null {
+  if (startTarget?.kind !== "product") return null;
+  return {
+    authorSlug: startTarget.authorSlug,
+    slug: startTarget.productSlug,
+  };
+}
+
+function initialMaxPromoTarget(
+  startTarget: MaxResolvedStartTarget | null | undefined,
+): MaxPromoTarget | null {
+  if (startTarget?.kind === "promo") {
+    return {
+      authorSlug: startTarget.authorSlug,
+      promoSlug: startTarget.promoSlug,
+    };
+  }
+  if (startTarget?.kind === "product") return null;
+  return readMaxPromoTargetFromLocation();
+}
+
+function homeShelfTarget(shelfId: MaxHomeShelfId): {
+  section: PublicCatalogSection | null;
+  access: CatalogAccessFilter;
+} {
+  const shelf = MAX_HOME_SHELVES.find((item) => item.id === shelfId);
+  return {
+    section: shelf?.section ?? null,
+    access: shelf?.access ?? "all",
+  };
+}
+
 export default function MaxAuthenticatedHome({
   initialStartTarget = null,
   guestMode = false,
@@ -79,14 +117,27 @@ export default function MaxAuthenticatedHome({
   onUnlinkAccount?: () => Promise<boolean>;
   unlinking?: boolean;
 }) {
-  const [selected, setSelected] = useState<MaxSelectedProduct | null>(null);
-  const [detail, setDetail] = useState<MaxProductDetailState>({ status: "idle" });
-  const [playback, setPlayback] = useState<MaxPlaybackState>({ status: "idle" });
+  const [selected, setSelected] = useState<MaxSelectedProduct | null>(() =>
+    initialMaxSelectedProduct(initialStartTarget),
+  );
+  const [detail, setDetail] = useState<MaxProductDetailState>(() =>
+    initialStartTarget?.kind === "product" ? { status: "loading" } : { status: "idle" },
+  );
+  const [playback, setPlayback] = useState<MaxPlaybackState>(() =>
+    initialStartTarget?.kind === "product" ? { status: "loading" } : { status: "idle" },
+  );
   const [listenArmed, setListenArmed] = useState(false);
-  const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(MAX_INITIAL_PRIMARY_TAB);
+  const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(() =>
+    resolveInitialMaxPrimaryTab(
+      initialStartTarget,
+      Boolean(readMaxPromoTargetFromLocation()),
+    ),
+  );
   const [catalogTopicNavigation, setCatalogTopicNavigation] =
     useState<MaxCatalogTopicNavigationRequest | null>(null);
-  const [promoTarget, setPromoTarget] = useState<MaxPromoTarget | null>(null);
+  const [promoTarget, setPromoTarget] = useState<MaxPromoTarget | null>(() =>
+    initialMaxPromoTarget(initialStartTarget),
+  );
   const playRef = useRef<(() => void) | null>(null);
   const pendingPlayRef = useRef(false);
   useEffect(() => {
@@ -117,7 +168,11 @@ export default function MaxAuthenticatedHome({
         return;
       }
 
-      setPromoTarget(readMaxPromoTargetFromLocation());
+      const locationPromo = readMaxPromoTargetFromLocation();
+      setPromoTarget(locationPromo);
+      if (locationPromo) {
+        setActiveTab("catalog");
+      }
     });
     return () => {
       cancelled = true;
@@ -164,6 +219,31 @@ export default function MaxAuthenticatedHome({
       key,
       requestId: (current?.requestId ?? 0) + 1,
     }));
+  }
+
+  function openCatalogFromHome(target: {
+    section: PublicCatalogSection | null;
+    access: CatalogAccessFilter;
+  }) {
+    closeProductDetail();
+    if (promoTarget) {
+      closePromoLanding();
+    }
+    setActiveTab("catalog");
+    setCatalogTopicNavigation((current) => ({
+      requestId: (current?.requestId ?? 0) + 1,
+      section: target.section,
+      access: target.access,
+      publicationClass: "all",
+    }));
+  }
+
+  function openHomeProduct(product: MaxCatalogProduct) {
+    if (promoTarget) {
+      closePromoLanding();
+    }
+    setActiveTab("catalog");
+    openCatalogProduct(product);
   }
 
   useEffect(() => {
@@ -295,7 +375,18 @@ export default function MaxAuthenticatedHome({
           topicNavigationRequest={catalogTopicNavigation}
         />
       </div>
-      {activeTab === "catalog" || activeTab === "profile" ? null : (
+      {activeTab === "home" ? (
+        <div className="mx-auto max-w-lg">
+          <MaxHome
+            onOpenCatalog={() => openCatalogFromHome({ section: null, access: "all" })}
+            onListenFree={() => openCatalogFromHome({ section: null, access: "free" })}
+            onOpenSection={(section) => openCatalogFromHome({ section, access: "all" })}
+            onOpenShelf={(shelfId) => openCatalogFromHome(homeShelfTarget(shelfId))}
+            onSelectProduct={openHomeProduct}
+          />
+        </div>
+      ) : null}
+      {activeTab === "catalog" || activeTab === "profile" || activeTab === "home" ? null : (
         <MaxTabPlaceholder title={activeTabLabel} />
       )}
       {activeTab === "profile" && guestMode ? (

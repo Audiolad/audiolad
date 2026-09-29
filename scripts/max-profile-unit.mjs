@@ -43,7 +43,7 @@ assert.match(
 );
 assert.match(
   home,
-  /activeTab === "catalog" \|\| activeTab === "profile" \? null : \(\s*<MaxTabPlaceholder title=\{activeTabLabel\} \/>/,
+  /activeTab === "catalog" \|\| activeTab === "profile" \|\| activeTab === "home" \? null : \(\s*<MaxTabPlaceholder title=\{activeTabLabel\} \/>/,
 );
 assert.match(home, /<MaxBottomNav activeTab=\{activeTab\} onSelectTab=\{selectMaxTab\} \/>/);
 assert.doesNotMatch(

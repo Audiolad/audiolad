@@ -5,8 +5,11 @@ const source = readFileSync(join(process.cwd(), "src/components/max/MaxAuthentic
 const detailSource = readFileSync(join(process.cwd(), "src/components/max/MaxProductDetailView.tsx"), "utf8");
 const legalFooterSource = readFileSync(join(process.cwd(), "src/components/max/MaxProductLegalFooter.tsx"), "utf8");
 const catalogSource = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogSearch.tsx"), "utf8");
+const cardSource = readFileSync(join(process.cwd(), "src/components/max/MaxCatalogProductCard.tsx"), "utf8");
 assert.match(catalogSource, /key=\{`\$\{product\.authorSlug\}\/\$\{product\.slug\}`\}/);
-assert.match(catalogSource, /<ul[\s\S]*<li[\s\S]*<button/);
+assert.match(catalogSource, /<ul[\s\S]*<li[\s\S]*MaxCatalogProductCard/);
+assert.match(cardSource, /<button/);
+assert.match(cardSource, /onSelectProduct\(product\)/);
 assert.match(source, /status: "loading"/);
 assert.match(source, /status: "not_found"/);
 assert.match(source, /status: "error"/);
@@ -39,7 +42,7 @@ const catalogStart = catalogSource.indexOf('<ul className="mt-5 -mx-4 grid grid-
 assert.notEqual(catalogStart, -1, "catalog list exists");
 const readyStart = source.indexOf('{detail.status === "ready" ?');
 assert.notEqual(readyStart, -1, "ready detail block exists");
-const catalogBlock = catalogSource.slice(catalogStart);
+const catalogBlock = `${catalogSource.slice(catalogStart)}\n${cardSource}`;
 assert.match(catalogBlock, /grid-cols-2/);
 assert.match(catalogBlock, /gap-\[6px\]/);
 assert.match(catalogBlock, /-mx-4/);

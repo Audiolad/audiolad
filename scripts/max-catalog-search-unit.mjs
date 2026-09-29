@@ -137,9 +137,10 @@ assert.match(
   search,
   /<ul className="mt-5 -mx-4 grid grid-cols-2 gap-\[6px\] px-\[6px\]">/,
 );
-const grid = search.slice(
+const card = read("src/components/max/MaxCatalogProductCard.tsx");
+const grid = `${search.slice(
   search.indexOf('<ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">'),
-);
+)}\n${card}`;
 assert.match(grid, /grid-cols-2/);
 assert.match(grid, /gap-\[6px\]/);
 assert.match(grid, /-mx-4/);

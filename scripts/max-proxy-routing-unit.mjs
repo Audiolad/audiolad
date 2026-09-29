@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
   isMaxCatalogPath,
   isMaxCatalogTopicsPath,
+  isMaxHomePath,
   isMaxPlaybackAudioPath,
   isMaxPlaybackPreviewPath,
   isMaxPlaybackSessionPath,
@@ -27,6 +28,7 @@ import {
   MAX_HOSTNAME,
   MAX_CATALOG_PATH,
   MAX_CATALOG_TOPICS_PATH,
+  MAX_HOME_PATH,
   MAX_PLAYBACK_AUDIO_PATH,
   MAX_PLAYBACK_PREVIEW_PATH,
   MAX_PLAYBACK_SESSION_PATH,
@@ -107,6 +109,11 @@ assert.equal(isMaxCatalogPath(MAX_CATALOG_PATH), true);
 assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
 assert.equal(isMaxCatalogPath(MAX_CATALOG_TOPICS_PATH), false);
 assert.equal(isMaxCatalogPath("/api/max"), false);
+assert.equal(isMaxHomePath(MAX_HOME_PATH), true);
+assert.equal(isMaxHomePath(`${MAX_HOME_PATH}/`), false);
+assert.equal(isMaxHomePath("/api/max"), false);
+assert.equal(isMaxHomePath("/api/max/home/extra"), false);
+assert.equal(isMaxCatalogPath(MAX_HOME_PATH), false);
 assert.equal(isMaxCatalogTopicsPath(MAX_CATALOG_TOPICS_PATH), true);
 assert.equal(isMaxCatalogTopicsPath(`${MAX_CATALOG_TOPICS_PATH}/`), false);
 assert.equal(isMaxCatalogTopicsPath(MAX_CATALOG_PATH), false);
@@ -141,6 +148,7 @@ assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_UNLINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_TOPICS_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_HOME_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PROMO_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PROMO_ANALYTICS_PATH, "pass_through");
@@ -153,6 +161,8 @@ assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_UNLINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_HOME_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/home/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_TOPICS_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/catalog/topics/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PRODUCT_PATH}/`, "not_found");
@@ -292,6 +302,10 @@ const maxClientSources = [
   "src/components/max/MaxProductRating.tsx",
   "src/components/max/MaxAuthorAppreciation.tsx",
   "src/components/max/MaxCatalogSearch.tsx",
+  "src/components/max/MaxCatalogProductCard.tsx",
+  "src/components/max/MaxHome.tsx",
+  "src/lib/max/home.ts",
+  "src/lib/max/catalog-product.ts",
   "src/components/max/MaxBottomNav.tsx",
   "src/components/max/MaxTabPlaceholder.tsx",
   "src/components/max/MaxProfile.tsx",
@@ -402,6 +416,7 @@ assert.match(
 assert.match(policySource, /isMaxSessionVerifyPath/);
 assert.match(policySource, /isMaxSessionLinkPath/);
 assert.match(policySource, /isMaxSessionUnlinkPath/);
+assert.match(policySource, /isMaxHomePath/);
 assert.doesNotMatch(
   policySource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /pathname\.startsWith\(|\/api\/max\/\*/,

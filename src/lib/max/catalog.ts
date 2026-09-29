@@ -26,21 +26,12 @@ import {
   getPublishedCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const MAX_CATALOG_LIMIT = 24;
 
-export type MaxCatalogProduct = {
-  authorSlug: string;
-  slug: string;
-  title: string;
-  subtitle: string | null;
-  coverUrl: string | null;
-  authorName: string | null;
-  formatLabel: string;
-  priceLabel: string;
-  isFree: boolean;
-};
+export type { MaxCatalogProduct };
 
 export type MaxCatalogResult =
   | { ok: true; items: MaxCatalogProduct[] }
