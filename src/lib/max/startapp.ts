@@ -1,4 +1,4 @@
-export const MAX_MINI_APP_BOT_NAME = "id507305817690_bot";
+export const MAX_MINI_APP_BOT_NAME = "id507305817690_1_bot";
 export const MAX_MINI_APP_DEEP_LINK_ORIGIN = "https://max.ru";
 
 const UUID_RE =
