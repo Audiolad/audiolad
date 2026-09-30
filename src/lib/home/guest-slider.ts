@@ -23,9 +23,9 @@ export const GUEST_HOME_SLIDES: readonly GuestHomeSlide[] = [
   {
     id: "01",
     src: "/images/home/guest-slider/01-audio-practices.webp",
-    href: "/catalog",
+    href: "/catalog?class=release",
     ariaLabel:
-      "Слайд 1: Аудиопрактики на разные задачи. Сон, расслабление, энергия, внутреннее спокойствие, развитие и другие состояния.",
+      "Слайд 1: Фоновая музыка. Музыка для сна, расслабления, работы, концентрации и спокойного фона.",
   },
   {
     id: "02",
@@ -37,9 +37,9 @@ export const GUEST_HOME_SLIDES: readonly GuestHomeSlide[] = [
   {
     id: "03",
     src: "/images/home/guest-slider/03-audio-practices.webp",
-    href: "/catalog?class=release",
+    href: "/catalog",
     ariaLabel:
-      "Слайд 3: Фоновая музыка. Музыка для сна, расслабления, работы, концентрации и спокойного фона.",
+      "Слайд 3: Аудиопрактики на разные задачи. Сон, расслабление, энергия, внутреннее спокойствие, развитие и другие состояния.",
   },
   {
     id: "04",
