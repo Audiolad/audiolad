@@ -136,14 +136,11 @@ export default function GuestHomeSlider() {
   };
 
   const scrollToPreviousSlide = () => {
-    const previousIndex =
-      (activeIndex - 1 + GUEST_HOME_SLIDES.length) % GUEST_HOME_SLIDES.length;
-    scrollToSlide(previousIndex);
+    scrollToSlide(Math.max(activeIndex - 1, 0));
   };
 
   const scrollToNextSlide = () => {
-    const nextIndex = (activeIndex + 1) % GUEST_HOME_SLIDES.length;
-    scrollToSlide(nextIndex);
+    scrollToSlide(Math.min(activeIndex + 1, GUEST_HOME_SLIDES.length - 1));
   };
 
   const onPointerDown = (event: PointerEvent<HTMLUListElement>) => {
@@ -237,6 +234,7 @@ export default function GuestHomeSlider() {
           type="button"
           className="guest-home-slider__arrow guest-home-slider__arrow--previous"
           aria-label="Предыдущий слайд"
+          disabled={activeIndex === 0}
           onClick={scrollToPreviousSlide}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -255,6 +253,7 @@ export default function GuestHomeSlider() {
           type="button"
           className="guest-home-slider__arrow guest-home-slider__arrow--next"
           aria-label="Следующий слайд"
+          disabled={activeIndex === GUEST_HOME_SLIDES.length - 1}
           onClick={scrollToNextSlide}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
