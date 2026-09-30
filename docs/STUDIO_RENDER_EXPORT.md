@@ -103,6 +103,17 @@ the heartbeat with a one-shot 5400s lease. Complete/fail updates also require
 the current token; a worker that lost the lease must not mark the job
 completed or overwrite the output object.
 
+FFmpeg progress watchdog, separate from the lease: the encode starts with
+`-progress pipe:1`. Machine-readable `out_time_*` is read from stdout; stderr
+diagnostics stay intact. The watchdog runs only while that FFmpeg child is
+alive. If the processed output position does not grow for 10 minutes
+(`STUDIO_RENDER_FFMPEG_STALL_MS`), the worker sends SIGTERM, waits the existing
+~2s grace, sends SIGKILL, and awaits the child `close`. The job is stored as
+`failed` with `error_code=ffmpeg_stalled` and a fixed safe message. There is
+no absolute wall-clock cap: a 1–3 hour render continues while `out_time` keeps
+advancing. Lease renewal stays the ownership heartbeat above, including during
+download, upload, and ffprobe, when FFmpeg progress lines are absent.
+
 Graceful shutdown (SIGTERM/SIGINT): stop claiming; wait up to **90s**
 (`STUDIO_RENDER_SHUTDOWN_DRAIN_MS`) for the in-flight FFmpeg job. After the
 drain window the worker aborts the render signal (SIGTERM, then SIGKILL after
