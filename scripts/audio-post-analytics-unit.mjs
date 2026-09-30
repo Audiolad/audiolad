@@ -67,13 +67,41 @@ assert.deepEqual(
   [],
   "resume in the same session must not duplicate the 25% milestone",
 );
+let nearEnd = resumed;
+for (let second = 40; second <= 99; second += 10) {
+  nearEnd = updateListeningProgressState(nearEnd, {
+    currentTime: Math.min(second, 99),
+    duration: 100,
+    isPlaying: true,
+    deltaSeconds: 10,
+    wallDeltaSeconds: 10,
+  });
+}
 assert.equal(
-  isListeningCompleted(
-    { ...resumed, listenedSeconds: 85 },
-    { currentTime: 99, duration: 100, programCompleted: false },
-  ),
+  isListeningCompleted(nearEnd, {
+    currentTime: 99,
+    duration: 100,
+    programCompleted: false,
+  }),
   true,
-  "near-end playback with sufficient listened time completes",
+  "playback that reaches the final zone completes without waiting for ended",
+);
+
+const seekedIntoZone = updateListeningProgressState(resumed, {
+  currentTime: 99,
+  duration: 100,
+  isPlaying: true,
+  deltaSeconds: 0.2,
+  wallDeltaSeconds: 0.2,
+});
+assert.equal(
+  isListeningCompleted(seekedIntoZone, {
+    currentTime: 99,
+    duration: 100,
+    programCompleted: false,
+  }),
+  false,
+  "a seek into the final seconds does not complete",
 );
 
 const syntheticTrackId = "0fdccda9-6705-47fa-93a7-86e6bfe4fad0";
