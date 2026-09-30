@@ -43,8 +43,9 @@ assert.match(
 );
 assert.match(
   home,
-  /activeTab === "catalog" \|\| activeTab === "profile" \|\| activeTab === "home" \? null : \(\s*<MaxTabPlaceholder title=\{activeTabLabel\} \/>/,
+  /activeTab === "library" \? \(\s*<MaxTabPlaceholder title=\{activeTabLabel\} \/>/,
 );
+assert.match(home, /activeTab === "playlists" \? \(\s*<MaxPlaylists/);
 assert.match(home, /<MaxBottomNav activeTab=\{activeTab\} onSelectTab=\{selectMaxTab\} \/>/);
 assert.doesNotMatch(
   `${home}\n${profile}\n${bridge}`,

@@ -69,6 +69,7 @@ export type MaxPlaybackDeps = {
   resolvePreview?: (
     practice: PublicPracticeRow,
     supabase: SupabaseClient,
+    audioItemId?: string | null,
   ) => Promise<MaxStorefrontPreview>;
   preview?: MaxStorefrontPreviewDeps;
   buildPreviewClip?: typeof buildMaxStorefrontPreviewClip;
@@ -175,6 +176,7 @@ export async function getMaxPlaybackSession(
   authorSlug: string,
   productSlug: string,
   deps?: MaxPlaybackDeps,
+  audioItemId?: string | null,
 ): Promise<GetMaxPlaybackSessionResult> {
   try {
     const listed = await resolveListedPractice(authorSlug, productSlug, deps);
@@ -200,12 +202,26 @@ export async function getMaxPlaybackSession(
         return { ok: false, reason: "storage_unavailable" };
       }
 
+      const requestedAudioItemId = audioItemId?.trim() || null;
       const resolvePreview =
         deps?.resolvePreview ??
         playbackDeps?.resolvePreview ??
-        ((practice: PublicPracticeRow, client: SupabaseClient) =>
-          resolveMaxStorefrontPreview(practice, client, deps?.preview ?? playbackDeps?.preview));
-      const preview = await resolvePreview(listed.practice, supabase);
+        ((
+          practice: PublicPracticeRow,
+          client: SupabaseClient,
+          requestedId?: string | null,
+        ) =>
+          resolveMaxStorefrontPreview(
+            practice,
+            client,
+            deps?.preview ?? playbackDeps?.preview,
+            { audioItemId: requestedId },
+          ));
+      const preview = await resolvePreview(
+        listed.practice,
+        supabase,
+        requestedAudioItemId,
+      );
       if (!preview.ok) {
         return preview;
       }

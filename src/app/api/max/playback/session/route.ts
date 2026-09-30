@@ -9,6 +9,28 @@ export { setResolveMaxNativeUserForTests } from "@/lib/max/session-binding";
 export { setMaxPlaybackDepsForTests } from "@/lib/max/playback";
 export { setMaxPlaybackTicketNowForTests } from "@/lib/max/playback-ticket";
 
+const AUDIO_ITEM_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readOptionalAudioItemId(
+  value: unknown,
+): { ok: true; value: string | null } | { ok: false } {
+  if (value == null) {
+    return { ok: true, value: null };
+  }
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { ok: true, value: null };
+  }
+  if (!AUDIO_ITEM_UUID.test(trimmed)) {
+    return { ok: false };
+  }
+  return { ok: true, value: trimmed };
+}
+
 function fail(reason: string, status: number) {
   return Response.json(
     { ok: false, reason },
@@ -28,10 +50,16 @@ export async function POST(request: Request) {
 
     const authorSlug = String(verified.body.authorSlug).trim();
     const productSlug = String(verified.body.productSlug).trim();
+    const audioItemId = readOptionalAudioItemId(verified.body.audioItemId);
+    if (!audioItemId.ok) {
+      return fail("invalid_request", 400);
+    }
     const result = await getMaxPlaybackSession(
       verified.userId,
       authorSlug,
       productSlug,
+      undefined,
+      audioItemId.value,
     );
 
     if (!result.ok) {

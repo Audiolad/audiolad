@@ -22,6 +22,8 @@ export default function MaxAudioPlayer({
   session,
   fetchAudio,
   onBindPlay,
+  onBindPause,
+  onPlayingChange,
   onPlaybackStarted,
   onPlaybackCompleted,
 }: {
@@ -33,6 +35,8 @@ export default function MaxAudioPlayer({
     { ok: true; url: string; objectUrl?: boolean } | { ok: false; reason: string }
   >;
   onBindPlay?: (play: () => void) => void;
+  onBindPause?: (pause: () => void) => void;
+  onPlayingChange?: (isPlaying: boolean) => void;
   onPlaybackStarted?: (input: { trackId: string | null }) => void;
   onPlaybackCompleted?: (input: {
     trackId: string | null;
@@ -63,6 +67,14 @@ export default function MaxAudioPlayer({
   useEffect(() => {
     onBindPlay?.(play);
   }, [onBindPlay, play]);
+
+  useEffect(() => {
+    onBindPause?.(pause);
+  }, [onBindPause, pause]);
+
+  useEffect(() => {
+    onPlayingChange?.(isPlaying);
+  }, [isPlaying, onPlayingChange]);
 
   const startedNotifiedRef = useRef(false);
   const completionNotifiedRef = useRef(false);
