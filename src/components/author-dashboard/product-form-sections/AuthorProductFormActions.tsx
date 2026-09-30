@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { canWithdrawPracticeFromModeration } from "@/lib/author-products/moderation";
+import { formatMoscowDateTime } from "@/lib/author-products/publication-schedule";
 
 type AuthorProductFormActionsProps = {
   mode: "create" | "edit";
@@ -13,10 +14,12 @@ type AuthorProductFormActionsProps = {
   canBypassProductModeration: boolean;
   isPublished: boolean;
   isUnpublished: boolean;
+  isScheduled: boolean;
   isDraft: boolean;
   isSubmitted: boolean;
   needsChanges: boolean;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
   moderationStatus: string;
   practiceId: string | null;
   publicPath: string;
@@ -43,10 +46,12 @@ export default function AuthorProductFormActions({
   canBypassProductModeration,
   isPublished,
   isUnpublished,
+  isScheduled,
   isDraft,
   isSubmitted,
   needsChanges,
   publishedAt,
+  scheduledPublishAt,
   moderationStatus,
   practiceId,
   publicPath,
@@ -65,16 +70,18 @@ export default function AuthorProductFormActions({
 }: AuthorProductFormActionsProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-      <button
-        type="button"
-        disabled={busy || saveDisabled || !canEditPublicFields}
-        onClick={() => void onSaveDraft()}
-        className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
-      >
-        {isPublished || isUnpublished || publishedAt
-          ? "Сохранить изменения"
-          : "Сохранить черновик"}
-      </button>
+      {!isScheduled ? (
+        <button
+          type="button"
+          disabled={busy || saveDisabled || !canEditPublicFields}
+          onClick={() => void onSaveDraft()}
+          className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
+        >
+          {isPublished || isUnpublished || publishedAt
+            ? "Сохранить изменения"
+            : "Сохранить черновик"}
+        </button>
+      ) : null}
 
       {isPublished ? (
         <>
@@ -93,6 +100,34 @@ export default function AuthorProductFormActions({
             className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
           >
             Снять и редактировать
+          </button>
+        </>
+      ) : null}
+
+      {isScheduled ? (
+        <>
+          <div className="w-full rounded-[18px] border border-[#c9d7f5] bg-[#f3f6ff] px-4 py-3 text-sm text-[#35518f]">
+            <p className="font-semibold">Публикация запланирована</p>
+            <p className="mt-1 leading-5">
+              Продукт одобрен и автоматически появится на платформе{" "}
+              {formatMoscowDateTime(scheduledPublishAt)} МСК.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy || !canMutateContent}
+            onClick={() => void onStartEditing()}
+            className="rounded-[22px] border border-[#d9c9ef] px-5 py-4 font-semibold text-[#5f5484] disabled:opacity-60"
+          >
+            Перейти к редактированию
+          </button>
+          <button
+            type="button"
+            disabled={busy || !canMutateContent || !publishPreviewPath}
+            onClick={() => void onOpenPublishPreview()}
+            className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
+          >
+            Предпросмотр
           </button>
         </>
       ) : null}

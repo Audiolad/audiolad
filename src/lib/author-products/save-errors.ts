@@ -39,6 +39,8 @@ export const PRODUCT_CREATE_ERROR_FALLBACK =
 
 const VALIDATION_CODES = new Set([
   "invalid_request",
+  "invalid_scheduled_publish_at",
+  "scheduled_publish_time_in_past",
   "invalid_publication_class",
   "invalid_product_kind",
   "invalid_cabinet_branch",

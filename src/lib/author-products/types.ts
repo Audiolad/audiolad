@@ -118,6 +118,7 @@ export type PracticeRow = {
   deletion_reason: string | null;
   currency: string;
   published_at: string | null;
+  scheduled_publish_at: string | null;
   listening_notice_enabled: boolean;
   listening_notice_title: string;
   listening_notice_text: string;
@@ -152,6 +153,7 @@ export type AuthorProductListItem = {
   moderation_submitted_at: string | null;
   moderation_review_comment: string | null;
   moderation_attempt: number;
+  scheduled_publish_at: string | null;
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string;
@@ -174,6 +176,7 @@ export function coercePracticeRow(
     | "moderation_attempt"
     | "moderation_submitted_at"
     | "moderation_review_comment"
+    | "scheduled_publish_at"
     | "deleted_at"
     | "deleted_by"
     | "deletion_reason"
@@ -202,6 +205,7 @@ export function coercePracticeRow(
     moderation_attempt?: number | null;
     moderation_submitted_at?: string | null;
     moderation_review_comment?: string | null;
+    scheduled_publish_at?: string | null;
     deleted_at?: string | null;
     deleted_by?: string | null;
     deletion_reason?: string | null;
@@ -252,6 +256,7 @@ export function coercePracticeRow(
     moderation_attempt: row.moderation_attempt ?? 0,
     moderation_submitted_at: row.moderation_submitted_at ?? null,
     moderation_review_comment: row.moderation_review_comment ?? null,
+    scheduled_publish_at: row.scheduled_publish_at ?? null,
     deleted_at: row.deleted_at ?? null,
     deleted_by: row.deleted_by ?? null,
     deletion_reason: row.deletion_reason ?? null,
@@ -306,12 +311,14 @@ export function getStatusLabel(
   status: string,
   moderationStatus?: string | null,
   deletedAt?: string | null,
+  scheduledPublishAt?: string | null,
 ): string {
   return getVisibleAuthorProductStatusLabel(
     getVisibleAuthorProductStatus({
       status,
       moderationStatus,
       deletedAt,
+      scheduledPublishAt,
     }),
   );
 }
@@ -320,12 +327,14 @@ export function getStatusClassName(
   status: string,
   moderationStatus?: string | null,
   deletedAt?: string | null,
+  scheduledPublishAt?: string | null,
 ): string {
   return getVisibleAuthorProductStatusClassName(
     getVisibleAuthorProductStatus({
       status,
       moderationStatus,
       deletedAt,
+      scheduledPublishAt,
     }),
   );
 }

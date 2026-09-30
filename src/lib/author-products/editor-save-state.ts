@@ -38,6 +38,7 @@ export function serializeProductEditorBaseline(
     price: number;
     catalogVisibility: string;
     catalogSection?: string | null;
+    scheduledPublishAt?: string | null;
     listeningNoticeEnabled: boolean;
     listeningNoticeTitle: string;
     listeningNoticeText: string;
@@ -85,6 +86,7 @@ export function serializeProductEditorBaseline(
     price: form.price,
     catalogVisibility: form.catalogVisibility,
     catalogSection: form.catalogSection ?? null,
+    scheduledPublishAt: form.scheduledPublishAt ?? null,
     listeningNoticeEnabled: form.listeningNoticeEnabled,
     listeningNoticeTitle: form.listeningNoticeTitle,
     listeningNoticeText: form.listeningNoticeText,

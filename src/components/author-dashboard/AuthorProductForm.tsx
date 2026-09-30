@@ -11,6 +11,7 @@ import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGal
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { AuthorProductCharCounter as CharCounter } from "@/components/author-dashboard/product-form-sections/AuthorProductCharCounter";
 import AuthorProductFormActions from "@/components/author-dashboard/product-form-sections/AuthorProductFormActions";
+import AuthorProductPublicationSchedule from "@/components/author-dashboard/product-form-sections/AuthorProductPublicationSchedule";
 import AuthorProductWizardStepNav from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepNav";
 import AuthorProductWizardStepper from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepper";
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
@@ -414,6 +415,7 @@ type FormState = {
   moderationReviewComment: string | null;
   moderationAttempt: number;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
 };
 
 function formatDurationLong(seconds: number | null): string {
@@ -630,6 +632,7 @@ function buildInitialForm(
     moderationReviewComment: null,
     moderationAttempt: 0,
     publishedAt: null,
+    scheduledPublishAt: null,
   };
 }
 
@@ -747,6 +750,7 @@ function buildProductSavePayload(
       form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree,
     is_catalog_listed: form.catalogVisibility === CATALOG_VISIBILITY.LISTED,
     catalog_visibility: form.catalogVisibility,
+    scheduled_publish_at: form.scheduledPublishAt,
     promo_enabled: form.promoEnabled,
     promo_title: form.promoTitle,
     promo_text: form.promoText,
@@ -1247,11 +1251,14 @@ export default function AuthorProductForm({
   const visibleStatus = getVisibleAuthorProductStatus({
     status: form.status,
     moderationStatus: form.moderationStatus,
+    scheduledPublishAt: form.scheduledPublishAt,
   });
   const isPublished =
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED;
   const isUnpublished =
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.UNPUBLISHED;
+  const isScheduled =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.SCHEDULED;
   const isSubmitted =
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.SUBMITTED;
   const needsChanges =
@@ -3472,6 +3479,22 @@ export default function AuthorProductForm({
         moderationReviewComment={form.moderationReviewComment}
       />
 
+      {(!wizardEnabled || wizardStep === PRODUCT_WIZARD_STEP_COUNT) &&
+      !isPublished &&
+      (!canBypassProductModeration || Boolean(form.scheduledPublishAt)) &&
+      (!isUnpublished || isScheduled) ? (
+        <AuthorProductPublicationSchedule
+          value={form.scheduledPublishAt}
+          disabled={busy || !canEditPublicFields}
+          onChange={(scheduledPublishAt) =>
+            setForm((current) => ({
+              ...current,
+              scheduledPublishAt,
+            }))
+          }
+        />
+      ) : null}
+
       {wizardEnabled ? (
         <AuthorProductWizardStepper
           activeStep={wizardStep}
@@ -3498,9 +3521,16 @@ export default function AuthorProductForm({
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(
                 form.status,
                 form.moderationStatus,
+                null,
+                form.scheduledPublishAt,
               )}`}
             >
-              {getStatusLabel(form.status, form.moderationStatus)}
+              {getStatusLabel(
+                form.status,
+                form.moderationStatus,
+                null,
+                form.scheduledPublishAt,
+              )}
             </span>
           ) : null}
         </div>
@@ -5584,10 +5614,12 @@ export default function AuthorProductForm({
         canBypassProductModeration={canBypassProductModeration}
         isPublished={isPublished}
         isUnpublished={isUnpublished}
+        isScheduled={isScheduled}
         isDraft={isDraft}
         isSubmitted={isSubmitted}
         needsChanges={needsChanges}
         publishedAt={form.publishedAt}
+        scheduledPublishAt={form.scheduledPublishAt}
         moderationStatus={form.moderationStatus}
         practiceId={practiceId}
         publicPath={publicPath}
@@ -5617,10 +5649,12 @@ export default function AuthorProductForm({
           canBypassProductModeration={canBypassProductModeration}
           isPublished={isPublished}
           isUnpublished={isUnpublished}
+        isScheduled={isScheduled}
           isDraft={isDraft}
           isSubmitted={isSubmitted}
           needsChanges={needsChanges}
           publishedAt={form.publishedAt}
+        scheduledPublishAt={form.scheduledPublishAt}
           moderationStatus={form.moderationStatus}
           practiceId={practiceId}
           publicPath={publicPath}

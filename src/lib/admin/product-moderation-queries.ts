@@ -76,6 +76,7 @@ export type AdminProductModerationDetail = {
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
   authorId: string;
   authorName: string;
   authorSlug: string;
@@ -294,6 +295,7 @@ export async function getAdminProductModerationDetail(
       created_at,
       updated_at,
       published_at,
+      scheduled_publish_at,
       deleted_at,
       author_id,
       authors!practices_author_id_fkey (
@@ -445,6 +447,8 @@ export async function getAdminProductModerationDetail(
     createdAt: (practice.created_at as string) || "",
     updatedAt: (practice.updated_at as string) || "",
     publishedAt: (practice.published_at as string | null) ?? null,
+    scheduledPublishAt:
+      (practice.scheduled_publish_at as string | null) ?? null,
     authorId: (author?.id as string) || (practice.author_id as string),
     authorName: (author?.name as string) || "Автор",
     authorSlug: (author?.slug as string) || "",

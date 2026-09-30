@@ -82,6 +82,7 @@ export type ProductFormSnapshot = {
   moderationReviewComment: string | null;
   moderationAttempt: number;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
 };
 
 export function productDetailToFormSnapshot(
@@ -186,6 +187,7 @@ export function productDetailToFormSnapshot(
     moderationReviewComment: practice.moderation_review_comment ?? null,
     moderationAttempt: practice.moderation_attempt ?? 0,
     publishedAt: practice.published_at,
+    scheduledPublishAt: practice.scheduled_publish_at,
   };
 }
 
