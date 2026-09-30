@@ -181,10 +181,12 @@ export async function releaseDueScheduledPublications(): Promise<void> {
     }
 
     try {
-      after(() => {
-        void drainScheduledPublishOutbox(supabase).catch(() => {
+      after(async () => {
+        try {
+          await drainScheduledPublishOutbox(supabase);
+        } catch {
           // An unfinished drain leaves the row pending or leased for retry.
-        });
+        }
       });
     } catch {
       // No request context: do not call IndexNow or Yandex on this turn.
