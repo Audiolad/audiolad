@@ -69,7 +69,7 @@ export default async function AuthorsPage() {
             <div className="text-center">
               <h1 className="text-[26px] font-semibold">Авторы</h1>
               <p className="mt-1 text-xs text-[#7d70a2]">
-                Практики от проверенных специалистов
+                Музыка и авторское аудио
               </p>
             </div>
 
@@ -86,11 +86,11 @@ export default async function AuthorsPage() {
             <p className="text-sm text-white/75">Авторы АудиоЛада</p>
 
             <h2 className="mt-2 text-[24px] font-semibold leading-8">
-              Найдите голос, которому хочется доверять
+              Найдите автора, чьё звучание вам близко
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-white/75">
-              У каждого автора свой подход, тематика и атмосфера практик.
+              У каждого автора своё звучание, подход, тематика и атмосфера.
             </p>
           </section>
 
@@ -133,8 +133,8 @@ export default async function AuthorsPage() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-[#70628e]">
-              Размещайте медитации, энергопрактики, эзотерические практики,
-              молитвы, программы и аудиокурсы.
+              Размещайте музыку, аудиопрактики, медитации, программы и
+              аудиокурсы.
             </p>
 
             <Link
