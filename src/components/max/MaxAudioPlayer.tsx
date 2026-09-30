@@ -7,6 +7,7 @@ import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
   isMaxPreviewPlaybackMode,
   shouldDisableMaxPrimaryPlayWhilePreparing,
+  shouldShowMaxPlayerTrackList,
   shouldShowMaxTrackNavigation,
   visibleMaxQueuePositionLabel,
   type MaxExternalQueueNavigation,
@@ -31,6 +32,7 @@ export default function MaxAudioPlayer({
   onPlaybackStarted,
   onPlaybackCompleted,
   externalQueue,
+  hideTrackList = false,
 }: {
   session: MaxPlaybackSession;
   fetchAudio: (
@@ -50,6 +52,8 @@ export default function MaxAudioPlayer({
     durationSeconds: number | null;
   }) => void;
   externalQueue?: MaxExternalQueueNavigation;
+  /** Product pages already render the track rows. Playlist and promo keep the player list. */
+  hideTrackList?: boolean;
 }) {
   const {
     audioRef,
@@ -77,6 +81,12 @@ export default function MaxAudioPlayer({
   const showNavigation = usesExternalQueue || internalNavigation;
   const canGoPrevious = externalQueue ? externalQueue.canGoPrevious : internalCanGoPrevious;
   const canGoNext = externalQueue ? externalQueue.canGoNext : internalCanGoNext;
+  const showTrackList = shouldShowMaxPlayerTrackList({
+    hideTrackList,
+    usesExternalQueue,
+    showNavigation,
+    trackCount: session.tracks.length,
+  });
   const positionLabel = visibleMaxQueuePositionLabel({
     externalIndex: externalQueue ? externalQueue.index : null,
     externalLength: externalQueue ? externalQueue.length : null,
@@ -226,7 +236,7 @@ export default function MaxAudioPlayer({
         {formatClock(currentTime)} / {formatClock(sliderMax)}
       </p>
 
-      {!usesExternalQueue && (showNavigation || session.tracks.length > 1) ? (
+      {showTrackList ? (
         <ol className="mt-4 space-y-2">
           {session.tracks.map((track, index) => {
             const active = index === trackIndex;

@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { toMaxPlaylistCard, toMaxPlaylistDetail } from "../src/lib/max/playlist-dto.ts";
 import {
   advanceMaxPlaylistQueueOnEnded,
+  continueMaxPlaylistQueueAfterFailure,
   firstMaxPlaylistQueueIndex,
   maxPlaylistPlaybackResource,
   maxPlaylistPlaybackSessionBody,
@@ -583,6 +584,31 @@ const picked = narrowMaxPlaybackSession({ ...session, playbackMode: "full" }, "t
 assert.equal(picked?.tracks.length, 1);
 assert.equal(picked?.tracks[0].trackId, "track-2");
 assert.equal(narrowMaxPlaybackSession(session, "missing-track"), null);
+const directionQueue = [
+  { key: "A", available: true, authorSlug: "anna", productSlug: "a", audioItemId: "audio-a" },
+  { key: "B", available: true, authorSlug: "anna", productSlug: "b", audioItemId: "audio-b" },
+  { key: "C", available: true, authorSlug: "anna", productSlug: "c", audioItemId: "audio-c" },
+];
+const runtimeBlocked = new Set([1]);
+assert.equal(previousMaxPlaylistQueueIndex(directionQueue, 2), 1);
+const previousSkipped = new Set();
+let previousCursor = previousMaxPlaylistQueueIndex(directionQueue, 2, previousSkipped);
+while (previousCursor != null && runtimeBlocked.has(previousCursor)) {
+  previousCursor = continueMaxPlaylistQueueAfterFailure(
+    directionQueue,
+    previousCursor,
+    "previous",
+    previousSkipped,
+  );
+}
+assert.equal(previousCursor, 0);
+assert.notEqual(previousCursor, 2);
+assert.equal(previousSkipped.has(1), true);
+const forwardSkipped = new Set();
+assert.equal(
+  continueMaxPlaylistQueueAfterFailure(directionQueue, 1, "next", forwardSkipped),
+  2,
+);
 assert.equal(maxPlaylistPlaybackResource("full"), "audio");
 assert.equal(maxPlaylistPlaybackResource("preview"), "preview");
 assert.equal(

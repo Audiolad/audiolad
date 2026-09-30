@@ -42,6 +42,35 @@ export function nextMaxPlaylistQueueIndex(
   return null;
 }
 
+export type MaxPlaylistQueueDirection = "next" | "previous";
+
+/** One step in the requested direction, skipping unavailable and skipped rows. */
+export function stepMaxPlaylistQueue(
+  items: readonly MaxPlaylistQueueItem[],
+  fromIndex: number,
+  direction: MaxPlaylistQueueDirection,
+  skipped: ReadonlySet<number> = new Set(),
+): number | null {
+  if (direction === "previous") {
+    return previousMaxPlaylistQueueIndex(items, fromIndex, skipped);
+  }
+  return nextMaxPlaylistQueueIndex(items, fromIndex, skipped);
+}
+
+/**
+ * A runtime failure keeps walking in the same direction.
+ * Previous must not turn around toward a later row.
+ */
+export function continueMaxPlaylistQueueAfterFailure(
+  items: readonly MaxPlaylistQueueItem[],
+  failedIndex: number,
+  direction: MaxPlaylistQueueDirection,
+  skipped: Set<number>,
+): number | null {
+  skipped.add(failedIndex);
+  return stepMaxPlaylistQueue(items, failedIndex, direction, skipped);
+}
+
 /** Walk backward over the playlist queue, skipping unavailable and skipped rows. */
 export function previousMaxPlaylistQueueIndex(
   items: readonly MaxPlaylistQueueItem[],

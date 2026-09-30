@@ -199,6 +199,40 @@ export type MaxExternalQueueNavigation = {
   length: number;
 };
 
+/** The product page has its own track rows, so the player list can be turned off. */
+export function shouldShowMaxPlayerTrackList(input: {
+  hideTrackList: boolean;
+  usesExternalQueue: boolean;
+  showNavigation: boolean;
+  trackCount: number;
+}): boolean {
+  if (input.hideTrackList || input.usesExternalQueue) {
+    return false;
+  }
+  return input.showNavigation || input.trackCount > 1;
+}
+
+/**
+ * On the product page the contents list is the only track list.
+ * The player keeps Previous / Next and the position label.
+ */
+export function maxPdpVisibleTrackListCount(input: {
+  contentCount: number;
+  sessionTrackCount: number;
+  hidePlayerTrackList: boolean;
+}): number {
+  const productList = input.contentCount > 0 ? 1 : 0;
+  const playerList = shouldShowMaxPlayerTrackList({
+    hideTrackList: input.hidePlayerTrackList,
+    usesExternalQueue: false,
+    showNavigation: true,
+    trackCount: input.sessionTrackCount,
+  })
+    ? 1
+    : 0;
+  return productList + playerList;
+}
+
 export function formatMaxQueuePositionLabel(index: number, length: number): string | null {
   if (!Number.isInteger(index) || !Number.isInteger(length)) {
     return null;

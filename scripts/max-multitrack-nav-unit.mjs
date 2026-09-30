@@ -9,12 +9,15 @@ import { join } from "node:path";
 import {
   decideMaxProductTrackAction,
   formatMaxQueuePositionLabel,
+  maxPdpVisibleTrackListCount,
   nextMaxTrackIndex,
   previousMaxTrackIndex,
   resolveMaxAuthorizedTrackIndex,
+  shouldShowMaxPlayerTrackList,
   visibleMaxQueuePositionLabel,
 } from "../src/lib/max/max-audio-playback.ts";
 import {
+  continueMaxPlaylistQueueAfterFailure,
   maxPlaylistPlaybackSessionBody,
   nextMaxPlaylistQueueIndex,
   previousMaxPlaylistQueueIndex,
@@ -175,6 +178,53 @@ assert.deepEqual(sessionBodies, [
   { authorSlug: "anna", productSlug: "three", audioItemId: "audio-3" },
 ]);
 assert.equal(maxPlaylistPlaybackSessionBody(playlist[2]), null);
+
+const runtimeBlockedQueue = [
+  { key: "A", available: true, authorSlug: "anna", productSlug: "a", audioItemId: "audio-a" },
+  { key: "B", available: true, authorSlug: "anna", productSlug: "b", audioItemId: "audio-b" },
+  { key: "C", available: true, authorSlug: "anna", productSlug: "c", audioItemId: "audio-c" },
+];
+const blockedB = new Set([1]);
+assert.equal(previousMaxPlaylistQueueIndex(runtimeBlockedQueue, 2), 1);
+const previousFromC = new Set();
+let landed = previousMaxPlaylistQueueIndex(runtimeBlockedQueue, 2, previousFromC);
+while (landed != null && blockedB.has(landed)) {
+  landed = continueMaxPlaylistQueueAfterFailure(
+    runtimeBlockedQueue,
+    landed,
+    "previous",
+    previousFromC,
+  );
+}
+assert.equal(landed, 0);
+assert.notEqual(landed, 2);
+
+assert.equal(
+  maxPdpVisibleTrackListCount({
+    contentCount: 10,
+    sessionTrackCount: 10,
+    hidePlayerTrackList: true,
+  }),
+  1,
+);
+assert.equal(
+  shouldShowMaxPlayerTrackList({
+    hideTrackList: true,
+    usesExternalQueue: false,
+    showNavigation: true,
+    trackCount: 10,
+  }),
+  false,
+);
+assert.equal(
+  shouldShowMaxPlayerTrackList({
+    hideTrackList: false,
+    usesExternalQueue: false,
+    showNavigation: true,
+    trackCount: 10,
+  }),
+  true,
+);
 assert.equal(
   visibleMaxQueuePositionLabel({
     externalIndex: 2,
@@ -216,7 +266,10 @@ assert.match(player, /externalQueue \? externalQueue\.onPrevious : previousTrack
 assert.match(player, /externalQueue \? externalQueue\.onNext : nextTrack/);
 assert.match(player, /onBindSelectTrack\?\.\(selectTrack\)/);
 assert.match(player, /visibleMaxQueuePositionLabel/);
-assert.match(player, /!usesExternalQueue && \(showNavigation \|\| session\.tracks\.length > 1\)/);
+assert.match(player, /shouldShowMaxPlayerTrackList/);
+assert.match(player, /showTrackList \? \(/);
+assert.match(player, /Пред/);
+assert.match(player, /След/);
 
 assert.match(home, /decideMaxProductTrackAction/);
 assert.match(home, /onBindSelectTrack=\{bindSelectTrack\}/);
@@ -245,8 +298,22 @@ assert.doesNotMatch(productLoader, /audio_path/);
 assert.match(detail, /narrowMaxPlaybackSession/);
 assert.match(detail, /maxPlaylistPlaybackSessionBody\(item\)/);
 assert.match(detail, /previousMaxPlaylistQueueIndex/);
-assert.match(detail, /startAt\(queueEnds\.previous, true\)/);
-assert.match(detail, /startAt\(queueEnds\.next, true\)/);
+assert.match(detail, /continueMaxPlaylistQueueAfterFailure/);
+assert.match(detail, /startAt\(queueEnds\.previous, "previous"\)/);
+assert.match(detail, /startAt\(queueEnds\.next, "next"\)/);
+assert.match(detail, /startAt\(first, "next"\)/);
+assert.match(detail, /startAt\(next, "next"\)/);
+const productPlayer = home.slice(home.indexOf("<MaxAudioPlayer"), home.indexOf("fetchAudio={async"));
+assert.match(productPlayer, /hideTrackList/);
+assert.equal((productView.match(/data-max-product-contents/g) ?? []).length, 1);
+assert.equal(
+  maxPdpVisibleTrackListCount({
+    contentCount: 10,
+    sessionTrackCount: 10,
+    hidePlayerTrackList: productPlayer.includes("hideTrackList"),
+  }),
+  1,
+);
 assert.match(detail, /externalQueue/);
 
 assert.match(sessionRoute, /readOptionalAudioItemId/);
