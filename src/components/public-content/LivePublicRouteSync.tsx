@@ -9,8 +9,8 @@ import { restoreWindowScrollY } from "@/lib/public-content/live-sync";
 /**
  * Soft-refreshes the current route from its existing server loaders.
  * Used by surfaces that render public data from props rather than a
- * paginated client list. The visible-tab fallback stays a light catalog
- * probe inside LivePublicContentSync and does not refresh the route on
+ * paginated client list. The visible-tab fallback compares the public
+ * revision inside LivePublicContentSync and does not refresh the route on
  * every tick.
  */
 export default function LivePublicRouteSync() {

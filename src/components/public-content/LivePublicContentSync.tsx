@@ -8,7 +8,9 @@ import {
   PUBLIC_CONTENT_REVISION_TABLE,
   clientVisibleRevisionRow,
   createLivePublicContentController,
-  probePublicCatalogHead,
+  nextRevisionAction,
+  parsePublicContentRevision,
+  probePublicContentRevision,
   realtimeReconnectDelayMs,
   revisionRowFromRealtimePayload,
   shouldResubscribeRealtime,
@@ -22,8 +24,8 @@ type LivePublicContentSyncProps = {
    */
   refresh: () => Promise<void> | void;
   /**
-   * Light visible-tab check. Defaults to the public catalog head, which
-   * also claims due scheduled publications.
+   * Light visible-tab check. Defaults to the revision endpoint, which
+   * claims due scheduled publications and returns only `{ revision }`.
    */
   probe?: () => Promise<string | null>;
   enabled?: boolean;
@@ -53,10 +55,39 @@ export default function LivePublicContentSync({
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
+    let lastSeenRevision: number | null = null;
+
+    const rememberRevision = (current: number | null) => {
+      const action = nextRevisionAction(lastSeenRevision, current);
+      lastSeenRevision = action.lastSeen;
+      return action.refresh;
+    };
+
+    const readCurrentRevision = async () => {
+      try {
+        const { data, error } = await supabase
+          .from(PUBLIC_CONTENT_REVISION_TABLE)
+          .select("revision")
+          .eq("scope", PUBLIC_CONTENT_REVISION_SCOPE)
+          .maybeSingle();
+
+        if (error) {
+          return null;
+        }
+
+        return parsePublicContentRevision(data?.revision);
+      } catch {
+        return null;
+      }
+    };
 
     const controller = createLivePublicContentController({
       refresh: () => refreshRef.current(),
-      probe: () => (probeRef.current ?? probePublicCatalogHead)(),
+      probe: async () => {
+        const token = await (probeRef.current ?? probePublicContentRevision)();
+        rememberRevision(parsePublicContentRevision(token));
+        return token;
+      },
       getVisibility: () =>
         document.visibilityState === "hidden" ? "hidden" : "visible",
       subscribeVisibility: (listener) => {
@@ -66,6 +97,24 @@ export default function LivePublicContentSync({
       },
     });
     const stopController = controller.start();
+
+    const catchUpRevision = async () => {
+      if (stopped) {
+        return;
+      }
+
+      const current = await readCurrentRevision();
+
+      if (stopped) {
+        return;
+      }
+
+      if (rememberRevision(current)) {
+        controller.signal("realtime");
+      }
+    };
+
+    void catchUpRevision();
 
     const closeChannel = () => {
       if (!channel) {
@@ -98,6 +147,7 @@ export default function LivePublicContentSync({
           },
           (payload) => {
             const visible = clientVisibleRevisionRow(revisionRowFromRealtimePayload(payload));
+            rememberRevision(parsePublicContentRevision(visible?.revision));
             const signal = signalFromRealtimePayload(visible);
             controller.signal(signal.source);
           },
@@ -109,6 +159,7 @@ export default function LivePublicContentSync({
 
           if (status === "SUBSCRIBED") {
             attempt = 0;
+            void catchUpRevision();
             return;
           }
 

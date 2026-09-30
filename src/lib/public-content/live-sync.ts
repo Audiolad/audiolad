@@ -1,6 +1,7 @@
 import type { CatalogCard } from "@/lib/catalog/dto";
 import {
   buildCatalogListingApiUrl,
+  CATALOG_LISTING_PAGE_SIZE,
   type CatalogListingQuery,
   type CatalogListingResult,
 } from "@/lib/catalog/listing-contract";
@@ -27,6 +28,24 @@ export const PUBLIC_CONTENT_REVISION_TABLE = "public_content_revision";
 /** Scope bumped by practice and topic triggers. Catalog listens to this row. */
 export const PUBLIC_CONTENT_REVISION_SCOPE = "practices";
 
+/** Light fallback. Claims due schedules, then returns only the revision. */
+export const PUBLIC_CONTENT_REVISION_API_PATH = "/api/public-content/revision";
+
+/** Extra pages allowed when a new item shifts the loaded anchor down. */
+export const CATALOG_LIVE_REFRESH_PAGE_HEADROOM = 2;
+
+export const PUBLIC_REVISION_CHILD_TABLES = [
+  "practice_topics",
+  "practice_price_promotions",
+  "publication_gallery_slides",
+  "audio_items",
+] as const;
+
+export const PUBLIC_REVISION_PARENT_TABLES = ["authors", "topics"] as const;
+
+/** Visitor-specific rows. A change here must not bump the global revision. */
+export const PUBLIC_REVISION_EXCLUDED_TABLES = ["practice_price_promotion_starts"] as const;
+
 export type PublicContentRevisionRow = {
   scope: string;
   revision: number;
@@ -40,10 +59,10 @@ export type PublicContentRevisionRow = {
 export function clientVisibleRevisionRow(row: object): PublicContentRevisionRow | null {
   const record = row as Record<string, unknown>;
   const scope = record.scope;
-  const revision = record.revision;
+  const revision = parsePublicContentRevision(record.revision);
   const updatedAt = record.updated_at;
 
-  if (typeof scope !== "string" || typeof revision !== "number" || typeof updatedAt !== "string") {
+  if (typeof scope !== "string" || revision == null || typeof updatedAt !== "string") {
     return null;
   }
 
@@ -67,6 +86,67 @@ export function revisionRowFromRealtimePayload(payload: unknown): object {
   }
 
   return next;
+}
+
+export function parsePublicContentRevision(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Remember the newest revision. The first sample is a baseline.
+ * A later higher value means a change was missed or just landed.
+ * A stale lower read does not move the cursor backward.
+ */
+export function nextRevisionAction(
+  lastSeen: number | null,
+  current: number | null,
+): { lastSeen: number | null; refresh: boolean } {
+  if (current == null || !Number.isFinite(current)) {
+    return { lastSeen, refresh: false };
+  }
+
+  if (lastSeen == null) {
+    return { lastSeen: current, refresh: false };
+  }
+
+  if (current > lastSeen) {
+    return { lastSeen: current, refresh: true };
+  }
+
+  return { lastSeen, refresh: false };
+}
+
+export function relatedChangeBumpsPublicRevision(input: {
+  table: string;
+  publicSurface: boolean;
+}): boolean {
+  if ((PUBLIC_REVISION_EXCLUDED_TABLES as readonly string[]).includes(input.table)) {
+    return false;
+  }
+
+  const watched = new Set<string>([
+    "practices",
+    ...PUBLIC_REVISION_CHILD_TABLES,
+    ...PUBLIC_REVISION_PARENT_TABLES,
+  ]);
+
+  if (!watched.has(input.table)) {
+    return false;
+  }
+
+  return input.publicSurface;
 }
 
 export type PracticeSurfaceSnapshot = {
@@ -305,9 +385,24 @@ export async function fetchCatalogListingPage(
 }
 
 /**
+ * HTTP page budget for a live refetch. Uses loaded pages, not item count.
+ * Headroom covers an insert that pushes the anchor onto the next page.
+ * A missing anchor stops at this cap instead of walking the whole catalog.
+ */
+export function catalogLiveRefreshPageCap(loadedCount: number, pageSize: number): number {
+  const size = Math.max(1, Math.floor(pageSize) || 1);
+
+  if (loadedCount <= 0) {
+    return 1;
+  }
+
+  return Math.ceil(loadedCount / size) + CATALOG_LIVE_REFRESH_PAGE_HEADROOM;
+}
+
+/**
  * Re-read the public listing until the last id the user already loaded is
- * inside the fetched prefix, or the listing ends. Full pages are kept so
- * the returned cursor still points at the next unread page.
+ * inside the fetched prefix, the page cap is hit, or the listing ends.
+ * Full pages are kept so the returned cursor still points at the next unread page.
  */
 export async function fetchCatalogListingToLoadedDepth(
   query: Omit<CatalogListingQuery, "cursor">,
@@ -319,7 +414,8 @@ export async function fetchCatalogListingToLoadedDepth(
   const seen = new Set<string>();
   let cursor: string | null = null;
   let nextCursor: string | null = null;
-  const maxPages = Math.max(loadedIds.length, 1) + 2;
+  const pageSize = Math.max(1, Math.floor(query.limit) || CATALOG_LISTING_PAGE_SIZE);
+  const maxPages = catalogLiveRefreshPageCap(loadedIds.length, pageSize);
 
   for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
     const page = await fetchCatalogListingPage({ ...query, cursor }, fetchImpl);
@@ -364,6 +460,40 @@ export function createSerialTaskQueue(): <T>(task: () => Promise<T>) => Promise<
     );
     return run;
   };
+}
+
+export function revisionProbeToken(body: unknown): string | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const revision = parsePublicContentRevision((body as { revision?: unknown }).revision);
+
+  if (revision == null) {
+    return null;
+  }
+
+  return String(revision);
+}
+
+/** Visible-tab fallback. The body is only the revision number. */
+export async function probePublicContentRevision(
+  fetchImpl: CatalogFetch = fetch,
+): Promise<string | null> {
+  try {
+    const response = await fetchImpl(PUBLIC_CONTENT_REVISION_API_PATH, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return revisionProbeToken(await response.json());
+  } catch {
+    return null;
+  }
 }
 
 export async function probePublicCatalogHead(

@@ -11,15 +11,23 @@ import {
   PUBLIC_CONTENT_REVISION_SCOPE,
   PUBLIC_CONTENT_REVISION_TABLE,
   applyLocalLibrarySave,
+  PUBLIC_CONTENT_REVISION_API_PATH,
+  PUBLIC_REVISION_CHILD_TABLES,
+  PUBLIC_REVISION_EXCLUDED_TABLES,
+  PUBLIC_REVISION_PARENT_TABLES,
   catalogListingUnchanged,
+  catalogLiveRefreshPageCap,
   clientVisibleRevisionRow,
   createLivePublicContentController,
   createSerialTaskQueue,
   fetchCatalogListingToLoadedDepth,
   fingerprintPublicCatalogCards,
   mergeLoadedCatalogWindow,
+  nextRevisionAction,
   practiceAffectsPublicSurface,
-  probePublicCatalogHead,
+  probePublicContentRevision,
+  relatedChangeBumpsPublicRevision,
+  revisionProbeToken,
   realtimeReconnectDelayMs,
   restoreWindowScrollY,
   revisionRowFromRealtimePayload,
@@ -543,42 +551,159 @@ function testScrollRestoreDoesNotJumpWhenUnchanged() {
   }
 }
 
-async function testProbeUsesPublicCatalogApi() {
+async function testRevisionProbeIgnoresProductFields() {
   const urls: string[] = [];
-  const fingerprint = await probePublicCatalogHead(async (url) => {
+  const init: RequestInit[] = [];
+  const token = await probePublicContentRevision(async (url, options) => {
     urls.push(url);
+    init.push(options ?? {});
     return {
       ok: true,
       async json() {
         return {
-          items: [
-            {
-              publication_id: "listed-1",
-              title: "Открытый",
-              slug: "otkrytyy",
-              cover: { url: "/ok.jpg", updated_at: null },
-              catalog_visibility: "selected_users",
-            },
-          ],
-          nextCursor: null,
+          revision: 12,
+          publication_id: "outside-top-8",
+          title: "Далеко в каталоге",
+          slug: "daleko",
+          catalog_visibility: "selected_users",
         };
       },
     };
   });
 
-  assert.equal(urls.length, 1);
-  assert.match(urls[0] ?? "", /^\/api\/catalog\?/);
-  assert.match(urls[0] ?? "", /limit=8/);
-  assert.equal(fingerprint?.includes("listed-1"), true);
-  assert.equal(fingerprint?.includes("selected_users"), false);
+  assert.deepEqual(urls, [PUBLIC_CONTENT_REVISION_API_PATH]);
+  assert.equal(init[0]?.cache, "no-store");
+  assert.equal(token, "12");
+  assert.equal(token?.includes("outside-top-8"), false);
+  assert.equal(token?.includes("selected_users"), false);
+  assert.equal(
+    revisionProbeToken({
+      revision: 12,
+      publication_id: "secret-practice",
+      title: "Только выбранным",
+    }),
+    "12",
+  );
 
-  const failed = await probePublicCatalogHead(async () => ({
+  const failed = await probePublicContentRevision(async () => ({
     ok: false,
     async json() {
-      return { items: [] };
+      return { revision: 1, items: [] };
     },
   }));
   assert.equal(failed, null);
+}
+
+function testMissedRevisionOnReconnectRefreshes() {
+  let lastSeen: number | null = null;
+  const first = nextRevisionAction(lastSeen, 10);
+  lastSeen = first.lastSeen;
+  assert.equal(first.refresh, false, "the first sample is a baseline");
+  assert.equal(lastSeen, 10);
+
+  const same = nextRevisionAction(lastSeen, 10);
+  lastSeen = same.lastSeen;
+  assert.equal(same.refresh, false);
+
+  const missed = nextRevisionAction(lastSeen, 12);
+  lastSeen = missed.lastSeen;
+  assert.equal(missed.refresh, true, "revision 12 after a gap from 10 refreshes without a replayed event");
+  assert.equal(lastSeen, 12);
+
+  const stale = nextRevisionAction(lastSeen, 11);
+  assert.equal(stale.refresh, false);
+  assert.equal(stale.lastSeen, 12);
+}
+
+async function testFallbackSeesRevisionOutsideFirstPage() {
+  const fake = createFakeClock();
+  let revision = "4";
+  let refreshCalls = 0;
+  const controller = createLivePublicContentController({
+    clock: fake.clock,
+    debounceMs: 600,
+    fallbackIntervalMs: 45_000,
+    getVisibility: () => "visible",
+    subscribeVisibility: () => () => {},
+    probe: async () => revision,
+    refresh: async () => {
+      refreshCalls += 1;
+    },
+  });
+  const stop = controller.start();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(refreshCalls, 0);
+
+  revision = "5";
+  await fake.advance(45_000);
+  await fake.advance(600);
+  assert.equal(refreshCalls, 1, "a revision change outside the first cards still refreshes");
+  stop();
+}
+
+async function testDeletedAnchorDoesNotCrawlCatalog() {
+  const pageSize = 20;
+  const loaded = Array.from({ length: 80 }, (_, index) => `loaded-${index}`);
+  let calls = 0;
+  const page = await fetchCatalogListingToLoadedDepth(
+    listingQuery(pageSize),
+    loaded,
+    async () => {
+      calls += 1;
+      const start = (calls - 1) * pageSize;
+      return {
+        ok: true,
+        async json() {
+          return {
+            items: Array.from({ length: pageSize }, (_, index) => card(`other-${start + index}`)),
+            nextCursor: String(start + pageSize),
+          };
+        },
+      };
+    },
+  );
+
+  const cap = catalogLiveRefreshPageCap(loaded.length, pageSize);
+  assert.equal(cap, 6);
+  assert.equal(calls, cap);
+  assert.ok(calls < 20, "a missing anchor does not walk tens of pages");
+  assert.equal(page?.items.length, cap * pageSize);
+  assert.equal(page?.items.some((item) => item.publication_id === "loaded-79"), false);
+}
+
+function testRelatedTablesBumpOnlyForPublicSurface() {
+  for (const table of PUBLIC_REVISION_CHILD_TABLES) {
+    assert.equal(relatedChangeBumpsPublicRevision({ table, publicSurface: true }), true, table);
+    assert.equal(relatedChangeBumpsPublicRevision({ table, publicSurface: false }), false, table);
+  }
+
+  for (const table of PUBLIC_REVISION_PARENT_TABLES) {
+    assert.equal(relatedChangeBumpsPublicRevision({ table, publicSurface: true }), true, table);
+    assert.equal(relatedChangeBumpsPublicRevision({ table, publicSurface: false }), false, table);
+  }
+
+  for (const table of PUBLIC_REVISION_EXCLUDED_TABLES) {
+    assert.equal(relatedChangeBumpsPublicRevision({ table, publicSurface: true }), false, table);
+  }
+
+  const privatePayload = clientVisibleRevisionRow(
+    revisionRowFromRealtimePayload({
+      new: {
+        scope: "practices",
+        revision: 9,
+        updated_at: PAST,
+        practice_id: "secret-practice",
+        publication_id: "secret-practice",
+        author_id: "secret-author",
+        topic_id: "secret-topic",
+      },
+    }),
+  );
+  const encoded = JSON.stringify(privatePayload);
+  assert.equal(encoded.includes("secret-practice"), false);
+  assert.equal(encoded.includes("secret-author"), false);
+  assert.equal(encoded.includes("secret-topic"), false);
 }
 
 function testRevisionSignalDoesNotCarryProducts() {
@@ -725,10 +850,16 @@ async function testScheduledReleaseFallbackRefreshesSurfaces() {
   await Promise.resolve();
   assert.equal(refreshCalls, 0);
 
-  fingerprint = "after-scheduled-claim";
+  fingerprint = "12";
   await fake.advance(45_000);
   await fake.advance(600);
-  assert.equal(refreshCalls, 1, "visible fallback refreshes after the scheduled claim changes the public head");
+  assert.equal(refreshCalls, 1, "visible fallback refreshes after the scheduled claim changes the revision");
+  const revisionRoute = read("src/app/api/public-content/revision/route.ts");
+  const claimAt = revisionRoute.indexOf("releaseDueScheduledPublications");
+  const readAt = revisionRoute.indexOf('.select("revision")');
+  assert.ok(claimAt >= 0 && readAt > claimAt, "the revision probe claims due schedules before reading the row");
+  assert.match(revisionRoute, /cache: "no-store"|no-store/);
+  assert.doesNotMatch(revisionRoute, /publication_id|title|slug/);
 
   const claimBumps = shouldBumpPublicContentRevision({
     operation: "UPDATE",
@@ -767,6 +898,11 @@ function testWiring() {
   assert.match(sync, /removeChannel/);
   assert.match(sync, /signalFromRealtimePayload/);
   assert.match(sync, /clientVisibleRevisionRow/);
+  assert.match(sync, /nextRevisionAction/);
+  assert.match(sync, /catchUpRevision/);
+  assert.match(sync, /probePublicContentRevision/);
+  assert.match(sync, /\.select\("revision"\)/);
+  assert.doesNotMatch(sync, /probePublicCatalogHead/);
   assert.match(sync, /PUBLIC_CONTENT_REVISION_TABLE/);
   assert.equal(PUBLIC_CONTENT_REVISION_TABLE, "public_content_revision");
   assert.equal(PUBLIC_CONTENT_REVISION_SCOPE, "practices");
@@ -784,12 +920,16 @@ async function main() {
   await testLoadedWindowRefresh();
   testViewerMergeKeepsOnlyLocalSave();
   await testLiveRefreshConcurrentWithLoadMore();
+  await testDeletedAnchorDoesNotCrawlCatalog();
   testRevisionSignalDoesNotCarryProducts();
+  testMissedRevisionOnReconnectRefreshes();
+  testRelatedTablesBumpOnlyForPublicSurface();
+  await testFallbackSeesRevisionOutsideFirstPage();
   await testScheduledReleaseFallbackRefreshesSurfaces();
   await testDebounceFallbackVisibilityAndCleanup();
   testReconnectHelpers();
   testScrollRestoreDoesNotJumpWhenUnchanged();
-  await testProbeUsesPublicCatalogApi();
+  await testRevisionProbeIgnoresProductFields();
   testWiring();
   console.log("live-public-content-sync-unit: ok");
 }

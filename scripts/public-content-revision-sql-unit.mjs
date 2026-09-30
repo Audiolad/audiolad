@@ -59,7 +59,21 @@ assert.doesNotMatch(
 
 assert.match(sql, /AFTER INSERT OR UPDATE OR DELETE ON public\.practices/);
 assert.match(sql, /AFTER INSERT OR UPDATE OR DELETE ON public\.practice_topics/);
+assert.match(sql, /AFTER INSERT OR UPDATE OR DELETE ON public\.practice_price_promotions/);
+assert.match(sql, /AFTER INSERT OR UPDATE OR DELETE ON public\.publication_gallery_slides/);
+assert.match(sql, /AFTER INSERT OR UPDATE OR DELETE ON public\.audio_items/);
+assert.match(sql, /AFTER INSERT OR UPDATE ON public\.authors/);
+assert.match(sql, /BEFORE DELETE ON public\.authors/);
+assert.match(sql, /AFTER INSERT OR UPDATE ON public\.topics/);
+assert.match(sql, /BEFORE DELETE ON public\.topics/);
+assert.match(sql, /to_jsonb\(OLD\)/);
+assert.match(sql, /'practice_id'/);
+assert.match(sql, /'publication_id'/);
+assert.match(sql, /WHEN TG_OP = 'DELETE' THEN OLD\.id/);
+assert.match(sql, /bump_public_content_revision_for_practice/);
+assert.doesNotMatch(sql, /practice_price_promotion_starts/);
 assert.match(sql, /REVOKE ALL ON FUNCTION public\.touch_public_content_revision\(text\) FROM PUBLIC, anon, authenticated/);
+assert.match(sql, /REVOKE ALL ON FUNCTION public\.bump_public_content_revision_for_practice\(uuid\) FROM PUBLIC, anon, authenticated/);
 assert.match(sql, /INSERT INTO public\.public_content_revision \(scope, revision\)/);
 assert.doesNotMatch(sql, /selected_users/);
 
