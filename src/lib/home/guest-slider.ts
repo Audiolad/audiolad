@@ -2,7 +2,7 @@ import { buildAuthRouteHref } from "@/lib/auth/routes";
 import { MEDITATION_AUTHORS_LANDING_PROMO_LINK } from "@/lib/seo/meditation-authors-landing";
 
 export const GUEST_HOME_INTRO =
-  "АудиоЛад – платформа авторского аудио: медитации, аудиопрактики, музыка, аудиокурсы.";
+  "АудиоЛад – платформа авторского аудио: музыка, аудиопрактики, медитации, обучение.";
 
 export const GUEST_HOME_LISTEN_FREE_CTA = {
   label: "Начать слушать бесплатно",
