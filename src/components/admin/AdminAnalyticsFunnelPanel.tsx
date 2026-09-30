@@ -35,39 +35,50 @@ export default function AdminAnalyticsFunnelPanel({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {[
-          { label: "Реальные посетители", value: overview.realVisitors },
-          { label: "Посетители практик", value: overview.practiceVisitors },
-          { label: "Начали слушать", value: overview.listeners },
-          { label: "Дослушали", value: overview.completers },
+          {
+            label: "Недельное время прослушивания",
+            value: overview.weeklyListeningLabel,
+            previous: overview.weeklyListeningPreviousLabel,
+            delta: overview.weeklyListeningDeltaLabel,
+          },
+          {
+            label: "Месячное время прослушивания",
+            value: overview.monthlyListeningLabel,
+            previous: overview.monthlyListeningPreviousLabel,
+            delta: overview.monthlyListeningDeltaLabel,
+          },
         ].map((metric) => (
           <article
             key={metric.label}
-            className="rounded-[22px] border border-[#d9c9f4] bg-white p-5 shadow-sm"
+            className="rounded-[18px] border border-[#d9c9f4] bg-white p-4 shadow-sm"
           >
-            <p className="text-sm text-[#796ba0]">{metric.label}</p>
-            <p className="mt-2 text-3xl font-semibold text-[#25135c]">
-              {metric.value.toLocaleString("ru-RU")}
+            <p className="text-xs text-[#796ba0]">{metric.label}</p>
+            <p className="mt-1 text-2xl font-semibold text-[#25135c]">{metric.value}</p>
+            <p className="mt-1 text-xs text-[#9485b4]">
+              {metric.delta} к пред. окну · {metric.previous}
             </p>
-            <p className="mt-2 text-xs font-medium text-[#7042c5]">люди</p>
           </article>
         ))}
       </div>
+      <p className="text-xs text-[#796ba0]">
+        Скользящие 7 и 30 суток до конца выбранного периода, как у недельных и месячных слушателей. Сумма принятого MEDIA-TIME, не длительность трека.
+      </p>
       {hasProductFilter ? (
         <p className="text-xs text-[#796ba0]">
           «Реальные посетители» относятся ко всей платформе в выбранных периоде, источнике и устройстве; фильтр автора или практики применяется только к продуктовым действиям.
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <p className="rounded-xl bg-[#f6f0ff] px-4 py-3 text-sm text-[#5d4f7d]">
-          В прослушивание: <strong>{overview.conversionToListening}</strong>
-        </p>
+      {overview.completionByListeners ? (
         <p className="rounded-xl bg-[#f6f0ff] px-4 py-3 text-sm text-[#5d4f7d]">
           Дослушали: <strong>{overview.completionByListeners}</strong>
+          <span className="mt-1 block text-xs text-[#796ba0]">
+            Доля «Слушателей» этого окна, у которых в том же окне есть audio_completed. Знаменатель — карточка «Слушатели».
+          </span>
         </p>
-      </div>
+      ) : null}
 
       <section aria-labelledby="admin-retention-heading" className="space-y-3">
         <div>

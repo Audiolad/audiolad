@@ -17,12 +17,14 @@ import {
   resolvePlaybackUsageListeningKey,
 } from "../src/lib/analytics/listening-context-store";
 import {
+  compareQualifiedListeningWindows,
   effectiveListeningFrom,
   formatAverageListening,
   formatListeningDuration,
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
   listeningAverageLabels,
+  rollingListeningBounds,
 } from "../src/lib/admin/format-listening-time";
 import {
   buildListenStatsHeartbeatBody,
@@ -654,6 +656,56 @@ function testFormatting() {
   assert.notEqual(measured.perListener, fullPeriod.perListener);
   assert.notEqual(measured.perStart, fullPeriod.perStart);
   assert.equal(listeningAverageLabels(null, 4, 8).perListener, "—");
+
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const bounds = rollingListeningBounds("2026-07-24T21:00:00.000Z");
+  assert.equal(bounds.end, "2026-07-24T21:00:00.000Z");
+  assert.equal(bounds.weekFrom, new Date(Date.parse(bounds.end) - weekMs).toISOString());
+  assert.equal(bounds.weekPrevTo, bounds.weekFrom);
+  assert.equal(bounds.weekPrevFrom, new Date(Date.parse(bounds.end) - 2 * weekMs).toISOString());
+  assert.equal(bounds.monthPrevTo, bounds.monthFrom);
+  assert.equal(
+    Date.parse(bounds.end) - Date.parse(bounds.monthFrom),
+    30 * 24 * 60 * 60 * 1000,
+  );
+  assert.equal(
+    Date.parse(bounds.monthFrom) - Date.parse(bounds.monthPrevFrom),
+    30 * 24 * 60 * 60 * 1000,
+  );
+
+  const currentMs = (128 * 3600 + 34 * 60) * 1000;
+  const previousMs = (104 * 3600 + 31 * 60) * 1000;
+  const up = compareQualifiedListeningWindows(
+    { listenedMs: currentMs, fullWindow: true },
+    { listenedMs: previousMs, fullWindow: true },
+  );
+  assert.equal(up.currentLabel, "128 ч 34 мин");
+  assert.equal(up.previousLabel, "104 ч 31 мин");
+  assert.equal(up.compactLabel, "▲ +23%");
+  const down = compareQualifiedListeningWindows(
+    { listenedMs: previousMs, fullWindow: true },
+    { listenedMs: currentMs, fullWindow: true },
+  );
+  assert.equal(down.compactLabel, "▼ −19%");
+  const zeroBase = compareQualifiedListeningWindows(
+    { listenedMs: currentMs, fullWindow: true },
+    { listenedMs: 0, fullWindow: true },
+  );
+  assert.equal(zeroBase.compactLabel, "—");
+  assert.equal(zeroBase.previousLabel, "0 мин 0 сек");
+  assert.doesNotMatch(zeroBase.compactLabel, /∞|Infinity/);
+  const unmeasured = compareQualifiedListeningWindows(
+    { listenedMs: currentMs, fullWindow: true },
+    { listenedMs: null, fullWindow: false },
+  );
+  assert.equal(unmeasured.compactLabel, "—");
+  assert.equal(unmeasured.previousLabel, "—");
+  const partial = compareQualifiedListeningWindows(
+    { listenedMs: currentMs, fullWindow: true },
+    { listenedMs: 12_000, fullWindow: false },
+  );
+  assert.equal(partial.compactLabel, "—");
+  assert.equal(partial.previousLabel, "0 мин 12 сек");
 }
 
 function testSourceContracts() {

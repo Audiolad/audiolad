@@ -15,9 +15,12 @@ import {
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 import {
   listeningAverageLabels,
+  compareQualifiedListeningWindows,
   formatListeningDuration,
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
+  rollingListeningBounds,
+  type QualifiedListeningWindow,
 } from "@/lib/admin/format-listening-time";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -95,8 +98,17 @@ export type AdminAnalyticsProductOverview = {
   practiceViews: number;
   playStarts: number;
   completions: number;
-  conversionToListening: string;
-  completionByListeners: string;
+  /**
+   * Share of this window's listeners who also have audio_completed in it.
+   * Null until analytics_owner_overview returns completers_among_listeners.
+   */
+  completionByListeners: string | null;
+  weeklyListeningLabel: string;
+  weeklyListeningPreviousLabel: string;
+  weeklyListeningDeltaLabel: string;
+  monthlyListeningLabel: string;
+  monthlyListeningPreviousLabel: string;
+  monthlyListeningDeltaLabel: string;
   startsPerListener: string;
   listenedMs: number | null;
   listeningTimeLabel: string;
@@ -592,8 +604,8 @@ function buildFunnelLines(summary: SummarySnapshot): {
         practiceVisitors,
         "unique_person",
       ),
-      funnelStep("listeners", "Слушатели", listeners, "unique_person", practiceVisitors),
-      funnelStep("completers", "Дослушавшие", completers, "unique_person", listeners),
+      funnelStep("listeners", "Слушатели", listeners, "unique_person"),
+      funnelStep("completers", "Дослушавшие", completers, "unique_person"),
       funnelStep(
         "savers",
         "Сохранившие",
@@ -602,6 +614,70 @@ function buildFunnelLines(summary: SummarySnapshot): {
         listeners,
       ),
     ],
+  };
+}
+
+function sequentialCompletionLabel(
+  raw: Record<string, unknown>,
+  listeners: number,
+): string | null {
+  if (!Object.prototype.hasOwnProperty.call(raw, "completers_among_listeners")) {
+    return null;
+  }
+
+  return formatAdminPercent(
+    asNonNegativeInt(raw.completers_among_listeners),
+    listeners,
+  );
+}
+
+const EMPTY_LISTENING_COMPARISON = {
+  weeklyListeningLabel: "—",
+  weeklyListeningPreviousLabel: "—",
+  weeklyListeningDeltaLabel: "—",
+  monthlyListeningLabel: "—",
+  monthlyListeningPreviousLabel: "—",
+  monthlyListeningDeltaLabel: "—",
+} as const;
+
+function qualifiedWindowFromRpc(
+  data: unknown,
+  errored: boolean,
+): QualifiedListeningWindow {
+  if (errored || !data || typeof data !== "object") {
+    return { listenedMs: null, fullWindow: false };
+  }
+
+  const raw = data as {
+    listened_ms?: number | null;
+    partial?: boolean;
+    unmeasured?: boolean;
+  };
+
+  if (raw.unmeasured === true || raw.listened_ms == null) {
+    return { listenedMs: null, fullWindow: false };
+  }
+
+  return {
+    listenedMs: asNonNegativeInt(raw.listened_ms),
+    fullWindow: raw.partial !== true,
+  };
+}
+
+function rollingListeningComparison(
+  current: QualifiedListeningWindow,
+  previous: QualifiedListeningWindow,
+): {
+  label: string;
+  previousLabel: string;
+  deltaLabel: string;
+} {
+  const compared = compareQualifiedListeningWindows(current, previous);
+
+  return {
+    label: compared.currentLabel,
+    previousLabel: compared.previousLabel,
+    deltaLabel: compared.compactLabel,
   };
 }
 
@@ -638,8 +714,8 @@ function buildProductOverview(
     practiceViews,
     playStarts,
     completions,
-    conversionToListening: formatAdminPercent(listeners, practiceVisitors),
-    completionByListeners: formatAdminPercent(completers, listeners),
+    completionByListeners: sequentialCompletionLabel(raw, listeners),
+    ...EMPTY_LISTENING_COMPARISON,
     startsPerListener: formatAdminDecimal(playStarts, listeners),
     listenedMs: null,
     listeningTimeLabel: "—",
@@ -953,8 +1029,27 @@ export async function getAdminAnalyticsSummaryBundle(
     resolveSharedQuery(input);
   const generatedAt = new Date().toISOString();
   const service = createServiceRoleClient();
+  const listeningBounds = rollingListeningBounds(sharedFilters.p_to ?? generatedAt);
+  const listeningFilters = {
+    p_include_test: sharedFilters.p_include_test,
+    p_author_id: sharedFilters.p_author_id,
+    p_practice_id: sharedFilters.p_practice_id,
+    p_utm_source: sharedFilters.p_utm_source,
+    p_device_type: sharedFilters.p_device_type,
+  };
 
-  const [summaryRes, overviewRes, timeseriesRes, listeningRes, listeningSeriesRes, filterOptions] =
+  const [
+    summaryRes,
+    overviewRes,
+    timeseriesRes,
+    listeningRes,
+    listeningSeriesRes,
+    weekListeningRes,
+    weekPrevListeningRes,
+    monthListeningRes,
+    monthPrevListeningRes,
+    filterOptions,
+  ] =
     await Promise.all([
     service.rpc("admin_analytics_p2_summary", {
       ...sharedFilters,
@@ -965,6 +1060,26 @@ export async function getAdminAnalyticsSummaryBundle(
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
     service.rpc("admin_analytics_listening_time", sharedFilters),
     service.rpc("admin_analytics_listening_time_timeseries", sharedFilters),
+    service.rpc("admin_analytics_listening_time", {
+      ...listeningFilters,
+      p_from: listeningBounds.weekFrom,
+      p_to: listeningBounds.end,
+    }),
+    service.rpc("admin_analytics_listening_time", {
+      ...listeningFilters,
+      p_from: listeningBounds.weekPrevFrom,
+      p_to: listeningBounds.weekPrevTo,
+    }),
+    service.rpc("admin_analytics_listening_time", {
+      ...listeningFilters,
+      p_from: listeningBounds.monthFrom,
+      p_to: listeningBounds.end,
+    }),
+    service.rpc("admin_analytics_listening_time", {
+      ...listeningFilters,
+      p_from: listeningBounds.monthPrevFrom,
+      p_to: listeningBounds.monthPrevTo,
+    }),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
 
@@ -992,6 +1107,20 @@ export async function getAdminAnalyticsSummaryBundle(
   } | null;
   const overviewBase = buildProductOverview(
     (overviewRes.data ?? {}) as Record<string, unknown>,
+  );
+  const weeklyListening = rollingListeningComparison(
+    qualifiedWindowFromRpc(weekListeningRes.data, Boolean(weekListeningRes.error)),
+    qualifiedWindowFromRpc(
+      weekPrevListeningRes.data,
+      Boolean(weekPrevListeningRes.error),
+    ),
+  );
+  const monthlyListening = rollingListeningComparison(
+    qualifiedWindowFromRpc(monthListeningRes.data, Boolean(monthListeningRes.error)),
+    qualifiedWindowFromRpc(
+      monthPrevListeningRes.data,
+      Boolean(monthPrevListeningRes.error),
+    ),
   );
   const listeningTime = presentListeningTime(
     listeningRes.error ? null : listeningSnapshot,
@@ -1043,6 +1172,12 @@ export async function getAdminAnalyticsSummaryBundle(
     productOverview: {
       ...overviewBase,
       ...listeningTime,
+      weeklyListeningLabel: weeklyListening.label,
+      weeklyListeningPreviousLabel: weeklyListening.previousLabel,
+      weeklyListeningDeltaLabel: weeklyListening.deltaLabel,
+      monthlyListeningLabel: monthlyListening.label,
+      monthlyListeningPreviousLabel: monthlyListening.previousLabel,
+      monthlyListeningDeltaLabel: monthlyListening.deltaLabel,
     },
     funnelEvents: funnel.events,
     funnelPeople: funnel.people,

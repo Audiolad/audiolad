@@ -225,6 +225,7 @@ function applyMigrations() {
   psqlFile(TEST_DB, migration("20261006120000_analytics_shared_product_semantics.sql"));
   psqlFile(TEST_DB, migration("20261006120200_analytics_nullable_visitor_identity.sql"));
   psqlFile(TEST_DB, migration("20261006120400_analytics_owner_overview.sql"));
+  psqlFile(TEST_DB, migration("20261209120000_owner_overview_sequential_completion.sql"));
 }
 
 /**
@@ -383,7 +384,27 @@ INSERT INTO public.analytics_events(session_id,anonymous_session_id,user_id,even
   assertEqual(overview.mal, 3, "MAL current");
   assertEqual(overview.previous_mal, 1, "MAL previous consecutive window");
   assertEqual(Math.round((overview.listeners / overview.practice_visitors) * 100), 100, "people conversion");
-  assertEqual(Math.round((overview.completers / overview.listeners) * 100), 33, "people completion");
+  assertEqual(overview.completers_among_listeners, 1, "seed completer also started in the window");
+  assert(overview.completers_among_listeners <= overview.listeners, "sequential completion is a subset of listeners");
+  psql(TEST_DB, `
+INSERT INTO public.analytics_sessions(anonymous_id,started_at,last_seen_at,device_type,is_staff,is_test,is_bot,traffic_class) VALUES
+  ('p2anon-complete-a','2026-07-22 15:00:00+00','2026-07-22 15:00:00+00','desktop',false,false,false,'human'),
+  ('p2anon-complete-b','2026-07-22 15:10:00+00','2026-07-22 15:10:00+00','desktop',false,false,false,'human'),
+  ('p2anon-complete-c','2026-07-22 15:20:00+00','2026-07-22 15:20:00+00','desktop',false,false,false,'human');
+INSERT INTO public.analytics_events(session_id,anonymous_session_id,event_name,practice_id,occurred_at,is_staff,is_test,is_bot,traffic_class)
+SELECT id, anonymous_id, 'audio_completed', '${PRACTICE_ONE}', started_at + interval '5 minutes', false, false, false, 'human'
+FROM public.analytics_sessions
+WHERE anonymous_id IN ('p2anon-complete-a','p2anon-complete-b','p2anon-complete-c');
+`);
+  const completionOnly = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(completionOnly.listeners, overview.listeners, "completion without a start is not a listener");
+  assertEqual(completionOnly.completers, overview.completers + 3, "completion-only people still count as completers");
+  assert(completionOnly.completers > completionOnly.listeners, "raw completers/listeners can exceed 100%");
+  assertEqual(completionOnly.completers_among_listeners, overview.completers_among_listeners, "sequential numerator ignores completion-only people");
+  psql(TEST_DB, `
+DELETE FROM public.analytics_events WHERE anonymous_session_id IN ('p2anon-complete-a','p2anon-complete-b','p2anon-complete-c');
+DELETE FROM public.analytics_sessions WHERE anonymous_id IN ('p2anon-complete-a','p2anon-complete-b','p2anon-complete-c');
+`);
   assertEqual(overview.play_starts / overview.listeners, 2, "starts per listener");
   const all = json(`SELECT public.analytics_owner_overview(NULL,NULL,false,NULL,NULL,NULL,NULL)::text;`);
   assertEqual(all.new_listeners, all.listeners, "all treats all listeners as new");

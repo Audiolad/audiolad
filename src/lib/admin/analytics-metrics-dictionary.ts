@@ -24,6 +24,9 @@ export const ADMIN_ANALYTICS_METHOD_NOTES = [
   "Регистрации считаются по profiles.created_at в базе, а не по клиентской цели signup_completed.",
   "Сохранение в воронке — событие first_manual_library_save («Сохранили практику в Аудиотеку»). PWA install сюда не входит.",
   "Источники/UTM в разрезе — модель session-touch (атрибуты сессии, в которой произошло действие).",
+  "Недельное и месячное время прослушивания — SUM(playback_usage_facts.listened_ms) через admin_analytics_listening_time за скользящие 7 и 30 суток до конца выбранного периода против предыдущего окна той же длины. Те же фильтры, что у недельных и месячных слушателей. Если предыдущее окно нулевое, неполное или ещё не измерялось, процент не показывается.",
+  "«В прослушивание» не считается: посетители практик (practice_view) и слушатели (audio_play_started) — разные множества. Запуск из каталога, дома, плейлиста или плеера не требует practice_view, поэтому частное могло превышать 100%.",
+  "«Дослушали» под карточками — доля слушателей окна, у которых в том же окне есть audio_completed. Карточка «Дослушавшие» по-прежнему считает всех людей с audio_completed и не заменяется отдельной зоной дослушивания.",
 ] as const;
 
 export const ADMIN_METRIC_DEFINITIONS: AdminMetricDefinition[] = [
@@ -115,6 +118,29 @@ export const ADMIN_METRIC_DEFINITIONS: AdminMetricDefinition[] = [
     sqlSource: "audio_completed + visitor_key",
     formula: "COUNT(DISTINCT visitor_key)",
     filters: "те же",
+    comparableToMetrika: false,
+  },
+  {
+    key: "weekly_listening_time",
+    label: "Недельное время прослушивания",
+    shortDescription: "Сумма доверенного MEDIA-TIME за последние 7 суток и предыдущие 7 суток.",
+    kind: "event",
+    sqlSource: "playback_usage_facts.listened_ms → admin_analytics_listening_time",
+    formula:
+      "SUM(listened_ms) за [конец периода − 7 суток, конец) против [конец − 14 суток, конец − 7 суток)",
+    filters:
+      "те же includeTest, автор, практика, UTM и устройство, что у недельных слушателей; окно не равно выбранному периоду",
+    comparableToMetrika: false,
+  },
+  {
+    key: "monthly_listening_time",
+    label: "Месячное время прослушивания",
+    shortDescription: "Сумма доверенного MEDIA-TIME за последние 30 суток и предыдущие 30 суток.",
+    kind: "event",
+    sqlSource: "playback_usage_facts.listened_ms → admin_analytics_listening_time",
+    formula:
+      "SUM(listened_ms) за [конец периода − 30 суток, конец) против [конец − 60 суток, конец − 30 суток)",
+    filters: "те же, что у недельного времени прослушивания",
     comparableToMetrika: false,
   },
   {
