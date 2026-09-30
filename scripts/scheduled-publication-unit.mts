@@ -10,7 +10,9 @@ import { resolveLibraryAction } from "../src/lib/products/practice-access-ui";
 import {
   createMemoryScheduledPublishStore,
   deliverPendingScheduledPublishEvents,
+  yandexDeliveryOutcome,
   type MemoryScheduledPractice,
+  type ScheduledPublishOutboxEvent,
 } from "../src/lib/products/scheduled-publish-outbox";
 import { canRevealPublicProductPage } from "../src/lib/products/publish-preview";
 import {
@@ -459,6 +461,12 @@ const releaseSource = readFileSync(
 );
 assert.match(releaseSource, /import "server-only"/);
 assert.match(releaseSource, /createServiceRoleClient\(\)/);
+assert.match(releaseSource, /after\(/);
+assert.doesNotMatch(
+  releaseSource,
+  /await drainScheduledPublishOutbox/,
+  "public request must not wait on IndexNow or Yandex",
+);
 assert.match(
   releaseSource,
   /export async function releaseDueScheduledPublications\(\)/,
@@ -552,6 +560,21 @@ assert.equal(once.claim("service_role", [listed]), 1);
 assert.equal(once.claim("service_role", [listed]), 0);
 assert.equal(once.eventCount(), 1, "parallel and repeated claims create one event");
 
+function memoryDrain(store: ReturnType<typeof createMemoryScheduledPublishStore>) {
+  return {
+    take: async () => store.take("service_role"),
+    complete: async (events: ScheduledPublishOutboxEvent[]) => {
+      store.complete("service_role", events);
+    },
+    abandon: async (events: ScheduledPublishOutboxEvent[]) => {
+      store.abandon("service_role", events);
+    },
+    deadLetter: async (events: ScheduledPublishOutboxEvent[]) => {
+      store.deadLetter("service_role", events);
+    },
+  };
+}
+
 const durable = createMemoryScheduledPublishStore(
   () => Date.parse("2026-10-15T07:00:01.000Z"),
 );
@@ -560,9 +583,7 @@ assert.equal(durable.claim("service_role", [durablePractice]), 1);
 assert.deepEqual(durable.pendingIds(), ["listed-2"]);
 let attempts = 0;
 const crashed = await deliverPendingScheduledPublishEvents({
-  take: async () => durable.take("service_role"),
-  complete: async (ids) => durable.complete("service_role", ids),
-  abandon: async (ids) => durable.abandon("service_role", ids),
+  ...memoryDrain(durable),
   notify: async () => {
     attempts += 1;
     throw new Error("process died before IndexNow");
@@ -571,26 +592,134 @@ const crashed = await deliverPendingScheduledPublishEvents({
 assert.deepEqual(crashed.delivered, []);
 assert.deepEqual(durable.pendingIds(), ["listed-2"]);
 const recovered = await deliverPendingScheduledPublishEvents({
-  take: async () => durable.take("service_role"),
-  complete: async (ids) => durable.complete("service_role", ids),
-  abandon: async (ids) => durable.abandon("service_role", ids),
+  ...memoryDrain(durable),
   notify: async () => {
     attempts += 1;
-    return true;
+    return "delivered";
   },
 });
 assert.deepEqual(recovered.delivered, ["listed-2"]);
 assert.equal(attempts, 2);
 const again = await deliverPendingScheduledPublishEvents({
-  take: async () => durable.take("service_role"),
-  complete: async (ids) => durable.complete("service_role", ids),
-  abandon: async (ids) => durable.abandon("service_role", ids),
+  ...memoryDrain(durable),
   notify: async () => {
     attempts += 1;
-    return true;
+    return "delivered";
   },
 });
 assert.deepEqual(again.delivered, []);
 assert.equal(attempts, 2, "processed event is not sent again");
+
+assert.equal(yandexDeliveryOutcome("disabled"), "delivered");
+assert.equal(yandexDeliveryOutcome("submitted"), "delivered");
+assert.equal(yandexDeliveryOutcome("already_queued"), "delivered");
+assert.equal(yandexDeliveryOutcome("quota_exhausted"), "retry");
+assert.equal(yandexDeliveryOutcome("quota_check_failed"), "retry");
+assert.equal(yandexDeliveryOutcome("failed"), "retry");
+assert.equal(yandexDeliveryOutcome("auth_failed"), "dead");
+assert.equal(yandexDeliveryOutcome("invalid_user_id"), "dead");
+assert.equal(yandexDeliveryOutcome("host_not_verified"), "dead");
+
+const quotaStore = createMemoryScheduledPublishStore(
+  () => Date.parse("2026-10-15T07:00:01.000Z"),
+);
+const quotaPractice = duePractice("listed-quota", "listed");
+assert.equal(quotaStore.claim("service_role", [quotaPractice]), 1);
+let quotaSends = 0;
+const quotaHeld = await deliverPendingScheduledPublishEvents({
+  ...memoryDrain(quotaStore),
+  notify: async () => {
+    quotaSends += 1;
+    return yandexDeliveryOutcome("quota_exhausted");
+  },
+});
+assert.deepEqual(quotaHeld.delivered, []);
+assert.deepEqual(quotaHeld.pending, ["listed-quota"]);
+assert.deepEqual(quotaStore.pendingIds(), ["listed-quota"]);
+const quotaRetried = await deliverPendingScheduledPublishEvents({
+  ...memoryDrain(quotaStore),
+  notify: async () => {
+    quotaSends += 1;
+    return yandexDeliveryOutcome("submitted");
+  },
+});
+assert.deepEqual(quotaRetried.delivered, ["listed-quota"]);
+assert.equal(quotaSends, 2, "quota_exhausted stays pending for the next drain");
+assert.deepEqual(quotaStore.pendingIds(), []);
+
+const deadStore = createMemoryScheduledPublishStore(
+  () => Date.parse("2026-10-15T07:00:01.000Z"),
+);
+const deadPractice = duePractice("listed-dead", "listed");
+assert.equal(deadStore.claim("service_role", [deadPractice]), 1);
+let deadSends = 0;
+const deadLettered = await deliverPendingScheduledPublishEvents({
+  ...memoryDrain(deadStore),
+  notify: async () => {
+    deadSends += 1;
+    return yandexDeliveryOutcome("auth_failed");
+  },
+});
+assert.deepEqual(deadLettered.delivered, []);
+assert.deepEqual(deadLettered.dead, ["listed-dead"]);
+assert.deepEqual(deadStore.pendingIds(), []);
+const deadAgain = await deliverPendingScheduledPublishEvents({
+  ...memoryDrain(deadStore),
+  notify: async () => {
+    deadSends += 1;
+    return "delivered";
+  },
+});
+assert.deepEqual(deadAgain.delivered, []);
+assert.equal(deadSends, 1, "config failure is not a success and is not retried");
+
+const parallelStore = createMemoryScheduledPublishStore(
+  () => Date.parse("2026-10-15T07:00:01.000Z"),
+);
+const parallelPractice = duePractice("listed-parallel", "listed");
+assert.equal(parallelStore.claim("service_role", [parallelPractice]), 1);
+const inFlight = new Set<string>();
+let overlap = false;
+const parallelNotify = async (event: ScheduledPublishOutboxEvent) => {
+  if (inFlight.has(event.id)) {
+    overlap = true;
+  }
+
+  inFlight.add(event.id);
+  await Promise.resolve();
+  inFlight.delete(event.id);
+  return "delivered" as const;
+};
+const [leftDrain, rightDrain] = await Promise.all([
+  deliverPendingScheduledPublishEvents({
+    ...memoryDrain(parallelStore),
+    notify: parallelNotify,
+  }),
+  deliverPendingScheduledPublishEvents({
+    ...memoryDrain(parallelStore),
+    notify: parallelNotify,
+  }),
+]);
+assert.equal(overlap, false, "two drains must not deliver the same event at once");
+assert.deepEqual(
+  [...leftDrain.delivered, ...rightDrain.delivered].sort(),
+  ["listed-parallel"],
+);
+
+let clock = Date.parse("2026-10-15T07:00:01.000Z");
+const tokenStore = createMemoryScheduledPublishStore(() => clock);
+const tokenPractice = duePractice("listed-token", "listed");
+assert.equal(tokenStore.claim("service_role", [tokenPractice]), 1);
+const [firstLease] = tokenStore.take("service_role");
+clock += 15 * 60 * 1000 + 1;
+const [secondLease] = tokenStore.take("service_role");
+assert.notEqual(firstLease.leaseToken, secondLease.leaseToken);
+tokenStore.complete("service_role", [firstLease]);
+tokenStore.abandon("service_role", [secondLease]);
+assert.deepEqual(
+  tokenStore.pendingIds(),
+  ["listed-token"],
+  "a stale lease token cannot complete a row another drain has taken",
+);
 
 console.log("scheduled-publication-unit: ok");

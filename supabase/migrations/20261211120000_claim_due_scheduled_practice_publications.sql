@@ -87,6 +87,8 @@ COMMENT ON FUNCTION public.claim_due_scheduled_practice_publications() IS
   'Idempotent first go-live stamp. Sets published_at to the elapsed scheduled_publish_at and returns only rows this call claimed. Approval after a past schedule is not claimed, because that write already set published_at to the approval instant.';
 
 REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM anon;
+REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO service_role;
 
 COMMIT;

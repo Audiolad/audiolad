@@ -16,11 +16,12 @@ CREATE TABLE IF NOT EXISTS public.scheduled_publish_notification_outbox (
   published_at timestamptz NOT NULL,
   prior_public_count integer NOT NULL,
   status text NOT NULL DEFAULT 'pending',
+  lease_token uuid,
   leased_until timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   processed_at timestamptz,
   CONSTRAINT scheduled_publish_notification_outbox_status_check
-    CHECK (status IN ('pending', 'leased', 'processed'))
+    CHECK (status IN ('pending', 'leased', 'processed', 'dead'))
 );
 
 COMMENT ON TABLE public.scheduled_publish_notification_outbox IS
@@ -132,7 +133,8 @@ RETURNS TABLE (
   catalog_visibility text,
   is_catalog_listed boolean,
   published_at timestamptz,
-  prior_public_count integer
+  prior_public_count integer,
+  lease_token uuid
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -151,12 +153,13 @@ BEGIN
        )
     ORDER BY q.created_at
     FOR UPDATE SKIP LOCKED
-    LIMIT 50
+    LIMIT 5
   )
   UPDATE public.scheduled_publish_notification_outbox AS o
   SET
     status = 'leased',
-    leased_until = now() + interval '2 minutes'
+    lease_token = gen_random_uuid(),
+    leased_until = now() + interval '15 minutes'
   FROM picked
   WHERE o.id = picked.id
   RETURNING
@@ -168,19 +171,23 @@ BEGIN
     o.catalog_visibility,
     o.is_catalog_listed,
     o.published_at,
-    o.prior_public_count;
+    o.prior_public_count,
+    o.lease_token;
 END;
 $$;
 
 COMMENT ON FUNCTION public.take_pending_scheduled_publish_notifications() IS
-  'Service-only lease of pending first-go-live notifications. An expired lease can be taken again. Does not mark the event processed.';
+  'Service-only lease of at most 5 pending first-go-live notifications. Returns a lease token. An in-flight lease cannot be taken again until it expires. Does not mark the event processed.';
 
 REVOKE ALL ON FUNCTION public.take_pending_scheduled_publish_notifications() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.take_pending_scheduled_publish_notifications() FROM anon;
 REVOKE ALL ON FUNCTION public.take_pending_scheduled_publish_notifications() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.take_pending_scheduled_publish_notifications() TO service_role;
 
-CREATE FUNCTION public.complete_scheduled_publish_notifications(p_ids uuid[])
+CREATE FUNCTION public.complete_scheduled_publish_notifications(
+  p_ids uuid[],
+  p_tokens uuid[]
+)
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -189,25 +196,34 @@ AS $$
 DECLARE
   updated_count integer;
 BEGIN
-  UPDATE public.scheduled_publish_notification_outbox
+  UPDATE public.scheduled_publish_notification_outbox AS o
   SET
     status = 'processed',
     processed_at = now(),
-    leased_until = NULL
-  WHERE id = ANY (COALESCE(p_ids, ARRAY[]::uuid[]))
-    AND status = 'leased';
+    leased_until = NULL,
+    lease_token = NULL
+  FROM unnest(
+    COALESCE(p_ids, ARRAY[]::uuid[]),
+    COALESCE(p_tokens, ARRAY[]::uuid[])
+  ) AS claim(id, token)
+  WHERE o.id = claim.id
+    AND o.lease_token = claim.token
+    AND o.status = 'leased';
 
   GET DIAGNOSTICS updated_count = ROW_COUNT;
   RETURN updated_count;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.complete_scheduled_publish_notifications(uuid[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.complete_scheduled_publish_notifications(uuid[]) FROM anon;
-REVOKE ALL ON FUNCTION public.complete_scheduled_publish_notifications(uuid[]) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.complete_scheduled_publish_notifications(uuid[]) TO service_role;
+REVOKE ALL ON FUNCTION public.complete_scheduled_publish_notifications(uuid[], uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.complete_scheduled_publish_notifications(uuid[], uuid[]) FROM anon;
+REVOKE ALL ON FUNCTION public.complete_scheduled_publish_notifications(uuid[], uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_scheduled_publish_notifications(uuid[], uuid[]) TO service_role;
 
-CREATE FUNCTION public.abandon_scheduled_publish_notifications(p_ids uuid[])
+CREATE FUNCTION public.abandon_scheduled_publish_notifications(
+  p_ids uuid[],
+  p_tokens uuid[]
+)
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -216,21 +232,66 @@ AS $$
 DECLARE
   updated_count integer;
 BEGIN
-  UPDATE public.scheduled_publish_notification_outbox
+  UPDATE public.scheduled_publish_notification_outbox AS o
   SET
     status = 'pending',
-    leased_until = NULL
-  WHERE id = ANY (COALESCE(p_ids, ARRAY[]::uuid[]))
-    AND status = 'leased';
+    leased_until = NULL,
+    lease_token = NULL
+  FROM unnest(
+    COALESCE(p_ids, ARRAY[]::uuid[]),
+    COALESCE(p_tokens, ARRAY[]::uuid[])
+  ) AS claim(id, token)
+  WHERE o.id = claim.id
+    AND o.lease_token = claim.token
+    AND o.status = 'leased';
 
   GET DIAGNOSTICS updated_count = ROW_COUNT;
   RETURN updated_count;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[]) FROM anon;
-REVOKE ALL ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[]) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[]) TO service_role;
+REVOKE ALL ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[], uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[], uuid[]) FROM anon;
+REVOKE ALL ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[], uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.abandon_scheduled_publish_notifications(uuid[], uuid[]) TO service_role;
+
+CREATE FUNCTION public.dead_letter_scheduled_publish_notifications(
+  p_ids uuid[],
+  p_tokens uuid[]
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  updated_count integer;
+BEGIN
+  UPDATE public.scheduled_publish_notification_outbox AS o
+  SET
+    status = 'dead',
+    processed_at = now(),
+    leased_until = NULL,
+    lease_token = NULL
+  FROM unnest(
+    COALESCE(p_ids, ARRAY[]::uuid[]),
+    COALESCE(p_tokens, ARRAY[]::uuid[])
+  ) AS claim(id, token)
+  WHERE o.id = claim.id
+    AND o.lease_token = claim.token
+    AND o.status = 'leased';
+
+  GET DIAGNOSTICS updated_count = ROW_COUNT;
+  RETURN updated_count;
+END;
+$$;
+
+COMMENT ON FUNCTION public.dead_letter_scheduled_publish_notifications(uuid[], uuid[]) IS
+  'Service-only. Permanent Yandex configuration failure. Not a successful delivery and not retried.';
+
+REVOKE ALL ON FUNCTION public.dead_letter_scheduled_publish_notifications(uuid[], uuid[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.dead_letter_scheduled_publish_notifications(uuid[], uuid[]) FROM anon;
+REVOKE ALL ON FUNCTION public.dead_letter_scheduled_publish_notifications(uuid[], uuid[]) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.dead_letter_scheduled_publish_notifications(uuid[], uuid[]) TO service_role;
 
 COMMIT;

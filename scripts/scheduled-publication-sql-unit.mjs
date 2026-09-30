@@ -84,6 +84,22 @@ assert(
   "claim does not replace the schedule with the read time",
 );
 assert(
+  claimSql.includes("REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM anon"),
+  "first claim migration revokes anon",
+);
+assert(
+  claimSql.includes("REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM authenticated"),
+  "first claim migration revokes authenticated",
+);
+assert(
+  claimSql.includes("GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO service_role"),
+  "first claim migration grants service_role",
+);
+assert(
+  !claimSql.includes("TO anon") && !claimSql.includes("TO authenticated"),
+  "first claim migration never grants anon or authenticated",
+);
+assert(
   outboxSql.includes("REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM anon"),
   "anon cannot execute the claim",
 );
@@ -122,6 +138,22 @@ assert(
 assert(
   outboxSql.includes("FOR UPDATE SKIP LOCKED"),
   "parallel drains lease distinct rows",
+);
+assert(outboxSql.includes("lease_token uuid"), "outbox stores a lease token");
+assert(outboxSql.includes("LIMIT 5"), "drain leases a small batch");
+assert(
+  outboxSql.includes("interval '15 minutes'"),
+  "in-flight lease lasts long enough for one delivery attempt",
+);
+assert(outboxSql.includes("p_tokens uuid[]"), "complete and abandon check the lease token");
+assert(
+  outboxSql.includes("dead_letter_scheduled_publish_notifications"),
+  "config failures have a dead-letter path",
+);
+assert(outboxSql.includes("'dead'"), "dead-letter is not a processed success");
+assert(
+  !outboxSql.includes("TO anon") && !outboxSql.includes("TO authenticated"),
+  "outbox migration never grants anon or authenticated",
 );
 
 const claimFree = readFileSync(

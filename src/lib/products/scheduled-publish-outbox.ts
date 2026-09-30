@@ -8,40 +8,68 @@ export type ScheduledPublishOutboxEvent = {
   isCatalogListed: boolean | null;
   publishedAt: string;
   priorPublicCount: number;
+  leaseToken: string;
 };
+
+export type ScheduledPublishDeliveryOutcome = "delivered" | "retry" | "dead";
 
 export type ScheduledPublishDelivery = {
   delivered: string[];
   pending: string[];
+  dead: string[];
 };
 
-type NotifyResult = boolean;
+/**
+ * Yandex recrawl is delivered only when the integration is off or the URL
+ * was accepted. Quota stays retryable. Configuration failures are dead-letter,
+ * not a successful delivery.
+ */
+export function yandexDeliveryOutcome(status: string): ScheduledPublishDeliveryOutcome {
+  if (status === "disabled" || status === "submitted" || status === "already_queued") {
+    return "delivered";
+  }
+
+  if (
+    status === "auth_failed" ||
+    status === "invalid_user_id" ||
+    status === "host_not_verified"
+  ) {
+    return "dead";
+  }
+
+  return "retry";
+}
 
 /**
- * Drain leased events. A thrown or unsuccessful notify leaves the event
- * pending so the next server run can deliver it. Successful ids are completed
- * once and are not returned again.
+ * Drain leased events. Retry and a thrown notify leave the event pending.
+ * Dead-letter is not a successful delivery and is not taken again.
+ * External APIs are at-least-once: one durable event, safe repeats.
  */
 export async function deliverPendingScheduledPublishEvents(input: {
   take: () => Promise<ScheduledPublishOutboxEvent[]>;
-  complete: (ids: string[]) => Promise<void>;
-  abandon: (ids: string[]) => Promise<void>;
-  notify: (event: ScheduledPublishOutboxEvent) => Promise<NotifyResult>;
+  complete: (events: ScheduledPublishOutboxEvent[]) => Promise<void>;
+  abandon: (events: ScheduledPublishOutboxEvent[]) => Promise<void>;
+  deadLetter: (events: ScheduledPublishOutboxEvent[]) => Promise<void>;
+  notify: (event: ScheduledPublishOutboxEvent) => Promise<ScheduledPublishDeliveryOutcome>;
 }): Promise<ScheduledPublishDelivery> {
   const events = await input.take();
-  const delivered: string[] = [];
-  const pending: string[] = [];
+  const delivered: ScheduledPublishOutboxEvent[] = [];
+  const pending: ScheduledPublishOutboxEvent[] = [];
+  const dead: ScheduledPublishOutboxEvent[] = [];
 
   for (const event of events) {
     try {
-      const ok = await input.notify(event);
-      if (ok) {
-        delivered.push(event.id);
+      const outcome = await input.notify(event);
+
+      if (outcome === "delivered") {
+        delivered.push(event);
+      } else if (outcome === "dead") {
+        dead.push(event);
       } else {
-        pending.push(event.id);
+        pending.push(event);
       }
     } catch {
-      pending.push(event.id);
+      pending.push(event);
     }
   }
 
@@ -49,11 +77,19 @@ export async function deliverPendingScheduledPublishEvents(input: {
     await input.complete(delivered);
   }
 
+  if (dead.length > 0) {
+    await input.deadLetter(dead);
+  }
+
   if (pending.length > 0) {
     await input.abandon(pending);
   }
 
-  return { delivered, pending };
+  return {
+    delivered: delivered.map((event) => event.id),
+    pending: pending.map((event) => event.id),
+    dead: dead.map((event) => event.id),
+  };
 }
 
 export type ScheduledPublishRole = "anon" | "authenticated" | "service_role";
@@ -71,12 +107,14 @@ export type MemoryScheduledPractice = {
   deleted?: boolean;
 };
 
-type MemoryEvent = ScheduledPublishOutboxEvent & {
-  status: "pending" | "leased" | "processed";
+type MemoryEvent = Omit<ScheduledPublishOutboxEvent, "leaseToken"> & {
+  status: "pending" | "leased" | "processed" | "dead";
+  leaseToken: string | null;
   leasedUntil: number | null;
 };
 
-const LEASE_MS = 2 * 60 * 1000;
+const LEASE_MS = 15 * 60 * 1000;
+const TAKE_LIMIT = 5;
 
 /**
  * In-memory stand-in for the claim transaction and the outbox lease.
@@ -138,6 +176,7 @@ export function createMemoryScheduledPublishStore(now: () => number = Date.now) 
         publishedAt: practice.scheduledPublishAt ?? "",
         priorPublicCount,
         status: "pending",
+        leaseToken: null,
         leasedUntil: null,
       });
       inserted += 1;
@@ -146,11 +185,27 @@ export function createMemoryScheduledPublishStore(now: () => number = Date.now) 
     return inserted;
   }
 
+  function matchesLease(
+    event: MemoryEvent | undefined,
+    claim: ScheduledPublishOutboxEvent,
+  ): event is MemoryEvent {
+    return (
+      event != null &&
+      event.status === "leased" &&
+      event.leaseToken != null &&
+      event.leaseToken === claim.leaseToken
+    );
+  }
+
   function take(role: ScheduledPublishRole): ScheduledPublishOutboxEvent[] {
     assertServiceRole(role);
     const taken: ScheduledPublishOutboxEvent[] = [];
 
     for (const event of events.values()) {
+      if (taken.length >= TAKE_LIMIT) {
+        break;
+      }
+
       const leaseExpired =
         event.status === "leased" &&
         event.leasedUntil != null &&
@@ -160,7 +215,9 @@ export function createMemoryScheduledPublishStore(now: () => number = Date.now) 
         continue;
       }
 
+      const leaseToken = crypto.randomUUID();
       event.status = "leased";
+      event.leaseToken = leaseToken;
       event.leasedUntil = now() + LEASE_MS;
       taken.push({
         id: event.id,
@@ -172,35 +229,58 @@ export function createMemoryScheduledPublishStore(now: () => number = Date.now) 
         isCatalogListed: event.isCatalogListed,
         publishedAt: event.publishedAt,
         priorPublicCount: event.priorPublicCount,
+        leaseToken,
       });
     }
 
     return taken;
   }
 
-  function complete(role: ScheduledPublishRole, ids: string[]) {
+  function complete(role: ScheduledPublishRole, claimed: ScheduledPublishOutboxEvent[]) {
     assertServiceRole(role);
 
-    for (const id of ids) {
-      const event = events.get(id);
+    for (const claim of claimed) {
+      const event = events.get(claim.id);
 
-      if (event && event.status === "leased") {
-        event.status = "processed";
-        event.leasedUntil = null;
+      if (!matchesLease(event, claim)) {
+        continue;
       }
+
+      event.status = "processed";
+      event.leaseToken = null;
+      event.leasedUntil = null;
     }
   }
 
-  function abandon(role: ScheduledPublishRole, ids: string[]) {
+  function abandon(role: ScheduledPublishRole, claimed: ScheduledPublishOutboxEvent[]) {
     assertServiceRole(role);
 
-    for (const id of ids) {
-      const event = events.get(id);
+    for (const claim of claimed) {
+      const event = events.get(claim.id);
 
-      if (event && event.status === "leased") {
-        event.status = "pending";
-        event.leasedUntil = null;
+      if (!matchesLease(event, claim)) {
+        continue;
       }
+
+      event.status = "pending";
+      event.leaseToken = null;
+      event.leasedUntil = null;
+    }
+  }
+
+  function deadLetter(role: ScheduledPublishRole, claimed: ScheduledPublishOutboxEvent[]) {
+    assertServiceRole(role);
+
+    for (const claim of claimed) {
+      const event = events.get(claim.id);
+
+      if (!matchesLease(event, claim)) {
+        continue;
+      }
+
+      event.status = "dead";
+      event.leaseToken = null;
+      event.leasedUntil = null;
     }
   }
 
@@ -209,6 +289,7 @@ export function createMemoryScheduledPublishStore(now: () => number = Date.now) 
     take,
     complete,
     abandon,
+    deadLetter,
     eventCount: () => events.size,
     pendingIds: () =>
       [...events.values()]

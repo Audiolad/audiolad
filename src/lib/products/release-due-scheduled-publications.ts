@@ -1,9 +1,12 @@
 import "server-only";
 
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   deliverPendingScheduledPublishEvents,
+  yandexDeliveryOutcome,
+  type ScheduledPublishDeliveryOutcome,
   type ScheduledPublishOutboxEvent,
 } from "@/lib/products/scheduled-publish-outbox";
 import { notifyIndexNowUrls } from "@/lib/seo/indexnow/notify";
@@ -24,6 +27,7 @@ type OutboxRow = {
   is_catalog_listed?: unknown;
   published_at?: unknown;
   prior_public_count?: unknown;
+  lease_token?: unknown;
 };
 
 function readString(value: unknown): string | null {
@@ -41,12 +45,21 @@ function parseOutboxRow(row: OutboxRow): ScheduledPublishOutboxEvent | null {
   const practiceSlug = readString(row.practice_slug);
   const authorSlug = readString(row.author_slug);
   const publishedAt = readString(row.published_at);
+  const leaseToken = readString(row.lease_token);
   const prior =
     typeof row.prior_public_count === "number" && Number.isFinite(row.prior_public_count)
       ? row.prior_public_count
       : 0;
 
-  if (!id || !practiceId || !authorId || !practiceSlug || !authorSlug || !publishedAt) {
+  if (
+    !id ||
+    !practiceId ||
+    !authorId ||
+    !practiceSlug ||
+    !authorSlug ||
+    !publishedAt ||
+    !leaseToken
+  ) {
     return null;
   }
 
@@ -62,6 +75,7 @@ function parseOutboxRow(row: OutboxRow): ScheduledPublishOutboxEvent | null {
       typeof row.is_catalog_listed === "boolean" ? row.is_catalog_listed : null,
     publishedAt,
     priorPublicCount: prior,
+    leaseToken,
   };
 }
 
@@ -69,19 +83,9 @@ function indexNowSettled(status: string): boolean {
   return status === "disabled" || status === "no_urls" || status === "submitted";
 }
 
-function yandexSettled(status: string): boolean {
-  return (
-    status === "disabled" ||
-    status === "submitted" ||
-    status === "already_queued" ||
-    status === "auth_failed" ||
-    status === "invalid_user_id" ||
-    status === "host_not_verified" ||
-    status === "quota_exhausted"
-  );
-}
-
-async function notifyOutboxEvent(event: ScheduledPublishOutboxEvent): Promise<boolean> {
+async function notifyOutboxEvent(
+  event: ScheduledPublishOutboxEvent,
+): Promise<ScheduledPublishDeliveryOutcome> {
   const [plan] = planClaimedPublicationNotifications([
     {
       practiceId: event.practiceId,
@@ -96,7 +100,7 @@ async function notifyOutboxEvent(event: ScheduledPublishOutboxEvent): Promise<bo
   ]);
 
   if (!plan) {
-    return true;
+    return "delivered";
   }
 
   const searchPlan = planPracticePublishedSearchNotifications(plan);
@@ -105,7 +109,7 @@ async function notifyOutboxEvent(event: ScheduledPublishOutboxEvent): Promise<bo
     const result = await notifyIndexNowUrls(indexEvent.urls, indexEvent.reason);
 
     if (!indexNowSettled(result.status)) {
-      return false;
+      return "retry";
     }
   }
 
@@ -115,25 +119,56 @@ async function notifyOutboxEvent(event: ScheduledPublishOutboxEvent): Promise<bo
       searchPlan.yandex.reason,
     );
 
-    if (!yandexSettled(result.status)) {
-      return false;
-    }
+    return yandexDeliveryOutcome(result.status);
   }
 
-  return true;
+  return "delivered";
 }
 
-async function rpcIds(supabase: SupabaseClient, fn: string, ids: string[]) {
-  const { error } = await supabase.rpc(fn, { p_ids: ids });
+async function rpcLease(
+  supabase: SupabaseClient,
+  fn: string,
+  events: ScheduledPublishOutboxEvent[],
+) {
+  const { error } = await supabase.rpc(fn, {
+    p_ids: events.map((event) => event.id),
+    p_tokens: events.map((event) => event.leaseToken),
+  });
 
   if (error) {
     throw error;
   }
 }
 
+async function drainScheduledPublishOutbox(supabase: SupabaseClient): Promise<void> {
+  await deliverPendingScheduledPublishEvents({
+    take: async () => {
+      const { data, error } = await supabase.rpc(
+        "take_pending_scheduled_publish_notifications",
+      );
+
+      if (error || !Array.isArray(data)) {
+        return [];
+      }
+
+      return data
+        .map((row) => parseOutboxRow(row as OutboxRow))
+        .filter((row): row is ScheduledPublishOutboxEvent => row != null);
+    },
+    complete: (events) =>
+      rpcLease(supabase, "complete_scheduled_publish_notifications", events),
+    abandon: (events) =>
+      rpcLease(supabase, "abandon_scheduled_publish_notifications", events),
+    deadLetter: (events) =>
+      rpcLease(supabase, "dead_letter_scheduled_publish_notifications", events),
+    notify: notifyOutboxEvent,
+  });
+}
+
 /**
- * Stamp due schedules and drain the durable notification outbox.
- * Uses the service-role client. The caller session is not allowed to claim.
+ * Stamp due schedules before the public read returns.
+ * Search delivery runs after the response. If that callback never runs,
+ * pending outbox rows stay for the next server run.
  * Fail-open: a missing key or a write error must not break the public read.
  */
 export async function releaseDueScheduledPublications(): Promise<void> {
@@ -145,24 +180,15 @@ export async function releaseDueScheduledPublications(): Promise<void> {
       return;
     }
 
-    await deliverPendingScheduledPublishEvents({
-      take: async () => {
-        const { data, error } = await supabase.rpc(
-          "take_pending_scheduled_publish_notifications",
-        );
-
-        if (error || !Array.isArray(data)) {
-          return [];
-        }
-
-        return data
-          .map((row) => parseOutboxRow(row as OutboxRow))
-          .filter((row): row is ScheduledPublishOutboxEvent => row != null);
-      },
-      complete: (ids) => rpcIds(supabase, "complete_scheduled_publish_notifications", ids),
-      abandon: (ids) => rpcIds(supabase, "abandon_scheduled_publish_notifications", ids),
-      notify: notifyOutboxEvent,
-    });
+    try {
+      after(() => {
+        void drainScheduledPublishOutbox(supabase).catch(() => {
+          // An unfinished drain leaves the row pending or leased for retry.
+        });
+      });
+    } catch {
+      // No request context: do not call IndexNow or Yandex on this turn.
+    }
   } catch {
     // Public pages stay available when the service claim cannot run.
   }
