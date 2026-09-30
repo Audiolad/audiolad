@@ -23,7 +23,7 @@ import {
   resolveMaxGuestHomeAuthorUrl,
   resolveMaxGuestHomeSlideAction,
 } from "../src/lib/max/guest-home-slider.ts";
-import { readMaxHomeShelves, MAX_HOME_SHELVES } from "../src/lib/max/home.ts";
+import { readMaxHomeShelves, MAX_HOME_SHELVES, MAX_HOME_SUBTITLE } from "../src/lib/max/home.ts";
 import {
   MAX_INITIAL_PRIMARY_TAB,
   resolveInitialMaxPrimaryTab,
@@ -72,8 +72,16 @@ assert.match(homePane, /<MaxHome/);
 assert.match(homePane, /guestMode=\{guestMode\}/);
 assert.match(homePane, /onSlideAction=\{applyGuestHomeSlide\}/);
 assert.doesNotMatch(shell, /MaxGuestHomeSlider/);
-assert.match(shell, /activeTab === "catalog" \|\| activeTab === "profile" \|\| activeTab === "home"/);
+assert.match(shell, /activeTab === "playlists" \? \(/);
+assert.match(shell, /<MaxPlaylists/);
+assert.match(shell, /activeTab === "library" \? \(/);
 assert.match(shell, /<MaxTabPlaceholder title=\{activeTabLabel\} \/>/);
+const playlistsPane = shell.slice(
+  shell.indexOf('activeTab === "playlists"'),
+  shell.indexOf('activeTab === "library"'),
+);
+assert.match(playlistsPane, /<MaxPlaylists/);
+assert.doesNotMatch(playlistsPane, /MaxTabPlaceholder/);
 
 assert.match(home, /MAX_HOME_PATH/);
 assert.match(home, /method: "POST"/);
@@ -214,7 +222,7 @@ const markup = renderToStaticMarkup(
   }),
 );
 assert.match(markup, /АудиоЛад/);
-assert.match(markup, /Музыка, медитации, аудиопрактики и аудиокурсы/);
+assert.ok(markup.includes(MAX_HOME_SUBTITLE));
 assert.match(markup, /Открыть каталог/);
 assert.match(markup, /Слушать бесплатно/);
 assert.match(markup, /data-max-home-section="music"/);
@@ -288,7 +296,7 @@ assert.match(guestMarkup, /data-max-home-shelf="free"/);
 assert.match(guestMarkup, /data-max-home-shelf="meditations"/);
 assert.match(guestMarkup, /Бесплатная практика/);
 assert.doesNotMatch(guestMarkup, /Открыть каталог/);
-assert.doesNotMatch(guestMarkup, /Музыка, медитации, аудиопрактики и аудиокурсы/);
+assert.equal(guestMarkup.includes(MAX_HOME_SUBTITLE), false);
 const guestBody = guestMarkup.replace(/<link\b[^>]*>/g, "");
 assert.doesNotMatch(guestBody, /<a[\s>]|\/catalog\?|\/practice\/|\/auth\/|\/playlists\//);
 assert.doesNotMatch(guestBody, /href=/);
@@ -318,7 +326,7 @@ assert.deepEqual(resolveMaxGuestHomeSlideAction("01"), {
   type: "catalog",
   section: null,
   access: "all",
-  publicationClass: "all",
+  publicationClass: "release",
 });
 assert.deepEqual(resolveMaxGuestHomeSlideAction("02"), {
   type: "catalog",
@@ -330,7 +338,7 @@ assert.deepEqual(resolveMaxGuestHomeSlideAction("03"), {
   type: "catalog",
   section: null,
   access: "all",
-  publicationClass: "release",
+  publicationClass: "all",
 });
 assert.deepEqual(resolveMaxGuestHomeSlideAction("04"), { type: "playlists" });
 assert.deepEqual(resolveMaxGuestHomeSlideAction("05"), {

@@ -20,6 +20,7 @@ import MaxCatalogSearch, {
   type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxHome from "@/components/max/MaxHome";
+import MaxPlaylists from "@/components/max/MaxPlaylists";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
 import MaxProfile, { MaxGuestProfile } from "@/components/max/MaxProfile";
 import MaxPromoLanding from "@/components/max/MaxPromoLanding";
@@ -418,9 +419,16 @@ export default function MaxAuthenticatedHome({
           />
         </div>
       ) : null}
-      {activeTab === "catalog" || activeTab === "profile" || activeTab === "home" ? null : (
+      {activeTab === "playlists" ? (
+        <MaxPlaylists
+          guestMode={guestMode}
+          onRequestLogin={onRequestLogin}
+          onRequestSignup={onRequestSignup}
+        />
+      ) : null}
+      {activeTab === "library" ? (
         <MaxTabPlaceholder title={activeTabLabel} />
-      )}
+      ) : null}
       {activeTab === "profile" && guestMode ? (
         <MaxGuestProfile onLogin={onRequestLogin} onSignup={onRequestSignup} />
       ) : null}
