@@ -32,7 +32,7 @@ export type MaxGuestSlideGesture = {
 };
 
 /**
- * Ordinary slide 03 is `/catalog?class=release`. MAX catalog already
+ * Ordinary slide 01 is `/catalog?class=release`. MAX catalog already
  * accepts that publication class, so the guest banner uses it directly.
  */
 const CATALOG_SLIDE_ACTIONS: Record<string, MaxGuestHomeCatalogAction> = {
@@ -40,7 +40,7 @@ const CATALOG_SLIDE_ACTIONS: Record<string, MaxGuestHomeCatalogAction> = {
     type: "catalog",
     section: null,
     access: "all",
-    publicationClass: "all",
+    publicationClass: "release",
   },
   "02": {
     type: "catalog",
@@ -52,7 +52,7 @@ const CATALOG_SLIDE_ACTIONS: Record<string, MaxGuestHomeCatalogAction> = {
     type: "catalog",
     section: null,
     access: "all",
-    publicationClass: "release",
+    publicationClass: "all",
   },
   "05": {
     type: "catalog",
