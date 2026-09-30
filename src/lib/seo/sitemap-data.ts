@@ -29,7 +29,11 @@ import {
   getPublishedCatalogProducts,
   getPublishedPracticeIdsForTopicKey,
 } from "@/lib/products/catalog";
-import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
+import {
+  applyPracticePublicAvailabilityFilter,
+  resolvePracticePublicLastModified,
+} from "@/lib/products/scheduled-publication";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -187,10 +191,14 @@ export function mapPracticeRowsToSitemapEntries(
 
     seen.add(path);
 
-    const lastModified = resolveContentLastModified(
-      row.updated_at,
-      row.published_at,
-      row.created_at,
+    const lastModified = toLastModified(
+      resolvePracticePublicLastModified({
+        updatedAt: row.updated_at,
+        createdAt: row.created_at,
+        status: row.status,
+        scheduledPublishAt: row.scheduled_publish_at,
+        publishedAt: row.published_at,
+      }),
     );
 
     return [
@@ -211,6 +219,7 @@ type AuthorPracticeSitemapRow = {
   author_id: string | null;
   updated_at: string | null;
   published_at: string | null;
+  scheduled_publish_at?: string | null;
   created_at: string | null;
   cover_image?: unknown;
   authors:
@@ -236,10 +245,14 @@ export function mapAuthorPracticeRowsToSitemapEntries(
       continue;
     }
 
-    const lastModified = resolveContentLastModified(
-      row.updated_at,
-      row.published_at,
-      row.created_at,
+    const lastModified = toLastModified(
+      resolvePracticePublicLastModified({
+        updatedAt: row.updated_at,
+        createdAt: row.created_at,
+        status: row.status,
+        scheduledPublishAt: row.scheduled_publish_at,
+        publishedAt: row.published_at,
+      }),
     );
 
     if (!lastModified) {
@@ -723,6 +736,7 @@ export async function buildSitemapEntries(): Promise<{
 
   try {
     const supabase = await createClient();
+    await releaseDueScheduledPublications(supabase);
     [
       productEntries,
       authorEntries,

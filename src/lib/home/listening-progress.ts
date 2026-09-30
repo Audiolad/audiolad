@@ -14,7 +14,10 @@ import {
 } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { isPracticeCatalogListed } from "@/lib/products/access";
-import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
+import {
+  applyPracticePublicAvailabilityFilter,
+  publicReleaseSortTimestamp,
+} from "@/lib/products/scheduled-publication";
 import { formatAudioDuration } from "@/lib/products/duration";
 import { buildListenPath } from "@/lib/products/paths";
 import { mapProductCoverFields } from "@/lib/products/cover-display";
@@ -52,6 +55,7 @@ type PracticeRow = {
   cover_image?: unknown;
   updated_at: string | null;
   published_at: string | null;
+  scheduled_publish_at?: string | null;
   created_at: string | null;
   authors: PracticeAuthorRow | PracticeAuthorRow[];
 };
@@ -86,22 +90,18 @@ function normalizeAuthor(
   };
 }
 
-function getSortTimestamp(
-  publishedAt: string | null,
-  createdAt: string | null,
-): number {
-  const publishedTime = publishedAt ? Date.parse(publishedAt) : Number.NaN;
-  const createdTime = createdAt ? Date.parse(createdAt) : Number.NaN;
-
-  if (Number.isFinite(publishedTime)) {
-    return publishedTime;
-  }
-
-  if (Number.isFinite(createdTime)) {
-    return createdTime;
-  }
-
-  return 0;
+function getSortTimestamp(practice: {
+  status?: string | null;
+  published_at: string | null;
+  scheduled_publish_at?: string | null;
+  created_at: string | null;
+}): number {
+  return publicReleaseSortTimestamp({
+    status: practice.status ?? "published",
+    publishedAt: practice.published_at,
+    scheduledPublishAt: practice.scheduled_publish_at,
+    createdAt: practice.created_at,
+  });
 }
 
 function mapPracticeToHomeProduct(
@@ -117,6 +117,8 @@ function mapPracticeToHomeProduct(
     !isPracticeCatalogListed({
       status: practice.status,
       is_catalog_listed: practice.is_catalog_listed,
+      scheduled_publish_at: practice.scheduled_publish_at,
+      published_at: practice.published_at,
     })
   ) {
     return null;
@@ -163,7 +165,7 @@ function mapPracticeToHomeProduct(
           ? "Программа аудиопрактик"
           : "Аудиопрактика",
     priceLabel: practice.is_free ? "Подарок" : `${practice.price ?? 0} ₽`,
-    sortTimestamp: getSortTimestamp(practice.published_at, practice.created_at),
+    sortTimestamp: getSortTimestamp(practice),
     audioCount,
     listenHref: buildListenPath(author.slug, practice.slug, { autoplay: true }),
   };

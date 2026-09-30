@@ -7,6 +7,8 @@
  *
  * scheduled_publish_at is timestamptz UTC. Europe/Moscow is UI-only.
  * published_at stays the actual first go-live and is not a schedule.
+ * Until a write stamps it, effectivePublishedAt is that instant for products
+ * that are already publicly available.
  */
 
 export const PUBLICATION_TIME_ZONE = "Europe/Moscow";
@@ -232,6 +234,103 @@ export function isPracticePubliclyAvailable(input: {
   }
 
   return scheduledMs <= nowMs;
+}
+
+function parseInstant(value: string | null | undefined): number {
+  if (typeof value !== "string" || value.trim() === "") {
+    return Number.NaN;
+  }
+
+  return Date.parse(value);
+}
+
+/**
+ * Factual first public go-live for a product that is already available.
+ *
+ * published_at wins when it is already in the past. That covers an approval
+ * that happens after the schedule: the approval write stamps now(), and the
+ * product must not sort as if it had been public on the old schedule date.
+ *
+ * When status is published, the schedule is due, and published_at was never
+ * stamped, the schedule itself is the go-live. A future schedule is not a
+ * publish date.
+ */
+export function effectivePublishedAt(input: {
+  status?: string | null;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
+  now?: Date;
+}): string | null {
+  const nowMs = (input.now ?? new Date()).getTime();
+  const publishedMs = parseInstant(input.publishedAt);
+
+  if (Number.isFinite(publishedMs) && publishedMs <= nowMs) {
+    return input.publishedAt?.trim() || null;
+  }
+
+  const scheduledMs = parseInstant(input.scheduledPublishAt);
+  if (
+    input.status === "published" &&
+    Number.isFinite(scheduledMs) &&
+    scheduledMs <= nowMs &&
+    !Number.isFinite(publishedMs)
+  ) {
+    return input.scheduledPublishAt?.trim() || null;
+  }
+
+  return null;
+}
+
+/** Newest public release first. Falls back to created_at only when there is no go-live. */
+export function publicReleaseSortTimestamp(input: {
+  status?: string | null;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string | null;
+  now?: Date;
+}): number {
+  const effective = effectivePublishedAt(input);
+  const releaseMs = parseInstant(effective);
+  if (Number.isFinite(releaseMs)) {
+    return releaseMs;
+  }
+
+  const createdMs = parseInstant(input.createdAt);
+  if (Number.isFinite(createdMs)) {
+    return createdMs;
+  }
+
+  return 0;
+}
+
+/** Later of the last edit and the factual go-live, for sitemap lastmod. */
+export function resolvePracticePublicLastModified(input: {
+  updatedAt?: string | null;
+  createdAt?: string | null;
+  status?: string | null;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
+  now?: Date;
+}): string | null {
+  const candidates = [
+    input.updatedAt,
+    effectivePublishedAt(input),
+    input.createdAt,
+  ];
+  let best: { ms: number; iso: string } | null = null;
+
+  for (const candidate of candidates) {
+    const ms = parseInstant(candidate);
+    if (!Number.isFinite(ms)) {
+      continue;
+    }
+
+    if (!best || ms > best.ms) {
+      best = { ms, iso: candidate?.trim() ?? "" };
+    }
+  }
+
+  return best?.iso || null;
 }
 
 export function hasPendingPublicationSchedule(input: {

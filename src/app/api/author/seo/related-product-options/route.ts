@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
+import {
+  applyPracticePublicAvailabilityFilter,
+  publicReleaseSortTimestamp,
+} from "@/lib/products/scheduled-publication";
 
 import { requirePracticeAccess, handleAuthorRouteError } from "@/lib/author-products/auth";
 import { getDisplayFormat } from "@/lib/author-products/format";
@@ -47,10 +51,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ options: [] });
     }
 
+    await releaseDueScheduledPublications(supabase);
+
     let productQuery = applyPracticePublicAvailabilityFilter(
       supabase
         .from("practices")
-        .select("id, title, subtitle, format, cover_url, authors!practices_author_id_fkey(name)")
+        .select(
+          "id, title, subtitle, format, cover_url, status, published_at, scheduled_publish_at, created_at, authors!practices_author_id_fkey(name)",
+        )
         .eq("status", "published")
         .is("deleted_at", null)
         .eq("catalog_visibility", "listed")
@@ -88,8 +96,40 @@ export async function GET(request: Request) {
       throw new Error("related_product_options_lookup_failed");
     }
 
+    const rows = [...(data ?? [])];
+    if (!searching && selectedIds.length === 0) {
+      rows.sort((left, right) => {
+        const leftRow = left as {
+          status?: string | null;
+          published_at?: string | null;
+          scheduled_publish_at?: string | null;
+          created_at?: string | null;
+        };
+        const rightRow = right as {
+          status?: string | null;
+          published_at?: string | null;
+          scheduled_publish_at?: string | null;
+          created_at?: string | null;
+        };
+        return (
+          publicReleaseSortTimestamp({
+            status: rightRow.status ?? "published",
+            publishedAt: rightRow.published_at,
+            scheduledPublishAt: rightRow.scheduled_publish_at,
+            createdAt: rightRow.created_at,
+          }) -
+          publicReleaseSortTimestamp({
+            status: leftRow.status ?? "published",
+            publishedAt: leftRow.published_at,
+            scheduledPublishAt: leftRow.scheduled_publish_at,
+            createdAt: leftRow.created_at,
+          })
+        );
+      });
+    }
+
     return NextResponse.json({
-      options: (data ?? []).map((item) => {
+      options: rows.map((item) => {
         const authorName = readAuthorName(item.authors);
         return {
           value: item.id,

@@ -5,8 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationName = "20261210120000_practice_scheduled_publication.sql";
+const claimName = "20261211120000_claim_due_scheduled_practice_publications.sql";
 const sql = readFileSync(
   join(repoRoot, "supabase/migrations", migrationName),
+  "utf8",
+);
+const claimSql = readFileSync(
+  join(repoRoot, "supabase/migrations", claimName),
   "utf8",
 );
 
@@ -22,6 +27,7 @@ const versions = names
   .filter(Boolean);
 assert(new Set(versions).size === versions.length, "no duplicate migration timestamps");
 assert(versions.includes("20261210120000"), "scheduled publication version listed");
+assert(versions.includes("20261211120000"), "due publication claim version listed");
 assert(sql.includes("ADD COLUMN IF NOT EXISTS scheduled_publish_at timestamptz"), "column");
 assert(sql.includes("practice_is_publicly_available"), "visibility function");
 assert(sql.includes("scheduled_publish_after_release"), "hide-after-release guard");
@@ -49,6 +55,50 @@ assert(
     sql.includes("p_scheduled_publish_at <= p_at") &&
     sql.includes("p_published_at <= p_at"),
   "computed availability predicate",
+);
+assert(sql.includes("ELSE now()"), "approval of a past schedule stamps now()");
+assert(
+  claimSql.includes("SET published_at = p.scheduled_publish_at"),
+  "elapsed schedule stamps the scheduled instant",
+);
+assert(
+  claimSql.includes("p.published_at IS NULL"),
+  "already stamped rows, including approval-after-schedule, are not claimed again",
+);
+assert(
+  claimSql.includes("p.scheduled_publish_at <= now()"),
+  "claim waits until the schedule is due",
+);
+assert(
+  claimSql.includes("p.status = 'published'"),
+  "claim does not publish an unapproved product",
+);
+assert(
+  !claimSql.includes("SET published_at = now()"),
+  "claim does not replace the schedule with the read time",
+);
+assert(
+  claimSql.includes("GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO anon, authenticated, service_role"),
+  "public reads can claim due rows",
+);
+
+const claimFree = readFileSync(
+  join(
+    repoRoot,
+    "supabase/migrations",
+    "20260901120100_practice_catalog_visibility_modes.sql",
+  ),
+  "utf8",
+);
+assert(
+  claimFree.includes("claim_free_practice") &&
+    claimFree.includes("viewer_can_commercially_access_practice"),
+  "free obtain goes through the commercial gate",
+);
+assert(
+  sql.includes("viewer_can_commercially_access_practice") &&
+    sql.includes("practice_is_publicly_available"),
+  "commercial obtain requires public availability",
 );
 
 console.log("scheduled-publication-sql-unit: ok");

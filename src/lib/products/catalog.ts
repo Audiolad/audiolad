@@ -39,6 +39,11 @@ import {
   GUEST_ORDINARY_CATALOG_VIEWER,
   type OrdinaryCatalogViewer,
 } from "@/lib/catalog/visibility-query";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
+import {
+  effectivePublishedAt,
+  publicReleaseSortTimestamp,
+} from "@/lib/products/scheduled-publication";
 import {
   chunkIds,
   PRACTICE_TOPICS_CATALOG_COUNT_CHUNK_SIZE,
@@ -64,6 +69,7 @@ type CatalogPracticeRow = {
   catalog_visibility?: string | null;
   updated_at: string | null;
   published_at: string | null;
+  scheduled_publish_at?: string | null;
   created_at: string | null;
   authors: { name: string; slug: string } | { name: string; slug: string }[] | null;
 };
@@ -280,28 +286,26 @@ function getProductTypeLabel(
   return "Аудиопрактика";
 }
 
-function getSortTimestamp(
-  publishedAt: string | null,
-  createdAt: string | null,
-): number {
-  const publishedTime = publishedAt ? Date.parse(publishedAt) : Number.NaN;
-  const createdTime = createdAt ? Date.parse(createdAt) : Number.NaN;
-
-  if (Number.isFinite(publishedTime)) {
-    return publishedTime;
-  }
-
-  if (Number.isFinite(createdTime)) {
-    return createdTime;
-  }
-
-  return 0;
+function getSortTimestamp(practice: {
+  status?: string | null;
+  published_at: string | null;
+  scheduled_publish_at?: string | null;
+  created_at: string | null;
+}): number {
+  return publicReleaseSortTimestamp({
+    status: practice.status,
+    publishedAt: practice.published_at,
+    scheduledPublishAt: practice.scheduled_publish_at,
+    createdAt: practice.created_at,
+  });
 }
 
 export async function getPublishedCatalogProducts(
   supabase: SupabaseClient,
   options?: CatalogQueryOptions,
 ): Promise<CatalogProduct[]> {
+  await releaseDueScheduledPublications(supabase);
+
   const topicKey = options?.topicKey?.trim().toLowerCase() || null;
   const viewer = options?.viewer ?? GUEST_ORDINARY_CATALOG_VIEWER;
   let practiceIdsForTopic: string[] | null = null;
@@ -342,6 +346,7 @@ export async function getPublishedCatalogProducts(
       catalog_visibility,
       updated_at,
       published_at,
+      scheduled_publish_at,
       created_at,
       authors!practices_author_id_fkey (
         name,
@@ -506,16 +511,18 @@ export async function mapPracticeRowsToCatalogProducts(
         priceLabel: listingPrice.priceLabel,
         compareAtPriceLabel: listingPrice.compareAtPriceLabel,
         promotionEndsAt: listingPrice.promotionEndsAt,
-        sortTimestamp: getSortTimestamp(
-          practice.published_at,
-          practice.created_at,
-        ),
+        sortTimestamp: getSortTimestamp(practice),
         audioCount,
         durationSeconds:
           (audioSummary?.totalDurationSeconds ?? 0) > 0
             ? audioSummary?.totalDurationSeconds ?? null
             : null,
-        publishedAt: practice.published_at,
+        publishedAt:
+          effectivePublishedAt({
+            status: practice.status,
+            publishedAt: practice.published_at,
+            scheduledPublishAt: practice.scheduled_publish_at,
+          }) ?? practice.published_at,
         gallery: isProductGalleryEligible(
           practice.publication_class,
           practice.product_kind,

@@ -17,6 +17,7 @@ import {
   GUEST_ORDINARY_CATALOG_VIEWER,
   type OrdinaryCatalogViewer,
 } from "@/lib/catalog/visibility-query";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 
 export const CATALOG_SEARCH_MAX_LENGTH = 100;
 export const CATALOG_SEARCH_RESULT_LIMIT = 50;
@@ -45,6 +46,7 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
   catalog_visibility,
   updated_at,
   published_at,
+  scheduled_publish_at,
   created_at,
   authors!practices_author_id_fkey (
     name,
@@ -139,6 +141,7 @@ type CatalogPracticeSearchRow = {
   catalog_visibility?: string | null;
   updated_at: string | null;
   published_at: string | null;
+  scheduled_publish_at?: string | null;
   created_at: string | null;
   authors:
     | { name: string; slug: string }
@@ -258,6 +261,8 @@ export async function searchPublishedCatalogProducts(
   if (!normalizedQuery) {
     return [];
   }
+
+  await releaseDueScheduledPublications(supabase);
 
   const resultLimit = options.limit ?? CATALOG_SEARCH_RESULT_LIMIT;
   const topicKey = options.topicKey?.trim().toLowerCase() || null;
