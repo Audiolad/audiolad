@@ -4,9 +4,13 @@ import { useEffect, useRef } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import {
+  PUBLIC_CONTENT_REVISION_SCOPE,
+  PUBLIC_CONTENT_REVISION_TABLE,
+  clientVisibleRevisionRow,
   createLivePublicContentController,
   probePublicCatalogHead,
   realtimeReconnectDelayMs,
+  revisionRowFromRealtimePayload,
   shouldResubscribeRealtime,
   signalFromRealtimePayload,
 } from "@/lib/public-content/live-sync";
@@ -81,12 +85,20 @@ export default function LivePublicContentSync({
       const currentGeneration = ++generation;
       closeChannel();
       channel = supabase
-        .channel(`live-public-practices-${currentGeneration}-${Math.random().toString(36).slice(2)}`)
+        .channel(
+          `live-public-content-revision-${currentGeneration}-${Math.random().toString(36).slice(2)}`,
+        )
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "practices" },
+          {
+            event: "*",
+            schema: "public",
+            table: PUBLIC_CONTENT_REVISION_TABLE,
+            filter: `scope=eq.${PUBLIC_CONTENT_REVISION_SCOPE}`,
+          },
           (payload) => {
-            const signal = signalFromRealtimePayload(payload);
+            const visible = clientVisibleRevisionRow(revisionRowFromRealtimePayload(payload));
+            const signal = signalFromRealtimePayload(visible);
             controller.signal(signal.source);
           },
         )

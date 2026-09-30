@@ -120,7 +120,7 @@ assert.doesNotMatch(
 assert.match(grid, /catalog-product-grid/, "grid uses the 2-column class");
 assert.match(grid, /IntersectionObserver/, "infinite scroll is wired");
 assert.match(grid, /Загрузить ещё/, "load more fallback exists");
-assert.match(grid, /buildCatalogListingApiUrl/, "grid loads more from listing API");
+assert.match(grid, /fetchCatalogListingPage/, "grid loads more from listing API");
 assert.match(
   read("src/lib/catalog/listing-contract.ts"),
   /\/api\/catalog/,

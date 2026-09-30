@@ -4,21 +4,30 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { CatalogCard } from "../src/lib/catalog/dto";
+import type { CatalogListingQuery } from "../src/lib/catalog/listing-contract";
 import {
   LIVE_PUBLIC_CONTENT_DEBOUNCE_MS,
   LIVE_PUBLIC_CONTENT_FALLBACK_MS,
+  PUBLIC_CONTENT_REVISION_SCOPE,
+  PUBLIC_CONTENT_REVISION_TABLE,
+  applyLocalLibrarySave,
   catalogListingUnchanged,
+  clientVisibleRevisionRow,
   createLivePublicContentController,
+  createSerialTaskQueue,
+  fetchCatalogListingToLoadedDepth,
   fingerprintPublicCatalogCards,
-  mergePublicCatalogCard,
+  mergeLoadedCatalogWindow,
+  practiceAffectsPublicSurface,
   probePublicCatalogHead,
   realtimeReconnectDelayMs,
-  replaceCatalogPageOne,
-  resolveNextCursorAfterPageReplace,
   restoreWindowScrollY,
+  revisionRowFromRealtimePayload,
+  shouldBumpPublicContentRevision,
   shouldResubscribeRealtime,
   signalFromRealtimePayload,
   type LiveSyncClock,
+  type PracticeSurfaceSnapshot,
 } from "../src/lib/public-content/live-sync";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -182,75 +191,211 @@ function testFingerprintIgnoresNonPublicFields() {
   assert.equal(fingerprint.includes("hidden@example.com"), false);
 }
 
-function testPageOneReplaceScenarios() {
-  const pageSize = 2;
-  const saved = card("kept", {
-    title: "Старое имя",
-    viewer: { can_listen: true, has_grant: true, is_saved: true },
-  });
-  const second = card("second");
-  const tail = card("tail");
-  const published = card("new", { title: "Новый продукт" });
-  const renamed = card("kept", {
-    title: "Новое имя",
-    cover: { url: "/new-cover.jpg", alt: "Новое имя", updated_at: "2026-09-30T00:00:00.000Z" },
-    viewer: { can_listen: false, has_grant: false, is_saved: false },
-  });
+const NOW_MS = Date.parse("2026-09-30T12:00:00.000Z");
+const PAST = "2026-09-01T00:00:00.000Z";
+const FUTURE = "2026-10-30T00:00:00.000Z";
 
-  const withNew = replaceCatalogPageOne([saved, second], [published, renamed], pageSize);
+function surface(overrides: Partial<PracticeSurfaceSnapshot> = {}): PracticeSurfaceSnapshot {
+  return {
+    status: "published",
+    scheduledPublishAt: null,
+    publishedAt: PAST,
+    deletedAt: null,
+    catalogVisibility: "listed",
+    ...overrides,
+  };
+}
+
+function listingQuery(limit: number): Omit<CatalogListingQuery, "cursor"> {
+  return {
+    q: "",
+    topic: null,
+    section: null,
+    access: "all",
+    class: "all",
+    sort: "new",
+    limit,
+  };
+}
+
+function paginatedCatalogFetch(server: () => string[], limit: number) {
+  return async (url: string) => {
+    const cursor = new URL(url, "https://audiolad.test").searchParams.get("cursor");
+    const start = cursor ? Number(cursor) : 0;
+    const ids = server();
+    const slice = ids.slice(start, start + limit);
+    const next = start + limit < ids.length ? String(start + limit) : null;
+
+    return {
+      ok: true,
+      async json() {
+        return {
+          items: slice.map((id) => card(id)),
+          nextCursor: next,
+        };
+      },
+    };
+  };
+}
+
+async function testLoadedWindowRefresh() {
+  const limit = 2;
+  const loaded = ["A", "B", "C", "D"];
+
+  const published = await fetchCatalogListingToLoadedDepth(
+    listingQuery(limit),
+    loaded,
+    paginatedCatalogFetch(() => ["X", "A", "B", "C", "D"], limit),
+  );
+  assert.ok(published);
   assert.deepEqual(
-    withNew.items.map((item) => item.publication_id),
-    ["new", "kept"],
+    published.items.map((item) => item.publication_id),
+    ["X", "A", "B", "C", "D"],
   );
-  assert.equal(withNew.items[0]?.title, "Новый продукт");
-  assert.equal(withNew.items[1]?.title, "Новое имя");
-  assert.equal(withNew.items[1]?.cover.url, "/new-cover.jpg");
-  assert.equal(withNew.items[1]?.viewer.has_grant, true);
-  assert.equal(withNew.items[1]?.viewer.is_saved, true);
-  assert.equal(withNew.items[1]?.viewer.can_listen, true);
-  assert.equal(withNew.tailCount, 0);
+  assert.equal(published.nextCursor, null);
 
-  const unpublished = replaceCatalogPageOne(
-    [saved, second, tail],
-    [renamed],
-    pageSize,
+  const unpublished = await fetchCatalogListingToLoadedDepth(
+    listingQuery(limit),
+    loaded,
+    paginatedCatalogFetch(() => ["A", "C", "D"], limit),
   );
+  assert.ok(unpublished);
   assert.deepEqual(
     unpublished.items.map((item) => item.publication_id),
-    ["kept", "tail"],
+    ["A", "C", "D"],
   );
-  assert.equal(unpublished.items.some((item) => item.publication_id === "second"), false);
+  assert.equal(unpublished.items.some((item) => item.publication_id === "B"), false);
 
-  const duplicated = replaceCatalogPageOne(
-    [saved, second, tail],
-    [renamed, renamed, second],
-    pageSize,
-  );
+  const merged = mergeLoadedCatalogWindow([
+    card("kept", { title: "Новое имя", viewer: { can_listen: false, has_grant: false, is_saved: false } }),
+    card("kept"),
+  ]);
   assert.deepEqual(
-    duplicated.items.map((item) => item.publication_id),
-    ["kept", "second", "tail"],
+    merged.map((item) => item.publication_id),
+    ["kept"],
   );
-  assert.equal(new Set(duplicated.items.map((item) => item.publication_id)).size, 3);
+  assert.equal(merged[0]?.viewer.has_grant, false);
+  assert.equal(merged[0]?.viewer.can_listen, false);
+  assert.equal(catalogListingUnchanged(merged, merged), true);
+}
 
-  const cursor = resolveNextCursorAfterPageReplace({
-    tailCount: duplicated.tailCount,
-    previousCursor: "page-2",
-    freshCursor: "fresh-page-2",
+function testViewerMergeKeepsOnlyLocalSave() {
+  const server = card("kept", {
+    title: "Новое имя",
+    viewer: { can_listen: false, has_grant: false, is_saved: false },
   });
-  assert.equal(cursor, "page-2");
-  assert.equal(
-    resolveNextCursorAfterPageReplace({
-      tailCount: 0,
-      previousCursor: "page-2",
-      freshCursor: null,
-    }),
-    null,
-  );
+  const withoutLocal = applyLocalLibrarySave(server, null);
+  assert.equal(withoutLocal.viewer.has_grant, false);
+  assert.equal(withoutLocal.viewer.is_saved, false);
+  assert.equal(withoutLocal.viewer.can_listen, false);
 
-  const merged = mergePublicCatalogCard(saved, renamed);
-  assert.equal(merged.viewer.has_grant, true);
-  assert.equal(catalogListingUnchanged([merged], [merged]), true);
-  assert.equal(catalogListingUnchanged([saved], [renamed]), false);
+  const withLocal = applyLocalLibrarySave(server, true);
+  assert.equal(withLocal.viewer.is_saved, true);
+  assert.equal(withLocal.viewer.has_grant, false);
+  assert.equal(withLocal.viewer.can_listen, false);
+  assert.equal(catalogListingUnchanged([server], [withLocal]), false);
+  assert.match(read("src/lib/public-content/live-sync.ts"), /peekLibrarySave\(next\.publication_id\)/);
+}
+
+async function testLiveRefreshConcurrentWithLoadMore() {
+  const limit = 2;
+  const enqueue = createSerialTaskQueue();
+  let items = ["A", "B"];
+  let cursor: string | null = "2";
+  let server = ["A", "B", "C", "D"];
+  let releaseLoadMore: () => void = () => {};
+  const loadMoreGate = new Promise<void>((resolve) => {
+    releaseLoadMore = resolve;
+  });
+  let refreshStarted = false;
+
+  const loadMore = () =>
+    enqueue(async () => {
+      const startCursor = cursor;
+
+      if (!startCursor) {
+        return;
+      }
+
+      const snapshot = server.slice();
+      await loadMoreGate;
+      const start = Number(startCursor);
+      const nextIds = snapshot.slice(start, start + limit);
+      const seen = new Set(items);
+      items = [...items, ...nextIds.filter((id) => !seen.has(id))];
+      cursor = start + limit < snapshot.length ? String(start + limit) : null;
+    });
+
+  const refresh = () =>
+    enqueue(async () => {
+      refreshStarted = true;
+      const page = await fetchCatalogListingToLoadedDepth(
+        listingQuery(limit),
+        items,
+        paginatedCatalogFetch(() => server, limit),
+      );
+      assert.ok(page);
+      items = mergeLoadedCatalogWindow(page.items).map((item) => item.publication_id);
+      cursor = page.nextCursor;
+    });
+
+  const loadMorePromise = loadMore();
+  await Promise.resolve();
+  server = ["X", "A", "B", "C", "D"];
+  const refreshPromise = refresh();
+  await Promise.resolve();
+  assert.equal(refreshStarted, false, "live refresh waits for the in-flight loadMore");
+  releaseLoadMore();
+  await loadMorePromise;
+  await refreshPromise;
+  assert.deepEqual(items, ["X", "A", "B", "C", "D"]);
+  assert.equal(new Set(items).size, items.length);
+
+  items = ["A", "B"];
+  cursor = "2";
+  server = ["A", "B", "C", "D"];
+  let releaseRefresh: () => void = () => {};
+  const refreshGate = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  let loadMoreApplied = false;
+
+  const blockedRefresh = enqueue(async () => {
+    await refreshGate;
+    server = ["X", "A", "B", "C", "D"];
+    const page = await fetchCatalogListingToLoadedDepth(
+      listingQuery(limit),
+      items,
+      paginatedCatalogFetch(() => server, limit),
+    );
+    assert.ok(page);
+    items = mergeLoadedCatalogWindow(page.items).map((item) => item.publication_id);
+    cursor = page.nextCursor;
+  });
+  const queuedLoadMore = enqueue(async () => {
+    loadMoreApplied = true;
+    const startCursor = cursor;
+
+    if (!startCursor) {
+      return;
+    }
+
+    const start = Number(startCursor);
+    const nextIds = server.slice(start, start + limit);
+    const seen = new Set(items);
+    items = [...items, ...nextIds.filter((id) => !seen.has(id))];
+    cursor = start + limit < server.length ? String(start + limit) : null;
+  });
+
+  await Promise.resolve();
+  assert.equal(loadMoreApplied, false);
+  releaseRefresh();
+  await blockedRefresh;
+  await queuedLoadMore;
+  assert.deepEqual(items, ["X", "A", "B", "C", "D"]);
+  assert.equal(new Set(items).size, items.length);
+  assert.equal(items.filter((id) => id === "B").length, 1);
+  assert.equal(items.filter((id) => id === "X").length, 1);
 }
 
 async function testDebounceFallbackVisibilityAndCleanup() {
@@ -436,6 +581,168 @@ async function testProbeUsesPublicCatalogApi() {
   assert.equal(failed, null);
 }
 
+function testRevisionSignalDoesNotCarryProducts() {
+  const atMs = NOW_MS;
+  const publicRow = surface();
+  const unpublished = surface({ status: "unpublished" });
+  const privateRow = surface({ catalogVisibility: "selected_users" });
+  const scheduledBefore = surface({
+    publishedAt: null,
+    scheduledPublishAt: FUTURE,
+  });
+  const scheduledAfter = surface({
+    publishedAt: PAST,
+    scheduledPublishAt: PAST,
+  });
+
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "UPDATE",
+      previous: publicRow,
+      next: unpublished,
+      atMs,
+    }),
+    true,
+    "unpublish still bumps after the row leaves the public surface",
+  );
+  assert.equal(practiceAffectsPublicSurface(unpublished, atMs), false);
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "INSERT",
+      previous: null,
+      next: publicRow,
+      atMs,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "UPDATE",
+      previous: publicRow,
+      next: publicRow,
+      atMs,
+    }),
+    true,
+    "title, cover, price, and other edits on a public product bump",
+  );
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "UPDATE",
+      previous: publicRow,
+      next: surface({ catalogVisibility: "unlisted" }),
+      atMs,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "UPDATE",
+      previous: scheduledBefore,
+      next: scheduledAfter,
+      atMs,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "DELETE",
+      previous: publicRow,
+      next: null,
+      atMs,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "DELETE",
+      previous: privateRow,
+      next: null,
+      atMs,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldBumpPublicContentRevision({
+      operation: "DELETE",
+      previous: surface({ status: "draft", publishedAt: null }),
+      next: null,
+      atMs,
+    }),
+    false,
+  );
+
+  const payload = {
+    eventType: "DELETE",
+    old: {
+      id: "secret-practice",
+      publication_id: "secret-practice",
+      title: "Только выбранным",
+      slug: "secret",
+      catalog_visibility: "selected_users",
+    },
+    new: {
+      scope: PUBLIC_CONTENT_REVISION_SCOPE,
+      revision: 4,
+      updated_at: PAST,
+      publication_id: "secret-practice",
+      title: "Только выбранным",
+      catalog_visibility: "selected_users",
+    },
+  };
+  const visible = clientVisibleRevisionRow(revisionRowFromRealtimePayload(payload));
+  const signal = signalFromRealtimePayload(visible);
+  const encoded = JSON.stringify({ visible, signal });
+
+  assert.deepEqual(visible, {
+    scope: "practices",
+    revision: 4,
+    updated_at: PAST,
+  });
+  assert.deepEqual(signal, { source: "realtime" });
+  assert.equal(encoded.includes("secret-practice"), false);
+  assert.equal(encoded.includes("selected_users"), false);
+  assert.equal(encoded.includes("Только выбранным"), false);
+  assert.equal(encoded.includes("secret"), false);
+}
+
+async function testScheduledReleaseFallbackRefreshesSurfaces() {
+  const fake = createFakeClock();
+  let fingerprint = "before-release";
+  let refreshCalls = 0;
+  const controller = createLivePublicContentController({
+    clock: fake.clock,
+    debounceMs: 600,
+    fallbackIntervalMs: 45_000,
+    getVisibility: () => "visible",
+    subscribeVisibility: () => () => {},
+    probe: async () => fingerprint,
+    refresh: async () => {
+      refreshCalls += 1;
+    },
+  });
+  const stop = controller.start();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(refreshCalls, 0);
+
+  fingerprint = "after-scheduled-claim";
+  await fake.advance(45_000);
+  await fake.advance(600);
+  assert.equal(refreshCalls, 1, "visible fallback refreshes after the scheduled claim changes the public head");
+
+  const claimBumps = shouldBumpPublicContentRevision({
+    operation: "UPDATE",
+    previous: surface({ publishedAt: null, scheduledPublishAt: PAST }),
+    next: surface({ publishedAt: PAST, scheduledPublishAt: PAST }),
+    atMs: NOW_MS,
+  });
+  assert.equal(claimBumps, true, "scheduled claim changes the revision row");
+  controller.signal("realtime");
+  await fake.advance(600);
+  assert.equal(refreshCalls, 2, "revision signal refreshes open surfaces");
+  stop();
+}
+
 function testWiring() {
   const grid = read("src/components/products/CatalogProductGrid.tsx");
   const sync = read("src/components/public-content/LivePublicContentSync.tsx");
@@ -443,12 +750,14 @@ function testWiring() {
   const catalog = read("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx");
   const home = read("src/app/(platform)/(listener)/(home)/layout.tsx");
   const author = read("src/app/(platform)/(listener)/authors/[slug]/layout.tsx");
-  const migration = read("supabase/migrations/20261213120000_practices_realtime_publication.sql");
+  const migration = read("supabase/migrations/20261213120000_public_content_revision.sql");
 
-  assert.match(grid, /replaceCatalogPageOne/);
+  assert.match(grid, /fetchCatalogListingToLoadedDepth/);
   assert.match(grid, /fetchCatalogListingPage/);
+  assert.match(grid, /createSerialTaskQueue/);
   assert.match(grid, /LivePublicContentSync/);
   assert.match(grid, /restoreWindowScrollY/);
+  assert.doesNotMatch(grid, /replaceCatalogPageOne/);
   assert.doesNotMatch(grid, /router\.refresh/);
   assert.match(catalog, /emptyState=/);
   assert.match(catalog, /CatalogProductGrid/);
@@ -457,20 +766,26 @@ function testWiring() {
   assert.match(sync, /@\/lib\/supabase\/client/);
   assert.match(sync, /removeChannel/);
   assert.match(sync, /signalFromRealtimePayload/);
-  assert.match(sync, /schema: "public", table: "practices"/);
+  assert.match(sync, /clientVisibleRevisionRow/);
+  assert.match(sync, /PUBLIC_CONTENT_REVISION_TABLE/);
+  assert.equal(PUBLIC_CONTENT_REVISION_TABLE, "public_content_revision");
+  assert.equal(PUBLIC_CONTENT_REVISION_SCOPE, "practices");
+  assert.doesNotMatch(sync, /table: "practices"/);
   assert.match(route, /router\.refresh\(\)/);
   assert.doesNotMatch(route, /setInterval/);
-  assert.match(migration, /ALTER PUBLICATION supabase_realtime ADD TABLE public\.practices/);
-  assert.match(migration, /REPLICA IDENTITY FULL/);
-  const sql = migration.replace(/--[^\n]*/g, "");
-  assert.doesNotMatch(sql, /CREATE POLICY|DROP POLICY|DISABLE ROW LEVEL SECURITY|GRANT /i);
-  assert.doesNotMatch(sql, /\b(DELETE|TRUNCATE|UPDATE)\b/i);
+  assert.match(migration, /public\.public_content_revision/);
+  assert.doesNotMatch(migration, /ADD TABLE public\.practices/);
+  assert.doesNotMatch(migration, /REPLICA IDENTITY FULL/);
 }
 
 async function main() {
   testSignalDropsPrivatePayload();
   testFingerprintIgnoresNonPublicFields();
-  testPageOneReplaceScenarios();
+  await testLoadedWindowRefresh();
+  testViewerMergeKeepsOnlyLocalSave();
+  await testLiveRefreshConcurrentWithLoadMore();
+  testRevisionSignalDoesNotCarryProducts();
+  await testScheduledReleaseFallbackRefreshesSurfaces();
   await testDebounceFallbackVisibilityAndCleanup();
   testReconnectHelpers();
   testScrollRestoreDoesNotJumpWhenUnchanged();

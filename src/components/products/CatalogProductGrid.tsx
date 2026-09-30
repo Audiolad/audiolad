@@ -6,7 +6,6 @@ import LivePublicContentSync from "@/components/public-content/LivePublicContent
 import CatalogProductGridCard from "@/components/products/CatalogProductGridCard";
 import type { CatalogCard } from "@/lib/catalog/dto";
 import {
-  buildCatalogListingApiUrl,
   CATALOG_LISTING_PAGE_SIZE,
   type CatalogListingQuery,
 } from "@/lib/catalog/listing-contract";
@@ -14,9 +13,10 @@ import { useFlushPendingLibrarySave } from "@/lib/library/use-catalog-library-sa
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 import {
   catalogListingUnchanged,
+  createSerialTaskQueue,
   fetchCatalogListingPage,
-  replaceCatalogPageOne,
-  resolveNextCursorAfterPageReplace,
+  fetchCatalogListingToLoadedDepth,
+  mergeLoadedCatalogWindow,
   restoreWindowScrollY,
 } from "@/lib/public-content/live-sync";
 
@@ -27,11 +27,6 @@ type CatalogProductGridProps = {
   isAuthenticated?: boolean;
   signInReturnPath?: string;
   emptyState?: ReactNode;
-};
-
-type CatalogListingResponse = {
-  items?: CatalogCard[];
-  nextCursor?: string | null;
 };
 
 export default function CatalogProductGrid({
@@ -47,56 +42,54 @@ export default function CatalogProductGrid({
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const inFlightRef = useRef(false);
+  const loadQueuedRef = useRef(false);
+  const enqueueRef = useRef(createSerialTaskQueue());
   const queryRef = useRef(query);
   const itemsRef = useRef(items);
+  const nextCursorRef = useRef(nextCursor);
   const pendingScrollRef = useRef<number | null>(null);
 
   useEffect(() => {
     queryRef.current = query;
-    itemsRef.current = items;
-  });
+  }, [query]);
 
   useFlushPendingLibrarySave(isAuthenticated);
 
-  const applyPublicPage = useCallback((page: { items: CatalogCard[]; nextCursor: string | null }) => {
-    const pageSize = queryRef.current.limit || CATALOG_LISTING_PAGE_SIZE;
-    const replaced = replaceCatalogPageOne(itemsRef.current, page.items, pageSize);
-
-    if (catalogListingUnchanged(itemsRef.current, replaced.items)) {
-      return;
-    }
-
-    pendingScrollRef.current = typeof window === "undefined" ? null : window.scrollY;
-    itemsRef.current = replaced.items;
-    setItems(replaced.items);
-    setNextCursor((current) =>
-      resolveNextCursorAfterPageReplace({
-        tailCount: replaced.tailCount,
-        previousCursor: current,
-        freshCursor: page.nextCursor,
-      }),
-    );
-  }, []);
-
   const refreshPublicPage = useCallback(async () => {
-    const current = queryRef.current;
-    const page = await fetchCatalogListingPage({
-      q: current.q,
-      topic: current.topic,
-      section: current.section,
-      access: current.access,
-      class: current.class,
-      sort: current.sort,
-      limit: current.limit,
+    await enqueueRef.current(async () => {
+      const current = queryRef.current;
+      const loadedIds = itemsRef.current.map((item) => item.publication_id);
+      const page = await fetchCatalogListingToLoadedDepth(
+        {
+          q: current.q,
+          topic: current.topic,
+          section: current.section,
+          access: current.access,
+          class: current.class,
+          sort: current.sort,
+          limit: current.limit || CATALOG_LISTING_PAGE_SIZE,
+        },
+        loadedIds,
+      );
+
+      if (!page) {
+        return;
+      }
+
+      const nextItems = mergeLoadedCatalogWindow(page.items);
+      nextCursorRef.current = page.nextCursor;
+
+      if (catalogListingUnchanged(itemsRef.current, nextItems)) {
+        setNextCursor(page.nextCursor);
+        return;
+      }
+
+      pendingScrollRef.current = typeof window === "undefined" ? null : window.scrollY;
+      itemsRef.current = nextItems;
+      setItems(nextItems);
+      setNextCursor(page.nextCursor);
     });
-
-    if (!page) {
-      return;
-    }
-
-    applyPublicPage(page);
-  }, [applyPublicPage]);
+  }, []);
 
   useLayoutEffect(() => {
     const scrollY = pendingScrollRef.current;
@@ -110,45 +103,55 @@ export default function CatalogProductGrid({
   }, [items]);
 
   const loadMore = useCallback(async () => {
-    if (!nextCursor || inFlightRef.current) {
+    if (!nextCursorRef.current || loadQueuedRef.current) {
       return;
     }
 
-    inFlightRef.current = true;
+    loadQueuedRef.current = true;
     setIsLoading(true);
     setLoadError(null);
 
     try {
-      const response = await fetch(
-        buildCatalogListingApiUrl({
-          ...query,
-          cursor: nextCursor,
-        }),
-        { headers: { Accept: "application/json" } },
-      );
+      await enqueueRef.current(async () => {
+        const cursor = nextCursorRef.current;
 
-      if (!response.ok) {
-        throw new Error("catalog_page_unavailable");
-      }
+        if (!cursor) {
+          return;
+        }
 
-      const payload = (await response.json()) as CatalogListingResponse;
-      const nextItems = Array.isArray(payload.items) ? payload.items : [];
+        const current = queryRef.current;
+        const page = await fetchCatalogListingPage({
+          q: current.q,
+          topic: current.topic,
+          section: current.section,
+          access: current.access,
+          class: current.class,
+          sort: current.sort,
+          limit: current.limit || CATALOG_LISTING_PAGE_SIZE,
+          cursor,
+        });
 
-      setItems((current) => {
-        const seen = new Set(current.map((item) => item.publication_id));
-        return [
-          ...current,
-          ...nextItems.filter((item) => !seen.has(item.publication_id)),
+        if (!page) {
+          throw new Error("catalog_page_unavailable");
+        }
+
+        const seen = new Set(itemsRef.current.map((item) => item.publication_id));
+        const nextItems = [
+          ...itemsRef.current,
+          ...page.items.filter((item) => item.publication_id && !seen.has(item.publication_id)),
         ];
+        itemsRef.current = nextItems;
+        nextCursorRef.current = page.nextCursor;
+        setItems(nextItems);
+        setNextCursor(page.nextCursor);
       });
-      setNextCursor(payload.nextCursor ?? null);
     } catch {
       setLoadError("Не удалось загрузить ещё материалы.");
     } finally {
-      inFlightRef.current = false;
+      loadQueuedRef.current = false;
       setIsLoading(false);
     }
-  }, [nextCursor, query]);
+  }, []);
 
   useEffect(() => {
     const node = sentinelRef.current;

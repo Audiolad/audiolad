@@ -4,6 +4,7 @@ import {
   type CatalogListingQuery,
   type CatalogListingResult,
 } from "@/lib/catalog/listing-contract";
+import { peekLibrarySave } from "@/lib/library/saves-sync";
 
 /** Coalesce bursts of Realtime events into one public reload. */
 export const LIVE_PUBLIC_CONTENT_DEBOUNCE_MS = 600;
@@ -19,6 +20,113 @@ export const PUBLIC_CATALOG_PROBE_LIMIT = 8;
 
 export const REALTIME_RECONNECT_BASE_MS = 500;
 export const REALTIME_RECONNECT_MAX_MS = 30_000;
+
+/** Realtime table. Rows contain no product id, slug, title, or visibility. */
+export const PUBLIC_CONTENT_REVISION_TABLE = "public_content_revision";
+
+/** Scope bumped by practice and topic triggers. Catalog listens to this row. */
+export const PUBLIC_CONTENT_REVISION_SCOPE = "practices";
+
+export type PublicContentRevisionRow = {
+  scope: string;
+  revision: number;
+  updated_at: string;
+};
+
+/**
+ * Fields a browser is allowed to observe from the revision table.
+ * Any other key on the payload is dropped.
+ */
+export function clientVisibleRevisionRow(row: object): PublicContentRevisionRow | null {
+  const record = row as Record<string, unknown>;
+  const scope = record.scope;
+  const revision = record.revision;
+  const updatedAt = record.updated_at;
+
+  if (typeof scope !== "string" || typeof revision !== "number" || typeof updatedAt !== "string") {
+    return null;
+  }
+
+  return {
+    scope,
+    revision,
+    updated_at: updatedAt,
+  };
+}
+
+/** Reads the new revision row from a postgres_changes payload and nothing else. */
+export function revisionRowFromRealtimePayload(payload: unknown): object {
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+
+  const next = (payload as { new?: unknown }).new;
+
+  if (!next || typeof next !== "object") {
+    return {};
+  }
+
+  return next;
+}
+
+export type PracticeSurfaceSnapshot = {
+  status: string | null;
+  scheduledPublishAt: string | null;
+  publishedAt: string | null;
+  deletedAt: string | null;
+  catalogVisibility: string | null;
+};
+
+/**
+ * Mirrors public.practice_affects_public_surface / practice_is_publicly_available.
+ * Listed and unlisted published rows are on the public surface. Other modes are not.
+ */
+export function practiceAffectsPublicSurface(
+  row: PracticeSurfaceSnapshot | null,
+  atMs: number,
+): boolean {
+  if (!row || row.deletedAt) {
+    return false;
+  }
+
+  if (row.catalogVisibility !== "listed" && row.catalogVisibility !== "unlisted") {
+    return false;
+  }
+
+  if (row.status !== "published") {
+    return false;
+  }
+
+  if (row.publishedAt) {
+    const publishedMs = Date.parse(row.publishedAt);
+
+    if (Number.isFinite(publishedMs) && publishedMs <= atMs) {
+      return true;
+    }
+  }
+
+  if (!row.scheduledPublishAt) {
+    return true;
+  }
+
+  const scheduledMs = Date.parse(row.scheduledPublishAt);
+  return Number.isFinite(scheduledMs) && scheduledMs <= atMs;
+}
+
+export function shouldBumpPublicContentRevision(input: {
+  operation: "INSERT" | "UPDATE" | "DELETE";
+  previous: PracticeSurfaceSnapshot | null;
+  next: PracticeSurfaceSnapshot | null;
+  atMs?: number;
+}): boolean {
+  const atMs = input.atMs ?? Date.now();
+  const previousPublic =
+    input.operation !== "INSERT" && practiceAffectsPublicSurface(input.previous, atMs);
+  const nextPublic =
+    input.operation !== "DELETE" && practiceAffectsPublicSurface(input.next, atMs);
+
+  return previousPublic || nextPublic;
+}
 
 export type PublicContentSignalSource = "realtime" | "fallback" | "visibility";
 
@@ -85,68 +193,45 @@ export function restoreWindowScrollY(y: number): void {
   }
 }
 
-export function mergePublicCatalogCard(
-  previous: CatalogCard | undefined,
+/**
+ * Server viewer flags stay authoritative. The only local overlay is an
+ * in-tab library save. Grant and listen access always come from `next`.
+ */
+export function applyLocalLibrarySave(
   next: CatalogCard,
+  localSaved: boolean | null,
 ): CatalogCard {
-  if (!previous) {
+  if (localSaved == null || localSaved === next.viewer.is_saved) {
     return next;
   }
 
   return {
     ...next,
     viewer: {
-      can_listen: previous.viewer.can_listen || next.viewer.can_listen,
-      has_grant: previous.viewer.has_grant || next.viewer.has_grant,
-      is_saved: previous.viewer.is_saved || next.viewer.is_saved,
+      ...next.viewer,
+      is_saved: localSaved,
     },
   };
 }
 
-export function replaceCatalogPageOne(
-  current: readonly CatalogCard[],
-  pageOne: readonly CatalogCard[],
-  pageSize: number,
-): { items: CatalogCard[]; tailCount: number } {
-  const safePageSize = Math.max(1, Math.floor(pageSize) || 1);
-  const previousById = new Map(current.map((item) => [item.publication_id, item]));
-  const seen = new Set<string>();
-  const head: CatalogCard[] = [];
-
-  for (const item of pageOne) {
-    if (!item?.publication_id || seen.has(item.publication_id)) {
-      continue;
-    }
-
-    seen.add(item.publication_id);
-    head.push(mergePublicCatalogCard(previousById.get(item.publication_id), item));
-  }
-
-  const tail: CatalogCard[] = [];
-  const tailStart = Math.min(safePageSize, current.length);
-
-  for (const item of current.slice(tailStart)) {
-    if (!item?.publication_id || seen.has(item.publication_id)) {
-      continue;
-    }
-
-    seen.add(item.publication_id);
-    tail.push(item);
-  }
-
-  return { items: [...head, ...tail], tailCount: tail.length };
+export function mergePublicCatalogCard(next: CatalogCard): CatalogCard {
+  return applyLocalLibrarySave(next, peekLibrarySave(next.publication_id));
 }
 
-export function resolveNextCursorAfterPageReplace(input: {
-  tailCount: number;
-  previousCursor: string | null;
-  freshCursor: string | null;
-}): string | null {
-  if (input.tailCount > 0) {
-    return input.previousCursor;
+export function mergeLoadedCatalogWindow(fetched: readonly CatalogCard[]): CatalogCard[] {
+  const seen = new Set<string>();
+  const items: CatalogCard[] = [];
+
+  for (const item of fetched) {
+    if (!item?.publication_id || seen.has(item.publication_id)) {
+      continue;
+    }
+
+    seen.add(item.publication_id);
+    items.push(mergePublicCatalogCard(item));
   }
 
-  return input.freshCursor;
+  return items;
 }
 
 export function catalogListingUnchanged(
@@ -183,11 +268,11 @@ type CatalogFetch = (
 ) => Promise<Pick<Response, "ok" | "json">>;
 
 export async function fetchCatalogListingPage(
-  query: Omit<CatalogListingQuery, "cursor">,
+  query: CatalogListingQuery,
   fetchImpl: CatalogFetch = fetch,
 ): Promise<CatalogListingResult | null> {
   try {
-    const response = await fetchImpl(buildCatalogListingApiUrl({ ...query, cursor: null }), {
+    const response = await fetchImpl(buildCatalogListingApiUrl(query), {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
@@ -219,6 +304,68 @@ export async function fetchCatalogListingPage(
   }
 }
 
+/**
+ * Re-read the public listing until the last id the user already loaded is
+ * inside the fetched prefix, or the listing ends. Full pages are kept so
+ * the returned cursor still points at the next unread page.
+ */
+export async function fetchCatalogListingToLoadedDepth(
+  query: Omit<CatalogListingQuery, "cursor">,
+  loadedIds: readonly string[],
+  fetchImpl: CatalogFetch = fetch,
+): Promise<CatalogListingResult | null> {
+  const anchor = loadedIds.length > 0 ? loadedIds[loadedIds.length - 1] : null;
+  const items: CatalogCard[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  let nextCursor: string | null = null;
+  const maxPages = Math.max(loadedIds.length, 1) + 2;
+
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {
+    const page = await fetchCatalogListingPage({ ...query, cursor }, fetchImpl);
+
+    if (!page) {
+      return null;
+    }
+
+    if (page.items.length === 0) {
+      nextCursor = page.nextCursor;
+      break;
+    }
+
+    for (const item of page.items) {
+      if (!item?.publication_id || seen.has(item.publication_id)) {
+        continue;
+      }
+
+      seen.add(item.publication_id);
+      items.push(item);
+    }
+
+    nextCursor = page.nextCursor;
+    cursor = page.nextCursor;
+
+    if (anchor == null || seen.has(anchor) || !page.nextCursor) {
+      break;
+    }
+  }
+
+  return { items, nextCursor };
+}
+
+export function createSerialTaskQueue(): <T>(task: () => Promise<T>) => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve();
+
+  return function enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = tail.then(task, task);
+    tail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+}
+
 export async function probePublicCatalogHead(
   fetchImpl: CatalogFetch = fetch,
 ): Promise<string | null> {
@@ -230,6 +377,7 @@ export async function probePublicCatalogHead(
       access: "all",
       class: "all",
       sort: "new",
+      cursor: null,
       limit: PUBLIC_CATALOG_PROBE_LIMIT,
     },
     fetchImpl,
