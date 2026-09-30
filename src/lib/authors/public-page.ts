@@ -12,7 +12,6 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import {
   applyPracticePublicAvailabilityFilter,
   publicReleaseSortTimestamp,
@@ -160,8 +159,6 @@ export async function loadAuthorPublicPageData(
   }
 
   const profile = await getAuthorProfileDetail(supabase, author.id);
-
-  await releaseDueScheduledPublications(supabase);
 
   const { data: practiceRows, error: practicesError } =
     await applyPracticePublicAvailabilityFilter(

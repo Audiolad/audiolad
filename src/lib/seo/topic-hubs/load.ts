@@ -4,6 +4,7 @@ import {
   getPublishedCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import {
   buildArticlePath,
   listArticlesByTopicSlug,
@@ -78,6 +79,7 @@ export async function loadTopicHubPageData(
   }
 
   const topicKey = hub.topicKey?.trim() || null;
+  await releaseDueScheduledPublications(supabase);
 
   const [productsRaw, activeTopics] = await Promise.all([
     getPublishedCatalogProducts(supabase, {

@@ -6,6 +6,7 @@ import {
   getPublishedCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { resolveLibraryAction } from "@/lib/products/practice-access-ui";
 import { buildSiteCanonicalUrl } from "@/lib/seo/public-page-metadata";
 
@@ -112,6 +113,7 @@ export async function loadArticlePageData(
         return assertInvalidArticleDefinition();
       }
 
+      await releaseDueScheduledPublications(supabase);
       const catalog = await getPublishedCatalogProducts(supabase, {
         productKind: PRODUCT_KIND.PRACTICE,
       });

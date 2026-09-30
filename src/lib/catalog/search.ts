@@ -17,7 +17,6 @@ import {
   GUEST_ORDINARY_CATALOG_VIEWER,
   type OrdinaryCatalogViewer,
 } from "@/lib/catalog/visibility-query";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 
 export const CATALOG_SEARCH_MAX_LENGTH = 100;
 export const CATALOG_SEARCH_RESULT_LIMIT = 50;
@@ -261,8 +260,6 @@ export async function searchPublishedCatalogProducts(
   if (!normalizedQuery) {
     return [];
   }
-
-  await releaseDueScheduledPublications(supabase);
 
   const resultLimit = options.limit ?? CATALOG_SEARCH_RESULT_LIMIT;
   const topicKey = options.topicKey?.trim().toLowerCase() || null;

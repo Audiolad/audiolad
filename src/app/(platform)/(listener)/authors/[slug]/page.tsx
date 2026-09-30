@@ -20,6 +20,7 @@ import {
 } from "@/lib/author-appreciation/config";
 import JsonLd from "@/components/seo/JsonLd";
 import { loadAuthorPublicPageData } from "@/lib/authors/public-page";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import {
   DEFAULT_AUTHOR_SHORT_POSITIONING,
 } from "@/lib/authors/brand-assets";
@@ -38,6 +39,7 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
+  await releaseDueScheduledPublications(supabase);
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
   if (error || !data) {
@@ -90,6 +92,7 @@ export default async function AuthorPublicPage({
   const { slug } = await params;
   const query = await searchParams;
   const supabase = await createClient();
+  await releaseDueScheduledPublications(supabase);
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
   if (error) {

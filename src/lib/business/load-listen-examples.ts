@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -15,6 +16,7 @@ export async function loadBusinessListenExamples(): Promise<
 > {
   try {
     const supabase = await createClient();
+    await releaseDueScheduledPublications(supabase);
     const products = await getPublishedCatalogProducts(supabase, {
       productKind: "music",
     });

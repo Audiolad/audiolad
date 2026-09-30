@@ -39,7 +39,6 @@ import {
   GUEST_ORDINARY_CATALOG_VIEWER,
   type OrdinaryCatalogViewer,
 } from "@/lib/catalog/visibility-query";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import {
   effectivePublishedAt,
   publicReleaseSortTimestamp,
@@ -304,8 +303,6 @@ export async function getPublishedCatalogProducts(
   supabase: SupabaseClient,
   options?: CatalogQueryOptions,
 ): Promise<CatalogProduct[]> {
-  await releaseDueScheduledPublications(supabase);
-
   const topicKey = options?.topicKey?.trim().toLowerCase() || null;
   const viewer = options?.viewer ?? GUEST_ORDINARY_CATALOG_VIEWER;
   let practiceIdsForTopic: string[] | null = null;
