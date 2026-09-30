@@ -6,6 +6,7 @@
 export const PLATFORM_PERMISSIONS = [
   "admin_panel.access",
   "dashboard.view",
+  "ai_company.view",
   "authors.view",
   "authors.manage",
   "authors.payout_profiles.review",
@@ -59,6 +60,7 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
   admin: [
     "admin_panel.access",
     "dashboard.view",
+    "ai_company.view",
     "authors.view",
     "authors.manage",
     "products.view",
