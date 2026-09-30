@@ -18,7 +18,6 @@ import {
   type CatalogProductViewer,
   type CatalogProduct,
 } from "@/lib/products/catalog";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import {
   loadOrdinaryCatalogViewer,
   resolveCatalogViewerUserId,
@@ -328,7 +327,6 @@ export async function listPublishedCatalog(
     savesStore?: LibrarySavesAsyncStore;
   } = {},
 ): Promise<CatalogListingResult> {
-  await releaseDueScheduledPublications(supabase);
   const productKindHint = listingProductKindHint(query.class);
   const userId = await resolveCatalogViewerUserId(supabase, options.userId);
   const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);

@@ -17,6 +17,7 @@ import {
   serializeCatalogTopicParam,
 } from "@/lib/catalog/topic-filter";
 import { normalizeCatalogSearchQuery } from "@/lib/catalog/search";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { buildCatalogMetadata } from "@/lib/seo/public-page-metadata";
 import { listTopicsWithCatalogCountsSafe } from "@/lib/topics/queries";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
@@ -53,6 +54,7 @@ export async function generateMetadata({
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams;
   const supabase = await createClient();
+  await releaseDueScheduledPublications(supabase);
   const searchQuery = normalizeCatalogSearchQuery(params.q);
   const isSearchActive = searchQuery.length > 0;
   const topicSearchParam = resolveCatalogTopicSearchParam(params);

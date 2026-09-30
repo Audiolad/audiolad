@@ -28,6 +28,7 @@ import {
   PRODUCT_KIND,
 } from "@/lib/author-products/product-kind";
 import { getAudioPostDisplayLabel } from "@/lib/author-products/format";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { resolvePublicPromoRecommendation } from "@/lib/products/promo-recommendation";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
@@ -256,6 +257,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const [authorSlug, productSlug] = segments;
   const supabase = await createClient();
+  await releaseDueScheduledPublications(supabase);
   const { practice, error } = await getPracticeByAuthorAndSlug(
     supabase,
     authorSlug,
@@ -368,6 +370,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   const { authorSlug, productSlug } = route;
   const supabase = await createClient();
+  await releaseDueScheduledPublications(supabase);
   const execution = await peekAuthorExecutionContext();
   // Resolve the public route author with the ordinary client first. This
   // prevents a valid session for author X from elevating a lookup for Y.

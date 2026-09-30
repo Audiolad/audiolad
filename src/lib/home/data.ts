@@ -8,7 +8,6 @@ import { resolveInitialPlayback } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { loadPublicAuthorsList } from "@/lib/authors/public-list-data";
 
 import {
@@ -168,7 +167,6 @@ async function getPublishedAuthors(
 export async function getGuestHomeData(
   supabase: SupabaseClient,
 ): Promise<GuestHomeData> {
-  await releaseDueScheduledPublications(supabase);
   const catalogProducts = await safeHomeSection(
     "guest_catalog",
     () => getPublishedCatalogProducts(supabase),
@@ -232,7 +230,6 @@ export async function getPersonalHomeData(
     { userId },
   );
 
-  await releaseDueScheduledPublications(supabase);
   const catalogProducts = await safeHomeSection(
     "personal_catalog",
     () => getPublishedCatalogProducts(supabase),
