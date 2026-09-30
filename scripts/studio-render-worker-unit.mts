@@ -897,11 +897,11 @@ function trackTimers() {
     }, ms);
     pending.add(timer);
     return timer;
-  }) as typeof setTimeout;
+  }) as unknown as typeof setTimeout;
   globalThis.clearTimeout = ((timer?: ReturnType<typeof setTimeout>) => {
     if (timer !== undefined) pending.delete(timer);
     return originalClear(timer as never);
-  }) as typeof clearTimeout;
+  }) as unknown as typeof clearTimeout;
   return {
     pending,
     restore() {
