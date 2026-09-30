@@ -21,41 +21,34 @@ type Agent = {
   current_task_id: string | null;
   last_heartbeat_at: string | null;
 };
-type Heartbeat = {
-  service_key: string;
-  service_type: string;
-  observed_at: string;
-  state: string;
-  current_task_id: string | null;
-};
 type Event = {
   event_type: string;
   agent_slug: string | null;
   task_id: string | null;
+  payload: object;
   created_at: string;
 };
 type Status = {
   generated_at: string;
   tasks: Task[];
   agents: Agent[];
-  heartbeats: Heartbeat[];
+  heartbeats: { service_key: string; service_type: string; observed_at: string; state: string; current_task_id: string | null; health_metadata: object }[];
   recent_events: Event[];
   costs: { amount_usd: string; input_units: number | string; output_units: number | string };
 };
 
 const roles = [
-  ["orchestrator", "Orchestrator / AI COO"],
-  ["research", "Research"],
-  ["product", "Product"],
-  ["ux", "UX"],
-  ["engineering", "Engineering"],
-  ["qa", "QA"],
-  ["analytics", "Analytics"],
-  ["marketing", "Marketing & Sales"],
+  ["orchestrator", "Оркестратор (Orchestrator)"],
+  ["research", "Исследователь (Research)"],
+  ["product", "Продуктовый агент (Product)"],
+  ["ux", "UX-агент (UX)"],
+  ["engineering", "Инженер (Engineering)"],
+  ["qa", "Контроль качества (QA)"],
+  ["analytics", "Аналитик (Analytics)"],
+  ["marketing", "Маркетинг и продажи (Marketing & Sales)"],
 ] as const;
-const terminal = new Set(["done", "accepted", "qa_pass", "merged", "deployed", "production"]);
+const terminal = new Set(["done", "completed", "accepted", "qa_pass", "merged", "deployed", "production"]);
 const active = new Set(["working", "in_progress", "started"]);
-const unavailable = "Недоступно в текущем контракте Company Core";
 
 function time(value: string | null) {
   if (!value) return "Нет данных";
@@ -66,33 +59,39 @@ function isGate(value: string) {
   return Boolean(value && !["none", "no", "false", "null"].includes(value.toLowerCase()));
 }
 function isStale(agent: Agent, now: number) {
-  return agent.status.toUpperCase() === "WORKING" &&
-    (!agent.last_heartbeat_at || now - new Date(agent.last_heartbeat_at).valueOf() > 60 * 60 * 1000);
+  return active.has(agent.status.toLowerCase()) && (!agent.last_heartbeat_at || now - Date.parse(agent.last_heartbeat_at) > 60 * 60 * 1000);
 }
 function taskFor(data: Status, slug: string) {
   return data.tasks.find((task) => task.producer_agent_slug === slug && active.has(task.status.toLowerCase())) ?? null;
 }
 function issueLink(task: Task) {
-  return task.github_issue_number
-    ? `https://github.com/Audiolad/audiolad/issues/${task.github_issue_number}`
-    : null;
+  return task.github_issue_number ? `https://github.com/Audiolad/audiolad/issues/${task.github_issue_number}` : null;
+}
+function taskStatus(status: string) {
+  const value = status.toLowerCase();
+  if (terminal.has(value)) return "Выполнено (Completed)";
+  if (value === "blocked" || value === "failed" || value === "error") return "Требует внимания (Attention)";
+  if (value === "waiting" || value === "review" || value === "human_gate") return "Ожидает (Waiting)";
+  if (active.has(value)) return "Работает (Working)";
+  return `${status} (технический статус)`;
+}
+function agentState(agent: Agent | undefined, now: number) {
+  if (!agent) return { label: "⚪ Не подключён / простаивает (Not commissioned / Idle)", tone: "border-slate-200 bg-slate-50" };
+  if (isStale(agent, now) || ["blocked", "failed", "error", "attention"].includes(agent.status.toLowerCase())) return { label: "🔴 Требует внимания (Attention)", tone: "border-red-200 bg-red-50" };
+  if (active.has(agent.status.toLowerCase())) return { label: "🟢 Работает (Working)", tone: "border-green-200 bg-green-50" };
+  if (["waiting", "review", "human_gate"].includes(agent.status.toLowerCase())) return { label: "🟡 Ожидает (Waiting)", tone: "border-amber-200 bg-amber-50" };
+  return { label: "⚪ Не подключён / простаивает (Not commissioned / Idle)", tone: "border-slate-200 bg-slate-50" };
 }
 
 async function loadStatus(): Promise<{ data: Status | null; error: string | null }> {
   const base = process.env.COMPANY_CORE_URL ?? process.env.COMPANY_API_URL;
   const token = process.env.COMPANY_API_TOKEN;
-  if (!base || !token) return { data: null, error: "Company Core не настроен: отсутствует URL или server token." };
+  if (!base || !token) return { data: null, error: "Company Core не настроен: отсутствует URL или серверный токен." };
   try {
-    const response = await fetch(`${base.replace(/\/$/, "")}/v1/status`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
+    const response = await fetch(`${base.replace(/\/$/, "")}/v1/status`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(8000) });
     if (!response.ok) return { data: null, error: `Company Core вернул HTTP ${response.status}.` };
     const data = (await response.json()) as Status;
-    if (!data.generated_at || !Array.isArray(data.agents) || !Array.isArray(data.tasks)) {
-      return { data: null, error: "Company Core вернул несовместимый payload." };
-    }
+    if (!data.generated_at || !Array.isArray(data.agents) || !Array.isArray(data.tasks) || !Array.isArray(data.recent_events)) return { data: null, error: "Company Core вернул несовместимый набор данных." };
     return { data, error: null };
   } catch (error) {
     console.error("ai_company_status_load_error", error);
@@ -100,35 +99,55 @@ async function loadStatus(): Promise<{ data: Status | null; error: string | null
   }
 }
 
-export default async function AiCompanyPage() {
-  await requirePlatformOwnerAccess("/admin/ai-company");
-  const { data, error } = await loadStatus();
-  if (!data) return <main><meta httpEquiv="refresh" content="45" /><h1 className="text-2xl font-semibold">ИИ-компания</h1><div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800"><strong>ANDON: нет достоверных live-данных</strong><p className="mt-2 text-sm">{error}</p><p className="mt-2 text-sm">Fake-состояние не подставлено. Повтор через 45 секунд.</p></div></main>;
+function TaskCard({ task }: { task: Task }) {
+  const href = issueLink(task);
+  return <details className="rounded-xl border border-[#eadff8] bg-white p-4 text-sm">
+    <summary className="cursor-pointer font-semibold">{task.title} · {taskStatus(task.status)}</summary>
+    <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div><dt className="text-[#796ba0]">Полный исходный текст постановки</dt><dd>Нет данных</dd></div>
+      <div><dt className="text-[#796ba0]">Дата и время</dt><dd>{time(task.updated_at)} (последнее обновление)</dd></div>
+      <div><dt className="text-[#796ba0]">Источник</dt><dd>{href ? <a className="text-[#7042c5] underline" href={href}>GitHub Issue #{task.github_issue_number}</a> : "Нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">Ответственный агент</dt><dd>{task.producer_agent_slug ?? "Нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">Текущий этап</dt><dd>{taskStatus(task.status)}</dd></div>
+      <div><dt className="text-[#796ba0]">Приоритет</dt><dd>{task.priority || "Нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">Передача результата (handoff)</dt><dd>{task.result_consumer ?? "Нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">Причина блокировки</dt><dd>{task.blocked_reason ?? "Нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">Контроль качества (QA)</dt><dd>{task.status.toLowerCase() === "qa_pass" ? "PASS" : "Нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">Ручное разрешение (Human Gate)</dt><dd>{isGate(task.human_gate) ? task.human_gate : "Не требуется / нет данных"}</dd></div>
+      <div><dt className="text-[#796ba0]">История, результаты, возвраты, PR и CI</dt><dd>Нет данных</dd></div>
+      <div><dt className="text-[#796ba0]">Production, итог и дата завершения</dt><dd>{terminal.has(task.status.toLowerCase()) ? `Выполнено; обновлено ${time(task.updated_at)}` : "Нет данных"}</dd></div>
+    </dl>
+  </details>;
+}
 
-  const now = new Date(data.generated_at).valueOf();
+export default async function AiCompanyPage({ searchParams }: { searchParams: Promise<{ period?: string; status?: string; agent?: string }> }) {
+  await requirePlatformOwnerAccess("/admin/ai-company");
+  const filters = await searchParams;
+  const { data, error } = await loadStatus();
+  if (!data) return <main><meta httpEquiv="refresh" content="45" /><h1 className="text-2xl font-semibold">ИИ-компания</h1><div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800"><strong>Требует внимания (Attention): нет достоверных данных</strong><p className="mt-2 text-sm">{error}</p><p className="mt-2 text-sm">Фиктивное состояние не подставлено. Повтор через 45 секунд.</p></div></main>;
+
+  const now = Date.parse(data.generated_at);
   const stale = data.agents.filter((agent) => isStale(agent, now));
-  const blocked = data.tasks.filter((task) => task.blocked_reason || task.status.toUpperCase() === "BLOCKED");
+  const blocked = data.tasks.filter((task) => task.blocked_reason || ["blocked", "failed", "error"].includes(task.status.toLowerCase()));
   const gates = data.tasks.filter((task) => isGate(task.human_gate));
-  const andon = data.recent_events.filter((event) => event.event_type.toUpperCase() === "ANDON");
-  const pulse = andon.length || gates.length ? "ANDON" : stale.length || blocked.length ? "DEGRADED" : "NORMAL";
-  const today = new Date(data.generated_at).toISOString().slice(0, 10);
-  const produced = data.tasks.filter((task) => task.updated_at.slice(0, 10) === today && terminal.has(task.status.toLowerCase()));
-  const day = Math.floor((now - Date.parse("2026-09-29T00:00:00Z")) / 86400000) + 1;
-  const counts = ["WORKING", "WAITING", "AVAILABLE", "BLOCKED"].map((status) => [status, data.agents.filter((agent) => agent.status.toUpperCase() === status).length] as const);
+  const today = data.generated_at.slice(0, 10);
+  const todayTasks = data.tasks.filter((task) => task.updated_at.slice(0, 10) === today);
+  const history = data.tasks.filter((task) => terminal.has(task.status.toLowerCase())).filter((task) => !filters.agent || task.producer_agent_slug === filters.agent).filter((task) => !filters.status || task.status.toLowerCase() === filters.status.toLowerCase()).filter((task) => filters.period !== "today" || task.updated_at.slice(0, 10) === today);
 
   return <main className="space-y-7">
     <meta httpEquiv="refresh" content="45" />
-    <header><h1 className="text-2xl font-semibold">ИИ-компания</h1><p className="mt-1 text-sm text-[#796ba0]">Launch Supervision — Day {Math.max(1, day)} of 7 · автообновление 45 сек.</p></header>
+    <header><h1 className="text-2xl font-semibold">ИИ-компания</h1><p className="mt-1 text-sm text-[#796ba0]">Операционное табло · автообновление каждые 45 секунд · обновлено {time(data.generated_at)}</p></header>
 
-    {(gates.length || andon.length || stale.length || blocked.length) ? <section className="rounded-2xl border border-red-300 bg-red-50 p-5" aria-labelledby="attention"><h2 id="attention" className="text-lg font-semibold text-red-900">Требует внимания</h2><ul className="mt-3 space-y-1 text-sm text-red-800"><li>Human Gates: {gates.length}</li><li>ANDON events: {andon.length}</li><li>STALE agents: {stale.map((agent) => agent.slug).join(", ") || "0"}</li><li>Blocked tasks: {blocked.map((task) => task.title).join(", ") || "0"}</li></ul></section> : null}
+    {(gates.length || stale.length || blocked.length) ? <section className="rounded-2xl border border-red-300 bg-red-50 p-5"><h2 className="text-lg font-semibold text-red-900">Требует внимания (Attention)</h2><ul className="mt-3 space-y-1 text-sm text-red-800"><li>Ручные разрешения (Human Gates): {gates.length}</li><li>Устаревшие сигналы жизнеспособности: {stale.map((agent) => agent.slug).join(", ") || "0"}</li><li>Заблокированные задачи: {blocked.map((task) => task.title).join(", ") || "0"}</li></ul></section> : null}
 
-    <section className="rounded-2xl border border-[#eadff8] bg-white p-5"><h2 className="text-lg font-semibold">Company Pulse: {pulse}</h2><div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{counts.map(([label, count]) => <div key={label}><div className="text-xs text-[#796ba0]">{label}</div><div className="text-xl font-semibold">{count}</div></div>)}<div><div className="text-xs text-[#796ba0]">STALE</div><div className="text-xl font-semibold">{stale.length}</div></div><div><div className="text-xs text-[#796ba0]">Завершено сегодня</div><div className="text-xl font-semibold">{produced.length}</div></div></div><p className="mt-4 text-sm text-[#796ba0]">Обновлено: {time(data.generated_at)} · API cost: ${data.costs.amount_usd} · input {String(data.costs.input_units)} · output {String(data.costs.output_units)}</p></section>
+    <section className="rounded-2xl border border-[#eadff8] bg-white p-5"><h2 className="text-lg font-semibold">Пульс компании (Company Pulse)</h2><div className="mt-3 flex flex-wrap gap-4 text-sm"><span>Задач сегодня: <strong>{todayTasks.length}</strong></span><span>Завершено: <strong>{todayTasks.filter((task) => terminal.has(task.status.toLowerCase())).length}</strong></span><span>Стоимость API: <strong>${data.costs.amount_usd}</strong></span></div></section>
 
-    <section><h2 className="text-xl font-semibold">Агенты</h2><div className="mt-4 grid gap-4 lg:grid-cols-2">{roles.map(([slug, label]) => { const agent = data.agents.find((item) => item.slug === slug || (slug === "marketing" && item.slug.includes("marketing"))); const task = taskFor(data, agent?.slug ?? slug); const events = data.recent_events.filter((event) => event.agent_slug === agent?.slug).slice(0, 5); return <details key={slug} className="rounded-2xl border border-[#eadff8] bg-white p-5"><summary className="cursor-pointer font-semibold">{label} — {agent ? (isStale(agent, now) ? "STALE" : agent.status) : "UNKNOWN"}</summary><dl className="mt-4 grid gap-2 text-sm"><div><dt className="text-[#796ba0]">Current task</dt><dd>{task?.title ?? unavailable}</dd></div><div><dt className="text-[#796ba0]">Started / current step / next queue</dt><dd>{unavailable}</dd></div><div><dt className="text-[#796ba0]">Last heartbeat</dt><dd>{time(agent?.last_heartbeat_at ?? null)}</dd></div><div><dt className="text-[#796ba0]">Blocked/waiting reason</dt><dd>{task?.blocked_reason ?? "Не указан"}</dd></div><div><dt className="text-[#796ba0]">Latest result</dt><dd>{events[0]?.event_type ?? unavailable}</dd></div><div><dt className="text-[#796ba0]">Recent events</dt><dd>{events.map((event) => `${event.event_type} · ${time(event.created_at)}`).join("; ") || "Нет событий"}</dd></div><div><dt className="text-[#796ba0]">Task/heartbeat history, QA/Consumer state, agent cost</dt><dd>{unavailable}</dd></div></dl></details>; })}</div></section>
+    <section><h2 className="text-xl font-semibold">Агенты</h2><div className="mt-4 grid gap-4 lg:grid-cols-2">{roles.map(([slug, label]) => { const agent = data.agents.find((item) => item.slug === slug || (slug === "marketing" && item.slug.includes("marketing"))); const task = taskFor(data, agent?.slug ?? slug); const events = data.recent_events.filter((event) => event.agent_slug === agent?.slug).slice(0, 3); const state = agentState(agent, now); return <details key={slug} className={`rounded-2xl border p-5 ${state.tone}`}><summary className="cursor-pointer font-semibold">{label} — {state.label}</summary><dl className="mt-4 grid gap-2 text-sm"><div><dt className="text-[#796ba0]">Текущая задача</dt><dd>{task?.title ?? "Нет данных"}</dd></div><div><dt className="text-[#796ba0]">Текущий этап</dt><dd>{task ? taskStatus(task.status) : "Нет данных"}</dd></div><div><dt className="text-[#796ba0]">Время начала</dt><dd>Нет данных</dd></div><div><dt className="text-[#796ba0]">Последний heartbeat</dt><dd>{time(agent?.last_heartbeat_at ?? null)}</dd></div><div><dt className="text-[#796ba0]">Последний измеримый результат</dt><dd>{events[0]?.event_type ?? "Нет данных"}</dd></div><div><dt className="text-[#796ba0]">Причина ожидания / блокировки</dt><dd>{task?.blocked_reason ?? "Нет данных"}</dd></div><div><dt className="text-[#796ba0]">Кому передан результат</dt><dd>{task?.result_consumer ?? "Нет данных"}</dd></div><div><dt className="text-[#796ba0]">Состояние QA</dt><dd>{task?.status.toLowerCase() === "qa_pass" ? "PASS" : "Нет данных"}</dd></div></dl></details>; })}</div></section>
 
-    <section><h2 className="text-xl font-semibold">Live Event Feed</h2><ol className="mt-3 divide-y rounded-2xl border border-[#eadff8] bg-white px-5">{data.recent_events.length ? data.recent_events.map((event, index) => <li key={`${event.created_at}-${index}`} className="py-3 text-sm"><strong>{event.event_type}</strong> · {event.agent_slug ?? "system"} · {time(event.created_at)}</li>) : <li className="py-4 text-sm text-[#796ba0]">Событий пока нет.</li>}</ol></section>
+    <section><h2 className="text-xl font-semibold">Сегодня в компании</h2><p className="mt-1 text-xs text-[#796ba0]">Company Core не передаёт время получения; показано время последнего обновления.</p><div className="mt-3 space-y-2">{todayTasks.length ? todayTasks.map((task, index) => <TaskCard key={`${task.title}-${index}`} task={task} />) : <p className="rounded-xl border border-[#eadff8] bg-white p-4 text-sm text-[#796ba0]">Сегодня задач нет.</p>}</div></section>
 
-    <section><h2 className="text-xl font-semibold">Produced Today</h2><ul className="mt-3 space-y-2">{produced.length ? produced.map((task, index) => { const href = issueLink(task); return <li key={`${task.title}-${index}`} className="rounded-xl border border-[#eadff8] bg-white p-4 text-sm"><strong>{task.title}</strong> · {task.status}{href ? <> · <a className="text-[#7042c5] underline" href={href}>Issue #{task.github_issue_number}</a></> : <span className="text-[#796ba0]"> · artifact link unavailable</span>}</li>; }) : <li className="rounded-xl border border-[#eadff8] bg-white p-4 text-sm text-[#796ba0]">Принятых или завершённых outputs сегодня нет.</li>}</ul></section>
-    <p className="text-xs text-[#796ba0]">Hourly snapshots и исторические heartbeat не входят в GET /v1/status и на этом экране не выдумываются.</p>
+    <section><h2 className="text-xl font-semibold">История работы</h2><form className="mt-3 flex flex-wrap gap-2" method="get"><select name="period" defaultValue={filters.period ?? "all"} className="rounded-lg border p-2 text-sm"><option value="all">Все периоды</option><option value="today">Сегодня</option></select><input name="status" defaultValue={filters.status ?? ""} placeholder="Технический статус" className="rounded-lg border p-2 text-sm" /><input name="agent" defaultValue={filters.agent ?? ""} placeholder="Идентификатор агента" className="rounded-lg border p-2 text-sm" /><button className="rounded-lg bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">Применить</button></form><div className="mt-3 space-y-2">{history.length ? history.map((task, index) => <TaskCard key={`${task.title}-${index}`} task={task} />) : <p className="rounded-xl border border-[#eadff8] bg-white p-4 text-sm text-[#796ba0]">Завершённых задач по фильтрам нет.</p>}</div></section>
+
+    <section><h2 className="text-xl font-semibold">Журнал событий (Event Feed)</h2><ol className="mt-3 divide-y rounded-2xl border border-[#eadff8] bg-white px-5">{data.recent_events.length ? data.recent_events.map((event, index) => <li key={`${event.created_at}-${index}`} className="py-3 text-sm"><strong>{event.event_type}</strong> · {event.agent_slug ?? "система"} · {time(event.created_at)}</li>) : <li className="py-4 text-sm text-[#796ba0]">Событий пока нет.</li>}</ol></section>
   </main>;
 }
