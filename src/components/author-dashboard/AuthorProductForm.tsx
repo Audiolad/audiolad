@@ -3525,7 +3525,12 @@ export default function AuthorProductForm({
                 form.scheduledPublishAt,
               )}`}
             >
-              {getStatusLabel(form.status, form.moderationStatus, null, form.scheduledPublishAt)}
+              {getStatusLabel(
+                form.status,
+                form.moderationStatus,
+                null,
+                form.scheduledPublishAt,
+              )}
             </span>
           ) : null}
         </div>
@@ -5609,12 +5614,12 @@ export default function AuthorProductForm({
         canBypassProductModeration={canBypassProductModeration}
         isPublished={isPublished}
         isUnpublished={isUnpublished}
-                isScheduled={isScheduled}
+        isScheduled={isScheduled}
         isDraft={isDraft}
         isSubmitted={isSubmitted}
         needsChanges={needsChanges}
         publishedAt={form.publishedAt}
-                scheduledPublishAt={form.scheduledPublishAt}
+        scheduledPublishAt={form.scheduledPublishAt}
         moderationStatus={form.moderationStatus}
         practiceId={practiceId}
         publicPath={publicPath}
@@ -5644,12 +5649,12 @@ export default function AuthorProductForm({
           canBypassProductModeration={canBypassProductModeration}
           isPublished={isPublished}
           isUnpublished={isUnpublished}
-                isScheduled={isScheduled}
+        isScheduled={isScheduled}
           isDraft={isDraft}
           isSubmitted={isSubmitted}
           needsChanges={needsChanges}
           publishedAt={form.publishedAt}
-                scheduledPublishAt={form.scheduledPublishAt}
+        scheduledPublishAt={form.scheduledPublishAt}
           moderationStatus={form.moderationStatus}
           practiceId={practiceId}
           publicPath={publicPath}
