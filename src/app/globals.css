@@ -562,6 +562,12 @@ html.catalog-sheet-lock body {
   }
 }
 
+@media (min-width: 1024px) {
+  .guest-home-slider:not(.guest-home-slider--max) {
+    max-width: 42rem;
+  }
+}
+
 /* Fill the MAX column (max-w-lg) so the square banner has no side gap. */
 .guest-home-slider.guest-home-slider--max {
   max-width: none;
@@ -635,6 +641,23 @@ button.guest-home-slider__link {
   aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #efe6f8;
+}
+
+.guest-home-slider__media > picture {
+  position: absolute;
+  inset: 0;
+  display: block;
+  margin: 0;
+}
+
+@media (min-width: 1024px) {
+  .guest-home-slider:not(.guest-home-slider--max) .guest-home-slider__media {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+.guest-home-slider.guest-home-slider--max .guest-home-slider__media {
+  aspect-ratio: 1 / 1;
 }
 
 .guest-home-slider__dots {

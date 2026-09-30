@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image, { getImageProps } from "next/image";
 import Link from "next/link";
 import {
   useEffect,
@@ -11,9 +11,68 @@ import {
   type PointerEvent,
 } from "react";
 
-import { GUEST_HOME_SLIDES } from "@/lib/home/guest-slider";
+import {
+  GUEST_HOME_SLIDES,
+  type GuestHomeSlide,
+} from "@/lib/home/guest-slider";
 
 const TAP_MOVE_THRESHOLD_PX = 8;
+const MOBILE_SLIDE_SIZES = "(max-width: 430px) calc(100vw - 2.5rem), 520px";
+const DESKTOP_SLIDE_SIZES = "(min-width: 1024px) 42rem, 520px";
+const DESKTOP_SLIDE_MEDIA = "(min-width: 1024px)";
+
+function GuestHomeSlideImage({
+  slide,
+  priority,
+}: {
+  slide: GuestHomeSlide;
+  priority: boolean;
+}) {
+  if (!slide.desktopSrc) {
+    return (
+      <Image
+        src={slide.src}
+        alt=""
+        fill
+        priority={priority}
+        sizes={MOBILE_SLIDE_SIZES}
+        className="object-contain"
+        draggable={false}
+      />
+    );
+  }
+
+  const mobile = getImageProps({
+    src: slide.src,
+    alt: "",
+    fill: true,
+    sizes: MOBILE_SLIDE_SIZES,
+    className: "object-contain",
+  }).props;
+  const desktop = getImageProps({
+    src: slide.desktopSrc,
+    alt: "",
+    fill: true,
+    sizes: DESKTOP_SLIDE_SIZES,
+  }).props;
+
+  return (
+    <picture>
+      <source
+        media={DESKTOP_SLIDE_MEDIA}
+        srcSet={desktop.srcSet}
+        sizes={desktop.sizes}
+      />
+      <img
+        {...mobile}
+        alt=""
+        draggable={false}
+        fetchPriority={priority ? "high" : "auto"}
+        loading={priority ? "eager" : "lazy"}
+      />
+    </picture>
+  );
+}
 
 export default function GuestHomeSlider() {
   const trackRef = useRef<HTMLUListElement>(null);
@@ -152,14 +211,9 @@ export default function GuestHomeSlider() {
               onClick={onSlideClick}
             >
               <span className="guest-home-slider__media">
-                <Image
-                  src={slide.src}
-                  alt=""
-                  fill
+                <GuestHomeSlideImage
+                  slide={slide}
                   priority={index === 0}
-                  sizes="(max-width: 430px) calc(100vw - 2.5rem), 520px"
-                  className="object-contain"
-                  draggable={false}
                 />
               </span>
             </Link>
