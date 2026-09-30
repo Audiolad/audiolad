@@ -158,9 +158,20 @@ export default function GuestHomeSlider() {
                   fill
                   priority={index === 0}
                   sizes="(max-width: 430px) calc(100vw - 2.5rem), 520px"
-                  className="object-contain"
+                  className="guest-home-slider__image guest-home-slider__image--mobile object-contain"
                   draggable={false}
                 />
+                {slide.desktopSrc ? (
+                  <Image
+                    src={slide.desktopSrc}
+                    alt=""
+                    fill
+                    priority={index === 0}
+                    sizes="(min-width: 1024px) 42rem, 520px"
+                    className="guest-home-slider__image guest-home-slider__image--desktop object-contain"
+                    draggable={false}
+                  />
+                ) : null}
               </span>
             </Link>
           </li>
