@@ -8,6 +8,11 @@ import {
   CATALOG_MUSIC_UNAVAILABLE,
 } from "../catalog-asset";
 import {
+  STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  type StudioRenderFfmpegStallDetails,
+} from "./ffmpeg-stall";
+import {
+  isStudioRenderFfmpegStalledError,
   renderStudioProjectToMp3,
   StudioRenderChildAbortedError,
   StudioRenderDurationError,
@@ -34,6 +39,7 @@ import type { StudioRenderSnapshot } from "./types";
 import { isStudioRenderCatalogAsset, isStudioRenderFileAsset } from "./types";
 import {
   allowStudioRenderOutputUpload,
+  isStudioRenderAbort,
   parseClaimedStudioRenderJob,
   StudioRenderAbandonedError,
   STUDIO_RENDER_LEASE_SECONDS,
@@ -159,11 +165,22 @@ export function classifyStudioRenderFailure(error: unknown): {
       internalMessage,
     };
   }
-  if (error instanceof StudioRenderDurationError) {
+  if (
+    error instanceof StudioRenderDurationError
+    || (error instanceof Error && (error as { code?: string }).code === "render_duration_mismatch")
+  ) {
     return {
       stage: "ffmpeg",
-      errorCode: error.code,
+      errorCode: "render_duration_mismatch",
       errorMessageSafe: STUDIO_RENDER_PREPARE_FAILED_MESSAGE,
+      internalMessage,
+    };
+  }
+  if (isStudioRenderFfmpegStalledError(error)) {
+    return {
+      stage: "ffmpeg",
+      errorCode: "ffmpeg_stalled",
+      errorMessageSafe: STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
       internalMessage,
     };
   }
@@ -336,13 +353,19 @@ export async function executeClaimedStudioRenderJob(
         { renderId: job.id, outputDirectory: workspace, signal },
       );
     } catch (error) {
-      if (error instanceof StudioRenderChildAbortedError || signal.aborted) {
+      if (
+        error instanceof StudioRenderChildAbortedError
+        || (error instanceof Error && (error as { code?: string }).code === "studio_render_aborted")
+        || signal.aborted
+      ) {
         throw new StudioRenderAbandonedError();
       }
       if (
         error instanceof StudioRenderDurationError
+        || (error instanceof Error && (error as { code?: string }).code === "render_duration_mismatch")
         || error instanceof StudioRenderStageError
         || error instanceof StudioRenderAbandonedError
+        || isStudioRenderFfmpegStalledError(error)
       ) {
         throw error;
       }
@@ -472,10 +495,11 @@ export async function failClaimedStudioRenderJob(
   job: ClaimedStudioRenderJob,
   error: unknown,
 ): Promise<boolean> {
-  if (error instanceof StudioRenderAbandonedError || error instanceof StudioRenderChildAbortedError) {
+  if (isStudioRenderAbort(error)) {
     return false;
   }
   const classified = classifyStudioRenderFailure(error);
+  const stall = readStudioRenderFfmpegStallDetails(error);
   console.error(JSON.stringify({
     event: "studio_render_failed",
     jobId: job.id,
@@ -484,6 +508,14 @@ export async function failClaimedStudioRenderJob(
     stage: classified.stage,
     errorCode: classified.errorCode,
     error: classified.internalMessage,
+    ...(stall
+      ? {
+          elapsedMs: stall.elapsedMs,
+          lastProgressUs: stall.lastProgressUs,
+          lastOutTime: stall.lastOutTime,
+          expectedDurationSeconds: stall.expectedDurationSeconds,
+        }
+      : {}),
   }));
   const { data: failedJob, error: failureUpdateError } = await service
     .from("studio_render_jobs")
@@ -505,6 +537,28 @@ export async function failClaimedStudioRenderJob(
     return false;
   }
   return true;
+}
+
+function readStudioRenderFfmpegStallDetails(
+  error: unknown,
+): StudioRenderFfmpegStallDetails | null {
+  if (!isStudioRenderFfmpegStalledError(error)) return null;
+  const details = (error as { details?: Partial<StudioRenderFfmpegStallDetails> }).details;
+  if (!details || typeof details.elapsedMs !== "number") return null;
+  return {
+    elapsedMs: details.elapsedMs,
+    lastProgressUs: typeof details.lastProgressUs === "number" || details.lastProgressUs === null
+      ? details.lastProgressUs
+      : null,
+    lastOutTime: typeof details.lastOutTime === "string" || details.lastOutTime === null
+      ? details.lastOutTime
+      : null,
+    expectedDurationSeconds: typeof details.expectedDurationSeconds === "number"
+      || details.expectedDurationSeconds === null
+      ? details.expectedDurationSeconds
+      : null,
+    closeSignal: details.closeSignal ?? null,
+  };
 }
 
 export { sweepStaleStudioRenderTempDirs, StudioRenderDiskSpaceError } from "./temp-workspace";

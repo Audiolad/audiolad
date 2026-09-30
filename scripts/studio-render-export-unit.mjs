@@ -21,6 +21,18 @@ assert.match(render, /runStudioRenderChild/);
 assert.match(render, /SIGTERM/);
 assert.match(render, /SIGKILL/);
 assert.match(render, /StudioRenderChildAbortedError/);
+assert.match(render, /studioRenderFfmpegProgressArgs/);
+assert.match(render, /STUDIO_RENDER_FFMPEG_STALL_MS/);
+assert.match(render, /clearStallTimer/);
+assert.match(workerRuntime, /StudioRenderFfmpegStalledError/);
+assert.match(workerRuntime, /elapsedMs/);
+assert.match(workerLoop, /Ownership only/);
+assert.match(shell, /studioRenderExportErrorMessage/);
+assert.match(
+  read("src/lib/studio/render/ffmpeg-stall.ts"),
+  /Создание MP3 остановилось\. Исходники проекта сохранены — попробуйте создать MP3 ещё раз\./,
+);
+assert.match(read("src/lib/studio/render/ffmpeg.ts"), /-progress", "pipe:1"/);
 assert.match(workerRuntime, /upsert: true/);
 assert.match(workerLoop, /Array\.isArray\(claimed\) \? claimed\[0\] : claimed/);
 assert.match(workerLoop, /typeof \(job as \{ id\?: unknown \}\)\.id !== "string"/);

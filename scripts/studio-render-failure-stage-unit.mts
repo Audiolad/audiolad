@@ -5,7 +5,14 @@ import { join } from "node:path";
 
 import { CATALOG_MUSIC_UNAVAILABLE } from "../src/lib/studio/catalog-asset";
 import { StudioCatalogMusicUnavailableError } from "../src/lib/studio/render/catalog-source";
-import { StudioRenderDurationError } from "../src/lib/studio/render/render";
+import {
+  STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  studioRenderExportErrorMessage,
+} from "../src/lib/studio/render/ffmpeg-stall";
+import {
+  StudioRenderDurationError,
+  StudioRenderFfmpegStalledError,
+} from "../src/lib/studio/render/render";
 import type { StudioRenderSnapshot } from "../src/lib/studio/render/types";
 import type { ClaimedStudioRenderJob } from "../src/lib/studio/render/worker";
 import { StudioRenderAbandonedError } from "../src/lib/studio/render/worker";
@@ -115,11 +122,11 @@ function bytes() {
 
 async function captureFailure(error: unknown) {
   const logs: string[] = [];
-  const payload: { error_code?: string; error_message_safe?: string } = {};
+  const payload: { status?: string; error_code?: string; error_message_safe?: string } = {};
   const service = {
     from() {
       return {
-        update(next: { error_code?: string; error_message_safe?: string }) {
+        update(next: { status?: string; error_code?: string; error_message_safe?: string }) {
           Object.assign(payload, next);
           return this;
         },
@@ -189,7 +196,9 @@ async function main() {
       60,
       stageDeps(),
     ),
-    (error: unknown) => error instanceof StudioRenderAbandonedError,
+    (error: unknown) =>
+      error instanceof StudioRenderAbandonedError
+      || (error instanceof Error && (error as { code?: string }).code === "studio_render_abandoned"),
   );
   assert.deepEqual(abortedDownloads.downloads, []);
   const abandoned = await captureFailure(new StudioRenderAbandonedError());
@@ -268,6 +277,90 @@ async function main() {
   assert.equal(duration.stage, "ffmpeg");
   assert.equal(duration.errorCode, "render_duration_mismatch");
   assert.notEqual(duration.errorCode, "render_failed");
+
+  const stalledError = new StudioRenderFfmpegStalledError({
+    elapsedMs: 600_000,
+    lastProgressUs: 1_500_000,
+    lastOutTime: "00:00:01.500000",
+    expectedDurationSeconds: 3_600,
+    closeSignal: "SIGKILL",
+  });
+  const stalled = await captureFailure(stalledError);
+  assert.equal(stalled.persisted, true);
+  assert.equal(stalled.payload.status, "failed");
+  assert.equal(stalled.payload.error_code, "ffmpeg_stalled");
+  assert.equal(stalled.payload.error_message_safe, STUDIO_RENDER_FFMPEG_STALLED_MESSAGE);
+  const stalledLog = JSON.parse(stalled.logs[0]) as {
+    jobId: string;
+    projectId: string;
+    stage: string;
+    errorCode: string;
+    elapsedMs: number;
+    lastProgressUs: number;
+    lastOutTime: string;
+    expectedDurationSeconds: number;
+  };
+  assert.equal(stalledLog.jobId, "job-1");
+  assert.equal(stalledLog.projectId, "project-1");
+  assert.equal(stalledLog.stage, "ffmpeg");
+  assert.equal(stalledLog.errorCode, "ffmpeg_stalled");
+  assert.equal(stalledLog.elapsedMs, 600_000);
+  assert.equal(stalledLog.lastProgressUs, 1_500_000);
+  assert.equal(stalledLog.lastOutTime, "00:00:01.500000");
+  assert.equal(stalledLog.expectedDurationSeconds, 3_600);
+  assert.doesNotMatch(stalled.logs[0], /token=|eyJ|service_role|SUPABASE/i);
+
+  await assert.rejects(
+    () => executeClaimedStudioRenderJob(
+      storageService(async () => bytes()).service as never,
+      claimed("studio/author/project/asset/voice.wav"),
+      new AbortController().signal,
+      60,
+      stageDeps(async () => {
+        throw stalledError;
+      }),
+    ),
+    (error: unknown) => error instanceof StudioRenderFfmpegStalledError && error.code === "ffmpeg_stalled",
+  );
+  await assert.rejects(
+    () => executeClaimedStudioRenderJob(
+      storageService(async () => bytes()).service as never,
+      claimed("studio/author/project/asset/voice.wav"),
+      new AbortController().signal,
+      60,
+      stageDeps(async () => {
+        throw new StudioRenderDurationError(2, 1);
+      }),
+    ),
+    (error: unknown) => error instanceof StudioRenderDurationError && error.code === "render_duration_mismatch",
+  );
+
+  assert.equal(
+    studioRenderExportErrorMessage({ error_code: "ffmpeg_stalled", error_message_safe: null }),
+    STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  );
+  assert.equal(
+    studioRenderExportErrorMessage({ error_code: "ffmpeg_stalled", error_message_safe: "  " }),
+    STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  );
+  assert.equal(
+    studioRenderExportErrorMessage({
+      error_code: "ffmpeg_stalled",
+      error_message_safe: STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+    }),
+    STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  );
+  assert.equal(
+    studioRenderExportErrorMessage({
+      error_code: "ffmpeg_failed",
+      error_message_safe: STUDIO_RENDER_PREPARE_FAILED_MESSAGE,
+    }),
+    STUDIO_RENDER_PREPARE_FAILED_MESSAGE,
+  );
+  assert.equal(
+    studioRenderExportErrorMessage({ error_code: "render_failed", error_message_safe: null }),
+    "Не удалось создать MP3. Попробуйте ещё раз.",
+  );
   assert.equal(
     sanitizeStudioRenderErrorMessage(new Error("https://audiolad.ru/file?token=abc&x=1")),
     "https://audiolad.ru/file?token=redacted&x=1",

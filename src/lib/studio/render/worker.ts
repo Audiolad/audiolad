@@ -16,6 +16,9 @@ export const STUDIO_RENDER_LEASE_SECONDS = 1800;
  * Renew every 5 minutes while a job is active. With a 30-minute lease that is
  * six ticks per window: several missed heartbeats still leave margin, and a
  * 3-hour FFmpeg run never relies on a one-shot 1800s/5400s lease bump.
+ * Ownership only: renewal stays on this interval through download, upload,
+ * ffprobe, and FFmpeg, whether or not `out_time` is advancing. A stalled
+ * encode is failed by the FFmpeg progress watchdog, not by stopping renew.
  */
 export const STUDIO_RENDER_HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
 /** Idle poll after an empty claim. Faster than the former 2-minute cron, not a spin loop. */

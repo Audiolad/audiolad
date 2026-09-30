@@ -3,7 +3,17 @@ import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildStudioRenderFilterGraph, studioRenderFfmpegOutputArgs } from "./ffmpeg";
+import { buildStudioRenderFilterGraph, studioRenderFfmpegOutputArgs, studioRenderFfmpegProgressArgs } from "./ffmpeg";
+import {
+  consumeStudioRenderFfmpegProgress,
+  createStudioRenderFfmpegProgressState,
+  STUDIO_RENDER_FFMPEG_STALL_MS,
+  STUDIO_RENDER_FFMPEG_STALLED_CODE,
+  STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  studioRenderFfmpegProgressAdvanced,
+  type StudioRenderFfmpegProgressSample,
+  type StudioRenderFfmpegStallDetails,
+} from "./ffmpeg-stall";
 import { writeStudioVoicePresetImpulseWav } from "./ir";
 import type { StudioRenderInput } from "./types";
 
@@ -28,6 +38,26 @@ export class StudioRenderChildAbortedError extends Error {
     super("studio_render_aborted");
     this.name = "StudioRenderChildAbortedError";
   }
+}
+
+export class StudioRenderFfmpegStalledError extends Error {
+  readonly code = STUDIO_RENDER_FFMPEG_STALLED_CODE;
+  readonly stage = "ffmpeg" as const;
+  readonly safeMessage = STUDIO_RENDER_FFMPEG_STALLED_MESSAGE;
+
+  constructor(readonly details: StudioRenderFfmpegStallDetails) {
+    super(STUDIO_RENDER_FFMPEG_STALLED_CODE);
+    this.name = "StudioRenderFfmpegStalledError";
+  }
+}
+
+export function isStudioRenderFfmpegStalledError(
+  error: unknown,
+): error is StudioRenderFfmpegStalledError {
+  if (error instanceof StudioRenderFfmpegStalledError) return true;
+  if (!(error instanceof Error)) return false;
+  return error.name === "StudioRenderFfmpegStalledError"
+    && (error as { code?: string }).code === STUDIO_RENDER_FFMPEG_STALLED_CODE;
 }
 
 export class StudioRenderDurationError extends Error {
@@ -77,17 +107,22 @@ export async function terminateStudioRenderChild(
   } catch {
     return;
   }
-  await Promise.race([
-    waitForChildClose(child),
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, graceMs);
-    }),
-  ]);
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      waitForChildClose(child),
+      new Promise<void>((resolve) => {
+        graceTimer = setTimeout(resolve, graceMs);
+      }),
+    ]);
+  } finally {
+    if (graceTimer !== undefined) clearTimeout(graceTimer);
+  }
   if (childAlreadyExited(child)) return;
   try {
     child.kill("SIGKILL");
   } catch {
-    return;
+    // The pid may already be gone; still wait so callers observe close.
   }
   await waitForChildClose(child);
 }
@@ -99,32 +134,98 @@ export function runStudioRenderChild(
     signal?: AbortSignal;
     termGraceMs?: number;
     captureStdout?: boolean;
+    /**
+     * FFmpeg stage only. Reads `-progress pipe:1` from stdout and aborts the
+     * child when `out_time` stops growing. Omitted for ffprobe and other tools.
+     */
+    progress?: {
+      stallMs?: number;
+      expectedDurationSeconds: number;
+    };
   } = {},
 ): Promise<string> {
   const signal = options.signal;
   const termGraceMs = options.termGraceMs ?? STUDIO_RENDER_CHILD_TERM_GRACE_MS;
+  const progress = options.progress;
+  const stallMs = progress?.stallMs ?? STUDIO_RENDER_FFMPEG_STALL_MS;
   if (signal?.aborted) return Promise.reject(new StudioRenderChildAbortedError());
+  if (progress && (!Number.isFinite(stallMs) || stallMs < 1)) {
+    return Promise.reject(new Error("invalid_ffmpeg_stall_ms"));
+  }
 
   return new Promise((resolve, reject) => {
+    const captureStdout = Boolean(options.captureStdout) && !progress;
     const child = spawn(binary, [...args], {
-      stdio: ["ignore", options.captureStdout ? "pipe" : "ignore", "pipe"],
+      stdio: ["ignore", captureStdout || progress ? "pipe" : "ignore", "pipe"],
     });
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let stalled = false;
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopping: Promise<void> | undefined;
+    const startedAt = Date.now();
+    let highWaterUs: number | null = null;
+    let lastProgressUs: number | null = null;
+    let lastOutTime: string | null = null;
+    const progressState = createStudioRenderFfmpegProgressState();
+
+    const clearStallTimer = () => {
+      if (stallTimer !== undefined) {
+        clearTimeout(stallTimer);
+        stallTimer = undefined;
+      }
+    };
+    const stopChild = () => {
+      if (!stopping) stopping = terminateStudioRenderChild(child, termGraceMs);
+      return stopping;
+    };
+    const armStallTimer = () => {
+      if (!progress || settled || signal?.aborted || stalled) return;
+      clearStallTimer();
+      stallTimer = setTimeout(() => {
+        stallTimer = undefined;
+        if (settled || signal?.aborted) return;
+        stalled = true;
+        void stopChild();
+      }, stallMs);
+    };
     const settle = (finish: () => void) => {
       if (settled) return;
       settled = true;
+      clearStallTimer();
       signal?.removeEventListener("abort", onAbort);
       finish();
     };
     const onAbort = () => {
-      void terminateStudioRenderChild(child, termGraceMs);
+      clearStallTimer();
+      void stopChild();
     };
+    const noteSample = (sample: StudioRenderFfmpegProgressSample) => {
+      if (settled || signal?.aborted || stalled) return;
+      if (sample.outTime) lastOutTime = sample.outTime;
+      if (sample.positionUs != null) lastProgressUs = sample.positionUs;
+      if (
+        sample.positionUs != null
+        && studioRenderFfmpegProgressAdvanced(highWaterUs, sample.positionUs)
+      ) {
+        highWaterUs = sample.positionUs;
+        armStallTimer();
+      }
+    };
+
     signal?.addEventListener("abort", onAbort);
-    if (options.captureStdout && child.stdout) {
+    if (progress) armStallTimer();
+    if (captureStdout && child.stdout) {
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (chunk: string) => { stdout += chunk; });
+    } else if (progress && child.stdout) {
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        for (const sample of consumeStudioRenderFfmpegProgress(progressState, chunk)) {
+          noteSample(sample);
+        }
+      });
     }
     if (child.stderr) {
       child.stderr.setEncoding("utf8");
@@ -136,7 +237,15 @@ export function runStudioRenderChild(
     child.once("close", (code, killSignal) => {
       settle(() => {
         if (signal?.aborted) reject(new StudioRenderChildAbortedError());
-        else if (code === 0) resolve(options.captureStdout ? stdout : stderr);
+        else if (stalled) {
+          reject(new StudioRenderFfmpegStalledError({
+            elapsedMs: Date.now() - startedAt,
+            lastProgressUs,
+            lastOutTime,
+            expectedDurationSeconds: progress?.expectedDurationSeconds ?? null,
+            closeSignal: killSignal,
+          }));
+        } else if (code === 0) resolve(captureStdout ? stdout : stderr);
         else reject(new Error(`${binary} exited with ${code ?? killSignal ?? "unknown"}: ${stderr}`));
       });
     });
@@ -193,6 +302,7 @@ async function renderStudioProject(
     }));
     const args = [
       "-hide_banner", "-nostdin",
+      ...studioRenderFfmpegProgressArgs(),
       ...graph.assetInputPaths.flatMap((path) => ["-i", path]),
       ...irPaths.flatMap((path) => ["-i", path]),
       "-filter_complex", graph.filterComplex,
@@ -200,7 +310,10 @@ async function renderStudioProject(
         ? studioRenderFfmpegOutputArgs(outputPath, graph.durationSeconds)
         : ["-map", "[out]", "-c:a", "pcm_f32le", "-ar", "44100", "-ac", "2", "-y", outputPath]),
     ];
-    const stderr = await runStudioRenderChild(ffmpegPath, args, { signal: options.signal });
+    const stderr = await runStudioRenderChild(ffmpegPath, args, {
+      signal: options.signal,
+      progress: { expectedDurationSeconds: graph.durationSeconds },
+    });
     if (options.signal?.aborted) throw new StudioRenderChildAbortedError();
     const output = await stat(outputPath);
     const actualDurationSeconds = await probeDuration(outputPath, "ffprobe", options.signal);

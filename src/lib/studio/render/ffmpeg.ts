@@ -191,6 +191,11 @@ export function buildStudioRenderFilterGraph(input: StudioRenderInput): FilterGr
   return { filterComplex: filters.join(";"), assetInputPaths, irPresets, durationSeconds: timeline.durationSeconds };
 }
 
+/** Machine-readable progress on stdout so stderr diagnostics stay intact. */
+export function studioRenderFfmpegProgressArgs(): string[] {
+  return ["-progress", "pipe:1"];
+}
+
 export function studioRenderFfmpegOutputArgs(
   outputPath: string,
   durationSeconds: number,
