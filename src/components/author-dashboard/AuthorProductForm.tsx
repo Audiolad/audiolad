@@ -3481,7 +3481,7 @@ export default function AuthorProductForm({
 
       {(!wizardEnabled || wizardStep === PRODUCT_WIZARD_STEP_COUNT) &&
       !isPublished &&
-      !canBypassProductModeration &&
+      (!canBypassProductModeration || Boolean(form.scheduledPublishAt)) &&
       (!isUnpublished || isScheduled) ? (
         <AuthorProductPublicationSchedule
           value={form.scheduledPublishAt}
@@ -3521,6 +3521,8 @@ export default function AuthorProductForm({
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClassName(
                 form.status,
                 form.moderationStatus,
+                null,
+                form.scheduledPublishAt,
               )}`}
             >
               {getStatusLabel(form.status, form.moderationStatus, null, form.scheduledPublishAt)}
