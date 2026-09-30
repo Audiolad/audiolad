@@ -15,6 +15,15 @@ export const RESULT_SCHEMA = "audiolad.deployment_bridge.v1";
 export const BRIDGE_STATUS_CONTEXT = "Deployment Bridge";
 export const REQUIRED_CHECK_NAME = "PR Repository Validation";
 export const REQUIRED_STATUS_CONTEXT = "Production / PR Safety";
+// Ignored by subjectEvidence. Required evidence is still REQUIRED_CHECK_NAME
+// and REQUIRED_STATUS_CONTEXT. Job names match deployment-bridge.yml.
+export const IGNORED_EVIDENCE_CHECK_NAMES = Object.freeze([
+  BRIDGE_STATUS_CONTEXT,
+  "Refuse dispatch outside main",
+  "Gate commit",
+  "Deploy pinned SHA",
+  "Production / PR Safety Runner",
+]);
 export const BRIDGE_STATES = Object.freeze([
   "queued",
   "running",
@@ -95,8 +104,10 @@ export function selectCommitSha({ eventName, inputCommitSha, clientPayload }) {
   return { ok: false, error: "unsupported_event" };
 }
 
-function isBridgeCheck(run) {
-  return run?.name === BRIDGE_STATUS_CONTEXT;
+const IGNORED_EVIDENCE_CHECK_NAME_SET = new Set(IGNORED_EVIDENCE_CHECK_NAMES);
+
+function isIgnoredEvidenceCheck(run) {
+  return IGNORED_EVIDENCE_CHECK_NAME_SET.has(run?.name);
 }
 
 function eventTime(value) {
@@ -131,7 +142,7 @@ function latestByContext(statuses) {
 function subjectEvidence(checks, statuses) {
   const namedChecks = [];
   for (const run of checks ?? []) {
-    if (isBridgeCheck(run)) {
+    if (isIgnoredEvidenceCheck(run)) {
       continue;
     }
     if (typeof run?.name !== "string" || run.name.length === 0) {

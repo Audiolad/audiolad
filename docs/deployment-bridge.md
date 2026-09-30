@@ -105,8 +105,14 @@ POST /repos/Audiolad/audiolad/dispatches
 4. На этом же SHA нет незавершённых и нет красных check run / commit
    status. Для одного имени check берётся последний прогон
    (`completed_at`), поэтому успешный rerun не блокируется старым
-   падением. Собственный статус `Deployment Bridge` игнорируется, чтобы
-   повторный деплой не блокировался прошлым результатом.
+   падением. Игнорируются собственный статус и check `Deployment Bridge`,
+   check run'ы job'ов этого workflow (`Refuse dispatch outside main`,
+   `Gate commit`, `Deploy pinned SHA`) и check
+   `Production / PR Safety Runner`. Эти имена не заменяют требуемый CI
+   из пункта 3: без успешного `PR Repository Validation` и успешного
+   статуса `Production / PR Safety` деплой не допускается. Так повторный
+   деплой не блокируется прошлым результатом моста и повторным прогоном
+   Runner на уже закрытом PR.
 5. Для обычного merge-коммита GitHub CI висит на втором родителе
    (голове PR), а не на самом merge-коммите. Мост принимает этот CI
    только если tree второго родителя **равен** tree деплоя. Если main
