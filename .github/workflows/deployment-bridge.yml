@@ -1,0 +1,228 @@
+# Deployment Bridge: deploy(commit_sha) for a commit already on main.
+# Remote command is only:
+#   sudo -n /usr/local/sbin/audiolad-deploy <40-char-lowercase-hex-sha>
+# No push, pull_request, or schedule trigger. No shell input. No ops confirms.
+# Environment production (branch main only) supplies the existing SSH secrets.
+# Merging this file does not deploy production.
+
+name: Deployment Bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Exact 40-character lowercase hex SHA already on main."
+        required: true
+        type: string
+  repository_dispatch:
+    types: [deployment-bridge]
+
+permissions:
+  contents: read
+  checks: write
+  statuses: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  refuse-non-main:
+    name: Refuse dispatch outside main
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse
+        run: |
+          echo "Deployment Bridge accepts only refs/heads/main" >&2
+          exit 1
+
+  gate:
+    name: Gate commit
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      target_sha: ${{ steps.gate.outputs.target_sha }}
+      origin_main_sha: ${{ steps.gate.outputs.origin_main_sha }}
+      ci_subject_sha: ${{ steps.gate.outputs.ci_subject_sha }}
+      started_at: ${{ steps.gate.outputs.started_at }}
+    steps:
+      - name: Resolve main and gate the SHA
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          INPUT_COMMIT_SHA: ${{ inputs.commit_sha }}
+          CLIENT_PAYLOAD_JSON: ${{ github.event_name == 'repository_dispatch' && toJson(github.event.client_payload) || '' }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "refused_not_main" >&2
+            exit 1
+          fi
+          OBJECT_STORE="$(mktemp -d)"
+          git -C "${OBJECT_STORE}" init --quiet
+          git -C "${OBJECT_STORE}" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "${OBJECT_STORE}" fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          ORIGIN_MAIN_SHA="$(git -C "${OBJECT_STORE}" rev-parse refs/remotes/origin/main)"
+          POLICY="${RUNNER_TEMP}/deployment-bridge-policy.mjs"
+          git -C "${OBJECT_STORE}" show "${ORIGIN_MAIN_SHA}:scripts/deployment-bridge-policy.mjs" > "${POLICY}"
+          export OBJECT_STORE ORIGIN_MAIN_SHA
+          node "${POLICY}" gate
+
+  deploy:
+    name: Deploy pinned SHA
+    needs: [gate]
+    if: needs.gate.result == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via existing wrapper and verify health
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ needs.gate.outputs.target_sha }}
+          ORIGIN_MAIN_SHA: ${{ needs.gate.outputs.origin_main_sha }}
+          CI_SUBJECT_SHA: ${{ needs.gate.outputs.ci_subject_sha }}
+          STARTED_AT: ${{ needs.gate.outputs.started_at }}
+          PRODUCTION_SSH_PRIVATE_KEY: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+          PRODUCTION_SSH_HOST: ${{ secrets.PRODUCTION_SSH_HOST }}
+          PRODUCTION_SSH_PORT: ${{ secrets.PRODUCTION_SSH_PORT }}
+          PRODUCTION_SSH_USER: ${{ secrets.PRODUCTION_SSH_USER }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          if [[ ! "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid target sha" >&2
+            exit 1
+          fi
+          if [[ ! "${ORIGIN_MAIN_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid origin main sha" >&2
+            exit 1
+          fi
+          if [[ ! "${CI_SUBJECT_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid ci subject sha" >&2
+            exit 1
+          fi
+          if [[ ! "${PRODUCTION_SSH_PORT}" =~ ^[0-9]+$ ]]; then
+            echo "invalid ssh port" >&2
+            exit 1
+          fi
+          if [[ "${PRODUCTION_SSH_USER}" == *[!A-Za-z0-9._-]* ]]; then
+            echo "invalid ssh user" >&2
+            exit 1
+          fi
+          if [[ "${PRODUCTION_SSH_HOST}" == *[!A-Za-z0-9.:-]* ]]; then
+            echo "invalid ssh host" >&2
+            exit 1
+          fi
+          : "${PRODUCTION_SSH_PRIVATE_KEY:?PRODUCTION_SSH_PRIVATE_KEY secret is required}"
+          : "${PRODUCTION_SSH_KNOWN_HOSTS:?PRODUCTION_SSH_KNOWN_HOSTS secret is required}"
+          : "${PRODUCTION_SSH_HOST:?PRODUCTION_SSH_HOST secret is required}"
+          : "${PRODUCTION_SSH_PORT:?PRODUCTION_SSH_PORT secret is required}"
+          : "${PRODUCTION_SSH_USER:?PRODUCTION_SSH_USER secret is required}"
+
+          umask 077
+          SSH_DIR="$(mktemp -d)"
+          KEY_FILE="${SSH_DIR}/id"
+          HOSTS_FILE="${SSH_DIR}/known_hosts"
+          printf '%s\n' "${PRODUCTION_SSH_PRIVATE_KEY}" > "${KEY_FILE}"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOSTS_FILE}"
+          chmod 0600 "${KEY_FILE}" "${HOSTS_FILE}"
+          unset PRODUCTION_SSH_PRIVATE_KEY PRODUCTION_SSH_KNOWN_HOSTS
+          trap 'rm -rf "${SSH_DIR}"' EXIT
+
+          OBJECT_STORE="$(mktemp -d)"
+          git -C "${OBJECT_STORE}" init --quiet
+          git -C "${OBJECT_STORE}" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -C "${OBJECT_STORE}" fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          FRESH_MAIN="$(git -C "${OBJECT_STORE}" rev-parse refs/remotes/origin/main)"
+          POLICY="${RUNNER_TEMP}/deployment-bridge-policy.mjs"
+          git -C "${OBJECT_STORE}" show "${FRESH_MAIN}:scripts/deployment-bridge-policy.mjs" > "${POLICY}"
+
+          RESULT_FILE="${RUNNER_TEMP}/deployment-bridge-result.json"
+          export RESULT_FILE
+          publish_result() {
+            if [[ -s "${RESULT_FILE}" ]]; then
+              node "${POLICY}" publish < "${RESULT_FILE}"
+            fi
+          }
+          finish_forced() {
+            export BRIDGE_FORCE_ERROR="$1"
+            set +e
+            node "${POLICY}" complete
+            publish_result
+            exit 1
+          }
+
+          if ! git -C "${OBJECT_STORE}" cat-file -e "${TARGET_SHA}^{commit}"; then
+            finish_forced ancestry_lost
+          fi
+          if ! git -C "${OBJECT_STORE}" merge-base --is-ancestor "${TARGET_SHA}" "${FRESH_MAIN}"; then
+            finish_forced ancestry_lost
+          fi
+
+          set +e
+          node "${POLICY}" running
+          RUNNING_CODE=$?
+          set -e
+          if [[ "${RUNNING_CODE}" -ne 0 ]]; then
+            finish_forced running_publish_failed
+          fi
+
+          LOG="${RUNNER_TEMP}/deploy-stdout.txt"
+          : > "${LOG}"
+          set +e
+          set +o pipefail
+          ssh \
+            -i "${KEY_FILE}" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile="${HOSTS_FILE}" \
+            -o StrictHostKeyChecking=yes \
+            -p "${PRODUCTION_SSH_PORT}" \
+            -- \
+            "${PRODUCTION_SSH_USER}@${PRODUCTION_SSH_HOST}" \
+            sudo -n /usr/local/sbin/audiolad-deploy \
+            "${TARGET_SHA}" | tee "${LOG}"
+          DEPLOY_EXIT="${PIPESTATUS[0]}"
+          set -o pipefail
+          set -e
+
+          BUILD_FILE="${RUNNER_TEMP}/health-build.json"
+          DEPS_FILE="${RUNNER_TEMP}/health-deps.json"
+          HOME_FILE="${RUNNER_TEMP}/homepage.html"
+          HEALTH_FILE="${RUNNER_TEMP}/health.json"
+          export BUILD_FILE DEPS_FILE HEALTH_FILE
+          export DEPLOY_STDOUT_FILE="${LOG}"
+          export DEPLOY_EXIT_CODE="${DEPLOY_EXIT}"
+          : > "${BUILD_FILE}"
+          : > "${DEPS_FILE}"
+
+          attempt=1
+          while [[ "${attempt}" -le 3 ]]; do
+            HOMEPAGE_STATUS="$(curl -sS --max-time 20 -o "${HOME_FILE}" -w '%{http_code}' https://audiolad.ru/ || true)"
+            BUILD_STATUS="$(curl -sS --max-time 20 -o "${BUILD_FILE}" -w '%{http_code}' https://audiolad.ru/api/health/build || true)"
+            DEPS_STATUS="$(curl -sS --max-time 20 -o "${DEPS_FILE}" -w '%{http_code}' https://audiolad.ru/api/health/dependencies || true)"
+            export HOMEPAGE_STATUS BUILD_STATUS DEPS_STATUS
+            set +e
+            node "${POLICY}" health
+            HEALTH_CODE=$?
+            set -e
+            if [[ "${HEALTH_CODE}" -eq 0 ]]; then
+              break
+            fi
+            attempt=$((attempt + 1))
+            sleep 2
+          done
+
+          set +e
+          node "${POLICY}" complete
+          COMPLETE_CODE=$?
+          publish_result
+          PUBLISH_CODE=$?
+          set -e
+          if [[ "${COMPLETE_CODE}" -ne 0 || "${PUBLISH_CODE}" -ne 0 ]]; then
+            exit 1
+          fi
