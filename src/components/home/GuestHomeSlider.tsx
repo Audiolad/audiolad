@@ -135,6 +135,17 @@ export default function GuestHomeSlider() {
     });
   };
 
+  const scrollToPreviousSlide = () => {
+    const previousIndex =
+      (activeIndex - 1 + GUEST_HOME_SLIDES.length) % GUEST_HOME_SLIDES.length;
+    scrollToSlide(previousIndex);
+  };
+
+  const scrollToNextSlide = () => {
+    const nextIndex = (activeIndex + 1) % GUEST_HOME_SLIDES.length;
+    scrollToSlide(nextIndex);
+  };
+
   const onPointerDown = (event: PointerEvent<HTMLUListElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
       return;
@@ -188,38 +199,76 @@ export default function GuestHomeSlider() {
       aria-label="Возможности АудиоЛада"
       data-guest-home-slider
     >
-      <ul
-        ref={trackRef}
-        className="guest-home-slider__track"
-        aria-label="Слайды для гостей"
-        tabIndex={0}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerCancel}
-        onPointerCancel={onPointerCancel}
-        onKeyDown={onTrackKeyDown}
-      >
-        {GUEST_HOME_SLIDES.map((slide, index) => (
-          <li key={slide.id} className="guest-home-slider__item">
-            <Link
-              href={slide.href}
-              target={slide.target}
-              rel={slide.rel}
-              aria-label={slide.ariaLabel}
-              data-guest-home-slide={slide.id}
-              className="guest-home-slider__link"
-              onClick={onSlideClick}
-            >
-              <span className="guest-home-slider__media">
-                <GuestHomeSlideImage
-                  slide={slide}
-                  priority={index === 0}
-                />
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <div className="guest-home-slider__viewport">
+        <ul
+          ref={trackRef}
+          className="guest-home-slider__track"
+          aria-label="Слайды для гостей"
+          tabIndex={0}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerCancel}
+          onPointerCancel={onPointerCancel}
+          onKeyDown={onTrackKeyDown}
+        >
+          {GUEST_HOME_SLIDES.map((slide, index) => (
+            <li key={slide.id} className="guest-home-slider__item">
+              <Link
+                href={slide.href}
+                target={slide.target}
+                rel={slide.rel}
+                aria-label={slide.ariaLabel}
+                data-guest-home-slide={slide.id}
+                className="guest-home-slider__link"
+                onClick={onSlideClick}
+              >
+                <span className="guest-home-slider__media">
+                  <GuestHomeSlideImage
+                    slide={slide}
+                    priority={index === 0}
+                  />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <button
+          type="button"
+          className="guest-home-slider__arrow guest-home-slider__arrow--previous"
+          aria-label="Предыдущий слайд"
+          onClick={scrollToPreviousSlide}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="m15 18-6-6 6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          className="guest-home-slider__arrow guest-home-slider__arrow--next"
+          aria-label="Следующий слайд"
+          onClick={scrollToNextSlide}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="m9 18 6-6-6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
 
       <nav
         className="guest-home-slider__dots"
