@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import LegalFooter from "@/components/LegalFooter";
 import HomeMobileHeader from "@/components/listener/HomeMobileHeader";
+import LivePublicRouteSync from "@/components/public-content/LivePublicRouteSync";
 import { getListenerShellData } from "@/lib/listener/shell-data";
 
 export default async function HomeListenerLayout({
@@ -14,6 +15,7 @@ export default async function HomeListenerLayout({
   return (
     <>
       <HomeMobileHeader shellData={shellData} />
+      <LivePublicRouteSync />
 
       <div className="listener-home-content px-5 lg:px-10 xl:px-6 xl:pt-4 xl:pb-5">
         {children}

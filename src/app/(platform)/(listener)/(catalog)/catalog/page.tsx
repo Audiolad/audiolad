@@ -108,7 +108,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     defaultListing ??
     (await listPublishedCatalog(supabase, resolvedListingQuery, { visitorId }));
 
-  const hasAnyProducts = listing.items.length > 0;
   const isTopicFiltered = activeTopicKeys.length > 0;
   const isSectionFiltered = activeSection !== null;
   const isAccessFiltered = resolvedListingQuery.access !== "all";
@@ -170,71 +169,70 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         </p>
       ) : null}
 
-      {hasAnyProducts ? (
-        <CatalogProductGrid
-          key={[
-            resolvedListingQuery.q,
-            resolvedListingQuery.topic,
-            resolvedListingQuery.section,
-            resolvedListingQuery.access,
-            resolvedListingQuery.class,
-            resolvedListingQuery.sort,
-          ].join("|")}
-          initialItems={listing.items}
-          initialNextCursor={listing.nextCursor}
-          query={resolvedListingQuery}
-          isAuthenticated={Boolean(authUser)}
-          signInReturnPath={signInReturnPath}
-        />
-      ) : (
-        <section className="mt-8">
-          <div className="rounded-[24px] border border-[#e8def5] bg-[#faf6ff] px-5 py-8 text-center">
-            {isSearchActive ? (
-              <>
-                <p className="text-[15px] font-medium text-[#5f3f9d]">
-                  По запросу «{searchQuery}» ничего не найдено
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                  Попробуйте изменить запрос или выбрать другую тему.
-                </p>
-                <Link
-                  href={clearSearchHref}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-[#ddcfef] bg-white px-5 py-2 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-                >
-                  Очистить поиск
-                </Link>
-              </>
-            ) : isListingFiltered ? (
-              <>
-                <p className="text-[15px] font-medium text-[#5f3f9d]">
-                  {activeTopicTitle
-                    ? `В выбранных фильтрах по ${activeTopicKeys.length > 1 ? "темам" : "теме"} «${activeTopicTitle}» пока нет аудиопродуктов.`
-                    : "По выбранным фильтрам пока нет аудиопродуктов."}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                  Посмотрите{" "}
+      <CatalogProductGrid
+        key={[
+          resolvedListingQuery.q,
+          resolvedListingQuery.topic,
+          resolvedListingQuery.section,
+          resolvedListingQuery.access,
+          resolvedListingQuery.class,
+          resolvedListingQuery.sort,
+        ].join("|")}
+        initialItems={listing.items}
+        initialNextCursor={listing.nextCursor}
+        query={resolvedListingQuery}
+        isAuthenticated={Boolean(authUser)}
+        signInReturnPath={signInReturnPath}
+        emptyState={
+          <section className="mt-8">
+            <div className="rounded-[24px] border border-[#e8def5] bg-[#faf6ff] px-5 py-8 text-center">
+              {isSearchActive ? (
+                <>
+                  <p className="text-[15px] font-medium text-[#5f3f9d]">
+                    По запросу «{searchQuery}» ничего не найдено
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                    Попробуйте изменить запрос или выбрать другую тему.
+                  </p>
                   <Link
-                    href={catalogRootHref}
-                    className="font-medium text-[#7042c5] underline-offset-2 hover:underline"
+                    href={clearSearchHref}
+                    className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full border border-[#ddcfef] bg-white px-5 py-2 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                   >
-                    весь каталог
+                    Очистить поиск
                   </Link>
-                  .
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-[15px] font-medium text-[#5f3f9d]">
-                  В каталоге пока нет опубликованных аудиопродуктов.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
-                  Новые аудиопродукты скоро появятся.
-                </p>
-              </>
-            )}
-          </div>
-        </section>
-      )}
+                </>
+              ) : isListingFiltered ? (
+                <>
+                  <p className="text-[15px] font-medium text-[#5f3f9d]">
+                    {activeTopicTitle
+                      ? `В выбранных фильтрах по ${activeTopicKeys.length > 1 ? "темам" : "теме"} «${activeTopicTitle}» пока нет аудиопродуктов.`
+                      : "По выбранным фильтрам пока нет аудиопродуктов."}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                    Посмотрите{" "}
+                    <Link
+                      href={catalogRootHref}
+                      className="font-medium text-[#7042c5] underline-offset-2 hover:underline"
+                    >
+                      весь каталог
+                    </Link>
+                    .
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[15px] font-medium text-[#5f3f9d]">
+                    В каталоге пока нет опубликованных аудиопродуктов.
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#7d70a2]">
+                    Новые аудиопродукты скоро появятся.
+                  </p>
+                </>
+              )}
+            </div>
+          </section>
+        }
+      />
     </>
   );
 }
