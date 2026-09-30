@@ -7,6 +7,11 @@ production и **не устанавливает** wrapper на сервер.
 Канонический путь деплоя не меняется. Actions только запускает уже
 существующий launcher.
 
+Узкий вызов `deploy(commit_sha)` для AI Company — отдельный workflow
+`Deployment Bridge` (`.github/workflows/deployment-bridge.yml`,
+`docs/deployment-bridge.md`). Он не добавляет режимы в этот workflow и
+не заменяет ручной `confirm=DEPLOY`.
+
 ## Архитектура
 
 ```text
