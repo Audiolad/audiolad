@@ -17,6 +17,28 @@ CREATE INDEX IF NOT EXISTS practices_due_scheduled_publish_idx
     AND moderation_status = 'approved'
     AND scheduled_publish_at IS NOT NULL;
 
+ALTER TABLE public.practice_moderation_events
+  DROP CONSTRAINT IF EXISTS practice_moderation_events_action_check;
+
+ALTER TABLE public.practice_moderation_events
+  ADD CONSTRAINT practice_moderation_events_action_check CHECK (
+    action = ANY (
+      ARRAY[
+        'submitted'::text,
+        'resubmitted'::text,
+        'submission_withdrawn'::text,
+        'changes_requested'::text,
+        'approved_scheduled'::text,
+        'approved_and_published'::text,
+        'unpublished'::text,
+        'republished'::text,
+        'edit_mode_started'::text,
+        'deleted'::text,
+        'migration_backfill'::text
+      ]
+    )
+  );
+
 -- Lock the release time together with the moderated snapshot. Server lifecycle
 -- RPCs may clear it using the transaction-local allow flag.
 CREATE OR REPLACE FUNCTION public.guard_practices_scheduled_publish_immutable()
