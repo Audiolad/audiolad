@@ -95,6 +95,7 @@ jobs:
           npx tsx scripts/business-landing-unit.mts
           npm run test:music-lab
           npm run test:scheduled-publication
+          npm run test:ai-company-dashboard
           npm run build
           npm run typecheck
           npm run test:author-project-cyrillic-name
