@@ -389,7 +389,7 @@ function assertLifecycleFunctionDoesNotResetProductHistory(name) {
   assert.doesNotMatch(
     lifecycle.body,
     /\b(?:DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?|UPDATE)\s+public\.(?:practice_ratings|practice_rating_events|practice_listen_stats|playback_usage_facts)\b/i,
-    \`\${name} must not reset ratings or listening history\`,
+    "lifecycle " + name + " must not reset ratings or listening history",
   );
 }
 
