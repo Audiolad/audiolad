@@ -10,6 +10,7 @@ import {
   HEALTH_BUILD_URL,
   HEALTH_DEPENDENCIES_URL,
   HOMEPAGE_URL,
+  IGNORED_EVIDENCE_CHECK_NAMES,
   REMOTE_DEPLOY_COMMAND,
   REQUIRED_CHECK_NAME,
   REQUIRED_STATUS_CONTEXT,
@@ -305,6 +306,146 @@ function testGateRejectsTreeMismatchAndRedCi() {
     }),
   );
   assert.equal(redOnDeployShaBlocksEqualParent.error, "ci_not_green");
+}
+
+function testGateAcceptsTwoParentMergeAfterBridgeAndRunnerNoise() {
+  const bridgeJobNoise = [
+    {
+      name: "Gate commit",
+      status: "completed",
+      conclusion: "failure",
+      completed_at: "2026-09-30T18:45:57.000Z",
+    },
+    {
+      name: "Gate commit",
+      status: "in_progress",
+      conclusion: null,
+      started_at: "2026-09-30T18:46:10.000Z",
+    },
+    {
+      name: "Deploy pinned SHA",
+      status: "completed",
+      conclusion: "skipped",
+      completed_at: "2026-09-30T18:45:58.000Z",
+    },
+    {
+      name: "Refuse dispatch outside main",
+      status: "completed",
+      conclusion: "skipped",
+      completed_at: "2026-09-30T18:45:43.000Z",
+    },
+    {
+      name: BRIDGE_STATUS_CONTEXT,
+      status: "completed",
+      conclusion: "failure",
+      completed_at: "2026-09-30T18:45:55.000Z",
+    },
+  ];
+  const decision = evaluateGate(
+    mergeFacts({
+      checks: {
+        [MERGE]: bridgeJobNoise,
+        [HEAD]: [
+          {
+            name: REQUIRED_CHECK_NAME,
+            status: "completed",
+            conclusion: "success",
+            completed_at: "2026-09-30T18:39:24.000Z",
+          },
+          {
+            name: REQUIRED_CHECK_NAME,
+            status: "completed",
+            conclusion: "success",
+            completed_at: "2026-09-30T18:50:49.000Z",
+          },
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "success",
+            completed_at: "2026-09-30T18:33:49.000Z",
+          },
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "failure",
+            completed_at: "2026-09-30T18:45:29.000Z",
+          },
+        ],
+      },
+      statuses: {
+        [MERGE]: [{ context: BRIDGE_STATUS_CONTEXT, state: "failure" }],
+        [HEAD]: [
+          {
+            context: REQUIRED_STATUS_CONTEXT,
+            state: "success",
+            updated_at: "2026-09-30T18:33:42.000Z",
+          },
+        ],
+      },
+    }),
+  );
+  assert.equal(decision.ok, true);
+  assert.equal(decision.deploySha, MERGE);
+  assert.equal(decision.ciSubjectSha, HEAD);
+
+  const laterSkippedRunner = evaluateGate(
+    mergeFacts({
+      checks: {
+        [MERGE]: bridgeJobNoise,
+        [HEAD]: greenChecks([
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "failure",
+            completed_at: "2026-09-30T18:45:29.000Z",
+          },
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "skipped",
+            completed_at: "2026-09-30T18:46:00.000Z",
+          },
+        ]),
+      },
+    }),
+  );
+  assert.equal(laterSkippedRunner.ok, true);
+  assert.equal(laterSkippedRunner.ciSubjectSha, HEAD);
+
+  const runnerDoesNotReplaceRequiredEvidence = evaluateGate(
+    mergeFacts({
+      checks: {
+        [MERGE]: bridgeJobNoise,
+        [HEAD]: [
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "success",
+            completed_at: "2026-09-30T18:33:49.000Z",
+          },
+        ],
+      },
+      statuses: {
+        [MERGE]: [],
+        [HEAD]: [{ context: REQUIRED_STATUS_CONTEXT, state: "success" }],
+      },
+    }),
+  );
+  assert.equal(runnerDoesNotReplaceRequiredEvidence.ok, false);
+  assert.equal(runnerDoesNotReplaceRequiredEvidence.error, "ci_not_green");
+
+  const unrelatedMergeFailureStillBlocks = evaluateGate(
+    mergeFacts({
+      checks: {
+        [MERGE]: [
+          ...bridgeJobNoise,
+          { name: "extra", status: "completed", conclusion: "failure" },
+        ],
+        [HEAD]: greenChecks(),
+      },
+    }),
+  );
+  assert.equal(unrelatedMergeFailureStillBlocks.error, "ci_not_green");
 }
 
 function testHealthAndClassification() {
@@ -719,7 +860,16 @@ function testWorkflowContract() {
   assert.match(docs, /repository_dispatch/);
   assert.match(docs, /PR Repository Validation/);
   assert.match(docs, /Production \/ PR Safety/);
+  assert.match(docs, /Production \/ PR Safety Runner/);
   assert.match(docs, /sudo -n \/usr\/local\/sbin\/audiolad-deploy/);
+  const ignoredChecks = new Set(IGNORED_EVIDENCE_CHECK_NAMES);
+  for (const job of Object.values(workflow.jobs)) {
+    assert.equal(typeof job.name, "string");
+    assert.equal(ignoredChecks.has(job.name), true, job.name);
+    assert.match(docs, new RegExp(job.name.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.equal(ignoredChecks.has(REQUIRED_CHECK_NAME), false);
+  assert.equal(ignoredChecks.has("Production / PR Safety Runner"), true);
   assert.match(docs, /не деплоит/);
 }
 
@@ -729,6 +879,7 @@ async function main() {
   testGateAllowsCiOnTheDeployShaItself();
   testGateRejectsOffMainAndBadShapes();
   testGateRejectsTreeMismatchAndRedCi();
+  testGateAcceptsTwoParentMergeAfterBridgeAndRunnerNoise();
   testHealthAndClassification();
   await testPublication();
   await testLoadGateFactsDoesNotFetchCiOffMain();
