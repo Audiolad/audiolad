@@ -5,6 +5,7 @@ import {
   parseCatalogListingQuery,
 } from "@/lib/catalog/listing";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
+    await releaseDueScheduledPublications();
     const visitorId = await readPriceVisitorId();
     const result = await listPublishedCatalog(supabase, query, { visitorId });
 

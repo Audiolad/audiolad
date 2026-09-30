@@ -7,6 +7,10 @@ import {
 } from "@/lib/author-products/moderation";
 import { getProductKindLabel } from "@/lib/author-products/product-kind";
 import { getProductPriceLabel } from "@/lib/products/price-format";
+import {
+  adminAwaitingPublicationLabel,
+  adminScheduledPublicationLine,
+} from "@/lib/products/scheduled-publication";
 
 type ProductModerationListProps = {
   products: AdminProductModerationListItem[];
@@ -126,7 +130,19 @@ export default function ProductModerationList({
                       {formatDateTime(product.moderationSubmittedAt)}
                     </td>
                     <td className="px-4 py-4 text-[#796ba0]">
-                      <div>{getVisibleAuthorProductStatusLabel(visible)}</div>
+                      <div>
+                        {adminAwaitingPublicationLabel({
+                          status: product.status,
+                          moderationStatus: product.moderationStatus,
+                          scheduledPublishAt: product.scheduledPublishAt,
+                          publishedAt: product.publishedAt,
+                        }) ?? getVisibleAuthorProductStatusLabel(visible)}
+                      </div>
+                      {adminScheduledPublicationLine(product.scheduledPublishAt) ? (
+                        <div className="mt-1 text-xs">
+                          {adminScheduledPublicationLine(product.scheduledPublishAt)}
+                        </div>
+                      ) : null}
                       <div className="mt-1 text-xs">
                         {product.status} / {product.moderationStatus}
                       </div>

@@ -14,6 +14,11 @@ import {
   requestProductChangesAction,
 } from "@/app/(platform)/admin/product-moderation/actions";
 import { ADMIN_PRODUCT_MODERATION_CHECKLIST } from "@/lib/admin/product-moderation-checklist";
+import {
+  adminAwaitingPublicationLabel,
+  adminScheduledPublicationLine,
+  isPracticePubliclyAvailable,
+} from "@/lib/products/scheduled-publication";
 import type { AdminProductModerationDetail } from "@/lib/admin/product-moderation-queries";
 import {
   getVisibleAuthorProductStatus,
@@ -215,8 +220,20 @@ export default function ProductModerationReviewForm({
     moderationStatus: product.moderationStatus,
   });
   const isAwaitingDecision = product.moderationStatus === "submitted";
+  const productIsPublic = isPracticePubliclyAvailable({
+    status: product.status,
+    scheduledPublishAt: product.scheduledPublishAt,
+    publishedAt: product.publishedAt,
+  });
+  const scheduleLine = adminScheduledPublicationLine(product.scheduledPublishAt);
+  const awaitingLabel = adminAwaitingPublicationLabel({
+    status: product.status,
+    moderationStatus: product.moderationStatus,
+    scheduledPublishAt: product.scheduledPublishAt,
+    publishedAt: product.publishedAt,
+  });
   const publicPath =
-    product.authorSlug && product.slug
+    productIsPublic && product.authorSlug && product.slug
       ? buildPracticePublicPath(product.authorSlug, product.slug)
       : null;
 
@@ -243,9 +260,12 @@ export default function ProductModerationReviewForm({
             ) : null}
           </div>
           <span className="rounded-full bg-[#f4eefe] px-3 py-1 text-xs font-semibold text-[#7042c5]">
-            {getVisibleAuthorProductStatusLabel(visible)}
+            {awaitingLabel ?? getVisibleAuthorProductStatusLabel(visible)}
           </span>
         </div>
+        {scheduleLine ? (
+          <p className="mt-3 text-sm font-medium text-[#25135c]">{scheduleLine}</p>
+        ) : null}
 
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div>
@@ -374,7 +394,7 @@ export default function ProductModerationReviewForm({
           Bypass модерации:{" "}
           {product.authorCanBypass ? "включён" : "выключен"}
         </p>
-        {publicPath && product.status === "published" ? (
+        {publicPath && productIsPublic ? (
           <p className="mt-3">
             <Link
               href={publicPath}

@@ -1,5 +1,10 @@
 import { catalogSectionForProductForm } from "@/lib/author-products/catalog-section-field";
 import {
+  PUBLICATION_MODE,
+  utcIsoToMskFields,
+  type PublicationMode,
+} from "@/lib/products/scheduled-publication";
+import {
   parseAudioPostFormat,
   parsePracticeFormat,
 } from "@/lib/author-products/format";
@@ -82,6 +87,10 @@ export type ProductFormSnapshot = {
   moderationReviewComment: string | null;
   moderationAttempt: number;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
+  publicationMode: PublicationMode;
+  publishDate: string;
+  publishTime: string;
 };
 
 export function productDetailToFormSnapshot(
@@ -186,6 +195,12 @@ export function productDetailToFormSnapshot(
     moderationReviewComment: practice.moderation_review_comment ?? null,
     moderationAttempt: practice.moderation_attempt ?? 0,
     publishedAt: practice.published_at,
+    scheduledPublishAt: practice.scheduled_publish_at,
+    publicationMode: practice.scheduled_publish_at
+      ? PUBLICATION_MODE.SCHEDULED
+      : PUBLICATION_MODE.AFTER_APPROVAL,
+    publishDate: utcIsoToMskFields(practice.scheduled_publish_at)?.date ?? "",
+    publishTime: utcIsoToMskFields(practice.scheduled_publish_at)?.time ?? "",
   };
 }
 
@@ -239,6 +254,9 @@ export function mergeServerProductIntoForm(
     seoAbout: current.seoAbout,
     authorRecommendationsTitle: current.authorRecommendationsTitle,
     seoContent: current.seoContent,
+    publicationMode: current.publicationMode,
+    publishDate: current.publishDate,
+    publishTime: current.publishTime,
     coverUrl: server.coverUrl ?? current.coverUrl,
     coverVersion: server.coverUrl ? server.coverVersion : current.coverVersion,
   };

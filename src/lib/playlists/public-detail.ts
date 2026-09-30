@@ -48,6 +48,8 @@ type PracticeEmbed = {
   status: string | null;
   is_catalog_listed: boolean | null;
   catalog_visibility?: string | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
   authors: AuthorEmbed | AuthorEmbed[] | null;
 };
 
@@ -213,6 +215,8 @@ export const loadPublicPlaylistBySlug = cache(
         status,
         is_catalog_listed,
         catalog_visibility,
+        scheduled_publish_at,
+        published_at,
         authors!practices_author_id_fkey (
           name,
           slug
@@ -285,6 +289,8 @@ export const loadPublicPlaylistBySlug = cache(
         is_catalog_listed: practice.is_catalog_listed,
         catalog_visibility: practice.catalog_visibility,
         cover_image: practice.cover_image,
+        scheduled_publish_at: practice.scheduled_publish_at,
+        published_at: practice.published_at,
       });
 
       const author = normalizeOne(practice.authors);

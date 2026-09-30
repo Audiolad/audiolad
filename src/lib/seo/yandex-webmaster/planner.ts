@@ -76,6 +76,8 @@ export function planPracticeYandexRecrawl(input: {
   changedFields?: ReadonlyArray<string>;
   authorSlug: string;
   practiceSlug: string;
+  /** Approved earlier; this call is the first moment the page is public. */
+  firstPublicGoLive?: boolean;
 }): YandexRecrawlPlan | null {
   const authorSlug = input.authorSlug.trim();
   const practiceSlug = input.practiceSlug.trim();
@@ -98,7 +100,8 @@ export function planPracticeYandexRecrawl(input: {
   }
 
   const previousStatus = input.previousStatus ?? null;
-  const becamePublished = previousStatus !== "published";
+  const becamePublished =
+    previousStatus !== "published" || input.firstPublicGoLive === true;
   const url = buildPracticeCanonicalUrl(authorSlug, practiceSlug);
 
   if (becamePublished) {

@@ -420,7 +420,7 @@ export async function requirePracticeAccess(practiceId: string) {
   const { data: practice, error: practiceError } = await dataClient
     .from("practices")
     .select(
-      "id, author_id, status, moderation_status, deleted_at, slug, published_at, use_shared_cover, is_free, price, product_kind, publication_class, music_usage_permission, studio_music_pricing_mode, studio_music_price_minor, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab, is_catalog_listed, catalog_visibility",
+      "id, author_id, status, moderation_status, deleted_at, slug, published_at, scheduled_publish_at, use_shared_cover, is_free, price, product_kind, publication_class, music_usage_permission, studio_music_pricing_mode, studio_music_price_minor, promo_enabled, promo_title, promo_text, promo_button_text, promo_url, promo_open_in_new_tab, is_catalog_listed, catalog_visibility",
     )
     .eq("id", practiceId)
     .maybeSingle();
@@ -458,6 +458,7 @@ export async function requirePracticeAccess(practiceId: string) {
         deleted_at: string | null;
         slug: string;
         published_at: string | null;
+        scheduled_publish_at?: string | null;
         use_shared_cover: boolean;
         is_free?: boolean | null;
         price?: number | null;
@@ -513,6 +514,7 @@ export async function requirePracticeAccess(practiceId: string) {
       deleted_at: string | null;
       slug: string;
       published_at: string | null;
+      scheduled_publish_at?: string | null;
       use_shared_cover: boolean;
       is_free?: boolean | null;
       price?: number | null;

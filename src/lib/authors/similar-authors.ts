@@ -10,6 +10,7 @@ import {
 } from "@/lib/fixtures/test-fixture-marker";
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import {
   POSTGREST_IN_FILTER_CHUNK_SIZE,
   chunkIds,
@@ -79,7 +80,8 @@ export async function findSimilarAuthors(
   _authorSlug: string,
   authorTopicKeys: string[],
 ): Promise<SimilarAuthorCard[]> {
-  const { data: publishedPractices, error } = await supabase
+  const { data: publishedPractices, error } = await applyPracticePublicAvailabilityFilter(
+    supabase
     .from("practices")
     .select(
       `
@@ -98,7 +100,8 @@ export async function findSimilarAuthors(
     )
     .eq("status", "published")
     .eq("is_catalog_listed", true)
-    .neq("author_id", authorId);
+    .neq("author_id", authorId),
+  );
 
   if (error || !publishedPractices?.length) {
     return [];

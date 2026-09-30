@@ -137,7 +137,9 @@ export async function listPlaylistMembershipForPractice(
 }> {
   const { data: practiceRow, error: practiceError } = await supabase
     .from("practices")
-    .select("id, author_id, status, is_free, price, is_catalog_listed")
+    .select(
+      "id, author_id, status, is_free, price, is_catalog_listed, scheduled_publish_at, published_at",
+    )
     .eq("id", practiceId)
     .maybeSingle();
 

@@ -527,10 +527,13 @@ function testListingsKeepUnlistedOut() {
     },
   };
   applyOrdinaryCatalogEligibility(query);
-  assert.deepEqual(calls, [
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.slice(0, 2), [
     ["eq", "status", "published"],
     ["eq", "catalog_visibility", "listed"],
   ]);
+  assert.equal(calls[2][0], "or");
+  assert.match(String(calls[2][1]), /scheduled_publish_at\.is\.null/);
 
   const authorPage = read("src/lib/authors/public-page.ts");
   assert.match(authorPage, /\.eq\("is_catalog_listed", true\)/);

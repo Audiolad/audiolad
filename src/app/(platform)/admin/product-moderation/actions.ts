@@ -11,6 +11,10 @@ import {
 } from "@/lib/author-products/admin-moderation-actions";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import {
+  formatMskPublicationStamp,
+  isPracticePubliclyAvailable,
+} from "@/lib/products/scheduled-publication";
+import {
   countAuthorPublishedPractices,
   loadAuthorSlug,
 } from "@/lib/seo/indexnow/hooks";
@@ -80,10 +84,19 @@ export async function approveAndPublishProductAction(
   }
 
   const detail = await getAdminProductModerationDetail(practiceId);
+  const publiclyAvailable = isPracticePubliclyAvailable({
+    status: publishedPractice.status,
+    scheduledPublishAt: publishedPractice.scheduled_publish_at,
+    publishedAt: publishedPractice.published_at,
+  });
   const publicPath =
-    detail?.authorSlug && detail.slug
+    publiclyAvailable && detail?.authorSlug && detail.slug
       ? buildPracticePublicPath(detail.authorSlug, detail.slug)
       : undefined;
+  const scheduledStamp = formatMskPublicationStamp(
+    publishedPractice.scheduled_publish_at,
+    { withYear: false },
+  );
 
   const authorSlug =
     detail?.authorSlug ||
@@ -100,6 +113,7 @@ export async function approveAndPublishProductAction(
       isCatalogListed: publishedPractice.is_catalog_listed,
       isFirstPublishOfPractice,
       publishedCountBefore,
+      publiclyAvailable,
     });
   }
 
@@ -115,7 +129,10 @@ export async function approveAndPublishProductAction(
 
   return {
     ok: true,
-    message: "Продукт одобрен и опубликован.",
+    message:
+      publiclyAvailable || !scheduledStamp
+        ? "Продукт одобрен и опубликован."
+        : `Одобрено. Публикация запланирована на ${scheduledStamp}`,
     publicPath,
   };
 }

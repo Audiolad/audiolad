@@ -45,6 +45,7 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
   catalog_visibility,
   updated_at,
   published_at,
+  scheduled_publish_at,
   created_at,
   authors!practices_author_id_fkey (
     name,
@@ -139,6 +140,7 @@ type CatalogPracticeSearchRow = {
   catalog_visibility?: string | null;
   updated_at: string | null;
   published_at: string | null;
+  scheduled_publish_at?: string | null;
   created_at: string | null;
   authors:
     | { name: string; slug: string }

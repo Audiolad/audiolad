@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -152,5 +154,5 @@ export function applyOrdinaryCatalogEligibility<T>(
     next = next.not("id", "in", postgrestInList(hidden)) as typeof q;
   }
 
-  return next as T;
+  return applyPracticePublicAvailabilityFilter(next) as T;
 }

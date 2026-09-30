@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  applyPracticePublicAvailabilityFilter,
+  isPracticePubliclyAvailable,
+} from "@/lib/products/scheduled-publication";
+
 import type { AuthorType } from "./constants";
 import {
   isAuthorContactPlatform,
@@ -121,7 +126,9 @@ export async function getAuthorProfileDetail(
         price,
         is_free,
         status,
-        author_id
+        author_id,
+        scheduled_publish_at,
+        published_at
       )
     `,
     )
@@ -138,7 +145,11 @@ export async function getAuthorProfileDetail(
     if (
       !practice?.id ||
       practice.author_id !== authorId ||
-      practice.status !== "published"
+      !isPracticePubliclyAvailable({
+        status: practice.status,
+        scheduledPublishAt: practice.scheduled_publish_at as string | null,
+        publishedAt: practice.published_at as string | null,
+      })
     ) {
       continue;
     }
@@ -271,7 +282,7 @@ export async function replaceAuthorFeaturedProducts(
 
   const { data: products, error: productsError } = await supabase
     .from("practices")
-    .select("id, author_id, status")
+    .select("id, author_id, status, scheduled_publish_at, published_at")
     .in("id", productIds);
 
   if (productsError) {
@@ -293,7 +304,13 @@ export async function replaceAuthorFeaturedProducts(
       return { ok: false, code: "featured_product_forbidden" };
     }
 
-    if (product.status !== "published") {
+    if (
+      !isPracticePubliclyAvailable({
+        status: product.status,
+        scheduledPublishAt: product.scheduled_publish_at,
+        publishedAt: product.published_at,
+      })
+    ) {
       return { ok: false, code: "featured_product_not_published" };
     }
   }
@@ -399,12 +416,15 @@ export async function listAuthorPublishedProductsForPicker(
     is_free: boolean | null;
   }>
 > {
-  const { data, error } = await supabase
-    .from("practices")
-    .select("id, title, slug, format, cover_url, price, is_free")
-    .eq("author_id", authorId)
-    .eq("status", "published")
-    .order("created_at", { ascending: false });
+  const { data, error } = await applyPracticePublicAvailabilityFilter(
+    supabase
+      .from("practices")
+      .select(
+        "id, title, slug, format, cover_url, price, is_free, scheduled_publish_at, published_at",
+      )
+      .eq("author_id", authorId)
+      .eq("status", "published"),
+  ).order("created_at", { ascending: false });
 
   if (error) {
     return [];

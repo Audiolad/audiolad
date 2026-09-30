@@ -12,6 +12,7 @@ import { mapCuratedMaxRecommendations } from "@/lib/max/product-recommendations"
 import type { MaxProductDetailView } from "@/lib/max/product-view";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { loadPublicPracticeSeoContent } from "@/lib/products/practice-seo-content";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
@@ -59,6 +60,7 @@ export async function getMaxPublishedProduct(
     const normalizedProduct = productSlug.trim();
     if (!normalizedAuthor || !normalizedProduct) return { ok: true, product: null };
     const service = createServiceRoleClient();
+    await releaseDueScheduledPublications();
     const products = await getPublishedCatalogProducts(service, {
       viewer: GUEST_ORDINARY_CATALOG_VIEWER,
       throwOnStorageError: true,
