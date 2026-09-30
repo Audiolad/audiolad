@@ -135,6 +135,14 @@ export default function GuestHomeSlider() {
     });
   };
 
+  const scrollToPreviousSlide = () => {
+    scrollToSlide(Math.max(activeIndex - 1, 0));
+  };
+
+  const scrollToNextSlide = () => {
+    scrollToSlide(Math.min(activeIndex + 1, GUEST_HOME_SLIDES.length - 1));
+  };
+
   const onPointerDown = (event: PointerEvent<HTMLUListElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
       return;
@@ -188,38 +196,78 @@ export default function GuestHomeSlider() {
       aria-label="Возможности АудиоЛада"
       data-guest-home-slider
     >
-      <ul
-        ref={trackRef}
-        className="guest-home-slider__track"
-        aria-label="Слайды для гостей"
-        tabIndex={0}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerCancel}
-        onPointerCancel={onPointerCancel}
-        onKeyDown={onTrackKeyDown}
-      >
-        {GUEST_HOME_SLIDES.map((slide, index) => (
-          <li key={slide.id} className="guest-home-slider__item">
-            <Link
-              href={slide.href}
-              target={slide.target}
-              rel={slide.rel}
-              aria-label={slide.ariaLabel}
-              data-guest-home-slide={slide.id}
-              className="guest-home-slider__link"
-              onClick={onSlideClick}
-            >
-              <span className="guest-home-slider__media">
-                <GuestHomeSlideImage
-                  slide={slide}
-                  priority={index === 0}
-                />
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <div className="guest-home-slider__viewport">
+        <ul
+          ref={trackRef}
+          className="guest-home-slider__track"
+          aria-label="Слайды для гостей"
+          tabIndex={0}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerCancel}
+          onPointerCancel={onPointerCancel}
+          onKeyDown={onTrackKeyDown}
+        >
+          {GUEST_HOME_SLIDES.map((slide, index) => (
+            <li key={slide.id} className="guest-home-slider__item">
+              <Link
+                href={slide.href}
+                target={slide.target}
+                rel={slide.rel}
+                aria-label={slide.ariaLabel}
+                data-guest-home-slide={slide.id}
+                className="guest-home-slider__link"
+                onClick={onSlideClick}
+              >
+                <span className="guest-home-slider__media">
+                  <GuestHomeSlideImage
+                    slide={slide}
+                    priority={index === 0}
+                  />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+
+        <button
+          type="button"
+          className="guest-home-slider__arrow guest-home-slider__arrow--previous"
+          aria-label="Предыдущий слайд"
+          disabled={activeIndex === 0}
+          onClick={scrollToPreviousSlide}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="m15 18-6-6 6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          className="guest-home-slider__arrow guest-home-slider__arrow--next"
+          aria-label="Следующий слайд"
+          disabled={activeIndex === GUEST_HOME_SLIDES.length - 1}
+          onClick={scrollToNextSlide}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="m9 18 6-6-6-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
 
       <nav
         className="guest-home-slider__dots"
