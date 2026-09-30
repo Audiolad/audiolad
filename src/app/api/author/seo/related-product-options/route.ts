@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ options: [] });
     }
 
-    await releaseDueScheduledPublications(supabase);
+    await releaseDueScheduledPublications();
 
     let productQuery = applyPracticePublicAvailabilityFilter(
       supabase

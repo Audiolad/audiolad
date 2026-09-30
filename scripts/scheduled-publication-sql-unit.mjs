@@ -6,12 +6,17 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationName = "20261210120000_practice_scheduled_publication.sql";
 const claimName = "20261211120000_claim_due_scheduled_practice_publications.sql";
+const outboxName = "20261212120000_scheduled_publish_notification_outbox.sql";
 const sql = readFileSync(
   join(repoRoot, "supabase/migrations", migrationName),
   "utf8",
 );
 const claimSql = readFileSync(
   join(repoRoot, "supabase/migrations", claimName),
+  "utf8",
+);
+const outboxSql = readFileSync(
+  join(repoRoot, "supabase/migrations", outboxName),
   "utf8",
 );
 
@@ -28,6 +33,7 @@ const versions = names
 assert(new Set(versions).size === versions.length, "no duplicate migration timestamps");
 assert(versions.includes("20261210120000"), "scheduled publication version listed");
 assert(versions.includes("20261211120000"), "due publication claim version listed");
+assert(versions.includes("20261212120000"), "publish notification outbox version listed");
 assert(sql.includes("ADD COLUMN IF NOT EXISTS scheduled_publish_at timestamptz"), "column");
 assert(sql.includes("practice_is_publicly_available"), "visibility function");
 assert(sql.includes("scheduled_publish_after_release"), "hide-after-release guard");
@@ -78,8 +84,44 @@ assert(
   "claim does not replace the schedule with the read time",
 );
 assert(
-  claimSql.includes("GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO anon, authenticated, service_role"),
-  "public reads can claim due rows",
+  outboxSql.includes("REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM anon"),
+  "anon cannot execute the claim",
+);
+assert(
+  outboxSql.includes("REVOKE ALL ON FUNCTION public.claim_due_scheduled_practice_publications() FROM authenticated"),
+  "authenticated cannot execute the claim",
+);
+assert(
+  outboxSql.includes("GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO service_role"),
+  "service role can execute the claim",
+);
+assert(
+  !outboxSql.includes("GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_practice_publications() TO anon"),
+  "claim is not granted to anon",
+);
+assert(
+  outboxSql.includes("RETURNS integer"),
+  "claim returns a count and not product rows",
+);
+assert(
+  outboxSql.includes("INSERT INTO public.scheduled_publish_notification_outbox"),
+  "pending notification is inserted with the stamp",
+);
+assert(
+  outboxSql.includes("ON CONFLICT (practice_id) DO NOTHING"),
+  "a practice cannot get a second publish event",
+);
+assert(
+  outboxSql.includes("REVOKE ALL ON TABLE public.scheduled_publish_notification_outbox FROM anon"),
+  "anon cannot read the outbox",
+);
+assert(
+  outboxSql.includes("REVOKE ALL ON FUNCTION public.take_pending_scheduled_publish_notifications() FROM anon"),
+  "anon cannot drain notifications",
+);
+assert(
+  outboxSql.includes("FOR UPDATE SKIP LOCKED"),
+  "parallel drains lease distinct rows",
 );
 
 const claimFree = readFileSync(

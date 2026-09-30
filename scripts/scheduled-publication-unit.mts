@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isPublicCatalogPracticeRow } from "../src/lib/fixtures/test-fixture-marker";
 import { resolveProductAccess } from "../src/lib/products/access";
 import { resolveListenAccess } from "../src/lib/listen/access";
 import { resolveLibraryAction } from "../src/lib/products/practice-access-ui";
+import {
+  createMemoryScheduledPublishStore,
+  deliverPendingScheduledPublishEvents,
+  type MemoryScheduledPractice,
+} from "../src/lib/products/scheduled-publish-outbox";
 import { canRevealPublicProductPage } from "../src/lib/products/publish-preview";
 import {
   adminAwaitingPublicationLabel,
@@ -445,5 +452,145 @@ assert.deepEqual(
   await resolveListenAccess(supabase, null, guestPractice, { now: AFTER_GO_LIVE }),
   { mode: "entitled" },
 );
+
+const releaseSource = readFileSync(
+  "src/lib/products/release-due-scheduled-publications.ts",
+  "utf8",
+);
+assert.match(releaseSource, /import "server-only"/);
+assert.match(releaseSource, /createServiceRoleClient\(\)/);
+assert.match(
+  releaseSource,
+  /export async function releaseDueScheduledPublications\(\)/,
+);
+assert.doesNotMatch(
+  releaseSource,
+  /releaseDueScheduledPublications\(\s*[A-Za-z]/,
+);
+
+function listSourceFiles(dir: string): string[] {
+  const entries = readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...listSourceFiles(path));
+      continue;
+    }
+
+    if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) {
+      files.push(path);
+    }
+  }
+
+  return files;
+}
+
+for (const path of listSourceFiles("src")) {
+  if (path.endsWith("release-due-scheduled-publications.ts")) {
+    continue;
+  }
+
+  const source = readFileSync(path, "utf8");
+  assert.doesNotMatch(
+    source,
+    /releaseDueScheduledPublications\(\s*[^)\s]/,
+    `${path} must not pass a user client into the claim`,
+  );
+}
+
+function duePractice(
+  id: string,
+  catalogVisibility: string,
+): MemoryScheduledPractice {
+  return {
+    id,
+    authorId: "author-1",
+    practiceSlug: `slug-${id}`,
+    authorSlug: "author",
+    catalogVisibility,
+    isCatalogListed: catalogVisibility === "listed",
+    status: "published",
+    scheduledPublishAt: "2026-10-15T07:00:00.000Z",
+    publishedAt: null,
+  };
+}
+
+const hidden = duePractice("hidden-1", "selected_users");
+const guard = createMemoryScheduledPublishStore(
+  () => Date.parse("2026-10-15T07:00:01.000Z"),
+);
+assert.throws(
+  () => guard.claim("anon", [hidden]),
+  /permission denied/,
+  "anon cannot call the claim",
+);
+assert.throws(
+  () => guard.claim("authenticated", [hidden]),
+  /permission denied/,
+  "authenticated cannot call the claim",
+);
+assert.equal(hidden.publishedAt, null, "denied claim does not stamp");
+const hiddenClaim = guard.claim("service_role", [hidden]);
+assert.equal(hiddenClaim, 1);
+assert.equal(typeof hiddenClaim, "number");
+assert.equal(JSON.stringify(hiddenClaim).includes("slug-hidden-1"), false);
+assert.equal(hidden.publishedAt, "2026-10-15T07:00:00.000Z");
+assert.throws(
+  () => guard.take("anon"),
+  /permission denied/,
+  "anon cannot read claimed selected_users rows",
+);
+
+const once = createMemoryScheduledPublishStore(
+  () => Date.parse("2026-10-15T07:00:01.000Z"),
+);
+const listed = duePractice("listed-1", "listed");
+assert.equal(once.claim("service_role", [listed]), 1);
+assert.equal(once.claim("service_role", [listed]), 0);
+assert.equal(once.eventCount(), 1, "parallel and repeated claims create one event");
+
+const durable = createMemoryScheduledPublishStore(
+  () => Date.parse("2026-10-15T07:00:01.000Z"),
+);
+const durablePractice = duePractice("listed-2", "listed");
+assert.equal(durable.claim("service_role", [durablePractice]), 1);
+assert.deepEqual(durable.pendingIds(), ["listed-2"]);
+let attempts = 0;
+const crashed = await deliverPendingScheduledPublishEvents({
+  take: async () => durable.take("service_role"),
+  complete: async (ids) => durable.complete("service_role", ids),
+  abandon: async (ids) => durable.abandon("service_role", ids),
+  notify: async () => {
+    attempts += 1;
+    throw new Error("process died before IndexNow");
+  },
+});
+assert.deepEqual(crashed.delivered, []);
+assert.deepEqual(durable.pendingIds(), ["listed-2"]);
+const recovered = await deliverPendingScheduledPublishEvents({
+  take: async () => durable.take("service_role"),
+  complete: async (ids) => durable.complete("service_role", ids),
+  abandon: async (ids) => durable.abandon("service_role", ids),
+  notify: async () => {
+    attempts += 1;
+    return true;
+  },
+});
+assert.deepEqual(recovered.delivered, ["listed-2"]);
+assert.equal(attempts, 2);
+const again = await deliverPendingScheduledPublishEvents({
+  take: async () => durable.take("service_role"),
+  complete: async (ids) => durable.complete("service_role", ids),
+  abandon: async (ids) => durable.abandon("service_role", ids),
+  notify: async () => {
+    attempts += 1;
+    return true;
+  },
+});
+assert.deepEqual(again.delivered, []);
+assert.equal(attempts, 2, "processed event is not sent again");
 
 console.log("scheduled-publication-unit: ok");

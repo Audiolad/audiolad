@@ -60,7 +60,7 @@ export async function getMaxPublishedProduct(
     const normalizedProduct = productSlug.trim();
     if (!normalizedAuthor || !normalizedProduct) return { ok: true, product: null };
     const service = createServiceRoleClient();
-    await releaseDueScheduledPublications(service);
+    await releaseDueScheduledPublications();
     const products = await getPublishedCatalogProducts(service, {
       viewer: GUEST_ORDINARY_CATALOG_VIEWER,
       throwOnStorageError: true,

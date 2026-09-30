@@ -257,7 +257,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const [authorSlug, productSlug] = segments;
   const supabase = await createClient();
-  await releaseDueScheduledPublications(supabase);
+  await releaseDueScheduledPublications();
   const { practice, error } = await getPracticeByAuthorAndSlug(
     supabase,
     authorSlug,
@@ -370,7 +370,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
 
   const { authorSlug, productSlug } = route;
   const supabase = await createClient();
-  await releaseDueScheduledPublications(supabase);
+  await releaseDueScheduledPublications();
   const execution = await peekAuthorExecutionContext();
   // Resolve the public route author with the ordinary client first. This
   // prevents a valid session for author X from elevating a lookup for Y.

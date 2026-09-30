@@ -39,7 +39,7 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createClient();
-  await releaseDueScheduledPublications(supabase);
+  await releaseDueScheduledPublications();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
   if (error || !data) {
@@ -92,7 +92,7 @@ export default async function AuthorPublicPage({
   const { slug } = await params;
   const query = await searchParams;
   const supabase = await createClient();
-  await releaseDueScheduledPublications(supabase);
+  await releaseDueScheduledPublications();
   const { data, error } = await loadAuthorPublicPageData(supabase, slug);
 
   if (error) {

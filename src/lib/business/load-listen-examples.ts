@@ -16,7 +16,7 @@ export async function loadBusinessListenExamples(): Promise<
 > {
   try {
     const supabase = await createClient();
-    await releaseDueScheduledPublications(supabase);
+    await releaseDueScheduledPublications();
     const products = await getPublishedCatalogProducts(supabase, {
       productKind: "music",
     });

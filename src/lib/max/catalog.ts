@@ -166,7 +166,7 @@ async function listMaxPublishedCatalogImpl(
 ): Promise<MaxCatalogResult> {
   try {
     const service = (input.getServiceClient ?? createServiceRoleClient)();
-    await releaseDueScheduledPublications(service);
+    await releaseDueScheduledPublications();
     const normalizedQuery = normalizeCatalogSearchQuery(input.query);
     const catalogSection = input.section ?? null;
     const topicKey = input.topicKey?.trim() ? input.topicKey.trim() : null;

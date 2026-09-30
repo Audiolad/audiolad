@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
-    await releaseDueScheduledPublications(supabase);
+    await releaseDueScheduledPublications();
     const visitorId = await readPriceVisitorId();
     const userId = await resolveCatalogViewerUserId(supabase);
     const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);

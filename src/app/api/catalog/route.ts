@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
-    await releaseDueScheduledPublications(supabase);
+    await releaseDueScheduledPublications();
     const visitorId = await readPriceVisitorId();
     const result = await listPublishedCatalog(supabase, query, { visitorId });
 

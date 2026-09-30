@@ -1,12 +1,21 @@
+import "server-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { schedulePracticePublishedSearchNotifications } from "@/lib/seo/practice-publish-notifications";
+import {
+  deliverPendingScheduledPublishEvents,
+  type ScheduledPublishOutboxEvent,
+} from "@/lib/products/scheduled-publish-outbox";
+import { notifyIndexNowUrls } from "@/lib/seo/indexnow/notify";
 import {
   planClaimedPublicationNotifications,
-  type ClaimedScheduledPublication,
+  planPracticePublishedSearchNotifications,
 } from "@/lib/seo/practice-publish-plan";
+import { notifyYandexRecrawlUrl } from "@/lib/seo/yandex-webmaster/notify";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-type ClaimRow = {
+type OutboxRow = {
+  id?: unknown;
   practice_id?: unknown;
   author_id?: unknown;
   practice_slug?: unknown;
@@ -25,23 +34,24 @@ function readString(value: unknown): string | null {
   return value;
 }
 
-function parseClaimedRow(row: ClaimRow): ClaimedScheduledPublication | null {
+function parseOutboxRow(row: OutboxRow): ScheduledPublishOutboxEvent | null {
+  const id = readString(row.id);
   const practiceId = readString(row.practice_id);
   const authorId = readString(row.author_id);
   const practiceSlug = readString(row.practice_slug);
   const authorSlug = readString(row.author_slug);
   const publishedAt = readString(row.published_at);
   const prior =
-    typeof row.prior_public_count === "number" &&
-    Number.isFinite(row.prior_public_count)
+    typeof row.prior_public_count === "number" && Number.isFinite(row.prior_public_count)
       ? row.prior_public_count
       : 0;
 
-  if (!practiceId || !authorId || !practiceSlug || !authorSlug || !publishedAt) {
+  if (!id || !practiceId || !authorId || !practiceSlug || !authorSlug || !publishedAt) {
     return null;
   }
 
   return {
+    id,
     practiceId,
     authorId,
     practiceSlug,
@@ -55,34 +65,105 @@ function parseClaimedRow(row: ClaimRow): ClaimedScheduledPublication | null {
   };
 }
 
-/**
- * Stamp published_at for approved practices whose schedule has elapsed, then
- * notify search engines once per claimed row. A later call returns no rows.
- * Fail-open: a missing function or a write error must not break public reads.
- * Sorting still uses effectivePublishedAt when the stamp has not happened yet.
- */
-export async function releaseDueScheduledPublications(
-  supabase: SupabaseClient,
-): Promise<void> {
-  const rpc = (supabase as { rpc?: SupabaseClient["rpc"] }).rpc;
-  if (typeof rpc !== "function") {
-    return;
+function indexNowSettled(status: string): boolean {
+  return status === "disabled" || status === "no_urls" || status === "submitted";
+}
+
+function yandexSettled(status: string): boolean {
+  return (
+    status === "disabled" ||
+    status === "submitted" ||
+    status === "already_queued" ||
+    status === "auth_failed" ||
+    status === "invalid_user_id" ||
+    status === "host_not_verified" ||
+    status === "quota_exhausted"
+  );
+}
+
+async function notifyOutboxEvent(event: ScheduledPublishOutboxEvent): Promise<boolean> {
+  const [plan] = planClaimedPublicationNotifications([
+    {
+      practiceId: event.practiceId,
+      authorId: event.authorId,
+      practiceSlug: event.practiceSlug,
+      authorSlug: event.authorSlug,
+      catalogVisibility: event.catalogVisibility,
+      isCatalogListed: event.isCatalogListed,
+      publishedAt: event.publishedAt,
+      priorPublicCount: event.priorPublicCount,
+    },
+  ]);
+
+  if (!plan) {
+    return true;
   }
 
+  const searchPlan = planPracticePublishedSearchNotifications(plan);
+
+  for (const indexEvent of searchPlan.indexNow) {
+    const result = await notifyIndexNowUrls(indexEvent.urls, indexEvent.reason);
+
+    if (!indexNowSettled(result.status)) {
+      return false;
+    }
+  }
+
+  if (searchPlan.yandex) {
+    const result = await notifyYandexRecrawlUrl(
+      searchPlan.yandex.url,
+      searchPlan.yandex.reason,
+    );
+
+    if (!yandexSettled(result.status)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function rpcIds(supabase: SupabaseClient, fn: string, ids: string[]) {
+  const { error } = await supabase.rpc(fn, { p_ids: ids });
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Stamp due schedules and drain the durable notification outbox.
+ * Uses the service-role client. The caller session is not allowed to claim.
+ * Fail-open: a missing key or a write error must not break the public read.
+ */
+export async function releaseDueScheduledPublications(): Promise<void> {
   try {
-    const { data, error } = await rpc("claim_due_scheduled_practice_publications");
-    if (error || !Array.isArray(data) || data.length === 0) {
+    const supabase = createServiceRoleClient();
+    const claim = await supabase.rpc("claim_due_scheduled_practice_publications");
+
+    if (claim.error) {
       return;
     }
 
-    const claimed = data
-      .map((row) => parseClaimedRow(row as ClaimRow))
-      .filter((row): row is ClaimedScheduledPublication => row != null);
+    await deliverPendingScheduledPublishEvents({
+      take: async () => {
+        const { data, error } = await supabase.rpc(
+          "take_pending_scheduled_publish_notifications",
+        );
 
-    for (const input of planClaimedPublicationNotifications(claimed)) {
-      schedulePracticePublishedSearchNotifications(input);
-    }
+        if (error || !Array.isArray(data)) {
+          return [];
+        }
+
+        return data
+          .map((row) => parseOutboxRow(row as OutboxRow))
+          .filter((row): row is ScheduledPublishOutboxEvent => row != null);
+      },
+      complete: (ids) => rpcIds(supabase, "complete_scheduled_publish_notifications", ids),
+      abandon: (ids) => rpcIds(supabase, "abandon_scheduled_publish_notifications", ids),
+      notify: notifyOutboxEvent,
+    });
   } catch {
-    // Public pages stay available when the stamp cannot run.
+    // Public pages stay available when the service claim cannot run.
   }
 }

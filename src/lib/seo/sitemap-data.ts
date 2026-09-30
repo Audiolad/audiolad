@@ -29,7 +29,6 @@ import {
   getPublishedCatalogProducts,
   getPublishedPracticeIdsForTopicKey,
 } from "@/lib/products/catalog";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import {
   applyPracticePublicAvailabilityFilter,
   resolvePracticePublicLastModified,
@@ -736,7 +735,6 @@ export async function buildSitemapEntries(): Promise<{
 
   try {
     const supabase = await createClient();
-    await releaseDueScheduledPublications(supabase);
     [
       productEntries,
       authorEntries,

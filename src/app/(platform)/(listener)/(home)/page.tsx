@@ -36,7 +36,7 @@ async function resolveHomeRenderState(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<HomeRenderState> {
   try {
-    await releaseDueScheduledPublications(supabase);
+    await releaseDueScheduledPublications();
     const {
       data: { user },
     } = await supabase.auth.getUser();

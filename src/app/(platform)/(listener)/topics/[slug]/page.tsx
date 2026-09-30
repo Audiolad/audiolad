@@ -35,7 +35,7 @@ export async function generateMetadata({
   }
 
   const supabase = await createClient();
-  await releaseDueScheduledPublications(supabase);
+  await releaseDueScheduledPublications();
   const data = await loadTopicHubPageData(supabase, slug);
 
   if (!data) {
@@ -56,7 +56,7 @@ export default async function TopicHubPage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
-  await releaseDueScheduledPublications(supabase);
+  await releaseDueScheduledPublications();
   const data = await loadTopicHubPageData(supabase, slug);
 
   if (!data) {
