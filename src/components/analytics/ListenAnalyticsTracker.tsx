@@ -280,8 +280,14 @@ export default function ListenAnalyticsTracker({
       }
     }
 
+    const wallDeltaSeconds =
+      isPlaying && previousTick != null
+        ? Math.max(0, (now - previousTick) / 1000)
+        : 0;
+    // listenedSeconds stays capped so 25/50/75/90 milestones keep their formula.
+    // Completion seek-vs-playback uses the uncapped wall delta above.
     const deltaSeconds =
-      isPlaying && previousTick ? Math.min(5, (now - previousTick) / 1000) : 0;
+      isPlaying && previousTick != null ? Math.min(5, wallDeltaSeconds) : 0;
 
     const previousState = progressStateRef.current;
     const nextState = updateListeningProgressState(previousState, {
@@ -289,6 +295,7 @@ export default function ListenAnalyticsTracker({
       duration,
       isPlaying,
       deltaSeconds,
+      wallDeltaSeconds,
     });
 
     progressStateRef.current = nextState;
@@ -320,6 +327,10 @@ export default function ListenAnalyticsTracker({
       });
     }
 
+    // Fix completion on this tick — pause, close, track change, or `ended`
+    // must not be required. `trackPlatformEvent` uses fetch keepalive.
+    // One emit per listening context; continuous-session dedup blocks a
+    // second audio_completed after programCompleted resets local state.
     if (
       !context.completionTracked &&
       isListeningCompleted(nextState, {
