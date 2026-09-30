@@ -890,8 +890,7 @@ function trackTimers() {
   const originalSet = globalThis.setTimeout;
   const originalClear = globalThis.clearTimeout;
   globalThis.setTimeout = ((fn: TimerHandler, ms?: number, ...args: unknown[]) => {
-    let timer!: ReturnType<typeof setTimeout>;
-    timer = originalSet(() => {
+    const timer = originalSet(() => {
       pending.delete(timer);
       if (typeof fn === "function") fn(...args);
     }, ms);
