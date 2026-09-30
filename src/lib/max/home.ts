@@ -9,7 +9,7 @@ export const MAX_HOME_SHELF_LIMIT = 6;
 
 export const MAX_HOME_TITLE = "АудиоЛад";
 export const MAX_HOME_SUBTITLE =
-  "Музыка, медитации, аудиопрактики и аудиокурсы";
+  "Музыка, аудиопрактики, медитации и обучение";
 export const MAX_HOME_OPEN_CATALOG_LABEL = "Открыть каталог";
 export const MAX_HOME_LISTEN_FREE_LABEL = "Слушать бесплатно";
 export const MAX_HOME_SEE_ALL_LABEL = "Смотреть все";
