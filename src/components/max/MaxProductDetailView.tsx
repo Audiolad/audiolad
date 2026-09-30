@@ -24,6 +24,13 @@ import { formatMaxDuration } from "@/lib/max/format-duration";
 import type { MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
 import type { MaxCatalogProduct } from "@/components/max/MaxCatalogSearch";
 
+type MaxProductTrackPlayback = {
+  playableTrackIds: readonly string[];
+  activeTrackId: string | null;
+  isPlaying: boolean;
+  onPressTrack: (audioItemId: string) => void;
+};
+
 type MaxProductDetailViewProps = {
   authorSlug: string;
   productSlug: string;
@@ -32,6 +39,7 @@ type MaxProductDetailViewProps = {
   onOpenRecommendation: (product: MaxCatalogProduct) => void;
   onOpenTopic: (topicKey: string) => void;
   interactiveActionsEnabled?: boolean;
+  trackPlayback: MaxProductTrackPlayback;
 };
 
 function toHeroCover(slug: string, title: string, coverUrl: string | null): PracticePageCoverData {
@@ -58,7 +66,9 @@ export default function MaxProductDetailView({
   onOpenRecommendation,
   onOpenTopic,
   interactiveActionsEnabled = true,
+  trackPlayback,
 }: MaxProductDetailViewProps) {
+  const playableTrackIds = new Set(trackPlayback.playableTrackIds);
   const slides: CatalogSlide[] = product.gallery.map((slide, index) => ({
     id: slide.id,
     image_url: slide.image_url,
@@ -145,13 +155,60 @@ export default function MaxProductDetailView({
       ) : null}
 
       {product.contents.length ? (
-        <ol className="mt-6 space-y-2 text-sm" data-max-product-contents="">
-          {product.contents.map((track) => (
-            <li key={`${track.position}-${track.title}`}>
-              {track.position}. {track.title}
-              {track.durationSeconds !== null ? ` · ${formatMaxDuration(track.durationSeconds)}` : ""}
-            </li>
-          ))}
+        <ol className="mt-6 space-y-1.5" data-max-product-contents="" aria-label="Треки">
+          {product.contents.map((track) => {
+            const playable = playableTrackIds.has(track.audioItemId);
+            const active = trackPlayback.activeTrackId === track.audioItemId;
+            const playingThis = active && trackPlayback.isPlaying;
+            return (
+              <li
+                key={track.audioItemId}
+                data-max-product-track={track.audioItemId}
+                data-max-product-track-playable={playable ? "true" : "false"}
+                className={`flex min-h-11 items-center gap-2 rounded-xl px-1 py-1 ${
+                  active ? "bg-[#f3edfb]" : ""
+                }`}
+              >
+                {playable ? (
+                  <button
+                    type="button"
+                    aria-label={playingThis ? `Пауза ${track.title}` : `Слушать ${track.title}`}
+                    onClick={() => trackPlayback.onPressTrack(track.audioItemId)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-xs text-white"
+                  >
+                    {playingThis ? (
+                      <span aria-hidden="true" className="text-xs font-semibold">
+                        II
+                      </span>
+                    ) : (
+                      <span aria-hidden="true" className="ml-0.5 text-xs">
+                        ▶
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  <span className="h-9 w-9 shrink-0" aria-hidden="true" />
+                )}
+                <span className="w-6 shrink-0 text-center text-xs text-[#6c5d94]">{track.position}</span>
+                <span
+                  className={`min-w-0 flex-1 truncate text-sm ${
+                    active
+                      ? "font-medium text-[#7042c5]"
+                      : playable
+                        ? "text-[#25135c]"
+                        : "text-[#8d82aa]"
+                  }`}
+                >
+                  {track.title}
+                </span>
+                {track.durationSeconds !== null ? (
+                  <span className="shrink-0 text-xs text-[#6c5d94]">
+                    {formatMaxDuration(track.durationSeconds)}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
         </ol>
       ) : null}
 

@@ -42,6 +42,50 @@ export function nextMaxPlaylistQueueIndex(
   return null;
 }
 
+/** Walk backward over the playlist queue, skipping unavailable and skipped rows. */
+export function previousMaxPlaylistQueueIndex(
+  items: readonly MaxPlaylistQueueItem[],
+  fromIndex: number,
+  skipped: ReadonlySet<number> = new Set(),
+): number | null {
+  for (let index = fromIndex - 1; index >= 0; index -= 1) {
+    if (skipped.has(index)) {
+      continue;
+    }
+
+    if (isMaxPlaylistItemPlayable(items[index])) {
+      return index;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * One playlist row requests its own canonical playback session.
+ * audioItemId is optional and never replaced by a sibling track.
+ */
+export function maxPlaylistPlaybackSessionBody(item: MaxPlaylistQueueItem): {
+  authorSlug: string;
+  productSlug: string;
+  audioItemId?: string;
+} | null {
+  if (!isMaxPlaylistItemPlayable(item)) {
+    return null;
+  }
+  const authorSlug = item.authorSlug;
+  const productSlug = item.productSlug;
+  if (!authorSlug || !productSlug) {
+    return null;
+  }
+  const audioItemId = item.audioItemId?.trim() || null;
+  return {
+    authorSlug,
+    productSlug,
+    ...(audioItemId ? { audioItemId } : {}),
+  };
+}
+
 export function firstMaxPlaylistQueueIndex(
   items: readonly MaxPlaylistQueueItem[],
   skipped: ReadonlySet<number> = new Set(),

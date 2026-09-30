@@ -18,9 +18,12 @@ import {
   firstMaxPlaylistQueueIndex,
   isMaxPlaylistItemPlayable,
   maxPlaylistPlaybackResource,
+  maxPlaylistPlaybackSessionBody,
   narrowMaxPlaybackSession,
   nextMaxPlaylistQueueIndex,
+  previousMaxPlaylistQueueIndex,
   toMaxPlaylistQueueItem,
+  type MaxPlaylistQueueItem,
 } from "@/lib/max/playlist-queue";
 import {
   readMaxPlaylistDetailPayload,
@@ -83,6 +86,10 @@ export default function MaxPlaylistDetail({
   const [playback, setPlayback] = useState<PlaybackStatus>({ status: "idle" });
   const [playing, setPlaying] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [queueEnds, setQueueEnds] = useState<{ previous: number | null; next: number | null }>({
+    previous: null,
+    next: null,
+  });
   const generationRef = useRef(0);
   const queueModeRef = useRef(false);
   const skippedRef = useRef<Set<number>>(new Set());
@@ -164,7 +171,15 @@ export default function MaxPlaylistDetail({
     pendingPlayRef.current = false;
     setPlaying(false);
     setActiveIndex(null);
+    setQueueEnds({ previous: null, next: null });
     setPlayback({ status: "idle" });
+  }
+
+  function rememberQueueEnds(items: readonly MaxPlaylistQueueItem[], index: number) {
+    setQueueEnds({
+      previous: previousMaxPlaylistQueueIndex(items, index, skippedRef.current),
+      next: nextMaxPlaylistQueueIndex(items, index, skippedRef.current),
+    });
   }
 
   async function startAt(index: number, skipFailures: boolean) {
@@ -202,6 +217,12 @@ export default function MaxPlaylistDetail({
       return;
     }
 
+    const playbackTarget = maxPlaylistPlaybackSessionBody(item);
+    if (!playbackTarget) {
+      setPlayback({ status: "error", index });
+      return;
+    }
+
     try {
       const response = await fetch(MAX_PLAYBACK_SESSION_PATH, {
         method: "POST",
@@ -209,9 +230,7 @@ export default function MaxPlaylistDetail({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           initData,
-          authorSlug: item.authorSlug,
-          productSlug: item.productSlug,
-          ...(item.audioItemId ? { audioItemId: item.audioItemId } : {}),
+          ...playbackTarget,
         }),
         cache: "no-store",
       });
@@ -253,6 +272,7 @@ export default function MaxPlaylistDetail({
       }
 
       pendingPlayRef.current = true;
+      rememberQueueEnds(queue, index);
       setPlayback({
         status: "ready",
         index,
@@ -390,6 +410,20 @@ export default function MaxPlaylistDetail({
             <MaxAudioPlayer
               key={`${playback.session.authorSlug}:${playback.session.productSlug}:${playback.session.tracks[0]?.trackId ?? ""}`}
               session={playback.session}
+              externalQueue={{
+                index: playback.index,
+                length: detail.items.length,
+                canGoPrevious: queueEnds.previous != null,
+                canGoNext: queueEnds.next != null,
+                onPrevious: () => {
+                  if (queueEnds.previous == null) return;
+                  void startAt(queueEnds.previous, true);
+                },
+                onNext: () => {
+                  if (queueEnds.next == null) return;
+                  void startAt(queueEnds.next, true);
+                },
+              }}
               onBindPlay={bindPlay}
               onBindPause={(pause) => {
                 pauseRef.current = pause;

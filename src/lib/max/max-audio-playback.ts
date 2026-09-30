@@ -188,6 +188,91 @@ export function nextMaxTrackIndex(current: number, length: number): number | nul
   return current + 1;
 }
 
+/** Previous / Next for a playlist queue. Album playback does not use this. */
+export type MaxExternalQueueNavigation = {
+  onPrevious: () => void;
+  onNext: () => void;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  /** Zero-based index in the external queue, not in the narrowed session. */
+  index: number;
+  length: number;
+};
+
+export function formatMaxQueuePositionLabel(index: number, length: number): string | null {
+  if (!Number.isInteger(index) || !Number.isInteger(length)) {
+    return null;
+  }
+  if (length <= 0 || index < 0 || index >= length) {
+    return null;
+  }
+  return `Трек ${index + 1} из ${length}`;
+}
+
+/**
+ * Playlist position wins when an external queue is connected.
+ * Album mode counts session tracks and stays hidden for a single track or preview.
+ */
+export function visibleMaxQueuePositionLabel(input: {
+  externalIndex: number | null;
+  externalLength: number | null;
+  trackIndex: number;
+  trackCount: number;
+  showInternalNavigation: boolean;
+}): string | null {
+  if (input.externalIndex != null && input.externalLength != null) {
+    return formatMaxQueuePositionLabel(input.externalIndex, input.externalLength);
+  }
+  if (!input.showInternalNavigation || input.trackCount <= 1) {
+    return null;
+  }
+  return formatMaxQueuePositionLabel(input.trackIndex, input.trackCount);
+}
+
+/** Session track index for a content row. Ids outside the authorized session are not playable. */
+export function resolveMaxAuthorizedTrackIndex(
+  tracks: readonly { trackId: string }[],
+  audioItemId: string,
+): number | null {
+  const id = audioItemId.trim();
+  if (!id) {
+    return null;
+  }
+  const index = tracks.findIndex((track) => track.trackId === id);
+  return index >= 0 ? index : null;
+}
+
+export type MaxProductTrackPressAction =
+  | { type: "ignore" }
+  | { type: "pause" }
+  | { type: "resume" }
+  | { type: "select"; index: number };
+
+/**
+ * Product rows may start only a track already present on the authorized session.
+ * Preview sessions contain the single returned preview track, so other rows do nothing.
+ */
+export function decideMaxProductTrackAction(input: {
+  tracks: readonly { trackId: string }[];
+  audioItemId: string;
+  activeTrackId: string | null;
+  listenArmed: boolean;
+  isPlaying: boolean;
+}): MaxProductTrackPressAction {
+  const index = resolveMaxAuthorizedTrackIndex(input.tracks, input.audioItemId);
+  if (index == null) {
+    return { type: "ignore" };
+  }
+  const trackId = input.tracks[index]?.trackId;
+  if (!trackId) {
+    return { type: "ignore" };
+  }
+  if (input.listenArmed && input.activeTrackId === trackId) {
+    return input.isPlaying ? { type: "pause" } : { type: "resume" };
+  }
+  return { type: "select", index };
+}
+
 export function previousMaxTrackIndex(current: number, length: number): number | null {
   if (length <= 0 || current <= 0) {
     return null;
