@@ -100,7 +100,8 @@ export const ADMIN_METRIC_DEFINITIONS: AdminMetricDefinition[] = [
   {
     key: "completions",
     label: "Дослушивания",
-    shortDescription: "События audio_completed.",
+    shortDescription:
+      "События audio_completed: финальная зона при реальном воспроизведении или ended, один раз за прослушивание.",
     kind: "event",
     sqlSource: "analytics_events.event_name = audio_completed",
     formula: "COUNT(*)",
@@ -110,7 +111,8 @@ export const ADMIN_METRIC_DEFINITIONS: AdminMetricDefinition[] = [
   {
     key: "completers",
     label: "Дослушавшие",
-    shortDescription: "Уникальные люди с audio_completed.",
+    shortDescription:
+      "Уникальные люди с audio_completed (финальная зона или ended).",
     kind: "unique_person",
     sqlSource: "audio_completed + visitor_key",
     formula: "COUNT(DISTINCT visitor_key)",
