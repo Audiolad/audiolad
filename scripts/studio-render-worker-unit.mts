@@ -3,13 +3,22 @@ import { getEventListeners } from "node:events";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { studioRenderFfmpegProgressArgs } from "../src/lib/studio/render/ffmpeg";
+import {
+  consumeStudioRenderFfmpegProgress,
+  createStudioRenderFfmpegProgressState,
+  STUDIO_RENDER_FFMPEG_STALLED_CODE,
+  STUDIO_RENDER_FFMPEG_STALLED_MESSAGE,
+  studioRenderFfmpegProgressAdvanced,
+} from "../src/lib/studio/render/ffmpeg-stall";
 import {
   runStudioRenderChild,
   StudioRenderChildAbortedError,
+  StudioRenderFfmpegStalledError,
 } from "../src/lib/studio/render/render";
 import {
   allowStudioRenderOutputUpload,
@@ -839,7 +848,325 @@ function testStreamingUploadAndLeaseTokenComplete() {
   assert.match(loop, /formatStudioRenderReleaseUnavailableLog/);
 }
 
+const ADVANCING_FFMPEG = `
+let us = 0;
+const step = () => {
+  us += 1000000;
+  const seconds = String(us / 1000000).padStart(2, "0");
+  process.stdout.write(
+    "out_time_us=" + us + "\\n" +
+    "out_time_ms=" + us + "\\n" +
+    "out_time=00:00:" + seconds + ".000000\\n" +
+    "progress=continue\\n"
+  );
+  if (us >= 6000000) {
+    process.stdout.write("progress=end\\n");
+    process.exit(0);
+  }
+  setTimeout(step, 30);
+};
+step();
+`;
+
+const STALLED_FFMPEG = `
+const line = "out_time_us=250000\\nout_time_ms=250000\\nout_time=00:00:00.250000\\nprogress=continue\\n";
+process.stdout.write(line);
+setInterval(() => process.stdout.write(line), 15);
+`;
+
+function ignoreTermScript(logPath: string): string {
+  return `
+const fs = require("node:fs");
+process.on("SIGTERM", () => {
+  fs.appendFileSync(${JSON.stringify(logPath)}, "SIGTERM\\n");
+});
+process.stdout.write("out_time_us=1000\\nout_time=00:00:00.001000\\nprogress=continue\\n");
+setInterval(() => {}, 1000);
+`;
+}
+
+function trackTimers() {
+  const pending = new Set<ReturnType<typeof setTimeout>>();
+  const originalSet = globalThis.setTimeout;
+  const originalClear = globalThis.clearTimeout;
+  globalThis.setTimeout = ((fn: TimerHandler, ms?: number, ...args: unknown[]) => {
+    const timer = originalSet(() => {
+      pending.delete(timer);
+      if (typeof fn === "function") fn(...args);
+    }, ms);
+    pending.add(timer);
+    return timer;
+  }) as unknown as typeof setTimeout;
+  globalThis.clearTimeout = ((timer?: ReturnType<typeof setTimeout>) => {
+    if (timer !== undefined) pending.delete(timer);
+    return originalClear(timer as never);
+  }) as unknown as typeof clearTimeout;
+  return {
+    pending,
+    restore() {
+      globalThis.setTimeout = originalSet;
+      globalThis.clearTimeout = originalClear;
+    },
+  };
+}
+
+function testFfmpegProgressParser() {
+  assert.deepEqual(studioRenderFfmpegProgressArgs(), ["-progress", "pipe:1"]);
+  assert.equal(studioRenderFfmpegProgressAdvanced(null, 0), false);
+  assert.equal(studioRenderFfmpegProgressAdvanced(null, 1_000), true);
+  assert.equal(studioRenderFfmpegProgressAdvanced(1_000, 1_000), false);
+  assert.equal(studioRenderFfmpegProgressAdvanced(1_000, 2_000), true);
+  const state = createStudioRenderFfmpegProgressState();
+  assert.deepEqual(consumeStudioRenderFfmpegProgress(state, "out_time_us=10"), []);
+  const samples = consumeStudioRenderFfmpegProgress(
+    state,
+    "00\nout_time=00:00:00.001000\nprogress=continue\n",
+  );
+  assert.equal(samples[0]?.positionUs, 1_000);
+  assert.equal(samples[0]?.outTime, "00:00:00.001000");
+  const clockOnly = createStudioRenderFfmpegProgressState();
+  const fromClock = consumeStudioRenderFfmpegProgress(
+    clockOnly,
+    "out_time=01:02:03.500000\nprogress=continue\n",
+  );
+  assert.equal(fromClock[0]?.positionUs, Math.round((3600 + 120 + 3.5) * 1_000_000));
+  assert.equal(studioRenderFfmpegProgressAdvanced(fromClock[0]?.positionUs ?? null, fromClock[0]?.positionUs ?? null), false);
+}
+
+async function assertTimersCleared(pending: Set<ReturnType<typeof setTimeout>>) {
+  await delay(0);
+  assert.equal(pending.size, 0, "watchdog and grace timers must be cleared");
+}
+
+async function testAdvancingFfmpegIsNotAborted() {
+  const tracker = trackTimers();
+  const started = Date.now();
+  try {
+    const stderr = await runStudioRenderChild(process.execPath, ["-e", ADVANCING_FFMPEG], {
+      progress: { stallMs: 70, expectedDurationSeconds: 3 * 60 * 60 },
+      termGraceMs: 40,
+    });
+    assert.equal(stderr, "");
+    assert.ok(Date.now() - started >= 70, "advancing render must outlive one stall window");
+    await assertTimersCleared(tracker.pending);
+  } finally {
+    tracker.restore();
+  }
+}
+
+async function testRepeatedProgressStillStalls() {
+  const tracker = trackTimers();
+  try {
+    await assert.rejects(
+      () => runStudioRenderChild(process.execPath, ["-e", STALLED_FFMPEG], {
+        progress: { stallMs: 80, expectedDurationSeconds: 90 },
+        termGraceMs: 40,
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof StudioRenderFfmpegStalledError);
+        assert.equal(error.code, STUDIO_RENDER_FFMPEG_STALLED_CODE);
+        assert.equal(error.stage, "ffmpeg");
+        assert.equal(error.safeMessage, STUDIO_RENDER_FFMPEG_STALLED_MESSAGE);
+        assert.equal(error.details.lastProgressUs, 250_000);
+        assert.equal(error.details.lastOutTime, "00:00:00.250000");
+        assert.equal(error.details.expectedDurationSeconds, 90);
+        assert.ok(error.details.elapsedMs >= 80);
+        return true;
+      },
+    );
+    await assertTimersCleared(tracker.pending);
+  } finally {
+    tracker.restore();
+  }
+}
+
+async function testZeroProgressStillStalls() {
+  const source = `
+process.stdout.write("out_time_us=0\\nout_time=00:00:00.000000\\nprogress=continue\\n");
+setInterval(() => {
+  process.stdout.write("out_time_us=0\\nout_time=00:00:00.000000\\nprogress=continue\\n");
+}, 10);
+`;
+  await assert.rejects(
+    () => runStudioRenderChild(process.execPath, ["-e", source], {
+      progress: { stallMs: 80, expectedDurationSeconds: 5 },
+      termGraceMs: 30,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof StudioRenderFfmpegStalledError);
+      assert.equal(error.details.lastProgressUs, 0);
+      return true;
+    },
+  );
+}
+
+async function testHungChildAfterSigtermGetsSigkill() {
+  const workspace = await mkdtemp(join(tmpdir(), "audiolad-ffmpeg-stall-"));
+  const logPath = join(workspace, "signals.log");
+  const tracker = trackTimers();
+  try {
+    await assert.rejects(
+      () => runStudioRenderChild(process.execPath, ["-e", ignoreTermScript(logPath)], {
+        progress: { stallMs: 60, expectedDurationSeconds: 30 },
+        termGraceMs: 50,
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof StudioRenderFfmpegStalledError);
+        assert.equal(error.details.closeSignal, "SIGKILL");
+        return true;
+      },
+    );
+    assert.match(await readFile(logPath, "utf8"), /SIGTERM/);
+    await assertTimersCleared(tracker.pending);
+  } finally {
+    tracker.restore();
+    await rm(workspace, { recursive: true, force: true });
+  }
+}
+
+async function testWatchdogClearedOnAbortAndSpawnFailure() {
+  const tracker = trackTimers();
+  try {
+    const controller = new AbortController();
+    const pending = runStudioRenderChild(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      signal: controller.signal,
+      termGraceMs: 40,
+      progress: { stallMs: 5_000, expectedDurationSeconds: 10 },
+    });
+    await delay(20);
+    controller.abort();
+    await assert.rejects(pending, (error: unknown) => error instanceof StudioRenderChildAbortedError);
+    await assert.rejects(
+      () => runStudioRenderChild(process.execPath, ["-e", "process.stderr.write('boom'); process.exit(1)"], {
+        progress: { stallMs: 5_000, expectedDurationSeconds: 4 },
+        termGraceMs: 40,
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error instanceof StudioRenderFfmpegStalledError, false);
+        assert.match(error.message, /exited with 1/);
+        return true;
+      },
+    );
+    const fast = await runStudioRenderChild(process.execPath, ["-e", "process.exit(0)"], {
+      progress: { stallMs: 5_000, expectedDurationSeconds: 1 },
+    });
+    assert.equal(fast, "");
+    await assertTimersCleared(tracker.pending);
+  } finally {
+    tracker.restore();
+  }
+}
+
+async function testHeartbeatContinuesDuringAdvancingFfmpeg() {
+  const port = createPort({
+    claimQueue: [job("advancing")],
+    async executeJob(_claimed, signal) {
+      await runStudioRenderChild(process.execPath, ["-e", ADVANCING_FFMPEG], {
+        signal,
+        progress: { stallMs: 70, expectedDurationSeconds: 7_200 },
+        termGraceMs: 40,
+      });
+      return { sizeBytes: 4 };
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 30,
+    shutdownDrainMs: 500,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  const started = Date.now();
+  while (!port.completed.includes("advancing")) {
+    if (Date.now() - started > 2_000) {
+      worker.requestShutdown();
+      await running;
+      throw new Error("advancing render did not complete");
+    }
+    await delay(10);
+  }
+  assert.ok(
+    port.renewals.length >= 2,
+    `expected heartbeat during advancing ffmpeg, got ${port.renewals.length}`,
+  );
+  assert.deepEqual(port.failed, []);
+  worker.requestShutdown();
+  await running;
+}
+
+async function testHeartbeatContinuesWhileFfmpegHasNoProgress() {
+  const started = createDeferred();
+  const port = createPort({
+    claimQueue: [job("silent")],
+    async executeJob(_claimed, signal) {
+      started.resolve();
+      try {
+        await runStudioRenderChild(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+          signal,
+          progress: { stallMs: 10_000, expectedDurationSeconds: 3_600 },
+          termGraceMs: 40,
+        });
+        return { sizeBytes: 1 };
+      } catch (error) {
+        if (error instanceof StudioRenderChildAbortedError || signal.aborted) {
+          throw new StudioRenderAbandonedError();
+        }
+        throw error;
+      }
+    },
+  });
+  const worker = createStudioRenderWorker(port, {
+    idleIntervalMs: 20,
+    heartbeatIntervalMs: 30,
+    shutdownDrainMs: 40,
+    logger: { info() {}, error() {} },
+  });
+  const running = worker.run();
+  await started.promise;
+  await delay(120);
+  assert.ok(
+    port.renewals.length >= 2,
+    `heartbeat must continue without ffmpeg progress, got ${port.renewals.length}`,
+  );
+  assert.deepEqual(port.failed, []);
+  worker.requestShutdown();
+  await running;
+  assert.deepEqual(port.failed, []);
+  assert.deepEqual(port.completed, []);
+  assert.deepEqual(port.released, ["silent"]);
+}
+
+async function testStallFailsJobInsteadOfRequeue() {
+  let seen: unknown;
+  const port = createPort({
+    claimQueue: [job("stalled-job")],
+    async executeJob() {
+      await runStudioRenderChild(process.execPath, ["-e", STALLED_FFMPEG], {
+        progress: { stallMs: 70, expectedDurationSeconds: 120 },
+        termGraceMs: 30,
+      });
+      return { sizeBytes: 1 };
+    },
+    async failJob(_claimed, error) {
+      seen = error;
+      return true;
+    },
+  });
+  await runUntil(
+    port,
+    { heartbeatIntervalMs: 10_000 },
+    () => port.failed.includes("stalled-job"),
+    2_000,
+  );
+  assert.ok(seen instanceof StudioRenderFfmpegStalledError);
+  assert.equal(seen.code, STUDIO_RENDER_FFMPEG_STALLED_CODE);
+  assert.deepEqual(port.completed, []);
+  assert.deepEqual(port.released, []);
+}
+
 async function main() {
+  testFfmpegProgressParser();
   testParseClaimedJob();
   await testSleepCleansAbortListener();
   await testQueuedClaimedCompletedAndLoopContinues();
@@ -847,6 +1174,14 @@ async function main() {
   await testIdleWorkerNotBusyLoop();
   await testIdlePollsDoNotAccumulateAbortListeners();
   await testHeartbeatRenewDuringLongRender();
+  await testHeartbeatContinuesDuringAdvancingFfmpeg();
+  await testHeartbeatContinuesWhileFfmpegHasNoProgress();
+  await testAdvancingFfmpegIsNotAborted();
+  await testRepeatedProgressStillStalls();
+  await testZeroProgressStillStalls();
+  await testHungChildAfterSigtermGetsSigkill();
+  await testWatchdogClearedOnAbortAndSpawnFailure();
+  await testStallFailsJobInsteadOfRequeue();
   await testTransientHeartbeatErrorDoesNotAbandon();
   await testLostOwnershipDoesNotComplete();
   await testStaleWorkerSkipsOutputUpload();

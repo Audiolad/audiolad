@@ -71,6 +71,7 @@ import {
   isCatalogSelectionAttached,
   projectCatalogMusicExportUnavailable,
 } from "@/lib/studio/catalog-asset";
+import { studioRenderExportErrorMessage } from "@/lib/studio/render/ffmpeg-stall";
 import { createStudioGuestHandoff, getStudioRender, queueStudioRender, updateStudioProject, attachStudioCatalogAsset, StudioPersistenceClientError, type StudioRenderJob } from "@/lib/studio/persistence-client";
 import { STUDIO_GUEST_HANDOFF_CREATE_FAILED_MESSAGE } from "@/lib/studio/guest-handoff";
 import {
@@ -583,9 +584,7 @@ export default function StudioEditorShell({
         : null;
   const exportAlert =
     renderError
-    ?? (failedRenderJob
-      ? (failedRenderJob.error_message_safe?.trim() || "Не удалось создать MP3. Попробуйте ещё раз.")
-      : null);
+    ?? (failedRenderJob ? studioRenderExportErrorMessage(failedRenderJob) : null);
   const autosaveStateRef = useRef<StudioAutosaveState | null>(null);
   const navigationInProgressRef = useRef(false);
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);

@@ -16,6 +16,7 @@ import {
 import {
   buildStudioRenderFilterGraph,
   studioRenderFfmpegOutputArgs,
+  studioRenderFfmpegProgressArgs,
 } from "../src/lib/studio/render/ffmpeg";
 import { renderStudioProjectToMp3 } from "../src/lib/studio/render/render";
 import {
@@ -105,6 +106,7 @@ async function main() {
     localAssetPaths: new Map([["a1", "/tmp/x.wav"]]),
   });
   assert.equal(normalGraph.durationSeconds, 2);
+  assert.deepEqual(studioRenderFfmpegProgressArgs(), ["-progress", "pipe:1"]);
   const outArgs = studioRenderFfmpegOutputArgs("/tmp/out.mp3", normalGraph.durationSeconds);
   assert.ok(outArgs.includes("-t"));
   assert.ok(outArgs.includes("2.000000"));
