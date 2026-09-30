@@ -1,3 +1,5 @@
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
+
 /**
  * Product VISIBILITY — who may see a product in catalog / PDP discovery.
  *
@@ -107,14 +109,25 @@ export function isDirectLinkPublicVisibility(
  * Ordinary catalog eligibility for a single row, given the viewer.
  * `unlisted` never appears. `selected_users` only for allowlisted viewers.
  * Granted / saved hiding is applied separately in the server query.
+ * A future scheduled_publish_at keeps an approved product out of the catalog.
  */
 export function isOrdinaryCatalogEligible(input: {
   status?: string | null;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
   allowlisted?: boolean;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
+  now?: Date;
 }): boolean {
-  if (input.status !== "published") {
+  if (
+    !isPracticePubliclyAvailable({
+      status: input.status,
+      scheduledPublishAt: input.scheduledPublishAt,
+      publishedAt: input.publishedAt,
+      now: input.now,
+    })
+  ) {
     return false;
   }
 

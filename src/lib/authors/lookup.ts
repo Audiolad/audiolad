@@ -6,6 +6,7 @@ import {
 } from "@/lib/fixtures/test-fixture-marker";
 
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import { getProductPriceLabel, formatRubles } from "@/lib/products/price-format";
 import { loadPricePromotionsForPractices } from "@/lib/pricing/queries";
 import { resolvePracticePrice } from "@/lib/pricing/resolve";
@@ -79,14 +80,16 @@ export async function getAuthorPublishedPractices(
   authorId: string,
   authorSlug: string,
 ): Promise<{ practices: AuthorPublishedPractice[]; error: boolean }> {
-  const { data, error } = await supabase
-    .from("practices")
-    .select(
-      "id, title, slug, subtitle, format, duration_minutes, price, is_free, cover_image",
-    )
-    .eq("author_id", authorId)
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
+  const { data, error } = await applyPracticePublicAvailabilityFilter(
+    supabase
+      .from("practices")
+      .select(
+        "id, title, slug, subtitle, format, duration_minutes, price, is_free, cover_image, scheduled_publish_at, published_at",
+      )
+      .eq("author_id", authorId)
+      .eq("status", "published")
+      .eq("is_catalog_listed", true),
+  )
     .order("created_at", { ascending: false });
 
   if (error) {

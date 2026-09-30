@@ -24,6 +24,8 @@ export type AdminProductModerationListItem = {
   isFirstSubmission: boolean;
   isResubmission: boolean;
   updatedAt: string;
+  scheduledPublishAt: string | null;
+  publishedAt: string | null;
 };
 
 export type AdminProductModerationEvent = {
@@ -76,6 +78,7 @@ export type AdminProductModerationDetail = {
   createdAt: string;
   updatedAt: string;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
   authorId: string;
   authorName: string;
   authorSlug: string;
@@ -122,6 +125,8 @@ export async function listAdminProductModerationQueue(input: {
       price,
       duration_minutes,
       updated_at,
+      published_at,
+      scheduled_publish_at,
       author_id,
       authors!practices_author_id_fkey (
         id,
@@ -224,6 +229,9 @@ export async function listAdminProductModerationQueue(input: {
       isFirstSubmission: attempt <= 1,
       isResubmission: attempt > 1,
       updatedAt: (row.updated_at as string) || "",
+      scheduledPublishAt:
+        (row.scheduled_publish_at as string | null) ?? null,
+      publishedAt: (row.published_at as string | null) ?? null,
     };
   });
 }
@@ -294,6 +302,7 @@ export async function getAdminProductModerationDetail(
       created_at,
       updated_at,
       published_at,
+      scheduled_publish_at,
       deleted_at,
       author_id,
       authors!practices_author_id_fkey (
@@ -445,6 +454,8 @@ export async function getAdminProductModerationDetail(
     createdAt: (practice.created_at as string) || "",
     updatedAt: (practice.updated_at as string) || "",
     publishedAt: (practice.published_at as string | null) ?? null,
+    scheduledPublishAt:
+      (practice.scheduled_publish_at as string | null) ?? null,
     authorId: (author?.id as string) || (practice.author_id as string),
     authorName: (author?.name as string) || "Автор",
     authorSlug: (author?.slug as string) || "",

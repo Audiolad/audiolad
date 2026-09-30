@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isCoursePublication } from "@/lib/course-content/validators";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   isListedCatalogVisibility,
   isSelectedUsersCatalogVisibility,
@@ -29,6 +30,8 @@ export type ProductAccessInput = {
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
   publication_class?: string | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 export type CourseContentAccessInput = ProductAccessInput;
@@ -76,9 +79,15 @@ export function isPracticeCatalogListed(practice: {
   status: string | null | undefined;
   is_catalog_listed?: boolean | null;
   catalog_visibility?: string | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 }): boolean {
   return (
-    isPracticePublished(practice.status) &&
+    isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+    }) &&
     isListedCatalogVisibility(
       practice.catalog_visibility,
       practice.is_catalog_listed,
@@ -101,7 +110,13 @@ export function canAcquirePractice(
   practice: ProductAccessInput,
   options?: { canSeeSelectedUsers?: boolean },
 ): boolean {
-  if (!isPracticePublished(practice.status)) {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+    })
+  ) {
     return false;
   }
 

@@ -12,6 +12,7 @@ import {
   type ProductKind,
 } from "@/lib/author-products/product-kind";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import { sanitizePublicImageManifest } from "@/lib/images/image-manifest";
 import {
   resolveAuthorAvatarUrl,
@@ -156,14 +157,17 @@ export async function loadAuthorPublicPageData(
 
   const profile = await getAuthorProfileDetail(supabase, author.id);
 
-  const { data: practiceRows, error: practicesError } = await supabase
-    .from("practices")
-    .select(
-      "id, title, slug, subtitle, description, format, product_kind, duration_minutes, price, is_free, cover_url, cover_image, updated_at, created_at, published_at",
+  const { data: practiceRows, error: practicesError } =
+    await applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select(
+          "id, title, slug, subtitle, description, format, product_kind, duration_minutes, price, is_free, cover_url, cover_image, updated_at, created_at, published_at, scheduled_publish_at",
+        )
+        .eq("author_id", author.id)
+        .eq("status", "published")
+        .eq("is_catalog_listed", true),
     )
-    .eq("author_id", author.id)
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
     .order("published_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 

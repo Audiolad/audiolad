@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
+
 import { requirePracticeAccess, handleAuthorRouteError } from "@/lib/author-products/auth";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { hasPermission } from "@/lib/auth/platform-access";
@@ -45,14 +47,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ options: [] });
     }
 
-    let productQuery = supabase
-      .from("practices")
-      .select("id, title, subtitle, format, cover_url, authors!practices_author_id_fkey(name)")
-      .eq("status", "published")
-      .is("deleted_at", null)
-      .eq("catalog_visibility", "listed")
-      .eq("is_catalog_listed", true)
-      .neq("id", practice.id);
+    let productQuery = applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select("id, title, subtitle, format, cover_url, authors!practices_author_id_fkey(name)")
+        .eq("status", "published")
+        .is("deleted_at", null)
+        .eq("catalog_visibility", "listed")
+        .eq("is_catalog_listed", true)
+        .neq("id", practice.id),
+    );
 
     if (searching) {
       // Nonempty search: authors stay scoped to themselves; admin may search others.

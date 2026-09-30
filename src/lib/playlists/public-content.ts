@@ -1,5 +1,5 @@
 import { isFixtureMarkedPractice } from "@/lib/fixtures/test-fixture-marker";
-import { isPracticePublished } from "@/lib/products/access";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 
 export type PlaylistPublishPractice = {
   id: string;
@@ -9,6 +9,8 @@ export type PlaylistPublishPractice = {
   is_catalog_listed?: boolean | null;
   catalog_visibility?: string | null;
   cover_image?: unknown;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 export type PlaylistStorefrontPractice = {
@@ -17,6 +19,8 @@ export type PlaylistStorefrontPractice = {
   is_catalog_listed?: boolean | null;
   catalog_visibility?: string | null;
   cover_image?: unknown;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 /**
@@ -35,7 +39,13 @@ function isPublishedListedNonFixturePractice(
     return false;
   }
 
-  if (!isPracticePublished(practice.status)) {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+    })
+  ) {
     return false;
   }
 

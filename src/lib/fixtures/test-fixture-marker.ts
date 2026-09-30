@@ -1,3 +1,5 @@
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
+
 /**
  * Machine-readable test fixture markers — defence in depth for public queries.
  */
@@ -59,13 +61,19 @@ export function isPublicCatalogPracticeRow(row: {
   slug: string | null;
   author_id: string | null;
   cover_image?: unknown;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 }): boolean {
   if (isFixtureMarkedPractice(row)) {
     return false;
   }
 
   return (
-    row.status === "published" &&
+    isPracticePubliclyAvailable({
+      status: row.status,
+      scheduledPublishAt: row.scheduled_publish_at,
+      publishedAt: row.published_at,
+    }) &&
     row.is_catalog_listed === true &&
     typeof row.slug === "string" &&
     row.slug.trim().length > 0 &&
@@ -86,6 +94,8 @@ export function filterPublicCatalogPracticeRows<
     slug: string | null;
     author_id: string | null;
     cover_image?: unknown;
+    scheduled_publish_at?: string | null;
+    published_at?: string | null;
   },
 >(rows: T[]): T[] {
   return rows.filter((row) => isPublicCatalogPracticeRow(row));

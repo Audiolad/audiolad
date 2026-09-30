@@ -11,6 +11,7 @@ import {
 import { getPublishedPracticeIdsForTopicKey } from "@/lib/products/catalog";
 import { resolveAuthorAvatarUrl } from "@/lib/images/resolve-display";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 
 export const CATALOG_AUTHOR_SEARCH_RESULT_LIMIT = 50;
 export const CATALOG_AUTHOR_SUGGEST_LIMIT = 3;
@@ -217,13 +218,15 @@ async function loadEligibleAuthorCounts(
   supabase: SupabaseClient,
   practiceIdsForTopic: string[] | null,
 ): Promise<Map<string, number>> {
-  let query = supabase
-    .from("practices")
-    .select("author_id, cover_image")
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
-    .not("slug", "is", null)
-    .not("author_id", "is", null);
+  let query = applyPracticePublicAvailabilityFilter(
+    supabase
+      .from("practices")
+      .select("author_id, cover_image, scheduled_publish_at, published_at")
+      .eq("status", "published")
+      .eq("is_catalog_listed", true)
+      .not("slug", "is", null)
+      .not("author_id", "is", null),
+  );
 
   if (practiceIdsForTopic) {
     query = query.in("id", practiceIdsForTopic);

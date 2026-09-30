@@ -20,6 +20,10 @@ import {
 } from "@/lib/authors/community";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import {
+  authorPublicationScheduleLine,
+  isPracticePubliclyAvailable,
+} from "@/lib/products/scheduled-publication";
+import {
   getAudioPostDisplayLabel,
   getDisplayFormat,
 } from "@/lib/author-products/format";
@@ -89,6 +93,17 @@ function ProductCard({
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.CHANGES_REQUESTED;
   const isPublished =
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED;
+  const productIsPublic = isPracticePubliclyAvailable({
+    status: product.status,
+    scheduledPublishAt: product.scheduled_publish_at,
+    publishedAt: product.published_at,
+  });
+  const scheduleLine = authorPublicationScheduleLine({
+    status: product.status,
+    moderationStatus: product.moderation_status,
+    scheduledPublishAt: product.scheduled_publish_at,
+    publishedAt: product.published_at,
+  });
 
   const primaryActionLabel = isSubmitted ? "Просмотреть" : "Редактировать";
 
@@ -124,7 +139,8 @@ function ProductCard({
                 product.moderation_status,
               )}`}
             >
-              {getStatusLabel(product.status, product.moderation_status)}
+              {scheduleLine ??
+                getStatusLabel(product.status, product.moderation_status)}
             </span>
           </div>
 
@@ -170,7 +186,7 @@ function ProductCard({
               {primaryActionLabel}
             </Link>
 
-            {isPublished ? (
+            {isPublished && productIsPublic ? (
               <Link
                 href={buildPracticePublicPath(authorSlug, product.slug)}
                 className="rounded-full border border-[#c6afe6] px-4 py-2 text-sm font-semibold text-[#7042c5]"

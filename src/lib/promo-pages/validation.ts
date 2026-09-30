@@ -1,4 +1,5 @@
 import { slugifyTitle } from "@/lib/author-products/utils";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   isInvalidPromoPageCtaTarget,
   resolvePromoPageCtaTarget,
@@ -246,12 +247,20 @@ export type PromoPageProductEligibilityInput = {
   is_free: boolean | null;
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 export function isPracticePromoPageEligible(
   practice: PromoPageProductEligibilityInput,
 ): boolean {
-  if (practice.status !== "published") {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+    })
+  ) {
     return false;
   }
 

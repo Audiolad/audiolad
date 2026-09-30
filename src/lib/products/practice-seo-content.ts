@@ -4,6 +4,7 @@ import { getDisplayFormat } from "@/lib/author-products/format";
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
 import { resolveAuthorRecommendationsTitle } from "@/lib/products/author-recommendations-title";
 import { formatProductDuration } from "@/lib/products/duration";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import { getListenPageBySlug } from "@/lib/seo/listens/registry";
 import {
   RELATED_PRODUCT_STORED_PARSE_LIMIT,
@@ -152,14 +153,18 @@ export async function validateRelatedPracticeTargets(input: {
   }
   if (!input.relatedPracticeIds.length) return null;
 
-  const { data, error } = await input.supabase
-    .from("practices")
-    .select("id, author_id, status, deleted_at, catalog_visibility, is_catalog_listed")
-    .in("id", input.relatedPracticeIds)
-    .eq("status", "published")
-    .is("deleted_at", null)
-    .eq("catalog_visibility", "listed")
-    .eq("is_catalog_listed", true);
+  const { data, error } = await applyPracticePublicAvailabilityFilter(
+    input.supabase
+      .from("practices")
+      .select(
+        "id, author_id, status, deleted_at, catalog_visibility, is_catalog_listed, scheduled_publish_at, published_at",
+      )
+      .in("id", input.relatedPracticeIds)
+      .eq("status", "published")
+      .is("deleted_at", null)
+      .eq("catalog_visibility", "listed")
+      .eq("is_catalog_listed", true),
+  );
   if (error || (data?.length ?? 0) !== input.relatedPracticeIds.length) {
     return "invalid_related_product";
   }
@@ -292,14 +297,18 @@ export async function loadPublicPracticeSeoContent(
   ]);
   const ids = (relatedProducts.data ?? []).map((row) => row.related_practice_id as string);
   const { data: targets } = ids.length
-    ? await supabase
-        .from("practices")
-        .select("id, title, slug, format, duration_minutes, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(slug, name)")
-        .in("id", ids)
-        .eq("status", "published")
-        .is("deleted_at", null)
-        .eq("catalog_visibility", "listed")
-        .eq("is_catalog_listed", true)
+    ? await applyPracticePublicAvailabilityFilter(
+        supabase
+          .from("practices")
+          .select(
+            "id, title, slug, format, duration_minutes, cover_url, cover_image, updated_at, scheduled_publish_at, published_at, authors!practices_author_id_fkey(slug, name)",
+          )
+          .in("id", ids)
+          .eq("status", "published")
+          .is("deleted_at", null)
+          .eq("catalog_visibility", "listed")
+          .eq("is_catalog_listed", true),
+      )
     : { data: [] as Array<Record<string, unknown>> };
   const targetById = new Map((targets ?? []).map((target) => [target.id as string, target]));
 

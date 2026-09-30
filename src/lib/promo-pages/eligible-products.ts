@@ -28,6 +28,8 @@ type PracticeRow = {
   is_free: boolean | null;
   is_catalog_listed?: boolean | null;
   guest_access_enabled?: boolean | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 function getAccessLabel(practice: PracticeRow): string {
@@ -65,7 +67,7 @@ export async function listPromoEligibleProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, duration_minutes, cover_url, cover_image, status, is_free, is_catalog_listed, guest_access_enabled",
+      "id, title, slug, format, duration_minutes, cover_url, cover_image, status, is_free, is_catalog_listed, guest_access_enabled, scheduled_publish_at, published_at",
     )
     .eq("author_id", authorId)
     .eq("status", "published")

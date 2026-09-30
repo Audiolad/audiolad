@@ -4,6 +4,7 @@ import { isFixtureMarkedAuthor, isFixtureMarkedPractice } from "@/lib/fixtures/t
 import { resolveAuthorCardPositioningText } from "@/lib/authors/brand-assets";
 import { resolveAuthorAvatarUrl } from "@/lib/images/resolve-display";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 
 import {
   sortPublicAuthors,
@@ -37,7 +38,8 @@ export async function loadPublicAuthorsList(
   supabase: SupabaseClient,
   options?: { sort?: PublicAuthorSort },
 ): Promise<{ authors: PublicAuthorCard[]; error: boolean }> {
-  const { data: practices, error } = await supabase
+  const { data: practices, error } = await applyPracticePublicAvailabilityFilter(
+    supabase
     .from("practices")
     .select(
       `
@@ -58,7 +60,8 @@ export async function loadPublicAuthorsList(
     )
     .eq("status", "published")
     .eq("is_catalog_listed", true)
-    .not("author_id", "is", null);
+    .not("author_id", "is", null),
+  );
 
   if (error) {
     return { authors: [], error: true };

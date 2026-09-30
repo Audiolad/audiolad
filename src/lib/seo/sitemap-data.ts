@@ -29,6 +29,7 @@ import {
   getPublishedCatalogProducts,
   getPublishedPracticeIdsForTopicKey,
 } from "@/lib/products/catalog";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -129,6 +130,7 @@ type PracticeSitemapRow = {
   author_id: string | null;
   updated_at: string | null;
   published_at: string | null;
+  scheduled_publish_at?: string | null;
   created_at: string | null;
   cover_image?: unknown;
   authors:
@@ -431,10 +433,11 @@ async function fetchProductSitemapEntries(
   supabase: SupabaseClient,
 ): Promise<SitemapEntry[]> {
   try {
-    const { data, error } = await supabase
-      .from("practices")
-      .select(
-        `
+    const { data, error } = await applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select(
+          `
         slug,
         status,
         is_catalog_listed,
@@ -443,16 +446,18 @@ async function fetchProductSitemapEntries(
         published_at,
         created_at,
         cover_image,
+        scheduled_publish_at,
         authors!practices_author_id_fkey (
           slug,
           avatar_image
         )
       `,
-      )
-      .eq("status", "published")
-      .eq("is_catalog_listed", true)
-      .not("slug", "is", null)
-      .not("author_id", "is", null);
+        )
+        .eq("status", "published")
+        .eq("is_catalog_listed", true)
+        .not("slug", "is", null)
+        .not("author_id", "is", null),
+    );
 
     if (error) {
       console.error("[sitemap] practices query failed:", error.message);
@@ -471,10 +476,11 @@ async function fetchAuthorSitemapEntries(
   supabase: SupabaseClient,
 ): Promise<SitemapEntry[]> {
   try {
-    const { data, error } = await supabase
-      .from("practices")
-      .select(
-        `
+    const { data, error } = await applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select(
+          `
         status,
         is_catalog_listed,
         slug,
@@ -482,16 +488,18 @@ async function fetchAuthorSitemapEntries(
         cover_image,
         updated_at,
         published_at,
+        scheduled_publish_at,
         created_at,
         authors!practices_author_id_fkey (
           slug,
           avatar_image
         )
       `,
-      )
-      .eq("status", "published")
-      .eq("is_catalog_listed", true)
-      .not("author_id", "is", null);
+        )
+        .eq("status", "published")
+        .eq("is_catalog_listed", true)
+        .not("author_id", "is", null),
+    );
 
     if (error) {
       console.error("[sitemap] authors query failed:", error.message);
@@ -552,7 +560,9 @@ async function fetchPromoPageSitemapEntries(): Promise<SitemapEntry[]> {
             status,
             is_free,
             is_catalog_listed,
-            guest_access_enabled
+            guest_access_enabled,
+            scheduled_publish_at,
+            published_at
           )
         )
       `,

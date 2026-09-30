@@ -118,6 +118,7 @@ export type PracticeRow = {
   deletion_reason: string | null;
   currency: string;
   published_at: string | null;
+  scheduled_publish_at: string | null;
   listening_notice_enabled: boolean;
   listening_notice_title: string;
   listening_notice_text: string;
@@ -155,6 +156,8 @@ export type AuthorProductListItem = {
   cover_url: string | null;
   cover_image?: unknown;
   updated_at: string;
+  published_at: string | null;
+  scheduled_publish_at: string | null;
   audio_count: number;
 };
 
@@ -191,6 +194,7 @@ export function coercePracticeRow(
     | "seo_about"
     | "author_recommendations_title"
     | "listener_appreciation_override"
+    | "scheduled_publish_at"
   > & {
     audio_product_author?: string | null;
     product_kind?: string | null;
@@ -222,6 +226,7 @@ export function coercePracticeRow(
     seo_about?: string | null;
     author_recommendations_title?: string | null;
     listener_appreciation_override?: boolean | null;
+    scheduled_publish_at?: string | null;
   },
 ): PracticeRow {
   return {
@@ -282,6 +287,10 @@ export function coercePracticeRow(
     listener_appreciation_override:
       typeof row.listener_appreciation_override === "boolean"
         ? row.listener_appreciation_override
+        : null,
+    scheduled_publish_at:
+      typeof row.scheduled_publish_at === "string"
+        ? row.scheduled_publish_at
         : null,
   };
 }

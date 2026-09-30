@@ -14,6 +14,7 @@ import {
 } from "@/lib/listen/progress";
 import type { ListenProgressEntry } from "@/lib/listen/types";
 import { isPracticeCatalogListed } from "@/lib/products/access";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import { formatAudioDuration } from "@/lib/products/duration";
 import { buildListenPath } from "@/lib/products/paths";
 import { mapProductCoverFields } from "@/lib/products/cover-display";
@@ -324,10 +325,12 @@ export async function getContinueListening(
     ),
   ];
 
-  const { data: practices, error: practicesError } = await supabase
-    .from("practices")
-    .select(
-      `
+  const { data: practices, error: practicesError } =
+    await applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select(
+          `
       id,
       author_id,
       title,
@@ -345,13 +348,15 @@ export async function getContinueListening(
       cover_image,
       updated_at,
       published_at,
+      scheduled_publish_at,
       created_at,
       authors!practices_author_id_fkey (name, slug)
     `,
-    )
-    .in("id", practiceIds)
-    .eq("status", "published")
-    .eq("is_catalog_listed", true);
+        )
+        .in("id", practiceIds)
+        .eq("status", "published")
+        .eq("is_catalog_listed", true),
+    );
 
   if (practicesError || !practices?.length) {
     return null;
@@ -431,7 +436,9 @@ export async function getRecentlyListenedProducts(
     return [];
   }
 
-  const { data: practices, error: practicesError } = await supabase
+  const { data: practices, error: practicesError } =
+    await applyPracticePublicAvailabilityFilter(
+      supabase
     .from("practices")
     .select(
       `
@@ -458,7 +465,8 @@ export async function getRecentlyListenedProducts(
     )
     .in("id", orderedPracticeIds)
     .eq("status", "published")
-    .eq("is_catalog_listed", true);
+    .eq("is_catalog_listed", true),
+    );
 
   if (practicesError || !practices?.length) {
     return [];
@@ -519,7 +527,9 @@ export async function getActivePrograms(
     return [];
   }
 
-  const { data: practices, error: practicesError } = await supabase
+  const { data: practices, error: practicesError } =
+    await applyPracticePublicAvailabilityFilter(
+      supabase
     .from("practices")
     .select(
       `
@@ -546,7 +556,8 @@ export async function getActivePrograms(
     )
     .in("id", multiTrackPracticeIds)
     .eq("status", "published")
-    .eq("is_catalog_listed", true);
+    .eq("is_catalog_listed", true),
+    );
 
   if (practicesError || !practices?.length) {
     return [];

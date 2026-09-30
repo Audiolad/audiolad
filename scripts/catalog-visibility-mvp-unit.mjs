@@ -252,10 +252,13 @@ function testCatalogQueryBuilder() {
   };
 
   applyOrdinaryCatalogEligibility(query, GUEST_ORDINARY_CATALOG_VIEWER);
-  assert.deepEqual(calls, [
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls.slice(0, 2), [
     ["eq", "status", "published"],
     ["eq", "catalog_visibility", "listed"],
   ]);
+  assert.equal(calls[2][0], "or");
+  assert.match(String(calls[2][1]), /scheduled_publish_at\.is\.null/);
 
   calls.length = 0;
   const allowId = "11111111-1111-4111-8111-111111111111";

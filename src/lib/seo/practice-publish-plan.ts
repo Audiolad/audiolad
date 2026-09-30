@@ -19,6 +19,8 @@ export type PracticePublishedSearchInput = {
   isCatalogListed?: boolean | null;
   isFirstPublishOfPractice: boolean;
   publishedCountBefore: number;
+  /** When false, the product is approved but not publicly available yet. */
+  publiclyAvailable?: boolean;
 };
 
 /**
@@ -29,6 +31,10 @@ export function planPracticePublishedSearchNotifications(
   input: PracticePublishedSearchInput,
 ): PracticePublishedSearchPlan {
   const nextStatus = input.nextStatus ?? "published";
+
+  if (input.publiclyAvailable === false) {
+    return { indexNow: [], yandex: null };
+  }
 
   return {
     indexNow: planPracticePublishIndexNow({

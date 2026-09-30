@@ -1,6 +1,7 @@
 import "server-only";
 
 import { parseMaxStartPayload, type MaxResolvedStartTarget } from "@/lib/max/startapp";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type RelationSlug = { slug?: string | null } | Array<{ slug?: string | null }> | null;
@@ -20,25 +21,28 @@ export async function resolveMaxStartTarget(
   const supabase = createServiceRoleClient();
 
   if (parsed.kind === "product") {
-    const { data, error } = await supabase
-      .from("practices")
-      .select(
-        `
+    const { data, error } = await applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select(
+          `
         id,
         slug,
         status,
         deleted_at,
         is_catalog_listed,
         catalog_visibility,
+        scheduled_publish_at,
+        published_at,
         authors!practices_author_id_fkey!inner(slug)
       `,
-      )
-      .eq("id", parsed.practiceId)
-      .eq("status", "published")
-      .is("deleted_at", null)
-      .eq("is_catalog_listed", true)
-      .eq("catalog_visibility", "listed")
-      .maybeSingle();
+        )
+        .eq("id", parsed.practiceId)
+        .eq("status", "published")
+        .is("deleted_at", null)
+        .eq("is_catalog_listed", true)
+        .eq("catalog_visibility", "listed"),
+    ).maybeSingle();
 
     if (error || !data || typeof data.slug !== "string") return null;
     const authorSlug = relationSlug(
