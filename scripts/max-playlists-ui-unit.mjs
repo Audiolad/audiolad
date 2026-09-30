@@ -68,6 +68,7 @@ assert.match(detail, /← Плейлисты/);
 assert.match(detail, /Слушать всё/);
 assert.match(detail, /MAX_PLAYLISTS_DETAIL_PATH/);
 assert.match(detail, /MAX_PLAYBACK_SESSION_PATH/);
+assert.match(detail, /audioItemId: item\.audioItemId/);
 assert.match(detail, /MAX_PLAYBACK_AUDIO_PATH/);
 assert.match(detail, /MAX_PLAYBACK_PREVIEW_PATH/);
 assert.match(detail, /maxPlaylistPlaybackResource/);

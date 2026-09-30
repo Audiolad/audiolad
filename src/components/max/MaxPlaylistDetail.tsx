@@ -211,6 +211,7 @@ export default function MaxPlaylistDetail({
           initData,
           authorSlug: item.authorSlug,
           productSlug: item.productSlug,
+          ...(item.audioItemId ? { audioItemId: item.audioItemId } : {}),
         }),
         cache: "no-store",
       });
