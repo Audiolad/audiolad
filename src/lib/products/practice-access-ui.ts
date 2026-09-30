@@ -1,8 +1,6 @@
 import type { ProductAccessResult } from "@/lib/products/access";
-import {
-  isPracticeCatalogListed,
-  isPracticePublished,
-} from "@/lib/products/access";
+import { isPracticeCatalogListed } from "@/lib/products/access";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   isDirectLinkPublicVisibility,
   isSelectedUsersCatalogVisibility,
@@ -24,6 +22,8 @@ type PracticePricing = {
   is_catalog_listed?: boolean | null;
   catalog_visibility?: string | null;
   guest_access_enabled?: boolean | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
   /** Effective ruble amount for display/checkout confirmation. */
   displayPrice?: number | null;
   compareAtPrice?: number | null;
@@ -156,6 +156,14 @@ export type PracticeAccessPresentation = {
   showProductAbout: boolean;
 };
 
+function isPubliclyAvailablePractice(practice: PracticePricing): boolean {
+  return isPracticePubliclyAvailable({
+    status: practice.status,
+    scheduledPublishAt: practice.scheduled_publish_at,
+    publishedAt: practice.published_at,
+  });
+}
+
 export function resolveLibraryAction(input: {
   access: ProductAccessResult;
   practice: PracticePricing;
@@ -181,11 +189,11 @@ export function resolveLibraryAction(input: {
   const isPublicFreeProduct =
     practice.is_free === true &&
     isPracticeCatalogListed(practice) &&
-    isPracticePublished(practice.status);
+    isPubliclyAvailablePractice(practice);
 
   const isGuestPromoProduct =
     practice.guest_access_enabled === true &&
-    isPracticePublished(practice.status);
+    isPubliclyAvailablePractice(practice);
 
   if (!isPublicFreeProduct && !isGuestPromoProduct) {
     return "hidden";
@@ -265,7 +273,7 @@ function canPresentPublicFreeListen(
   practice: PracticePricing,
   access: ProductAccessResult,
 ): boolean {
-  if (practice.is_free !== true || !isPracticePublished(practice.status)) {
+  if (practice.is_free !== true || !isPubliclyAvailablePractice(practice)) {
     return false;
   }
 
@@ -295,8 +303,9 @@ function resolveCommercialAccess(
 
   if (buyerPreviewMode && canUseBuyerPreview) {
     const isPubliclyListed = isPracticeCatalogListed(practice);
+    const publiclyAvailable = isPubliclyAvailablePractice(practice);
     const canAcquire =
-      isPracticePublished(practice.status) &&
+      publiclyAvailable &&
       !isSelectedUsersCatalogVisibility(
         practice.catalog_visibility,
         practice.is_catalog_listed,
@@ -306,7 +315,7 @@ function resolveCommercialAccess(
     // Listing is discovery only: unlisted published free still looks like a gift.
     if (
       practice.is_free === true &&
-      isPracticePublished(practice.status) &&
+      publiclyAvailable &&
       isDirectLinkPublicVisibility(
         practice.catalog_visibility,
         practice.is_catalog_listed,
@@ -324,10 +333,7 @@ function resolveCommercialAccess(
       };
     }
 
-    if (
-      practice.guest_access_enabled === true &&
-      isPracticePublished(practice.status)
-    ) {
+    if (practice.guest_access_enabled === true && publiclyAvailable) {
       return {
         canListen: true,
         canAcquire: false,

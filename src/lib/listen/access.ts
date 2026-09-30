@@ -18,14 +18,22 @@ type PracticeAccessRow = {
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
   publication_class?: string | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 export async function resolveListenAccess(
   supabase: SupabaseClient,
   userId: string | null,
   practice: PracticeAccessRow,
+  options?: { now?: Date },
 ): Promise<ListenAccess | null> {
-  const access = await resolveProductAccess(supabase, practice, userId);
+  const access = await resolveProductAccess(
+    supabase,
+    practice,
+    userId,
+    options,
+  );
 
   if (isCoursePublication(practice.publication_class, practice.product_kind)) {
     const allowed = await canAccessCourseContent(

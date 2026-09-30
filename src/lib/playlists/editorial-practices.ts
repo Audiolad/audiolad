@@ -9,6 +9,7 @@ import {
 } from "@/lib/author-products/product-kind";
 import { isPracticeEligibleForEditorialPlaylist } from "@/lib/playlists/editorial-content";
 import { mapProductCoverFields, type ProductCoverFields } from "@/lib/products/cover-display";
+import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
 import {
   formatAudioDuration,
   formatCatalogProductStats,
@@ -125,10 +126,12 @@ export async function listEditorialPracticeOptions(
   supabase: SupabaseClient,
   playlistId: string,
 ): Promise<{ practices: EditorialPracticeOption[]; error: string | null }> {
-  const { data: practiceRows, error: practicesError } = await supabase
-    .from("practices")
-    .select(
-      `
+  const { data: practiceRows, error: practicesError } =
+    await applyPracticePublicAvailabilityFilter(
+      supabase
+        .from("practices")
+        .select(
+          `
       id,
       title,
       slug,
@@ -144,17 +147,20 @@ export async function listEditorialPracticeOptions(
       is_catalog_listed,
       author_id,
       product_kind,
+      scheduled_publish_at,
+      published_at,
       authors!practices_author_id_fkey (
         id,
         name,
         slug
       )
     `,
-    )
-    .eq("status", "published")
-    .eq("is_catalog_listed", true)
-    .not("slug", "is", null)
-    .not("author_id", "is", null);
+        )
+        .eq("status", "published")
+        .eq("is_catalog_listed", true)
+        .not("slug", "is", null)
+        .not("author_id", "is", null),
+    );
 
   if (practicesError) {
     return { practices: [], error: practicesError.message };

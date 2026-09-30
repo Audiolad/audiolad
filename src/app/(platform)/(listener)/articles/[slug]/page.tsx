@@ -9,6 +9,7 @@ import {
   listArticleSlugs,
   loadArticlePageData,
 } from "@/lib/seo/articles";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export async function generateMetadata({
   }
 
   const supabase = await createClient();
+  await releaseDueScheduledPublications();
   const data = await loadArticlePageData(supabase, slug);
 
   if (!data) {
@@ -54,6 +56,7 @@ export default async function ArticlePage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
+  await releaseDueScheduledPublications();
   const data = await loadArticlePageData(supabase, slug);
 
   if (!data) {

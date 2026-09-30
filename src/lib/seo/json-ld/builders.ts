@@ -2,6 +2,7 @@ import {
   DEFAULT_AUTHOR_SHORT_POSITIONING,
 } from "@/lib/authors/brand-assets";
 import { isProductFree } from "@/lib/products/price-format";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   buildAuthorPublicPath,
   buildPracticePublicPath,
@@ -856,8 +857,17 @@ export function shouldEmitPracticeJsonLd(input: {
   isFixtureMarked: boolean;
   isCatalogListed?: boolean | null;
   catalogVisibility?: string | null;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
 }): boolean {
-  if (input.status !== "published" || input.isFixtureMarked) {
+  if (
+    !isPracticePubliclyAvailable({
+      status: input.status,
+      scheduledPublishAt: input.scheduledPublishAt,
+      publishedAt: input.publishedAt,
+    }) ||
+    input.isFixtureMarked
+  ) {
     return false;
   }
 

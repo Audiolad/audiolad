@@ -53,6 +53,9 @@ export function serializeProductEditorBaseline(
     seoDescription: string;
     seoAbout?: string;
     authorRecommendationsTitle?: string;
+    publicationMode?: string;
+    publishDate?: string;
+    publishTime?: string;
     seoContent?: {
       usageItems: Array<{ content: string }>;
       faqItems: Array<{ question: string; answer: string }>;
@@ -100,6 +103,9 @@ export function serializeProductEditorBaseline(
     seoDescription: form.seoDescription,
     seoAbout: form.seoAbout ?? "",
     authorRecommendationsTitle: form.authorRecommendationsTitle ?? "",
+    publicationMode: form.publicationMode ?? "after_approval",
+    publishDate: form.publishDate ?? "",
+    publishTime: form.publishTime ?? "",
     seoContent: form.seoContent ?? {
       usageItems: [],
       faqItems: [],

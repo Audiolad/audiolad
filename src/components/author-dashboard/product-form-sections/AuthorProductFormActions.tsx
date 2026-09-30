@@ -9,6 +9,7 @@ type AuthorProductFormActionsProps = {
   busy: boolean;
   publishing: boolean;
   canEditPublicFields: boolean;
+  canEditSchedule?: boolean;
   canMutateContent: boolean;
   canBypassProductModeration: boolean;
   isPublished: boolean;
@@ -39,6 +40,7 @@ export default function AuthorProductFormActions({
   busy,
   publishing,
   canEditPublicFields,
+  canEditSchedule = false,
   canMutateContent,
   canBypassProductModeration,
   isPublished,
@@ -67,7 +69,9 @@ export default function AuthorProductFormActions({
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <button
         type="button"
-        disabled={busy || saveDisabled || !canEditPublicFields}
+        disabled={
+          busy || saveDisabled || !(canEditPublicFields || canEditSchedule)
+        }
         onClick={() => void onSaveDraft()}
         className="rounded-[22px] border border-[#c6afe6] px-5 py-4 font-semibold text-[#7042c5] disabled:opacity-60"
       >

@@ -26,6 +26,7 @@ import {
   getPublishedCatalogProducts,
   type CatalogProduct,
 } from "@/lib/products/catalog";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -165,6 +166,7 @@ async function listMaxPublishedCatalogImpl(
 ): Promise<MaxCatalogResult> {
   try {
     const service = (input.getServiceClient ?? createServiceRoleClient)();
+    await releaseDueScheduledPublications();
     const normalizedQuery = normalizeCatalogSearchQuery(input.query);
     const catalogSection = input.section ?? null;
     const topicKey = input.topicKey?.trim() ? input.topicKey.trim() : null;

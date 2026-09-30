@@ -17,6 +17,7 @@ import {
   resolveCatalogViewerUserId,
 } from "@/lib/catalog/visibility-query";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
+    await releaseDueScheduledPublications();
     const visitorId = await readPriceVisitorId();
     const userId = await resolveCatalogViewerUserId(supabase);
     const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  isPracticePubliclyAvailable,
+  mskWallClockToUtcIso,
+  PUBLICATION_MODE,
+} from "@/lib/products/scheduled-publication";
+
+import {
   STUDIO_MUSIC_COMMERCIAL_REQUIRED,
   STUDIO_MUSIC_COMMERCIAL_REQUIRED_MESSAGE,
 } from "@/lib/studio-music/commercial-author";
@@ -212,11 +218,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const { supabase, practice, user, accessStatus } =
       await requirePracticeMutationAccess(id);
-    await assertPracticePublicContentEditableForActor(
-      supabase,
-      practice,
-      user.id,
-    );
 
     let body: unknown;
 
@@ -228,6 +229,28 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const scheduleOnly =
+      Object.keys(body).every((key) =>
+        key === "publication_mode" ||
+        key === "publish_date" ||
+        key === "publish_time",
+      ) && "publication_mode" in body;
+    const awaitingScheduledRelease =
+      practice.status === "published" &&
+      !isPracticePubliclyAvailable({
+        status: practice.status,
+        scheduledPublishAt: practice.scheduled_publish_at,
+        publishedAt: practice.published_at,
+      });
+
+    if (!(scheduleOnly && awaitingScheduledRelease)) {
+      await assertPracticePublicContentEditableForActor(
+        supabase,
+        practice,
+        user.id,
+      );
     }
 
     const parsedSeoContent =
@@ -812,6 +835,42 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.listener_appreciation_override = appreciationPatch.value;
     }
 
+    if ("publication_mode" in body) {
+      const publication = body as Record<string, unknown>;
+      const mode = publication.publication_mode;
+      if (mode === PUBLICATION_MODE.AFTER_APPROVAL) {
+        updates.scheduled_publish_at = null;
+      } else if (mode === PUBLICATION_MODE.SCHEDULED) {
+        const publishDate =
+          typeof publication.publish_date === "string"
+            ? publication.publish_date
+            : "";
+        const publishTime =
+          typeof publication.publish_time === "string"
+            ? publication.publish_time
+            : "";
+        const scheduledAt = mskWallClockToUtcIso(publishDate, publishTime);
+        if (!scheduledAt) {
+          return NextResponse.json(
+            {
+              error: "invalid_publication_schedule",
+              message: "Укажите дату и время публикации.",
+            },
+            { status: 400 },
+          );
+        }
+        updates.scheduled_publish_at = scheduledAt;
+      } else {
+        return NextResponse.json(
+          {
+            error: "invalid_publication_schedule",
+            message: "Выберите, когда публиковать продукт.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     if (
       "catalog_visibility" in body &&
       (body.catalog_visibility === "listed" ||
@@ -1014,6 +1073,25 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     const currentPractice = currentProduct.practice;
     const previousSlug = currentPractice.slug;
+    if (
+      typeof updates.scheduled_publish_at === "string" &&
+      isPracticePubliclyAvailable({
+        status: currentPractice.status,
+        scheduledPublishAt: currentPractice.scheduled_publish_at,
+        publishedAt: currentPractice.published_at,
+      }) &&
+      Date.parse(updates.scheduled_publish_at) > Date.now()
+    ) {
+      return NextResponse.json(
+        {
+          error: "scheduled_publish_after_release",
+          message:
+            "После выхода продукта расписание нельзя перенести вперёд.",
+        },
+        { status: 400 },
+      );
+    }
+
     const scalarUpdates = Object.fromEntries(
       Object.entries(updates).filter(([key, value]) => !samePublicValue(
         (currentPractice as Record<string, unknown>)[key],
@@ -1057,6 +1135,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (updateError) {
+      if (updateError.message.toLowerCase().includes("scheduled_publish_after_release")) {
+        return NextResponse.json(
+          {
+            error: "scheduled_publish_after_release",
+            message:
+              "После выхода продукта расписание нельзя перенести вперёд.",
+          },
+          { status: 400 },
+        );
+      }
       if (isStudioNewFreeDisabledViolation(updateError)) {
         return NextResponse.json(studioNewFreeDisabledResponseBody(), {
           status: 409,

@@ -7,6 +7,7 @@ import {
   isSchoolHostname,
   SCHOOL_ORIGIN,
 } from "@/lib/school/host";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { buildSitemapEntries } from "@/lib/seo/sitemap-data";
 
 /** Regenerate sitemap hourly so publish/unpublish changes propagate without hammering the DB. */
@@ -29,6 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [];
   }
 
+  await releaseDueScheduledPublications();
   const { entries } = await buildSitemapEntries();
 
   return entries;

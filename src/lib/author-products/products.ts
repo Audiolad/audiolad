@@ -74,6 +74,7 @@ const PRACTICE_DETAIL_SELECT = `
   deletion_reason,
   currency,
   published_at,
+  scheduled_publish_at,
   listening_notice_enabled,
   listening_notice_title,
   listening_notice_text,
@@ -296,7 +297,7 @@ export async function listAuthorProducts(
   const { data: practices, error } = await supabase
     .from("practices")
     .select(
-      "id, title, slug, format, product_kind, publication_class, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, updated_at",
+      "id, title, slug, format, product_kind, publication_class, price, is_free, status, moderation_status, moderation_submitted_at, moderation_review_comment, moderation_attempt, cover_url, cover_image, updated_at, published_at, scheduled_publish_at",
     )
     .eq("author_id", authorId)
     .is("deleted_at", null)
@@ -345,6 +346,8 @@ export async function listAuthorProducts(
     moderation_submitted_at: row.moderation_submitted_at ?? null,
     moderation_review_comment: row.moderation_review_comment ?? null,
     moderation_attempt: row.moderation_attempt ?? 0,
+    published_at: row.published_at ?? null,
+    scheduled_publish_at: row.scheduled_publish_at ?? null,
     audio_count: countMap.get(row.id) ?? 0,
   }));
 }

@@ -1,5 +1,6 @@
 import type { ProductAccessResult } from "@/lib/products/access";
 import { isPracticePublished } from "@/lib/products/access";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   isSelectedUsersCatalogVisibility,
   parseCatalogVisibility,
@@ -64,8 +65,18 @@ export function canRevealPublicProductPage(input: {
   >;
   catalogVisibility?: CatalogVisibility | string | null;
   isCatalogListed?: boolean | null;
+  scheduledPublishAt?: string | null;
+  publishedAt?: string | null;
+  now?: Date;
 }): boolean {
-  if (isPracticePublished(input.practiceStatus)) {
+  if (
+    isPracticePubliclyAvailable({
+      status: input.practiceStatus,
+      scheduledPublishAt: input.scheduledPublishAt,
+      publishedAt: input.publishedAt,
+      now: input.now,
+    })
+  ) {
     if (
       isSelectedUsersCatalogVisibility(
         input.catalogVisibility,
@@ -141,8 +152,20 @@ export function shouldIndexPracticePage(
   practiceStatus: string | null | undefined,
   isCatalogListed?: boolean | null,
   catalogVisibility?: CatalogVisibility | string | null,
+  schedule?: {
+    scheduledPublishAt?: string | null;
+    publishedAt?: string | null;
+    now?: Date;
+  },
 ): boolean {
-  if (!isPracticePublished(practiceStatus)) {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practiceStatus,
+      scheduledPublishAt: schedule?.scheduledPublishAt,
+      publishedAt: schedule?.publishedAt,
+      now: schedule?.now,
+    })
+  ) {
     return false;
   }
 
@@ -153,9 +176,19 @@ export function shouldFollowPracticePage(
   practiceStatus: string | null | undefined,
   isCatalogListed?: boolean | null,
   catalogVisibility?: CatalogVisibility | string | null,
+  schedule?: {
+    scheduledPublishAt?: string | null;
+    publishedAt?: string | null;
+    now?: Date;
+  },
 ): boolean {
   return shouldFollowByCatalogVisibility(
-    isPracticePublished(practiceStatus),
+    isPracticePubliclyAvailable({
+      status: practiceStatus,
+      scheduledPublishAt: schedule?.scheduledPublishAt,
+      publishedAt: schedule?.publishedAt,
+      now: schedule?.now,
+    }),
     catalogVisibility,
     isCatalogListed,
   );
@@ -165,9 +198,19 @@ export function resolvePracticePageRobots(
   practiceStatus: string | null | undefined,
   isCatalogListed?: boolean | null,
   catalogVisibility?: CatalogVisibility | string | null,
+  schedule?: {
+    scheduledPublishAt?: string | null;
+    publishedAt?: string | null;
+    now?: Date;
+  },
 ) {
   return resolvePracticeRobots({
-    published: isPracticePublished(practiceStatus),
+    published: isPracticePubliclyAvailable({
+      status: practiceStatus,
+      scheduledPublishAt: schedule?.scheduledPublishAt,
+      publishedAt: schedule?.publishedAt,
+      now: schedule?.now,
+    }),
     catalogVisibility,
     isCatalogListed,
   });

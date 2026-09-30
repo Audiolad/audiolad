@@ -9,6 +9,7 @@ import {
   listTopicHubSlugs,
   loadTopicHubPageData,
 } from "@/lib/seo/topic-hubs";
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export async function generateMetadata({
   }
 
   const supabase = await createClient();
+  await releaseDueScheduledPublications();
   const data = await loadTopicHubPageData(supabase, slug);
 
   if (!data) {
@@ -54,6 +56,7 @@ export default async function TopicHubPage({ params }: PageProps) {
   }
 
   const supabase = await createClient();
+  await releaseDueScheduledPublications();
   const data = await loadTopicHubPageData(supabase, slug);
 
   if (!data) {

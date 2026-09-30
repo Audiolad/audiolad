@@ -19,6 +19,7 @@ import {
   loadAuthorSlug,
 } from "@/lib/seo/indexnow/hooks";
 import { schedulePracticePublishedSearchNotifications } from "@/lib/seo/practice-publish-notifications";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
 
 type RouteContext = {
@@ -178,6 +179,11 @@ export async function POST(_request: Request, context: RouteContext) {
           isCatalogListed: product.practice.is_catalog_listed,
           isFirstPublishOfPractice,
           publishedCountBefore,
+          publiclyAvailable: isPracticePubliclyAvailable({
+            status: product.practice.status,
+            scheduledPublishAt: product.practice.scheduled_publish_at,
+            publishedAt: product.practice.published_at,
+          }),
         });
       }
     }

@@ -5,6 +5,10 @@ import {
   MUSIC_USAGE_PERMISSION,
 } from "@/lib/author-products/product-kind";
 import { isListedCatalogVisibility } from "@/lib/products/catalog-visibility";
+import {
+  applyPracticePublicAvailabilityFilter,
+  isPracticePubliclyAvailable,
+} from "@/lib/products/scheduled-publication";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { normalizeDurationSeconds } from "@/lib/products/duration";
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
@@ -78,6 +82,7 @@ export type StudioMusicCatalogPublication = StudioMusicPublicationInput & {
   cover_image?: unknown;
   updated_at?: string | null;
   published_at?: string | null;
+  scheduled_publish_at?: string | null;
   created_at?: string | null;
   subtitle?: string | null;
   authors?:
@@ -394,7 +399,13 @@ export function isCommerciallyAccessibleStudioPublication(
   if (!practice.id || practice.deleted_at) {
     return false;
   }
-  if (practice.status !== "published") {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+    })
+  ) {
     return false;
   }
   if (options?.commerciallyAccessible === false) {
@@ -1064,6 +1075,7 @@ const PRACTICE_SELECT_PUBLIC = `
   cover_image,
   updated_at,
   published_at,
+  scheduled_publish_at,
   created_at,
   authors!practices_author_id_fkey!inner (
     name,
@@ -1176,18 +1188,20 @@ export function createSupabaseStudioMusicCatalogStore(
 ): StudioMusicCatalogStore {
   return {
     async listPublicInventory({ filter, cursor, limit, q = null }) {
-      let query = supabase
-        .from("practices")
-        .select(PRACTICE_SELECT_PUBLIC)
-        .eq("status", "published")
-        .is("deleted_at", null)
-        .eq(
-          "music_usage_permission",
-          MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
-        )
-        .or("product_kind.eq.music,publication_class.eq.release")
-        .or(studioMusicListedVisibilityOrFilter())
-        .in("authors.access_status", ["commercial_active", "commercial"]);
+      let query = applyPracticePublicAvailabilityFilter(
+        supabase
+          .from("practices")
+          .select(PRACTICE_SELECT_PUBLIC)
+          .eq("status", "published")
+          .is("deleted_at", null)
+          .eq(
+            "music_usage_permission",
+            MUSIC_USAGE_PERMISSION.PLATFORM_REUSE_ALLOWED,
+          )
+          .or("product_kind.eq.music,publication_class.eq.release")
+          .or(studioMusicListedVisibilityOrFilter())
+          .in("authors.access_status", ["commercial_active", "commercial"]),
+      );
 
       if (filter === "free") {
         query = query.or(studioMusicCatalogFreeOrFilter());

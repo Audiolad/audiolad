@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isCoursePublication } from "@/lib/course-content/validators";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import {
   isListedCatalogVisibility,
   isSelectedUsersCatalogVisibility,
@@ -29,6 +30,8 @@ export type ProductAccessInput = {
   guest_access_enabled?: boolean | null;
   product_kind?: string | null;
   publication_class?: string | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 export type CourseContentAccessInput = ProductAccessInput;
@@ -72,13 +75,23 @@ export function isPracticeArchived(status: string | null | undefined): boolean {
   return status === "archived";
 }
 
-export function isPracticeCatalogListed(practice: {
-  status: string | null | undefined;
-  is_catalog_listed?: boolean | null;
-  catalog_visibility?: string | null;
-}): boolean {
+export function isPracticeCatalogListed(
+  practice: {
+    status: string | null | undefined;
+    is_catalog_listed?: boolean | null;
+    catalog_visibility?: string | null;
+    scheduled_publish_at?: string | null;
+    published_at?: string | null;
+  },
+  options?: { now?: Date },
+): boolean {
   return (
-    isPracticePublished(practice.status) &&
+    isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+      now: options?.now,
+    }) &&
     isListedCatalogVisibility(
       practice.catalog_visibility,
       practice.is_catalog_listed,
@@ -99,9 +112,16 @@ export function canEntitledUserAccessPracticeStatus(
 
 export function canAcquirePractice(
   practice: ProductAccessInput,
-  options?: { canSeeSelectedUsers?: boolean },
+  options?: { canSeeSelectedUsers?: boolean; now?: Date },
 ): boolean {
-  if (!isPracticePublished(practice.status)) {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+      now: options?.now,
+    })
+  ) {
     return false;
   }
 
@@ -187,12 +207,15 @@ export async function resolveProductAccess(
   supabase: SupabaseClient,
   practice: ProductAccessInput,
   userId: string | null,
+  options?: { now?: Date },
 ): Promise<ProductAccessResult> {
   const catalogVisibility = parseCatalogVisibility(
     practice.catalog_visibility,
     practice.is_catalog_listed,
   );
-  const isPubliclyListed = isPracticeCatalogListed(practice);
+  const isPubliclyListed = isPracticeCatalogListed(practice, {
+    now: options?.now,
+  });
   const selectedUsers = isSelectedUsersCatalogVisibility(
     practice.catalog_visibility,
     practice.is_catalog_listed,
@@ -218,7 +241,10 @@ export async function resolveProductAccess(
     if (isAuthorMember) {
       return {
         canListen: true,
-        canAcquire: canAcquirePractice(practice, { canSeeSelectedUsers: true }),
+        canAcquire: canAcquirePractice(practice, {
+          canSeeSelectedUsers: true,
+          now: options?.now,
+        }),
         isPubliclyListed,
         reason: "author_owner",
         isAuthorMember: true,
@@ -273,17 +299,23 @@ export async function resolveProductAccess(
     }
   }
 
-  const canAcquire = canAcquirePractice(practice, { canSeeSelectedUsers });
+  const canAcquire = canAcquirePractice(practice, {
+    canSeeSelectedUsers,
+    now: options?.now,
+  });
   const canSeeProduct = !selectedUsers || canSeeSelectedUsers;
+  const publiclyAvailable = isPracticePubliclyAvailable({
+    status: practice.status,
+    scheduledPublishAt: practice.scheduled_publish_at,
+    publishedAt: practice.published_at,
+    now: options?.now,
+  });
 
   // Free classification is independent of catalog listing.
   // listed = discovery; published + unlisted + is_free = gift by direct link.
   // selected_users stays closed unless the viewer is allowlisted.
-  if (
-    practice.is_free === true &&
-    isPracticePublished(practice.status) &&
-    canSeeProduct
-  ) {
+  // A future schedule is not publicly available, so it cannot be played.
+  if (practice.is_free === true && publiclyAvailable && canSeeProduct) {
     return {
       canListen: true,
       canAcquire: false,
@@ -300,7 +332,7 @@ export async function resolveProductAccess(
 
   if (
     practice.guest_access_enabled === true &&
-    isPracticePublished(practice.status) &&
+    publiclyAvailable &&
     canSeeProduct
   ) {
     return {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 import {
   getGuestHomeData,
@@ -35,6 +36,7 @@ async function resolveHomeRenderState(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<HomeRenderState> {
   try {
+    await releaseDueScheduledPublications();
     const {
       data: { user },
     } = await supabase.auth.getUser();

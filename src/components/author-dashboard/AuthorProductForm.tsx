@@ -11,6 +11,7 @@ import AuthorProductGallery from "@/components/author-dashboard/AuthorProductGal
 import CoverUploadBlock from "@/components/author-dashboard/CoverUploadBlock";
 import { AuthorProductCharCounter as CharCounter } from "@/components/author-dashboard/product-form-sections/AuthorProductCharCounter";
 import AuthorProductFormActions from "@/components/author-dashboard/product-form-sections/AuthorProductFormActions";
+import AuthorPublicationScheduleSection from "@/components/author-dashboard/product-form-sections/AuthorPublicationScheduleSection";
 import AuthorProductWizardStepNav from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepNav";
 import AuthorProductWizardStepper from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepper";
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
@@ -26,6 +27,13 @@ import {
   CATALOG_VISIBILITY,
   type CatalogVisibility,
 } from "@/lib/products/catalog-visibility";
+import {
+  PUBLICATION_MODE,
+  authorPublicationScheduleLine,
+  isPracticePubliclyAvailable,
+  mskWallClockToUtcIso,
+  type PublicationMode,
+} from "@/lib/products/scheduled-publication";
 import TopicSelector from "@/components/author-products/TopicSelector";
 import {
   MAX_PAID_PRICE_RUB,
@@ -414,6 +422,10 @@ type FormState = {
   moderationReviewComment: string | null;
   moderationAttempt: number;
   publishedAt: string | null;
+  scheduledPublishAt: string | null;
+  publicationMode: PublicationMode;
+  publishDate: string;
+  publishTime: string;
 };
 
 function formatDurationLong(seconds: number | null): string {
@@ -630,6 +642,10 @@ function buildInitialForm(
     moderationReviewComment: null,
     moderationAttempt: 0,
     publishedAt: null,
+    scheduledPublishAt: null,
+    publicationMode: PUBLICATION_MODE.AFTER_APPROVAL,
+    publishDate: "",
+    publishTime: "",
   };
 }
 
@@ -775,6 +791,9 @@ function buildProductSavePayload(
       related_practice_ids: form.seoContent.relatedPracticeIds,
       related_listen_slugs: form.seoContent.relatedListenSlugs,
     },
+    publication_mode: form.publicationMode,
+    publish_date: form.publishDate,
+    publish_time: form.publishTime,
   };
 }
 
@@ -1309,6 +1328,26 @@ export default function AuthorProductForm({
     (isDraft ||
       needsChanges ||
       (canBypassProductModeration && (isPublished || isUnpublished)));
+  const productIsPublic = isPracticePubliclyAvailable({
+    status: form.status,
+    scheduledPublishAt: form.scheduledPublishAt,
+    publishedAt: form.publishedAt,
+  });
+  const canEditSchedule =
+    canMutateContent &&
+    !isSubmitted &&
+    !productIsPublic &&
+    (canEditPublicFields || form.status === "published");
+  const draftScheduledAt =
+    form.publicationMode === PUBLICATION_MODE.SCHEDULED
+      ? mskWallClockToUtcIso(form.publishDate, form.publishTime)
+      : null;
+  const scheduleStatusLine = authorPublicationScheduleLine({
+    status: form.status,
+    moderationStatus: form.moderationStatus,
+    scheduledPublishAt: form.scheduledPublishAt,
+    publishedAt: form.publishedAt,
+  });
   const isCourse = isCoursePublication(form.publicationClass, form.productKind);
   const canUsePaidPricing = authorAccessAllowsPaidProducts(
     selectedAuthorAccessStatus,
@@ -1670,9 +1709,107 @@ export default function AuthorProductForm({
     return productPayload.product;
   }
 
+  async function savePublicationScheduleOnly(
+    practiceIdForSave: string,
+  ): Promise<boolean> {
+    if (
+      form.publicationMode === PUBLICATION_MODE.SCHEDULED &&
+      !mskWallClockToUtcIso(form.publishDate, form.publishTime)
+    ) {
+      setError("Укажите дату и время публикации.");
+      return false;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/author/products/${practiceIdForSave}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publication_mode: form.publicationMode,
+          publish_date: form.publishDate,
+          publish_time: form.publishTime,
+        }),
+      });
+      const payload = (await response.json()) as {
+        product?: AuthorProductDetail;
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok || !payload.product) {
+        setError(
+          getProductSaveErrorMessage({
+            error: payload.error,
+            message: payload.message,
+            status: response.status,
+          }),
+        );
+        return false;
+      }
+
+      const reloaded = await reloadSavedProduct(practiceIdForSave);
+      if (!reloaded) {
+        setError(
+          "Изменения сохранены, но не удалось обновить форму. Обновите страницу.",
+        );
+        return false;
+      }
+
+      savedBaselineRef.current = serializeProductEditorBaseline(
+        {
+          ...productDetailToFormSnapshot(reloaded),
+          audioProductAuthor: resolveFormAudioProductAuthor(
+            authors,
+            reloaded.practice.author_id,
+            reloaded.practice.audio_product_author,
+          ),
+          seoPrimaryQuery:
+            seoReservationContext?.queryText ||
+            reloaded.practice.seo_primary_query ||
+            "",
+        },
+        reloaded.audio_items,
+      );
+      setEditorDirty(applyProductEditorSaveToDirty({ dirty: true, saved: true }));
+      router.refresh();
+      return true;
+    } catch {
+      setError(getProductSaveErrorMessage({ networkError: true }));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveProduct(): Promise<boolean> {
     if (isSubmitted) {
       setError(PRODUCT_UNDER_MODERATION_MESSAGE);
+      return false;
+    }
+
+    if (!canEditPublicFields && canEditSchedule) {
+      const existingPracticeId = practiceIdRef.current || practiceId;
+      if (!existingPracticeId) {
+        setError("Сначала сохраните продукт, затем задайте расписание.");
+        return false;
+      }
+      return savePublicationScheduleOnly(existingPracticeId);
+    }
+
+    if (!canEditPublicFields) {
+      setError("Сейчас нельзя изменить продукт.");
+      return false;
+    }
+
+    if (
+      form.publicationMode === PUBLICATION_MODE.SCHEDULED &&
+      !mskWallClockToUtcIso(form.publishDate, form.publishTime)
+    ) {
+      setError("Укажите дату и время публикации.");
       return false;
     }
     if (
@@ -3500,7 +3637,8 @@ export default function AuthorProductForm({
                 form.moderationStatus,
               )}`}
             >
-              {getStatusLabel(form.status, form.moderationStatus)}
+              {scheduleStatusLine ??
+                getStatusLabel(form.status, form.moderationStatus)}
             </span>
           ) : null}
         </div>
@@ -4699,6 +4837,30 @@ export default function AuthorProductForm({
           }
         >
 {showWizardStep(4) ? (
+        <div className="mb-6">
+          <AuthorPublicationScheduleSection
+            publicationMode={form.publicationMode}
+            publishDate={form.publishDate}
+            publishTime={form.publishTime}
+            status={form.status}
+            moderationStatus={form.moderationStatus}
+            scheduledPublishAt={
+              form.publicationMode === PUBLICATION_MODE.SCHEDULED
+                ? (draftScheduledAt ?? form.scheduledPublishAt)
+                : null
+            }
+            publishedAt={form.publishedAt}
+            disabled={!canEditSchedule || busy}
+            onChange={(patch) =>
+              setForm((current) => ({
+                ...current,
+                ...patch,
+              }))
+            }
+          />
+        </div>
+      ) : null}
+{showWizardStep(4) ? (
         <fieldset className="block">
           <legend className="mb-2 block text-sm font-medium">
             Кому показывать продукт?
@@ -5558,7 +5720,10 @@ export default function AuthorProductForm({
           showBack={wizardStep > 1}
           showContinue
           busy={busy}
-          canSave={canEditPublicFields && !musicQueueHasLocalFile(musicQueue)}
+          canSave={
+            (canEditPublicFields || canEditSchedule) &&
+            !musicQueueHasLocalFile(musicQueue)
+          }
           onBack={goWizardBack}
           onSave={() => void saveWizardStep()}
           onSaveAndContinue={() => void saveWizardStepAndContinue()}
@@ -5580,6 +5745,7 @@ export default function AuthorProductForm({
         busy={busy}
         publishing={publishing}
         canEditPublicFields={canEditPublicFields}
+        canEditSchedule={canEditSchedule}
         canMutateContent={canMutateContent}
         canBypassProductModeration={canBypassProductModeration}
         isPublished={isPublished}
@@ -5590,7 +5756,7 @@ export default function AuthorProductForm({
         publishedAt={form.publishedAt}
         moderationStatus={form.moderationStatus}
         practiceId={practiceId}
-        publicPath={publicPath}
+        publicPath={productIsPublic ? publicPath : ""}
         publishPreviewPath={publishPreviewPath}
         deleteLockedAfterPaidPurchase={deleteLockedAfterPaidPurchase}
         saveDisabled={musicQueueHasLocalFile(musicQueue)}
@@ -5613,6 +5779,7 @@ export default function AuthorProductForm({
           busy={busy}
           publishing={publishing}
           canEditPublicFields={canEditPublicFields}
+          canEditSchedule={canEditSchedule}
           canMutateContent={canMutateContent}
           canBypassProductModeration={canBypassProductModeration}
           isPublished={isPublished}
@@ -5623,7 +5790,7 @@ export default function AuthorProductForm({
           publishedAt={form.publishedAt}
           moderationStatus={form.moderationStatus}
           practiceId={practiceId}
-          publicPath={publicPath}
+          publicPath={productIsPublic ? publicPath : ""}
           publishPreviewPath={publishPreviewPath}
           deleteLockedAfterPaidPurchase={deleteLockedAfterPaidPurchase}
           saveDisabled={musicQueueHasLocalFile(musicQueue)}

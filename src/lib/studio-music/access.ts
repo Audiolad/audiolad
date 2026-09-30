@@ -2,6 +2,7 @@ import {
   MUSIC_USAGE_PERMISSION,
   PRODUCT_KIND,
 } from "@/lib/author-products/product-kind";
+import { isPracticePubliclyAvailable } from "@/lib/products/scheduled-publication";
 import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 
 export const STUDIO_MUSIC_ORDER_KIND = "studio_music_license" as const;
@@ -34,6 +35,8 @@ export type StudioMusicPublicationInput = {
   price?: number | null;
   studio_music_pricing_mode?: string | null;
   studio_music_price_minor?: number | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
 };
 
 export type StudioMusicEntitlementInput = {
@@ -98,7 +101,13 @@ export function canAcquireStudioMusic(
     return false;
   }
 
-  if (practice.status !== "published") {
+  if (
+    !isPracticePubliclyAvailable({
+      status: practice.status,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      publishedAt: practice.published_at,
+    })
+  ) {
     return false;
   }
 
