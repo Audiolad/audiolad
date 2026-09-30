@@ -16,6 +16,7 @@ import {
 } from "@/lib/seo/indexnow/hooks";
 import { schedulePracticePublishedSearchNotifications } from "@/lib/seo/practice-publish-notifications";
 import { createClient } from "@/lib/supabase/server";
+import { formatMoscowDateTime } from "@/lib/author-products/publication-schedule";
 
 function revalidateProductModerationPaths(practiceId: string) {
   revalidatePath("/admin/product-moderation");
@@ -80,8 +81,10 @@ export async function approveAndPublishProductAction(
   }
 
   const detail = await getAdminProductModerationDetail(practiceId);
+  const publishedNow = publishedPractice.status === "published";
+  const scheduledPublishAt = publishedPractice.scheduled_publish_at;
   const publicPath =
-    detail?.authorSlug && detail.slug
+    publishedNow && detail?.authorSlug && detail.slug
       ? buildPracticePublicPath(detail.authorSlug, detail.slug)
       : undefined;
 
@@ -90,7 +93,7 @@ export async function approveAndPublishProductAction(
     (authorId ? await loadAuthorSlug(supabase, authorId) : null);
   const practiceSlug = publishedPractice.slug || detail?.slug || "";
 
-  if (authorSlug && practiceSlug) {
+  if (publishedNow && authorSlug && practiceSlug) {
     schedulePracticePublishedSearchNotifications({
       authorSlug,
       practiceSlug,
@@ -107,7 +110,8 @@ export async function approveAndPublishProductAction(
     practiceId,
     authorId: detail?.authorId ?? null,
     adminUserId: session.userId,
-    action: "approved_and_published",
+    action: publishedNow ? "approved_and_published" : "approved_scheduled",
+    scheduledPublishAt: scheduledPublishAt ?? null,
     attempt: detail?.moderationAttempt ?? null,
   });
 
@@ -115,7 +119,13 @@ export async function approveAndPublishProductAction(
 
   return {
     ok: true,
-    message: "Продукт одобрен и опубликован.",
+    message: publishedNow
+      ? "Продукт одобрен и опубликован."
+      : scheduledPublishAt
+        ? `Продукт одобрен. Публикация запланирована на ${formatMoscowDateTime(
+            scheduledPublishAt,
+          )} МСК.`
+        : "Продукт одобрен.",
     publicPath,
   };
 }

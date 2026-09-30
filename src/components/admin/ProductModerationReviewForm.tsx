@@ -23,6 +23,10 @@ import { getProductKindLabel } from "@/lib/author-products/product-kind";
 import { AUTHOR_DESCRIPTION_LABEL } from "@/lib/products/product-copy";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { getProductPriceLabel } from "@/lib/products/price-format";
+import {
+  formatMoscowDateTime,
+  isScheduledPublishFuture,
+} from "@/lib/author-products/publication-schedule";
 
 type ProductModerationReviewFormProps = {
   product: AdminProductModerationDetail;
@@ -63,6 +67,8 @@ function actionLabel(action: string): string {
       return "Отозван с модерации";
     case "changes_requested":
       return "Требуются изменения";
+    case "approved_scheduled":
+      return "Одобрен к публикации по расписанию";
     case "approved_and_published":
       return "Одобрен и опубликован";
     case "migration_backfill":
@@ -213,8 +219,12 @@ export default function ProductModerationReviewForm({
   const visible = getVisibleAuthorProductStatus({
     status: product.status,
     moderationStatus: product.moderationStatus,
+    scheduledPublishAt: product.scheduledPublishAt,
   });
   const isAwaitingDecision = product.moderationStatus === "submitted";
+  const hasFutureSchedule = isScheduledPublishFuture(
+    product.scheduledPublishAt,
+  );
   const publicPath =
     product.authorSlug && product.slug
       ? buildPracticePublicPath(product.authorSlug, product.slug)
@@ -268,6 +278,14 @@ export default function ProductModerationReviewForm({
               {formatDateTime(product.moderationSubmittedAt)}
             </dd>
           </div>
+          {product.scheduledPublishAt ? (
+            <div>
+              <dt className="text-[#796ba0]">Публикация</dt>
+              <dd className="mt-1 font-medium text-[#25135c]">
+                {formatMoscowDateTime(product.scheduledPublishAt)} МСК
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-[#796ba0]">Попытка</dt>
             <dd className="mt-1 font-medium text-[#25135c]">
@@ -526,7 +544,11 @@ export default function ProductModerationReviewForm({
               action={approveAction}
               onSubmit={(event) => {
                 const confirmed = window.confirm(
-                  "Продукт будет сразу опубликован и станет доступен слушателям.",
+                  hasFutureSchedule
+                    ? `Продукт будет одобрен и автоматически опубликован ${formatMoscowDateTime(
+                        product.scheduledPublishAt,
+                      )} МСК.`
+                    : "Продукт будет сразу опубликован и станет доступен слушателям.",
                 );
                 if (!confirmed) {
                   event.preventDefault();
@@ -535,7 +557,11 @@ export default function ProductModerationReviewForm({
             >
               <input type="hidden" name="practiceId" value={product.id} />
               <SubmitButton
-                label="Одобрить и опубликовать"
+                label={
+                  hasFutureSchedule
+                    ? "Одобрить к публикации"
+                    : "Одобрить и опубликовать"
+                }
                 className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
               />
             </form>

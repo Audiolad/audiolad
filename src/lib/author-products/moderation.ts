@@ -38,6 +38,7 @@ export const VISIBLE_AUTHOR_PRODUCT_STATUS = {
   SUBMITTED: "submitted",
   CHANGES_REQUESTED: "changes_requested",
   PUBLISHED: "published",
+  SCHEDULED: "scheduled",
   UNPUBLISHED: "unpublished",
   DELETED: "deleted",
 } as const;
@@ -69,6 +70,7 @@ export type PublishModerationGateResult =
 export type VisibleAuthorProductStatusInput = {
   status: string;
   moderationStatus: string | null | undefined;
+  scheduledPublishAt?: string | null;
   deletedAt?: string | null;
 };
 
@@ -97,6 +99,14 @@ export function getVisibleAuthorProductStatus(
 
   if (
     input.status === "unpublished" &&
+    input.moderationStatus === MODERATION_STATUS.APPROVED &&
+    Boolean(input.scheduledPublishAt)
+  ) {
+    return VISIBLE_AUTHOR_PRODUCT_STATUS.SCHEDULED;
+  }
+
+  if (
+    input.status === "unpublished" &&
     input.moderationStatus === MODERATION_STATUS.APPROVED
   ) {
     return VISIBLE_AUTHOR_PRODUCT_STATUS.UNPUBLISHED;
@@ -111,6 +121,8 @@ export function getVisibleAuthorProductStatusLabel(
   switch (visible) {
     case VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED:
       return "Опубликован";
+    case VISIBLE_AUTHOR_PRODUCT_STATUS.SCHEDULED:
+      return "Запланировано";
     case VISIBLE_AUTHOR_PRODUCT_STATUS.UNPUBLISHED:
       return "Снят с публикации";
     case VISIBLE_AUTHOR_PRODUCT_STATUS.SUBMITTED:
@@ -131,6 +143,8 @@ export function getVisibleAuthorProductStatusClassName(
   switch (visible) {
     case VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED:
       return "bg-[#eaf7ef] text-[#3d8d65]";
+    case VISIBLE_AUTHOR_PRODUCT_STATUS.SCHEDULED:
+      return "bg-[#eef3ff] text-[#4457a5]";
     case VISIBLE_AUTHOR_PRODUCT_STATUS.UNPUBLISHED:
       return "bg-[#eef3ff] text-[#4f6db8]";
     case VISIBLE_AUTHOR_PRODUCT_STATUS.SUBMITTED:
@@ -571,6 +585,14 @@ export function mapPublishRpcError(
 } | null {
   const parts = readPublishRpcErrorParts(source);
   const normalized = `${parts.message} ${parts.details}`.toLowerCase();
+
+  if (normalized.includes("scheduled_publish_not_due")) {
+    return {
+      status: 409,
+      code: "scheduled_publish_not_due",
+      message: "Продукт уже одобрен и будет опубликован автоматически в запланированное время.",
+    };
+  }
 
   if (normalized.includes("moderation_required")) {
     return {

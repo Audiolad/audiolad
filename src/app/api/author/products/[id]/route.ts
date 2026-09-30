@@ -253,6 +253,46 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const updates: Record<string, unknown> = {};
 
+    if ("scheduled_publish_at" in body) {
+      const rawScheduledPublishAt = (
+        body as Record<string, unknown>
+      ).scheduled_publish_at;
+
+      if (
+        rawScheduledPublishAt === null ||
+        rawScheduledPublishAt === undefined ||
+        rawScheduledPublishAt === ""
+      ) {
+        updates.scheduled_publish_at = null;
+      } else if (typeof rawScheduledPublishAt !== "string") {
+        return NextResponse.json(
+          { error: "invalid_scheduled_publish_at" },
+          { status: 400 },
+        );
+      } else {
+        const scheduledDate = new Date(rawScheduledPublishAt);
+
+        if (Number.isNaN(scheduledDate.getTime())) {
+          return NextResponse.json(
+            { error: "invalid_scheduled_publish_at" },
+            { status: 400 },
+          );
+        }
+
+        if (scheduledDate.getTime() <= Date.now()) {
+          return NextResponse.json(
+            {
+              error: "scheduled_publish_time_in_past",
+              message: "Выберите будущие дату и время публикации по МСК.",
+            },
+            { status: 400 },
+          );
+        }
+
+        updates.scheduled_publish_at = scheduledDate.toISOString();
+      }
+    }
+
     if ("title" in body && typeof body.title === "string") {
       const title = body.title.trim();
 

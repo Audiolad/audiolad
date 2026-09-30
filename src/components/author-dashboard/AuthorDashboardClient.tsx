@@ -33,6 +33,7 @@ import {
 } from "@/lib/author-products/moderation";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import { authorAccessAllowsContentMutations } from "@/lib/authors/access";
+import { formatMoscowDateTime } from "@/lib/author-products/publication-schedule";
 import {
   formatPriceLabel,
   formatUpdatedAt,
@@ -82,6 +83,7 @@ function ProductCard({
   const visibleStatus = getVisibleAuthorProductStatus({
     status: product.status,
     moderationStatus: product.moderation_status,
+    scheduledPublishAt: product.scheduled_publish_at,
   });
   const isSubmitted =
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.SUBMITTED;
@@ -89,8 +91,11 @@ function ProductCard({
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.CHANGES_REQUESTED;
   const isPublished =
     visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.PUBLISHED;
+  const isScheduled =
+    visibleStatus === VISIBLE_AUTHOR_PRODUCT_STATUS.SCHEDULED;
 
-  const primaryActionLabel = isSubmitted ? "Просмотреть" : "Редактировать";
+  const primaryActionLabel =
+    isSubmitted || isScheduled ? "Просмотреть" : "Редактировать";
 
   return (
     <article className="rounded-[24px] border border-[#eadff8] bg-white p-4 shadow-[0_8px_22px_rgba(91,62,145,0.06)]">
@@ -122,9 +127,16 @@ function ProductCard({
               className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClassName(
                 product.status,
                 product.moderation_status,
+                null,
+                product.scheduled_publish_at,
               )}`}
             >
-              {getStatusLabel(product.status, product.moderation_status)}
+              {getStatusLabel(
+                product.status,
+                product.moderation_status,
+                null,
+                product.scheduled_publish_at,
+              )}
             </span>
           </div>
 
@@ -139,6 +151,11 @@ function ProductCard({
             {product.moderation_submitted_at ? (
               <span>
                 Отправлен {formatUpdatedAt(product.moderation_submitted_at)}
+              </span>
+            ) : null}
+            {product.scheduled_publish_at ? (
+              <span>
+                Выход {formatMoscowDateTime(product.scheduled_publish_at)} МСК
               </span>
             ) : null}
           </div>
