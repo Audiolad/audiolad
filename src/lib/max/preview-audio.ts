@@ -31,6 +31,7 @@ export async function buildMaxStorefrontPreviewClip(input: {
       input.practice,
       input.supabase,
       input.preview,
+      { audioItemId: input.trackId },
     );
     if (!preview.ok) {
       return preview;

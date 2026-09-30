@@ -356,7 +356,169 @@ try {
   });
   const otherTrack = await buildMaxPlaybackPreviewClip("author", "product", "track-other");
   assert.equal(otherTrack.ok, false);
-  assert.equal(otherTrack.reason, "forbidden");
+  assert.equal(otherTrack.reason, "preview_unavailable");
+
+  const track1 = "11111111-1111-4111-8111-111111111111";
+  const track2 = "22222222-2222-4222-8222-222222222222";
+  const foreignId = "33333333-3333-4333-8333-333333333333";
+  const lesson1 = "44444444-4444-4444-8444-444444444444";
+  const lesson2 = "55555555-5555-4555-8555-555555555555";
+  const paidRows = [
+    {
+      id: track1,
+      title: "Первый",
+      position: 1,
+      duration_seconds: 180,
+      audio_path: "practices/a.mp3",
+      status: "published",
+      is_preview: true,
+      preview_start_ms: 0,
+      preview_end_ms: 60_000,
+    },
+    {
+      id: track2,
+      title: "Второй",
+      position: 2,
+      duration_seconds: 200,
+      audio_path: "practices/b.mp3",
+      status: "published",
+      is_preview: false,
+      preview_start_ms: 5_000,
+      preview_end_ms: 50_000,
+    },
+  ];
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => listed(),
+    getPractice: async () => ({ practice: paidPractice, error: false }),
+    loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    preview: {
+      listAudioItems: async () => paidRows,
+      filterPlayable: async (rows) => rows,
+    },
+  });
+  const canonicalPreview = await getMaxPlaybackSession(userId, "author", "product");
+  assert.equal(canonicalPreview.ok, true);
+  assert.equal(canonicalPreview.playbackMode, "preview");
+  assert.equal(canonicalPreview.session.tracks.length, 1);
+  assert.equal(canonicalPreview.session.tracks[0].trackId, track1);
+  const playlistTrack = await getMaxPlaybackSession(
+    userId,
+    "author",
+    "product",
+    undefined,
+    track2,
+  );
+  assert.equal(playlistTrack.ok, true);
+  assert.equal(playlistTrack.playbackMode, "preview");
+  assert.equal(playlistTrack.session.tracks.length, 1);
+  assert.equal(playlistTrack.session.tracks[0].trackId, track2);
+  assert.equal(JSON.stringify(playlistTrack.session).includes(track1), false);
+  assert.equal(JSON.stringify(playlistTrack).includes("audio_path"), false);
+  const foreignPreview = await getMaxPlaybackSession(
+    userId,
+    "author",
+    "product",
+    undefined,
+    foreignId,
+  );
+  assert.deepEqual(foreignPreview, { ok: false, reason: "preview_unavailable" });
+
+  const courseRows = [
+    {
+      id: lesson1,
+      title: "Урок 1",
+      position: 1,
+      duration_seconds: 200,
+      audio_path: "courses/l1.mp3",
+      status: "published",
+      preview_start_ms: 0,
+      preview_end_ms: 60_000,
+    },
+    {
+      id: lesson2,
+      title: "Урок 2",
+      position: 2,
+      duration_seconds: 200,
+      audio_path: "courses/l2.mp3",
+      status: "published",
+      preview_start_ms: 0,
+      preview_end_ms: 60_000,
+    },
+  ];
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => listed("course"),
+    getPractice: async () => ({ practice: coursePractice, error: false }),
+    loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    preview: {
+      listAudioItems: async () => courseRows,
+      filterPlayable: async (rows) => rows,
+      listCoursePreviewIds: async () => new Set([lesson1]),
+    },
+  });
+  const courseCanonical = await getMaxPlaybackSession(userId, "author", "course");
+  assert.equal(courseCanonical.ok, true);
+  assert.equal(courseCanonical.session.tracks.length, 1);
+  assert.equal(courseCanonical.session.tracks[0].trackId, lesson1);
+  const courseSelected = await getMaxPlaybackSession(
+    userId,
+    "author",
+    "course",
+    undefined,
+    lesson1,
+  );
+  assert.equal(courseSelected.ok, true);
+  assert.equal(courseSelected.session.tracks[0].trackId, lesson1);
+  const courseOutsideAllowList = await getMaxPlaybackSession(
+    userId,
+    "author",
+    "course",
+    undefined,
+    lesson2,
+  );
+  assert.deepEqual(courseOutsideAllowList, { ok: false, reason: "preview_unavailable" });
+  const courseForeign = await getMaxPlaybackSession(
+    userId,
+    "author",
+    "course",
+    undefined,
+    foreignId,
+  );
+  assert.deepEqual(courseForeign, { ok: false, reason: "preview_unavailable" });
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => listed("course"),
+    getPractice: async () => ({ practice: coursePractice, error: false }),
+    loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    preview: {
+      listAudioItems: async () => [
+        {
+          id: lesson1,
+          title: "Урок 1",
+          position: 1,
+          duration_seconds: 200,
+          audio_path: "courses/l1.mp3",
+          status: "published",
+          preview_start_ms: null,
+          preview_end_ms: null,
+        },
+      ],
+      filterPlayable: async (rows) => rows,
+      listCoursePreviewIds: async () => new Set([lesson1]),
+    },
+  });
+  const courseAllowedWithoutWindow = await getMaxPlaybackSession(
+    userId,
+    "author",
+    "course",
+    undefined,
+    lesson1,
+  );
+  assert.deepEqual(courseAllowedWithoutWindow, {
+    ok: false,
+    reason: "preview_unavailable",
+  });
 
   setMaxPlaybackDepsForTests({
     createClient: () => ({}),

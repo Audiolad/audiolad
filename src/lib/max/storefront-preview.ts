@@ -150,6 +150,7 @@ export async function resolveMaxStorefrontPreview(
   practice: PublicPracticeRow,
   supabase: SupabaseClient,
   deps: MaxStorefrontPreviewDeps = {},
+  options: { audioItemId?: string | null } = {},
 ): Promise<MaxStorefrontPreview> {
   try {
     const isCourse =
@@ -180,6 +181,7 @@ export async function resolveMaxStorefrontPreview(
 
     const chosenResult = chooseCatalogPreviewAudioRow(playable, {
       isCourse,
+      audioItemId: options.audioItemId,
       allowedAudioItemIds,
     });
     if (!chosenResult.ok) {

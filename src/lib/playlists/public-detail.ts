@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import { getDisplayFormat } from "@/lib/author-products/format";
@@ -129,25 +130,25 @@ function normalizeOne<T>(value: T | T[] | null | undefined): T | null {
   return value;
 }
 
+export type PublicPlaylistLoadResult =
+  | { ok: true; detail: PublicPlaylistView }
+  | { ok: false; reason: "not_found" | "error" };
+
 /**
- * Load a public published playlist by slug for /p/[slug].
+ * Load a public published playlist by slug.
  * Does not write entitlement, progress, or updated_at.
- * Uses session/anon Supabase client (RLS) + service role only for cover signing.
- * React cache() dedupes generateMetadata + page within one request (keyed by slug).
+ * The caller supplies the read client so RLS decides which item embeds exist.
+ * Service role is used only to sign a custom cover.
  */
-export const loadPublicPlaylistBySlug = cache(
-  async function loadPublicPlaylistBySlug(
-    rawSlug: string,
-  ): Promise<
-    | { ok: true; detail: PublicPlaylistView }
-    | { ok: false; reason: "not_found" | "error" }
-  > {
+export async function loadPublicPlaylistBySlugWithClient(
+  supabase: SupabaseClient,
+  rawSlug: string,
+): Promise<PublicPlaylistLoadResult> {
     if (!isValidPlaylistPublicSlug(rawSlug)) {
       return { ok: false, reason: "not_found" };
     }
 
     const slug = normalizePlaylistPublicSlug(rawSlug);
-    const supabase = await createClient();
 
     const { data: playlistRow, error: playlistError } = await supabase
       .from("playlists")
@@ -442,5 +443,17 @@ export const loadPublicPlaylistBySlug = cache(
           : USER_PLAYLIST_OWNER_LABEL,
       },
     };
+}
+
+/**
+ * Session/anon load for /p/[slug].
+ * React cache() dedupes generateMetadata + page within one request (keyed by slug).
+ */
+export const loadPublicPlaylistBySlug = cache(
+  async function loadPublicPlaylistBySlug(
+    rawSlug: string,
+  ): Promise<PublicPlaylistLoadResult> {
+    const supabase = await createClient();
+    return loadPublicPlaylistBySlugWithClient(supabase, rawSlug);
   },
 );

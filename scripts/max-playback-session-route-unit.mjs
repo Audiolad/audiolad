@@ -215,6 +215,157 @@ try {
   r = await POST(request({ initData: init(), authorSlug: "author", productSlug: "product" }));
   assert.equal(r.status, 403);
   assert.equal((await r.json()).reason, "preview_unavailable");
+
+  const track1 = "11111111-1111-4111-8111-111111111111";
+  const track2 = "22222222-2222-4222-8222-222222222222";
+  const foreignId = "33333333-3333-4333-8333-333333333333";
+  let previewCalls = 0;
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
+    getPractice: async () => ({
+      practice: {
+        id: "practice-1",
+        title: "Утро",
+        slug: "product",
+        product_kind: "practice",
+        publication_class: "audio_product",
+        price: 490,
+        is_free: false,
+        authors: { name: "Анна", slug: "author" },
+      },
+      error: false,
+    }),
+    loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    preview: {
+      listAudioItems: async () => [
+        {
+          id: track1,
+          title: "Первый",
+          position: 1,
+          duration_seconds: 180,
+          audio_path: "practices/a.mp3",
+          status: "published",
+          is_preview: true,
+          preview_start_ms: 0,
+          preview_end_ms: 60_000,
+        },
+        {
+          id: track2,
+          title: "Второй",
+          position: 2,
+          duration_seconds: 200,
+          audio_path: "practices/b.mp3",
+          status: "published",
+          preview_start_ms: 0,
+          preview_end_ms: 45_000,
+        },
+      ],
+      filterPlayable: async (rows) => rows,
+    },
+    resolvePreview: async (_practice, _client, audioItemId) => {
+      previewCalls += 1;
+      assert.fail(`resolver stub must not replace chooseCatalogPreviewAudioRow (${audioItemId})`);
+    },
+  });
+  const callsBeforeInvalid = previewCalls;
+  r = await POST(
+    request({
+      initData: init(),
+      authorSlug: "author",
+      productSlug: "product",
+      audioItemId: "track-2",
+    }),
+  );
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).reason, "invalid_request");
+  assert.equal(previewCalls, callsBeforeInvalid);
+  r = await POST(
+    request({
+      initData: init(),
+      authorSlug: "author",
+      productSlug: "product",
+      audioItemId: 12,
+    }),
+  );
+  assert.equal(r.status, 400);
+  assert.equal(previewCalls, callsBeforeInvalid);
+
+  setMaxPlaybackDepsForTests({
+    createClient: () => ({}),
+    listCatalog: async () => [{ authorSlug: "author", slug: "product" }],
+    getPractice: async () => ({
+      practice: {
+        id: "practice-1",
+        title: "Утро",
+        slug: "product",
+        product_kind: "practice",
+        publication_class: "audio_product",
+        price: 490,
+        is_free: false,
+        authors: { name: "Анна", slug: "author" },
+      },
+      error: false,
+    }),
+    loadSession: async () => ({ ok: false, reason: "unavailable" }),
+    preview: {
+      listAudioItems: async () => [
+        {
+          id: track1,
+          title: "Первый",
+          position: 1,
+          duration_seconds: 180,
+          audio_path: "practices/a.mp3",
+          status: "published",
+          is_preview: true,
+          preview_start_ms: 0,
+          preview_end_ms: 60_000,
+        },
+        {
+          id: track2,
+          title: "Второй",
+          position: 2,
+          duration_seconds: 200,
+          audio_path: "practices/b.mp3",
+          status: "published",
+          preview_start_ms: 0,
+          preview_end_ms: 45_000,
+        },
+      ],
+      filterPlayable: async (rows) => rows,
+    },
+  });
+  r = await POST(request({ initData: init(), authorSlug: "author", productSlug: "product" }));
+  assert.equal(r.status, 200);
+  const canonical = await r.json();
+  assert.equal(canonical.playbackMode, "preview");
+  assert.equal(canonical.session.tracks.length, 1);
+  assert.equal(canonical.session.tracks[0].trackId, track1);
+  r = await POST(
+    request({
+      initData: init(),
+      authorSlug: "author",
+      productSlug: "product",
+      audioItemId: track2,
+    }),
+  );
+  assert.equal(r.status, 200);
+  const selected = await r.json();
+  assert.equal(selected.playbackMode, "preview");
+  assert.equal(selected.session.tracks.length, 1);
+  assert.equal(selected.session.tracks[0].trackId, track2);
+  assert.equal(JSON.stringify(selected).includes("audio_path"), false);
+  assert.equal(JSON.stringify(selected).includes(track1), false);
+  r = await POST(
+    request({
+      initData: init(),
+      authorSlug: "author",
+      productSlug: "product",
+      audioItemId: foreignId,
+    }),
+  );
+  assert.equal(r.status, 403);
+  assert.equal((await r.json()).reason, "preview_unavailable");
 } finally {
   setResolveMaxNativeUserForTests(null);
   setMaxPlaybackDepsForTests(null);

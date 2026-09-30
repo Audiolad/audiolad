@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 import {
   isMaxCatalogPath,
   isMaxCatalogTopicsPath,
+  isMaxPlaylistsCatalogPath,
+  isMaxPlaylistsDetailPath,
   isMaxHomePath,
   isMaxPlaybackAudioPath,
   isMaxPlaybackPreviewPath,
@@ -28,6 +30,8 @@ import {
   MAX_HOSTNAME,
   MAX_CATALOG_PATH,
   MAX_CATALOG_TOPICS_PATH,
+  MAX_PLAYLISTS_CATALOG_PATH,
+  MAX_PLAYLISTS_DETAIL_PATH,
   MAX_HOME_PATH,
   MAX_PLAYBACK_AUDIO_PATH,
   MAX_PLAYBACK_PREVIEW_PATH,
@@ -105,6 +109,12 @@ assert.equal(isMaxSessionUnlinkPath(`${MAX_SESSION_UNLINK_PATH}/`), false);
 assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_LINK_PATH), false);
 assert.equal(isMaxSessionUnlinkPath("/api/max"), false);
 assert.equal(isMaxSessionLinkPath("/api/foo"), false);
+assert.equal(isMaxPlaylistsCatalogPath(MAX_PLAYLISTS_CATALOG_PATH), true);
+assert.equal(isMaxPlaylistsCatalogPath(`${MAX_PLAYLISTS_CATALOG_PATH}/`), false);
+assert.equal(isMaxPlaylistsCatalogPath("/api/max/playlists"), false);
+assert.equal(isMaxPlaylistsDetailPath(MAX_PLAYLISTS_DETAIL_PATH), true);
+assert.equal(isMaxPlaylistsDetailPath(`${MAX_PLAYLISTS_DETAIL_PATH}/`), false);
+assert.equal(isMaxPlaylistsDetailPath(MAX_PLAYLISTS_CATALOG_PATH), false);
 assert.equal(isMaxCatalogPath(MAX_CATALOG_PATH), true);
 assert.equal(isMaxCatalogPath(`${MAX_CATALOG_PATH}/`), false);
 assert.equal(isMaxCatalogPath(MAX_CATALOG_TOPICS_PATH), false);
@@ -147,6 +157,8 @@ assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_UNLINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PLAYLISTS_CATALOG_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PLAYLISTS_DETAIL_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_TOPICS_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_HOME_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PRODUCT_PATH, "pass_through");
@@ -161,6 +173,11 @@ assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_UNLINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYLISTS_CATALOG_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYLISTS_DETAIL_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/playlists", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/p/morning-playlist", "not_found");
+assertMaxAction(MAX_HOSTNAME, "/playlists/catalog", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_HOME_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/home/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_TOPICS_PATH}/`, "not_found");
@@ -310,6 +327,11 @@ const maxClientSources = [
   "src/lib/max/catalog-product.ts",
   "src/components/max/MaxBottomNav.tsx",
   "src/components/max/MaxTabPlaceholder.tsx",
+  "src/components/max/MaxPlaylists.tsx",
+  "src/components/max/MaxPlaylistCard.tsx",
+  "src/components/max/MaxPlaylistDetail.tsx",
+  "src/lib/max/playlist-queue.ts",
+  "src/lib/max/playlist-types.ts",
   "src/components/max/MaxProfile.tsx",
   "src/lib/max/primary-tabs.ts",
   "src/components/max/MaxAudioPlayer.tsx",
@@ -419,6 +441,8 @@ assert.match(policySource, /isMaxSessionVerifyPath/);
 assert.match(policySource, /isMaxSessionLinkPath/);
 assert.match(policySource, /isMaxSessionUnlinkPath/);
 assert.match(policySource, /isMaxHomePath/);
+assert.match(policySource, /isMaxPlaylistsCatalogPath/);
+assert.match(policySource, /isMaxPlaylistsDetailPath/);
 assert.doesNotMatch(
   policySource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""),
   /pathname\.startsWith\(|\/api\/max\/\*/,
