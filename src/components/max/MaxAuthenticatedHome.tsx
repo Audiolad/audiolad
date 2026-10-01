@@ -474,7 +474,6 @@ export default function MaxAuthenticatedHome({
         <div className="mx-auto max-w-lg">
           <MaxHome
             guestMode={guestMode}
-            onOpenCatalog={() => openCatalogFromHome({ section: null, access: "all" })}
             onListenFree={() => openCatalogFromHome({ section: null, access: "free" })}
             onSlideAction={applyGuestHomeSlide}
             onOpenSection={(section) => openCatalogFromHome({ section, access: "all" })}

@@ -89,8 +89,7 @@ assert.match(home, /cache: "no-store"/);
 assert.match(home, /JSON\.stringify\(\{ initData \}\)/);
 assert.match(home, /\{MAX_HOME_TITLE\}/);
 assert.match(home, /\{MAX_HOME_SUBTITLE\}/);
-assert.match(home, /\{MAX_HOME_OPEN_CATALOG_LABEL\}/);
-assert.match(home, /\{MAX_HOME_LISTEN_FREE_LABEL\}/);
+assert.doesNotMatch(home, /MAX_HOME_OPEN_CATALOG_LABEL|MAX_HOME_LISTEN_FREE_LABEL|onOpenCatalog/);
 assert.match(home, /\{shelf\.title\}/);
 assert.match(home, /\{MAX_HOME_SEE_ALL_LABEL\}/);
 assert.match(home, /PUBLIC_CATALOG_SECTION_CARDS/);
@@ -110,6 +109,7 @@ assert.match(shell, /function openHomeProduct\(product: MaxCatalogProduct\)/);
 assert.match(shell, /setActiveTab\("catalog"\)/);
 assert.match(shell, /openCatalogProduct\(product\)/);
 assert.match(shell, /<MaxProductDetailView/);
+assert.doesNotMatch(shell, /onOpenCatalog/);
 assert.match(
   shell,
   /onListenFree=\{\(\) => openCatalogFromHome\(\{ section: null, access: "free" \}\)\}/,
@@ -206,7 +206,6 @@ assert.equal(readMaxHomeShelves({ shelves: { free: [], music: [] } }), null);
 
 const linkedProps = {
   guestMode: false,
-  onOpenCatalog: () => {},
   onListenFree: () => {},
   onSlideAction: () => {},
   onOpenSection: () => {},
@@ -223,8 +222,8 @@ const markup = renderToStaticMarkup(
 );
 assert.match(markup, /АудиоЛад/);
 assert.ok(markup.includes(MAX_HOME_SUBTITLE));
-assert.match(markup, /Открыть каталог/);
-assert.match(markup, /Слушать бесплатно/);
+assert.doesNotMatch(markup, /Открыть каталог/);
+assert.doesNotMatch(markup, /Слушать бесплатно/);
 assert.match(markup, /data-max-home-section="music"/);
 assert.match(markup, /data-max-home-section="meditations"/);
 assert.match(markup, /data-max-home-section="education"/);
@@ -254,7 +253,12 @@ const loading = renderToStaticMarkup(
     shelves: null,
   }),
 );
-assert.match(loading, /Открыть каталог/);
+assert.doesNotMatch(loading, /Открыть каталог/);
+assert.doesNotMatch(loading, /Слушать бесплатно/);
+assert.match(loading, /data-max-home-section="music"/);
+assert.match(loading, /data-max-home-section="meditations"/);
+assert.match(loading, /data-max-home-section="education"/);
+assert.match(loading, /data-max-home-section="stories"/);
 assert.match(loading, /Собираем подборки/);
 assert.doesNotMatch(loading, /data-max-home-shelf=/);
 assert.doesNotMatch(loading, /data-max-guest-home-slider/);
