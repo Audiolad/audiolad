@@ -24,25 +24,27 @@ export default function VenuePlayerPage() {
   const domain = useBusinessDomain();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [credential, setCredential] = useState<string>("");
+  const [credential, setCredential] = useState<string>(() => {
+    try {
+      const stored = sessionStorage.getItem(VENUE_PLAYER_CREDENTIAL_STORAGE_KEY);
+      return stored && isVenuePlayerCredential(stored) ? stored : "";
+    } catch {
+      return "";
+    }
+  });
   const [playerCode, setPlayerCode] = useState<string>("");
-  const [phase, setPhase] = useState<RuntimePhase>("idle");
+  const [phase, setPhase] = useState<RuntimePhase>(() => {
+    try {
+      const stored = sessionStorage.getItem(VENUE_PLAYER_CREDENTIAL_STORAGE_KEY);
+      return stored && isVenuePlayerCredential(stored) ? "ready" : "idle";
+    } catch {
+      return "idle";
+    }
+  });
   const [error, setError] = useState<string | null>(null);
   const [lastHeartbeatAt, setLastHeartbeatAt] = useState<string | null>(null);
   const [heartbeatOk, setHeartbeatOk] = useState(false);
   const pilot = useMemo(() => getVenuePlayerPilotTrack(), []);
-
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(VENUE_PLAYER_CREDENTIAL_STORAGE_KEY);
-      if (stored && isVenuePlayerCredential(stored)) {
-        setCredential(stored);
-        setPhase("ready");
-      }
-    } catch {
-      // sessionStorage may be unavailable
-    }
-  }, []);
 
   const stopHeartbeat = useCallback(() => {
     if (heartbeatTimerRef.current) {
