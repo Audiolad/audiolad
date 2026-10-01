@@ -135,7 +135,22 @@ assert.match(home, /hidden=\{activeTab !== "catalog" \|\| Boolean\(promoTarget\)
 
 assert.match(promo, /3 КвантМедитации|page\.publicTitle/);
 assert.match(promo, /page\.publicDescription/);
+assert.match(promo, /page\.authorName/);
 assert.match(promo, /page\.products\.map/);
+const promoHeader = promo.slice(
+  promo.indexOf("← В каталог"),
+  promo.indexOf("{page.publicTitle}"),
+);
+assert.ok(promoHeader.length > 0);
+assert.doesNotMatch(promoHeader, /АудиоЛад/);
+assert.doesNotMatch(
+  promo,
+  /<p[^>]*>\s*АудиоЛад\s*<\/p>/,
+);
+assert.match(
+  promo,
+  /<h1 className="text-\[26px\] font-semibold leading-tight text-\[#2f2548\]">\s*\{page\.publicTitle\}/,
+);
 assert.match(promo, /Начать слушать/);
 assert.match(promo, /MAX_PLAYBACK_SESSION_PATH/);
 assert.match(promo, /MAX_PLAYBACK_AUDIO_PATH/);

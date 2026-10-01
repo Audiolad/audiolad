@@ -250,10 +250,7 @@ export default function MaxPromoLanding({
         ) : null}
 
         <div className="border-b border-[#eadff8] bg-white px-5 py-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#9485b4]">
-            АудиоЛад
-          </p>
-          <h1 className="mt-3 text-[26px] font-semibold leading-tight text-[#2f2548]">
+          <h1 className="text-[26px] font-semibold leading-tight text-[#2f2548]">
             {page.publicTitle}
           </h1>
           {page.publicDescription ? (
