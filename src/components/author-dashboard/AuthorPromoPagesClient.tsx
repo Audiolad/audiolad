@@ -19,6 +19,7 @@ import type {
 } from "@/lib/promo-pages/types";
 import { getPromoPageUiErrorMessage } from "@/lib/promo-pages/errors";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
+import { buildMaxPromoDeepLink } from "@/lib/max/startapp";
 import { copyTextToClipboard } from "@/lib/playlists/public-url";
 
 type PromoPageListItem = PromoPageRecord & {
@@ -46,6 +47,7 @@ export default function AuthorPromoPagesClient({
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [copiedPageId, setCopiedPageId] = useState<string | null>(null);
+  const [copiedMaxPageId, setCopiedMaxPageId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
@@ -262,6 +264,15 @@ export default function AuthorPromoPagesClient({
     }
   }
 
+  async function handleCopyMaxLink(pageId: string, maxUrl: string) {
+    const ok = await copyTextToClipboard(maxUrl);
+
+    if (ok) {
+      setCopiedMaxPageId(pageId);
+      window.setTimeout(() => setCopiedMaxPageId(null), 1800);
+    }
+  }
+
   const sortedPages = useMemo(
     () =>
       [...pages].sort(
@@ -346,6 +357,7 @@ export default function AuthorPromoPagesClient({
           {sortedPages.map((page) => {
             const isBusy = actionLoadingId === page.id;
             const publicPath = buildPromoPagePath(page.author_slug, page.slug);
+            const maxUrl = buildMaxPromoDeepLink(page.id);
             const isDraftLike = page.status !== "published";
             const displayName = page.public_title.trim() || page.internal_name;
 
@@ -365,6 +377,9 @@ export default function AuthorPromoPagesClient({
                       </p>
                     ) : null}
                     <p className="mt-1 break-all text-sm text-[#7d70a2]">{publicPath}</p>
+                    {page.status === "published" && maxUrl ? (
+                      <p className="mt-1 break-all text-xs text-[#7d70a2]">MAX: {maxUrl}</p>
+                    ) : null}
                   </div>
                   <span
                     className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${getPromoPageStatusClassName(page.status)}`}
@@ -422,6 +437,17 @@ export default function AuthorPromoPagesClient({
                       >
                         {copiedPageId === page.id ? "Ссылка скопирована" : "Скопировать ссылку"}
                       </button>
+                      {maxUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyMaxLink(page.id, maxUrl)}
+                          className="rounded-full border border-[#ddcfef] px-3 py-1.5 text-xs font-semibold text-[#7042c5]"
+                        >
+                          {copiedMaxPageId === page.id
+                            ? "MAX-ссылка скопирована"
+                            : "Скопировать MAX-ссылку"}
+                        </button>
+                      ) : null}
                     </>
                   )}
                 </div>

@@ -212,9 +212,66 @@ function testPublishedLinkVisibility() {
     "copy link only in published branch",
   );
   assert(
-    !pagesClient.includes("buildMaxPromoDeepLink") &&
-      !pagesClient.includes("Скопировать MAX-ссылку"),
-    "MAX deep links stay hidden until Mini App bot binding is ready",
+    pagesClient.includes(
+      'import { buildMaxPromoDeepLink } from "@/lib/max/startapp"',
+    ),
+    "MAX deeplink imported from canonical helper",
+  );
+  assert(
+    pagesClient.includes("const maxUrl = buildMaxPromoDeepLink(page.id)"),
+    "card computes MAX link with buildMaxPromoDeepLink(page.id)",
+  );
+  assert(
+    !pagesClient.includes("buildMaxPromoDeepLink(page.slug)") &&
+      !pagesClient.includes("https://max.ru") &&
+      !pagesClient.includes("startapp="),
+    "MAX url is not assembled by hand and does not depend on slug",
+  );
+  assert(
+    pagesClient.includes("copiedMaxPageId") &&
+      pagesClient.includes("setCopiedMaxPageId") &&
+      pagesClient.includes("copiedPageId") &&
+      pagesClient.includes("copyTextToClipboard"),
+    "MAX copy feedback is separate and uses the existing clipboard helper",
+  );
+  assert(
+    pagesClient.includes('page.status === "published" && maxUrl') &&
+      pagesClient.includes("MAX: {maxUrl}") &&
+      pagesClient.includes("break-all"),
+    "published cards show a wrapping MAX address under the public path",
+  );
+
+  const actionsStart = pagesClient.indexOf("{isDraftLike ? (");
+  const actionsEnd = pagesClient.indexOf("</article>", actionsStart);
+  const actions = pagesClient.slice(actionsStart, actionsEnd);
+  const publishedStart = actions.indexOf(") : (");
+  assert(
+    actionsStart > 0 && actionsEnd > actionsStart && publishedStart > 0,
+    "draft and published action branches exist",
+  );
+  const draftBranch = actions.slice(0, publishedStart);
+  const publishedBranch = actions.slice(publishedStart);
+  assert(
+    !draftBranch.includes("Скопировать MAX-ссылку") &&
+      !draftBranch.includes("MAX-ссылка скопирована") &&
+      !draftBranch.includes("handleCopyMaxLink") &&
+      !draftBranch.includes("buildMaxPromoDeepLink"),
+    "draft does not show MAX copy action",
+  );
+  assert(
+    publishedBranch.includes("Скопировать MAX-ссылку") &&
+      publishedBranch.includes("MAX-ссылка скопирована") &&
+      publishedBranch.includes("handleCopyMaxLink(page.id, maxUrl)") &&
+      publishedBranch.includes("copiedMaxPageId === page.id"),
+    "published page shows MAX copy action",
+  );
+  assert(
+    publishedBranch.includes("handleCopyLink(page)") &&
+      publishedBranch.includes("Скопировать ссылку") &&
+      publishedBranch.includes("Ссылка скопирована") &&
+      publishedBranch.includes("copiedPageId === page.id") &&
+      publishedBranch.includes("Снять с публикации"),
+    "public copy link behavior unchanged",
   );
   assert(form.includes("isPublished"), "form read-only when published");
   assert(!preview.includes("buildPromoPageUrl"), "preview does not expose public url builder");
