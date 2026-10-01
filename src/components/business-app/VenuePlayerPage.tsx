@@ -8,9 +8,14 @@ import { createClient } from "@/lib/supabase/client";
 import {
   VENUE_PLAYER_APP_VERSION,
   VENUE_PLAYER_CREDENTIAL_STORAGE_KEY,
+  VENUE_PLAYER_POP_SAMPLE_INTERVAL_MS,
+  VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID,
+  buildBusinessPopHeartbeatArgs,
+  createVenuePlayerUuid,
   getVenuePlayerPilotTrack,
   isVenuePlayerCredential,
   resolveHeartbeatIntervalSeconds,
+  type BusinessPopPhase,
 } from "@/lib/business-app/venue-player";
 
 type RuntimePhase =
@@ -24,6 +29,11 @@ export default function VenuePlayerPage() {
   const domain = useBusinessDomain();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playbackSessionIdRef = useRef<string>("");
+  const sampleSeqRef = useRef(0);
+  const lastPositionMsRef = useRef(0);
+  const playStartedAtMsRef = useRef(0);
   const [credential, setCredential] = useState<string>(() => {
     try {
       const stored = sessionStorage.getItem(VENUE_PLAYER_CREDENTIAL_STORAGE_KEY);
@@ -44,12 +54,25 @@ export default function VenuePlayerPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastHeartbeatAt, setLastHeartbeatAt] = useState<string | null>(null);
   const [heartbeatOk, setHeartbeatOk] = useState(false);
+  const [popOk, setPopOk] = useState(false);
+  const [lastPopAcceptedMs, setLastPopAcceptedMs] = useState<number | null>(
+    null,
+  );
+  const [lastPopAt, setLastPopAt] = useState<string | null>(null);
+  const [popSampleSeq, setPopSampleSeq] = useState(0);
   const pilot = useMemo(() => getVenuePlayerPilotTrack(), []);
 
   const stopHeartbeat = useCallback(() => {
     if (heartbeatTimerRef.current) {
       clearInterval(heartbeatTimerRef.current);
       heartbeatTimerRef.current = null;
+    }
+  }, []);
+
+  const stopPopLoop = useCallback(() => {
+    if (popTimerRef.current) {
+      clearInterval(popTimerRef.current);
+      popTimerRef.current = null;
     }
   }, []);
 
@@ -88,6 +111,74 @@ export default function VenuePlayerPage() {
     return resolveHeartbeatIntervalSeconds(payload.recommended_interval_seconds);
   }, []);
 
+  const sendPopSample = useCallback(
+    async (cred: string, phaseName: BusinessPopPhase) => {
+      if (!playbackSessionIdRef.current) return null;
+      const nowMs = Date.now();
+      const positionMs = Math.max(
+        0,
+        Math.floor(nowMs - playStartedAtMsRef.current),
+      );
+      const prior =
+        sampleSeqRef.current === 0 ? null : lastPositionMsRef.current;
+      sampleSeqRef.current += 1;
+      const sampleSeq = sampleSeqRef.current;
+      let args;
+      try {
+        args = buildBusinessPopHeartbeatArgs({
+          credential: cred,
+          clientEventId: createVenuePlayerUuid(),
+          playbackSessionId: playbackSessionIdRef.current,
+          sampleSeq,
+          audioItemId: VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID,
+          positionMs,
+          priorPositionMs: prior,
+          phase: phaseName,
+        });
+      } catch (err) {
+        setPopOk(false);
+        setError(err instanceof Error ? err.message : "pop_args_invalid");
+        return null;
+      }
+
+      const supabase = createClient();
+      const { data, error: rpcError } = await supabase.rpc(
+        "apply_business_playback_usage_heartbeat",
+        args,
+      );
+      if (rpcError) {
+        setPopOk(false);
+        setError(rpcError.message || "pop_emit_failed");
+        return null;
+      }
+      const payload = data as {
+        ok?: boolean;
+        accepted_ms?: number;
+        duplicate?: boolean;
+        server_time?: string;
+      } | null;
+      if (!payload?.ok) {
+        setPopOk(false);
+        setError("pop_invalid_response");
+        return null;
+      }
+      lastPositionMsRef.current = positionMs;
+      setPopOk(true);
+      setPopSampleSeq(sampleSeq);
+      setLastPopAcceptedMs(
+        typeof payload.accepted_ms === "number" ? payload.accepted_ms : 0,
+      );
+      setLastPopAt(
+        typeof payload.server_time === "string"
+          ? payload.server_time
+          : new Date().toISOString(),
+      );
+      setError(null);
+      return payload;
+    },
+    [],
+  );
+
   const startHeartbeatLoop = useCallback(
     async (cred: string) => {
       stopHeartbeat();
@@ -110,7 +201,31 @@ export default function VenuePlayerPage() {
     [sendHeartbeat, stopHeartbeat],
   );
 
-  useEffect(() => () => stopHeartbeat(), [stopHeartbeat]);
+  const startPopLoop = useCallback(
+    async (cred: string) => {
+      stopPopLoop();
+      playbackSessionIdRef.current = createVenuePlayerUuid();
+      sampleSeqRef.current = 0;
+      lastPositionMsRef.current = 0;
+      playStartedAtMsRef.current = Date.now();
+      setPopSampleSeq(0);
+      setLastPopAcceptedMs(null);
+      // Baseline sample (accepted_ms=0) then cadence advances.
+      await sendPopSample(cred, "advance");
+      popTimerRef.current = setInterval(() => {
+        void sendPopSample(cred, "advance");
+      }, VENUE_PLAYER_POP_SAMPLE_INTERVAL_MS);
+    },
+    [sendPopSample, stopPopLoop],
+  );
+
+  useEffect(
+    () => () => {
+      stopHeartbeat();
+      stopPopLoop();
+    },
+    [stopHeartbeat, stopPopLoop],
+  );
 
   async function onProvision() {
     if (domain.status !== "authenticated" || !domain.location?.defaultZoneId) {
@@ -157,6 +272,7 @@ export default function VenuePlayerPage() {
       await audio.play();
       setPhase("playing");
       await startHeartbeatLoop(credential);
+      await startPopLoop(credential);
     } catch (err) {
       setPhase("error");
       setError(err instanceof Error ? err.message : "play_failed");
@@ -170,6 +286,10 @@ export default function VenuePlayerPage() {
       audio.currentTime = 0;
     }
     stopHeartbeat();
+    stopPopLoop();
+    if (isVenuePlayerCredential(credential) && sampleSeqRef.current > 0) {
+      void sendPopSample(credential, "pause");
+    }
     setPhase(credential ? "ready" : "idle");
   }
 
@@ -200,7 +320,7 @@ export default function VenuePlayerPage() {
     <section className="business-app-span-full space-y-4">
       <header className="rounded-2xl border border-white/10 bg-black/20 p-6">
         <p className="text-sm font-semibold uppercase tracking-wide opacity-70">
-          Venue Player · runtime v0
+          Venue Player · runtime v0 · PoP
         </p>
         <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Эфир точки</h1>
         <p className="mt-2 text-[1.05rem] opacity-90">
@@ -213,6 +333,11 @@ export default function VenuePlayerPage() {
           ) : null}
         </p>
         <p className="mt-2 text-sm opacity-70">{pilot.description}</p>
+        <p className="mt-1 text-xs opacity-50">
+          Proof of Play →{" "}
+          <code>apply_business_playback_usage_heartbeat</code> (evidence;
+          allowlist audio_item, не eligible-каталог).
+        </p>
       </header>
 
       <div className="rounded-2xl border border-white/10 bg-black/20 p-6 space-y-4">
@@ -236,7 +361,7 @@ export default function VenuePlayerPage() {
               className="rounded-xl bg-sky-400 px-5 py-3 text-base font-semibold text-black"
               onClick={() => void onStartPlayback()}
             >
-              Старт эфира (пилот-тон + heartbeat)
+              Старт эфира (пилот-тон + heartbeat + PoP)
             </button>
           ) : null}
           {phase === "playing" ? (
@@ -256,14 +381,31 @@ export default function VenuePlayerPage() {
             <dd className="font-semibold">{phase}</dd>
           </div>
           <div>
-            <dt className="opacity-60">Heartbeat</dt>
+            <dt className="opacity-60">Heartbeat (A2)</dt>
             <dd className="font-semibold">
               {heartbeatOk ? "ok" : "—"}
               {lastHeartbeatAt ? ` · ${lastHeartbeatAt}` : ""}
             </dd>
           </div>
+          <div>
+            <dt className="opacity-60">Proof of Play (A3)</dt>
+            <dd className="font-semibold">
+              {popOk ? "ok" : "—"}
+              {lastPopAcceptedMs != null
+                ? ` · accepted_ms=${lastPopAcceptedMs}`
+                : ""}
+              {popSampleSeq > 0 ? ` · seq=${popSampleSeq}` : ""}
+              {lastPopAt ? ` · ${lastPopAt}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="opacity-60">PoP audio_item (allowlist)</dt>
+            <dd className="font-semibold break-all text-xs">
+              {VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID}
+            </dd>
+          </div>
           <div className="sm:col-span-2">
-            <dt className="opacity-60">Трек</dt>
+            <dt className="opacity-60">Трек (audio)</dt>
             <dd className="font-semibold">
               {pilot.title} · {pilot.program}
             </dd>
@@ -271,7 +413,10 @@ export default function VenuePlayerPage() {
         </dl>
 
         {error ? (
-          <p className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-100" role="alert">
+          <p
+            className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-100"
+            role="alert"
+          >
             {error}
           </p>
         ) : null}

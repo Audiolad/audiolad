@@ -95,3 +95,116 @@ export function resolveHeartbeatIntervalSeconds(
   }
   return Math.floor(n);
 }
+
+/** PoP sample cadence while playing (media-time evidence). */
+export const VENUE_PLAYER_POP_SAMPLE_INTERVAL_MS = 5_000;
+
+/**
+ * Slice v0 allowlist: one published music audio_item for PoP ledger bind.
+ * Evidence only — not Rights Eligibility / not "licensed for venue".
+ * Full catalog freeze = P0-06 after HG-3/4.
+ */
+export const VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID =
+  "157f8644-4ad1-4bea-9de0-d44f911ae009";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isVenuePlayerUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+export function createVenuePlayerUuid(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Node <19 / odd runtimes — still valid v4-shaped id for unit/smoke.
+  const bytes = new Uint8Array(16);
+  for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export type BusinessPopPhase =
+  | "advance"
+  | "seek"
+  | "pause"
+  | "ended"
+  | "track_change";
+
+export type BusinessPopHeartbeatArgs = {
+  p_credential: string;
+  p_client_event_id: string;
+  p_playback_session_id: string;
+  p_sample_seq: number;
+  p_audio_item_id: string;
+  p_position_ms: number;
+  p_client_media_delta_ms: number | null;
+  p_playback_rate: number | null;
+  p_phase: BusinessPopPhase;
+};
+
+/**
+ * Build args for public.apply_business_playback_usage_heartbeat.
+ * Spatial attribution is server-derived from credential → assignment.
+ */
+export function buildBusinessPopHeartbeatArgs(input: {
+  credential: string;
+  clientEventId: string;
+  playbackSessionId: string;
+  sampleSeq: number;
+  audioItemId?: string;
+  positionMs: number;
+  priorPositionMs?: number | null;
+  playbackRate?: number | null;
+  phase?: BusinessPopPhase;
+}): BusinessPopHeartbeatArgs {
+  if (!isVenuePlayerCredential(input.credential)) {
+    throw new Error("invalid_player_credential");
+  }
+  if (!isVenuePlayerUuid(input.clientEventId)) {
+    throw new Error("invalid_client_event_id");
+  }
+  if (!isVenuePlayerUuid(input.playbackSessionId)) {
+    throw new Error("invalid_playback_session_id");
+  }
+  if (!Number.isInteger(input.sampleSeq) || input.sampleSeq < 1) {
+    throw new Error("invalid_sample_seq");
+  }
+  const audioItemId = (
+    input.audioItemId ?? VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID
+  ).trim();
+  if (!isVenuePlayerUuid(audioItemId)) {
+    throw new Error("invalid_audio_item_id");
+  }
+  const positionMs = Math.max(0, Math.floor(input.positionMs));
+  const prior =
+    typeof input.priorPositionMs === "number" &&
+    Number.isFinite(input.priorPositionMs)
+      ? Math.max(0, Math.floor(input.priorPositionMs))
+      : null;
+  const mediaDelta =
+    prior === null ? null : Math.max(0, positionMs - prior);
+  const phase = input.phase ?? "advance";
+  const rate =
+    typeof input.playbackRate === "number" &&
+    Number.isFinite(input.playbackRate) &&
+    input.playbackRate > 0 &&
+    input.playbackRate <= 4
+      ? input.playbackRate
+      : null;
+
+  return {
+    p_credential: input.credential,
+    p_client_event_id: input.clientEventId,
+    p_playback_session_id: input.playbackSessionId,
+    p_sample_seq: input.sampleSeq,
+    p_audio_item_id: audioItemId,
+    p_position_ms: positionMs,
+    p_client_media_delta_ms: mediaDelta,
+    p_playback_rate: rate,
+    p_phase: phase,
+  };
+}

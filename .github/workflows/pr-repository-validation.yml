@@ -94,6 +94,7 @@ jobs:
           npx tsx scripts/music-draft-track-delete-unit.mts
           npx tsx scripts/legacy-music-draft-placeholder-unit.mts
           npx tsx scripts/business-landing-unit.mts
+          npm run test:business-app-venue-player
           npm run test:music-lab
           npm run test:scheduled-publication
           npm run test:live-public-content-sync

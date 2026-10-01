@@ -16,8 +16,13 @@ import {
 import {
   VENUE_PLAYER_APP_VERSION,
   VENUE_PLAYER_DEFAULT_HEARTBEAT_SECONDS,
+  VENUE_PLAYER_POP_SAMPLE_INTERVAL_MS,
+  VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID,
+  buildBusinessPopHeartbeatArgs,
+  createVenuePlayerUuid,
   getVenuePlayerPilotTrack,
   isVenuePlayerCredential,
+  isVenuePlayerUuid,
   resolveHeartbeatIntervalSeconds,
 } from "../src/lib/business-app/venue-player.ts";
 
@@ -75,8 +80,58 @@ const page = readFileSync(
   "utf8",
 );
 assert.match(page, /record_business_player_heartbeat/);
+assert.match(page, /apply_business_playback_usage_heartbeat/);
+assert.match(page, /buildBusinessPopHeartbeatArgs/);
 assert.match(page, /getVenuePlayerPilotTrack/);
 assert.match(page, /VENUE_PLAYER_APP_VERSION/);
 assert.equal(VENUE_PLAYER_APP_VERSION, "venue-player-v0");
+
+assert.ok(VENUE_PLAYER_POP_SAMPLE_INTERVAL_MS >= 1000);
+assert.equal(isVenuePlayerUuid(VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID), true);
+const sessionId = createVenuePlayerUuid();
+const eventId = createVenuePlayerUuid();
+assert.equal(isVenuePlayerUuid(sessionId), true);
+assert.equal(isVenuePlayerUuid(eventId), true);
+
+const cred = "ab".repeat(32);
+const baseline = buildBusinessPopHeartbeatArgs({
+  credential: cred,
+  clientEventId: eventId,
+  playbackSessionId: sessionId,
+  sampleSeq: 1,
+  positionMs: 0,
+  priorPositionMs: null,
+  phase: "advance",
+});
+assert.equal(baseline.p_credential, cred);
+assert.equal(baseline.p_sample_seq, 1);
+assert.equal(baseline.p_position_ms, 0);
+assert.equal(baseline.p_client_media_delta_ms, null);
+assert.equal(baseline.p_audio_item_id, VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID);
+assert.equal(baseline.p_phase, "advance");
+
+const advance = buildBusinessPopHeartbeatArgs({
+  credential: cred,
+  clientEventId: createVenuePlayerUuid(),
+  playbackSessionId: sessionId,
+  sampleSeq: 2,
+  positionMs: 5000,
+  priorPositionMs: 0,
+  phase: "advance",
+});
+assert.equal(advance.p_position_ms, 5000);
+assert.equal(advance.p_client_media_delta_ms, 5000);
+
+assert.throws(
+  () =>
+    buildBusinessPopHeartbeatArgs({
+      credential: "short",
+      clientEventId: eventId,
+      playbackSessionId: sessionId,
+      sampleSeq: 1,
+      positionMs: 0,
+    }),
+  /invalid_player_credential/,
+);
 
 console.log("business-app-venue-player-unit: ok");
