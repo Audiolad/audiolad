@@ -8,6 +8,8 @@ import {
   BizPlayIcon,
   BizPrevIcon,
 } from "@/components/business-app/BusinessIcons";
+import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
+import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   buildBusinessGreeting,
   buildBusinessGreetingSubtitle,
@@ -22,8 +24,14 @@ type BusinessHomePageProps = {
   initialState: BusinessPointState;
 };
 
-function StatusBanner({ state }: { state: BusinessPointState }) {
-  const location = BUSINESS_HOME_MOCK.location.name;
+function StatusBanner({
+  state,
+  locationName,
+}: {
+  state: BusinessPointState;
+  locationName: string;
+}) {
+  const location = locationName;
   const reserve = BUSINESS_HOME_MOCK.musicReserveHours[state];
   const stoppedMinutes = BUSINESS_HOME_MOCK.stoppedMinutes;
 
@@ -144,6 +152,7 @@ function ControlCard({
 export default function BusinessHomePage({
   initialState,
 }: BusinessHomePageProps) {
+  const domain = useBusinessDomain();
   const mock = BUSINESS_HOME_MOCK;
   const [state] = useState<BusinessPointState>(initialState);
   const [liked, setLiked] = useState(false);
@@ -154,11 +163,27 @@ export default function BusinessHomePage({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [actionNote, setActionNote] = useState<string | null>(null);
 
+  const ownerFirstName =
+    domain.status === "authenticated" ? domain.owner.firstName : "гость";
+  const locationName =
+    domain.status === "authenticated" && domain.location
+      ? domain.location.name
+      : "";
+  const locationType =
+    domain.status === "authenticated" && domain.location
+      ? domain.location.businessCategory
+      : "";
+
   const greeting = useMemo(
-    () => buildBusinessGreeting(mock.owner.firstName),
-    [mock.owner.firstName],
+    () => buildBusinessGreeting(ownerFirstName),
+    [ownerFirstName],
   );
-  const subtitle = buildBusinessGreetingSubtitle(state);
+  const subtitle =
+    domain.status === "anonymous"
+      ? "Войдите, чтобы управлять точкой."
+      : domain.status === "authenticated" && !domain.location
+        ? "Создайте организацию и первую точку — это займёт минуту."
+        : buildBusinessGreetingSubtitle(state);
 
   const trackTitles = [
     mock.currentTrack.title,
@@ -187,6 +212,58 @@ export default function BusinessHomePage({
 
   const reserveHours = mock.musicReserveHours[state];
 
+  if (domain.status === "anonymous") {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-5">
+          <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">
+            Аудиолад Бизнес
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
+            Войдите в аккаунт, чтобы подключить точку и увидеть реальный статус.
+          </p>
+        </header>
+        <section className="business-app-card max-w-xl">
+          <p className="text-[1.05rem] text-[var(--biz-text)]">
+            Кабинет больше не использует демонстрационные данные «Марина / Beauty Line».
+            Нужна сессия владельца.
+          </p>
+          <a
+            href="https://audiolad.ru/auth/sign-in"
+            className="mt-4 inline-flex rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Войти
+          </a>
+        </section>
+      </div>
+    );
+  }
+
+  if (!domain.location) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-5">
+          <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">
+            {greeting}
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
+            {subtitle}
+          </p>
+        </header>
+        <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
+          <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
+            Первая точка
+          </h2>
+          <p className="mt-2 text-[var(--biz-text-muted)]">
+            Создадим Organization → Location → зону «по умолчанию» через production RPC
+            <code className="mx-1 text-sm">create_business_organization_with_location</code>.
+          </p>
+          <BusinessDomainBootstrapForm />
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <header className="mb-5">
@@ -199,7 +276,7 @@ export default function BusinessHomePage({
       </header>
 
       <div className="business-app-home-grid">
-        <StatusBanner state={state} />
+        <StatusBanner state={state} locationName={locationName || "Точка"} />
 
         <div className="business-app-home-stack">
           <section className="business-app-card" aria-labelledby="now-playing-title">
