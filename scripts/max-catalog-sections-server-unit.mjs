@@ -13,7 +13,6 @@ import { searchPublishedCatalogProducts } from "../src/lib/catalog/search.ts";
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "../src/lib/catalog/visibility-query.ts";
 import { MAX_CATALOG_PATH, MAX_HOSTNAME, MAX_ORIGIN } from "../src/lib/max/host.ts";
 import {
-  MAX_CATALOG_LIMIT,
   listMaxPublishedCatalog,
   setListMaxPublishedCatalogForTests,
 } from "../src/lib/max/catalog.ts";
@@ -165,17 +164,19 @@ assert.deepEqual(Object.keys(searchCalls[0]).sort(), [
 ]);
 assertSafeDto(both.items);
 
-const many = Array.from({ length: MAX_CATALOG_LIMIT + 8 }, (_, index) =>
-  catalogCard(index + 1),
-);
-const capped = await listMaxPublishedCatalog({
+const many = Array.from({ length: 32 }, (_, index) => catalogCard(index + 1));
+const uncappedSection = await listMaxPublishedCatalog({
   section: "stories",
   ...deps([], many),
 });
-assert.equal(capped.ok, true);
-assert.equal(capped.items.length, MAX_CATALOG_LIMIT);
-assert.equal(MAX_CATALOG_LIMIT, 24);
-assertSafeDto(capped.items);
+assert.equal(uncappedSection.ok, true);
+assert.equal(uncappedSection.items.length, many.length);
+assert.deepEqual(
+  uncappedSection.items.map((item) => item.slug),
+  many.map((product) => product.slug),
+);
+assert.equal(uncappedSection.items[24].slug, "product-25");
+assertSafeDto(uncappedSection.items);
 
 function ilikeMatch(value, pattern) {
   const needle = String(pattern)
@@ -588,7 +589,8 @@ const catalogSource = readFileSync(join(repoRoot, "src/lib/max/catalog.ts"), "ut
 assert.match(routeSource, /parsePublicCatalogSection/);
 assert.doesNotMatch(routeSource, /isCatalogSection\(/);
 assert.match(catalogSource, /GUEST_ORDINARY_CATALOG_VIEWER/);
-assert.match(catalogSource, /\.slice\(0, MAX_CATALOG_LIMIT\)/);
+assert.doesNotMatch(catalogSource, /MAX_CATALOG_LIMIT/);
+assert.doesNotMatch(catalogSource, /\.slice\(/);
 assert.match(catalogSource, /catalogSection/);
 assert.match(routeSource, /"Cache-Control": "no-store"/);
 

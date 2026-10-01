@@ -12,7 +12,6 @@ import {
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "../src/lib/catalog/visibility-query.ts";
 import {
   listMaxPublishedCatalog,
-  MAX_CATALOG_LIMIT,
   setListMaxPublishedCatalogForTests,
 } from "../src/lib/max/catalog.ts";
 
@@ -123,18 +122,20 @@ for (const query of [undefined, null, "", "   ", " \n\t "]) {
   assert.equal(listed.items[0].isFree, true);
 }
 
-const many = Array.from({ length: MAX_CATALOG_LIMIT + 6 }, (_, index) =>
-  catalogCard(index + 1),
-);
-const capped = await listMaxPublishedCatalog({
+const many = Array.from({ length: 30 }, (_, index) => catalogCard(index + 1));
+const uncappedSearch = await listMaxPublishedCatalog({
   query: "практика",
   getServiceClient: () => ({}),
   searchCatalogProducts: async () => many,
 });
-assert.equal(capped.ok, true);
-assert.equal(capped.items.length, MAX_CATALOG_LIMIT);
-assert.equal(capped.items.at(-1).slug, `product-${MAX_CATALOG_LIMIT}`);
-assertSafeDto(capped.items);
+assert.equal(uncappedSearch.ok, true);
+assert.equal(uncappedSearch.items.length, many.length);
+assert.deepEqual(
+  uncappedSearch.items.map((item) => item.slug),
+  many.map((product) => product.slug),
+);
+assert.equal(uncappedSearch.items[24].slug, "product-25");
+assertSafeDto(uncappedSearch.items);
 
 const storageFailure = await listMaxPublishedCatalog({
   query: "сон",
@@ -399,12 +400,13 @@ const cappedCanonicalResult = await listMaxPublishedCatalog({
   getServiceClient: () => cappedCanonical.client,
 });
 assert.equal(cappedCanonicalResult.ok, true);
-assert.equal(cappedCanonicalResult.items.length, MAX_CATALOG_LIMIT);
-assert.equal(cappedCanonicalResult.items[0].slug, "limit-01");
-assert.equal(cappedCanonicalResult.items.at(-1).slug, `limit-${String(MAX_CATALOG_LIMIT).padStart(2, "0")}`);
-assert.equal(
-  cappedCanonicalResult.items.some((item) => item.slug === "limit-30"),
-  false,
+assert.equal(cappedCanonicalResult.items.length, limitPractices.length);
+assert.deepEqual(
+  cappedCanonicalResult.items.map((item) => item.slug),
+  limitPractices.map((practice) => practice.slug),
 );
+assert.equal(cappedCanonicalResult.items[0].slug, "limit-01");
+assert.equal(cappedCanonicalResult.items[24].slug, "limit-25");
+assert.equal(cappedCanonicalResult.items.at(-1).slug, "limit-30");
 
 console.log("max-catalog-search-server-unit: ok");

@@ -228,5 +228,18 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(search, /aria-autocomplete|role="listbox"|role="combobox"|search history|недавн/i);
 assert.doesNotMatch(search, /CATALOG_SEARCH_SUGGEST_MIN_LENGTH/);
+assert.doesNotMatch(search, /\.slice\(\s*0\s*,\s*20\s*\)/);
+assert.doesNotMatch(search, /\.slice\(\s*0\s*,\s*24\s*\)/);
+assert.doesNotMatch(
+  search,
+  /(?:gridItems|defaultCatalog\.items|searchItems|sectionListing\.items|filterListing\.items)\.slice\(/,
+);
+assert.match(search, /const items = response\.ok \? readMaxCatalogProducts\(payload\) : null/);
+assert.match(search, /setDefaultCatalog\(items \? \{ status: "ready", items \} : \{ status: "error" \}\)/);
+assert.match(search, /setSearchItems\(items\)/);
+assert.match(search, /<CatalogGrid items=\{gridItems\}/);
+const catalogGrid = search.slice(search.indexOf("function CatalogGrid"));
+assert.match(catalogGrid, /\{items\.map\(\(product\) =>/);
+assert.doesNotMatch(catalogGrid, /\.slice\(/);
 
 console.log("max-catalog-search-unit: ok");
