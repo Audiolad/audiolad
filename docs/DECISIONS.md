@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-10-01 — Music Passport Basic is a product store, separate from Rights Passport and the lab
+
+**Контекст:** P1-01 needs a versioned stage-1 passport on Track Identity so a later Engine can read measured attributes. `music_lab_*` is the R&D console. `get_music_rights_passport_basic` is the A4 rights projection. Neither is the product Music Passport.
+
+**Решение:**
+
+1. New tables `music_passport_versions` and `music_passport_attributes`. Track Identity columns and triggers are not changed. `audio_item_id` is stored without a cascading delete. Writes require an existing music track and `music_track_code`.
+2. Each write appends a sealed snapshot and supersedes the previous active row. Attributes are immutable after seal. Read `get_music_passport_basic(audio_item_id, as_of)` returns `NO_PASSPORT` with `passport: null` when nothing is effective. That state is fail-closed: missing BPM/energy/mood/genre are omitted, not zero.
+3. `origin` is `measured` or `interpreted`. The same key may exist in both. `provenance` is `analyzer` or `manual` and does not replace `origin`. Measured rows require `confidence` in 0..1.
+4. Storage names for the ROADMAP stage-4 slots, proposed here and not a Bible canon rename: `musical_key` holds key, `genre_class` holds genre. Other keys use the slot names `bpm`, `mode`, `energy`, `loudness_lufs`, `vocal_role`, `mood`, `instrument`. Slug vocabularies for genre, mood, and instrument are not frozen to a Bible list. If a later Bible token must replace `musical_key` or `genre_class`, that rename is a canon change (HG-10) and is not done in this slice.
+5. Service-role RPCs only. No product UI. No catalog backfill. No writes to `music_lab_*` or `music_rights_*`. No playback-decision field.
+
+**Принято:** задание P1-01 (Task Contract). Schema is additive and does not change Track Identity canon.
+
+---
+
 ## 2026-09-27 — Music Analyzer Lab v0.1 остаётся вне каталога
 
 **Контекст:** нужна закрытая ручная проверка пакета listening v0.5, без Music Passport и без моделей в Next.js.

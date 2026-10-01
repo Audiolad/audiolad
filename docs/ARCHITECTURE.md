@@ -371,7 +371,18 @@ Eligibility Decision (computed short-lived; rights_eligibility_v1)
 ```
 
   Decisions: `ELIGIBLE` | `INELIGIBLE` | `CONDITIONAL` | `UNKNOWN`. UNKNOWN never defaults to ELIGIBLE. INELIGIBLE only from explicit negative machine facts (e.g. service_status=unsupported). Absence of grants/profile/context → UNKNOWN. No country-if branches; new countries are data. Rights First: eligibility independent of BPM/genre/Sonic DNA. No Aural Candidate Pool / Music License Passport / economics wiring in A5. No persistent high-volume eligibility ledger.
-- Следующие слои (отдельные PR): Aural wiring to Eligibility Decision, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Analyzer, Business App / Rights Ops UI.
+- **Music Passport Basic** (product, P1-01): `20261214120000_music_passport_basic.sql`. Versioned sonic snapshot on `audio_items.id` (`music_passport_versions` + `music_passport_attributes`). `get_music_passport_basic` / `upsert_music_passport_basic`, service_role only. `NO_PASSPORT` is fail-closed (no invented BPM/energy/mood/genre). Measured and interpreted values stay in separate `origin` rows. This is not Rights Passport, not `music_lab_*`, and not Sonic DNA / Engine.
+
+```
+Track (audio_items.id / AL-T-*)
+  ↓
+Music Passport Basic snapshot (version, analysis_version, as_of window)
+  ↓
+measured attributes  |  interpreted attributes
+```
+
+  Stage-1 storage keys: `bpm`, `musical_key`, `mode`, `energy`, `loudness_lufs`, `vocal_role`, `genre_class`, `mood`, `instrument`. `musical_key` / `genre_class` are the storage names for the ROADMAP key and genre slots (see `docs/DECISIONS.md`). Typed contract: `src/lib/music-passport/contract.ts`. No passport UI in this slice.
+- Следующие слои (отдельные PR): Aural wiring to Eligibility Decision, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Engine V1 on top of this passport, Business App / Rights Ops UI.
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса. Music Rights Catalog — global/shared domain (не organization-scoped в A4).
 
