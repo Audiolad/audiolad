@@ -13,6 +13,7 @@ import {
   isMaxRatingPath,
   isMaxAppreciationPath,
   isMaxHostname,
+  isMaxProfilePath,
   isMaxSessionLinkPath,
   isMaxSessionUnlinkPath,
   isMaxSessionVerifyPath,
@@ -73,6 +74,7 @@ export function resolveMaxProxyAction(
     (isMaxSessionVerifyPath(pathname) ||
       isMaxSessionLinkPath(pathname) ||
       isMaxSessionUnlinkPath(pathname) ||
+      isMaxProfilePath(pathname) ||
       isMaxCatalogPath(pathname) ||
       isMaxPlaylistsCatalogPath(pathname) ||
       isMaxPlaylistsDetailPath(pathname) ||

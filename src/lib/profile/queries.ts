@@ -23,6 +23,8 @@ import type {
   ProfilePageData,
 } from "./types";
 
+export { formatCounterDisplay, getAuthorMemberRoleLabel } from "./display-name";
+
 type ProfileRow = {
   full_name: string | null;
   role: string | null;
@@ -257,7 +259,7 @@ export async function getProfilePageData(
     countActiveLibraryItems(supabase, user.id),
     countOwnedPlaylists(supabase, user.id),
     countCompletedPractices(supabase, user.id),
-    listAuthorWorkspacesForUser(user.id).catch((error) => {
+    listAuthorWorkspacesForUser(user.id, supabase).catch((error) => {
       console.error("profile_author_workspaces_error", error);
       return [] as Awaited<ReturnType<typeof listAuthorWorkspacesForUser>>;
     }),
@@ -305,20 +307,3 @@ export async function getProfilePageData(
   };
 }
 
-export function formatCounterDisplay(value: number | null): string {
-  if (value === null) {
-    return "—";
-  }
-
-  return String(value);
-}
-
-export function getAuthorMemberRoleLabel(
-  role: AuthorWorkspace["role"],
-): string {
-  if (role === "owner") {
-    return "Владелец";
-  }
-
-  return "Редактор";
-}
