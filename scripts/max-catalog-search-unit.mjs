@@ -36,7 +36,7 @@ assert.match(search, /rounded-\[18px\]/);
 assert.match(search, /border border-\[#ded1f1\]/);
 assert.match(search, /bg-white/);
 assert.match(search, /data-max-catalog-search-row/);
-assert.match(search, /className="mt-4 flex items-start gap-2"/);
+assert.match(search, /data-max-catalog-search-row[\s\S]{0,80}className="flex items-start gap-2"/);
 assert.match(search, /className="relative flex h-\[52px\]/);
 
 assert.match(search, /normalizedInput\.length > 0/);
@@ -98,8 +98,58 @@ assert.doesNotMatch(search, /Аудиопрактики, музыка и кур�
 const topicsAt = search.indexOf("<MaxCatalogTopicsSheet");
 const sectionsAt = search.indexOf("<MaxCatalogSections");
 const gridAt = search.indexOf("<CatalogGrid");
-assert.ok(search.indexOf("data-max-catalog-search-row") < topicsAt);
+const chromeAt = search.indexOf("data-max-catalog-sticky-chrome");
+assert.ok(chromeAt !== -1, "data-max-catalog-sticky-chrome exists");
+const chromeClass = search.slice(
+  search.indexOf("className=", chromeAt),
+  search.indexOf(">", chromeAt),
+);
+assert.match(chromeClass, /\bsticky\b/, "chrome contains sticky");
+assert.match(chromeClass, /\btop-0\b/);
+assert.match(chromeClass, /bg-\[#faf8ff\]/, "opaque catalog background");
+assert.doesNotMatch(chromeClass, /bg-transparent|bg-white\/|backdrop-blur/);
+const stickyZ = Number(chromeClass.match(/z-\[(\d+)\]/)?.[1]);
+assert.ok(Number.isInteger(stickyZ), "sticky chrome declares a numeric z-index");
+
+const rowAt = search.indexOf("data-max-catalog-search-row");
+assert.ok(chromeAt < rowAt && rowAt < topicsAt, "search row and Topics are inside sticky chrome");
+const chromeOpen = search.lastIndexOf("<div", chromeAt);
+const chromeBeforeSections = search.slice(chromeOpen, sectionsAt);
+const chromeOpens = chromeBeforeSections.match(/<div\b/g)?.length ?? 0;
+const chromeCloses = chromeBeforeSections.match(/<\/div>/g)?.length ?? 0;
+assert.equal(
+  chromeOpens,
+  chromeCloses,
+  "sticky wrapper closes before MaxCatalogSections",
+);
 assert.ok(topicsAt < sectionsAt && sectionsAt < gridAt);
+assert.doesNotMatch(
+  search.slice(sectionsAt, sectionsAt + 180),
+  /\bsticky\b/,
+  "catalog sections stay in the scrolling flow",
+);
+
+const productOverlay = home.slice(
+  home.indexOf('activeTab === "catalog" && selected && !promoTarget'),
+  home.indexOf("← Назад в каталог"),
+);
+const productZ = Number(productOverlay.match(/\bz-(\d+)\b/)?.[1]);
+assert.ok(Number.isInteger(productZ), "product detail overlay declares a z-index");
+const topicsSheet = read("src/components/max/MaxCatalogTopicsSheet.tsx");
+const topicsZ = Number(
+  topicsSheet.match(/fixed inset-0 z-(\d+)/)?.[1],
+);
+assert.ok(Number.isInteger(topicsZ), "Topics sheet declares a z-index");
+assert.ok(
+  stickyZ < productZ,
+  `sticky z-index ${stickyZ} stays below product detail overlay z-${productZ}`,
+);
+assert.ok(
+  stickyZ < topicsZ,
+  `sticky z-index ${stickyZ} stays below Topics sheet z-${topicsZ}`,
+);
+
+assert.ok(search.indexOf("data-max-catalog-search-row") < topicsAt);
 assert.match(search, /onApply=\{applyFilters\}/);
 assert.doesNotMatch(
   search,

@@ -901,55 +901,60 @@ export default function MaxCatalogSearch({
   return (
     <>
       <div
-        data-max-catalog-search-row
-        className="mt-4 flex items-start gap-2"
+        data-max-catalog-sticky-chrome
+        className="sticky top-0 z-[5] -mx-4 bg-[#faf8ff] px-4 pt-4 pb-2"
       >
-        <form
-          role="search"
-          onSubmit={submitSearch}
-          className="relative flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]"
+        <div
+          data-max-catalog-search-row
+          className="flex items-start gap-2"
         >
-          <label htmlFor={inputId} className="sr-only">
-            Поиск аудиопродуктов в каталоге
-          </label>
-          <button
-            type="submit"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#7042c5]"
+          <form
+            role="search"
+            onSubmit={submitSearch}
+            className="relative flex h-[52px] min-h-[52px] max-h-[56px] min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#ded1f1] bg-white px-3 shadow-[0_2px_10px_rgba(90,60,145,0.04)] focus-within:border-[#dcc9f2] focus-within:shadow-[0_4px_14px_rgba(90,60,145,0.07)]"
           >
-            <SearchIcon />
-          </button>
-          <input
-            id={inputId}
-            type="search"
-            value={searchInput}
-            onChange={(event) => handleInputChange(event.target.value)}
-            placeholder="Поиск по каталогу"
-            autoComplete="off"
-            enterKeyHint="search"
-            maxLength={CATALOG_SEARCH_MAX_LENGTH}
-            aria-label="Поиск аудиопродуктов в каталоге"
-            className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
-          />
-          {normalizedInput.length > 0 ? (
+            <label htmlFor={inputId} className="sr-only">
+              Поиск аудиопродуктов в каталоге
+            </label>
             <button
-              type="button"
-              onClick={clearSearch}
-              aria-label="Очистить поиск"
-              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[#9485b4] transition hover:bg-[#faf6ff] hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              type="submit"
+              tabIndex={-1}
+              aria-hidden="true"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#7042c5]"
             >
-              <ClearIcon />
+              <SearchIcon />
             </button>
-          ) : null}
-        </form>
-        <MaxCatalogTopicsSheet
-          activeTopicKeys={activeTopicKeys}
-          activeAccess={activeAccess}
-          activeClass={activeClass}
-          onApply={applyFilters}
-          onReset={resetFilters}
-        />
+            <input
+              id={inputId}
+              type="search"
+              value={searchInput}
+              onChange={(event) => handleInputChange(event.target.value)}
+              placeholder="Поиск по каталогу"
+              autoComplete="off"
+              enterKeyHint="search"
+              maxLength={CATALOG_SEARCH_MAX_LENGTH}
+              aria-label="Поиск аудиопродуктов в каталоге"
+              className="min-w-0 flex-1 border-0 bg-transparent py-0 text-base leading-normal text-[#25135c] placeholder:text-[#9485b4] focus:outline-none"
+            />
+            {normalizedInput.length > 0 ? (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Очистить поиск"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full text-[#9485b4] transition hover:bg-[#faf6ff] hover:text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              >
+                <ClearIcon />
+              </button>
+            ) : null}
+          </form>
+          <MaxCatalogTopicsSheet
+            activeTopicKeys={activeTopicKeys}
+            activeAccess={activeAccess}
+            activeClass={activeClass}
+            onApply={applyFilters}
+            onReset={resetFilters}
+          />
+        </div>
       </div>
 
       <MaxCatalogSections
