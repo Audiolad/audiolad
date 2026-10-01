@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
@@ -115,12 +116,12 @@ function StatusBanner({
         >
           Открыть плеер
         </a>
-        <a
+        <Link
           href="/help"
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"
         >
           Диагностика для поддержки
-        </a>
+        </Link>
       </div>
     </section>
   );
