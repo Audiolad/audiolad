@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { resolveBusinessAirplayEligibilityProbe } from "@/app/business-app/actions";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -13,7 +13,11 @@ import {
 type ProbeState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; rows: BusinessEligibilityProbeRow[]; eligibleCount: number }
+  | {
+      status: "ready";
+      rows: BusinessEligibilityProbeRow[];
+      eligibleCount: number;
+    }
   | { status: "error"; message: string };
 
 export default function BusinessEligibilityProbePanel({
@@ -45,10 +49,6 @@ export default function BusinessEligibilityProbePanel({
     });
   }, [domain]);
 
-  useEffect(() => {
-    void runProbe();
-  }, [runProbe]);
-
   if (domain.status === "anonymous") {
     return (
       <section className="rounded-2xl border border-white/10 bg-black/20 p-5">
@@ -61,11 +61,20 @@ export default function BusinessEligibilityProbePanel({
     );
   }
 
-  const empty = venueAirplayEmptyStateCopy({
-    hasLocation: Boolean(domain.location),
-    probed: probe.status === "ready",
-    eligibleCount: probe.status === "ready" ? probe.eligibleCount : 0,
-  });
+  const empty =
+    probe.status === "idle"
+      ? {
+          title: compact
+            ? "Пул эфира (eligibility)"
+            : "Проверка eligibility",
+          description:
+            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав — после HG-3/HG-4.",
+        }
+      : venueAirplayEmptyStateCopy({
+          hasLocation: Boolean(domain.location),
+          probed: probe.status === "ready",
+          eligibleCount: probe.status === "ready" ? probe.eligibleCount : 0,
+        });
 
   return (
     <section className="rounded-2xl border border-white/10 bg-black/20 p-5 space-y-3">
@@ -75,7 +84,7 @@ export default function BusinessEligibilityProbePanel({
             Rights Eligibility · read-only
           </p>
           <h2 className="text-lg font-bold">
-            {compact ? "Пул эфира (eligibility)" : empty.title}
+            {compact && probe.status !== "idle" ? "Пул эфира (eligibility)" : empty.title}
           </h2>
           <p className="mt-1 text-sm opacity-80">{empty.description}</p>
           <p className="mt-1 text-xs opacity-50">
@@ -89,7 +98,11 @@ export default function BusinessEligibilityProbePanel({
           disabled={probe.status === "loading" || !domain.location}
           onClick={() => void runProbe()}
         >
-          {probe.status === "loading" ? "Проверяем…" : "Обновить"}
+          {probe.status === "loading"
+            ? "Проверяем…"
+            : probe.status === "idle"
+              ? "Проверить"
+              : "Обновить"}
         </button>
       </header>
 
