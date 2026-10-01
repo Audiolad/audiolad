@@ -20,11 +20,11 @@ import MaxCatalogSearch, {
   type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxHome from "@/components/max/MaxHome";
+import MaxLibrary from "@/components/max/MaxLibrary";
 import MaxPlaylists from "@/components/max/MaxPlaylists";
 import MaxProductDetailView from "@/components/max/MaxProductDetailView";
 import MaxProfile, { MaxGuestProfile } from "@/components/max/MaxProfile";
 import MaxPromoLanding from "@/components/max/MaxPromoLanding";
-import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { decideMaxProductTrackAction } from "@/lib/max/max-audio-playback";
 import {
@@ -149,6 +149,11 @@ export default function MaxAuthenticatedHome({
   const [promoTarget, setPromoTarget] = useState<MaxPromoTarget | null>(() =>
     initialMaxPromoTarget(initialStartTarget),
   );
+  const [detailOrigin, setDetailOrigin] = useState<"catalog" | "library">("catalog");
+  const [playlistRequest, setPlaylistRequest] = useState<{
+    id: number;
+    slug: string;
+  } | null>(null);
   const playRef = useRef<(() => void) | null>(null);
   const pauseRef = useRef<(() => void) | null>(null);
   const selectTrackRef = useRef<((index: number) => void) | null>(null);
@@ -240,10 +245,21 @@ export default function MaxAuthenticatedHome({
   }
 
   function openCatalogProduct(product: MaxCatalogProduct) {
+    setDetailOrigin(activeTab === "library" ? "library" : "catalog");
     resetArmedPlayback();
     setDetail({ status: "loading" });
     setPlayback({ status: "loading" });
     setSelected(product);
+  }
+
+  function openLibraryPlaylist(slug: string) {
+    const trimmed = slug.trim();
+    if (!trimmed) return;
+    setPlaylistRequest((current) => ({
+      slug: trimmed,
+      id: (current?.id ?? 0) + 1,
+    }));
+    selectMaxTab("playlists");
   }
 
   function openCatalogTopic(topicKey: string) {
@@ -393,9 +409,10 @@ export default function MaxAuthenticatedHome({
     }
     if (next === activeTab) {
       if (next === "catalog" && selected) closeProductDetail();
+      if (next === "library" && selected) closeProductDetail();
       return;
     }
-    if (activeTab === "catalog") {
+    if (activeTab === "catalog" || activeTab === "library") {
       resetArmedPlayback();
       setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
     }
@@ -487,10 +504,21 @@ export default function MaxAuthenticatedHome({
           guestMode={guestMode}
           onRequestLogin={onRequestLogin}
           onRequestSignup={onRequestSignup}
+          requestedSlug={playlistRequest}
+          onRequestedSlugApplied={() => setPlaylistRequest(null)}
         />
       ) : null}
       {activeTab === "library" ? (
-        <MaxTabPlaceholder title={activeTabLabel} />
+        <MaxLibrary
+          title={activeTabLabel}
+          guestMode={guestMode}
+          onRequestLogin={onRequestLogin}
+          onRequestSignup={onRequestSignup}
+          onOpenProduct={openCatalogProduct}
+          onOpenPlaylist={openLibraryPlaylist}
+          onBrowseCatalog={() => selectMaxTab("catalog")}
+          onOpenPlaylists={() => selectMaxTab("playlists")}
+        />
       ) : null}
       {activeTab === "profile" && guestMode ? (
         <MaxGuestProfile onLogin={onRequestLogin} onSignup={onRequestSignup} />
@@ -512,7 +540,8 @@ export default function MaxAuthenticatedHome({
           </div>
         </div>
       ) : null}
-      {activeTab === "catalog" && selected && !promoTarget ? (
+      {(activeTab === "catalog" && selected && !promoTarget) ||
+      (activeTab === "library" && selected && !promoTarget) ? (
         <div
           className="fixed inset-x-0 top-0 z-10 overflow-y-auto bg-[#faf8ff] px-4 pt-[max(1rem,env(safe-area-inset-top))]"
           style={{
@@ -521,7 +550,7 @@ export default function MaxAuthenticatedHome({
         >
           <div className="mx-auto max-w-lg pb-6">
             <button type="button" onClick={closeProductDetail} className="min-h-11 text-sm font-medium text-[#7042c5]">
-              ← Назад в каталог
+              {detailOrigin === "library" ? "← Назад в аудиотеку" : "← Назад в каталог"}
             </button>
           {detail.status === "loading" ? <p className="mt-6 text-sm text-[#6c5d94]">Детали продукта загружаются…</p> : null}
           {detail.status === "not_found" ? <p className="mt-6 text-sm text-[#6c5d94]">Продукт недоступен.</p> : null}

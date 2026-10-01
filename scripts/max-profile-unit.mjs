@@ -50,7 +50,7 @@ assert.match(
 );
 assert.match(
   home,
-  /activeTab === "library" \? \(\s*<MaxTabPlaceholder title=\{activeTabLabel\} \/>/,
+  /activeTab === "library" \? \(\s*<MaxLibrary/,
 );
 assert.match(home, /activeTab === "playlists" \? \(\s*<MaxPlaylists/);
 assert.match(home, /<MaxBottomNav activeTab=\{activeTab\} onSelectTab=\{selectMaxTab\} \/>/);

@@ -230,7 +230,7 @@ assert.match(home, /<MaxCatalogSearch[\s\S]*onSelectProduct=\{openCatalogProduct
 assert.match(home, /activeTab === "catalog" \? null : \(/);
 const catalogPane = home.slice(
   home.indexOf('hidden={activeTab !== "catalog" || Boolean(promoTarget)}'),
-  home.indexOf("<MaxTabPlaceholder"),
+  home.indexOf('activeTab === "home"'),
 );
 assert.doesNotMatch(catalogPane, /AudioladHorizontalLogo/);
 const catalogHeader = home.slice(

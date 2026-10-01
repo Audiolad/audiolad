@@ -94,7 +94,9 @@ assert.match(nav, /height: `\$\{MAX_TAB_BAR_HEIGHT_PX\}px`/);
 assert.match(home, /paddingBottom: MAX_SHELL_CONTENT_BOTTOM_PADDING/);
 
 assert.match(home, /activeTab === "catalog" \?/);
-assert.match(home, /<MaxTabPlaceholder title=\{activeTabLabel\} \/>/);
+assert.match(home, /<MaxLibrary/);
+assert.match(home, /title=\{activeTabLabel\}/);
+assert.doesNotMatch(home, /<MaxTabPlaceholder/);
 assert.match(home, /MAX_PRIMARY_TABS\.find\(\(tab\) => tab\.id === activeTab\)/);
 assert.match(placeholder, /<h1[^>]*>\{title\}<\/h1>/);
 assert.match(placeholder, /Раздел готовится\./);
@@ -109,7 +111,7 @@ assert.match(catalogSearch, /gap-\[6px\]/);
 assert.match(catalogSearch, /-mx-4/);
 assert.match(catalogSearch, /px-\[6px\]/);
 
-const gate = home.indexOf('{activeTab === "catalog" && selected && !promoTarget ? (');
+const gate = home.indexOf('activeTab === "catalog" && selected && !promoTarget');
 const player = home.indexOf("<MaxAudioPlayer");
 const navUse = home.indexOf("<MaxBottomNav");
 assert.ok(gate >= 0, "product detail stays on the catalog tab");
@@ -130,7 +132,7 @@ const selectFn = home.slice(
 );
 assert.match(selectFn, /if \(next === activeTab\)/);
 assert.match(selectFn, /if \(next === "catalog" && selected\) closeProductDetail\(\)/);
-assert.match(selectFn, /if \(activeTab === "catalog"\)/);
+assert.match(selectFn, /if \(activeTab === "catalog" \|\| activeTab === "library"\)/);
 assert.match(
   selectFn,
   /setPlayback\(\{ status: "idle" \}\); setDetail\(\{ status: "idle" \}\); setSelected\(null\)/,

@@ -320,12 +320,25 @@ export default function MaxPlaylists({
   guestMode = false,
   onRequestLogin,
   onRequestSignup,
+  requestedSlug = null,
+  onRequestedSlugApplied,
 }: {
   guestMode?: boolean;
   onRequestLogin?: () => void;
   onRequestSignup?: () => void;
+  requestedSlug?: { id: number; slug: string } | null;
+  onRequestedSlugApplied?: () => void;
 }) {
-  const [slug, setSlug] = useState<string | null>(null);
+  const [slug, setSlug] = useState<string | null>(requestedSlug?.slug ?? null);
+  const appliedRequestId = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!requestedSlug) return;
+    if (appliedRequestId.current === requestedSlug.id) return;
+    appliedRequestId.current = requestedSlug.id;
+    setSlug(requestedSlug.slug);
+    onRequestedSlugApplied?.();
+  }, [onRequestedSlugApplied, requestedSlug]);
 
   return (
     <div className="mx-auto max-w-lg" data-max-playlists>

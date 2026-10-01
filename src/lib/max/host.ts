@@ -21,6 +21,12 @@ export const MAX_SESSION_UNLINK_PATH = "/api/max/session/unlink";
 /** HMAC-verify linked MAX identity, then return that listener's profile. */
 export const MAX_PROFILE_PATH = "/api/max/profile";
 
+/**
+ * HMAC-verify linked MAX identity, then return that listener's Stage-1 library.
+ * Catalog entitlements, catalog saves, and saved public playlists only.
+ */
+export const MAX_LIBRARY_PATH = "/api/max/library";
+
 /** HMAC-verify linked MAX identity, then return the read-only MAX catalog. */
 export const MAX_CATALOG_PATH = "/api/max/catalog";
 
@@ -82,6 +88,10 @@ export function isMaxSessionUnlinkPath(pathname: string): boolean {
 
 export function isMaxProfilePath(pathname: string): boolean {
   return pathname === MAX_PROFILE_PATH;
+}
+
+export function isMaxLibraryPath(pathname: string): boolean {
+  return pathname === MAX_LIBRARY_PATH;
 }
 
 export function isMaxCatalogPath(pathname: string): boolean {
