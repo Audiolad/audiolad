@@ -387,8 +387,12 @@ function testSourceBoundaries() {
   const privateCard = read("src/components/private-audio/PrivateAudioCard.tsx");
   const filters = read("src/lib/library/filters.ts");
 
+  const savedPlaylists = read("src/lib/library/saved-playlist-sources.ts");
   assert.match(unified, /loadLibraryCollection/);
-  assert.match(unified, /listSavedPlaylists/);
+  assert.match(unified, /loadSavedPlaylistSources\(supabase, userId\)/);
+  assert.match(savedPlaylists, /listSavedPlaylists\(/);
+  assert.match(savedPlaylists, /\{ userId \}/);
+  assert.match(savedPlaylists, /\.eq\("user_id", userId\)/);
   assert.match(unified, /listPrivateAudioItems/);
   assert.match(unified, /listMyPersonalMaterials/);
   assert.match(unified, /assembleUnifiedLibrary/);

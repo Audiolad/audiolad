@@ -66,7 +66,7 @@ assert.match(
 assert.match(bridge, /guestMode=\{view\.phase === "guest_unlinked"\}/);
 const homePane = shell.slice(
   shell.indexOf('activeTab === "home"'),
-  shell.indexOf("<MaxTabPlaceholder"),
+  shell.indexOf('activeTab === "playlists"'),
 );
 assert.match(homePane, /<MaxHome/);
 assert.match(homePane, /guestMode=\{guestMode\}/);
@@ -75,10 +75,12 @@ assert.doesNotMatch(shell, /MaxGuestHomeSlider/);
 assert.match(shell, /activeTab === "playlists" \? \(/);
 assert.match(shell, /<MaxPlaylists/);
 assert.match(shell, /activeTab === "library" \? \(/);
-assert.match(shell, /<MaxTabPlaceholder title=\{activeTabLabel\} \/>/);
+assert.match(shell, /<MaxLibrary/);
+assert.match(shell, /title=\{activeTabLabel\}/);
+assert.doesNotMatch(shell, /<MaxTabPlaceholder/);
 const playlistsPane = shell.slice(
   shell.indexOf('activeTab === "playlists"'),
-  shell.indexOf('activeTab === "library"'),
+  shell.indexOf('activeTab === "library" ? ('),
 );
 assert.match(playlistsPane, /<MaxPlaylists/);
 assert.doesNotMatch(playlistsPane, /MaxTabPlaceholder/);
@@ -146,7 +148,7 @@ const selectFn = shell.slice(
   shell.indexOf("function selectMaxTab"),
   shell.indexOf("const activeTabLabel"),
 );
-assert.match(selectFn, /if \(activeTab === "catalog"\)/);
+assert.match(selectFn, /if \(activeTab === "catalog" \|\| activeTab === "library"\)/);
 assert.match(selectFn, /setSelected\(null\)/);
 assert.match(shell, /activeTab === "catalog" && selected && !promoTarget/);
 assert.match(shell, /<MaxBottomNav activeTab=\{activeTab\} onSelectTab=\{selectMaxTab\} \/>/);

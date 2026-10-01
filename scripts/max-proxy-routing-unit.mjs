@@ -22,6 +22,7 @@ import {
   isMaxPromoAnalyticsPath,
   isMaxRatingPath,
   isMaxAppreciationPath,
+  isMaxLibraryPath,
   isMaxProfilePath,
   isMaxHostname,
   isMaxSessionLinkPath,
@@ -42,6 +43,7 @@ import {
   MAX_PROMO_ANALYTICS_PATH,
   MAX_RATING_PATH,
   MAX_APPRECIATION_PATH,
+  MAX_LIBRARY_PATH,
   MAX_PROFILE_PATH,
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_UNLINK_PATH,
@@ -109,6 +111,10 @@ assert.equal(isMaxSessionLinkPath("/api/max"), false);
 assert.equal(isMaxProfilePath(MAX_PROFILE_PATH), true);
 assert.equal(isMaxProfilePath(`${MAX_PROFILE_PATH}/`), false);
 assert.equal(isMaxProfilePath("/api/max"), false);
+assert.equal(isMaxLibraryPath(MAX_LIBRARY_PATH), true);
+assert.equal(isMaxLibraryPath(`${MAX_LIBRARY_PATH}/`), false);
+assert.equal(isMaxLibraryPath("/api/max"), false);
+assert.equal(isMaxLibraryPath("/api/max/library/extra"), false);
 assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_UNLINK_PATH), true);
 assert.equal(isMaxSessionUnlinkPath(`${MAX_SESSION_UNLINK_PATH}/`), false);
 assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_LINK_PATH), false);
@@ -162,6 +168,7 @@ assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_UNLINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PROFILE_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_LIBRARY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYLISTS_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYLISTS_DETAIL_PATH, "pass_through");
@@ -180,6 +187,8 @@ assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_UNLINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PROFILE_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, "/api/max/profile/extra", "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_LIBRARY_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/library/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYLISTS_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYLISTS_DETAIL_PATH}/`, "not_found");
@@ -335,6 +344,8 @@ const maxClientSources = [
   "src/lib/max/catalog-product.ts",
   "src/components/max/MaxBottomNav.tsx",
   "src/components/max/MaxTabPlaceholder.tsx",
+  "src/components/max/MaxLibrary.tsx",
+  "src/lib/max/library-dto.ts",
   "src/components/max/MaxPlaylists.tsx",
   "src/components/max/MaxPlaylistCard.tsx",
   "src/components/max/MaxPlaylistDetail.tsx",

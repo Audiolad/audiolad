@@ -32,12 +32,13 @@ assert.match(shell, /guestMode=\{guestMode\}/);
 
 const playlistsPane = shell.slice(
   shell.indexOf('activeTab === "playlists"'),
-  shell.indexOf('activeTab === "library"'),
+  shell.indexOf('activeTab === "library" ? ('),
 );
 assert.match(playlistsPane, /<MaxPlaylists/);
 assert.doesNotMatch(playlistsPane, /MaxTabPlaceholder/);
 assert.match(shell, /activeTab === "library" \? \(/);
-assert.match(shell, /<MaxTabPlaceholder title=\{activeTabLabel\} \/>/);
+assert.match(shell, /<MaxLibrary/);
+assert.doesNotMatch(shell, /<MaxTabPlaceholder/);
 assert.match(shell, /<MaxCatalogSearch/);
 assert.match(shell, /activeTab === "home" \? \(/);
 assert.match(shell, /<MaxHome/);

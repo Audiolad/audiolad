@@ -3,6 +3,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "@/lib/catalog/visibility-query";
+import {
+  canUseMaxStorefrontPreview,
+  evaluateLoadedMaxExactPractice,
+  practiceDeclaresMaxVisibility,
+  type MaxExactPracticeDeps,
+} from "@/lib/max/exact-product";
 import { loadListenSessionPayload } from "@/lib/listen/load-session-payload";
 import { signEntitledListenAudio } from "@/lib/listen/sign-entitled-audio";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
@@ -64,6 +70,7 @@ export type MaxPlaybackDeps = {
   createClient?: () => SupabaseClient;
   listCatalog?: typeof getPublishedCatalogProducts;
   getPractice?: typeof getPracticeByAuthorAndSlug;
+  resolveAccess?: MaxExactPracticeDeps["resolveAccess"];
   loadSession?: typeof loadListenSessionPayload;
   signAudio?: typeof signEntitledListenAudio;
   resolvePreview?: (
@@ -85,9 +92,18 @@ function client(deps?: MaxPlaybackDeps) {
   return (deps?.createClient ?? playbackDeps?.createClient ?? createServiceRoleClient)();
 }
 
-async function resolveListedPractice(
+function maxPlaybackPreviewAllowed(practice: PublicPracticeRow): boolean {
+  if (!practiceDeclaresMaxVisibility(practice)) {
+    return true;
+  }
+
+  return canUseMaxStorefrontPreview(practice);
+}
+
+async function resolvePlaybackPractice(
   authorSlug: string,
   productSlug: string,
+  userId: string | null,
   deps?: MaxPlaybackDeps,
 ): Promise<
   | { ok: true; practice: PublicPracticeRow }
@@ -96,19 +112,9 @@ async function resolveListedPractice(
   const supabase = client(deps);
   const listCatalog = deps?.listCatalog ?? playbackDeps?.listCatalog ?? getPublishedCatalogProducts;
   const getPractice = deps?.getPractice ?? playbackDeps?.getPractice ?? getPracticeByAuthorAndSlug;
+  const resolveAccess = deps?.resolveAccess ?? playbackDeps?.resolveAccess;
 
   try {
-    const products = await listCatalog(supabase, {
-      viewer: GUEST_ORDINARY_CATALOG_VIEWER,
-      throwOnStorageError: true,
-    });
-    const listed = products.find(
-      (item) => item.authorSlug === authorSlug && item.slug === productSlug,
-    );
-    if (!listed) {
-      return { ok: false, reason: "not_found" };
-    }
-
     const loaded = await getPractice(supabase, authorSlug, productSlug);
     if (loaded.error) {
       return { ok: false, reason: "storage_unavailable" };
@@ -116,7 +122,27 @@ async function resolveListedPractice(
     if (!loaded.practice) {
       return { ok: false, reason: "not_found" };
     }
-    return { ok: true, practice: loaded.practice };
+    if (loaded.practice.slug && loaded.practice.slug !== productSlug) {
+      return { ok: false, reason: "not_found" };
+    }
+
+    if (!practiceDeclaresMaxVisibility(loaded.practice)) {
+      const products = await listCatalog(supabase, {
+        viewer: GUEST_ORDINARY_CATALOG_VIEWER,
+        throwOnStorageError: true,
+      });
+      const listed = products.find(
+        (item) => item.authorSlug === authorSlug && item.slug === productSlug,
+      );
+      if (!listed) {
+        return { ok: false, reason: "not_found" };
+      }
+      return { ok: true, practice: loaded.practice };
+    }
+
+    return evaluateLoadedMaxExactPractice(supabase, loaded.practice, userId, {
+      resolveAccess,
+    });
   } catch {
     return { ok: false, reason: "storage_unavailable" };
   }
@@ -179,7 +205,7 @@ export async function getMaxPlaybackSession(
   audioItemId?: string | null,
 ): Promise<GetMaxPlaybackSessionResult> {
   try {
-    const listed = await resolveListedPractice(authorSlug, productSlug, deps);
+    const listed = await resolvePlaybackPractice(authorSlug, productSlug, userId, deps);
     if (!listed.ok) {
       return listed;
     }
@@ -200,6 +226,10 @@ export async function getMaxPlaybackSession(
       }
       if (payload.reason !== "unavailable") {
         return { ok: false, reason: "storage_unavailable" };
+      }
+
+      if (!maxPlaybackPreviewAllowed(listed.practice)) {
+        return { ok: false, reason: "access_required" };
       }
 
       const requestedAudioItemId = audioItemId?.trim() || null;
@@ -252,7 +282,7 @@ export async function signMaxPlaybackAudio(
   deps?: MaxPlaybackDeps,
 ): Promise<SignMaxPlaybackAudioResult> {
   try {
-    const listed = await resolveListedPractice(authorSlug, productSlug, deps);
+    const listed = await resolvePlaybackPractice(authorSlug, productSlug, userId, deps);
     if (!listed.ok) {
       return listed;
     }
@@ -286,9 +316,12 @@ export async function buildMaxPlaybackPreviewClip(
     }
 > {
   try {
-    const listed = await resolveListedPractice(authorSlug, productSlug, deps);
+    const listed = await resolvePlaybackPractice(authorSlug, productSlug, null, deps);
     if (!listed.ok) {
       return listed;
+    }
+    if (!maxPlaybackPreviewAllowed(listed.practice)) {
+      return { ok: false, reason: "preview_unavailable" };
     }
 
     const supabase = client(deps);
