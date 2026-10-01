@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   captureMaxRecoveryPosition,
   clampMaxSeek,
+  formatMaxPlayerTrackListLabel,
   decideMaxSignedUrlRecovery,
   hasMaxAudioElementSource,
   isStaleMaxAudioRequest,
@@ -171,6 +172,39 @@ assert.equal(shouldStartMaxPrimaryPlayFetch({ isPreparing: false, hasSource: tru
 assert.equal(shouldDisableMaxPrimaryPlayWhilePreparing(true), true);
 assert.equal(shouldDisableMaxPrimaryPlayWhilePreparing(false), false);
 
+assert.equal(
+  formatMaxPlayerTrackListLabel({
+    trackCount: 1,
+    position: 1,
+    title: "Ключ к Изобилию - КвантМедитация",
+  }),
+  "Ключ к Изобилию - КвантМедитация",
+);
+assert.equal(
+  formatMaxPlayerTrackListLabel({
+    trackCount: 1,
+    position: 1,
+    title: "Ключ к Изобилию - КвантМедитация",
+  }).startsWith("1."),
+  false,
+);
+assert.equal(
+  formatMaxPlayerTrackListLabel({
+    trackCount: 3,
+    position: 1,
+    title: "Первая практика",
+  }),
+  "1. Первая практика",
+);
+assert.equal(
+  formatMaxPlayerTrackListLabel({
+    trackCount: 3,
+    position: 2,
+    title: "Вторая практика",
+  }),
+  "2. Вторая практика",
+);
+
 const teardownIgnored = decideMaxSignedUrlRecovery({
   mediaErrorCode: 4,
   hadSuccessfulPlaying: true,
@@ -196,6 +230,9 @@ assert.match(player, /selectTrack/);
 assert.match(player, /disabled=\{!canGoPrevious\}/);
 assert.match(player, /disabled=\{!canGoNext\}/);
 assert.match(player, /shouldDisableMaxPrimaryPlayWhilePreparing\(isPreparing\)/);
+assert.match(player, /formatMaxPlayerTrackListLabel\(\{/);
+assert.match(player, /trackCount: session\.tracks\.length/);
+assert.doesNotMatch(player, /\{track\.position\}\. \{track\.title\}/);
 assert.match(hook, /const \[completed, setCompleted\]/);
 assert.match(hook, /setCompleted\(true\)/);
 assert.match(player, /onPlaybackStarted/);
