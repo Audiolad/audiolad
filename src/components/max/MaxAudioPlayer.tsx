@@ -6,6 +6,7 @@ import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
   isMaxPreviewPlaybackMode,
+  formatMaxPlayerTrackListLabel,
   shouldDisableMaxPrimaryPlayWhilePreparing,
   shouldShowMaxPlayerTrackList,
   shouldShowMaxTrackNavigation,
@@ -250,7 +251,11 @@ export default function MaxAudioPlayer({
                   }`}
                 >
                   <span>
-                    {track.position}. {track.title}
+                    {formatMaxPlayerTrackListLabel({
+                      trackCount: session.tracks.length,
+                      position: track.position,
+                      title: track.title,
+                    })}
                   </span>
                   {track.durationSeconds !== null ? (
                     <span className="text-xs text-[#6c5d94]">

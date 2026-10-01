@@ -244,6 +244,21 @@ export function formatMaxQueuePositionLabel(index: number, length: number): stri
 }
 
 /**
+ * Lower player track list. A single session track shows the title alone.
+ * Multi-track albums keep the stored position number.
+ */
+export function formatMaxPlayerTrackListLabel(input: {
+  trackCount: number;
+  position: number;
+  title: string;
+}): string {
+  if (input.trackCount > 1) {
+    return `${input.position}. ${input.title}`;
+  }
+  return input.title;
+}
+
+/**
  * Playlist position wins when an external queue is connected.
  * Album mode counts session tracks and stays hidden for a single track or preview.
  */
