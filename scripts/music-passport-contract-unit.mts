@@ -5,7 +5,7 @@ import {
   measuredNumeric,
   musicPassportUsableForEngine,
   parseMusicPassportBasic,
-} from "../src/lib/music-passport/contract.ts";
+} from "../src/lib/music-passport/contract";
 
 const audioId = "dddddddd-dddd-4ddd-8ddd-dddddddddd01";
 
