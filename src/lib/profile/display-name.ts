@@ -61,6 +61,22 @@ export function getProfileRolePrimaryLabel(
   return "Слушатель";
 }
 
+export function formatCounterDisplay(value: number | null): string {
+  if (value === null) {
+    return "—";
+  }
+
+  return String(value);
+}
+
+export function getAuthorMemberRoleLabel(role: "owner" | "editor"): string {
+  if (role === "owner") {
+    return "Владелец";
+  }
+
+  return "Редактор";
+}
+
 export function getAuthorWorkspaceCountLabel(count: number): string | null {
   if (count <= 1) {
     return null;

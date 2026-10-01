@@ -496,7 +496,11 @@ export default function MaxAuthenticatedHome({
         <MaxGuestProfile onLogin={onRequestLogin} onSignup={onRequestSignup} />
       ) : null}
       {activeTab === "profile" && !guestMode && onUnlinkAccount ? (
-        <MaxProfile submitting={unlinking} onLogout={onUnlinkAccount} />
+        <MaxProfile
+          submitting={unlinking}
+          onLogout={onUnlinkAccount}
+          onOpenPlaylists={() => selectMaxTab("playlists")}
+        />
       ) : null}
       {activeTab === "catalog" && promoTarget ? (
         <div

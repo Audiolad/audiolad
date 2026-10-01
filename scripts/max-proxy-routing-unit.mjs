@@ -22,6 +22,7 @@ import {
   isMaxPromoAnalyticsPath,
   isMaxRatingPath,
   isMaxAppreciationPath,
+  isMaxProfilePath,
   isMaxHostname,
   isMaxSessionLinkPath,
   isMaxSessionUnlinkPath,
@@ -41,6 +42,7 @@ import {
   MAX_PROMO_ANALYTICS_PATH,
   MAX_RATING_PATH,
   MAX_APPRECIATION_PATH,
+  MAX_PROFILE_PATH,
   MAX_SESSION_LINK_PATH,
   MAX_SESSION_UNLINK_PATH,
   MAX_SESSION_VERIFY_PATH,
@@ -104,6 +106,9 @@ assert.equal(isMaxSessionVerifyPath("/api/max"), false);
 assert.equal(isMaxSessionLinkPath(MAX_SESSION_LINK_PATH), true);
 assert.equal(isMaxSessionLinkPath(`${MAX_SESSION_LINK_PATH}/`), false);
 assert.equal(isMaxSessionLinkPath("/api/max"), false);
+assert.equal(isMaxProfilePath(MAX_PROFILE_PATH), true);
+assert.equal(isMaxProfilePath(`${MAX_PROFILE_PATH}/`), false);
+assert.equal(isMaxProfilePath("/api/max"), false);
 assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_UNLINK_PATH), true);
 assert.equal(isMaxSessionUnlinkPath(`${MAX_SESSION_UNLINK_PATH}/`), false);
 assert.equal(isMaxSessionUnlinkPath(MAX_SESSION_LINK_PATH), false);
@@ -156,6 +161,7 @@ assertMaxAction(MAX_HOSTNAME, "/manifest.webmanifest", "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_VERIFY_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_LINK_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_SESSION_UNLINK_PATH, "pass_through");
+assertMaxAction(MAX_HOSTNAME, MAX_PROFILE_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYLISTS_CATALOG_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, MAX_PLAYLISTS_DETAIL_PATH, "pass_through");
@@ -172,6 +178,8 @@ assertMaxAction(MAX_HOSTNAME, MAX_PLAYBACK_PREVIEW_PATH, "pass_through");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_VERIFY_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_LINK_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_SESSION_UNLINK_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, `${MAX_PROFILE_PATH}/`, "not_found");
+assertMaxAction(MAX_HOSTNAME, "/api/max/profile/extra", "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYLISTS_CATALOG_PATH}/`, "not_found");
 assertMaxAction(MAX_HOSTNAME, `${MAX_PLAYLISTS_DETAIL_PATH}/`, "not_found");
