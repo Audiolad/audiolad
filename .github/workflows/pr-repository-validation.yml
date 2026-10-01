@@ -97,6 +97,7 @@ jobs:
           npm run test:business-app-venue-player
           npm run test:business-app-eligibility
           npm run test:business-app-owner-home-signals
+          npm run test:business-app-support-diagnostics
           npm run test:music-lab
           npm run test:scheduled-publication
           npm run test:live-public-content-sync

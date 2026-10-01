@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
@@ -115,17 +116,12 @@ function StatusBanner({
         >
           Открыть плеер
         </a>
-        <button
-          type="button"
+        <Link
+          href="/help"
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-          onClick={() => {
-            window.alert(
-              "Поддержка: откройте /player и проверьте heartbeat. Диагностика расширится в P1-07.",
-            );
-          }}
         >
-          Связаться с поддержкой
-        </button>
+          Диагностика для поддержки
+        </Link>
       </div>
     </section>
   );
