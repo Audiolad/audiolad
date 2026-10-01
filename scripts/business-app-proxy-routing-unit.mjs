@@ -67,6 +67,12 @@ assertAction(
 );
 assertAction(
   BUSINESS_HOSTNAME,
+  "/player",
+  "rewrite_business_app",
+  `${BUSINESS_SITE_PATH}/player`,
+);
+assertAction(
+  BUSINESS_HOSTNAME,
   "/preferences",
   "rewrite_business_app",
   `${BUSINESS_SITE_PATH}/settings`,
@@ -99,9 +105,9 @@ assert.equal(isBusinessPointState("broken"), false);
 assert.equal(parseBusinessPointState("autonomous"), "autonomous");
 assert.equal(parseBusinessPointState("nope"), "healthy");
 
-assert.equal(BUSINESS_PRIMARY_NAV_ITEMS.length, 4);
+assert.equal(BUSINESS_PRIMARY_NAV_ITEMS.length, 5);
 assert.equal(BUSINESS_SECONDARY_NAV_ITEMS.length, 5);
-assert.equal(BUSINESS_MOBILE_NAV_ITEMS.length, 5);
+assert.equal(BUSINESS_MOBILE_NAV_ITEMS.length, 6);
 assert.equal(isBusinessNavItemActive("/", "/"), true);
 assert.equal(isBusinessNavItemActive("/music", "/"), false);
 assert.equal(

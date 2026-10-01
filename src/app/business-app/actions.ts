@@ -69,3 +69,98 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
     zoneId: payload.zone_id,
   };
 }
+
+export type ProvisionVenuePlayerResult =
+  | {
+      ok: true;
+      playerId: string;
+      playerCode: string;
+      credential: string;
+      zoneId: string;
+      assignmentId: string;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Owner-only: create Player + assign to Zone in one UI step.
+ * Returns plaintext credential once (A2 contract).
+ */
+export async function provisionVenuePlayer(input: {
+  organizationId: string;
+  zoneId: string;
+  displayName?: string;
+}): Promise<ProvisionVenuePlayerResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "not_authenticated" };
+  }
+
+  const displayName = (input.displayName ?? "Venue Player").trim() || "Venue Player";
+
+  const { data: created, error: createError } = await supabase.rpc(
+    "create_business_player",
+    {
+      p_organization_id: input.organizationId,
+      p_display_name: displayName,
+    },
+  );
+
+  if (createError) {
+    return { ok: false, error: createError.message || "create_player_failed" };
+  }
+
+  const createdPayload = created as {
+    ok?: boolean;
+    player_id?: string;
+    player_code?: string;
+    credential?: string;
+  } | null;
+
+  if (
+    !createdPayload?.ok ||
+    !createdPayload.player_id ||
+    !createdPayload.player_code ||
+    !createdPayload.credential
+  ) {
+    return { ok: false, error: "create_player_invalid_response" };
+  }
+
+  const { data: assigned, error: assignError } = await supabase.rpc(
+    "assign_business_player_to_zone",
+    {
+      p_player_id: createdPayload.player_id,
+      p_zone_id: input.zoneId,
+    },
+  );
+
+  if (assignError) {
+    return { ok: false, error: assignError.message || "assign_player_failed" };
+  }
+
+  const assignedPayload = assigned as {
+    ok?: boolean;
+    assignment_id?: string;
+    zone_id?: string;
+  } | null;
+
+  if (!assignedPayload?.ok || !assignedPayload.assignment_id) {
+    return { ok: false, error: "assign_player_invalid_response" };
+  }
+
+  revalidatePath(BUSINESS_SITE_PATH);
+  revalidatePath(`${BUSINESS_SITE_PATH}/player`);
+  revalidatePath(`${BUSINESS_SITE_PATH}/locations`);
+
+  return {
+    ok: true,
+    playerId: createdPayload.player_id,
+    playerCode: createdPayload.player_code,
+    credential: createdPayload.credential,
+    zoneId: assignedPayload.zone_id ?? input.zoneId,
+    assignmentId: assignedPayload.assignment_id,
+  };
+}
