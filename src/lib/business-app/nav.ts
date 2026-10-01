@@ -91,7 +91,7 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     title: "Помощь",
     href: "/help",
     icon: "help",
-    available: false,
+    available: true,
   },
 ] as const;
 
