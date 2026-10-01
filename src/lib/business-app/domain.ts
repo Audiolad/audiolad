@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 
 import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
+import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
+import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 
 export { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
+export type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 
 export type BusinessDomainLocation = {
   id: string;
@@ -27,11 +30,15 @@ export type BusinessOwnerHomeContext =
       owner: BusinessDomainOwner;
       location: BusinessDomainLocation | null;
       organizationName: string | null;
+      organizationId: string | null;
+      /** Real player health / last-play projection for Owner Home chrome (P1-05). */
+      signals: BusinessOwnerHomeSignals | null;
     };
 
 /**
- * Reads the caller's first Organization membership + primary Location + default Zone.
- * Expand-only read path over A1 tables already in production. No mock fallback.
+ * Reads the caller's first Organization membership + primary Location + default Zone
+ * and (when org exists) A2 player health + latest business PoP for Home 🟢/🟡/🔴.
+ * Expand-only read path. No mock fallback. No rights / ELIGIBLE invention.
  */
 export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeContext> {
   const supabase = await createClient();
@@ -71,13 +78,17 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       owner: { userId: user.id, firstName },
       location: null,
       organizationName: null,
+      organizationId: null,
+      signals: null,
     };
   }
+
+  const organizationId = membership.organization_id as string;
 
   const { data: org, error: orgError } = await supabase
     .from("business_organizations")
     .select("id, name, status")
-    .eq("id", membership.organization_id)
+    .eq("id", organizationId)
     .maybeSingle();
 
   if (orgError) {
@@ -89,7 +100,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     .select(
       "id, organization_id, name, business_category, country_code, timezone, status",
     )
-    .eq("organization_id", membership.organization_id)
+    .eq("organization_id", organizationId)
     .eq("status", "active")
     .order("created_at", { ascending: true })
     .limit(1)
@@ -102,11 +113,18 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   }
 
   if (!location) {
+    const signals = await loadBusinessOwnerHomeSignals({
+      organizationId,
+      locationId: null,
+      userId: user.id,
+    });
     return {
       status: "authenticated",
       owner: { userId: user.id, firstName },
       location: null,
       organizationName: org?.name ?? null,
+      organizationId,
+      signals,
     };
   }
 
@@ -124,10 +142,17 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     throw new Error(`business_domain_zone_read_failed:${zoneError.message}`);
   }
 
+  const signals = await loadBusinessOwnerHomeSignals({
+    organizationId,
+    locationId: location.id,
+    userId: user.id,
+  });
+
   return {
     status: "authenticated",
     owner: { userId: user.id, firstName },
     organizationName: org?.name ?? null,
+    organizationId,
     location: {
       id: location.id,
       organizationId: location.organization_id,
@@ -138,5 +163,6 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       status: location.status,
       defaultZoneId: zone?.id ?? null,
     },
+    signals,
   };
 }

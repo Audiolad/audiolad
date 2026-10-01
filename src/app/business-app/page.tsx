@@ -1,7 +1,8 @@
 import BusinessHomePage from "@/components/business-app/BusinessHomePage";
 import {
   BUSINESS_MOCK_STATE_QUERY,
-  parseBusinessPointState,
+  isBusinessPointState,
+  type BusinessPointState,
 } from "@/lib/business-app/point-state";
 
 type PageProps = {
@@ -9,15 +10,16 @@ type PageProps = {
 };
 
 /**
- * Owner Home. Domain (Organization/Location) is loaded in layout from A1 tables.
- * `mockState` remains a reviewer-only switch for status chrome until Player health
- * is wired (P0-03); it no longer invents owner/location identity.
+ * Owner Home. Domain + player-health signals load in layout (P0-01 / P1-05).
+ * `mockState` is an optional reviewer override only when explicitly set.
  */
 export default async function BusinessAppHomePage({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
   const raw = params[BUSINESS_MOCK_STATE_QUERY];
   const value = Array.isArray(raw) ? raw[0] : raw;
-  const initialState = parseBusinessPointState(value, "stopped");
+  const mockOverride: BusinessPointState | null = isBusinessPointState(value)
+    ? value
+    : null;
 
-  return <BusinessHomePage initialState={initialState} />;
+  return <BusinessHomePage mockStateOverride={mockOverride} />;
 }

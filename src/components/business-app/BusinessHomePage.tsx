@@ -21,19 +21,24 @@ import {
 import type { BusinessPointState } from "@/lib/business-app/point-state";
 
 type BusinessHomePageProps = {
-  initialState: BusinessPointState;
+  /** Reviewer-only ?mockState= override; null → use real health signals. */
+  mockStateOverride?: BusinessPointState | null;
 };
 
 function StatusBanner({
   state,
   locationName,
+  stoppedMinutes,
+  playerCount,
+  lastPlayMinutesAgo,
 }: {
   state: BusinessPointState;
   locationName: string;
+  stoppedMinutes: number | null;
+  playerCount: number;
+  lastPlayMinutesAgo: number | null;
 }) {
   const location = locationName;
-  const reserve = BUSINESS_HOME_MOCK.musicReserveHours[state];
-  const stoppedMinutes = BUSINESS_HOME_MOCK.stoppedMinutes;
 
   if (state === "healthy") {
     return (
@@ -49,7 +54,14 @@ function StatusBanner({
           Всё работает
         </h2>
         <p className="mt-1 text-lg font-semibold">{location}</p>
-        <p className="mt-1 text-[1.02rem]">Музыка играет как запланировано.</p>
+        <p className="mt-1 text-[1.02rem]">
+          Плеер на связи
+          {lastPlayMinutesAgo != null
+            ? lastPlayMinutesAgo <= 15
+              ? "; недавний факт звучания подтверждён."
+              : "."
+            : "."}
+        </p>
       </section>
     );
   }
@@ -65,18 +77,23 @@ function StatusBanner({
         </p>
         <h2 className="mt-1 text-[1.45rem] font-bold leading-tight sm:text-[1.65rem]">
           <span aria-hidden="true">🟡 </span>
-          Музыка продолжает играть
+          Связь нестабильна
         </h2>
         <p className="mt-1 text-[1.02rem]">
-          Интернет временно недоступен. Точка работает автономно.
+          Плеер в {location} отвечает с задержкой (stale heartbeat). Проверьте
+          интернет на точке.
         </p>
-        <p className="mt-2 text-[1.02rem] font-medium">
-          Запаса музыки хватит ещё на {reserve} часа.
-        </p>
-        <p className="mt-3 text-[1.08rem] font-bold">Ничего делать не нужно.</p>
+        <p className="mt-3 text-[1.08rem] font-bold">Пока ничего настраивать не нужно.</p>
       </section>
     );
   }
+
+  const stoppedCopy =
+    playerCount === 0
+      ? `Плеер в ${location} ещё не подключён.`
+      : stoppedMinutes != null
+        ? `Плеер в ${location} не отвечает ${stoppedMinutes} мин.`
+        : `Плеер в ${location} ещё не выходил на связь.`;
 
   return (
     <section
@@ -88,27 +105,22 @@ function StatusBanner({
       </p>
       <h2 className="mt-1 text-[1.45rem] font-bold leading-tight sm:text-[1.65rem]">
         <span aria-hidden="true">🔴 </span>
-        Музыка остановилась
+        {playerCount === 0 ? "Плеер не подключён" : "Музыка остановилась"}
       </h2>
-      <p className="mt-1 text-[1.02rem]">
-        Плеер в {location} не отвечает {stoppedMinutes} минут.
-      </p>
+      <p className="mt-1 text-[1.02rem]">{stoppedCopy}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
+        <a
+          href="/player"
           className="business-app-btn business-app-btn-primary business-app-focus-ring"
-          onClick={() => {
-            window.alert("В этом прототипе действие «Исправить» пока локальное.");
-          }}
         >
-          Исправить
-        </button>
+          Открыть плеер
+        </a>
         <button
           type="button"
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"
           onClick={() => {
             window.alert(
-              "В этом прототипе «Связаться с поддержкой» пока локальное.",
+              "Поддержка: откройте /player и проверьте heartbeat. Диагностика расширится в P1-07.",
             );
           }}
         >
@@ -150,14 +162,18 @@ function ControlCard({
 }
 
 export default function BusinessHomePage({
-  initialState,
+  mockStateOverride = null,
 }: BusinessHomePageProps) {
   const domain = useBusinessDomain();
   const mock = BUSINESS_HOME_MOCK;
-  const [state] = useState<BusinessPointState>(initialState);
+  const signals =
+    domain.status === "authenticated" ? domain.signals : null;
+  const derivedState: BusinessPointState =
+    mockStateOverride ?? signals?.pointState ?? "stopped";
+  const [state] = useState<BusinessPointState>(derivedState);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
-  const [paused, setPaused] = useState(state === "stopped");
+  const [paused, setPaused] = useState(derivedState === "stopped");
   const [trackIndex, setTrackIndex] = useState(0);
   const [atmosphere, setAtmosphere] = useState(50);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -276,7 +292,13 @@ export default function BusinessHomePage({
       </header>
 
       <div className="business-app-home-grid">
-        <StatusBanner state={state} locationName={locationName || "Точка"} />
+        <StatusBanner
+          state={state}
+          locationName={locationName || "Точка"}
+          stoppedMinutes={signals?.stoppedMinutes ?? null}
+          playerCount={signals?.playerCount ?? 0}
+          lastPlayMinutesAgo={signals?.lastPlayMinutesAgo ?? null}
+        />
 
         <div className="business-app-home-stack">
           <section className="business-app-card" aria-labelledby="now-playing-title">
