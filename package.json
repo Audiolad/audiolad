@@ -206,7 +206,7 @@
     "test:max-bottom-nav": "node scripts/max-bottom-nav-unit.mjs",
     "test:max-profile": "npx tsx scripts/max-profile-unit.mjs",
     "test:max-profile-route": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-profile-route-unit.mjs",
-    "test:max-library": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-library-route-unit.mjs && npx tsx scripts/max-library-ui-unit.mjs",
+    "test:max-library": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-library-route-unit.mjs && npx tsx scripts/max-library-ui-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-library-visibility-unit.mjs",
     "test:max-home": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-home-route-unit.mjs && npx tsx scripts/max-home-unit.mjs",
     "test:max-session-unlink": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-unlink-external-identity-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-session-unlink-route-unit.mjs",
     "test:business-app-domain-bind": "npx tsx scripts/business-app-domain-bind-unit.mjs",

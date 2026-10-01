@@ -112,6 +112,13 @@ function practiceRow(input) {
     audio_url: AUDIO_SECRET,
     workspace_id: WORKSPACE_SECRET,
     user_id: input.ownerId,
+    author_id: "author-listed",
+    status: "published",
+    deleted_at: null,
+    catalog_visibility: "listed",
+    is_catalog_listed: true,
+    scheduled_publish_at: null,
+    published_at: "2026-01-01T00:00:00.000Z",
     authors: { name: input.authorName, slug: input.authorSlug },
   };
 }
@@ -217,7 +224,7 @@ const tables = {
       created_at: "2026-05-02T00:00:00.000Z",
     },
   ],
-  practices: [savedPractice, foreignPractice],
+  practices: [savedPractice, purchasedPractice, giftPractice, foreignPractice],
   playlist_saves: [
     {
       user_id: USER_A,
@@ -534,8 +541,15 @@ try {
   assert.equal(JSON.stringify(otherBody).includes(USER_A), false);
   assert.equal(JSON.stringify(otherBody).includes(USER_B), false);
   assert.deepEqual(playlistUsers.slice(playlistsAfterLinked), [USER_B]);
-  assert.ok(queries.slice(queriesAfterLinked).every((query) => query.value === USER_B));
-  assert.equal(queries.slice(queriesAfterLinked).some((query) => query.value === USER_A), false);
+  const otherUserFilters = queries
+    .slice(queriesAfterLinked)
+    .filter((query) => query.column === "user_id");
+  assert.ok(otherUserFilters.length >= 3);
+  assert.ok(otherUserFilters.every((query) => query.value === USER_B));
+  assert.equal(
+    queries.slice(queriesAfterLinked).some((query) => query.value === USER_A),
+    false,
+  );
 
   const queriesAfterOther = queries.length;
   const playlistsAfterOther = playlistUsers.length;

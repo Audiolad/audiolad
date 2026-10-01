@@ -35,6 +35,7 @@ export type PublicPracticeRow = {
   use_shared_cover?: boolean | null;
   audio_url: string | null;
   status: string | null;
+  deleted_at?: string | null;
   scheduled_publish_at?: string | null;
   published_at?: string | null;
   updated_at: string | null;
@@ -108,6 +109,7 @@ export async function getPracticeByAuthorAndSlug(
       use_shared_cover,
       audio_url,
       status,
+      deleted_at,
       scheduled_publish_at,
       published_at,
       updated_at,

@@ -8,16 +8,19 @@ import {
 } from "@/lib/catalog/product-hero-gallery";
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "@/lib/catalog/visibility-query";
 import { isCoursePublication } from "@/lib/course-content/validators";
+import { resolveMaxExactPractice, type MaxExactPracticeDeps } from "@/lib/max/exact-product";
 import { mapCuratedMaxRecommendations } from "@/lib/max/product-recommendations";
 import { toMaxProductContentTracks, type MaxProductDetailView } from "@/lib/max/product-view";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
-import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import {
+  getPublishedCatalogProducts,
+  mapPracticeRowsToCatalogProducts,
+} from "@/lib/products/catalog";
 import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { loadPublicAudioItems } from "@/lib/products/public-audio-items";
 import { loadPublicPracticeSeoContent } from "@/lib/products/practice-seo-content";
 import { loadPublicPracticeTopicsSafe } from "@/lib/products/practice-topics";
 import {
-  getPracticeByAuthorAndSlug,
   type PublicPracticeAuthor,
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
@@ -37,7 +40,24 @@ export type MaxProductDetail = MaxProductDetailView & {
 export type GetMaxPublishedProductFn = (
   authorSlug: string,
   productSlug: string,
+  userId?: string | null,
 ) => ReturnType<typeof getMaxPublishedProduct>;
+
+type MaxProductDeps = MaxExactPracticeDeps & {
+  createClient?: () => ReturnType<typeof createServiceRoleClient>;
+  listCatalog?: typeof getPublishedCatalogProducts;
+  mapProducts?: typeof mapPracticeRowsToCatalogProducts;
+  loadTracks?: typeof loadPublicAudioItems;
+  loadTopics?: typeof loadPublicPracticeTopicsSafe;
+  loadSeo?: typeof loadPublicPracticeSeoContent;
+  releaseScheduled?: typeof releaseDueScheduledPublications;
+};
+
+let productDeps: MaxProductDeps | null = null;
+
+export function setMaxProductDepsForTests(deps: MaxProductDeps | null) {
+  productDeps = deps;
+}
 
 const MOBILE_COVER_DISPLAY_WIDTH = 640;
 
@@ -53,43 +73,87 @@ let productImpl: GetMaxPublishedProductFn | null = null;
 export async function getMaxPublishedProduct(
   authorSlug: string,
   productSlug: string,
+  userId: string | null = null,
 ): Promise<{ ok: true; product: MaxProductDetail | null } | { ok: false }> {
-  if (productImpl) return productImpl(authorSlug, productSlug);
+  if (productImpl) return productImpl(authorSlug, productSlug, userId);
   try {
     const normalizedAuthor = authorSlug.trim();
     const normalizedProduct = productSlug.trim();
     if (!normalizedAuthor || !normalizedProduct) return { ok: true, product: null };
-    const service = createServiceRoleClient();
-    await releaseDueScheduledPublications();
-    const products = await getPublishedCatalogProducts(service, {
-      viewer: GUEST_ORDINARY_CATALOG_VIEWER,
-      throwOnStorageError: true,
-    });
-    const product = products.find(
-      (item) =>
-        item.authorSlug === normalizedAuthor && item.slug === normalizedProduct,
-    );
-    if (!product) return { ok: true, product: null };
-
-    const practiceResult = await getPracticeByAuthorAndSlug(
+    const service = productDeps?.createClient?.() ?? createServiceRoleClient();
+    await (productDeps?.releaseScheduled ?? releaseDueScheduledPublications)();
+    const exact = await resolveMaxExactPractice(
       service,
       normalizedAuthor,
       normalizedProduct,
+      userId,
+      {
+        getPractice: productDeps?.getPractice,
+        resolveAccess: productDeps?.resolveAccess,
+      },
     );
-    if (practiceResult.error) return { ok: false };
-    const practice = practiceResult.practice;
-    if (!practice) return { ok: true, product: null };
+    if (!exact.ok) {
+      return exact.reason === "storage_unavailable"
+        ? { ok: false }
+        : { ok: true, product: null };
+    }
+    const listCatalog = productDeps?.listCatalog ?? getPublishedCatalogProducts;
+    const products = await listCatalog(service, {
+      viewer: GUEST_ORDINARY_CATALOG_VIEWER,
+      throwOnStorageError: true,
+    });
+    let product =
+      products.find(
+        (item) =>
+          item.authorSlug === normalizedAuthor && item.slug === normalizedProduct,
+      ) ?? null;
+    if (!product) {
+      const mapProducts = productDeps?.mapProducts ?? mapPracticeRowsToCatalogProducts;
+      const mapped = await mapProducts(service, [
+        {
+          id: exact.practice.id,
+          author_id: exact.practice.author_id,
+          title: exact.practice.title,
+          slug: exact.practice.slug,
+          subtitle: exact.practice.subtitle,
+          description: exact.practice.description,
+          format: exact.practice.format,
+          product_kind: exact.practice.product_kind,
+          publication_class: exact.practice.publication_class,
+          duration_minutes: exact.practice.duration_minutes,
+          price: exact.practice.price,
+          is_free: exact.practice.is_free,
+          cover_url: exact.practice.cover_url,
+          cover_image: exact.practice.cover_image,
+          status: exact.practice.status,
+          is_catalog_listed: exact.practice.is_catalog_listed ?? null,
+          catalog_visibility: exact.practice.catalog_visibility,
+          updated_at: exact.practice.updated_at,
+          published_at: exact.practice.published_at ?? null,
+          scheduled_publish_at: exact.practice.scheduled_publish_at,
+          created_at: null,
+          authors: exact.practice.authors,
+        },
+      ]);
+      product = mapped[0] ?? null;
+    }
+    if (!product) return { ok: true, product: null };
 
+    const practice = exact.practice;
+
+    const loadTracks = productDeps?.loadTracks ?? loadPublicAudioItems;
+    const loadTopics = productDeps?.loadTopics ?? loadPublicPracticeTopicsSafe;
+    const loadSeo = productDeps?.loadSeo ?? loadPublicPracticeSeoContent;
     const [tracks, topics, seoContent] = await Promise.all([
-      loadPublicAudioItems(service, {
+      loadTracks(service, {
         practiceId: product.id,
         practiceStatus: "published",
         authorPreview: false,
         publicationClass: product.publicationClass,
         productKind: product.productKind,
       }),
-      loadPublicPracticeTopicsSafe(service, product.id),
-      loadPublicPracticeSeoContent(
+      loadTopics(service, product.id),
+      loadSeo(
         service,
         product.id,
         practice.author_recommendations_title,

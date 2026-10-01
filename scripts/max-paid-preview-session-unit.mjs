@@ -140,16 +140,25 @@ try {
   setMaxPlaybackDepsForTests({
     createClient: () => ({}),
     listCatalog: async () => [],
-    getPractice: async () => ({ practice: paidPractice, error: false }),
+    getPractice: async () => ({
+      practice: { ...paidPractice, status: "draft", catalog_visibility: "unlisted", is_catalog_listed: false },
+      error: false,
+    }),
+    resolveAccess: async () => ({
+      canListen: false,
+      isAuthorMember: false,
+      hasEntitlement: false,
+      canSeeSelectedUsers: false,
+    }),
     loadSession: async () => {
-      throw new Error("draft/unlisted must not load");
+      throw new Error("draft must not load");
     },
     resolvePreview: async () => {
-      throw new Error("draft/unlisted must not preview");
+      throw new Error("draft must not preview");
     },
   });
-  const unlisted = await getMaxPlaybackSession(userId, "author", "product");
-  assert.deepEqual(unlisted, { ok: false, reason: "not_found" });
+  const draftHidden = await getMaxPlaybackSession(userId, "author", "product");
+  assert.deepEqual(draftHidden, { ok: false, reason: "not_found" });
 
   const thirty = await resolveMaxStorefrontPreview(paidPractice, {}, {
     listAudioItems: async () => [

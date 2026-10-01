@@ -86,9 +86,18 @@ try {
   setMaxPlaybackDepsForTests({
     createClient: () => ({}),
     listCatalog: async () => [],
-    getPractice: async () => ({ practice: listedPractice, error: false }),
+    getPractice: async () => ({
+      practice: { ...listedPractice, status: "draft", catalog_visibility: "unlisted", is_catalog_listed: false },
+      error: false,
+    }),
+    resolveAccess: async () => ({
+      canListen: false,
+      isAuthorMember: false,
+      hasEntitlement: false,
+      canSeeSelectedUsers: false,
+    }),
     loadSession: async () => {
-      throw new Error("session should not load unlisted product");
+      throw new Error("session should not load a draft product");
     },
   });
   const hidden = await getMaxPlaybackSession(userId, "author", "product");
@@ -269,7 +278,12 @@ try {
     createClient: () => ({}),
     listCatalog: async () => [{ authorSlug: "author", slug: "course" }],
     getPractice: async () => ({
-      practice: { ...listedPractice, product_kind: "course", publication_class: "course" },
+      practice: {
+        ...listedPractice,
+        slug: "course",
+        product_kind: "course",
+        publication_class: "course",
+      },
       error: false,
     }),
     loadSession: async () => ({
@@ -404,6 +418,7 @@ try {
     getPractice: async () => ({
       practice: {
         ...listedPractice,
+        slug: "course",
         is_free: true,
         product_kind: "course",
         publication_class: "course",

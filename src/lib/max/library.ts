@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadLibraryCollection } from "@/lib/library/collection";
 import { loadSavedPlaylistSources } from "@/lib/library/saved-playlist-sources";
+import { redactMaxLibraryCatalogVisibility } from "@/lib/max/library-visibility";
 import {
   compareUnifiedLibraryEntries,
   mapCatalogLibraryEntry,
@@ -104,8 +105,20 @@ export async function loadMaxStage1Library(
     }),
   ]);
 
+  const visibleCatalog = catalog.error
+    ? { items: [], error: true }
+    : await redactMaxLibraryCatalogVisibility(supabase, userId, catalog.items).catch(
+        (error) => {
+          console.error(
+            "max_library_visibility_error",
+            error instanceof Error ? error.message : error,
+          );
+          return { items: [], error: true };
+        },
+      );
+
   const entries = [
-    ...catalog.items.map(mapCatalogLibraryEntry),
+    ...visibleCatalog.items.map(mapCatalogLibraryEntry),
     ...playlists.items.map(mapPlaylistLibraryEntry),
   ].sort(compareUnifiedLibraryEntries);
 
@@ -118,6 +131,6 @@ export async function loadMaxStage1Library(
 
   return {
     items: items ?? [],
-    error: catalog.error || playlists.error,
+    error: catalog.error || visibleCatalog.error || playlists.error,
   };
 }
