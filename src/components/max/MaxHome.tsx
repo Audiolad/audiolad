@@ -15,8 +15,6 @@ import {
 import { readMaxInitData } from "@/lib/max/bridge";
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import {
-  MAX_HOME_LISTEN_FREE_LABEL,
-  MAX_HOME_OPEN_CATALOG_LABEL,
   MAX_HOME_SEE_ALL_LABEL,
   MAX_HOME_SHELF_LIMIT,
   MAX_HOME_SHELVES,
@@ -34,7 +32,6 @@ type MaxHomeScreenProps = {
   guestMode: boolean;
   status: MaxHomeStatus;
   shelves: MaxHomeShelves | null;
-  onOpenCatalog: () => void;
   onListenFree: () => void;
   onSlideAction: (slideId: string) => void;
   onOpenSection: (section: PublicCatalogSection) => void;
@@ -52,7 +49,6 @@ export function MaxHomeScreen({
   guestMode,
   status,
   shelves,
-  onOpenCatalog,
   onListenFree,
   onSlideAction,
   onOpenSection,
@@ -91,22 +87,6 @@ export function MaxHomeScreen({
             {MAX_HOME_TITLE}
           </h1>
           <p className="mt-2 text-[17px] leading-6 text-[#4a3d73]">{MAX_HOME_SUBTITLE}</p>
-          <div className="mt-5 flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={onOpenCatalog}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              {MAX_HOME_OPEN_CATALOG_LABEL}
-            </button>
-            <button
-              type="button"
-              onClick={onListenFree}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#7042c5] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              {MAX_HOME_LISTEN_FREE_LABEL}
-            </button>
-          </div>
         </>
       )}
 
@@ -178,7 +158,6 @@ export function MaxHomeScreen({
 
 export default function MaxHome({
   guestMode,
-  onOpenCatalog,
   onListenFree,
   onSlideAction,
   onOpenSection,
@@ -233,7 +212,6 @@ export default function MaxHome({
       guestMode={guestMode}
       status={status}
       shelves={shelves}
-      onOpenCatalog={onOpenCatalog}
       onListenFree={onListenFree}
       onSlideAction={onSlideAction}
       onOpenSection={onOpenSection}
