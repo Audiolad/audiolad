@@ -7,7 +7,10 @@ import { formatMaxDuration } from "@/lib/max/format-duration";
 import {
   isMaxPreviewPlaybackMode,
   shouldDisableMaxPrimaryPlayWhilePreparing,
+  shouldShowMaxPlayerTrackList,
   shouldShowMaxTrackNavigation,
+  visibleMaxQueuePositionLabel,
+  type MaxExternalQueueNavigation,
 } from "@/lib/max/max-audio-playback";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
 
@@ -23,9 +26,13 @@ export default function MaxAudioPlayer({
   fetchAudio,
   onBindPlay,
   onBindPause,
+  onBindSelectTrack,
   onPlayingChange,
+  onActiveTrackChange,
   onPlaybackStarted,
   onPlaybackCompleted,
+  externalQueue,
+  hideTrackList = false,
 }: {
   session: MaxPlaybackSession;
   fetchAudio: (
@@ -36,12 +43,17 @@ export default function MaxAudioPlayer({
   >;
   onBindPlay?: (play: () => void) => void;
   onBindPause?: (pause: () => void) => void;
+  onBindSelectTrack?: (selectTrack: (index: number) => void) => void;
   onPlayingChange?: (isPlaying: boolean) => void;
+  onActiveTrackChange?: (track: { trackId: string | null; index: number }) => void;
   onPlaybackStarted?: (input: { trackId: string | null }) => void;
   onPlaybackCompleted?: (input: {
     trackId: string | null;
     durationSeconds: number | null;
   }) => void;
+  externalQueue?: MaxExternalQueueNavigation;
+  /** Product pages already render the track rows. Playlist and promo keep the player list. */
+  hideTrackList?: boolean;
 }) {
   const {
     audioRef,
@@ -61,9 +73,28 @@ export default function MaxAudioPlayer({
     selectTrack,
     nextTrack,
     previousTrack,
-    canGoPrevious,
-    canGoNext,
+    canGoPrevious: internalCanGoPrevious,
+    canGoNext: internalCanGoNext,
   } = useMaxAudioPlayback({ session, fetchAudio });
+  const usesExternalQueue = externalQueue != null;
+  const internalNavigation = shouldShowMaxTrackNavigation(session.playbackMode);
+  const showNavigation = usesExternalQueue || internalNavigation;
+  const canGoPrevious = externalQueue ? externalQueue.canGoPrevious : internalCanGoPrevious;
+  const canGoNext = externalQueue ? externalQueue.canGoNext : internalCanGoNext;
+  const showTrackList = shouldShowMaxPlayerTrackList({
+    hideTrackList,
+    usesExternalQueue,
+    showNavigation,
+    trackCount: session.tracks.length,
+  });
+  const positionLabel = visibleMaxQueuePositionLabel({
+    externalIndex: externalQueue ? externalQueue.index : null,
+    externalLength: externalQueue ? externalQueue.length : null,
+    trackIndex,
+    trackCount: session.tracks.length,
+    showInternalNavigation: !usesExternalQueue && internalNavigation,
+  });
+
   useEffect(() => {
     onBindPlay?.(play);
   }, [onBindPlay, play]);
@@ -73,14 +104,24 @@ export default function MaxAudioPlayer({
   }, [onBindPause, pause]);
 
   useEffect(() => {
+    onBindSelectTrack?.(selectTrack);
+  }, [onBindSelectTrack, selectTrack]);
+
+  useEffect(() => {
     onPlayingChange?.(isPlaying);
   }, [isPlaying, onPlayingChange]);
+
+  useEffect(() => {
+    onActiveTrackChange?.({
+      trackId: currentTrack?.trackId ?? null,
+      index: trackIndex,
+    });
+  }, [currentTrack?.trackId, onActiveTrackChange, trackIndex]);
 
   const startedNotifiedRef = useRef(false);
   const completionNotifiedRef = useRef(false);
 
   const isPreview = isMaxPreviewPlaybackMode(session.playbackMode);
-  const showNavigation = shouldShowMaxTrackNavigation(session.playbackMode);
   const currentTitle = currentTrack?.title ?? session.title;
   const previewDuration =
     isPreview && typeof currentTrack?.durationSeconds === "number"
@@ -121,6 +162,11 @@ export default function MaxAudioPlayer({
         </p>
       ) : null}
       <p className="text-sm font-medium text-[#25135c]">{currentTitle}</p>
+      {positionLabel ? (
+        <p className="mt-1 text-xs text-[#6c5d94]" data-max-queue-position="">
+          {positionLabel}
+        </p>
+      ) : null}
       {isPreparing ? (
         <p className="mt-2 text-sm text-[#6c5d94]">Подготавливаем аудио…</p>
       ) : null}
@@ -135,7 +181,7 @@ export default function MaxAudioPlayer({
         {showNavigation ? (
           <button
             type="button"
-            onClick={previousTrack}
+            onClick={externalQueue ? externalQueue.onPrevious : previousTrack}
             disabled={!canGoPrevious}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
           >
@@ -167,7 +213,7 @@ export default function MaxAudioPlayer({
         {showNavigation ? (
           <button
             type="button"
-            onClick={nextTrack}
+            onClick={externalQueue ? externalQueue.onNext : nextTrack}
             disabled={!canGoNext}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[#eadff8] text-sm font-medium text-[#7042c5] disabled:opacity-40"
           >
@@ -190,7 +236,7 @@ export default function MaxAudioPlayer({
         {formatClock(currentTime)} / {formatClock(sliderMax)}
       </p>
 
-      {showNavigation || session.tracks.length > 1 ? (
+      {showTrackList ? (
         <ol className="mt-4 space-y-2">
           {session.tracks.map((track, index) => {
             const active = index === trackIndex;

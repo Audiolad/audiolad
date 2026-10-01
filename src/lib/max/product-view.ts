@@ -25,6 +25,13 @@ export type MaxProductRatingView = {
   };
 };
 
+export type MaxProductContentTrack = {
+  audioItemId: string;
+  title: string;
+  position: number;
+  durationSeconds: number | null;
+};
+
 export type MaxProductDetailView = {
   title: string;
   subtitle: string | null;
@@ -35,11 +42,7 @@ export type MaxProductDetailView = {
   isFree: boolean;
   gallery: MaxProductGallerySlide[];
   topics: Array<{ key: string; title: string }>;
-  contents: Array<{
-    title: string;
-    position: number;
-    durationSeconds: number | null;
-  }>;
+  contents: MaxProductContentTrack[];
   recommendationsTitle: string;
   recommendations: MaxProductRecommendationView[];
   rating: MaxProductRatingView;
@@ -113,12 +116,14 @@ export function readMaxProductDetail(value: unknown): MaxProductDetailView | nul
 
   const contents = value.contents.flatMap((track) => {
     if (!isRecord(track)) return [];
+    const audioItemId = readString(track.audioItemId)?.trim() ?? "";
     const trackTitle = readString(track.title);
     const position = track.position;
     const durationSeconds = track.durationSeconds;
-    if (!trackTitle || typeof position !== "number") return [];
+    if (!audioItemId || !trackTitle || typeof position !== "number") return [];
     if (durationSeconds !== null && typeof durationSeconds !== "number") return [];
     return [{
+      audioItemId,
       title: trackTitle,
       position,
       durationSeconds: durationSeconds === null ? null : durationSeconds,
@@ -208,4 +213,25 @@ export function readMaxProductDetail(value: unknown): MaxProductDetailView | nul
     },
     appreciation,
   };
+}
+
+/** Public product contents expose the playback id only — never storage paths or practice ids. */
+export function toMaxProductContentTracks(
+  tracks: readonly {
+    id: string;
+    title: string;
+    position: number;
+    durationSeconds: number | null;
+  }[],
+): MaxProductContentTrack[] {
+  return tracks.flatMap((track) => {
+    const audioItemId = track.id.trim();
+    if (!audioItemId) return [];
+    return [{
+      audioItemId,
+      title: track.title,
+      position: track.position,
+      durationSeconds: track.durationSeconds,
+    }];
+  });
 }

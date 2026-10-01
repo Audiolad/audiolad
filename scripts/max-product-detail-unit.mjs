@@ -129,4 +129,13 @@ for (const field of fieldOrder) {
   lastIndex = index;
 }
 
+assert.match(detailSource, /track\.audioItemId/);
+assert.match(detailSource, /onPressTrack\(track\.audioItemId\)/);
+assert.doesNotMatch(detailSource, /onPressTrack\(track\.title\)/);
+assert.match(detailSource, /data-max-product-track-playable/);
+assert.match(detailSource, /rounded-full bg-\[#7042c5\]/);
+assert.match(source, /decideMaxProductTrackAction/);
+assert.match(source, /onBindSelectTrack=\{bindSelectTrack\}/);
+assert.match(source, /PLAY_ACTION_LABEL/);
+
 console.log("max-product-detail-unit: ok");

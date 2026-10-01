@@ -26,6 +26,7 @@ import MaxProfile, { MaxGuestProfile } from "@/components/max/MaxProfile";
 import MaxPromoLanding from "@/components/max/MaxPromoLanding";
 import MaxTabPlaceholder from "@/components/max/MaxTabPlaceholder";
 import { readMaxInitData } from "@/lib/max/bridge";
+import { decideMaxProductTrackAction } from "@/lib/max/max-audio-playback";
 import {
   MAX_PLAYBACK_AUDIO_PATH,
   MAX_PLAYBACK_PREVIEW_PATH,
@@ -135,6 +136,8 @@ export default function MaxAuthenticatedHome({
     initialStartTarget?.kind === "product" ? { status: "loading" } : { status: "idle" },
   );
   const [listenArmed, setListenArmed] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MaxPrimaryTab>(() =>
     resolveInitialMaxPrimaryTab(
       initialStartTarget,
@@ -147,7 +150,10 @@ export default function MaxAuthenticatedHome({
     initialMaxPromoTarget(initialStartTarget),
   );
   const playRef = useRef<(() => void) | null>(null);
+  const pauseRef = useRef<(() => void) | null>(null);
+  const selectTrackRef = useRef<((index: number) => void) | null>(null);
   const pendingPlayRef = useRef(false);
+  const pendingTrackIndexRef = useRef<number | null>(null);
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -166,7 +172,11 @@ export default function MaxAuthenticatedHome({
       if (initialStartTarget?.kind === "product") {
         setActiveTab("catalog");
         setPromoTarget(null);
+        pendingPlayRef.current = false;
+        pendingTrackIndexRef.current = null;
         setListenArmed(false);
+        setPlaying(false);
+        setActiveTrackId(null);
         setDetail({ status: "loading" });
         setPlayback({ status: "loading" });
         setSelected({
@@ -195,9 +205,28 @@ export default function MaxAuthenticatedHome({
     }
   }, []);
 
-  function closeProductDetail() {
+  const bindSelectTrack = useCallback((selectTrack: (index: number) => void) => {
+    selectTrackRef.current = selectTrack;
+    if (pendingTrackIndexRef.current == null) return;
+    const index = pendingTrackIndexRef.current;
+    pendingTrackIndexRef.current = null;
+    selectTrack(index);
+  }, []);
+
+  const reportActiveTrack = useCallback((track: { trackId: string | null }) => {
+    setActiveTrackId((current) => (current === track.trackId ? current : track.trackId));
+  }, []);
+
+  function resetArmedPlayback() {
     pendingPlayRef.current = false;
+    pendingTrackIndexRef.current = null;
     setListenArmed(false);
+    setPlaying(false);
+    setActiveTrackId(null);
+  }
+
+  function closeProductDetail() {
+    resetArmedPlayback();
     setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
   }
 
@@ -211,8 +240,7 @@ export default function MaxAuthenticatedHome({
   }
 
   function openCatalogProduct(product: MaxCatalogProduct) {
-    pendingPlayRef.current = false;
-    setListenArmed(false);
+    resetArmedPlayback();
     setDetail({ status: "loading" });
     setPlayback({ status: "loading" });
     setSelected(product);
@@ -368,17 +396,53 @@ export default function MaxAuthenticatedHome({
       return;
     }
     if (activeTab === "catalog") {
-      pendingPlayRef.current = false;
-      setListenArmed(false);
+      resetArmedPlayback();
       setPlayback({ status: "idle" }); setDetail({ status: "idle" }); setSelected(null);
     }
     setActiveTab(next);
   }
 
   function startListening() {
+    pendingTrackIndexRef.current = null;
+    if (playback.status === "ready") {
+      const firstId = playback.session.tracks[0]?.trackId ?? null;
+      if (firstId) setActiveTrackId(firstId);
+    }
     setListenArmed(true);
     if (playRef.current) playRef.current();
     else pendingPlayRef.current = true;
+  }
+
+  function pressProductTrack(audioItemId: string) {
+    if (playback.status !== "ready") return;
+    const decision = decideMaxProductTrackAction({
+      tracks: playback.session.tracks,
+      audioItemId,
+      activeTrackId,
+      listenArmed,
+      isPlaying: playing,
+    });
+    if (decision.type === "ignore") return;
+    if (decision.type === "pause") {
+      pauseRef.current?.();
+      return;
+    }
+    if (decision.type === "resume") {
+      setListenArmed(true);
+      if (playRef.current) playRef.current();
+      else pendingPlayRef.current = true;
+      return;
+    }
+    const track = playback.session.tracks[decision.index];
+    if (!track) return;
+    pendingPlayRef.current = false;
+    setActiveTrackId(track.trackId);
+    setListenArmed(true);
+    if (selectTrackRef.current) {
+      selectTrackRef.current(decision.index);
+      return;
+    }
+    pendingTrackIndexRef.current = decision.index;
   }
 
   const activeTabLabel =
@@ -464,6 +528,15 @@ export default function MaxAuthenticatedHome({
               authorSlug={selected.authorSlug}
               productSlug={selected.slug}
               product={detail.product}
+              trackPlayback={{
+                playableTrackIds:
+                  playback.status === "ready"
+                    ? playback.session.tracks.map((track) => track.trackId)
+                    : [],
+                activeTrackId: listenArmed ? activeTrackId : null,
+                isPlaying: listenArmed && playing,
+                onPressTrack: pressProductTrack,
+              }}
               onOpenRecommendation={openCatalogProduct}
               onOpenTopic={openCatalogTopic}
               interactiveActionsEnabled={!guestMode}
@@ -511,7 +584,14 @@ export default function MaxAuthenticatedHome({
                     >
                 <MaxAudioPlayer
                   session={playback.session}
+                  hideTrackList
                   onBindPlay={bindPlay}
+                  onBindPause={(pause) => {
+                    pauseRef.current = pause;
+                  }}
+                  onBindSelectTrack={bindSelectTrack}
+                  onPlayingChange={setPlaying}
+                  onActiveTrackChange={reportActiveTrack}
                   fetchAudio={async (trackId, signal) => {
                     if (playback.session.playbackMode === "preview") {
                       const response = await fetch(MAX_PLAYBACK_PREVIEW_PATH, {

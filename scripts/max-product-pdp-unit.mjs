@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { mapCuratedMaxRecommendations } from "../src/lib/max/product-recommendations.ts";
-import { readMaxProductDetail } from "../src/lib/max/product-view.ts";
+import { readMaxProductDetail, toMaxProductContentTracks } from "../src/lib/max/product-view.ts";
 import { MAX_AUTHOR_RECOMMENDATIONS } from "../src/lib/seo/related-product-search.ts";
 
 const current = "current";
@@ -64,7 +64,14 @@ const detail = readMaxProductDetail({
   isFree: true,
   gallery: [{ id: "s1", image_url: "https://cdn.example/slide.jpg", alt: "Слайд" }],
   topics: [{ key: "sleep", title: "Сон" }],
-  contents: [{ title: "Трек", position: 1, durationSeconds: 40 }],
+  contents: [{
+    audioItemId: "11111111-1111-4111-8111-111111111111",
+    title: "Трек",
+    position: 1,
+    durationSeconds: 40,
+    audio_path: "secret/audio.mp3",
+    practiceId: "practice-secret",
+  }],
   recommendationsTitle: "Рекомендации автора",
   recommendations: rows.slice(0, 1).map((row) => ({ ...row, subtitle: null })),
   rating: { enabled: true, aggregate: { totalStars: 8, ratingCount: 2 } },
@@ -74,6 +81,52 @@ assert.equal(detail?.metaLine, "Автор · 12 мин");
 assert.equal(detail?.recommendationsTitle, "Рекомендации автора");
 assert.equal(detail?.topics[0].title, "Сон");
 assert.equal(detail?.rating.aggregate.ratingCount, 2);
+assert.equal(detail?.contents[0].audioItemId, "11111111-1111-4111-8111-111111111111");
+assert.equal(detail?.contents[0].title, "Трек");
+assert.equal("audio_path" in (detail?.contents[0] ?? {}), false);
+assert.equal("practiceId" in (detail?.contents[0] ?? {}), false);
+assert.equal(JSON.stringify(detail).includes("secret/audio.mp3"), false);
+assert.equal(JSON.stringify(detail).includes("practice-secret"), false);
+
+const contents = toMaxProductContentTracks([
+  {
+    id: "22222222-2222-4222-8222-222222222222",
+    title: "Второй",
+    position: 2,
+    durationSeconds: 80,
+    audio_path: "practices/hidden.mp3",
+    practiceId: "practice-1",
+  },
+  { id: "  ", title: "Пустой", position: 3, durationSeconds: null },
+]);
+assert.deepEqual(contents, [{
+  audioItemId: "22222222-2222-4222-8222-222222222222",
+  title: "Второй",
+  position: 2,
+  durationSeconds: 80,
+}]);
+assert.equal(JSON.stringify(contents).includes("audio_path"), false);
+assert.equal(JSON.stringify(contents).includes("practiceId"), false);
+
+assert.equal(
+  readMaxProductDetail({
+    title: "Тишина",
+    subtitle: null,
+    formatLabel: "Медитация",
+    coverUrl: null,
+    metaLine: null,
+    priceLabel: "0",
+    isFree: true,
+    gallery: [],
+    topics: [],
+    contents: [{ title: "Без идентификатора", position: 1, durationSeconds: 10 }],
+    recommendationsTitle: "Рекомендации автора",
+    recommendations: [],
+    rating: { enabled: false, aggregate: { totalStars: 0, ratingCount: 0 } },
+    appreciation: null,
+  }),
+  null,
+);
 
 assert.equal(
   readMaxProductDetail({

@@ -42,6 +42,79 @@ export function nextMaxPlaylistQueueIndex(
   return null;
 }
 
+export type MaxPlaylistQueueDirection = "next" | "previous";
+
+/** One step in the requested direction, skipping unavailable and skipped rows. */
+export function stepMaxPlaylistQueue(
+  items: readonly MaxPlaylistQueueItem[],
+  fromIndex: number,
+  direction: MaxPlaylistQueueDirection,
+  skipped: ReadonlySet<number> = new Set(),
+): number | null {
+  if (direction === "previous") {
+    return previousMaxPlaylistQueueIndex(items, fromIndex, skipped);
+  }
+  return nextMaxPlaylistQueueIndex(items, fromIndex, skipped);
+}
+
+/**
+ * A runtime failure keeps walking in the same direction.
+ * Previous must not turn around toward a later row.
+ */
+export function continueMaxPlaylistQueueAfterFailure(
+  items: readonly MaxPlaylistQueueItem[],
+  failedIndex: number,
+  direction: MaxPlaylistQueueDirection,
+  skipped: Set<number>,
+): number | null {
+  skipped.add(failedIndex);
+  return stepMaxPlaylistQueue(items, failedIndex, direction, skipped);
+}
+
+/** Walk backward over the playlist queue, skipping unavailable and skipped rows. */
+export function previousMaxPlaylistQueueIndex(
+  items: readonly MaxPlaylistQueueItem[],
+  fromIndex: number,
+  skipped: ReadonlySet<number> = new Set(),
+): number | null {
+  for (let index = fromIndex - 1; index >= 0; index -= 1) {
+    if (skipped.has(index)) {
+      continue;
+    }
+
+    if (isMaxPlaylistItemPlayable(items[index])) {
+      return index;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * One playlist row requests its own canonical playback session.
+ * audioItemId is optional and never replaced by a sibling track.
+ */
+export function maxPlaylistPlaybackSessionBody(item: MaxPlaylistQueueItem): {
+  authorSlug: string;
+  productSlug: string;
+  audioItemId?: string;
+} | null {
+  if (!isMaxPlaylistItemPlayable(item)) {
+    return null;
+  }
+  const authorSlug = item.authorSlug;
+  const productSlug = item.productSlug;
+  if (!authorSlug || !productSlug) {
+    return null;
+  }
+  const audioItemId = item.audioItemId?.trim() || null;
+  return {
+    authorSlug,
+    productSlug,
+    ...(audioItemId ? { audioItemId } : {}),
+  };
+}
+
 export function firstMaxPlaylistQueueIndex(
   items: readonly MaxPlaylistQueueItem[],
   skipped: ReadonlySet<number> = new Set(),

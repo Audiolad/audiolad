@@ -9,7 +9,7 @@ import {
 import { GUEST_ORDINARY_CATALOG_VIEWER } from "@/lib/catalog/visibility-query";
 import { isCoursePublication } from "@/lib/course-content/validators";
 import { mapCuratedMaxRecommendations } from "@/lib/max/product-recommendations";
-import type { MaxProductDetailView } from "@/lib/max/product-view";
+import { toMaxProductContentTracks, type MaxProductDetailView } from "@/lib/max/product-view";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
 import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
@@ -191,11 +191,7 @@ export async function getMaxPublishedProduct(
           alt: slide.alt,
         })),
         topics,
-        contents: tracks.map((track) => ({
-          title: track.title,
-          position: track.position,
-          durationSeconds: track.durationSeconds,
-        })),
+        contents: toMaxProductContentTracks(tracks),
         recommendationsTitle: seoContent.authorRecommendationsTitle,
         recommendations,
         rating: {
