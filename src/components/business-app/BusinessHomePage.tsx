@@ -267,10 +267,22 @@ export default function BusinessHomePage({
             Первая точка
           </h2>
           <p className="mt-2 text-[var(--biz-text-muted)]">
-            Создадим Organization → Location → зону «по умолчанию» через production RPC
+            Пройдите Zero-to-Music: тип → атмосфера → preview → подтверждение. Создадим
+            Organization → Location → зону «по умолчанию» через production RPC
             <code className="mx-1 text-sm">create_business_organization_with_location</code>.
           </p>
-          <BusinessDomainBootstrapForm />
+          <Link
+            href="/onboarding"
+            className="mt-4 inline-flex rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Начать подключение
+          </Link>
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm font-medium text-[var(--biz-text-muted)]">
+              Быстрая форма без мастера
+            </summary>
+            <BusinessDomainBootstrapForm />
+          </details>
         </section>
       </div>
     );

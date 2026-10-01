@@ -73,6 +73,12 @@ assertAction(
 );
 assertAction(
   BUSINESS_HOSTNAME,
+  "/onboarding",
+  "rewrite_business_app",
+  `${BUSINESS_SITE_PATH}/onboarding`,
+);
+assertAction(
+  BUSINESS_HOSTNAME,
   "/preferences",
   "rewrite_business_app",
   `${BUSINESS_SITE_PATH}/settings`,
