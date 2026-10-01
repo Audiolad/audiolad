@@ -28,6 +28,13 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     available: true,
   },
   {
+    id: "player",
+    title: "Player",
+    href: "/player",
+    icon: "music",
+    available: true,
+  },
+  {
     id: "locations",
     title: "Точки",
     href: "/locations",
