@@ -14,7 +14,8 @@
 - **A4** Rights Passport v1 / Rights Grants Core — merged: `music_rightsholders`, `music_rights_grants`, `music_rights_grant_countries`; Rights Grant = legal source of truth; Passport Basic projection; A5 adds grant `ceased_at` for historical usability.
 - **A5** Country Rights Profile + Location Rights Context + Rights Eligibility — реализовано (Draft): `music_country_rights_profiles` / rules; `business_location_rights_contexts` / use statuses; `resolve_business_track_eligibility` → ELIGIBLE|INELIGIBLE|CONDITIONAL|UNKNOWN (`rights_eligibility_v1`). UNKNOWN never defaults to ELIGIBLE. No production country legal seeds. No licensed boolean. No Aural/Analyzer/economics/UI.
 - Business App UI по-прежнему на mock-data; к domain/Player/playback/rights/eligibility не подключён.
-- Ещё не реализованы: Aural Candidate Pool wiring, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / financial usage / billing, Player playback engine, Analyzer / Sonic DNA / Music Passport UI, Rights Ops / Music License Passport UI.
+- **Music Passport Basic** (P1-01, в репозитории, не production-apply): таблицы `music_passport_versions` / `music_passport_attributes`; RPC `get_music_passport_basic` и `upsert_music_passport_basic` (service_role). `NO_PASSPORT` не подставляет BPM/energy/mood/genre. Это не Rights Passport и не `music_lab_*`. UI паспорта нет. Sonic DNA / Engine нет.
+- Ещё не реализованы: Aural Candidate Pool wiring, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / financial usage / billing, Player playback engine, Sonic DNA / Engine V1, Music Passport UI, Rights Ops / Music License Passport UI.
 - `MERGE=NO`, `DEPLOY=NO`, `PRODUCTION_DB_APPLY=NO` в рамках A5 Draft (production DB apply не выполнялся).
 
 ## Music Analyzer Lab

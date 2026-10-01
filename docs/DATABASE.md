@@ -1797,3 +1797,69 @@ RLS on all new tables. PUBLIC/anon/authenticated: no raw access. service_role AL
 ### Explicit non-goals (A5)
 
 No production legal country seeds. No licensed/is_licensed boolean SoT. No Studio auto-map. No Aural Candidate Pool / playlist / Business UI. No Music License Passport / QR. No Analyzer. No economics / playback_usage_facts mutation. No country-if branches.
+
+## Music Passport Basic (P1-01, product path)
+
+Migration: `20261214120000_music_passport_basic.sql` (expand-only). Not applied by this change.
+
+This is the sonic passport for a future Engine. It is a different object from:
+
+- **Rights Passport** — `get_music_rights_passport_basic` projects verified rights grants (`REVIEW_REQUIRED` | `HAS_VERIFIED_GRANTS`).
+- **Music Analyzer Lab** — `music_lab_*` and `/music-analyzer`. R&D console. Not written by this migration.
+
+Track Identity is unchanged: `audio_items.id` stays the relational root and `music_track_code` stays `AL-T-*`. The passport stores `audio_item_id` without a cascading FK. A write requires `product_kind = 'music'` and an existing code. This migration does not allocate codes and does not backfill the catalog.
+
+### Versions
+
+`music_passport_versions`: one sealed `active` snapshot per track. A new write supersedes the previous snapshot (`ceased_at` = the new `activated_at`). Rows are not edited in place and are not deleted.
+
+| Column | Notes |
+|--------|-------|
+| `version` | monotonic snapshot number per `audio_item_id` |
+| `analysis_version` | pipeline label, e.g. `stage1.v1`. Not the row version |
+| `observed_at` | caller time of the measurement/interpretation; not in the future; `<= activated_at` |
+| `activated_at` / `ceased_at` | server `clock_timestamp()` effective window. Readable while `activated_at <= as_of` and (`ceased_at` is null or `as_of < ceased_at`) |
+| `sealed_at` | set when the attribute set is closed. Unsealed rows are invisible to the read RPC |
+
+### Attributes (measured ≠ interpreted)
+
+`music_passport_attributes.origin`:
+
+- `measured` — signal or classifier fact. `confidence` is required (0..1).
+- `interpreted` — a reading of the music. `confidence` may be null.
+
+`provenance` is independent: `analyzer` or `manual`. A corrected BPM is `origin=measured`, `provenance=manual`.
+
+Stage-1 keys (storage proposal mapped from the ROADMAP stage-4 slots; not a Track Identity canon change):
+
+| ROADMAP slot | `attribute_key` | value | cardinality |
+|--------------|-----------------|-------|-------------|
+| BPM | `bpm` | numeric 20..300 | one per origin |
+| key | `musical_key` | pitch class `C`…`B` | one per origin |
+| mode | `mode` | `major` \| `minor` | one per origin |
+| energy | `energy` | numeric 0..1 | one per origin |
+| loudness | `loudness_lufs` | numeric −80..5 | one per origin |
+| vocal/instrumental | `vocal_role` | `instrumental` \| `vocal` \| `mixed` \| `spoken` | one per origin |
+| genre | `genre_class` | lowercase slug | many per origin |
+| mood | `mood` | lowercase slug | many per origin |
+| instruments | `instrument` | lowercase slug | many per origin |
+
+Absent keys are omitted. They are not stored as zero.
+
+### RPCs (service_role)
+
+- `get_music_passport_basic(audio_item_id, as_of default now())` → jsonb `object=music_passport_basic`.
+  - No sealed snapshot at `as_of` → `status=NO_PASSPORT`, `passport=null`.
+  - Snapshot → `status=HAS_PASSPORT` with `measured` and `interpreted` objects.
+  - Missing audio → `audio_item_not_found`. Non-music → `audio_item_not_music`. Music without `AL-T-*` → `music_track_code_required`.
+- `upsert_music_passport_basic(audio_item_id, analysis_version, observed_at, attributes jsonb)` appends one sealed snapshot. The caller sends the full attribute set. Previous attributes are not copied.
+
+`NO_PASSPORT` is fail-closed for a future Engine: do not rank as if BPM, energy, mood, or genre were known. `HAS_PASSPORT` is not a rights status and does not mean a track may be played.
+
+RLS is enabled. `anon` / `authenticated` have no table or RPC access.
+
+Typed read helper: `src/lib/music-passport/contract.ts` (`parseMusicPassportBasic`, `musicPassportUsableForEngine`, `measuredNumeric`). No product UI in this slice — a screen would look like Analyzer readiness.
+
+### Explicit non-goals
+
+No Sonic DNA, dayparts, or Engine. No fingerprints. No rights grants, country seeds, or playback-decision copy. No `music_lab_*` writes. No mass catalog analysis.
