@@ -27,8 +27,8 @@ import {
   type BusinessNavIconKey,
   type BusinessNavItem,
 } from "@/lib/business-app/nav";
+import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
-import { BUSINESS_HOME_MOCK } from "@/lib/business-app/mock-data";
 
 type IconComp = ComponentType<{ active?: boolean; className?: string }>;
 
@@ -119,8 +119,16 @@ export default function BusinessSidebar() {
     }
   }, [collapsed]);
 
-  const owner = BUSINESS_HOME_MOCK.owner;
-  const location = BUSINESS_HOME_MOCK.location;
+  const domain = useBusinessDomain();
+  const ownerFirstName =
+    domain.status === "authenticated" ? domain.owner.firstName : "Гость";
+  const locationName =
+    domain.status === "authenticated" && domain.location
+      ? domain.location.name
+      : domain.status === "authenticated"
+        ? "Точка ещё не создана"
+        : "Войдите в аккаунт";
+  const ownerInitial = ownerFirstName.slice(0, 1).toUpperCase() || "А";
 
   return (
     <aside
@@ -185,22 +193,22 @@ export default function BusinessSidebar() {
         {collapsed ? (
           <span
             className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-white"
-            title={`${owner.firstName} · ${location.name}`}
-            aria-label={`${owner.firstName}, ${location.name}`}
+            title={`${ownerFirstName} · ${locationName}`}
+            aria-label={`${ownerFirstName}, ${locationName}`}
           >
-            {owner.firstName.slice(0, 1)}
+            {ownerInitial}
           </span>
         ) : (
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-white">
-              {owner.firstName.slice(0, 1)}
+              {ownerInitial}
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[var(--biz-text)]">
-                {owner.firstName}
+                {ownerFirstName}
               </p>
               <p className="truncate text-xs text-[var(--biz-text-muted)]">
-                {location.name}
+                {locationName}
               </p>
             </div>
           </div>

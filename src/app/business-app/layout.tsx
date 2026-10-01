@@ -4,7 +4,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import BusinessAppShell from "@/components/business-app/BusinessAppShell";
+import { BusinessDomainProvider } from "@/components/business-app/BusinessDomainProvider";
 import "@/components/business-app/business-app.css";
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import {
   getHostnameFromHeaders,
   isBusinessHostname,
@@ -25,9 +27,13 @@ export default async function BusinessAppLayout({
     notFound();
   }
 
+  const domain = await loadBusinessOwnerHomeContext();
+
   return (
     <div className="business-app-root">
-      <BusinessAppShell>{children}</BusinessAppShell>
+      <BusinessDomainProvider value={domain}>
+        <BusinessAppShell>{children}</BusinessAppShell>
+      </BusinessDomainProvider>
     </div>
   );
 }
