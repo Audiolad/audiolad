@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { provisionVenuePlayer } from "@/app/business-app/actions";
+import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -338,6 +339,10 @@ export default function VenuePlayerPage() {
           <code>apply_business_playback_usage_heartbeat</code> (evidence;
           allowlist audio_item, не eligible-каталог).
         </p>
+        <p className="mt-1 text-xs opacity-50">
+          Eligibility gate (P0-05): в пул эфира только{" "}
+          <code>ELIGIBLE</code>; UNKNOWN ≠ ELIGIBLE.
+        </p>
       </header>
 
       <div className="rounded-2xl border border-white/10 bg-black/20 p-6 space-y-4">
@@ -429,6 +434,8 @@ export default function VenuePlayerPage() {
           </p>
         ) : null}
       </div>
+
+      <BusinessEligibilityProbePanel compact />
     </section>
   );
 }
