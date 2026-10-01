@@ -84,6 +84,7 @@ assert.match(page, /apply_business_playback_usage_heartbeat/);
 assert.match(page, /buildBusinessPopHeartbeatArgs/);
 assert.match(page, /getVenuePlayerPilotTrack/);
 assert.match(page, /VENUE_PLAYER_APP_VERSION/);
+assert.match(page, /BusinessEligibilityProbePanel/);
 assert.equal(VENUE_PLAYER_APP_VERSION, "venue-player-v0");
 
 assert.ok(VENUE_PLAYER_POP_SAMPLE_INTERVAL_MS >= 1000);

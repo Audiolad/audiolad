@@ -46,7 +46,7 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     title: "Музыка",
     href: "/music",
     icon: "music",
-    available: false,
+    available: true,
   },
   {
     id: "stats",

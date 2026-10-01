@@ -2,8 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 
+import {
+  BUSINESS_AIRPLAY_CANDIDATE_PROBES,
+  filterEligibleAirplayRows,
+  parseBusinessEligibilityPayload,
+  type BusinessEligibilityProbeRow,
+} from "@/lib/business-app/eligibility";
 import { BUSINESS_SITE_PATH } from "@/lib/business-app/host";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type BootstrapBusinessDomainResult =
   | { ok: true; organizationId: string; locationId: string; zoneId: string }
@@ -162,5 +169,152 @@ export async function provisionVenuePlayer(input: {
     credential: createdPayload.credential,
     zoneId: assignedPayload.zone_id ?? input.zoneId,
     assignmentId: assignedPayload.assignment_id,
+  };
+}
+
+export type ResolveBusinessAirplayEligibilityResult =
+  | {
+      ok: true;
+      locationId: string;
+      zoneId: string | null;
+      rows: BusinessEligibilityProbeRow[];
+      eligibleCount: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Owner read-only eligibility probe (P0-05).
+ * Auth + membership gate via user client; A5 RPC via service_role
+ * (RPC is not granted to authenticated — by A5 design).
+ * Does not invent grants; UNKNOWN-safe.
+ */
+export async function resolveBusinessAirplayEligibilityProbe(input: {
+  locationId: string;
+  zoneId?: string | null;
+  audioItemIds?: string[];
+}): Promise<ResolveBusinessAirplayEligibilityResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "not_authenticated" };
+  }
+
+  const locationId = input.locationId.trim();
+  if (!locationId) {
+    return { ok: false, error: "location_id_required" };
+  }
+
+  const { data: location, error: locationError } = await supabase
+    .from("business_locations")
+    .select("id, organization_id")
+    .eq("id", locationId)
+    .maybeSingle();
+
+  if (locationError) {
+    return { ok: false, error: locationError.message || "location_read_failed" };
+  }
+  if (!location?.organization_id) {
+    return { ok: false, error: "location_not_found" };
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("business_organization_members")
+    .select("organization_id")
+    .eq("user_id", user.id)
+    .eq("organization_id", location.organization_id)
+    .maybeSingle();
+
+  if (membershipError) {
+    return {
+      ok: false,
+      error: membershipError.message || "membership_read_failed",
+    };
+  }
+  if (!membership) {
+    return { ok: false, error: "not_org_member" };
+  }
+
+  const zoneId =
+    typeof input.zoneId === "string" && input.zoneId.trim()
+      ? input.zoneId.trim()
+      : null;
+
+  const candidates =
+    Array.isArray(input.audioItemIds) && input.audioItemIds.length > 0
+      ? input.audioItemIds.map((id) => ({
+          audioItemId: id.trim(),
+          label: id.trim(),
+        }))
+      : [...BUSINESS_AIRPLAY_CANDIDATE_PROBES];
+
+  let service;
+  try {
+    service = createServiceRoleClient();
+  } catch {
+    return { ok: false, error: "supabase_service_role_not_configured" };
+  }
+
+  const rows: BusinessEligibilityProbeRow[] = [];
+  for (const candidate of candidates) {
+    if (!candidate.audioItemId) continue;
+    const { data, error: rpcError } = await service.rpc(
+      "resolve_business_track_eligibility",
+      {
+        p_audio_item_id: candidate.audioItemId,
+        p_location_id: locationId,
+        p_zone_id: zoneId,
+        p_use_type: "business_background_playback",
+      },
+    );
+
+    if (rpcError) {
+      rows.push({
+        audioItemId: candidate.audioItemId,
+        label: candidate.label,
+        decision: "UNKNOWN",
+        trackCode: null,
+        reasonCodes: ["RPC_ERROR"],
+        engineVersion: null,
+        locationId,
+        zoneId,
+        error: rpcError.message || "eligibility_rpc_failed",
+      });
+      continue;
+    }
+
+    const parsed = parseBusinessEligibilityPayload(data, candidate.audioItemId);
+    if (!parsed) {
+      rows.push({
+        audioItemId: candidate.audioItemId,
+        label: candidate.label,
+        decision: "UNKNOWN",
+        trackCode: null,
+        reasonCodes: ["INVALID_RPC_PAYLOAD"],
+        engineVersion: null,
+        locationId,
+        zoneId,
+        error: "eligibility_invalid_response",
+      });
+      continue;
+    }
+
+    rows.push({
+      ...parsed,
+      label: candidate.label,
+      locationId: parsed.locationId || locationId,
+      zoneId: parsed.zoneId ?? zoneId,
+      error: null,
+    });
+  }
+
+  return {
+    ok: true,
+    locationId,
+    zoneId,
+    rows,
+    eligibleCount: filterEligibleAirplayRows(rows).length,
   };
 }
