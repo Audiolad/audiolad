@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { adminSeoReservationReleaseDiagnosticCode } from "@/lib/seo-queries/admin-release-error";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 
@@ -79,6 +80,14 @@ export async function DELETE(request: Request) {
     "admin_release_seo_query_reservation",
     { p_reservation_id: reservationId },
   );
-  if (error) return NextResponse.json({ error: "seo_reservation_release_failed" }, { status: 400 });
+  if (error) {
+    return NextResponse.json(
+      {
+        error: "seo_reservation_release_failed",
+        code: adminSeoReservationReleaseDiagnosticCode(error),
+      },
+      { status: 400 },
+    );
+  }
   return NextResponse.json({ reservation: data });
 }
