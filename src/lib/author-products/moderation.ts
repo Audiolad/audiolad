@@ -54,6 +54,26 @@ export const PRODUCT_PUBLISHED_IMMUTABLE_MESSAGE =
 export const PRODUCT_APPROVED_UNPUBLISHED_IMMUTABLE_MESSAGE =
   "Чтобы изменить одобренную версию, сначала выберите «Перейти к редактированию». После этого потребуется повторная модерация.";
 
+export const PRODUCT_MODERATION_MISSING_COVER_CODE = "missing_cover" as const;
+export const PRODUCT_MODERATION_MISSING_COVER_MESSAGE =
+  "Загрузите обложку.";
+
+export function hasProductCoverForModeration(input: {
+  coverUrl?: string | null;
+  coverImage?: unknown;
+}): boolean {
+  if (input.coverUrl?.trim()) {
+    return true;
+  }
+
+  return Boolean(
+    input.coverImage &&
+      typeof input.coverImage === "object" &&
+      !Array.isArray(input.coverImage) &&
+      Object.keys(input.coverImage as Record<string, unknown>).length > 0,
+  );
+}
+
 export type PublishModerationGateResult =
   | { ok: true; canBypass: boolean }
   | {
