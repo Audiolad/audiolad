@@ -386,6 +386,15 @@ assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /act
 assert.match(read("src/lib/author-products/server/direct-audio-upload.ts"), /assertSaleLockAllowsMutation/);
 
 
+assert.equal(
+  getAudioUploadErrorMessage("upload_failed", 502),
+  "Не удалось загрузить аудиофайл. Попробуйте ещё раз.",
+);
+assert.equal(
+  getAudioUploadErrorMessage(undefined, 500),
+  "Не удалось загрузить аудиофайл.",
+);
+
 console.log("author-product-direct-audio-upload-unit: ok");
 
 // LIVE_ROUTING_RACE_HARDENING
