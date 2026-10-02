@@ -1,6 +1,6 @@
 -- Additive replacement of assert_practice_moderation_ready.
--- Restores a mandatory product cover before moderation/publish while keeping
--- the v6 course access-level checks unchanged.
+-- Starts from the current music-playable/course-access readiness contract and
+-- adds exactly one new mandatory field: the product cover.
 -- Do not edit already-applied migrations.
 
 CREATE OR REPLACE FUNCTION public.assert_practice_moderation_ready(p_practice_id uuid)
@@ -206,11 +206,28 @@ BEGIN
     END IF;
     IF EXISTS (
       SELECT 1
-      FROM public.audio_items
-      WHERE practice_id = p_practice_id
-        AND (
-          NULLIF(btrim(COALESCE(audio_path, '')), '') IS NULL
-          OR COALESCE(duration_seconds, 0) <= 0
+      FROM public.audio_items AS ai
+      WHERE ai.practice_id = p_practice_id
+        AND NOT (
+          (
+            NULLIF(btrim(COALESCE(ai.audio_path, '')), '') IS NOT NULL
+            AND COALESCE(ai.duration_seconds, 0) > 0
+          )
+          OR (
+            v_practice.product_kind = 'music'
+            AND public.music_item_has_validated_active_delivery(ai.id)
+            AND EXISTS (
+              SELECT 1
+              FROM public.music_audio_assets AS asset
+              WHERE asset.id = ai.active_music_delivery_asset_id
+                AND asset.audio_item_id = ai.id
+                AND asset.asset_role = 'stream'
+                AND asset.lifecycle_state = 'verified'
+                AND asset.storage_bucket = 'music-streams'
+                AND NULLIF(btrim(COALESCE(asset.storage_path, '')), '') IS NOT NULL
+                AND COALESCE(ai.duration_seconds, asset.duration_seconds, 0) > 0
+            )
+          )
         )
     ) THEN
       RAISE EXCEPTION 'product_not_ready'
@@ -221,4 +238,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.assert_practice_moderation_ready(uuid) IS
-  'audiolad:internal-moderation-readiness:v7; SECURITY DEFINER helper for trusted lifecycle RPCs only; title plus product cover plus ready audio/course content required; other optional content does not gate moderation; course access-level catalog is optional and checked only when rows exist';
+  'audiolad:internal-moderation-readiness:v8; title + product cover + current audio/course readiness required';
