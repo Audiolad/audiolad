@@ -48,6 +48,7 @@ function buildPageHref(input: {
   page: number;
   query: string;
   roleFilter: string;
+  authorFilter: string;
 }): string {
   const params = new URLSearchParams();
 
@@ -57,6 +58,10 @@ function buildPageHref(input: {
 
   if (input.roleFilter && input.roleFilter !== "all") {
     params.set("role", input.roleFilter);
+  }
+
+  if (input.authorFilter && input.authorFilter !== "all") {
+    params.set("author", input.authorFilter);
   }
 
   if (input.page > 1) {
@@ -182,7 +187,7 @@ function UserRowMenu({
 }
 
 export default function AdminUsersTable({ data }: AdminUsersTableProps) {
-  const selectionScopeKey = `${data.page}|${data.query}|${data.roleFilter}|${data.actorUserId}`;
+  const selectionScopeKey = `${data.page}|${data.query}|${data.roleFilter}|${data.authorFilter}|${data.actorUserId}`;
 
   return <AdminUsersTableBody key={selectionScopeKey} data={data} />;
 }
@@ -287,6 +292,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
             page: newTotalPages,
             query: data.query,
             roleFilter: data.roleFilter,
+            authorFilter: data.authorFilter,
           }),
         );
         return;
@@ -296,7 +302,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
         router.refresh();
       });
     },
-    [data.page, data.pageSize, data.query, data.roleFilter, data.total, router],
+    [data.authorFilter, data.page, data.pageSize, data.query, data.roleFilter, data.total, router],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -377,7 +383,16 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
         action="/admin/users"
         className="rounded-[22px] border border-[#eadff8] bg-white p-5"
       >
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+        <div className="mb-4 flex justify-end">
+          <a
+            href="/api/admin/users/export-authors"
+            className="inline-flex min-h-10 items-center rounded-full border border-[#bda6e1] px-4 text-sm font-medium text-[#7042c5] hover:bg-[#faf6ff]"
+          >
+            Скачать авторов CSV
+          </a>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
           <label className="block">
             <span className="text-sm font-medium text-[#25135c]">Поиск</span>
             <input
@@ -401,6 +416,17 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                   {option.label}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-[#25135c]">Авторство</span>
+            <select
+              name="author"
+              defaultValue={data.authorFilter}
+              className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm"
+            >
+              <option value="all">Все пользователи</option>
+              <option value="authors">Только авторы</option>
             </select>
           </label>
 
@@ -638,6 +664,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                 page: data.page - 1,
                 query: data.query,
                 roleFilter: data.roleFilter,
+                authorFilter: data.authorFilter,
               })}
               className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
             >
@@ -657,6 +684,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                 page: data.page + 1,
                 query: data.query,
                 roleFilter: data.roleFilter,
+                authorFilter: data.authorFilter,
               })}
               className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
             >

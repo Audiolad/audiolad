@@ -71,10 +71,12 @@ export type AdminUsersPageData = {
   pageSize: number;
   query: string;
   roleFilter: string;
+  authorFilter: string;
   actorUserId: string;
 };
 
 const USERS_PAGE_SIZE = 20;
+const ADMIN_USERS_ID_CHUNK = 40;
 
 function getOverviewStat(
   raw: Record<string, unknown>,
@@ -414,10 +416,41 @@ async function findUserIdsByProductQuery(
   ];
 }
 
+async function listAdminAuthorUserIds(
+  service: ReturnType<typeof createServiceRoleClient>,
+): Promise<string[]> {
+  const pageSize = 1000;
+  const userIds = new Set<string>();
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await service
+      .from("author_members")
+      .select("user_id")
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw new Error("admin_author_user_ids_load_failed");
+    }
+
+    for (const row of data ?? []) {
+      if (row.user_id) {
+        userIds.add(row.user_id);
+      }
+    }
+
+    if (!data || data.length < pageSize) {
+      break;
+    }
+  }
+
+  return [...userIds];
+}
+
 export async function listAdminUsers(input: {
   page?: number;
   query?: string;
   roleFilter?: string;
+  authorFilter?: string;
   actorUserId: string;
 }): Promise<AdminUsersPageData> {
   const service = createServiceRoleClient();
@@ -427,30 +460,110 @@ export async function listAdminUsers(input: {
   const to = from + pageSize - 1;
   const search = input.query?.trim() ?? "";
   const roleFilter = input.roleFilter?.trim() ?? "all";
+  const authorFilter = input.authorFilter?.trim() ?? "all";
+  const authorFilterUserIds =
+    authorFilter === "authors" ? await listAdminAuthorUserIds(service) : null;
 
-  let query = service
-    .from("profiles")
-    .select("id, email, full_name, role, created_at", { count: "exact" })
-    .order("created_at", { ascending: false });
-
-  if (roleFilter !== "all") {
-    query = query.eq("role", roleFilter);
+  if (authorFilterUserIds && authorFilterUserIds.length === 0) {
+    return {
+      users: [],
+      total: 0,
+      page,
+      pageSize,
+      query: search,
+      roleFilter,
+      authorFilter,
+      actorUserId: input.actorUserId,
+    };
   }
 
-  if (search) {
-    const extraUserIds = await findUserIdsByProductQuery(service, search);
-    query = query.or(
-      buildAdminUsersProfileSearchOr({
-        search,
-        extraUserIds,
-      }),
+  type AdminProfileListRow = {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    role: string;
+    created_at: string;
+  };
+
+  let profiles: AdminProfileListRow[] = [];
+  let count = 0;
+
+  if (authorFilterUserIds) {
+    const extraUserIds = search
+      ? await findUserIdsByProductQuery(service, search)
+      : [];
+    const searchOr = search
+      ? buildAdminUsersProfileSearchOr({ search, extraUserIds })
+      : null;
+    const matchedProfiles: AdminProfileListRow[] = [];
+
+    for (
+      let index = 0;
+      index < authorFilterUserIds.length;
+      index += ADMIN_USERS_ID_CHUNK
+    ) {
+      const idChunk = authorFilterUserIds.slice(
+        index,
+        index + ADMIN_USERS_ID_CHUNK,
+      );
+
+      let authorProfilesQuery = service
+        .from("profiles")
+        .select("id, email, full_name, role, created_at")
+        .in("id", idChunk);
+
+      if (roleFilter !== "all") {
+        authorProfilesQuery = authorProfilesQuery.eq("role", roleFilter);
+      }
+
+      if (searchOr) {
+        authorProfilesQuery = authorProfilesQuery.or(searchOr);
+      }
+
+      const { data, error } = await authorProfilesQuery;
+
+      if (error) {
+        throw new Error("admin_users_list_failed");
+      }
+
+      matchedProfiles.push(...((data ?? []) as AdminProfileListRow[]));
+    }
+
+    matchedProfiles.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
-  }
 
-  const { data: profiles, error, count } = await query.range(from, to);
+    count = matchedProfiles.length;
+    profiles = matchedProfiles.slice(from, to + 1);
+  } else {
+    let query = service
+      .from("profiles")
+      .select("id, email, full_name, role, created_at", { count: "exact" })
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    throw new Error("admin_users_list_failed");
+    if (roleFilter !== "all") {
+      query = query.eq("role", roleFilter);
+    }
+
+    if (search) {
+      const extraUserIds = await findUserIdsByProductQuery(service, search);
+      query = query.or(
+        buildAdminUsersProfileSearchOr({
+          search,
+          extraUserIds,
+        }),
+      );
+    }
+
+    const result = await query.range(from, to);
+
+    if (result.error) {
+      throw new Error("admin_users_list_failed");
+    }
+
+    profiles = (result.data ?? []) as AdminProfileListRow[];
+    count = result.count ?? 0;
   }
 
   const userIds = (profiles ?? []).map((row) => row.id);
@@ -505,11 +618,12 @@ export async function listAdminUsers(input: {
 
   return {
     users,
-    total: count ?? 0,
+    total: count,
     page,
     pageSize,
     query: search,
     roleFilter,
+    authorFilter,
     actorUserId: input.actorUserId,
   };
 }
