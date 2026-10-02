@@ -307,6 +307,7 @@ function bpmKind(segments: string[]): "published" | "candidate" | "raw" | "confi
   if (/confidence/i.test(name) && segmentHas(segments, /bpm|tempo/i)) return "confidence";
   if (/(^|_)gate($|_)|gate_passed|gate_status/i.test(name) && segmentHas(segments, /bpm|tempo/i)) return "gate";
   // Prefer explicit BPM raw fields (incl. bpm_candidate_raw) before generic "candidate".
+  // Keep nested shapes like bpm.raw / tempo.raw_bpm.
   // Do not treat tempo_octave_score_raw / other score_*_raw as BPM raw.
   if (
     /^bpm_candidate_raw$/i.test(name)
@@ -314,6 +315,7 @@ function bpmKind(segments: string[]): "published" | "candidate" | "raw" | "confi
     || /^raw_bpm$/i.test(name)
     || /^measured_bpm$/i.test(name)
     || (/bpm/i.test(name) && /(^|_)raw($|_)/i.test(name) && !/score/i.test(name))
+    || (/^raw$/i.test(name) && /^(bpm|tempo)$/i.test(above))
   ) return "raw";
   if (/candidate/i.test(name) && segmentHas(segments, /bpm|tempo/i)) return "candidate";
   if (/measurement|measured_bpm/i.test(name) && segmentHas(segments, /bpm|tempo/i)) return "raw";
