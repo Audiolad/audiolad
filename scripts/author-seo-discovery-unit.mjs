@@ -69,6 +69,10 @@ assert.doesNotMatch(proposalsRoute, /selectProductCreateWordstatAdditions/);
 assert.match(discoveryRoute, /suggestion\.count/);
 assert.doesNotMatch(discoveryRoute, /topicTotalCount/);
 assert.doesNotMatch(discoveryRoute, /YANDEX_SEARCH_API_KEY|NEXT_PUBLIC_YANDEX/);
+assert.match(discoveryRoute, /wordstatWarning/);
+assert.match(discoveryRoute, /databaseMatches,\s*results: \[\],\s*wordstatWarning/);
+assert.match(discoveryRoute, /Дополнительные варианты из Яндекса временно недоступны/);
+assert.match(panel, /payload\.wordstatWarning/);
 
 // A — proposals API no longer takes client count as source of truth
 assert.match(proposalsRoute, /seed_phrase/);
