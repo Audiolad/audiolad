@@ -95,6 +95,8 @@ export async function terminateMusicTranscodeChild(
 type MusicTranscodeProgressState = {
   rest: string;
   outTimeUs: number | null;
+  outTimeMs: number | null;
+  outTimeNs: number | null;
   outTime: string | null;
 };
 
@@ -129,13 +131,20 @@ function consumeMusicTranscodeProgress(
     const key = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
     if (key === "out_time_us") state.outTimeUs = parseNonNegative(value);
+    else if (key === "out_time_ms") state.outTimeMs = parseNonNegative(value);
+    else if (key === "out_time_ns") state.outTimeNs = parseNonNegative(value);
     else if (key === "out_time") state.outTime = value || null;
     else if (key === "progress") {
       samples.push({
-        positionUs: state.outTimeUs ?? parseOutTimeUs(state.outTime),
+        positionUs: state.outTimeUs
+          ?? (state.outTimeNs == null ? null : Math.round(state.outTimeNs / 1000))
+          ?? parseOutTimeUs(state.outTime)
+          ?? state.outTimeMs,
         outTime: state.outTime,
       });
       state.outTimeUs = null;
+      state.outTimeMs = null;
+      state.outTimeNs = null;
       state.outTime = null;
     }
   }
@@ -179,6 +188,8 @@ export function runMusicTranscodeChild(
     const progressState: MusicTranscodeProgressState = {
       rest: "",
       outTimeUs: null,
+      outTimeMs: null,
+      outTimeNs: null,
       outTime: null,
     };
 
