@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.from("seo_queries").insert({
     query_text: queryText,
     source: text(body.source) ?? "manual",
+    analysis_status: "analyzed",
     frequency: typeof body.frequency === "number" ? body.frequency : null,
     cluster_id: text(body.cluster_id),
     intent: text(body.intent),

@@ -25,7 +25,7 @@ export type WordstatIntakeRepository = {
     source: "wordstat";
     frequency: number;
     frequencyCheckedAt: string;
-    analysisStatus: "not_analyzed";
+    analysisStatus: "analyzed";
   }): Promise<
     | { status: "created"; query: StoredQuery }
     | { status: "conflict" }
@@ -105,7 +105,7 @@ export async function importWordstatIntakeItem(
     source: "wordstat",
     frequency: item.count,
     frequencyCheckedAt,
-    analysisStatus: "not_analyzed",
+    analysisStatus: "analyzed",
   });
   if (created.status === "created") {
     return {

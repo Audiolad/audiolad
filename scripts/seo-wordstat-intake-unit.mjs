@@ -13,6 +13,10 @@ const route = readFileSync(
   join(root, "src/app/api/admin/seo-queries/wordstat/route.ts"),
   "utf8",
 );
+const adminRoute = readFileSync(
+  join(root, "src/app/api/admin/seo-queries/route.ts"),
+  "utf8",
+);
 const ui = readFileSync(
   join(root, "src/components/admin/AdminSeoQueriesClient.tsx"),
   "utf8",
@@ -39,6 +43,10 @@ assert.doesNotMatch(
   /\.update\(\{[^}]*?(?:query_text|source|cluster_id|intent|recommended_format|audio_fit|analysis_status)/s,
 );
 assert.doesNotMatch(route, /reservation_id|product_id|primary_seo_query_id/);
+
+// Admin decisions are authoritative: manual and selected Wordstat queries are immediately author-visible.
+assert.match(adminRoute, /analysis_status: "analyzed"/);
+assert.match(ui, /audioFit: null, analysisStatus: "analyzed", lifecycle: "Свободен"/);
 
 assert.match(ui, /Найти запросы в Wordstat/);
 assert.match(ui, /Выбрать все/);
@@ -108,7 +116,7 @@ assert.equal(newRepository.records.length, 1);
 assert.deepEqual(newRepository.records[0], {
   id: "q-1", query_text: "  Медитация для сна  ", normalized_query: "медитация для сна",
   source: "wordstat", frequency: 880, frequency_checked_at: checkedAt, cluster_id: null,
-  intent: null, recommended_format: null, audio_fit: null, analysis_status: "not_analyzed",
+  intent: null, recommended_format: null, audio_fit: null, analysis_status: "analyzed",
   reservation_id: null, product_id: null,
 });
 
