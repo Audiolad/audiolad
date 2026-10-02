@@ -128,10 +128,27 @@ export async function POST(request: Request) {
       numPhrases: wordstatNumPhrasesForDiscoverySurface(surface),
     });
     if (!wordstat.ok) {
-      return NextResponse.json(
-        { error: wordstat.error.message, code: wordstat.error.code },
-        { status: wordstatHttpStatus(wordstat.error.code) },
-      );
+      const wordstatWarning =
+        wordstat.error.code === "NO_RESULTS"
+          ? "Проверенные запросы из базы АудиоЛада показаны ниже. Дополнительных вариантов из Яндекса по этой теме не найдено."
+          : wordstat.error.code === "INVALID_QUERY" || wordstat.error.code === "INVALID_PHRASE"
+            ? `${wordstat.error.message} Проверенные запросы из базы АудиоЛада показаны ниже.`
+            : "Показываем проверенные запросы из базы АудиоЛада. Дополнительные варианты из Яндекса временно недоступны.";
+
+      console.info("[wordstat] author_discovery_degraded", {
+        code: wordstat.error.code,
+        authorId,
+        phraseLength: phrase.length,
+      });
+
+      return NextResponse.json({
+        phrase,
+        region: null,
+        periodLabel: null,
+        databaseMatches,
+        results: [],
+        wordstatWarning,
+      });
     }
 
     let context;
