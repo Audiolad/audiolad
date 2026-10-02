@@ -6,8 +6,11 @@
  */
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+createRequire(import.meta.url)("./cjs-stub-server-only.cjs");
 
 import { isProductCreateSeoDiscoveryEnabled } from "../src/lib/seo-queries/discovery-beta.ts";
 import { isSeoReservationProductLinkAllowed } from "../src/lib/seo-queries/reservation-product-link-gate.ts";
@@ -513,6 +516,11 @@ assert.match(list, /lifecycleForSeoOpportunity/);
 assert.match(list, /isEffectiveSeoReservation/);
 assert.match(list, /createServiceRoleClient/);
 assert.match(list, /expire_seo_query_reservation/);
+assert.match(list, /AUDIO_SPRINT_IN_CHUNK = 40/);
+assert.match(list, /chunkIds\(ids, AUDIO_SPRINT_IN_CHUNK\)/);
+assert.doesNotMatch(list, /\.in\("id", queryIds\)/);
+assert.doesNotMatch(list, /\.in\("query_id", queryIds\)/);
+assert.doesNotMatch(list, /\.in\("id", productIds\)/);
 assert.doesNotMatch(list, /\.update\(|\.insert\(/);
 
 assert.doesNotMatch(read("src/lib/seo-queries/discovery-beta.ts"), /osen-zvuchit|audioSprint/);
@@ -539,5 +547,303 @@ assert.match(editPage, /product\.practice\.publication_class/);
 assert.match(editPage, /product\.practice\.product_kind/);
 assert.match(editPage, /audioSprintTitleLock/);
 assert.doesNotMatch(sprintLib, /seoAbout/);
+
+const { listAudioSprintForAuthor } = await import(
+  "../src/lib/seo-queries/list-audio-sprint-queries.ts"
+);
+
+const SPRINT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const SPRINT_SLUG = "osen-zvuchit-2026";
+const CHUNK_AUTHOR = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+function uuidAt(prefix, n) {
+  return `${prefix}-${String(n).padStart(12, "0")}`;
+}
+
+function inLengths(calls, table, column) {
+  return calls
+    .filter((call) => call.table === table && call.column === column)
+    .map((call) => call.ids.length);
+}
+
+/**
+ * Records every PostgREST `.in()` issued by listAudioSprintForAuthor,
+ * including occupancy reads that the loader calls afterward.
+ */
+function createSprintClient(seed, fail) {
+  const inCalls = [];
+
+  function finish(state) {
+    if (
+      fail &&
+      state.table === fail.table &&
+      state.ins.some((item) => item.column === fail.column)
+    ) {
+      fail.seen += 1;
+      if (fail.seen === fail.onCall) {
+        return { data: null, error: fail.error };
+      }
+    }
+    return seed.resolve(state);
+  }
+
+  function builder(table) {
+    const state = { table, ins: [], eqs: [], ranged: false };
+    const api = {
+      select() {
+        return api;
+      },
+      eq(column, value) {
+        state.eqs.push({ column, value });
+        return api;
+      },
+      in(column, values) {
+        const ids = Array.isArray(values) ? [...values] : [];
+        state.ins.push({ column, ids });
+        inCalls.push({ table, column, ids });
+        return api;
+      },
+      is() {
+        return api;
+      },
+      not() {
+        return api;
+      },
+      order() {
+        return api;
+      },
+      range() {
+        state.ranged = true;
+        return api;
+      },
+      maybeSingle() {
+        return Promise.resolve(finish(state));
+      },
+      then(onFulfilled, onRejected) {
+        return Promise.resolve(finish(state)).then(onFulfilled, onRejected);
+      },
+    };
+    return api;
+  }
+
+  return {
+    from(table) {
+      return builder(table);
+    },
+    rpc() {
+      return Promise.resolve({ data: null, error: null });
+    },
+    inCalls,
+  };
+}
+
+function seedSprint(count) {
+  const queryIds = Array.from({ length: count }, (_, index) =>
+    uuidAt("11111111-1111-4111-8111", index + 1),
+  );
+  const productIds = Array.from({ length: count }, (_, index) =>
+    uuidAt("22222222-2222-4222-8222", index + 1),
+  );
+  const texts = queryIds.map((_, index) => `Осень ${String(index + 1).padStart(3, "0")}`);
+  const queryById = new Map(
+    queryIds.map((id, index) => [
+      id,
+      { id, query_text: texts[index], normalized_query: texts[index] },
+    ]),
+  );
+  const reservationByQuery = new Map(
+    queryIds.map((queryId, index) => [
+      queryId,
+      {
+        id: uuidAt("33333333-3333-4333-8333", index + 1),
+        query_id: queryId,
+        author_id: CHUNK_AUTHOR,
+        product_id: productIds[index],
+        expires_at: "2099-01-01T00:00:00.000Z",
+        status: "active",
+      },
+    ]),
+  );
+  const productById = new Map(
+    productIds.map((id, index) => {
+      const n = index + 1;
+      if (n === 1 || n === 90) {
+        return [id, { id, title: `p${n}`, status: "draft", moderation_status: "submitted" }];
+      }
+      if (n === 50) {
+        return [id, { id, title: `p${n}`, status: "published", moderation_status: null }];
+      }
+      return [id, { id, title: `p${n}`, status: "draft", moderation_status: null }];
+    }),
+  );
+  const memberships = queryIds.map((queryId) => ({
+    query_id: queryId,
+    author_group: "music",
+    pool: "initial",
+  }));
+
+  return {
+    queryIds,
+    productIds,
+    texts,
+    resolve(state) {
+      if (state.table === "seo_sprints") {
+        return {
+          data: { id: SPRINT_ID, slug: SPRINT_SLUG, title: "Осень звучит" },
+          error: null,
+        };
+      }
+      if (state.table === "seo_sprint_queries") {
+        return { data: memberships, error: null };
+      }
+      if (state.table === "seo_queries") {
+        const ids = state.ins.find((item) => item.column === "id")?.ids ?? [];
+        return {
+          data: ids.map((id) => queryById.get(id)).filter(Boolean),
+          error: null,
+        };
+      }
+      if (state.table === "seo_query_reservations") {
+        const ids = state.ins.find((item) => item.column === "query_id")?.ids;
+        if (!ids) return { data: [], error: null };
+        return {
+          data: ids.map((id) => reservationByQuery.get(id)).filter(Boolean),
+          error: null,
+        };
+      }
+      if (state.table === "practices") {
+        if (state.ranged) return { data: [], error: null };
+        const byId = state.ins.find((item) => item.column === "id");
+        if (!byId) return { data: [], error: null };
+        return {
+          data: byId.ids.map((id) => productById.get(id)).filter(Boolean),
+          error: null,
+        };
+      }
+      throw new Error(`unexpected table ${state.table}`);
+    },
+  };
+}
+
+function assertNoOversizedIn(calls) {
+  for (const call of calls) {
+    assert.ok(
+      call.ids.length <= 40,
+      `${call.table}.${call.column} received ${call.ids.length} values`,
+    );
+  }
+}
+
+async function listWith(count, fail) {
+  const seed = seedSprint(count);
+  const client = createSprintClient(seed, fail);
+  const listing = await listAudioSprintForAuthor(
+    { slug: SPRINT_SLUG, authorId: CHUNK_AUTHOR },
+    client,
+  );
+  return { listing, calls: client.inCalls, seed };
+}
+
+{
+  const { listing, calls, seed } = await listWith(100);
+  assertNoOversizedIn(calls);
+  assert.deepEqual(inLengths(calls, "seo_queries", "id"), [40, 40, 20]);
+  assert.deepEqual(inLengths(calls, "seo_query_reservations", "query_id"), [40, 40, 20]);
+  assert.deepEqual(inLengths(calls, "practices", "id"), [40, 40, 20]);
+  assert.deepEqual(inLengths(calls, "practices", "primary_seo_query_id"), [40, 40, 20]);
+  assert.deepEqual(
+    calls
+      .filter((call) => call.table === "seo_queries" && call.column === "id")
+      .flatMap((call) => call.ids),
+    seed.queryIds,
+  );
+  assert.equal(listing.queries.length, 100);
+  const byId = new Map(listing.queries.map((query) => [query.id, query]));
+  assert.equal(byId.get(seed.queryIds[0]).lifecycle, "moderation");
+  assert.equal(byId.get(seed.queryIds[0]).productId, seed.productIds[0]);
+  assert.equal(byId.get(seed.queryIds[49]).lifecycle, "published");
+  assert.equal(byId.get(seed.queryIds[49]).productId, seed.productIds[49]);
+  assert.equal(byId.get(seed.queryIds[89]).lifecycle, "moderation");
+  assert.equal(byId.get(seed.queryIds[89]).queryText, seed.texts[89]);
+  assert.equal(byId.get(seed.queryIds[2]).lifecycle, "in_progress");
+  const expectedOrder = [...seed.texts].sort((left, right) =>
+    left.localeCompare(right, "ru", { sensitivity: "base" }),
+  );
+  assert.deepEqual(
+    listing.queries.map((query) => query.queryText),
+    expectedOrder,
+  );
+}
+
+{
+  const { calls } = await listWith(40);
+  assertNoOversizedIn(calls);
+  assert.deepEqual(inLengths(calls, "seo_queries", "id"), [40]);
+  assert.deepEqual(inLengths(calls, "seo_query_reservations", "query_id"), [40]);
+  assert.deepEqual(inLengths(calls, "practices", "id"), [40]);
+}
+
+{
+  const { calls } = await listWith(41);
+  assertNoOversizedIn(calls);
+  assert.deepEqual(inLengths(calls, "seo_queries", "id"), [40, 1]);
+  assert.deepEqual(inLengths(calls, "seo_query_reservations", "query_id"), [40, 1]);
+  assert.deepEqual(inLengths(calls, "practices", "id"), [40, 1]);
+}
+
+{
+  const { listing, calls } = await listWith(0);
+  assert.equal(listing.queries.length, 0);
+  assert.deepEqual(inLengths(calls, "seo_queries", "id"), []);
+  assert.deepEqual(inLengths(calls, "seo_query_reservations", "query_id"), []);
+  assert.deepEqual(inLengths(calls, "practices", "id"), []);
+}
+
+const nginxError = {
+  code: "502",
+  message: "upstream sent too big header",
+  details: "Content-Location",
+};
+
+async function assertChunkFailure(table, column, wrapper) {
+  const logged = [];
+  const original = console.error;
+  console.error = (...args) => {
+    logged.push(args);
+  };
+  try {
+    const seed = seedSprint(100);
+    const client = createSprintClient(seed, {
+      table,
+      column,
+      onCall: 2,
+      seen: 0,
+      error: nginxError,
+    });
+    await assert.rejects(
+      () =>
+        listAudioSprintForAuthor(
+          { slug: SPRINT_SLUG, authorId: CHUNK_AUTHOR },
+          client,
+        ),
+      (error) => error instanceof Error && error.message === wrapper,
+    );
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0][0], wrapper);
+    assert.deepEqual(logged[0][1], nginxError);
+    assert.deepEqual(inLengths(client.inCalls, table, column), [40, 40]);
+    assertNoOversizedIn(client.inCalls);
+  } finally {
+    console.error = original;
+  }
+}
+
+await assertChunkFailure("seo_queries", "id", "audio_sprint_queries_load_failed");
+await assertChunkFailure(
+  "seo_query_reservations",
+  "query_id",
+  "audio_sprint_reservations_load_failed",
+);
+await assertChunkFailure("practices", "id", "audio_sprint_products_load_failed");
 
 console.log("audio-sprint-osen-zvuchit-unit: ok");

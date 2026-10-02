@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
@@ -57,6 +58,52 @@ const NO_SPRINT_MATCH: AudioSprintTitleConstraintResult = {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Public nginx 502s (`upstream sent too big header`) when PostgREST echoes a
+ * long UUID `.in()` in Content-Location. n≤90 can pass; n=100 does not.
+ * Same cap as loadPublishedSeoOccupancyForQueries (ID_CHUNK = 40).
+ */
+const AUDIO_SPRINT_IN_CHUNK = 40;
+
+function audioSprintErrorLog(error: unknown): {
+  code: string | null;
+  message: string | null;
+  details: string | null;
+} {
+  if (!error || typeof error !== "object") {
+    return { code: null, message: null, details: null };
+  }
+  const row = error as Record<string, unknown>;
+  const text = (value: unknown) => (typeof value === "string" ? value : null);
+  return {
+    code: text(row.code),
+    message: text(row.message),
+    details: text(row.details),
+  };
+}
+
+function failAudioSprintLoad(wrapper: string, error: unknown): never {
+  console.error(wrapper, audioSprintErrorLog(error));
+  throw new Error(wrapper);
+}
+
+async function loadRowsByIdChunks<T>(
+  ids: readonly string[],
+  wrapper: string,
+  query: (
+    chunk: string[],
+  ) => PromiseLike<{ data: T[] | null; error: unknown }>,
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+  const rows: T[] = [];
+  for (const chunk of chunkIds(ids, AUDIO_SPRINT_IN_CHUNK)) {
+    const { data, error } = await query(chunk);
+    if (error) failAudioSprintLoad(wrapper, error);
+    if (data?.length) rows.push(...data);
+  }
+  return rows;
 }
 
 async function findEnabledSprintQueryText(
@@ -231,15 +278,18 @@ export async function resolveAudioSprintTitleConstraint(
   return titleLockForMatchedPair(found, publicationClass, productKind);
 }
 
-export async function listAudioSprintForAuthor(input: {
-  slug: string;
-  authorId: string;
-}): Promise<AudioSprintListing | null> {
+export async function listAudioSprintForAuthor(
+  input: {
+    slug: string;
+    authorId: string;
+  },
+  supabaseClient?: SupabaseClient,
+): Promise<AudioSprintListing | null> {
   const slug = input.slug.trim();
   const authorId = input.authorId.trim();
   if (!slug || !authorId) return null;
 
-  const supabase = createServiceRoleClient();
+  const supabase = supabaseClient ?? createServiceRoleClient();
   await supabase.rpc("expire_seo_query_reservation", { p_author_id: authorId });
 
   const { data: sprint, error: sprintError } = await supabase
@@ -267,16 +317,18 @@ export async function listAudioSprintForAuthor(input: {
   );
   const queryIds = [...new Set(membership.map((row) => readString(row.query_id)))];
 
-  const { data: queryRows, error: queryError } = queryIds.length
-    ? await supabase
+  const queryRows = await loadRowsByIdChunks(
+    queryIds,
+    "audio_sprint_queries_load_failed",
+    (chunk) =>
+      supabase
         .from("seo_queries")
         .select("id, query_text, normalized_query")
-        .in("id", queryIds)
-    : { data: [], error: null };
-  if (queryError) throw new Error("audio_sprint_queries_load_failed");
+        .in("id", chunk),
+  );
 
   const queryById = new Map(
-    (queryRows ?? []).map((row) => [readString(row.id), row]),
+    queryRows.map((row) => [readString(row.id), row]),
   );
 
   const joined: MembershipRow[] = [];
@@ -293,22 +345,22 @@ export async function listAudioSprintForAuthor(input: {
     });
   }
 
-  const [{ data: reservationRows, error: reservationError }, activeCount] =
-    await Promise.all([
-      queryIds.length
-        ? supabase
-            .from("seo_query_reservations")
-            .select("id, query_id, author_id, product_id, expires_at, status")
-            .in("query_id", queryIds)
-            .in("status", ["active", "used"])
-        : Promise.resolve({ data: [], error: null }),
-      countAuthorActiveSeoReservations(supabase, authorId),
-    ]);
-
-  if (reservationError) throw new Error("audio_sprint_reservations_load_failed");
+  const [reservationRows, activeCount] = await Promise.all([
+    loadRowsByIdChunks(
+      queryIds,
+      "audio_sprint_reservations_load_failed",
+      (chunk) =>
+        supabase
+          .from("seo_query_reservations")
+          .select("id, query_id, author_id, product_id, expires_at, status")
+          .in("query_id", chunk)
+          .in("status", ["active", "used"]),
+    ),
+    countAuthorActiveSeoReservations(supabase, authorId),
+  ]);
 
   const now = new Date();
-  const reservations = ((reservationRows ?? []) as ReservationRow[]).filter((row) =>
+  const reservations = (reservationRows as ReservationRow[]).filter((row) =>
     isEffectiveSeoReservation(
       {
         status: row.status,
@@ -322,19 +374,21 @@ export async function listAudioSprintForAuthor(input: {
   const productIds = reservations
     .map((row) => row.product_id)
     .filter((id): id is string => Boolean(id));
-  const { data: products, error: productError } = productIds.length
-    ? await supabase
+  const products = await loadRowsByIdChunks(
+    productIds,
+    "audio_sprint_products_load_failed",
+    (chunk) =>
+      supabase
         .from("practices")
         .select("id, title, status, moderation_status")
-        .in("id", productIds)
-    : { data: [], error: null };
-  if (productError) throw new Error("audio_sprint_products_load_failed");
+        .in("id", chunk),
+  );
 
   const reservationByQuery = new Map(
     reservations.map((row) => [row.query_id, row]),
   );
   const productById = new Map(
-    (products ?? []).map((row) => [readString(row.id), row]),
+    products.map((row) => [readString(row.id), row]),
   );
   const occupancyByQueryId = await loadPublishedSeoOccupancyForQueries(
     supabase,
