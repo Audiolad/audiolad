@@ -1,11 +1,12 @@
 import "server-only";
 
+import type { AuthorWorkspace } from "@/lib/author-products/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { loadPublishedSeoOccupancyForQueries } from "./load-published-seo-occupancy";
 import { lifecycleForSeoOpportunity } from "./published-query-occupancy";
 import { isEffectiveSeoReservation } from "./reservation-effective";
-import type { SeoQueryOpportunity } from "./types";
+import type { SeoQueryOpportunity, SeoWorkspaceReservation } from "./types";
 
 type ReservationRow = {
   id: string;
@@ -15,6 +16,94 @@ type ReservationRow = {
   expires_at: string | null;
   status: string;
 };
+
+/**
+ * Active, unlinked reservations across every author workspace the signed-in
+ * user can access. Used by product-create so a reservation never appears to
+ * "disappear" merely because another workspace is currently selected.
+ */
+export async function listActiveSeoReservationsForWorkspaces(
+  workspaces: ReadonlyArray<Pick<AuthorWorkspace, "id" | "name" | "slug">>,
+): Promise<SeoWorkspaceReservation[]> {
+  const authorIds = [...new Set(workspaces.map((item) => item.id).filter(Boolean))];
+  if (authorIds.length === 0) return [];
+
+  const supabase = createServiceRoleClient();
+  await Promise.all(
+    authorIds.map((authorId) =>
+      supabase.rpc("expire_seo_query_reservation", { p_author_id: authorId }),
+    ),
+  );
+
+  const { data: reservations, error: reservationError } = await supabase
+    .from("seo_query_reservations")
+    .select("id, query_id, author_id, product_id, expires_at, status")
+    .in("author_id", authorIds)
+    .eq("status", "active")
+    .is("product_id", null);
+
+  if (reservationError) {
+    throw new Error("seo_workspace_reservations_load_failed");
+  }
+
+  const now = new Date();
+  const activeReservations = ((reservations ?? []) as ReservationRow[]).filter(
+    (item) =>
+      isEffectiveSeoReservation(
+        {
+          status: item.status,
+          productId: item.product_id,
+          expiresAt: item.expires_at,
+        },
+        now,
+      ),
+  );
+  if (activeReservations.length === 0) return [];
+
+  const queryIds = [...new Set(activeReservations.map((item) => item.query_id))];
+  const { data: queries, error: queryError } = await supabase
+    .from("seo_queries")
+    .select("id, query_text, frequency")
+    .in("id", queryIds);
+
+  if (queryError) {
+    throw new Error("seo_workspace_reservation_queries_load_failed");
+  }
+
+  const workspaceById = new Map(workspaces.map((item) => [item.id, item]));
+  const queryById = new Map(
+    (queries ?? []).map((item) => [
+      item.id as string,
+      {
+        queryText: item.query_text as string,
+        frequency: typeof item.frequency === "number" ? item.frequency : null,
+      },
+    ]),
+  );
+
+  return activeReservations
+    .flatMap((reservation) => {
+      const workspace = workspaceById.get(reservation.author_id);
+      const query = queryById.get(reservation.query_id);
+      if (!workspace || !query?.queryText) return [];
+
+      return [{
+        reservationId: reservation.id,
+        queryId: reservation.query_id,
+        queryText: query.queryText,
+        frequency: query.frequency,
+        expiresAt: reservation.expires_at,
+        authorId: workspace.id,
+        authorName: workspace.name,
+        authorSlug: workspace.slug,
+      }];
+    })
+    .sort(
+      (a, b) =>
+        a.authorName.localeCompare(b.authorName, "ru") ||
+        a.queryText.localeCompare(b.queryText, "ru"),
+    );
+}
 
 /** Uses the server-only client after the page has verified author membership. */
 export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<SeoQueryOpportunity[]> {
