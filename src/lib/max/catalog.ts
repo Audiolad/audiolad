@@ -30,8 +30,6 @@ import { releaseDueScheduledPublications } from "@/lib/products/release-due-sche
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-export const MAX_CATALOG_LIMIT = 24;
-
 export type { MaxCatalogProduct };
 
 export type MaxCatalogResult =
@@ -157,7 +155,6 @@ function toMaxCatalogProduct(product: {
 function toMaxCatalogProducts(products: CatalogProduct[]): MaxCatalogProduct[] {
   return products
     .filter((product) => Boolean(product.authorSlug))
-    .slice(0, MAX_CATALOG_LIMIT)
     .map(toMaxCatalogProduct);
 }
 

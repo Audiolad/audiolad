@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MAX_CATALOG_PATH, MAX_HOSTNAME, MAX_ORIGIN } from "../src/lib/max/host.ts";
+import { listMaxPublishedCatalog } from "../src/lib/max/catalog.ts";
 import {
   MAX_CATALOG_BODY_MAX_BYTES,
   POST,
@@ -334,9 +335,153 @@ assert.match(catalogSource, /getPublishedCatalogProducts/);
 assert.match(catalogSource, /searchPublishedCatalogProducts/);
 assert.match(catalogSource, /normalizeCatalogSearchQuery/);
 assert.match(catalogSource, /GUEST_ORDINARY_CATALOG_VIEWER/);
-assert.match(catalogSource, /\.slice\(0, MAX_CATALOG_LIMIT\)/);
+assert.doesNotMatch(catalogSource, /MAX_CATALOG_LIMIT/);
+assert.doesNotMatch(catalogSource, /\.slice\(/);
 assert.doesNotMatch(catalogSource, /CATALOG_SEARCH_SUGGEST_MIN_LENGTH/);
 assert.doesNotMatch(catalogSource, /userId|visitorId|localStorage|auth\.admin/);
 assert.doesNotMatch(routeSource, /searchParams|localStorage|body\.user_id|max_user_id|maxAuthenticated/);
+assert.doesNotMatch(routeSource, /\.slice\(/);
+
+function canonicalCatalogProduct(index) {
+  const isFree = index % 2 === 0;
+  return {
+    id: `product-${index}`,
+    authorId: "author-id",
+    title: `Продукт ${index}`,
+    slug: `product-${String(index).padStart(2, "0")}`,
+    subtitle: null,
+    description: null,
+    format: "Аудиопрактика",
+    productKind: "practice",
+    publicationClass: "practice",
+    price: isFree ? 0 : 490,
+    compareAtPrice: null,
+    isFree,
+    coverUrl: "https://cdn.example.test/cover.webp",
+    coverImage: null,
+    updatedAt: null,
+    authorName: "Автор",
+    authorSlug: "author",
+    href: `/practice/author/product-${index}`,
+    meta: null,
+    statsLabel: null,
+    productTypeLabel: "Аудиопрактика",
+    priceLabel: isFree ? "Бесплатно" : "490 ₽",
+    sortTimestamp: 1000 - index,
+    durationSeconds: 600,
+    publishedAt: "2026-01-01T00:00:00.000Z",
+    gallery: [],
+  };
+}
+
+const canonicalProducts = Array.from({ length: 60 }, (_, index) =>
+  canonicalCatalogProduct(index + 1),
+);
+const invalidAuthorProduct = {
+  ...canonicalCatalogProduct(61),
+  authorSlug: "",
+  slug: "missing-author",
+  isFree: true,
+  price: 0,
+  priceLabel: "Бесплатно",
+};
+const canonicalLoaderRows = [
+  ...canonicalProducts.slice(0, 24),
+  invalidAuthorProduct,
+  ...canonicalProducts.slice(24),
+];
+const loaderCalls = [];
+const searchCalls = [];
+
+const uncapped = await listMaxPublishedCatalog({
+  getServiceClient: () => ({}),
+  getCatalogProducts: async (_client, options) => {
+    loaderCalls.push(options);
+    return canonicalLoaderRows;
+  },
+  searchCatalogProducts: async () => {
+    throw new Error("search must not run for the default catalog");
+  },
+});
+
+assert.equal(uncapped.ok, true);
+assert.equal(loaderCalls.length, 1);
+assert.equal(uncapped.items.length, 60);
+assert.deepEqual(
+  uncapped.items.map((item) => item.slug),
+  canonicalProducts.map((product) => product.slug),
+);
+assert.equal(uncapped.items[24].slug, "product-25");
+assert.equal(uncapped.items[39].slug, "product-40");
+assert.equal(uncapped.items[59].slug, "product-60");
+assert.equal(
+  uncapped.items.some((item) => item.slug === "missing-author"),
+  false,
+);
+
+const searched = await listMaxPublishedCatalog({
+  query: "  продукт 40  ",
+  getServiceClient: () => ({}),
+  searchCatalogProducts: async (_client, options) => {
+    searchCalls.push(options);
+    return [canonicalProducts[39], invalidAuthorProduct, canonicalProducts[59]];
+  },
+  getCatalogProducts: async () => {
+    throw new Error("canonical loader must not run during search");
+  },
+});
+assert.equal(searched.ok, true);
+assert.equal(searchCalls.length, 1);
+assert.equal(searchCalls[0].query, "продукт 40");
+assert.deepEqual(
+  searched.items.map((item) => item.slug),
+  ["product-40", "product-60"],
+);
+
+const freeFiltered = await listMaxPublishedCatalog({
+  access: "free",
+  getServiceClient: () => ({}),
+  getCatalogProducts: async () => canonicalLoaderRows,
+  searchCatalogProducts: async () => {
+    throw new Error("search must not run for an access filter");
+  },
+});
+assert.equal(freeFiltered.ok, true);
+assert.deepEqual(
+  freeFiltered.items.map((item) => item.slug),
+  canonicalProducts.filter((product) => product.isFree).map((product) => product.slug),
+);
+assert.equal(freeFiltered.items.some((item) => item.slug === "product-25"), false);
+assert.equal(freeFiltered.items.some((item) => item.slug === "product-40"), true);
+assert.equal(freeFiltered.items.some((item) => item.slug === "product-60"), true);
+assert.equal(
+  freeFiltered.items.some((item) => item.slug === "missing-author"),
+  false,
+);
+
+process.env.MAX_BOT_TOKEN = FICTIONAL_BOT_TOKEN;
+setListMaxPublishedCatalogForTests(async () => uncapped);
+try {
+  const endpoint = await readJson(
+    await POST(maxRequest({ initData: currentInitData() })),
+  );
+  assert.equal(endpoint.status, 200);
+  assert.equal(endpoint.body.ok, true);
+  assert.equal(endpoint.body.items.length, 60);
+  assert.equal(endpoint.body.items[24].slug, "product-25");
+  assert.equal(endpoint.body.items[39].slug, "product-40");
+  assert.equal(endpoint.body.items[59].slug, "product-60");
+  assert.deepEqual(
+    endpoint.body.items.map((item) => item.slug),
+    uncapped.items.map((item) => item.slug),
+  );
+} finally {
+  setListMaxPublishedCatalogForTests(null);
+  if (previousToken === undefined) {
+    delete process.env.MAX_BOT_TOKEN;
+  } else {
+    process.env.MAX_BOT_TOKEN = previousToken;
+  }
+}
 
 console.log("max-catalog-route-unit: ok");
