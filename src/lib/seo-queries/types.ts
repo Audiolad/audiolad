@@ -20,6 +20,17 @@ export type SeoQueryOpportunity = {
   productTitle: string | null;
 };
 
+export type SeoWorkspaceReservation = {
+  reservationId: string;
+  queryId: string;
+  queryText: string;
+  frequency: number | null;
+  expiresAt: string | null;
+  authorId: string;
+  authorName: string;
+  authorSlug: string;
+};
+
 export function lifecycleLabel(value: SeoQueryLifecycle): string {
   switch (value) {
     case "in_progress":
