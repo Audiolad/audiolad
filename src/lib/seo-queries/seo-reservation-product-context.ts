@@ -44,7 +44,7 @@ export function mapSeoReservationLinkError(code: string | null | undefined): {
     case "seo_reservation_product_not_music":
       return {
         code,
-        message: "Связать запрос можно только с музыкальным продуктом.",
+        message: "Связать запрос можно только с музыкой или практикой.",
       };
     case "seo_reservation_not_linkable":
       return {
