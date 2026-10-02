@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { normalizeAudioMime } from "@/lib/music-analyzer-runs/audio-file";
+import {
+  classifySignedUploadError,
+  fileForSignedUpload,
+} from "@/lib/music-analyzer-runs/browser-upload";
 import type { MusicAnalyzerRunClient } from "@/lib/music-analyzer-runs/contract";
 import { MUSIC_ANALYZER_RUNS_BUCKET } from "@/lib/music-analyzer-runs/constants";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +22,9 @@ const ERRORS: Record<string, string> = {
   upload_size_mismatch: "Размер файла не совпал с загруженным объектом.",
   storage_unavailable: "Хранилище анализа сейчас недоступно.",
   enqueue_failed: "Не удалось поставить прогон в очередь.",
+  invalid_mime_type: "Хранилище не приняло тип файла.",
+  upload_network: "Не удалось связаться с хранилищем.",
+  upload_rejected: "Хранилище отклонило загрузку.",
   object_missing: "Файл не попал в хранилище.",
 };
 
@@ -82,18 +89,24 @@ export function RunsWorkspace({ runs }: { runs: MusicAnalyzerRunClient[] }) {
     }
     const uploaded = await createClient().storage
       .from(MUSIC_ANALYZER_RUNS_BUCKET)
-      .uploadToSignedUrl(started.signedUpload.path, started.signedUpload.token, file, {
-        contentType: mime,
-        upsert: false,
-      });
+      .uploadToSignedUrl(
+        started.signedUpload.path,
+        started.signedUpload.token,
+        fileForSignedUpload(file, file.name, mime),
+        {
+          contentType: mime,
+          upsert: false,
+        },
+      );
     if (uploaded.error) {
+      const storageError = classifySignedUploadError(uploaded.error);
       await fetch("/api/music-analyzer/runs/uploads/abandon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: started.ticket }),
+        body: JSON.stringify({ ticket: started.ticket, storageError }),
       });
       setPending(false);
-      setError(message("object_missing"));
+      setError(message(storageError.code));
       return;
     }
     const finalized = await fetch("/api/music-analyzer/runs/uploads/complete", {
