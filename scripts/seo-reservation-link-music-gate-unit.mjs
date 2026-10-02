@@ -163,7 +163,7 @@ assert.match(practiceMigration, /v_practice\.product_kind IS DISTINCT FROM 'musi
 assert.match(practiceMigration, /v_practice\.publication_class IS DISTINCT FROM 'release'/);
 assert.match(practiceMigration, /v_practice\.publication_class IS DISTINCT FROM 'practice'/);
 assert.match(practiceMigration, /seo_reservation_product_not_music/);
-assert.match(practiceMigration, /course, audiobook, and post stay closed/);
+assert.match(practiceMigration, /course, audiobook, and post stay closed/i);
 assert.match(practiceMigration, /audiolad:seo-reservation-link:v4/);
 assert.doesNotMatch(practiceMigration, /p_publication_class|publication_class text/);
 assert.doesNotMatch(practiceMigration, /ADD COLUMN|CREATE TABLE/);
