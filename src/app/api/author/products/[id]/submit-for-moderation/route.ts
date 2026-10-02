@@ -11,7 +11,11 @@ import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { evaluatePublishReadiness } from "@/lib/author-products/publish";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
-import { evaluateAudioSprintModerationGate } from "@/lib/seo-queries/audio-sprint";
+import {
+  AUDIO_SPRINT_CLASS_MISMATCH_CODE,
+  AUDIO_SPRINT_CLASS_MISMATCH_MESSAGE,
+  evaluateAudioSprintModerationGate,
+} from "@/lib/seo-queries/audio-sprint";
 import { loadAudioSprintModerationQuery } from "@/lib/seo-queries/list-audio-sprint-queries";
 
 type RouteContext = {
@@ -80,15 +84,33 @@ export async function POST(_request: Request, context: RouteContext) {
     if (!sprintQuery.ok) {
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
+    if (sprintQuery.queryText && !sprintQuery.authorGroup) {
+      return NextResponse.json(
+        {
+          error: AUDIO_SPRINT_CLASS_MISMATCH_CODE,
+          message: AUDIO_SPRINT_CLASS_MISMATCH_MESSAGE,
+        },
+        { status: 400 },
+      );
+    }
     const sprintGate = evaluateAudioSprintModerationGate({
       isSprintProduct: Boolean(sprintQuery.queryText),
+      authorGroup: sprintQuery.authorGroup,
+      publicationClass: detail.practice.publication_class,
+      productKind: detail.practice.product_kind,
       isFree: detail.practice.is_free === true,
       catalogVisibility: detail.practice.catalog_visibility,
+      isCatalogListed: detail.practice.is_catalog_listed === true,
       title: detail.practice.title,
       queryText: sprintQuery.queryText ?? "",
+      subtitle: detail.practice.subtitle,
+      description: detail.practice.description,
       seoTitle: detail.practice.seo_title,
       seoDescription: detail.practice.seo_description,
-      seoAbout: detail.practice.seo_about,
+      usageItems: detail.seo_content.usageItems,
+      faqItems: detail.seo_content.faqItems,
+      coverUrl: detail.practice.cover_url,
+      coverImage: detail.practice.cover_image ?? null,
     });
     if (sprintGate) {
       return NextResponse.json(

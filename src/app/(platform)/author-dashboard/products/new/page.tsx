@@ -10,6 +10,7 @@ import {
   CABINET_BRANCH_LABELS,
   parsePublicationClass,
   publicationClassToCabinetBranch,
+  publicationClassToLegacyKind,
 } from "@/lib/author-products/publication-class";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
@@ -187,6 +188,10 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     ? await loadEnabledAudioSprintQueryText(
         supabase,
         reservationLoad.context.queryId,
+        {
+          publicationClass,
+          productKind: publicationClassToLegacyKind(publicationClass),
+        },
       )
     : null;
 

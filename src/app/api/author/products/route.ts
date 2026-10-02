@@ -117,6 +117,8 @@ export async function POST(request: Request) {
       const sprintTitle = await resolveAudioSprintTitleConstraint(supabase, {
         seoReservationId,
         authorId,
+        publicationClass: classification.value.publicationClass,
+        productKind: classification.value.productKind,
       });
       if (!sprintTitle.ok) {
         return NextResponse.json({ error: "internal_error" }, { status: 500 });

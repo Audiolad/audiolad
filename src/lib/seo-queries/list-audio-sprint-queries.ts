@@ -7,6 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
   audioSprintEnabledPools,
+  audioSprintProductMatchesGroup,
   isAudioSprintAuthorGroup,
   isAudioSprintPoolVisible,
   selectVisibleAudioSprintQueries,
@@ -41,8 +42,18 @@ export type AudioSprintListing = {
 };
 
 export type AudioSprintTitleConstraintResult =
-  | { ok: true; queryText: string | null }
+  | {
+      ok: true;
+      queryText: string | null;
+      authorGroup: AudioSprintAuthorGroup | null;
+    }
   | { ok: false };
+
+const NO_SPRINT_MATCH: AudioSprintTitleConstraintResult = {
+  ok: true,
+  queryText: null,
+  authorGroup: null,
+};
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -54,7 +65,7 @@ async function findEnabledSprintQueryText(
 ): Promise<AudioSprintTitleConstraintResult> {
   const { data: rows, error } = await supabase
     .from("seo_sprint_queries")
-    .select("pool, sprint_id")
+    .select("pool, sprint_id, author_group")
     .eq("query_id", queryId);
 
   if (error) return { ok: false };
@@ -62,12 +73,12 @@ async function findEnabledSprintQueryText(
   const visible = (rows ?? []).filter((row) =>
     isAudioSprintPoolVisible(readString(row.pool)),
   );
-  if (visible.length === 0) return { ok: true, queryText: null };
+  if (visible.length === 0) return NO_SPRINT_MATCH;
 
   const sprintIds = [
     ...new Set(visible.map((row) => readString(row.sprint_id)).filter(Boolean)),
   ];
-  if (sprintIds.length === 0) return { ok: true, queryText: null };
+  if (sprintIds.length === 0) return NO_SPRINT_MATCH;
 
   const { data: sprints, error: sprintError } = await supabase
     .from("seo_sprints")
@@ -76,7 +87,19 @@ async function findEnabledSprintQueryText(
     .eq("slug", AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG);
 
   if (sprintError) return { ok: false };
-  if (!sprints?.length) return { ok: true, queryText: null };
+  const enabledSprintIds = new Set((sprints ?? []).map((row) => readString(row.id)));
+  if (enabledSprintIds.size === 0) return NO_SPRINT_MATCH;
+
+  const groups = new Set<AudioSprintAuthorGroup>();
+  for (const row of visible) {
+    if (!enabledSprintIds.has(readString(row.sprint_id))) continue;
+    const authorGroup = readString(row.author_group);
+    if (!isAudioSprintAuthorGroup(authorGroup)) return { ok: false };
+    groups.add(authorGroup);
+  }
+  if (groups.size === 0) return NO_SPRINT_MATCH;
+  if (groups.size !== 1) return { ok: false };
+  const authorGroup = [...groups][0];
 
   const { data: query, error: queryError } = await supabase
     .from("seo_queries")
@@ -86,16 +109,34 @@ async function findEnabledSprintQueryText(
 
   if (queryError) return { ok: false };
   const queryText = readString(query?.query_text);
-  return { ok: true, queryText: queryText || null };
+  if (!queryText) return { ok: false };
+  return { ok: true, queryText, authorGroup };
 }
 
-/** Canonical query text when query_id is in the enabled pool of this sprint. */
+/**
+ * Title-lock text for a sprint query only when the product class matches
+ * author_group. A mismatched pair returns null so the lock is not applied.
+ * Lookup errors return null for the editor; submit still fail-closes.
+ */
 export async function loadEnabledAudioSprintQueryText(
   supabase: SupabaseClient,
   queryId: string | null | undefined,
+  product: {
+    publicationClass: string | null | undefined;
+    productKind: string | null | undefined;
+  },
 ): Promise<string | null> {
   const found = await loadAudioSprintModerationQuery(supabase, queryId);
-  if (!found.ok) return null;
+  if (!found.ok || !found.queryText || !found.authorGroup) return null;
+  if (
+    !audioSprintProductMatchesGroup({
+      authorGroup: found.authorGroup,
+      publicationClass: product.publicationClass,
+      productKind: product.productKind,
+    })
+  ) {
+    return null;
+  }
   return found.queryText;
 }
 
@@ -105,8 +146,30 @@ export async function loadAudioSprintModerationQuery(
   queryId: string | null | undefined,
 ): Promise<AudioSprintTitleConstraintResult> {
   const id = readString(queryId);
-  if (!id) return { ok: true, queryText: null };
+  if (!id) return NO_SPRINT_MATCH;
   return findEnabledSprintQueryText(supabase, id);
+}
+
+/**
+ * Apply the sprint title lock only for a matching author_group ↔ product class.
+ * Mismatch returns no constraint. The product row's class wins over the caller.
+ */
+function titleLockForMatchedPair(
+  found: Extract<AudioSprintTitleConstraintResult, { ok: true }>,
+  publicationClass: string | null,
+  productKind: string | null,
+): AudioSprintTitleConstraintResult {
+  if (!found.queryText || !found.authorGroup) return NO_SPRINT_MATCH;
+  if (
+    !audioSprintProductMatchesGroup({
+      authorGroup: found.authorGroup,
+      publicationClass,
+      productKind,
+    })
+  ) {
+    return NO_SPRINT_MATCH;
+  }
+  return found;
 }
 
 /**
@@ -120,27 +183,36 @@ export async function resolveAudioSprintTitleConstraint(
     practiceId?: string | null;
     seoReservationId?: string | null;
     authorId?: string | null;
+    publicationClass?: string | null;
+    productKind?: string | null;
   },
 ): Promise<AudioSprintTitleConstraintResult> {
   const practiceId = readString(input.practiceId);
   const reservationId = readString(input.seoReservationId);
   const authorId = readString(input.authorId);
+  let publicationClass = readString(input.publicationClass) || null;
+  let productKind = readString(input.productKind) || null;
 
   if (practiceId) {
     const { data: practice, error } = await supabase
       .from("practices")
-      .select("primary_seo_query_id")
+      .select("primary_seo_query_id, publication_class, product_kind")
       .eq("id", practiceId)
       .maybeSingle();
     if (error) return { ok: false };
+    publicationClass = readString(practice?.publication_class) || null;
+    productKind = readString(practice?.product_kind) || null;
     const queryId = readString(practice?.primary_seo_query_id);
     if (queryId) {
       const found = await findEnabledSprintQueryText(supabase, queryId);
-      if (!found.ok || found.queryText) return found;
+      if (!found.ok) return found;
+      if (found.queryText) {
+        return titleLockForMatchedPair(found, publicationClass, productKind);
+      }
     }
   }
 
-  if (!reservationId) return { ok: true, queryText: null };
+  if (!reservationId) return NO_SPRINT_MATCH;
 
   const { data: reservation, error: reservationError } = await supabase
     .from("seo_query_reservations")
@@ -148,13 +220,15 @@ export async function resolveAudioSprintTitleConstraint(
     .eq("id", reservationId)
     .maybeSingle();
   if (reservationError) return { ok: false };
-  if (!reservation) return { ok: true, queryText: null };
+  if (!reservation) return NO_SPRINT_MATCH;
   if (authorId && readString(reservation.author_id) !== authorId) {
-    return { ok: true, queryText: null };
+    return NO_SPRINT_MATCH;
   }
   const queryId = readString(reservation.query_id);
-  if (!queryId) return { ok: true, queryText: null };
-  return findEnabledSprintQueryText(supabase, queryId);
+  if (!queryId) return NO_SPRINT_MATCH;
+  const found = await findEnabledSprintQueryText(supabase, queryId);
+  if (!found.ok) return found;
+  return titleLockForMatchedPair(found, publicationClass, productKind);
 }
 
 export async function listAudioSprintForAuthor(input: {

@@ -70,6 +70,7 @@ const VALIDATION_CODES = new Set([
   "audio_sprint_must_be_free",
   "audio_sprint_must_be_listed",
   "audio_sprint_seo_required",
+  "audio_sprint_class_mismatch",
 ]);
 
 const PERMISSION_CODES = new Set([

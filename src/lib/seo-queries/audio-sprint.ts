@@ -60,7 +60,28 @@ export const AUDIO_SPRINT_MUST_BE_LISTED_MESSAGE =
 
 export const AUDIO_SPRINT_SEO_REQUIRED_CODE = "audio_sprint_seo_required";
 export const AUDIO_SPRINT_SEO_REQUIRED_MESSAGE =
-  "Заполните заголовок для поиска, описание для поиска и текст «Подробнее о продукте».";
+  "Заполните подназвание, описание, заголовок и описание для поиска, ровно 3 пункта «Как слушать / Как проходить», ровно 3 вопроса и ответа и обложку.";
+
+export const AUDIO_SPRINT_CLASS_MISMATCH_CODE = "audio_sprint_class_mismatch";
+export const AUDIO_SPRINT_CLASS_MISMATCH_MESSAGE =
+  "Класс продукта не соответствует разделу спринта. Музыкальный запрос публикуется как релиз, голосовой — как практика.";
+
+/** Packaging contract from AuthorSeoPromptBuilder: exactly three how-to items and three Q&A. */
+export const AUDIO_SPRINT_USAGE_ITEM_COUNT = 3;
+export const AUDIO_SPRINT_FAQ_ITEM_COUNT = 3;
+
+/**
+ * Reserve POST conflict codes that mean the query is no longer free.
+ * `already_reserved` is another author's live reservation (in progress).
+ * `occupied_by_published_product` is a published product on that query.
+ */
+export function audioSprintReserveConflictLifecycle(
+  code: string,
+): "in_progress" | "published" | null {
+  if (code === "seo_query_occupied_by_published_product") return "published";
+  if (code === "seo_query_already_reserved") return "in_progress";
+  return null;
+}
 
 export function isAudioSprintAuthorGroup(
   value: string,
@@ -72,6 +93,56 @@ export function audioSprintPublicationClass(
   authorGroup: AudioSprintAuthorGroup,
 ): "release" | "practice" {
   return authorGroup === "music" ? "release" : "practice";
+}
+
+/**
+ * Valid sprint product pair.
+ *
+ * music author_group matches publication_class `release` or product_kind `music`.
+ * voice author_group matches publication_class `practice`
+ * (and not a music or audio-post kind).
+ *
+ * A mismatch is not a valid sprint product. Title lock is not applied.
+ * Submit rejects with `audio_sprint_class_mismatch` so the query cannot be
+ * sent to moderation under the wrong class and cannot skip the packaging gate.
+ */
+export function audioSprintProductMatchesGroup(input: {
+  authorGroup: string | null | undefined;
+  publicationClass: string | null | undefined;
+  productKind: string | null | undefined;
+}): boolean {
+  const publicationClass = input.publicationClass?.trim() ?? "";
+  const productKind = input.productKind?.trim() ?? "";
+  if (input.authorGroup === "music") {
+    return publicationClass === "release" || productKind === "music";
+  }
+  if (input.authorGroup === "voice") {
+    if (publicationClass !== "practice") return false;
+    if (productKind === "music" || productKind === "audio_post") return false;
+    return true;
+  }
+  return false;
+}
+
+function filledText(value: string | null | undefined): string {
+  return value?.trim() ?? "";
+}
+
+/** Cover is present when a legacy URL or an image manifest variant path exists. */
+export function audioSprintHasCover(input: {
+  coverUrl: string | null | undefined;
+  coverImage: unknown;
+}): boolean {
+  if (filledText(input.coverUrl)) return true;
+  const image = input.coverImage;
+  if (!image || typeof image !== "object") return false;
+  const variants = (image as { variants?: unknown }).variants;
+  if (!variants || typeof variants !== "object") return false;
+  return Object.values(variants as Record<string, unknown>).some((variant) => {
+    if (!variant || typeof variant !== "object") return false;
+    const variantPath = (variant as { path?: unknown }).path;
+    return typeof variantPath === "string" && variantPath.trim().length > 0;
+  });
 }
 
 export function audioSprintEnabledPools(
@@ -160,15 +231,37 @@ export function evaluateAudioSprintTitleSave(input: {
 
 export function evaluateAudioSprintModerationGate(input: {
   isSprintProduct: boolean;
+  authorGroup: string | null;
+  publicationClass: string | null;
+  productKind: string | null;
   isFree: boolean;
   catalogVisibility: string | null;
+  isCatalogListed: boolean;
   title: string;
   queryText: string;
+  subtitle: string | null;
+  description: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
-  seoAbout: string | null;
+  usageItems: ReadonlyArray<{ content?: string | null }>;
+  faqItems: ReadonlyArray<{ question?: string | null; answer?: string | null }>;
+  coverUrl: string | null;
+  coverImage: unknown;
 }): { code: string; message: string } | null {
   if (!input.isSprintProduct) return null;
+
+  if (
+    !audioSprintProductMatchesGroup({
+      authorGroup: input.authorGroup,
+      publicationClass: input.publicationClass,
+      productKind: input.productKind,
+    })
+  ) {
+    return {
+      code: AUDIO_SPRINT_CLASS_MISMATCH_CODE,
+      message: AUDIO_SPRINT_CLASS_MISMATCH_MESSAGE,
+    };
+  }
 
   const queryText = input.queryText.trim();
   if (!queryText || input.title.trim() !== queryText) {
@@ -185,18 +278,30 @@ export function evaluateAudioSprintModerationGate(input: {
     };
   }
 
-  if (input.catalogVisibility !== "listed") {
+  if (input.catalogVisibility !== "listed" || input.isCatalogListed !== true) {
     return {
       code: AUDIO_SPRINT_MUST_BE_LISTED_CODE,
       message: AUDIO_SPRINT_MUST_BE_LISTED_MESSAGE,
     };
   }
 
-  if (
-    !input.seoTitle?.trim() ||
-    !input.seoDescription?.trim() ||
-    !input.seoAbout?.trim()
-  ) {
+  const usageCount = input.usageItems.filter((item) => filledText(item.content)).length;
+  const faqCount = input.faqItems.filter(
+    (item) => filledText(item.question) && filledText(item.answer),
+  ).length;
+  const packagingReady =
+    Boolean(filledText(input.subtitle)) &&
+    Boolean(filledText(input.description)) &&
+    Boolean(filledText(input.seoTitle)) &&
+    Boolean(filledText(input.seoDescription)) &&
+    usageCount === AUDIO_SPRINT_USAGE_ITEM_COUNT &&
+    faqCount === AUDIO_SPRINT_FAQ_ITEM_COUNT &&
+    audioSprintHasCover({
+      coverUrl: input.coverUrl,
+      coverImage: input.coverImage,
+    });
+
+  if (!packagingReady) {
     return {
       code: AUDIO_SPRINT_SEO_REQUIRED_CODE,
       message: AUDIO_SPRINT_SEO_REQUIRED_MESSAGE,

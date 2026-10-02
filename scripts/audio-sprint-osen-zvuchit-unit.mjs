@@ -19,7 +19,10 @@ import {
   AUDIO_SPRINT_OSEN_ZVUCHIT_TITLE,
   audioSprintEnabledPools,
   audioSprintHref,
+  audioSprintHasCover,
+  audioSprintProductMatchesGroup,
   audioSprintPublicationClass,
+  audioSprintReserveConflictLifecycle,
   buildAudioSprintProductCreateHref,
   canReserveAudioSprintQuery,
   evaluateAudioSprintModerationGate,
@@ -182,17 +185,45 @@ assert.equal(
   "ordinary product title stays editable",
 );
 
+const usageItems = [
+  { content: "Слушайте вечером" },
+  { content: "Снизьте громкость" },
+  { content: "Не ставьте на паузу" },
+];
+const faqItems = [
+  { question: "Когда слушать?", answer: "Перед сном." },
+  { question: "Сколько длится?", answer: "Один трек." },
+  { question: "Нужны ли слова?", answer: "Нет, это музыка." },
+];
 const readySprint = {
   isSprintProduct: true,
+  authorGroup: "music",
+  publicationClass: "release",
+  productKind: "music",
   isFree: true,
   catalogVisibility: "listed",
+  isCatalogListed: true,
   title: "Осенняя музыка для сна",
   queryText: "Осенняя музыка для сна",
+  subtitle: "Спокойный фон для засыпания",
+  description: "Инструментальная осенняя музыка без слов.",
   seoTitle: "Осенняя музыка для сна — АудиоЛад",
   seoDescription: "Спокойная осенняя музыка для сна.",
-  seoAbout: "Подробный текст о продукте.",
+  usageItems,
+  faqItems,
+  coverUrl: "https://cdn.example/cover.jpg",
+  coverImage: null,
 };
 assert.equal(evaluateAudioSprintModerationGate(readySprint), null);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    coverUrl: "  ",
+    coverImage: { variants: { lg: { path: "covers/osen.jpg" } } },
+  }),
+  null,
+  "a cover manifest counts without a legacy URL",
+);
 assert.equal(
   evaluateAudioSprintModerationGate({ ...readySprint, isFree: false })?.code,
   "audio_sprint_must_be_free",
@@ -212,11 +243,22 @@ assert.equal(
   "audio_sprint_must_be_listed",
 );
 assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    isCatalogListed: false,
+  })?.code,
+  "audio_sprint_must_be_listed",
+);
+assert.equal(
   evaluateAudioSprintModerationGate({ ...readySprint, title: "Другое" })?.code,
   "audio_sprint_title_locked",
 );
 assert.equal(
-  evaluateAudioSprintModerationGate({ ...readySprint, seoAbout: "  " })?.code,
+  evaluateAudioSprintModerationGate({ ...readySprint, subtitle: "  " })?.code,
+  "audio_sprint_seo_required",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({ ...readySprint, description: "" })?.code,
   "audio_sprint_seo_required",
 );
 assert.equal(
@@ -230,13 +272,113 @@ assert.equal(
 assert.equal(
   evaluateAudioSprintModerationGate({
     ...readySprint,
+    usageItems: usageItems.slice(0, 2),
+  })?.code,
+  "audio_sprint_seo_required",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    usageItems: [...usageItems, { content: "Четвёртый пункт" }],
+  })?.code,
+  "audio_sprint_seo_required",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    faqItems: faqItems.map((item, index) =>
+      index === 2 ? { ...item, answer: " " } : item,
+    ),
+  })?.code,
+  "audio_sprint_seo_required",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    coverUrl: "",
+    coverImage: null,
+  })?.code,
+  "audio_sprint_seo_required",
+);
+assert.equal(audioSprintHasCover({ coverUrl: "", coverImage: {} }), false);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    authorGroup: "music",
+    publicationClass: "practice",
+    productKind: "practice",
+  })?.code,
+  "audio_sprint_class_mismatch",
+  "music query with a practice product is not a valid sprint pair",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    authorGroup: "voice",
+    publicationClass: "release",
+    productKind: "music",
+  })?.code,
+  "audio_sprint_class_mismatch",
+  "voice query with a release is not a valid sprint pair",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    authorGroup: "voice",
+    publicationClass: "practice",
+    productKind: "practice",
+  }),
+  null,
+  "voice query with a practice product passes the packaging gate",
+);
+assert.equal(
+  audioSprintProductMatchesGroup({
+    authorGroup: "music",
+    publicationClass: null,
+    productKind: "music",
+  }),
+  true,
+);
+assert.equal(
+  audioSprintProductMatchesGroup({
+    authorGroup: "music",
+    publicationClass: "release",
+    productKind: "practice",
+  }),
+  true,
+);
+assert.equal(
+  audioSprintProductMatchesGroup({
+    authorGroup: "voice",
+    publicationClass: "practice",
+    productKind: "music",
+  }),
+  false,
+);
+assert.equal(audioSprintReserveConflictLifecycle("seo_query_already_reserved"), "in_progress");
+assert.equal(
+  audioSprintReserveConflictLifecycle("seo_query_occupied_by_published_product"),
+  "published",
+);
+assert.equal(audioSprintReserveConflictLifecycle("seo_reservation_limit_reached"), null);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
     isSprintProduct: false,
     isFree: false,
     catalogVisibility: "unlisted",
+    isCatalogListed: false,
     title: "Своё название",
     seoTitle: "",
     seoDescription: "",
-    seoAbout: "",
+    subtitle: "",
+    description: "",
+    usageItems: [],
+    faqItems: [],
+    coverUrl: "",
+    authorGroup: "music",
+    publicationClass: "practice",
+    productKind: "practice",
   }),
   null,
   "ordinary non-sprint products do not get sprint moderation restrictions",
@@ -304,6 +446,8 @@ assert.match(client, /audioSprintPublicationClass/);
 assert.match(client, /buildAudioSprintProductCreateHref/);
 assert.match(client, /AuthorSeoPromptBuilder/);
 assert.match(client, /canReserveAudioSprintQuery/);
+assert.match(client, /audioSprintReserveConflictLifecycle/);
+assert.match(client, /router\.refresh\(\)/);
 assert.match(client, /isAudioSprintPoolVisible/);
 assert.match(client, /Музыка|AUDIO_SPRINT_GROUP_LABEL/);
 assert.doesNotMatch(client, /publication_class:\s*"course"/);
@@ -332,8 +476,10 @@ assert.match(form, /readOnly=\{Boolean\(audioSprintTitleLock\)\}/);
 assert.match(form, /function applyAudioSprintTitleLock/);
 assert.match(form, /if \(!sprintTitle\) return form/);
 assert.match(form, /title: sprintTitle/);
-assert.match(form, /seo_about: sprintAbout/);
+assert.doesNotMatch(form, /seo_about: sprintAbout/);
+assert.doesNotMatch(form, /Подробнее о продукте/);
 assert.doesNotMatch(form, /seo_about: form\.seoAbout/);
+assert.match(form, /seo_reservation_id: seoReservationContext\.reservationId/);
 assert.match(
   form,
   /buildProductSavePayload\(\s*formForSave,\s*slugLocked,\s*canConfigureAppreciation,\s*\)/,
@@ -342,6 +488,8 @@ assert.match(
 const createRoute = read("src/app/api/author/products/route.ts");
 assert.match(createRoute, /evaluateAudioSprintTitleSave/);
 assert.match(createRoute, /seo_reservation_id/);
+assert.match(createRoute, /publicationClass: classification\.value\.publicationClass/);
+assert.match(createRoute, /productKind: classification\.value\.productKind/);
 const patchRoute = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patchRoute, /evaluateAudioSprintTitleSave/);
 assert.match(patchRoute, /resolveAudioSprintTitleConstraint/);
@@ -350,9 +498,17 @@ const submitRoute = read(
 );
 assert.match(submitRoute, /evaluateAudioSprintModerationGate/);
 assert.match(submitRoute, /loadAudioSprintModerationQuery/);
+assert.match(submitRoute, /isCatalogListed: detail\.practice\.is_catalog_listed === true/);
+assert.match(submitRoute, /usageItems: detail\.seo_content\.usageItems/);
+assert.match(submitRoute, /faqItems: detail\.seo_content\.faqItems/);
+assert.match(submitRoute, /authorGroup: sprintQuery\.authorGroup/);
+assert.doesNotMatch(submitRoute, /seo_about|seoAbout/);
 
 const list = read("src/lib/seo-queries/list-audio-sprint-queries.ts");
 assert.match(list, /audioSprintEnabledPools\(\)/);
+assert.match(list, /author_group/);
+assert.match(list, /audioSprintProductMatchesGroup/);
+assert.match(list, /publication_class, product_kind/);
 assert.match(list, /lifecycleForSeoOpportunity/);
 assert.match(list, /isEffectiveSeoReservation/);
 assert.match(list, /createServiceRoleClient/);
@@ -376,8 +532,12 @@ assert.match(
 const newPage = read("src/app/(platform)/author-dashboard/products/new/page.tsx");
 const editPage = read("src/app/(platform)/author-dashboard/products/[id]/page.tsx");
 assert.match(newPage, /loadEnabledAudioSprintQueryText/);
+assert.match(newPage, /publicationClassToLegacyKind\(publicationClass\)/);
 assert.match(newPage, /audioSprintTitleLock/);
 assert.match(editPage, /loadEnabledAudioSprintQueryText/);
+assert.match(editPage, /product\.practice\.publication_class/);
+assert.match(editPage, /product\.practice\.product_kind/);
 assert.match(editPage, /audioSprintTitleLock/);
+assert.doesNotMatch(sprintLib, /seoAbout/);
 
 console.log("audio-sprint-osen-zvuchit-unit: ok");

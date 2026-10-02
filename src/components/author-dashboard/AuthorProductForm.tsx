@@ -1926,18 +1926,14 @@ export default function AuthorProductForm({
         slugLocked,
         canConfigureAppreciation,
       );
-      const sprintAbout = formForSave.seoAbout.trim() || null;
       const response = await fetch(`/api/author/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          audioSprintTitleLock
+          audioSprintTitleLock && seoReservationContext?.reservationId
             ? {
                 ...productSavePayload,
-                seo_about: sprintAbout,
-                ...(seoReservationContext?.reservationId
-                  ? { seo_reservation_id: seoReservationContext.reservationId }
-                  : {}),
+                seo_reservation_id: seoReservationContext.reservationId,
               }
             : productSavePayload,
         ),
@@ -4000,25 +3996,6 @@ export default function AuthorProductForm({
             <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.title}</p>
           ) : null}
         </label>
-
-        {audioSprintTitleLock ? (
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium">Подробнее о продукте</span>
-            <textarea
-              value={form.seoAbout}
-              maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
-              rows={5}
-              onChange={(event) => {
-                setForm((current) => ({ ...current, seoAbout: event.target.value }));
-              }}
-              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
-            />
-            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-              Нужно для отправки продукта спринта на модерацию.
-            </p>
-            <CharCounter value={form.seoAbout} max={PRODUCT_CONTENT_LIMITS.seoAbout} />
-          </label>
-        ) : null}
 
         <label
           className="block"

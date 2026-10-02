@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
@@ -9,6 +10,7 @@ import {
   AUDIO_SPRINT_GROUP_LABEL,
   AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION,
   audioSprintPublicationClass,
+  audioSprintReserveConflictLifecycle,
   buildAudioSprintProductCreateHref,
   canReserveAudioSprintQuery,
   isAudioSprintPoolVisible,
@@ -46,6 +48,7 @@ export default function AuthorAudioSprintClient({
   queries,
   activeReservationCount,
 }: Props) {
+  const router = useRouter();
   const [group, setGroup] = useState<AudioSprintAuthorGroup>("music");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState(queries);
@@ -83,10 +86,35 @@ export default function AuthorAudioSprintClient({
     });
     const payload = (await response.json().catch(() => ({}))) as {
       message?: string;
+      code?: string;
+      error?: string;
       reservation?: { id?: string; expires_at?: string | null };
     };
     setPendingId(null);
     if (!response.ok || !payload.reservation?.id) {
+      const code =
+        typeof payload.code === "string" && payload.code.trim()
+          ? payload.code.trim()
+          : typeof payload.error === "string"
+            ? payload.error.trim()
+            : "";
+      const occupiedLifecycle = audioSprintReserveConflictLifecycle(code);
+      if (occupiedLifecycle) {
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  lifecycle: occupiedLifecycle,
+                  reservationId: null,
+                  expiresAt: null,
+                  productId: null,
+                }
+              : entry,
+          ),
+        );
+        router.refresh();
+      }
       setMessage(
         typeof payload.message === "string" && payload.message.trim()
           ? payload.message

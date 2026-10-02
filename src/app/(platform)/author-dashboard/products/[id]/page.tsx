@@ -95,7 +95,10 @@ export default async function EditAuthorProductPage({
   }
 
   const sprintQueryText = primaryQueryId
-    ? await loadEnabledAudioSprintQueryText(supabase, primaryQueryId)
+    ? await loadEnabledAudioSprintQueryText(supabase, primaryQueryId, {
+        publicationClass: product.practice.publication_class,
+        productKind: product.practice.product_kind,
+      })
     : null;
 
   const { data: relatedProducts } = await supabase
