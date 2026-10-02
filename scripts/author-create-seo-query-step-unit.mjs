@@ -220,6 +220,13 @@ assert.match(panel, /AuthorSeoPromptBuilder/);
 
 assert.match(wizard, /buildAuthorProductCreateHref/);
 assert.match(wizard, /reservationId:\s*input\.seoReservationId/);
+assert.doesNotMatch(wizard, /PRODUCT_OPTIONS/);
+assert.doesNotMatch(wizard, /Какой продукт создать\?/);
+assert.doesNotMatch(wizard, /Назад к выбору ветки/);
+assert.match(
+  wizard,
+  /option\.value === CABINET_BRANCH\.PRODUCT[\s\S]*\? "practice"/,
+);
 
 // Zero migrations for this feature
 const migDir = path.join(root, "supabase/migrations");
