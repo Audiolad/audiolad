@@ -26,7 +26,7 @@ function practice(overrides = {}) {
     duration_minutes: null,
     price: 0,
     is_free: true,
-    cover_url: null,
+    cover_url: "https://cdn.example/cover.webp",
     use_shared_cover: false,
     audio_url: null,
     status: "draft",
@@ -93,6 +93,21 @@ assert.equal(
   "missing_title",
 );
 assert.equal(
+  evaluatePublishReadiness(practice({ cover_url: null }), [audio(1)], {
+    activeTopicCount: 0,
+  }).firstFailure?.code,
+  "missing_cover",
+);
+assert.equal(
+  evaluateDatabaseModerationReady({
+    practice: practice({ cover_url: null }),
+    audioItems: [audio(1)],
+    accessStatus: "free",
+    activeTopicCount: 0,
+  }).firstFailure?.code,
+  "missing_cover",
+);
+assert.equal(
   evaluatePublishReadiness(practice(), [], { activeTopicCount: 0 }).firstFailure
     ?.code,
   "missing_audio",
@@ -115,7 +130,17 @@ assert.match(migration, /CREATE OR REPLACE FUNCTION public\.assert_practice_mode
 assert.match(migration, /DETAIL = 'missing_title'/);
 assert.match(migration, /DETAIL = 'missing_audio'/);
 assert.match(migration, /DETAIL = 'incomplete_audio'/);
-assert.doesNotMatch(migration, /missing_description|missing_cover|slug_required|topic_min_required/);
+assert.doesNotMatch(migration, /missing_description|slug_required|topic_min_required/);
+
+const coverMigration = readFileSync(
+  path.join(
+    root,
+    "supabase/migrations/20261217120200_require_product_cover_for_moderation.sql",
+  ),
+  "utf8",
+);
+assert.match(coverMigration, /DETAIL = 'missing_cover'/);
+assert.match(coverMigration, /v_practice\.cover_url/);
 
 const form = readFileSync(
   path.join(root, "src/components/author-dashboard/AuthorProductForm.tsx"),
