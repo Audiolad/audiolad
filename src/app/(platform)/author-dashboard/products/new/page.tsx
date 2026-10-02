@@ -10,6 +10,7 @@ import {
   CABINET_BRANCH_LABELS,
   parsePublicationClass,
   publicationClassToCabinetBranch,
+  publicationClassToLegacyKind,
 } from "@/lib/author-products/publication-class";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
@@ -22,6 +23,7 @@ import {
   isSeoQuerySkipParam,
 } from "@/lib/seo-queries/reservation-product-create-href";
 import { loadSeoReservationProductCreateContext } from "@/lib/seo-queries/load-seo-reservation-product-create-context";
+import { loadEnabledAudioSprintQueryText } from "@/lib/seo-queries/list-audio-sprint-queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -182,6 +184,16 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     .limit(8);
 
   const formBackHref = seoQueryStepEnabled ? queryStepHref : typeChooserHref;
+  const sprintQueryText = reservationLoad?.ok
+    ? await loadEnabledAudioSprintQueryText(
+        supabase,
+        reservationLoad.context.queryId,
+        {
+          publicationClass,
+          productKind: publicationClassToLegacyKind(publicationClass),
+        },
+      )
+    : null;
 
   return (
     <AuthorShell
@@ -200,6 +212,9 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
         initialWizardStep={initialWizardStep}
         initialSeoReservationContext={
           reservationLoad?.ok ? reservationLoad.context : null
+        }
+        audioSprintTitleLock={
+          sprintQueryText ? { queryText: sprintQueryText } : null
         }
         topicFormData={topicFormData}
         mode="create"

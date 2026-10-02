@@ -11,6 +11,8 @@ import {
 } from "@/lib/author-products/auth";
 import { createDraftProduct, listAuthorProducts } from "@/lib/author-products/products";
 import { resolveCreateClassification } from "@/lib/author-products/publication-class";
+import { evaluateAudioSprintTitleSave } from "@/lib/seo-queries/audio-sprint";
+import { resolveAudioSprintTitleConstraint } from "@/lib/seo-queries/list-audio-sprint-queries";
 
 function parseAuthorId(request: Request): string | null {
   const url = new URL(request.url);
@@ -104,7 +106,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: titleError }, { status: 400 });
     }
 
+    const seoReservationId =
+      "seo_reservation_id" in body && typeof body.seo_reservation_id === "string"
+        ? body.seo_reservation_id.trim()
+        : "";
+
     const { supabase } = await requireAuthorMutationMembership(authorId);
+
+    if (seoReservationId) {
+      const sprintTitle = await resolveAudioSprintTitleConstraint(supabase, {
+        seoReservationId,
+        authorId,
+        publicationClass: classification.value.publicationClass,
+        productKind: classification.value.productKind,
+      });
+      if (!sprintTitle.ok) {
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+      const titleFailure = evaluateAudioSprintTitleSave({
+        sprintQueryText: sprintTitle.queryText,
+        nextTitle: title,
+      });
+      if (titleFailure) {
+        return NextResponse.json(
+          { error: titleFailure.code, message: titleFailure.message },
+          { status: 400 },
+        );
+      }
+    }
     const { recordAuthorSupportAudit } = await import(
       "@/lib/author-support/audit"
     );
