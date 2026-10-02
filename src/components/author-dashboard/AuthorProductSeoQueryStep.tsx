@@ -13,7 +13,10 @@ import {
   selectOwnUnlinkedSeoOpportunities,
 } from "@/lib/seo-queries/release-own-seo-reservation";
 import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
-import type { SeoQueryOpportunity } from "@/lib/seo-queries/types";
+import type {
+  SeoQueryOpportunity,
+  SeoWorkspaceReservation,
+} from "@/lib/seo-queries/types";
 import { countActiveAuthorSeoReservations } from "@/lib/seo-queries/types";
 
 type Props = {
@@ -21,6 +24,7 @@ type Props = {
   authorSlug: string;
   publicationClass: string;
   opportunities: SeoQueryOpportunity[];
+  otherWorkspaceReservations: SeoWorkspaceReservation[];
 };
 
 function formatMonthlyFrequency(value: number | null) {
@@ -37,6 +41,7 @@ export default function AuthorProductSeoQueryStep({
   authorSlug,
   publicationClass,
   opportunities,
+  otherWorkspaceReservations,
 }: Props) {
   const router = useRouter();
   const [releasedReservationIds, setReleasedReservationIds] = useState<string[]>([]);
@@ -162,6 +167,61 @@ export default function AuthorProductSeoQueryStep({
                   </p>
                 ) : null}
               </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {otherWorkspaceReservations.length > 0 ? (
+        <section
+          className="rounded-[24px] border border-[#d7c4f5] bg-[#faf6ff] p-5"
+          data-testid="author-product-seo-other-workspaces"
+        >
+          <h3 className="text-base font-semibold text-[#25135c]">
+            Забронировано в других авторских пространствах
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
+            Эти запросы не пропали: они закреплены за другими вашими проектами.
+            Откройте нужное пространство, чтобы продолжить создание продукта.
+          </p>
+          <div className="mt-3 grid gap-3">
+            {otherWorkspaceReservations.map((item) => {
+              const frequencyLabel = formatMonthlyFrequency(item.frequency);
+              return (
+                <article
+                  key={item.reservationId}
+                  className="rounded-[18px] border border-[#eadff8] bg-white p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-[#25135c]">
+                        {item.queryText}
+                      </h4>
+                      <p className="mt-1 text-sm font-medium text-[#7042c5]">
+                        Авторское пространство: {item.authorName}
+                      </p>
+                      {frequencyLabel ? (
+                        <p className="mt-1 text-sm text-[#5f5484]">
+                          {frequencyLabel}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">
+                      У вас в работе
+                    </span>
+                  </div>
+                  <Link
+                    href={buildAuthorProductCreateHref({
+                      authorSlug: item.authorSlug,
+                      publicationClass,
+                      reservationId: item.reservationId,
+                    })}
+                    className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
+                  >
+                    Создать в этом пространстве
+                  </Link>
+                </article>
               );
             })}
           </div>
