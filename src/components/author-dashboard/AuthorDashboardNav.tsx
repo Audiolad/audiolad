@@ -84,9 +84,10 @@ function SeoIcon() {
 
 function AudioSprintIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" aria-hidden="true">
       <path
         d="M12 4c2 3 2 5 0 8 3-1 5-1 8 1-3 1-5 3-5 7-2-3-4-4-7-4 2-2 3-4 4-12Z"
+        fill="#E0892A"
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinejoin="round"
@@ -174,6 +175,24 @@ function DocumentsIcon() {
   );
 }
 
+const AUTUMN_NAV_LABEL = "Осень звучит";
+
+function dashboardNavLinkClass(active: boolean, autumn: boolean) {
+  if (!autumn) {
+    return `inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+      active
+        ? "bg-[#7042c5] text-white"
+        : "border border-[#e4d7f4] bg-white text-[#7042c5]"
+    }`;
+  }
+
+  return `inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold text-[#25135c] shadow-[0_2px_6px_rgba(176,116,24,0.2)] transition-colors ${
+    active
+      ? "border-[#D08928] bg-gradient-to-r from-[#F6D07A] to-[#E39A2E] hover:from-[#F3C560] hover:to-[#DB8E20]"
+      : "border-[#E4B24A] bg-gradient-to-r from-[#FFF3D6] to-[#F6C76A] hover:border-[#D9A33A] hover:from-[#FFE8B6] hover:to-[#F0B44A]"
+  }`;
+}
+
 type AuthorDashboardNavProps = {
   authorSlug?: string;
   authorId?: string;
@@ -229,7 +248,7 @@ export default function AuthorDashboardNav({
     },
     {
       href: audioSprintHref(authorSlug),
-      label: "Осень звучит",
+      label: AUTUMN_NAV_LABEL,
       icon: AudioSprintIcon,
       active: pathname.startsWith("/author-dashboard/audio-sprints"),
     },
@@ -287,19 +306,21 @@ export default function AuthorDashboardNav({
       <nav className="flex flex-wrap gap-2">
         {items.map((item) => {
           const Icon = item.icon;
+          const autumn = item.label === AUTUMN_NAV_LABEL;
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                item.active
-                  ? "bg-[#7042c5] text-white"
-                  : "border border-[#e4d7f4] bg-white text-[#7042c5]"
-              }`}
+              className={dashboardNavLinkClass(item.active, autumn)}
             >
               <Icon />
               {item.label}
+              {autumn ? (
+                <span className="hidden h-4 shrink-0 items-center rounded-full bg-[#25135c] px-1.5 text-[10px] font-semibold leading-none text-[#FFF8EA] sm:inline-flex">
+                  до 18 октября
+                </span>
+              ) : null}
             </Link>
           );
         })}
