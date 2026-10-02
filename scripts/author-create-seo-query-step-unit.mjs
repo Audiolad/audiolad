@@ -16,6 +16,7 @@ import {
   isSeoQuerySkipParam,
 } from "../src/lib/seo-queries/reservation-product-create-href.ts";
 import { getProductSeoQueryStepCopy } from "../src/lib/seo-queries/product-seo-query-step-copy.ts";
+import { isProductCreateSeoDiscoveryEnabled } from "../src/lib/seo-queries/discovery-beta.ts";
 import { authorDiscoveryRowAfterOwnReservationRelease } from "../src/lib/seo-queries/author-discovery-status.ts";
 import {
   RELEASE_SEO_QUERY_FALLBACK_MESSAGE,
@@ -52,6 +53,33 @@ assert.doesNotMatch(dashPage, /isAuthorSeoDiscoveryEnabled/);
 
 assert.match(nav, /Что ищут слушатели/);
 assert.match(opportunitiesUi, /variant="opportunities"/);
+
+// --- Product-create gate: music + practice open; course/audiobook/post closed ---
+const OTHER_AUTHOR = "00000000-0000-4000-8000-000000000099";
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: OTHER_AUTHOR,
+    publicationClass: "release",
+  }),
+  true,
+);
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: OTHER_AUTHOR,
+    publicationClass: "practice",
+  }),
+  true,
+);
+for (const publicationClass of ["course", "audiobook", "post", null]) {
+  assert.equal(
+    isProductCreateSeoDiscoveryEnabled({
+      authorId: OTHER_AUTHOR,
+      publicationClass,
+    }),
+    false,
+    `product create discovery must stay closed for ${publicationClass}`,
+  );
+}
 
 // --- URL helpers ---
 assert.equal(SEO_RESERVATION_ID_PARAM, "seo_reservation_id");
