@@ -15,7 +15,10 @@ import {
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
 import { isProductCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
-import { listSeoOpportunitiesForAuthor } from "@/lib/seo-queries/queries";
+import {
+  listActiveSeoReservationsForWorkspaces,
+  listSeoOpportunitiesForAuthor,
+} from "@/lib/seo-queries/queries";
 import {
   SEO_QUERY_SKIP_PARAM,
   SEO_RESERVATION_ID_PARAM,
@@ -149,7 +152,14 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
   // B: product-create discovery + class + no reservation + no skip → pre-create query step
   const hasValidReservation = Boolean(reservationLoad?.ok);
   if (seoQueryStepEnabled && !hasValidReservation && !seoQuerySkip) {
-    const opportunities = await listSeoOpportunitiesForAuthor(initialAuthor.id);
+    const [opportunities, workspaceReservations] = await Promise.all([
+      listSeoOpportunitiesForAuthor(initialAuthor.id),
+      listActiveSeoReservationsForWorkspaces(authors),
+    ]);
+    const otherWorkspaceReservations = workspaceReservations.filter(
+      (item) => item.authorId !== initialAuthor.id,
+    );
+
     return (
       <AuthorShell
         title="Создать"
@@ -161,6 +171,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
           authorSlug={initialAuthor.slug}
           publicationClass={publicationClass}
           opportunities={opportunities}
+          otherWorkspaceReservations={otherWorkspaceReservations}
         />
       </AuthorShell>
     );
