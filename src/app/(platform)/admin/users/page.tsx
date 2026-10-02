@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; role?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; role?: string; author?: string; page?: string }>;
 }) {
   const session = await requireAdminPermission("users.view");
   const ownerSession = await getPlatformOwnerSessionIfOwner();
