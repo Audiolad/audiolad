@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createClient } from "@/lib/supabase/server";
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -73,7 +74,8 @@ export async function DELETE(request: Request) {
   const body = await request.json() as Record<string, unknown>;
   const reservationId = text(body.reservation_id);
   if (!reservationId) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
-  const { data, error } = await createServiceRoleClient().rpc(
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
     "admin_release_seo_query_reservation",
     { p_reservation_id: reservationId },
   );
