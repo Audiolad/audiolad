@@ -262,7 +262,6 @@ function buildCorePublishRequirements(
 
   const coverFailure = !hasProductCoverForModeration({
     coverUrl: practice.cover_url,
-    coverImage: practice.cover_image ?? null,
   })
     ? {
         code: PRODUCT_MODERATION_MISSING_COVER_CODE,
