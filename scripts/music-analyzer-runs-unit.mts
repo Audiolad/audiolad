@@ -6,6 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { StorageClient } from "@supabase/storage-js";
 
 import { collectAnalyzerDocuments } from "../src/lib/music-analyzer-runs/analyze-output";
+import { readMusicAnalyzerPassport } from "../src/lib/music-analyzer-runs/passport";
 import {
   classifySignedUploadError,
   fileForSignedUpload,
@@ -367,5 +368,152 @@ assert.equal(readSignedUploadClientReport({
 assert.equal(readSignedUploadClientReport({ code: "object_missing", status: 404, message: "Object not found" })?.code, "object_missing");
 assert.equal(readSignedUploadClientReport({ code: "drop_table", message: "nope" }), null);
 assert.equal(readSignedUploadClientReport(null), null);
+
+const goldLike = {
+  technical: {
+    bpm: null,
+    bpm_candidate: 70.3,
+    bpm_raw: 140.6,
+    bpm_confidence: "low",
+    bpm_gate: "not_published",
+    duration_s: 200.5,
+    lufs: -15.1,
+    sample_rate: 44100,
+    channels: 2,
+    format: "wav",
+  },
+  key: { candidate: "F", mode: "major", published: null },
+  genres: [
+    { label: "Jazz", score: 0.91, band: "high" },
+    { label: "Lounge", score: 0.4, band: "medium" },
+    { label: "Ambient", score: 0.2, band: "low" },
+    { label: "Pop", score: 0.1, band: "low" },
+  ],
+  styles: [
+    { name: "Smooth jazz" },
+    { name: "Lounge jazz" },
+    { name: "Spa" },
+    { name: "Extra" },
+  ],
+  moods: [
+    { label: "Calm", score: 0.8, band: "high" },
+    { label: "Warm", score: 0.5, band: "medium" },
+  ],
+  instruments: [
+    { label: "Saxophone", score: 0.7, rank: 2 },
+    { label: "Piano", score: 0.9, rank: 1 },
+  ],
+  sound_character: [{ label: "Soft", score: 0.66 }],
+  taxonomy: { version: "listening-v05" },
+};
+const goldPassport = readMusicAnalyzerPassport({ normalized: goldLike });
+assert.equal(goldPassport.bpm.headline, "70.3 BPM · кандидат");
+assert.equal(goldPassport.bpm.lines.includes("raw 140.6"), true);
+assert.equal(goldPassport.bpm.lines.includes("опубликовано: —"), true);
+assert.equal(goldPassport.bpm.lines.some((line) => line.includes("низкая уверенность")), true);
+assert.equal(goldPassport.bpm.lines.some((line) => line.includes("не опубликован")), true);
+assert.equal(goldPassport.bpm.headline.startsWith("140.6"), false);
+assert.equal(goldPassport.bpm.headline.includes("кандидат"), true);
+assert.equal(goldPassport.key.headline, "F major · кандидат");
+assert.equal(goldPassport.key.lines.includes("опубликовано: —"), true);
+assert.equal(goldPassport.genres.map((row) => row.label).join(","), "Jazz,Lounge,Ambient");
+assert.equal(goldPassport.genres[0]?.tone, "high");
+assert.equal(goldPassport.genres[2]?.tone, "low");
+assert.equal(goldPassport.styles.map((row) => row.label).join(","), "Smooth jazz,Lounge jazz,Spa");
+assert.deepEqual(goldPassport.moods.map((row) => row.label), ["Calm", "Warm"]);
+assert.deepEqual(goldPassport.instruments.map((row) => row.label), ["Piano", "Saxophone"]);
+assert.equal(goldPassport.instruments[0]?.rank, 1);
+assert.equal(goldPassport.sound?.label, "Soft");
+assert.equal(goldPassport.technical.find((row) => row.label === "Длительность")?.value, "200.5 с");
+assert.equal(goldPassport.technical.find((row) => row.label === "LUFS")?.value, "-15.1");
+assert.equal(goldPassport.technical.find((row) => row.label === "Частота дискретизации")?.value, "44100 Гц");
+assert.equal(goldPassport.technical.find((row) => row.label === "Каналы")?.value, "2");
+assert.equal(goldPassport.technical.find((row) => row.label === "Формат")?.value, "wav");
+assert.equal(goldPassport.taxonomy, "listening-v05");
+assert.equal(goldPassport.prompt, null);
+assert.equal(goldPassport.sources.bpmPublished, "technical.bpm");
+assert.equal(goldPassport.sources.bpmCandidate, "technical.bpm_candidate");
+assert.equal(goldPassport.sources.bpmRaw, "technical.bpm_raw");
+assert.equal(goldPassport.sources.bpmConfidence, "technical.bpm_confidence");
+assert.equal(goldPassport.sources.bpmGate, "technical.bpm_gate");
+assert.equal(goldPassport.sources.keyCandidate, "key.candidate");
+assert.equal(goldPassport.sources.keyCandidateMode, "key.mode");
+assert.equal(goldPassport.sources.genres, "genres");
+assert.equal(goldPassport.sources.styles, "styles");
+assert.equal(goldPassport.sources.moods, "moods");
+assert.equal(goldPassport.sources.instruments, "instruments");
+assert.equal(goldPassport.sources.soundCharacter, "sound_character");
+assert.equal(goldPassport.sources.duration, "technical.duration_s");
+assert.equal(goldPassport.sources.lufs, "technical.lufs");
+assert.equal(goldPassport.sources.sampleRate, "technical.sample_rate");
+assert.equal(goldPassport.sources.channels, "technical.channels");
+assert.equal(goldPassport.sources.format, "technical.format");
+assert.equal(goldPassport.sources.taxonomy, "taxonomy.version");
+assert.equal(goldPassport.sources.prompt, null);
+
+const nestedPassport = readMusicAnalyzerPassport({
+  normalized: {
+    technical: { bpm: null, duration: 12, sample_rate: 48000, channels: 1, format: "mp3" },
+    bpm: { candidate: 70.3, raw: 140.6, published: null, confidence: "low", gate_passed: false },
+    key: { candidate: "F major", published: null },
+    meta: { taxonomy_version: "tax-nested" },
+  },
+});
+assert.equal(nestedPassport.bpm.headline, "70.3 BPM · кандидат");
+assert.equal(nestedPassport.bpm.lines.includes("raw 140.6"), true);
+assert.equal(nestedPassport.key.headline, "F major · кандидат");
+assert.equal(nestedPassport.sources.bpmPublished, "technical.bpm");
+assert.equal(nestedPassport.sources.bpmCandidate, "bpm.candidate");
+assert.equal(nestedPassport.sources.bpmRaw, "bpm.raw");
+assert.equal(nestedPassport.sources.bpmGate, "bpm.gate_passed");
+assert.equal(nestedPassport.sources.keyCandidate, "key.candidate");
+assert.equal(nestedPassport.taxonomy, "tax-nested");
+assert.equal(nestedPassport.sources.taxonomy, "meta.taxonomy_version");
+assert.equal(nestedPassport.technical.find((row) => row.label === "Длительность")?.value, "12");
+
+const publishedPassport = readMusicAnalyzerPassport({
+  normalized: {
+    technical: { bpm: 90 },
+    tempo: { candidate_bpm: 70.3, raw_bpm: 140.6 },
+    technical_key: null,
+    key: { published: "C", published_mode: "minor", candidate: "F major" },
+  },
+});
+assert.equal(publishedPassport.bpm.headline, "90 BPM");
+assert.equal(publishedPassport.bpm.headline.includes("кандидат"), false);
+assert.equal(publishedPassport.bpm.lines.includes("кандидат: 70.3 BPM"), true);
+assert.equal(publishedPassport.bpm.lines.includes("raw 140.6"), true);
+assert.equal(publishedPassport.key.headline, "C minor");
+assert.equal(publishedPassport.sources.bpmPublished, "technical.bpm");
+assert.equal(publishedPassport.sources.bpmCandidate, "tempo.candidate_bpm");
+assert.equal(publishedPassport.sources.bpmRaw, "tempo.raw_bpm");
+assert.equal(publishedPassport.sources.keyPublished, "key.published");
+assert.equal(publishedPassport.sources.keyPublishedMode, "key.published_mode");
+
+const versionPassport = readMusicAnalyzerPassport({
+  normalized: { taxonomy: { version: "from-json" }, prompt: { version: "prompt-2" } },
+  raw: { meta: { taxonomy_version: "from-raw" } },
+  taxonomyVersion: "from-column",
+  promptVersion: null,
+});
+assert.equal(versionPassport.taxonomy, "from-column");
+assert.equal(versionPassport.sources.taxonomy, "column");
+assert.equal(versionPassport.prompt, "prompt-2");
+assert.equal(versionPassport.sources.prompt, "prompt.version");
+
+const detail = read("src/components/music-analyzer-runs/RunDetail.tsx");
+const passportUi = read("src/components/music-analyzer-runs/RunPassport.tsx");
+assert.match(detail, /RunPassport/);
+assert.match(detail, /Технические данные \/ Raw JSON/);
+assert.match(passportUi, /Музыкальный паспорт/);
+assert.match(detail, /format=json/);
+assert.match(detail, /format=csv/);
+assert.match(detail, /format=markdown/);
+assert.match(passportUi, /Темп \(BPM\)/);
+assert.match(passportUi, /Тональность/);
+assert.match(passportUi, /Характер \/ настроение/);
+assert.match(passportUi, /Инструменты/);
+assert.doesNotMatch(`${detail}\n${passportUi}`, /ведущий инструмент/);
+assert.doesNotMatch(read("src/lib/music-analyzer-runs/export-run.ts"), /passport/);
 
 console.log("music-analyzer-runs-unit: ok");
