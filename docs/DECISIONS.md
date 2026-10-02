@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-10-02 — Music Analyzer Lab Phase 2A runs the pinned Python analyzer on the app VPS
+
+**Контекст:** Human Listening Validation остаётся на `music_lab_*` и `/music-analyzer`. Нужен отдельный автоанализ WAV/MP3: неизменяемый прогон, повтор того же SHA256 — новая версия, выгрузка JSON/CSV/Markdown и сравнение двух версий. Музыкальные поля не выдумываются в Next.js. Music Passport в этом шаге не подключается.
+
+**Решение:**
+
+1. Новые объекты только `music_analyzer_runs` и приватный bucket `music-analyzer-runs`. `music_lab_*`, `music-analyzer-lab` и `music_passport_*` не изменяются.
+2. Доступ тот же: owner/admin через `platform-access`. Путь `/music-analyzer/runs` рядом с хабом прослушивания.
+3. Исполнение — PM2 `audiolad-music-analyzer-worker` на том же Timeweb VPS, что и audiolad.ru. Не Company Core. Команда из чекаута `cursor/benchmark-harness-v01` @ `932c4ce` (содержание анализатора `3750f3b`): `python analyze_track.py <wav> --output-dir <dir> --device cpu` в `.venv-v03-clap`. Чекпоинт `music_audioset_epoch_15_esc_90.14.pt` лежит в `/var/lib/audiolad/music-analyzer/`, вне релиза Next.
+4. Candidate A не выбирается. Флаги стратегии инструментов в вызов не добавляются. Таксономия и версия промпта пишутся только если их вернул анализатор.
+5. Успешный и неуспешный прогон после печати не редактируется и не удаляется.
+
+**Принято:** задание Phase 2A. Production cutover только явным «деплоим» (`production-deploy.yml`, `confirm=DEPLOY`). Bootstrap Python на VPS — отдельный ops-шаг, см. `deploy/docs/MUSIC_ANALYZER_WORKER.md`.
+
+---
+
 ## 2026-10-01 — Music Passport Basic is a product store, separate from Rights Passport and the lab
 
 **Контекст:** P1-01 needs a versioned stage-1 passport on Track Identity so a later Engine can read measured attributes. `music_lab_*` is the R&D console. `get_music_rights_passport_basic` is the A4 rights projection. Neither is the product Music Passport.

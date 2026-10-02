@@ -5,11 +5,30 @@ import { loadMusicLabBundle } from "@/lib/music-lab/page-data";
 
 export const dynamic = "force-dynamic";
 
+function AutoAnalyzeLink() {
+  return (
+    <Link
+      href="/music-analyzer/runs"
+      className="block rounded-[22px] border border-[#e4d7f4] bg-white p-5"
+    >
+      <h2 className="text-lg font-semibold text-[#25135c]">Автоанализ</h2>
+      <p className="mt-2 text-sm text-[#796ba0]">
+        WAV или MP3 через Python-анализатор. Тот же файл снова — новая версия прогона.
+      </p>
+    </Link>
+  );
+}
+
 export default async function MusicAnalyzerHubPage() {
   const { bundle } = await loadMusicLabBundle();
 
   if (!bundle) {
-    return <ImportPacketButton initial />;
+    return (
+      <div className="space-y-6">
+        <ImportPacketButton initial />
+        <AutoAnalyzeLink />
+      </div>
+    );
   }
 
   const missing = {
@@ -83,6 +102,7 @@ export default async function MusicAnalyzerHubPage() {
           ),
         )}
       </div>
+      <AutoAnalyzeLink />
       <CompleteExperimentButton
         ready={ready}
         missing={missing}
