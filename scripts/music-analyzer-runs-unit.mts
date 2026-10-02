@@ -3,7 +3,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { StorageClient } from "@supabase/storage-js";
+
 import { collectAnalyzerDocuments } from "../src/lib/music-analyzer-runs/analyze-output";
+import {
+  classifySignedUploadError,
+  fileForSignedUpload,
+  readSignedUploadClientReport,
+} from "../src/lib/music-analyzer-runs/browser-upload";
 import { diffJson } from "../src/lib/music-analyzer-runs/compare";
 import {
   MUSIC_ANALYZER_CONTENT_COMMIT,
@@ -275,5 +282,90 @@ worker.requestShutdown();
 await running;
 assert.deepEqual(recorded.completed, ["run-1"]);
 assert.equal(recorded.failed.length, 0);
+
+const workspace = read("src/components/music-analyzer-runs/RunsWorkspace.tsx");
+assert.match(workspace, /fileForSignedUpload\(file, file\.name, mime\)/);
+assert.match(workspace, /classifySignedUploadError\(uploaded\.error\)/);
+assert.match(workspace, /message\(storageError\.code\)/);
+assert.doesNotMatch(workspace, /setError\(message\("object_missing"\)\)/);
+const abandon = read("src/app/api/music-analyzer/runs/uploads/abandon/route.ts");
+assert.match(abandon, /readSignedUploadClientReport/);
+assert.match(abandon, /music-analyzer browser upload rejected/);
+assert.match(abandon, /code: storageError\.code/);
+
+async function signedUploadPartType(file: Blob, contentType: "audio/wav" | "audio/mpeg"): Promise<string> {
+  let raw = "";
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    if (init?.body instanceof FormData) {
+      const probe = new Request("https://example.test/put", { method: "PUT", body: init.body });
+      raw = await probe.text();
+    }
+    return new Response(JSON.stringify({ Key: "music-analyzer-runs/runs/id/file" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  const storage = new StorageClient(
+    "https://example.test/storage/v1",
+    { apikey: "test" },
+    fetchImpl,
+  );
+  const uploaded = await storage.from("music-analyzer-runs").uploadToSignedUrl(
+    "runs/id/file",
+    "signed-token",
+    file,
+    { contentType, upsert: false },
+  );
+  assert.equal(uploaded.error, null);
+  const match = raw.match(/content-type:\s*([^\r\n]+)/i);
+  return (match?.[1] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+const emptyWav = new File([Uint8Array.from([82, 73, 70, 70])], "Трек 1.wav", { type: "" });
+const octetWav = new File([Uint8Array.from([82, 73, 70, 70])], "track.wav", { type: "application/octet-stream" });
+const octetMp3 = new File([Uint8Array.from([73, 68, 51])], "song.mp3", { type: "application/octet-stream" });
+const emptyBlob = new Blob([Uint8Array.from([82, 73, 70, 70])], { type: "" });
+const octetBlob = new Blob([Uint8Array.from([82, 73, 70, 70])], { type: "application/octet-stream" });
+assert.equal(await signedUploadPartType(emptyWav, "audio/wav"), "application/octet-stream");
+assert.equal(await signedUploadPartType(emptyBlob, "audio/wav"), "application/octet-stream");
+assert.equal(await signedUploadPartType(octetBlob, "audio/wav"), "application/octet-stream");
+assert.equal(await signedUploadPartType(fileForSignedUpload(emptyWav, emptyWav.name, "audio/wav"), "audio/wav"), "audio/wav");
+assert.equal(await signedUploadPartType(fileForSignedUpload(emptyBlob, "clip.wav", "audio/wav"), "audio/wav"), "audio/wav");
+assert.equal(await signedUploadPartType(fileForSignedUpload(octetWav, octetWav.name, "audio/wav"), "audio/wav"), "audio/wav");
+assert.equal(await signedUploadPartType(fileForSignedUpload(octetBlob, "clip.wav", "audio/wav"), "audio/wav"), "audio/wav");
+assert.equal(await signedUploadPartType(fileForSignedUpload(octetMp3, octetMp3.name, "audio/mpeg"), "audio/mpeg"), "audio/mpeg");
+assert.equal(fileForSignedUpload(emptyWav, emptyWav.name, "audio/wav").type, "audio/wav");
+
+assert.equal(classifySignedUploadError({
+  status: 415,
+  statusCode: "415",
+  error: "invalid_mime_type",
+  message: "mime type application/octet-stream is not supported",
+}).code, "invalid_mime_type");
+assert.equal(classifySignedUploadError({
+  status: 400,
+  message: "InvalidMimeType",
+}).code, "invalid_mime_type");
+assert.equal(classifySignedUploadError(new TypeError("Failed to fetch")).code, "upload_network");
+assert.equal(classifySignedUploadError({ name: "StorageUnknownError", message: "Failed to fetch" }).code, "upload_network");
+assert.equal(classifySignedUploadError({ status: 404, statusCode: "404", message: "Object not found" }).code, "object_missing");
+assert.equal(classifySignedUploadError({ status: 400, statusCode: "InvalidJWT", message: "Invalid Compact JWS" }).code, "upload_rejected");
+const leaked = classifySignedUploadError({
+  status: 415,
+  statusCode: "415",
+  message: "mime rejected token=secret eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiJ9.c2ln",
+});
+assert.equal(leaked.code, "invalid_mime_type");
+assert.match(leaked.message ?? "", /token=\[redacted\]/);
+assert.doesNotMatch(leaked.message ?? "", /eyJ/);
+assert.equal(readSignedUploadClientReport({
+  code: "invalid_mime_type",
+  status: 415,
+  statusCode: "415",
+  message: leaked.message,
+})?.code, "invalid_mime_type");
+assert.equal(readSignedUploadClientReport({ code: "object_missing", status: 404, message: "Object not found" })?.code, "object_missing");
+assert.equal(readSignedUploadClientReport({ code: "drop_table", message: "nope" }), null);
+assert.equal(readSignedUploadClientReport(null), null);
 
 console.log("music-analyzer-runs-unit: ok");
