@@ -86,6 +86,7 @@ export default function AuthorSeoDiscoveryPanel({
   const [databaseMatches, setDatabaseMatches] = useState<AuthorSeoDiscoveryResult[]>([]);
   const [discoverResults, setDiscoverResults] = useState<AuthorSeoDiscoveryResult[]>([]);
   const [discoverMessage, setDiscoverMessage] = useState<string | null>(null);
+  const [wordstatWarning, setWordstatWarning] = useState<string | null>(null);
   const [discoverPending, setDiscoverPending] = useState(false);
   const [proposePendingKey, setProposePendingKey] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -198,6 +199,7 @@ export default function AuthorSeoDiscoveryPanel({
     if (!phrase) return;
     setDiscoverPending(true);
     setDiscoverMessage(null);
+    setWordstatWarning(null);
     setDiscoverResults([]);
     setDatabaseMatches([]);
     setDiscoverySeedPhrase(null);
@@ -237,9 +239,14 @@ export default function AuthorSeoDiscoveryPanel({
     setDiscoverySeedPhrase(seed);
     setDatabaseMatches(Array.isArray(payload.databaseMatches) ? payload.databaseMatches : []);
     setDiscoverResults(Array.isArray(payload.results) ? payload.results : []);
+    const nextWordstatWarning =
+      typeof payload.wordstatWarning === "string" && payload.wordstatWarning.trim()
+        ? payload.wordstatWarning.trim()
+        : null;
+    setWordstatWarning(nextWordstatWarning);
     const dbCount = Array.isArray(payload.databaseMatches) ? payload.databaseMatches.length : 0;
     const wsCount = Array.isArray(payload.results) ? payload.results.length : 0;
-    if (!dbCount && !wsCount) {
+    if (!dbCount && !wsCount && !nextWordstatWarning) {
       setDiscoverMessage("Подходящих запросов не найдено.");
     }
   }
@@ -453,7 +460,9 @@ export default function AuthorSeoDiscoveryPanel({
               отправить на проверку.
             </p>
             {discoverResults.length === 0 ? (
-              <p className="mt-3 text-sm text-[#796ba0]">Дополнительных вариантов из Яндекса сейчас нет.</p>
+              <p className="mt-3 text-sm text-[#796ba0]">
+                {wordstatWarning ?? "Дополнительных вариантов из Яндекса сейчас нет."}
+              </p>
             ) : (
               <div className="mt-3 grid gap-3">
                 {discoverResults.map((rawItem) => {
