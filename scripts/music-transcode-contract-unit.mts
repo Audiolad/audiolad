@@ -8,6 +8,7 @@ import {
   MUSIC_STREAM_BITRATE,
   MUSIC_STREAM_MIME,
   MUSIC_TRANSCODE_FAILED_MESSAGE,
+  MUSIC_TRANSCODE_FFMPEG_STALL_MS,
   MUSIC_TRANSCODE_MAX_ATTEMPTS,
   MUSIC_TRANSCODE_RETRY_MESSAGE,
   buildMusicStreamStoragePath,
@@ -26,6 +27,7 @@ const sourceId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const storagePath = buildMusicStreamStoragePath(audioItemId, sourceId);
 
 assert.equal(MUSIC_TRANSCODE_MAX_ATTEMPTS, 3);
+assert.equal(MUSIC_TRANSCODE_FFMPEG_STALL_MS, 2 * 60 * 1000);
 assert.equal(MUSIC_STREAM_BITRATE, "256k");
 assert.equal(MUSIC_STREAM_MIME, "audio/mpeg");
 assert.equal(storagePath, `${audioItemId}/${sourceId}/mp3-256.mp3`);
@@ -33,6 +35,7 @@ assert.equal(isOwnedMusicStreamStoragePath(storagePath, audioItemId, sourceId), 
 assert.equal(isOwnedMusicStreamStoragePath(`${storagePath}/../x.mp3`, audioItemId, sourceId), false);
 assert.equal(musicStreamOriginalFileName("Track.WAV"), "Track.mp3");
 assert.equal(classifyMusicTranscodeError(new Error("source_unavailable")), "source_unavailable");
+assert.equal(classifyMusicTranscodeError(new Error("ffmpeg_stalled")), "ffmpeg_stalled");
 assert.equal(durationWithinTolerance(10, 10), true);
 assert.equal(durationWithinTolerance(20, 10), false);
 
@@ -94,6 +97,14 @@ assert.match(ffmpeg, /MUSIC_STREAM_BITRATE/);
 assert.match(ffmpeg, /-vn/);
 assert.match(ffmpeg, /probe\.bitrate == null/);
 assert.doesNotMatch(ffmpeg, /loudnorm|dynaudnorm|acompressor|equalizer/);
+assert.match(ffmpeg, /-progress", "pipe:1"/);
+assert.match(ffmpeg, /MusicTranscodeFfmpegStalledError/);
+
+const ensureWorker = read("deploy/scripts/ensure-music-transcode-worker.sh");
+assert.match(ensureWorker, /MUSIC_TRANSCODE_FORCE_REFRESH/);
+assert.match(ensureWorker, /reason=deploy_cutover/);
+const deploy = read("deploy/scripts/deploy.sh");
+assert.match(deploy, /MUSIC_TRANSCODE_FORCE_REFRESH=1 DEPLOY_TREE=/);
 
 const signed = read("src/lib/listen/signed-audio.ts");
 assert.doesNotMatch(signed, /music-streams|music-masters/);
