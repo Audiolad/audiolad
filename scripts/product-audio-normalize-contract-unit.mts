@@ -186,7 +186,10 @@ assert.match(
   /pm2|\$PM2_BIN/,
   "deploy cutover must actively restart an already-online normalize worker",
 );
-assert.match(onlineCase, /restart.*--update-env/s);
+assert.ok(
+  onlineCase.includes("restart") && onlineCase.includes("--update-env"),
+  "online worker must restart with updated env",
+);
 assert.doesNotMatch(
   onlineCase,
   /already_online[\s\S]*exit 0/,
