@@ -423,7 +423,7 @@ main() {
     send_deploy_alert "deploy_failed" "Music transcode worker ensure missing for $RELEASE_NAME"
     exit 1
   fi
-  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$MUSIC_WORKER_ENSURE"; then
+  if ! MUSIC_TRANSCODE_FORCE_REFRESH=1 DEPLOY_TREE="$RELEASE_DIR/deploy" "$MUSIC_WORKER_ENSURE"; then
     log_error "music_transcode_worker_ensure_failed"
     send_deploy_alert "deploy_failed" "Music transcode worker ensure failed for $RELEASE_NAME"
     # Cutover already completed: do not roll back healthy web/nginx.

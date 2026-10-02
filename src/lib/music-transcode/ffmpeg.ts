@@ -5,6 +5,7 @@ import {
   MUSIC_STREAM_BITRATE,
   MUSIC_STREAM_BITRATE_MAX,
   MUSIC_STREAM_BITRATE_MIN,
+  MUSIC_TRANSCODE_FFMPEG_STALL_MS,
   durationWithinTolerance,
 } from "./contract";
 
@@ -15,6 +16,21 @@ export class MusicTranscodeAbortedError extends Error {
   constructor() {
     super("worker_lease_lost");
     this.name = "MusicTranscodeAbortedError";
+  }
+}
+
+export type MusicTranscodeFfmpegStallDetails = {
+  elapsedMs: number;
+  lastProgressUs: number | null;
+  lastOutTime: string | null;
+  closeSignal: NodeJS.Signals | null;
+};
+
+export class MusicTranscodeFfmpegStalledError extends Error {
+  readonly code = "ffmpeg_stalled";
+  constructor(readonly details: MusicTranscodeFfmpegStallDetails) {
+    super("ffmpeg_stalled");
+    this.name = "MusicTranscodeFfmpegStalledError";
   }
 }
 
@@ -56,50 +72,180 @@ export async function terminateMusicTranscodeChild(
   } catch {
     return;
   }
-  await Promise.race([
-    waitForChildClose(child),
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, graceMs);
-    }),
-  ]);
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      waitForChildClose(child),
+      new Promise<void>((resolve) => {
+        graceTimer = setTimeout(resolve, graceMs);
+      }),
+    ]);
+  } finally {
+    if (graceTimer !== undefined) clearTimeout(graceTimer);
+  }
   if (childAlreadyExited(child)) return;
   try {
     child.kill("SIGKILL");
   } catch {
-    return;
+    // The process may have exited between the check and SIGKILL.
   }
   await waitForChildClose(child);
+}
+
+type MusicTranscodeProgressState = {
+  rest: string;
+  outTimeUs: number | null;
+  outTimeMs: number | null;
+  outTimeNs: number | null;
+  outTime: string | null;
+};
+
+function parseNonNegative(value: string): number | null {
+  if (!value || value === "N/A") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function parseOutTimeUs(value: string | null): number | null {
+  if (!value) return null;
+  const match = /^(\d+):(\d{2}):(\d{2}(?:\.\d+)?)$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  if (![hours, minutes, seconds].every((part) => Number.isFinite(part))) return null;
+  return Math.round((hours * 3600 + minutes * 60 + seconds) * 1_000_000);
+}
+
+function consumeMusicTranscodeProgress(
+  state: MusicTranscodeProgressState,
+  chunk: string,
+): Array<{ positionUs: number | null; outTime: string | null }> {
+  const lines = `${state.rest}${chunk}`.split(/\r?\n/);
+  state.rest = lines.pop() ?? "";
+  if (state.rest.length > 65_536) state.rest = "";
+  const samples: Array<{ positionUs: number | null; outTime: string | null }> = [];
+  for (const line of lines) {
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    if (key === "out_time_us") state.outTimeUs = parseNonNegative(value);
+    else if (key === "out_time_ms") state.outTimeMs = parseNonNegative(value);
+    else if (key === "out_time_ns") state.outTimeNs = parseNonNegative(value);
+    else if (key === "out_time") state.outTime = value || null;
+    else if (key === "progress") {
+      samples.push({
+        positionUs: state.outTimeUs
+          ?? (state.outTimeNs == null ? null : Math.round(state.outTimeNs / 1000))
+          ?? parseOutTimeUs(state.outTime)
+          ?? state.outTimeMs,
+        outTime: state.outTime,
+      });
+      state.outTimeUs = null;
+      state.outTimeMs = null;
+      state.outTimeNs = null;
+      state.outTime = null;
+    }
+  }
+  return samples;
 }
 
 export function runMusicTranscodeChild(
   binary: string,
   args: readonly string[],
-  options: { signal?: AbortSignal; termGraceMs?: number; captureStdout?: boolean } = {},
+  options: {
+    signal?: AbortSignal;
+    termGraceMs?: number;
+    captureStdout?: boolean;
+    progress?: { stallMs?: number };
+  } = {},
 ): Promise<string> {
   const signal = options.signal;
   const termGraceMs = options.termGraceMs ?? MUSIC_TRANSCODE_CHILD_TERM_GRACE_MS;
+  const progress = options.progress;
+  const stallMs = progress?.stallMs ?? MUSIC_TRANSCODE_FFMPEG_STALL_MS;
   if (signal?.aborted) return Promise.reject(new MusicTranscodeAbortedError());
+  if (progress && (!Number.isFinite(stallMs) || stallMs < 1)) {
+    return Promise.reject(new Error("invalid_ffmpeg_stall_ms"));
+  }
 
   return new Promise((resolve, reject) => {
+    const captureStdout = Boolean(options.captureStdout) && !progress;
     const child = spawn(binary, [...args], {
-      stdio: ["ignore", options.captureStdout ? "pipe" : "ignore", "pipe"],
+      stdio: ["ignore", captureStdout || progress ? "pipe" : "ignore", "pipe"],
     });
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let stalled = false;
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopping: Promise<void> | undefined;
+    const startedAt = Date.now();
+    let highWaterUs: number | null = null;
+    let lastProgressUs: number | null = null;
+    let lastOutTime: string | null = null;
+    const progressState: MusicTranscodeProgressState = {
+      rest: "",
+      outTimeUs: null,
+      outTimeMs: null,
+      outTimeNs: null,
+      outTime: null,
+    };
+
+    const clearStallTimer = () => {
+      if (stallTimer !== undefined) {
+        clearTimeout(stallTimer);
+        stallTimer = undefined;
+      }
+    };
+    const stopChild = () => {
+      if (!stopping) stopping = terminateMusicTranscodeChild(child, termGraceMs);
+      return stopping;
+    };
+    const armStallTimer = () => {
+      if (!progress || settled || stalled || signal?.aborted) return;
+      clearStallTimer();
+      stallTimer = setTimeout(() => {
+        stallTimer = undefined;
+        if (settled || signal?.aborted) return;
+        stalled = true;
+        void stopChild();
+      }, stallMs);
+    };
     const settle = (finish: () => void) => {
       if (settled) return;
       settled = true;
+      clearStallTimer();
       signal?.removeEventListener("abort", onAbort);
       finish();
     };
     const onAbort = () => {
-      void terminateMusicTranscodeChild(child, termGraceMs);
+      clearStallTimer();
+      void stopChild();
     };
     signal?.addEventListener("abort", onAbort);
-    if (options.captureStdout && child.stdout) {
+
+    if (progress) armStallTimer();
+    if (captureStdout && child.stdout) {
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (chunk: string) => { stdout += chunk; });
+    } else if (progress && child.stdout) {
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        for (const sample of consumeMusicTranscodeProgress(progressState, chunk)) {
+          if (sample.outTime) lastOutTime = sample.outTime;
+          if (sample.positionUs != null) lastProgressUs = sample.positionUs;
+          if (
+            sample.positionUs != null
+            && sample.positionUs > 0
+            && (highWaterUs == null || sample.positionUs > highWaterUs)
+          ) {
+            highWaterUs = sample.positionUs;
+            armStallTimer();
+          }
+        }
+      });
     }
     if (child.stderr) {
       child.stderr.setEncoding("utf8");
@@ -108,10 +254,17 @@ export function runMusicTranscodeChild(
     child.once("error", (error) => {
       settle(() => reject(error));
     });
-    child.once("close", (code) => {
+    child.once("close", (code, closeSignal) => {
       settle(() => {
         if (signal?.aborted) reject(new MusicTranscodeAbortedError());
-        else if (code === 0) resolve(options.captureStdout ? stdout : stderr);
+        else if (stalled) {
+          reject(new MusicTranscodeFfmpegStalledError({
+            elapsedMs: Date.now() - startedAt,
+            lastProgressUs,
+            lastOutTime,
+            closeSignal,
+          }));
+        } else if (code === 0) resolve(captureStdout ? stdout : stderr);
         else reject(new Error("transcode_failed"));
       });
     });
@@ -186,6 +339,9 @@ export async function transcodeWavToMp3(
   signal?: AbortSignal,
 ): Promise<void> {
   await runMusicTranscodeChild("ffmpeg", [
+    "-hide_banner",
+    "-nostdin",
+    "-progress", "pipe:1",
     "-y",
     "-i", inputPath,
     "-map", "0:a:0",
@@ -193,7 +349,7 @@ export async function transcodeWavToMp3(
     "-c:a", "libmp3lame",
     "-b:a", MUSIC_STREAM_BITRATE,
     outputPath,
-  ], { signal });
+  ], { signal, progress: {} });
 }
 
 export async function validateMusicStreamFile(

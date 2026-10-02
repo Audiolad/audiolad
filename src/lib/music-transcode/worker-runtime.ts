@@ -20,6 +20,7 @@ import {
 } from "./contract";
 import {
   MusicTranscodeAbortedError,
+  MusicTranscodeFfmpegStalledError,
   transcodeWavToMp3,
   validateMusicStreamFile,
 } from "./ffmpeg";
@@ -337,6 +338,17 @@ export async function executeClaimedMusicTranscodeJob(
     } catch (error) {
       if (error instanceof MusicTranscodeAbortedError || signal.aborted) {
         throw new MusicTranscodeAbortedError();
+      }
+      if (error instanceof MusicTranscodeFfmpegStalledError) {
+        console.error(JSON.stringify({
+          event: "music_transcode_ffmpeg_stalled",
+          jobId: job.id,
+          elapsedMs: error.details.elapsedMs,
+          lastProgressUs: error.details.lastProgressUs,
+          lastOutTime: error.details.lastOutTime,
+          closeSignal: error.details.closeSignal,
+        }));
+        throw new MusicTranscodeCodedError(error.code);
       }
       throw new MusicTranscodeCodedError("transcode_failed");
     }

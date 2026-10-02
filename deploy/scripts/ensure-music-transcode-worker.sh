@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Ensure audiolad-music-transcode-worker is online for the active release.
 # Missing ecosystem fails the caller. Existing stopped/errored processes are
-# recovered; absent processes are started. Online processes are left alone
-# for self-refresh. Does not touch Studio worker, health-watch, or Nginx.
+# recovered; absent processes are started. Deploy may request one graceful
+# refresh of an online process so a stuck old release cannot survive cutover.
+# Does not touch Studio worker, health-watch, or Nginx.
 # No new secrets.
 set -Eeuo pipefail
 
@@ -17,6 +18,15 @@ APP_NAME="${MUSIC_TRANSCODE_PM2_APP:-audiolad-music-transcode-worker}"
 ECOSYSTEM="${ECOSYSTEM:-$DEPLOY_TREE/music-transcode-worker.ecosystem.config.cjs}"
 PM2_BIN="${PM2_BIN:-pm2}"
 SETTLE_SECONDS="${MUSIC_TRANSCODE_WORKER_SETTLE_SECONDS:-3}"
+FORCE_REFRESH="${MUSIC_TRANSCODE_FORCE_REFRESH:-0}"
+
+case "$FORCE_REFRESH" in
+  0|1) ;;
+  *)
+    printf '[%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "music_transcode_worker_invalid_force_refresh value=$FORCE_REFRESH"
+    exit 1
+    ;;
+esac
 
 log() {
   printf '[%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$*"
@@ -75,8 +85,16 @@ fi
 STATUS="$(pm2_status)"
 case "$STATUS" in
   online)
-    log "music_transcode_worker_already_online app=$APP_NAME"
-    exit 0
+    if [[ "$FORCE_REFRESH" == "1" ]]; then
+      log "music_transcode_worker_refresh app=$APP_NAME reason=deploy_cutover"
+      if ! "$PM2_BIN" restart "$APP_NAME" --update-env; then
+        log "music_transcode_worker_restart_failed app=$APP_NAME"
+        exit 1
+      fi
+    else
+      log "music_transcode_worker_already_online app=$APP_NAME"
+      exit 0
+    fi
     ;;
   missing)
     log "music_transcode_worker_start app=$APP_NAME"
