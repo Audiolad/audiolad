@@ -3,7 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { PRODUCT_CONTENT_LIMITS } from "@/lib/author-products/limits";
-import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isProductCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
 
 export type SeoReservationProductCreateContext = SeoReservationProductFormContext;
@@ -52,7 +52,7 @@ export async function loadSeoReservationProductCreateContext(
   }
 
   if (
-    !isMusicCreateSeoDiscoveryEnabled({
+    !isProductCreateSeoDiscoveryEnabled({
       authorId: input.authorId,
       publicationClass: input.publicationClass,
     })
@@ -60,7 +60,7 @@ export async function loadSeoReservationProductCreateContext(
     return {
       ok: false,
       code: "beta_disabled",
-      message: "Эта функция пока доступна только в закрытой бете.",
+      message: "Выбор поискового запроса недоступен для этого типа продукта.",
     };
   }
 
