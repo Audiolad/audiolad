@@ -15,7 +15,7 @@ import {
 export const AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG = "osen-zvuchit-2026";
 export const AUDIO_SPRINT_OSEN_ZVUCHIT_TITLE = "Осень звучит";
 export const AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION =
-  "Выберите свободный запрос и создайте по нему бесплатный аудиопродукт в каталог. Музыка публикуется как релиз, медитации и практики — как практика.";
+  "Выберите свободный запрос и создайте по нему бесплатный аудиопродукт в каталог. Музыка создаётся в разделе «Музыка», медитации, аффирмации и практики — через «Продукт» → «Аудиопрактика».";
 
 /** First release shows the initial pool only. Reserve stays hidden. */
 export const reservePoolEnabled = false;
@@ -64,7 +64,7 @@ export const AUDIO_SPRINT_SEO_REQUIRED_MESSAGE =
 
 export const AUDIO_SPRINT_CLASS_MISMATCH_CODE = "audio_sprint_class_mismatch";
 export const AUDIO_SPRINT_CLASS_MISMATCH_MESSAGE =
-  "Класс продукта не соответствует разделу спринта. Музыкальный запрос публикуется как релиз, голосовой — как практика.";
+  "Тип продукта не соответствует разделу спринта. Для музыкального запроса выберите «Музыка», для медитации, аффирмации или практики — «Продукт» → «Аудиопрактика».";
 
 /** Packaging contract from AuthorSeoPromptBuilder: exactly three how-to items and three Q&A. */
 export const AUDIO_SPRINT_USAGE_ITEM_COUNT = 3;

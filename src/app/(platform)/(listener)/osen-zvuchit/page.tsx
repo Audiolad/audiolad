@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -128,6 +127,65 @@ function Step({
         </div>
       </div>
     </li>
+  );
+}
+
+function AudioSprintQueryPreview() {
+  const examples = [
+    "Босса нова музыка для кофейни",
+    "Волшебная осенняя музыка",
+    "Грустная осенняя музыка",
+  ];
+
+  return (
+    <div
+      className="rounded-[24px] bg-[#faf7ff] p-3 sm:p-4"
+      aria-label="Пример страницы выбора запросов «Осень звучит»"
+    >
+      <div className="rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] p-4 sm:p-5">
+        <p className="text-sm leading-6 text-[#4c3d78]">
+          Выберите свободный запрос и создайте по нему бесплатный аудиопродукт в
+          каталог.
+        </p>
+        <p className="mt-3 text-sm font-semibold text-[#25135c]">
+          Мои запросы: 0 из 5
+        </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white">
+            Музыка (56)
+          </span>
+          <span className="inline-flex min-h-10 items-center rounded-full border border-[#e4d7f4] bg-white px-4 text-sm font-semibold text-[#7042c5]">
+            Медитации и практики (44)
+          </span>
+        </div>
+
+        <div className="mt-4 flex min-h-11 items-center rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm text-[#9a8fba]">
+          Поиск по запросам
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {examples.map((title) => (
+          <div
+            key={title}
+            className="rounded-[22px] border border-[#eadff8] bg-white p-4 sm:p-5"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="text-base font-semibold text-[#25135c] sm:text-lg">
+                {title}
+              </p>
+              <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">
+                Свободен
+              </span>
+            </div>
+            <span className="mt-4 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white">
+              Забронировать
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -391,15 +449,7 @@ export default function OsenZvuchitPage() {
           </p>
 
           <figure className="mt-6 overflow-hidden rounded-[26px] border border-[#e8def5] bg-white p-2 shadow-sm">
-            <Image
-              src="/images/osen-zvuchit/queries.webp"
-              alt="Раздел «Осень звучит» в кабинете автора: категории поисковых запросов, поиск и кнопка «Забронировать»"
-              width={1100}
-              height={632}
-              className="h-auto w-full rounded-[20px]"
-              sizes="(max-width: 1024px) 100vw, 896px"
-              priority={false}
-            />
+            <AudioSprintQueryPreview />
             <figcaption className="px-3 pb-2 pt-3 text-sm leading-6 text-[#7d70a2]">
               Если около запроса стоит статус «Свободен», нажмите
               «Забронировать» – и тема закрепится за вами.
