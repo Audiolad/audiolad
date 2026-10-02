@@ -14,6 +14,15 @@ import {
 import type { ProductNormalizeSourceFormat } from "./contract";
 
 export const PRODUCT_NORMALIZE_CHILD_TERM_GRACE_MS = 2_000;
+export const PRODUCT_NORMALIZE_CHILD_STALL_MS = 10 * 60_000;
+
+export class ProductNormalizeStalledError extends Error {
+  readonly code = "ffmpeg_stalled";
+  constructor() {
+    super("ffmpeg_stalled");
+    this.name = "ProductNormalizeStalledError";
+  }
+}
 
 export class ProductNormalizeAbortedError extends Error {
   readonly code = "worker_lease_lost";
@@ -79,10 +88,16 @@ export async function terminateProductNormalizeChild(
 export function runProductNormalizeChild(
   binary: string,
   args: readonly string[],
-  options: { signal?: AbortSignal; termGraceMs?: number; captureStdout?: boolean } = {},
+  options: {
+    signal?: AbortSignal;
+    termGraceMs?: number;
+    captureStdout?: boolean;
+    stallMs?: number;
+  } = {},
 ): Promise<string> {
   const signal = options.signal;
   const termGraceMs = options.termGraceMs ?? PRODUCT_NORMALIZE_CHILD_TERM_GRACE_MS;
+  const stallMs = options.stallMs ?? PRODUCT_NORMALIZE_CHILD_STALL_MS;
   if (signal?.aborted) return Promise.reject(new ProductNormalizeAbortedError());
 
   return new Promise((resolve, reject) => {
@@ -92,9 +107,21 @@ export function runProductNormalizeChild(
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let stalled = false;
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const armStallWatchdog = () => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        if (settled) return;
+        stalled = true;
+        void terminateProductNormalizeChild(child, termGraceMs);
+      }, stallMs);
+    };
     const settle = (finish: () => void) => {
       if (settled) return;
       settled = true;
+      clearTimeout(stallTimer);
       signal?.removeEventListener("abort", onAbort);
       finish();
     };
@@ -102,16 +129,19 @@ export function runProductNormalizeChild(
       void terminateProductNormalizeChild(child, termGraceMs);
     };
     signal?.addEventListener("abort", onAbort);
+    armStallWatchdog();
     if (options.captureStdout && child.stdout) {
       child.stdout.setEncoding("utf8");
       child.stdout.on("data", (chunk: string) => {
         stdout += chunk;
+        armStallWatchdog();
       });
     }
     if (child.stderr) {
       child.stderr.setEncoding("utf8");
       child.stderr.on("data", (chunk: string) => {
         stderr += chunk;
+        armStallWatchdog();
       });
     }
     child.once("error", (error) => {
@@ -120,6 +150,7 @@ export function runProductNormalizeChild(
     child.once("close", (code) => {
       settle(() => {
         if (signal?.aborted) reject(new ProductNormalizeAbortedError());
+        else if (stalled) reject(new ProductNormalizeStalledError());
         else if (code === 0) resolve(options.captureStdout ? stdout : stderr);
         else reject(new Error("normalize_failed"));
       });

@@ -11,11 +11,24 @@ import {
   probeProductAudioFile,
   validateProductDeliveryMp3File,
   ProductNormalizeSourceInvalidError,
+  ProductNormalizeStalledError,
+  runProductNormalizeChild,
 } from "../src/lib/product-audio-normalize/ffmpeg";
 import { validateProductSourceProbe } from "../src/lib/product-audio-normalize/source-validation";
 
 const execFile = promisify(execFileCallback);
 const fixtureDirectory = await mkdtemp(path.join(tmpdir(), "audiolad-product-normalize-"));
+
+await assert.rejects(
+  () =>
+    runProductNormalizeChild(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { stallMs: 50, termGraceMs: 50 },
+    ),
+  (err: unknown) => err instanceof ProductNormalizeStalledError,
+  "silent stuck child is terminated by the normalize stall watchdog",
+);
 
 try {
   const m4aPath = path.join(fixtureDirectory, "source.m4a");
