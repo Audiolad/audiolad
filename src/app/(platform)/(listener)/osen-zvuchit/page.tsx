@@ -197,6 +197,33 @@ export default function OsenZvuchitPage() {
         </div>
       </header>
 
+      <section
+        className="mt-6 max-w-4xl rounded-[28px] border border-[#ead7bc] bg-[#fff9ef] px-5 py-6 sm:px-7"
+        aria-labelledby="three-months-heading"
+      >
+        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#9a6b2f]">
+          3 октября – ровно 3 месяца АудиоЛаду
+        </p>
+        <h2
+          id="three-months-heading"
+          className="mt-2 text-2xl font-semibold tracking-tight text-[#25135c] sm:text-3xl"
+        >
+          Этот старт для нас особенный
+        </h2>
+        <div className="mt-4 space-y-3 text-base leading-7 text-[#4a3d73] sm:text-[17px] sm:leading-8">
+          <p>
+            3 июля 2026 года родилась идея АудиоЛада и был куплен домен. За эти
+            три месяца АудиоЛад прошёл путь от задумки до работающей платформы с
+            авторами, каталогом и собственными инструментами продвижения.
+          </p>
+          <p>
+            И символично, что именно 3 октября, ровно через три месяца, мы
+            начинаем <strong className="text-[#25135c]">«Осень звучит»</strong> –
+            первый общий авторский спринт АудиоЛада.
+          </p>
+        </div>
+      </section>
+
       <div className="max-w-4xl">
         <Section id="what-is-it" title="Что такое «Осень звучит»">
           <div className={`space-y-4 ${proseClassName}`}>
