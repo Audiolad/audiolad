@@ -66,6 +66,10 @@ const VALIDATION_CODES = new Set([
   "seo_description_too_long",
   "author_recommendations_title_too_long",
   "appreciation_not_eligible",
+  "audio_sprint_title_locked",
+  "audio_sprint_must_be_free",
+  "audio_sprint_must_be_listed",
+  "audio_sprint_seo_required",
 ]);
 
 const PERMISSION_CODES = new Set([

@@ -11,6 +11,8 @@ import { getAuthorProductDetail } from "@/lib/author-products/products";
 import { evaluatePublishReadiness } from "@/lib/author-products/publish";
 import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import { countActivePracticeTopics } from "@/lib/topics/queries";
+import { evaluateAudioSprintModerationGate } from "@/lib/seo-queries/audio-sprint";
+import { loadAudioSprintModerationQuery } from "@/lib/seo-queries/list-audio-sprint-queries";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -67,6 +69,30 @@ export async function POST(_request: Request, context: RouteContext) {
             "Продукт ещё не готов к отправке на модерацию.",
           requirements: readiness.requirements,
         },
+        { status: 400 },
+      );
+    }
+
+    const sprintQuery = await loadAudioSprintModerationQuery(
+      supabase,
+      detail.practice.primary_seo_query_id,
+    );
+    if (!sprintQuery.ok) {
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
+    const sprintGate = evaluateAudioSprintModerationGate({
+      isSprintProduct: Boolean(sprintQuery.queryText),
+      isFree: detail.practice.is_free === true,
+      catalogVisibility: detail.practice.catalog_visibility,
+      title: detail.practice.title,
+      queryText: sprintQuery.queryText ?? "",
+      seoTitle: detail.practice.seo_title,
+      seoDescription: detail.practice.seo_description,
+      seoAbout: detail.practice.seo_about,
+    });
+    if (sprintGate) {
+      return NextResponse.json(
+        { error: sprintGate.code, message: sprintGate.message },
         { status: 400 },
       );
     }

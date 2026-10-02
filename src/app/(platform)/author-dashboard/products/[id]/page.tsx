@@ -8,6 +8,7 @@ import {
   mapAuthorDashboardProductEditError,
 } from "@/lib/author-products/dashboard-edit-page";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
+import { loadEnabledAudioSprintQueryText } from "@/lib/seo-queries/list-audio-sprint-queries";
 import type { SeoReservationProductFormContext } from "@/lib/seo-queries/seo-reservation-product-context";
 import { createClient } from "@/lib/supabase/server";
 
@@ -93,6 +94,10 @@ export default async function EditAuthorProductPage({
     }
   }
 
+  const sprintQueryText = primaryQueryId
+    ? await loadEnabledAudioSprintQueryText(supabase, primaryQueryId)
+    : null;
+
   const { data: relatedProducts } = await supabase
     .from("practices")
     .select("id, title")
@@ -120,6 +125,9 @@ export default async function EditAuthorProductPage({
         initialProduct={product}
         initialWizardStep={initialWizardStep}
         initialSeoReservationContext={initialSeoReservationContext}
+        audioSprintTitleLock={
+          sprintQueryText ? { queryText: sprintQueryText } : null
+        }
         topicFormData={topicFormData}
         mode="edit"
       />

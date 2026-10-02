@@ -108,6 +108,8 @@ import {
   withPreservedRelatedListenSlugs,
 } from "@/lib/products/practice-seo-content";
 import { shouldRejectChangedAuthorRecommendations } from "@/lib/seo/related-product-search";
+import { evaluateAudioSprintTitleSave } from "@/lib/seo-queries/audio-sprint";
+import { resolveAudioSprintTitleConstraint } from "@/lib/seo-queries/list-audio-sprint-queries";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -290,6 +292,30 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
 
       updates.title = title;
+
+      const seoReservationId =
+        "seo_reservation_id" in body &&
+        typeof (body as { seo_reservation_id?: unknown }).seo_reservation_id === "string"
+          ? (body as { seo_reservation_id: string }).seo_reservation_id.trim()
+          : "";
+      const sprintTitle = await resolveAudioSprintTitleConstraint(supabase, {
+        practiceId: id,
+        seoReservationId,
+        authorId: practice.author_id,
+      });
+      if (!sprintTitle.ok) {
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+      const titleFailure = evaluateAudioSprintTitleSave({
+        sprintQueryText: sprintTitle.queryText,
+        nextTitle: title,
+      });
+      if (titleFailure) {
+        return NextResponse.json(
+          { error: titleFailure.code, message: titleFailure.message },
+          { status: 400 },
+        );
+      }
     }
 
     if ("subtitle" in body) {

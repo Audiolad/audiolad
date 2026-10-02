@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
+import { audioSprintHref } from "@/lib/seo-queries/audio-sprint";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
 function ProfileIcon() {
@@ -77,6 +78,19 @@ function SeoIcon() {
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
       <circle cx="11" cy="11" r="5.5" stroke="currentColor" strokeWidth="1.8" />
       <path d="m15 15 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AudioSprintIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M12 4c2 3 2 5 0 8 3-1 5-1 8 1-3 1-5 3-5 7-2-3-4-4-7-4 2-2 3-4 4-12Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -212,6 +226,12 @@ export default function AuthorDashboardNav({
       label: discoveryEnabled ? "Что ищут слушатели" : "SEO-возможности",
       icon: SeoIcon,
       active: pathname.startsWith("/author-dashboard/seo-opportunities"),
+    },
+    {
+      href: audioSprintHref(authorSlug),
+      label: "Осень звучит",
+      icon: AudioSprintIcon,
+      active: pathname.startsWith("/author-dashboard/audio-sprints"),
     },
     {
       href: `/author-dashboard/stats${authorQuery}`,

@@ -57,6 +57,7 @@ import {
   shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
 import { isAuthorProductWizardEnabled } from "@/lib/author-products/product-wizard-beta";
+import type { AudioSprintTitleLock } from "@/lib/seo-queries/audio-sprint";
 import { isPublishedProductSeoAttachEnabled } from "@/lib/seo-queries/published-product-seo-attach-gate";
 import {
   buildAuthorProductEditPath,
@@ -373,6 +374,8 @@ type AuthorProductFormProps = {
   initialPublicationClass?: PublicationClass | null;
   initialWizardStep?: ProductWizardStep;
   initialSeoReservationContext?: SeoReservationProductFormContext | null;
+  /** Set only when the product query is in the enabled AudioSprint pool. */
+  audioSprintTitleLock?: AudioSprintTitleLock | null;
   topicFormData: AuthorProductTopicFormData;
   mode: "create" | "edit";
 };
@@ -535,6 +538,19 @@ function resolveFormAudioProductAuthor(
   const workspace =
     authors.find((item) => item.id === authorId) ?? authors[0] ?? null;
   return workspace?.defaultAudioProductAuthor ?? "";
+}
+
+function applyAudioSprintTitleLock(
+  form: FormState,
+  audioSprintTitleLock?: AudioSprintTitleLock | null,
+): FormState {
+  const sprintTitle = audioSprintTitleLock?.queryText.trim() ?? "";
+  if (!sprintTitle) return form;
+  return {
+    ...form,
+    title: sprintTitle,
+    seoPrimaryQuery: sprintTitle,
+  };
 }
 
 function buildInitialForm(
@@ -806,6 +822,7 @@ export default function AuthorProductForm({
   initialPublicationClass,
   initialWizardStep = PRODUCT_WIZARD_DEFAULT_STEP,
   initialSeoReservationContext = null,
+  audioSprintTitleLock = null,
   topicFormData,
   mode,
 }: AuthorProductFormProps) {
@@ -813,12 +830,15 @@ export default function AuthorProductForm({
   const [wizardStep, setWizardStep] =
     useState<ProductWizardStep>(initialWizardStep);
   const [form, setForm] = useState<FormState>(() =>
-    buildInitialForm(
-      authors,
-      initialAuthorSlug,
-      initialProduct,
-      initialPublicationClass,
-      initialSeoReservationContext,
+    applyAudioSprintTitleLock(
+      buildInitialForm(
+        authors,
+        initialAuthorSlug,
+        initialProduct,
+        initialPublicationClass,
+        initialSeoReservationContext,
+      ),
+      audioSprintTitleLock,
     ),
   );
   const [catalogSectionOverridden, setCatalogSectionOverridden] = useState(
@@ -1411,7 +1431,11 @@ export default function AuthorProductForm({
       };
     }
 
-    if (!form.authorId || !form.title.trim()) {
+    const titleForCreate = audioSprintTitleLock
+      ? audioSprintTitleLock.queryText.trim()
+      : form.title.trim();
+
+    if (!form.authorId || !titleForCreate) {
       setError("Укажите автора и название, чтобы сохранить черновик.");
       return null;
     }
@@ -1423,7 +1447,7 @@ export default function AuthorProductForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         author_id: form.authorId,
-        title: form.title.trim(),
+        title: titleForCreate,
         product_kind: form.productKind,
         ...(form.publicationClass
           ? {
@@ -1439,6 +1463,9 @@ export default function AuthorProductForm({
           publicationClass: form.publicationClass,
           catalogSection: form.catalogSection,
         }),
+        ...(audioSprintTitleLock && seoReservationContext?.reservationId
+          ? { seo_reservation_id: seoReservationContext.reservationId }
+          : {}),
       }),
     });
 
@@ -1695,12 +1722,15 @@ export default function AuthorProductForm({
       return null;
     }
 
-    const nextForm = buildInitialForm(
-      authors,
-      initialAuthorSlug,
-      productPayload.product,
-      undefined,
-      seoReservationContext,
+    const nextForm = applyAudioSprintTitleLock(
+      buildInitialForm(
+        authors,
+        initialAuthorSlug,
+        productPayload.product,
+        undefined,
+        seoReservationContext,
+      ),
+      audioSprintTitleLock,
     );
     setForm(nextForm);
     setCatalogSectionOverridden(true);
@@ -1854,6 +1884,9 @@ export default function AuthorProductForm({
 
     const formForSave = {
       ...form,
+      ...(audioSprintTitleLock
+        ? { title: audioSprintTitleLock.queryText.trim() }
+        : {}),
       ...(studioMusicPrice?.ok
         ? { studioMusicPriceRubles: studioMusicPrice.rubles }
         : {}),
@@ -1888,15 +1921,25 @@ export default function AuthorProductForm({
 
       const id = ensured.practiceId;
 
+      const productSavePayload = buildProductSavePayload(
+        formForSave,
+        slugLocked,
+        canConfigureAppreciation,
+      );
+      const sprintAbout = formForSave.seoAbout.trim() || null;
       const response = await fetch(`/api/author/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          buildProductSavePayload(
-            formForSave,
-            slugLocked,
-            canConfigureAppreciation,
-          ),
+          audioSprintTitleLock
+            ? {
+                ...productSavePayload,
+                seo_about: sprintAbout,
+                ...(seoReservationContext?.reservationId
+                  ? { seo_reservation_id: seoReservationContext.reservationId }
+                  : {}),
+              }
+            : productSavePayload,
         ),
       });
 
@@ -3937,21 +3980,45 @@ export default function AuthorProductForm({
           <input
             value={form.title}
             maxLength={PRODUCT_CONTENT_LIMITS.title}
+            readOnly={Boolean(audioSprintTitleLock)}
+            aria-readonly={audioSprintTitleLock ? true : undefined}
             onChange={(event) => {
+              if (audioSprintTitleLock) return;
               setFieldErrors((current) => ({ ...current, title: undefined }));
               setForm((current) => ({ ...current, title: event.target.value }));
             }}
-            className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+            className={`w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] ${audioSprintTitleLock ? "bg-[#f7f2ff] text-[#3f3560]" : ""}`}
             placeholder="Название аудиопродукта"
           />
           <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
-            {PRODUCT_LANGUAGE_GUIDELINES.fieldHints.title}
+            {audioSprintTitleLock
+              ? "Название совпадает с поисковым запросом спринта и не редактируется."
+              : PRODUCT_LANGUAGE_GUIDELINES.fieldHints.title}
           </p>
           <CharCounter value={form.title} max={PRODUCT_CONTENT_LIMITS.title} />
           {fieldErrors.title ? (
             <p className="mt-2 text-sm text-[#9b3d3d]">{fieldErrors.title}</p>
           ) : null}
         </label>
+
+        {audioSprintTitleLock ? (
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium">Подробнее о продукте</span>
+            <textarea
+              value={form.seoAbout}
+              maxLength={PRODUCT_CONTENT_LIMITS.seoAbout}
+              rows={5}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, seoAbout: event.target.value }));
+              }}
+              className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
+            />
+            <p className="mt-2 text-sm leading-5 text-[#7d70a2]">
+              Нужно для отправки продукта спринта на модерацию.
+            </p>
+            <CharCounter value={form.seoAbout} max={PRODUCT_CONTENT_LIMITS.seoAbout} />
+          </label>
+        ) : null}
 
         <label
           className="block"
