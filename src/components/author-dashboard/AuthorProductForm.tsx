@@ -1559,7 +1559,6 @@ export default function AuthorProductForm({
     if (
       hasProductCoverForModeration({
         coverUrl,
-        coverImage: product?.practice.cover_image ?? coverImage ?? null,
       })
     ) {
       setCoverSubmitError(null);
@@ -2460,7 +2459,6 @@ export default function AuthorProductForm({
     if (
       !hasProductCoverForModeration({
         coverUrl: form.coverUrl,
-        coverImage: form.coverImage,
       })
     ) {
       setCoverSubmitError(PRODUCT_MODERATION_MISSING_COVER_MESSAGE);
