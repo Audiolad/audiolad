@@ -436,6 +436,39 @@ assert.equal(goldPassport.sources.bpmCandidate, "technical.bpm_candidate");
 assert.equal(goldPassport.sources.bpmRaw, "technical.bpm_raw");
 assert.equal(goldPassport.sources.bpmConfidence, "technical.bpm_confidence");
 assert.equal(goldPassport.sources.bpmGate, "technical.bpm_gate");
+
+const productionGoldDiagnostics = {
+  technical: {
+    bpm: null,
+    bpm_confidence: "low",
+    duration_s: 188.0,
+    lufs: -14.2,
+    sample_rate: 44100,
+    channels: 2,
+    format: "wav",
+    diagnostics: {
+      bpm_candidate: 70.3125,
+      bpm_candidate_raw: 140.625,
+      tempo_octave_score_raw: 0.64067,
+      tempo_octave_factor: 0.5,
+      key_candidate: "F major",
+      key_accepted: false,
+      pulse_accepted: false,
+    },
+  },
+  genres: [{ label: "Jazz", score: 0.9, band: "high" }],
+  styles: [{ name: "Smooth Jazz" }, { name: "Lounge Jazz" }],
+  moods: [{ label: "warm", score: 0.8, band: "high" }],
+  instruments: [{ label: "organ", score: 0.4, rank: 1 }, { label: "brushes", score: 0.3, rank: 2 }],
+};
+const productionGoldPassport = readMusicAnalyzerPassport({ normalized: productionGoldDiagnostics });
+assert.equal(productionGoldPassport.bpm.headline, "70.3125 BPM · кандидат");
+assert.equal(productionGoldPassport.bpm.lines.includes("raw 140.625"), true);
+assert.equal(productionGoldPassport.bpm.lines.some((line) => line.includes("0.64067")), false);
+assert.equal(productionGoldPassport.sources.bpmCandidate, "technical.diagnostics.bpm_candidate");
+assert.equal(productionGoldPassport.sources.bpmRaw, "technical.diagnostics.bpm_candidate_raw");
+assert.equal(productionGoldPassport.key.headline, "F major · кандидат");
+
 assert.equal(goldPassport.sources.keyCandidate, "key.candidate");
 assert.equal(goldPassport.sources.keyCandidateMode, "key.mode");
 assert.equal(goldPassport.sources.genres, "genres");
