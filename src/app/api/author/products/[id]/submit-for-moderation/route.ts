@@ -59,7 +59,6 @@ export async function POST(_request: Request, context: RouteContext) {
     if (
       !hasProductCoverForModeration({
         coverUrl: detail.practice.cover_url,
-        coverImage: detail.practice.cover_image ?? null,
       })
     ) {
       return NextResponse.json(
