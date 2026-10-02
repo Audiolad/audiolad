@@ -20,7 +20,9 @@
 
 ## Music Analyzer Lab
 
-Черновик `/music-analyzer` (Human Listening Validation v0.5) есть в репозитории как закрытая консоль owner/admin. Публичный пакет проверки лежит в `data/music-lab/listening-v05/`. Слепой ключ похожести в git не хранится. Production-миграция не применялась, деплой не выполнялся, публичная навигация на лабораторию не ведёт.
+Черновик `/music-analyzer` (Human Listening Validation v0.5) есть в репозитории как закрытая консоль owner/admin. Публичный пакет проверки лежит в `data/music-lab/listening-v05/`. Слепой ключ похожести в git не хранится. Публичная навигация на лабораторию не ведёт. Хаб прослушивания, похожести и BPM не снят.
+
+Phase 2A добавляет рядом `/music-analyzer/runs`: загрузка WAV/MP3, очередь `music_analyzer_runs`, PM2-воркер на том же VPS, что и сайт. Python — чекаут `cursor/benchmark-harness-v01` @ `932c4ce`, не LLM в Next.js. Passport к этим прогонам не подключён. Production cutover этим изменением не делается: нужен явный «деплоим» и ops-bootstrap из `deploy/docs/MUSIC_ANALYZER_WORKER.md`. До этого URL `https://audiolad.ru/music-analyzer/runs` на проде ещё не открыт новой сборкой.
 
 ## Сводный статус
 

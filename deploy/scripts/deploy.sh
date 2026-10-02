@@ -126,6 +126,24 @@ assert_music_transcode_worker_release_tree() {
   return "$missing"
 }
 
+assert_music_analyzer_worker_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required=(
+    "$release_dir/deploy/music-analyzer-worker.ecosystem.config.cjs"
+    "$release_dir/deploy/scripts/ensure-music-analyzer-worker.sh"
+    "$release_dir/scripts/run-music-analyzer-worker.mts"
+  )
+  local path
+  for path in "${required[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "music_analyzer_worker_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 assert_product_audio_normalize_worker_release_tree() {
   local release_dir="$1"
   local missing=0
@@ -247,6 +265,11 @@ main() {
   if ! assert_product_audio_normalize_worker_release_tree "$RELEASE_DIR"; then
     log_error "product_audio_normalize_worker_artifact_missing"
     send_deploy_alert "deploy_failed" "Product audio normalize worker artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! assert_music_analyzer_worker_release_tree "$RELEASE_DIR"; then
+    log_error "music_analyzer_worker_artifact_missing"
+    send_deploy_alert "deploy_failed" "Music analyzer worker artifact missing for $RELEASE_NAME"
     exit 1
   fi
 
@@ -446,6 +469,24 @@ main() {
   if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$PRODUCT_AUDIO_WORKER_ENSURE"; then
     log_error "product_audio_normalize_worker_ensure_failed"
     send_deploy_alert "deploy_failed" "Product audio normalize worker ensure failed for $RELEASE_NAME"
+    exit 1
+  fi
+
+  ANALYZER_WORKER_ECOSYSTEM="$RELEASE_DIR/deploy/music-analyzer-worker.ecosystem.config.cjs"
+  ANALYZER_WORKER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-music-analyzer-worker.sh"
+  if [[ ! -f "$ANALYZER_WORKER_ECOSYSTEM" ]]; then
+    log_error "music_analyzer_worker_ecosystem_missing"
+    send_deploy_alert "deploy_failed" "Music analyzer worker ecosystem missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if [[ ! -x "$ANALYZER_WORKER_ENSURE" ]]; then
+    log_error "music_analyzer_worker_ensure_missing"
+    send_deploy_alert "deploy_failed" "Music analyzer worker ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$ANALYZER_WORKER_ENSURE"; then
+    log_error "music_analyzer_worker_ensure_failed"
+    send_deploy_alert "deploy_failed" "Music analyzer worker ensure failed for $RELEASE_NAME"
     exit 1
   fi
 

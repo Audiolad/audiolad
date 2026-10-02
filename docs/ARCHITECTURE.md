@@ -382,6 +382,7 @@ measured attributes  |  interpreted attributes
 ```
 
   Stage-1 storage keys: `bpm`, `musical_key`, `mode`, `energy`, `loudness_lufs`, `vocal_role`, `genre_class`, `mood`, `instrument`. `musical_key` / `genre_class` are the storage names for the ROADMAP key and genre slots (see `docs/DECISIONS.md`). Typed contract: `src/lib/music-passport/contract.ts`. No passport UI in this slice.
+- **Music Analyzer runs (Phase 2A):** `/music-analyzer/runs` next to the human listening hub. Table `music_analyzer_runs`, bucket `music-analyzer-runs`. PM2 `audiolad-music-analyzer-worker` on the audiolad.ru VPS shells out to the pinned checkout `cursor/benchmark-harness-v01` @ `932c4ce` (`analyze_track.py --device cpu`). It does not write `music_lab_*` or `music_passport_*`. Bootstrap: `deploy/docs/MUSIC_ANALYZER_WORKER.md`.
 - Следующие слои (отдельные PR): Aural wiring to Eligibility Decision, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Engine V1 on top of this passport, Business App / Rights Ops UI.
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса. Music Rights Catalog — global/shared domain (не organization-scoped в A4).

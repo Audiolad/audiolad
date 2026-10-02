@@ -1673,6 +1673,16 @@ RLS включён, политик для `anon` / `authenticated` нет: до�
 
 Таблицы каталога, SEO, треков и «Аудиолад Бизнес» эта миграция не изменяет. На production она не применялась в рамках чернового PR.
 
+## Music Analyzer runs (Phase 2A)
+
+Миграция `supabase/migrations/20261217120000_music_analyzer_runs_v01.sql` — таблица `music_analyzer_runs` и приватный bucket `music-analyzer-runs`. Это не `music_lab_*` и не Music Passport.
+
+Очередь: `queued` → `processing` → `succeeded` | `failed`. Повтор того же `sha256` вставляет новую строку с следующим `version_number`. Успешная и неуспешная строка закрыта триггером: нет UPDATE и нет DELETE. `raw_json` и `normalized_json` появляются только при печати успешного прогона. Успех требует git-коммит с префиксом `932c4ce`, content-коммит с префиксом `3750f3b`, `device = cpu` и provenance `candidate_a=false`, `instrument_strategy=checkout_default`.
+
+RLS включён. `anon` / `authenticated` не имеют прав. `service_role` только `SELECT` и RPC (`enqueue`, `claim`, `renew`, `complete`, `fail`, `release`, `recover`). Роль owner/admin проверяет приложение.
+
+На production миграция попадает вместе с обычным деплоем, не отдельной ручной командой с ноутбука. Пока деплой не выполнен, таблицы на сервере нет.
+
 ## Резервное копирование
 
 Будет заполнено позже.
