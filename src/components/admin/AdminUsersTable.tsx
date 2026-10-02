@@ -302,7 +302,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
         router.refresh();
       });
     },
-    [data.page, data.pageSize, data.query, data.roleFilter, data.total, router],
+    [data.authorFilter, data.page, data.pageSize, data.query, data.roleFilter, data.total, router],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -664,6 +664,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                 page: data.page - 1,
                 query: data.query,
                 roleFilter: data.roleFilter,
+                authorFilter: data.authorFilter,
               })}
               className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
             >
@@ -683,6 +684,7 @@ function AdminUsersTableBody({ data }: AdminUsersTableProps) {
                 page: data.page + 1,
                 query: data.query,
                 roleFilter: data.roleFilter,
+                authorFilter: data.authorFilter,
               })}
               className="inline-flex min-h-11 items-center rounded-full border border-[#bda6e1] px-5 text-sm font-medium text-[#7042c5]"
             >
