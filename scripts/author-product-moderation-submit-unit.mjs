@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   PRODUCT_APPROVED_UNPUBLISHED_IMMUTABLE_MESSAGE,
+  PRODUCT_MODERATION_MISSING_COVER_CODE,
+  PRODUCT_MODERATION_MISSING_COVER_MESSAGE,
   PRODUCT_UNDER_MODERATION_MESSAGE,
   VISIBLE_AUTHOR_PRODUCT_STATUS,
   assertPracticeNotUnderModeration,
@@ -15,6 +17,7 @@ import {
   canWithdrawPracticeFromModeration,
   getVisibleAuthorProductStatus,
   getVisibleAuthorProductStatusLabel,
+  hasProductCoverForModeration,
   isPracticePublishedImmutableError,
   isPracticeUnderModerationError,
 } from "../src/lib/author-products/moderation.ts";
@@ -158,7 +161,25 @@ assert.doesNotThrow(() =>
   }),
 );
 
-// 4. Source guards — UI / API / RPC
+// 4. Cover is mandatory before moderation submission
+assert.equal(PRODUCT_MODERATION_MISSING_COVER_CODE, "missing_cover");
+assert.equal(PRODUCT_MODERATION_MISSING_COVER_MESSAGE, "Загрузите обложку.");
+assert.equal(
+  hasProductCoverForModeration({ coverUrl: null }),
+  false,
+);
+assert.equal(
+  hasProductCoverForModeration({ coverUrl: "   " }),
+  false,
+);
+assert.equal(
+  hasProductCoverForModeration({
+    coverUrl: "https://cdn.example/cover.webp",
+  }),
+  true,
+);
+
+// 5. Source guards — UI / API / RPC
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 const formActions = read(
   "src/components/author-dashboard/product-form-sections/AuthorProductFormActions.tsx",
@@ -178,6 +199,10 @@ assert.doesNotMatch(formActions, /archiveProduct/);
 assert.match(form, /canBypassProductModeration/);
 assert.match(formActions, /Опубликовать/);
 assert.match(form, /requestScrollToFirstSubmitIssue/);
+assert.match(form, /PRODUCT_MODERATION_MISSING_COVER_MESSAGE/);
+assert.match(form, /hasProductCoverForModeration/);
+assert.match(form, /setWizardStep\(2\)/);
+assert.match(form, /data-submit-issue=\{coverSubmitError \? "" : undefined\}/);
 assert.match(form, /data-submit-issue=\{topicError \? "" : undefined\}/);
 assert.match(form, /error=\{topicError\}/);
 assert.match(
@@ -205,6 +230,9 @@ const submitRoute = read(
   "src/app/api/author/products/[id]/submit-for-moderation/route.ts",
 );
 assert.match(submitRoute, /evaluatePublishReadiness/);
+assert.match(submitRoute, /hasProductCoverForModeration/);
+assert.match(submitRoute, /PRODUCT_MODERATION_MISSING_COVER_CODE/);
+assert.match(submitRoute, /PRODUCT_MODERATION_MISSING_COVER_MESSAGE/);
 assert.match(submitRoute, /submitPracticeForModeration/);
 assert.match(submitRoute, /requirements/);
 

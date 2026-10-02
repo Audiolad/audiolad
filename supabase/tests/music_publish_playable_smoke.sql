@@ -39,10 +39,10 @@ BEGIN
   VALUES (v_author, 'Проверка публикации', 'music-publish-playable-smoke', 'commercial');
 
   INSERT INTO public.practices (
-    id, author_id, title, slug, status, is_free, price, product_kind, publication_class
+    id, author_id, title, slug, status, is_free, price, product_kind, publication_class, cover_url
   ) VALUES (
     v_practice, v_author, 'Publish WAV Music', 'music-publish-playable-smoke',
-    'draft', true, 0, 'music', 'release'
+    'draft', true, 0, 'music', 'release', 'https://example.test/music-cover.webp'
   );
 
   INSERT INTO public.audio_items (id, practice_id, title, position, audio_path, duration_seconds)
@@ -135,10 +135,10 @@ BEGIN
 
   -- ready job + verified stream, but no active pointer, must still fail incomplete_audio.
   INSERT INTO public.practices (
-    id, author_id, title, slug, status, is_free, price, product_kind, publication_class
+    id, author_id, title, slug, status, is_free, price, product_kind, publication_class, cover_url
   ) VALUES (
     v_practice_ready, v_author, 'Ready Job Only', 'music-publish-ready-job',
-    'draft', true, 0, 'music', 'release'
+    'draft', true, 0, 'music', 'release', 'https://example.test/music-ready-cover.webp'
   );
   INSERT INTO public.audio_items (id, practice_id, title, position, audio_path, duration_seconds)
   VALUES (v_audio_ready, v_practice_ready, 'Track', 1, NULL, NULL);
@@ -198,10 +198,10 @@ BEGIN
 
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class,
-    moderation_status
+    moderation_status, cover_url
   ) VALUES (
     v_practice_pub, v_author, 'Publish Stream Duration', 'music-publish-stream-duration',
-    'draft', true, 0, 'music', 'release', 'approved'
+    'draft', true, 0, 'music', 'release', 'approved', 'https://example.test/music-pub-cover.webp'
   );
   INSERT INTO public.audio_items (id, practice_id, title, position, audio_path, duration_seconds)
   VALUES (v_audio_pub, v_practice_pub, 'Stream Track', 1, NULL, NULL);
@@ -259,10 +259,10 @@ BEGIN
   -- Mixed MP3 + validated WAV stream with NULL item duration.
   INSERT INTO public.practices (
     id, author_id, title, slug, status, is_free, price, product_kind, publication_class,
-    moderation_status
+    moderation_status, cover_url
   ) VALUES (
     v_practice_mixed, v_author, 'Publish Mixed Duration', 'music-publish-mixed-duration',
-    'draft', true, 0, 'music', 'release', 'approved'
+    'draft', true, 0, 'music', 'release', 'approved', 'https://example.test/music-mixed-cover.webp'
   );
   INSERT INTO public.audio_items (id, practice_id, title, position, audio_path, duration_seconds)
   VALUES

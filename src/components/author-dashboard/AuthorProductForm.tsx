@@ -51,9 +51,12 @@ import {
   getStatusClassName,
 } from "@/lib/author-products/types";
 import {
+  PRODUCT_MODERATION_MISSING_COVER_CODE,
+  PRODUCT_MODERATION_MISSING_COVER_MESSAGE,
   PRODUCT_UNDER_MODERATION_MESSAGE,
   VISIBLE_AUTHOR_PRODUCT_STATUS,
   getVisibleAuthorProductStatus,
+  hasProductCoverForModeration,
   shouldSaveProductBeforePublish,
 } from "@/lib/author-products/moderation";
 import { isAuthorProductWizardEnabled } from "@/lib/author-products/product-wizard-beta";
@@ -965,6 +968,7 @@ export default function AuthorProductForm({
     useState(initialProduct?.deleteLockedAfterPaidPurchase === true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [coverSubmitError, setCoverSubmitError] = useState<string | null>(null);
   const [maxLinkCopied, setMaxLinkCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [courseContentSnapshot, setCourseContentSnapshot] =
@@ -1550,6 +1554,14 @@ export default function AuthorProductForm({
         coverImage: coverImage ?? null,
         coverVersion: coverUrl ? String(Date.now()) : null,
       }));
+    }
+
+    if (
+      hasProductCoverForModeration({
+        coverUrl,
+      })
+    ) {
+      setCoverSubmitError(null);
     }
 
     setMessage(coverUrl ? "Обложка загружена." : "Обложка удалена.");
@@ -2442,6 +2454,22 @@ export default function AuthorProductForm({
     setMessage(null);
     setFieldErrors({});
     setTopicError(undefined);
+    setCoverSubmitError(null);
+
+    if (
+      !hasProductCoverForModeration({
+        coverUrl: form.coverUrl,
+      })
+    ) {
+      setCoverSubmitError(PRODUCT_MODERATION_MISSING_COVER_MESSAGE);
+      setError(PRODUCT_MODERATION_MISSING_COVER_MESSAGE);
+      if (wizardEnabled) {
+        setWizardStep(2);
+      }
+      requestScrollToFirstSubmitIssue();
+      setBusy(false);
+      return;
+    }
 
     const courseContentCheck = evaluateCoursePublishContentGate({
       publicationClass: form.publicationClass,
@@ -2484,7 +2512,15 @@ export default function AuthorProductForm({
       };
 
       if (!response.ok) {
-        if (
+        if (payload.error === PRODUCT_MODERATION_MISSING_COVER_CODE) {
+          const message =
+            payload.message ?? PRODUCT_MODERATION_MISSING_COVER_MESSAGE;
+          setCoverSubmitError(message);
+          setError(message);
+          if (wizardEnabled) {
+            setWizardStep(2);
+          }
+        } else if (
           payload.error === "topic_min_required" ||
           payload.error === "topic_limit_exceeded" ||
           payload.error === "topic_not_found"
@@ -4610,19 +4646,26 @@ export default function AuthorProductForm({
 
 {showWizardStep(2) ? (
         <>
-        <CoverUploadBlock
-          label="Обложка"
-          coverUrl={form.coverUrl}
-          coverVersion={form.coverVersion}
-          coverImage={form.coverImage}
-          buildUploadUrl={(id) => `/api/author/products/${id}/cover`}
-          buildDeleteUrl={(id) => `/api/author/products/${id}/cover`}
-          getPracticeId={getPracticeIdForCoverUpload}
-          onUpdated={handleProductCoverUpdated}
-          hint={`${PRODUCT_LANGUAGE_GUIDELINES.coverTechnicalHint}. ${PRODUCT_LANGUAGE_GUIDELINES.fieldHints.cover}`}
-          uploadLabel="Загрузить обложку"
-          replaceLabel="Заменить обложку"
-        />
+        <div data-submit-issue={coverSubmitError ? "" : undefined}>
+          <CoverUploadBlock
+            label="Обложка"
+            coverUrl={form.coverUrl}
+            coverVersion={form.coverVersion}
+            coverImage={form.coverImage}
+            buildUploadUrl={(id) => `/api/author/products/${id}/cover`}
+            buildDeleteUrl={(id) => `/api/author/products/${id}/cover`}
+            getPracticeId={getPracticeIdForCoverUpload}
+            onUpdated={handleProductCoverUpdated}
+            hint={`${PRODUCT_LANGUAGE_GUIDELINES.coverTechnicalHint}. ${PRODUCT_LANGUAGE_GUIDELINES.fieldHints.cover}`}
+            uploadLabel="Загрузить обложку"
+            replaceLabel="Заменить обложку"
+          />
+          {coverSubmitError ? (
+            <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
+              {coverSubmitError}
+            </p>
+          ) : null}
+        </div>
 
         {isProductGalleryEligible(form.publicationClass, form.productKind) ? (
           <AuthorProductGallery

@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { mapPublishRpcError } from "@/lib/author-products/moderation";
+import {
+  PRODUCT_MODERATION_MISSING_COVER_CODE,
+  PRODUCT_MODERATION_MISSING_COVER_MESSAGE,
+  hasProductCoverForModeration,
+  mapPublishRpcError,
+} from "@/lib/author-products/moderation";
 import { mapTopicRpcError } from "@/lib/topics/errors";
 
 import type { AuthorAccessStatus } from "@/lib/authors/access";
@@ -38,6 +43,7 @@ export type PublishValidationResult =
 export type PublishReadinessRequirementKey =
   | "author"
   | "title"
+  | "cover"
   | "audio"
   | "course_content";
 
@@ -254,6 +260,15 @@ function buildCorePublishRequirements(
       }
     : null;
 
+  const coverFailure = !hasProductCoverForModeration({
+    coverUrl: practice.cover_url,
+  })
+    ? {
+        code: PRODUCT_MODERATION_MISSING_COVER_CODE,
+        message: PRODUCT_MODERATION_MISSING_COVER_MESSAGE,
+      }
+    : null;
+
   const blockCount = courseContent?.blockCount ?? 0;
   const skipFlatAudio = shouldSkipFlatAudioPublishRequirement({
     publicationClass: practice.publication_class,
@@ -288,6 +303,7 @@ function buildCorePublishRequirements(
   const requirements: PublishReadinessRequirement[] = [
     requirement("author", "Авторское пространство", authorFailure),
     requirement("title", "Название", titleFailure),
+    requirement("cover", "Обложка", coverFailure),
     requirement("audio", "Аудиозапись", audioFailure),
   ];
 
@@ -302,7 +318,7 @@ function buildCorePublishRequirements(
 
 /**
  * Shared structured moderation-readiness for the author dashboard.
- * A non-course product needs only a title and a successfully uploaded audio item.
+ * A product needs a title, its own cover, and ready audio/course content.
  */
 export function evaluatePublishReadiness(
   practice: PracticeRow,

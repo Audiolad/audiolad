@@ -4,7 +4,12 @@ import {
   handleAuthorRouteError,
   requirePracticeMutationAccess,
 } from "@/lib/author-products/auth";
-import { canSubmitPracticeForModeration } from "@/lib/author-products/moderation";
+import {
+  PRODUCT_MODERATION_MISSING_COVER_CODE,
+  PRODUCT_MODERATION_MISSING_COVER_MESSAGE,
+  canSubmitPracticeForModeration,
+  hasProductCoverForModeration,
+} from "@/lib/author-products/moderation";
 import { submitPracticeForModeration } from "@/lib/author-products/moderation-actions";
 import { countCoursePublishContent } from "@/lib/author-products/course-builder";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
@@ -46,6 +51,21 @@ export async function POST(_request: Request, context: RouteContext) {
             detail.practice.deleted_at
               ? "Удалённый продукт нельзя отправить на модерацию."
               : "В текущем статусе продукт нельзя отправить на модерацию.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (
+      !hasProductCoverForModeration({
+        coverUrl: detail.practice.cover_url,
+      })
+    ) {
+      return NextResponse.json(
+        {
+          error: PRODUCT_MODERATION_MISSING_COVER_CODE,
+          publishReady: false,
+          message: PRODUCT_MODERATION_MISSING_COVER_MESSAGE,
         },
         { status: 400 },
       );
