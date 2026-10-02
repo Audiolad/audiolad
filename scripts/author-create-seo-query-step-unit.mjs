@@ -42,6 +42,7 @@ const opportunitiesUi = read("src/components/author-dashboard/AuthorSeoOpportuni
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
 const reservationRoute = read("src/app/api/author/seo-reservations/route.ts");
 const releaseLib = read("src/lib/seo-queries/release-own-seo-reservation.ts");
+const queriesLib = read("src/lib/seo-queries/queries.ts");
 
 // --- Dashboard: discovery removed ---
 assert.doesNotMatch(dash, /AuthorSeoDiscoveryPanel/);
@@ -136,6 +137,8 @@ assert.match(createPage, /AuthorProductSeoQueryStep/);
 assert.match(createPage, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(createPage, /isSeoQuerySkipParam/);
 assert.match(createPage, /listSeoOpportunitiesForAuthor/);
+assert.match(createPage, /listActiveSeoReservationsForWorkspaces/);
+assert.match(createPage, /otherWorkspaceReservations/);
 assert.match(createPage, /AuthorCreateWizard/);
 assert.match(createPage, /if \(!publicationClass\)/);
 assert.match(createPage, /seoQueryStepEnabled && !hasValidReservation && !seoQuerySkip/);
@@ -147,6 +150,17 @@ assert.match(createPage, /internalBackHref=\{typeChooserHref\}/);
 // --- Query step structure ---
 assert.match(createStep, /Ваши запросы в работе/);
 assert.match(createStep, /selectOwnUnlinkedSeoOpportunities/);
+assert.match(createStep, /Забронировано в других авторских пространствах/);
+assert.match(createStep, /Авторское пространство:/);
+assert.match(createStep, /Создать в этом пространстве/);
+assert.match(createStep, /otherWorkspaceReservations/);
+assert.match(createStep, /authorSlug:\s*item\.authorSlug/);
+assert.match(createStep, /reservationId:\s*item\.reservationId/);
+assert.match(queriesLib, /listActiveSeoReservationsForWorkspaces/);
+assert.match(queriesLib, /\.in\("author_id", authorIds\)/);
+assert.match(queriesLib, /\.eq\("status", "active"\)/);
+assert.match(queriesLib, /\.is\("product_id", null\)/);
+assert.match(queriesLib, /isEffectiveSeoReservation/);
 assert.match(releaseLib, /!item\.productId/);
 assert.match(releaseLib, /item\.lifecycle !== "published"/);
 assert.match(createStep, /variant="product-create"/);
