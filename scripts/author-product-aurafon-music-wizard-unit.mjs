@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon.ts";
 import { isAuthorProductWizardEnabled } from "../src/lib/author-products/product-wizard-beta.ts";
 import { isMusicProductWizardEnabled } from "../src/lib/author-products/music-product-wizard.ts";
+import { isPracticeProductWizardEnabled } from "../src/lib/author-products/practice-product-wizard.ts";
 import {
   AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE,
   hasAudioProductAuthor,
@@ -69,6 +70,17 @@ assert.equal(
   }),
   false,
 );
+assert.equal(
+  isPracticeProductWizardEnabled({ publicationClass: "practice" }),
+  true,
+);
+for (const publicationClass of ["course", "audiobook", "release", "post", null]) {
+  assert.equal(
+    isPracticeProductWizardEnabled({ publicationClass }),
+    false,
+    `practice wizard must stay closed for ${publicationClass}`,
+  );
+}
 assert.equal(
   isMusicProductWizardEnabled({
     authorId: OTHER,
@@ -184,8 +196,9 @@ assert.match(
 assert.match(form, /musicProductWizard \? \([\s\S]*Автор музыки/);
 assert.match(
   form,
-  /const wizardEnabled =\s*isAuthorProductWizardEnabled\(form\.authorId\) \|\| musicProductWizard/,
+  /const wizardEnabled =[\s\S]*isAuthorProductWizardEnabled\(form\.authorId\)[\s\S]*musicProductWizard[\s\S]*practiceProductWizard/,
 );
+assert.match(form, /isPracticeProductWizardEnabled/);
 
 assert.equal(CATALOG_GALLERY_MAX_SLIDES, 30);
 assert.equal(AUDIO_PRODUCT_AUTHOR_REQUIRED_MESSAGE, "Укажите автора музыки.");
