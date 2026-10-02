@@ -43,7 +43,7 @@ const linkFocusClass =
   "focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
 const primaryCtaClassName =
-  \`inline-flex min-h-12 items-center justify-center rounded-[24px] bg-[#7042c5] px-6 py-3 text-[16px] font-semibold text-white shadow-sm transition hover:bg-[#6338b0] \${linkFocusClass}\`;
+  `inline-flex min-h-12 items-center justify-center rounded-[24px] bg-[#7042c5] px-6 py-3 text-[16px] font-semibold text-white shadow-sm transition hover:bg-[#6338b0] ${linkFocusClass}`;
 
 const headingClassName =
   "text-2xl font-semibold tracking-tight text-[#25135c] sm:text-3xl";
@@ -96,8 +96,8 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="mt-14 scroll-mt-24" aria-labelledby={\`\${id}-heading\`}>
-      <h2 id={\`\${id}-heading\`} className={headingClassName}>
+    <section id={id} className="mt-14 scroll-mt-24" aria-labelledby={`${id}-heading`}>
+      <h2 id={`${id}-heading`} className={headingClassName}>
         {title}
       </h2>
       <div className="mt-5">{children}</div>
@@ -139,7 +139,7 @@ export default function OsenZvuchitPage() {
           <li>
             <Link
               href="/"
-              className={\`font-medium text-[#7042c5] underline-offset-2 hover:underline \${linkFocusClass}\`}
+              className={`font-medium text-[#7042c5] underline-offset-2 hover:underline ${linkFocusClass}`}
             >
               Главная
             </Link>
@@ -199,7 +199,7 @@ export default function OsenZvuchitPage() {
 
       <div className="max-w-4xl">
         <Section id="what-is-it" title="Что такое «Осень звучит»">
-          <div className={\`space-y-4 \${proseClassName}\`}>
+          <div className={`space-y-4 ${proseClassName}`}>
             <p>
               «Осень звучит» – авторский спринт АудиоЛада.
             </p>
@@ -403,7 +403,7 @@ export default function OsenZvuchitPage() {
             <h3 className="text-xl font-semibold text-[#25135c]">
               Каждый продукт – отдельный шанс
             </h3>
-            <p className={\`mt-3 \${proseClassName}\`}>
+            <p className={`mt-3 ${proseClassName}`}>
               Количество продуктов от одного автора не ограничено. Каждый
               опубликованный по правилам спринта продукт даёт один отдельный шанс
               в розыгрыше.
@@ -438,7 +438,7 @@ export default function OsenZvuchitPage() {
           <h2 id="prizes-heading" className="mt-2 text-2xl font-semibold tracking-tight text-[#25135c] sm:text-3xl">
             Три денежных приза
           </h2>
-          <p className={\`mt-4 \${proseClassName}\`}>
+          <p className={`mt-4 ${proseClassName}`}>
             После завершения «Осень звучит» мы проведём розыгрыш среди всех
             продуктов, которые выполнили условия участия.
           </p>
@@ -473,7 +473,7 @@ export default function OsenZvuchitPage() {
         </section>
 
         <Section id="size" title="Не обязательно создавать что-то большое">
-          <div className={\`space-y-4 \${proseClassName}\`}>
+          <div className={`space-y-4 ${proseClassName}`}>
             <p>Для участия не нужен огромный альбом или часовая программа.</p>
             <p>
               Музыкальный продукт может состоять из одной самостоятельной
