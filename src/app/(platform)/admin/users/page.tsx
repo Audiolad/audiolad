@@ -30,6 +30,7 @@ export default async function AdminUsersPage({
         page: Number.isFinite(page) ? page : 1,
         query: params.q,
         roleFilter: params.role,
+        authorFilter: params.author,
         actorUserId: session.userId,
       }),
       ownerSession
