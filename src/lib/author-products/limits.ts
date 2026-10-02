@@ -56,7 +56,7 @@ export function getAudioUploadErrorMessage(
         return message.trim();
       }
 
-      return "Не удалось загрузить MP3.";
+      return "Не удалось загрузить аудио.";
   }
 }
 
