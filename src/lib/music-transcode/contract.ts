@@ -9,6 +9,8 @@ export const MUSIC_TRANSCODE_HEARTBEAT_RETRY_MS = 15_000;
 export const MUSIC_TRANSCODE_IDLE_INTERVAL_MS = 5_000;
 export const MUSIC_TRANSCODE_LEASE_HOLD_SAFETY_MS = 60_000;
 export const MUSIC_TRANSCODE_SHUTDOWN_DRAIN_MS = 90_000;
+/** No encoded-position growth for this long means the music FFmpeg child is stalled. */
+export const MUSIC_TRANSCODE_FFMPEG_STALL_MS = 2 * 60 * 1000;
 
 export const MUSIC_STREAM_PROFILE = "mp3-256";
 export const MUSIC_STREAM_FILENAME = "mp3-256.mp3";
@@ -30,6 +32,7 @@ export const MUSIC_TRANSCODE_ERROR_CODES = [
   "source_unavailable",
   "source_invalid",
   "transcode_failed",
+  "ffmpeg_stalled",
   "output_invalid",
   "upload_failed",
   "worker_lease_lost",
