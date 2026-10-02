@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Reservation → product link uses the loaded practices row.
- * Client publication_class is not proof. Aurafon keeps non-music beta linking.
+ * Client publication_class is not proof. Music and explicit practice are open
+ * to every author; course/audiobook/post stay closed. Aurafon keeps full beta.
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -52,8 +53,8 @@ assert.equal(
     productKind: "practice",
     publicationClass: "practice",
   }),
-  false,
-  "other author practice; spoofed client release is not an input",
+  true,
+  "other author explicit practice",
 );
 for (const publicationClass of ["course", "audiobook", "post"]) {
   assert.equal(
@@ -95,15 +96,15 @@ assert.equal(
 
 assert.equal(
   mapSeoReservationLinkError("seo_reservation_product_not_music").message,
-  "Связать запрос можно только с музыкальным продуктом.",
+  "Связать запрос можно только с музыкой или практикой.",
 );
 
 const route = read("src/app/api/author/seo-reservations/route.ts");
 const post = route.slice(0, route.indexOf("export async function DELETE"));
 const patch = route.slice(route.indexOf("export async function PATCH"));
-assert.match(post, /musicCreateSeoDiscoveryAllowed\(body\)/);
+assert.match(post, /productCreateSeoDiscoveryAllowed\(body\)/);
 assert.match(post, /reserve_seo_query/);
-assert.doesNotMatch(patch, /musicCreateSeoDiscoveryAllowed/);
+assert.doesNotMatch(patch, /productCreateSeoDiscoveryAllowed/);
 assert.doesNotMatch(patch, /readString\(body,\s*"publication_class"\)/);
 assert.match(patch, /\.from\("practices"\)/);
 assert.match(patch, /author_id, product_kind, publication_class/);
@@ -112,11 +113,14 @@ assert.match(
   /isSeoReservationProductLinkAllowed\(\{[\s\S]*authorId: practice\.author_id[\s\S]*productKind:[\s\S]*practice\.product_kind[\s\S]*publicationClass:[\s\S]*practice\.publication_class/,
 );
 assert.match(patch, /link_seo_reservation_to_product/);
-assert.match(patch, /seoReservationProductNotMusicResponse\(\)/);
+assert.match(patch, /seoReservationProductNotSupportedResponse\(\)/);
 assert.match(route, /error: "seo_reservation_product_not_music"/);
 
 const migration = read(
   "supabase/migrations/20261031120200_seo_reservation_link_music_gate.sql",
+);
+const practiceMigration = read(
+  "supabase/migrations/20261216120000_seo_reservation_link_practice_gate.sql",
 );
 const previous = read(
   "supabase/migrations/20261021120000_seo_reservation_product_primary_sync.sql",
@@ -152,6 +156,25 @@ assert.match(
   /REVOKE ALL ON FUNCTION public\.link_seo_reservation_to_product\(uuid, uuid\) FROM PUBLIC, anon/,
 );
 assert.doesNotMatch(migration, /GRANT EXECUTE ON FUNCTION public\.link_seo_reservation_to_product\(uuid, uuid\) TO anon/);
+
+// Current override expands the factual gate to explicit practices only.
+assert.match(practiceMigration, /CREATE OR REPLACE FUNCTION public\.link_seo_reservation_to_product/);
+assert.match(practiceMigration, /v_practice\.product_kind IS DISTINCT FROM 'music'/);
+assert.match(practiceMigration, /v_practice\.publication_class IS DISTINCT FROM 'release'/);
+assert.match(practiceMigration, /v_practice\.publication_class IS DISTINCT FROM 'practice'/);
+assert.match(practiceMigration, /seo_reservation_product_not_music/);
+assert.match(practiceMigration, /course, audiobook, and post stay closed/i);
+assert.match(practiceMigration, /audiolad:seo-reservation-link:v4/);
+assert.doesNotMatch(practiceMigration, /p_publication_class|publication_class text/);
+assert.doesNotMatch(practiceMigration, /ADD COLUMN|CREATE TABLE/);
+assert.match(
+  practiceMigration,
+  /GRANT EXECUTE ON FUNCTION public\.link_seo_reservation_to_product\(uuid, uuid\) TO authenticated/,
+);
+assert.match(
+  practiceMigration,
+  /REVOKE ALL ON FUNCTION public\.link_seo_reservation_to_product\(uuid, uuid\) FROM PUBLIC, anon/,
+);
 
 const gateAt = migration.indexOf("seo_reservation_product_not_music");
 const idempotentAt = migration.indexOf(

@@ -31,6 +31,7 @@ import {
   AURAFON_AUTHOR_ID,
   isAuthorSeoDiscoveryEnabled,
   isMusicCreateSeoDiscoveryEnabled,
+  isProductCreateSeoDiscoveryEnabled,
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import {
   countActiveAuthorSeoReservations,
@@ -616,16 +617,40 @@ assert.equal(
   }),
   false,
 );
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "release",
+  }),
+  true,
+);
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: otherAuthorId,
+    publicationClass: "practice",
+  }),
+  true,
+);
+for (const publicationClass of ["course", "audiobook", "post", null]) {
+  assert.equal(
+    isProductCreateSeoDiscoveryEnabled({
+      authorId: otherAuthorId,
+      publicationClass,
+    }),
+    false,
+    `neutral create gate must stay closed for ${publicationClass}`,
+  );
+}
 
 const aurafonIdentity = read("src/lib/authors/aurafon.ts");
 assert.match(aurafonIdentity, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 const discoveryBeta = read("src/lib/seo-queries/discovery-beta.ts");
 assert.match(discoveryBeta, /from "@\/lib\/authors\/aurafon"/);
 assert.doesNotMatch(discoveryBeta, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
-assert.match(discoveryRoute, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(discoveryRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(discoveryRoute, /seo_discovery_beta_disabled/);
 assert.match(discoveryRoute, /seo_discovery_context_failed/);
-assert.match(proposalsRoute, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(proposalsRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(proposalsRoute, /seo_discovery_beta_disabled/);
 
 const page = read("src/app/(platform)/author-dashboard/seo-opportunities/page.tsx");
@@ -752,7 +777,7 @@ assert.equal(
 assert.doesNotMatch(dash, /isAuthorSeoDiscoveryEnabled\(selectedAuthor\.id\)/);
 assert.doesNotMatch(dash, /seoActiveReservationCounts/);
 assert.match(createStep, /AuthorSeoDiscoveryPanel/);
-assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(createPage, /isProductCreateSeoDiscoveryEnabled/);
 
 // G — seo-opportunities uses canonical counter
 assert.match(ui, /countActiveAuthorSeoReservations\(items\)/);
@@ -767,7 +792,7 @@ assert.doesNotMatch(dash, /wordstat/i);
 assert.match(dash, /\/api\/author\/products/);
 
 // I — beta gate lives on create page + opportunities (not products dashboard)
-assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(createPage, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(page, /isAuthorSeoDiscoveryEnabled/);
 
 // J — single shared panel (create step + opportunities)

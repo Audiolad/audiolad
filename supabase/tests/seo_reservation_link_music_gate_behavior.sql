@@ -1,4 +1,4 @@
--- Behavior for link_seo_reservation_to_product music gate. Never run on production.
+-- Behavior for link_seo_reservation_to_product music + practice gates. Never run on production.
 
 DO $$
 DECLARE
@@ -122,19 +122,17 @@ BEGIN
     RAISE EXCEPTION 'publication_class release link failed';
   END IF;
 
-  -- Factual practice is rejected. There is no client publication_class argument to spoof.
-  BEGIN
-    PERFORM public.link_seo_reservation_to_product(v_r_practice, v_practice);
-    RAISE EXCEPTION 'practice link unexpectedly succeeded';
-  EXCEPTION WHEN OTHERS THEN
-    GET STACKED DIAGNOSTICS v_err = MESSAGE_TEXT;
-    IF v_err IS DISTINCT FROM 'seo_reservation_product_not_music' THEN
-      RAISE;
-    END IF;
-  END;
-  IF (SELECT product_id FROM public.seo_query_reservations WHERE id = v_r_practice) IS NOT NULL
-     OR (SELECT primary_seo_query_id FROM public.practices WHERE id = v_practice) IS NOT NULL THEN
-    RAISE EXCEPTION 'rejected practice link mutated rows';
+  -- Explicit publication_class = practice is allowed.
+  PERFORM public.link_seo_reservation_to_product(v_r_practice, v_practice);
+  SELECT primary_seo_query_id, seo_primary_query
+    INTO v_primary, v_text
+  FROM public.practices WHERE id = v_practice;
+  IF v_primary IS DISTINCT FROM v_q_practice
+     OR v_text IS DISTINCT FROM 'медитация для сна' THEN
+    RAISE EXCEPTION 'practice link failed';
+  END IF;
+  IF (SELECT expires_at FROM public.seo_query_reservations WHERE id = v_r_practice) IS NOT NULL THEN
+    RAISE EXCEPTION 'practice link left an expiry';
   END IF;
 
   BEGIN
@@ -196,22 +194,16 @@ BEGIN
     RAISE EXCEPTION 'anon can execute link_seo_reservation_to_product';
   END IF;
 
-  -- Direct RPC as authenticated still sees the factual practice row.
+  -- Direct RPC as authenticated uses the same factual server-side practice gate.
   EXECUTE 'SET LOCAL ROLE authenticated';
-  BEGIN
-    PERFORM public.link_seo_reservation_to_product(v_r_direct, v_direct);
-    RAISE EXCEPTION 'direct rpc bypass succeeded';
-  EXCEPTION WHEN OTHERS THEN
-    GET STACKED DIAGNOSTICS v_err = MESSAGE_TEXT;
-    IF v_err IS DISTINCT FROM 'seo_reservation_product_not_music' THEN
-      RAISE;
-    END IF;
-  END;
+  PERFORM public.link_seo_reservation_to_product(v_r_direct, v_direct);
   EXECUTE 'RESET ROLE';
 
-  IF (SELECT product_id FROM public.seo_query_reservations WHERE id = v_r_direct) IS NOT NULL
-     OR (SELECT primary_seo_query_id FROM public.practices WHERE id = v_direct) IS NOT NULL THEN
-    RAISE EXCEPTION 'direct rpc bypass mutated rows';
+  IF (SELECT product_id FROM public.seo_query_reservations WHERE id = v_r_direct)
+       IS DISTINCT FROM v_direct
+     OR (SELECT primary_seo_query_id FROM public.practices WHERE id = v_direct)
+       IS DISTINCT FROM v_q_direct THEN
+    RAISE EXCEPTION 'direct authenticated practice link failed';
   END IF;
 
   RAISE NOTICE 'seo_reservation_link_music_gate_behavior: ALL PASS';

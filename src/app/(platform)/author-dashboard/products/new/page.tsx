@@ -13,7 +13,7 @@ import {
 } from "@/lib/author-products/publication-class";
 import { parseProductWizardStep } from "@/lib/author-products/product-wizard-steps";
 import { loadAuthorProductTopicFormData } from "@/lib/author-products/topic-form-data";
-import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isProductCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { listSeoOpportunitiesForAuthor } from "@/lib/seo-queries/queries";
 import {
   SEO_QUERY_SKIP_PARAM,
@@ -91,7 +91,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
   const initialAuthor =
     authors.find((item) => item.slug === params.author) ?? authors[0];
   const publicationClass = parsePublicationClass(params.class);
-  const seoQueryStepEnabled = isMusicCreateSeoDiscoveryEnabled({
+  const seoQueryStepEnabled = isProductCreateSeoDiscoveryEnabled({
     authorId: initialAuthor.id,
     publicationClass,
   });
@@ -144,7 +144,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
     return reservationErrorShell(reservationLoad.message, queryStepHref);
   }
 
-  // B: music-create discovery + class + no reservation + no skip → pre-create query step
+  // B: product-create discovery + class + no reservation + no skip → pre-create query step
   const hasValidReservation = Boolean(reservationLoad?.ok);
   if (seoQueryStepEnabled && !hasValidReservation && !seoQuerySkip) {
     const opportunities = await listSeoOpportunitiesForAuthor(initialAuthor.id);

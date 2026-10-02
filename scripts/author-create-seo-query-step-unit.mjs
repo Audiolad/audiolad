@@ -16,6 +16,7 @@ import {
   isSeoQuerySkipParam,
 } from "../src/lib/seo-queries/reservation-product-create-href.ts";
 import { getProductSeoQueryStepCopy } from "../src/lib/seo-queries/product-seo-query-step-copy.ts";
+import { isProductCreateSeoDiscoveryEnabled } from "../src/lib/seo-queries/discovery-beta.ts";
 import { authorDiscoveryRowAfterOwnReservationRelease } from "../src/lib/seo-queries/author-discovery-status.ts";
 import {
   RELEASE_SEO_QUERY_FALLBACK_MESSAGE,
@@ -52,6 +53,33 @@ assert.doesNotMatch(dashPage, /isAuthorSeoDiscoveryEnabled/);
 
 assert.match(nav, /Что ищут слушатели/);
 assert.match(opportunitiesUi, /variant="opportunities"/);
+
+// --- Product-create gate: music + practice open; course/audiobook/post closed ---
+const OTHER_AUTHOR = "00000000-0000-4000-8000-000000000099";
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: OTHER_AUTHOR,
+    publicationClass: "release",
+  }),
+  true,
+);
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: OTHER_AUTHOR,
+    publicationClass: "practice",
+  }),
+  true,
+);
+for (const publicationClass of ["course", "audiobook", "post", null]) {
+  assert.equal(
+    isProductCreateSeoDiscoveryEnabled({
+      authorId: OTHER_AUTHOR,
+      publicationClass,
+    }),
+    false,
+    `product create discovery must stay closed for ${publicationClass}`,
+  );
+}
 
 // --- URL helpers ---
 assert.equal(SEO_RESERVATION_ID_PARAM, "seo_reservation_id");
@@ -105,7 +133,7 @@ assert.doesNotMatch(
 
 // --- Create page orchestration (I) ---
 assert.match(createPage, /AuthorProductSeoQueryStep/);
-assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(createPage, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(createPage, /isSeoQuerySkipParam/);
 assert.match(createPage, /listSeoOpportunitiesForAuthor/);
 assert.match(createPage, /AuthorCreateWizard/);
@@ -150,10 +178,10 @@ assert.match(releaseCopy.description, /создаёте музыку/);
 assert.match(createStep, /getProductSeoQueryStepCopy/);
 assert.match(createStep, /copy\.title/);
 
-// D — generic non-release
+// D — practice-specific copy; other product classes keep generic copy
 const practiceCopy = getProductSeoQueryStepCopy("practice");
-assert.equal(practiceCopy.title, "Выберите поисковый запрос");
-assert.match(practiceCopy.description, /создаёте аудиопродукт/);
+assert.equal(practiceCopy.title, "Выберите поисковый запрос для практики");
+assert.match(practiceCopy.description, /создаёте практику/);
 assert.doesNotMatch(practiceCopy.description, /создаёте музыку/);
 assert.equal(getProductSeoQueryStepCopy("course").title, "Выберите поисковый запрос");
 assert.equal(getProductSeoQueryStepCopy(undefined).title, "Выберите поисковый запрос");

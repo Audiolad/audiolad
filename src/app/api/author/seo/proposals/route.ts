@@ -9,7 +9,7 @@ import {
   proposeAuthorSeoQuery,
 } from "@/lib/seo-queries/author-discovery";
 import { createAuthorProposalRepository } from "@/lib/seo-queries/author-discovery-repository";
-import { isMusicCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
+import { isProductCreateSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import { wordstatHttpStatus } from "@/lib/seo/wordstat/errors";
 import { sendSeoQueryProposalAdminAlertEmail } from "@/lib/email/send-seo-query-proposal-admin-alert-email";
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     if (
-      !isMusicCreateSeoDiscoveryEnabled({
+      !isProductCreateSeoDiscoveryEnabled({
         authorId,
         publicationClass,
       })

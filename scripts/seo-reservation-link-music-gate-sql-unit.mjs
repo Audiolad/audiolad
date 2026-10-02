@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Isolated DB behavior for the reservation → product music gate.
+ * Isolated DB behavior for reservation → product music/practice gates.
  * Never touches production. Uses localhost DATABASE_URL or docker postgres.
  */
 import { execFileSync } from "node:child_process";
@@ -15,6 +15,10 @@ const TEST_DB = "audiolad_seo_reservation_link_music_gate_test";
 const MIGRATION = join(
   ROOT,
   "supabase/migrations/20261031120200_seo_reservation_link_music_gate.sql",
+);
+const PRACTICE_MIGRATION = join(
+  ROOT,
+  "supabase/migrations/20261216120000_seo_reservation_link_practice_gate.sql",
 );
 const STUB = join(ROOT, "scripts/lib/seo-reservation-link-music-gate-sql-stub.sql");
 const BEHAVIOR = join(
@@ -128,7 +132,8 @@ function psqlFile(database, absolutePath) {
 }
 
 function main() {
-  assert(existsSync(MIGRATION), "migration missing");
+  assert(existsSync(MIGRATION), "music migration missing");
+  assert(existsSync(PRACTICE_MIGRATION), "practice migration missing");
   assert(existsSync(STUB), "stub missing");
   assert(existsSync(BEHAVIOR), "behavior sql missing");
 
@@ -153,6 +158,7 @@ function main() {
   try {
     psqlFile(TEST_DB, STUB);
     psqlFile(TEST_DB, MIGRATION);
+    psqlFile(TEST_DB, PRACTICE_MIGRATION);
     const out = psqlFile(TEST_DB, BEHAVIOR);
     if (!/seo_reservation_link_music_gate_behavior: ALL PASS/.test(out)) {
       throw new Error(`behavior SQL did not pass:\n${out}`);

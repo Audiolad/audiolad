@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Focused unit coverage: SEO reservation → product create (Aurafon closed beta).
+ * Focused unit coverage: SEO reservation → product create (music + practices; Aurafon full beta).
  * A–H per product brief: URL, wizard, CTA, loader, form/Step3, link helper, SQL RPC, script.
  */
 import assert from "node:assert/strict";
@@ -105,7 +105,7 @@ const loader = read(
   "src/lib/seo-queries/load-seo-reservation-product-create-context.ts",
 );
 assert.match(loader, /import "server-only"/);
-assert.match(loader, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(loader, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(loader, /seo_query_reservations/);
 assert.match(loader, /author_id !== input\.authorId/);
 assert.match(loader, /code:\s*"expired"/);

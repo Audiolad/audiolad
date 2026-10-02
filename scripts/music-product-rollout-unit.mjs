@@ -198,7 +198,7 @@ const updateRoute = read("src/app/api/author/products/[id]/route.ts");
 
 assert.match(
   form,
-  /isAuthorProductWizardEnabled\(form\.authorId\) \|\| musicProductWizard/,
+  /const wizardEnabled =[\s\S]*isAuthorProductWizardEnabled\(form\.authorId\)[\s\S]*musicProductWizard[\s\S]*practiceProductWizard/,
 );
 assert.match(form, /isMusicProductWizardEnabled\(\{/);
 assert.match(form, /publicationClass: form\.publicationClass/);
@@ -207,18 +207,18 @@ assert.match(form, /validateMusicTrackTitleCyrillic/);
 assert.match(form, /Автор музыки/);
 assert.match(form, /data-catalog-section=""/);
 
-assert.match(createPage, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(createPage, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(createPage, /publicationClass/);
 assert.match(createPage, /AuthorProductSeoQueryStep/);
 assert.doesNotMatch(createPage, /isAuthorSeoDiscoveryEnabled\(/);
 
-assert.match(discoveryRoute, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(discoveryRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(discoveryRoute, /publication_class/);
 assert.match(discoveryRoute, /seo_discovery_beta_disabled/);
-assert.match(proposalsRoute, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(proposalsRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(proposalsRoute, /publication_class/);
 assert.match(proposalsRoute, /seo_discovery_beta_disabled/);
-assert.match(reservationRoute, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(reservationRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(reservationRoute, /publication_class/);
 assert.match(reservationRoute, /seo_discovery_beta_disabled/);
 assert.match(panel, /publication_class: publicationClass/);

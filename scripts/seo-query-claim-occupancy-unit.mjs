@@ -15,6 +15,7 @@ import {
   SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
   SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS,
   isMusicCreateSeoDiscoveryEnabled,
+  isProductCreateSeoDiscoveryEnabled,
 } from "../src/lib/seo-queries/discovery-beta.ts";
 import { SEO_DISCOVERY_DATABASE_LIMIT } from "../src/lib/seo-queries/discovery-ranking.ts";
 import { resolveBackfillMode } from "./seo-legacy-primary-query-backfill.mjs";
@@ -110,6 +111,13 @@ assert.equal(
   }),
   false,
 );
+assert.equal(
+  isProductCreateSeoDiscoveryEnabled({
+    authorId: OLGA_AUTHOR_ID,
+    publicationClass: "practice",
+  }),
+  true,
+);
 assert.equal(isMusicCreateSeoDiscoveryEnabled({ authorId: AURAFON_AUTHOR_ID }), true);
 assert.equal(
   planSeoQueryReserve({
@@ -132,7 +140,7 @@ assert.match(
 );
 assert.equal(SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS, "release");
 assert.match(reservationRoute, /publication_class/);
-assert.match(reservationRoute, /isMusicCreateSeoDiscoveryEnabled/);
+assert.match(reservationRoute, /isProductCreateSeoDiscoveryEnabled/);
 
 // CASE 3 — active reservation is the insert plan; SQL inserts one active row.
 {
@@ -477,7 +485,7 @@ assert.match(reservationRoute, /SEO_DISCOVERY_BETA_DISABLED_MESSAGE/);
 assert.match(reservationRoute, /code: "seo_discovery_beta_disabled"/);
 assert.match(reservationRoute, /SEO_QUERY_OCCUPIED_BY_PUBLISHED_PRODUCT_MESSAGE/);
 assert.equal(
-  SEO_DISCOVERY_BETA_DISABLED_MESSAGE.includes("музыкальных релизов"),
+  SEO_DISCOVERY_BETA_DISABLED_MESSAGE.includes("музыки и практик"),
   true,
 );
 assert.equal(

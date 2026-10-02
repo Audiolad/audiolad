@@ -6,9 +6,9 @@ import { PRODUCT_KIND } from "@/lib/author-products/product-kind";
  *
  * Callers must pass fields loaded from the practices row.
  * A client publication_class is not an input and is not proof.
- * Aurafon keeps the existing beta flow, including non-music products.
- * Every other author may link only when the product is factual music
- * (`product_kind = music`) or a release (`publication_class = release`).
+ * Aurafon keeps the existing beta flow, including other product classes.
+ * Every other author may link music releases and explicit practices.
+ * Course, audiobook, and post stay closed.
  */
 export function isSeoReservationProductLinkAllowed(input: {
   authorId?: string | null;
@@ -22,5 +22,9 @@ export function isSeoReservationProductLinkAllowed(input: {
   const productKind = input.productKind?.trim() ?? "";
   const publicationClass = input.publicationClass?.trim() ?? "";
 
-  return productKind === PRODUCT_KIND.MUSIC || publicationClass === "release";
+  return (
+    productKind === PRODUCT_KIND.MUSIC ||
+    publicationClass === "release" ||
+    publicationClass === "practice"
+  );
 }
