@@ -17,6 +17,7 @@ import {
   ProductNormalizeAbortedError,
   ProductNormalizeOutputInvalidError,
   ProductNormalizeSourceInvalidError,
+  ProductNormalizeStalledError,
   assertValidProductSourceFile,
   normalizeProductSourceToMp3,
   validateProductDeliveryMp3File,
@@ -170,6 +171,9 @@ export async function executeClaimedProductNormalizeJob(
     } catch (error) {
       if (error instanceof ProductNormalizeAbortedError || signal.aborted) {
         throw new ProductNormalizeAbortedError();
+      }
+      if (error instanceof ProductNormalizeStalledError) {
+        throw new ProductNormalizeCodedError(error.code);
       }
       throw new ProductNormalizeCodedError("normalize_failed");
     }
