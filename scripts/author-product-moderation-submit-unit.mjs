@@ -165,24 +165,16 @@ assert.doesNotThrow(() =>
 assert.equal(PRODUCT_MODERATION_MISSING_COVER_CODE, "missing_cover");
 assert.equal(PRODUCT_MODERATION_MISSING_COVER_MESSAGE, "Загрузите обложку.");
 assert.equal(
-  hasProductCoverForModeration({ coverUrl: null, coverImage: null }),
+  hasProductCoverForModeration({ coverUrl: null }),
   false,
 );
 assert.equal(
-  hasProductCoverForModeration({ coverUrl: "   ", coverImage: null }),
+  hasProductCoverForModeration({ coverUrl: "   " }),
   false,
 );
 assert.equal(
   hasProductCoverForModeration({
     coverUrl: "https://cdn.example/cover.webp",
-    coverImage: null,
-  }),
-  true,
-);
-assert.equal(
-  hasProductCoverForModeration({
-    coverUrl: null,
-    coverImage: { variants: { square: "cover.webp" } },
   }),
   true,
 );
