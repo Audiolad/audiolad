@@ -5,7 +5,7 @@ import {
 } from "@/lib/author-products/audio-prepare-status";
 /**
  * Read-only TypeScript mirror of public.assert_practice_moderation_ready
- * (latest: supabase/migrations/20260924120000_course_access_levels_moderation_readiness.sql).
+ * (latest: supabase/migrations/20261217120200_require_product_cover_for_moderation.sql).
  *
  * Used by admin support diagnostics so a product is never reported READY
  * when the live submit RPC would fail existing DB validation.
@@ -120,6 +120,11 @@ export function evaluateDatabaseModerationReady(
       "missing_title",
       "Название",
       !practice.title?.trim() ? "Укажите название аудиопродукта." : null,
+    ),
+    check(
+      "missing_cover",
+      "Обложка",
+      !practice.cover_url?.trim() ? "Загрузите обложку." : null,
     ),
     check(
       "missing_audio",
