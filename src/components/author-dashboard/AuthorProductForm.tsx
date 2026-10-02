@@ -71,6 +71,7 @@ import {
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
+import { isPracticeProductWizardEnabled } from "@/lib/author-products/practice-product-wizard";
 import {
   CATALOG_SECTION_FIELD_LABEL,
   CATALOG_SECTION_FIELD_OPTIONS,
@@ -1294,8 +1295,13 @@ export default function AuthorProductForm({
     productKind: form.productKind,
     publicationClass: form.publicationClass,
   });
+  const practiceProductWizard = isPracticeProductWizardEnabled({
+    publicationClass: form.publicationClass,
+  });
   const wizardEnabled =
-    isAuthorProductWizardEnabled(form.authorId) || musicProductWizard;
+    isAuthorProductWizardEnabled(form.authorId) ||
+    musicProductWizard ||
+    practiceProductWizard;
   const publishedProductStatus =
     initialProduct?.practice.status === "published";
   const hasRelationalPrimarySeoQuery = Boolean(
