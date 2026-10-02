@@ -689,9 +689,9 @@ await withEnvAsync(enabledEnv(), async () => {
   assert.equal(JSON.stringify(result).includes(TEST_KEY), false);
 });
 
-assert.equal(WORDSTAT_USER_LIMIT, 8);
+assert.equal(WORDSTAT_USER_LIMIT, 20);
 assert.equal(WORDSTAT_USER_WINDOW_MS, 15 * 60 * 1000);
-assert.equal(WORDSTAT_PROCESS_OUTBOUND_LIMIT, 40);
+assert.equal(WORDSTAT_PROCESS_OUTBOUND_LIMIT, 80);
 assert.equal(WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS, 60 * 60 * 1000);
 
 function uniqueOkHandler() {
@@ -715,10 +715,10 @@ function fillOutboundSlots(store, count) {
 await withEnvAsync(enabledEnv(), async () => {
   const rateLimit = createWordstatRateLimitStore();
   const fetchImpl = mockFetch(
-    Array.from({ length: 9 }, () => uniqueOkHandler),
+    Array.from({ length: WORDSTAT_USER_LIMIT + 1 }, () => uniqueOkHandler),
   );
   const results = [];
-  for (let index = 0; index < 9; index += 1) {
+  for (let index = 0; index < WORDSTAT_USER_LIMIT + 1; index += 1) {
     results.push(
       await fetchWordstatSuggestions(`фраза ${index}`, {
         fetchImpl,
@@ -1016,9 +1016,9 @@ const rateLimitSource = read("src/lib/seo/wordstat/rate-limit.ts");
 assert.match(rateLimitSource, /intentionally conservative process-local guard/);
 assert.match(rateLimitSource, /Yandex quota 100\/hour/);
 assert.match(rateLimitSource, /zero-downtime overlapping/);
-assert.match(rateLimitSource, /WORDSTAT_PROCESS_OUTBOUND_LIMIT = 40/);
+assert.match(rateLimitSource, /WORDSTAT_PROCESS_OUTBOUND_LIMIT = 80/);
 assert.match(rateLimitSource, /WORDSTAT_PROCESS_OUTBOUND_WINDOW_MS = 60 \* 60 \* 1000/);
-assert.match(rateLimitSource, /WORDSTAT_USER_LIMIT = 8/);
+assert.match(rateLimitSource, /WORDSTAT_USER_LIMIT = 20/);
 assert.match(rateLimitSource, /WORDSTAT_USER_WINDOW_MS = 15 \* 60 \* 1000/);
 assert.doesNotMatch(rateLimitSource, /WORDSTAT_PROCESS_WINDOW_MS = 15 \* 60 \* 1000/);
 
