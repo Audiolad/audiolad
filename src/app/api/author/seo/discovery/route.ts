@@ -25,8 +25,8 @@ import {
 } from "@/lib/seo-queries/author-discovery-repository";
 import {
   SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
-  assertMusicCreateSeoDiscoveryEnabled,
-  isMusicCreateSeoDiscoveryEnabled,
+  assertProductCreateSeoDiscoveryEnabled,
+  isProductCreateSeoDiscoveryEnabled,
 } from "@/lib/seo-queries/discovery-beta";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import {
@@ -42,11 +42,11 @@ function readString(body: Record<string, unknown>, key: string): string {
 }
 
 /**
- * Discovery for the Aurafon SEO beta and for any author creating a release.
+ * Discovery for the Aurafon SEO beta and for product creation.
  * Client sends { author_id, phrase, surface, publication_class? }.
  * `surface` is the authoritative UI context: product_create hides used queries.
- * publication_class=release opens the music create path. Omitting it keeps
- * the standalone dashboard Aurafon-only.
+ * publication_class=release or practice opens the respective create path.
+ * Omitting it keeps the standalone dashboard Aurafon-only.
  */
 export async function POST(request: Request) {
   try {
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     if (
-      !isMusicCreateSeoDiscoveryEnabled({
+      !isProductCreateSeoDiscoveryEnabled({
         authorId,
         publicationClass,
       })
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     const { user } = await requireAuthorMembership(authorId);
-    assertMusicCreateSeoDiscoveryEnabled({ authorId, publicationClass });
+    assertProductCreateSeoDiscoveryEnabled({ authorId, publicationClass });
 
     let databaseMatches: Array<Record<string, unknown>> = [];
     let seedNormalized: string | null = null;
