@@ -6,8 +6,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import {
+  MusicTranscodeFfmpegStalledError,
   isValidMusicStreamProbe,
   probeMusicStreamFile,
+  runMusicTranscodeChild,
   transcodeWavToMp3,
   validateMusicStreamFile,
 } from "../src/lib/music-transcode/ffmpeg";
@@ -43,5 +45,45 @@ try {
 } finally {
   await rm(fixtureDirectory, { recursive: true, force: true });
 }
+
+const repeatedProgress = `
+const line = "out_time_us=250000\\nout_time=00:00:00.250000\\nprogress=continue\\n";
+process.stdout.write(line);
+setInterval(() => process.stdout.write(line), 10);
+`;
+
+await assert.rejects(
+  () => runMusicTranscodeChild(process.execPath, ["-e", repeatedProgress], {
+    progress: { stallMs: 80 },
+    termGraceMs: 40,
+  }),
+  (error: unknown) => {
+    assert.ok(error instanceof MusicTranscodeFfmpegStalledError);
+    assert.equal(error.code, "ffmpeg_stalled");
+    assert.equal(error.details.lastProgressUs, 250_000);
+    assert.equal(error.details.lastOutTime, "00:00:00.250000");
+    assert.ok(error.details.elapsedMs >= 70);
+    return true;
+  },
+);
+
+const advancingProgress = `
+let us = 0;
+const step = () => {
+  us += 250000;
+  process.stdout.write(
+    "out_time_us=" + us + "\\n" +
+    "out_time=00:00:00.250000\\n" +
+    "progress=continue\\n"
+  );
+  if (us >= 1000000) process.exit(0);
+  setTimeout(step, 30);
+};
+step();
+`;
+await runMusicTranscodeChild(process.execPath, ["-e", advancingProgress], {
+  progress: { stallMs: 70 },
+  termGraceMs: 40,
+});
 
 console.log("music-transcode-ffmpeg-unit: ok");
