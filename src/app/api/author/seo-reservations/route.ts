@@ -6,7 +6,7 @@ import {
 } from "@/lib/author-products/auth";
 import {
   SEO_DISCOVERY_BETA_DISABLED_MESSAGE,
-  isMusicCreateSeoDiscoveryEnabled,
+  isProductCreateSeoDiscoveryEnabled,
 } from "@/lib/seo-queries/discovery-beta";
 import { SEO_QUERY_OCCUPIED_BY_PUBLISHED_PRODUCT_MESSAGE } from "@/lib/seo-queries/published-query-occupancy";
 import { isSeoReservationProductLinkAllowed } from "@/lib/seo-queries/reservation-product-link-gate";
@@ -47,8 +47,8 @@ function reservationErrorResponse(
   );
 }
 
-function musicCreateSeoDiscoveryAllowed(body: Record<string, unknown>): boolean {
-  return isMusicCreateSeoDiscoveryEnabled({
+function productCreateSeoDiscoveryAllowed(body: Record<string, unknown>): boolean {
+  return isProductCreateSeoDiscoveryEnabled({
     authorId: readString(body, "author_id"),
     publicationClass: readString(body, "publication_class"),
   });
@@ -93,19 +93,19 @@ function mapReservationError(error: unknown) {
   if (message.includes("seo_reservation_product_not_music")) {
     return {
       error: "seo_reservation_product_not_music",
-      message: "Связать запрос можно только с музыкальным продуктом.",
+      message: "Связать запрос можно только с музыкой или практикой.",
       status: 403,
     };
   }
   return null;
 }
 
-function seoReservationProductNotMusicResponse() {
+function seoReservationProductNotSupportedResponse() {
   return NextResponse.json(
     {
       error: "seo_reservation_product_not_music",
       code: "seo_reservation_product_not_music",
-      message: "Связать запрос можно только с музыкальным продуктом.",
+      message: "Связать запрос можно только с музыкой или практикой.",
     },
     { status: 403 },
   );
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
+    if (!productCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("reserve_seo_query", {
@@ -161,7 +161,7 @@ export async function DELETE(request: Request) {
         { status: 400 },
       );
     }
-    if (!musicCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
+    if (!productCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
     const { supabase } = await requireAuthorMutationMembership(authorId);
     const { data, error } = await supabase.rpc("release_seo_query_reservation", {
@@ -229,7 +229,7 @@ export async function PATCH(request: Request) {
           typeof practice.publication_class === "string" ? practice.publication_class : null,
       })
     ) {
-      return seoReservationProductNotMusicResponse();
+      return seoReservationProductNotSupportedResponse();
     }
 
     const { data, error } = await supabase.rpc("link_seo_reservation_to_product", {
