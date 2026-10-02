@@ -60,18 +60,8 @@ export const PRODUCT_MODERATION_MISSING_COVER_MESSAGE =
 
 export function hasProductCoverForModeration(input: {
   coverUrl?: string | null;
-  coverImage?: unknown;
 }): boolean {
-  if (input.coverUrl?.trim()) {
-    return true;
-  }
-
-  return Boolean(
-    input.coverImage &&
-      typeof input.coverImage === "object" &&
-      !Array.isArray(input.coverImage) &&
-      Object.keys(input.coverImage as Record<string, unknown>).length > 0,
-  );
+  return Boolean(input.coverUrl?.trim());
 }
 
 export type PublishModerationGateResult =
