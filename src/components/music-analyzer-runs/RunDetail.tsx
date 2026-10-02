@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import type { MusicAnalyzerRunClient } from "@/lib/music-analyzer-runs/contract";
+import { readMusicAnalyzerPassport } from "@/lib/music-analyzer-runs/passport";
+
+import { RunPassport } from "./RunPassport";
 
 const ERRORS: Record<string, string> = {
   analyzer_commit_mismatch: "Чекаут анализатора не совпал с зафиксированным коммитом.",
@@ -49,6 +52,12 @@ export function RunDetail({
   }, [run.id, run.status]);
 
   const other = siblings.filter((item) => item.id !== run.id);
+  const passport = readMusicAnalyzerPassport({
+    normalized: run.normalizedJson,
+    raw: run.rawJson,
+    taxonomyVersion: run.taxonomyVersion,
+    promptVersion: run.promptVersion,
+  });
 
   return (
     <div className="space-y-6">
@@ -69,6 +78,10 @@ export function RunDetail({
           <dd className="mt-1 break-all font-mono text-xs text-[#25135c]">{run.sha256}</dd>
         </div>
         <div>
+          <dt className="text-[#796ba0]">Версия анализатора</dt>
+          <dd className="mt-1 text-[#25135c]">{run.analyzerVersion ?? "—"}</dd>
+        </div>
+        <div>
           <dt className="text-[#796ba0]">Коммит анализатора</dt>
           <dd className="mt-1 break-all font-mono text-xs text-[#25135c]">{run.analyzerGitCommit ?? "—"}</dd>
         </div>
@@ -81,14 +94,24 @@ export function RunDetail({
           <dd className="mt-1 text-[#25135c]">{run.modelCheckpoint ?? "—"}</dd>
         </div>
         <div>
-          <dt className="text-[#796ba0]">Таксономия / промпт</dt>
-          <dd className="mt-1 text-[#25135c]">
-            {run.taxonomyVersion ?? "—"} / {run.promptVersion ?? "—"}
-          </dd>
+          <dt className="text-[#796ba0]">Устройство</dt>
+          <dd className="mt-1 text-[#25135c]">{run.device ?? "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-[#796ba0]">Таксономия</dt>
+          <dd className="mt-1 text-[#25135c]">{passport.taxonomy ?? "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-[#796ba0]">Промпт</dt>
+          <dd className="mt-1 text-[#25135c]">{passport.prompt ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-[#796ba0]">Создан</dt>
           <dd className="mt-1 text-[#25135c]">{run.createdAt}</dd>
+        </div>
+        <div>
+          <dt className="text-[#796ba0]">Завершён</dt>
+          <dd className="mt-1 text-[#25135c]">{run.finishedAt ?? "—"}</dd>
         </div>
       </dl>
       {run.status === "failed" ? (
@@ -101,14 +124,20 @@ export function RunDetail({
       ) : null}
       {run.status === "succeeded" ? (
         <div className="space-y-4">
+          <RunPassport passport={passport} />
           <div className="flex flex-wrap gap-4 text-sm font-medium text-[#7042c5]">
             <a href={`/api/music-analyzer/runs/${run.id}/export?format=json`}>JSON</a>
             <a href={`/api/music-analyzer/runs/${run.id}/export?format=csv`}>CSV</a>
             <a href={`/api/music-analyzer/runs/${run.id}/export?format=markdown`}>Markdown</a>
           </div>
-          <pre className="max-h-[32rem] overflow-auto rounded-[22px] border border-[#e4d7f4] bg-white p-4 text-xs leading-5 text-[#25135c]">
-            {JSON.stringify(run.normalizedJson, null, 2)}
-          </pre>
+          <details className="rounded-[22px] border border-[#e4d7f4] bg-white">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[#25135c]">
+              Технические данные / Raw JSON
+            </summary>
+            <pre className="max-h-[32rem] overflow-auto border-t border-[#e4d7f4] p-4 text-xs leading-5 text-[#25135c]">
+              {JSON.stringify(run.normalizedJson, null, 2)}
+            </pre>
+          </details>
         </div>
       ) : null}
       {other.length > 0 ? (
