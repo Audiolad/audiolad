@@ -71,6 +71,7 @@ export type AdminUsersPageData = {
   pageSize: number;
   query: string;
   roleFilter: string;
+  authorFilter: string;
   actorUserId: string;
 };
 
@@ -414,10 +415,41 @@ async function findUserIdsByProductQuery(
   ];
 }
 
+async function listAdminAuthorUserIds(
+  service: ReturnType<typeof createServiceRoleClient>,
+): Promise<string[]> {
+  const pageSize = 1000;
+  const userIds = new Set<string>();
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await service
+      .from("author_members")
+      .select("user_id")
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw new Error("admin_author_user_ids_load_failed");
+    }
+
+    for (const row of data ?? []) {
+      if (row.user_id) {
+        userIds.add(row.user_id);
+      }
+    }
+
+    if (!data || data.length < pageSize) {
+      break;
+    }
+  }
+
+  return [...userIds];
+}
+
 export async function listAdminUsers(input: {
   page?: number;
   query?: string;
   roleFilter?: string;
+  authorFilter?: string;
   actorUserId: string;
 }): Promise<AdminUsersPageData> {
   const service = createServiceRoleClient();
@@ -427,6 +459,22 @@ export async function listAdminUsers(input: {
   const to = from + pageSize - 1;
   const search = input.query?.trim() ?? "";
   const roleFilter = input.roleFilter?.trim() ?? "all";
+  const authorFilter = input.authorFilter?.trim() ?? "all";
+  const authorUserIds =
+    authorFilter === "authors" ? await listAdminAuthorUserIds(service) : null;
+
+  if (authorUserIds && authorUserIds.length === 0) {
+    return {
+      users: [],
+      total: 0,
+      page,
+      pageSize,
+      query: search,
+      roleFilter,
+      authorFilter,
+      actorUserId: input.actorUserId,
+    };
+  }
 
   let query = service
     .from("profiles")
@@ -435,6 +483,10 @@ export async function listAdminUsers(input: {
 
   if (roleFilter !== "all") {
     query = query.eq("role", roleFilter);
+  }
+
+  if (authorUserIds) {
+    query = query.in("id", authorUserIds);
   }
 
   if (search) {
@@ -510,6 +562,7 @@ export async function listAdminUsers(input: {
     pageSize,
     query: search,
     roleFilter,
+    authorFilter,
     actorUserId: input.actorUserId,
   };
 }
