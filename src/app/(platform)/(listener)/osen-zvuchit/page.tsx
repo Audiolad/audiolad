@@ -395,7 +395,7 @@ export default function OsenZvuchitPage() {
               src="/images/osen-zvuchit/queries.webp"
               alt="Раздел «Осень звучит» в кабинете автора: категории поисковых запросов, поиск и кнопка «Забронировать»"
               width={1100}
-              height={509}
+              height={632}
               className="h-auto w-full rounded-[20px]"
               sizes="(max-width: 1024px) 100vw, 896px"
               priority={false}
