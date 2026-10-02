@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Ensure audiolad-product-audio-normalize-worker is online for the active release.
 # Missing ecosystem fails the caller. Existing stopped/errored processes are
-# recovered; absent processes are started. Online processes are left alone
-# for self-refresh. Does not touch music transcode worker, Studio worker, health-watch, or Nginx.
+# recovered; absent processes are started. Online processes are restarted at
+# deploy cutover so a pre-cutover worker stuck inside FFmpeg cannot keep running
+# old code forever. Does not touch music transcode worker, Studio worker,
+# health-watch, or Nginx.
 # No new secrets.
 set -Eeuo pipefail
 
@@ -75,8 +77,18 @@ fi
 STATUS="$(pm2_status)"
 case "$STATUS" in
   online)
-    log "product_audio_normalize_worker_already_online app=$APP_NAME"
-    exit 0
+    log "product_audio_normalize_worker_cutover_restart app=$APP_NAME"
+    if ! "$PM2_BIN" restart "$APP_NAME" --update-env; then
+      log "product_audio_normalize_worker_restart_failed app=$APP_NAME"
+      if ! "$PM2_BIN" delete "$APP_NAME"; then
+        log "product_audio_normalize_worker_delete_failed app=$APP_NAME"
+        exit 1
+      fi
+      if ! "$PM2_BIN" start "$ECOSYSTEM"; then
+        log "product_audio_normalize_worker_start_failed app=$APP_NAME"
+        exit 1
+      fi
+    fi
     ;;
   missing)
     log "product_audio_normalize_worker_start app=$APP_NAME"

@@ -173,4 +173,27 @@ const runtime = readFileSync(path.join(root, "src/lib/product-audio-normalize/wo
 assert.match(runtime, /upsert:\s*false/);
 assert.equal(/upsert:\s*true/.test(runtime), false, "stale worker must not overwrite another attempt");
 
+const ensureWorker = readFileSync(
+  path.join(root, "deploy/scripts/ensure-product-audio-normalize-worker.sh"),
+  "utf8",
+);
+const onlineCase = ensureWorker.slice(
+  ensureWorker.indexOf("  online)"),
+  ensureWorker.indexOf("  missing)"),
+);
+assert.match(
+  onlineCase,
+  /pm2|\$PM2_BIN/,
+  "deploy cutover must actively restart an already-online normalize worker",
+);
+assert.ok(
+  onlineCase.includes("restart") && onlineCase.includes("--update-env"),
+  "online worker must restart with updated env",
+);
+assert.doesNotMatch(
+  onlineCase,
+  /already_online[\s\S]*exit 0/,
+  "online worker must not bypass cutover restart",
+);
+
 console.log("product-audio-normalize-contract-unit: ok");
