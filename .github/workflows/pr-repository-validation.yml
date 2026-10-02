@@ -72,6 +72,7 @@ jobs:
           npm run test:author-product-price-input
           npm run test:platform-analytics-p2
           npm run test:seo-core-v1
+          npm run test:admin-seo-reservation-release
           npm run test:seo-wordstat-intake
           npm run test:wordstat
           npm run test:seo-query-analysis

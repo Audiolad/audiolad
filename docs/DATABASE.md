@@ -1457,6 +1457,14 @@ RPC перед удалением авторов и перед завершен�
 
 `link_seo_reservation_to_product(uuid, uuid)` по-прежнему выполняется ролью `authenticated`: прямого вызова RPC недостаточно, чтобы обойти проверку. Функция загружает фактическую строку `practices` и не принимает `publication_class` от клиента. Для автора «Аурафон» (`59c7e5b8-eae4-4394-82fb-b815a10be6c2`) сохраняется прежний beta-flow, включая продукты не-music. Для остальных linking разрешён только если `product_kind = music` или `publication_class = release`. Идемпотентность, блокировки и прежние отказы RPC не меняются. Seed `seo_queries` миграция не добавляет.
 
+## Снятие SEO-брони администратором
+
+`public.admin_release_seo_query_reservation(uuid)` — `SECURITY DEFINER`, вызов только у `authenticated`, внутри проверяется `has_platform_permission(auth.uid(), 'seo.manage')`. Миграция `supabase/migrations/20261217120100_admin_release_seo_reservation_clear_product.sql` заменяет функцию версии v2.
+
+Ограничение `seo_query_reservations_product_active_check` разрешает `product_id` только при статусе `active` или `used`. Версия v2 ставила `status = 'released'`, не обнуляя `product_id`. Для брони, уже связанной с продуктом, Postgres возвращает `23514` / `seo_query_reservations_product_active_check`, и транзакция откатывает очистку `practices.primary_seo_query_id` и `practices.seo_primary_query`.
+
+v3 в том же обновлении строки брони ставит `product_id = NULL`. Очистка SEO-полей практики остаётся прежней: только если `primary_seo_query_id` совпадает с `query_id` брони, под флагом `audiolad.allow_primary_seo_query_link`.
+
 ## Занятость SEO-запроса опубликованным продуктом
 
 Миграция `supabase/migrations/20261125120000_seo_reservation_published_occupancy.sql` заменяет `reserve_seo_query`. Повторный вызов с уже активным бронированием того же автора возвращает существующую строку и не создаёт вторую. Опубликованная практика с `primary_seo_query_id` блокирует новое бронирование даже без строки в `seo_query_reservations`. Пока отдельный backfill не заполнен, то же делает точное нормализованное равенство `practices.seo_primary_query` и `seo_queries.normalized_query` при `primary_seo_query_id IS NULL`. Это не ILIKE и не нечёткое сравнение. Лимит активных бронирований остаётся 5; статусы `used`, `released` и истёкшие слот не занимают. Миграция не обновляет существующие строки и не запускает backfill.

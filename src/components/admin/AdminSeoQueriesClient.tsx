@@ -154,8 +154,28 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
   }
 
   async function release(reservationId: string) {
-    const response = await fetch("/api/admin/seo-queries", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ reservation_id: reservationId }) });
-    if (!response.ok) return setNotice("Не удалось снять бронь.");
+    let response: Response;
+    try {
+      response = await fetch("/api/admin/seo-queries", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ reservation_id: reservationId }) });
+    } catch {
+      setNotice("Не удалось снять бронь (network_error).");
+      return;
+    }
+    let payload: { error?: unknown; code?: unknown } | null = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    if (!response.ok) {
+      const code = typeof payload?.code === "string" && payload.code.trim()
+        ? payload.code.trim()
+        : typeof payload?.error === "string" && payload.error.trim()
+          ? payload.error.trim()
+          : `http_${response.status}`;
+      setNotice(`Не удалось снять бронь (${code}).`);
+      return;
+    }
     setRows((current) => current.map((row) => row.reservationId === reservationId ? { ...row, reservationId: null, lifecycle: "Свободен", author: null, product: null, reservedAt: null, expiresAt: null } : row));
     setNotice("Бронь снята.");
   }
