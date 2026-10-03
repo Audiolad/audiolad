@@ -25,6 +25,7 @@ import {
 } from "@/lib/seo-queries/types";
 
 type Props = {
+  sprintSlug: string;
   authorId: string;
   authorSlug: string;
   queries: AudioSprintQueryCard[];
@@ -43,6 +44,7 @@ function formatUntil(value: string | null) {
 }
 
 export default function AuthorAudioSprintClient({
+  sprintSlug,
   authorId,
   authorSlug,
   queries,
@@ -196,6 +198,16 @@ export default function AuthorAudioSprintClient({
           {sectionItems.map((item) => {
             const own = Boolean(item.reservationId);
             const until = formatUntil(item.expiresAt);
+            const reservedInOtherWorkspace =
+              !own && Boolean(item.reservationWorkspaceName);
+            const statusLabel = reservedInOtherWorkspace
+              ? item.lifecycle === "published"
+                ? "Опубликован у вас"
+                : "У вас в другом пространстве"
+              : !own &&
+                  (item.lifecycle === "in_progress" || item.lifecycle === "moderation")
+                ? "Занят"
+                : lifecycleLabel(item.lifecycle);
             const reserveEnabled = canReserveAudioSprintQuery({
               lifecycle: item.lifecycle,
               isOwnReservation: own,
@@ -215,9 +227,31 @@ export default function AuthorAudioSprintClient({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h2 className="text-lg font-semibold text-[#25135c]">{item.queryText}</h2>
                   <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">
-                    {lifecycleLabel(item.lifecycle)}
+                    {statusLabel}
                   </span>
                 </div>
+                {reservedInOtherWorkspace && item.reservationWorkspaceName ? (
+                  <div className="mt-3 rounded-[16px] border border-[#e4d7f4] bg-[#faf6ff] px-4 py-3">
+                    <p className="text-sm font-medium text-[#4c3d78]">
+                      {item.lifecycle === "published"
+                        ? "Этот запрос уже используется вашим авторским пространством."
+                        : "Этот запрос уже забронирован вашим авторским пространством."}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[#7042c5]">
+                      {item.reservationWorkspaceName}
+                    </p>
+                    {item.reservationWorkspaceSlug ? (
+                      <Link
+                        href={`/author-dashboard/audio-sprints/${encodeURIComponent(
+                          sprintSlug,
+                        )}?author=${encodeURIComponent(item.reservationWorkspaceSlug)}`}
+                        className="mt-2 inline-flex text-sm font-semibold text-[#7042c5]"
+                      >
+                        Открыть в этом пространстве
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null}
                 {own ? (
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     {until ? (
