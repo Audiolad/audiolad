@@ -369,11 +369,15 @@ printf '%s\\n' "$@" > "${marker}"
   mkdirSync(curlTripwire);
   writeExecutable(join(curlTripwire, "curl"), "#!/bin/sh\nexit 97\n");
   writeExecutable(join(curlTripwire, "wget"), "#!/bin/sh\nexit 97\n");
+  // PR Repository Validation materializes the tree with git archive and no
+  // .git. The lockfile check uses the temporary repo created above, which
+  // already contains this tree's package-lock.json and deploy.sh.
+  const lockfileSha = candidateSha;
   const inventory = run("bash", [
     join(emergency, "build/emergency-build-ready.sh"),
     "--inventory",
-    "--git-dir", repoRoot,
-    "--sha", run("git", ["-C", repoRoot, "rev-parse", "HEAD"]).output.trim(),
+    "--git-dir", gitDir,
+    "--sha", lockfileSha,
     "--cache", emptyCache,
   ], { env: { PATH: `${curlTripwire}:${process.env.PATH}` } });
   assert(inventory.output.includes("emergency_build_ready=inventory"), inventory.output);
@@ -381,8 +385,8 @@ printf '%s\\n' "$@" > "${marker}"
   assert(inventory.output.includes("playwright_skip_in_deploy_sh=no") || inventory.output.includes("playwright_skip_in_deploy_sh=yes"), inventory.output);
   const notReady = run("bash", [
     join(emergency, "build/emergency-build-ready.sh"),
-    "--git-dir", repoRoot,
-    "--sha", run("git", ["-C", repoRoot, "rev-parse", "HEAD"]).output.trim(),
+    "--git-dir", gitDir,
+    "--sha", lockfileSha,
     "--cache", emptyCache,
   ], { env: { PATH: `${curlTripwire}:${process.env.PATH}` }, allowFail: true });
   assert(notReady.status !== 0, "empty cache must not be emergency-build-ready");
