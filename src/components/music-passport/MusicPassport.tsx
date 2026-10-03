@@ -1,5 +1,10 @@
 import {
-  formatMeasureDetail,
+  formatAnalyzedAtMoscow,
+  formatDisplayedBpm,
+  formatDisplayedDuration,
+  formatDisplayedLufs,
+  formatDisplayedMeasureDetail,
+  formatDisplayedQuantity,
   instrumentPlaceLabel,
   rowQuantityDisplay,
 } from "@/lib/music-analyzer-runs/passport-display";
@@ -12,6 +17,7 @@ import type {
 
 export type MusicPassportMode = "full" | "product";
 
+/** Identity of one run. Commit and snapshot SHA stay out of this model. */
 export type MusicPassportHeader = {
   filename: string;
   analyzedAt: string | null;
@@ -62,15 +68,27 @@ function shown(value: string | null | undefined): string {
   return "не указано";
 }
 
+function displayedQuantity(value: string | null): string | null {
+  return formatDisplayedQuantity(value);
+}
+
 function Tag({ row }: { row: PassportRow }) {
   const quantity = rowQuantityDisplay(row);
-  const primary = quantity.primary ?? quantity.max;
+  const primary = displayedQuantity(quantity.primary);
+  const max = displayedQuantity(quantity.max);
+  const visible = primary ?? max;
   return (
     <li className={`inline-flex max-w-full flex-wrap items-baseline gap-x-2 rounded-full px-3 py-1 text-sm ${toneClass(row.tone)}`}>
-      <span className="font-medium">{row.label}</span>
-      {primary ? <span className="text-xs">{primary}</span> : null}
-      {quantity.primary && quantity.max ? <span className="text-xs">max {quantity.max}</span> : null}
-      {row.bandLabel ? <span className="text-xs">{row.bandLabel}</span> : null}
+      <span className="font-medium" data-passport-signal="label">{row.label}</span>
+      {row.bandLabel ? (
+        <span className="font-medium" data-passport-signal="band">{row.bandLabel}</span>
+      ) : null}
+      {visible ? (
+        <span className="text-[11px] font-normal text-[#796ba0]" data-passport-quantity="secondary">{visible}</span>
+      ) : null}
+      {primary && max ? (
+        <span className="text-[11px] font-normal text-[#796ba0]" data-passport-quantity="secondary">max {max}</span>
+      ) : null}
     </li>
   );
 }
@@ -101,15 +119,18 @@ function MeasureCard({
   measure: PassportMeasureDisplay;
   unit: string | null;
 }) {
-  const detail = formatMeasureDetail(measure);
+  const detail = formatDisplayedMeasureDetail(measure);
+  const bpm = unit === "BPM";
+  const primary = bpm ? formatDisplayedBpm(measure.primary) ?? measure.primary : measure.primary;
+  const secondary = bpm ? formatDisplayedBpm(measure.secondary) ?? measure.secondary : measure.secondary;
   return (
     <section className="rounded-[22px] border border-[#e4d7f4] bg-white p-4">
       <h3 className="text-sm font-medium text-[#796ba0]">{title}</h3>
       <p className="mt-3 text-[2rem] font-semibold leading-none tracking-tight text-[#25135c]">
-        {measure.primary ?? "—"}
+        {primary ?? "—"}
       </p>
-      {measure.primary && unit ? <p className="mt-2 text-sm font-medium text-[#796ba0]">{unit}</p> : null}
-      {!measure.primary ? <p className="mt-2 text-sm text-[#796ba0]">не указано</p> : null}
+      {primary && unit ? <p className="mt-2 text-sm font-medium text-[#796ba0]">{unit}</p> : null}
+      {!primary ? <p className="mt-2 text-sm text-[#796ba0]">не указано</p> : null}
       {measure.badge ? (
         <p className="mt-3">
           <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeClass(measure.status)}`}>
@@ -117,9 +138,9 @@ function MeasureCard({
           </span>
         </p>
       ) : null}
-      {measure.secondary ? (
+      {secondary ? (
         <p className="mt-2 text-sm text-[#5c4a78]">
-          кандидат: {measure.secondary}{unit ? ` ${unit}` : ""}
+          кандидат: {secondary}{unit ? ` ${unit}` : ""}
         </p>
       ) : null}
       {detail ? (
@@ -138,13 +159,15 @@ function InstrumentList({ rows }: { rows: PassportRow[] }) {
         <ol className="mt-3 space-y-2">
           {rows.map((row, index) => {
             const quantity = rowQuantityDisplay(row);
-            const primary = quantity.primary ?? quantity.max;
+            const primary = displayedQuantity(quantity.primary);
+            const max = displayedQuantity(quantity.max);
+            const visible = primary ?? max;
             return (
               <li key={`${row.label}-${row.rank ?? index}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-[#25135c]">
                 <span className="min-w-28 text-[#796ba0]">{instrumentPlaceLabel(row, index)}</span>
                 <span className="font-medium">{row.label}</span>
-                <span className="text-[#796ba0]">{primary ?? "оценка не указана"}</span>
-                {quantity.primary && quantity.max ? <span className="text-xs text-[#796ba0]">max {quantity.max}</span> : null}
+                <span className="text-[#796ba0]">{visible ?? "оценка не указана"}</span>
+                {primary && max ? <span className="text-xs text-[#796ba0]">max {max}</span> : null}
               </li>
             );
           })}
@@ -156,8 +179,19 @@ function InstrumentList({ rows }: { rows: PassportRow[] }) {
   );
 }
 
-function ProvenanceList({ provenance }: { provenance: MusicPassportAnalyzerProvenance }) {
+function ProvenanceList({
+  provenance,
+  snapshot,
+}: {
+  provenance: MusicPassportAnalyzerProvenance;
+  snapshot: MusicPassportAnalyzerSnapshot;
+}) {
+  const snapshotCommit = snapshot.commit && snapshot.commit !== provenance.analyzerGitCommit
+    ? snapshot.commit
+    : null;
   const rows: Array<{ label: string; value: string | null; mono?: boolean }> = [
+    { label: "Версия анализатора", value: snapshot.version ?? provenance.analyzerGitCommit },
+    ...(snapshotCommit ? [{ label: "Снимок", value: snapshotCommit, mono: true }] : []),
     { label: "SHA256", value: provenance.sha256, mono: true },
     { label: "Коммит анализатора", value: provenance.analyzerGitCommit, mono: true },
     { label: "Содержание", value: provenance.analyzerContentCommit, mono: true },
@@ -178,6 +212,18 @@ function ProvenanceList({ provenance }: { provenance: MusicPassportAnalyzerProve
   );
 }
 
+const INSTRUMENT_LIMIT: Record<MusicPassportMode, number> = {
+  full: 10,
+  product: 5,
+};
+
+function technicalValue(label: string, value: string): string {
+  if (value === "—" || !value.trim()) return "не указано";
+  if (label === "Длительность") return formatDisplayedDuration(value) ?? "не указано";
+  if (label === "LUFS") return formatDisplayedLufs(value) ?? value;
+  return value;
+}
+
 export function MusicPassport({
   mode,
   passport,
@@ -189,41 +235,21 @@ export function MusicPassport({
 }: MusicPassportProps) {
   const research = mode === "full";
   const showDeveloperJson = research && developerJson != null;
+  const instruments = passport?.instruments.slice(0, INSTRUMENT_LIMIT[mode]) ?? [];
+  const statusLine = [
+    research ? "Музыкальный паспорт · экспериментальная версия" : "Музыкальный паспорт",
+    header.statusLabel,
+    header.fileVersion != null ? `прогон ${header.fileVersion}` : null,
+  ].filter(Boolean).join(" · ");
   return (
     <section className="space-y-4" aria-labelledby="music-passport-heading">
-      <div>
-        <p className="text-xs font-medium text-[#796ba0]">
-          {research ? "Музыкальный паспорт · экспериментальная версия" : "Музыкальный паспорт"}
-        </p>
-        {research ? (
-          <p className="mt-1 break-all text-xs text-[#796ba0]">
-            Анализатор {shown(snapshot.version)} · снимок {shown(snapshot.commit)}
-          </p>
-        ) : null}
+      <header data-passport-header="true">
+        <p className="text-xs font-medium text-[#796ba0]">{statusLine}</p>
         <h2 id="music-passport-heading" className="mt-2 text-[22px] font-semibold text-[#25135c]">
           {header.filename}
         </h2>
-        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-          <div>
-            <dt className="text-[#796ba0]">Дата анализа</dt>
-            <dd className="text-[#25135c]">{shown(header.analyzedAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-[#796ba0]">Версия анализатора</dt>
-            <dd className="text-[#25135c]">{shown(header.analyzerVersion)}</dd>
-          </div>
-          <div>
-            <dt className="text-[#796ba0]">Статус</dt>
-            <dd className="text-[#25135c]">{header.statusLabel}</dd>
-          </div>
-          {header.fileVersion != null ? (
-            <div>
-              <dt className="text-[#796ba0]">Версия прогона</dt>
-              <dd className="text-[#25135c]">{header.fileVersion}</dd>
-            </div>
-          ) : null}
-        </dl>
-      </div>
+        <p className="mt-1 text-sm text-[#25135c]">{formatAnalyzedAtMoscow(header.analyzedAt)}</p>
+      </header>
       {notice ? (
         <p className={`text-sm ${notice.tone === "error" ? "text-[#8b2f4b]" : "text-[#796ba0]"}`}>{notice.text}</p>
       ) : null}
@@ -236,9 +262,14 @@ export function MusicPassport({
             <TagGroup title="Стиль" rows={passport.styles} />
           </div>
           <TagGroup title="Характер и настроение" rows={passport.moods} />
-          <div className="grid gap-3 lg:grid-cols-2">
-            <InstrumentList rows={passport.instruments} />
-            <section className="rounded-[22px] border border-[#e4d7f4] bg-white p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="min-w-0 flex-1 basis-full lg:basis-[28rem]">
+              <InstrumentList rows={instruments} />
+            </div>
+            <section
+              className="w-fit max-w-full self-start rounded-[22px] border border-[#e4d7f4] bg-white p-4"
+              data-sound-character="fit"
+            >
               <h3 className="text-sm font-medium text-[#796ba0]">Характер звучания</h3>
               {passport.sound ? (
                 <ul className="mt-3 flex flex-wrap gap-2">
@@ -255,7 +286,7 @@ export function MusicPassport({
               {passport.technical.map((row) => (
                 <li key={row.label}>
                   <span className="text-[#796ba0]">{row.label}</span>{" "}
-                  <span className="text-[#25135c]">{row.value === "—" ? "не указано" : row.value}</span>
+                  <span className="text-[#25135c]">{technicalValue(row.label, row.value)}</span>
                 </li>
               ))}
             </ul>
@@ -265,7 +296,13 @@ export function MusicPassport({
       {research ? (
         <details className="rounded-[22px] border border-[#e4d7f4] bg-white">
           <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[#25135c]">О версии анализа</summary>
-          <ProvenanceList provenance={provenance} />
+          <ProvenanceList
+            provenance={provenance}
+            snapshot={{
+              version: snapshot.version ?? header.analyzerVersion,
+              commit: snapshot.commit,
+            }}
+          />
         </details>
       ) : null}
       {showDeveloperJson ? (
