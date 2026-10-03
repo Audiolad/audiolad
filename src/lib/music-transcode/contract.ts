@@ -15,6 +15,8 @@ export const MUSIC_STREAM_FILENAME = "mp3-256.mp3";
 export const MUSIC_STREAM_MIME = "audio/mpeg";
 export const MUSIC_STREAM_BITRATE_KBPS = 256;
 export const MUSIC_STREAM_BITRATE = "256k";
+/** MPEG-1 rate. 22050 Hz is MPEG-2 and cannot carry 256 kbps. */
+export const MUSIC_STREAM_SAMPLE_RATE_HZ = 44100;
 
 export const MUSIC_STREAM_DURATION_ABS_TOLERANCE_SECONDS = 0.35;
 export const MUSIC_STREAM_DURATION_REL_TOLERANCE = 0.05;

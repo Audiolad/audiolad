@@ -26,6 +26,9 @@ export type MusicMasterTranscodeStatus =
   | "ready"
   | "failed";
 
+export const MUSIC_MASTER_UPLOAD_ACCEPTED_MESSAGE =
+  "Файл загружен. Подготавливаем версию для прослушивания…";
+
 export type MusicMasterUploadResult =
   | {
       ok: true;
@@ -176,7 +179,7 @@ export async function uploadMusicMasterDirect(input: {
     }
     return {
       ok: true,
-      message: "Файл загружен. Подготавливаем версию для прослушивания…",
+      message: MUSIC_MASTER_UPLOAD_ACCEPTED_MESSAGE,
       assetId: payload?.asset_id ?? started.asset_id,
       lifecycleState: readLifecycleState(payload?.lifecycle_state),
       transcodeStatus: readTranscodeStatus(payload?.transcode_status),

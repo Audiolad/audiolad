@@ -4,9 +4,17 @@ import { readFileSync } from "node:fs";
 import {
   mergeAudioReorderPreservingLocalMedia,
   applyMusicAudioItemDeletion,
+  applyServerMusicMasterStatus,
+  musicTranscodeBecameFailed,
+  musicTranscodeStatusNeedsPoll,
   patchAudioItemAfterMusicMasterFinalize,
   patchAudioItemFromUpload,
 } from "../src/lib/author-products/form-merge";
+import {
+  MUSIC_DELIVERY_FAILED_TEXT,
+  MUSIC_DELIVERY_PREPARING_TEXT,
+  musicAuthorTrackStatusText,
+} from "../src/lib/listen/music-delivery";
 import {
   MAX_CONCURRENT_MUSIC_UPLOADS,
   dropMusicUpload,
@@ -360,6 +368,94 @@ assert.match(formSource, /uploadAudio\(audioItem\.id, file, "legacy"\)/);
 assert.match(formSource, /audio\/wav,audio\/x-wav,audio\/wave,\.wav,audio\/mpeg,\.mp3/);
 assert.match(formSource, /uploadMusicMasterDirect\(/);
 assert.match(formSource, /uploadAuthorProductAudioDirect\(/);
+
+{
+  const local = [
+    item({
+      id: "a",
+      title: "Локальное название",
+      description: "черновик описания",
+      music_master: {
+        assetId: "asset-a",
+        lifecycleState: "verified",
+        transcodeStatus: "queued",
+        hasActiveDelivery: false,
+      },
+    }),
+  ];
+  assert.equal(musicTranscodeStatusNeedsPoll(local[0]?.music_master?.transcodeStatus), true);
+  assert.equal(
+    musicAuthorTrackStatusText({
+      hasLegacyAudioPath: false,
+      hasActiveDelivery: false,
+      lifecycleState: "verified",
+      transcodeStatus: "queued",
+    }),
+    MUSIC_DELIVERY_PREPARING_TEXT,
+  );
+  const server = [
+    item({
+      id: "a",
+      title: "Сервер",
+      description: "сервер",
+      music_master: {
+        assetId: "asset-a",
+        lifecycleState: "verified",
+        transcodeStatus: "failed",
+        hasActiveDelivery: false,
+      },
+    }),
+  ];
+  const patched = applyServerMusicMasterStatus(local, server);
+  assert.equal(patched[0]?.title, "Локальное название");
+  assert.equal(patched[0]?.description, "черновик описания");
+  assert.equal(patched[0]?.music_master?.transcodeStatus, "failed");
+  assert.equal(musicTranscodeBecameFailed(local, patched), true);
+  assert.equal(
+    musicAuthorTrackStatusText({
+      hasLegacyAudioPath: false,
+      hasActiveDelivery: false,
+      lifecycleState: patched[0]?.music_master?.lifecycleState,
+      transcodeStatus: patched[0]?.music_master?.transcodeStatus,
+    }),
+    MUSIC_DELIVERY_FAILED_TEXT,
+  );
+  assert.notEqual(
+    musicAuthorTrackStatusText({
+      hasLegacyAudioPath: false,
+      hasActiveDelivery: false,
+      lifecycleState: patched[0]?.music_master?.lifecycleState,
+      transcodeStatus: patched[0]?.music_master?.transcodeStatus,
+    }),
+    MUSIC_DELIVERY_PREPARING_TEXT,
+  );
+  const otherAsset = applyServerMusicMasterStatus(local, [
+    item({
+      id: "a",
+      music_master: {
+        assetId: "asset-b",
+        lifecycleState: "verified",
+        transcodeStatus: "failed",
+        hasActiveDelivery: false,
+      },
+    }),
+  ]);
+  assert.equal(otherAsset, local);
+  assert.equal(applyServerMusicMasterStatus(patched, server), patched);
+}
+
+{
+  const pollStart = formSource.indexOf("musicTranscodeStatusNeedsPoll(item.music_master?.transcodeStatus)");
+  const pollEnd = formSource.indexOf("musicQueueHasLocalFile(musicQueue)", pollStart);
+  assert.ok(pollStart > 0 && pollEnd > pollStart);
+  const musicPoll = formSource.slice(pollStart, pollEnd);
+  assert.match(musicPoll, /applyServerMusicMasterStatus/);
+  assert.match(musicPoll, /\/api\/author\/products\/\$\{practiceId\}/);
+  assert.match(musicPoll, /cache: "no-store"/);
+  assert.match(musicPoll, /replacePreparingNoticeAfterMusicTranscodeFailure/);
+  assert.doesNotMatch(musicPoll, /reloadSavedProduct/);
+  assert.doesNotMatch(musicPoll, /MusicPassport|AlbumMusicPassport|aurafon|932c4ce/);
+}
 assert.doesNotMatch(
   formSource,
   /productKind === PRODUCT_KIND\.MUSIC[\s\S]{0,180}uploadAudio\(audioItem\.id, file, mode\)/,
