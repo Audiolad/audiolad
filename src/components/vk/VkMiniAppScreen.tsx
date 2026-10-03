@@ -8,6 +8,7 @@ import {
   FEATURED_CARD_CHIP_CLASS,
   FEATURED_CARD_META_CLASS,
   FEATURED_CARD_PRIMARY_CTA_CLASS,
+  FEATURED_CARD_SECONDARY_CTA_CLASS,
   FEATURED_CARD_SUBTITLE_CLASS,
   FEATURED_CARD_TITLE_CLASS,
 } from "@/components/home/FeaturedProductCard";
@@ -19,7 +20,9 @@ import MaxCatalogSearch, {
 import MaxPlaylists from "@/components/max/MaxPlaylists";
 import { MiniAppGuestTransportProvider } from "@/components/mini-app/MiniAppGuestTransport";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import VkAuthorAppreciation from "@/components/vk/VkAuthorAppreciation";
 import VkHomePanel from "@/components/vk/VkHomePanel";
+import VkPublicFooter from "@/components/vk/VkPublicFooter";
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import type {
   CatalogAccessFilter,
@@ -51,11 +54,11 @@ import {
   openVkGuestExternalUrl,
   VK_GUEST_LOGIN_URL,
   VK_GUEST_SIGNUP_URL,
-  VK_PROFILE_LEGAL_LINKS,
 } from "@/lib/vk/guest-links";
 import { readVkLaunchTarget } from "@/lib/vk/launch-target";
 import { readVkPlaybackAudioResponse } from "@/lib/vk/playback-client";
 import { readVkProductView, type VkProductView } from "@/lib/vk/product-view";
+import { openVkCanonicalPracticePage, vkProductCommerce } from "@/lib/vk/purchase";
 import {
   resolveVkShellLaunch,
   vkDetailBackTarget,
@@ -166,32 +169,6 @@ function VkGuestAuthActions() {
         {VK_GUEST_SIGNUP_LABEL}
       </button>
     </div>
-  );
-}
-
-function VkProfileLegalLinks() {
-  return (
-    <nav
-      aria-label="Правовая информация и поддержка"
-      className="mt-6"
-      data-vk-profile-legal=""
-    >
-      <ul className="flex flex-col">
-        {VK_PROFILE_LEGAL_LINKS.map((item) => (
-          <li key={item.id}>
-            <button
-              type="button"
-              onClick={() => {
-                openVkGuestExternalUrl(item.url);
-              }}
-              className="inline-flex min-h-11 w-full items-center text-left text-[15px] text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              {item.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </nav>
   );
 }
 
@@ -356,6 +333,7 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
   }
 
   const product = detail.status === "ready" ? detail.product : null;
+  const commerce = product ? vkProductCommerce(product) : null;
   const playableTrackIds = new Set(
     playback.status === "ready" ? playback.session.tracks.map((track) => track.trackId) : [],
   );
@@ -399,6 +377,29 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
             </p>
           ) : null}
 
+          {commerce?.priceLabel ? (
+            <div className="mt-4" data-vk-product-purchase="">
+              <p
+                className="text-[22px] font-semibold leading-tight text-[#25135c]"
+                data-vk-product-price=""
+              >
+                {commerce.priceLabel}
+              </p>
+              {commerce.buyLabel ? (
+                <button
+                  type="button"
+                  data-vk-buy=""
+                  onClick={() => {
+                    openVkCanonicalPracticePage(product.authorSlug, product.productSlug);
+                  }}
+                  className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} mt-3 w-full justify-center`}
+                >
+                  {commerce.buyLabel}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {playback.status === "loading" ? (
             <p className="mt-4 text-sm text-[#6c5d94]">Проверяем доступ к прослушиванию…</p>
           ) : null}
@@ -433,7 +434,11 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
           ) : null}
 
           {!listenArmed && playback.status === "ready" ? (
-            <button type="button" onClick={startListening} className={`${FEATURED_CARD_PRIMARY_CTA_CLASS} mt-4`}>
+            <button
+              type="button"
+              onClick={startListening}
+              className={`${commerce?.buyLabel ? FEATURED_CARD_SECONDARY_CTA_CLASS : FEATURED_CARD_PRIMARY_CTA_CLASS} mt-4`}
+            >
               <PlayIcon />
               {playLabel}
             </button>
@@ -476,6 +481,15 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
               })}
             </ol>
           ) : null}
+
+          {product.appreciation ? (
+            <VkAuthorAppreciation
+              authorName={product.appreciation.authorName}
+              authorSlug={product.authorSlug}
+              productSlug={product.productSlug}
+            />
+          ) : null}
+          <VkPublicFooter variant="product" />
         </>
       ) : null}
     </article>
@@ -678,7 +692,7 @@ export default function VkMiniAppScreen() {
               <p className="text-sm leading-5 text-[#4a3d73]">{VK_PROFILE_GUEST_STATUS}</p>
             </section>
             <VkGuestAuthActions />
-            <VkProfileLegalLinks />
+            <VkPublicFooter variant="profile" />
           </div>
         ) : null}
 

@@ -1,5 +1,9 @@
 import type { MaxProductContentTrack } from "@/lib/max/product-view";
 
+export type VkProductAppreciation = {
+  authorName: string;
+};
+
 export type VkProductView = {
   authorSlug: string;
   productSlug: string;
@@ -8,12 +12,17 @@ export type VkProductView = {
   formatLabel: string;
   coverUrl: string | null;
   metaLine: string | null;
+  priceLabel: string;
+  isFree: boolean;
+  appreciation: VkProductAppreciation | null;
   contents: MaxProductContentTrack[];
 };
 
 const LEAKED_KEYS = [
   "practiceId",
   "practice_id",
+  "authorId",
+  "author_id",
   "audio_path",
   "audio_url",
   "storage_path",
@@ -35,6 +44,23 @@ function readNullableString(value: unknown): string | null | undefined {
   return undefined;
 }
 
+function publicCommerce(product: {
+  priceLabel?: string | null;
+  isFree?: boolean | null;
+}): { priceLabel: string; isFree: boolean } {
+  const priceLabel = typeof product.priceLabel === "string" ? product.priceLabel.trim() : "";
+  if (product.isFree === false) return { priceLabel, isFree: false };
+  return { priceLabel: priceLabel || "Подарок", isFree: true };
+}
+
+function publicAppreciation(
+  value: { authorName?: string | null } | null | undefined,
+): VkProductAppreciation | null {
+  const authorName = value?.authorName?.trim() ?? "";
+  if (!authorName) return null;
+  return { authorName };
+}
+
 export function toVkProductView(product: {
   authorSlug: string;
   productSlug: string;
@@ -44,7 +70,11 @@ export function toVkProductView(product: {
   coverUrl: string | null;
   metaLine: string | null;
   contents: readonly MaxProductContentTrack[];
+  priceLabel?: string | null;
+  isFree?: boolean | null;
+  appreciation?: { authorName?: string | null } | null;
 }): VkProductView {
+  const commerce = publicCommerce(product);
   return {
     authorSlug: product.authorSlug,
     productSlug: product.productSlug,
@@ -53,6 +83,9 @@ export function toVkProductView(product: {
     formatLabel: product.formatLabel,
     coverUrl: product.coverUrl,
     metaLine: product.metaLine,
+    priceLabel: commerce.priceLabel,
+    isFree: commerce.isFree,
+    appreciation: publicAppreciation(product.appreciation),
     contents: product.contents.map((track) => ({
       audioItemId: track.audioItemId,
       title: track.title,
@@ -73,6 +106,7 @@ export function readVkProductView(value: unknown): VkProductView | null {
   const subtitle = readNullableString(value.subtitle);
   const coverUrl = readNullableString(value.coverUrl);
   const metaLine = readNullableString(value.metaLine);
+  const priceLabel = readString(value.priceLabel)?.trim() ?? "";
   if (
     !authorSlug ||
     !productSlug ||
@@ -81,9 +115,22 @@ export function readVkProductView(value: unknown): VkProductView | null {
     subtitle === undefined ||
     coverUrl === undefined ||
     metaLine === undefined ||
+    typeof value.isFree !== "boolean" ||
+    (value.isFree && !priceLabel) ||
     !Array.isArray(value.contents)
   ) {
     return null;
+  }
+
+  let appreciation: VkProductAppreciation | null = null;
+  if (value.appreciation != null) {
+    const rawAppreciation = value.appreciation;
+    if (!isRecord(rawAppreciation)) return null;
+    if (LEAKED_KEYS.some((key) => key in rawAppreciation)) return null;
+    if (Object.keys(rawAppreciation).some((key) => key !== "authorName")) return null;
+    const authorName = readString(rawAppreciation.authorName)?.trim() ?? "";
+    if (!authorName) return null;
+    appreciation = { authorName };
   }
 
   const contents = value.contents.flatMap((track) => {
@@ -112,6 +159,9 @@ export function readVkProductView(value: unknown): VkProductView | null {
     formatLabel,
     coverUrl,
     metaLine,
+    priceLabel,
+    isFree: value.isFree,
+    appreciation,
     contents,
   };
 }
