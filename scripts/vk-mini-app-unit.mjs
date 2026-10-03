@@ -13,13 +13,24 @@ import {
   VK_BRIDGE_INIT_METHOD,
   VK_BRIDGE_OPEN_LINK_METHOD,
 } from "../src/lib/vk/bridge.ts";
+import { LEGAL_LINKS } from "../src/lib/legal/links.ts";
+import { formatRubles } from "../src/lib/products/price-format.ts";
 import {
+  getVkDiscoveryFooterLinks,
+  getVkLegalFooterLinks,
   isVkGuestExternalUrl,
   openVkGuestExternalUrl,
   VK_GUEST_LOGIN_URL,
   VK_GUEST_SIGNUP_URL,
-  VK_PROFILE_LEGAL_LINKS,
+  VK_PUBLIC_CONTACT_EMAIL,
 } from "../src/lib/vk/guest-links.ts";
+import { readVkProductView } from "../src/lib/vk/product-view.ts";
+import {
+  openVkCanonicalPracticePage,
+  vkBuyCtaLabel,
+  vkCanonicalPracticeUrl,
+  vkProductCommerce,
+} from "../src/lib/vk/purchase.ts";
 import {
   buildVkFrameAncestorsPolicy,
   parseVkLaunchToken,
@@ -131,10 +142,17 @@ assert.match(screen, /selectVkTab/);
 assert.match(screen, /VK_LIBRARY_GUEST_MESSAGE/);
 assert.match(screen, /VK_PROFILE_GUEST_STATUS/);
 assert.match(screen, /data-vk-guest-auth/);
-assert.match(screen, /data-vk-profile-legal/);
+assert.match(screen, /VkPublicFooter variant="profile"/);
+assert.match(screen, /VkPublicFooter variant="product"/);
+assert.match(screen, /data-vk-product-purchase/);
+assert.match(screen, /data-vk-buy/);
+assert.match(screen, /openVkCanonicalPracticePage/);
+assert.match(screen, /vkProductCommerce/);
+assert.match(screen, /product\.appreciation \?/);
+assert.match(screen, /VkAuthorAppreciation/);
+assert.match(screen, /PREVIEW_ACTION_LABEL/);
 assert.match(screen, /openVkGuestExternalUrl\(VK_GUEST_LOGIN_URL\)/);
 assert.match(screen, /openVkGuestExternalUrl\(VK_GUEST_SIGNUP_URL\)/);
-assert.match(screen, /openVkGuestExternalUrl\(item\.url\)/);
 assert.match(screen, /onRequestLogin=\{\(\) => \{/);
 assert.match(screen, /onRequestSignup=\{\(\) => \{/);
 assert.match(screen, /action\.type === "signup"/);
@@ -143,25 +161,69 @@ assert.doesNotMatch(screen, /cursor-not-allowed|opacity-60/);
 assert.doesNotMatch(screen, /smoke|placeholder|TODO|stack/i);
 assert.doesNotMatch(screen, /MaxProductRating|MaxAuthorAppreciation|readMaxInitData|sign-up|history\.back|VKWebAppGetUserInfo/);
 assert.doesNotMatch(screen, /href="\/catalog"|href="\/profile"|\/api\/max\//);
+assert.doesNotMatch(screen, /author_id|practice_id|BuyPracticeButton|\/api\/orders/);
 assert.equal(VK_LIBRARY_GUEST_MESSAGE, "Войдите в АудиоЛад, чтобы видеть сохранённое и покупки");
 assert.equal(VK_PROFILE_GUEST_STATUS, "Вы используете АудиоЛад без входа");
 assert.equal(VK_GUEST_LOGIN_LABEL, "Войти в АудиоЛад");
 assert.equal(VK_GUEST_SIGNUP_LABEL, "Создать аккаунт");
 assert.equal(VK_GUEST_LOGIN_URL, "https://audiolad.ru/auth/sign-in");
 assert.equal(VK_GUEST_SIGNUP_URL, "https://audiolad.ru/auth/sign-up");
+assert.equal(VK_PUBLIC_CONTACT_EMAIL, "1@audiolad.ru");
 assert.deepEqual(
-  VK_PROFILE_LEGAL_LINKS.map((item) => [item.label, item.url]),
+  getVkDiscoveryFooterLinks().map((item) => [item.title, item.url]),
   [
-    ["Политика конфиденциальности", "https://audiolad.ru/privacy"],
-    ["Оферта / условия", "https://audiolad.ru/offer"],
-    ["Помощь / поддержка", "https://audiolad.ru/help/support"],
+    ["О платформе", "https://audiolad.ru/about"],
+    ["Принципы", "https://audiolad.ru/philosophy"],
+    ["Авторам", "https://audiolad.ru/for-authors"],
+    ["Помощь и поддержка", "https://audiolad.ru/help"],
   ],
 );
+assert.deepEqual(
+  getVkLegalFooterLinks().map((item) => [item.title, item.url]),
+  LEGAL_LINKS.map((item) => [item.title, `https://audiolad.ru${item.href}`]),
+);
+assert.equal(getVkDiscoveryFooterLinks().some((item) => item.href === "/articles"), false);
 assert.equal(isVkGuestExternalUrl(VK_GUEST_LOGIN_URL), true);
 assert.equal(isVkGuestExternalUrl("https://audiolad.ru/auth/sign-in/"), false);
 assert.equal(isVkGuestExternalUrl("https://evil.example/privacy"), false);
-assert.equal(screen.includes("VK_PROFILE_LEGAL_LINKS"), true);
-assert.equal(screen.split("data-vk-profile-legal").length, 2);
+assert.equal(isVkGuestExternalUrl("https://audiolad.ru/privacy"), true);
+assert.equal(isVkGuestExternalUrl("https://audiolad.ru/help"), true);
+assert.equal(isVkGuestExternalUrl("https://audiolad.ru/help/support"), false);
+assert.equal(isVkGuestExternalUrl("https://audiolad.ru/articles"), false);
+assert.equal(
+  vkCanonicalPracticeUrl(VK_SMOKE_AUTHOR_SLUG, VK_SMOKE_PRODUCT_SLUG),
+  `https://audiolad.ru/practice/${VK_SMOKE_AUTHOR_SLUG}/${VK_SMOKE_PRODUCT_SLUG}`,
+);
+assert.equal(vkCanonicalPracticeUrl("../secret", VK_SMOKE_PRODUCT_SLUG), null);
+assert.equal(vkBuyCtaLabel(formatRubles(500)), `Купить за ${formatRubles(500)}`);
+assert.equal(vkBuyCtaLabel("Подарок"), null);
+assert.equal(vkBuyCtaLabel("Цена уточняется"), null);
+assert.deepEqual(vkProductCommerce({ isFree: false, priceLabel: formatRubles(500) }), {
+  priceLabel: formatRubles(500),
+  buyLabel: `Купить за ${formatRubles(500)}`,
+});
+assert.deepEqual(vkProductCommerce({ isFree: true, priceLabel: formatRubles(500) }), {
+  priceLabel: null,
+  buyLabel: null,
+});
+const footer = readFileSync(join(process.cwd(), "src/components/vk/VkPublicFooter.tsx"), "utf8");
+const appreciationUi = readFileSync(join(process.cwd(), "src/components/vk/VkAuthorAppreciation.tsx"), "utf8");
+assert.match(footer, /getVkDiscoveryFooterLinks\(\)/);
+assert.match(footer, /getVkLegalFooterLinks\(\)/);
+assert.match(footer, /VK_PUBLIC_CONTACT_EMAIL/);
+assert.match(footer, /openVkGuestExternalUrl\(item\.url\)/);
+assert.match(footer, /data-vk-profile-legal/);
+assert.match(footer, /data-vk-product-legal/);
+assert.match(footer, /variant === "profile" \? getVkDiscoveryFooterLinks\(\)/);
+assert.doesNotMatch(footer, /\/articles|Статьи|help\/support/);
+assert.match(appreciationUi, /❤️ Поблагодарить автора/);
+assert.match(appreciationUi, /\/api\/vk\/appreciation/);
+assert.match(appreciationUi, /guestEmail/);
+assert.match(appreciationUi, /\[100, 300, 500, 1000\]/);
+assert.match(appreciationUi, /openVkExternalHttps/);
+assert.match(appreciationUi, /data-vk-appreciation-email/);
+assert.match(appreciationUi, /пока платёж не подтверждён/);
+assert.doesNotMatch(appreciationUi, /author_id|practice_id|authorId|practiceId|readMaxInitData|оплачено/);
 assert.equal(screen.split("VkGuestAuthActions").length, 4);
 assert.deepEqual(resolveVkShellLaunch(null), { tab: "home", productToken: null });
 assert.deepEqual(resolveVkShellLaunch({ kind: "product", payload }), {
@@ -186,6 +248,7 @@ assert.equal(vkDetailBackTarget("catalog"), "catalog");
 assert.equal(openVkExternalHttps("https://audiolad.ru/authors/meditation"), false);
 assert.equal(openVkGuestExternalUrl(VK_GUEST_LOGIN_URL), false);
 assert.equal(openVkGuestExternalUrl("https://audiolad.ru/admin"), false);
+assert.equal(openVkCanonicalPracticePage(VK_SMOKE_AUTHOR_SLUG, VK_SMOKE_PRODUCT_SLUG), false);
 
 const previousWindow = globalThis.window;
 try {
@@ -251,12 +314,29 @@ try {
     },
   });
   assert.equal(
-    openVkGuestExternalUrl(VK_PROFILE_LEGAL_LINKS[0].url),
+    openVkGuestExternalUrl(getVkLegalFooterLinks().find((item) => item.href === "/privacy").url),
     true,
   );
   assert.equal(embedded.sent.length, 1);
   assert.equal(embedded.sent[0].method, VK_BRIDGE_OPEN_LINK_METHOD);
   assert.equal(embedded.opened.length, 0);
+
+  const practiceUrl = vkCanonicalPracticeUrl(VK_SMOKE_AUTHOR_SLUG, VK_SMOKE_PRODUCT_SLUG);
+  const practiceBridge = installWindow({
+    isEmbedded() {
+      return true;
+    },
+    send(method, params) {
+      assert.equal(method, VK_BRIDGE_OPEN_LINK_METHOD);
+      assert.equal(params.url, practiceUrl);
+      return { ok: true };
+    },
+  });
+  assert.equal(openVkCanonicalPracticePage(VK_SMOKE_AUTHOR_SLUG, VK_SMOKE_PRODUCT_SLUG), true);
+  assert.equal(practiceBridge.sent.length, 1);
+  assert.equal(practiceBridge.opened.length, 0);
+  assert.equal(openVkCanonicalPracticePage("../secret", VK_SMOKE_PRODUCT_SLUG), false);
+  assert.equal(practiceBridge.sent.length, 1);
 
   const rejected = installWindow({
     isEmbedded() {
@@ -280,8 +360,8 @@ try {
       throw new Error("bridge unavailable");
     },
   });
-  assert.equal(openVkGuestExternalUrl("https://audiolad.ru/help/support"), true);
-  assert.equal(thrown.opened[0].url, "https://audiolad.ru/help/support");
+  assert.equal(openVkGuestExternalUrl("https://audiolad.ru/help"), true);
+  assert.equal(thrown.opened[0].url, "https://audiolad.ru/help");
 
   const crashedEmbed = installWindow({
     isEmbedded() {
@@ -362,7 +442,11 @@ const product = {
   formatLabel: "Музыка",
   coverUrl: "https://audiolad.ru/covers/sleep.jpg",
   metaLine: "Аурафон · 34 мин",
+  priceLabel: formatRubles(500),
+  isFree: false,
+  appreciation: { authorName: "Аурафон", authorId: "should-not-leak" },
   practiceId: practiceId,
+  authorId: "should-not-leak",
   contents: [{
     audioItemId: trackId,
     title: "Ночной фон",
@@ -402,8 +486,28 @@ try {
   assert.equal(openedBody.product.metaLine, "Аурафон · 34 мин");
   assert.equal(openedBody.product.contents[0].title, "Ночной фон");
   assert.equal("practiceId" in openedBody.product, false);
+  assert.equal("authorId" in openedBody.product, false);
+  assert.equal("author_id" in openedBody.product, false);
+  assert.equal("practice_id" in openedBody.product, false);
+  assert.equal(openedBody.product.isFree, false);
+  assert.equal(openedBody.product.priceLabel, formatRubles(500));
+  assert.deepEqual(openedBody.product.appreciation, { authorName: "Аурафон" });
   assert.equal("audio_path" in openedBody.product.contents[0], false);
   assert.equal(openedBody.product.contents[0].audioItemId, trackId);
+  const parsedProduct = readVkProductView(openedBody.product);
+  assert.equal(parsedProduct?.title, "Музыка для крепкого сна");
+  assert.deepEqual(vkProductCommerce(parsedProduct), {
+    priceLabel: formatRubles(500),
+    buyLabel: `Купить за ${formatRubles(500)}`,
+  });
+  assert.equal(readVkProductView({
+    ...openedBody.product,
+    appreciation: { authorName: "Аурафон", practice_id: practiceId },
+  }), null);
+  assert.equal(readVkProductView({
+    ...openedBody.product,
+    author_id: "client-author",
+  }), null);
 
   setPublishedProductLookupForTests({
     async bySlug() {
