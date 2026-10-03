@@ -443,7 +443,7 @@ assert.doesNotMatch(collapseSql, /INSERT INTO public\.seo_queries/);
 assert.doesNotMatch(collapseSql, /CREATE TABLE public\.seo_pages/);
 assert.doesNotMatch(collapseSql, /seo_page_query_metrics/);
 
-const matchSql = read("supabase/migrations/20261220121000_count_matching_seo_queries.sql");
+const matchSql = read("supabase/migrations/20261220122000_count_matching_seo_queries.sql");
 assert.match(matchSql, /CREATE FUNCTION public\.count_matching_seo_queries\(p_normalized_queries text\[\]\)/);
 assert.match(matchSql, /count\(DISTINCT q\.normalized_query\)/);
 assert.match(matchSql, /q\.normalized_query = ANY \(p_normalized_queries\)/);
