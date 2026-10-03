@@ -50,17 +50,35 @@ export function withTestSubjectPrefix(subject: string): string {
   return `${TEST_SUBJECT_PREFIX}${subject}`;
 }
 
+function containsAddressListSeparator(value: string): boolean {
+  return value.includes(",") || value.includes(";");
+}
+
 export function resolveTestSendRecipient(input: {
   actorEmail: string | null | undefined;
   requestedEmail: string;
   allowlist?: readonly string[];
+  /**
+   * True only when the authenticated server session roles include owner.
+   * Callers must not copy this from a client payload.
+   */
+  isOwner?: boolean;
 }): { ok: true; email: string } | { ok: false; code: "test_recipient_not_allowed" } {
-  const requested = validateEmailFormat(input.requestedEmail);
+  const requestedRaw = typeof input.requestedEmail === "string" ? input.requestedEmail : "";
+  if (containsAddressListSeparator(requestedRaw)) {
+    return { ok: false, code: "test_recipient_not_allowed" };
+  }
+
+  const requested = validateEmailFormat(requestedRaw);
   if (!requested.ok) {
     return { ok: false, code: "test_recipient_not_allowed" };
   }
 
   const normalized = requested.normalizedEmail.toLowerCase();
+  if (input.isOwner === true) {
+    return { ok: true, email: normalized };
+  }
+
   const actor = input.actorEmail ? validateEmailFormat(input.actorEmail) : null;
   const actorEmail = actor && actor.ok ? actor.normalizedEmail.toLowerCase() : null;
   const allowlist = new Set(
@@ -116,6 +134,8 @@ export async function sendAuthorMailingTest(input: {
   actorEmail: string | null | undefined;
   requestedEmail: string;
   allowlist?: readonly string[];
+  /** Server session only. Never taken from the client payload. */
+  isOwner?: boolean;
   subject: string;
   preheader?: string | null;
   content: ManualCampaignContent;
@@ -123,7 +143,7 @@ export async function sendAuthorMailingTest(input: {
   siteOrigin: string;
   deliver?: (message: TestSendMessage) => Promise<EmailProviderResult>;
 }): Promise<
-  | { ok: true; providerMessageId?: string }
+  | { ok: true; email: string; providerMessageId?: string }
   | {
       ok: false;
       code:
@@ -159,7 +179,7 @@ export async function sendAuthorMailingTest(input: {
   if (input.deliver) {
     const result = await input.deliver(built.message);
     return result.ok
-      ? { ok: true, providerMessageId: result.providerMessageId }
+      ? { ok: true, email: recipient.email, providerMessageId: result.providerMessageId }
       : { ok: false, code: "send_failed" };
   }
 
@@ -183,5 +203,5 @@ export async function sendAuthorMailingTest(input: {
     return { ok: false, code: "send_failed" };
   }
 
-  return { ok: true, providerMessageId: result.providerMessageId };
+  return { ok: true, email: recipient.email, providerMessageId: result.providerMessageId };
 }
