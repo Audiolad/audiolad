@@ -108,6 +108,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     requiredPermission: "mailings.view",
     match: (path) => path.startsWith("/admin/mailings"),
   },
+  {
+    href: "/classica/production",
+    label: "Classica",
+    requiredPermission: "classica.production.access",
+    match: (path) => path.startsWith("/classica/production"),
+  },
 ] as const;
 
 export function getVisibleAdminNavItems(

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import {
+  isPlatformTeamRole,
   legacyProfileRoleToTeamRoles,
   resolvePermissionsForRoles,
   rolesGrantPermission,
@@ -43,14 +44,7 @@ async function loadAssignedTeamRoles(
 
   const roles: PlatformTeamRole[] = [];
   for (const row of (data as UserRoleRow[] | null) ?? []) {
-    if (
-      row.role_code === "owner" ||
-      row.role_code === "admin" ||
-      row.role_code === "editor" ||
-      row.role_code === "support" ||
-      row.role_code === "analyst" ||
-      row.role_code === "finance"
-    ) {
+    if (isPlatformTeamRole(row.role_code)) {
       roles.push(row.role_code);
     }
   }

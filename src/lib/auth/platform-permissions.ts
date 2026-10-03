@@ -39,6 +39,10 @@ export const PLATFORM_PERMISSIONS = [
   "mailings.view",
   "mailings.manage",
   "mailings.send",
+  "classica.production.access",
+  "classica.production.operate",
+  "classica.production.moderate",
+  "classica.production.admin",
 ] as const;
 
 export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[number];
@@ -50,6 +54,8 @@ export const PLATFORM_TEAM_ROLES = [
   "support",
   "analyst",
   "finance",
+  "classica_operator",
+  "classica_moderator",
 ] as const;
 
 export type PlatformTeamRole = (typeof PLATFORM_TEAM_ROLES)[number];
@@ -79,6 +85,10 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
     "team.view",
     "settings.manage",
     "audit_log.view",
+    "classica.production.access",
+    "classica.production.operate",
+    "classica.production.moderate",
+    "classica.production.admin",
   ],
   editor: [
     "admin_panel.access",
@@ -105,6 +115,14 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
     "finance.payouts.manage",
     "payouts.manage",
     "refunds.manage",
+  ],
+  classica_operator: [
+    "classica.production.access",
+    "classica.production.operate",
+  ],
+  classica_moderator: [
+    "classica.production.access",
+    "classica.production.moderate",
   ],
 };
 
