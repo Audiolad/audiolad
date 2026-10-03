@@ -11,7 +11,15 @@ import {
   openVkExternalHttps,
   resetVkBridgeInitForTests,
   VK_BRIDGE_INIT_METHOD,
+  VK_BRIDGE_OPEN_LINK_METHOD,
 } from "../src/lib/vk/bridge.ts";
+import {
+  isVkGuestExternalUrl,
+  openVkGuestExternalUrl,
+  VK_GUEST_LOGIN_URL,
+  VK_GUEST_SIGNUP_URL,
+  VK_PROFILE_LEGAL_LINKS,
+} from "../src/lib/vk/guest-links.ts";
 import {
   buildVkFrameAncestorsPolicy,
   parseVkLaunchToken,
@@ -122,13 +130,39 @@ assert.match(screen, /MaxBottomNav/);
 assert.match(screen, /selectVkTab/);
 assert.match(screen, /VK_LIBRARY_GUEST_MESSAGE/);
 assert.match(screen, /VK_PROFILE_GUEST_STATUS/);
-assert.match(screen, /disabled/);
+assert.match(screen, /data-vk-guest-auth/);
+assert.match(screen, /data-vk-profile-legal/);
+assert.match(screen, /openVkGuestExternalUrl\(VK_GUEST_LOGIN_URL\)/);
+assert.match(screen, /openVkGuestExternalUrl\(VK_GUEST_SIGNUP_URL\)/);
+assert.match(screen, /openVkGuestExternalUrl\(item\.url\)/);
+assert.match(screen, /onRequestLogin=\{\(\) => \{/);
+assert.match(screen, /onRequestSignup=\{\(\) => \{/);
+assert.match(screen, /action\.type === "signup"/);
+assert.doesNotMatch(screen, /\bdisabled\b/);
+assert.doesNotMatch(screen, /cursor-not-allowed|opacity-60/);
+assert.doesNotMatch(screen, /smoke|placeholder|TODO|stack/i);
 assert.doesNotMatch(screen, /MaxProductRating|MaxAuthorAppreciation|readMaxInitData|sign-up|history\.back|VKWebAppGetUserInfo/);
 assert.doesNotMatch(screen, /href="\/catalog"|href="\/profile"|\/api\/max\//);
 assert.equal(VK_LIBRARY_GUEST_MESSAGE, "Войдите в АудиоЛад, чтобы видеть сохранённое и покупки");
 assert.equal(VK_PROFILE_GUEST_STATUS, "Вы используете АудиоЛад без входа");
 assert.equal(VK_GUEST_LOGIN_LABEL, "Войти в АудиоЛад");
 assert.equal(VK_GUEST_SIGNUP_LABEL, "Создать аккаунт");
+assert.equal(VK_GUEST_LOGIN_URL, "https://audiolad.ru/auth/sign-in");
+assert.equal(VK_GUEST_SIGNUP_URL, "https://audiolad.ru/auth/sign-up");
+assert.deepEqual(
+  VK_PROFILE_LEGAL_LINKS.map((item) => [item.label, item.url]),
+  [
+    ["Политика конфиденциальности", "https://audiolad.ru/privacy"],
+    ["Оферта / условия", "https://audiolad.ru/offer"],
+    ["Помощь / поддержка", "https://audiolad.ru/help/support"],
+  ],
+);
+assert.equal(isVkGuestExternalUrl(VK_GUEST_LOGIN_URL), true);
+assert.equal(isVkGuestExternalUrl("https://audiolad.ru/auth/sign-in/"), false);
+assert.equal(isVkGuestExternalUrl("https://evil.example/privacy"), false);
+assert.equal(screen.includes("VK_PROFILE_LEGAL_LINKS"), true);
+assert.equal(screen.split("data-vk-profile-legal").length, 2);
+assert.equal(screen.split("VkGuestAuthActions").length, 4);
 assert.deepEqual(resolveVkShellLaunch(null), { tab: "home", productToken: null });
 assert.deepEqual(resolveVkShellLaunch({ kind: "product", payload }), {
   tab: "catalog",
@@ -150,6 +184,134 @@ assert.equal(vkDetailBackTarget("home"), "home");
 assert.equal(vkDetailBackTarget("deeplink"), "catalog");
 assert.equal(vkDetailBackTarget("catalog"), "catalog");
 assert.equal(openVkExternalHttps("https://audiolad.ru/authors/meditation"), false);
+assert.equal(openVkGuestExternalUrl(VK_GUEST_LOGIN_URL), false);
+assert.equal(openVkGuestExternalUrl("https://audiolad.ru/admin"), false);
+
+const previousWindow = globalThis.window;
+try {
+  function installWindow(vkBridge) {
+    const opened = [];
+    const sent = [];
+    globalThis.window = {
+      open(url, target, features) {
+        opened.push({ url, target, features });
+        return {};
+      },
+      parent: null,
+      vkBridge,
+      get sent() {
+        return sent;
+      },
+    };
+    if (vkBridge) {
+      globalThis.window.vkBridge = {
+        ...vkBridge,
+        send(method, params) {
+          sent.push({ method, params });
+          return vkBridge.send(method, params);
+        },
+      };
+    }
+    return { opened, sent };
+  }
+
+  const ordinary = installWindow({
+    isEmbedded() {
+      return false;
+    },
+    send() {
+      throw new Error("bridge must stay unused in a normal browser");
+    },
+  });
+  assert.equal(openVkExternalHttps("https://audiolad.ru/authors/meditation"), true);
+  assert.equal(ordinary.sent.length, 0);
+  assert.deepEqual(ordinary.opened, [{
+    url: "https://audiolad.ru/authors/meditation",
+    target: "_blank",
+    features: "noopener,noreferrer",
+  }]);
+
+  const scriptOnly = installWindow({
+    send() {
+      throw new Error("loaded script is not a VK client");
+    },
+  });
+  assert.equal(openVkGuestExternalUrl(VK_GUEST_SIGNUP_URL), true);
+  assert.equal(scriptOnly.sent.length, 0);
+  assert.equal(scriptOnly.opened[0].url, VK_GUEST_SIGNUP_URL);
+
+  const embedded = installWindow({
+    isEmbedded() {
+      return true;
+    },
+    send(method, params) {
+      assert.equal(method, VK_BRIDGE_OPEN_LINK_METHOD);
+      assert.equal(params.url, "https://audiolad.ru/privacy");
+      return { ok: true };
+    },
+  });
+  assert.equal(
+    openVkGuestExternalUrl(VK_PROFILE_LEGAL_LINKS[0].url),
+    true,
+  );
+  assert.equal(embedded.sent.length, 1);
+  assert.equal(embedded.sent[0].method, VK_BRIDGE_OPEN_LINK_METHOD);
+  assert.equal(embedded.opened.length, 0);
+
+  const rejected = installWindow({
+    isEmbedded() {
+      return true;
+    },
+    send() {
+      return Promise.reject(new Error("open link failed"));
+    },
+  });
+  assert.equal(openVkGuestExternalUrl("https://audiolad.ru/offer"), true);
+  assert.equal(rejected.opened.length, 0);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(rejected.opened[0].url, "https://audiolad.ru/offer");
+
+  const thrown = installWindow({
+    isEmbedded() {
+      return true;
+    },
+    send() {
+      throw new Error("bridge unavailable");
+    },
+  });
+  assert.equal(openVkGuestExternalUrl("https://audiolad.ru/help/support"), true);
+  assert.equal(thrown.opened[0].url, "https://audiolad.ru/help/support");
+
+  const crashedEmbed = installWindow({
+    isEmbedded() {
+      throw new Error("embed check failed");
+    },
+    send() {
+      throw new Error("must not be called");
+    },
+  });
+  assert.equal(openVkGuestExternalUrl(VK_GUEST_LOGIN_URL), true);
+  assert.equal(crashedEmbed.sent.length, 0);
+  assert.equal(crashedEmbed.opened[0].url, VK_GUEST_LOGIN_URL);
+
+  globalThis.window = {
+    open() {
+      throw new Error("popup blocked");
+    },
+  };
+  assert.equal(openVkExternalHttps("https://audiolad.ru/privacy"), false);
+  assert.equal(openVkExternalHttps("http://audiolad.ru/privacy"), false);
+  assert.equal(openVkExternalHttps("https://user:secret@audiolad.ru/privacy"), false);
+  assert.equal(openVkExternalHttps("not a url"), false);
+  assert.equal(openVkGuestExternalUrl("javascript:alert(1)"), false);
+} finally {
+  if (previousWindow === undefined) {
+    delete globalThis.window;
+  } else {
+    globalThis.window = previousWindow;
+  }
+}
 assert.deepEqual(
   readVkProductRef({ authorSlug: VK_SMOKE_AUTHOR_SLUG, productSlug: VK_SMOKE_PRODUCT_SLUG }),
   { kind: "slugs", authorSlug: VK_SMOKE_AUTHOR_SLUG, productSlug: VK_SMOKE_PRODUCT_SLUG },

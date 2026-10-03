@@ -47,6 +47,12 @@ import {
   VK_PROFILE_GUEST_STATUS,
   VK_PROFILE_TITLE,
 } from "@/lib/vk/guest-copy";
+import {
+  openVkGuestExternalUrl,
+  VK_GUEST_LOGIN_URL,
+  VK_GUEST_SIGNUP_URL,
+  VK_PROFILE_LEGAL_LINKS,
+} from "@/lib/vk/guest-links";
 import { readVkLaunchTarget } from "@/lib/vk/launch-target";
 import { readVkPlaybackAudioResponse } from "@/lib/vk/playback-client";
 import { readVkProductView, type VkProductView } from "@/lib/vk/product-view";
@@ -140,22 +146,52 @@ function homeShelfTarget(shelfId: MaxHomeShelfId): {
 
 function VkGuestAuthActions() {
   return (
-    <div className="mt-6 flex flex-col gap-3">
+    <div className="mt-6 flex flex-col gap-3" data-vk-guest-auth="">
       <button
         type="button"
-        disabled
-        className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white opacity-60"
+        onClick={() => {
+          openVkGuestExternalUrl(VK_GUEST_LOGIN_URL);
+        }}
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         {VK_GUEST_LOGIN_LABEL}
       </button>
       <button
         type="button"
-        disabled
-        className="inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center rounded-full border border-[#7042c5] px-5 py-3 text-[17px] font-medium text-[#7042c5] opacity-60"
+        onClick={() => {
+          openVkGuestExternalUrl(VK_GUEST_SIGNUP_URL);
+        }}
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#7042c5] px-5 py-3 text-[17px] font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         {VK_GUEST_SIGNUP_LABEL}
       </button>
     </div>
+  );
+}
+
+function VkProfileLegalLinks() {
+  return (
+    <nav
+      aria-label="Правовая информация и поддержка"
+      className="mt-6"
+      data-vk-profile-legal=""
+    >
+      <ul className="flex flex-col">
+        {VK_PROFILE_LEGAL_LINKS.map((item) => (
+          <li key={item.id}>
+            <button
+              type="button"
+              onClick={() => {
+                openVkGuestExternalUrl(item.url);
+              }}
+              className="inline-flex min-h-11 w-full items-center text-left text-[15px] text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              {item.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -542,7 +578,11 @@ export default function VkMiniAppScreen() {
 
   function applyGuestHomeSlide(slideId: string) {
     const action = resolveMaxGuestHomeSlideAction(slideId);
-    if (!action || action.type === "signup") return;
+    if (!action) return;
+    if (action.type === "signup") {
+      openVkGuestExternalUrl(VK_GUEST_SIGNUP_URL);
+      return;
+    }
     if (action.type === "external") {
       openVkExternalHttps(action.url);
       return;
@@ -605,7 +645,15 @@ export default function VkMiniAppScreen() {
 
         {ready && activeTab === "playlists" ? (
           <div data-vk-panel="playlists">
-            <MaxPlaylists guestMode />
+            <MaxPlaylists
+              guestMode
+              onRequestLogin={() => {
+                openVkGuestExternalUrl(VK_GUEST_LOGIN_URL);
+              }}
+              onRequestSignup={() => {
+                openVkGuestExternalUrl(VK_GUEST_SIGNUP_URL);
+              }}
+            />
           </div>
         ) : null}
 
@@ -630,6 +678,7 @@ export default function VkMiniAppScreen() {
               <p className="text-sm leading-5 text-[#4a3d73]">{VK_PROFILE_GUEST_STATUS}</p>
             </section>
             <VkGuestAuthActions />
+            <VkProfileLegalLinks />
           </div>
         ) : null}
 
