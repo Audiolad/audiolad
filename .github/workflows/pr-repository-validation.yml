@@ -106,6 +106,7 @@ jobs:
           npm run test:scheduled-publication
           npm run test:live-public-content-sync
           npm run test:ai-company-dashboard
+          npm run test:admin-mailings
           npm run build
           npm run typecheck
           npm run test:author-project-cyrillic-name

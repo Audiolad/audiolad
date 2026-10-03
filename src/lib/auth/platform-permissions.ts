@@ -36,6 +36,9 @@ export const PLATFORM_PERMISSIONS = [
   "team.manage",
   "settings.manage",
   "audit_log.view",
+  "mailings.view",
+  "mailings.manage",
+  "mailings.send",
 ] as const;
 
 export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[number];
