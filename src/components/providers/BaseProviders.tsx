@@ -16,7 +16,9 @@ export default function BaseProviders({ children }: { children: ReactNode }) {
   // analytics, telemetry and any third-party script while the flow is active.
   if (
     pathname === "/auth/recovery" ||
-    pathname === "/auth/reset-password"
+    pathname === "/auth/reset-password" ||
+    pathname === "/vk" ||
+    pathname.startsWith("/vk/")
   ) {
     return <>{children}</>;
   }

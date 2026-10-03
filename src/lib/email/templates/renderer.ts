@@ -123,6 +123,12 @@ import type {
   EmailTemplateRenderer,
 } from "./types";
 import {
+  MANUAL_CAMPAIGN_TEMPLATE_KEY,
+  MANUAL_CAMPAIGN_TEMPLATE_VERSION,
+  renderManualCampaignEmail,
+  type ManualCampaignContent,
+} from "./manual-campaign";
+import {
   WELCOME_EMAIL_SUBJECT,
   WELCOME_EMAIL_TEMPLATE_KEY,
   WELCOME_EMAIL_TEMPLATE_VERSION,
@@ -654,8 +660,82 @@ export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
       };
     }
 
+    if (input.templateKey === MANUAL_CAMPAIGN_TEMPLATE_KEY) {
+      const subject = readString(input.payload, "subject");
+      const heading = readString(input.payload, "heading");
+      const paragraphsRaw = input.payload.paragraphs;
+      const paragraphs = Array.isArray(paragraphsRaw)
+        ? paragraphsRaw.filter((item): item is string => typeof item === "string")
+        : [];
+
+      if (!subject || !heading || paragraphs.length === 0) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      const content: ManualCampaignContent = {
+        heading,
+        paragraphs,
+        cta: readLink(input.payload.cta),
+        infoBlock: readInfoBlock(input.payload.infoBlock),
+        secondaryLink: readLink(input.payload.secondaryLink),
+      };
+      const rendered = renderManualCampaignEmail({
+        subject,
+        preheader: readString(input.payload, "preheader"),
+        content,
+        firstName: readString(input.payload, "firstName"),
+        unsubscribeUrl: readString(input.payload, "unsubscribeUrl"),
+        siteOrigin: readString(input.payload, "siteOrigin") ?? undefined,
+      });
+
+      if (!rendered.ok) {
+        return { ok: false, code: "invalid_payload" };
+      }
+
+      return {
+        ok: true,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+      };
+    }
+
     return { ok: false, code: "template_not_found" };
   }
+}
+
+function readLink(value: unknown): { label: string; url: string } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const label = typeof record.label === "string" ? record.label.trim() : "";
+  const url = typeof record.url === "string" ? record.url.trim() : "";
+
+  if (!label || !url) {
+    return null;
+  }
+
+  return { label, url };
+}
+
+function readInfoBlock(
+  value: unknown,
+): { title: string; text: string } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const text = typeof record.text === "string" ? record.text.trim() : "";
+  const title = typeof record.title === "string" ? record.title.trim() : "";
+
+  if (!text) {
+    return null;
+  }
+
+  return { title, text };
 }
 
 export function getBrandEmailTemplateVersion(templateKey: string): string | null {
@@ -730,6 +810,9 @@ export function getBrandEmailTemplateVersion(templateKey: string): string | null
   }
   if (templateKey === SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_KEY) {
     return SEO_QUERY_PROPOSAL_REJECTED_EMAIL_TEMPLATE_VERSION;
+  }
+  if (templateKey === MANUAL_CAMPAIGN_TEMPLATE_KEY) {
+    return MANUAL_CAMPAIGN_TEMPLATE_VERSION;
   }
   return null;
 }

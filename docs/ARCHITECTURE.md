@@ -316,6 +316,40 @@ Timeweb Cloud
 MAX user_id  ↔  профиль АудиоЛада  ↔  пользователь Supabase Auth
 ```
 
+## VK Mini App
+
+Гостевой shell на `https://audiolad.ru/vk` для приложения VK `54802101`.
+Связки VK ↔ АудиоЛад нет: библиотека и профиль показывают гостевое состояние
+и не читают персональные данные.
+
+Верхний уровень совпадает с MAX: Главная, Каталог, Аудиотека, Плейлисты, Профиль.
+Нижнее меню — те же подписи и иконки (`MaxBottomNav` / `MAX_PRIMARY_TABS`).
+Обычный запуск открывает Главную. Product deeplink `#p_<UUID>` открывает релиз
+в контексте Каталога, меню остаётся на месте. Назад закрывает карточку внутри
+приложения.
+
+- Цель релиза: общий payload `p_<UUID без дефисов>` (`src/lib/mini-app/product-target.ts`).
+  Временный smoke-token `smoke` разрешается только в `aurafon/muzyka-dlya-krepkogo-sna`.
+  Карточка каталога открывается по `authorSlug` + `productSlug`.
+- Сервер открывает только опубликованный, уже публично доступный и catalog-listed
+  продукт. Неопубликованные, отложенные, unlisted и selected_users не отдаются.
+- Главная, каталог и плейлисты — отдельные `/api/vk/*` адаптеры поверх канонических
+  гостевых загрузчиков. MAX initData и MAX HMAC не используются. `userId = null`.
+- Аудиотека и профиль не ходят в API и не читают сессию. Гость видит
+  «Войдите в АудиоЛад, чтобы видеть сохранённое и покупки». Кнопки входа и
+  регистрации открывают `https://audiolad.ru/auth/sign-in` и
+  `https://audiolad.ru/auth/sign-up` снаружи мини-приложения. Связки VK ↔
+  АудиоЛад нет.
+- В профиле компактный блок: политика конфиденциальности (`/privacy`),
+  оферта (`/offer`) и помощь (`/help/support`). Длинные юридические тексты
+  внутрь мини-приложения не копируются.
+- Внешние https-ссылки идут через `VKWebAppOpenLink`, только если VK Bridge
+  сообщает `isEmbedded`. В обычном браузере открывается новая вкладка.
+  Ошибка моста или `window.open` не роняет экран.
+- `VKWebAppInit` вызывается только на `/vk` и не должен ронять обычный браузер.
+- `frame-ancestors` и `noindex, nofollow, noarchive` заданы только для `/vk`
+  и официальных origin VK (`vk.com`, `m.vk.com`, `vk.ru`, `m.vk.ru`).
+
 
 ## Business bounded context (Аудиолад Бизнес)
 
@@ -383,7 +417,7 @@ measured attributes  |  interpreted attributes
 
   Stage-1 storage keys: `bpm`, `musical_key`, `mode`, `energy`, `loudness_lufs`, `vocal_role`, `genre_class`, `mood`, `instrument`. `musical_key` / `genre_class` are the storage names for the ROADMAP key and genre slots (see `docs/DECISIONS.md`). Typed contract: `src/lib/music-passport/contract.ts`. No passport UI in this slice.
 - **Jazz Relax music passport pilot:** author UUID `0a847461-a429-4868-986a-59d7bf2fdb2b` only (`src/lib/authors/jazz-relax.ts`). Aurafon and every other author keep the existing wizard CTA. Step 2 (`AuthorProductForm` / `JazzRelaxMusicPassportPanel`) can enqueue the existing analyzer via `enqueue_music_analyzer_run` (`src/lib/music-passport/jazz-relax-pilot.ts`). «Продолжить без музыкального паспорта» saves and opens step 3 without a passport row; a missing album version is the skipped state and is not an error. Existing runs and passports stay. The product API, not the worker, appends a new `music_passport_versions` row per succeeded run and inserts a new `music_album_passports` version (`src/lib/music-passport/album-aggregate.ts`). Step 3 reads that frozen album row (`generated_from_album_passport_version_id`). Re-analysis inserts new versions and does not rewrite the description. Candidate A stays off. Analyzer pin stays `932c4ce`.
-- **Music Analyzer runs (Phase 2A):** `/music-analyzer/runs` next to the human listening hub. Table `music_analyzer_runs`, bucket `music-analyzer-runs`. PM2 `audiolad-music-analyzer-worker` on the audiolad.ru VPS shells out to the pinned checkout `cursor/benchmark-harness-v01` @ `932c4ce` (`analyze_track.py --device cpu`). It does not write `music_lab_*` or `music_passport_*`. Bootstrap: `deploy/docs/MUSIC_ANALYZER_WORKER.md`.
+- **Music Analyzer runs (Phase 2A):** `/music-analyzer/runs` next to the human listening hub. Table `music_analyzer_runs`, bucket `music-analyzer-runs`. PM2 `audiolad-music-analyzer-worker` on the audiolad.ru VPS shells out to the pinned checkout `cursor/benchmark-harness-v01` @ `932c4ce` (`analyze_track.py --device cpu`). It does not write `music_lab_*` or `music_passport_*`. Bootstrap: `deploy/docs/MUSIC_ANALYZER_WORKER.md`. The run screen renders `MusicPassport` (`src/components/music-passport/MusicPassport.tsx`) in `full` mode: collapsed provenance and raw JSON stay on the Lab page. `product` mode hides those blocks and is not wired to the author wizard. Next.js still only displays analyzer fields.
 - Следующие слои (отдельные PR): Aural wiring to Eligibility Decision, full Proof of Play UX, offline/cache evidence + provenance, Qualified Usage / billing, Sonic DNA / Engine V1 on top of this passport, Business App / Rights Ops UI.
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса. Music Rights Catalog — global/shared domain (не organization-scoped в A4).

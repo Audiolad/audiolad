@@ -15,6 +15,7 @@ import {
   countCatalogFilterGroups,
   toggleCatalogDraftTopics,
 } from "@/lib/catalog/topic-filter";
+import { useMiniAppGuestTransport } from "@/components/mini-app/MiniAppGuestTransport";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_CATALOG_TOPICS_PATH } from "@/lib/max/host";
 import { useSheetScrollLock } from "@/lib/listener/use-sheet-scroll-lock";
@@ -92,6 +93,7 @@ export default function MaxCatalogTopicsSheet({
   onApply,
   onReset,
 }: MaxCatalogTopicsSheetProps) {
+  const guestTransport = useMiniAppGuestTransport();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -113,6 +115,19 @@ export default function MaxCatalogTopicsSheet({
 
     void (async () => {
       try {
+        if (guestTransport) {
+          const guest = await guestTransport.postCatalogTopics(controller.signal);
+          if (controller.signal.aborted) return;
+          const nextTopics = guest.ok ? readTopics(guest.payload) : null;
+          if (!nextTopics) {
+            setTopicsStatus("error");
+            return;
+          }
+          setTopics(nextTopics);
+          setTopicsStatus("ready");
+          return;
+        }
+
         const initData = readMaxInitData();
         if (!initData) {
           if (!controller.signal.aborted) {
@@ -148,7 +163,7 @@ export default function MaxCatalogTopicsSheet({
     })();
 
     return () => controller.abort();
-  }, [open]);
+  }, [guestTransport, open]);
 
   useEffect(() => {
     if (!open) {
