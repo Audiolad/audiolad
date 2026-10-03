@@ -35,6 +35,42 @@ export function resetVkBridgeInitForTests() {
   initPromise = null;
 }
 
+/** Open an already-validated https URL inside VK, or a new tab outside it. */
+export function openVkExternalHttps(url: string): boolean {
+  if (typeof window === "undefined") return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+
+  const href = parsed.toString();
+  const bridge = window.vkBridge;
+  if (bridge && typeof bridge.send === "function") {
+    try {
+      const result = bridge.send("VKWebAppOpenLink", { url: href });
+      if (
+        result &&
+        typeof result === "object" &&
+        "then" in result &&
+        typeof (result as Promise<unknown>).then === "function"
+      ) {
+        void (result as Promise<unknown>).catch(() => {
+          window.open(href, "_blank", "noopener,noreferrer");
+        });
+      }
+      return true;
+    } catch {
+      // Fall through to a normal window when the bridge rejects synchronously.
+    }
+  }
+
+  window.open(href, "_blank", "noopener,noreferrer");
+  return true;
+}
+
 function callInit(bridge: VkBridgeLike | undefined): Promise<void> {
   return new Promise((resolve) => {
     try {

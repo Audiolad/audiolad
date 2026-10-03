@@ -8,6 +8,7 @@ import {
 } from "../src/lib/mini-app/product-target.ts";
 import {
   initVkBridge,
+  openVkExternalHttps,
   resetVkBridgeInitForTests,
   VK_BRIDGE_INIT_METHOD,
 } from "../src/lib/vk/bridge.ts";
@@ -30,6 +31,23 @@ import {
   setVkPlaybackDepsForTests,
 } from "../src/app/api/vk/playback/audio/route.ts";
 import { POST as postSession } from "../src/app/api/vk/playback/session/route.ts";
+import { POST as postHome, setListMaxPublishedCatalogForTests } from "../src/app/api/vk/home/route.ts";
+import { POST as postCatalog } from "../src/app/api/vk/catalog/route.ts";
+import { POST as postTopics, setListMaxCatalogTopicsForTests } from "../src/app/api/vk/catalog/topics/route.ts";
+import { POST as postPlaylistCatalog, setListMaxPublicPlaylistsForTests } from "../src/app/api/vk/playlists/catalog/route.ts";
+import { POST as postPlaylistDetail, setLoadMaxPublicPlaylistForTests } from "../src/app/api/vk/playlists/detail/route.ts";
+import {
+  VK_GUEST_LOGIN_LABEL,
+  VK_GUEST_SIGNUP_LABEL,
+  VK_LIBRARY_GUEST_MESSAGE,
+  VK_PROFILE_GUEST_STATUS,
+} from "../src/lib/vk/guest-copy.ts";
+import { readVkProductRef } from "../src/lib/vk/request.ts";
+import {
+  resolveVkShellLaunch,
+  vkDetailBackTarget,
+  vkTabSelectionAfterSelect,
+} from "../src/lib/vk/shell.ts";
 import { SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/robots-config.ts";
 import nextConfigModule from "../next.config.ts";
 
@@ -100,7 +118,44 @@ assert.match(screen, /initVkBridge/);
 assert.match(screen, /\/api\/vk\/product/);
 assert.match(screen, /\/api\/vk\/playback\/session/);
 assert.match(screen, /\/api\/vk\/playback\/audio/);
-assert.doesNotMatch(screen, /MaxProductRating|MaxAuthorAppreciation|sign-up|\/catalog|\/profile/);
+assert.match(screen, /MaxBottomNav/);
+assert.match(screen, /selectVkTab/);
+assert.match(screen, /VK_LIBRARY_GUEST_MESSAGE/);
+assert.match(screen, /VK_PROFILE_GUEST_STATUS/);
+assert.match(screen, /disabled/);
+assert.doesNotMatch(screen, /MaxProductRating|MaxAuthorAppreciation|readMaxInitData|sign-up|history\.back|VKWebAppGetUserInfo/);
+assert.doesNotMatch(screen, /href="\/catalog"|href="\/profile"|\/api\/max\//);
+assert.equal(VK_LIBRARY_GUEST_MESSAGE, "Войдите в АудиоЛад, чтобы видеть сохранённое и покупки");
+assert.equal(VK_PROFILE_GUEST_STATUS, "Вы используете АудиоЛад без входа");
+assert.equal(VK_GUEST_LOGIN_LABEL, "Войти в АудиоЛад");
+assert.equal(VK_GUEST_SIGNUP_LABEL, "Создать аккаунт");
+assert.deepEqual(resolveVkShellLaunch(null), { tab: "home", productToken: null });
+assert.deepEqual(resolveVkShellLaunch({ kind: "product", payload }), {
+  tab: "catalog",
+  productToken: payload,
+});
+assert.deepEqual(resolveVkShellLaunch({ kind: "smoke" }), {
+  tab: "catalog",
+  productToken: "smoke",
+});
+assert.deepEqual(
+  vkTabSelectionAfterSelect({ activeTab: "catalog", nextTab: "playlists", hasProductDetail: true }),
+  { tab: "playlists", closeProductDetail: true },
+);
+assert.deepEqual(
+  vkTabSelectionAfterSelect({ activeTab: "catalog", nextTab: "catalog", hasProductDetail: true }),
+  { tab: "catalog", closeProductDetail: true },
+);
+assert.equal(vkDetailBackTarget("home"), "home");
+assert.equal(vkDetailBackTarget("deeplink"), "catalog");
+assert.equal(vkDetailBackTarget("catalog"), "catalog");
+assert.equal(openVkExternalHttps("https://audiolad.ru/authors/meditation"), false);
+assert.deepEqual(
+  readVkProductRef({ authorSlug: VK_SMOKE_AUTHOR_SLUG, productSlug: VK_SMOKE_PRODUCT_SLUG }),
+  { kind: "slugs", authorSlug: VK_SMOKE_AUTHOR_SLUG, productSlug: VK_SMOKE_PRODUCT_SLUG },
+);
+assert.equal(readVkProductRef({ authorSlug: "../secret", productSlug: "ok" }), null);
+assert.deepEqual(readVkProductRef({ target: payload }), { kind: "token", token: payload });
 
 resetVkBridgeInitForTests();
 let initCalls = 0;
@@ -305,10 +360,205 @@ try {
   assert.equal(denied.status, 404);
   assert.equal(sessionCalls, 0);
   assert.equal(signCalls, 0);
+  setPublishedProductLookupForTests({
+    async bySlug(authorSlug, productSlug) {
+      assert.equal(authorSlug, VK_SMOKE_AUTHOR_SLUG);
+      assert.equal(productSlug, VK_SMOKE_PRODUCT_SLUG);
+      return {
+        ok: true,
+        target: { authorSlug, productSlug },
+      };
+    },
+    async byId() {
+      return { ok: true, target: null };
+    },
+  });
+  let productLoadsBeforeSlug = productLoads;
+  const bySlug = await postProduct(request("https://audiolad.ru/api/vk/product", {
+    authorSlug: VK_SMOKE_AUTHOR_SLUG,
+    productSlug: VK_SMOKE_PRODUCT_SLUG,
+  }));
+  const bySlugBody = await bySlug.json();
+  assert.equal(bySlug.status, 200);
+  assert.equal(bySlugBody.product.title, "Музыка для крепкого сна");
+  assert.equal(productLoads, productLoadsBeforeSlug + 1);
+  assert.equal("practiceId" in bySlugBody.product, false);
+
+  const slugSession = await postSession(request("https://audiolad.ru/api/vk/playback/session", {
+    authorSlug: VK_SMOKE_AUTHOR_SLUG,
+    productSlug: VK_SMOKE_PRODUCT_SLUG,
+  }));
+  assert.equal(slugSession.status, 200);
+  const slugAudio = await postAudio(request("https://audiolad.ru/api/vk/playback/audio", {
+    authorSlug: VK_SMOKE_AUTHOR_SLUG,
+    productSlug: VK_SMOKE_PRODUCT_SLUG,
+    trackId,
+  }));
+  assert.equal(slugAudio.status, 200);
+
+  setPublishedProductLookupForTests({
+    async bySlug() {
+      return { ok: true, target: null };
+    },
+    async byId() {
+      return { ok: true, target: null };
+    },
+  });
+  productLoadsBeforeSlug = productLoads;
+  const hiddenSlug = await postProduct(request("https://audiolad.ru/api/vk/product", {
+    authorSlug: "hidden-author",
+    productSlug: "hidden-release",
+  }));
+  assert.equal(hiddenSlug.status, 404);
+  assert.equal(productLoads, productLoadsBeforeSlug);
+
+  const badSlug = await postProduct(request("https://audiolad.ru/api/vk/product", {
+    authorSlug: "../secret",
+    productSlug: VK_SMOKE_PRODUCT_SLUG,
+  }));
+  assert.equal(badSlug.status, 400);
 } finally {
   setPublishedProductLookupForTests(null);
   setGetMaxPublishedProductForTests(null);
   setVkPlaybackDepsForTests(null);
+}
+
+const guestCard = {
+  authorSlug: VK_SMOKE_AUTHOR_SLUG,
+  slug: VK_SMOKE_PRODUCT_SLUG,
+  title: "Музыка для крепкого сна",
+  subtitle: null,
+  coverUrl: null,
+  authorName: "Аурафон",
+  formatLabel: "Музыка",
+  priceLabel: "Бесплатно",
+  isFree: true,
+};
+
+try {
+  const catalogCalls = [];
+  setListMaxPublishedCatalogForTests(async (input = {}) => {
+    catalogCalls.push(input);
+    assert.equal("userId" in input, false);
+    assert.equal("limit" in input, false);
+    return { ok: true, items: [guestCard] };
+  });
+
+  const home = await postHome(request("https://audiolad.ru/api/vk/home", {}));
+  const homeBody = await home.json();
+  assert.equal(home.status, 200);
+  assert.equal(homeBody.shelves.free[0].slug, VK_SMOKE_PRODUCT_SLUG);
+  assert.equal(homeBody.shelves.music.length, 1);
+  assert.equal(homeBody.shelves.meditations.length, 1);
+  assert.equal(catalogCalls.some((call) => call.access === "free"), true);
+  assert.equal(catalogCalls.some((call) => call.section === "music"), true);
+  assert.equal(catalogCalls.some((call) => call.section === "meditations"), true);
+  assert.equal("practiceId" in homeBody.shelves.free[0], false);
+
+  catalogCalls.length = 0;
+  const found = await postCatalog(request("https://audiolad.ru/api/vk/catalog", {
+    query: "сон",
+    section: "music",
+    access: "free",
+    class: "release",
+    topic: "sleep",
+  }));
+  const foundBody = await found.json();
+  assert.equal(found.status, 200);
+  assert.equal(foundBody.items.length, 1);
+  assert.equal(catalogCalls[0].query, "сон");
+  assert.equal(catalogCalls[0].section, "music");
+  assert.equal(catalogCalls[0].access, "free");
+  assert.equal(catalogCalls[0].class, "release");
+  assert.equal(catalogCalls[0].topicKey, "sleep");
+  assert.equal("limit" in catalogCalls[0], false);
+
+  const badSection = await postCatalog(request("https://audiolad.ru/api/vk/catalog", {
+    section: "secret",
+  }));
+  assert.equal(badSection.status, 400);
+
+  setListMaxPublishedCatalogForTests(async () => ({ ok: false, reason: "storage_unavailable" }));
+  const brokenHome = await postHome(request("https://audiolad.ru/api/vk/home", {}));
+  assert.equal(brokenHome.status, 503);
+  assert.equal("shelves" in await brokenHome.json(), false);
+
+  setListMaxCatalogTopicsForTests(async () => ({
+    ok: true,
+    topics: [{ key: "sleep", title: "Сон" }],
+  }));
+  const topics = await postTopics(request("https://audiolad.ru/api/vk/catalog/topics", {}));
+  const topicsBody = await topics.json();
+  assert.equal(topics.status, 200);
+  assert.equal(topicsBody.topics[0].key, "sleep");
+
+  const crossHome = await postHome(request(
+    "https://audiolad.ru/api/vk/home",
+    {},
+    { origin: "https://evil.example", "sec-fetch-site": "cross-site" },
+  ));
+  assert.equal(crossHome.status, 403);
+} finally {
+  setListMaxPublishedCatalogForTests(null);
+  setListMaxCatalogTopicsForTests(null);
+}
+
+try {
+  let playlistUserId = "unset";
+  setListMaxPublicPlaylistsForTests(async (query, userId) => {
+    playlistUserId = userId;
+    assert.equal(query.q, "сон");
+    assert.equal(query.access, "free");
+    return {
+      items: [{
+        class: "playlist",
+        id: "playlist-1",
+        slug: "night-rest",
+        href: "/playlists/night-rest",
+        title: "Ночной покой",
+        coverUrl: null,
+        creator: "АудиоЛад",
+        trackCount: 2,
+        durationSeconds: 120,
+        savesCount: 0,
+        topics: ["сон"],
+        access: "free",
+        viewer: { saved: false, playing: false },
+      }],
+      nextCursor: null,
+    };
+  });
+  const playlists = await postPlaylistCatalog(request("https://audiolad.ru/api/vk/playlists/catalog", {
+    q: "сон",
+    access: "free",
+    sort: "newest",
+  }));
+  const playlistsBody = await playlists.json();
+  assert.equal(playlists.status, 200);
+  assert.equal(playlistUserId, null);
+  assert.equal(playlistsBody.items[0].slug, "night-rest");
+  assert.equal("viewer" in playlistsBody.items[0], false);
+  assert.equal("id" in playlistsBody.items[0], false);
+
+  let detailLoads = 0;
+  setLoadMaxPublicPlaylistForTests(async () => {
+    detailLoads += 1;
+    return { ok: false, reason: "not_found" };
+  });
+  const missingPlaylist = await postPlaylistDetail(request("https://audiolad.ru/api/vk/playlists/detail", {
+    slug: "../secret",
+  }));
+  assert.equal(missingPlaylist.status, 400);
+  assert.equal(detailLoads, 0);
+
+  const absentPlaylist = await postPlaylistDetail(request("https://audiolad.ru/api/vk/playlists/detail", {
+    slug: "night-rest",
+  }));
+  assert.equal(absentPlaylist.status, 404);
+  assert.equal(detailLoads, 1);
+} finally {
+  setListMaxPublicPlaylistsForTests(null);
+  setLoadMaxPublicPlaylistForTests(null);
 }
 
 console.log("vk-mini-app-unit: ok");

@@ -7,7 +7,8 @@ import {
   type GetMaxPlaybackSessionResult,
 } from "@/lib/max/playback";
 import type { MaxPlaybackSession } from "@/lib/max/playback-types";
-import { resolveVkLaunchTarget } from "@/lib/vk/resolve-target";
+import type { VkProductRef } from "@/lib/vk/request";
+import { resolveVkProductRef } from "@/lib/vk/resolve-target";
 
 type VkPlaybackDeps = {
   getSession?: typeof getMaxPlaybackSession;
@@ -43,7 +44,13 @@ function sanitizeSession(session: MaxPlaybackSession): MaxPlaybackSession {
 export async function loadVkPlaybackSession(
   token: string,
 ): Promise<GetMaxPlaybackSessionResult> {
-  const resolved = await resolveVkLaunchTarget(token);
+  return loadVkPlaybackSessionRef({ kind: "token", token });
+}
+
+export async function loadVkPlaybackSessionRef(
+  ref: VkProductRef,
+): Promise<GetMaxPlaybackSessionResult> {
+  const resolved = await resolveVkProductRef(ref);
   if (!resolved.ok) return { ok: false, reason: "storage_unavailable" };
   if (!resolved.target) return { ok: false, reason: "not_found" };
 
@@ -86,7 +93,14 @@ export async function loadVkPlaybackAudio(
   token: string,
   trackId: string,
 ): Promise<LoadVkPlaybackAudioResult> {
-  const resolved = await resolveVkLaunchTarget(token);
+  return loadVkPlaybackAudioRef({ kind: "token", token }, trackId);
+}
+
+export async function loadVkPlaybackAudioRef(
+  ref: VkProductRef,
+  trackId: string,
+): Promise<LoadVkPlaybackAudioResult> {
+  const resolved = await resolveVkProductRef(ref);
   if (!resolved.ok) return { ok: false, reason: "storage_unavailable" };
   if (!resolved.target) return { ok: false, reason: "not_found" };
 

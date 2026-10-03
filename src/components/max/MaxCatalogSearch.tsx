@@ -9,6 +9,7 @@ import type {
 } from "@/lib/catalog/listing-contract";
 import { CATALOG_SEARCH_MAX_LENGTH, normalizeCatalogSearchQuery } from "@/lib/catalog/search";
 import { serializeCatalogTopicParam } from "@/lib/catalog/topic-filter";
+import { useMiniAppGuestTransport } from "@/components/mini-app/MiniAppGuestTransport";
 import { readMaxInitData } from "@/lib/max/bridge";
 import {
   readMaxCatalogProducts,
@@ -150,9 +151,10 @@ export default function MaxCatalogSearch({
   onSelectProduct,
   topicNavigationRequest = null,
 }: MaxCatalogSearchProps) {
+  const guestTransport = useMiniAppGuestTransport();
   const inputId = useId();
   const [defaultCatalog, setDefaultCatalog] = useState<DefaultCatalogState>(() =>
-    readMaxInitData() ? { status: "loading" } : { status: "error" },
+    guestTransport || readMaxInitData() ? { status: "loading" } : { status: "error" },
   );
   const [activeSection, setActiveSection] = useState<PublicCatalogSection | null>(null);
   const [sectionListing, setSectionListing] = useState<SectionListingState>({
@@ -202,6 +204,28 @@ export default function MaxCatalogSearch({
     setSearchItems(null);
   }
 
+  function finishGuestSearch(
+    normalized: string,
+    section: PublicCatalogSection | null,
+    topicParam: string | null,
+    access: CatalogAccessFilter,
+    publicationClass: CatalogClassFilter,
+    items: MaxCatalogProduct[],
+  ) {
+    setResultQuery(normalized);
+    setResultSection(section);
+    setResultTopic(topicParam);
+    setResultAccess(access);
+    setResultClass(publicationClass);
+    setSearchItems(items);
+    setSearchStatus("ready");
+  }
+
+  function finishGuestSection(section: PublicCatalogSection, items: MaxCatalogProduct[]) {
+    sectionCacheRef.current.set(section, items);
+    setSectionListing({ status: "ready", section, items });
+  }
+
   function beginSearch(
     normalized: string,
     section: PublicCatalogSection | null = activeSectionRef.current,
@@ -217,6 +241,29 @@ export default function MaxCatalogSearch({
 
     void (async () => {
       try {
+        if (guestTransport) {
+          const guest = await guestTransport.postCatalog(
+            {
+              query: normalized,
+              section,
+              topic: topicParam,
+              access,
+              publicationClass,
+            },
+            controller.signal,
+          );
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          const items = guest.ok ? readMaxCatalogProducts(guest.payload) : null;
+          if (!items) {
+            setSearchStatus("error");
+            return;
+          }
+          finishGuestSearch(normalized, section, topicParam, access, publicationClass, items);
+          return;
+        }
+
         const initData = readMaxInitData();
         if (!initData) {
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -456,6 +503,16 @@ export default function MaxCatalogSearch({
 
     void (async () => {
       try {
+        if (guestTransport) {
+          const guest = await guestTransport.postCatalog({}, controller.signal);
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          const items = guest.ok ? readMaxCatalogProducts(guest.payload) : null;
+          setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
+          return;
+        }
+
         const initData = readMaxInitData();
         if (!initData) {
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -508,6 +565,20 @@ export default function MaxCatalogSearch({
 
     void (async () => {
       try {
+        if (guestTransport) {
+          const guest = await guestTransport.postCatalog({ section }, controller.signal);
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          const items = guest.ok ? readMaxCatalogProducts(guest.payload) : null;
+          if (!items) {
+            setSectionListing({ status: "error", section });
+            return;
+          }
+          finishGuestSection(section, items);
+          return;
+        }
+
         const initData = readMaxInitData();
         if (!initData) {
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -576,6 +647,36 @@ export default function MaxCatalogSearch({
 
     void (async () => {
       try {
+        if (guestTransport) {
+          const guest = await guestTransport.postCatalog(
+            { section, topic: topicParam, access, publicationClass },
+            controller.signal,
+          );
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          const items = guest.ok ? readMaxCatalogProducts(guest.payload) : null;
+          if (!items) {
+            setFilterListing({
+              status: "error",
+              section,
+              topic: topicParam,
+              access,
+              publicationClass,
+            });
+            return;
+          }
+          setFilterListing({
+            status: "ready",
+            section,
+            topic: topicParam,
+            access,
+            publicationClass,
+            items,
+          });
+          return;
+        }
+
         const initData = readMaxInitData();
         if (!initData) {
           if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
@@ -746,8 +847,7 @@ export default function MaxCatalogSearch({
   }, [activeClass]);
 
   useEffect(() => {
-    const initData = readMaxInitData();
-    if (!initData) {
+    if (!guestTransport && !readMaxInitData()) {
       return;
     }
 
@@ -757,6 +857,20 @@ export default function MaxCatalogSearch({
 
     void (async () => {
       try {
+        if (guestTransport) {
+          const guest = await guestTransport.postCatalog({}, controller.signal);
+          if (requestId !== requestGenerationRef.current || controller.signal.aborted) {
+            return;
+          }
+          const items = guest.ok ? readMaxCatalogProducts(guest.payload) : null;
+          setDefaultCatalog(items ? { status: "ready", items } : { status: "error" });
+          return;
+        }
+
+        const initData = readMaxInitData();
+        if (!initData) {
+          return;
+        }
         const response = await fetch(MAX_CATALOG_PATH, {
           method: "POST",
           credentials: "same-origin",
@@ -780,7 +894,7 @@ export default function MaxCatalogSearch({
     })();
 
     return () => controller.abort();
-  }, []);
+  }, [guestTransport]);
 
   useEffect(() => {
     return () => {

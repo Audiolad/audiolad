@@ -83,10 +83,38 @@ export async function readVkJsonPost(
   return { ok: true, body: parsed };
 }
 
+const PRODUCT_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PRODUCT_SLUG_MAX = 80;
+
+export type VkProductRef =
+  | { kind: "token"; token: string }
+  | { kind: "slugs"; authorSlug: string; productSlug: string };
+
 export function readVkTarget(body: Record<string, unknown>): string | null {
   if (typeof body.target !== "string") return null;
   const target = body.target.trim();
   return target || null;
+}
+
+export function readVkSlug(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const slug = value.trim();
+  if (!slug || slug.length > PRODUCT_SLUG_MAX || !PRODUCT_SLUG_RE.test(slug)) return null;
+  return slug;
+}
+
+/**
+ * Deeplink token wins when present. Catalog cards send author and product slugs.
+ * Neither path accepts a user id.
+ */
+export function readVkProductRef(body: Record<string, unknown>): VkProductRef | null {
+  const target = readVkTarget(body);
+  if (target) return { kind: "token", token: target };
+
+  const authorSlug = readVkSlug(body.authorSlug);
+  const productSlug = readVkSlug(body.productSlug);
+  if (!authorSlug || !productSlug) return null;
+  return { kind: "slugs", authorSlug, productSlug };
 }
 
 export function readVkTrackId(value: unknown): string | null {

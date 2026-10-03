@@ -1,9 +1,9 @@
 import "server-only";
 
-import { loadVkPlaybackAudio } from "@/lib/vk/playback";
+import { loadVkPlaybackAudioRef } from "@/lib/vk/playback";
 import {
   readVkJsonPost,
-  readVkTarget,
+  readVkProductRef,
   readVkTrackId,
   vkFail,
   vkJson,
@@ -18,11 +18,11 @@ export async function POST(request: Request) {
     const parsed = await readVkJsonPost(request);
     if (!parsed.ok) return parsed.response;
 
-    const target = readVkTarget(parsed.body);
+    const ref = readVkProductRef(parsed.body);
     const trackId = readVkTrackId(parsed.body.trackId);
-    if (!target || !trackId) return vkFail("invalid_request", 400);
+    if (!ref || !trackId) return vkFail("invalid_request", 400);
 
-    const result = await loadVkPlaybackAudio(target, trackId);
+    const result = await loadVkPlaybackAudioRef(ref, trackId);
     if (!result.ok) {
       if (result.reason === "not_found" || result.reason === "no_audio") {
         return vkFail(result.reason, 404);

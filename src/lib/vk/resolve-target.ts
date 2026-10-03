@@ -11,6 +11,7 @@ import {
   VK_SMOKE_AUTHOR_SLUG,
   VK_SMOKE_PRODUCT_SLUG,
 } from "@/lib/vk/launch-target";
+import type { VkProductRef } from "@/lib/vk/request";
 
 /** Resolve a VK launch token to a published listed product, or fail closed. */
 export async function resolveVkLaunchTarget(
@@ -29,4 +30,12 @@ export async function resolveVkLaunchTarget(
   const product = parseProductStartPayload(parsed.payload);
   if (!product) return { ok: true, target: null };
   return resolvePublishedListedProductById(product.practiceId);
+}
+
+/** Token and slug opens both fail closed unless the product is published and listed. */
+export async function resolveVkProductRef(
+  ref: VkProductRef,
+): Promise<PublishedProductLookupResult> {
+  if (ref.kind === "token") return resolveVkLaunchTarget(ref.token);
+  return resolvePublishedListedProductBySlug(ref.authorSlug, ref.productSlug);
 }

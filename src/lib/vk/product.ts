@@ -1,8 +1,9 @@
 import "server-only";
 
 import { getMaxPublishedProduct } from "@/lib/max/product";
-import { resolveVkLaunchTarget } from "@/lib/vk/resolve-target";
 import { toVkProductView, type VkProductView } from "@/lib/vk/product-view";
+import type { VkProductRef } from "@/lib/vk/request";
+import { resolveVkProductRef } from "@/lib/vk/resolve-target";
 
 export type LoadVkProductResult =
   | { ok: true; product: VkProductView | null }
@@ -11,7 +12,13 @@ export type LoadVkProductResult =
 export async function loadVkPublishedProduct(
   token: string,
 ): Promise<LoadVkProductResult> {
-  const resolved = await resolveVkLaunchTarget(token);
+  return loadVkPublishedProductRef({ kind: "token", token });
+}
+
+export async function loadVkPublishedProductRef(
+  ref: VkProductRef,
+): Promise<LoadVkProductResult> {
+  const resolved = await resolveVkProductRef(ref);
   if (!resolved.ok) return { ok: false, reason: "storage_unavailable" };
   if (!resolved.target) return { ok: true, product: null };
 
