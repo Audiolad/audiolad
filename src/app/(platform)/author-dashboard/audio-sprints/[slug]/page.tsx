@@ -36,6 +36,11 @@ export default async function AuthorAudioSprintPage({
   const listing = await listAudioSprintForAuthor({
     slug,
     authorId: workspace.id,
+    authorWorkspaces: workspaces.map((item) => ({
+      id: item.id,
+      name: item.name,
+      slug: item.slug,
+    })),
   });
   if (!listing) notFound();
 

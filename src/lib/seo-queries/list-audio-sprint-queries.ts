@@ -282,6 +282,11 @@ export async function listAudioSprintForAuthor(
   input: {
     slug: string;
     authorId: string;
+    authorWorkspaces?: ReadonlyArray<{
+      id: string;
+      name: string;
+      slug: string;
+    }>;
   },
   supabaseClient?: SupabaseClient,
 ): Promise<AudioSprintListing | null> {
@@ -399,12 +404,26 @@ export async function listAudioSprintForAuthor(
     })),
   );
 
+  const workspaceById = new Map(
+    (input.authorWorkspaces ?? []).map((workspace) => [
+      workspace.id,
+      {
+        name: workspace.name.trim(),
+        slug: workspace.slug.trim(),
+      },
+    ]),
+  );
+
   const cards = joined.map((row) => {
     const reservation = reservationByQuery.get(row.query_id);
     const product = reservation?.product_id
       ? productById.get(reservation.product_id)
       : undefined;
     const own = reservation?.author_id === authorId;
+    const reservationWorkspace = reservation
+      ? workspaceById.get(reservation.author_id)
+      : undefined;
+    const reservedByCurrentUser = Boolean(reservation) && (own || Boolean(reservationWorkspace));
     return {
       id: row.query_id,
       queryText: row.queryText,
@@ -418,6 +437,13 @@ export async function listAudioSprintForAuthor(
       reservationId: own ? reservation.id : null,
       expiresAt: own ? reservation.expires_at : null,
       productId: own ? reservation.product_id : null,
+      reservedByCurrentUser,
+      reservationWorkspaceName: reservedByCurrentUser
+        ? reservationWorkspace?.name || null
+        : null,
+      reservationWorkspaceSlug: reservedByCurrentUser
+        ? reservationWorkspace?.slug || null
+        : null,
     } satisfies AudioSprintQueryCard;
   });
 

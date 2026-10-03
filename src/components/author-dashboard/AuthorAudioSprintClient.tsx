@@ -9,6 +9,7 @@ import {
   AUDIO_SPRINT_AUTHOR_GROUPS,
   AUDIO_SPRINT_GROUP_LABEL,
   AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION,
+  audioSprintHref,
   audioSprintPublicationClass,
   audioSprintReserveConflictLifecycle,
   buildAudioSprintProductCreateHref,
@@ -195,10 +196,12 @@ export default function AuthorAudioSprintClient({
         <div className="grid gap-4">
           {sectionItems.map((item) => {
             const own = Boolean(item.reservationId);
+            const reservedInOtherWorkspace =
+              item.reservedByCurrentUser && !own && Boolean(item.reservationWorkspaceSlug);
             const until = formatUntil(item.expiresAt);
             const reserveEnabled = canReserveAudioSprintQuery({
               lifecycle: item.lifecycle,
-              isOwnReservation: own,
+              isOwnReservation: own || item.reservedByCurrentUser,
               activeReservationCount: activeCount,
             });
             const related = visibleItems
@@ -215,7 +218,11 @@ export default function AuthorAudioSprintClient({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h2 className="text-lg font-semibold text-[#25135c]">{item.queryText}</h2>
                   <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">
-                    {lifecycleLabel(item.lifecycle)}
+                    {(own || item.reservedByCurrentUser) && item.lifecycle === "in_progress"
+                      ? "Забронирован вами"
+                      : item.lifecycle === "in_progress"
+                        ? "Забронирован"
+                        : lifecycleLabel(item.lifecycle)}
                   </span>
                 </div>
                 {own ? (
@@ -242,6 +249,18 @@ export default function AuthorAudioSprintClient({
                         Создать продукт по этому запросу
                       </Link>
                     ) : null}
+                  </div>
+                ) : reservedInOtherWorkspace ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-[#5f5484]">
+                      Забронирован в пространстве «{item.reservationWorkspaceName || "другой артист"}»
+                    </span>
+                    <Link
+                      href={audioSprintHref(item.reservationWorkspaceSlug)}
+                      className="text-sm font-semibold text-[#7042c5]"
+                    >
+                      Открыть это пространство
+                    </Link>
                   </div>
                 ) : item.lifecycle === "available" ? (
                   <button

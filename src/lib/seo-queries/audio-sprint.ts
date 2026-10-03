@@ -40,6 +40,9 @@ export type AudioSprintQueryCard = {
   reservationId: string | null;
   expiresAt: string | null;
   productId: string | null;
+  reservedByCurrentUser: boolean;
+  reservationWorkspaceName: string | null;
+  reservationWorkspaceSlug: string | null;
 };
 
 export type AudioSprintTitleLock = {
