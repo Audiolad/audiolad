@@ -115,3 +115,45 @@ export function isSmtpConfigured(): boolean {
 export function isAuthorsSmtpConfigured(): boolean {
   return getAuthorsSmtpConfigFromEnv() !== null;
 }
+
+/**
+ * Dedicated support mailbox. User and password are required and never fall
+ * back to the primary or authors SMTP login. Host may inherit from primary
+ * SMTP. Absent credentials mean support sending stays disabled.
+ */
+export function getSupportSmtpConfigFromEnv(): SmtpConfig | null {
+  const user = process.env.AUDIOLAD_SMTP_SUPPORT_USER?.trim();
+  const password = process.env.AUDIOLAD_SMTP_SUPPORT_PASS?.trim();
+
+  if (!user || !password) {
+    return null;
+  }
+
+  const host =
+    process.env.AUDIOLAD_SMTP_SUPPORT_HOST?.trim() ||
+    process.env.AUDIOLAD_SMTP_HOST?.trim();
+
+  if (!host) {
+    return null;
+  }
+
+  const portRaw =
+    process.env.AUDIOLAD_SMTP_SUPPORT_PORT?.trim() ||
+    process.env.AUDIOLAD_SMTP_PORT?.trim();
+
+  const secureRaw =
+    process.env.AUDIOLAD_SMTP_SUPPORT_SECURE?.trim().toLowerCase() ||
+    process.env.AUDIOLAD_SMTP_SECURE?.trim().toLowerCase();
+
+  return buildSmtpConfig({
+    host,
+    portRaw,
+    secureRaw,
+    user,
+    password,
+  });
+}
+
+export function isSupportMailboxConfigured(): boolean {
+  return getSupportSmtpConfigFromEnv() !== null;
+}
