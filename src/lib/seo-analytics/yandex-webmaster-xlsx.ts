@@ -1,7 +1,7 @@
-import { normalizeSeoQueryText } from "@/lib/seo-queries/published-query-occupancy";
-
+import { collapseNormalizedWebmasterMetrics } from "@/lib/seo-analytics/collapse-metrics";
 import type { ParsedWebmasterMetric, ParsedWebmasterWorkbook } from "@/lib/seo-analytics/types";
 import { unzipArchive, zipArchive } from "@/lib/seo-analytics/xlsx-zip";
+import { normalizeSeoQueryText } from "@/lib/seo-queries/published-query-occupancy";
 
 export const SEO_ANALYTICS_MAX_XLSX_BYTES = 8 * 1024 * 1024;
 export const SEO_ANALYTICS_MAX_ROWS = 50_000;
@@ -258,7 +258,25 @@ function ctrRatio(ctrPercent: number, impressions: number, clicks: number, excel
   return ratio;
 }
 
+export type ValidatedWebmasterSource = {
+  periodStart: string;
+  periodEnd: string;
+  rows: ParsedWebmasterMetric[];
+};
+
 export function parseYandexWebmasterXlsx(bytes: Buffer): ParsedWebmasterWorkbook {
+  const source = parseYandexWebmasterSourceRows(bytes);
+  const collapsed = collapseNormalizedWebmasterMetrics(source.rows);
+  return {
+    periodStart: source.periodStart,
+    periodEnd: source.periodEnd,
+    sourceRowCount: source.rows.length,
+    collapsedGroupCount: collapsed.collapsedGroupCount,
+    rows: collapsed.rows,
+  };
+}
+
+export function parseYandexWebmasterSourceRows(bytes: Buffer): ValidatedWebmasterSource {
   if (bytes.length > SEO_ANALYTICS_MAX_XLSX_BYTES) {
     throw new SeoAnalyticsImportError("file_too_large", "Файл больше 8 МБ.");
   }
@@ -321,7 +339,6 @@ export function parseYandexWebmasterXlsx(bytes: Buffer): ParsedWebmasterWorkbook
   const rows: ParsedWebmasterMetric[] = [];
   let periodStart = "";
   let periodEnd = "";
-  const seen = new Set<string>();
 
   for (let index = headerExcelRow + 1; index < table.length; index += 1) {
     const row = table[index];
@@ -342,13 +359,6 @@ export function parseYandexWebmasterXlsx(bytes: Buffer): ParsedWebmasterWorkbook
     if (!normalizedQuery) {
       throw new SeoAnalyticsImportError("empty_query", `Строка ${excelRow}: пустой запрос после нормализации.`);
     }
-    if (seen.has(normalizedQuery)) {
-      throw new SeoAnalyticsImportError(
-        "duplicate_normalized_query",
-        `Строка ${excelRow}: повтор нормализованного запроса «${normalizedQuery}».`,
-      );
-    }
-    seen.add(normalizedQuery);
 
     const period = parseDatesRange(dates);
     if (!periodStart) {
