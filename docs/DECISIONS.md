@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-10-03 — Emergency development contour reuses canonical deploy
+
+**Контекст:** GitHub, GitHub Actions и западные API могут быть недоступны из РФ. Текущий production-путь остаётся `production-deploy.yml` → SSH → `/usr/local/sbin/audiolad-deploy <sha>` → `run-from-target-sha.sh` → `deploy.sh`. Второй deployment engine запрещён.
+
+**Решение:**
+
+1. Аварийный Git — push-mirror в self-hosted Gitea (приватный репозиторий, полные ветки и теги). Пока primary = GitHub, sync только с GitHub на зеркало. Promotion в writable primary — явный confirm и отказ от обратного `--mirror`, чтобы не затереть аварийные коммиты. Возврат на GitHub — только fast-forward.
+2. Аварийный deploy не вызывает `deploy.sh` напрямую и не открывает root shell. Локальный preflight проверяет SHA, достижимость из emergency `main` и ancestry текущего production commit. Исполнение — та же команда `sudo -n /usr/local/sbin/audiolad-deploy <sha>`. Переключение `origin` на сервере — отдельный фиксированный wrapper с тремя подкомандами.
+3. `npm ci` в каноническом `deploy.sh` выставляет `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`. Smoke остаётся HTTP. Это не второй путь деплоя.
+4. Новый Timeweb VDS под Gitea не создаётся этим изменением. Единственный Human Gate описан в `docs/operations/emergency-contour/HUMAN_GATE.md`.
+
+**Принято:** issue #745 Phase 1. Production cutover не выполняется.
+
+---
+
 ## 2026-10-02 — Music Analyzer Lab Phase 2A runs the pinned Python analyzer on the app VPS
 
 **Контекст:** Human Listening Validation остаётся на `music_lab_*` и `/music-analyzer`. Нужен отдельный автоанализ WAV/MP3: неизменяемый прогон, повтор того же SHA256 — новая версия, выгрузка JSON/CSV/Markdown и сравнение двух версий. Музыкальные поля не выдумываются в Next.js. Music Passport в этом шаге не подключается.

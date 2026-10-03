@@ -307,6 +307,11 @@ main() {
   fi
 
   cd "$RELEASE_DIR"
+  # Production smoke is HTTP-only (deploy/scripts/smoke-test.sh). Playwright is
+  # a devDependency whose postinstall downloads browsers from a western CDN.
+  # Skip that download so the canonical npm ci does not depend on it.
+  export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+  export PLAYWRIGHT_SKIP_BROWSER_GC=1
   npm ci
   npm run lint
   npm run build
