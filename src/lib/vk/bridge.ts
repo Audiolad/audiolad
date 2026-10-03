@@ -5,9 +5,11 @@
  */
 export const VK_BRIDGE_SCRIPT_PATH = "/vendor/vk-bridge-3.0.2.min.js";
 export const VK_BRIDGE_INIT_METHOD = "VKWebAppInit";
+export const VK_BRIDGE_OPEN_LINK_METHOD = "VKWebAppOpenLink";
 
 type VkBridgeLike = {
   send?: (method: string, params?: Record<string, unknown>) => unknown;
+  isEmbedded?: () => boolean;
 };
 
 type VkBridgeDocument = {
@@ -35,7 +37,29 @@ export function resetVkBridgeInitForTests() {
   initPromise = null;
 }
 
-/** Open an already-validated https URL inside VK, or a new tab outside it. */
+function bridgeIsEmbedded(bridge: VkBridgeLike): boolean {
+  if (typeof bridge.isEmbedded !== "function") return false;
+  try {
+    return bridge.isEmbedded() === true;
+  } catch {
+    return false;
+  }
+}
+
+function openInOrdinaryBrowser(href: string): boolean {
+  try {
+    window.open(href, "_blank", "noopener,noreferrer");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Open an https URL inside VK when the official client is actually embedded.
+ * A top-level browser — even after the bridge script loads — uses a normal tab.
+ * Neither path throws.
+ */
 export function openVkExternalHttps(url: string): boolean {
   if (typeof window === "undefined") return false;
   let parsed: URL;
@@ -44,31 +68,33 @@ export function openVkExternalHttps(url: string): boolean {
   } catch {
     return false;
   }
-  if (parsed.protocol !== "https:") return false;
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password) return false;
 
   const href = parsed.toString();
   const bridge = window.vkBridge;
-  if (bridge && typeof bridge.send === "function") {
+  if (bridge && bridgeIsEmbedded(bridge) && typeof bridge.send === "function") {
     try {
-      const result = bridge.send("VKWebAppOpenLink", { url: href });
+      const result = bridge.send(VK_BRIDGE_OPEN_LINK_METHOD, { url: href });
       if (
         result &&
         typeof result === "object" &&
         "then" in result &&
         typeof (result as Promise<unknown>).then === "function"
       ) {
-        void (result as Promise<unknown>).catch(() => {
-          window.open(href, "_blank", "noopener,noreferrer");
-        });
+        void (result as Promise<unknown>).then(
+          () => undefined,
+          () => {
+            openInOrdinaryBrowser(href);
+          },
+        );
       }
       return true;
     } catch {
-      // Fall through to a normal window when the bridge rejects synchronously.
+      // Synchronous bridge failure falls through to a normal tab.
     }
   }
 
-  window.open(href, "_blank", "noopener,noreferrer");
-  return true;
+  return openInOrdinaryBrowser(href);
 }
 
 function callInit(bridge: VkBridgeLike | undefined): Promise<void> {
