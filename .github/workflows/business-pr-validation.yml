@@ -1,0 +1,45 @@
+name: Audiolad Business Validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audiolad-business-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  business-validation:
+    name: Audiolad Business Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Audiolad Business
+        run: |
+          set -euo pipefail
+          npx tsx scripts/business-landing-unit.mts
+          npm run test:business-app-domain-bind
+          npm run test:business-app-proxy-routing
+          npm run test:business-app-venue-player
+          npm run test:business-app-eligibility
+          npm run test:business-app-owner-home-signals
+          npm run test:business-app-support-diagnostics
+          npm run test:business-app-onboarding-wizard
+          npm run test:business-domain-core
+          npm run test:business-player-foundation
+          npm run test:business-playback-attribution
+          npm run test:business-rights-foundation
+          npm run test:business-rights-eligibility
