@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
+import { normalizeCatalogGallery } from "@/lib/catalog/gallery";
 import {
   CATALOG_ACCESS_FILTERS,
   CATALOG_CLASS_FILTERS,
@@ -27,7 +28,10 @@ import {
   type CatalogProduct,
 } from "@/lib/products/catalog";
 import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
-import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
+import type {
+  MaxCatalogGallerySlide,
+  MaxCatalogProduct,
+} from "@/lib/max/catalog-product";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type { MaxCatalogProduct };
@@ -128,6 +132,22 @@ export type ListMaxPublishedCatalogFn = (
   input?: ListMaxPublishedCatalogInput,
 ) => Promise<MaxCatalogResult>;
 
+function toPublicCatalogGallery(
+  slides: Parameters<typeof normalizeCatalogGallery>[0],
+): MaxCatalogGallerySlide[] {
+  return normalizeCatalogGallery(slides).flatMap((slide, index) => {
+    const id = slide.id.trim();
+    const imageUrl = slide.image_url.trim();
+    if (!id || !imageUrl) return [];
+    return [{
+      id,
+      image_url: imageUrl,
+      alt: slide.alt,
+      position: Number.isFinite(slide.position) ? slide.position : index,
+    }];
+  });
+}
+
 function toMaxCatalogProduct(product: {
   authorSlug: string | null;
   slug: string;
@@ -138,6 +158,7 @@ function toMaxCatalogProduct(product: {
   productTypeLabel: string;
   priceLabel: string;
   isFree: boolean;
+  gallery?: Parameters<typeof normalizeCatalogGallery>[0];
 }): MaxCatalogProduct {
   return {
     authorSlug: product.authorSlug ?? "",
@@ -149,6 +170,7 @@ function toMaxCatalogProduct(product: {
     formatLabel: product.productTypeLabel,
     priceLabel: product.priceLabel,
     isFree: product.isFree,
+    gallery: toPublicCatalogGallery(product.gallery),
   };
 }
 
