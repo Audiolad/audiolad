@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { MusicPassport } from "@/components/music-passport/MusicPassport";
 import type { MusicAnalyzerRunClient } from "@/lib/music-analyzer-runs/contract";
 import { readMusicAnalyzerPassport } from "@/lib/music-analyzer-runs/passport";
-
-import { RunPassport } from "./RunPassport";
 
 const ERRORS: Record<string, string> = {
   analyzer_commit_mismatch: "Чекаут анализатора не совпал с зафиксированным коммитом.",
@@ -59,85 +58,53 @@ export function RunDetail({
     promptVersion: run.promptVersion,
   });
 
+  const notice = run.status === "failed"
+    ? {
+        tone: "error" as const,
+        text: ERRORS[run.errorCode ?? ""] ?? "Прогон не сохранился. Повтор того же файла создаст новую версию.",
+      }
+    : run.status === "queued" || run.status === "processing"
+      ? { tone: "info" as const, text: "Результат появится здесь, когда анализатор закончит." }
+      : null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-[22px] font-semibold text-[#25135c]">{run.sourceFilename}</h2>
-          <p className="mt-2 text-sm text-[#796ba0]">
-            Версия {run.versionNumber} · {statusLabel(run.status)}
-          </p>
-        </div>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex justify-end">
         <Link href="/music-analyzer/runs" className="text-sm font-medium text-[#7042c5]">
           К истории
         </Link>
       </div>
-      <dl className="grid gap-3 rounded-[22px] border border-[#e4d7f4] bg-white p-5 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-[#796ba0]">SHA256</dt>
-          <dd className="mt-1 break-all font-mono text-xs text-[#25135c]">{run.sha256}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Версия анализатора</dt>
-          <dd className="mt-1 text-[#25135c]">{run.analyzerVersion ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Коммит анализатора</dt>
-          <dd className="mt-1 break-all font-mono text-xs text-[#25135c]">{run.analyzerGitCommit ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Содержание</dt>
-          <dd className="mt-1 break-all font-mono text-xs text-[#25135c]">{run.analyzerContentCommit ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Чекпоинт</dt>
-          <dd className="mt-1 text-[#25135c]">{run.modelCheckpoint ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Устройство</dt>
-          <dd className="mt-1 text-[#25135c]">{run.device ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Таксономия</dt>
-          <dd className="mt-1 text-[#25135c]">{passport.taxonomy ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Промпт</dt>
-          <dd className="mt-1 text-[#25135c]">{passport.prompt ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Создан</dt>
-          <dd className="mt-1 text-[#25135c]">{run.createdAt}</dd>
-        </div>
-        <div>
-          <dt className="text-[#796ba0]">Завершён</dt>
-          <dd className="mt-1 text-[#25135c]">{run.finishedAt ?? "—"}</dd>
-        </div>
-      </dl>
-      {run.status === "failed" ? (
-        <p className="text-sm text-[#8b2f4b]">
-          {ERRORS[run.errorCode ?? ""] ?? "Прогон не сохранился. Повтор того же файла создаст новую версию."}
-        </p>
-      ) : null}
-      {run.status === "queued" || run.status === "processing" ? (
-        <p className="text-sm text-[#796ba0]">Результат появится здесь, когда анализатор закончит.</p>
-      ) : null}
+      <MusicPassport
+        mode="full"
+        passport={run.status === "succeeded" ? passport : null}
+        header={{
+          filename: run.sourceFilename,
+          analyzedAt: run.finishedAt ?? run.createdAt,
+          analyzerVersion: run.analyzerVersion,
+          statusLabel: statusLabel(run.status),
+          fileVersion: run.versionNumber,
+        }}
+        snapshot={{
+          version: run.analyzerVersion,
+          commit: run.analyzerGitCommit,
+        }}
+        provenance={{
+          sha256: run.sha256,
+          analyzerGitCommit: run.analyzerGitCommit,
+          analyzerContentCommit: run.analyzerContentCommit,
+          modelCheckpoint: run.modelCheckpoint,
+          device: run.device,
+          taxonomy: passport.taxonomy,
+          prompt: passport.prompt,
+        }}
+        developerJson={run.status === "succeeded" ? run.normalizedJson : null}
+        notice={notice}
+      />
       {run.status === "succeeded" ? (
-        <div className="space-y-4">
-          <RunPassport passport={passport} />
-          <div className="flex flex-wrap gap-4 text-sm font-medium text-[#7042c5]">
-            <a href={`/api/music-analyzer/runs/${run.id}/export?format=json`}>JSON</a>
-            <a href={`/api/music-analyzer/runs/${run.id}/export?format=csv`}>CSV</a>
-            <a href={`/api/music-analyzer/runs/${run.id}/export?format=markdown`}>Markdown</a>
-          </div>
-          <details className="rounded-[22px] border border-[#e4d7f4] bg-white">
-            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[#25135c]">
-              Технические данные / Raw JSON
-            </summary>
-            <pre className="max-h-[32rem] overflow-auto border-t border-[#e4d7f4] p-4 text-xs leading-5 text-[#25135c]">
-              {JSON.stringify(run.normalizedJson, null, 2)}
-            </pre>
-          </details>
+        <div className="flex flex-wrap gap-4 text-sm font-medium text-[#7042c5]">
+          <a href={`/api/music-analyzer/runs/${run.id}/export?format=json`}>JSON</a>
+          <a href={`/api/music-analyzer/runs/${run.id}/export?format=csv`}>CSV</a>
+          <a href={`/api/music-analyzer/runs/${run.id}/export?format=markdown`}>Markdown</a>
         </div>
       ) : null}
       {other.length > 0 ? (
