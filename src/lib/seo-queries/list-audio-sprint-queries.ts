@@ -444,6 +444,13 @@ export async function listAudioSprintForAuthor(
       reservationWorkspaceSlug: reservedByCurrentUser
         ? reservationWorkspace?.slug || null
         : null,
+      transferReservationId:
+        reservedByCurrentUser &&
+        !own &&
+        reservation?.status === "active" &&
+        !reservation.product_id
+          ? reservation.id
+          : null,
     } satisfies AudioSprintQueryCard;
   });
 
