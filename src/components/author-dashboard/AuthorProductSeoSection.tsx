@@ -108,6 +108,8 @@ export type AuthorProductSeoSectionProps = {
   productKind: string;
   /** Author workspace id — quality review is Aurafon or music/release. */
   authorId?: string;
+  /** Jazz Relax passport facts are loaded for this product only. */
+  practiceId?: string;
   publicationClass?: string | null;
   /** Authoritative form access flag (`isFree` / `is_free`). */
   isFree: boolean;
@@ -149,6 +151,7 @@ export default function AuthorProductSeoSection({
   description,
   productKind,
   authorId = "",
+  practiceId,
   publicationClass = null,
   isFree,
   seoPrimaryQuery,
@@ -540,6 +543,7 @@ export default function AuthorProductSeoSection({
           description,
           productKind,
           isFree,
+          ...(practiceId ? { practiceId } : {}),
           seoPrimaryQuery,
           seoSecondaryQueries,
           usageItems: seoContent.usageItems.map((item) => item.content),

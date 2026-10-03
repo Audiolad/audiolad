@@ -607,3 +607,116 @@ export function readMusicAnalyzerPassport(input: {
     },
   };
 }
+
+/**
+ * Structured copy of analyzer fields. Published BPM/key stay separate from
+ * candidate and raw. This does not estimate a new tempo, key, or tag.
+ */
+export type MusicAnalyzerLabelFact = {
+  label: string;
+  score: number | null;
+};
+
+export type MusicAnalyzerStructuredFacts = {
+  bpm: {
+    published: number | null;
+    candidate: number | null;
+    raw: number | null;
+    confidence: number | null;
+  };
+  key: {
+    published: string | null;
+    publishedMode: string | null;
+    candidate: string | null;
+    candidateMode: string | null;
+  };
+  genres: MusicAnalyzerLabelFact[];
+  styles: MusicAnalyzerLabelFact[];
+  moods: MusicAnalyzerLabelFact[];
+  instruments: MusicAnalyzerLabelFact[];
+  soundCharacter: MusicAnalyzerLabelFact | null;
+  loudnessLufs: number | null;
+  energy: number | null;
+};
+
+function finiteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && /^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function unitConfidence(value: unknown): number | null {
+  const number = finiteNumber(value);
+  if (number == null || number < 0 || number > 1) return null;
+  return number;
+}
+
+function labelFacts(rows: PassportRow[]): MusicAnalyzerLabelFact[] {
+  return rows.map((row) => {
+    const score = row.score == null ? null : finiteNumber(row.score);
+    return { label: row.label, score };
+  });
+}
+
+export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnalyzerStructuredFacts {
+  const nodes = collect(normalized);
+  const publishedMatches = nodes.filter((node) => (
+    bpmKind(node.segments) === "published" && isScalarQuantity(node.value)
+  ));
+  const publishedNode = publishedMatches.find((node) => (
+    parent(node.segments) === "technical" && leaf(node.segments) === "bpm"
+  )) ?? shortest(publishedMatches);
+  const candidateNode = quantityNode(nodes, "candidate");
+  const rawNode = quantityNode(nodes, "raw");
+  const confidenceNode = quantityNode(nodes, "confidence");
+  const publishedKeyNode = shortest(nodes.filter((node) => (
+    keyKind(node.segments) === "published" && cleanText(node.value)
+  )));
+  const publishedModeNode = shortest(nodes.filter((node) => (
+    keyKind(node.segments) === "published-mode" && cleanText(node.value)
+  ))) ?? siblingMode(nodes, publishedKeyNode);
+  const candidateKeyNode = shortest(nodes.filter((node) => (
+    keyKind(node.segments) === "candidate" && cleanText(node.value)
+  )));
+  const candidateModeNode = shortest(nodes.filter((node) => (
+    keyKind(node.segments) === "candidate-mode" && cleanText(node.value)
+  ))) ?? siblingMode(nodes, candidateKeyNode);
+  const genres = takeList(nodes, ["genres", "genre_top", "top_genres", "genre"], ["genre", "genres", "genre_class"], 3);
+  const styles = takeList(nodes, ["styles", "style_top", "top_styles", "style"], ["style", "styles"], 3);
+  const moods = takeList(nodes, ["moods", "mood_top", "top_moods", "mood"], ["mood", "moods"], 5);
+  const instruments = takeList(
+    nodes,
+    ["instruments", "instrument_top", "top_instruments", "instrument"],
+    ["instrument", "instruments"],
+    10,
+  );
+  const soundFound = findKeyed(nodes, ["sound_character", "soundCharacter", "sound_characters"]);
+  const soundRows = soundFound ? orderRows(rowsFromValue(soundFound.value)) : groupedRows(nodes, ["sound_character", "sound"]);
+  const lufs = technicalValue(nodes, ["lufs", "integrated_lufs", "loudness_lufs"]);
+  const energy = technicalValue(nodes, ["energy"]);
+  const sound = labelFacts(soundRows)[0] ?? null;
+  return {
+    bpm: {
+      published: publishedNode ? finiteNumber(publishedNode.value) : null,
+      candidate: candidateNode ? finiteNumber(candidateNode.value) : null,
+      raw: rawNode ? finiteNumber(rawNode.value) : null,
+      confidence: confidenceNode ? unitConfidence(confidenceNode.value) : null,
+    },
+    key: {
+      published: publishedKeyNode ? cleanText(publishedKeyNode.value) : null,
+      publishedMode: publishedModeNode ? cleanText(publishedModeNode.value) : null,
+      candidate: candidateKeyNode ? cleanText(candidateKeyNode.value) : null,
+      candidateMode: candidateModeNode ? cleanText(candidateModeNode.value) : null,
+    },
+    genres: labelFacts(genres.rows),
+    styles: labelFacts(styles.rows),
+    moods: labelFacts(moods.rows),
+    instruments: labelFacts(instruments.rows),
+    soundCharacter: sound,
+    loudnessLufs: lufs ? finiteNumber(lufs.value) : null,
+    energy: energy ? finiteNumber(energy.value) : null,
+  };
+}

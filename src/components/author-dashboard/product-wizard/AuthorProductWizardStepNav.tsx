@@ -5,6 +5,7 @@ type AuthorProductWizardStepNavProps = {
   showContinue: boolean;
   busy: boolean;
   canSave: boolean;
+  continueLabel?: string;
   onBack: () => void;
   onSave: () => void;
   onSaveAndContinue: () => void;
@@ -15,6 +16,7 @@ export default function AuthorProductWizardStepNav({
   showContinue,
   busy,
   canSave,
+  continueLabel = "Сохранить и продолжить",
   onBack,
   onSave,
   onSaveAndContinue,
@@ -46,7 +48,7 @@ export default function AuthorProductWizardStepNav({
           onClick={onSaveAndContinue}
           className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
         >
-          Сохранить и продолжить
+          {continueLabel}
         </button>
       ) : null}
     </div>
