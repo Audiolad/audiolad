@@ -1,0 +1,44 @@
+# Disposable or production-shaped Gitea config.
+# Replace __WORK_PATH__ and __HTTP_PORT__ before use.
+# Do not put real tokens in this file.
+
+APP_NAME = Audiolad Emergency Git
+RUN_MODE = prod
+WORK_PATH = __WORK_PATH__
+
+[server]
+PROTOCOL = http
+DOMAIN = 127.0.0.1
+HTTP_ADDR = 127.0.0.1
+HTTP_PORT = __HTTP_PORT__
+ROOT_URL = http://127.0.0.1:__HTTP_PORT__/
+DISABLE_SSH = false
+SSH_PORT = 2222
+SSH_LISTEN_PORT = 2222
+START_SSH_SERVER = true
+LFS_START_SERVER = false
+OFFLINE_MODE = true
+
+[database]
+DB_TYPE = sqlite3
+PATH = __WORK_PATH__/data/gitea.db
+
+[security]
+INSTALL_LOCK = true
+SECRET_KEY = replace-with-a-random-secret
+INTERNAL_TOKEN = replace-with-a-random-internal-token
+
+[oauth2]
+JWT_SECRET = replace-with-a-random-jwt-secret
+
+[service]
+DISABLE_REGISTRATION = true
+REQUIRE_SIGNIN_VIEW = true
+
+[repository]
+DEFAULT_PRIVATE = private
+ENABLE_PUSH_CREATE_USER = false
+
+[log]
+MODE = console
+LEVEL = Warn

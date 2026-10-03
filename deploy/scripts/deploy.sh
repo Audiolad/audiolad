@@ -307,7 +307,14 @@ main() {
   fi
 
   cd "$RELEASE_DIR"
-  npm ci
+  # shellcheck source=lib/npm-ci-flags.sh
+  source "$SCRIPT_DIR/lib/npm-ci-flags.sh"
+  if ! read_npm_ci_argv; then
+    log_error "npm_ci_flags_rejected"
+    send_deploy_alert "deploy_failed" "npm ci offline flags rejected for $RELEASE_NAME"
+    exit 1
+  fi
+  "${NPM_CI_ARGV[@]}"
   npm run lint
   npm run build
 

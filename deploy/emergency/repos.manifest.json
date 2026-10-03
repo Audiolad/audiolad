@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "repos": [
+    {
+      "name": "audiolad",
+      "github": "Audiolad/audiolad",
+      "sourceUrlEnv": "AUDIOLAD_MIRROR_SOURCE_AUDIOLAD",
+      "defaultSourceUrl": "https://github.com/Audiolad/audiolad.git",
+      "targetPath": "audiolad/audiolad.git",
+      "primaryBranch": "main",
+      "required": true
+    },
+    {
+      "name": "music-analyzer",
+      "github": "Audiolad/music-analyzer",
+      "sourceUrlEnv": "AUDIOLAD_MIRROR_SOURCE_MUSIC_ANALYZER",
+      "defaultSourceUrl": "https://github.com/Audiolad/music-analyzer.git",
+      "targetPath": "audiolad/music-analyzer.git",
+      "primaryBranch": "main",
+      "required": false,
+      "note": "Kept in the mirror set so a later readable source can be added without a new design. Phase 1 could not read Audiolad/music-analyzer with the available GitHub credential. Sync records skipped_source_unreachable and continues."
+    }
+  ]
+}
