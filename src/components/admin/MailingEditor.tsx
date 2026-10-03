@@ -305,10 +305,15 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
 
         {canSend ? (
           <div className="space-y-3 border-t border-[#e4d7f4] pt-4">
-            <label className="block text-sm font-semibold">
-              Тестовый адрес
-              <input className={fieldClass} value={testEmail} onChange={(event) => setTestEmail(event.target.value)} placeholder="email администратора или @audiolad.ru" />
-            </label>
+            <div className="space-y-1">
+              <label className="block text-sm font-semibold">
+                Куда отправить тест
+                <input className={fieldClass} value={testEmail} onChange={(event) => setTestEmail(event.target.value)} placeholder="один адрес" />
+              </label>
+              <p className="text-xs text-[#7d70a2]">
+                Владелец может ввести один корректный адрес, чтобы проверить отображение в Mail.ru, Yandex, Gmail и других клиентах.
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -317,7 +322,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
                 onClick={() => {
                   startTransition(async () => {
                     const result = await sendMailingTestAction({ ...payload, requestedEmail: testEmail });
-                    setMessage(result.ok ? "Тест поставлен в отправку" : `Тест не отправлен: ${result.code}`);
+                    setMessage(result.ok ? `Тест отправлен на ${result.email}` : `Тест не отправлен: ${result.code}`);
                   });
                 }}
               >
