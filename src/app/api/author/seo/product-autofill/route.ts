@@ -102,10 +102,6 @@ export async function POST(request: Request) {
           "jazz_relax_passport_facts_failed",
           passportError instanceof Error ? passportError.name : "unknown",
         );
-        requestForDraft = {
-          ...parsed.request,
-          musicPassportFacts: "Музыкальный паспорт недоступен. Не указывай BPM, тональность, жанр, стиль, настроение или инструменты.",
-        };
       }
     }
 

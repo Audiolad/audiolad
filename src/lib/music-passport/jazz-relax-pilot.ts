@@ -633,10 +633,7 @@ export async function jazzRelaxAlbumFactsForDescription(input: {
   if (!versionId) {
     return {
       albumPassportVersionId: null,
-      facts: [
-        "Музыкальный паспорт этой версии не опубликован.",
-        "Не указывай BPM, тональность, жанр, стиль, настроение или инструменты.",
-      ].join("\n"),
+      facts: null,
       alreadyBound: false,
     };
   }
