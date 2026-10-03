@@ -91,6 +91,34 @@ assert_author_appreciation_reconcile_release_tree() {
   return "$missing"
 }
 
+assert_application_email_outbox_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required_files=(
+    "$release_dir/deploy/systemd/audiolad-application-email-outbox.service"
+    "$release_dir/deploy/systemd/audiolad-application-email-outbox.timer"
+    "$release_dir/deploy/logrotate/audiolad-application-email-outbox"
+  )
+  local required_scripts=(
+    "$release_dir/deploy/scripts/ensure-application-email-outbox.sh"
+    "$release_dir/deploy/scripts/run-application-email-outbox.sh"
+  )
+  local path
+  for path in "${required_files[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "application_email_outbox_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  for path in "${required_scripts[@]}"; do
+    if [[ ! -f "$path" || ! -x "$path" ]]; then
+      log_error "application_email_outbox_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 assert_author_sale_email_outbox_release_tree() {
   local release_dir="$1"
   local missing=0
@@ -254,6 +282,11 @@ main() {
   if ! assert_author_sale_email_outbox_release_tree "$RELEASE_DIR"; then
     log_error "author_sale_email_outbox_artifact_missing"
     send_deploy_alert "deploy_failed" "Sale email outbox deploy artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! assert_application_email_outbox_release_tree "$RELEASE_DIR"; then
+    log_error "application_email_outbox_artifact_missing"
+    send_deploy_alert "deploy_failed" "Application email outbox deploy artifact missing for $RELEASE_NAME"
     exit 1
   fi
   if ! assert_music_transcode_worker_release_tree "$RELEASE_DIR"; then
@@ -499,6 +532,19 @@ main() {
     send_deploy_alert "deploy_failed" "Sale email outbox wrapper ensure failed for $RELEASE_NAME"
     # Cutover already completed: fail the deploy result without rolling back a
     # healthy web release, matching the existing worker ensure convention.
+    exit 1
+  fi
+  APPLICATION_EMAIL_OUTBOX_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-application-email-outbox.sh"
+  if [[ ! -x "$APPLICATION_EMAIL_OUTBOX_ENSURE" ]]; then
+    log_error "application_email_outbox_ensure_missing"
+    send_deploy_alert "deploy_failed" "Application email outbox ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$APPLICATION_EMAIL_OUTBOX_ENSURE"; then
+    log_error "application_email_outbox_ensure_failed"
+    send_deploy_alert "deploy_failed" "Application email outbox timer ensure failed for $RELEASE_NAME"
+    # Cutover already completed: fail the deploy result without rolling back a
+    # healthy web release, matching the sale email outbox ensure convention.
     exit 1
   fi
   if [[ ! -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then
