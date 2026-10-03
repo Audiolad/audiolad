@@ -455,6 +455,9 @@ assert.match(client, /isAudioSprintPoolVisible/);
 assert.match(client, /Забронирован вами/);
 assert.match(client, /Забронирован в пространстве/);
 assert.match(client, /Открыть это пространство/);
+assert.match(client, /Перенести в/);
+assert.match(client, /transferSeoReservationToWorkspace/);
+assert.match(client, /transferAndCreate/);
 assert.match(client, /audioSprintHref\(item\.reservationWorkspaceSlug\)/);
 assert.match(client, /Музыка|AUDIO_SPRINT_GROUP_LABEL/);
 assert.doesNotMatch(client, /publication_class:\s*"course"/);
@@ -468,6 +471,7 @@ const page = read(
 assert.match(page, /listAudioSprintForAuthor/);
 assert.match(page, /AuthorDashboardNav/);
 assert.match(page, /authorWorkspaces:\s*workspaces\.map/);
+assert.match(page, /authorName=\{workspace\.name\}/);
 assert.match(page, /AUDIO_SPRINT_OSEN_ZVUCHIT_TITLE/);
 
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
@@ -523,6 +527,8 @@ assert.match(list, /workspaceById/);
 assert.match(list, /reservedByCurrentUser/);
 assert.match(list, /reservationWorkspaceName/);
 assert.match(list, /reservationWorkspaceSlug/);
+assert.match(list, /transferReservationId/);
+assert.match(list, /!reservation\.product_id/);
 assert.match(list, /createServiceRoleClient/);
 assert.match(list, /expire_seo_query_reservation/);
 assert.match(list, /AUDIO_SPRINT_IN_CHUNK = 40/);
@@ -545,6 +551,26 @@ assert.match(
   read("src/lib/seo-queries/reservation-product-link-gate.ts"),
   /publicationClass === "practice"/,
 );
+
+const transferRoute = read(
+  "src/app/api/author/seo-reservations/transfer/route.ts",
+);
+assert.match(transferRoute, /transfer_seo_query_reservation/);
+assert.match(transferRoute, /target_author_id/);
+assert.match(transferRoute, /requireAuthorMutationMembership/);
+assert.match(transferRoute, /seo_reservation_limit_reached/);
+
+const transferMigration = read(
+  "supabase/migrations/20261218121000_transfer_seo_reservation_workspace.sql",
+);
+assert.match(transferMigration, /CREATE OR REPLACE FUNCTION public\.transfer_seo_query_reservation/);
+assert.match(transferMigration, /v_reservation\.product_id IS NOT NULL/);
+assert.match(transferMigration, /v_reservation\.expires_at <= now\(\)/);
+assert.match(transferMigration, /role IN \('owner', 'editor'\)/);
+assert.match(transferMigration, /v_active_count >= 5/);
+assert.match(transferMigration, /author_id = p_target_author_id/);
+assert.match(transferMigration, /hashtextextended\(v_first_author, 73051\)/);
+assert.doesNotMatch(transferMigration, /expires_at = now\(\) \+ interval/);
 
 const newPage = read("src/app/(platform)/author-dashboard/products/new/page.tsx");
 const editPage = read("src/app/(platform)/author-dashboard/products/[id]/page.tsx");
@@ -789,6 +815,7 @@ async function listWith(count, fail) {
 {
   const seed = seedSprint(3);
   seed.reservationByQuery.get(seed.queryIds[2]).author_id = SECOND_AUTHOR;
+  seed.reservationByQuery.get(seed.queryIds[2]).product_id = null;
   const client = createSprintClient(seed);
   const listing = await listAudioSprintForAuthor(
     {
@@ -807,6 +834,10 @@ async function listWith(count, fail) {
   assert.equal(crossWorkspace.reservedByCurrentUser, true);
   assert.equal(crossWorkspace.reservationWorkspaceName, "Второй артист");
   assert.equal(crossWorkspace.reservationWorkspaceSlug, "second-artist");
+  assert.equal(
+    crossWorkspace.transferReservationId,
+    seed.reservationByQuery.get(seed.queryIds[2]).id,
+  );
 }
 
 {
