@@ -93,9 +93,15 @@ assert.ok(
 );
 assert.match(verifyRoute, /result\.data\.start_param/);
 assert.match(verifyRoute, /startTarget \? \{ startTarget \} : \{\}/);
-assert.match(resolver, /\.eq\("status", "published"\)/);
-assert.match(resolver, /\.eq\("is_catalog_listed", true\)/);
-assert.match(resolver, /\.eq\("catalog_visibility", "listed"\)/);
+const publishedTarget = readFileSync(
+  join(process.cwd(), "src/lib/mini-app/published-product-target.ts"),
+  "utf8",
+);
+assert.match(resolver, /resolvePublishedListedProductById/);
+assert.match(publishedTarget, /\.eq\("status", "published"\)/);
+assert.match(publishedTarget, /\.eq\("is_catalog_listed", true\)/);
+assert.match(publishedTarget, /\.eq\("catalog_visibility", "listed"\)/);
+assert.match(publishedTarget, /applyPracticePublicAvailabilityFilter/);
 assert.match(resolver, /\.from\("promo_pages"\)/);
 assert.match(shellClient, /readMaxResolvedStartTarget/);
 assert.match(bridge, /initialStartTarget=\{startTarget\}/);
