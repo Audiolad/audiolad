@@ -9,6 +9,7 @@ import {
   AUDIO_SPRINT_AUTHOR_GROUPS,
   AUDIO_SPRINT_GROUP_LABEL,
   AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION,
+  audioSprintHref,
   audioSprintPublicationClass,
   audioSprintReserveConflictLifecycle,
   buildAudioSprintProductCreateHref,
@@ -217,7 +218,7 @@ export default function AuthorAudioSprintClient({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h2 className="text-lg font-semibold text-[#25135c]">{item.queryText}</h2>
                   <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">
-                    {item.reservedByCurrentUser && item.lifecycle === "in_progress"
+                    {(own || item.reservedByCurrentUser) && item.lifecycle === "in_progress"
                       ? "Забронирован вами"
                       : item.lifecycle === "in_progress"
                         ? "Забронирован"
@@ -255,9 +256,7 @@ export default function AuthorAudioSprintClient({
                       Забронирован в пространстве «{item.reservationWorkspaceName || "другой артист"}»
                     </span>
                     <Link
-                      href={`/author-dashboard/audio-sprints/osen-zvuchit-2026?author=${encodeURIComponent(
-                        item.reservationWorkspaceSlug!,
-                      )}`}
+                      href={audioSprintHref(item.reservationWorkspaceSlug)}
                       className="text-sm font-semibold text-[#7042c5]"
                     >
                       Открыть это пространство
