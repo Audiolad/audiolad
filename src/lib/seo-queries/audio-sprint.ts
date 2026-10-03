@@ -43,6 +43,7 @@ export type AudioSprintQueryCard = {
   reservedByCurrentUser: boolean;
   reservationWorkspaceName: string | null;
   reservationWorkspaceSlug: string | null;
+  transferReservationId: string | null;
 };
 
 export type AudioSprintTitleLock = {

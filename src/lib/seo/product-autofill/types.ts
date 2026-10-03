@@ -69,6 +69,11 @@ export type ProductSeoAutofillRequest = {
   seoSecondaryQueries?: string[];
   usageItems?: string[];
   styleProfile?: ProductSeoStyleProfile;
+  /**
+   * Frozen album-passport facts attached by the server for Jazz Relax.
+   * Client JSON is not copied into this field.
+   */
+  musicPassportFacts?: string;
   mode?: ProductSeoGenerateMode;
   fields?: ProductSeoGenerateField[];
 };

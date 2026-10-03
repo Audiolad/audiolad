@@ -13,6 +13,7 @@ import {
   selectOwnUnlinkedSeoOpportunities,
 } from "@/lib/seo-queries/release-own-seo-reservation";
 import { buildAuthorProductCreateHref } from "@/lib/seo-queries/reservation-product-create-href";
+import { transferSeoReservationToWorkspace } from "@/lib/seo-queries/seo-reservation-product-context";
 import type {
   SeoQueryOpportunity,
   SeoWorkspaceReservation,
@@ -21,6 +22,7 @@ import { countActiveAuthorSeoReservations } from "@/lib/seo-queries/types";
 
 type Props = {
   authorId: string;
+  authorName: string;
   authorSlug: string;
   publicationClass: string;
   opportunities: SeoQueryOpportunity[];
@@ -38,6 +40,7 @@ function formatMonthlyFrequency(value: number | null) {
  */
 export default function AuthorProductSeoQueryStep({
   authorId,
+  authorName,
   authorSlug,
   publicationClass,
   opportunities,
@@ -48,6 +51,10 @@ export default function AuthorProductSeoQueryStep({
   const [confirmTarget, setConfirmTarget] = useState<SeoQueryOpportunity | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [releaseError, setReleaseError] = useState<{
+    reservationId: string;
+    message: string;
+  } | null>(null);
+  const [transferError, setTransferError] = useState<{
     reservationId: string;
     message: string;
   } | null>(null);
@@ -93,6 +100,34 @@ export default function AuthorProductSeoQueryStep({
     );
     setConfirmTarget(null);
     router.refresh();
+  }
+
+  async function transferAndContinue(item: SeoWorkspaceReservation) {
+    if (pendingId) return;
+    setPendingId(item.reservationId);
+    setTransferError(null);
+
+    const result = await transferSeoReservationToWorkspace({
+      reservationId: item.reservationId,
+      targetAuthorId: authorId,
+    });
+
+    setPendingId(null);
+    if (!result.ok) {
+      setTransferError({
+        reservationId: item.reservationId,
+        message: result.message,
+      });
+      return;
+    }
+
+    router.push(
+      buildAuthorProductCreateHref({
+        authorSlug,
+        publicationClass,
+        reservationId: result.reservation.id,
+      }),
+    );
   }
 
   return (
@@ -182,8 +217,8 @@ export default function AuthorProductSeoQueryStep({
             Забронировано в других авторских пространствах
           </h3>
           <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
-            Эти запросы не пропали: они закреплены за другими вашими проектами.
-            Откройте нужное пространство, чтобы продолжить создание продукта.
+            Эти запросы закреплены за другими вашими проектами. Если хотите
+            создавать продукт от текущего проекта, перенесите бронь сюда.
           </p>
           <div className="mt-3 grid gap-3">
             {otherWorkspaceReservations.map((item) => {
@@ -211,16 +246,33 @@ export default function AuthorProductSeoQueryStep({
                       У вас в работе
                     </span>
                   </div>
-                  <Link
-                    href={buildAuthorProductCreateHref({
-                      authorSlug: item.authorSlug,
-                      publicationClass,
-                      reservationId: item.reservationId,
-                    })}
-                    className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white"
-                  >
-                    Создать в этом пространстве
-                  </Link>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={Boolean(pendingId)}
+                      onClick={() => void transferAndContinue(item)}
+                      className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {pendingId === item.reservationId
+                        ? "Переносим…"
+                        : `Перенести в «${authorName}» и продолжить`}
+                    </button>
+                    <Link
+                      href={buildAuthorProductCreateHref({
+                        authorSlug: item.authorSlug,
+                        publicationClass,
+                        reservationId: item.reservationId,
+                      })}
+                      className="text-sm font-semibold text-[#7042c5]"
+                    >
+                      Открыть «{item.authorName}»
+                    </Link>
+                  </div>
+                  {transferError?.reservationId === item.reservationId ? (
+                    <p role="alert" className="mt-2 text-sm font-medium text-[#9b3d3d]">
+                      {transferError.message}
+                    </p>
+                  ) : null}
                 </article>
               );
             })}

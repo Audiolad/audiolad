@@ -1878,6 +1878,18 @@ RLS is enabled. `anon` / `authenticated` have no table or RPC access.
 
 Typed read helper: `src/lib/music-passport/contract.ts` (`parseMusicPassportBasic`, `musicPassportUsableForEngine`, `measuredNumeric`). No product UI in this slice — a screen would look like Analyzer readiness.
 
+### Jazz Relax pilot album versions
+
+Migration: `20261218120000_jazz_relax_album_passport.sql` (expand-only). Not a catalog backfill.
+
+`music_passport_versions` gains `analyzer_run_id` (unique when set, FK to `music_analyzer_runs`), `source_sha256`, `analyzer_git_commit`, `analyzer_version_text`, and `structured_fields`. Those columns stay immutable across seal and supersede. `append_music_passport_from_analyzer_run` inserts a new sealed track version for one succeeded run and returns the existing row if that run already has a version. It does not copy `raw_json`. `vocal_role` is rejected.
+
+`music_album_passports` is insert-only. `music_album_passports_immutable` rejects UPDATE and DELETE. `insert_music_album_passport` inserts the next `version` for a practice. The same `source_fingerprint` returns the existing id and does not update the row. Each row stores `status` (`pending` | `completed` | `partial` | `failed`), `aggregation_version`, `analyzer_version`, `analyzer_git_commit`, `aggregated_at`, and `sources` (the exact `track_passport_version_id` and `music_analyzer_run_id` list that version was built from).
+
+`music_passport_analysis_links` records which analyzer run was requested for which product track. Insert-only. The product API writes these rows for the Jazz Relax author UUID only. The analyzer worker does not.
+
+`practices.description_generation_metadata.generated_from_album_passport_version_id` is set once by `bind_description_album_passport` to a `completed` album version of that practice. A different existing binding is left unchanged. The RPC does not rewrite description or SEO text.
+
 ### Explicit non-goals
 
 No Sonic DNA, dayparts, or Engine. No fingerprints. No rights grants, country seeds, or playback-decision copy. No `music_lab_*` writes. No mass catalog analysis.
