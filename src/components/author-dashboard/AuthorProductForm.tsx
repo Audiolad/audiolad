@@ -77,7 +77,6 @@ import {
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
 import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
-import type { JazzRelaxPassportView } from "@/lib/music-passport/jazz-relax-status";
 import { isPracticeProductWizardEnabled } from "@/lib/author-products/practice-product-wizard";
 import {
   CATALOG_SECTION_FIELD_LABEL,
@@ -840,13 +839,8 @@ export default function AuthorProductForm({
     action: "start" | "retry" | "reanalyze";
     audioItemId?: string;
   } | null>(null);
-  const [jazzRelaxPassportCompleted, setJazzRelaxPassportCompleted] = useState(false);
-  const [passportRunning, setPassportRunning] = useState(false);
-  const [passportStatusLoaded, setPassportStatusLoaded] = useState(false);
-  const onJazzRelaxPassportStatus = useCallback((status: JazzRelaxPassportView) => {
-    setPassportStatusLoaded(true);
-    setPassportRunning(status.phase === "running");
-    setJazzRelaxPassportCompleted(Boolean(status.completedAlbumPassportVersionId));
+  const onJazzRelaxPassportStatus = useCallback(() => {
+    // The panel owns progress. Step 3 is not blocked when no passport exists.
   }, []);
   const [form, setForm] = useState<FormState>(() =>
     applyAudioSprintTitleLock(
@@ -3586,9 +3580,6 @@ export default function AuthorProductForm({
     if (step < wizardStep) {
       return true;
     }
-    if (jazzRelaxMusicPassport && step > 2 && !jazzRelaxPassportCompleted) {
-      return false;
-    }
     return Boolean(practiceIdRef.current || practiceId);
   }
 
@@ -3683,13 +3674,6 @@ export default function AuthorProductForm({
     }
 
     if (jazzRelaxMusicPassport && wizardStep === 2) {
-      if (jazzRelaxPassportCompleted) {
-        const next = nextProductWizardStep(wizardStep);
-        if (next) {
-          goToWizardStep(next);
-        }
-        return;
-      }
       setPassportCommand({ nonce: Date.now(), action: "start" });
       return;
     }
@@ -3707,19 +3691,22 @@ export default function AuthorProductForm({
     }
   }
 
-  const jazzRelaxMustReturnToMaterials =
-    jazzRelaxMusicPassport
-    && wizardStep > 2
-    && (!practiceId || (passportStatusLoaded && !jazzRelaxPassportCompleted));
-  if (jazzRelaxMustReturnToMaterials) {
-    if (typeof window !== "undefined") {
-      window.history.replaceState(
-        null,
-        "",
-        buildWizardStepHref(window.location.pathname, window.location.search, 2),
-      );
+  async function continueWithoutMusicPassport() {
+    setError(null);
+    setMessage(null);
+    const saved = await saveProduct();
+    if (!saved) {
+      return;
     }
-    setWizardStep(2);
+    setMessage("Черновик сохранён.");
+    if (musicProductWizard && wizardStep === 2 && applyMusicTrackTitleErrors()) {
+      requestScrollToFirstSubmitIssue();
+      return;
+    }
+    const next = nextProductWizardStep(wizardStep);
+    if (next) {
+      goToWizardStep(next);
+    }
   }
 
   return (
@@ -5870,12 +5857,20 @@ export default function AuthorProductForm({
         <AuthorProductWizardStepNav
           showBack={wizardStep > 1}
           showContinue
-          busy={busy || (passportRunning && !jazzRelaxPassportCompleted)}
+          busy={busy}
           continueLabel={
             jazzRelaxMusicPassport && wizardStep === 2
-              ? jazzRelaxPassportCompleted
-                ? "Перейти к оформлению"
-                : "Сохранить и создать музыкальный паспорт"
+              ? "Сохранить и создать музыкальный паспорт"
+              : undefined
+          }
+          secondaryContinueLabel={
+            jazzRelaxMusicPassport && wizardStep === 2
+              ? "Продолжить без музыкального паспорта"
+              : undefined
+          }
+          onSecondaryContinue={
+            jazzRelaxMusicPassport && wizardStep === 2
+              ? () => void continueWithoutMusicPassport()
               : undefined
           }
           canSave={

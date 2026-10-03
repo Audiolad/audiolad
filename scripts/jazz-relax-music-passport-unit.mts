@@ -40,6 +40,19 @@ assert.doesNotMatch(jazzSource, /AURAFON_AUTHOR_ID|59c7e5b8-eae4-4394-82fb-b815a
 assert.doesNotMatch(read("src/lib/author-products/music-product-wizard.ts"), /jazz-relax|JAZZ_RELAX/);
 assert.doesNotMatch(read("src/lib/music-analyzer-runs/worker-runtime.ts"), /append_music_passport|music_album_passports/);
 assert.match(read("src/components/author-dashboard/product-wizard/AuthorProductWizardStepNav.tsx"), /Сохранить и продолжить/);
+assert.match(read("src/components/author-dashboard/product-wizard/AuthorProductWizardStepNav.tsx"), /secondaryContinueLabel/);
+
+const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
+assert.match(form, /Сохранить и создать музыкальный паспорт/);
+assert.match(form, /Продолжить без музыкального паспорта/);
+assert.match(form, /continueWithoutMusicPassport/);
+assert.doesNotMatch(form, /jazzRelaxMustReturnToMaterials|jazzRelaxPassportCompleted/);
+assert.match(
+  form,
+  /secondaryContinueLabel=\{\s*jazzRelaxMusicPassport && wizardStep === 2/,
+);
+assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /if \(!versionId\) \{[\s\S]*?facts: null/);
+assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Продолжить без музыкального паспорта/);
 
 const migration = read("supabase/migrations/20261218120000_jazz_relax_album_passport.sql");
 assert.match(migration, /generated_from_album_passport_version_id/);
