@@ -69,6 +69,9 @@ type Preview = {
   periodStart: string;
   periodEnd: string;
   rowCount: number;
+  sourceRowCount: number;
+  metricCount: number;
+  collapsedGroupCount: number;
   impressions: number;
   clicks: number;
   matched: number;
@@ -440,6 +443,7 @@ export default function AdminSeoAnalyticsClient({ data }: { data: SeoAnalyticsDa
             <p className="mt-2 text-sm text-[#796ba0]">
               Колонки Query, Dates range, Impressions, Clicks, CTR %, Avg. position.
               URL в этой выгрузке нет и не угадывается. Новые запросы не добавляются в SEO-карту.
+              Одинаковые запросы после нормализации суммируются, повтор периода не плодит строки.
             </p>
             <label className="mt-4 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-[#eadff8] bg-[#faf6ff] px-4 py-6 text-center text-sm text-[#5f5484]">
               Перетащите файл или выберите его
@@ -457,7 +461,8 @@ export default function AdminSeoAnalyticsClient({ data }: { data: SeoAnalyticsDa
               <div className="mt-4 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4">
                 <p className="font-semibold text-[#25135c]">{formatPeriod(preview.periodStart, preview.periodEnd)}</p>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484] sm:grid-cols-3">
-                  <span>{preview.rowCount.toLocaleString("ru-RU")} строк</span>
+                  <span>{preview.sourceRowCount.toLocaleString("ru-RU")} строк файла</span>
+                  <span>{preview.metricCount.toLocaleString("ru-RU")} запросов</span>
                   <span>{preview.impressions.toLocaleString("ru-RU")} показов</span>
                   <span>{preview.clicks.toLocaleString("ru-RU")} кликов</span>
                   <span>{preview.matched.toLocaleString("ru-RU")} в SEO-карте</span>
@@ -480,7 +485,7 @@ export default function AdminSeoAnalyticsClient({ data }: { data: SeoAnalyticsDa
               <table className="min-w-full text-left text-sm">
                 <thead className="text-[#796ba0]">
                   <tr>
-                    {["Период", "Файл", "Импорт", "Строки", "Показы", "Клики"].map((title) => (
+                    {["Период", "Файл", "Импорт", "Строки файла", "Запросы", "Показы", "Клики"].map((title) => (
                       <th key={title} className="px-3 py-2 font-medium">{title}</th>
                     ))}
                   </tr>
@@ -491,7 +496,8 @@ export default function AdminSeoAnalyticsClient({ data }: { data: SeoAnalyticsDa
                       <td className="px-3 py-3">{formatPeriod(snapshot.periodStart, snapshot.periodEnd)}</td>
                       <td className="px-3 py-3">{snapshot.originalFilename}</td>
                       <td className="px-3 py-3">{new Date(snapshot.importedAt).toLocaleString("ru-RU")}</td>
-                      <td className="px-3 py-3">{snapshot.rowCount.toLocaleString("ru-RU")}</td>
+                      <td className="px-3 py-3">{snapshot.sourceRowCount.toLocaleString("ru-RU")}</td>
+                      <td className="px-3 py-3">{snapshot.metricCount.toLocaleString("ru-RU")}</td>
                       <td className="px-3 py-3">{snapshot.totalImpressions.toLocaleString("ru-RU")}</td>
                       <td className="px-3 py-3">{snapshot.totalClicks.toLocaleString("ru-RU")}</td>
                     </tr>
@@ -505,7 +511,8 @@ export default function AdminSeoAnalyticsClient({ data }: { data: SeoAnalyticsDa
                   <h4 className="font-semibold text-[#25135c]">{formatPeriod(snapshot.periodStart, snapshot.periodEnd)}</h4>
                   <p className="mt-1 text-sm text-[#796ba0]">{snapshot.originalFilename}</p>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484]">
-                    <span>{snapshot.rowCount.toLocaleString("ru-RU")} строк</span>
+                    <span>{snapshot.sourceRowCount.toLocaleString("ru-RU")} строк файла</span>
+                    <span>{snapshot.metricCount.toLocaleString("ru-RU")} запросов</span>
                     <span>{snapshot.totalImpressions.toLocaleString("ru-RU")} показов</span>
                     <span>{snapshot.totalClicks.toLocaleString("ru-RU")} кликов</span>
                     <span>{new Date(snapshot.importedAt).toLocaleString("ru-RU")}</span>

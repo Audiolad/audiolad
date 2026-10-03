@@ -27,6 +27,8 @@ type SnapshotRow = {
   imported_at: string;
   original_filename: string;
   row_count: number;
+  source_row_count: number;
+  metric_count: number;
   total_impressions: number | string;
   total_clicks: number | string;
 };
@@ -89,7 +91,9 @@ function snapshotSummary(row: SnapshotRow): SeoAnalyticsSnapshotSummary {
     periodEnd: row.period_end,
     importedAt: row.imported_at,
     originalFilename: row.original_filename,
-    rowCount: row.row_count,
+    rowCount: row.source_row_count,
+    sourceRowCount: row.source_row_count,
+    metricCount: row.metric_count,
     totalImpressions: readMetricNumber(row.total_impressions),
     totalClicks: readMetricNumber(row.total_clicks),
   };
@@ -186,7 +190,7 @@ export async function loadSeoAnalyticsDashboard(
   const snapshotRows = await selectPages<SnapshotRow>((from, to) =>
     supabase
       .from("seo_search_snapshots")
-      .select("id, period_start, period_end, imported_at, original_filename, row_count, total_impressions, total_clicks")
+      .select("id, period_start, period_end, imported_at, original_filename, row_count, source_row_count, metric_count, total_impressions, total_clicks")
       .order("period_end", { ascending: false })
       .order("period_start", { ascending: false })
       .range(from, to),
