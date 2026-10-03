@@ -260,6 +260,10 @@ assert.equal(
   evaluateAudioSprintModerationGate({ ...readySprint, subtitle: "  " })?.code,
   "audio_sprint_seo_required",
 );
+assert.match(
+  evaluateAudioSprintModerationGate({ ...readySprint, subtitle: "  " })?.message ?? "",
+  /подназвание/,
+);
 assert.equal(
   evaluateAudioSprintModerationGate({ ...readySprint, description: "" })?.code,
   "audio_sprint_seo_required",
@@ -279,12 +283,31 @@ assert.equal(
   })?.code,
   "audio_sprint_seo_required",
 );
+assert.match(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    usageItems: usageItems.slice(0, 2),
+  })?.message ?? "",
+  /2 из минимум 3/,
+);
 assert.equal(
   evaluateAudioSprintModerationGate({
     ...readySprint,
     usageItems: [...usageItems, { content: "Четвёртый пункт" }],
-  })?.code,
-  "audio_sprint_seo_required",
+  }),
+  null,
+  "extra filled usage items must not block a complete sprint product",
+);
+assert.equal(
+  evaluateAudioSprintModerationGate({
+    ...readySprint,
+    faqItems: [
+      ...faqItems,
+      { question: "Можно ли слушать повторно?", answer: "Да." },
+    ],
+  }),
+  null,
+  "extra complete FAQ items must not block a complete sprint product",
 );
 assert.equal(
   evaluateAudioSprintModerationGate({

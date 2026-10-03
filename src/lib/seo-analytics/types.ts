@@ -18,6 +18,11 @@ export type ParsedWebmasterMetric = {
 export type ParsedWebmasterWorkbook = {
   periodStart: string;
   periodEnd: string;
+  /** Rows in the XLSX before normalized queries are merged. */
+  sourceRowCount: number;
+  /** Normalized queries that had more than one source row. */
+  collapsedGroupCount: number;
+  /** One row per normalized query. */
   rows: ParsedWebmasterMetric[];
 };
 
@@ -69,7 +74,11 @@ export type SeoAnalyticsSnapshotSummary = {
   periodEnd: string;
   importedAt: string;
   originalFilename: string;
+  /** Source rows in the export. */
   rowCount: number;
+  sourceRowCount: number;
+  /** Unique normalized queries stored for the snapshot. */
+  metricCount: number;
   totalImpressions: number;
   totalClicks: number;
 };

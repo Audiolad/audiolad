@@ -64,13 +64,13 @@ export const AUDIO_SPRINT_MUST_BE_LISTED_MESSAGE =
 
 export const AUDIO_SPRINT_SEO_REQUIRED_CODE = "audio_sprint_seo_required";
 export const AUDIO_SPRINT_SEO_REQUIRED_MESSAGE =
-  "Заполните подназвание, описание, заголовок и описание для поиска, ровно 3 пункта «Как слушать / Как проходить», ровно 3 вопроса и ответа и обложку.";
+  "Заполните подназвание, описание, заголовок и описание для поиска, не менее 3 пунктов «Как слушать / Как проходить», не менее 3 вопросов и ответов и обложку.";
 
 export const AUDIO_SPRINT_CLASS_MISMATCH_CODE = "audio_sprint_class_mismatch";
 export const AUDIO_SPRINT_CLASS_MISMATCH_MESSAGE =
   "Тип продукта не соответствует разделу спринта. Для музыкального запроса выберите «Музыка», для медитации, аффирмации или практики — «Продукт» → «Аудиопрактика».";
 
-/** Packaging contract from AuthorSeoPromptBuilder: exactly three how-to items and three Q&A. */
+/** Sprint minimum; the shared editor intentionally allows authors to add more. */
 export const AUDIO_SPRINT_USAGE_ITEM_COUNT = 3;
 export const AUDIO_SPRINT_FAQ_ITEM_COUNT = 3;
 
@@ -293,22 +293,35 @@ export function evaluateAudioSprintModerationGate(input: {
   const faqCount = input.faqItems.filter(
     (item) => filledText(item.question) && filledText(item.answer),
   ).length;
-  const packagingReady =
-    Boolean(filledText(input.subtitle)) &&
-    Boolean(filledText(input.description)) &&
-    Boolean(filledText(input.seoTitle)) &&
-    Boolean(filledText(input.seoDescription)) &&
-    usageCount === AUDIO_SPRINT_USAGE_ITEM_COUNT &&
-    faqCount === AUDIO_SPRINT_FAQ_ITEM_COUNT &&
-    audioSprintHasCover({
+  const missing: string[] = [];
+
+  if (!filledText(input.subtitle)) missing.push("подназвание");
+  if (!filledText(input.description)) missing.push("описание");
+  if (!filledText(input.seoTitle)) missing.push("заголовок для поиска");
+  if (!filledText(input.seoDescription)) missing.push("описание для поиска");
+  if (usageCount < AUDIO_SPRINT_USAGE_ITEM_COUNT) {
+    missing.push(
+      `пункты «Как слушать / Как проходить»: ${usageCount} из минимум ${AUDIO_SPRINT_USAGE_ITEM_COUNT}`,
+    );
+  }
+  if (faqCount < AUDIO_SPRINT_FAQ_ITEM_COUNT) {
+    missing.push(
+      `вопросы и ответы: ${faqCount} из минимум ${AUDIO_SPRINT_FAQ_ITEM_COUNT}`,
+    );
+  }
+  if (
+    !audioSprintHasCover({
       coverUrl: input.coverUrl,
       coverImage: input.coverImage,
-    });
+    })
+  ) {
+    missing.push("обложка");
+  }
 
-  if (!packagingReady) {
+  if (missing.length > 0) {
     return {
       code: AUDIO_SPRINT_SEO_REQUIRED_CODE,
-      message: AUDIO_SPRINT_SEO_REQUIRED_MESSAGE,
+      message: `Для модерации не хватает: ${missing.join(", ")}.`,
     };
   }
 

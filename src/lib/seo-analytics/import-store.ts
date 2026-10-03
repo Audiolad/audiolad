@@ -1,4 +1,5 @@
 import { aggregateSearchMetrics } from "@/lib/seo-analytics/aggregate";
+import { collapseNormalizedWebmasterMetrics } from "@/lib/seo-analytics/collapse-metrics";
 import type { ParsedWebmasterMetric, ParsedWebmasterWorkbook } from "@/lib/seo-analytics/types";
 import { YANDEX_WEBMASTER_SOURCE } from "@/lib/seo-analytics/types";
 
@@ -13,6 +14,9 @@ export type StoredSearchSnapshot = {
   periodEnd: string;
   originalFilename: string;
   rowCount: number;
+  sourceRowCount: number;
+  metricCount: number;
+  collapsedGroupCount: number;
   totalImpressions: number;
   totalClicks: number;
   metrics: StoredSearchMetric[];
@@ -37,20 +41,37 @@ export function attachSeoQueryIds(
   }));
 }
 
-function assertImportable(workbook: ParsedWebmasterWorkbook): void {
+function prepareImport(workbook: ParsedWebmasterWorkbook): {
+  metricsSource: ParsedWebmasterMetric[];
+  sourceRowCount: number;
+  collapsedGroupCount: number;
+} {
   if (workbook.periodEnd < workbook.periodStart) {
     throw new Error("invalid_period");
   }
   if (workbook.rows.length === 0) throw new Error("empty_export");
-  const seen = new Set<string>();
   for (const row of workbook.rows) {
     if (!row.normalizedQuery) throw new Error("empty_query");
-    if (seen.has(row.normalizedQuery)) throw new Error("duplicate_normalized_query");
-    seen.add(row.normalizedQuery);
     if (row.impressions < 0 || row.clicks < 0 || row.clicks > row.impressions) {
       throw new Error("invalid_metrics");
     }
   }
+  const collapsed = collapseNormalizedWebmasterMetrics(workbook.rows);
+  for (const row of collapsed.rows) {
+    if (row.clicks > row.impressions || row.ctr < 0 || row.ctr > 1) {
+      throw new Error("invalid_metrics");
+    }
+  }
+  const alreadyUnique = collapsed.collapsedGroupCount === 0;
+  return {
+    metricsSource: collapsed.rows,
+    sourceRowCount: alreadyUnique
+      ? (workbook.sourceRowCount ?? workbook.rows.length)
+      : workbook.rows.length,
+    collapsedGroupCount: alreadyUnique
+      ? (workbook.collapsedGroupCount ?? 0)
+      : collapsed.collapsedGroupCount,
+  };
 }
 
 /**
@@ -65,8 +86,8 @@ export function applySearchSnapshotImport(
   filename: string,
   seoQueryIdsByNormalized: ReadonlyMap<string, string>,
 ): SeoAnalyticsStore {
-  assertImportable(workbook);
-  const metrics = attachSeoQueryIds(workbook.rows, seoQueryIdsByNormalized);
+  const prepared = prepareImport(workbook);
+  const metrics = attachSeoQueryIds(prepared.metricsSource, seoQueryIdsByNormalized);
   const totals = aggregateSearchMetrics(metrics);
   const existing = state.snapshots.find((snapshot) =>
     snapshot.source === YANDEX_WEBMASTER_SOURCE
@@ -80,7 +101,10 @@ export function applySearchSnapshotImport(
         ? {
             ...snapshot,
             originalFilename: filename,
-            rowCount: totals.queryCount,
+            rowCount: prepared.sourceRowCount,
+            sourceRowCount: prepared.sourceRowCount,
+            metricCount: metrics.length,
+            collapsedGroupCount: prepared.collapsedGroupCount,
             totalImpressions: totals.impressions,
             totalClicks: totals.clicks,
             metrics,
@@ -98,7 +122,10 @@ export function applySearchSnapshotImport(
         periodStart: workbook.periodStart,
         periodEnd: workbook.periodEnd,
         originalFilename: filename,
-        rowCount: totals.queryCount,
+        rowCount: prepared.sourceRowCount,
+        sourceRowCount: prepared.sourceRowCount,
+        metricCount: metrics.length,
+        collapsedGroupCount: prepared.collapsedGroupCount,
         totalImpressions: totals.impressions,
         totalClicks: totals.clicks,
         metrics,
