@@ -1,9 +1,15 @@
+import {
+  buildProductStartPayload,
+  compactUuid,
+  expandCompactUuid,
+  parseProductStartPayload,
+} from "@/lib/mini-app/product-target";
+
 export const MAX_MINI_APP_BOT_NAME = "id507305817690_1_bot";
 export const MAX_MINI_APP_DEEP_LINK_ORIGIN = "https://max.ru";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const COMPACT_UUID_RE = /^[0-9a-f]{32}$/i;
 
 export type MaxStartTarget =
   | {
@@ -29,28 +35,8 @@ export type MaxResolvedStartTarget =
       promoSlug: string;
     };
 
-function compactUuid(uuid: string): string | null {
-  const normalized = uuid.trim().toLowerCase();
-  if (!UUID_RE.test(normalized)) return null;
-  return normalized.replaceAll("-", "");
-}
-
-function expandUuid(compact: string): string | null {
-  const normalized = compact.trim().toLowerCase();
-  if (!COMPACT_UUID_RE.test(normalized)) return null;
-  const uuid = [
-    normalized.slice(0, 8),
-    normalized.slice(8, 12),
-    normalized.slice(12, 16),
-    normalized.slice(16, 20),
-    normalized.slice(20),
-  ].join("-");
-  return UUID_RE.test(uuid) ? uuid : null;
-}
-
 export function buildMaxProductStartPayload(practiceId: string): string | null {
-  const compact = compactUuid(practiceId);
-  return compact ? `p_${compact}` : null;
+  return buildProductStartPayload(practiceId);
 }
 
 export function buildMaxPromoStartPayload(promoPageId: string): string | null {
@@ -64,15 +50,17 @@ export function parseMaxStartPayload(
   const normalized = payload?.trim();
   if (!normalized || normalized.length > 512) return null;
 
-  const match = normalized.match(/^([pg])_([0-9a-f]{32})$/i);
+  const product = parseProductStartPayload(normalized);
+  if (product) {
+    return { kind: "product", practiceId: product.practiceId };
+  }
+
+  const match = normalized.match(/^g_([0-9a-f]{32})$/i);
   if (!match) return null;
 
-  const id = expandUuid(match[2] ?? "");
-  if (!id) return null;
-
-  return match[1]?.toLowerCase() === "p"
-    ? { kind: "product", practiceId: id }
-    : { kind: "promo", promoPageId: id };
+  const promoPageId = expandCompactUuid(match[1] ?? "");
+  if (!promoPageId) return null;
+  return { kind: "promo", promoPageId };
 }
 
 export function buildMaxMiniAppDeepLink(payload: string): string | null {
