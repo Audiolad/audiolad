@@ -251,7 +251,7 @@ assert.deepEqual(
   { impressions: 219, clicks: 15, avgPosition: -0.5 },
 );
 
-const sql = read("supabase/migrations/20261219120000_seo_search_analytics_phase1.sql");
+const sql = read("supabase/migrations/20261219121000_seo_search_analytics_phase1.sql");
 assert.match(sql, /CREATE TABLE public\.seo_search_snapshots/);
 assert.match(sql, /CREATE TABLE public\.seo_search_query_metrics/);
 assert.match(sql, /seo_search_snapshots_period_source_unique UNIQUE \(period_start, period_end, source\)/);
