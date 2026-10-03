@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { MusicPassport } from "../src/components/music-passport/MusicPassport";
-import { readMusicAnalyzerPassport } from "../src/lib/music-analyzer-runs/passport";
-import { formatMeasureDetail } from "../src/lib/music-analyzer-runs/passport-display";
+import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
+import { formatMeasureDetail, instrumentPlaceLabel, rowQuantityDisplay } from "../src/lib/music-analyzer-runs/passport-display";
 
 const productionGold = readMusicAnalyzerPassport({
   normalized: {
@@ -108,7 +108,8 @@ assert.match(fullMarkup, /ранг 1/);
 assert.match(fullMarkup, /organ/);
 assert.match(fullMarkup, /brushes/);
 assert.match(fullMarkup, /electric guitar/);
-assert.match(fullMarkup, /ранг не указан/);
+assert.match(fullMarkup, /№3/);
+assert.doesNotMatch(fullMarkup, /ранг не указан/);
 assert.match(fullMarkup, /О версии анализа/);
 assert.match(fullMarkup, /passport-provenance-sha/);
 assert.match(fullMarkup, /Данные разработчика \/ Raw JSON/);
@@ -159,5 +160,103 @@ assert.doesNotMatch(missingMarkup, /Jazz/);
 assert.doesNotMatch(missingMarkup, /Raw JSON/);
 assert.doesNotMatch(missingMarkup, /passport-debug-json/);
 assert.doesNotMatch(missingMarkup, /О версии анализа/);
+
+const gold001Normalized = {
+  genres: [{ name: "Jazz", average: 0.82, max: 0.91, band: "high" }],
+  styles: [{ name: "Smooth Jazz", average: 0.44, max: 0.5, band: "medium" }],
+  moods: [{ name: "warm", average: 0.61, max: 0.7, band: "high" }],
+  instruments: [
+    { label: "organ", average: 0.131, max: 0.42, band: "medium" },
+    { label: "brushes", average: 0.124, max: 0.38, band: "medium" },
+    { label: "saxophone", average: 0.123, max: 0.36, band: "low" },
+    { label: "bass guitar", average: 0.118, max: 0.33, band: "low" },
+    { label: "electric guitar", average: 0.111, max: 0.29, band: "low" },
+  ],
+};
+const gold001 = readMusicAnalyzerPassport({ normalized: gold001Normalized });
+assert.deepEqual(
+  gold001.instruments.map((row) => row.label),
+  ["organ", "brushes", "saxophone", "bass guitar", "electric guitar"],
+);
+assert.deepEqual(gold001.instruments.map((row) => row.rank), [null, null, null, null, null]);
+assert.deepEqual(
+  gold001.instruments.map((row) => row.average),
+  ["0.131", "0.124", "0.123", "0.118", "0.111"],
+);
+assert.equal(gold001.instruments[0]?.score, null);
+assert.equal(gold001.instruments[0]?.max, "0.42");
+assert.equal(gold001.genres[0]?.score, null);
+assert.equal(gold001.genres[0]?.average, "0.82");
+assert.equal(gold001.styles[0]?.average, "0.44");
+assert.equal(gold001.moods[0]?.average, "0.61");
+assert.equal(rowQuantityDisplay(gold001.instruments[0]!).primary, "0.131");
+assert.equal(instrumentPlaceLabel(gold001.instruments[0]!, 0), "№1");
+assert.equal(instrumentPlaceLabel({ ...gold001.instruments[0]!, rank: 1 }, 0), "ранг 1");
+
+const goldFacts = readMusicAnalyzerStructuredFacts(gold001Normalized);
+assert.equal(goldFacts.instruments[0]?.label, "organ");
+assert.equal(goldFacts.instruments[0]?.score, null);
+assert.equal(goldFacts.genres[0]?.score, null);
+
+const goldMarkup = renderToStaticMarkup(
+  <MusicPassport
+    mode="full"
+    passport={gold001}
+    header={header}
+    snapshot={snapshot}
+    provenance={provenance}
+  />,
+);
+assert.match(goldMarkup, /№1[\s\S]*organ[\s\S]*0\.131[\s\S]*max 0\.42/);
+assert.match(goldMarkup, /№2[\s\S]*brushes[\s\S]*0\.124/);
+assert.match(goldMarkup, /№3[\s\S]*saxophone[\s\S]*0\.123/);
+assert.match(goldMarkup, /№4[\s\S]*bass guitar[\s\S]*0\.118/);
+assert.match(goldMarkup, /№5[\s\S]*electric guitar[\s\S]*0\.111/);
+assert.match(goldMarkup, /Jazz[\s\S]*0\.82[\s\S]*max 0\.91/);
+assert.match(goldMarkup, /Smooth Jazz[\s\S]*0\.44/);
+assert.match(goldMarkup, /warm[\s\S]*0\.61/);
+assert.doesNotMatch(goldMarkup, /ранг не указан/);
+assert.doesNotMatch(goldMarkup, /оценка не указана/);
+assert.doesNotMatch(goldMarkup, /ведущий инструмент/);
+
+const maxOnly = readMusicAnalyzerPassport({
+  normalized: {
+    instruments: [{ label: "piano", max: 0.2, band: "low" }],
+  },
+});
+assert.equal(maxOnly.instruments[0]?.average, null);
+assert.equal(maxOnly.instruments[0]?.score, null);
+assert.equal(rowQuantityDisplay(maxOnly.instruments[0]!).primary, null);
+assert.equal(rowQuantityDisplay(maxOnly.instruments[0]!).max, "0.2");
+const maxOnlyMarkup = renderToStaticMarkup(
+  <MusicPassport
+    mode="product"
+    passport={maxOnly}
+    header={header}
+    snapshot={snapshot}
+    provenance={provenance}
+    developerJson={{ debug: true }}
+  />,
+);
+assert.match(maxOnlyMarkup, /№1/);
+assert.match(maxOnlyMarkup, /piano/);
+assert.match(maxOnlyMarkup, /0\.2/);
+assert.doesNotMatch(maxOnlyMarkup, /оценка не указана/);
+assert.doesNotMatch(maxOnlyMarkup, /Raw JSON/);
+
+const blankScore = readMusicAnalyzerPassport({
+  normalized: { instruments: [{ label: "harp" }] },
+});
+const blankMarkup = renderToStaticMarkup(
+  <MusicPassport
+    mode="full"
+    passport={blankScore}
+    header={header}
+    snapshot={snapshot}
+    provenance={provenance}
+  />,
+);
+assert.match(blankMarkup, /№1/);
+assert.match(blankMarkup, /оценка не указана/);
 
 console.log("music-passport-ui-unit: ok");
