@@ -61,6 +61,7 @@ export default async function AuthorAudioSprintPage({
       </div>
       <AuthorAudioSprintClient
         authorId={workspace.id}
+        authorName={workspace.name}
         authorSlug={workspace.slug}
         queries={listing.queries}
         activeReservationCount={listing.activeReservationCount}
