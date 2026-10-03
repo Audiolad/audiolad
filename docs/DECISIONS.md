@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-10-03 — Аварийный Git и CI не заменяют канонический деплой
+
+**Контекст:** issue #745. Нужен второй путь на случай недоступности GitHub, GitHub Actions и западных AI API. Текущий production deploy — `sudo -n /usr/local/sbin/audiolad-deploy <sha>` и `deploy.sh` целевого коммита.
+
+**Решение:**
+
+1. GitHub остаётся primary. Workflow `production-deploy.yml` и установленный wrapper этой фазой не меняются и не ослабляются.
+2. Зеркало — push mirror в Gitea на отдельном VDS, не на production `72.56.232.160`. Пока репозиторий не promoted, sync обновляет все refs. После `PROMOTE_MIRROR` `main` аварийного репозитория sync не переписывает.
+3. Аварийный раннер вызывает тот же `audiolad-deploy`. Второй движок сборки и cutover не создаётся. Откат остаётся `rollback.sh`.
+4. `npm ci` остаётся в `deploy.sh`. Офлайн-флаги включаются только файлом `shared/npm-ci-offline.env`, которого на production нет.
+5. Покупка VDS и DNS `git.audiolad.ru` — Human Gate HG-745-1. Переключение production `origin` этим решением не разрешено.
+
+**Принято:** задание issue #745 на реализацию фазы 1. Merge PR и production cutover — отдельное решение после ревью.
+
+---
+
 ## 2026-10-02 — Music Analyzer Lab Phase 2A runs the pinned Python analyzer on the app VPS
 
 **Контекст:** Human Listening Validation остаётся на `music_lab_*` и `/music-analyzer`. Нужен отдельный автоанализ WAV/MP3: неизменяемый прогон, повтор того же SHA256 — новая версия, выгрузка JSON/CSV/Markdown и сравнение двух версий. Музыкальные поля не выдумываются в Next.js. Music Passport в этом шаге не подключается.

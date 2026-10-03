@@ -1,0 +1,54 @@
+# Warm the Russian Git mirror while GitHub is reachable.
+# This workflow does not deploy production and does not use the production
+# environment. A GitHub outage is handled by the copy of these scripts on the
+# emergency host, not by this workflow.
+name: Emergency Git mirror
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    name: Mirror Audiolad repos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch this repository without a marketplace action
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          : "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
+          git init --quiet .
+          git fetch --no-tags \
+            --config "http.extraHeader=Authorization: Bearer ${GITHUB_TOKEN}" \
+            "https://github.com/${GITHUB_REPOSITORY}.git" \
+            "${GITHUB_REF}:refs/heads/dispatch"
+          git checkout --quiet dispatch
+
+      - name: Require the emergency git target
+        env:
+          EMERGENCY_GIT_TARGET_BASE: ${{ secrets.EMERGENCY_GIT_TARGET_BASE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EMERGENCY_GIT_TARGET_BASE}" ]]; then
+            echo "Human Gate HG-745-1: EMERGENCY_GIT_TARGET_BASE is not configured. No mirror was pushed." >&2
+            exit 1
+          fi
+
+      - name: Push mirror
+        env:
+          AUDIOLAD_EMERGENCY_GIT_TARGET_BASE: ${{ secrets.EMERGENCY_GIT_TARGET_BASE }}
+          AUDIOLAD_EMERGENCY_GIT_USERNAME: ${{ secrets.EMERGENCY_GIT_USERNAME }}
+          AUDIOLAD_EMERGENCY_GIT_TOKEN: ${{ secrets.EMERGENCY_GIT_TOKEN }}
+          AUDIOLAD_MIRROR_SOURCE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          bash deploy/emergency/mirror-sync.sh \
+            --manifest deploy/emergency/repos.manifest.json \
+            --work-dir "${RUNNER_TEMP}/emergency-mirrors" \
+            --target-base "${AUDIOLAD_EMERGENCY_GIT_TARGET_BASE}"
