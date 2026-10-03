@@ -908,7 +908,7 @@ RLS: существующие политики author members на `practices/{p
 | Таблица | Назначение |
 |--------|------------|
 | `platform_permissions` | Коды разрешений (`admin_panel.access`, `dashboard.view`, …) |
-| `platform_roles` | Роли команды: `owner`, `admin`, `editor`, `support`, `analyst`, `finance` |
+| `platform_roles` | Роли команды: `owner`, `admin`, `editor`, `support`, `analyst`, `finance`, `classica_operator`, `classica_moderator` |
 | `platform_role_permissions` | Наборы permissions для ролей |
 | `platform_user_roles` | Many-to-many: пользователь → роли команды |
 
@@ -923,7 +923,31 @@ RLS: существующие политики author members на `practices/{p
 
 - Чтение справочников ролей/permissions — `authenticated`.
 - Чтение `platform_user_roles` — свои строки или при наличии `team.view`.
-- Мутации назначений — через `service_role` / SQL (UI назначения ролей пока нет).
+- Мутации назначений — через `service_role` / SQL. Роли Classica (`classica_operator`, `classica_moderator`) можно выдать в `/classica/production/team`.
+
+## Classica Production v0.1
+
+Миграция `supabase/migrations/20261220120000_classica_production_v01.sql`.
+
+Закрытый многопользовательский конвейер будущей Classica. Не создаёт практики и не наполняет каталог автоматически.
+
+| Таблица | Назначение |
+|--------|------------|
+| `classica_production_jobs` | Карточка работы и статус |
+| `classica_production_assets` | Исходник, рендер, итоговое аудио, обложка, слайдер |
+| `classica_production_events` | История действий и смен статуса |
+| `classica_production_reviews` | Принятие, возврат, комментарий |
+| `classica_production_prompts` | Один мастер-промпт оформления |
+| `classica_production_accruals` | Начисление исполнителю при принятии, включая 0 ₽ |
+| `classica_public_works` | Опубликованная страница `/classica/{composer}/{work}` |
+
+Статусы: `queued`, `in_progress`, `audio_ready`, `packaging_ready`, `in_review`, `needs_revision`, `accepted`, `published`.
+
+«Взять в работу» блокирует строку `FOR UPDATE` и проходит только из `queued` без исполнителя. Запись — через `SECURITY DEFINER` RPC. Прямой INSERT/UPDATE клиенту не выдан.
+
+Публикация дополнительно обновляет `classical_composers` и `classical_works`. Аудио страницы лежит в публичном bucket `classica-public`, черновики — в приватном `classica-production`.
+
+Разрешения: `classica.production.access`, `.operate`, `.moderate`, `.admin`. Их получают `owner` и `admin`. `classica_operator` — access и operate. `classica_moderator` — access и moderate.
 
 ## practice_audio_progress (resume cursor)
 

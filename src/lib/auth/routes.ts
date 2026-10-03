@@ -11,6 +11,7 @@ const PRIVATE_ROUTE_PREFIXES = [
   "/settings",
   "/author-dashboard",
   "/admin",
+  "/classica/production",
 ] as const;
 
 const AUTH_ROUTES = [

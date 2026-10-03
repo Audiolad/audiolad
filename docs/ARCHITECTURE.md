@@ -436,6 +436,8 @@ measured attributes  |  interpreted attributes
 
 Business Organization и Author Workspace — разные bounded contexts; один `auth.users` может быть и автором, и владельцем бизнеса. Music Rights Catalog — global/shared domain (не organization-scoped в A4).
 
+- **Classica Production v0.1:** закрытый конвейер `/classica/production` и публичные страницы `/classica` и `/classica/{composer}/{work}`. Роли — существующий platform RBAC (`admin` / `owner` плюс `classica_operator` и `classica_moderator`). Черновики не попадают в каталог практик. Опубликованная работа дополняет `classical_composers` / `classical_works` и читается из `classica_public_works`.
+
 ## Что отсутствует в архитектуре
 
 - Глобальная защита приватных маршрутов — не реализована (профиль проверяет сессию локально, но маршрут не защищён на уровне proxy).
