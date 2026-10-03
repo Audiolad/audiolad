@@ -5,13 +5,16 @@ import { redirect } from "next/navigation";
 
 import { classicaIdleState, type ClassicaActionState } from "@/lib/classica/production/action-state";
 import { mapClassicaError } from "@/lib/classica/production/errors";
+import { classicaCanAdmin, requireClassicaProductionAccess } from "@/lib/classica/production/access";
 import {
   classicaAssetAllowsMime,
   classicaAssetExtension,
   classicaAssetMaxBytes,
   classicaProductionObjectPath,
   classicaPublishedObjectPath,
+  classicaPublishCleanupPaths,
   type ClassicaAssetKind,
+  type ClassicaPublicCopyAttempt,
 } from "@/lib/classica/production/files";
 import { parseRublesInput } from "@/lib/classica/production/money";
 import { prepareClassicaPackaging } from "@/lib/classica/production/openai";
@@ -21,8 +24,13 @@ import {
 } from "@/lib/classica/production/packaging";
 import { getClassicaJob, getClassicaMasterPrompt } from "@/lib/classica/production/queries";
 import { isClassicaSlug, slugifyClassicaName } from "@/lib/classica/production/slug";
+import {
+  canEditClassicaCard,
+  classicaPackagingCooldownActive,
+} from "@/lib/classica/production/status";
 import { CLASSICA_PRODUCTION_BUCKET, CLASSICA_PUBLIC_BUCKET } from "@/lib/classica/public/paths";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 function fail(error: unknown): ClassicaActionState {
   return { error: mapClassicaError(error) };
@@ -355,14 +363,28 @@ export async function removeClassicaAssetAction(formData: FormData): Promise<voi
 
 export async function prepareClassicaPackagingAction(formData: FormData): Promise<void> {
   const jobId = readText(formData, "job_id");
-  const supabase = await userClient();
-  const job = await getClassicaJob(supabase, jobId);
+  const session = await requireClassicaProductionAccess();
+  const job = await getClassicaJob(session.supabase, jobId);
   if (!job) {
     redirect("/classica/production?error=not-found");
   }
+  const canEdit = canEditClassicaCard(job.status, {
+    isAssignee: job.assigneeId === session.userId,
+    isAdmin: classicaCanAdmin(session.access),
+  });
+  if (!canEdit) {
+    redirect(
+      `/classica/production/${jobId}?error=${encodeURIComponent("Недостаточно прав для этого действия.")}`,
+    );
+  }
+  if (classicaPackagingCooldownActive(job.packagingPreparedAt, new Date())) {
+    redirect(
+      `/classica/production/${jobId}?error=${encodeURIComponent("Повторная подготовка оформления для этой работы пока недоступна. Подождите пару минут.")}`,
+    );
+  }
   let masterPrompt = "";
   try {
-    masterPrompt = await getClassicaMasterPrompt(supabase);
+    masterPrompt = await getClassicaMasterPrompt(createServiceRoleClient());
   } catch {
     redirect(`/classica/production/${jobId}?error=${encodeURIComponent("Мастер-промпт не найден.")}`);
   }
@@ -389,7 +411,7 @@ export async function prepareClassicaPackagingAction(formData: FormData): Promis
   const fields = Object.fromEntries(
     CLASSICA_PACKAGING_FIELDS.map((field) => [field, prepared.draft[field].text]),
   );
-  const { error } = await supabase.rpc("classica_production_apply_packaging", {
+  const { error } = await session.supabase.rpc("classica_production_apply_packaging", {
     p_job_id: jobId,
     p_fields: fields,
     p_flags: prepared.flags,
@@ -422,17 +444,53 @@ export async function publishClassicaJobAction(formData: FormData): Promise<void
     );
   }
 
+  const copiedThisAttempt: ClassicaPublicCopyAttempt[] = [];
+
+  async function removeFilesCopiedThisAttempt() {
+    const paths = classicaPublishCleanupPaths(copiedThisAttempt);
+    if (paths.length === 0) {
+      return;
+    }
+    await supabase.storage.from(CLASSICA_PUBLIC_BUCKET).remove(paths);
+  }
+
+  function objectAlreadyExists(error: { message?: string; statusCode?: string | number; status?: number }) {
+    const message = `${error.message ?? ""}`.toLowerCase();
+    const status = `${error.statusCode ?? error.status ?? ""}`;
+    return status === "409" || message.includes("already exists") || message.includes("duplicate");
+  }
+
   async function copyAsset(sourcePath: string, targetPath: string, mime: string) {
+    const slash = targetPath.lastIndexOf("/");
+    const folder = targetPath.slice(0, slash);
+    const name = targetPath.slice(slash + 1);
+    const listed = await supabase.storage.from(CLASSICA_PUBLIC_BUCKET).list(folder, {
+      limit: 1000,
+      search: name,
+    });
+    const existedBefore = listed.error
+      ? null
+      : (listed.data ?? []).some((item) => item.name === name);
+    if (existedBefore === true) {
+      copiedThisAttempt.push({ path: targetPath, existedBefore: true });
+      return;
+    }
     const downloaded = await supabase.storage.from(CLASSICA_PRODUCTION_BUCKET).download(sourcePath);
     if (downloaded.error || !downloaded.data) {
       throw new Error("classica_publish_incomplete");
     }
-    const uploaded = await supabase.storage
-      .from(CLASSICA_PUBLIC_BUCKET)
-      .upload(targetPath, downloaded.data, { contentType: mime, upsert: true });
+    const uploaded = await supabase.storage.from(CLASSICA_PUBLIC_BUCKET).upload(targetPath, downloaded.data, {
+      contentType: mime,
+      upsert: false,
+    });
     if (uploaded.error) {
+      if (objectAlreadyExists(uploaded.error)) {
+        copiedThisAttempt.push({ path: targetPath, existedBefore: true });
+        return;
+      }
       throw new Error("classica_publish_incomplete");
     }
+    copiedThisAttempt.push({ path: targetPath, existedBefore: false });
   }
 
   const audioName = audio.storagePath.split("/").pop() ?? "audio.bin";
@@ -454,6 +512,7 @@ export async function publishClassicaJobAction(formData: FormData): Promise<void
       });
     }
   } catch (error) {
+    await removeFilesCopiedThisAttempt();
     redirect(`/classica/production/${jobId}?error=${encodeURIComponent(mapClassicaError(error))}`);
   }
 
@@ -465,6 +524,7 @@ export async function publishClassicaJobAction(formData: FormData): Promise<void
     p_images: images,
   });
   if (error) {
+    await removeFilesCopiedThisAttempt();
     redirect(`/classica/production/${jobId}?error=${encodeURIComponent(mapClassicaError(error))}`);
   }
   revalidateJob(jobId);
@@ -473,19 +533,16 @@ export async function publishClassicaJobAction(formData: FormData): Promise<void
   redirect(`/classica/${composerSlug}/${job.slug}`);
 }
 
-export async function saveClassicaPromptAction(
-  _state: ClassicaActionState,
-  formData: FormData,
-): Promise<ClassicaActionState> {
+export async function saveClassicaPromptAction(formData: FormData): Promise<void> {
   const supabase = await userClient();
   const { error } = await supabase.rpc("classica_production_save_prompt", {
     p_body: readText(formData, "body"),
   });
   if (error) {
-    return fail(error);
+    redirect(`/classica/production/prompt?error=${encodeURIComponent(mapClassicaError(error))}`);
   }
   revalidatePath("/classica/production/prompt");
-  return classicaIdleState;
+  redirect("/classica/production/prompt");
 }
 
 export async function grantClassicaRoleAction(

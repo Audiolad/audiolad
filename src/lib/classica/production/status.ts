@@ -124,3 +124,20 @@ export function canEditClassicaCard(
   }
   return actor.isAssignee && isClassicaWorkStatus(status);
 }
+
+/** After a successful packaging run, block another OpenAI call for this job. */
+export const CLASSICA_PACKAGING_COOLDOWN_MS = 2 * 60 * 1000;
+
+export function classicaPackagingCooldownActive(
+  packagingPreparedAt: string | null | undefined,
+  now: Date,
+): boolean {
+  if (!packagingPreparedAt) {
+    return false;
+  }
+  const preparedAt = Date.parse(packagingPreparedAt);
+  if (!Number.isFinite(preparedAt)) {
+    return false;
+  }
+  return now.getTime() - preparedAt < CLASSICA_PACKAGING_COOLDOWN_MS;
+}

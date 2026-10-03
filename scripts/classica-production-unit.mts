@@ -18,12 +18,14 @@ import {
 } from "../src/lib/classica/production/stats";
 import {
   canEditClassicaCard,
+  classicaPackagingCooldownActive,
   evaluateClassicaTake,
   classicaStatusLabel,
 } from "../src/lib/classica/production/status";
 import {
   classicaAssetAllowsMime,
   classicaAssetMaxBytes,
+  classicaPublishCleanupPaths,
 } from "../src/lib/classica/production/files";
 import {
   buildClassicaWorkCanonical,
@@ -33,7 +35,15 @@ import {
 import { SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/robots-config";
 
 const sql = readFileSync(
-  new URL("../supabase/migrations/20261220122000_classica_production_v01.sql", import.meta.url),
+  new URL("../supabase/migrations/20261220123000_classica_production_v01.sql", import.meta.url),
+  "utf8",
+);
+const actionsSource = readFileSync(
+  new URL("../src/lib/classica/production/actions.ts", import.meta.url),
+  "utf8",
+);
+const promptFormSource = readFileSync(
+  new URL("../src/components/classica/ClassicaPromptForm.tsx", import.meta.url),
   "utf8",
 );
 
@@ -241,5 +251,75 @@ assert.match(String(jsonLd?.url), /\/classica\/bach\/toccata-and-fugue$/);
 const audio = jsonLd?.audio as { contentUrl?: string };
 assert.match(String(audio.contentUrl), /^https:\/\/audiolad\.ru\/classica\/media\//);
 assert.doesNotMatch(String(audio.contentUrl), /supabase|token=/);
+
+function sqlPolicy(name: string): string {
+  const match = sql.match(new RegExp(`CREATE POLICY ${name}\\b[\\s\\S]*?;`));
+  assert.ok(match, `missing policy ${name}`);
+  return match[0];
+}
+
+for (const name of [
+  "classica_production_storage_insert",
+  "classica_production_storage_update",
+  "classica_production_storage_delete",
+]) {
+  const policy = sqlPolicy(name);
+  assert.match(policy, /classica_production_storage_can_write\(name\)/);
+  assert.doesNotMatch(policy, /classica\.production\.operate/);
+  assert.doesNotMatch(policy, /classica\.production\.admin/);
+}
+assert.match(sql, /CREATE OR REPLACE FUNCTION public\.classica_production_storage_can_write\(p_name text\)/);
+assert.match(sql, /split_part\(p_name, '\/', 1\)/);
+assert.match(sql, /classica_production_actor_can_edit\(job, auth\.uid\(\)\)/);
+assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.classica_production_storage_can_write\(text\) TO authenticated/);
+
+const promptsPolicy = sqlPolicy("classica_production_prompts_select");
+assert.match(promptsPolicy, /classica\.production\.admin/);
+assert.doesNotMatch(promptsPolicy, /classica\.production\.access/);
+
+const accrualsPolicy = sqlPolicy("classica_production_accruals_select");
+assert.match(
+  accrualsPolicy,
+  /classica\.production\.admin[\s\S]*OR[\s\S]*classica\.production\.access[\s\S]*operator_id = auth\.uid\(\)/,
+);
+
+assert.doesNotMatch(sql, /UPDATE\s+public\.classical_composers/);
+assert.match(sql, /INSERT INTO public\.classical_composers/);
+
+const preparedAt = "2026-10-03T11:59:00.000Z";
+assert.equal(classicaPackagingCooldownActive(null, now), false);
+assert.equal(classicaPackagingCooldownActive("not-a-date", now), false);
+assert.equal(classicaPackagingCooldownActive(preparedAt, now), true);
+assert.equal(classicaPackagingCooldownActive("2026-10-03T11:57:00.000Z", now), false);
+
+assert.deepEqual(
+  classicaPublishCleanupPaths([
+    { path: "works/job/audio/existing.mp3", existedBefore: true },
+    { path: "works/job/cover/new.jpg", existedBefore: false },
+  ]),
+  ["works/job/cover/new.jpg"],
+);
+
+const packagingSource = actionsSource.slice(
+  actionsSource.indexOf("export async function prepareClassicaPackagingAction"),
+  actionsSource.indexOf("export async function publishClassicaJobAction"),
+);
+const openAiCall = packagingSource.indexOf("prepareClassicaPackaging(");
+assert.ok(openAiCall > packagingSource.indexOf("canEditClassicaCard("));
+assert.ok(openAiCall > packagingSource.indexOf("classicaPackagingCooldownActive("));
+assert.ok(openAiCall > packagingSource.indexOf("createServiceRoleClient("));
+assert.equal(packagingSource.includes("getClassicaMasterPrompt(supabase)"), false);
+assert.equal(packagingSource.includes("getClassicaMasterPrompt(session.supabase)"), false);
+
+const publishSource = actionsSource.slice(
+  actionsSource.indexOf("export async function publishClassicaJobAction"),
+  actionsSource.indexOf("export async function saveClassicaPromptAction"),
+);
+assert.match(publishSource, /classicaPublishCleanupPaths\(copiedThisAttempt\)/);
+assert.ok(publishSource.indexOf("classica_production_publish") < publishSource.lastIndexOf("removeFilesCopiedThisAttempt"));
+assert.match(publishSource, /upsert: false/);
+
+assert.doesNotMatch(promptFormSource, /["']use client["']/);
+assert.doesNotMatch(promptFormSource, /useActionState/);
 
 console.log("classica production unit ok");

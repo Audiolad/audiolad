@@ -515,6 +515,21 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION public.classica_production_storage_can_write(p_name text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.classica_production_jobs AS job
+    WHERE job.id::text = split_part(p_name, '/', 1)
+      AND public.classica_production_actor_can_edit(job, auth.uid())
+  );
+$$;
+
 CREATE OR REPLACE FUNCTION public.classica_production_checklist_gaps(
   p_job public.classica_production_jobs
 )
@@ -1309,13 +1324,6 @@ BEGIN
       'published'
     )
     RETURNING id INTO v_composer_id;
-  ELSE
-    UPDATE public.classical_composers
-    SET
-      name_ru = v_job.composer_name,
-      editorial_status = 'published',
-      bio = COALESCE(NULLIF(btrim(bio), ''), v_job.about_composer)
-    WHERE id = v_composer_id;
   END IF;
 
   SELECT work.id INTO v_work_id
@@ -1702,12 +1710,18 @@ CREATE POLICY classica_production_reviews_select
 CREATE POLICY classica_production_prompts_select
   ON public.classica_production_prompts
   FOR SELECT TO authenticated
-  USING (public.has_platform_permission(auth.uid(), 'classica.production.access'));
+  USING (public.has_platform_permission(auth.uid(), 'classica.production.admin'));
 
 CREATE POLICY classica_production_accruals_select
   ON public.classica_production_accruals
   FOR SELECT TO authenticated
-  USING (public.has_platform_permission(auth.uid(), 'classica.production.access'));
+  USING (
+    public.has_platform_permission(auth.uid(), 'classica.production.admin')
+    OR (
+      public.has_platform_permission(auth.uid(), 'classica.production.access')
+      AND operator_id = auth.uid()
+    )
+  );
 
 CREATE POLICY classica_public_works_select
   ON public.classica_public_works
@@ -1738,6 +1752,7 @@ REVOKE ALL ON FUNCTION public.classica_production_clean_faq(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.classica_production_clean_blocks(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.classica_production_log(uuid, uuid, text, text, text, uuid, jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.classica_production_actor_can_edit(public.classica_production_jobs, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.classica_production_storage_can_write(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.classica_production_checklist_gaps(public.classica_production_jobs) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.classica_production_lock(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.classica_production_create_job(jsonb) FROM PUBLIC;
@@ -1777,6 +1792,7 @@ GRANT EXECUTE ON FUNCTION public.classica_production_grant_role(text, text) TO a
 GRANT EXECUTE ON FUNCTION public.classica_production_revoke_role(uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.classica_production_role_holders() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.classica_production_operator_options() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.classica_production_storage_can_write(text) TO authenticated;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES
@@ -1818,10 +1834,7 @@ CREATE POLICY classica_production_storage_insert
   FOR INSERT TO authenticated
   WITH CHECK (
     bucket_id = 'classica-production'
-    AND (
-      public.has_platform_permission(auth.uid(), 'classica.production.operate')
-      OR public.has_platform_permission(auth.uid(), 'classica.production.admin')
-    )
+    AND public.classica_production_storage_can_write(name)
   );
 
 CREATE POLICY classica_production_storage_update
@@ -1829,17 +1842,11 @@ CREATE POLICY classica_production_storage_update
   FOR UPDATE TO authenticated
   USING (
     bucket_id = 'classica-production'
-    AND (
-      public.has_platform_permission(auth.uid(), 'classica.production.operate')
-      OR public.has_platform_permission(auth.uid(), 'classica.production.admin')
-    )
+    AND public.classica_production_storage_can_write(name)
   )
   WITH CHECK (
     bucket_id = 'classica-production'
-    AND (
-      public.has_platform_permission(auth.uid(), 'classica.production.operate')
-      OR public.has_platform_permission(auth.uid(), 'classica.production.admin')
-    )
+    AND public.classica_production_storage_can_write(name)
   );
 
 CREATE POLICY classica_production_storage_delete
@@ -1847,10 +1854,7 @@ CREATE POLICY classica_production_storage_delete
   FOR DELETE TO authenticated
   USING (
     bucket_id = 'classica-production'
-    AND (
-      public.has_platform_permission(auth.uid(), 'classica.production.operate')
-      OR public.has_platform_permission(auth.uid(), 'classica.production.admin')
-    )
+    AND public.classica_production_storage_can_write(name)
   );
 
 CREATE POLICY classica_public_storage_insert

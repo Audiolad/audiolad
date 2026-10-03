@@ -92,6 +92,7 @@ export type ClassicaJobRecord = {
   faq: Array<{ question: string; answer: string }>;
   extraBlocks: Array<{ heading: string; body: string }>;
   packagingFlags: Record<string, boolean>;
+  packagingPreparedAt: string | null;
   createdAt: string;
   assets: ClassicaAssetRecord[];
   events: ClassicaEventRecord[];
@@ -198,6 +199,7 @@ export function mapClassicaJobRow(row: JobRow): Omit<ClassicaJobRecord, "assets"
     faq,
     extraBlocks,
     packagingFlags: flags,
+    packagingPreparedAt: nullableText(row.packaging_prepared_at),
     createdAt: String(row.created_at ?? ""),
   };
 }

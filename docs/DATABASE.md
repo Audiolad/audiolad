@@ -927,7 +927,7 @@ RLS: существующие политики author members на `practices/{p
 
 ## Classica Production v0.1
 
-Миграция `supabase/migrations/20261220122000_classica_production_v01.sql`.
+Миграция `supabase/migrations/20261220123000_classica_production_v01.sql`.
 
 Закрытый многопользовательский конвейер будущей Classica. Не создаёт практики и не наполняет каталог автоматически.
 
@@ -945,7 +945,7 @@ RLS: существующие политики author members на `practices/{p
 
 «Взять в работу» блокирует строку `FOR UPDATE` и проходит только из `queued` без исполнителя. Запись — через `SECURITY DEFINER` RPC. Прямой INSERT/UPDATE клиенту не выдан.
 
-Публикация дополнительно обновляет `classical_composers` и `classical_works`. Аудио страницы лежит в публичном bucket `classica-public`, черновики — в приватном `classica-production`.
+Публикация создаёт `classical_composers` только если такого slug ещё нет. Существующего композитора она связывает по slug и не меняет его канонические поля и `editorial_status`. Новое произведение создаётся в `classical_works`. Аудио страницы лежит в публичном bucket `classica-public`, черновики — в приватном `classica-production`. Запись в `classica-production` проверяет `classica_production_storage_can_write`: администратор — любая редактируемая работа, оператор — только объекты своей работы в редактируемом статусе. Прямой SELECT мастер-промпта разрешён только `classica.production.admin` (включая owner). Начисления читает исполнитель только свои, администратор Classica — все.
 
 Разрешения: `classica.production.access`, `.operate`, `.moderate`, `.admin`. Их получают `owner` и `admin`. `classica_operator` — access и operate. `classica_moderator` — access и moderate.
 

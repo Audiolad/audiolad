@@ -4,9 +4,14 @@ import { getClassicaMasterPrompt } from "@/lib/classica/production/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClassicaPromptPage() {
+export default async function ClassicaPromptPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireClassicaAdmin();
   const body = await getClassicaMasterPrompt(session.supabase);
+  const params = await searchParams;
 
   return (
     <section className="max-w-3xl">
@@ -15,7 +20,7 @@ export default async function ClassicaPromptPage() {
         Этот текст один на всех операторов. К нему на сервере всегда добавляется запрет выдумывать факты, даты и каталожные номера.
       </p>
       <div className="mt-4">
-        <ClassicaPromptForm body={body} />
+        <ClassicaPromptForm body={body} error={params.error} />
       </div>
     </section>
   );

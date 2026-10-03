@@ -96,3 +96,15 @@ export function classicaPublishedObjectPath(
 ): string {
   return `works/${jobId}/${folder}/${fileName}`;
 }
+
+export type ClassicaPublicCopyAttempt = {
+  path: string;
+  existedBefore: boolean;
+};
+
+/** Paths uploaded during a failed publication. Pre-existing public objects stay. */
+export function classicaPublishCleanupPaths(
+  copies: readonly ClassicaPublicCopyAttempt[],
+): string[] {
+  return copies.filter((copy) => copy.existedBefore === false).map((copy) => copy.path);
+}
