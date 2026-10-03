@@ -17,6 +17,7 @@ import { isEffectiveSeoReservation } from "@/lib/seo-queries/reservation-effecti
 import { loadPublishedSeoOccupancyForQueries } from "@/lib/seo-queries/load-published-seo-occupancy";
 import { lifecycleForSeoOpportunity } from "@/lib/seo-queries/published-query-occupancy";
 import type { SeoQueryLifecycle } from "@/lib/seo-queries/types";
+import { countMatchingSeoQueries } from "@/lib/seo-analytics/match-queries";
 import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -158,29 +159,13 @@ async function loadAuthorNames(
   return map;
 }
 
-async function countMatches(
-  supabase: SupabaseClient,
-  normalizedQueries: readonly string[],
-): Promise<number> {
-  const unique = [...new Set(normalizedQueries)];
-  let matched = 0;
-  for (const chunk of chunkIds(unique, 50)) {
-    const { data, error } = await supabase
-      .from("seo_queries")
-      .select("normalized_query")
-      .in("normalized_query", chunk);
-    if (error) throw new Error(error.message);
-    matched += data?.length ?? 0;
-  }
-  return matched;
-}
-
 export async function previewSeoQueryMatches(
   normalizedQueries: readonly string[],
 ): Promise<{ matched: number; fresh: number }> {
   const supabase = createServiceRoleClient();
-  const matched = await countMatches(supabase, normalizedQueries);
-  return { matched, fresh: normalizedQueries.length - matched };
+  const matched = await countMatchingSeoQueries(supabase, normalizedQueries);
+  const metricCount = new Set(normalizedQueries.filter((query) => query.length > 0)).size;
+  return { matched, fresh: metricCount - matched };
 }
 
 export async function loadSeoAnalyticsDashboard(

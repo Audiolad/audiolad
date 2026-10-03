@@ -9,6 +9,11 @@ import {
   metricDelta,
 } from "../src/lib/seo-analytics/aggregate";
 import {
+  countMatchingSeoQueries,
+  SEO_QUERY_MATCH_RPC_BATCH,
+} from "../src/lib/seo-analytics/match-queries";
+import { seoAnalyticsErrorMessage } from "../src/lib/seo-analytics/messages";
+import {
   buildIssue735ControlWorkbook,
   ISSUE_735_CONTROL,
 } from "../src/lib/seo-analytics/control-fixture";
@@ -437,6 +442,16 @@ assert.doesNotMatch(collapseSql, /duplicate_normalized_query/);
 assert.doesNotMatch(collapseSql, /INSERT INTO public\.seo_queries/);
 assert.doesNotMatch(collapseSql, /CREATE TABLE public\.seo_pages/);
 assert.doesNotMatch(collapseSql, /seo_page_query_metrics/);
+
+const matchSql = read("supabase/migrations/20261220122000_count_matching_seo_queries.sql");
+assert.match(matchSql, /CREATE FUNCTION public\.count_matching_seo_queries\(p_normalized_queries text\[\]\)/);
+assert.match(matchSql, /count\(DISTINCT q\.normalized_query\)/);
+assert.match(matchSql, /q\.normalized_query = ANY \(p_normalized_queries\)/);
+assert.match(matchSql, /has_platform_permission\(auth\.uid\(\), 'seo\.manage'\)/);
+assert.match(matchSql, /cardinality\(p_normalized_queries\) > 1000/);
+assert.doesNotMatch(matchSql, /INSERT INTO public\.seo_queries/);
+assert.doesNotMatch(matchSql, /CREATE TABLE public\.seo_pages/);
+assert.doesNotMatch(matchSql, /\.in\(/);
 assert.match(read("data/seo-analytics/README.md"), /derived from the control values published in/);
 assert.match(read("data/seo-analytics/README.md"), /not a live Yandex Webmaster export/);
 
@@ -557,6 +572,57 @@ assert.equal(productionState.snapshots[0]?.id, productionId);
 assert.equal(productionState.snapshots[0]?.metricCount, 2681);
 assert.equal(productionState.snapshots[0]?.sourceRowCount, 2701);
 assert.equal(productionCatalog.size, 0);
+
+const dashboardSource = read("src/lib/seo-analytics/load-dashboard.ts");
+const matchSource = read("src/lib/seo-analytics/match-queries.ts");
+assert.match(dashboardSource, /countMatchingSeoQueries/);
+assert.doesNotMatch(dashboardSource, /\.in\("normalized_query"/);
+assert.match(matchSource, /count_matching_seo_queries/);
+assert.doesNotMatch(matchSource, /\.from\(/);
+assert.doesNotMatch(matchSource, /\.in\(/);
+assert.equal(
+  seoAnalyticsErrorMessage("seo_map_match_failed"),
+  "Файл прочитан, но не удалось сверить запросы с SEO-картой. Данные не импортированы.",
+);
+assert.equal(seoAnalyticsErrorMessage("preview_failed"), "Не удалось прочитать файл.");
+assert.match(importRoute, /seo_map_match_failed/);
+
+const longQuery = `длинный запрос ${"вода ".repeat(70)}`.trim();
+assert.ok(longQuery.length >= 300 && longQuery.length <= 400, `long query length ${longQuery.length}`);
+const matchQueries = Array.from({ length: 2681 }, (_, index) => `нормализованный запрос ${index}`);
+matchQueries[10] = longQuery;
+assert.equal(matchQueries.length, 2681);
+const catalogHits = new Set([matchQueries[0], matchQueries[900], longQuery]);
+const rpcBodies: string[][] = [];
+const matched = await countMatchingSeoQueries(
+  {
+    rpc: (fn, args) => {
+      assert.equal(fn, "count_matching_seo_queries");
+      const batch = args.p_normalized_queries;
+      assert.ok(Array.isArray(batch));
+      assert.ok(batch.length > 0 && batch.length <= SEO_QUERY_MATCH_RPC_BATCH);
+      assert.ok(batch.length <= 1000);
+      rpcBodies.push(batch);
+      return Promise.resolve({
+        data: batch.filter((query) => catalogHits.has(query)).length,
+        error: null,
+      });
+    },
+  },
+  matchQueries,
+);
+const fresh = matchQueries.length - matched;
+assert.equal(matched, 3);
+assert.equal(matched + fresh, 2681);
+assert.equal(rpcBodies.length, Math.ceil(2681 / SEO_QUERY_MATCH_RPC_BATCH));
+assert.equal(rpcBodies.flat().length, 2681);
+assert.ok(rpcBodies.some((batch) => batch.includes(longQuery)));
+const singleInUrl = `/rest/v1/seo_queries?normalized_query=in.(${matchQueries.map((query) => encodeURIComponent(query)).join(",")})`;
+assert.ok(singleInUrl.length > 11_000);
+assert.ok(rpcBodies.every((batch) => {
+  const bodyUrl = `/rest/v1/seo_queries?normalized_query=in.(${batch.map((query) => encodeURIComponent(query)).join(",")})`;
+  return bodyUrl.length < singleInUrl.length;
+}));
 
 console.log("seo-analytics-phase1-unit: ok");
 console.log(JSON.stringify({
