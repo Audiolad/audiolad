@@ -642,9 +642,17 @@ assert.match(passportUi, /Характер и настроение/);
 assert.match(passportUi, /Характер звучания/);
 assert.match(passportUi, /Инструменты/);
 assert.doesNotMatch(`${detail}\n${passportUi}`, /ведущий инструмент/);
-assert.doesNotMatch(
+assert.match(
   read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx"),
-  /components\/music-passport\/MusicPassport/,
+  /mode="product"/,
+);
+assert.match(
+  read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx"),
+  /AlbumMusicPassport/,
+);
+assert.doesNotMatch(
+  read("src/components/music-passport/AlbumMusicPassport.tsx"),
+  /\bMusicPassport\b|<MusicPassport|mode="product"|data-music-passport-mode/,
 );
 assert.doesNotMatch(read("src/components/author-dashboard/AuthorProductForm.tsx"), /components\/music-passport\/MusicPassport/);
 assert.equal(MUSIC_ANALYZER_FREEZE_SNAPSHOT, "932c4ce");

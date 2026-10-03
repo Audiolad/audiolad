@@ -242,7 +242,7 @@ export function MusicPassport({
     header.fileVersion != null ? `прогон ${header.fileVersion}` : null,
   ].filter(Boolean).join(" · ");
   return (
-    <section className="space-y-4" aria-labelledby="music-passport-heading">
+    <section className="space-y-4" aria-labelledby="music-passport-heading" data-music-passport-mode={mode}>
       <header data-passport-header="true">
         <p className="text-xs font-medium text-[#796ba0]">{statusLine}</p>
         <h2 id="music-passport-heading" className="mt-2 text-[22px] font-semibold text-[#25135c]">

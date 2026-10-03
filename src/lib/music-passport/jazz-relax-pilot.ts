@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { isAudioPrepareInFlight, mapProductNormalizeJobToPrepareStatus } from "@/lib/author-products/audio-prepare-status";
 import { PRACTICE_AUDIO_BUCKET } from "@/lib/author-products/product-audio-upload-contract";
 import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
-import { readMusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
+import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
 import {
   MUSIC_ANALYZER_MAX_UPLOAD_BYTES,
   MUSIC_ANALYZER_RUNS_BUCKET,
@@ -26,6 +26,10 @@ import {
   type AlbumPassportSource,
   type AlbumTrackSnapshot,
 } from "@/lib/music-passport/album-aggregate";
+import {
+  albumPassportMatchesTracks,
+  readAlbumPassportDisplay,
+} from "@/lib/music-passport/album-passport-display";
 import {
   buildJazzRelaxPassportView,
   type JazzRelaxPassportTrackView,
@@ -421,6 +425,54 @@ function trackBlock(track: AudioRow, prepareFailed: Set<string>, inflight: Set<s
   return null;
 }
 
+function bareTrack(
+  input: Omit<JazzRelaxPassportTrackView, "productPassport">,
+): JazzRelaxPassportTrackView {
+  return { ...input, productPassport: null };
+}
+
+function attachFrozenTrackPassports(
+  tracks: JazzRelaxPassportTrackView[],
+  draft: AlbumPassportDraft,
+  runs: Map<string, RunRow>,
+): JazzRelaxPassportTrackView[] {
+  return tracks.map((track) => {
+    if (track.state !== "ready") return track;
+    const source = draft.sources.find((item) => (
+      item.outcome === "succeeded" && item.audio_item_id === track.audioItemId
+    ));
+    if (!source || source.track_passport_version_id !== track.passportVersionId) return track;
+    const run = source.music_analyzer_run_id ? runs.get(source.music_analyzer_run_id) : null;
+    if (!run || run.status !== "succeeded") return track;
+    const passport = readMusicAnalyzerPassport({ normalized: run.normalized_json });
+    return {
+      ...track,
+      productPassport: {
+        filename: track.title,
+        analyzedAt: run.finished_at,
+        passport: {
+          ...passport,
+          taxonomy: null,
+          prompt: null,
+        },
+      },
+    };
+  });
+}
+
+function matchSettledAlbum(
+  albums: AlbumRow[],
+  tracks: JazzRelaxPassportTrackView[],
+): { row: AlbumRow; draft: AlbumPassportDraft } | null {
+  for (const row of [...albums].reverse()) {
+    if (row.status !== "completed" && row.status !== "partial") continue;
+    const draft = draftFromAlbumRow(row);
+    if (!draft || !albumPassportMatchesTracks(draft, tracks)) continue;
+    return { row, draft };
+  }
+  return null;
+}
+
 async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
   const tracks = await loadTracks(practiceId);
   const prepare = await loadPrepareState(tracks);
@@ -431,46 +483,55 @@ async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
   const runs = await loadRuns([...latest.values()].map((link) => link.analyzer_run_id));
   const passports = await loadPassportsByRun([...latest.values()].map((link) => link.analyzer_run_id));
   const albums = await loadAlbums(practiceId);
-  const completed = [...albums].reverse().find((album) => album.status === "completed") ?? null;
-  const completedDraft = completed ? draftFromAlbumRow(completed) : null;
   const trackViews: JazzRelaxPassportTrackView[] = tracks.map((track) => {
     const title = (track.title ?? "Трек").trim() || "Трек";
     const block = trackBlock(track, prepareFailed, inflightPrepare);
     if (block === "missing_audio") {
-      return { audioItemId: track.id, title, state: "missing_audio", errorCode: block, passportVersionId: null, runId: null };
+      return bareTrack({ audioItemId: track.id, title, state: "missing_audio", errorCode: block, passportVersionId: null, runId: null });
     }
     if (block) {
-      return { audioItemId: track.id, title, state: "not_ready", errorCode: block, passportVersionId: null, runId: null };
+      return bareTrack({ audioItemId: track.id, title, state: "not_ready", errorCode: block, passportVersionId: null, runId: null });
     }
     const link = latest.get(track.id);
     const run = link ? runs.get(link.analyzer_run_id) : null;
     const passport = link ? passports.get(link.analyzer_run_id) : null;
     if (!link || !run) {
-      return { audioItemId: track.id, title, state: "not_ready", errorCode: "not_started", passportVersionId: null, runId: null };
+      return bareTrack({ audioItemId: track.id, title, state: "not_ready", errorCode: "not_started", passportVersionId: null, runId: null });
     }
     if (run.status === "queued") {
-      return { audioItemId: track.id, title, state: "queued", errorCode: null, passportVersionId: null, runId: run.id };
+      return bareTrack({ audioItemId: track.id, title, state: "queued", errorCode: null, passportVersionId: null, runId: run.id });
     }
     if (run.status === "processing") {
-      return { audioItemId: track.id, title, state: "processing", errorCode: null, passportVersionId: null, runId: run.id };
+      return bareTrack({ audioItemId: track.id, title, state: "processing", errorCode: null, passportVersionId: null, runId: run.id });
     }
     if (run.status === "succeeded" && passport) {
-      return { audioItemId: track.id, title, state: "ready", errorCode: null, passportVersionId: passport.id, runId: run.id };
+      return bareTrack({ audioItemId: track.id, title, state: "ready", errorCode: null, passportVersionId: passport.id, runId: run.id });
     }
-    return {
+    return bareTrack({
       audioItemId: track.id,
       title,
       state: "failed",
       errorCode: run.error_code ?? (run.status === "succeeded" ? "passport_write_failed" : "analyze_failed"),
       passportVersionId: null,
       runId: run.id,
-    };
+    });
   });
+  const running = trackViews.some((track) => track.state === "queued" || track.state === "processing");
+  const matched = running ? null : matchSettledAlbum(albums, trackViews);
+  const tracksForView = matched ? attachFrozenTrackPassports(trackViews, matched.draft, runs) : trackViews;
+  const album = matched
+    ? readAlbumPassportDisplay({
+      id: matched.row.id,
+      version: matched.row.version,
+      draft: matched.draft,
+    })
+    : null;
   return buildJazzRelaxPassportView({
-    tracks: trackViews,
-    completedAlbumPassportVersionId: completed?.id ?? null,
-    summary: completedDraft && completedDraft.status === "completed"
-      ? albumPassportSummaryLines(completedDraft)
+    tracks: tracksForView,
+    completedAlbumPassportVersionId: matched?.row.status === "completed" ? matched.row.id : null,
+    album,
+    summary: matched?.draft.status === "completed"
+      ? albumPassportSummaryLines(matched.draft)
       : [],
   });
 }
