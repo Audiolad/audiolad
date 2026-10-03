@@ -87,6 +87,9 @@ export function buildProductSeoGrounding(input: ProductSeoAiPromptInput): string
     usage.length > 0
       ? `Уже указанные ситуации использования: ${usage.join("; ")}`
       : "Уже указанные ситуации использования: нет",
+    input.request.musicPassportFacts
+      ? `Музыкальный паспорт:\n${input.request.musicPassportFacts}`
+      : null,
     ...productSeoStylePromptLines(
       input.request.styleProfile ?? createDefaultProductSeoStyleProfile(),
     ),
@@ -362,6 +365,9 @@ export function buildProductSeoSystemPrompt(
     "Пиши естественным русским языком. Не обещай позиций, индексацию, ТОП или трафик.",
     "Для тире используй короткое тире «–», а парные кавычки вокруг русских названий оформляй как «ёлочки». Не заменяй символы внутри дословно заданного основного запроса.",
     "Не выдумывай факты, которых нет в исходном контексте: длительность, число треков, голос, конкретную музыку, автора, технику, цену, срок доступа, противопоказания, лечебный эффект.",
+    input?.request.musicPassportFacts
+      ? "BPM, тональность, инструмент, жанр, стиль и настроение можно упоминать только если они есть в блоке «Музыкальный паспорт». Если поля там нет, не добавляй его."
+      : null,
     "Запрещены формулировки вроде: лечит, исцеляет, устраняет бессонницу, избавляет от тревоги, гарантирует.",
     primaryBudget,
     primaryQuery
@@ -429,6 +435,9 @@ export function buildProductSeoSafeGrounding(input: ProductSeoAiPromptInput): st
     activeSecondaryQueries[1]
       ? `Активный дополнительный запрос №2: ${activeSecondaryQueries[1]}`
       : null,
+    input.request.musicPassportFacts
+      ? `Музыкальный паспорт:\n${input.request.musicPassportFacts}`
+      : null,
   ]
     .filter((line): line is string => Boolean(line))
     .join("\n");
@@ -450,6 +459,9 @@ export function buildProductSeoSafeSystemPrompt(input: ProductSeoAiPromptInput):
     "Пиши естественным русским языком. Не обещай позиций, индексацию, ТОП или трафик.",
     "Для тире используй короткое тире «–», а парные кавычки вокруг русских названий оформляй как «ёлочки». Не заменяй символы внутри дословно заданного основного запроса.",
     "Не выдумывай факты, которых нет в исходных метаданных: длительность, число треков, голос, конкретную музыку, автора, технику, цену, срок доступа, противопоказания, лечебный эффект.",
+    input.request.musicPassportFacts
+      ? "BPM, тональность, инструмент, жанр, стиль и настроение можно упоминать только если они есть в блоке «Музыкальный паспорт». Если поля там нет, не добавляй его."
+      : null,
     "Запрещены формулировки вроде: лечит, исцеляет, устраняет бессонницу, избавляет от тревоги, гарантирует.",
     primaryBudget,
     primaryQuery

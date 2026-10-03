@@ -170,6 +170,13 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: ["src/app/api/author/products/[id]/start-editing/route.ts"],
     },
     {
+      key: "product_music_passport",
+      group: "product",
+      disposition: "allowed_audited",
+      action: "product_updated",
+      routePatterns: ["src/app/api/author/products/[id]/music-passport/route.ts"],
+    },
+    {
       key: "product_soft_delete",
       group: "product",
       disposition: "allowed_audited",

@@ -14,6 +14,7 @@ import AuthorProductFormActions from "@/components/author-dashboard/product-form
 import AuthorPublicationScheduleSection from "@/components/author-dashboard/product-form-sections/AuthorPublicationScheduleSection";
 import AuthorProductWizardStepNav from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepNav";
 import AuthorProductWizardStepper from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepper";
+import JazzRelaxMusicPassportPanel from "@/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
 import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
 import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
@@ -75,6 +76,8 @@ import {
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
+import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
+import type { JazzRelaxPassportView } from "@/lib/music-passport/jazz-relax-status";
 import { isPracticeProductWizardEnabled } from "@/lib/author-products/practice-product-wizard";
 import {
   CATALOG_SECTION_FIELD_LABEL,
@@ -832,6 +835,19 @@ export default function AuthorProductForm({
   const router = useRouter();
   const [wizardStep, setWizardStep] =
     useState<ProductWizardStep>(initialWizardStep);
+  const [passportCommand, setPassportCommand] = useState<{
+    nonce: number;
+    action: "start" | "retry" | "reanalyze";
+    audioItemId?: string;
+  } | null>(null);
+  const [jazzRelaxPassportCompleted, setJazzRelaxPassportCompleted] = useState(false);
+  const [passportRunning, setPassportRunning] = useState(false);
+  const [passportStatusLoaded, setPassportStatusLoaded] = useState(false);
+  const onJazzRelaxPassportStatus = useCallback((status: JazzRelaxPassportView) => {
+    setPassportStatusLoaded(true);
+    setPassportRunning(status.phase === "running");
+    setJazzRelaxPassportCompleted(Boolean(status.completedAlbumPassportVersionId));
+  }, []);
   const [form, setForm] = useState<FormState>(() =>
     applyAudioSprintTitleLock(
       buildInitialForm(
@@ -1319,6 +1335,7 @@ export default function AuthorProductForm({
     productKind: form.productKind,
     publicationClass: form.publicationClass,
   });
+  const jazzRelaxMusicPassport = musicProductWizard && isJazzRelaxAuthor(form.authorId);
   const practiceProductWizard = isPracticeProductWizardEnabled({
     publicationClass: form.publicationClass,
   });
@@ -3569,6 +3586,9 @@ export default function AuthorProductForm({
     if (step < wizardStep) {
       return true;
     }
+    if (jazzRelaxMusicPassport && step > 2 && !jazzRelaxPassportCompleted) {
+      return false;
+    }
     return Boolean(practiceIdRef.current || practiceId);
   }
 
@@ -3662,6 +3682,18 @@ export default function AuthorProductForm({
       }
     }
 
+    if (jazzRelaxMusicPassport && wizardStep === 2) {
+      if (jazzRelaxPassportCompleted) {
+        const next = nextProductWizardStep(wizardStep);
+        if (next) {
+          goToWizardStep(next);
+        }
+        return;
+      }
+      setPassportCommand({ nonce: Date.now(), action: "start" });
+      return;
+    }
+
     const next = nextProductWizardStep(wizardStep);
     if (next) {
       goToWizardStep(next);
@@ -3673,6 +3705,21 @@ export default function AuthorProductForm({
     if (prev) {
       goToWizardStep(prev);
     }
+  }
+
+  const jazzRelaxMustReturnToMaterials =
+    jazzRelaxMusicPassport
+    && wizardStep > 2
+    && (!practiceId || (passportStatusLoaded && !jazzRelaxPassportCompleted));
+  if (jazzRelaxMustReturnToMaterials) {
+    if (typeof window !== "undefined") {
+      window.history.replaceState(
+        null,
+        "",
+        buildWizardStepHref(window.location.pathname, window.location.search, 2),
+      );
+    }
+    setWizardStep(2);
   }
 
   return (
@@ -5751,6 +5798,7 @@ export default function AuthorProductForm({
         description={form.description}
         productKind={form.productKind}
         authorId={form.authorId}
+        practiceId={jazzRelaxMusicPassport ? practiceId : undefined}
         publicationClass={form.publicationClass}
         isFree={form.productKind === PRODUCT_KIND.AUDIO_POST ? true : form.isFree}
         seoPrimaryQuery={form.seoPrimaryQuery}
@@ -5808,11 +5856,28 @@ export default function AuthorProductForm({
       </>
       ) : null}
 
+      {jazzRelaxMusicPassport && practiceId ? (
+        <div className={wizardStep === 2 ? undefined : "hidden"}>
+          <JazzRelaxMusicPassportPanel
+            practiceId={practiceId}
+            command={passportCommand}
+            onStatus={onJazzRelaxPassportStatus}
+          />
+        </div>
+      ) : null}
+
       {wizardEnabled && wizardStep < PRODUCT_WIZARD_STEP_COUNT ? (
         <AuthorProductWizardStepNav
           showBack={wizardStep > 1}
           showContinue
-          busy={busy}
+          busy={busy || (passportRunning && !jazzRelaxPassportCompleted)}
+          continueLabel={
+            jazzRelaxMusicPassport && wizardStep === 2
+              ? jazzRelaxPassportCompleted
+                ? "Перейти к оформлению"
+                : "Сохранить и создать музыкальный паспорт"
+              : undefined
+          }
           canSave={
             (canEditPublicFields || canEditSchedule) &&
             !musicQueueHasLocalFile(musicQueue)
