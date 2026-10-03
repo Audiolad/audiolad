@@ -1571,33 +1571,37 @@ export default function StudioEditorShell({
             </button>
           ) : null}
           {hasPersistenceProject && track ? (
-            <div className="mt-2 flex items-center gap-2 text-xs" aria-live="polite">
-              {track.status === "error" ? (
-                <span className="text-rose-200">
-                  {track.replacementError ?? "Не удалось загрузить аудио дорожки"}
+            <div className="mt-2 text-xs" aria-live="polite">
+              <div className="flex items-center gap-2">
+                <span className={
+                  track.assetPersistenceStatus === "error"
+                    ? "text-rose-200"
+                    : "text-[#9ba7bb]"
+                }>
+                  {track.assetPersistenceStatus === "pending"
+                    ? "Ожидает сохранения"
+                    : track.assetPersistenceStatus === "uploading"
+                      ? "Сохранение аудио…"
+                      : track.assetPersistenceStatus === "saved"
+                        ? "Аудио сохранено"
+                        : "Не удалось сохранить аудио"}
                 </span>
-              ) : null}
-              <span className={
-                track.assetPersistenceStatus === "error"
-                  ? "text-rose-200"
-                  : "text-[#9ba7bb]"
-              }>
-                {track.assetPersistenceStatus === "pending"
-                  ? "Ожидает сохранения"
-                  : track.assetPersistenceStatus === "uploading"
-                    ? "Сохранение аудио…"
-                    : track.assetPersistenceStatus === "saved"
-                      ? "Аудио сохранено"
-                      : "Не удалось сохранить аудио"}
-              </span>
-              {track.assetPersistenceStatus === "error" ? (
-                <button
-                  type="button"
-                  onClick={() => retryTrackAssetUpload(track.id)}
-                  className="text-[#d8c8fb] underline underline-offset-4"
-                >
-                  Повторить
-                </button>
+                {track.assetPersistenceStatus === "error" ? (
+                  <button
+                    type="button"
+                    onClick={() => retryTrackAssetUpload(track.id)}
+                    className="text-[#d8c8fb] underline underline-offset-4"
+                  >
+                    Повторить
+                  </button>
+                ) : null}
+              </div>
+              {track.replacementError &&
+              (track.status === "error" ||
+                track.assetPersistenceStatus === "error") ? (
+                <p role="alert" className="mt-1 leading-5 text-rose-200">
+                  {track.replacementError}
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -2869,27 +2873,34 @@ export default function StudioEditorShell({
                 });
                 return;
               }
-              void loadLocalFiles([file], trackKind ?? "music").then(([track]) => {
-                if (track) {
-                  setSlots((currentSlots) =>
-                    currentSlots.map((slot) =>
-                      slot.id === slotId
-                        ? {
-                            ...slot,
-                            audioTrackId: track.id,
-                            name: isStudioDefaultTrackName(
-                              slot.name,
-                              slot.trackKind ?? "voice",
-                            )
-                              ? getStudioTrackNameFromSourceDisplayName(file.name) || slot.name
-                              : slot.name,
-                          }
-                        : slot,
-                    ),
+              void (async () => {
+                const controller = controllerRef.current;
+                if (controller && !(await controller.flushAndWait())) {
+                  setEditingError(
+                    "Не удалось сохранить изменения проекта перед загрузкой новой дорожки. Нажмите «Сохранить» и попробуйте снова.",
                   );
-                  markSavedChange();
+                  return;
                 }
-              });
+                const [track] = await loadLocalFiles([file], trackKind ?? "music");
+                if (!track) return;
+                setSlots((currentSlots) =>
+                  currentSlots.map((slot) =>
+                    slot.id === slotId
+                      ? {
+                          ...slot,
+                          audioTrackId: track.id,
+                          name: isStudioDefaultTrackName(
+                            slot.name,
+                            slot.trackKind ?? "voice",
+                          )
+                            ? getStudioTrackNameFromSourceDisplayName(file.name) || slot.name
+                            : slot.name,
+                        }
+                      : slot,
+                  ),
+                );
+                markSavedChange();
+              })();
             }}
           />
           <input

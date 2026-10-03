@@ -4,7 +4,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { MusicPassport } from "../src/components/music-passport/MusicPassport";
 import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
-import { formatMeasureDetail, instrumentPlaceLabel, rowQuantityDisplay } from "../src/lib/music-analyzer-runs/passport-display";
+import {
+  formatAnalyzedAtMoscow,
+  formatDisplayedBpm,
+  formatDisplayedDuration,
+  formatDisplayedLufs,
+  formatDisplayedQuantity,
+  formatMeasureDetail,
+  instrumentPlaceLabel,
+  rowQuantityDisplay,
+} from "../src/lib/music-analyzer-runs/passport-display";
 
 const productionGold = readMusicAnalyzerPassport({
   normalized: {
@@ -47,6 +56,25 @@ assert.notEqual(productionGold.bpmDisplay.raw, "0.64067");
 assert.equal(productionGold.bpmDisplay.status, "candidate");
 assert.equal(productionGold.bpmDisplay.withheld, true);
 assert.equal(formatMeasureDetail(productionGold.bpmDisplay), "raw 140.625 · не прошло порог публикации");
+assert.equal(formatDisplayedBpm(productionGold.bpmDisplay.primary), "70.3");
+assert.equal(formatDisplayedBpm(productionGold.bpmDisplay.raw), "140.6");
+assert.equal(formatDisplayedBpm("100"), "100.0");
+assert.equal(formatDisplayedLufs("-14.2"), "-14.2");
+assert.equal(formatDisplayedLufs("-14.26"), "-14.3");
+assert.equal(formatDisplayedLufs("-15"), "-15.0");
+assert.equal(formatDisplayedDuration("188 с"), "3:08");
+assert.equal(formatDisplayedDuration("200.5 с"), "3:21");
+assert.equal(formatDisplayedDuration("12"), "0:12");
+assert.equal(formatDisplayedDuration("1500 мс"), "0:02");
+assert.equal(formatDisplayedQuantity("0.131103"), "0.131");
+assert.equal(formatDisplayedQuantity("0.175234"), "0.175");
+assert.equal(formatDisplayedQuantity("0.0506"), "0.051");
+assert.equal(formatDisplayedQuantity("0.131"), "0.131");
+assert.equal(formatDisplayedQuantity("0.42"), "0.42");
+assert.equal(formatAnalyzedAtMoscow("2026-10-02T00:01:00.000Z"), "2 октября 2026, 03:01 МСК");
+assert.equal(formatAnalyzedAtMoscow("2026-10-03T15:38:00.000Z"), "3 октября 2026, 18:38 МСК");
+assert.equal(formatAnalyzedAtMoscow(null), "не указано");
+assert.equal(formatAnalyzedAtMoscow("not-a-date"), "не указано");
 assert.equal(productionGold.keyDisplay.primary, "F major");
 assert.equal(productionGold.keyDisplay.status, "candidate");
 assert.equal(productionGold.keyDisplay.withheld, true);
@@ -67,6 +95,10 @@ const header = {
   statusLabel: "Готово",
   fileVersion: 1,
 };
+assert.deepEqual(
+  Object.keys(header).sort(),
+  ["analyzedAt", "analyzerVersion", "fileVersion", "filename", "statusLabel"],
+);
 const snapshot = { version: "snapshot:932c4ce", commit: "932c4ceaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" };
 const provenance = {
   sha256: "passport-provenance-sha",
@@ -90,9 +122,11 @@ const fullMarkup = renderToStaticMarkup(
   />,
 );
 assert.match(fullMarkup, /Музыкальный паспорт · экспериментальная версия/);
-assert.match(fullMarkup, /70\.3125/);
+assert.match(fullMarkup, /70\.3/);
+assert.doesNotMatch(fullMarkup, /70\.3125/);
 assert.match(fullMarkup, /кандидат/);
-assert.match(fullMarkup, /raw 140\.625 · не прошло порог публикации/);
+assert.match(fullMarkup, /raw 140\.6 · не прошло порог публикации/);
+assert.doesNotMatch(fullMarkup, /140\.625/);
 assert.doesNotMatch(fullMarkup, /raw 0\.64067/);
 assert.match(fullMarkup, /F major/);
 assert.match(fullMarkup, /Jazz/);
@@ -114,7 +148,21 @@ assert.match(fullMarkup, /О версии анализа/);
 assert.match(fullMarkup, /passport-provenance-sha/);
 assert.match(fullMarkup, /Данные разработчика \/ Raw JSON/);
 assert.match(fullMarkup, /passport-debug-json/);
-assert.match(fullMarkup, /188 с/);
+assert.match(fullMarkup, /3:08/);
+assert.match(fullMarkup, /-14\.2/);
+assert.doesNotMatch(fullMarkup, /188 с/);
+assert.match(fullMarkup, /2 октября 2026, 03:01 МСК/);
+assert.doesNotMatch(fullMarkup, /2026-10-02T00:01:00/);
+const fullHeader = /data-passport-header="true"[\s\S]*?<\/header>/.exec(fullMarkup)?.[0] ?? "";
+assert.match(fullHeader, /gold_001\.wav/);
+assert.doesNotMatch(fullHeader, /932c4ce/);
+assert.doesNotMatch(fullHeader, /снимок/);
+assert.doesNotMatch(fullHeader, /Human Listening Validation/);
+assert.match(fullMarkup, /О версии анализа[\s\S]*932c4ceaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+assert.match(fullMarkup, /data-passport-signal="label">Jazz<\/span>[\s\S]*data-passport-signal="band">высокая<\/span>[\s\S]*data-passport-quantity="secondary">0\.9/);
+assert.match(fullMarkup, /data-sound-character="fit"/);
+assert.match(fullMarkup, /w-fit/);
+assert.doesNotMatch(fullMarkup, /lg:grid-cols-2/);
 assert.doesNotMatch(fullMarkup, /ведущий инструмент/);
 
 const productMarkup = renderToStaticMarkup(
@@ -129,8 +177,10 @@ const productMarkup = renderToStaticMarkup(
 );
 assert.match(productMarkup, /Музыкальный паспорт/);
 assert.doesNotMatch(productMarkup, /экспериментальная версия/);
-assert.match(productMarkup, /70\.3125/);
-assert.match(productMarkup, /raw 140\.625 · не прошло порог публикации/);
+assert.match(productMarkup, /70\.3/);
+assert.doesNotMatch(productMarkup, /70\.3125/);
+assert.match(productMarkup, /raw 140\.6 · не прошло порог публикации/);
+assert.doesNotMatch(productMarkup, /932c4ce/);
 assert.match(productMarkup, /Jazz/);
 assert.match(productMarkup, /organ/);
 assert.doesNotMatch(productMarkup, /О версии анализа/);
@@ -258,5 +308,101 @@ const blankMarkup = renderToStaticMarkup(
 );
 assert.match(blankMarkup, /№1/);
 assert.match(blankMarkup, /оценка не указана/);
+
+const tenInstruments = [
+  { label: "organ", average: 0.131103, max: 0.175234, band: "medium" },
+  { label: "brushes", average: 0.123645, max: 0.177415, band: "medium" },
+  { label: "saxophone", average: 0.122596, max: 0.163785, band: "low" },
+  { label: "bass guitar", average: 0.118182, max: 0.1249, band: "low" },
+  { label: "electric guitar", average: 0.110964, max: 0.123683, band: "low" },
+  { label: "strings", average: 0.102372, max: 0.142099, band: "low" },
+  { label: "acoustic guitar", average: 0.078663, max: 0.106735, band: "low" },
+  { label: "flute", average: 0.077252, max: 0.120632, band: "low" },
+  { label: "hand percussion", average: 0.051503, max: 0.0902, band: "low" },
+  { label: "double bass", average: 0.0506, max: 0.057179, band: "low" },
+];
+const precisePassport = readMusicAnalyzerPassport({
+  normalized: {
+    technical: {
+      bpm: null,
+      bpm_confidence: "low",
+      duration_s: 200.5,
+      lufs: -14.26,
+      diagnostics: {
+        bpm_candidate: 70.3125,
+        bpm_candidate_raw: 140.625,
+        pulse_accepted: false,
+      },
+    },
+    genres: [{ name: "Blues", average: 0.334211, max: 0.354713, band: "high" }],
+    styles: [{ name: "Lounge Jazz", average: 0.427353, max: 0.471471, band: "high" }],
+    moods: [{ name: "warm", average: 0.30539, max: 0.362738, band: "high" }],
+    sound_character: [{ label: "rich", average: 0.170706, max: 0.196714, band: "low" }],
+    instruments: tenInstruments,
+  },
+});
+assert.equal(precisePassport.bpmDisplay.primary, "70.3125");
+assert.equal(precisePassport.bpmDisplay.raw, "140.625");
+assert.equal(precisePassport.instruments[0]?.average, "0.131103");
+assert.equal(precisePassport.instruments[0]?.score, null);
+assert.equal(precisePassport.instruments.length, 10);
+assert.equal(precisePassport.technical.find((row) => row.label === "Длительность")?.value, "200.5 с");
+assert.equal(precisePassport.technical.find((row) => row.label === "LUFS")?.value, "-14.26");
+
+const preciseFull = renderToStaticMarkup(
+  <MusicPassport
+    mode="full"
+    passport={precisePassport}
+    header={header}
+    snapshot={snapshot}
+    provenance={provenance}
+    developerJson={developerJson}
+  />,
+);
+assert.match(preciseFull, /70\.3/);
+assert.match(preciseFull, /raw 140\.6/);
+assert.match(preciseFull, /3:21/);
+assert.match(preciseFull, /-14\.3/);
+assert.doesNotMatch(preciseFull, /70\.3125/);
+assert.doesNotMatch(preciseFull, /140\.625/);
+assert.doesNotMatch(preciseFull, /200\.5 с/);
+assert.doesNotMatch(preciseFull, /-14\.26/);
+assert.doesNotMatch(preciseFull, /0\.131103/);
+assert.doesNotMatch(preciseFull, /0\.334211/);
+assert.match(preciseFull, /№1[\s\S]*organ[\s\S]*0\.131[\s\S]*max 0\.175/);
+assert.match(preciseFull, /№10[\s\S]*double bass/);
+assert.match(preciseFull, /data-passport-signal="label">Blues<\/span>[\s\S]*data-passport-signal="band">высокая<\/span>[\s\S]*data-passport-quantity="secondary">0\.334/);
+assert.match(preciseFull, /data-passport-quantity="secondary">max 0\.355/);
+assert.match(preciseFull, /Lounge Jazz[\s\S]*высокая/);
+assert.match(preciseFull, /data-passport-signal="label">rich<\/span>[\s\S]*data-passport-signal="band">низкая/);
+assert.match(preciseFull, /data-sound-character="fit"/);
+assert.match(preciseFull, /О версии анализа/);
+assert.match(preciseFull, /passport-debug-json/);
+assert.equal(precisePassport.bpmDisplay.primary, "70.3125");
+assert.equal(precisePassport.instruments[0]?.average, "0.131103");
+
+const preciseProduct = renderToStaticMarkup(
+  <MusicPassport
+    mode="product"
+    passport={precisePassport}
+    header={header}
+    snapshot={snapshot}
+    provenance={provenance}
+    developerJson={developerJson}
+  />,
+);
+assert.match(preciseProduct, /№5[\s\S]*electric guitar/);
+assert.doesNotMatch(preciseProduct, /№6/);
+assert.doesNotMatch(preciseProduct, /strings/);
+assert.doesNotMatch(preciseProduct, /double bass/);
+assert.doesNotMatch(preciseProduct, /О версии анализа/);
+assert.doesNotMatch(preciseProduct, /passport-provenance-sha/);
+assert.doesNotMatch(preciseProduct, /Raw JSON/);
+assert.doesNotMatch(preciseProduct, /passport-debug-json/);
+assert.doesNotMatch(preciseProduct, /экспериментальная версия/);
+assert.doesNotMatch(preciseProduct, /932c4ce/);
+assert.match(preciseProduct, /data-passport-signal="label">Blues<\/span>[\s\S]*data-passport-signal="band">высокая/);
+assert.match(preciseProduct, /data-passport-quantity="secondary">0\.334/);
+assert.equal(precisePassport.instruments.length, 10);
 
 console.log("music-passport-ui-unit: ok");

@@ -117,6 +117,7 @@ export async function sendMailingTestAction(payload: CampaignDraftInput & { requ
   return sendAuthorMailingTest({
     actorEmail: session.email,
     requestedEmail: payload.requestedEmail,
+    isOwner: session.access.roles.includes("owner"),
     subject: draft.subject,
     preheader: draft.preheader,
     content: draft.content,
