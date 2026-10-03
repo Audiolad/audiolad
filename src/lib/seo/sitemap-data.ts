@@ -729,6 +729,7 @@ export async function buildSitemapEntries(): Promise<{
   let playlistEntries: SitemapEntry[] = [];
   let promoEntries: SitemapEntry[] = [];
   let topicHubEntries: SitemapEntry[] = [];
+  let classicaEntries: SitemapEntry[] = [];
   const articleEntries = mapArticleDefinitionsToSitemapEntries();
   const listenEntries = mapListenPageDefinitionsToSitemapEntries();
   const helpArticleEntries = mapHelpArticlesToSitemapEntries();
@@ -741,12 +742,14 @@ export async function buildSitemapEntries(): Promise<{
       playlistEntries,
       promoEntries,
       topicHubEntries,
+      classicaEntries,
     ] = await Promise.all([
       fetchProductSitemapEntries(supabase),
       fetchAuthorSitemapEntries(supabase),
       fetchPublicPlaylistSitemapEntries(supabase),
       fetchPromoPageSitemapEntries(),
       fetchTopicHubSitemapEntries(supabase),
+      fetchClassicaSitemapEntries(supabase),
     ]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -763,6 +766,7 @@ export async function buildSitemapEntries(): Promise<{
     articleEntries,
     listenEntries,
     helpArticleEntries,
+    classicaEntries,
   );
 
   return {
@@ -783,4 +787,43 @@ export async function buildSitemapEntries(): Promise<{
 }
 
 /** Production origin used in sitemap URLs when env is unset (tests). */
+async function fetchClassicaSitemapEntries(
+  supabase: SupabaseClient,
+): Promise<SitemapEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from("classica_public_works")
+      .select("composer_slug, work_slug, published_at");
+    if (error || !data || data.length === 0) {
+      return [];
+    }
+    const origin = getAppOrigin();
+    const entries: SitemapEntry[] = [
+      {
+        url: `${origin}/classica`,
+        changeFrequency: "weekly",
+        priority: 0.6,
+      },
+    ];
+    for (const row of data) {
+      const composerSlug = typeof row.composer_slug === "string" ? row.composer_slug : "";
+      const workSlug = typeof row.work_slug === "string" ? row.work_slug : "";
+      if (!composerSlug || !workSlug) {
+        continue;
+      }
+      entries.push({
+        url: `${origin}/classica/${composerSlug}/${workSlug}`,
+        lastModified: row.published_at ? new Date(String(row.published_at)) : undefined,
+        changeFrequency: "monthly",
+        priority: 0.7,
+      });
+    }
+    return entries;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[sitemap] classica query unexpected error:", message);
+    return [];
+  }
+}
+
 export { PRODUCTION_APP_ORIGIN };

@@ -6,6 +6,21 @@
 
 ---
 
+## 2026-10-03 — Classica Production v0.1 публикует страницу на основном домене, не практику
+
+**Контекст:** Нужен внутренний конвейер первых произведений Classica. В базе уже есть `classical_composers` / `classical_works` с комментарием про будущий URL `/classics/{composer}/{work}` и связь с практикой. Задание требует `/classica`, плеер на странице произведения и запрет параллельного АудиоЛада.
+
+**Решение:**
+
+1. Производство живёт в `/classica/production` на существующих platform roles. `admin` и `owner` получают все права Classica, поэтому один администратор может быть оператором и модератором. Отдельные роли `classica_operator` и `classica_moderator` выдаются следующим людям без нового контура.
+2. Публичная страница — `/classica/{composerSlug}/{workSlug}` на audiolad.ru. Это отклонение от комментария `/classics/...`: адрес берётся из задания v0.1.
+3. Публикация пишет `classical_composers`, `classical_works` и `classica_public_works`. Практику и запись в каталог практик не создаёт: плеер читает аудио страницы Classica, а не `classical_work_practices`.
+4. Мастер-промпт оформления хранится в `classica_production_prompts`. Запрет выдумывать факты добавляется кодом и не снимается правкой промпта.
+
+**Принято:** задание Classica Production v0.1. Деплой и merge не входят в этот шаг.
+
+---
+
 ## 2026-10-02 — Music Analyzer Lab Phase 2A runs the pinned Python analyzer on the app VPS
 
 **Контекст:** Human Listening Validation остаётся на `music_lab_*` и `/music-analyzer`. Нужен отдельный автоанализ WAV/MP3: неизменяемый прогон, повтор того же SHA256 — новая версия, выгрузка JSON/CSV/Markdown и сравнение двух версий. Музыкальные поля не выдумываются в Next.js. Music Passport в этом шаге не подключается.

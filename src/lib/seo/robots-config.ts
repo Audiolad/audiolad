@@ -6,6 +6,7 @@ import { isPublicSeoIndexingEnabled } from "@/lib/seo/indexing";
 /** Paths blocked in robots.txt — not a substitute for auth or noindex metadata. */
 export const SEO_ROBOTS_DISALLOWED_PATHS = [
   "/admin/",
+  "/classica/production/",
   "/music-analyzer/",
   "/api/",
   "/auth/",
