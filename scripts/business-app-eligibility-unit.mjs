@@ -105,11 +105,12 @@ const empty = venueAirplayEmptyStateCopy({
   eligibleCount: 0,
 });
 assert.match(empty.title, /пуст/i);
-assert.match(empty.description, /UNKNOWN ≠ ELIGIBLE|UNKNOWN/);
-assert.match(empty.description, /HG-3|HG-4|P0-06/);
-assert.doesNotMatch(empty.description, /лицензирован/i);
+assert.match(empty.description, /уточняется|подтвержд/i);
+assert.doesNotMatch(empty.description, /Лицензия активн/i);
+assert.match(empty.description, /не утверждаем.*лицензирован/i);
 
-assert.equal(formatEligibilityDecisionLabel("ELIGIBLE"), "ELIGIBLE");
+assert.match(formatEligibilityDecisionLabel("ELIGIBLE"), /эфир/i);
+assert.match(formatEligibilityDecisionLabel("UNKNOWN"), /уточняется/i);
 
 assert.ok(
   BUSINESS_PRIMARY_NAV_ITEMS.some((i) => i.id === "music" && i.available),
@@ -141,7 +142,8 @@ const player = readFileSync(
   "utf8",
 );
 assert.match(player, /BusinessEligibilityProbePanel/);
-assert.match(player, /UNKNOWN ≠ ELIGIBLE|ELIGIBLE/);
+assert.match(player, /эфир|пригодност|уточняется/i);
+assert.doesNotMatch(player, /Лицензия активн/i);
 
 const music = readFileSync(
   join(repoRoot, "src/app/business-app/music/page.tsx"),
@@ -149,5 +151,19 @@ const music = readFileSync(
 );
 assert.match(music, /BusinessEligibilityProbePanel/);
 assert.doesNotMatch(music, /появятся позже/);
+
+const home = readFileSync(
+  join(repoRoot, "src/components/business-app/BusinessHomePage.tsx"),
+  "utf8",
+);
+assert.doesNotMatch(home, /Лицензия активна/);
+assert.match(home, /BUSINESS_RIGHTS_HOME_CONTROL|Статус прав/);
+
+const docs = readFileSync(
+  join(repoRoot, "src/app/business-app/documents/page.tsx"),
+  "utf8",
+);
+assert.doesNotMatch(docs, /Лицензия и оплата/);
+assert.match(docs, /BUSINESS_RIGHTS_DOCUMENTS_EMPTY/);
 
 console.log("business-app-eligibility-unit: ok");

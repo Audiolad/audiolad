@@ -352,8 +352,8 @@ export default function BusinessOnboardingWizardPage() {
               Точка создана
             </h2>
             <p className="text-[var(--biz-text)]">
-              Дальше: откройте Venue Player и проверьте статус музыки. Каталог
-              ELIGIBLE пока пуст — eligibility остаётся UNKNOWN-safe.
+              Дальше: откройте плеер и проверьте статус музыки. Каталог эфира
+              пока пуст — статус прав уточняется (fail-closed).
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
@@ -373,7 +373,7 @@ export default function BusinessOnboardingWizardPage() {
                 href="/music"
                 className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
               >
-                Музыка / eligibility
+                Музыка / статус прав
               </Link>
               <Link
                 href="/"
