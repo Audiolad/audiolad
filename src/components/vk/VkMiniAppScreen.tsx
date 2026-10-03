@@ -19,11 +19,13 @@ import MaxCatalogSearch, {
 } from "@/components/max/MaxCatalogSearch";
 import MaxPlaylists from "@/components/max/MaxPlaylists";
 import { MiniAppGuestTransportProvider } from "@/components/mini-app/MiniAppGuestTransport";
-import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
+import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
+import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import VkAuthorAppreciation from "@/components/vk/VkAuthorAppreciation";
 import VkHomePanel from "@/components/vk/VkHomePanel";
 import VkPublicFooter from "@/components/vk/VkPublicFooter";
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
+import type { CatalogSlide } from "@/lib/catalog/dto";
 import type {
   CatalogAccessFilter,
   CatalogClassFilter,
@@ -39,6 +41,10 @@ import {
   MAX_TAB_BAR_HEIGHT_PX,
   type MaxPrimaryTab,
 } from "@/lib/max/primary-tabs";
+import {
+  getProductCoverGradient,
+  getProductCoverSymbol,
+} from "@/lib/products/cover-display";
 import { PLAY_ACTION_LABEL, PREVIEW_ACTION_LABEL } from "@/lib/ui/action-labels";
 import { initVkBridge, openVkExternalHttps } from "@/lib/vk/bridge";
 import { createVkGuestTransport } from "@/lib/vk/guest-transport";
@@ -170,6 +176,35 @@ function VkGuestAuthActions() {
       </button>
     </div>
   );
+}
+
+function vkHeroCover(
+  slug: string,
+  title: string,
+  coverUrl: string | null,
+): PracticePageCoverData {
+  return {
+    displayUrl: coverUrl,
+    responsive: {
+      src: coverUrl,
+      manifest: null,
+      srcSet: null,
+      sizes: "100vw",
+    },
+    alt: title,
+    gradient: getProductCoverGradient(slug),
+    symbol: getProductCoverSymbol(slug),
+    displayWidth: 640,
+  };
+}
+
+function vkHeroSlides(gallery: VkProductView["gallery"]): CatalogSlide[] {
+  return gallery.map((slide, index) => ({
+    id: slide.id,
+    image_url: slide.image_url,
+    alt: slide.alt,
+    position: index,
+  }));
 }
 
 function VkProductDetail({ selection }: { selection: VkProductSelection }) {
@@ -355,15 +390,14 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
       ) : null}
       {product ? (
         <>
-          <ProductCoverThumbnail
-            slug={product.productSlug}
-            title={product.title}
-            coverUrl={product.coverUrl}
-            authorName={product.metaLine}
-            className="aspect-square w-full rounded-[28px]"
-            displayWidth={640}
-            priority
-          />
+          <div className="vk-product-gallery" data-vk-product-gallery="">
+            <PracticeHeroGallery
+              cover={vkHeroCover(product.productSlug, product.title, product.coverUrl)}
+              slides={vkHeroSlides(product.gallery)}
+              priority
+              showMobileDots
+            />
+          </div>
           {product.formatLabel ? (
             <p className={`${FEATURED_CARD_CHIP_CLASS} mt-4`}>{product.formatLabel}</p>
           ) : null}

@@ -60,6 +60,7 @@ function assertSafeDto(items) {
       "authorSlug",
       "coverUrl",
       "formatLabel",
+      "gallery",
       "isFree",
       "priceLabel",
       "slug",
@@ -466,6 +467,7 @@ setRouteCatalogForTests(async (input) => {
       formatLabel: item.productTypeLabel,
       priceLabel: item.priceLabel,
       isFree: item.isFree,
+      gallery: [],
     })),
   };
 });

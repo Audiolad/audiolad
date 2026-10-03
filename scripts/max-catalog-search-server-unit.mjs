@@ -44,6 +44,7 @@ function assertSafeDto(items) {
       "authorSlug",
       "coverUrl",
       "formatLabel",
+      "gallery",
       "isFree",
       "priceLabel",
       "slug",
