@@ -187,6 +187,7 @@
     "test:indexnow-hooks": "npx tsx scripts/indexnow-hooks-unit.mjs",
     "test:wordstat": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/wordstat-unit.mjs",
     "test:seo-core-v1": "node scripts/seo-core-v1-unit.mjs",
+    "test:seo-analytics-phase1": "npx tsx scripts/seo-analytics-phase1-unit.mts",
     "test:admin-seo-reservation-release": "npx tsx scripts/admin-seo-reservation-release-unit.mjs && node scripts/admin-seo-reservation-release-sql-unit.mjs",
     "test:seo-query-analysis": "npx tsx scripts/seo-query-analysis-unit.mjs",
     "test:seo-wordstat-intake": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-wordstat-intake-unit.mjs",

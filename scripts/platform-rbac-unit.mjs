@@ -121,8 +121,12 @@ assert.deepEqual(
     "/admin",
     "/admin/author-applications",
     "/admin/commercial-applications",
+    "/admin/catalog-sections",
+    "/admin/tracks",
+    "/admin/seo-queries",
+    "/admin/seo-analytics",
   ],
-  "editor sees overview + author/commercial applications, not users or finance",
+  "editor sees sections granted by dashboard, authors, products, and seo.manage",
 );
 assert.equal(
   editorNav.some((item) => item.href === "/admin/users"),
