@@ -1,4 +1,8 @@
-import { formatMeasureDetail } from "@/lib/music-analyzer-runs/passport-display";
+import {
+  formatMeasureDetail,
+  instrumentPlaceLabel,
+  rowQuantityDisplay,
+} from "@/lib/music-analyzer-runs/passport-display";
 import type {
   MusicAnalyzerPassport,
   PassportMeasureDisplay,
@@ -59,10 +63,13 @@ function shown(value: string | null | undefined): string {
 }
 
 function Tag({ row }: { row: PassportRow }) {
+  const quantity = rowQuantityDisplay(row);
+  const primary = quantity.primary ?? quantity.max;
   return (
     <li className={`inline-flex max-w-full flex-wrap items-baseline gap-x-2 rounded-full px-3 py-1 text-sm ${toneClass(row.tone)}`}>
       <span className="font-medium">{row.label}</span>
-      {row.score ? <span className="text-xs">{row.score}</span> : null}
+      {primary ? <span className="text-xs">{primary}</span> : null}
+      {quantity.primary && quantity.max ? <span className="text-xs">max {quantity.max}</span> : null}
       {row.bandLabel ? <span className="text-xs">{row.bandLabel}</span> : null}
     </li>
   );
@@ -129,13 +136,18 @@ function InstrumentList({ rows }: { rows: PassportRow[] }) {
       <h3 className="text-sm font-medium text-[#796ba0]">Инструменты</h3>
       {rows.length > 0 ? (
         <ol className="mt-3 space-y-2">
-          {rows.map((row, index) => (
-            <li key={`${row.label}-${row.rank ?? index}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-[#25135c]">
-              <span className="min-w-28 text-[#796ba0]">{row.rank != null ? `ранг ${row.rank}` : "ранг не указан"}</span>
-              <span className="font-medium">{row.label}</span>
-              <span className="text-[#796ba0]">{row.score ? row.score : "оценка не указана"}</span>
-            </li>
-          ))}
+          {rows.map((row, index) => {
+            const quantity = rowQuantityDisplay(row);
+            const primary = quantity.primary ?? quantity.max;
+            return (
+              <li key={`${row.label}-${row.rank ?? index}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-[#25135c]">
+                <span className="min-w-28 text-[#796ba0]">{instrumentPlaceLabel(row, index)}</span>
+                <span className="font-medium">{row.label}</span>
+                <span className="text-[#796ba0]">{primary ?? "оценка не указана"}</span>
+                {quantity.primary && quantity.max ? <span className="text-xs text-[#796ba0]">max {quantity.max}</span> : null}
+              </li>
+            );
+          })}
         </ol>
       ) : (
         <p className="mt-3 text-sm text-[#796ba0]">не указано</p>
