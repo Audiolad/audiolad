@@ -282,6 +282,11 @@ export async function listAudioSprintForAuthor(
   input: {
     slug: string;
     authorId: string;
+    workspaces?: ReadonlyArray<{
+      id: string;
+      name: string;
+      slug: string;
+    }>;
   },
   supabaseClient?: SupabaseClient,
 ): Promise<AudioSprintListing | null> {
@@ -387,6 +392,9 @@ export async function listAudioSprintForAuthor(
   const reservationByQuery = new Map(
     reservations.map((row) => [row.query_id, row]),
   );
+  const workspaceById = new Map(
+    (input.workspaces ?? []).map((workspace) => [workspace.id, workspace]),
+  );
   const productById = new Map(
     products.map((row) => [readString(row.id), row]),
   );
@@ -405,6 +413,8 @@ export async function listAudioSprintForAuthor(
       ? productById.get(reservation.product_id)
       : undefined;
     const own = reservation?.author_id === authorId;
+    const reservationWorkspace =
+      reservation && !own ? workspaceById.get(reservation.author_id) ?? null : null;
     return {
       id: row.query_id,
       queryText: row.queryText,
@@ -418,6 +428,8 @@ export async function listAudioSprintForAuthor(
       reservationId: own ? reservation.id : null,
       expiresAt: own ? reservation.expires_at : null,
       productId: own ? reservation.product_id : null,
+      reservationWorkspaceName: reservationWorkspace?.name ?? null,
+      reservationWorkspaceSlug: reservationWorkspace?.slug ?? null,
     } satisfies AudioSprintQueryCard;
   });
 
