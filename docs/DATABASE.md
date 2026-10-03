@@ -927,7 +927,7 @@ RLS: существующие политики author members на `practices/{p
 
 ## Classica Production v0.1
 
-Миграция `supabase/migrations/20261220120000_classica_production_v01.sql`.
+Миграция `supabase/migrations/20261003190700_classica_production_v01.sql`.
 
 Закрытый многопользовательский конвейер будущей Classica. Не создаёт практики и не наполняет каталог автоматически.
 
