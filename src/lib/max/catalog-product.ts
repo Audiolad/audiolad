@@ -2,6 +2,13 @@
  * Safe MAX catalog card DTO shared by the catalog grid and Home shelves.
  * Internal ids, storage paths, and auth fields are not part of this shape.
  */
+export type MaxCatalogGallerySlide = {
+  id: string;
+  image_url: string;
+  alt: string;
+  position: number;
+};
+
 export type MaxCatalogProduct = {
   authorSlug: string;
   slug: string;
@@ -12,6 +19,7 @@ export type MaxCatalogProduct = {
   formatLabel: string;
   priceLabel: string;
   isFree: boolean;
+  gallery: MaxCatalogGallerySlide[];
 };
 
 export function readMaxCatalogProductList(value: unknown): MaxCatalogProduct[] | null {
@@ -52,6 +60,13 @@ export function readMaxCatalogProduct(value: unknown): MaxCatalogProduct | null 
     return null;
   }
 
+  const gallery = readMaxCatalogGallery(
+    (value as { gallery?: unknown }).gallery,
+  );
+  if (!gallery) {
+    return null;
+  }
+
   return {
     authorSlug: product.authorSlug,
     slug: product.slug,
@@ -62,5 +77,52 @@ export function readMaxCatalogProduct(value: unknown): MaxCatalogProduct | null 
     formatLabel: product.formatLabel,
     priceLabel: product.priceLabel,
     isFree: product.isFree,
+    gallery,
+  };
+}
+
+/** Missing gallery is an empty showcase. A non-array gallery is rejected. */
+export function readMaxCatalogGallery(
+  value: unknown,
+): MaxCatalogGallerySlide[] | null {
+  if (value == null) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return value.flatMap((slide, index) => {
+    const safe = readMaxCatalogGallerySlide(slide, index);
+    return safe ? [safe] : [];
+  });
+}
+
+function readMaxCatalogGallerySlide(
+  value: unknown,
+  index: number,
+): MaxCatalogGallerySlide | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const slide = value as Record<string, unknown>;
+  const id = typeof slide.id === "string" ? slide.id.trim() : "";
+  const imageUrl = typeof slide.image_url === "string" ? slide.image_url.trim() : "";
+  if (!id || !imageUrl) {
+    return null;
+  }
+
+  const position =
+    typeof slide.position === "number" && Number.isFinite(slide.position)
+      ? slide.position
+      : index;
+
+  return {
+    id,
+    image_url: imageUrl,
+    alt: typeof slide.alt === "string" ? slide.alt : "",
+    position,
   };
 }

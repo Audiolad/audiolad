@@ -1,4 +1,7 @@
-import type { MaxProductContentTrack } from "@/lib/max/product-view";
+import type {
+  MaxProductContentTrack,
+  MaxProductGallerySlide,
+} from "@/lib/max/product-view";
 
 export type VkProductAppreciation = {
   authorName: string;
@@ -15,6 +18,7 @@ export type VkProductView = {
   priceLabel: string;
   isFree: boolean;
   appreciation: VkProductAppreciation | null;
+  gallery: MaxProductGallerySlide[];
   contents: MaxProductContentTrack[];
 };
 
@@ -28,6 +32,14 @@ const LEAKED_KEYS = [
   "storage_path",
   "storagePath",
   "description",
+] as const;
+
+const GALLERY_LEAKED_KEYS = [
+  ...LEAKED_KEYS,
+  "publication_id",
+  "publicationId",
+  "image_manifest",
+  "imageManifest",
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,6 +73,26 @@ function publicAppreciation(
   return { authorName };
 }
 
+function publicGallery(
+  slides: readonly {
+    id?: string | null;
+    image_url?: string | null;
+    alt?: string | null;
+  }[] | null | undefined,
+): MaxProductGallerySlide[] {
+  if (!Array.isArray(slides)) return [];
+  return slides.flatMap((slide) => {
+    const id = slide?.id?.trim() ?? "";
+    const imageUrl = slide?.image_url?.trim() ?? "";
+    if (!id || !imageUrl) return [];
+    return [{
+      id,
+      image_url: imageUrl,
+      alt: typeof slide.alt === "string" ? slide.alt : "",
+    }];
+  });
+}
+
 export function toVkProductView(product: {
   authorSlug: string;
   productSlug: string;
@@ -73,6 +105,11 @@ export function toVkProductView(product: {
   priceLabel?: string | null;
   isFree?: boolean | null;
   appreciation?: { authorName?: string | null } | null;
+  gallery?: readonly {
+    id?: string | null;
+    image_url?: string | null;
+    alt?: string | null;
+  }[] | null;
 }): VkProductView {
   const commerce = publicCommerce(product);
   return {
@@ -86,6 +123,7 @@ export function toVkProductView(product: {
     priceLabel: commerce.priceLabel,
     isFree: commerce.isFree,
     appreciation: publicAppreciation(product.appreciation),
+    gallery: publicGallery(product.gallery),
     contents: product.contents.map((track) => ({
       audioItemId: track.audioItemId,
       title: track.title,
@@ -121,6 +159,9 @@ export function readVkProductView(value: unknown): VkProductView | null {
   ) {
     return null;
   }
+
+  const gallery = readVkProductGallery(value.gallery);
+  if (!gallery) return null;
 
   let appreciation: VkProductAppreciation | null = null;
   if (value.appreciation != null) {
@@ -162,6 +203,23 @@ export function readVkProductView(value: unknown): VkProductView | null {
     priceLabel,
     isFree: value.isFree,
     appreciation,
+    gallery,
     contents,
   };
+}
+
+function readVkProductGallery(value: unknown): MaxProductGallerySlide[] | null {
+  if (value == null) return [];
+  if (!Array.isArray(value)) return null;
+  const gallery = value.flatMap((slide) => {
+    if (!isRecord(slide)) return [];
+    if (GALLERY_LEAKED_KEYS.some((key) => key in slide)) return [];
+    const id = readString(slide.id)?.trim() ?? "";
+    const imageUrl = readString(slide.image_url)?.trim() ?? "";
+    const alt = readString(slide.alt);
+    if (!id || !imageUrl || alt === null) return [];
+    return [{ id, image_url: imageUrl, alt }];
+  });
+  if (gallery.length !== value.length) return null;
+  return gallery;
 }
