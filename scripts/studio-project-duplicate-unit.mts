@@ -31,6 +31,8 @@ const LONGFORM_MIGRATION =
   "../supabase/migrations/20260928120000_studio_longform_asset_limits.sql";
 const READY_DUPLICATE_MIGRATION =
   "../supabase/migrations/20261002120000_studio_duplicate_project_upload_state_ready.sql";
+const DUPLICATE_UNREFERENCED_QUOTA_MIGRATION =
+  "../supabase/migrations/20261220121000_studio_duplicate_unreferenced_quota.sql";
 
 const voiceAssetId = "11111111-1111-4111-8111-111111111111";
 const musicAAssetId = "22222222-2222-4222-8222-222222222222";
@@ -132,7 +134,15 @@ assert.equal(
 const originalMigration = await readFile(new URL(ORIGINAL_DUPLICATE_MIGRATION, import.meta.url), "utf8");
 const longformMigration = await readFile(new URL(LONGFORM_MIGRATION, import.meta.url), "utf8");
 const readyMigration = await readFile(new URL(READY_DUPLICATE_MIGRATION, import.meta.url), "utf8");
+const duplicateQuotaMigration = await readFile(
+  new URL(DUPLICATE_UNREFERENCED_QUOTA_MIGRATION, import.meta.url),
+  "utf8",
+);
 const repository = await readFile(new URL("../src/lib/studio/server/repository.ts", import.meta.url), "utf8");
+const editor = await readFile(
+  new URL("../src/components/studio/StudioEditorShell.tsx", import.meta.url),
+  "utf8",
+);
 const replaceSql = extractFunction(longformMigration, "replace_studio_project_asset");
 const releaseSql = extractFunction(originalMigration, "release_studio_project_asset");
 const originalDuplicateSql = extractFunction(originalMigration, "duplicate_studio_project");
@@ -192,6 +202,29 @@ assert.doesNotMatch(readyMigration, /3832ded1-4100-447e-a8d4-7fc6a635f72e/);
 assert.doesNotMatch(readyMigration, /3832ded1-4100-4478-a8d4-7fc6a635f72e/);
 assert.doesNotMatch(readyMigration, /[Cc]onfirmed broken copy/);
 assert.doesNotMatch(readyDuplicateSql, /UPDATE public\.studio_project_assets/);
+
+assert.match(
+  duplicateQuotaMigration,
+  /CREATE OR REPLACE FUNCTION public\.studio_reserve_project_asset/,
+);
+assert.match(duplicateQuotaMigration, /asset\.source_id = asset\.id/);
+assert.match(duplicateQuotaMigration, /jsonb_array_elements/);
+assert.match(duplicateQuotaMigration, /v_project\.project_data -> 'tracks'/);
+assert.match(duplicateQuotaMigration, /track ->> 'assetId' = asset\.id::text/);
+assert.match(duplicateQuotaMigration, /asset\.upload_state <> 'ready'/);
+assert.doesNotMatch(
+  duplicateQuotaMigration,
+  /UPDATE public\.studio_project_assets[\s\S]*deleted_at = now\(\)/,
+);
+assert.match(editor, /await controller\.flushAndWait\(\)/);
+assert.match(
+  editor,
+  /Не удалось сохранить изменения проекта перед загрузкой новой дорожки/,
+);
+assert.match(
+  editor,
+  /track\.assetPersistenceStatus === "error"[\s\S]{0,300}track\.replacementError/,
+);
 
 assert.match(repository, /remapStudioProjectForDuplicate/);
 assert.match(repository, /duplicate_studio_project/);
@@ -312,6 +345,40 @@ assert.deepEqual(
 );
 const listedDuplicate = listReadyAssets(readyCopy, "copy-ready");
 assert.equal(listedDuplicate.length, 3, "listStudioAssets(duplicate) returns every shared ref");
+
+function countedProjectAssetBytes(
+  rows: readonly SimulatedRef[],
+  referencedAssetIds: ReadonlySet<string>,
+): number {
+  return rows
+    .filter((row) => {
+      if (row.deleted_at != null) return false;
+      if (row.upload_state !== "ready") return true;
+      if (row.source_id === row.id) return true;
+      return referencedAssetIds.has(row.id);
+    })
+    .reduce((sum, row) => sum + row.size_bytes, 0);
+}
+
+const duplicatedVoiceRef = readyCopy.find(
+  (row) => row.source_id === voiceAssetId,
+);
+assert.ok(duplicatedVoiceRef);
+const allDuplicateAssetIds = new Set(readyCopy.map((row) => row.id));
+assert.equal(
+  countedProjectAssetBytes(readyCopy, allDuplicateAssetIds),
+  readyCopy.reduce((sum, row) => sum + row.size_bytes, 0),
+  "all visible shared refs count toward the project quota",
+);
+const withoutClearedVoice = new Set(
+  [...allDuplicateAssetIds].filter((id) => id !== duplicatedVoiceRef.id),
+);
+assert.equal(
+  countedProjectAssetBytes(readyCopy, withoutClearedVoice),
+  readyCopy.reduce((sum, row) => sum + row.size_bytes, 0) -
+    duplicatedVoiceRef.size_bytes,
+  "a cleared shared copy ref no longer blocks quota for its replacement",
+);
 
 function metadataFromRef(row: SimulatedRef): StudioProjectAssetMetadata {
   return {
