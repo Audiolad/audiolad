@@ -7,6 +7,7 @@ import { StorageClient } from "@supabase/storage-js";
 
 import { collectAnalyzerDocuments } from "../src/lib/music-analyzer-runs/analyze-output";
 import { readMusicAnalyzerPassport } from "../src/lib/music-analyzer-runs/passport";
+import { formatMeasureDetail } from "../src/lib/music-analyzer-runs/passport-display";
 import {
   classifySignedUploadError,
   fileForSignedUpload,
@@ -436,6 +437,17 @@ assert.equal(goldPassport.sources.bpmCandidate, "technical.bpm_candidate");
 assert.equal(goldPassport.sources.bpmRaw, "technical.bpm_raw");
 assert.equal(goldPassport.sources.bpmConfidence, "technical.bpm_confidence");
 assert.equal(goldPassport.sources.bpmGate, "technical.bpm_gate");
+assert.equal(goldPassport.bpmDisplay.primary, "70.3");
+assert.equal(goldPassport.bpmDisplay.status, "candidate");
+assert.equal(goldPassport.bpmDisplay.badge, "кандидат");
+assert.equal(goldPassport.bpmDisplay.raw, "140.6");
+assert.equal(goldPassport.bpmDisplay.withheld, true);
+assert.equal(formatMeasureDetail(goldPassport.bpmDisplay), "raw 140.6 · не прошло порог публикации");
+assert.equal(goldPassport.keyDisplay.primary, "F major");
+assert.equal(goldPassport.keyDisplay.status, "candidate");
+assert.equal(goldPassport.keyDisplay.badge, "кандидат");
+assert.equal(goldPassport.keyDisplay.withheld, true);
+assert.equal(formatMeasureDetail(goldPassport.keyDisplay), "не прошло порог публикации");
 
 const productionGoldDiagnostics = {
   technical: {
@@ -467,7 +479,18 @@ assert.equal(productionGoldPassport.bpm.lines.includes("raw 140.625"), true);
 assert.equal(productionGoldPassport.bpm.lines.some((line) => line.includes("0.64067")), false);
 assert.equal(productionGoldPassport.sources.bpmCandidate, "technical.diagnostics.bpm_candidate");
 assert.equal(productionGoldPassport.sources.bpmRaw, "technical.diagnostics.bpm_candidate_raw");
+assert.equal(productionGoldPassport.bpmDisplay.primary, "70.3125");
+assert.equal(productionGoldPassport.bpmDisplay.raw, "140.625");
+assert.notEqual(productionGoldPassport.bpmDisplay.raw, "0.64067");
+assert.equal(productionGoldPassport.bpmDisplay.status, "candidate");
+assert.equal(productionGoldPassport.bpmDisplay.withheld, true);
+assert.equal(productionGoldPassport.bpmDisplay.confidence, "низкая уверенность");
+assert.equal(formatMeasureDetail(productionGoldPassport.bpmDisplay), "raw 140.625 · не прошло порог публикации");
 assert.equal(productionGoldPassport.key.headline, "F major · кандидат");
+assert.equal(productionGoldPassport.keyDisplay.primary, "F major");
+assert.equal(productionGoldPassport.keyDisplay.status, "candidate");
+assert.equal(productionGoldPassport.keyDisplay.withheld, true);
+assert.equal(formatMeasureDetail(productionGoldPassport.keyDisplay), "не прошло порог публикации");
 
 assert.equal(goldPassport.sources.keyCandidate, "key.candidate");
 assert.equal(goldPassport.sources.keyCandidateMode, "key.mode");
@@ -516,7 +539,18 @@ assert.equal(publishedPassport.bpm.headline, "90 BPM");
 assert.equal(publishedPassport.bpm.headline.includes("кандидат"), false);
 assert.equal(publishedPassport.bpm.lines.includes("кандидат: 70.3 BPM"), true);
 assert.equal(publishedPassport.bpm.lines.includes("raw 140.6"), true);
+assert.equal(publishedPassport.bpmDisplay.primary, "90");
+assert.equal(publishedPassport.bpmDisplay.status, "published");
+assert.equal(publishedPassport.bpmDisplay.badge, "опубликовано");
+assert.equal(publishedPassport.bpmDisplay.secondary, "70.3");
+assert.equal(publishedPassport.bpmDisplay.raw, "140.6");
+assert.equal(publishedPassport.bpmDisplay.withheld, false);
+assert.equal(formatMeasureDetail(publishedPassport.bpmDisplay), "raw 140.6");
 assert.equal(publishedPassport.key.headline, "C minor");
+assert.equal(publishedPassport.keyDisplay.primary, "C minor");
+assert.equal(publishedPassport.keyDisplay.status, "published");
+assert.equal(publishedPassport.keyDisplay.secondary, "F major");
+assert.equal(publishedPassport.keyDisplay.withheld, false);
 assert.equal(publishedPassport.sources.bpmPublished, "technical.bpm");
 assert.equal(publishedPassport.sources.bpmCandidate, "tempo.candidate_bpm");
 assert.equal(publishedPassport.sources.bpmRaw, "tempo.raw_bpm");
@@ -534,19 +568,79 @@ assert.equal(versionPassport.sources.taxonomy, "column");
 assert.equal(versionPassport.prompt, "prompt-2");
 assert.equal(versionPassport.sources.prompt, "prompt.version");
 
+const looseCandidate = readMusicAnalyzerPassport({
+  normalized: { tempo: { candidate_bpm: 88, raw_bpm: 176 } },
+});
+assert.equal(looseCandidate.bpm.headline, "88 BPM · кандидат");
+assert.equal(looseCandidate.bpmDisplay.primary, "88");
+assert.equal(looseCandidate.bpmDisplay.raw, "176");
+assert.equal(looseCandidate.bpmDisplay.status, "candidate");
+assert.equal(looseCandidate.bpmDisplay.withheld, false);
+assert.equal(looseCandidate.sources.bpmPublished, null);
+assert.equal(looseCandidate.sources.bpmGate, null);
+assert.equal(formatMeasureDetail(looseCandidate.bpmDisplay), "raw 176 · опубликовано: —");
+assert.equal(looseCandidate.keyDisplay.status, "absent");
+assert.equal(looseCandidate.keyDisplay.primary, null);
+assert.equal(looseCandidate.keyDisplay.withheld, false);
+assert.equal(formatMeasureDetail(looseCandidate.keyDisplay), null);
+
+const missingPassport = readMusicAnalyzerPassport({ normalized: { technical: { duration_s: 12 } } });
+assert.equal(missingPassport.bpmDisplay.status, "absent");
+assert.equal(missingPassport.bpmDisplay.primary, null);
+assert.equal(missingPassport.bpmDisplay.raw, null);
+assert.equal(missingPassport.bpmDisplay.withheld, false);
+assert.equal(missingPassport.keyDisplay.status, "absent");
+assert.equal(missingPassport.keyDisplay.withheld, false);
+assert.deepEqual(missingPassport.genres, []);
+assert.deepEqual(missingPassport.styles, []);
+assert.deepEqual(missingPassport.moods, []);
+assert.deepEqual(missingPassport.instruments, []);
+assert.equal(missingPassport.sound, null);
+assert.equal(formatMeasureDetail(missingPassport.bpmDisplay), null);
+
+const publishedDespitePulse = readMusicAnalyzerPassport({
+  normalized: {
+    technical: {
+      bpm: 100,
+      diagnostics: { bpm_candidate: 50, bpm_candidate_raw: 200, pulse_accepted: false, tempo_octave_score_raw: 0.64 },
+    },
+    key: { published: "C", published_mode: "major", candidate: "F major" },
+    diagnostics: { key_accepted: false },
+  },
+});
+assert.equal(publishedDespitePulse.bpmDisplay.primary, "100");
+assert.equal(publishedDespitePulse.bpmDisplay.status, "published");
+assert.equal(publishedDespitePulse.bpmDisplay.withheld, false);
+assert.equal(publishedDespitePulse.bpmDisplay.raw, "200");
+assert.notEqual(publishedDespitePulse.bpmDisplay.raw, "0.64");
+assert.equal(publishedDespitePulse.keyDisplay.primary, "C major");
+assert.equal(publishedDespitePulse.keyDisplay.status, "published");
+assert.equal(publishedDespitePulse.keyDisplay.withheld, false);
+
 const detail = read("src/components/music-analyzer-runs/RunDetail.tsx");
-const passportUi = read("src/components/music-analyzer-runs/RunPassport.tsx");
-assert.match(detail, /RunPassport/);
-assert.match(detail, /Технические данные \/ Raw JSON/);
+const passportUi = read("src/components/music-passport/MusicPassport.tsx");
+assert.match(detail, /MusicPassport/);
+assert.match(detail, /mode="full"/);
+assert.match(passportUi, /Данные разработчика \/ Raw JSON/);
+assert.match(passportUi, /О версии анализа/);
 assert.match(passportUi, /Музыкальный паспорт/);
+assert.match(passportUi, /экспериментальная версия/);
 assert.match(detail, /format=json/);
 assert.match(detail, /format=csv/);
 assert.match(detail, /format=markdown/);
-assert.match(passportUi, /Темп \(BPM\)/);
+assert.match(passportUi, /Темп/);
 assert.match(passportUi, /Тональность/);
-assert.match(passportUi, /Характер \/ настроение/);
+assert.match(passportUi, /Характер и настроение/);
+assert.match(passportUi, /Характер звучания/);
 assert.match(passportUi, /Инструменты/);
 assert.doesNotMatch(`${detail}\n${passportUi}`, /ведущий инструмент/);
+assert.doesNotMatch(
+  read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx"),
+  /components\/music-passport\/MusicPassport/,
+);
+assert.doesNotMatch(read("src/components/author-dashboard/AuthorProductForm.tsx"), /components\/music-passport\/MusicPassport/);
+assert.equal(MUSIC_ANALYZER_FREEZE_SNAPSHOT, "932c4ce");
 assert.doesNotMatch(read("src/lib/music-analyzer-runs/export-run.ts"), /passport/);
+assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce/);
 
 console.log("music-analyzer-runs-unit: ok");

@@ -20,6 +20,24 @@ export type PassportFact = {
   lines: string[];
 };
 
+export type PassportMeasureStatus = "published" | "candidate" | "absent";
+
+/**
+ * Visual slots for tempo and key. Built from the same analyzer fields as
+ * `PassportFact`. A candidate is never promoted to a published value.
+ * `withheld` is set only when the payload itself leaves the published slot
+ * empty, records a failed gate, or sets pulse_accepted / key_accepted to false.
+ */
+export type PassportMeasureDisplay = {
+  primary: string | null;
+  raw: string | null;
+  secondary: string | null;
+  status: PassportMeasureStatus;
+  badge: "опубликовано" | "кандидат" | null;
+  confidence: string | null;
+  withheld: boolean;
+};
+
 export type PassportSources = {
   bpmPublished: string | null;
   bpmCandidate: string | null;
@@ -46,7 +64,9 @@ export type PassportSources = {
 
 export type MusicAnalyzerPassport = {
   bpm: PassportFact;
+  bpmDisplay: PassportMeasureDisplay;
   key: PassportFact;
+  keyDisplay: PassportMeasureDisplay;
   genres: PassportRow[];
   styles: PassportRow[];
   moods: PassportRow[];
@@ -344,6 +364,61 @@ function confidenceLabel(value: unknown): string | null {
   return text;
 }
 
+function isFalseFlag(value: unknown): boolean {
+  if (value === false) return true;
+  if (typeof value === "string" && value.trim().toLowerCase() === "false") return true;
+  return false;
+}
+
+function hasFalseFlag(nodes: Found[], field: string): boolean {
+  const wanted = field.toLowerCase();
+  return nodes.some((node) => leaf(node.segments).toLowerCase() === wanted && isFalseFlag(node.value));
+}
+
+function isExplicitEmpty(value: unknown): boolean {
+  return value == null || (typeof value === "string" && value.trim() === "");
+}
+
+function measureDisplay(input: {
+  published: string | null;
+  candidate: string | null;
+  raw: string | null;
+  confidence: string | null;
+  withheld: boolean;
+}): PassportMeasureDisplay {
+  if (input.published) {
+    return {
+      primary: input.published,
+      raw: input.raw,
+      secondary: input.candidate && input.candidate !== input.published ? input.candidate : null,
+      status: "published",
+      badge: "опубликовано",
+      confidence: input.confidence,
+      withheld: false,
+    };
+  }
+  if (input.candidate) {
+    return {
+      primary: input.candidate,
+      raw: input.raw,
+      secondary: null,
+      status: "candidate",
+      badge: "кандидат",
+      confidence: input.confidence,
+      withheld: input.withheld,
+    };
+  }
+  return {
+    primary: null,
+    raw: input.raw,
+    secondary: null,
+    status: "absent",
+    badge: null,
+    confidence: input.confidence,
+    withheld: input.withheld,
+  };
+}
+
 function gateLabel(value: unknown): string | null {
   if (value === true) return "опубликован";
   if (value === false) return "не опубликован";
@@ -373,8 +448,11 @@ function quantityNode(nodes: Found[], kind: "candidate" | "raw" | "confidence" |
   )));
 }
 
-function readBpm(nodes: Found[]): { fact: PassportFact; sources: Pick<PassportSources,
-  "bpmPublished" | "bpmCandidate" | "bpmRaw" | "bpmConfidence" | "bpmGate"> } {
+function readBpm(nodes: Found[]): {
+  fact: PassportFact;
+  display: PassportMeasureDisplay;
+  sources: Pick<PassportSources, "bpmPublished" | "bpmCandidate" | "bpmRaw" | "bpmConfidence" | "bpmGate">;
+} {
   const publishedMatches = nodes.filter((node) => (
     bpmKind(node.segments) === "published" && isScalarQuantity(node.value)
   ));
@@ -414,8 +492,22 @@ function readBpm(nodes: Found[]): { fact: PassportFact; sources: Pick<PassportSo
   if (published && gate === "опубликован") status.push(gate);
   if (status.length > 0) lines.push(status.join(" · "));
 
+  const explicitGateWithheld = gateNode != null && gate === "не опубликован";
+  const withheld = !published && (
+    publishedSlotEmpty
+    || explicitGateWithheld
+    || hasFalseFlag(nodes, "pulse_accepted")
+  );
+
   return {
     fact: { headline, lines },
+    display: measureDisplay({
+      published,
+      candidate,
+      raw,
+      confidence,
+      withheld,
+    }),
     sources: {
       bpmPublished: publishedNode?.path ?? null,
       bpmCandidate: candidateNode?.path ?? null,
@@ -461,8 +553,11 @@ function siblingMode(nodes: Found[], node: Found | null): Found | null {
   }));
 }
 
-function readKey(nodes: Found[]): { fact: PassportFact; sources: Pick<PassportSources,
-  "keyPublished" | "keyPublishedMode" | "keyCandidate" | "keyCandidateMode"> } {
+function readKey(nodes: Found[]): {
+  fact: PassportFact;
+  display: PassportMeasureDisplay;
+  sources: Pick<PassportSources, "keyPublished" | "keyPublishedMode" | "keyCandidate" | "keyCandidateMode">;
+} {
   const publishedNode = shortest(nodes.filter((node) => keyKind(node.segments) === "published" && cleanText(node.value)));
   const publishedModeNode = shortest(nodes.filter((node) => keyKind(node.segments) === "published-mode" && cleanText(node.value)))
     ?? siblingMode(nodes, publishedNode);
@@ -484,8 +579,20 @@ function readKey(nodes: Found[]): { fact: PassportFact; sources: Pick<PassportSo
     headline = `${candidate} · кандидат`;
     lines.push("опубликовано: —");
   }
+  const withheld = !published && (
+    nodes.some((node) => keyKind(node.segments) === "published" && isExplicitEmpty(node.value))
+    || hasFalseFlag(nodes, "key_accepted")
+  );
+
   return {
     fact: { headline, lines },
+    display: measureDisplay({
+      published,
+      candidate,
+      raw: null,
+      confidence: null,
+      withheld,
+    }),
     sources: {
       keyPublished: publishedNode?.path ?? null,
       keyPublishedMode: publishedModeNode?.path ?? null,
@@ -583,7 +690,9 @@ export function readMusicAnalyzerPassport(input: {
   const prompt = columnText(input.promptVersion) ?? promptHit?.text ?? null;
   return {
     bpm: bpm.fact,
+    bpmDisplay: bpm.display,
     key: key.fact,
+    keyDisplay: key.display,
     genres: genres.rows,
     styles: styles.rows,
     moods: moods.rows,
