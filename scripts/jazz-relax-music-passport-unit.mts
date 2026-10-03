@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
+import { JazzRelaxPassportBody } from "../src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon";
 import {
   JAZZ_RELAX_AUTHOR_ID,
   JAZZ_RELAX_AUTHOR_SLUG,
   isJazzRelaxAuthor,
 } from "../src/lib/authors/jazz-relax";
-import { readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
+import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
+import {
+  albumPassportMatchesTracks,
+  readAlbumPassportDisplay,
+} from "../src/lib/music-passport/album-passport-display";
+import { buildJazzRelaxPassportView } from "../src/lib/music-passport/jazz-relax-status";
 import {
   ALBUM_PASSPORT_AGGREGATION_VERSION,
   albumPassportPromptFacts,
@@ -208,5 +216,348 @@ assert.equal(nextDescriptionAlbumBinding({
   existingVersionId: null,
   generatedFromVersionId: newAlbumId,
 }), newAlbumId);
+
+const sharedInstruments = ["organ", "brushes", "saxophone", "bass guitar", "electric guitar", "strings"];
+
+function albumTrack(input: {
+  audioItemId: string;
+  passportId: string;
+  runId: string;
+  bpm: number;
+  candidate: number | null;
+  key: string;
+  genre: string;
+}): AlbumTrackSnapshot {
+  return {
+    audioItemId: input.audioItemId,
+    passportId: input.passportId,
+    runId: input.runId,
+    analyzerVersion: "snapshot:932c4ce",
+    analyzerGitCommit: "932c4ce",
+    facts: {
+      bpm: { published: input.bpm, candidate: input.candidate, raw: input.candidate },
+      key: {
+        published: input.key,
+        published_mode: "major",
+        candidate: "Bb minor",
+        candidate_mode: null,
+      },
+      genres: [{ label: input.genre, score: 0.9 }],
+      styles: [{ label: "Smooth Jazz", score: 0.4 }],
+      moods: [{ label: "warm", score: 0.8 }],
+      instruments: sharedInstruments.map((label) => ({ label, score: 0.2 })),
+      sound_character: { label: "rich", score: 0.2 },
+      loudness_lufs: -14.2,
+      energy: null,
+    },
+  };
+}
+
+const leftTrack = albumTrack({
+  audioItemId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa11",
+  passportId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb11",
+  runId: "cccccccc-cccc-4ccc-8ccc-cccccccccc11",
+  bpm: 72,
+  candidate: 144,
+  key: "C",
+  genre: "Jazz",
+});
+const rightTrack = albumTrack({
+  audioItemId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa12",
+  passportId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb12",
+  runId: "cccccccc-cccc-4ccc-8ccc-cccccccccc12",
+  bpm: 110,
+  candidate: null,
+  key: "F",
+  genre: "Lounge",
+});
+const disagreed = buildAlbumPassportDraft({ succeeded: [leftTrack, rightTrack], failed: [] });
+const albumId = "dddddddd-dddd-4ddd-8ddd-ddddddddddd3";
+const albumDisplay = readAlbumPassportDisplay({ id: albumId, version: 4, draft: disagreed });
+assert.ok(albumDisplay);
+assert.equal(albumDisplay.id, albumId);
+assert.equal(albumDisplay.status, "completed");
+assert.equal(albumDisplay.analyzedTrackCount, 2);
+assert.deepEqual(albumDisplay.bpm, { kind: "range", min: 72, max: 110 });
+assert.equal(albumDisplay.ambiguity.some((item) => item.field === "Темп" && item.values.includes("72") && item.values.includes("110")), true);
+assert.equal(albumDisplay.ambiguity.some((item) => item.field === "Тональность" && item.values.includes("C major") && item.values.includes("F major")), true);
+assert.equal(albumDisplay.ambiguity.some((item) => item.field === "Жанр"), true);
+assert.equal(albumDisplay.ambiguity.some((item) => item.field === "Инструменты"), false);
+assert.ok(albumDisplay.instruments.includes("strings"));
+assert.equal(JSON.stringify(albumDisplay).includes("144"), false);
+assert.equal(JSON.stringify(albumDisplay).includes("91"), false);
+assert.equal(JSON.stringify(albumDisplay).includes("rich"), false);
+assert.equal(JSON.stringify(albumDisplay).includes("Bb"), false);
+
+const agreed = buildAlbumPassportDraft({
+  succeeded: [
+    albumTrack({
+      audioItemId: leftTrack.audioItemId,
+      passportId: leftTrack.passportId,
+      runId: leftTrack.runId,
+      bpm: 80,
+      candidate: 144,
+      key: "C",
+      genre: "Jazz",
+    }),
+    albumTrack({
+      audioItemId: rightTrack.audioItemId,
+      passportId: rightTrack.passportId,
+      runId: rightTrack.runId,
+      bpm: 80,
+      candidate: 144,
+      key: "C",
+      genre: "Jazz",
+    }),
+  ],
+  failed: [],
+});
+const agreedDisplay = readAlbumPassportDisplay({
+  id: "dddddddd-dddd-4ddd-8ddd-ddddddddddd4",
+  version: 5,
+  draft: agreed,
+});
+assert.equal(agreedDisplay?.bpm?.kind, "single");
+assert.equal(agreedDisplay?.ambiguity.length, 0);
+assert.equal(JSON.stringify(agreedDisplay).includes("144"), false);
+
+const unpublishedTempo = buildAlbumPassportDraft({
+  succeeded: [leftTrack],
+  failed: [{ audioItemId: rightTrack.audioItemId, runId: rightTrack.runId }],
+});
+unpublishedTempo.bpmProfile = {
+  published: null,
+  candidates: [{ value: 144, track_passport_version_id: leftTrack.passportId }],
+  raw: [{ value: 144, track_passport_version_id: leftTrack.passportId }],
+};
+unpublishedTempo.styleProfile = { items: [] };
+unpublishedTempo.moodProfile = { items: [] };
+const missingDisplay = readAlbumPassportDisplay({
+  id: "dddddddd-dddd-4ddd-8ddd-ddddddddddd5",
+  version: 2,
+  draft: unpublishedTempo,
+});
+assert.equal(missingDisplay?.status, "partial");
+assert.equal(missingDisplay?.analyzedTrackCount, 1);
+assert.equal(missingDisplay?.bpm, null);
+assert.deepEqual(missingDisplay?.styles, []);
+assert.deepEqual(missingDisplay?.moods, []);
+assert.equal(missingDisplay?.ambiguity.length, 0);
+assert.equal(JSON.stringify(missingDisplay).includes("144"), false);
+assert.equal(readAlbumPassportDisplay({
+  id: "dddddddd-dddd-4ddd-8ddd-ddddddddddd6",
+  version: 1,
+  draft: pending,
+}), null);
+
+assert.equal(albumPassportMatchesTracks(disagreed, [
+  { audioItemId: leftTrack.audioItemId, state: "ready", passportVersionId: leftTrack.passportId },
+  { audioItemId: rightTrack.audioItemId, state: "ready", passportVersionId: rightTrack.passportId },
+]), true);
+assert.equal(albumPassportMatchesTracks(disagreed, [
+  { audioItemId: leftTrack.audioItemId, state: "ready", passportVersionId: leftTrack.passportId },
+  { audioItemId: rightTrack.audioItemId, state: "ready", passportVersionId: rightTrack.passportId },
+  { audioItemId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa13", state: "not_ready", passportVersionId: null },
+]), false);
+assert.equal(albumPassportMatchesTracks(disagreed, [
+  { audioItemId: leftTrack.audioItemId, state: "ready", passportVersionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb99" },
+  { audioItemId: rightTrack.audioItemId, state: "ready", passportVersionId: rightTrack.passportId },
+]), false);
+assert.equal(albumPassportMatchesTracks(unpublishedTempo, [
+  { audioItemId: leftTrack.audioItemId, state: "ready", passportVersionId: leftTrack.passportId },
+  { audioItemId: rightTrack.audioItemId, state: "failed", passportVersionId: null },
+]), true);
+
+const trackPassport = readMusicAnalyzerPassport({
+  normalized: {
+    technical: {
+      bpm: null,
+      bpm_confidence: "low",
+      duration_s: 188,
+      lufs: -14.2,
+      diagnostics: {
+        bpm_candidate: 70.3125,
+        bpm_candidate_raw: 140.625,
+        pulse_accepted: false,
+        key_candidate: "F major",
+      },
+    },
+    genres: [{ label: "Jazz", score: 0.9, band: "high" }],
+    styles: [{ name: "Smooth Jazz", average: 0.44 }],
+    moods: [{ name: "warm", average: 0.61, band: "high" }],
+    sound_character: [{ label: "rich", average: 0.17, band: "low" }],
+    instruments: [
+      { label: "organ", average: 0.131, max: 0.42 },
+      { label: "brushes", average: 0.124, max: 0.38 },
+      { label: "saxophone", average: 0.123, max: 0.36 },
+      { label: "bass guitar", average: 0.118, max: 0.33 },
+      { label: "electric guitar", average: 0.111, max: 0.29 },
+      { label: "strings", average: 0.102, max: 0.14 },
+      { label: "flute", average: 0.077, max: 0.12 },
+    ],
+    prompt_version: "prompt-hidden-jazz",
+    debug_marker: "passport-debug-json",
+  },
+});
+
+function renderStatus(status: ReturnType<typeof buildJazzRelaxPassportView>): string {
+  return renderToStaticMarkup(createElement(JazzRelaxPassportBody, {
+    status,
+    pending: false,
+    onRetry: () => undefined,
+    onReanalyzeTrack: () => undefined,
+    onReanalyzeAll: () => undefined,
+  }));
+}
+
+function splitAlbum(markup: string): { album: string; tracks: string } {
+  const marker = 'data-track-passports="true"';
+  const index = markup.indexOf(marker);
+  assert.ok(index > 0);
+  return { album: markup.slice(0, index), tracks: markup.slice(index) };
+}
+
+const completedView = buildJazzRelaxPassportView({
+  tracks: [leftTrack, rightTrack].map((item, index) => ({
+    audioItemId: item.audioItemId,
+    title: index === 0 ? "Первый трек" : "Второй трек",
+    state: "ready" as const,
+    errorCode: null,
+    passportVersionId: item.passportId,
+    runId: item.runId,
+    productPassport: {
+      filename: index === 0 ? "Первый трек" : "Второй трек",
+      analyzedAt: "2026-10-02T00:01:00.000Z",
+      passport: trackPassport,
+    },
+  })),
+  completedAlbumPassportVersionId: albumId,
+  album: albumDisplay,
+  summary: ["BPM: 72–110"],
+});
+assert.equal(completedView.phase, "completed");
+const completedMarkup = renderStatus(completedView);
+const completedParts = splitAlbum(completedMarkup);
+assert.match(completedMarkup, /Паспорта треков/);
+assert.match(completedParts.album, /data-album-music-passport="true"/);
+assert.match(completedParts.album, /data-album-status="completed"/);
+assert.match(completedParts.album, /data-analyzed-track-count="2"/);
+assert.match(completedParts.album, /Музыкальный паспорт альбома/);
+assert.match(completedParts.album, /72\.0–110\.0/);
+assert.match(completedParts.album, /Jazz/);
+assert.match(completedParts.album, /Lounge/);
+assert.match(completedParts.album, /strings/);
+assert.match(completedParts.album, /data-album-ambiguity="true"/);
+assert.match(completedParts.album, /Расхождения между треками/);
+assert.match(completedParts.album, /C major/);
+assert.match(completedParts.album, /F major/);
+assert.doesNotMatch(completedParts.album, /data-music-passport-mode/);
+assert.doesNotMatch(completedParts.album, /id="music-passport-heading"/);
+assert.doesNotMatch(completedParts.album, /№1/);
+assert.doesNotMatch(completedParts.album, /Характер звучания/);
+assert.doesNotMatch(completedParts.album, /О версии анализа/);
+assert.doesNotMatch(completedParts.album, /Raw JSON/);
+assert.doesNotMatch(completedParts.album, /экспериментальная версия/);
+assert.doesNotMatch(completedParts.album, /144/);
+assert.doesNotMatch(completedParts.album, /91/);
+assert.doesNotMatch(completedParts.album, /rich/);
+assert.doesNotMatch(completedParts.album, /Bb minor/);
+assert.doesNotMatch(completedParts.album, /prompt-hidden-jazz/);
+assert.doesNotMatch(completedParts.album, /passport-debug-json/);
+assert.doesNotMatch(completedParts.album, /932c4ce/);
+assert.match(completedParts.tracks, /data-music-passport-mode="product"/);
+assert.match(completedParts.tracks, /data-track-passport="product"/);
+assert.match(completedParts.tracks, /№5/);
+assert.match(completedParts.tracks, /electric guitar/);
+assert.match(completedParts.tracks, /Характер звучания/);
+assert.match(completedParts.tracks, /rich/);
+assert.match(completedParts.tracks, /70\.3/);
+assert.doesNotMatch(completedParts.tracks, /№6/);
+assert.doesNotMatch(completedParts.tracks, /strings/);
+assert.doesNotMatch(completedParts.tracks, /flute/);
+assert.doesNotMatch(completedParts.tracks, /О версии анализа/);
+assert.doesNotMatch(completedParts.tracks, /Raw JSON/);
+assert.doesNotMatch(completedParts.tracks, /экспериментальная версия/);
+assert.doesNotMatch(completedParts.tracks, /prompt-hidden-jazz/);
+assert.doesNotMatch(completedParts.tracks, /passport-debug-json/);
+assert.doesNotMatch(completedParts.tracks, /932c4ce/);
+assert.doesNotMatch(completedMarkup, /data-music-passport-mode="full"/);
+
+const partialView = buildJazzRelaxPassportView({
+  tracks: [
+    {
+      audioItemId: leftTrack.audioItemId,
+      title: "Первый трек",
+      state: "ready",
+      errorCode: null,
+      passportVersionId: leftTrack.passportId,
+      runId: leftTrack.runId,
+      productPassport: {
+        filename: "Первый трек",
+        analyzedAt: null,
+        passport: trackPassport,
+      },
+    },
+    {
+      audioItemId: rightTrack.audioItemId,
+      title: "Сорванный трек",
+      state: "failed",
+      errorCode: "analyze_failed",
+      passportVersionId: null,
+      runId: rightTrack.runId,
+      productPassport: null,
+    },
+  ],
+  completedAlbumPassportVersionId: null,
+  album: missingDisplay,
+  summary: [],
+});
+assert.equal(partialView.phase, "partial");
+const partialMarkup = renderStatus(partialView);
+const partialParts = splitAlbum(partialMarkup);
+assert.match(partialParts.album, /data-album-status="partial"/);
+assert.match(partialParts.album, /не указано/);
+assert.doesNotMatch(partialParts.album, /144/);
+assert.doesNotMatch(partialParts.album, /data-music-passport-mode/);
+assert.match(partialParts.tracks, /data-music-passport-mode="product"/);
+assert.match(partialParts.tracks, /Не удалось проанализировать: Сорванный трек/);
+assert.match(partialParts.tracks, /Повторить анализ/);
+assert.match(partialParts.tracks, /data-track-passport="failed"/);
+
+const emptyAlbumMarkup = renderToStaticMarkup(createElement(
+  JazzRelaxPassportBody,
+  {
+    status: buildJazzRelaxPassportView({
+      tracks: [],
+      completedAlbumPassportVersionId: null,
+      album: null,
+      summary: [],
+    }),
+    pending: false,
+    onRetry: () => undefined,
+    onReanalyzeTrack: () => undefined,
+    onReanalyzeAll: () => undefined,
+  },
+));
+assert.doesNotMatch(emptyAlbumMarkup, /data-album-music-passport/);
+assert.doesNotMatch(emptyAlbumMarkup, /data-music-passport-mode/);
+
+const panelSource = read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx");
+const albumSource = read("src/components/music-passport/AlbumMusicPassport.tsx");
+assert.match(panelSource, /mode="product"/);
+assert.match(panelSource, /AlbumMusicPassport/);
+assert.match(panelSource, /Паспорта треков/);
+assert.match(panelSource, /Повторить анализ/);
+assert.doesNotMatch(panelSource, /developerJson/);
+assert.doesNotMatch(albumSource, /\bMusicPassport\b|<MusicPassport|mode="product"|data-music-passport-mode/);
+assert.doesNotMatch(albumSource, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
+assert.match(form, /passportPhase === "completed"\s*\?\s*"Перейти к оформлению"/);
+assert.match(form, /if \(jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed"\)/);
+assert.match(form, /Продолжить без музыкального паспорта/);
+assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /readAlbumPassportDisplay/);
+assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /bind_description_album_passport/);
+assert.match(read("src/lib/music-analyzer-runs/python-plan.ts"), /candidate_a:\s*false/);
+assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce/);
+assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Перейти к оформлению/);
 
 console.log("jazz-relax-music-passport-unit: ok");

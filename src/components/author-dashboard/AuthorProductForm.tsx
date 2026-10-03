@@ -77,6 +77,7 @@ import {
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
 import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
+import type { JazzRelaxPassportView } from "@/lib/music-passport/jazz-relax-status";
 import { isPracticeProductWizardEnabled } from "@/lib/author-products/practice-product-wizard";
 import {
   CATALOG_SECTION_FIELD_LABEL,
@@ -839,8 +840,9 @@ export default function AuthorProductForm({
     action: "start" | "retry" | "reanalyze";
     audioItemId?: string;
   } | null>(null);
-  const onJazzRelaxPassportStatus = useCallback(() => {
-    // The panel owns progress. Step 3 is not blocked when no passport exists.
+  const [passportPhase, setPassportPhase] = useState<JazzRelaxPassportView["phase"] | null>(null);
+  const onJazzRelaxPassportStatus = useCallback((status: JazzRelaxPassportView) => {
+    setPassportPhase(status.phase);
   }, []);
   const [form, setForm] = useState<FormState>(() =>
     applyAudioSprintTitleLock(
@@ -3673,6 +3675,14 @@ export default function AuthorProductForm({
       }
     }
 
+    if (jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed") {
+      const next = nextProductWizardStep(wizardStep);
+      if (next) {
+        goToWizardStep(next);
+      }
+      return;
+    }
+
     if (jazzRelaxMusicPassport && wizardStep === 2) {
       setPassportCommand({ nonce: Date.now(), action: "start" });
       return;
@@ -5860,7 +5870,9 @@ export default function AuthorProductForm({
           busy={busy}
           continueLabel={
             jazzRelaxMusicPassport && wizardStep === 2
-              ? "Сохранить и создать музыкальный паспорт"
+              ? passportPhase === "completed"
+                ? "Перейти к оформлению"
+                : "Сохранить и создать музыкальный паспорт"
               : undefined
           }
           secondaryContinueLabel={

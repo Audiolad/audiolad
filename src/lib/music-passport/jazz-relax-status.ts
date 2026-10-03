@@ -1,3 +1,6 @@
+import type { MusicAnalyzerPassport } from "@/lib/music-analyzer-runs/passport";
+import type { AlbumPassportDisplay } from "@/lib/music-passport/album-passport-display";
+
 export type JazzRelaxTrackState =
   | "missing_audio"
   | "not_ready"
@@ -6,6 +9,13 @@ export type JazzRelaxTrackState =
   | "ready"
   | "failed";
 
+/** Track card for product mode. Provenance and raw JSON are not part of this payload. */
+export type JazzRelaxProductTrackPassport = {
+  filename: string;
+  analyzedAt: string | null;
+  passport: MusicAnalyzerPassport;
+};
+
 export type JazzRelaxPassportTrackView = {
   audioItemId: string;
   title: string;
@@ -13,6 +23,7 @@ export type JazzRelaxPassportTrackView = {
   errorCode: string | null;
   passportVersionId: string | null;
   runId: string | null;
+  productPassport: JazzRelaxProductTrackPassport | null;
 };
 
 export type JazzRelaxPassportView = {
@@ -21,6 +32,8 @@ export type JazzRelaxPassportView = {
   totalCount: number;
   tracks: JazzRelaxPassportTrackView[];
   completedAlbumPassportVersionId: string | null;
+  /** Frozen album row for this settled analysis. Null while a run is still in progress. */
+  album: AlbumPassportDisplay | null;
   summary: string[];
   progressLabel: string;
 };
@@ -32,6 +45,7 @@ export function jazzRelaxProgressLabel(readyCount: number, totalCount: number): 
 export function buildJazzRelaxPassportView(input: {
   tracks: JazzRelaxPassportTrackView[];
   completedAlbumPassportVersionId: string | null;
+  album: AlbumPassportDisplay | null;
   summary: string[];
 }): JazzRelaxPassportView {
   const totalCount = input.tracks.length;
@@ -59,6 +73,7 @@ export function buildJazzRelaxPassportView(input: {
     totalCount,
     tracks: input.tracks,
     completedAlbumPassportVersionId: input.completedAlbumPassportVersionId,
+    album: input.album,
     summary: input.summary,
     progressLabel: jazzRelaxProgressLabel(readyCount, totalCount),
   };
