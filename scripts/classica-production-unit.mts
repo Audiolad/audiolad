@@ -33,7 +33,7 @@ import {
 import { SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/robots-config";
 
 const sql = readFileSync(
-  new URL("../supabase/migrations/20261003190700_classica_production_v01.sql", import.meta.url),
+  new URL("../supabase/migrations/20261220122000_classica_production_v01.sql", import.meta.url),
   "utf8",
 );
 
