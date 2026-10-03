@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
 import { MUSIC_STREAMS_BUCKET } from "../src/lib/author-products/music-master-upload-contract";
 import {
   MUSIC_STREAM_BITRATE,
+  MUSIC_STREAM_BITRATE_MAX,
+  MUSIC_STREAM_BITRATE_MIN,
   MUSIC_STREAM_MIME,
+  MUSIC_STREAM_SAMPLE_RATE_HZ,
   MUSIC_TRANSCODE_FAILED_MESSAGE,
   MUSIC_TRANSCODE_MAX_ATTEMPTS,
   MUSIC_TRANSCODE_RETRY_MESSAGE,
@@ -27,6 +30,9 @@ const storagePath = buildMusicStreamStoragePath(audioItemId, sourceId);
 
 assert.equal(MUSIC_TRANSCODE_MAX_ATTEMPTS, 3);
 assert.equal(MUSIC_STREAM_BITRATE, "256k");
+assert.equal(MUSIC_STREAM_SAMPLE_RATE_HZ, 44100);
+assert.equal(MUSIC_STREAM_BITRATE_MIN, 240_000);
+assert.equal(MUSIC_STREAM_BITRATE_MAX, 272_000);
 assert.equal(MUSIC_STREAM_MIME, "audio/mpeg");
 assert.equal(storagePath, `${audioItemId}/${sourceId}/mp3-256.mp3`);
 assert.equal(isOwnedMusicStreamStoragePath(storagePath, audioItemId, sourceId), true);
@@ -91,8 +97,14 @@ assert.equal(MUSIC_TRANSCODE_FAILED_MESSAGE.includes("Не удалось"), tru
 const ffmpeg = read("src/lib/music-transcode/ffmpeg.ts");
 assert.match(ffmpeg, /libmp3lame/);
 assert.match(ffmpeg, /MUSIC_STREAM_BITRATE/);
+assert.match(ffmpeg, /MUSIC_STREAM_SAMPLE_RATE_HZ/);
 assert.match(ffmpeg, /-vn/);
 assert.match(ffmpeg, /probe\.bitrate == null/);
+assert.match(
+  ffmpeg,
+  /-ar",\s*String\(MUSIC_STREAM_SAMPLE_RATE_HZ\),\s*"-c:a",\s*"libmp3lame",\s*"-b:a",\s*MUSIC_STREAM_BITRATE/,
+);
+assert.doesNotMatch(ffmpeg, /160000|160k/);
 assert.doesNotMatch(ffmpeg, /loudnorm|dynaudnorm|acompressor|equalizer/);
 
 const signed = read("src/lib/listen/signed-audio.ts");

@@ -139,7 +139,10 @@ import {
   type PublicationClass,
 } from "@/lib/author-products/publication-class";
 import { uploadAuthorProductAudioDirect } from "@/lib/author-products/direct-audio-upload-client";
-import { uploadMusicMasterDirect } from "@/lib/author-products/music-master-upload-client";
+import {
+  MUSIC_MASTER_UPLOAD_ACCEPTED_MESSAGE,
+  uploadMusicMasterDirect,
+} from "@/lib/author-products/music-master-upload-client";
 import { validateMusicMasterFileClient } from "@/lib/author-products/music-master-upload-contract";
 import {
   MUSIC_DELIVERY_REPLACE_LABEL,
@@ -147,6 +150,7 @@ import {
   MUSIC_DELIVERY_UPLOAD_HINT,
   hasPlayableAuthorAudioPreview,
   musicAuthorTrackStatusText,
+  replacePreparingNoticeAfterMusicTranscodeFailure,
   resolveMusicUploadMode,
 } from "@/lib/listen/music-delivery";
 import {
@@ -203,8 +207,11 @@ import {
 import {
   appendCreatedAudioItem,
   applyMusicAudioItemDeletion,
+  applyServerMusicMasterStatus,
   mergeServerAudioItems,
   mergeServerProductIntoForm,
+  musicTranscodeBecameFailed,
+  musicTranscodeStatusNeedsPoll,
   patchAudioItemAfterMusicMasterFinalize,
   patchAudioItemFromUpload,
   productDetailToFormSnapshot,
@@ -1097,6 +1104,59 @@ export default function AuthorProductForm({
       void reloadSavedProduct(practiceId);
     }, 3000);
     return () => window.clearInterval(timer);
+  }, [audioItems, form.productKind, practiceId]);
+
+  useEffect(() => {
+    if (form.productKind !== PRODUCT_KIND.MUSIC || !practiceId) {
+      return;
+    }
+    const pending = audioItems.some((item) =>
+      musicTranscodeStatusNeedsPoll(item.music_master?.transcodeStatus),
+    );
+    if (!pending) {
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/author/products/${practiceId}`, {
+          cache: "no-store",
+        });
+        if (!response.ok || cancelled) {
+          return;
+        }
+        const payload = (await response.json()) as {
+          product?: AuthorProductDetail;
+        };
+        if (!payload.product || cancelled) {
+          return;
+        }
+        const serverItems = payload.product.audio_items;
+        const before = audioItemsRef.current;
+        const preview = applyServerMusicMasterStatus(before, serverItems);
+        const becameFailed = musicTranscodeBecameFailed(before, preview);
+        setAudioItems((current) => applyServerMusicMasterStatus(current, serverItems));
+        if (becameFailed) {
+          setMessage((current) =>
+            replacePreparingNoticeAfterMusicTranscodeFailure(
+              current,
+              MUSIC_MASTER_UPLOAD_ACCEPTED_MESSAGE,
+              true,
+            ),
+          );
+        }
+      } catch {
+        // The next tick reads the job status again.
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [audioItems, form.productKind, practiceId]);
 
   useEffect(() => {

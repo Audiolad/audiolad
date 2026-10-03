@@ -204,3 +204,15 @@ export function musicAuthorTrackStatusText(input: {
   }
   return musicCabinetStatus(input).text;
 }
+
+/** Replace the post-upload preparing notice once the real job has failed. */
+export function replacePreparingNoticeAfterMusicTranscodeFailure(
+  currentMessage: string | null,
+  acceptedUploadMessage: string,
+  becameFailed: boolean,
+): string | null {
+  if (becameFailed && currentMessage === acceptedUploadMessage) {
+    return MUSIC_DELIVERY_FAILED_TEXT;
+  }
+  return currentMessage;
+}

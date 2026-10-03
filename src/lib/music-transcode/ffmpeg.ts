@@ -5,6 +5,7 @@ import {
   MUSIC_STREAM_BITRATE,
   MUSIC_STREAM_BITRATE_MAX,
   MUSIC_STREAM_BITRATE_MIN,
+  MUSIC_STREAM_SAMPLE_RATE_HZ,
   durationWithinTolerance,
 } from "./contract";
 
@@ -190,6 +191,7 @@ export async function transcodeWavToMp3(
     "-i", inputPath,
     "-map", "0:a:0",
     "-vn",
+    "-ar", String(MUSIC_STREAM_SAMPLE_RATE_HZ),
     "-c:a", "libmp3lame",
     "-b:a", MUSIC_STREAM_BITRATE,
     outputPath,

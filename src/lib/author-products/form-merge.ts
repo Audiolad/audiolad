@@ -398,6 +398,63 @@ export function patchAudioItemAfterMusicMasterFinalize(
   });
 }
 
+export function musicTranscodeStatusNeedsPoll(
+  status: string | null | undefined,
+): boolean {
+  return status === "queued" || status === "processing";
+}
+
+/** Copy the server job onto the same master. Leave titles and a newer asset alone. */
+export function applyServerMusicMasterStatus(
+  localItems: AudioItemRow[],
+  serverItems: readonly AudioItemRow[],
+): AudioItemRow[] {
+  const serverById = new Map(serverItems.map((item) => [item.id, item]));
+  let changed = false;
+  const next = localItems.map((item) => {
+    const localMaster = item.music_master;
+    const serverItem = serverById.get(item.id);
+    const serverMaster = serverItem?.music_master;
+    if (!localMaster || !serverMaster || localMaster.assetId !== serverMaster.assetId) {
+      return item;
+    }
+    const nextDeliveryId = serverMaster.hasActiveDelivery
+      ? serverItem?.active_music_delivery_asset_id ?? item.active_music_delivery_asset_id
+      : item.active_music_delivery_asset_id;
+    if (
+      localMaster.lifecycleState === serverMaster.lifecycleState
+      && localMaster.transcodeStatus === serverMaster.transcodeStatus
+      && localMaster.hasActiveDelivery === serverMaster.hasActiveDelivery
+      && item.active_music_delivery_asset_id === nextDeliveryId
+    ) {
+      return item;
+    }
+    changed = true;
+    return {
+      ...item,
+      active_music_delivery_asset_id: nextDeliveryId,
+      music_master: {
+        assetId: localMaster.assetId,
+        lifecycleState: serverMaster.lifecycleState,
+        transcodeStatus: serverMaster.transcodeStatus,
+        hasActiveDelivery: serverMaster.hasActiveDelivery,
+      },
+    };
+  });
+  return changed ? next : localItems;
+}
+
+export function musicTranscodeBecameFailed(
+  before: readonly AudioItemRow[],
+  after: readonly AudioItemRow[],
+): boolean {
+  return after.some((item) => {
+    if (item.music_master?.transcodeStatus !== "failed") return false;
+    const previous = before.find((entry) => entry.id === item.id);
+    return musicTranscodeStatusNeedsPoll(previous?.music_master?.transcodeStatus);
+  });
+}
+
 /** Drop one track and take sibling positions from the server. Keep local media and text. */
 export function applyMusicAudioItemDeletion(
   localItems: AudioItemRow[],

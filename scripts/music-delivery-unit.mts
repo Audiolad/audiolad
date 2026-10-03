@@ -13,6 +13,7 @@ import {
   hasPlayableAuthorAudioPreview,
   hasValidatedMusicPublishSource,
   musicCabinetStatus,
+  replacePreparingNoticeAfterMusicTranscodeFailure,
   resolveMusicCatalogPreviewMode,
   resolveMusicListenSource,
   resolveMusicUploadMode,
@@ -111,6 +112,39 @@ assert.equal(
     transcodeStatus: "failed",
   }).text,
   MUSIC_DELIVERY_FAILED_TEXT,
+);
+assert.equal(
+  MUSIC_DELIVERY_FAILED_TEXT.startsWith("Не удалось подготовить версию для прослушивания."),
+  true,
+);
+const acceptedUploadMessage = "Файл загружен. Подготавливаем версию для прослушивания…";
+assert.equal(
+  replacePreparingNoticeAfterMusicTranscodeFailure(
+    acceptedUploadMessage,
+    acceptedUploadMessage,
+    true,
+  ),
+  MUSIC_DELIVERY_FAILED_TEXT,
+);
+assert.equal(
+  replacePreparingNoticeAfterMusicTranscodeFailure(
+    "Черновик сохранён.",
+    acceptedUploadMessage,
+    true,
+  ),
+  "Черновик сохранён.",
+);
+assert.equal(
+  replacePreparingNoticeAfterMusicTranscodeFailure(
+    acceptedUploadMessage,
+    acceptedUploadMessage,
+    false,
+  ),
+  acceptedUploadMessage,
+);
+assert.equal(
+  replacePreparingNoticeAfterMusicTranscodeFailure(null, acceptedUploadMessage, true),
+  null,
 );
 assert.equal(
   musicCabinetStatus({
