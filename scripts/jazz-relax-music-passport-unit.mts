@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { MUSIC_MASTERS_BUCKET } from "../src/lib/author-products/music-master-upload-contract";
+import { PRACTICE_AUDIO_BUCKET } from "../src/lib/author-products/product-audio-upload-contract";
 import { JazzRelaxPassportBody } from "../src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon";
 import {
@@ -16,6 +18,11 @@ import {
   readAlbumPassportDisplay,
 } from "../src/lib/music-passport/album-passport-display";
 import { buildJazzRelaxPassportView } from "../src/lib/music-passport/jazz-relax-status";
+import {
+  jazzRelaxAnalysisStorageTarget,
+  jazzRelaxPassportTrackBlock,
+  resolveJazzRelaxAnalysisAudio,
+} from "../src/lib/music-passport/jazz-relax-pilot";
 import {
   ALBUM_PASSPORT_AGGREGATION_VERSION,
   albumPassportPromptFacts,
@@ -559,5 +566,117 @@ assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /bind_descripti
 assert.match(read("src/lib/music-analyzer-runs/python-plan.ts"), /candidate_a:\s*false/);
 assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce/);
 assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Перейти к оформлению/);
+
+{
+  const audioItemId = "track-jazz";
+  const masterId = "27e4ed87-d672-4fc6-8f38-512e58c2aaca";
+  const storagePath = `practices/37dc3a6b-ad83-4d74-880c-a8222537c2a9/audio/${audioItemId}/masters/${masterId}.wav`;
+  const verified = {
+    id: masterId,
+    audioItemId,
+    assetRole: "master",
+    lifecycleState: "verified",
+    storageBucket: MUSIC_MASTERS_BUCKET,
+    storagePath,
+    originalFileName: "jazz-relax.wav",
+  };
+  const withMaster = resolveJazzRelaxAnalysisAudio({
+    audioItemId,
+    audioPath: null,
+    desiredMasterAssetId: masterId,
+    master: verified,
+  });
+  assert.equal(withMaster.kind, "music_master");
+  if (withMaster.kind !== "music_master") {
+    throw new Error("verified master must be the analysis source");
+  }
+  assert.equal(withMaster.path, storagePath);
+  assert.deepEqual(jazzRelaxAnalysisStorageTarget(withMaster), {
+    bucket: MUSIC_MASTERS_BUCKET,
+    path: storagePath,
+  });
+  assert.notEqual(
+    jazzRelaxPassportTrackBlock(
+      { id: audioItemId, file_size_bytes: null },
+      new Set(),
+      new Set(),
+      withMaster,
+    ),
+    "missing_audio",
+  );
+
+  const blankPath = resolveJazzRelaxAnalysisAudio({
+    audioItemId,
+    audioPath: "   ",
+    desiredMasterAssetId: masterId,
+    master: verified,
+  });
+  assert.equal(blankPath.kind, "music_master");
+  assert.notEqual(
+    jazzRelaxPassportTrackBlock(
+      { id: audioItemId, file_size_bytes: null },
+      new Set(),
+      new Set(),
+      blankPath,
+    ),
+    "missing_audio",
+  );
+
+  const neither = resolveJazzRelaxAnalysisAudio({
+    audioItemId: "track-empty",
+    audioPath: null,
+    desiredMasterAssetId: null,
+    master: null,
+  });
+  assert.equal(neither.kind, "missing_audio");
+  assert.equal(
+    jazzRelaxPassportTrackBlock(
+      { id: "track-empty", file_size_bytes: null },
+      new Set(),
+      new Set(),
+      neither,
+    ),
+    "missing_audio",
+  );
+
+  const rejected = resolveJazzRelaxAnalysisAudio({
+    audioItemId,
+    audioPath: null,
+    desiredMasterAssetId: masterId,
+    master: { ...verified, lifecycleState: "rejected" },
+  });
+  assert.equal(rejected.kind, "missing_audio");
+  assert.equal(
+    jazzRelaxPassportTrackBlock(
+      { id: audioItemId, file_size_bytes: null },
+      new Set(),
+      new Set(),
+      rejected,
+    ),
+    "missing_audio",
+  );
+
+  const legacy = resolveJazzRelaxAnalysisAudio({
+    audioItemId,
+    audioPath: "legacy/track.mp3",
+    desiredMasterAssetId: masterId,
+    master: verified,
+  });
+  assert.equal(legacy.kind, "practice_audio");
+  if (legacy.kind === "practice_audio") {
+    assert.deepEqual(jazzRelaxAnalysisStorageTarget(legacy), {
+      bucket: PRACTICE_AUDIO_BUCKET,
+      path: "legacy/track.mp3",
+    });
+  }
+
+  const pilot = read("src/lib/music-passport/jazz-relax-pilot.ts");
+  assert.match(pilot, /resolveJazzRelaxAnalysisAudio/);
+  assert.match(pilot, /jazzRelaxPassportTrackBlock/);
+  assert.match(pilot, /MUSIC_MASTERS_BUCKET/);
+  assert.doesNotMatch(pilot, /if \(!track\.audio_path\?\.trim\(\)\) return "missing_audio"/);
+  assert.doesNotMatch(pilot, /\.from\("audio_items"\)[\s\S]{0,160}\.update\(/);
+  assert.doesNotMatch(pilot, /\.from\("music_audio_assets"\)[\s\S]{0,160}\.insert\(/);
+}
 
 console.log("jazz-relax-music-passport-unit: ok");
