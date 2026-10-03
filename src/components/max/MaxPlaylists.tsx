@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import MaxPlaylistCard from "@/components/max/MaxPlaylistCard";
 import MaxPlaylistDetail from "@/components/max/MaxPlaylistDetail";
+import { useMiniAppGuestTransport } from "@/components/mini-app/MiniAppGuestTransport";
+import type { MiniAppGuestTransport } from "@/lib/mini-app/guest-transport";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_PLAYLISTS_CATALOG_PATH } from "@/lib/max/host";
 import {
@@ -34,6 +36,7 @@ function MaxPlaylistCatalog({
 }: {
   onOpen: (slug: string) => void;
 }) {
+  const guestTransport = useMiniAppGuestTransport();
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<PlaylistListingSort>("newest");
@@ -70,7 +73,14 @@ function MaxPlaylistCatalog({
     requestRef.current = requestId;
     const controller = new AbortController();
 
-    void fetchCatalog({ query, sort, access, cursor: null, signal: controller.signal })
+    void fetchCatalog({
+      query,
+      sort,
+      access,
+      cursor: null,
+      signal: controller.signal,
+      guestTransport,
+    })
       .then((page) => {
         if (requestRef.current !== requestId) {
           return;
@@ -90,7 +100,7 @@ function MaxPlaylistCatalog({
       });
 
     return () => controller.abort();
-  }, [access, query, sort]);
+  }, [access, guestTransport, query, sort]);
 
   async function loadMore() {
     if (!nextCursor || inFlightMoreRef.current || status !== "ready") {
@@ -103,7 +113,14 @@ function MaxPlaylistCatalog({
     const cursor = nextCursor;
 
     try {
-      const page = await fetchCatalog({ query, sort, access, cursor, signal: undefined });
+      const page = await fetchCatalog({
+        query,
+        sort,
+        access,
+        cursor,
+        signal: undefined,
+        guestTransport,
+      });
       setItems((current) => {
         const seen = new Set(current.map((item) => item.slug));
         return [...current, ...page.items.filter((item) => !seen.has(item.slug))];
@@ -272,7 +289,12 @@ async function fetchCatalog(input: {
   access: PlaylistListingAccessFilter;
   cursor: string | null;
   signal: AbortSignal | undefined;
+  guestTransport: MiniAppGuestTransport | null;
 }) {
+  if (input.guestTransport) {
+    return input.guestTransport.postPlaylistCatalog(input);
+  }
+
   const initData = readMaxInitData();
   if (!initData) {
     throw new Error("max_init_data_missing");

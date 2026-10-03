@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { FEATURED_CARD_PRIMARY_CTA_CLASS } from "@/components/home/FeaturedProductCard";
 import MaxAudioPlayer from "@/components/max/MaxAudioPlayer";
 import PlaylistCover from "@/components/playlists/PlaylistCover";
+import { useMiniAppGuestTransport } from "@/components/mini-app/MiniAppGuestTransport";
 import { readMaxInitData } from "@/lib/max/bridge";
 import {
   MAX_PLAYBACK_AUDIO_PATH,
@@ -84,6 +85,7 @@ export default function MaxPlaylistDetail({
   onRequestLogin?: () => void;
   onRequestSignup?: () => void;
 }) {
+  const guestTransport = useMiniAppGuestTransport();
   const [detailState, setDetailState] = useState<DetailStatus>({ status: "loading" });
   const [playback, setPlayback] = useState<PlaybackStatus>({ status: "idle" });
   const [playing, setPlaying] = useState(false);
@@ -107,6 +109,33 @@ export default function MaxPlaylistDetail({
   useEffect(() => {
     const controller = new AbortController();
     const generation = ++generationRef.current;
+    if (guestTransport) {
+      void guestTransport
+        .postPlaylistDetail(slug, controller.signal)
+        .then(({ status, payload }) => {
+          if (controller.signal.aborted || generation !== generationRef.current) return;
+          if (status === 404) {
+            setDetailState({ status: "not_found" });
+            return;
+          }
+          const detail = readMaxPlaylistDetailPayload(payload);
+          if (!detail) {
+            setDetailState({ status: "error" });
+            return;
+          }
+          setDetailState({ status: "ready", detail });
+        })
+        .catch(() => {
+          if (!controller.signal.aborted && generation === generationRef.current) {
+            setDetailState({ status: "error" });
+          }
+        });
+      return () => {
+        generationRef.current += 1;
+        controller.abort();
+      };
+    }
+
     const initData = readMaxInitData();
     if (!initData) {
       queueMicrotask(() => {
@@ -157,7 +186,7 @@ export default function MaxPlaylistDetail({
       generationRef.current += 1;
       controller.abort();
     };
-  }, [slug]);
+  }, [guestTransport, slug]);
 
   function bindPlay(play: () => void) {
     playRef.current = play;
@@ -221,12 +250,6 @@ export default function MaxPlaylistDetail({
 
     setActiveIndex(index);
     setPlayback({ status: "loading", index });
-    const initData = readMaxInitData();
-    if (!initData || !item.authorSlug || !item.productSlug) {
-      setPlayback({ status: "error", index });
-      return;
-    }
-
     const playbackTarget = maxPlaylistPlaybackSessionBody(item);
     if (!playbackTarget) {
       setPlayback({ status: "error", index });
@@ -234,22 +257,43 @@ export default function MaxPlaylistDetail({
     }
 
     try {
-      const response = await fetch(MAX_PLAYBACK_SESSION_PATH, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          initData,
-          ...playbackTarget,
-        }),
-        cache: "no-store",
-      });
-      const payload = await response.json().catch(() => null);
+      let responseOk = false;
+      let payload: {
+        session?: MaxPlaybackSession;
+        playbackTicket?: unknown;
+        reason?: unknown;
+      } | null = null;
+      if (guestTransport) {
+        const guest = await guestTransport.postPlaybackSession(playbackTarget);
+        if (generation !== generationRef.current) return;
+        responseOk = guest.ok;
+        payload = guest.payload as typeof payload;
+      } else {
+        const initData = readMaxInitData();
+        if (!initData || !item.authorSlug || !item.productSlug) {
+          setPlayback({ status: "error", index });
+          return;
+        }
+        const response = await fetch(MAX_PLAYBACK_SESSION_PATH, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            initData,
+            ...playbackTarget,
+          }),
+          cache: "no-store",
+        });
+        payload = await response.json().catch(() => null);
+        responseOk = response.ok;
+      }
       if (generation !== generationRef.current) {
         return;
       }
 
-      if (!response.ok || !payload?.session || typeof payload.playbackTicket !== "string") {
+      const playbackTicket =
+        typeof payload?.playbackTicket === "string" ? payload.playbackTicket : "";
+      if (!responseOk || !payload?.session || (!guestTransport && !playbackTicket)) {
         const reason = isBlockReason(payload?.reason) ? payload.reason : "not_found";
         if (direction) {
           await skipAndContinue(direction);
@@ -275,7 +319,7 @@ export default function MaxPlaylistDetail({
         status: "ready",
         index,
         session,
-        playbackTicket: payload.playbackTicket,
+        playbackTicket,
       });
     } catch {
       if (generation === generationRef.current) {
@@ -429,6 +473,15 @@ export default function MaxPlaylistDetail({
               onPlayingChange={setPlaying}
               onPlaybackCompleted={handleEnded}
               fetchAudio={async (trackId, signal) => {
+                if (guestTransport) {
+                  return guestTransport.fetchPlaybackAudio({
+                    authorSlug: playback.session.authorSlug,
+                    productSlug: playback.session.productSlug,
+                    trackId,
+                    playbackMode: playback.session.playbackMode,
+                    signal,
+                  });
+                }
                 const resource = maxPlaylistPlaybackResource(playback.session.playbackMode);
                 const response = await fetch(
                   resource === "preview" ? MAX_PLAYBACK_PREVIEW_PATH : MAX_PLAYBACK_AUDIO_PATH,
