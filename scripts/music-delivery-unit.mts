@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import {
+  loadMusicMasterStatus,
+  selectNewestTranscodeStatusBySource,
+} from "../src/lib/author-products/products";
 import {
   MUSIC_DELIVERY_EMPTY_TEXT,
   MUSIC_DELIVERY_FAILED_TEXT,
@@ -297,4 +303,160 @@ assert.match(worker, /audiolad-music-transcode-worker/);
 assert.doesNotMatch(worker, /Do not add this process to/);
 
 assert.equal(MUSIC_DELIVERY_UNSUPPORTED_TEXT.includes("WAV"), true);
+
+// Older failed jobs must not hide a newer ready job when active delivery exists.
+{
+  const masters = [
+    {
+      id: "27e4ed87-d672-4fc6-8f38-512e58c2aaca",
+      audioId: "track-a",
+      streamId: "stream-a",
+      readyJobId: "95b2d0d7-c6e1-4782-a7d5-5baa9383d954",
+    },
+    {
+      id: "143ccec4-8e7f-44bf-81fd-8f23ca7e1c57",
+      audioId: "track-b",
+      streamId: "stream-b",
+      readyJobId: "44aa09c3-fd6f-47ac-8150-fa177d1160d2",
+    },
+  ] as const;
+
+  const items = masters.map((master) => ({
+    id: master.audioId,
+    audio_path: null,
+    desired_music_master_asset_id: master.id,
+    active_music_delivery_asset_id: master.streamId,
+  }));
+
+  const assets = masters.flatMap((master) => [
+    {
+      id: master.id,
+      audio_item_id: master.audioId,
+      asset_role: "master",
+      lifecycle_state: "verified",
+      storage_bucket: "music-masters",
+      storage_path: `practices/37dc3a6b-ad83-4d74-880c-a8222537c2a9/audio/${master.audioId}/masters/${master.id}.wav`,
+      created_at: "2026-08-01T00:00:00.000Z",
+    },
+    {
+      id: master.streamId,
+      audio_item_id: master.audioId,
+      asset_role: "stream",
+      lifecycle_state: "verified",
+      storage_bucket: "music-streams",
+      storage_path: `${master.audioId}/${master.id}/mp3-256.mp3`,
+      created_at: "2026-09-20T00:00:00.000Z",
+    },
+  ]);
+
+  const jobs = masters.flatMap((master) => [
+    {
+      id: `${master.id}-failed-1`,
+      source_asset_id: master.id,
+      status: "failed",
+      created_at: "2026-08-02T00:00:00.000Z",
+    },
+    {
+      id: `${master.id}-failed-2`,
+      source_asset_id: master.id,
+      status: "failed",
+      created_at: "2026-08-03T00:00:00.000Z",
+    },
+    {
+      id: `${master.id}-failed-3`,
+      source_asset_id: master.id,
+      status: "failed",
+      created_at: "2026-08-04T00:00:00.000Z",
+    },
+    {
+      id: master.readyJobId,
+      source_asset_id: master.id,
+      status: "ready",
+      created_at: "2026-09-15T00:00:00.000Z",
+    },
+  ]);
+
+  for (const master of masters) {
+    const newestFirst = jobs
+      .filter((job) => job.source_asset_id === master.id)
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+    const selected = selectNewestTranscodeStatusBySource(newestFirst).get(master.id);
+    assert.equal(selected, "ready");
+    assert.equal(
+      musicCabinetStatus({
+        hasLegacyAudioPath: false,
+        hasActiveDelivery: true,
+        lifecycleState: "verified",
+        transcodeStatus: selected,
+      }).text,
+      MUSIC_DELIVERY_READY_TEXT,
+    );
+    assert.notEqual(
+      musicCabinetStatus({
+        hasLegacyAudioPath: false,
+        hasActiveDelivery: true,
+        lifecycleState: "verified",
+        transcodeStatus: selected,
+      }).text,
+      MUSIC_DELIVERY_FAILED_TEXT,
+    );
+  }
+
+  const serviceRole = {
+    from(table: string) {
+      let rows = (table === "music_audio_assets" ? assets : table === "music_transcode_jobs" ? jobs : []).map(
+        (row) => ({ ...row }),
+      );
+      const chain = {
+        select() {
+          return chain;
+        },
+        in(column: string, values: readonly unknown[]) {
+          const allowed = new Set(values);
+          rows = rows.filter((row) => allowed.has(row[column as keyof typeof row]));
+          return chain;
+        },
+        eq(column: string, value: unknown) {
+          rows = rows.filter((row) => row[column as keyof typeof row] === value);
+          return chain;
+        },
+        order(column: string, options?: { ascending?: boolean }) {
+          const direction = options?.ascending ? 1 : -1;
+          rows = [...rows].sort((left, right) => {
+            const a = String(left[column as keyof typeof left] ?? "");
+            const b = String(right[column as keyof typeof right] ?? "");
+            if (a < b) return -1 * direction;
+            if (a > b) return 1 * direction;
+            return 0;
+          });
+          return chain;
+        },
+        then(
+          onFulfilled: (value: { data: typeof rows; error: null }) => unknown,
+          onRejected?: (reason: unknown) => unknown,
+        ) {
+          return Promise.resolve({ data: rows, error: null as null }).then(onFulfilled, onRejected);
+        },
+      };
+      return chain;
+    },
+  } as unknown as SupabaseClient;
+
+  const loaded = await loadMusicMasterStatus(items, { serviceRole });
+  for (const master of masters) {
+    const row = loaded.get(master.audioId);
+    assert.equal(row?.transcodeStatus, "ready");
+    assert.equal(row?.hasActiveDelivery, true);
+    assert.equal(row?.lifecycleState, "verified");
+    const text = musicCabinetStatus({
+      hasLegacyAudioPath: false,
+      hasActiveDelivery: row?.hasActiveDelivery === true,
+      lifecycleState: row?.lifecycleState,
+      transcodeStatus: row?.transcodeStatus,
+    }).text;
+    assert.equal(text, MUSIC_DELIVERY_READY_TEXT);
+    assert.notEqual(text, MUSIC_DELIVERY_FAILED_TEXT);
+  }
+}
+
 process.stdout.write("music-delivery-unit: ok\n");

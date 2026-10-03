@@ -146,6 +146,36 @@ export const AUDIO_ITEM_DETAIL_SELECT = `
 
 
 
+const MUSIC_TRANSCODE_STATUSES = ["queued", "processing", "ready", "failed"] as const;
+type MusicTranscodeStatus = (typeof MUSIC_TRANSCODE_STATUSES)[number];
+
+function isMusicTranscodeStatus(value: string): value is MusicTranscodeStatus {
+  return (MUSIC_TRANSCODE_STATUSES as readonly string[]).includes(value);
+}
+
+/** Newest created_at for each source asset. Equal timestamps keep the first row. */
+export function selectNewestTranscodeStatusBySource(
+  jobs: ReadonlyArray<{
+    source_asset_id: string;
+    status: string;
+    created_at?: string | null;
+  }>,
+): Map<string, MusicTranscodeStatus> {
+  const newest = new Map<string, MusicTranscodeStatus>();
+  const newestAt = new Map<string, number>();
+  for (const job of jobs) {
+    if (!job.source_asset_id || !isMusicTranscodeStatus(job.status)) continue;
+    const parsed = typeof job.created_at === "string" ? Date.parse(job.created_at) : Number.NaN;
+    const at = Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+    const currentAt = newestAt.get(job.source_asset_id);
+    if (currentAt === undefined || at > currentAt) {
+      newestAt.set(job.source_asset_id, at);
+      newest.set(job.source_asset_id, job.status);
+    }
+  }
+  return newest;
+}
+
 function asMusicStreamCandidate(asset: {
   audio_item_id: string;
   asset_role: string;
@@ -204,17 +234,18 @@ async function loadActiveStreamDurations(
   return out;
 }
 
-async function loadMusicMasterStatus(
+export async function loadMusicMasterStatus(
   items: Array<{
     id: string;
     audio_path?: string | null;
     desired_music_master_asset_id?: string | null;
     active_music_delivery_asset_id?: string | null;
   }>,
+  options?: { serviceRole?: SupabaseClient },
 ): Promise<Map<string, NonNullable<AudioItemRow["music_master"]>>> {
   const audioItemIds = items.map((item) => item.id);
   if (audioItemIds.length === 0) return new Map();
-  const service = createServiceRoleClient();
+  const service = options?.serviceRole ?? createServiceRoleClient();
   const { data: assets, error: assetError } = await service
     .from("music_audio_assets")
     .select("id, audio_item_id, lifecycle_state")
@@ -258,13 +289,15 @@ async function loadMusicMasterStatus(
   const { data: jobs } = assetIds.length
     ? await service
         .from("music_transcode_jobs")
-        .select("source_asset_id, status")
+        .select("source_asset_id, status, created_at")
         .in("source_asset_id", assetIds)
         .in("status", ["queued", "processing", "ready", "failed"])
         .order("created_at", { ascending: false })
     : { data: [] };
-  const jobsBySource = new Map((jobs ?? []).map((job) => [job.source_asset_id, job.status]));
-  const validatedActive = await loadValidatedActiveMusicDeliveryItemIds(items);
+  const jobsBySource = selectNewestTranscodeStatusBySource(jobs ?? []);
+  const validatedActive = await loadValidatedActiveMusicDeliveryItemIds(items, {
+    serviceRole: service,
+  });
   const statusByItem = new Map(
     [...chosenByAudioItem.values()].map((asset) => [
       asset.audio_item_id,

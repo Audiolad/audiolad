@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { isAudioPrepareInFlight, mapProductNormalizeJobToPrepareStatus } from "@/lib/author-products/audio-prepare-status";
+import { MUSIC_MASTERS_BUCKET } from "@/lib/author-products/music-master-upload-contract";
 import { PRACTICE_AUDIO_BUCKET } from "@/lib/author-products/product-audio-upload-contract";
 import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
 import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
@@ -62,7 +63,38 @@ type AudioRow = {
   audio_path: string | null;
   original_file_name: string | null;
   file_size_bytes: number | null;
+  desired_music_master_asset_id: string | null;
   desired_product_audio_normalize_job_id: string | null;
+};
+
+export type JazzRelaxMasterCandidate = {
+  id: string;
+  audioItemId: string;
+  assetRole: string;
+  lifecycleState: string;
+  storageBucket: string;
+  storagePath: string | null;
+  originalFileName?: string | null;
+};
+
+export type JazzRelaxAnalysisAudio =
+  | { kind: "practice_audio"; path: string }
+  | {
+      kind: "music_master";
+      bucket: typeof MUSIC_MASTERS_BUCKET;
+      path: string;
+      originalFileName: string | null;
+    }
+  | { kind: "missing_audio" };
+
+type MasterAssetRow = {
+  id: string;
+  audio_item_id: string;
+  asset_role: string;
+  lifecycle_state: string;
+  storage_bucket: string;
+  storage_path: string | null;
+  original_file_name: string | null;
 };
 
 type LinkRow = {
@@ -142,7 +174,7 @@ function observedAt(finishedAt: string | null): string {
 async function loadTracks(practiceId: string): Promise<AudioRow[]> {
   const { data, error } = await service()
     .from("audio_items")
-    .select("id, title, position, audio_path, original_file_name, file_size_bytes, desired_product_audio_normalize_job_id")
+    .select("id, title, position, audio_path, original_file_name, file_size_bytes, desired_music_master_asset_id, desired_product_audio_normalize_job_id")
     .eq("practice_id", practiceId)
     .order("position", { ascending: true });
   if (error) throw new JazzRelaxPassportError("passport_storage_failed", 500);
@@ -365,8 +397,92 @@ async function syncPassports(practiceId: string): Promise<void> {
   await insertAlbum(practiceId, draft);
 }
 
-async function downloadTrack(audioPath: string): Promise<Uint8Array> {
-  const { data, error } = await service().storage.from(PRACTICE_AUDIO_BUCKET).download(audioPath);
+export function resolveJazzRelaxAnalysisAudio(input: {
+  audioItemId: string;
+  audioPath: string | null | undefined;
+  desiredMasterAssetId: string | null | undefined;
+  master: JazzRelaxMasterCandidate | null;
+}): JazzRelaxAnalysisAudio {
+  const audioPath = input.audioPath?.trim() ?? "";
+  if (audioPath) return { kind: "practice_audio", path: audioPath };
+  const master = input.master;
+  const desiredId = input.desiredMasterAssetId?.trim() ?? "";
+  const storagePath = master?.storagePath?.trim() ?? "";
+  if (
+    master
+    && desiredId
+    && master.id === desiredId
+    && master.audioItemId === input.audioItemId
+    && master.assetRole === "master"
+    && master.lifecycleState === "verified"
+    && master.storageBucket === MUSIC_MASTERS_BUCKET
+    && storagePath
+  ) {
+    return {
+      kind: "music_master",
+      bucket: MUSIC_MASTERS_BUCKET,
+      path: storagePath,
+      originalFileName: master.originalFileName?.trim() || null,
+    };
+  }
+  return { kind: "missing_audio" };
+}
+
+export function jazzRelaxAnalysisStorageTarget(
+  source: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>,
+): { bucket: string; path: string } {
+  if (source.kind === "practice_audio") {
+    return { bucket: PRACTICE_AUDIO_BUCKET, path: source.path };
+  }
+  return { bucket: source.bucket, path: source.path };
+}
+
+async function loadDesiredMasterAssets(tracks: AudioRow[]): Promise<Map<string, MasterAssetRow>> {
+  const ids = [...new Set(
+    tracks
+      .filter((track) => !track.audio_path?.trim() && track.desired_music_master_asset_id)
+      .map((track) => track.desired_music_master_asset_id as string),
+  )];
+  const map = new Map<string, MasterAssetRow>();
+  if (ids.length === 0) return map;
+  const { data, error } = await service()
+    .from("music_audio_assets")
+    .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, original_file_name")
+    .in("id", ids);
+  if (error) throw new JazzRelaxPassportError("passport_storage_failed", 500);
+  for (const row of data ?? []) map.set(row.id as string, row as MasterAssetRow);
+  return map;
+}
+
+function analysisForTrack(
+  track: AudioRow,
+  masters: Map<string, MasterAssetRow>,
+): JazzRelaxAnalysisAudio {
+  const desiredId = track.desired_music_master_asset_id;
+  const row = desiredId ? masters.get(desiredId) : undefined;
+  return resolveJazzRelaxAnalysisAudio({
+    audioItemId: track.id,
+    audioPath: track.audio_path,
+    desiredMasterAssetId: desiredId,
+    master: row
+      ? {
+          id: row.id,
+          audioItemId: row.audio_item_id,
+          assetRole: row.asset_role,
+          lifecycleState: row.lifecycle_state,
+          storageBucket: row.storage_bucket,
+          storagePath: row.storage_path,
+          originalFileName: row.original_file_name,
+        }
+      : null,
+  });
+}
+
+async function downloadAnalysisAudio(
+  source: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>,
+): Promise<Uint8Array> {
+  const target = jazzRelaxAnalysisStorageTarget(source);
+  const { data, error } = await service().storage.from(target.bucket).download(target.path);
   if (error || !data) throw new JazzRelaxPassportError("track_audio_missing", 400);
   const bytes = new Uint8Array(await data.arrayBuffer());
   if (bytes.byteLength === 0 || bytes.byteLength > MUSIC_ANALYZER_MAX_UPLOAD_BYTES) {
@@ -379,11 +495,15 @@ async function enqueueTrack(input: {
   practiceId: string;
   userId: string;
   track: AudioRow;
+  source: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>;
 }): Promise<void> {
-  const audioPath = input.track.audio_path?.trim() ?? "";
-  const bytes = await downloadTrack(audioPath);
+  const bytes = await downloadAnalysisAudio(input.source);
   const sha = sha256Hex(bytes);
-  const filename = analyzerFilename(audioPath, input.track.original_file_name);
+  const filename = analyzerFilename(
+    input.source.path,
+    input.track.original_file_name?.trim()
+      || (input.source.kind === "music_master" ? input.source.originalFileName : null),
+  );
   const mime = filename.toLowerCase().endsWith(".wav") ? "audio/wav" : "audio/mpeg";
   const runId = randomUUID();
   const storagePath = buildRunStoragePath(runId, filename);
@@ -415,8 +535,13 @@ async function enqueueTrack(input: {
   if (linkError) throw new JazzRelaxPassportError("passport_storage_failed", 500);
 }
 
-function trackBlock(track: AudioRow, prepareFailed: Set<string>, inflight: Set<string>): string | null {
-  if (!track.audio_path?.trim()) return "missing_audio";
+export function jazzRelaxPassportTrackBlock(
+  track: Pick<AudioRow, "id" | "file_size_bytes">,
+  prepareFailed: ReadonlySet<string>,
+  inflight: ReadonlySet<string>,
+  analysis: JazzRelaxAnalysisAudio,
+): string | null {
+  if (analysis.kind === "missing_audio") return "missing_audio";
   if (inflight.has(track.id)) return "preparing";
   if (prepareFailed.has(track.id)) return "prepare_failed";
   if (typeof track.file_size_bytes === "number" && track.file_size_bytes > MUSIC_ANALYZER_MAX_UPLOAD_BYTES) {
@@ -483,9 +608,15 @@ async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
   const runs = await loadRuns([...latest.values()].map((link) => link.analyzer_run_id));
   const passports = await loadPassportsByRun([...latest.values()].map((link) => link.analyzer_run_id));
   const albums = await loadAlbums(practiceId);
+  const masters = await loadDesiredMasterAssets(tracks);
   const trackViews: JazzRelaxPassportTrackView[] = tracks.map((track) => {
     const title = (track.title ?? "Трек").trim() || "Трек";
-    const block = trackBlock(track, prepareFailed, inflightPrepare);
+    const block = jazzRelaxPassportTrackBlock(
+      track,
+      prepareFailed,
+      inflightPrepare,
+      analysisForTrack(track, masters),
+    );
     if (block === "missing_audio") {
       return bareTrack({ audioItemId: track.id, title, state: "missing_audio", errorCode: block, passportVersionId: null, runId: null });
     }
@@ -564,12 +695,14 @@ export async function runJazzRelaxPassportAction(input: {
   const latest = latestLinks(links);
   const runs = await loadRuns([...latest.values()].map((link) => link.analyzer_run_id));
   const passports = await loadPassportsByRun([...latest.values()].map((link) => link.analyzer_run_id));
+  const masters = await loadDesiredMasterAssets(tracks);
   const pendingSources: AlbumPassportSource[] = [];
 
   for (const track of tracks) {
     if (input.audioItemId && track.id !== input.audioItemId) continue;
-    const block = trackBlock(track, prepareFailed, inflightPrepare);
-    if (block) {
+    const analysis = analysisForTrack(track, masters);
+    const block = jazzRelaxPassportTrackBlock(track, prepareFailed, inflightPrepare, analysis);
+    if (analysis.kind === "missing_audio" || block) {
       if (input.action === "reanalyze" || input.audioItemId) {
         throw new JazzRelaxPassportError("tracks_not_ready", 400);
       }
@@ -583,12 +716,12 @@ export async function runJazzRelaxPassportAction(input: {
     } else if (input.action === "start") {
       if (run && (run.status === "queued" || run.status === "processing")) continue;
       if (run?.status === "succeeded" && passport) {
-        const bytes = await downloadTrack(track.audio_path ?? "");
+        const bytes = await downloadAnalysisAudio(analysis);
         if (sha256Hex(bytes) === run.sha256) continue;
       }
     }
     const before = new Set(links.map((item) => item.analyzer_run_id));
-    await enqueueTrack({ practiceId: input.practiceId, userId: input.userId, track });
+    await enqueueTrack({ practiceId: input.practiceId, userId: input.userId, track, source: analysis });
     const after = await loadLinks(input.practiceId);
     const created = after.find((item) => item.audio_item_id === track.id && !before.has(item.analyzer_run_id));
     if (created) {
@@ -603,7 +736,16 @@ export async function runJazzRelaxPassportAction(input: {
     }
   }
 
-  if (input.action === "start" && pendingSources.length === 0 && tracks.every((track) => trackBlock(track, prepareFailed, inflightPrepare))) {
+  if (
+    input.action === "start"
+    && pendingSources.length === 0
+    && tracks.every((track) => jazzRelaxPassportTrackBlock(
+      track,
+      prepareFailed,
+      inflightPrepare,
+      analysisForTrack(track, masters),
+    ))
+  ) {
     throw new JazzRelaxPassportError("tracks_not_ready", 400);
   }
 
