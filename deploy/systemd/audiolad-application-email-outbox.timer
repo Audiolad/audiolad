@@ -1,0 +1,15 @@
+[Unit]
+Description=Run Audiolad application email outbox every 2 minutes
+
+[Timer]
+# Each run claims at most 25 rows and holds a 120s DB lease. A 2-minute
+# cadence matches the sale email timer: a timed-out run is reclaimable on the
+# next tick, and flock skips a tick that overlaps a live wrapper.
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+Persistent=true
+Unit=audiolad-application-email-outbox.service
+
+[Install]
+WantedBy=timers.target

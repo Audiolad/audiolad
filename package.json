@@ -107,6 +107,7 @@
     "test:platform-analytics-p25": "node scripts/platform-analytics-p25-client-unit.mjs",
     "test:admin-sales": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/admin-sales-visibility-unit.mts",
     "test:admin-mailings": "npx tsx scripts/admin-mailings-unit.mts",
+    "test:application-email-outbox-timer": "bash scripts/application-email-outbox-timer-unit.sh",
     "test:price-promotions": "npx tsx scripts/price-promotions-unit.mjs && npx tsx scripts/catalog-personal-countdown-unit.mts && npx tsx scripts/personal-timer-copy-unit.mts && npx tsx scripts/author-promo-preview-unit.mts && node scripts/price-promotions-sql-unit.mjs",
     "test:payments-p30": "npx tsx scripts/payments-p30-client-unit.mjs && node scripts/payments-p30-sql-unit.mjs",
     "test:payments-p31": "npx tsx scripts/payments-p31-client-unit.mjs && node scripts/payments-p31-sql-unit.mjs",
