@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     "scripts/author-practice-access-cjs-stub.cjs",
     // Vendored PDF.js worker (minified third-party).
     "public/pdfjs/**",
+    // Official VK Bridge browser build (minified third-party).
+    "public/vendor/**",
   ]),
 ]);
 

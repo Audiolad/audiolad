@@ -316,6 +316,22 @@ Timeweb Cloud
 MAX user_id  ↔  профиль АудиоЛада  ↔  пользователь Supabase Auth
 ```
 
+## VK Mini App (MVP)
+
+Тонкая поверхность на `https://audiolad.ru/vk` для приложения VK `54802101`.
+Полной VK-авторизации нет. Каталог, профиль, библиотека и регистрация в этот
+вход не входят.
+
+- Цель релиза: общий payload `p_<UUID без дефисов>` (`src/lib/mini-app/product-target.ts`).
+  Временный smoke-token `smoke` разрешается только в `aurafon/muzyka-dlya-krepkogo-sna`.
+- Сервер открывает только опубликованный, уже публично доступный и catalog-listed
+  продукт. Неопубликованные, отложенные, unlisted и selected_users не отдаются.
+- Карточка и гостевое прослушивание идут через те же product/playback функции,
+  что и MAX, с `userId = null`. Клиенту не отдаются practice id и storage path.
+- `VKWebAppInit` вызывается только на `/vk` и не должен ронять обычный браузер.
+- `frame-ancestors` и `noindex, nofollow, noarchive` заданы только для `/vk`
+  и официальных origin VK (`vk.com`, `m.vk.com`, `vk.ru`, `m.vk.ru`).
+
 
 ## Business bounded context (Аудиолад Бизнес)
 
