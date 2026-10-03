@@ -452,6 +452,10 @@ assert.match(client, /canReserveAudioSprintQuery/);
 assert.match(client, /audioSprintReserveConflictLifecycle/);
 assert.match(client, /router\.refresh\(\)/);
 assert.match(client, /isAudioSprintPoolVisible/);
+assert.match(client, /Забронирован вами/);
+assert.match(client, /Забронирован в пространстве/);
+assert.match(client, /Открыть это пространство/);
+assert.match(client, /audioSprintHref\(item\.reservationWorkspaceSlug\)/);
 assert.match(client, /Музыка|AUDIO_SPRINT_GROUP_LABEL/);
 assert.doesNotMatch(client, /publication_class:\s*"course"/);
 assert.doesNotMatch(client, /publication_class:\s*"audiobook"/);
@@ -463,6 +467,7 @@ const page = read(
 );
 assert.match(page, /listAudioSprintForAuthor/);
 assert.match(page, /AuthorDashboardNav/);
+assert.match(page, /authorWorkspaces:\s*workspaces\.map/);
 assert.match(page, /AUDIO_SPRINT_OSEN_ZVUCHIT_TITLE/);
 
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
@@ -514,6 +519,10 @@ assert.match(list, /audioSprintProductMatchesGroup/);
 assert.match(list, /publication_class, product_kind/);
 assert.match(list, /lifecycleForSeoOpportunity/);
 assert.match(list, /isEffectiveSeoReservation/);
+assert.match(list, /workspaceById/);
+assert.match(list, /reservedByCurrentUser/);
+assert.match(list, /reservationWorkspaceName/);
+assert.match(list, /reservationWorkspaceSlug/);
 assert.match(list, /createServiceRoleClient/);
 assert.match(list, /expire_seo_query_reservation/);
 assert.match(list, /AUDIO_SPRINT_IN_CHUNK = 40/);
@@ -555,6 +564,7 @@ const { listAudioSprintForAuthor } = await import(
 const SPRINT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const SPRINT_SLUG = "osen-zvuchit-2026";
 const CHUNK_AUTHOR = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const SECOND_AUTHOR = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 function uuidAt(prefix, n) {
   return `${prefix}-${String(n).padStart(12, "0")}`;
@@ -686,6 +696,7 @@ function seedSprint(count) {
     queryIds,
     productIds,
     texts,
+    reservationByQuery,
     resolve(state) {
       if (state.table === "seo_sprints") {
         return {
@@ -773,6 +784,29 @@ async function listWith(count, fail) {
     listing.queries.map((query) => query.queryText),
     expectedOrder,
   );
+}
+
+{
+  const seed = seedSprint(3);
+  seed.reservationByQuery.get(seed.queryIds[2]).author_id = SECOND_AUTHOR;
+  const client = createSprintClient(seed);
+  const listing = await listAudioSprintForAuthor(
+    {
+      slug: SPRINT_SLUG,
+      authorId: CHUNK_AUTHOR,
+      authorWorkspaces: [
+        { id: CHUNK_AUTHOR, name: "Первый артист", slug: "first-artist" },
+        { id: SECOND_AUTHOR, name: "Второй артист", slug: "second-artist" },
+      ],
+    },
+    client,
+  );
+  const crossWorkspace = listing.queries.find((item) => item.id === seed.queryIds[2]);
+  assert.equal(crossWorkspace.lifecycle, "in_progress");
+  assert.equal(crossWorkspace.reservationId, null);
+  assert.equal(crossWorkspace.reservedByCurrentUser, true);
+  assert.equal(crossWorkspace.reservationWorkspaceName, "Второй артист");
+  assert.equal(crossWorkspace.reservationWorkspaceSlug, "second-artist");
 }
 
 {
