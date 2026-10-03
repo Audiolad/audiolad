@@ -13,6 +13,7 @@ import {
 } from "@/app/(platform)/admin/mailings/actions";
 import type { AuthorCampaignFilter } from "@/lib/admin/mailings/validation";
 import { formatHumanSenderLabel, getSenderIdentity } from "@/lib/email/sender-identities";
+import { normalizeOptionalCampaignLink } from "@/lib/email/templates/manual-campaign";
 
 type EditorProps = {
   campaignId?: string;
@@ -75,9 +76,12 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
       content: {
         heading: state.heading,
         paragraphs: paragraphsFromText(state.paragraphs),
-        cta: { label: state.ctaLabel, url: state.ctaUrl },
+        cta: normalizeOptionalCampaignLink({ label: state.ctaLabel, url: state.ctaUrl }),
         infoBlock: { title: state.infoTitle, text: state.infoText },
-        secondaryLink: { label: state.secondaryLabel, url: state.secondaryUrl },
+        secondaryLink: normalizeOptionalCampaignLink({
+          label: state.secondaryLabel,
+          url: state.secondaryUrl,
+        }),
       },
     };
   }, [campaignId, state]);

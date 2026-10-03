@@ -18,7 +18,10 @@ import {
   type ManualCampaignContentInput,
 } from "@/lib/admin/mailings/validation";
 import { createSupabaseApplicationEmailRuntime } from "@/lib/email/supabase-application-email-runtime";
-import { renderManualCampaignEmail } from "@/lib/email/templates/manual-campaign";
+import {
+  normalizeOptionalCampaignLink,
+  renderManualCampaignEmail,
+} from "@/lib/email/templates/manual-campaign";
 import { formatHumanSenderLabel, getSenderIdentity } from "@/lib/email/sender-identities";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 
@@ -30,10 +33,10 @@ function contentFromUnknown(value: unknown): ManualCampaignContentInput {
   const link = (raw: unknown) => {
     if (!raw || typeof raw !== "object") return null;
     const item = raw as Record<string, unknown>;
-    return {
+    return normalizeOptionalCampaignLink({
       label: typeof item.label === "string" ? item.label : "",
       url: typeof item.url === "string" ? item.url : "",
-    };
+    });
   };
   const info = record.infoBlock;
   return {

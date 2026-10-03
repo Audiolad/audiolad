@@ -80,6 +80,27 @@ export function sanitizeEmailSubject(value: string): string | null {
   return trimmed;
 }
 
+/**
+ * A blank optional CTA or secondary link is absent. Whitespace-only fields
+ * count as blank. A link with any text still has to pass URL checks later.
+ */
+export function normalizeOptionalCampaignLink(
+  link: ManualCampaignLink | null | undefined,
+): ManualCampaignLink | null {
+  if (!link) {
+    return null;
+  }
+
+  const label = link.label.trim();
+  const url = link.url.trim();
+
+  if (!label && !url) {
+    return null;
+  }
+
+  return { label, url };
+}
+
 /** Replaces only the exact {{first_name}} token. No other template evaluation. */
 export function applyFirstNamePlaceholder(
   text: string,
@@ -120,18 +141,15 @@ export function renderManualCampaignEmail(
     return { ok: false, code: "invalid_payload" };
   }
 
-  const ctaUrl = input.content.cta ? parseAbsoluteHttpUrl(input.content.cta.url) : null;
-  if (input.content.cta && (!ctaUrl || !input.content.cta.label.trim())) {
+  const cta = normalizeOptionalCampaignLink(input.content.cta);
+  const secondaryLink = normalizeOptionalCampaignLink(input.content.secondaryLink);
+  const ctaUrl = cta ? parseAbsoluteHttpUrl(cta.url) : null;
+  if (cta && (!ctaUrl || !cta.label)) {
     return { ok: false, code: "url_invalid" };
   }
 
-  const secondaryUrl = input.content.secondaryLink
-    ? parseAbsoluteHttpUrl(input.content.secondaryLink.url)
-    : null;
-  if (
-    input.content.secondaryLink &&
-    (!secondaryUrl || !input.content.secondaryLink.label.trim())
-  ) {
+  const secondaryUrl = secondaryLink ? parseAbsoluteHttpUrl(secondaryLink.url) : null;
+  if (secondaryLink && (!secondaryUrl || !secondaryLink.label)) {
     return { ok: false, code: "url_invalid" };
   }
 
@@ -160,10 +178,8 @@ export function renderManualCampaignEmail(
     ),
   ];
 
-  if (input.content.cta && ctaUrl) {
-    blocks.push(
-      renderBrandEmailButton(ctaUrl, input.content.cta.label.trim(), { msoWidth: 360 }),
-    );
+  if (cta && ctaUrl) {
+    blocks.push(renderBrandEmailButton(ctaUrl, cta.label, { msoWidth: 360 }));
   }
 
   if (input.content.infoBlock?.text.trim()) {
@@ -184,10 +200,10 @@ export function renderManualCampaignEmail(
     blocks.push(renderBrandEmailInfoBlock(infoParts.join("\n")));
   }
 
-  if (input.content.secondaryLink && secondaryUrl) {
+  if (secondaryLink && secondaryUrl) {
     blocks.push(
       renderBrandEmailParagraph(
-        `<a href="${escapeHtml(secondaryUrl)}" style="color:#5e2ca5;text-decoration:underline;">${escapeHtml(input.content.secondaryLink.label.trim())}</a>`,
+        `<a href="${escapeHtml(secondaryUrl)}" style="color:#5e2ca5;text-decoration:underline;">${escapeHtml(secondaryLink.label)}</a>`,
         "email-body",
         "0 0 8px",
       ),
@@ -224,9 +240,7 @@ export function renderManualCampaignEmail(
     heading,
     "",
     ...paragraphs.flatMap((paragraph) => [paragraph, ""]),
-    input.content.cta && ctaUrl
-      ? `${input.content.cta.label.trim()}: ${ctaUrl}`
-      : "",
+    cta && ctaUrl ? `${cta.label}: ${ctaUrl}` : "",
     input.content.infoBlock?.text.trim()
       ? [
           input.content.infoBlock.title.trim(),
@@ -235,9 +249,7 @@ export function renderManualCampaignEmail(
           .filter(Boolean)
           .join("\n")
       : "",
-    input.content.secondaryLink && secondaryUrl
-      ? `${input.content.secondaryLink.label.trim()}: ${secondaryUrl}`
-      : "",
+    secondaryLink && secondaryUrl ? `${secondaryLink.label}: ${secondaryUrl}` : "",
     "",
     "С заботой,",
     "команда АудиоЛада",

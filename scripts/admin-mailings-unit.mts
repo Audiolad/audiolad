@@ -150,6 +150,68 @@ const subject = validateCampaignDraft({
 });
 assert.equal(subject.ok, false);
 assert.equal(sanitizeEmailSubject("Hello\nBcc: x"), null);
+const previewWithBlankSecondary = renderManualCampaignEmail({
+  subject: "Служебное",
+  content: {
+    heading: "Заголовок",
+    paragraphs: ["Текст"],
+    cta: { label: "Открыть АудиоЛад", url: "https://audiolad.ru" },
+    infoBlock: null,
+    secondaryLink: { label: "", url: "" },
+  },
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(previewWithBlankSecondary.ok, true);
+if (previewWithBlankSecondary.ok) {
+  assert.match(previewWithBlankSecondary.html, /Открыть АудиоЛад/);
+  assert.match(previewWithBlankSecondary.html, /https:\/\/audiolad\.ru\/?/);
+}
+const previewWithEmptyCta = renderManualCampaignEmail({
+  subject: "Служебное",
+  content: {
+    heading: "Заголовок",
+    paragraphs: ["Текст"],
+    cta: { label: "", url: "" },
+    infoBlock: null,
+    secondaryLink: { label: " ", url: " " },
+  },
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(previewWithEmptyCta.ok, true);
+const rejectedCta = renderManualCampaignEmail({
+  subject: "Служебное",
+  content: {
+    heading: "Заголовок",
+    paragraphs: ["Текст"],
+    cta: { label: "Открыть", url: "javascript:alert(1)" },
+    infoBlock: null,
+    secondaryLink: null,
+  },
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(rejectedCta.ok, false);
+if (!rejectedCta.ok) {
+  assert.equal(rejectedCta.code, "url_invalid");
+}
+const blankLinksDraft = validateCampaignDraft({
+  audienceType: "authors",
+  messageType: "author_operational",
+  senderIdentity: "authors",
+  subject: "Тема",
+  content: {
+    heading: "Заголовок",
+    paragraphs: ["Абзац"],
+    cta: { label: "", url: "" },
+    infoBlock: null,
+    secondaryLink: { label: "", url: "" },
+  },
+  filter: { version: 1, kind: "all_authors" },
+});
+assert.equal(blankLinksDraft.ok, true);
+if (blankLinksDraft.ok) {
+  assert.equal(blankLinksDraft.value.content.cta, null);
+  assert.equal(blankLinksDraft.value.content.secondaryLink, null);
+}
 assert.equal(parseAbsoluteHttpUrl("javascript:alert(1)"), null);
 assert.equal(parseAbsoluteHttpUrl("/relative"), null);
 assert.equal(parseAbsoluteHttpUrl("https://audiolad.ru/author-dashboard")?.startsWith("https://"), true);

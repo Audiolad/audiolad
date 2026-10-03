@@ -1,4 +1,8 @@
-import { parseAbsoluteHttpUrl, sanitizeEmailSubject } from "@/lib/email/templates/manual-campaign";
+import {
+  normalizeOptionalCampaignLink,
+  parseAbsoluteHttpUrl,
+  sanitizeEmailSubject,
+} from "@/lib/email/templates/manual-campaign";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -81,16 +85,13 @@ function cleanText(value: string, max: number): string | null {
 function parseOptionalLink(
   link: { label: string; url: string } | null,
 ): { ok: true; value: { label: string; url: string } | null } | { ok: false; code: CampaignValidationError } {
-  if (!link) {
+  const normalized = normalizeOptionalCampaignLink(link);
+
+  if (!normalized) {
     return { ok: true, value: null };
   }
 
-  const label = link.label.trim();
-  const url = link.url.trim();
-
-  if (!label && !url) {
-    return { ok: true, value: null };
-  }
+  const { label, url } = normalized;
 
   if (!label || !url) {
     return { ok: false, code: "link_incomplete" };
@@ -197,10 +198,6 @@ export function validateCampaignDraft(
   const preheader = preheaderRaw ? cleanText(preheaderRaw, 180) : null;
   if (preheaderRaw && !preheader) {
     return { ok: false, code: "content_too_long" };
-  }
-
-  if (input.content.cta && (!input.content.cta.label.trim() || !input.content.cta.url.trim())) {
-    return { ok: false, code: "cta_incomplete" };
   }
 
   const cta = parseOptionalLink(input.content.cta);
