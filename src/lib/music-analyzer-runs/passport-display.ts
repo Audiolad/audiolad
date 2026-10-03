@@ -1,4 +1,27 @@
-import type { PassportMeasureDisplay } from "./passport";
+import type { PassportMeasureDisplay, PassportRow } from "./passport";
+
+/**
+ * Visible quantity for a tag or instrument.
+ * `average` is the primary figure when the analyzer sent it.
+ * An older `score` is used only when `average` is absent.
+ * This does not sort, rescale, or replace a candidate with a fact.
+ */
+export function rowQuantityDisplay(row: PassportRow): { primary: string | null; max: string | null } {
+  return {
+    primary: row.average ?? row.score,
+    max: row.max,
+  };
+}
+
+/**
+ * Explicit analyzer `rank` stays «ранг N».
+ * When that field is absent, `index` is the position in the analyzer array
+ * (already ordered by the analyzer). It is not a new musical rank.
+ */
+export function instrumentPlaceLabel(row: PassportRow, index: number): string {
+  if (row.rank != null) return `ранг ${row.rank}`;
+  return `№${index + 1}`;
+}
 
 /**
  * One small line under tempo or key.
