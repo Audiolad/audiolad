@@ -1,0 +1,14 @@
+[Unit]
+Description=Mirror Audiolad Git repos from GitHub to the emergency Gitea
+Documentation=file:/var/lib/audiolad/emergency/OPERATOR_RUNBOOK.md
+# Example unit for the future Gitea host. Do not enable on the production app VPS.
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/audiolad/emergency-mirror.env
+ExecStart=/usr/local/sbin/audiolad-git-mirror
+User=gitmirror
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/audiolad/emergency

@@ -1,0 +1,11 @@
+# Emergency Git mirror membership.
+# One enabled repository per line:
+#   github_slug|gitea_owner|gitea_repo|yes
+# Lines starting with # are ignored. Add a future Audiolad repo by appending
+# one line. Do not invent a repository this agent cannot see.
+#
+# Audiolad/music-analyzer is intentionally absent. On 2026-10-03
+# `gh repo view Audiolad/music-analyzer` returned
+# "Could not resolve to a Repository". Add an enabled line only after the
+# repo is actually visible to the operator.
+Audiolad/audiolad|Audiolad|audiolad|yes

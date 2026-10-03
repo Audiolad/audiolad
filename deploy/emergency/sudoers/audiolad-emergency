@@ -1,0 +1,13 @@
+# Draft only. Do NOT install from CI or from this Phase 1 change.
+# No unrestricted ALL sudo. No wildcards. No SETENV. No shell.
+# visudo -cf this file before any later install onto /etc/sudoers.d/.
+#
+# Exact commands the deploy user may run. Anything else stays refused.
+# audiolad-deploy itself stays on its existing sudoers line; this file
+# does not replace it and does not grant deploy.sh.
+Defaults!/usr/local/sbin/audiolad-emergency-git-source !setenv
+Defaults!/usr/local/sbin/audiolad-rollback !setenv
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-emergency-git-source status
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-emergency-git-source activate-mirror
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-emergency-git-source restore-github
+deploy ALL=(root) NOPASSWD: /usr/local/sbin/audiolad-rollback ""
