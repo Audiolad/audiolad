@@ -16,7 +16,7 @@ export type CatalogCardGalleryPage = {
 export function buildCatalogCardGalleryPages(
   product: Pick<MaxCatalogProduct, "coverUrl" | "gallery">,
 ): CatalogCardGalleryPage[] {
-  const slides = [...product.gallery]
+  const slides = [...(product.gallery ?? [])]
     .filter((slide) => slide.image_url.trim().length > 0)
     .sort((left, right) => compareSlides(left, right));
   const pages: CatalogCardGalleryPage[] = [];

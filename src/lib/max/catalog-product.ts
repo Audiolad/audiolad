@@ -19,7 +19,8 @@ export type MaxCatalogProduct = {
   formatLabel: string;
   priceLabel: string;
   isFree: boolean;
-  gallery: MaxCatalogGallerySlide[];
+  /** Absent on recommendation rows; catalog payloads always send an array. */
+  gallery?: MaxCatalogGallerySlide[];
 };
 
 export function readMaxCatalogProductList(value: unknown): MaxCatalogProduct[] | null {
