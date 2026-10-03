@@ -17,3 +17,13 @@ so the workbook totals match the issue:
 - 14 119 impressions on queries with 0 clicks
 
 Period: 2026-08-29 — 2026-09-29.
+
+`yandex-webmaster-2026-08-29.xlsx` is the production Yandex Webmaster export
+that failed preview with a duplicate normalized query. It is query-level only:
+Query, Dates range, Impressions, Clicks, CTR %, Avg. position, Avg. click
+position, and positional breakdown columns. It has no URL column and no
+credentials. 2 701 source rows collapse to 2 681 normalized queries (19 groups)
+and still total 26 549 impressions and 948 clicks. The source row «шум воды»
+is 2 219 impressions and 55 clicks; «шум воды.» adds 11 impressions, so the
+stored metric is 2 230 / 55. «музыка для отелей и ресторанов» and «шум фена»
+have no punctuation twin.
