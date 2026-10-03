@@ -102,3 +102,82 @@ export async function linkSeoReservationToProduct(input: {
 
   return { ok: true };
 }
+
+
+export async function transferSeoReservationToWorkspace(input: {
+  reservationId: string;
+  targetAuthorId: string;
+}): Promise<
+  | {
+      ok: true;
+      reservation: {
+        id: string;
+        author_id: string;
+        expires_at: string | null;
+      };
+      message: string;
+    }
+  | { ok: false; code: string; message: string }
+> {
+  const response = await fetch("/api/author/seo-reservations/transfer", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      reservation_id: input.reservationId,
+      target_author_id: input.targetAuthorId,
+    }),
+  });
+
+  let payload: {
+    error?: string;
+    code?: string;
+    message?: string;
+    reservation?: {
+      id?: string;
+      author_id?: string;
+      expires_at?: string | null;
+    };
+  } = {};
+
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (
+    !response.ok ||
+    !payload.reservation?.id ||
+    !payload.reservation.author_id
+  ) {
+    return {
+      ok: false,
+      code:
+        typeof payload.code === "string" && payload.code.trim()
+          ? payload.code.trim()
+          : typeof payload.error === "string" && payload.error.trim()
+            ? payload.error.trim()
+            : "seo_reservation_transfer_failed",
+      message:
+        typeof payload.message === "string" && payload.message.trim()
+          ? payload.message.trim()
+          : "Не удалось перенести бронь. Попробуйте ещё раз.",
+    };
+  }
+
+  return {
+    ok: true,
+    reservation: {
+      id: payload.reservation.id,
+      author_id: payload.reservation.author_id,
+      expires_at:
+        typeof payload.reservation.expires_at === "string"
+          ? payload.reservation.expires_at
+          : null,
+    },
+    message:
+      typeof payload.message === "string" && payload.message.trim()
+        ? payload.message.trim()
+        : "Бронь перенесена.",
+  };
+}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
+import { transferSeoReservationToWorkspace } from "@/lib/seo-queries/seo-reservation-product-context";
 import {
   AUDIO_SPRINT_AUTHOR_GROUPS,
   AUDIO_SPRINT_GROUP_LABEL,
@@ -27,6 +28,7 @@ import {
 
 type Props = {
   authorId: string;
+  authorName: string;
   authorSlug: string;
   queries: AudioSprintQueryCard[];
   activeReservationCount: number;
@@ -45,6 +47,7 @@ function formatUntil(value: string | null) {
 
 export default function AuthorAudioSprintClient({
   authorId,
+  authorName,
   authorSlug,
   queries,
   activeReservationCount,
@@ -142,6 +145,52 @@ export default function AuthorAudioSprintClient({
     );
     setActiveCount((current) => nextActiveReservationCountAfterReserve(current, true));
     setMessage("Запрос закреплен за вами");
+  }
+
+  async function transferAndCreate(item: AudioSprintQueryCard) {
+    const reservationId = item.transferReservationId;
+    if (!reservationId) return;
+
+    setPendingId(reservationId);
+    setMessage(null);
+    const result = await transferSeoReservationToWorkspace({
+      reservationId,
+      targetAuthorId: authorId,
+    });
+    setPendingId(null);
+
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+
+    setActiveCount((current) =>
+      nextActiveReservationCountAfterReserve(current, true),
+    );
+    setItems((current) =>
+      current.map((entry) =>
+        entry.id === item.id
+          ? {
+              ...entry,
+              reservationId: result.reservation.id,
+              expiresAt: result.reservation.expires_at,
+              productId: null,
+              reservedByCurrentUser: true,
+              reservationWorkspaceName: authorName,
+              reservationWorkspaceSlug: authorSlug,
+              transferReservationId: null,
+            }
+          : entry,
+      ),
+    );
+
+    router.push(
+      buildAudioSprintProductCreateHref({
+        authorSlug,
+        reservationId: result.reservation.id,
+        authorGroup: item.authorGroup,
+      }),
+    );
   }
 
   return (
@@ -251,16 +300,40 @@ export default function AuthorAudioSprintClient({
                     ) : null}
                   </div>
                 ) : reservedInOtherWorkspace ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <span className="text-sm text-[#5f5484]">
-                      Забронирован в пространстве «{item.reservationWorkspaceName || "другой артист"}»
-                    </span>
-                    <Link
-                      href={audioSprintHref(item.reservationWorkspaceSlug)}
-                      className="text-sm font-semibold text-[#7042c5]"
-                    >
-                      Открыть это пространство
-                    </Link>
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm text-[#5f5484]">
+                      Забронирован в пространстве «{item.reservationWorkspaceName || "другой артист"}».
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {item.transferReservationId ? (
+                        <button
+                          type="button"
+                          disabled={
+                            pendingId === item.transferReservationId ||
+                            activeCount >= SEO_ACTIVE_RESERVATION_LIMIT
+                          }
+                          onClick={() => void transferAndCreate(item)}
+                          className="inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                        >
+                          {pendingId === item.transferReservationId
+                            ? "Переносим…"
+                            : `Перенести в «${authorName}» и создать`}
+                        </button>
+                      ) : null}
+                      <Link
+                        href={audioSprintHref(item.reservationWorkspaceSlug)}
+                        className="text-sm font-semibold text-[#7042c5]"
+                      >
+                        Открыть это пространство
+                      </Link>
+                    </div>
+                    {item.transferReservationId &&
+                    activeCount >= SEO_ACTIVE_RESERVATION_LIMIT ? (
+                      <p className="text-xs leading-5 text-[#796ba0]">
+                        В «{authorName}» уже 5 запросов в работе. Освободите один,
+                        чтобы перенести эту бронь.
+                      </p>
+                    ) : null}
                   </div>
                 ) : item.lifecycle === "available" ? (
                   <button

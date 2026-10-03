@@ -423,17 +423,19 @@ export async function listAudioSprintForAuthor(
     const reservationWorkspace = reservation
       ? workspaceById.get(reservation.author_id)
       : undefined;
-    const reservedByCurrentUser = Boolean(reservation) && (own || Boolean(reservationWorkspace));
+    const reservedByCurrentUser =
+      Boolean(reservation) && (own || Boolean(reservationWorkspace));
+    const lifecycle = lifecycleForSeoOpportunity({
+      reservation,
+      product,
+      publishedOccupancy: occupancyByQueryId.get(row.query_id) ?? null,
+    });
     return {
       id: row.query_id,
       queryText: row.queryText,
       authorGroup: row.author_group as AudioSprintAuthorGroup,
       pool: row.pool as AudioSprintQueryCard["pool"],
-      lifecycle: lifecycleForSeoOpportunity({
-        reservation,
-        product,
-        publishedOccupancy: occupancyByQueryId.get(row.query_id) ?? null,
-      }),
+      lifecycle,
       reservationId: own ? reservation.id : null,
       expiresAt: own ? reservation.expires_at : null,
       productId: own ? reservation.product_id : null,
@@ -444,6 +446,14 @@ export async function listAudioSprintForAuthor(
       reservationWorkspaceSlug: reservedByCurrentUser
         ? reservationWorkspace?.slug || null
         : null,
+      transferReservationId:
+        reservedByCurrentUser &&
+        !own &&
+        reservation?.status === "active" &&
+        !reservation.product_id &&
+        lifecycle === "in_progress"
+          ? reservation.id
+          : null,
     } satisfies AudioSprintQueryCard;
   });
 

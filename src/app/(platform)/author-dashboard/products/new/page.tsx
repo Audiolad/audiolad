@@ -168,6 +168,7 @@ export default async function NewAuthorProductPage({ searchParams }: PageProps) 
       >
         <AuthorProductSeoQueryStep
           authorId={initialAuthor.id}
+          authorName={initialAuthor.name}
           authorSlug={initialAuthor.slug}
           publicationClass={publicationClass}
           opportunities={opportunities}
