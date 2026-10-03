@@ -84,8 +84,8 @@ export async function POST(request: Request) {
         fresh: matches.fresh,
       });
     } catch (error) {
-      console.error("seo_analytics_preview_failed", error);
-      return jsonError("preview_failed", 500);
+      console.error("seo_analytics_map_match_failed", error);
+      return jsonError("seo_map_match_failed", 500);
     }
   }
 
