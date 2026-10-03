@@ -16,6 +16,7 @@ export const SEO_ANALYTICS_ERROR_MESSAGES: Record<string, string> = {
   migration_required: "Таблица SEO-аналитики ещё не применена на базе. Импорт не записан.",
   import_failed: "Не удалось записать период. Данные не изменены.",
   preview_failed: "Не удалось прочитать файл.",
+  seo_map_match_failed: "Файл прочитан, но не удалось сверить запросы с SEO-картой. Данные не импортированы.",
 };
 
 export function seoAnalyticsErrorMessage(code: string, fallback?: string): string {
