@@ -9,7 +9,12 @@ export type PassportTone = "high" | "medium" | "low";
 
 export type PassportRow = {
   label: string;
+  /** Analyzer `score` / `probability` / `weight` only. Not `average`. */
   score: string | null;
+  /** Analyzer `average`, when that field is present. Display only. */
+  average: string | null;
+  /** Analyzer `max`, when that field is present. Display only. */
+  max: string | null;
   rank: number | null;
   bandLabel: string | null;
   tone: PassportTone | null;
@@ -193,6 +198,14 @@ function readScore(record: Record<string, unknown>): string | null {
   return null;
 }
 
+function readAverage(record: Record<string, unknown>): string | null {
+  return formatQuantity(record.average);
+}
+
+function readMax(record: Record<string, unknown>): string | null {
+  return formatQuantity(record.max);
+}
+
 function readLabel(record: Record<string, unknown>): string | null {
   for (const key of ["label", "name", "tag", "title", "text", "genre", "style", "mood", "instrument", "id", "slug"]) {
     const text = cleanText(record[key]);
@@ -204,7 +217,15 @@ function readLabel(record: Record<string, unknown>): string | null {
 
 function parseRow(value: unknown): PassportRow | null {
   if (typeof value === "string" && value.trim()) {
-    return { label: value.trim().slice(0, 200), score: null, rank: null, bandLabel: null, tone: null };
+    return {
+      label: value.trim().slice(0, 200),
+      score: null,
+      average: null,
+      max: null,
+      rank: null,
+      bandLabel: null,
+      tone: null,
+    };
   }
   if (!isRecord(value)) return null;
   const label = readLabel(value);
@@ -213,6 +234,8 @@ function parseRow(value: unknown): PassportRow | null {
   return {
     label,
     score: readScore(value),
+    average: readAverage(value),
+    max: readMax(value),
     rank: readRank(value.rank ?? value.position),
     bandLabel: band.label,
     tone: band.tone,
@@ -247,6 +270,8 @@ function rowsFromValue(value: unknown): PassportRow[] {
       .map(([label, score]) => ({
         label,
         score: formatQuantity(score),
+        average: null,
+        max: null,
         rank: null,
         bandLabel: null,
         tone: null,

@@ -9,6 +9,8 @@ export type SeoSearchImportResult = {
   snapshot_id: string;
   replaced: boolean;
   row_count: number;
+  source_row_count: number;
+  metric_count: number;
   matched_count: number;
   new_count: number;
   total_impressions: number;
@@ -44,6 +46,7 @@ export async function importYandexWebmasterSnapshot(
     p_period_end: workbook.periodEnd,
     p_original_filename: sanitizeImportFilename(filename),
     p_metrics: metricsPayload(workbook),
+    p_source_row_count: workbook.sourceRowCount,
   });
   if (error) throw error;
   if (!data || typeof data !== "object") {
@@ -54,6 +57,8 @@ export async function importYandexWebmasterSnapshot(
     snapshot_id: String(result.snapshot_id),
     replaced: Boolean(result.replaced),
     row_count: Number(result.row_count),
+    source_row_count: Number(result.source_row_count),
+    metric_count: Number(result.metric_count),
     matched_count: Number(result.matched_count),
     new_count: Number(result.new_count),
     total_impressions: Number(result.total_impressions),

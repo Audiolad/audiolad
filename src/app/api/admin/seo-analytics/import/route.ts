@@ -74,7 +74,10 @@ export async function POST(request: Request) {
       return NextResponse.json({
         periodStart: workbook.periodStart,
         periodEnd: workbook.periodEnd,
-        rowCount: totals.queryCount,
+        rowCount: workbook.sourceRowCount,
+        sourceRowCount: workbook.sourceRowCount,
+        metricCount: workbook.rows.length,
+        collapsedGroupCount: workbook.collapsedGroupCount,
         impressions: totals.impressions,
         clicks: totals.clicks,
         matched: matches.matched,
