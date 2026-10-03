@@ -16,6 +16,7 @@ import {
   resolveTestSendRecipient,
   sendAuthorMailingTest,
   TEST_SUBJECT_PREFIX,
+  withTestSubjectPrefix,
 } from "../src/lib/admin/mailings/test-send";
 import { validateCampaignDraft } from "../src/lib/admin/mailings/validation";
 import {
@@ -649,17 +650,88 @@ assert.equal(resolveTestSendRecipient({
   requestedEmail: "evil@gmail.com",
   allowlist: parseMailingTestAllowlist("evil@gmail.com"),
 }).ok, false);
+
+const ownerMailRu = resolveTestSendRecipient({
+  isOwner: true,
+  actorEmail: "owner@audiolad.ru",
+  requestedEmail: "Audiolad@Mail.ru",
+});
+assert.equal(ownerMailRu.ok && ownerMailRu.email, "audiolad@mail.ru");
+const ownerYandex = resolveTestSendRecipient({
+  isOwner: true,
+  actorEmail: "owner@audiolad.ru",
+  requestedEmail: "audiolad@yandex.ru",
+});
+assert.equal(ownerYandex.ok && ownerYandex.email, "audiolad@yandex.ru");
+for (const requestedEmail of ["", "   ", "not-an-email", "audiolad@", "@mail.ru", "audiolad@mail"]) {
+  assert.equal(resolveTestSendRecipient({
+    isOwner: true,
+    actorEmail: "owner@audiolad.ru",
+    requestedEmail,
+  }).ok, false);
+}
+for (const requestedEmail of [
+  "audiolad@mail.ru\r\nBcc: evil@example.com",
+  "audiolad@mail.ru\nBcc: evil@example.com",
+]) {
+  assert.equal(resolveTestSendRecipient({
+    isOwner: true,
+    actorEmail: "owner@audiolad.ru",
+    requestedEmail,
+  }).ok, false);
+}
+for (const requestedEmail of [
+  "audiolad@mail.ru,other@yandex.ru",
+  "audiolad@mail.ru, other@yandex.ru",
+  "audiolad@mail.ru;other@yandex.ru",
+  "audiolad@mail.ru; other@yandex.ru",
+]) {
+  assert.equal(resolveTestSendRecipient({
+    isOwner: true,
+    actorEmail: "owner@audiolad.ru",
+    requestedEmail,
+  }).ok, false);
+}
+assert.equal(resolveTestSendRecipient({
+  isOwner: false,
+  actorEmail: "editor@audiolad.ru",
+  requestedEmail: "audiolad@mail.ru",
+}).ok, false);
+const nonOwnerOwn = resolveTestSendRecipient({
+  isOwner: false,
+  actorEmail: "Editor@Audiolad.ru",
+  requestedEmail: "editor@audiolad.ru",
+});
+assert.equal(nonOwnerOwn.ok && nonOwnerOwn.email, "editor@audiolad.ru");
+const nonOwnerAllowlist = resolveTestSendRecipient({
+  isOwner: false,
+  actorEmail: "editor@audiolad.ru",
+  requestedEmail: "ops@audiolad.ru",
+  allowlist: ["ops@audiolad.ru"],
+});
+assert.equal(nonOwnerAllowlist.ok && nonOwnerAllowlist.email, "ops@audiolad.ru");
+
+assert.equal(withTestSubjectPrefix("Проверка"), `${TEST_SUBJECT_PREFIX}Проверка`);
+assert.equal(withTestSubjectPrefix(`${TEST_SUBJECT_PREFIX}Проверка`), `${TEST_SUBJECT_PREFIX}Проверка`);
+assert.equal(
+  withTestSubjectPrefix(withTestSubjectPrefix("Проверка")),
+  `${TEST_SUBJECT_PREFIX}Проверка`,
+);
+
 const testMessage = buildAuthorMailingTestMessage({
-  toEmail: "owner@personal.ru",
+  toEmail: "audiolad@mail.ru",
   subject: "Проверка",
   content: draftRecord().content,
   siteOrigin: "https://audiolad.ru",
 });
 assert.equal(testMessage.ok, true);
 if (testMessage.ok) {
+  assert.equal(testMessage.message.from, "АудиоЛад для авторов <authors@audiolad.ru>");
   assert.equal(testMessage.message.senderFrom, "authors@audiolad.ru");
   assert.equal(testMessage.message.replyTo, "authors@audiolad.ru");
-  assert.equal(testMessage.message.subject.startsWith(TEST_SUBJECT_PREFIX), true);
+  assert.equal(testMessage.message.envelopeFrom, "authors@audiolad.ru");
+  assert.equal(testMessage.message.to, "audiolad@mail.ru");
+  assert.equal(testMessage.message.subject, `${TEST_SUBJECT_PREFIX}Проверка`);
   const same = renderManualCampaignEmail({
     subject: "Проверка",
     content: draftRecord().content,
@@ -667,17 +739,102 @@ if (testMessage.ok) {
   });
   assert.equal(same.ok && same.html, testMessage.message.html);
 }
+const prefixedMessage = buildAuthorMailingTestMessage({
+  toEmail: "audiolad@yandex.ru",
+  subject: `${TEST_SUBJECT_PREFIX}Проверка`,
+  content: draftRecord().content,
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(prefixedMessage.ok, true);
+if (prefixedMessage.ok) {
+  assert.equal(prefixedMessage.message.subject, `${TEST_SUBJECT_PREFIX}Проверка`);
+  assert.equal(prefixedMessage.message.senderFrom, "authors@audiolad.ru");
+}
+
 const testRuntime = createMemoryApplicationEmailRuntime();
+let ownerDeliveries = 0;
 const sentTest = await sendAuthorMailingTest({
-  actorEmail: "owner@personal.ru",
-  requestedEmail: "owner@personal.ru",
+  isOwner: true,
+  actorEmail: "owner@audiolad.ru",
+  requestedEmail: "audiolad@mail.ru",
   subject: "Проверка",
   content: draftRecord().content,
   siteOrigin: "https://audiolad.ru",
-  deliver: async () => ({ ok: true, providerMessageId: "test-id" }),
+  deliver: async (message) => {
+    ownerDeliveries += 1;
+    assert.equal(message.to, "audiolad@mail.ru");
+    assert.equal(message.subject, `${TEST_SUBJECT_PREFIX}Проверка`);
+    assert.equal(message.from, "АудиоЛад для авторов <authors@audiolad.ru>");
+    assert.equal(message.replyTo, "authors@audiolad.ru");
+    assert.equal(message.envelopeFrom, "authors@audiolad.ru");
+    assert.equal(message.senderFrom, "authors@audiolad.ru");
+    return { ok: true, providerMessageId: "test-id" };
+  },
 });
 assert.equal(sentTest.ok, true);
+if (sentTest.ok) {
+  assert.equal(sentTest.email, "audiolad@mail.ru");
+}
+assert.equal(ownerDeliveries, 1);
+const sentPrefixed = await sendAuthorMailingTest({
+  isOwner: true,
+  actorEmail: "owner@audiolad.ru",
+  requestedEmail: "audiolad@yandex.ru",
+  subject: `${TEST_SUBJECT_PREFIX}Проверка`,
+  content: draftRecord().content,
+  siteOrigin: "https://audiolad.ru",
+  deliver: async (message) => {
+    assert.equal(message.subject, `${TEST_SUBJECT_PREFIX}Проверка`);
+    assert.equal(message.senderFrom, "authors@audiolad.ru");
+    return { ok: true, providerMessageId: "test-id-2" };
+  },
+});
+assert.equal(sentPrefixed.ok && sentPrefixed.email, "audiolad@yandex.ru");
+let blockedDeliveries = 0;
+const blockedList = await sendAuthorMailingTest({
+  isOwner: true,
+  actorEmail: "owner@audiolad.ru",
+  requestedEmail: "audiolad@mail.ru; other@yandex.ru",
+  subject: "Проверка",
+  content: draftRecord().content,
+  siteOrigin: "https://audiolad.ru",
+  deliver: async () => {
+    blockedDeliveries += 1;
+    return { ok: true, providerMessageId: "should-not-send" };
+  },
+});
+assert.equal(blockedList.ok, false);
+const blockedExternal = await sendAuthorMailingTest({
+  isOwner: false,
+  actorEmail: "editor@audiolad.ru",
+  requestedEmail: "audiolad@gmail.com",
+  subject: "Проверка",
+  content: draftRecord().content,
+  siteOrigin: "https://audiolad.ru",
+  deliver: async () => {
+    blockedDeliveries += 1;
+    return { ok: true, providerMessageId: "should-not-send" };
+  },
+});
+assert.equal(blockedExternal.ok, false);
+assert.equal(blockedDeliveries, 0);
 assert.equal((await testRuntime.listCampaigns()).length, 0);
+assert.equal((await testRuntime.listRecipients("10000000-0000-4000-8000-000000000001")).length, 0);
+assert.doesNotMatch(
+  read("src/lib/admin/mailings/test-send.ts"),
+  /email_campaigns|launchAuthorCampaign|launchSavedAuthorCampaign|createCampaign/,
+);
+const mailingActions = read("src/app/(platform)/admin/mailings/actions.ts");
+assert.match(mailingActions, /isOwner:\s*session\.access\.roles\.includes\("owner"\)/);
+assert.doesNotMatch(mailingActions, /payload\.isOwner|isOwner:\s*payload/);
+const mailingEditor = read("src/components/admin/MailingEditor.tsx");
+assert.match(mailingEditor, /Куда отправить тест/);
+assert.doesNotMatch(mailingEditor, /Тестовый адрес/);
+assert.match(
+  mailingEditor,
+  /Владелец может ввести один корректный адрес, чтобы проверить отображение в Mail\.ru, Yandex, Gmail и других клиентах\./,
+);
+assert.match(mailingEditor, /Тест отправлен на \$\{result\.email\}/);
 
 const redacted = redactMailingLogFields({
   token: "raw-unsubscribe-token",
