@@ -19,6 +19,11 @@ const workflowSha = process.env.PR_SAFETY_WORKFLOW_SHA?.trim() ?? "";
 const prNumber = process.env.PR_SAFETY_PR_NUMBER?.trim() ?? "";
 const prState = process.env.PR_SAFETY_PR_STATE?.trim() ?? "";
 const prBaseRef = process.env.PR_SAFETY_PR_BASE_REF?.trim() ?? "";
+const startMainSha = (
+  process.env.PR_SAFETY_START_MAIN_SHA ??
+  process.env.TRUSTED_MAIN_SHA ??
+  ""
+).trim();
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 const statusOutputPath =
   process.env.PR_SAFETY_STATUS_OUTPUT ?? process.env.GITHUB_OUTPUT;
@@ -101,6 +106,45 @@ export function resolveProductionHealthUrl(input, allowTestInjection = false) {
   throw new Error("production health URL must be the canonical audiolad endpoint");
 }
 
+function postMergeHeadLagExempt(input) {
+  return input.postMergeHeadLag === true &&
+    input.behind === 1 &&
+    input.ahead === 0 &&
+    input.prToMain === true &&
+    input.mainToPr === false;
+}
+
+/**
+ * True only for the merge race: this run started with origin/main at the
+ * pre-merge base, and current main is the merge commit of this PR head.
+ * The head is then exactly one commit behind, and that commit is the merge.
+ */
+export function isPostMergeHeadLag(input) {
+  if (!input || input.mainToPr || !input.prToMain) return false;
+  if (input.behind !== 1 || input.ahead !== 0) return false;
+  if (!isFullSha(input.mainSha) || !isFullSha(input.prSha) || !isFullSha(input.startMainSha)) {
+    return false;
+  }
+  const main = input.mainSha.toLowerCase();
+  const pr = input.prSha.toLowerCase();
+  const start = input.startMainSha.toLowerCase();
+  if (start === main) return false;
+  if (!Array.isArray(input.mainParents) || input.mainParents.length < 2) return false;
+  const parents = [];
+  for (const parent of input.mainParents) {
+    if (!isFullSha(parent)) return false;
+    parents.push(parent.toLowerCase());
+  }
+  if (parents[0] !== start || parents[0] === pr) return false;
+  return parents.slice(1).includes(pr);
+}
+
+function readCommitParents(sha) {
+  const result = gitResult(["log", "-1", "--format=%P", sha]);
+  if (!result.ok || !result.output) return [];
+  return result.output.split(/\s+/).filter(Boolean);
+}
+
 export function lineageBlockingReasons(input) {
   const reasons = [];
   if (!input.prodSha) {
@@ -114,7 +158,7 @@ export function lineageBlockingReasons(input) {
   if (input.canCompare && !input.prodToPr) {
     reasons.push("production is not an ancestor of this PR");
   }
-  if (input.canCompare && !input.mainToPr) {
+  if (input.canCompare && !input.mainToPr && !postMergeHeadLagExempt(input)) {
     reasons.push(`PR is behind current main by ${input.behind ?? "unknown"} commits`);
   }
   if (input.canCompare && !input.mainToPr && !input.prToMain) {
@@ -176,6 +220,8 @@ Health endpoint: \`${input.healthUrl}\`
 | production_is_ancestor_of_main | ${lineageValue(input.prodToMain, input.canCompare)} |
 | production_is_ancestor_of_pr | ${lineageValue(input.prodToPr, input.canCompare)} |
 | main_is_ancestor_of_pr | ${lineageValue(input.mainToPr, input.canCompare)} |
+| run_start_main_sha | ${input.startMainSha || "unavailable"} |
+| post_merge_head_lag | ${input.postMergeHeadLag ? "exempted" : "no"} |
 | main_changed_during_check | ${input.mainChanged ? "true" : "false"} |
 | migration_scan | ${input.migrationScanOk ? "ok" : "failed"} |
 | duplicate_migration_versions | ${input.duplicateMigrationVersions || "none"} |
@@ -190,6 +236,9 @@ ${lineageValue(input.prToMain, input.canCompare)} PR → MAIN<br>
 Merge base: \`${input.mergeBase ?? "unavailable"}\`  
 PR is ${input.behind ?? "unknown"} commits behind current main.  
 PR is ${input.ahead ?? "unknown"} commits ahead of current main.
+${input.postMergeHeadLag ? `
+Post-merge head lag is exempted. This run started at \`${input.startMainSha}\`, and current main is the merge commit of this PR head. That one commit is not a blocking reason.
+` : ""}
 ${input.mainChanged ? `
 ⚠️ MAIN CHANGED DURING CHECK<br>
 Start: \`${input.mainSha}\`<br>
@@ -358,6 +407,16 @@ async function main() {
   const mergeBaseResult = canCompare
     ? gitResult(["merge-base", mainSha, prSha])
     : { ok: false, output: "" };
+  const postMergeHeadLag = isPostMergeHeadLag({
+    mainSha,
+    prSha,
+    startMainSha,
+    behind: distance.mainOnly,
+    ahead: distance.prOnly,
+    mainToPr,
+    prToMain,
+    mainParents: isFullSha(mainSha) ? readCommitParents(mainSha) : [],
+  });
 
   reasons.push(...lineageBlockingReasons({
     prodSha,
@@ -369,6 +428,8 @@ async function main() {
     mainToPr,
     prToMain,
     behind: distance.mainOnly,
+    ahead: distance.prOnly,
+    postMergeHeadLag,
     mainChanged,
   }));
 
@@ -398,9 +459,11 @@ async function main() {
     healthReason: live.reason,
     mainSha,
     prSha,
+    startMainSha,
     workflowSha,
     finalMainSha,
     mainChanged,
+    postMergeHeadLag,
     prodToMain,
     prodToPr,
     mainToPr,
