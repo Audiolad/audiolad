@@ -3,6 +3,7 @@ import {
   MUSIC_MASTER_TOO_LARGE_MESSAGE,
   validateMusicMasterFileClient,
 } from "@/lib/author-products/music-master-upload-contract";
+import { fileForSignedAuthorAudioUpload } from "@/lib/author-products/signed-upload-client";
 import { createClient } from "@/lib/supabase/client";
 
 type SignedUpload = { path: string; token: string };
@@ -141,9 +142,9 @@ export async function uploadMusicMasterDirect(input: {
       .uploadToSignedUrl(
         started.signedUpload.path,
         started.signedUpload.token,
-        input.file,
-        // Descriptor MIME can be empty/octet-stream in browsers; Storage only
-        // accepts WAV variants, so the signed PUT always declares canonical WAV.
+        fileForSignedAuthorAudioUpload(input.file, input.file.name, "audio/wav"),
+        // storage-js uses the File/Blob type for multipart uploads. Keep the
+        // option too, but the wrapped File is what guarantees canonical WAV.
         { contentType: "audio/wav", upsert: false },
       );
     if (uploadError) {
