@@ -13,7 +13,6 @@ import {
   ADMIN_PRODUCT_MODERATION_FILTER_OPTIONS,
   resolveAdminProductModerationFilter,
 } from "../src/lib/admin/product-moderation-status.ts";
-import { ADMIN_PRODUCT_MODERATION_CHECKLIST } from "../src/lib/admin/product-moderation-checklist.ts";
 import {
   PLATFORM_ROLE_PERMISSIONS,
   resolvePermissionsForRoles,
@@ -77,7 +76,6 @@ assert.equal(
   "Опубликован",
 );
 
-assert.ok(ADMIN_PRODUCT_MODERATION_CHECKLIST.length >= 4);
 
 // Source guards
 const schemaMigration = read(
@@ -128,6 +126,12 @@ assert.match(form, /Одобрить и опубликовать/);
 assert.match(form, /Требуются изменения/);
 assert.doesNotMatch(form, /Отклонить/);
 assert.match(form, /AdminAudioPlayer/);
+assert.match(form, /SEO-блок/);
+assert.match(form, /SEO-заголовок/);
+assert.match(form, /SEO-описание/);
+assert.match(form, /getPracticeSeoUsageHeading/);
+assert.match(form, /product\.seoFaqItems/);
+assert.doesNotMatch(form, /Чек-лист проверки/);
 assert.match(form, /История модерации/);
 
 const nav = read("src/lib/admin/nav.ts");
@@ -144,5 +148,8 @@ const queries = read("src/lib/admin/product-moderation-queries.ts");
 assert.match(queries, /moderation_submitted_at/);
 assert.match(queries, /ascending:\s*true/);
 assert.match(queries, /\.is\("deleted_at", null\)/);
+assert.match(queries, /seo_title/);
+assert.match(queries, /seo_description/);
+assert.match(queries, /loadAuthorPracticeSeoContent\(supabase, practiceId\)/);
 
 console.log("admin-product-moderation-unit: ok");
