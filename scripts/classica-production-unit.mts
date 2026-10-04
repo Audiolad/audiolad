@@ -24,8 +24,11 @@ import {
 } from "../src/lib/classica/production/status";
 import {
   classicaAssetAllowsMime,
+  classicaAssetFileLabel,
   classicaAssetMaxBytes,
+  classicaChosenFileError,
   classicaPublishCleanupPaths,
+  formatClassicaByteSize,
 } from "../src/lib/classica/production/files";
 import {
   buildClassicaWorkCanonical,
@@ -321,5 +324,34 @@ assert.match(publishSource, /upsert: false/);
 
 assert.doesNotMatch(promptFormSource, /["']use client["']/);
 assert.doesNotMatch(promptFormSource, /useActionState/);
+
+assert.equal(classicaChosenFileError("final_audio", { type: "audio/mpeg", size: 128 }), null);
+assert.equal(
+  classicaChosenFileError("final_audio", { type: "image/png", size: 128 }),
+  "Этот тип файла для выбранного поля не подходит.",
+);
+assert.equal(
+  classicaChosenFileError("final_audio", { type: "audio/mpeg", size: classicaAssetMaxBytes("final_audio") + 1 }),
+  "Файл больше допустимого размера.",
+);
+assert.equal(classicaChosenFileError("cover", { type: "audio/mpeg", size: 10 }), "Этот тип файла для выбранного поля не подходит.");
+assert.equal(classicaChosenFileError("cover", { type: "image/png", size: 0 }), "Выберите файл.");
+assert.equal(classicaChosenFileError("source_file", { type: "application/pdf", size: 20 }), null);
+assert.equal(classicaChosenFileError("slider", { type: "image/webp", size: 20 }), null);
+assert.equal(classicaAssetFileLabel("job/cover/file.jpg"), "file.jpg");
+assert.equal(classicaAssetFileLabel(""), "Файл");
+assert.equal(formatClassicaByteSize(512), "512 Б");
+assert.match(formatClassicaByteSize(1536), /КБ$/);
+assert.match(formatClassicaByteSize(2.5 * 1024 * 1024), /МБ$/);
+
+const uploadSource = actionsSource.slice(
+  actionsSource.indexOf("export async function uploadClassicaAssetAction"),
+  actionsSource.indexOf("export async function removeClassicaAssetAction"),
+);
+assert.match(uploadSource, /classicaChosenFileError/);
+assert.match(uploadSource, /classica_production_register_asset/);
+assert.match(uploadSource, /\.upload\(path, file/);
+assert.match(uploadSource, /uploadedPath: path/);
+assert.doesNotMatch(uploadSource, /upsert:\s*true/);
 
 console.log("classica production unit ok");

@@ -7,9 +7,8 @@ import { classicaIdleState, type ClassicaActionState } from "@/lib/classica/prod
 import { mapClassicaError } from "@/lib/classica/production/errors";
 import { classicaCanAdmin, requireClassicaProductionAccess } from "@/lib/classica/production/access";
 import {
-  classicaAssetAllowsMime,
   classicaAssetExtension,
-  classicaAssetMaxBytes,
+  classicaChosenFileError,
   classicaProductionObjectPath,
   classicaPublishedObjectPath,
   classicaPublishCleanupPaths,
@@ -298,14 +297,12 @@ export async function uploadClassicaAssetAction(
   const jobId = readText(formData, "job_id");
   const kind = readText(formData, "kind") as ClassicaAssetKind;
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size <= 0) {
+  if (!(file instanceof File)) {
     return { error: "Выберите файл." };
   }
-  if (!classicaAssetAllowsMime(kind, file.type)) {
-    return { error: "Этот тип файла для выбранного поля не подходит." };
-  }
-  if (file.size > classicaAssetMaxBytes(kind)) {
-    return { error: "Файл больше допустимого размера." };
+  const chosenError = classicaChosenFileError(kind, file);
+  if (chosenError) {
+    return { error: chosenError };
   }
   const extension = classicaAssetExtension(file.type);
   if (!extension) {
@@ -342,7 +339,7 @@ export async function uploadClassicaAssetAction(
     await supabase.storage.from(CLASSICA_PRODUCTION_BUCKET).remove(replaced);
   }
   revalidateJob(jobId);
-  return classicaIdleState;
+  return { error: null, uploadedPath: path };
 }
 
 export async function removeClassicaAssetAction(formData: FormData): Promise<void> {

@@ -16,7 +16,6 @@ import {
   publishClassicaJobAction,
   reassignClassicaJobAction,
   releaseClassicaJobAction,
-  removeClassicaAssetAction,
   reviewClassicaJobAction,
   submitClassicaJobAction,
   takeClassicaJobAction,
@@ -218,31 +217,52 @@ export default async function ClassicaJobPage({ params, searchParams }: PageProp
 
       {canEdit ? (
         <div className="grid gap-3 md:grid-cols-2">
-          <ClassicaUploadForm jobId={job.id} kind="final_audio" label="Итоговое аудио" accept="audio/*" />
-          <ClassicaUploadForm jobId={job.id} kind="source_render" label="Исходный рендер" accept="audio/*" />
-          <ClassicaUploadForm jobId={job.id} kind="source_file" label="Файл источника" accept=".xml,.musicxml,.mid,.midi,.pdf,.zip,audio/*" />
-          <ClassicaUploadForm jobId={job.id} kind="cover" label="Обложка" accept="image/jpeg,image/png,image/webp" showText />
-          <ClassicaUploadForm jobId={job.id} kind="slider" label="Изображение для слайдера" accept="image/jpeg,image/png,image/webp" showText />
+          <ClassicaUploadForm
+            jobId={job.id}
+            kind="final_audio"
+            label="Итоговое аудио"
+            accept="audio/*"
+            assets={job.assets.filter((asset) => asset.kind === "final_audio")}
+          />
+          <ClassicaUploadForm
+            jobId={job.id}
+            kind="source_render"
+            label="Исходный рендер"
+            accept="audio/*"
+            assets={job.assets.filter((asset) => asset.kind === "source_render")}
+          />
+          <ClassicaUploadForm
+            jobId={job.id}
+            kind="source_file"
+            label="Файл источника"
+            accept=".xml,.musicxml,.mid,.midi,.pdf,.zip,audio/*"
+            assets={job.assets.filter((asset) => asset.kind === "source_file")}
+          />
+          <ClassicaUploadForm
+            jobId={job.id}
+            kind="cover"
+            label="Обложка"
+            accept="image/jpeg,image/png,image/webp"
+            showText
+            assets={job.assets.filter((asset) => asset.kind === "cover")}
+          />
+          <ClassicaUploadForm
+            jobId={job.id}
+            kind="slider"
+            label="Изображение для слайдера"
+            accept="image/jpeg,image/png,image/webp"
+            showText
+            assets={sliders}
+          />
         </div>
-      ) : null}
-
-      <ul className="grid gap-2 text-sm">
-        {cover ? <li>Обложка: {cover.altText || cover.titleText || "загружена"}</li> : null}
-        {sliders.map((image) => (
-          <li key={image.id} className="flex items-center gap-3">
-            <span>{image.altText || image.titleText || "Изображение слайдера"}</span>
-            {canEdit ? (
-              <form action={removeClassicaAssetAction}>
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="asset_id" value={image.id} />
-                <button type="submit" className="text-[#9b2c4a]">
-                  Удалить
-                </button>
-              </form>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+      ) : (
+        <ul className="grid gap-2 text-sm">
+          {cover ? <li>Обложка: {cover.altText || cover.titleText || "загружена"}</li> : null}
+          {sliders.map((image) => (
+            <li key={image.id}>{image.altText || image.titleText || "Изображение слайдера"}</li>
+          ))}
+        </ul>
+      )}
 
       <ClassicaCardForm job={job} readOnly={!canEdit} />
 
