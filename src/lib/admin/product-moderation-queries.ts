@@ -4,6 +4,7 @@ import {
   hasListenTrackPlayableSource,
   loadValidatedActiveMusicDeliveryItemIds,
 } from "@/lib/listen/validated-active-music-delivery";
+import { loadAuthorPracticeSeoContent } from "@/lib/products/practice-seo-content";
 
 export type AdminProductModerationListItem = {
   id: string;
@@ -57,6 +58,10 @@ export type AdminProductModerationDetail = {
   title: string;
   subtitle: string | null;
   description: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  seoUsageItems: string[];
+  seoFaqItems: Array<{ question: string; answer: string }>;
   slug: string;
   format: string | null;
   productKind: string;
@@ -281,6 +286,8 @@ export async function getAdminProductModerationDetail(
       title,
       subtitle,
       description,
+      seo_title,
+      seo_description,
       slug,
       format,
       product_kind,
@@ -328,8 +335,12 @@ export async function getAdminProductModerationDetail(
     ? practice.authors[0]
     : practice.authors;
 
-  const [{ data: audioItems }, { data: topicRows }, { data: events }] =
-    await Promise.all([
+  const [
+    { data: audioItems },
+    { data: topicRows },
+    { data: events },
+    seoContent,
+  ] = await Promise.all([
       supabase
         .from("audio_items")
         .select("id, title, position, duration_seconds, audio_path, active_music_delivery_asset_id, status")
@@ -358,6 +369,7 @@ export async function getAdminProductModerationDetail(
         )
         .eq("practice_id", practiceId)
         .order("created_at", { ascending: false }),
+      loadAuthorPracticeSeoContent(supabase, practiceId),
     ]);
 
   const actorIds = Array.from(
@@ -428,6 +440,10 @@ export async function getAdminProductModerationDetail(
     title: (practice.title as string) || "Без названия",
     subtitle: (practice.subtitle as string | null) ?? null,
     description: (practice.description as string | null) ?? null,
+    seoTitle: (practice.seo_title as string | null) ?? null,
+    seoDescription: (practice.seo_description as string | null) ?? null,
+    seoUsageItems: seoContent.usageItems.map((item) => item.content),
+    seoFaqItems: seoContent.faqItems,
     slug: (practice.slug as string) || "",
     format: (practice.format as string | null) ?? null,
     productKind: (practice.product_kind as string) || "practice",
