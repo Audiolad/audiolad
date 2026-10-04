@@ -1,9 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
-import { classicaIdleState } from "@/lib/classica/production/action-state";
+import ClassicaCardSaveButton from "@/components/classica/ClassicaCardSaveButton";
+import { classicaIdleState, type ClassicaActionState } from "@/lib/classica/production/action-state";
 import { saveClassicaCardAction } from "@/lib/classica/production/actions";
+import {
+  CLASSICA_CARD_SAVE_SUCCESS_MS,
+  classicaCardSavePhase,
+  isClassicaCardSaveSuccess,
+} from "@/lib/classica/production/card-save-feedback";
 import type { ClassicaJobRecord } from "@/lib/classica/production/queries";
 
 const inputClass =
@@ -47,8 +53,25 @@ type ClassicaCardFormProps = {
 };
 
 export default function ClassicaCardForm({ job, readOnly = false }: ClassicaCardFormProps) {
-  const [state, action] = useActionState(saveClassicaCardAction, classicaIdleState);
+  const [state, action, pending] = useActionState(saveClassicaCardAction, classicaIdleState);
+  const [hiddenSuccess, setHiddenSuccess] = useState<ClassicaActionState | null>(null);
+  const succeeded = isClassicaCardSaveSuccess(state);
+  const phase = classicaCardSavePhase({
+    pending,
+    succeeded,
+    successDismissed: hiddenSuccess === state,
+  });
   const flags = job.packagingFlags;
+
+  useEffect(() => {
+    if (!succeeded || pending) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setHiddenSuccess(state);
+    }, CLASSICA_CARD_SAVE_SUCCESS_MS);
+    return () => window.clearTimeout(timer);
+  }, [pending, state, succeeded]);
 
   return (
     <form action={action} className="grid gap-6">
@@ -206,11 +229,7 @@ export default function ClassicaCardForm({ job, readOnly = false }: ClassicaCard
 
       </fieldset>
       {state.error ? <p className="text-sm text-[#9b2c4a]">{state.error}</p> : null}
-      {readOnly ? null : (
-        <button type="submit" className="w-fit rounded-xl bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">
-          Сохранить карточку
-        </button>
-      )}
+      {readOnly ? null : <ClassicaCardSaveButton phase={phase} />}
     </form>
   );
 }

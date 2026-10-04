@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { classicaIdleState, type ClassicaActionState } from "@/lib/classica/production/action-state";
+import { classicaCardSavedState } from "@/lib/classica/production/card-save-feedback";
 import { mapClassicaError } from "@/lib/classica/production/errors";
 import { classicaCanAdmin, requireClassicaProductionAccess } from "@/lib/classica/production/access";
 import {
@@ -184,7 +185,7 @@ export async function saveClassicaCardAction(
     return fail(error);
   }
   revalidateJob(jobId);
-  return classicaIdleState;
+  return classicaCardSavedState();
 }
 
 export async function takeClassicaJobAction(formData: FormData): Promise<void> {
