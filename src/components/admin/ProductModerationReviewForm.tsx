@@ -13,7 +13,7 @@ import {
   approveAndPublishProductAction,
   requestProductChangesAction,
 } from "@/app/(platform)/admin/product-moderation/actions";
-import { ADMIN_PRODUCT_MODERATION_CHECKLIST } from "@/lib/admin/product-moderation-checklist";
+import { getPracticeSeoUsageHeading } from "@/lib/products/practice-seo-content";
 import {
   adminAwaitingPublicationLabel,
   adminScheduledPublicationLine,
@@ -213,7 +213,6 @@ export default function ProductModerationReviewForm({
     ADMIN_PRODUCT_MODERATION_ACTION_INITIAL_STATE,
   );
   const [showChangesForm, setShowChangesForm] = useState(false);
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   const visible = getVisibleAuthorProductStatus({
     status: product.status,
@@ -461,43 +460,68 @@ export default function ProductModerationReviewForm({
       </section>
 
       <section className="rounded-[22px] border border-[#eadff8] bg-white p-5">
-        <h3 className="text-[17px] font-semibold text-[#25135c]">
-          Чек-лист проверки
-        </h3>
-        <p className="mt-1 text-sm text-[#796ba0]">
-          Вспомогательные отметки. В v1 не сохраняются в базе.
-        </p>
-        <div className="mt-4 space-y-4">
-          {ADMIN_PRODUCT_MODERATION_CHECKLIST.map((section) => (
-            <div key={section.id}>
-              <h4 className="text-sm font-semibold text-[#25135c]">
-                {section.title}
-              </h4>
-              <ul className="mt-2 space-y-2">
-                {section.checks.map((check) => {
-                  const key = `${section.id}:${check}`;
-                  return (
-                    <li key={key}>
-                      <label className="flex items-start gap-2 text-sm text-[#5f5484]">
-                        <input
-                          type="checkbox"
-                          checked={checked[key] === true}
-                          onChange={(event) =>
-                            setChecked((current) => ({
-                              ...current,
-                              [key]: event.target.checked,
-                            }))
-                          }
-                          className="mt-1"
-                        />
-                        <span>{check}</span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+        <h3 className="text-[17px] font-semibold text-[#25135c]">SEO-блок</h3>
+
+        <div className="mt-4 space-y-5">
+          <div>
+            <h4 className="text-sm font-semibold text-[#25135c]">
+              SEO-заголовок
+            </h4>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#5f5484]">
+              {product.seoTitle || "—"}
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-[#25135c]">
+              SEO-описание
+            </h4>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#5f5484]">
+              {product.seoDescription || "—"}
+            </p>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-[#25135c]">
+              {getPracticeSeoUsageHeading(product.productKind)}
+            </h4>
+            {product.seoUsageItems.length > 0 ? (
+              <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-[#5f5484]">
+                {product.seoUsageItems.map((item, index) => (
+                  <li key={`${index}:${item}`} className="whitespace-pre-wrap">
+                    {item}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-2 text-sm text-[#796ba0]">—</p>
+            )}
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-[#25135c]">
+              Вопросы и ответы
+            </h4>
+            {product.seoFaqItems.length > 0 ? (
+              <ol className="mt-2 space-y-3">
+                {product.seoFaqItems.map((item, index) => (
+                  <li
+                    key={`${index}:${item.question}`}
+                    className="rounded-[16px] border border-[#eee6f7] bg-[#fbf8ff] px-3 py-3"
+                  >
+                    <p className="text-sm font-semibold text-[#25135c]">
+                      {index + 1}. {item.question}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[#5f5484]">
+                      {item.answer}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="mt-2 text-sm text-[#796ba0]">—</p>
+            )}
+          </div>
         </div>
       </section>
 
