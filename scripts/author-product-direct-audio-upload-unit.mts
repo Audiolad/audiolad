@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { StorageClient } from "@supabase/storage-js";
+
 import {
   MAX_AUDIO_BYTES,
   getAudioUploadErrorMessage,
@@ -24,6 +26,7 @@ import {
   validateProductMp3FileClient,
 } from "../src/lib/author-products/mp3-upload-contract";
 import { isAllowedMp3File } from "../src/lib/author-products/media";
+import { fileForSignedAuthorAudioUpload } from "../src/lib/author-products/signed-upload-client";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -44,6 +47,66 @@ function fakeFile({
   Object.defineProperty(file, "size", { value: size });
   return file;
 }
+
+async function signedUploadPartType(file: Blob, contentType: string): Promise<string> {
+  let raw = "";
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    if (init?.body instanceof FormData) {
+      const probe = new Request("https://example.test/put", { method: "PUT", body: init.body });
+      raw = await probe.text();
+    }
+    return new Response(JSON.stringify({ Key: "practice-audio/practices/id/audio/file" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  const storage = new StorageClient(
+    "https://example.test/storage/v1",
+    { apikey: "test" },
+    fetchImpl,
+  );
+  const uploaded = await storage.from("practice-audio").uploadToSignedUrl(
+    "practices/id/audio/file",
+    "signed-token",
+    file,
+    { contentType, upsert: false },
+  );
+  assert.equal(uploaded.error, null);
+  const match = raw.match(/content-type:\\s*([^\\r\\n]+)/i);
+  return (match?.[1] ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+const octetMp3ForSignedUpload = new File(
+  [Uint8Array.from([73, 68, 51])],
+  "track.mp3",
+  { type: "application/octet-stream" },
+);
+assert.equal(
+  await signedUploadPartType(octetMp3ForSignedUpload, "audio/mpeg"),
+  "application/octet-stream",
+  "storage-js ignores contentType for an unwrapped File",
+);
+assert.equal(
+  await signedUploadPartType(
+    fileForSignedAuthorAudioUpload(octetMp3ForSignedUpload, octetMp3ForSignedUpload.name, "audio/mpeg"),
+    "audio/mpeg",
+  ),
+  "audio/mpeg",
+  "wrapped File sends the canonical MP3 MIME",
+);
+const emptyWavForSignedUpload = new File(
+  [Uint8Array.from([82, 73, 70, 70])],
+  "трек.wav",
+  { type: "" },
+);
+assert.equal(
+  await signedUploadPartType(
+    fileForSignedAuthorAudioUpload(emptyWavForSignedUpload, emptyWavForSignedUpload.name, "audio/wav"),
+    "audio/wav",
+  ),
+  "audio/wav",
+  "wrapped File sends the canonical WAV MIME",
+);
 
 assert.equal(MAX_PRODUCT_AUDIO_BYTES, 300 * 1024 * 1024);
 assert.equal(MAX_AUDIO_BYTES, 50 * 1024 * 1024);
@@ -252,6 +315,7 @@ assert.doesNotMatch(
 assert.match(client, /uploadToSignedUrl/);
 assert.match(client, /PRACTICE_AUDIO_BUCKET/);
 assert.match(client, /canonicalProductAudioUploadMime/);
+assert.match(client, /fileForSignedAuthorAudioUpload\(input\.file, input\.file\.name, uploadMime\)/);
 assert.match(client, /upload\/start/);
 assert.match(client, /upload\/finalize/);
 assert.match(client, /upload\/abandon/);

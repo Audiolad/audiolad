@@ -5,6 +5,7 @@ import {
   detectProductAudioSourceFormat,
   validateProductAudioFileClient,
 } from "@/lib/author-products/product-audio-upload-contract";
+import { fileForSignedAuthorAudioUpload } from "@/lib/author-products/signed-upload-client";
 import type { AuthorProductDetail } from "@/lib/author-products/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -134,6 +135,9 @@ export async function uploadAuthorProductAudioDirect(input: {
   }
 
   const uploadPath = started.upload_path;
+  const uploadMime = canonicalProductAudioUploadMime(
+    detectProductAudioSourceFormat(input.file.name) ?? "mp3",
+  );
   try {
     const { error: storageError } = await createClient()
       .storage
@@ -141,11 +145,9 @@ export async function uploadAuthorProductAudioDirect(input: {
       .uploadToSignedUrl(
         started.signedUpload.path,
         started.signedUpload.token,
-        input.file,
+        fileForSignedAuthorAudioUpload(input.file, input.file.name, uploadMime),
         {
-          contentType: canonicalProductAudioUploadMime(
-            detectProductAudioSourceFormat(input.file.name) ?? "mp3",
-          ),
+          contentType: uploadMime,
           upsert: false,
         },
       );
