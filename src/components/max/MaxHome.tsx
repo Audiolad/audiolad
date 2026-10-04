@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import MaxCatalogProductCard from "@/components/max/MaxCatalogProductCard";
 import MaxGuestHomeSlider from "@/components/max/MaxGuestHomeSlider";
+import MaxHomeClosing from "@/components/max/MaxHomeClosing";
 import {
   PUBLIC_CATALOG_SECTION_CARDS,
   type PublicCatalogSection,
@@ -37,6 +38,7 @@ type MaxHomeScreenProps = {
   onOpenSection: (section: PublicCatalogSection) => void;
   onOpenShelf: (shelfId: MaxHomeShelfId) => void;
   onSelectProduct: (product: MaxCatalogProduct) => void;
+  closing?: ReactNode;
 };
 
 const EMPTY_SHELVES: MaxHomeShelves = {
@@ -54,6 +56,7 @@ export function MaxHomeScreen({
   onOpenSection,
   onOpenShelf,
   onSelectProduct,
+  closing,
 }: MaxHomeScreenProps) {
   const readyShelves = shelves ?? EMPTY_SHELVES;
 
@@ -152,6 +155,7 @@ export function MaxHomeScreen({
             );
           })
         : null}
+      {closing ?? <MaxHomeClosing />}
     </div>
   );
 }
@@ -163,6 +167,7 @@ export default function MaxHome({
   onOpenSection,
   onOpenShelf,
   onSelectProduct,
+  closing,
 }: Omit<MaxHomeScreenProps, "status" | "shelves">) {
   const [status, setStatus] = useState<MaxHomeStatus>(() =>
     readMaxInitData() ? "loading" : "error",
@@ -217,6 +222,7 @@ export default function MaxHome({
       onOpenSection={onOpenSection}
       onOpenShelf={onOpenShelf}
       onSelectProduct={onSelectProduct}
+      closing={closing}
     />
   );
 }

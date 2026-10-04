@@ -1,7 +1,9 @@
 import { LEGAL_LINKS } from "@/lib/legal/links";
+import { miniAppAudioladPageUrl } from "@/lib/mini-app/public-page-url";
 import { getVisiblePublicFooterLinks } from "@/lib/navigation/public-footer-links";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 import { ORGANIZATION_EMAIL } from "@/lib/seo/json-ld/organization-entity";
+import { MEDITATION_AUTHORS_LANDING_PROMO_LINK } from "@/lib/seo/meditation-authors-landing";
 import { openVkExternalHttps } from "@/lib/vk/bridge";
 
 /** Public Audiolad pages. Opening them does not link a VK identity. */
@@ -17,18 +19,13 @@ export type VkFooterLink = {
 
 /** Absolute https page on the production origin, with no query, hash, or credentials. */
 export function vkAudioladPageUrl(path: string): string | null {
-  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return null;
-  let url: URL;
-  try {
-    url = new URL(path, `${PRODUCTION_APP_ORIGIN}/`);
-  } catch {
-    return null;
-  }
-  if (url.origin !== PRODUCTION_APP_ORIGIN) return null;
-  if (url.username || url.password || url.search || url.hash) return null;
-  if (url.pathname !== path) return null;
-  return url.toString();
+  return miniAppAudioladPageUrl(path);
 }
+
+/** Canonical authors landing opened from the VK home banner. Not /become-author. */
+export const VK_AUTHORS_LANDING_URL = vkAudioladPageUrl(
+  MEDITATION_AUTHORS_LANDING_PROMO_LINK.href,
+);
 
 function toFooterLinks(
   items: readonly { href: string; title: string }[],
@@ -53,6 +50,7 @@ export function getVkLegalFooterLinks(): VkFooterLink[] {
 const VK_GUEST_EXTERNAL_URLS = new Set<string>([
   VK_GUEST_LOGIN_URL,
   VK_GUEST_SIGNUP_URL,
+  ...(VK_AUTHORS_LANDING_URL ? [VK_AUTHORS_LANDING_URL] : []),
   ...getVkDiscoveryFooterLinks().map((item) => item.url),
   ...getVkLegalFooterLinks().map((item) => item.url),
 ]);
