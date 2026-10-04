@@ -710,7 +710,22 @@ function testSourceGuards() {
   );
   const commercialSrc = read("src/lib/author-dashboard/commercial-onboarding.ts");
   assert.match(commercialSrc, /evaluateCommercialOnboardingChecklist/);
-  assert.match(commercialSrc, /COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 5/);
+  assert.match(commercialSrc, /COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 3/);
+  assert.match(
+    commercialSrc,
+    /Создайте и опубликуйте первый платный продукт/,
+  );
+  assert.match(
+    commercialSrc,
+    /Добавьте аудиоматериалы, описание, обложку, установите стоимость и опубликуйте продукт\./,
+  );
+  assert.doesNotMatch(commercialSrc, /Подготовьте платный продукт к публикации/);
+  assert.doesNotMatch(commercialSrc, /Опубликуйте первый платный продукт/);
+  assert.doesNotMatch(commercialSrc, /prepare_paid_product/);
+  assert.doesNotMatch(commercialSrc, /publish_paid_product/);
+  assert.doesNotMatch(checklistUi, /prepare_paid_product/);
+  assert.doesNotMatch(checklistUi, /Подготовьте платный продукт к публикации/);
+  assert.doesNotMatch(checklistUi, /Опубликуйте первый платный продукт/);
   assert.doesNotMatch(
     commercialSrc,
     /paidPromotionComplete,/,
@@ -742,6 +757,40 @@ function testSourceGuards() {
   );
 }
 
+const REMOVED_COMMERCIAL_CARD_TITLES = [
+  "Подготовьте платный продукт к публикации",
+  "Опубликуйте первый платный продукт",
+];
+
+function assertThreeStepCommercialPath(section) {
+  assert.equal(section.steps.length, 3);
+  assert.equal(section.totalCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
+  assert.equal(COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT, 3);
+  assert.deepEqual(
+    section.steps.map((step) => step.id),
+    ["commercial_application", "terms_acceptance", "paid_product"],
+  );
+  assert.deepEqual(
+    section.steps.map((step) => step.title),
+    [
+      "Подайте заявку на коммерческий статус",
+      "Примите условия сотрудничества",
+      "Создайте и опубликуйте первый платный продукт",
+    ],
+  );
+  assert.equal(
+    section.steps[2].description,
+    "Добавьте аудиоматериалы, описание, обложку, установите стоимость и опубликуйте продукт.",
+  );
+  for (const title of REMOVED_COMMERCIAL_CARD_TITLES) {
+    assert.equal(
+      section.steps.some((step) => step.title === title),
+      false,
+      title,
+    );
+  }
+}
+
 function testCommercialScenarios() {
   // 1. New author without profile
   const emptyFree = evaluate();
@@ -750,6 +799,7 @@ function testCommercialScenarios() {
   assert.equal(gated.unlocked, false);
   assert.equal(gated.progressMode, "gated");
   assert.equal(gated.totalCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
+  assertThreeStepCommercialPath(gated);
   assert.deepEqual(
     gated.steps.map((step) => step.id),
     [...COMMERCIAL_ONBOARDING_CHECKLIST_STEP_IDS],
@@ -841,7 +891,8 @@ function testCommercialScenarios() {
     "/author-dashboard/commercial-application?author=demo-author",
   );
   assert.equal(noApplication.steps[1].state, "locked");
-  assert.equal(noApplication.steps[3].state, "locked");
+  assert.equal(noApplication.steps[2].state, "locked");
+  assertThreeStepCommercialPath(noApplication);
 
   // Capability off still shows coming_soon
   const formUnavailable = evaluateCommercial({
@@ -870,7 +921,8 @@ function testCommercialScenarios() {
   assert.equal(submitted.steps[0].statusLabel, "На рассмотрении");
   assert.equal(submitted.steps[0].actionLabel, "Смотреть заявку");
   assert.equal(submitted.steps[1].state, "locked");
-  assert.equal(submitted.steps[3].state, "locked");
+  assert.equal(submitted.steps[2].state, "locked");
+  assertThreeStepCommercialPath(submitted);
 
   const submittedExplicit = evaluateCommercial({
     freeGateReady: true,
@@ -957,8 +1009,9 @@ function testCommercialScenarios() {
     approved.steps.some((step) => step.id === "paid_promotion"),
     false,
   );
-  assert.equal(approved.steps.at(-1)?.id, "publish_paid_product");
+  assert.equal(approved.steps.at(-1)?.id, "paid_product");
   assert.equal(approved.steps.at(-1)?.state, "locked");
+  assertThreeStepCommercialPath(approved);
 
   // Explicit application href is respected
   const applyReady = evaluateCommercial({
@@ -990,12 +1043,15 @@ function testCommercialScenarios() {
   assert.equal(requirementsMet.steps[2].id, "paid_product");
   assert.equal(requirementsMet.steps[2].state, "active");
   assert.equal(requirementsMet.steps[2].actionLabel, "Создать платный продукт");
+  assert.equal(requirementsMet.completedCount, 2);
+  assert.equal(requirementsMet.complete, false);
   assert.equal(
     requirementsMet.steps.some((step) => step.id === "payout_details"),
     false,
   );
-  assert.equal(requirementsMet.steps.at(-1)?.id, "publish_paid_product");
-  assert.equal(requirementsMet.steps.at(-1)?.state, "locked");
+  assert.equal(requirementsMet.steps.at(-1)?.id, "paid_product");
+  assert.equal(requirementsMet.steps.at(-1)?.state, "active");
+  assertThreeStepCommercialPath(requirementsMet);
 
   // 10. Paid draft created
   const paidDraft = evaluateCommercial({
@@ -1020,9 +1076,12 @@ function testCommercialScenarios() {
       ),
     ],
   });
-  assert.equal(paidDraft.steps[2].state, "completed");
-  assert.equal(paidDraft.steps[3].state, "active");
+  assert.equal(paidDraft.steps[2].state, "active");
+  assert.equal(paidDraft.steps[2].actionLabel, "Проверить перед публикацией");
+  assert.equal(paidDraft.completedCount, 2);
+  assert.equal(paidDraft.complete, false);
   assert.equal(paidDraft.focusPaidProductId, "paid-1");
+  assertThreeStepCommercialPath(paidDraft);
 
   // 11. Paid product previewed / ready to publish
   const paidReady = evaluateCommercial({
@@ -1047,9 +1106,12 @@ function testCommercialScenarios() {
       ),
     ],
   });
-  assert.equal(paidReady.steps[3].state, "completed");
-  assert.equal(paidReady.steps[4].state, "active");
-  assert.match(paidReady.steps[4].href ?? "", /preview=publish/);
+  assert.equal(paidReady.steps[2].state, "active");
+  assert.equal(paidReady.steps[2].actionLabel, "Перейти к публикации");
+  assert.match(paidReady.steps[2].href ?? "", /preview=publish/);
+  assert.equal(paidReady.completedCount, 2);
+  assert.equal(paidReady.complete, false);
+  assertThreeStepCommercialPath(paidReady);
 
   // 12. First paid product published
   const paidPublished = evaluateCommercial({
@@ -1074,10 +1136,11 @@ function testCommercialScenarios() {
       ),
     ],
   });
-  assert.equal(paidPublished.steps[4].state, "completed");
+  assert.equal(paidPublished.steps[2].state, "completed");
   assert.equal(paidPublished.complete, true);
-  assert.equal(paidPublished.completedCount, 5);
-  assert.equal(paidPublished.totalCount, 5);
+  assert.equal(paidPublished.completedCount, 3);
+  assert.equal(paidPublished.totalCount, 3);
+  assertThreeStepCommercialPath(paidPublished);
   assert.equal(
     paidPublished.steps.some((step) => step.id === "paid_promotion"),
     false,
@@ -1120,18 +1183,9 @@ function testCommercialScenarios() {
     ],
   });
   assert.equal(paidPromo.complete, true);
-  assert.equal(paidPromo.completedCount, 5);
-  assert.equal(paidPromo.totalCount, 5);
-  assert.deepEqual(
-    paidPromo.steps.map((step) => step.id),
-    [
-      "commercial_application",
-      "terms_acceptance",
-      "paid_product",
-      "prepare_paid_product",
-      "publish_paid_product",
-    ],
-  );
+  assert.equal(paidPromo.completedCount, 3);
+  assert.equal(paidPromo.totalCount, 3);
+  assertThreeStepCommercialPath(paidPromo);
 }
 
 function testOptionalPayoutChecklistDisplay() {
@@ -1182,8 +1236,9 @@ function testOptionalPayoutChecklistDisplay() {
     false,
   );
   assert.equal(missing.complete, true);
-  assert.equal(missing.completedCount, 5);
-  assert.equal(missing.totalCount, 5);
+  assert.equal(missing.completedCount, 3);
+  assert.equal(missing.totalCount, 3);
+  assertThreeStepCommercialPath(missing);
 
   const emptyDraft = evaluateCommercial({
     ...base,

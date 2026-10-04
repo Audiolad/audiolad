@@ -607,10 +607,12 @@ RLS: публичный SELECT только `is_visible = true`. Members (`owner
 | `author_id` | uuid PK | FK → `authors.id` ON DELETE CASCADE |
 | `free_completed_at` | timestamptz NULL | первый `now()` эпохи, когда free = 100%. Не перезаписывается, пока complete |
 | `free_hidden_at` | timestamptz NULL | `now()` по «Скрыть сейчас». Только если free complete |
-| `commercial_completed_at` | timestamptz NULL | то же для commercial (5 required steps: заявка, условия, создать/подготовить/опубликовать платный продукт). `paid_promotion` и `payout_details` не входят в 100% и не являются строками чек-листа) |
+| `commercial_completed_at` | timestamptz NULL | то же для commercial (3 required steps: заявка, условия, создать и опубликовать первый платный продукт). `paid_promotion` и `payout_details` не входят в 100% и не являются строками чек-листа) |
 | `commercial_hidden_at` | timestamptz NULL | то же для commercial |
 
-Миграция `20260907120000_commercial_onboarding_legacy_complete.sql`: одноразовый backfill. Авторы, которые уже удовлетворяют новому 5/5 (те же источники, что evaluator) и ещё не имеют `commercial_completed_at`, получают `commercial_completed_at` и `commercial_hidden_at` = `now()` — сразу compact, без нового 3-дневного grace. Авторы, уже проштампованные как 6/6, не трогаются. Новое завершение 5-го шага после выкладки по-прежнему first-stamp `completed_at = now()` без `hidden_at`.
+Миграция `20260907120000_commercial_onboarding_legacy_complete.sql`: одноразовый backfill того времени. Авторы, которые уже удовлетворяли тогдашнему 5/5 (те же источники, что evaluator) и ещё не имели `commercial_completed_at`, получили `commercial_completed_at` и `commercial_hidden_at` = `now()` — сразу compact, без нового 3-дневного grace. Авторы, уже проштампованные как 6/6, не трогались.
+
+Живой чек-лист — 3 шага: заявка, условия, создать и опубликовать первый платный продукт. `complete` по-прежнему означает одобренную заявку, принятые текущие условия и опубликованный платный продукт. Отдельной миграции для слияния карточек нет. Новое завершение по-прежнему first-stamp `completed_at = now()` без `hidden_at`.
 | `updated_at` | timestamptz | trigger `set_author_onboarding_ui_state_updated_at` |
 
 Incomplete → `completed_at` и `hidden_at` этой стороны очищаются (новая эпоха). Следующий rising edge ставит новый `completed_at`.

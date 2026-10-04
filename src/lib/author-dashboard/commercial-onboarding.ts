@@ -13,16 +13,16 @@ import {
   isAuthorCommercialApprovedAccess,
   type AuthorAccessStatus,
 } from "@/lib/authors/access";
-import {
-  buildPracticePublicPath,
-  buildPracticePublishPreviewPath,
-} from "@/lib/products/paths";
+import { buildPracticePublishPreviewPath } from "@/lib/products/paths";
 
 /**
  * Required commercial start steps. Promotion links and payout requisites stay
  * available outside this checklist and do not count toward 100%.
+ *
+ * The first paid product is one user-facing step. Created / ready / published
+ * stay internal and choose the step action; they are not separate cards.
  */
-export const COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 5;
+export const COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 3;
 /** @deprecated Use COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT; kept for older imports. */
 export const COMMERCIAL_ONBOARDING_STEP_COUNT =
   COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT;
@@ -31,8 +31,6 @@ export const COMMERCIAL_ONBOARDING_CHECKLIST_STEP_IDS = [
   "commercial_application",
   "terms_acceptance",
   "paid_product",
-  "prepare_paid_product",
-  "publish_paid_product",
 ] as const;
 
 export type CommercialOnboardingChecklistStepId =
@@ -136,19 +134,9 @@ const STEP_META: Record<
       "Ознакомьтесь с условиями размещения платных продуктов, расчёта вознаграждения и работы с АудиоЛадом.",
   },
   paid_product: {
-    title: "Создайте первый платный продукт",
+    title: "Создайте и опубликуйте первый платный продукт",
     description:
-      "Добавьте аудиоматериалы, описание, обложку и установите стоимость продукта.",
-  },
-  prepare_paid_product: {
-    title: "Подготовьте платный продукт к публикации",
-    description:
-      "Проверьте страницу продукта, содержание, цену и то, как его увидят слушатели.",
-  },
-  publish_paid_product: {
-    title: "Опубликуйте первый платный продукт",
-    description:
-      "После публикации продукт появится на вашей странице и станет доступен для покупки.",
+      "Добавьте аудиоматериалы, описание, обложку, установите стоимость и опубликуйте продукт.",
   },
   paid_promotion: {
     title: "Создайте ссылку для продвижения",
@@ -383,10 +371,6 @@ export function evaluateCommercialOnboardingChecklist(input: {
     focusPaidProduct.status !== "published"
       ? buildPracticePublishPreviewPath(authorSlug, focusPaidProduct.slug)
       : focusEditHref;
-  const publishedPublicHref =
-    publishedPaidProduct && publishedPaidProduct.slug
-      ? buildPracticePublicPath(authorSlug, publishedPaidProduct.slug)
-      : focusEditHref;
 
   const canCreatePaidProducts = authorAccessAllowsPaidProducts(accessStatus);
 
@@ -397,8 +381,6 @@ export function evaluateCommercialOnboardingChecklist(input: {
       }),
       lockedStep("terms_acceptance"),
       lockedStep("paid_product"),
-      lockedStep("prepare_paid_product"),
-      lockedStep("publish_paid_product"),
     ];
 
     return {
@@ -526,12 +508,11 @@ export function evaluateCommercialOnboardingChecklist(input: {
     };
   }
 
-  // --- Steps 3–5: paid product path ---
+  // --- Step 3: create and publish the first paid product (one card) ---
+  // created / ready / published stay internal and only pick the action.
   let paidProductStep: CommercialOnboardingStepState;
-  let preparePaidStep: CommercialOnboardingStepState;
-  let publishPaidStep: CommercialOnboardingStepState;
 
-  if (paidProductComplete) {
+  if (publishPaidComplete) {
     paidProductStep = {
       id: "paid_product",
       ...STEP_META.paid_product,
@@ -539,14 +520,14 @@ export function evaluateCommercialOnboardingChecklist(input: {
       hint: null,
       readiness: null,
     };
-  } else if (!canCreatePaidProducts) {
+  } else if (!paidProductComplete && !canCreatePaidProducts) {
     // Paid API/SQL gates follow access_status after Author Terms acceptance.
     paidProductStep = lockedStep("paid_product", {
       hint: applicationApproved
         ? "Сначала примите Авторские условия сотрудничества."
         : "Сначала нужна одобренная коммерческая заявка.",
     });
-  } else {
+  } else if (!paidProductComplete) {
     paidProductStep = {
       id: "paid_product",
       ...STEP_META.paid_product,
@@ -556,76 +537,35 @@ export function evaluateCommercialOnboardingChecklist(input: {
       hint: null,
       readiness: null,
     };
-  }
-
-  if (preparePaidComplete) {
-    preparePaidStep = {
-      id: "prepare_paid_product",
-      ...STEP_META.prepare_paid_product,
-      state: "completed",
-      hint: null,
-      readiness: buildVisiblePaidReadiness(
-        focusPaidProduct?.readiness ?? publishedPaidProduct?.readiness,
-      ),
-    };
-  } else if (!paidProductComplete) {
-    preparePaidStep = lockedStep("prepare_paid_product", {
-      hint: "Шаг откроется после создания платного продукта.",
-    });
-  } else {
-    preparePaidStep = {
-      id: "prepare_paid_product",
-      ...STEP_META.prepare_paid_product,
+  } else if (!preparePaidComplete) {
+    paidProductStep = {
+      id: "paid_product",
+      ...STEP_META.paid_product,
       state: "active",
       actionLabel: "Проверить перед публикацией",
       href: focusPreviewHref,
       hint: null,
       readiness: buildVisiblePaidReadiness(focusPaidProduct?.readiness),
     };
-  }
-
-  if (publishPaidComplete) {
-    publishPaidStep = {
-      id: "publish_paid_product",
-      ...STEP_META.publish_paid_product,
-      state: "completed",
-      actionLabel: "Открыть страницу продукта",
-      href: publishedPublicHref,
-      ctaExternal: true,
-      hint: null,
-      readiness: null,
-    };
-  } else if (!preparePaidComplete) {
-    publishPaidStep = lockedStep("publish_paid_product", {
-      hint: "Шаг откроется, когда платный продукт будет готов к публикации.",
-    });
   } else {
-    publishPaidStep = {
-      id: "publish_paid_product",
-      ...STEP_META.publish_paid_product,
+    paidProductStep = {
+      id: "paid_product",
+      ...STEP_META.paid_product,
       state: "active",
       actionLabel: "Перейти к публикации",
       href: focusPreviewHref,
       hint: null,
-      readiness: null,
+      readiness: buildVisiblePaidReadiness(focusPaidProduct?.readiness),
     };
   }
 
   // Required path: application → terms → first paid product publish.
   // Promotion links and payout requisites stay outside this checklist.
-  const steps = [
-    applicationStep,
-    termsStep,
-    paidProductStep,
-    preparePaidStep,
-    publishPaidStep,
-  ];
+  const steps = [applicationStep, termsStep, paidProductStep];
 
   const completionFlags = [
     applicationApproved,
     termsStepComplete,
-    paidProductComplete,
-    preparePaidComplete,
     publishPaidComplete,
   ];
   const completedCount = completionFlags.filter(Boolean).length;

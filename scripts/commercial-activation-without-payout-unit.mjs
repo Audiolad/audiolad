@@ -195,9 +195,24 @@ function checklist(overrides = {}) {
     payoutProfileStatus: null,
   });
   assert.equal(section.totalCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
-  assert.equal(COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT, 5);
+  assert.equal(COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT, 3);
+  assert.equal(section.steps.length, 3);
   assert.equal(section.complete, true);
-  assert.equal(section.steps.at(-1)?.id, "publish_paid_product");
+  assert.equal(section.steps.at(-1)?.id, "paid_product");
+  assert.equal(
+    section.steps.at(-1)?.title,
+    "Создайте и опубликуйте первый платный продукт",
+  );
+  assert.equal(
+    section.steps.some(
+      (step) =>
+        step.id === "prepare_paid_product" ||
+        step.id === "publish_paid_product" ||
+        step.title === "Подготовьте платный продукт к публикации" ||
+        step.title === "Опубликуйте первый платный продукт",
+    ),
+    false,
+  );
   assert.equal(
     section.steps.some((step) => step.id === "payout_details"),
     false,

@@ -338,7 +338,7 @@ function CommercialStepCard({ step }: { step: CommercialOnboardingStepState }) {
             </p>
           ) : null}
 
-          {step.id === "prepare_paid_product" && step.readiness ? (
+          {step.id === "paid_product" && step.readiness ? (
             <div className="mt-3">
               <p className="text-xs font-medium text-[#7d70a2]">
                 Готовность: {step.readiness.completedCount} из{" "}

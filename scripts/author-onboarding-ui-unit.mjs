@@ -308,7 +308,16 @@ function testOptionalPayoutDoesNotAffectCommercialComplete() {
 
   assert.equal(paidPromo.complete, true);
   assert.equal(paidPromo.completedCount, COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT);
-  assert.equal(paidPromo.totalCount, 5);
+  assert.equal(paidPromo.totalCount, 3);
+  assert.equal(paidPromo.steps.length, 3);
+  assert.equal(
+    paidPromo.steps.some(
+      (step) =>
+        step.id === "prepare_paid_product" ||
+        step.id === "publish_paid_product",
+    ),
+    false,
+  );
   assert.equal(
     paidPromo.steps.some((step) => step.id === "payout_details"),
     false,
@@ -320,7 +329,7 @@ function testOptionalPayoutDoesNotAffectCommercialComplete() {
 
   const withoutPromo = evaluateCommercialFive();
   assert.equal(withoutPromo.complete, true);
-  assert.equal(withoutPromo.completedCount, 5);
+  assert.equal(withoutPromo.completedCount, 3);
 
   const now = "2026-09-05T12:00:00.000Z";
   const ui = buildAuthorOnboardingUiState({
@@ -462,8 +471,9 @@ function evaluateCommercialFive(overrides = {}) {
 function testOldWorldFiveOfSixBecomesLegacyComplete() {
   const oldWorld = evaluateCommercialFive();
   assert.equal(oldWorld.complete, true);
-  assert.equal(oldWorld.completedCount, 5);
-  assert.equal(oldWorld.totalCount, 5);
+  assert.equal(oldWorld.completedCount, 3);
+  assert.equal(oldWorld.totalCount, 3);
+  assert.equal(oldWorld.steps.length, 3);
   assert.equal(
     oldWorld.steps.some((step) => step.id === "paid_promotion"),
     false,
@@ -548,7 +558,10 @@ function testCommercialThreeOfFiveStaysExpanded() {
   });
   assert.equal(commercialThree.complete, false);
   assert.equal(commercialThree.completedCount, 2);
-  assert.equal(commercialThree.totalCount, 5);
+  assert.equal(commercialThree.totalCount, 3);
+  assert.equal(commercialThree.steps.length, 3);
+  assert.equal(commercialThree.steps[2].id, "paid_product");
+  assert.equal(commercialThree.steps[2].state, "active");
 
   const now = "2026-09-07T12:00:00.000Z";
   assert.equal(
@@ -601,7 +614,8 @@ function testFreeCompleteAndCommercialFiveWithoutPromo() {
 
   const commercial = evaluateCommercialFive();
   assert.equal(commercial.complete, true);
-  assert.equal(commercial.completedCount, 5);
+  assert.equal(commercial.completedCount, 3);
+  assert.equal(commercial.steps.length, 3);
 }
 
 function testSourceGuards() {
@@ -724,7 +738,9 @@ function testSourceGuards() {
   const commercial = read("src/lib/author-dashboard/commercial-onboarding.ts");
   assert.doesNotMatch(evaluators, /free_completed_at/);
   assert.doesNotMatch(commercial, /commercial_completed_at/);
-  assert.match(commercial, /COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 5/);
+  assert.match(commercial, /COMMERCIAL_ONBOARDING_REQUIRED_STEP_COUNT = 3/);
+  assert.doesNotMatch(commercial, /Подготовьте платный продукт к публикации/);
+  assert.doesNotMatch(commercial, /Опубликуйте первый платный продукт/);
   assert.match(checklistUi, /isCommercialOnboardingChecklistStepId/);
   assert.doesNotMatch(checklistUi, /Создайте ссылку для продвижения/);
   assert.doesNotMatch(checklistUi, /Реквизиты для выплат/);
