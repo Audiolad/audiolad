@@ -1,5 +1,9 @@
 import { getAuthorProjectNameCyrillicError } from "@/lib/author-projects/cyrillic-name";
 import {
+  AUTHOR_PROJECT_NAME_MAX,
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+} from "@/lib/author-projects/constants";
+import {
   getEmailValidationMessage,
   validateEmailForRegistrationServer,
 } from "@/lib/auth/email";
@@ -105,7 +109,7 @@ export function parseStoredDirection(stored: string): {
 
 export const AUTHOR_APPLICATION_LIMITS = {
   displayNameMin: 2,
-  displayNameMax: 100,
+  displayNameMax: AUTHOR_PROJECT_NAME_MAX,
   directionMin: 3,
   directionMax: 200,
   directionOtherMin: 3,
@@ -229,10 +233,14 @@ export function validateAuthorApplicationContactFields(
 
 export function validateAuthorApplicationFormValues(
   values: AuthorApplicationFormValues,
-  options?: { requireConsent?: boolean },
+  options?: { requireConsent?: boolean; preservedDisplayName?: string | null },
 ): AuthorApplicationFieldErrors {
   const errors: AuthorApplicationFieldErrors = {};
   const requireConsent = options?.requireConsent ?? true;
+  const preservedDisplayName = options?.preservedDisplayName?.trim() ?? "";
+  const displayNameUnchanged =
+    preservedDisplayName.length > 0 &&
+    values.displayName === preservedDisplayName;
 
   const displayNameCyrillicError = getAuthorProjectNameCyrillicError(
     values.displayName,
@@ -240,8 +248,13 @@ export function validateAuthorApplicationFormValues(
   if (displayNameCyrillicError) {
     errors.displayName = displayNameCyrillicError;
   } else if (
-    values.displayName.length < AUTHOR_APPLICATION_LIMITS.displayNameMin ||
+    !displayNameUnchanged &&
     values.displayName.length > AUTHOR_APPLICATION_LIMITS.displayNameMax
+  ) {
+    errors.displayName = AUTHOR_PROJECT_NAME_TOO_LONG_ERROR;
+  } else if (
+    !displayNameUnchanged &&
+    values.displayName.length < AUTHOR_APPLICATION_LIMITS.displayNameMin
   ) {
     errors.displayName = `Укажите имя или название проекта (${AUTHOR_APPLICATION_LIMITS.displayNameMin}–${AUTHOR_APPLICATION_LIMITS.displayNameMax} символов).`;
   }
