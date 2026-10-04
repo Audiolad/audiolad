@@ -459,6 +459,17 @@ assert.equal(
   ),
   true,
 );
+const sprintCapsMigration = read(
+  "supabase/migrations/20261220124000_seo_sprint_query_initial_caps.sql",
+);
+assert.match(sprintCapsMigration, /slug = 'osen-zvuchit-2026'/);
+assert.match(sprintCapsMigration, /UPDATE public\.seo_queries AS q/);
+assert.match(sprintCapsMigration, /upper\(left\(q\.query_text, 1\)\) \|\| substr\(q\.query_text, 2\)/);
+assert.match(sprintCapsMigration, /UPDATE public\.seo_sprint_queries AS sq/);
+assert.match(sprintCapsMigration, /audiolad\.allow_primary_seo_query_link/);
+assert.match(sprintCapsMigration, /UPDATE public\.practices AS p/);
+assert.match(sprintCapsMigration, /audio_sprint_lowercase_queries_remaining/);
+assert.match(sprintCapsMigration, /audio_sprint_primary_query_mismatch_remaining/);
 
 const sprintLib = read("src/lib/seo-queries/audio-sprint.ts");
 assert.match(sprintLib, /export const reservePoolEnabled = false/);
