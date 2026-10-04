@@ -80,6 +80,54 @@ export function classicaAssetExtension(mime: string): string | null {
   return EXTENSIONS[mime] ?? null;
 }
 
+export function classicaChosenFileError(
+  kind: ClassicaAssetKind,
+  file: { type: string; size: number },
+): string | null {
+  if (file.size <= 0) {
+    return "Выберите файл.";
+  }
+  if (!classicaAssetAllowsMime(kind, file.type)) {
+    return "Этот тип файла для выбранного поля не подходит.";
+  }
+  if (file.size > classicaAssetMaxBytes(kind)) {
+    return "Файл больше допустимого размера.";
+  }
+  if (!classicaAssetExtension(file.type)) {
+    return "Не удалось определить расширение файла.";
+  }
+  return null;
+}
+
+export function classicaAssetFileLabel(storagePath: string): string {
+  const name = storagePath.split("/").filter(Boolean).pop()?.trim() ?? "";
+  return name || "Файл";
+}
+
+export function formatClassicaByteSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 Б";
+  }
+  if (bytes < 1024) {
+    return `${Math.round(bytes)} Б`;
+  }
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) {
+    const digits = kilobytes >= 10 ? 0 : 1;
+    return `${formatRuQuantity(kilobytes, digits)} КБ`;
+  }
+  const megabytes = kilobytes / 1024;
+  const digits = megabytes >= 10 ? 1 : 2;
+  return `${formatRuQuantity(megabytes, digits)} МБ`;
+}
+
+function formatRuQuantity(value: number, maximumFractionDigits: number): string {
+  return value.toLocaleString("ru-RU", {
+    maximumFractionDigits,
+    minimumFractionDigits: 0,
+  });
+}
+
 export function classicaProductionObjectPath(
   jobId: string,
   kind: ClassicaAssetKind,
