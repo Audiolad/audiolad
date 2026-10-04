@@ -75,6 +75,7 @@ assert.doesNotMatch(finalizeBlock, /\.from\("audio_items"\)\s*\.update/);
 assert.doesNotMatch(finalizeBlock, /audio_path:/);
 assert.match(client, new RegExp(`from\\(MUSIC_MASTERS_BUCKET\\)`));
 assert.match(client, /contentType: "audio\/wav"/);
+assert.match(client, /fileForSignedAuthorAudioUpload\(input\.file, input\.file\.name, "audio\/wav"\)/);
 assert.doesNotMatch(client, /contentType: input\.file\.type/);
 assert.match(client, /upsert: false/);
 assert.match(form, /MUSIC_DELIVERY_REPLACE_LABEL/);
