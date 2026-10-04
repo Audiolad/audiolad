@@ -76,11 +76,11 @@ export function resolveChecklistPresentation(input: {
  */
 /**
  * One-time legacy-complete decision for authors who already satisfy the
- * current commercial 5-step rule but were never stamped complete (old-world
- * 5/6: promotion and/or payout still missing).
+ * commercial checklist (application, terms, published paid product) but were
+ * never stamped complete (old-world 5/6: promotion and/or payout still missing).
  *
  * Must not treat «first stamp ever» as legacy: a new author who finishes
- * step 5 after this ships goes through GET `completed_at = now()` with
+ * the checklist after this ships goes through GET `completed_at = now()` with
  * `hidden_at` null and the normal 3-day grace.
  */
 export function planLegacyCommercialCompleteBackfill(input: {

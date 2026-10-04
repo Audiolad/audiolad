@@ -222,11 +222,7 @@ export function resolveAuthorOpportunitiesPrimaryCta(input: {
   if (
     isAuthorCommercialActiveAccess(accessStatus) &&
     checklist.commercial.steps.some(
-      (step) =>
-        (step.id === "paid_product" ||
-          step.id === "prepare_paid_product" ||
-          step.id === "publish_paid_product") &&
-        step.state === "active",
+      (step) => step.id === "paid_product" && step.state === "active",
     )
   ) {
     const paidStep = checklist.commercial.steps.find(

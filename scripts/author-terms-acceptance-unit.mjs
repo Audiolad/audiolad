@@ -236,16 +236,30 @@ const pendingTerms = evaluateCommercialOnboardingChecklist({
 });
 
 const stepIds = pendingTerms.steps.map((s) => s.id);
-assert.deepEqual(stepIds.slice(0, 3), [
+assert.deepEqual(stepIds, [
   "commercial_application",
   "terms_acceptance",
   "paid_product",
 ]);
-assert.equal(stepIds.at(-1), "publish_paid_product");
+assert.equal(stepIds.at(-1), "paid_product");
+assert.equal(stepIds.includes("prepare_paid_product"), false);
+assert.equal(stepIds.includes("publish_paid_product"), false);
 assert.equal(stepIds.includes("payout_details"), false);
 assert.equal(pendingTerms.steps[1].state, "active");
 assert.equal(pendingTerms.steps[2].state, "locked");
 assert.equal(pendingTerms.steps.at(-1)?.state, "locked");
+assert.equal(
+  pendingTerms.steps[2].title,
+  "Создайте и опубликуйте первый платный продукт",
+);
+assert.equal(
+  pendingTerms.steps.some(
+    (step) =>
+      step.title === "Подготовьте платный продукт к публикации" ||
+      step.title === "Опубликуйте первый платный продукт",
+  ),
+  false,
+);
 
 const acceptedTerms = evaluateCommercialOnboardingChecklist({
   authorSlug: "demo",
@@ -266,15 +280,16 @@ const acceptedTerms = evaluateCommercialOnboardingChecklist({
   legacyCommercialActive: false,
 });
 assert.equal(acceptedTerms.steps[1].state, "completed");
+assert.equal(acceptedTerms.steps.length, 3);
 assert.equal(acceptedTerms.steps[2].id, "paid_product");
 assert.equal(acceptedTerms.steps[2].state, "active");
-assert.equal(acceptedTerms.steps.at(-1)?.id, "publish_paid_product");
+assert.equal(acceptedTerms.steps.at(-1)?.id, "paid_product");
 assert.equal(
   acceptedTerms.steps.some((step) => step.id === "payout_details"),
   false,
 );
 assert.equal(acceptedTerms.complete, false);
-assert.equal(acceptedTerms.totalCount, 5);
+assert.equal(acceptedTerms.totalCount, 3);
 
 // error code contract
 assert.equal(AUTHOR_TERMS_ACCEPTANCE_REQUIRED, "AUTHOR_TERMS_ACCEPTANCE_REQUIRED");

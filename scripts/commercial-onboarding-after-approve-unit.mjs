@@ -95,9 +95,17 @@ function testOnboardingStates() {
     accessStatus: "commercial_pending",
     applicationStatus: "in_review",
   });
+  assert.equal(pending.steps.length, 3);
   assert.equal(pending.steps[1].state, "locked");
   assert.equal(pending.steps[2].state, "locked");
-  assert.equal(pending.steps[3].state, "locked");
+  assert.equal(
+    pending.steps.some(
+      (step) =>
+        step.id === "prepare_paid_product" ||
+        step.id === "publish_paid_product",
+    ),
+    false,
+  );
 
   const approved = evaluate({
     accessStatus: "commercial_onboarding",
@@ -113,10 +121,15 @@ function testOnboardingStates() {
   assert.equal(approved.steps[0].state, "completed");
   assert.equal(approved.steps[1].id, "terms_acceptance");
   assert.equal(approved.steps[1].state, "active");
+  assert.equal(approved.steps.length, 3);
   assert.equal(approved.steps[2].id, "paid_product");
   assert.equal(approved.steps[2].state, "locked");
-  assert.equal(approved.steps.at(-1)?.id, "publish_paid_product");
+  assert.equal(approved.steps.at(-1)?.id, "paid_product");
   assert.equal(approved.steps.at(-1)?.state, "locked");
+  assert.equal(
+    approved.steps[2].title,
+    "Создайте и опубликуйте первый платный продукт",
+  );
   assert.equal(
     approved.steps.some((step) => step.id === "payout_details"),
     false,
@@ -141,16 +154,18 @@ function testOnboardingStates() {
     termsHref: "/author-dashboard/commercial/terms?author=demo",
   });
   assert.equal(afterTerms.steps[1].state, "completed");
+  assert.equal(afterTerms.steps.length, 3);
   assert.equal(afterTerms.steps[2].id, "paid_product");
   assert.equal(afterTerms.steps[2].state, "active");
-  assert.equal(afterTerms.steps.at(-1)?.id, "publish_paid_product");
-  assert.equal(afterTerms.steps.at(-1)?.state, "locked");
+  assert.equal(afterTerms.steps.at(-1)?.id, "paid_product");
+  assert.equal(afterTerms.steps.at(-1)?.state, "active");
   assert.equal(
     afterTerms.steps.some((step) => step.id === "payout_details"),
     false,
   );
   assert.equal(afterTerms.complete, false);
-  assert.equal(afterTerms.totalCount, 5);
+  assert.equal(afterTerms.totalCount, 3);
+  assert.equal(afterTerms.completedCount, 2);
 
   const rejected = evaluate({
     accessStatus: "free",
