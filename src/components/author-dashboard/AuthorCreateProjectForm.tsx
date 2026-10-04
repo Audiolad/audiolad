@@ -117,7 +117,12 @@ export default function AuthorCreateProjectForm() {
           </p>
 
           <label className="mt-5 block">
-            <span className="mb-2 block text-sm font-medium">Название</span>
+            <span className="mb-2 flex items-baseline justify-between gap-3 text-sm font-medium">
+              <span>Название</span>
+              <span className="font-normal tabular-nums text-[#8a7daf]">
+                {name.length} / {AUTHOR_PROJECT_NAME_MAX}
+              </span>
+            </span>
             <input
               value={name}
               maxLength={AUTHOR_PROJECT_NAME_MAX}

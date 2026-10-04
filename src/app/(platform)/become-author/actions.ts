@@ -163,6 +163,7 @@ export async function submitAuthorApplication(
 
     const errors = validateAuthorApplicationFormValues(values, {
       requireConsent: true,
+      preservedDisplayName: existing?.display_name ?? null,
     });
 
     if (hasAuthorApplicationFieldErrors(errors)) {

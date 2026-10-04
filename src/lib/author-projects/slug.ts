@@ -1,6 +1,7 @@
 import {
   AUTHOR_PROJECT_NAME_MAX,
   AUTHOR_PROJECT_NAME_MIN,
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
   AUTHOR_PROJECT_SLUG_MAX,
 } from "@/lib/author-projects/constants";
 import { getAuthorProjectNameCyrillicError } from "@/lib/author-projects/cyrillic-name";
@@ -41,13 +42,31 @@ export function validateAuthorProjectName(
     return cyrillicError;
   }
 
-  if (
-    trimmed.length < AUTHOR_PROJECT_NAME_MIN ||
-    trimmed.length > AUTHOR_PROJECT_NAME_MAX
-  ) {
+  if (trimmed.length > AUTHOR_PROJECT_NAME_MAX) {
+    return AUTHOR_PROJECT_NAME_TOO_LONG_ERROR;
+  }
+
+  if (trimmed.length < AUTHOR_PROJECT_NAME_MIN) {
     return `Название проекта: от ${AUTHOR_PROJECT_NAME_MIN} до ${AUTHOR_PROJECT_NAME_MAX} символов.`;
   }
   return null;
+}
+
+/**
+ * Length limit applies only when the title changes.
+ * An existing longer title is kept as-is and is not truncated.
+ */
+export function getAuthorProjectNameChangeError(
+  nextName: string,
+  currentName: string,
+): string | null {
+  const next = nextName.trim();
+  const current = currentName.trim();
+  if (next === current || next.length <= AUTHOR_PROJECT_NAME_MAX) {
+    return null;
+  }
+
+  return AUTHOR_PROJECT_NAME_TOO_LONG_ERROR;
 }
 
 export function validateAuthorProjectSlug(slug: string): string | null {

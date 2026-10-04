@@ -37,6 +37,10 @@ import {
   getAuthorProjectNameCyrillicError,
 } from "@/lib/author-projects/cyrillic-name";
 import {
+  AUTHOR_PROJECT_NAME_MAX,
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+} from "@/lib/author-projects/constants";
+import {
   getFullBioLengthError,
   getShortPositioningLengthError,
 } from "@/lib/authors/validation";
@@ -86,6 +90,7 @@ export default function AuthorProfileClient({
   const [success, setSuccess] = useState<string | null>(null);
 
   const [name, setName] = useState("");
+  const [savedName, setSavedName] = useState("");
   const [authorType, setAuthorType] = useState<AuthorType>("person");
   const [shortPositioning, setShortPositioning] = useState("");
   const [fullBio, setFullBio] = useState("");
@@ -135,6 +140,7 @@ export default function AuthorProfileClient({
 
         const profile = payload.profile;
         setName(profile.name);
+        setSavedName(profile.name);
         setAuthorType((profile.author_type as AuthorType) ?? "person");
         setShortPositioning(profile.short_positioning?.trim() || "");
         setFullBio(profile.full_bio?.trim() || "");
@@ -210,6 +216,15 @@ export default function AuthorProfileClient({
       return;
     }
 
+    if (
+      name.trim() !== savedName.trim() &&
+      name.trim().length > AUTHOR_PROJECT_NAME_MAX
+    ) {
+      setError(AUTHOR_PROJECT_NAME_TOO_LONG_ERROR);
+      setSuccess(null);
+      return;
+    }
+
     const fullBioError = getFullBioLengthError(fullBio.trim().length);
 
     if (fullBioError) {
@@ -279,6 +294,7 @@ export default function AuthorProfileClient({
       };
 
       setName(payload.profile.name);
+      setSavedName(payload.profile.name);
       setTopicKeys(payload.profile.topicKeys);
       setFeaturedProductIds(
         payload.profile.featuredProducts.map((product) => product.id),
@@ -291,8 +307,10 @@ export default function AuthorProfileClient({
       setSuccess("Изменения сохранены.");
     } catch (saveError) {
       setError(
-        saveError instanceof Error && saveError.message === AUTHOR_PROJECT_NAME_LATIN_ERROR
-          ? AUTHOR_PROJECT_NAME_LATIN_ERROR
+        saveError instanceof Error &&
+        (saveError.message === AUTHOR_PROJECT_NAME_LATIN_ERROR ||
+          saveError.message === AUTHOR_PROJECT_NAME_TOO_LONG_ERROR)
+          ? saveError.message
           : saveError instanceof Error && saveError.message === "featured_product_forbidden"
           ? "Можно добавлять только собственные опубликованные продукты."
           : saveError instanceof Error && saveError.message === "invalid_contacts"
@@ -323,6 +341,13 @@ export default function AuthorProfileClient({
   const shortPositioningLength = shortPositioning.trim().length;
   const fullBioLength = fullBio.length;
   const nameLatinError = getAuthorProjectNameCyrillicError(name);
+  const nameLengthError =
+    !nameLatinError &&
+    name.trim() !== savedName.trim() &&
+    name.trim().length > AUTHOR_PROJECT_NAME_MAX
+      ? AUTHOR_PROJECT_NAME_TOO_LONG_ERROR
+      : null;
+  const nameFieldError = nameLatinError ?? nameLengthError;
 
   if (!selectedAuthor) {
     return null;
@@ -340,19 +365,28 @@ export default function AuthorProfileClient({
             <h2 className="text-lg font-semibold">Основное</h2>
 
             <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-medium">
-                Имя автора или название проекта
+              <span className="mb-2 flex items-baseline justify-between gap-3 text-sm font-medium">
+                <span>Имя автора или название проекта</span>
+                <span className="font-normal tabular-nums text-[#7d70a2]">
+                  {name.length} / {AUTHOR_PROJECT_NAME_MAX}
+                </span>
               </span>
               <input
                 type="text"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                maxLength={120}
+                onInvalid={(event) => {
+                  if (event.currentTarget.validity.tooLong) {
+                    event.preventDefault();
+                    setError(AUTHOR_PROJECT_NAME_TOO_LONG_ERROR);
+                  }
+                }}
+                maxLength={AUTHOR_PROJECT_NAME_MAX}
                 required
                 placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
-                aria-invalid={Boolean(nameLatinError)}
+                aria-invalid={Boolean(nameFieldError)}
                 aria-describedby={
-                  nameLatinError
+                  nameFieldError
                     ? "author-project-name-hint author-project-name-error"
                     : "author-project-name-hint"
                 }
@@ -364,13 +398,13 @@ export default function AuthorProfileClient({
               >
                 {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
               </span>
-              {nameLatinError ? (
+              {nameFieldError ? (
                 <span
                   id="author-project-name-error"
                   className="mt-1.5 block text-sm text-[#9b3d3d]"
                   role="alert"
                 >
-                  {nameLatinError}
+                  {nameFieldError}
                 </span>
               ) : null}
             </label>

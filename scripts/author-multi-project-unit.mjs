@@ -205,7 +205,7 @@ function main() {
 
   // Slug helpers
   assert.equal(slugifyAuthorProjectName("Аурафон"), "aurafon");
-  assert.equal(validateAuthorProjectName("А"), "Название проекта: от 2 до 80 символов.");
+  assert.equal(validateAuthorProjectName("А"), "Название проекта: от 2 до 30 символов.");
   assert.equal(validateAuthorProjectSlug("Bad Slug"), "Slug может содержать только латинские буквы, цифры и дефисы.");
 
   // Source files / migration contracts

@@ -21,11 +21,11 @@ import {
   normalizeAuthorType,
   normalizeFeaturedProductIds,
   normalizeFullBio,
-  normalizePublicName,
   normalizeShortBio,
   normalizeShortPositioning,
   normalizeTopicKeys,
 } from "@/lib/authors/validation";
+import { getAuthorProjectNameChangeError } from "@/lib/author-projects/slug";
 import {
   AUTHOR_ASSETS_BUCKET,
   MAX_AUTHOR_PROFILE_TOPICS,
@@ -86,7 +86,11 @@ export async function PATCH(request: Request) {
     };
 
     if ("name" in body) {
-      const name = normalizePublicName(body.name);
+      if (typeof body.name !== "string") {
+        return NextResponse.json({ error: "invalid_name" }, { status: 400 });
+      }
+
+      const name = body.name.trim();
 
       if (!name) {
         return NextResponse.json({ error: "invalid_name" }, { status: 400 });
@@ -96,6 +100,29 @@ export async function PATCH(request: Request) {
       if (cyrillicError) {
         return NextResponse.json(
           { error: "invalid_project_name", message: cyrillicError },
+          { status: 400 },
+        );
+      }
+
+      const { data: currentAuthor, error: currentAuthorError } = await supabase
+        .from("authors")
+        .select("name")
+        .eq("id", authorId)
+        .maybeSingle();
+
+      if (currentAuthorError) {
+        console.error("author_profile_name_read_error", currentAuthorError.message);
+        return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+
+      const currentName =
+        currentAuthor && typeof currentAuthor.name === "string"
+          ? currentAuthor.name
+          : "";
+      const nameChangeError = getAuthorProjectNameChangeError(name, currentName);
+      if (nameChangeError) {
+        return NextResponse.json(
+          { error: "invalid_project_name", message: nameChangeError },
           { status: 400 },
         );
       }

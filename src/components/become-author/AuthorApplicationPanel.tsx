@@ -44,6 +44,7 @@ import {
   AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
   getAuthorProjectNameCyrillicError,
 } from "@/lib/author-projects/cyrillic-name";
+import { AUTHOR_PROJECT_NAME_TOO_LONG_ERROR } from "@/lib/author-projects/constants";
 import {
   AUTHOR_APPLICATION_LIMITS,
   buildAuthorApplicationFormData,
@@ -195,6 +196,7 @@ function AuthorApplicationForm({
   updateContactsOnly,
   contactsSectionRef,
   inviteLocked,
+  preservedDisplayName,
   onValuesChange,
   onSubmit,
   onInteractionStart,
@@ -206,6 +208,7 @@ function AuthorApplicationForm({
   updateContactsOnly: boolean;
   contactsSectionRef: RefObject<HTMLDivElement | null>;
   inviteLocked: boolean;
+  preservedDisplayName: string | null;
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
   onInteractionStart?: () => void;
@@ -222,7 +225,18 @@ function AuthorApplicationForm({
   const displayNameLatinError = updateContactsOnly
     ? null
     : getAuthorProjectNameCyrillicError(values.displayName);
-  const displayNameError = displayNameLatinError ?? errors.displayName;
+  const preservedName = preservedDisplayName?.trim() ?? "";
+  const displayNameUnchanged =
+    preservedName.length > 0 && values.displayName.trim() === preservedName;
+  const displayNameLengthError =
+    !updateContactsOnly &&
+    !displayNameLatinError &&
+    !displayNameUnchanged &&
+    values.displayName.trim().length > AUTHOR_APPLICATION_LIMITS.displayNameMax
+      ? AUTHOR_PROJECT_NAME_TOO_LONG_ERROR
+      : null;
+  const displayNameError =
+    displayNameLatinError ?? displayNameLengthError ?? errors.displayName;
 
   return (
     <form
@@ -231,7 +245,8 @@ function AuthorApplicationForm({
         event.preventDefault();
         if (
           !updateContactsOnly &&
-          getAuthorProjectNameCyrillicError(values.displayName)
+          (getAuthorProjectNameCyrillicError(values.displayName) ||
+            displayNameLengthError)
         ) {
           return;
         }
@@ -260,10 +275,15 @@ function AuthorApplicationForm({
       )}
 
       <div>
-        <label htmlFor="displayName" className={becomeAuthorLabelClass}>
-          Как вы хотите представляться?{" "}
-          <span className="text-[#b34f63]">*</span>
-        </label>
+        <div className="flex items-baseline justify-between gap-3">
+          <label htmlFor="displayName" className={becomeAuthorLabelClass}>
+            Как вы хотите представляться?{" "}
+            <span className="text-[#b34f63]">*</span>
+          </label>
+          <span className="shrink-0 text-[15px] font-medium tabular-nums text-[#8a7ca9]">
+            {values.displayName.length} / {AUTHOR_APPLICATION_LIMITS.displayNameMax}
+          </span>
+        </div>
         <input
           id="displayName"
           name="displayName"
@@ -921,6 +941,7 @@ export default function AuthorApplicationPanel({
             updateContactsOnly={updateContactsOnly}
             contactsSectionRef={contactsSectionRef}
             inviteLocked={inviteLocked}
+            preservedDisplayName={application?.display_name ?? null}
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
             onInteractionStart={trackAuthorApplicationStartedOnce}

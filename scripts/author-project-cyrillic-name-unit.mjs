@@ -24,7 +24,14 @@ import {
   AUTHOR_PROJECT_NAME_LATIN_ERROR,
   getAuthorProjectNameCyrillicError,
 } from "../src/lib/author-projects/cyrillic-name.ts";
-import { validateAuthorProjectName } from "../src/lib/author-projects/slug.ts";
+import {
+  AUTHOR_PROJECT_NAME_MAX,
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+} from "../src/lib/author-projects/constants.ts";
+import {
+  getAuthorProjectNameChangeError,
+  validateAuthorProjectName,
+} from "../src/lib/author-projects/slug.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -71,9 +78,58 @@ for (const name of rejected) {
   assert.equal(validateAuthorProjectName(name), AUTHOR_PROJECT_NAME_LATIN_ERROR, name);
 }
 
+assert.equal(AUTHOR_PROJECT_NAME_MAX, 30);
+assert.equal(
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+  "Название проекта \u2014 не более 30 символов",
+);
 assert.equal(
   validateAuthorProjectName("А"),
-  "Название проекта: от 2 до 80 символов.",
+  "Название проекта: от 2 до 30 символов.",
+);
+
+const exactLimit = "Б".repeat(30);
+const overLimit = "Б".repeat(31);
+const legacyTitle = "Музыка для глубокого сна, расслабления и медитации";
+assert.equal(legacyTitle.length, 50);
+assert.equal(validateAuthorProjectName(exactLimit), null);
+assert.equal(validateAuthorProjectName(`  ${exactLimit}  `), null);
+assert.equal(validateAuthorProjectName("Сон, тишина и вечер"), null);
+assert.equal(validateAuthorProjectName(overLimit), AUTHOR_PROJECT_NAME_TOO_LONG_ERROR);
+assert.equal(
+  validateAuthorProjectName(` ${overLimit} `),
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+);
+assert.notEqual(validateAuthorProjectName(overLimit), overLimit.slice(0, 30));
+assert.equal(getAuthorProjectNameChangeError(legacyTitle, legacyTitle), null);
+assert.equal(getAuthorProjectNameChangeError(`  ${legacyTitle}  `, legacyTitle), null);
+assert.equal(getAuthorProjectNameChangeError(exactLimit, legacyTitle), null);
+assert.equal(getAuthorProjectNameChangeError("Б", legacyTitle), null);
+assert.equal(
+  getAuthorProjectNameChangeError(overLimit, legacyTitle),
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+);
+assert.equal(legacyTitle, "Музыка для глубокого сна, расслабления и медитации");
+
+assert.equal(
+  validateAuthorApplicationFormValues(applicationValues(exactLimit)).displayName,
+  undefined,
+);
+assert.equal(
+  validateAuthorApplicationFormValues(applicationValues(overLimit)).displayName,
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
+);
+assert.equal(
+  validateAuthorApplicationFormValues(applicationValues(legacyTitle), {
+    preservedDisplayName: legacyTitle,
+  }).displayName,
+  undefined,
+);
+assert.equal(
+  validateAuthorApplicationFormValues(applicationValues(overLimit), {
+    preservedDisplayName: legacyTitle,
+  }).displayName,
+  AUTHOR_PROJECT_NAME_TOO_LONG_ERROR,
 );
 
 function applicationValues(displayName) {
@@ -189,6 +245,20 @@ for (const source of [createForm, profileForm, applicationForm, studioForm]) {
   assert.match(source, /getAuthorProjectNameCyrillicError/);
   assert.match(source, /AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER/);
 }
+
+assert.match(createForm, /maxLength=\{AUTHOR_PROJECT_NAME_MAX\}/);
+assert.match(createForm, /\{name\.length\} \/ \{AUTHOR_PROJECT_NAME_MAX\}/);
+assert.match(profileForm, /maxLength=\{AUTHOR_PROJECT_NAME_MAX\}/);
+assert.match(profileForm, /\{name\.length\} \/ \{AUTHOR_PROJECT_NAME_MAX\}/);
+assert.doesNotMatch(profileForm, /maxLength=\{120\}/);
+assert.match(
+  applicationForm,
+  /\{values\.displayName\.length\} \/ \{AUTHOR_APPLICATION_LIMITS\.displayNameMax\}/,
+);
+assert.match(applicationForm, /maxLength=\{AUTHOR_APPLICATION_LIMITS\.displayNameMax\}/);
+assert.match(profilePatch, /getAuthorProjectNameChangeError/);
+assert.doesNotMatch(profilePatch, /\.slice\(0,\s*(?:30|AUTHOR_PROJECT_NAME_MAX)\)/);
+assert.doesNotMatch(projectsPost, /\.slice\(0,\s*(?:30|AUTHOR_PROJECT_NAME_MAX)\)/);
 
 assert.equal(
   AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
