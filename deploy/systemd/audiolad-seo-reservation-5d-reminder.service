@@ -1,0 +1,20 @@
+[Unit]
+Description=Audiolad SEO reservation day-5 reminder worker
+Documentation=file:/var/www/audiolad/deploy/docs/SEO_RESERVATION_5D_REMINDER.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/audiolad/run-seo-reservation-5d-reminder.sh
+Environment=DEPLOY_ROOT=/var/www/audiolad-deploy
+Environment=LOCK_FILE=/run/audiolad-seo-reservation-5d-reminder.lock
+Environment=LOG_FILE=/var/log/audiolad/seo-reservation-5d-reminder.log
+Environment=TIMEOUT_SECONDS=90
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=120
+SyslogIdentifier=audiolad-seo-reservation-5d-reminder
+StandardOutput=journal
+StandardError=journal

@@ -119,6 +119,36 @@ assert_application_email_outbox_release_tree() {
   return "$missing"
 }
 
+
+assert_seo_reservation_5d_reminder_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required_files=(
+    "$release_dir/deploy/systemd/audiolad-seo-reservation-5d-reminder.service"
+    "$release_dir/deploy/systemd/audiolad-seo-reservation-5d-reminder.timer"
+    "$release_dir/deploy/logrotate/audiolad-seo-reservation-5d-reminder"
+    "$release_dir/deploy/docs/SEO_RESERVATION_5D_REMINDER.md"
+  )
+  local required_scripts=(
+    "$release_dir/deploy/scripts/ensure-seo-reservation-5d-reminder.sh"
+    "$release_dir/deploy/scripts/run-seo-reservation-5d-reminder.sh"
+  )
+  local path
+  for path in "${required_files[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "seo_reservation_5d_reminder_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  for path in "${required_scripts[@]}"; do
+    if [[ ! -f "$path" || ! -x "$path" ]]; then
+      log_error "seo_reservation_5d_reminder_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 assert_author_sale_email_outbox_release_tree() {
   local release_dir="$1"
   local missing=0
@@ -305,6 +335,11 @@ main() {
   if ! assert_application_email_outbox_release_tree "$RELEASE_DIR"; then
     log_error "application_email_outbox_artifact_missing"
     send_deploy_alert "deploy_failed" "Application email outbox deploy artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! assert_seo_reservation_5d_reminder_release_tree "$RELEASE_DIR"; then
+    log_error "seo_reservation_5d_reminder_artifact_missing"
+    send_deploy_alert "deploy_failed" "SEO reservation 5d reminder deploy artifact missing for $RELEASE_NAME"
     exit 1
   fi
   if ! assert_music_transcode_worker_release_tree "$RELEASE_DIR"; then
@@ -586,6 +621,19 @@ main() {
     send_deploy_alert "deploy_failed" "Application email outbox timer ensure failed for $RELEASE_NAME"
     # Cutover already completed: fail the deploy result without rolling back a
     # healthy web release, matching the sale email outbox ensure convention.
+    exit 1
+  fi
+  SEO_RESERVATION_5D_REMINDER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-seo-reservation-5d-reminder.sh"
+  if [[ ! -x "$SEO_RESERVATION_5D_REMINDER_ENSURE" ]]; then
+    log_error "seo_reservation_5d_reminder_ensure_missing"
+    send_deploy_alert "deploy_failed" "SEO reservation 5d reminder ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SEO_RESERVATION_5D_REMINDER_ENSURE"; then
+    log_error "seo_reservation_5d_reminder_ensure_failed"
+    send_deploy_alert "deploy_failed" "SEO reservation 5d reminder timer ensure failed for $RELEASE_NAME"
+    # Cutover already completed: fail the deploy result without rolling back a
+    # healthy web release, matching the application email outbox ensure convention.
     exit 1
   fi
   if [[ ! -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then
