@@ -8,7 +8,7 @@ import {
   PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS,
   PRODUCT_VIDEO_ORIENTATION_META,
   isProductVideoExportAuthorSlug,
-} from "../src/lib/product-video-export/contract.ts";
+} from "../src/lib/product-video-export/contract";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(path.join(root, rel), "utf8");
