@@ -352,12 +352,16 @@ MAX user_id  ↔  профиль АудиоЛада  ↔  пользовател
   сам резолвит продукт и вызывает `startAuthorAppreciationCheckout`. Клиентские
   `author_id` / `practice_id` не принимаются. Ответ — https-ссылка в статусе
   `pending`. «Оплачено» до подтверждения провайдера не показывается.
-- Профиль: гостевой footer из `getVisiblePublicFooterLinks(null)` (без «Статьи»),
-  `LEGAL_LINKS` и контакт `1@audiolad.ru`. Низ карточки продукта — `LEGAL_LINKS`
-  и тот же контакт. Внутренние страницы открываются как абсолютные
-  `https://audiolad.ru/...`. Длинные юридические тексты внутрь мини-приложения
-  не копируются.
-- Внешние https-ссылки идут через `VKWebAppOpenLink`, только если VK Bridge
+- Профиль, главная и низ карточки продукта используют один `VkPublicFooter`.
+  Discovery берётся из `getVisiblePublicFooterLinks(null)` (без «Статьи»; на
+  карточке продукта discovery нет), юридические пункты — из `LEGAL_LINKS`.
+  Это нативные `<a href>` на точный allowlist `https://audiolad.ru/...`.
+  Мобильный VK не отменяет клик: переход остаётся у ссылки. Десктоп вызывает
+  существующий `openVkGuestExternalUrl` / `VKWebAppOpenLink` и делает
+  `preventDefault` только если мост принял переход. Контакт —
+  `mailto:1@audiolad.ru`, без Bridge. Длинные юридические тексты внутрь
+  мини-приложения не копируются.
+- Остальные внешние https-ссылки идут через `VKWebAppOpenLink`, только если VK Bridge
   сообщает `isEmbedded`. В обычном браузере открывается новая вкладка.
   Ошибка моста или `window.open` не роняет экран.
 - `VKWebAppInit` вызывается только на `/vk` и не должен ронять обычный браузер.

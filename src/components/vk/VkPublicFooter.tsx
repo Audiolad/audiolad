@@ -3,22 +3,32 @@
 import {
   getVkDiscoveryFooterLinks,
   getVkLegalFooterLinks,
-  openVkGuestExternalUrl,
+  isVkPublicFooterUrl,
   VK_PUBLIC_CONTACT_EMAIL,
   type VkFooterLink,
 } from "@/lib/vk/guest-links";
+import { activateVkPublicFooterClick } from "@/lib/vk/public-anchor-click";
+
+const linkClassName =
+  "inline-flex min-h-11 w-full items-center text-left text-[15px] text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
 function FooterLink({ item }: { item: VkFooterLink }) {
+  if (!isVkPublicFooterUrl(item.url)) return null;
+
   return (
-    <button
-      type="button"
-      onClick={() => {
-        openVkGuestExternalUrl(item.url);
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-vk-public-footer-link=""
+      style={{ touchAction: "manipulation" }}
+      className={linkClassName}
+      onClick={(event) => {
+        activateVkPublicFooterClick(event, item.url);
       }}
-      className="inline-flex min-h-11 w-full items-center text-left text-[15px] text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
     >
       {item.title}
-    </button>
+    </a>
   );
 }
 
@@ -73,7 +83,12 @@ export function VkPublicFooter({
       </nav>
       <div className="mt-5">
         <p className="text-sm font-medium text-[#7d70a2]">Контакт для связи</p>
-        <p className="mt-2 text-[15px] text-[#7042c5]">{VK_PUBLIC_CONTACT_EMAIL}</p>
+        <a
+          href={`mailto:${VK_PUBLIC_CONTACT_EMAIL}`}
+          className="mt-2 inline-flex min-h-11 items-center text-[15px] text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        >
+          {VK_PUBLIC_CONTACT_EMAIL}
+        </a>
       </div>
     </footer>
   );
