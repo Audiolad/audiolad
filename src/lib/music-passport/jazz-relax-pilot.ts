@@ -33,6 +33,8 @@ import {
 } from "@/lib/music-passport/album-passport-display";
 import {
   buildJazzRelaxPassportView,
+  jazzRelaxTrackEnqueueKind,
+  selectJazzRelaxPassportEnqueue,
   type JazzRelaxPassportTrackView,
   type JazzRelaxPassportView,
 } from "@/lib/music-passport/jazz-relax-status";
@@ -496,8 +498,9 @@ async function enqueueTrack(input: {
   userId: string;
   track: AudioRow;
   source: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>;
+  bytes?: Uint8Array;
 }): Promise<void> {
-  const bytes = await downloadAnalysisAudio(input.source);
+  const bytes = input.bytes ?? await downloadAnalysisAudio(input.source);
   const sha = sha256Hex(bytes);
   const filename = analyzerFilename(
     input.source.path,
@@ -684,6 +687,7 @@ export async function runJazzRelaxPassportAction(input: {
   userId: string;
   action: "start" | "retry" | "reanalyze";
   audioItemId?: string | null;
+  enqueueAfterAudioItemId?: string | null;
 }): Promise<JazzRelaxPassportView> {
   assertJazzRelaxMusicPassport(input);
   await syncPassports(input.practiceId);
@@ -696,7 +700,17 @@ export async function runJazzRelaxPassportAction(input: {
   const runs = await loadRuns([...latest.values()].map((link) => link.analyzer_run_id));
   const passports = await loadPassportsByRun([...latest.values()].map((link) => link.analyzer_run_id));
   const masters = await loadDesiredMasterAssets(tracks);
-  const pendingSources: AlbumPassportSource[] = [];
+  type EnqueueStep =
+    | { audioItemId: string; kind: "blocked" }
+    | { audioItemId: string; kind: "skip" }
+    | {
+        audioItemId: string;
+        kind: "enqueue" | "compare";
+        track: AudioRow;
+        analysis: Exclude<JazzRelaxAnalysisAudio, { kind: "missing_audio" }>;
+        run: RunRow | null;
+      };
+  const steps: EnqueueStep[] = [];
 
   for (const track of tracks) {
     if (input.audioItemId && track.id !== input.audioItemId) continue;
@@ -704,41 +718,64 @@ export async function runJazzRelaxPassportAction(input: {
     const block = jazzRelaxPassportTrackBlock(track, prepareFailed, inflightPrepare, analysis);
     if (analysis.kind === "missing_audio" || block) {
       if (input.action === "reanalyze" || input.audioItemId) {
-        throw new JazzRelaxPassportError("tracks_not_ready", 400);
+        steps.push({ audioItemId: track.id, kind: "blocked" });
       }
       continue;
     }
     const link = latest.get(track.id);
-    const run = link ? runs.get(link.analyzer_run_id) : null;
+    const run = link ? runs.get(link.analyzer_run_id) ?? null : null;
     const passport = link ? passports.get(link.analyzer_run_id) : null;
-    if (input.action === "retry") {
-      if (!run || run.status !== "failed") continue;
-    } else if (input.action === "start") {
-      if (run && (run.status === "queued" || run.status === "processing")) continue;
-      if (run?.status === "succeeded" && passport) {
-        const bytes = await downloadAnalysisAudio(analysis);
-        if (sha256Hex(bytes) === run.sha256) continue;
-      }
+    const kind = jazzRelaxTrackEnqueueKind({
+      action: input.action,
+      runStatus: run?.status ?? null,
+      hasPassport: Boolean(passport),
+    });
+    if (kind === "skip") {
+      steps.push({ audioItemId: track.id, kind: "skip" });
+      continue;
     }
-    const before = new Set(links.map((item) => item.analyzer_run_id));
-    await enqueueTrack({ practiceId: input.practiceId, userId: input.userId, track, source: analysis });
-    const after = await loadLinks(input.practiceId);
-    const created = after.find((item) => item.audio_item_id === track.id && !before.has(item.analyzer_run_id));
-    if (created) {
-      pendingSources.push({
-        outcome: "pending",
-        audio_item_id: track.id,
-        track_passport_version_id: null,
-        music_analyzer_run_id: created.analyzer_run_id,
-        analyzer_version: null,
-        analyzer_git_commit: null,
-      });
+    steps.push({ audioItemId: track.id, kind, track, analysis, run });
+  }
+
+  const batch = selectJazzRelaxPassportEnqueue({
+    candidates: steps.flatMap((step) => (
+      step.kind === "enqueue" || step.kind === "compare"
+        ? [{ audioItemId: step.audioItemId, kind: step.kind }]
+        : []
+    )),
+    cursor: input.enqueueAfterAudioItemId?.trim() || null,
+  });
+  const selectedIds = new Set(batch.selected.map((item) => item.audioItemId));
+  const resumeAfter = input.enqueueAfterAudioItemId?.trim() || null;
+  const resumeIndex = resumeAfter
+    ? steps.findIndex((step) => step.audioItemId === resumeAfter)
+    : -1;
+  let enqueuedCount = 0;
+  for (let index = resumeIndex >= 0 ? resumeIndex + 1 : 0; index < steps.length; index += 1) {
+    const step = steps[index];
+    if (!step || step.kind === "skip") continue;
+    if (step.kind === "blocked") {
+      throw new JazzRelaxPassportError("tracks_not_ready", 400);
     }
+    if (!selectedIds.has(step.audioItemId)) break;
+    let bytes: Uint8Array | undefined;
+    if (step.kind === "compare") {
+      bytes = await downloadAnalysisAudio(step.analysis);
+      if (step.run && sha256Hex(bytes) === step.run.sha256) continue;
+    }
+    await enqueueTrack({
+      practiceId: input.practiceId,
+      userId: input.userId,
+      track: step.track,
+      source: step.analysis,
+      bytes,
+    });
+    enqueuedCount += 1;
   }
 
   if (
     input.action === "start"
-    && pendingSources.length === 0
+    && enqueuedCount === 0
     && tracks.every((track) => jazzRelaxPassportTrackBlock(
       track,
       prepareFailed,
@@ -749,19 +786,17 @@ export async function runJazzRelaxPassportAction(input: {
     throw new JazzRelaxPassportError("tracks_not_ready", 400);
   }
 
-  if (pendingSources.length > 0) {
+  if (!batch.deferred) {
     const freshLinks = await loadLinks(input.practiceId);
     const freshLatest = latestLinks(freshLinks);
     const freshRuns = await loadRuns([...freshLatest.values()].map((link) => link.analyzer_run_id));
     const freshPassports = await loadPassportsByRun(
       [...freshLatest.values()].map((link) => link.analyzer_run_id),
     );
-    const pendingIds = new Set(pendingSources.map((source) => source.audio_item_id));
     const succeeded: AlbumTrackSnapshot[] = [];
     const failed: AlbumFailedTrack[] = [];
-    const pending = [...pendingSources];
+    const pending: AlbumPassportSource[] = [];
     for (const track of tracks) {
-      if (pendingIds.has(track.id)) continue;
       const link = freshLatest.get(track.id);
       const run = link ? freshRuns.get(link.analyzer_run_id) : null;
       const passport = link ? freshPassports.get(link.analyzer_run_id) : null;
@@ -793,14 +828,21 @@ export async function runJazzRelaxPassportAction(input: {
       }
       failed.push({ audioItemId: track.id, runId: run.id });
     }
-    await insertAlbum(
-      input.practiceId,
-      buildAlbumPassportDraft({ succeeded, failed, pending }),
-    );
+    if (pending.length > 0) {
+      await insertAlbum(
+        input.practiceId,
+        buildAlbumPassportDraft({ succeeded, failed, pending }),
+      );
+    }
   }
 
   await syncPassports(input.practiceId);
-  return viewFor(input.practiceId);
+  const view = await viewFor(input.practiceId);
+  return {
+    ...view,
+    enqueueDeferred: batch.deferred,
+    enqueueCursor: batch.cursor,
+  };
 }
 
 export async function jazzRelaxAlbumFactsForDescription(input: {
