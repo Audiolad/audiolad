@@ -104,6 +104,38 @@ export function maxGuestSlideClickActivates(gesture: MaxGuestSlideGesture): bool
   return !gesture.moved;
 }
 
+/**
+ * Real slide anchors follow the href on a tap. A swipe cancels that click
+ * so the browser does not open the link. The event is left alone on a tap
+ * so a native anchor, or a later bridge enhancement, can decide.
+ */
+export function handleMaxGuestSlideAnchorClick(
+  gesture: MaxGuestSlideGesture,
+  event: { preventDefault: () => void },
+  onTap: () => void,
+): "suppressed" | "activated" {
+  if (!maxGuestSlideClickActivates(gesture)) {
+    event.preventDefault();
+    return "suppressed";
+  }
+
+  onTap();
+  return "activated";
+}
+
+/** Optional slider anchors are external https pages, never an in-app route. */
+export function maxGuestSlideAnchorHref(href: string | null | undefined): string | null {
+  if (!href) return null;
+
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return href;
+  } catch {
+    return null;
+  }
+}
+
 export function nearestMaxGuestSlideIndex(
   slideOffsets: readonly number[],
   scrollLeft: number,

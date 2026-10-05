@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 
 import MaxCatalogProductCard from "@/components/max/MaxCatalogProductCard";
 import MaxGuestHomeSlider from "@/components/max/MaxGuestHomeSlider";
@@ -39,6 +39,12 @@ type MaxHomeScreenProps = {
   onOpenShelf: (shelfId: MaxHomeShelfId) => void;
   onSelectProduct: (product: MaxCatalogProduct) => void;
   closing?: ReactNode;
+  getSlideHref?: (slideId: string) => string | null;
+  onAnchorClick?: (
+    event: MouseEvent<HTMLAnchorElement>,
+    slideId: string,
+    url: string,
+  ) => void;
 };
 
 const EMPTY_SHELVES: MaxHomeShelves = {
@@ -57,6 +63,8 @@ export function MaxHomeScreen({
   onOpenShelf,
   onSelectProduct,
   closing,
+  getSlideHref,
+  onAnchorClick,
 }: MaxHomeScreenProps) {
   const readyShelves = shelves ?? EMPTY_SHELVES;
 
@@ -71,7 +79,11 @@ export function MaxHomeScreen({
             {GUEST_HOME_INTRO}
           </h1>
           <div className="mt-3">
-            <MaxGuestHomeSlider onSlideAction={onSlideAction} />
+            <MaxGuestHomeSlider
+              onSlideAction={onSlideAction}
+              getSlideHref={getSlideHref}
+              onAnchorClick={onAnchorClick}
+            />
           </div>
           <div className="mt-4 flex justify-center">
             <button
@@ -168,6 +180,8 @@ export default function MaxHome({
   onOpenShelf,
   onSelectProduct,
   closing,
+  getSlideHref,
+  onAnchorClick,
 }: Omit<MaxHomeScreenProps, "status" | "shelves">) {
   const [status, setStatus] = useState<MaxHomeStatus>(() =>
     readMaxInitData() ? "loading" : "error",
@@ -223,6 +237,8 @@ export default function MaxHome({
       onOpenShelf={onOpenShelf}
       onSelectProduct={onSelectProduct}
       closing={closing}
+      getSlideHref={getSlideHref}
+      onAnchorClick={onAnchorClick}
     />
   );
 }

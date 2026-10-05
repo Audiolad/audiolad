@@ -631,6 +631,8 @@ export default function VkMiniAppScreen() {
       selectVkTab("library");
       return;
     }
+    // Slide 07 is a real https anchor in VkHomePanel. This remains the
+    // button fallback when that href is unavailable.
     if (action.type === "external") {
       openVkExternalHttps(action.url);
       return;

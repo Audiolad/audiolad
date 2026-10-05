@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   buildProductStartPayload,
@@ -16,6 +18,10 @@ import {
 import { LEGAL_LINKS } from "../src/lib/legal/links.ts";
 import { formatRubles } from "../src/lib/products/price-format.ts";
 import {
+  beginMaxGuestSlideGesture,
+  endMaxGuestSlidePointer,
+  handleMaxGuestSlideAnchorClick,
+  moveMaxGuestSlideGesture,
   resolveMaxGuestHomeAuthorUrl,
   resolveMaxGuestHomeSlideAction,
 } from "../src/lib/max/guest-home-slider.ts";
@@ -72,6 +78,12 @@ import {
   vkTabSelectionAfterSelect,
 } from "../src/lib/vk/shell.ts";
 import { SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/robots-config.ts";
+import {
+  onVkGuestSlideAnchorClick,
+  vkGuestHomeSlideHref,
+} from "../src/lib/vk/authors-landing-click.ts";
+import { MaxHomeScreen } from "../src/components/max/MaxHome.tsx";
+import { VkHomeClosing } from "../src/components/vk/VkHomeClosing.tsx";
 import nextConfigModule from "../next.config.ts";
 
 const practiceId = "11111111-1111-4111-8111-111111111111";
@@ -872,5 +884,199 @@ try {
   setListMaxPublicPlaylistsForTests(null);
   setLoadMaxPublicPlaylistForTests(null);
 }
+
+const LANDING_URL = "https://audiolad.ru/dlya-avtorov-meditatsiy";
+assert.equal(vkGuestHomeSlideHref("07"), LANDING_URL);
+assert.equal(vkGuestHomeSlideHref("07"), resolveMaxGuestHomeAuthorUrl());
+for (const slideId of ["01", "02", "03", "04", "05", "06", "08"]) {
+  assert.equal(vkGuestHomeSlideHref(slideId), null, slideId);
+}
+assert.equal(String(vkGuestHomeSlideHref("07")).includes("become-author"), false);
+assert.equal(String(vkGuestHomeSlideHref("07")).includes("/auth/"), false);
+
+const vkPanelSource = readFileSync(join(process.cwd(), "src/components/vk/VkHomePanel.tsx"), "utf8");
+assert.match(vkPanelSource, /getSlideHref=\{vkGuestHomeSlideHref\}/);
+assert.match(vkPanelSource, /onAnchorClick=\{onVkGuestSlideAnchorClick\}/);
+assert.doesNotMatch(vkPanelSource, /become-author|\/auth\/|openVkExternalHttps/);
+
+function openingTag(html, marker) {
+  const at = html.indexOf(marker);
+  assert.ok(at >= 0, marker);
+  return html.slice(html.lastIndexOf("<", at), html.indexOf(">", at) + 1);
+}
+
+const vkHomeMarkup = renderToStaticMarkup(createElement(MaxHomeScreen, {
+  guestMode: true,
+  status: "loading",
+  shelves: null,
+  onListenFree: () => {},
+  onSlideAction: () => {},
+  onOpenSection: () => {},
+  onOpenShelf: () => {},
+  onSelectProduct: () => {},
+  closing: createElement(VkHomeClosing),
+  getSlideHref: vkGuestHomeSlideHref,
+  onAnchorClick: onVkGuestSlideAnchorClick,
+}));
+const vkSliderMarkup = vkHomeMarkup.slice(
+  vkHomeMarkup.indexOf("data-max-guest-home-slider"),
+  vkHomeMarkup.indexOf("data-max-guest-home-cta"),
+);
+assert.equal(vkSliderMarkup.match(/<a\b/g)?.length, 1);
+assert.equal(vkSliderMarkup.match(/data-guest-slide-anchor=/g)?.length, 1);
+const vkSlide07 = openingTag(vkSliderMarkup, 'data-max-guest-home-slide="07"');
+assert.match(vkSlide07, /^<a\b/);
+assert.match(vkSlide07, /href="https:\/\/audiolad\.ru\/dlya-avtorov-meditatsiy"/);
+assert.match(vkSlide07, /target="_blank"/);
+assert.match(vkSlide07, /rel="noopener noreferrer"/);
+assert.match(vkSlide07, /touch-action:manipulation/);
+assert.doesNotMatch(vkSlide07, /become-author|\/auth\/|signup/);
+for (const slideId of ["01", "02", "03", "04", "05", "06"]) {
+  const tag = openingTag(vkSliderMarkup, `data-max-guest-home-slide="${slideId}"`);
+  assert.match(tag, /^<button\b/, slideId);
+  assert.doesNotMatch(tag, /href=/, slideId);
+}
+assert.match(vkHomeMarkup, /data-vk-authors-landing-anchor=""/);
+assert.equal(resolveMaxGuestHomeSlideAction("06")?.type, "library");
+
+function clickEvent() {
+  return {
+    prevented: false,
+    preventDefault() {
+      this.prevented = true;
+    },
+  };
+}
+
+const mobileClick = clickEvent();
+assert.equal(
+  onVkGuestSlideAnchorClick(mobileClick, "07", LANDING_URL, {
+    client: "mobile",
+    openDesktop() {
+      throw new Error("mobile tap must not depend on the bridge callback");
+    },
+  }),
+  "native",
+);
+assert.equal(mobileClick.prevented, false);
+
+const mobileViewClick = clickEvent();
+assert.equal(
+  onVkGuestSlideAnchorClick(mobileViewClick, "07", LANDING_URL, {
+    view: { location: { search: "?vk_platform=mobile_iphone" }, AndroidBridge: {} },
+    openDesktop() {
+      throw new Error("mobile webview must keep the native anchor");
+    },
+  }),
+  "native",
+);
+assert.equal(mobileViewClick.prevented, false);
+
+const desktopRejected = clickEvent();
+assert.equal(
+  onVkGuestSlideAnchorClick(desktopRejected, "07", LANDING_URL, {
+    client: "desktop",
+    openDesktop() {
+      return false;
+    },
+  }),
+  "native",
+);
+assert.equal(desktopRejected.prevented, false);
+
+const desktopAccepted = clickEvent();
+let acceptedUrl = "";
+assert.equal(
+  onVkGuestSlideAnchorClick(desktopAccepted, "07", LANDING_URL, {
+    client: "desktop",
+    openDesktop(url) {
+      acceptedUrl = url;
+      return true;
+    },
+  }),
+  "bridge",
+);
+assert.equal(desktopAccepted.prevented, true);
+assert.equal(acceptedUrl, LANDING_URL);
+
+const becomeAuthorClick = clickEvent();
+assert.equal(
+  onVkGuestSlideAnchorClick(becomeAuthorClick, "07", "https://audiolad.ru/become-author", {
+    client: "desktop",
+    openDesktop() {
+      throw new Error("become-author must not be opened");
+    },
+  }),
+  "blocked",
+);
+assert.equal(becomeAuthorClick.prevented, true);
+
+const otherSlideClick = clickEvent();
+assert.equal(
+  onVkGuestSlideAnchorClick(otherSlideClick, "06", LANDING_URL, {
+    client: "mobile",
+    openDesktop() {
+      throw new Error("slide 06 must stay on the library callback");
+    },
+  }),
+  "blocked",
+);
+assert.equal(otherSlideClick.prevented, true);
+
+const swipeGesture = endMaxGuestSlidePointer(
+  moveMaxGuestSlideGesture(beginMaxGuestSlideGesture({ x: 0, y: 0 }), { x: 40, y: 0 }),
+);
+const swipeClick = clickEvent();
+let swipeActivations = 0;
+assert.equal(
+  handleMaxGuestSlideAnchorClick(swipeGesture, swipeClick, () => {
+    swipeActivations += 1;
+    onVkGuestSlideAnchorClick(swipeClick, "07", LANDING_URL, {
+      client: "desktop",
+      openDesktop() {
+        throw new Error("a swipe must not open the authors landing");
+      },
+    });
+  }),
+  "suppressed",
+);
+assert.equal(swipeClick.prevented, true);
+assert.equal(swipeActivations, 0);
+
+const tapGesture = beginMaxGuestSlideGesture({ x: 4, y: 4 });
+const mobileTapClick = clickEvent();
+assert.equal(
+  handleMaxGuestSlideAnchorClick(tapGesture, mobileTapClick, () => {
+    assert.equal(
+      onVkGuestSlideAnchorClick(mobileTapClick, "07", LANDING_URL, {
+        client: "mobile",
+        openDesktop() {
+          throw new Error("mobile tap must not depend on the bridge callback");
+        },
+      }),
+      "native",
+    );
+  }),
+  "activated",
+);
+assert.equal(mobileTapClick.prevented, false);
+
+const tapBridgeClick = clickEvent();
+assert.equal(
+  handleMaxGuestSlideAnchorClick(tapGesture, tapBridgeClick, () => {
+    assert.equal(
+      onVkGuestSlideAnchorClick(tapBridgeClick, "07", LANDING_URL, {
+        client: "desktop",
+        openDesktop(url) {
+          assert.equal(url, LANDING_URL);
+          return true;
+        },
+      }),
+      "bridge",
+    );
+  }),
+  "activated",
+);
+assert.equal(tapBridgeClick.prevented, true);
 
 console.log("vk-mini-app-unit: ok");

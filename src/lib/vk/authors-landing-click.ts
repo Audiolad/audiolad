@@ -1,4 +1,7 @@
-import { isMiniAppAuthorsLandingUrl } from "@/lib/mini-app/home-public-links";
+import {
+  isMiniAppAuthorsLandingUrl,
+  miniAppAuthorsLandingUrl,
+} from "@/lib/mini-app/home-public-links";
 import { openVkGuestExternalUrl } from "@/lib/vk/guest-links";
 
 export type VkAuthorsLandingClickEvent = {
@@ -37,6 +40,31 @@ export function detectVkAuthorsLandingClient(
   const platform = new URLSearchParams(view.location?.search ?? "").get("vk_platform") ?? "";
   if (platform.startsWith("desktop")) return "desktop";
   return "mobile";
+}
+
+/** VK guest slider: only slide 07 opens the canonical authors landing. */
+export function vkGuestHomeSlideHref(slideId: string): string | null {
+  if (slideId !== "07") return null;
+  return miniAppAuthorsLandingUrl();
+}
+
+/**
+ * Tap on VK slide 07. A non-canonical slide or URL is cancelled. Mobile
+ * leaves the real https anchor. Desktop cancels the click only after the
+ * bridge accepts the navigation.
+ */
+export function onVkGuestSlideAnchorClick(
+  event: VkAuthorsLandingClickEvent,
+  slideId: string,
+  url: string,
+  environment?: VkAuthorsLandingClickEnvironment,
+): "blocked" | "bridge" | "native" {
+  if (vkGuestHomeSlideHref(slideId) !== url) {
+    event.preventDefault();
+    return "blocked";
+  }
+
+  return activateVkAuthorsLandingClick(event, url, environment);
 }
 
 export function activateVkAuthorsLandingClick(

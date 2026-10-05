@@ -15,7 +15,9 @@ import { MaxHomeScreen } from "../src/components/max/MaxHome.tsx";
 import {
   beginMaxGuestSlideGesture,
   endMaxGuestSlidePointer,
+  handleMaxGuestSlideAnchorClick,
   isMaxGuestHomeAuthorSlideUrl,
+  maxGuestSlideAnchorHref,
   maxGuestSlideClickActivates,
   moveMaxGuestSlideGesture,
   nearestMaxGuestSlideIndex,
@@ -327,16 +329,28 @@ for (const href of guestMarkup.matchAll(/<link\b[^>]*href="([^"]+)"/g)) {
   assert.match(href[1], /^\/images\/|^https:\/\/cdn\.example\.test\//, href[1]);
 }
 
-const maxSlideSources = `${slider}\n${slideActions}\n${home}`;
+const maxSlideSources = `${slideActions}\n${home}`;
 assert.match(slider, /GUEST_HOME_SLIDES\.map/);
 assert.match(slider, /nearestMaxGuestSlideIndex/);
 assert.match(slider, /maxGuestSlideClickActivates\(gestureRef\.current\)/);
+assert.match(slider, /handleMaxGuestSlideAnchorClick\(gestureRef\.current, event/);
+assert.match(slider, /maxGuestSlideAnchorHref\(getSlideHref\?\.\(slide\.id\)\)/);
+assert.match(slider, /onAnchorClick\?\.\(event, slideId, url\)/);
 assert.match(slider, /onSlideAction\(slideId\)/);
+assert.match(slider, /<button/);
+assert.match(slider, /<a[\s>]/);
+assert.match(slider, /target="_blank"/);
+assert.match(slider, /rel="noopener noreferrer"/);
+assert.match(slider, /touchAction: "manipulation"/);
 assert.match(slider, /guest-home-slider guest-home-slider--max/);
 assert.match(slider, /guest-home-slider__dot--active/);
 assert.match(slider, /aspect-ratio|guest-home-slider__media/);
 assert.doesNotMatch(slider, /01-audio-practices\.webp/);
 assert.doesNotMatch(slider, /setInterval|autoplay|guest-home-slider__arrow|Следующий слайд|Предыдущий слайд/);
+assert.doesNotMatch(
+  slider,
+  /next\/link|next\/navigation|useRouter|useSearchParams|router\.push|href=["']\/|href=["']https:|\/become-author|\/catalog["']|\/auth\/|\/playlists\/|\/my-practices/,
+);
 assert.doesNotMatch(
   maxSlideSources,
   /next\/link|next\/navigation|useRouter|useSearchParams|router\.push|<a[\s>]|href=["']\/|\/catalog["']|\/auth\/|\/playlists\/|\/my-practices/,
@@ -420,6 +434,78 @@ assert.equal(swiped.moved, true);
 assert.equal(maxGuestSlideClickActivates(endMaxGuestSlidePointer(swiped)), false);
 const diagonal = moveMaxGuestSlideGesture(tap, { x: 16, y: 26 });
 assert.equal(diagonal.moved, true);
+
+assert.equal(maxGuestSlideAnchorHref(null), null);
+assert.equal(maxGuestSlideAnchorHref(""), null);
+assert.equal(maxGuestSlideAnchorHref("/dlya-avtorov-meditatsiy"), null);
+assert.equal(maxGuestSlideAnchorHref("http://audiolad.ru/dlya-avtorov-meditatsiy"), null);
+assert.equal(maxGuestSlideAnchorHref("https://user:secret@audiolad.ru/dlya-avtorov-meditatsiy"), null);
+assert.equal(maxGuestSlideAnchorHref("javascript:alert(1)"), null);
+assert.equal(
+  maxGuestSlideAnchorHref("https://audiolad.ru/dlya-avtorov-meditatsiy"),
+  "https://audiolad.ru/dlya-avtorov-meditatsiy",
+);
+
+function slideOpeningTag(html, slideId) {
+  const marker = `data-max-guest-home-slide="${slideId}"`;
+  const at = html.indexOf(marker);
+  assert.ok(at >= 0, slideId);
+  return html.slice(html.lastIndexOf("<", at), html.indexOf(">", at) + 1);
+}
+
+const anchoredMarkup = renderToStaticMarkup(
+  createElement(MaxHomeScreen, {
+    ...linkedProps,
+    guestMode: true,
+    status: "ready",
+    shelves: parsed,
+    getSlideHref: (slideId) =>
+      slideId === "07" ? "https://audiolad.ru/dlya-avtorov-meditatsiy" : null,
+  }),
+);
+const anchoredSlider = anchoredMarkup.slice(
+  anchoredMarkup.indexOf("data-max-guest-home-slider"),
+  anchoredMarkup.indexOf("data-max-guest-home-cta"),
+);
+assert.equal(anchoredSlider.match(/<a\b/g)?.length, 1);
+assert.equal(anchoredSlider.match(/data-guest-slide-anchor=/g)?.length, 1);
+const anchoredSlide07 = slideOpeningTag(anchoredSlider, "07");
+assert.match(anchoredSlide07, /^<a\b/);
+assert.match(anchoredSlide07, /href="https:\/\/audiolad\.ru\/dlya-avtorov-meditatsiy"/);
+assert.match(anchoredSlide07, /target="_blank"/);
+assert.match(anchoredSlide07, /rel="noopener noreferrer"/);
+assert.match(anchoredSlide07, /touch-action:manipulation/);
+assert.doesNotMatch(anchoredSlide07, /become-author|\/auth\//);
+for (const slideId of ["01", "02", "03", "04", "05", "06"]) {
+  const tag = slideOpeningTag(anchoredSlider, slideId);
+  assert.match(tag, /^<button\b/);
+  assert.doesNotMatch(tag, /href=/);
+}
+assert.doesNotMatch(
+  anchoredMarkup.slice(0, anchoredMarkup.indexOf("data-max-guest-home-slider")),
+  /<a[\s>]/,
+);
+
+const swipeEvent = { prevented: false, preventDefault() { this.prevented = true; } };
+let swipeTaps = 0;
+assert.equal(
+  handleMaxGuestSlideAnchorClick(endMaxGuestSlidePointer(swiped), swipeEvent, () => {
+    swipeTaps += 1;
+  }),
+  "suppressed",
+);
+assert.equal(swipeEvent.prevented, true);
+assert.equal(swipeTaps, 0);
+const tapEvent = { prevented: false, preventDefault() { this.prevented = true; } };
+let tapTaps = 0;
+assert.equal(
+  handleMaxGuestSlideAnchorClick(tap, tapEvent, () => {
+    tapTaps += 1;
+  }),
+  "activated",
+);
+assert.equal(tapEvent.prevented, false);
+assert.equal(tapTaps, 1);
 assert.equal(nearestMaxGuestSlideIndex([], 40), 0);
 assert.equal(nearestMaxGuestSlideIndex([0, 100, 200], 0), 0);
 assert.equal(nearestMaxGuestSlideIndex([0, 100, 200], 40), 0);
