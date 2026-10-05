@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 
 import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
@@ -79,7 +78,6 @@ export default function AuthorSeoDiscoveryPanel({
   analyzedOpportunities = [],
   onReserved,
 }: Props) {
-  const router = useRouter();
   const isProductCreate = variant === "product-create";
   const [discoverPhrase, setDiscoverPhrase] = useState("");
   const [discoverySeedPhrase, setDiscoverySeedPhrase] = useState<string | null>(null);
@@ -180,17 +178,11 @@ export default function AuthorSeoDiscoveryPanel({
         expiresAt,
       });
     }
-    if (isProductCreate && reservationId) {
-      router.push(
-        buildAuthorProductCreateHref({
-          authorSlug,
-          publicationClass,
-          reservationId,
-        }),
-      );
-      return;
-    }
-    setDiscoverMessage(payload.message ?? "Запрос закреплен за вами");
+    setDiscoverMessage(
+      isProductCreate
+        ? "Запрос закреплён за вами. Сформируйте SEO-промпт или продолжите создание продукта."
+        : payload.message ?? "Запрос закреплен за вами",
+    );
   }
 
   async function runDiscovery(event: FormEvent) {
@@ -397,7 +389,7 @@ export default function AuthorSeoDiscoveryPanel({
                         onClick={() => reserve(item.queryId!)}
                         className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
                       >
-                        {isProductCreate ? "Взять в работу и продолжить" : "Взять в работу"}
+                        "Взять в работу"
                       </button>
                     ) : null}
                     {item.status === "published" && item.productId ? (
@@ -435,8 +427,7 @@ export default function AuthorSeoDiscoveryPanel({
                         )}
                       </div>
                     ) : null}
-                    {!isProductCreate
-                      && item.status === "own"
+                    {item.status === "own"
                       && item.queryId
                       && item.reservationId ? (
                       <AuthorSeoPromptBuilder
