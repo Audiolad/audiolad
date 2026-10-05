@@ -648,7 +648,8 @@ html.catalog-sheet-lock body {
   }
 }
 
-button.guest-home-slider__link {
+button.guest-home-slider__link,
+.guest-home-slider--max a.guest-home-slider__link {
   width: 100%;
   margin: 0;
   padding: 0;
@@ -657,6 +658,7 @@ button.guest-home-slider__link {
   color: inherit;
   font: inherit;
   text-align: inherit;
+  text-decoration: none;
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;

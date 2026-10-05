@@ -7,6 +7,10 @@ import { VkHomeClosing } from "@/components/vk/VkHomeClosing";
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import { readMaxHomeShelves, type MaxHomeShelfId, type MaxHomeShelves } from "@/lib/max/home";
+import {
+  onVkGuestSlideAnchorClick,
+  vkGuestHomeSlideHref,
+} from "@/lib/vk/authors-landing-click";
 
 type VkHomePanelProps = {
   onListenFree: () => void;
@@ -67,6 +71,8 @@ export default function VkHomePanel({
       shelves={shelves}
       onListenFree={onListenFree}
       onSlideAction={onSlideAction}
+      getSlideHref={vkGuestHomeSlideHref}
+      onAnchorClick={onVkGuestSlideAnchorClick}
       onOpenSection={onOpenSection}
       onOpenShelf={onOpenShelf}
       onSelectProduct={onSelectProduct}
