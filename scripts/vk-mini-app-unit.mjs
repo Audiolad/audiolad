@@ -16,6 +16,10 @@ import {
 import { LEGAL_LINKS } from "../src/lib/legal/links.ts";
 import { formatRubles } from "../src/lib/products/price-format.ts";
 import {
+  resolveMaxGuestHomeAuthorUrl,
+  resolveMaxGuestHomeSlideAction,
+} from "../src/lib/max/guest-home-slider.ts";
+import {
   getVkDiscoveryFooterLinks,
   getVkLegalFooterLinks,
   isVkGuestExternalUrl,
@@ -155,7 +159,47 @@ assert.match(screen, /openVkGuestExternalUrl\(VK_GUEST_LOGIN_URL\)/);
 assert.match(screen, /openVkGuestExternalUrl\(VK_GUEST_SIGNUP_URL\)/);
 assert.match(screen, /onRequestLogin=\{\(\) => \{/);
 assert.match(screen, /onRequestSignup=\{\(\) => \{/);
-assert.match(screen, /action\.type === "signup"/);
+assert.match(screen, /action\.type === "library"/);
+const vkGuestSlideHandler = screen.slice(
+  screen.indexOf("function applyGuestHomeSlide"),
+  screen.indexOf("const showProduct"),
+);
+assert.match(vkGuestSlideHandler, /resolveMaxGuestHomeSlideAction\(slideId\)/);
+assert.match(vkGuestSlideHandler, /action\.type === "library"/);
+assert.match(vkGuestSlideHandler, /selectVkTab\("library"\)/);
+assert.match(vkGuestSlideHandler, /openVkExternalHttps\(action\.url\)/);
+assert.doesNotMatch(
+  vkGuestSlideHandler,
+  /signup|VK_GUEST_SIGNUP_URL|\/auth\/|become-author/,
+);
+const vkLibraryPane = screen.slice(
+  screen.indexOf('data-vk-panel="library"'),
+  screen.indexOf('data-vk-panel="profile"'),
+);
+assert.match(vkLibraryPane, /data-vk-library-guest/);
+assert.match(vkLibraryPane, /VK_LIBRARY_GUEST_MESSAGE/);
+assert.match(vkLibraryPane, /<VkGuestAuthActions \/>/);
+assert.deepEqual(resolveMaxGuestHomeSlideAction("06"), { type: "library" });
+assert.notEqual(resolveMaxGuestHomeSlideAction("06")?.type, "signup");
+assert.equal(
+  resolveMaxGuestHomeAuthorUrl(),
+  "https://audiolad.ru/dlya-avtorov-meditatsiy",
+);
+assert.deepEqual(resolveMaxGuestHomeSlideAction("07"), {
+  type: "external",
+  url: "https://audiolad.ru/dlya-avtorov-meditatsiy",
+});
+assert.equal(
+  new URL(resolveMaxGuestHomeSlideAction("07").url).pathname,
+  "/dlya-avtorov-meditatsiy",
+);
+assert.equal(
+  resolveMaxGuestHomeSlideAction("07").url.includes("become-author"),
+  false,
+);
+assert.equal(resolveMaxGuestHomeSlideAction("07").url.includes("/auth/"), false);
+assert.equal(isVkGuestExternalUrl(resolveMaxGuestHomeSlideAction("07").url), true);
+assert.equal(isVkGuestExternalUrl("https://audiolad.ru/become-author"), false);
 assert.doesNotMatch(screen, /\bdisabled\b/);
 assert.doesNotMatch(screen, /cursor-not-allowed|opacity-60/);
 assert.doesNotMatch(screen, /smoke|placeholder|TODO|stack/i);

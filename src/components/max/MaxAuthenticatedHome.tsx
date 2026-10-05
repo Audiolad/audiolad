@@ -388,8 +388,8 @@ export default function MaxAuthenticatedHome({
       openMaxGuestHomeExternalSlide(action.url);
       return;
     }
-    if (action.type === "signup") {
-      onRequestSignup?.();
+    if (action.type === "library") {
+      selectMaxTab("library");
       return;
     }
     if (action.type === "playlists") {

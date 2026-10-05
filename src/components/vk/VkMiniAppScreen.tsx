@@ -627,8 +627,8 @@ export default function VkMiniAppScreen() {
   function applyGuestHomeSlide(slideId: string) {
     const action = resolveMaxGuestHomeSlideAction(slideId);
     if (!action) return;
-    if (action.type === "signup") {
-      openVkGuestExternalUrl(VK_GUEST_SIGNUP_URL);
+    if (action.type === "library") {
+      selectVkTab("library");
       return;
     }
     if (action.type === "external") {

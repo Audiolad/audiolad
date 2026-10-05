@@ -127,8 +127,25 @@ assert.match(shell, /publicationClass: target\.publicationClass \?\? "all"/);
 assert.match(shell, /function applyGuestHomeSlide\(slideId: string\)/);
 assert.match(shell, /resolveMaxGuestHomeSlideAction\(slideId\)/);
 assert.match(shell, /openMaxGuestHomeExternalSlide\(action\.url\)/);
-assert.match(shell, /onRequestSignup\?\.\(\)/);
 assert.match(shell, /selectMaxTab\("playlists"\)/);
+const maxGuestSlideHandler = shell.slice(
+  shell.indexOf("function applyGuestHomeSlide"),
+  shell.indexOf("function selectMaxTab"),
+);
+assert.match(maxGuestSlideHandler, /action\.type === "library"/);
+assert.match(maxGuestSlideHandler, /selectMaxTab\("library"\)/);
+assert.doesNotMatch(
+  maxGuestSlideHandler,
+  /signup|onRequestSignup|\/auth\/|become-author/,
+);
+const maxLibraryPane = shell.slice(
+  shell.indexOf('{activeTab === "library" ? ('),
+  shell.indexOf('{activeTab === "profile"'),
+);
+assert.match(maxLibraryPane, /<MaxLibrary/);
+assert.match(maxLibraryPane, /guestMode=\{guestMode\}/);
+assert.match(maxLibraryPane, /onRequestLogin=\{onRequestLogin\}/);
+assert.match(maxLibraryPane, /onRequestSignup=\{onRequestSignup\}/);
 assert.match(shell, /publicationClass: action\.publicationClass/);
 assert.match(search, /section\?: PublicCatalogSection \| null/);
 assert.match(search, /access\?: CatalogAccessFilter/);
@@ -353,7 +370,8 @@ assert.deepEqual(resolveMaxGuestHomeSlideAction("05"), {
   access: "paid",
   publicationClass: "all",
 });
-assert.deepEqual(resolveMaxGuestHomeSlideAction("06"), { type: "signup" });
+assert.deepEqual(resolveMaxGuestHomeSlideAction("06"), { type: "library" });
+assert.notEqual(resolveMaxGuestHomeSlideAction("06")?.type, "signup");
 assert.equal(
   resolveMaxGuestHomeAuthorUrl(),
   "https://audiolad.ru/dlya-avtorov-meditatsiy",
@@ -362,6 +380,15 @@ assert.deepEqual(resolveMaxGuestHomeSlideAction("07"), {
   type: "external",
   url: "https://audiolad.ru/dlya-avtorov-meditatsiy",
 });
+assert.equal(
+  new URL(resolveMaxGuestHomeSlideAction("07").url).pathname,
+  "/dlya-avtorov-meditatsiy",
+);
+assert.equal(
+  resolveMaxGuestHomeSlideAction("07").url.includes("become-author"),
+  false,
+);
+assert.equal(resolveMaxGuestHomeSlideAction("07").url.includes("/auth/"), false);
 assert.equal(resolveMaxGuestHomeSlideAction("08"), null);
 for (const slide of GUEST_HOME_SLIDES) {
   assert.ok(resolveMaxGuestHomeSlideAction(slide.id), slide.id);
@@ -372,6 +399,7 @@ for (const blocked of [
   "https://audiolad.ru/catalog",
   "https://audiolad.ru/catalog?access=free",
   "https://audiolad.ru/auth/sign-up",
+  "https://audiolad.ru/become-author",
   "https://audiolad.ru/playlists/catalog",
   "https://audiolad.ru/dlya-avtorov-meditatsiy?next=/",
   "https://evil.example/dlya-avtorov-meditatsiy",
