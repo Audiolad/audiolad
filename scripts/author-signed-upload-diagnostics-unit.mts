@@ -4,8 +4,8 @@ import {
   classifyAuthorSignedUploadError,
   fileForSignedAuthorAudioUpload,
   readAuthorSignedUploadClientReport,
-} from "../src/lib/author-products/signed-upload-client.ts";
-import { MAX_CONCURRENT_MUSIC_UPLOADS } from "../src/lib/author-products/music-track-upload-queue.ts";
+} from "../src/lib/author-products/signed-upload-client";
+import { MAX_CONCURRENT_MUSIC_UPLOADS } from "../src/lib/author-products/music-track-upload-queue";
 
 assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 1);
 
