@@ -19,7 +19,7 @@ function stageReady(snapshot: MusicQueueSnapshot, ids: string[]): MusicQueueSnap
   );
 }
 
-assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
+assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 1);
 
 {
   let snapshot = emptyMusicQueue();
@@ -31,25 +31,25 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
   assert.equal(musicUploadActiveCount(snapshot), 0);
   assert.equal(snapshot.entries.length, 10);
   const started = enqueueReadyMusicUploads(snapshot, ids);
-  assert.equal(musicUploadActiveCount(started.snapshot), 3);
-  assert.equal(started.launchIds.length, 3);
+  assert.equal(musicUploadActiveCount(started.snapshot), 1);
+  assert.equal(started.launchIds.length, 1);
   assert.equal(
     started.snapshot.entries.filter((entry) => entry.phase === "queued").length,
-    7,
+    9,
   );
   const next = finishMusicUpload(started.snapshot, started.launchIds[0]!, 1);
   assert.equal(next.ignored, false);
   assert.equal(next.launchIds.length, 1);
-  assert.equal(musicUploadActiveCount(next.snapshot), 3);
+  assert.equal(musicUploadActiveCount(next.snapshot), 1);
 }
 
 {
   const staged = stageReady(emptyMusicQueue(), ["a", "b", "c", "d", "e"]);
   const started = enqueueReadyMusicUploads(staged, ["a", "b", "c", "d", "e"]);
-  assert.equal(musicUploadActiveCount(started.snapshot), 3);
+  assert.equal(musicUploadActiveCount(started.snapshot), 1);
   assert.equal(
     started.snapshot.entries.filter((entry) => entry.phase === "queued").length,
-    2,
+    4,
   );
   const none = enqueueReadyMusicUploads(emptyMusicQueue(), []);
   assert.deepEqual(none.launchIds, []);
@@ -95,7 +95,7 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
   const failed = finishMusicUpload(started.snapshot, "a", 1, "fail");
   assert.equal(failed.snapshot.entries.find((entry) => entry.audioId === "a")?.phase, "error");
   assert.equal(failed.launchIds.length, 1);
-  assert.equal(musicUploadActiveCount(failed.snapshot), 3);
+  assert.equal(musicUploadActiveCount(failed.snapshot), 1);
   const retried = retryMusicUpload(failed.snapshot, "a");
   assert.equal(
     retried.snapshot.entries.find((entry) => entry.audioId === "a")?.phase === "queued" ||
