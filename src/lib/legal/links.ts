@@ -5,7 +5,7 @@ export const LEGAL_LINKS = [
     href: "/author-terms",
     title: "Авторские условия сотрудничества",
   },
-  { href: "/privacy", title: "Политика обработки персональных данных" },
+  { href: "/pravovaya-model-muzyki", title: "Правовая модель музыки" },\n  { href: "/privacy", title: "Политика обработки персональных данных" },
   { href: "/consent", title: "Согласие на обработку персональных данных" },
   { href: "/payment-and-refund", title: "Оплата, получение и возврат" },
 ] as const;
