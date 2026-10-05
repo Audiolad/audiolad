@@ -22,8 +22,12 @@ function FooterLink({ item }: { item: VkFooterLink }) {
   );
 }
 
-export default function VkPublicFooter({ variant }: { variant: "profile" | "product" }) {
-  const discovery = variant === "profile" ? getVkDiscoveryFooterLinks() : [];
+export function VkPublicFooter({
+  variant,
+}: {
+  variant: "profile" | "product" | "home";
+}) {
+  const discovery = variant === "product" ? [] : getVkDiscoveryFooterLinks();
   const legal = getVkLegalFooterLinks();
 
   return (
@@ -31,16 +35,20 @@ export default function VkPublicFooter({ variant }: { variant: "profile" | "prod
       className={
         variant === "profile"
           ? "mt-6 border-t border-[#eadff8] pt-4"
-          : "mt-8 border-t border-[#eadff8] pb-2 pt-6"
+          : variant === "home"
+            ? "mt-8 border-t border-[#eadff8] pb-4 pt-6"
+            : "mt-8 border-t border-[#eadff8] pb-2 pt-6"
       }
       aria-label={
-        variant === "profile"
-          ? "О платформе, правовая информация и контакты"
-          : "Правовая информация и контакты"
+        variant === "product"
+          ? "Правовая информация и контакты"
+          : "О платформе, правовая информация и контакты"
       }
       {...(variant === "profile"
         ? { "data-vk-profile-legal": "" }
-        : { "data-vk-product-legal": "" })}
+        : variant === "product"
+          ? { "data-vk-product-legal": "" }
+          : { "data-vk-home-legal": "" })}
     >
       <p className="text-lg font-semibold text-[#6234b5]">АудиоЛад</p>
       {discovery.length ? (
@@ -70,3 +78,5 @@ export default function VkPublicFooter({ variant }: { variant: "profile" | "prod
     </footer>
   );
 }
+
+export default VkPublicFooter;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { MaxHomeScreen } from "@/components/max/MaxHome";
+import { VkHomeClosing } from "@/components/vk/VkHomeClosing";
 import type { PublicCatalogSection } from "@/lib/catalog/catalog-sections";
 import type { MaxCatalogProduct } from "@/lib/max/catalog-product";
 import { readMaxHomeShelves, type MaxHomeShelfId, type MaxHomeShelves } from "@/lib/max/home";
@@ -60,6 +61,7 @@ export default function VkHomePanel({
 
   return (
     <MaxHomeScreen
+      closing={<VkHomeClosing />}
       guestMode
       status={status}
       shelves={shelves}
