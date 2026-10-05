@@ -68,4 +68,13 @@ assert.match(migration, /claim_product_video_render_job/);
 assert.match(migration, /renew_product_video_render_job_lease/);
 assert.match(migration, /service_role/);
 
+const deploy = read("deploy/scripts/deploy.sh");
+assert.match(deploy, /assert_product_video_export_worker_release_tree/);
+assert.match(deploy, /ensure-product-video-export-worker\.sh/);
+assert.match(deploy, /product-video-export-worker\.ecosystem\.config\.cjs/);
+const ensureWorker = read("deploy/scripts/ensure-product-video-export-worker.sh");
+assert.match(ensureWorker, /audiolad-product-video-export-worker/);
+assert.match(ensureWorker, /pm2_status/);
+assert.match(ensureWorker, /product_video_export_worker_online/);
+
 console.log("product-video-export-unit: ok");
