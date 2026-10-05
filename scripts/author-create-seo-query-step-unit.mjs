@@ -177,7 +177,7 @@ assert.match(releaseLib, /item\.lifecycle !== "published"/);
 assert.match(createStep, /variant="product-create"/);
 assert.match(createStep, /seoQuerySkip:\s*true/);
 assert.match(createStep, /AuthorSeoPromptBuilder/);
-assert.match(createStep, /analyzedOpportunities=\{visibleOpportunities\}/);
+assert.match(createStep, /analyzedOpportunities=\{\[\.\.\.visibleOpportunities\]\}/);
 assert.doesNotMatch(createStep, /from\("practices"\)/);
 assert.doesNotMatch(createStep, /\/api\/author\/products/);
 
