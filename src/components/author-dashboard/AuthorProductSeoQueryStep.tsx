@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import AuthorSeoDiscoveryPanel from "@/components/author-dashboard/AuthorSeoDiscoveryPanel";
+import AuthorSeoPromptBuilder from "@/components/author-dashboard/AuthorSeoPromptBuilder";
 import { getProductSeoQueryStepCopy } from "@/lib/seo-queries/product-seo-query-step-copy";
 import {
   opportunitiesAfterOwnReservationRelease,
@@ -201,6 +202,13 @@ export default function AuthorProductSeoQueryStep({
                     {releaseError.message}
                   </p>
                 ) : null}
+                {item.reservationId ? (
+                  <AuthorSeoPromptBuilder
+                    primaryQueryText={item.queryText}
+                    primaryQueryId={item.id}
+                    analyzedOpportunities={visibleOpportunities}
+                  />
+                ) : null}
               </article>
               );
             })}
@@ -287,6 +295,7 @@ export default function AuthorProductSeoQueryStep({
         publicationClass={publicationClass}
         activeReservationCount={activeCount}
         releasedReservationIds={releasedReservationIds}
+        analyzedOpportunities={visibleOpportunities}
       />
 
       <div className="flex justify-center pt-1">
