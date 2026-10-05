@@ -1,4 +1,4 @@
-export const MAX_CONCURRENT_MUSIC_UPLOADS = 3;
+export const MAX_CONCURRENT_MUSIC_UPLOADS = 1;
 
 export type MusicUploadKind = "master" | "legacy";
 

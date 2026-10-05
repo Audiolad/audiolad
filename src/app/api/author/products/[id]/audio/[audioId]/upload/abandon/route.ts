@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleAuthorRouteError } from "@/lib/author-products/auth";
+import { readAuthorSignedUploadClientReport } from "@/lib/author-products/signed-upload-client";
 import {
   ProductAudioUploadError,
   abandonProductAudioDirectUpload,
@@ -27,6 +28,18 @@ export async function POST(request: Request, context: RouteContext) {
       body = (await request.json()) as Record<string, unknown>;
     } catch {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    const storageError = readAuthorSignedUploadClientReport(body.storageError);
+    if (storageError) {
+      console.error("author product-audio browser upload rejected", {
+        practiceId: id,
+        audioId,
+        code: storageError.code,
+        status: storageError.status,
+        statusCode: storageError.statusCode,
+        message: storageError.message,
+      });
     }
 
     await abandonProductAudioDirectUpload({

@@ -5,7 +5,11 @@ import {
   detectProductAudioSourceFormat,
   validateProductAudioFileClient,
 } from "@/lib/author-products/product-audio-upload-contract";
-import { fileForSignedAuthorAudioUpload } from "@/lib/author-products/signed-upload-client";
+import {
+  classifyAuthorSignedUploadError,
+  fileForSignedAuthorAudioUpload,
+  type AuthorSignedUploadErrorReport,
+} from "@/lib/author-products/signed-upload-client";
 import type { AuthorProductDetail } from "@/lib/author-products/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -73,6 +77,7 @@ async function abandonProductAudioUpload(input: {
   practiceId: string;
   audioId: string;
   uploadPath: string;
+  storageError?: AuthorSignedUploadErrorReport;
 }): Promise<void> {
   try {
     await fetch(
@@ -80,7 +85,10 @@ async function abandonProductAudioUpload(input: {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ upload_path: input.uploadPath }),
+        body: JSON.stringify({
+          upload_path: input.uploadPath,
+          ...(input.storageError ? { storageError: input.storageError } : {}),
+        }),
       },
     );
   } catch {
@@ -153,14 +161,18 @@ export async function uploadAuthorProductAudioDirect(input: {
       );
 
     if (storageError) {
+      const classified = classifyAuthorSignedUploadError(storageError);
       await abandonProductAudioUpload({
         practiceId: input.practiceId,
         audioId: input.audioId,
         uploadPath,
+        storageError: classified,
       });
       return {
         ok: false,
-        error: "upload_failed",
+        error: classified.code === "upload_token_expired"
+          ? "upload_token_expired"
+          : "upload_failed",
         status: 502,
       };
     }
