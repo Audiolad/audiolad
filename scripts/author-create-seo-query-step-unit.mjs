@@ -176,7 +176,8 @@ assert.match(releaseLib, /!item\.productId/);
 assert.match(releaseLib, /item\.lifecycle !== "published"/);
 assert.match(createStep, /variant="product-create"/);
 assert.match(createStep, /seoQuerySkip:\s*true/);
-assert.doesNotMatch(createStep, /AuthorSeoPromptBuilder/);
+assert.match(createStep, /AuthorSeoPromptBuilder/);
+assert.match(createStep, /analyzedOpportunities=\{\[\.\.\.visibleOpportunities\]\}/);
 assert.doesNotMatch(createStep, /from\("practices"\)/);
 assert.doesNotMatch(createStep, /\/api\/author\/products/);
 
@@ -236,11 +237,14 @@ assert.doesNotMatch(createStep, /lifecycleLabel/);
 // Discovery product-create CTAs
 assert.match(panel, /"opportunities" \| "product-create"/);
 assert.doesNotMatch(panel, /"dashboard"/);
-assert.match(panel, /Взять в работу и продолжить/);
+assert.doesNotMatch(panel, /Взять в работу и продолжить/);
+assert.match(panel, /Взять в работу/);
+assert.doesNotMatch(panel, />\s*"Взять в работу"\s*</);
 assert.match(panel, /Выбрать и продолжить/);
 assert.match(panel, /buildAuthorProductCreateHref/);
-assert.match(panel, /router\.push/);
-assert.match(panel, /!isProductCreate/);
+assert.doesNotMatch(panel, /router\.push/);
+assert.doesNotMatch(panel, /!isProductCreate\s*&&\s*item\.status === "own"/);
+assert.match(panel, /Сформируйте SEO-промпт или продолжите создание продукта/);
 assert.match(panel, /AuthorSeoPromptBuilder/);
 
 assert.match(wizard, /buildAuthorProductCreateHref/);
