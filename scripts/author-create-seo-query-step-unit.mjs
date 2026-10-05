@@ -239,6 +239,7 @@ assert.match(panel, /"opportunities" \| "product-create"/);
 assert.doesNotMatch(panel, /"dashboard"/);
 assert.doesNotMatch(panel, /Взять в работу и продолжить/);
 assert.match(panel, /Взять в работу/);
+assert.doesNotMatch(panel, />\s*"Взять в работу"\s*</);
 assert.match(panel, /Выбрать и продолжить/);
 assert.match(panel, /buildAuthorProductCreateHref/);
 assert.doesNotMatch(panel, /router\.push/);
