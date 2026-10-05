@@ -91,10 +91,11 @@ function classifyFailure(error: unknown): { code: string; message: string } {
   if (error instanceof ProductVideoRenderAbortedError) {
     return { code: "worker_lease_lost", message: "Создание видео прервано. Попробуйте ещё раз." };
   }
-  const code =
-    error instanceof Error && typeof (error as { code?: unknown }).code === "string"
-      ? String((error as { code: string }).code)
-      : "render_failed";
+  const errorCode =
+    error && typeof error === "object"
+      ? (error as { code?: unknown }).code
+      : undefined;
+  const code = typeof errorCode === "string" ? errorCode : "render_failed";
   return { code, message: "Не удалось создать видео. Попробуйте ещё раз." };
 }
 
