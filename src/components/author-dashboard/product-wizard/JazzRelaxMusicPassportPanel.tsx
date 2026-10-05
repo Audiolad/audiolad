@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 
 import { AlbumMusicPassport } from "@/components/music-passport/AlbumMusicPassport";
 import { MusicPassport } from "@/components/music-passport/MusicPassport";
-import type { JazzRelaxPassportView } from "@/lib/music-passport/jazz-relax-status";
+import {
+  JAZZ_RELAX_PASSPORT_ENQUEUE_MAX_REQUESTS,
+  jazzRelaxPassportEnqueueShouldContinue,
+  type JazzRelaxPassportView,
+} from "@/lib/music-passport/jazz-relax-status";
 
 type PassportCommand = {
   nonce: number;
@@ -31,7 +35,66 @@ const EMPTY_PROVENANCE = {
 function isPassportView(payload: unknown): payload is JazzRelaxPassportView {
   return typeof payload === "object"
     && payload !== null
-    && "progressLabel" in payload;
+    && "progressLabel" in payload
+    && "enqueueDeferred" in payload
+    && typeof payload.enqueueDeferred === "boolean";
+}
+
+async function runJazzRelaxPassportRequests(input: {
+  practiceId: string;
+  action: "start" | "retry" | "reanalyze";
+  audioItemId?: string;
+  isCancelled?: () => boolean;
+  onView: (view: JazzRelaxPassportView) => void;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  let cursor: string | null = null;
+  let latest: JazzRelaxPassportView | null = null;
+  const failure = input.action === "retry"
+    ? "Не удалось повторить анализ."
+    : input.action === "reanalyze"
+      ? "Не удалось запустить анализ."
+      : "Не удалось создать музыкальный паспорт.";
+  for (let attempt = 0; attempt < JAZZ_RELAX_PASSPORT_ENQUEUE_MAX_REQUESTS; attempt += 1) {
+    if (input.isCancelled?.()) return { ok: true };
+    let response: Response;
+    try {
+      response = await fetch(`/api/author/products/${input.practiceId}/music-passport`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: input.action,
+          ...(input.audioItemId ? { audioItemId: input.audioItemId } : {}),
+          ...(cursor ? { enqueueAfterAudioItemId: cursor } : {}),
+        }),
+      });
+    } catch {
+      return { ok: false, message: failure };
+    }
+    const payload = await response.json().catch(() => null) as unknown;
+    if (input.isCancelled?.()) return { ok: true };
+    if (!response.ok || !isPassportView(payload)) {
+      const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+        ? payload.error
+        : failure;
+      return { ok: false, message };
+    }
+    latest = payload;
+    input.onView(payload);
+    if (!jazzRelaxPassportEnqueueShouldContinue({
+      singleTrack: Boolean(input.audioItemId),
+      enqueueDeferred: payload.enqueueDeferred,
+    })) {
+      return { ok: true };
+    }
+    if (!payload.enqueueCursor || payload.enqueueCursor === cursor) {
+      return { ok: false, message: "Не все треки поставлены в очередь. Нажмите кнопку ещё раз." };
+    }
+    cursor = payload.enqueueCursor;
+  }
+  if (latest?.enqueueDeferred) {
+    return { ok: false, message: "Не все треки поставлены в очередь. Нажмите кнопку ещё раз." };
+  }
+  return { ok: true };
 }
 
 export function JazzRelaxPassportBody({
@@ -177,26 +240,20 @@ export default function JazzRelaxMusicPassportPanel({
     if (!command) return;
     let cancelled = false;
     void (async () => {
-      const response = await fetch(`/api/author/products/${practiceId}/music-passport`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: command.action,
-          ...(command.audioItemId ? { audioItemId: command.audioItemId } : {}),
-        }),
+      const result = await runJazzRelaxPassportRequests({
+        practiceId,
+        action: command.action,
+        audioItemId: command.audioItemId,
+        isCancelled: () => cancelled,
+        onView: (view) => {
+          setError(null);
+          setStatus(view);
+          onStatus(view);
+        },
       });
-      const payload = await response.json().catch(() => null) as unknown;
       if (cancelled) return;
+      if (!result.ok) setError(result.message);
       setPending(false);
-      if (!response.ok || !isPassportView(payload)) {
-        const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-          ? payload.error
-          : "Не удалось создать музыкальный паспорт.";
-        setError(message);
-        return;
-      }
-      setStatus(payload);
-      onStatus(payload);
     })();
     return () => {
       cancelled = true;
@@ -219,27 +276,17 @@ export default function JazzRelaxMusicPassportPanel({
   }, [status, practiceId, onStatus]);
 
   async function postAction(action: "retry" | "reanalyze", audioItemId?: string) {
-    const response = await fetch(`/api/author/products/${practiceId}/music-passport`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action,
-        ...(audioItemId ? { audioItemId } : {}),
-      }),
+    const result = await runJazzRelaxPassportRequests({
+      practiceId,
+      action,
+      audioItemId,
+      onView: (view) => {
+        setError(null);
+        setStatus(view);
+        onStatus(view);
+      },
     });
-    const payload = await response.json().catch(() => null) as unknown;
-    if (!response.ok || !isPassportView(payload)) {
-      const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-        ? payload.error
-        : action === "retry"
-          ? "Не удалось повторить анализ."
-          : "Не удалось запустить анализ.";
-      setError(message);
-      return;
-    }
-    setError(null);
-    setStatus(payload);
-    onStatus(payload);
+    if (!result.ok) setError(result.message);
   }
 
   if (!status && !error) return null;

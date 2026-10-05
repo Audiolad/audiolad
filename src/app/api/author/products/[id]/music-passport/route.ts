@@ -58,12 +58,17 @@ export async function POST(request: Request, context: RouteContext) {
     } catch {
       body = null;
     }
-    const record = body && typeof body === "object" ? body as { action?: unknown; audioItemId?: unknown } : {};
+    const record = body && typeof body === "object"
+      ? body as { action?: unknown; audioItemId?: unknown; enqueueAfterAudioItemId?: unknown }
+      : {};
     const action = record.action;
     if (action !== "start" && action !== "retry" && action !== "reanalyze") {
       return NextResponse.json({ error: "Некорректное действие.", code: "invalid_action" }, { status: 400 });
     }
     const audioItemId = typeof record.audioItemId === "string" ? record.audioItemId : null;
+    const enqueueAfterAudioItemId = typeof record.enqueueAfterAudioItemId === "string"
+      ? record.enqueueAfterAudioItemId
+      : null;
     const status = await runJazzRelaxPassportAction({
       practiceId: id,
       authorId: practice.author_id,
@@ -71,6 +76,7 @@ export async function POST(request: Request, context: RouteContext) {
       userId: user.id,
       action,
       audioItemId,
+      enqueueAfterAudioItemId,
     });
     return NextResponse.json(status);
   } catch (error) {
