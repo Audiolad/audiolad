@@ -1,0 +1,9 @@
+/var/log/audiolad/seo-reservation-5d-reminder.log {
+  weekly
+  rotate 8
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Audiolad SEO reservation day-5 reminder every 45 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=45min
+AccuracySec=1min
+Persistent=true
+Unit=audiolad-seo-reservation-5d-reminder.service
+
+[Install]
+WantedBy=timers.target
