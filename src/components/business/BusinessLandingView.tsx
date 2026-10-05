@@ -381,6 +381,16 @@ export default function BusinessLandingView({
               <p className="business-lead">{BUSINESS_LEGAL_LEAD}</p>
               <ul className="business-source-list">
                 <li>
+                  <Link className="business-source-link" href="/b/prava">
+                    Как устроены права на музыку
+                  </Link>
+                </li>
+                <li>
+                  <Link className="business-source-link" href="/pravovaya-model-muzyki">
+                    Полная правовая модель музыки
+                  </Link>
+                </li>
+                <li>
                   <Link className="business-source-link" href="/offer">
                     Публичная оферта
                   </Link>
