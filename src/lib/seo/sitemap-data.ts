@@ -44,7 +44,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   priority: number;
 }> = [
   { path: "/", changeFrequency: "weekly", priority: 1 },
-  { path: "/b", changeFrequency: "weekly", priority: 0.8 },
+  { path: "/b", changeFrequency: "weekly", priority: 0.8 },\n  { path: "/b/prava", changeFrequency: "monthly", priority: 0.7 },
   { path: "/catalog", changeFrequency: "daily", priority: 0.9 },
   { path: "/authors", changeFrequency: "weekly", priority: 0.8 },
   { path: "/articles", changeFrequency: "weekly", priority: 0.8 },
@@ -71,7 +71,7 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/become-author", changeFrequency: "monthly", priority: 0.5 },
   { path: "/first-audio-course", changeFrequency: "monthly", priority: 0.6 },
   { path: "/offer", changeFrequency: "yearly", priority: 0.3 },
-  { path: "/author-terms", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/author-terms", changeFrequency: "yearly", priority: 0.3 },\n  { path: "/pravovaya-model-muzyki", changeFrequency: "monthly", priority: 0.5 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/consent", changeFrequency: "yearly", priority: 0.3 },
   { path: "/payment-and-refund", changeFrequency: "yearly", priority: 0.3 },
