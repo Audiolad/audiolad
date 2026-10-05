@@ -267,7 +267,7 @@ export async function enqueueProductVideoRender(params: {
     await Promise.all([
       service
         .from("audio_items")
-        .select("id, practice_id, audio_path, audio_prepare_status")
+        .select("id, practice_id, audio_path")
         .eq("id", audioItemId)
         .eq("practice_id", practiceId)
         .maybeSingle(),
@@ -285,11 +285,7 @@ export async function enqueueProductVideoRender(params: {
     );
     throw new AuthorAccessError("internal_error", 500);
   }
-  if (
-    !audioItem?.audio_path ||
-    audioItem.audio_prepare_status === "queued" ||
-    audioItem.audio_prepare_status === "processing"
-  ) {
+  if (!audioItem?.audio_path) {
     throw new AuthorAccessError("audio_not_ready", 409);
   }
 
