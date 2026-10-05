@@ -32,6 +32,10 @@ import { SEO_ROBOTS_DISALLOWED_PATHS } from "../src/lib/seo/robots-config.ts";
 import { MEDITATION_AUTHORS_LANDING_PROMO_LINK } from "../src/lib/seo/meditation-authors-landing/content.ts";
 import { VK_BRIDGE_OPEN_LINK_METHOD } from "../src/lib/vk/bridge.ts";
 import {
+  activateVkAuthorsLandingClick,
+  detectVkAuthorsLandingClient,
+} from "../src/lib/vk/authors-landing-click.ts";
+import {
   isVkGuestExternalUrl,
   openVkGuestExternalUrl,
   VK_AUTHORS_LANDING_URL,
@@ -124,7 +128,19 @@ assert.match(links, /LEGAL_LINKS/);
 assert.match(links, /MEDITATION_AUTHORS_LANDING_PROMO_LINK/);
 assert.match(banner, /MINI_APP_BECOME_AUTHOR_BANNER_SRC/);
 assert.match(banner, /<button/);
-assert.doesNotMatch(banner, /<a[\s>]|href=|\/become-author|next\/link/);
+assert.match(banner, /<a[\s>]/);
+assert.match(banner, /href=\{url\}/);
+assert.match(banner, /target=\{MEDITATION_AUTHORS_LANDING_PROMO_LINK\.target\}/);
+assert.match(banner, /rel=\{MEDITATION_AUTHORS_LANDING_PROMO_LINK\.rel\}/);
+assert.match(banner, /anchorClick\(event, url\)/);
+assert.match(banner, /pointer-events-none/);
+assert.match(banner, /pointer-events-auto/);
+assert.match(banner, /touchAction: "manipulation"/);
+assert.doesNotMatch(banner, /preventDefault|\/become-author|next\/link/);
+assert.match(vkClosing, /anchorClick=\{activateVkAuthorsLandingClick\}/);
+assert.doesNotMatch(maxClosing, /anchorClick|activateVkAuthorsLandingClick/);
+assert.doesNotMatch(vkFooter, /<a[\s>]|activateVkAuthorsLandingClick/);
+assert.doesNotMatch(maxFooter, /<a[\s>]/);
 assert.match(links, /pathname === "\/become-author"/);
 assert.doesNotMatch(`${maxClosing}\n${vkClosing}\n${maxFooter}\n${banner}`, /\/become-author/);
 assert.doesNotMatch(productFooter, /MiniAppBecomeAuthorBanner|getVisiblePublicFooterLinks|data-max-home-legal/);
@@ -178,7 +194,7 @@ function renderHome({ guestMode, platform, status = "ready" }) {
   );
 }
 
-function assertHomeClosing(markup, footerMarker) {
+function assertHomeClosing(markup, footerMarker, anchorMode) {
   const shelfAt = markup.indexOf('data-max-home-shelf="free"');
   const bannerAt = markup.indexOf("data-mini-app-become-author-banner");
   const footerAt = markup.indexOf(footerMarker);
@@ -189,7 +205,25 @@ function assertHomeClosing(markup, footerMarker) {
   assert.match(markup, /rounded-\[24px\]/);
   assert.match(markup, /pb-4/);
   const body = markup.replace(/<link\b[^>]*>/g, "");
-  assert.doesNotMatch(body, /<a[\s>]|href=/);
+  const bannerHtml = body.slice(body.indexOf("data-mini-app-become-author-banner"), body.indexOf(footerMarker));
+  const footerHtml = body.slice(body.indexOf(footerMarker));
+  assert.match(bannerHtml, /pointer-events-auto/);
+  assert.match(bannerHtml, /pointer-events-none/);
+  assert.doesNotMatch(bannerHtml, /pointer-events-none[^>]*data-vk-authors-landing-anchor|data-vk-authors-landing-anchor[^>]*pointer-events-none/);
+  if (anchorMode === "vk-anchor") {
+    assert.equal(bannerHtml.match(/<a\b/g)?.length, 1);
+    assert.match(bannerHtml, /data-vk-authors-landing-anchor=""/);
+    assert.match(bannerHtml, /href="https:\/\/audiolad\.ru\/dlya-avtorov-meditatsiy"/);
+    assert.match(bannerHtml, /target="_blank"/);
+    assert.match(bannerHtml, /rel="noopener noreferrer"/);
+    assert.match(bannerHtml, /touch-action:manipulation/);
+    assert.doesNotMatch(bannerHtml, /<button/);
+    assert.doesNotMatch(footerHtml, /<a[\s>]/);
+    assert.match(footerHtml, /<button/);
+  } else {
+    assert.doesNotMatch(body, /<a[\s>]|href=/);
+    assert.match(bannerHtml, /<button/);
+  }
   assert.doesNotMatch(body, /\/become-author(?!-)/);
   assert.doesNotMatch(body, /Статьи|\/articles(?!-)/);
   for (const item of [...discovery, ...legal]) {
@@ -208,11 +242,11 @@ assert.match(maxGuest, /data-mini-app-home-closing="max"/);
 assert.match(maxGuest, /data-max-home-legal/);
 assert.match(maxGuest, /data-max-home-guest="true"/);
 assert.doesNotMatch(maxGuest, /data-vk-home-legal|data-max-product-legal-footer/);
-assertHomeClosing(maxGuest, "data-max-home-legal");
+assertHomeClosing(maxGuest, "data-max-home-legal", "button");
 
 assert.match(maxLinked, /data-mini-app-home-closing="max"/);
 assert.match(maxLinked, /data-max-home-guest="false"/);
-assertHomeClosing(maxLinked, "data-max-home-legal");
+assertHomeClosing(maxLinked, "data-max-home-legal", "button");
 
 assert.match(maxLoading, /data-mini-app-become-author-banner/);
 assert.match(maxLoading, /data-max-home-legal/);
@@ -221,7 +255,8 @@ assert.doesNotMatch(maxLoading, /data-max-home-shelf=/);
 assert.match(vkGuest, /data-mini-app-home-closing="vk"/);
 assert.match(vkGuest, /data-vk-home-legal/);
 assert.doesNotMatch(vkGuest, /data-max-home-legal|data-vk-product-legal|data-vk-profile-legal/);
-assertHomeClosing(vkGuest, "data-vk-home-legal");
+assertHomeClosing(vkGuest, "data-vk-home-legal", "vk-anchor");
+assert.doesNotMatch(maxLoading, /<a[\s>]|data-vk-authors-landing-anchor/);
 
 const profileFooter = renderToStaticMarkup(createElement(VkPublicFooter, { variant: "profile" }));
 const productVkFooter = renderToStaticMarkup(createElement(VkPublicFooter, { variant: "product" }));
@@ -329,6 +364,41 @@ try {
   assert.equal(vkEmbedded.opened.length, 0);
   assert.equal(openVkHomeAuthorsLanding(BECOME_AUTHOR_URL), false);
   assert.equal(sent.length, 1);
+
+  const vkRejected = installWindow();
+  let rejectOpen = () => {};
+  const pendingOpen = new Promise((resolve, reject) => {
+    rejectOpen = reject;
+  });
+  globalThis.window.vkBridge = {
+    isEmbedded() {
+      return true;
+    },
+    send(method, params) {
+      assert.equal(method, VK_BRIDGE_OPEN_LINK_METHOD);
+      assert.equal(params.url, LANDING_URL);
+      return pendingOpen;
+    },
+  };
+  const desktopAsyncClick = {
+    prevented: false,
+    preventDefault() {
+      this.prevented = true;
+    },
+  };
+  assert.equal(
+    activateVkAuthorsLandingClick(desktopAsyncClick, LANDING_URL, {
+      client: "desktop",
+    }),
+    "bridge",
+  );
+  assert.equal(desktopAsyncClick.prevented, true);
+  assert.equal(vkRejected.opened.length, 0);
+  rejectOpen(new Error("bridge rejected"));
+  await pendingOpen.catch(() => undefined);
+  await Promise.resolve();
+  assert.equal(vkRejected.opened.at(-1)?.url, LANDING_URL);
+  assert.equal(vkRejected.opened.at(-1)?.target, "_blank");
 } finally {
   if (previousWindow === undefined) {
     delete globalThis.window;
@@ -336,5 +406,110 @@ try {
     globalThis.window = previousWindow;
   }
 }
+
+assert.equal(detectVkAuthorsLandingClient(null), "mobile");
+assert.equal(detectVkAuthorsLandingClient({ location: { search: "" } }), "mobile");
+assert.equal(detectVkAuthorsLandingClient({ location: { search: "?vk_platform=mobile_iphone" } }), "mobile");
+assert.equal(detectVkAuthorsLandingClient({ location: { search: "?vk_platform=mobile_android&vk_user_id=1" } }), "mobile");
+assert.equal(detectVkAuthorsLandingClient({ location: { search: "?vk_platform=mobile_web" } }), "mobile");
+assert.equal(detectVkAuthorsLandingClient({ AndroidBridge: {} }), "mobile");
+assert.equal(
+  detectVkAuthorsLandingClient({ webkit: { messageHandlers: { VKWebAppClose: {} } } }),
+  "mobile",
+);
+assert.equal(
+  detectVkAuthorsLandingClient({
+    AndroidBridge: {},
+    location: { search: "?vk_platform=desktop_web" },
+  }),
+  "mobile",
+);
+assert.equal(
+  detectVkAuthorsLandingClient({ location: { search: "?vk_platform=desktop_web" } }),
+  "desktop",
+);
+
+function clickEvent() {
+  return {
+    prevented: false,
+    preventDefault() {
+      this.prevented = true;
+    },
+  };
+}
+
+const becomeAuthorClick = clickEvent();
+let desktopOpens = 0;
+assert.equal(
+  activateVkAuthorsLandingClick(becomeAuthorClick, BECOME_AUTHOR_URL, {
+    client: "desktop",
+    openDesktop() {
+      desktopOpens += 1;
+      return true;
+    },
+  }),
+  "blocked",
+);
+assert.equal(becomeAuthorClick.prevented, true);
+assert.equal(desktopOpens, 0);
+
+const mobileClick = clickEvent();
+assert.equal(
+  activateVkAuthorsLandingClick(mobileClick, LANDING_URL, {
+    client: "mobile",
+    openDesktop() {
+      throw new Error("mobile tap must not depend on the bridge callback");
+    },
+  }),
+  "native",
+);
+assert.equal(mobileClick.prevented, false);
+
+const mobileViewClick = clickEvent();
+assert.equal(
+  activateVkAuthorsLandingClick(mobileViewClick, LANDING_URL, {
+    view: { location: { search: "?vk_platform=mobile_iphone" } },
+    openDesktop() {
+      throw new Error("mobile webview must keep the native anchor");
+    },
+  }),
+  "native",
+);
+assert.equal(mobileViewClick.prevented, false);
+
+const desktopRejected = clickEvent();
+assert.equal(
+  activateVkAuthorsLandingClick(desktopRejected, LANDING_URL, {
+    client: "desktop",
+    openDesktop() {
+      return false;
+    },
+  }),
+  "native",
+);
+assert.equal(desktopRejected.prevented, false);
+
+const desktopAccepted = clickEvent();
+let acceptedUrl = "";
+assert.equal(
+  activateVkAuthorsLandingClick(desktopAccepted, LANDING_URL, {
+    client: "desktop",
+    openDesktop(url) {
+      acceptedUrl = url;
+      return true;
+    },
+  }),
+  "bridge",
+);
+assert.equal(desktopAccepted.prevented, true);
+assert.equal(acceptedUrl, LANDING_URL);
+assert.equal(acceptedUrl.includes("become-author"), false);
+
+const slider = read("src/components/max/MaxGuestHomeSlider.tsx");
+assert.ok(home.indexOf("<MaxGuestHomeSlider") < home.indexOf("{closing"));
+assert.doesNotMatch(slider, /data-mini-app-become-author-banner|MiniAppBecomeAuthorBanner/);
+const sliderTrack = slider.slice(slider.indexOf("<ul"), slider.indexOf("</ul>"));
+assert.match(sliderTrack, /onPointerDown=\{onPointerDown\}/);
+assert.match(sliderTrack, /onPointerMove=\{onPointerMove\}/);
 
 console.log("mini-app-home-banner-footer-unit: ok");

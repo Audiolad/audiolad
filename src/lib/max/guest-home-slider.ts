@@ -21,7 +21,7 @@ export type MaxGuestHomeCatalogAction = {
 export type MaxGuestHomeSlideAction =
   | MaxGuestHomeCatalogAction
   | { type: "playlists" }
-  | { type: "signup" }
+  | { type: "library" }
   | { type: "external"; url: string };
 
 export type MaxGuestSlidePoint = { x: number; y: number };
@@ -179,8 +179,9 @@ export function resolveMaxGuestHomeSlideAction(
     return { type: "playlists" };
   }
 
+  // Slide 06 opens the in-app Library tab. Login and signup stay on that screen.
   if (slideId === "06") {
-    return { type: "signup" };
+    return { type: "library" };
   }
 
   if (slideId === "07") {
