@@ -389,7 +389,7 @@ export default function AuthorSeoDiscoveryPanel({
                         onClick={() => reserve(item.queryId!)}
                         className="mt-3 inline-flex min-h-10 items-center rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-50"
                       >
-                        "Взять в работу"
+                        Взять в работу
                       </button>
                     ) : null}
                     {item.status === "published" && item.productId ? (
