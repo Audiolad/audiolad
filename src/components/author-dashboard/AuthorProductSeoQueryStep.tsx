@@ -206,7 +206,7 @@ export default function AuthorProductSeoQueryStep({
                   <AuthorSeoPromptBuilder
                     primaryQueryText={item.queryText}
                     primaryQueryId={item.id}
-                    analyzedOpportunities={visibleOpportunities}
+                    analyzedOpportunities={[...visibleOpportunities]}
                   />
                 ) : null}
               </article>
@@ -295,7 +295,7 @@ export default function AuthorProductSeoQueryStep({
         publicationClass={publicationClass}
         activeReservationCount={activeCount}
         releasedReservationIds={releasedReservationIds}
-        analyzedOpportunities={visibleOpportunities}
+        analyzedOpportunities={[...visibleOpportunities]}
       />
 
       <div className="flex justify-center pt-1">
