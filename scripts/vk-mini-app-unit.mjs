@@ -267,7 +267,12 @@ const appreciationUi = readFileSync(join(process.cwd(), "src/components/vk/VkAut
 assert.match(footer, /getVkDiscoveryFooterLinks\(\)/);
 assert.match(footer, /getVkLegalFooterLinks\(\)/);
 assert.match(footer, /VK_PUBLIC_CONTACT_EMAIL/);
-assert.match(footer, /openVkGuestExternalUrl\(item\.url\)/);
+assert.match(footer, /activateVkPublicFooterClick\(event, item\.url\)/);
+assert.match(footer, /href=\{item\.url\}/);
+assert.match(footer, /target="_blank"/);
+assert.match(footer, /rel="noopener noreferrer"/);
+assert.match(footer, /mailto:\$\{VK_PUBLIC_CONTACT_EMAIL\}/);
+assert.doesNotMatch(footer, /<button|openVkGuestExternalUrl|activateVkAuthorsLandingClick/);
 assert.match(footer, /data-vk-profile-legal/);
 assert.match(footer, /data-vk-product-legal/);
 assert.match(footer, /variant === "product" \? \[\] : getVkDiscoveryFooterLinks\(\)/);

@@ -2,44 +2,25 @@ import {
   isMiniAppAuthorsLandingUrl,
   miniAppAuthorsLandingUrl,
 } from "@/lib/mini-app/home-public-links";
-import { openVkGuestExternalUrl } from "@/lib/vk/guest-links";
+import {
+  activateVkPublicAnchorClick,
+  detectVkPublicAnchorClient,
+  type VkPublicAnchorClickEnvironment,
+  type VkPublicAnchorClickEvent,
+  type VkPublicAnchorClient,
+} from "@/lib/vk/public-anchor-click";
 
-export type VkAuthorsLandingClickEvent = {
-  preventDefault: () => void;
-};
+export type VkAuthorsLandingClickEvent = VkPublicAnchorClickEvent;
 
-export type VkAuthorsLandingClient = "mobile" | "desktop";
+export type VkAuthorsLandingClient = VkPublicAnchorClient;
 
-type VkAuthorsLandingView = {
-  AndroidBridge?: unknown;
-  webkit?: { messageHandlers?: { VKWebAppClose?: unknown } };
-  ReactNativeWebView?: { postMessage?: unknown };
-  location?: { search?: string };
-};
+export type VkAuthorsLandingClickEnvironment = VkPublicAnchorClickEnvironment;
 
-export type VkAuthorsLandingClickEnvironment = {
-  client?: VkAuthorsLandingClient;
-  view?: VkAuthorsLandingView | null;
-  openDesktop?: (url: string) => boolean;
-};
-
-/**
- * Mobile VK keeps the real HTTPS anchor. Desktop may use VK Bridge, and
- * cancels the click only when that call accepts the navigation. A sync
- * failure leaves the anchor. Async bridge failure still falls back inside
- * openVkExternalHttps when the desktop path was the one that accepted.
- */
+/** @see detectVkPublicAnchorClient */
 export function detectVkAuthorsLandingClient(
-  view: VkAuthorsLandingView | null | undefined,
+  view: Parameters<typeof detectVkPublicAnchorClient>[0],
 ): VkAuthorsLandingClient {
-  if (!view) return "mobile";
-  if (view.AndroidBridge) return "mobile";
-  if (view.webkit?.messageHandlers?.VKWebAppClose) return "mobile";
-  if (typeof view.ReactNativeWebView?.postMessage === "function") return "mobile";
-
-  const platform = new URLSearchParams(view.location?.search ?? "").get("vk_platform") ?? "";
-  if (platform.startsWith("desktop")) return "desktop";
-  return "mobile";
+  return detectVkPublicAnchorClient(view);
 }
 
 /** VK guest slider: only slide 07 opens the canonical authors landing. */
@@ -67,35 +48,11 @@ export function onVkGuestSlideAnchorClick(
   return activateVkAuthorsLandingClick(event, url, environment);
 }
 
+/** Authors-landing allowlist over the shared VK public anchor contract. */
 export function activateVkAuthorsLandingClick(
   event: VkAuthorsLandingClickEvent,
   url: string,
   environment?: VkAuthorsLandingClickEnvironment,
 ): "blocked" | "bridge" | "native" {
-  if (!isMiniAppAuthorsLandingUrl(url)) {
-    event.preventDefault();
-    return "blocked";
-  }
-
-  const client =
-    environment?.client ??
-    detectVkAuthorsLandingClient(
-      environment && "view" in environment
-        ? environment.view
-        : typeof window !== "undefined"
-          ? (window as VkAuthorsLandingView)
-          : null,
-    );
-
-  if (client !== "desktop") {
-    return "native";
-  }
-
-  const openDesktop = environment?.openDesktop ?? openVkGuestExternalUrl;
-  if (!openDesktop(url)) {
-    return "native";
-  }
-
-  event.preventDefault();
-  return "bridge";
+  return activateVkPublicAnchorClick(event, url, isMiniAppAuthorsLandingUrl, environment);
 }

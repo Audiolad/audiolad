@@ -36,11 +36,18 @@ import {
   detectVkAuthorsLandingClient,
 } from "../src/lib/vk/authors-landing-click.ts";
 import {
+  getVkDiscoveryFooterLinks,
+  getVkLegalFooterLinks,
   isVkGuestExternalUrl,
+  isVkPublicFooterUrl,
   openVkGuestExternalUrl,
   VK_AUTHORS_LANDING_URL,
+  VK_GUEST_LOGIN_URL,
   VK_PUBLIC_CONTACT_EMAIL,
 } from "../src/lib/vk/guest-links.ts";
+import {
+  activateVkPublicFooterClick,
+} from "../src/lib/vk/public-anchor-click.ts";
 import { buildVkFrameAncestorsPolicy } from "../src/lib/vk/launch-target.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -139,7 +146,20 @@ assert.match(banner, /touchAction: "manipulation"/);
 assert.doesNotMatch(banner, /preventDefault|\/become-author|next\/link/);
 assert.match(vkClosing, /anchorClick=\{activateVkAuthorsLandingClick\}/);
 assert.doesNotMatch(maxClosing, /anchorClick|activateVkAuthorsLandingClick/);
-assert.doesNotMatch(vkFooter, /<a[\s>]|activateVkAuthorsLandingClick/);
+assert.match(vkFooter, /<a[\s>]/);
+assert.match(vkFooter, /activateVkPublicFooterClick\(event, item\.url\)/);
+assert.match(vkFooter, /href=\{item\.url\}/);
+assert.match(vkFooter, /target="_blank"/);
+assert.match(vkFooter, /rel="noopener noreferrer"/);
+assert.match(vkFooter, /touchAction: "manipulation"/);
+assert.match(vkFooter, /mailto:\$\{VK_PUBLIC_CONTACT_EMAIL\}/);
+assert.match(vkFooter, /isVkPublicFooterUrl\(item\.url\)/);
+assert.doesNotMatch(vkFooter, /<button|activateVkAuthorsLandingClick|openVkGuestExternalUrl/);
+const vkFooterEmail = vkFooter.slice(vkFooter.indexOf("Контакт для связи"));
+assert.match(vkFooterEmail, /mailto:/);
+assert.doesNotMatch(vkFooterEmail, /activateVkPublicFooterClick|openVkGuestExternalUrl|preventDefault|vkBridge|target=/);
+assert.doesNotMatch(maxFooter, /mailto:|activateVkPublicFooterClick|<a[\s>]/);
+assert.doesNotMatch(productFooter, /mailto:|activateVkPublicFooterClick|<a[\s>]/);
 assert.doesNotMatch(maxFooter, /<a[\s>]/);
 assert.match(links, /pathname === "\/become-author"/);
 assert.doesNotMatch(`${maxClosing}\n${vkClosing}\n${maxFooter}\n${banner}`, /\/become-author/);
@@ -150,7 +170,8 @@ assert.doesNotMatch(productDetail, /MaxHomeClosing|VkPublicFooter|MiniAppBecomeA
 assert.match(vkFooter, /data-vk-profile-legal/);
 assert.match(vkFooter, /data-vk-product-legal/);
 assert.match(vkFooter, /data-vk-home-legal/);
-assert.match(vkFooter, /openVkGuestExternalUrl\(item\.url\)/);
+assert.match(vkFooter, /activateVkPublicFooterClick/);
+assert.match(read("src/lib/vk/public-anchor-click.ts"), /openVkGuestExternalUrl/);
 assert.match(maxShell, /MAX_SHELL_CONTENT_BOTTOM_PADDING/);
 assert.match(maxShell, /<MaxBottomNav/);
 assert.match(vkShell, /MAX_SHELL_CONTENT_BOTTOM_PADDING/);
@@ -218,8 +239,15 @@ function assertHomeClosing(markup, footerMarker, anchorMode) {
     assert.match(bannerHtml, /rel="noopener noreferrer"/);
     assert.match(bannerHtml, /touch-action:manipulation/);
     assert.doesNotMatch(bannerHtml, /<button/);
-    assert.doesNotMatch(footerHtml, /<a[\s>]/);
-    assert.match(footerHtml, /<button/);
+    assert.doesNotMatch(footerHtml, /<button/);
+    for (const item of [...discovery, ...legal]) {
+      assert.ok(footerHtml.includes(`href="${item.url}"`), item.url);
+    }
+    assert.ok(footerHtml.includes('href="mailto:1@audiolad.ru"'));
+    assert.match(footerHtml, /target="_blank"/);
+    assert.match(footerHtml, /rel="noopener noreferrer"/);
+    assert.match(footerHtml, /touch-action:manipulation/);
+    assert.doesNotMatch(footerHtml, /become-author|\/articles|javascript:/);
   } else {
     assert.doesNotMatch(body, /<a[\s>]|href=/);
     assert.match(bannerHtml, /<button/);
@@ -268,6 +296,61 @@ assert.match(productVkFooter, /data-vk-product-legal/);
 assert.ok(productVkFooter.includes("Публичная оферта"));
 assert.ok(productVkFooter.includes("Политика обработки персональных данных"));
 assert.doesNotMatch(productVkFooter, /О платформе|data-vk-home-legal|Статьи/);
+
+function footerHrefs(markup) {
+  return [...markup.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
+}
+
+function assertVkFooterAnchors(markup, items) {
+  assert.doesNotMatch(markup, /<button/);
+  const webUrls = items.map((item) => item.url);
+  assert.deepEqual(footerHrefs(markup), [...webUrls, "mailto:1@audiolad.ru"]);
+  for (const url of webUrls) {
+    const href = `href="${url}"`;
+    const at = markup.indexOf(href);
+    assert.ok(at >= 0, url);
+    const tag = markup.slice(markup.lastIndexOf("<", at), markup.indexOf(">", at) + 1);
+    assert.match(tag, /^<a\b/);
+    assert.match(tag, /target="_blank"/);
+    assert.match(tag, /rel="noopener noreferrer"/);
+    assert.match(tag, /data-vk-public-footer-link=""/);
+    assert.match(tag, /touch-action:manipulation/);
+    assert.match(url, /^https:\/\/audiolad\.ru\//);
+  }
+  const mailAt = markup.indexOf('href="mailto:1@audiolad.ru"');
+  assert.ok(mailAt >= 0);
+  const mailTag = markup.slice(markup.lastIndexOf("<", mailAt), markup.indexOf(">", mailAt) + 1);
+  assert.match(mailTag, /^<a\b/);
+  assert.doesNotMatch(mailTag, /target=|data-vk-public-footer-link/);
+  assert.equal(markup.match(/data-vk-public-footer-link=/g)?.length, items.length);
+  assert.doesNotMatch(markup, /become-author|\/articles|javascript:/);
+}
+
+const homeFooter = renderToStaticMarkup(createElement(VkPublicFooter, { variant: "home" }));
+assert.match(homeFooter, /data-vk-home-legal/);
+assertVkFooterAnchors(homeFooter, [...discovery, ...legal]);
+assertVkFooterAnchors(profileFooter, [...discovery, ...legal]);
+assertVkFooterAnchors(productVkFooter, legal);
+assert.deepEqual(
+  getVkDiscoveryFooterLinks().map((item) => item.url),
+  discovery.map((item) => item.url),
+);
+assert.deepEqual(
+  getVkLegalFooterLinks().map((item) => item.url),
+  legal.map((item) => item.url),
+);
+for (const item of [...getVkDiscoveryFooterLinks(), ...getVkLegalFooterLinks()]) {
+  assert.equal(isVkPublicFooterUrl(item.url), true, item.url);
+  assert.equal(isVkGuestExternalUrl(item.url), true, item.url);
+}
+assert.equal(isVkPublicFooterUrl(LANDING_URL), false);
+assert.equal(isVkPublicFooterUrl(VK_GUEST_LOGIN_URL), false);
+assert.equal(isVkPublicFooterUrl(BECOME_AUTHOR_URL), false);
+assert.equal(isVkPublicFooterUrl("https://audiolad.ru/articles"), false);
+assert.equal(isVkPublicFooterUrl("https://evil.example/offer"), false);
+assert.equal(isVkPublicFooterUrl("http://audiolad.ru/offer"), false);
+assert.equal(isVkPublicFooterUrl("mailto:1@audiolad.ru"), false);
+assert.equal(isVkGuestExternalUrl(VK_GUEST_LOGIN_URL), true);
 
 assert.equal(openMaxHomeAuthorsLanding(LANDING_URL), false);
 assert.equal(openMaxHomeAuthorsLanding(BECOME_AUTHOR_URL), false);
@@ -504,6 +587,167 @@ assert.equal(
 assert.equal(desktopAccepted.prevented, true);
 assert.equal(acceptedUrl, LANDING_URL);
 assert.equal(acceptedUrl.includes("become-author"), false);
+
+const OFFER_URL = "https://audiolad.ru/offer";
+const ABOUT_URL = "https://audiolad.ru/about";
+
+const mobileFooterClick = clickEvent();
+assert.equal(
+  activateVkPublicFooterClick(mobileFooterClick, OFFER_URL, {
+    client: "mobile",
+    openDesktop() {
+      throw new Error("mobile tap must not depend on the bridge callback");
+    },
+  }),
+  "native",
+);
+assert.equal(mobileFooterClick.prevented, false);
+
+const mobileFooterViewClick = clickEvent();
+assert.equal(
+  activateVkPublicFooterClick(mobileFooterViewClick, ABOUT_URL, {
+    view: { location: { search: "?vk_platform=mobile_iphone" }, AndroidBridge: {} },
+    openDesktop() {
+      throw new Error("mobile webview must keep the native footer anchor");
+    },
+  }),
+  "native",
+);
+assert.equal(mobileFooterViewClick.prevented, false);
+
+const desktopFooterRejected = clickEvent();
+assert.equal(
+  activateVkPublicFooterClick(desktopFooterRejected, OFFER_URL, {
+    client: "desktop",
+    openDesktop() {
+      return false;
+    },
+  }),
+  "native",
+);
+assert.equal(desktopFooterRejected.prevented, false);
+
+const desktopFooterAccepted = clickEvent();
+let footerAcceptedUrl = "";
+assert.equal(
+  activateVkPublicFooterClick(desktopFooterAccepted, OFFER_URL, {
+    client: "desktop",
+    openDesktop(url) {
+      footerAcceptedUrl = url;
+      return true;
+    },
+  }),
+  "bridge",
+);
+assert.equal(desktopFooterAccepted.prevented, true);
+assert.equal(footerAcceptedUrl, OFFER_URL);
+
+for (const unsafeUrl of [
+  "https://evil.example/offer",
+  "http://audiolad.ru/offer",
+  BECOME_AUTHOR_URL,
+  "https://audiolad.ru/articles",
+  "javascript:alert(1)",
+  "mailto:1@audiolad.ru",
+  VK_GUEST_LOGIN_URL,
+  `${OFFER_URL}?next=/admin`,
+  LANDING_URL,
+]) {
+  const unsafeClick = clickEvent();
+  assert.equal(
+    activateVkPublicFooterClick(unsafeClick, unsafeUrl, {
+      client: "desktop",
+      openDesktop() {
+        throw new Error(`non-allowlisted footer URL must not reach the bridge: ${unsafeUrl}`);
+      },
+    }),
+    "blocked",
+    unsafeUrl,
+  );
+  assert.equal(unsafeClick.prevented, true, unsafeUrl);
+}
+
+const footerWindow = globalThis.window;
+try {
+  const opened = [];
+  const sent = [];
+  globalThis.window = {
+    open(url, target, features) {
+      opened.push({ url, target, features });
+      return {};
+    },
+    vkBridge: {
+      isEmbedded() {
+        return true;
+      },
+      send(method, params) {
+        sent.push({ method, params });
+        return { ok: true };
+      },
+    },
+  };
+  const bridgeClick = clickEvent();
+  assert.equal(
+    activateVkPublicFooterClick(bridgeClick, OFFER_URL, { client: "desktop" }),
+    "bridge",
+  );
+  assert.equal(bridgeClick.prevented, true);
+  assert.deepEqual(sent, [{
+    method: VK_BRIDGE_OPEN_LINK_METHOD,
+    params: { url: OFFER_URL },
+  }]);
+  assert.equal(opened.length, 0);
+
+  globalThis.window.vkBridge.send = () => {
+    throw new Error("sync bridge failure");
+  };
+  globalThis.window.open = () => {
+    throw new Error("popup blocked");
+  };
+  const syncFailure = clickEvent();
+  assert.equal(
+    activateVkPublicFooterClick(syncFailure, "https://audiolad.ru/privacy", { client: "desktop" }),
+    "native",
+  );
+  assert.equal(syncFailure.prevented, false);
+
+  delete globalThis.window.vkBridge;
+  const unsupported = clickEvent();
+  assert.equal(
+    activateVkPublicFooterClick(unsupported, "https://audiolad.ru/help", { client: "desktop" }),
+    "native",
+  );
+  assert.equal(unsupported.prevented, false);
+
+  let mobileSends = 0;
+  globalThis.window.vkBridge = {
+    isEmbedded() {
+      return true;
+    },
+    send() {
+      mobileSends += 1;
+      return { ok: true };
+    },
+  };
+  const embeddedMobile = clickEvent();
+  assert.equal(
+    activateVkPublicFooterClick(embeddedMobile, ABOUT_URL, {
+      client: "mobile",
+      openDesktop() {
+        throw new Error("mobile tap must not depend on the bridge callback");
+      },
+    }),
+    "native",
+  );
+  assert.equal(embeddedMobile.prevented, false);
+  assert.equal(mobileSends, 0);
+} finally {
+  if (footerWindow === undefined) {
+    delete globalThis.window;
+  } else {
+    globalThis.window = footerWindow;
+  }
+}
 
 const slider = read("src/components/max/MaxGuestHomeSlider.tsx");
 assert.ok(home.indexOf("<MaxGuestHomeSlider") < home.indexOf("{closing"));

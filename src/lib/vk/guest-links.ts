@@ -47,16 +47,42 @@ export function getVkLegalFooterLinks(): VkFooterLink[] {
   return toFooterLinks(LEGAL_LINKS);
 }
 
-const VK_GUEST_EXTERNAL_URLS = new Set<string>([
-  VK_GUEST_LOGIN_URL,
-  VK_GUEST_SIGNUP_URL,
-  ...(VK_AUTHORS_LANDING_URL ? [VK_AUTHORS_LANDING_URL] : []),
+const VK_PUBLIC_FOOTER_URLS = new Set<string>([
   ...getVkDiscoveryFooterLinks().map((item) => item.url),
   ...getVkLegalFooterLinks().map((item) => item.url),
 ]);
 
+const VK_GUEST_EXTERNAL_URLS = new Set<string>([
+  VK_GUEST_LOGIN_URL,
+  VK_GUEST_SIGNUP_URL,
+  ...(VK_AUTHORS_LANDING_URL ? [VK_AUTHORS_LANDING_URL] : []),
+  ...VK_PUBLIC_FOOTER_URLS,
+]);
+
 export function isVkGuestExternalUrl(url: string): boolean {
   return VK_GUEST_EXTERNAL_URLS.has(url);
+}
+
+/**
+ * Exact canonical footer pages from getVkDiscoveryFooterLinks and
+ * getVkLegalFooterLinks. Login, signup, and the authors landing are not
+ * footer links.
+ */
+export function isVkPublicFooterUrl(url: string): boolean {
+  if (!VK_PUBLIC_FOOTER_URLS.has(url)) return false;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.origin === PRODUCTION_APP_ORIGIN &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Opens one allowlisted Audiolad page via VK Bridge, or a normal browser tab. */
