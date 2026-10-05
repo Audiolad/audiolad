@@ -63,7 +63,7 @@ const formSource = readFileSync(
   "utf8",
 );
 
-assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
+assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 1);
 
 {
   const ready = stageAll([{ id: "a", kind: "legacy" }]);
@@ -79,8 +79,12 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
     { id: "c", kind: "master" },
   ]);
   const started = enqueueReadyMusicUploads(ready, ["a", "b", "c"]);
-  assert.equal(started.launchIds.length, 3);
-  assert.equal(musicUploadActiveCount(started.snapshot), 3);
+  assert.deepEqual(started.launchIds, ["a"]);
+  assert.equal(musicUploadActiveCount(started.snapshot), 1);
+  assert.equal(
+    started.snapshot.entries.filter((entry) => entry.phase === "queued").length,
+    2,
+  );
   assert.deepEqual(
     started.snapshot.entries.map((entry) => entry.kind),
     ["master", "legacy", "master"],
@@ -99,13 +103,13 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
   );
   snapshot = step.snapshot;
   const seen = new Set(step.launchIds);
-  assert.equal(musicUploadActiveCount(snapshot), 3);
+  assert.equal(musicUploadActiveCount(snapshot), 1);
   while (snapshot.entries.some((entry) => entry.phase === "queued" || entry.phase === "uploading")) {
     const active = snapshot.entries.find((entry) => entry.phase === "uploading");
     assert.ok(active);
     step = finishMusicUpload(snapshot, active.audioId, active.generation);
     snapshot = step.snapshot;
-    assert.ok(musicUploadActiveCount(snapshot) <= 3);
+    assert.ok(musicUploadActiveCount(snapshot) <= 1);
     for (const id of step.launchIds) {
       assert.equal(seen.has(id), false);
       seen.add(id);
@@ -125,8 +129,15 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
   assert.equal(step.snapshot.entries.find((entry) => entry.audioId === "a")?.phase, "error");
   assert.equal(step.snapshot.entries.find((entry) => entry.audioId === "b")?.phase, "uploading");
   const retried = retryMusicUpload(step.snapshot, "a");
-  assert.equal(retried.launchIds.includes("b"), false);
-  assert.deepEqual(retried.launchIds, ["a"]);
+  // b still occupies the single slot; a waits queued until b finishes.
+  assert.deepEqual(retried.launchIds, []);
+  assert.equal(retried.snapshot.entries.find((entry) => entry.audioId === "a")?.phase, "queued");
+  const afterB = finishMusicUpload(
+    retried.snapshot,
+    "b",
+    retried.snapshot.entries.find((entry) => entry.audioId === "b")!.generation,
+  );
+  assert.deepEqual(afterB.launchIds, ["a"]);
 }
 
 {
@@ -137,7 +148,7 @@ assert.equal(MAX_CONCURRENT_MUSIC_UPLOADS, 3);
   const first = enqueueReadyMusicUploads(ready, ["a", "b"]);
   const second = enqueueReadyMusicUploads(first.snapshot, ["a", "b"]);
   assert.deepEqual(second.launchIds, []);
-  assert.equal(musicUploadActiveCount(second.snapshot), 2);
+  assert.equal(musicUploadActiveCount(second.snapshot), 1);
 }
 
 {

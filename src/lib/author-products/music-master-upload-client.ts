@@ -3,7 +3,11 @@ import {
   MUSIC_MASTER_TOO_LARGE_MESSAGE,
   validateMusicMasterFileClient,
 } from "@/lib/author-products/music-master-upload-contract";
-import { fileForSignedAuthorAudioUpload } from "@/lib/author-products/signed-upload-client";
+import {
+  classifyAuthorSignedUploadError,
+  fileForSignedAuthorAudioUpload,
+  type AuthorSignedUploadErrorReport,
+} from "@/lib/author-products/signed-upload-client";
 import { createClient } from "@/lib/supabase/client";
 
 type SignedUpload = { path: string; token: string };
@@ -79,6 +83,7 @@ async function abandon(input: {
   audioId: string;
   assetId: string;
   uploadPath: string;
+  storageError?: AuthorSignedUploadErrorReport;
 }) {
   try {
     await fetch(
@@ -89,6 +94,7 @@ async function abandon(input: {
         body: JSON.stringify({
           asset_id: input.assetId,
           upload_path: input.uploadPath,
+          ...(input.storageError ? { storageError: input.storageError } : {}),
         }),
       },
     );
@@ -148,8 +154,21 @@ export async function uploadMusicMasterDirect(input: {
         { contentType: "audio/wav", upsert: false },
       );
     if (uploadError) {
-      await abandon({ practiceId: input.practiceId, audioId: input.audioId, assetId: started.asset_id, uploadPath: started.upload_path });
-      return { ok: false, error: "upload_failed", status: 502 };
+      const storageError = classifyAuthorSignedUploadError(uploadError);
+      await abandon({
+        practiceId: input.practiceId,
+        audioId: input.audioId,
+        assetId: started.asset_id,
+        uploadPath: started.upload_path,
+        storageError,
+      });
+      return {
+        ok: false,
+        error: storageError.code === "upload_token_expired"
+          ? "upload_token_expired"
+          : "upload_failed",
+        status: 502,
+      };
     }
 
     const finalized = await fetch(

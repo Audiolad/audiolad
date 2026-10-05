@@ -40,6 +40,10 @@ export function getAudioUploadErrorMessage(
       return "Загрузка аудио не завершена. Попробуйте ещё раз.";
     case "stale_music_upload":
       return "Не удалось загрузить аудио. Попробуйте ещё раз.";
+    case "upload_token_expired":
+      return "Загрузка заняла слишком много времени. Попробуйте ещё раз — лучше по одному треку.";
+    case "upload_failed":
+      return "Не удалось загрузить аудио в хранилище. Попробуйте ещё раз.";
     case "invalid_audio_duration":
       return "Не удалось определить длительность аудио. Проверьте файл и попробуйте снова.";
     case "PRODUCT_CONTENT_LOCKED_AFTER_SALE":
