@@ -180,7 +180,9 @@ function teardownItem(items: Item[], assets: Asset[], jobs: Job[], itemId: strin
 }
 
 {
-  const snapshot = enqueueReadyMusicUploads(
+  // With MAX_CONCURRENT_MUSIC_UPLOADS=1 only the first staged id uploads.
+  // Finish "ok" first so "bad" becomes uploading, then mark it failed.
+  let snapshot = enqueueReadyMusicUploads(
     stageMusicFile(
       stageMusicFile(emptyMusicQueue(), "ok", "master", "ok.wav").snapshot,
       "bad",
@@ -189,15 +191,17 @@ function teardownItem(items: Item[], assets: Asset[], jobs: Job[], itemId: strin
     ).snapshot,
     ["ok", "bad"],
   ).snapshot;
+  const ok = snapshot.entries.find((entry) => entry.audioId === "ok")!;
+  snapshot = finishMusicUpload(snapshot, "ok", ok.generation).snapshot;
   const bad = snapshot.entries.find((entry) => entry.audioId === "bad")!;
+  assert.equal(bad.phase, "uploading");
   const failed = finishMusicUpload(snapshot, "bad", bad.generation, "Не удалось загрузить");
   assert.equal(failed.snapshot.entries.find((entry) => entry.audioId === "bad")?.phase, "error");
-  assert.equal(failed.snapshot.entries.some((entry) => entry.audioId === "ok"), true);
+  assert.equal(failed.snapshot.entries.some((entry) => entry.audioId === "ok"), false);
   const retried = retryMusicUpload(failed.snapshot, "bad");
   assert.notEqual(retried.snapshot.entries.find((entry) => entry.audioId === "bad")?.phase, "error");
   const removed = dropMusicUpload(retried.snapshot, "bad");
   assert.equal(removed.snapshot.entries.some((entry) => entry.audioId === "bad"), false);
-  assert.equal(removed.snapshot.entries.some((entry) => entry.audioId === "ok"), true);
 }
 
 assert.match(deleteRoute, /teardownMusicTrackDelivery/);
