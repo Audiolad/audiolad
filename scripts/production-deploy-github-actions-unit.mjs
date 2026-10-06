@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -36,6 +37,10 @@ const diskAuditPath = join(
 const diskCleanupPath = join(
   repoRoot,
   "deploy/scripts/audiolad-disk-storage-cleanup.sh",
+);
+const diskSpaceRecoverPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-disk-space-recover.sh",
 );
 const studioDupAssetDiagPath = join(
   repoRoot,
@@ -174,6 +179,7 @@ function main() {
   assert.ok(jobs.studio_worker_recover, "job studio_worker_recover must exist");
   assert.ok(jobs.disk_storage_audit, "job disk_storage_audit must exist");
   assert.ok(jobs.disk_storage_cleanup, "job disk_storage_cleanup must exist");
+  assert.ok(jobs.disk_space_recover, "job disk_space_recover must exist");
   assert.ok(jobs.studio_duplicate_asset_diag, "job studio_duplicate_asset_diag must exist");
   assert.ok(jobs.course_upgrade_diag, "job course_upgrade_diag must exist");
   assert.equal(jobs.deploy.environment, "production");
@@ -181,6 +187,7 @@ function main() {
   assert.equal(jobs.studio_worker_recover.environment, "production");
   assert.equal(jobs.disk_storage_audit.environment, "production");
   assert.equal(jobs.disk_storage_cleanup.environment, "production");
+  assert.equal(jobs.disk_space_recover.environment, "production");
   assert.equal(jobs.studio_duplicate_asset_diag.environment, "production");
   assert.equal(jobs.course_upgrade_diag.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
@@ -188,12 +195,14 @@ function main() {
   assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_audit["runs-on"], "ubuntu-latest");
   assert.equal(jobs.disk_storage_cleanup["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.disk_space_recover["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_duplicate_asset_diag["runs-on"], "ubuntu-latest");
   assert.equal(jobs.course_upgrade_diag["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_AUDIT'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_CLEANUP'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_SPACE_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_DUPLICATE_ASSET_DIAG'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_COURSE_UPGRADE_DIAG'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
@@ -259,6 +268,10 @@ function main() {
   assert.ok(
     confirm.options.includes("OPS_DISK_STORAGE_CLEANUP"),
     "confirm options must include OPS_DISK_STORAGE_CLEANUP",
+  );
+  assert.ok(
+    confirm.options.includes("OPS_DISK_SPACE_RECOVER"),
+    "confirm options must include OPS_DISK_SPACE_RECOVER",
   );
   assert.ok(
     confirm.options.includes("OPS_STUDIO_DUPLICATE_ASSET_DIAG"),
@@ -356,6 +369,7 @@ function main() {
   const diagnoseStepOffset = workflowText.indexOf("name: Read-only reconcile diagnostics via SSH");
   const diskAuditStepOffset = workflowText.indexOf("name: Read-only disk/Storage audit via SSH");
   const diskCleanupStepOffset = workflowText.indexOf("name: One-shot allowlist disk/Storage cleanup via SSH");
+  const diskSpaceRecoverStepOffset = workflowText.indexOf("name: One-shot disk space recover via SSH");
   const dupAssetDiagStepOffset = workflowText.indexOf(
     "name: Read-only Studio duplicate asset diagnostic via SSH",
   );
@@ -384,6 +398,10 @@ function main() {
     "workflow must verify origin/main ancestry before SSH disk/Storage cleanup",
   );
   assert.ok(
+    diskSpaceRecoverStepOffset > workflowAncestorOffset,
+    "workflow must verify origin/main ancestry before SSH disk space recover",
+  );
+  assert.ok(
     dupAssetDiagStepOffset > workflowAncestorOffset,
     "workflow must verify origin/main ancestry before SSH Studio duplicate asset diagnostic",
   );
@@ -404,6 +422,9 @@ function main() {
   assertDiskStorageCleanup(workflowText, docsText);
   assertRemoteDiskCleanupScriptSyntax(workflowText);
   assertDiskCleanupHelper(workflowText);
+  assertDiskSpaceRecover(workflowText, docsText);
+  assertRemoteDiskSpaceRecoverScriptSyntax(workflowText);
+  assertDiskSpaceRecoverHelper(workflowText);
   assertStudioDuplicateAssetDiag(workflowText, docsText);
   assertRemoteStudioDupAssetDiagScriptSyntax(workflowText);
   assertStudioDupAssetDiagHelper(workflowText);
@@ -1173,6 +1194,7 @@ function assertDiskStorageAudit(workflowText, docsText) {
   assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_AUDIT/);
   assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(auditJob, /OPS_DISK_SPACE_RECOVER/);
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(auditJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.match(docsText, /OPS_DISK_STORAGE_AUDIT/);
@@ -1472,13 +1494,18 @@ function assertDiskStorageCleanup(workflowText, docsText) {
   }
 
   const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
+  const diskSpaceRecoverStart = workflowText.indexOf("name: Ops disk space recover");
   const deployStart = workflowText.indexOf("name: Deploy to production");
   const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
   const dupDiagStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
   assert.ok(cleanupStart >= 0 && deployStart > cleanupStart, "cleanup job must precede deploy job");
+  assert.ok(
+    diskSpaceRecoverStart > cleanupStart && dupDiagStart > diskSpaceRecoverStart,
+    "disk space recover job must sit between cleanup and dup-asset diag",
+  );
   assert.ok(dupDiagStart > cleanupStart && deployStart > dupDiagStart, "dup-asset diag job must sit between cleanup and deploy");
-  const cleanupJob = workflowText.slice(cleanupStart, dupDiagStart);
+  const cleanupJob = workflowText.slice(cleanupStart, diskSpaceRecoverStart);
   const auditJob = workflowText.slice(auditStart, cleanupStart);
   const recoverJob = workflowText.slice(recoverStart, auditStart);
   const diagnoseJob = workflowText.slice(
@@ -1516,6 +1543,11 @@ function assertDiskStorageCleanup(workflowText, docsText) {
   assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.doesNotMatch(auditJob, /OPS_DISK_STORAGE_CLEANUP/);
   assert.doesNotMatch(deployJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(diagnoseJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(recoverJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(auditJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(cleanupJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(deployJob, /OPS_DISK_SPACE_RECOVER/);
   assert.doesNotMatch(diagnoseJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
@@ -2108,6 +2140,426 @@ function assertDiskCleanupHelper(workflowText) {
   }
 }
 
+function extractRemoteDiskSpaceRecoverScript(workflowText) {
+  const start = workflowText.indexOf("<<'REMOTE_DISK_SPACE_RECOVER'\n");
+  const end = workflowText.indexOf("\n          REMOTE_DISK_SPACE_RECOVER\n", start);
+  assert.ok(start >= 0 && end > start, "disk space recover job must contain a REMOTE_DISK_SPACE_RECOVER heredoc");
+  return workflowText
+    .slice(start + "<<'REMOTE_DISK_SPACE_RECOVER'\n".length, end)
+    .split("\n")
+    .map((line) => line.replace(/^          /, ""))
+    .join("\n");
+}
+
+function assertDiskSpaceRecover(workflowText, docsText) {
+  const required = [
+    "OPS_DISK_SPACE_RECOVER",
+    "20260924-161850-35872951",
+    "/tmp/cursor-sandbox-cache",
+    "/tmp/node-compile-cache",
+    "36043301016",
+    "MIN_FREE_MB=3500",
+    "FREE_MB_BEFORE=",
+    "FREE_MB_AFTER=",
+    "FREED_MB=",
+    "CURRENT_RELEASE_INTACT=",
+    "PREVIOUS_RELEASE_INTACT=",
+    "RESULT=\"OK\"",
+    "NEEDS_MORE_SPACE",
+    "CUTOVER=\"NO\"",
+    "audiolad_deploy=NOT_INVOKED",
+    "MODE=\"disk_space_recover\"",
+    "confirm=OPS_DISK_SPACE_RECOVER",
+    "live_process_ref",
+    "path_is_symlink",
+    "equals_current",
+    "equals_previous",
+    "/tmp/audiolad-render-stage",
+    "/tmp/audiolad-timeline-ruler",
+  ];
+  for (const needle of required) {
+    assert.match(
+      workflowText,
+      new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      `disk space recover workflow must contain ${needle}`,
+    );
+  }
+
+  const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
+  const recoverStart = workflowText.indexOf("name: Ops disk space recover");
+  const dupDiagStart = workflowText.indexOf("name: Ops Studio duplicate asset diagnostic");
+  const deployStart = workflowText.indexOf("name: Deploy to production");
+  const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
+  const workerRecoverStart = workflowText.indexOf("name: Ops Studio worker recover");
+  assert.ok(recoverStart >= 0 && deployStart > recoverStart, "disk space recover job must precede deploy job");
+  assert.ok(
+    recoverStart > cleanupStart && dupDiagStart > recoverStart,
+    "disk space recover job must sit between cleanup and dup-asset diag",
+  );
+  const recoverJob = workflowText.slice(recoverStart, dupDiagStart);
+  const cleanupJob = workflowText.slice(cleanupStart, recoverStart);
+  const auditJob = workflowText.slice(auditStart, cleanupStart);
+  const workerRecoverJob = workflowText.slice(workerRecoverStart, auditStart);
+  const diagnoseJob = workflowText.slice(
+    workflowText.indexOf("name: Production read-only diagnostics"),
+    workerRecoverStart,
+  );
+  const deployJob = workflowText.slice(deployStart);
+  assert.doesNotMatch(
+    recoverJob,
+    /sudo -n \/usr\/local\/sbin\/audiolad-deploy/,
+    "disk space recover job must not invoke audiolad-deploy",
+  );
+  assert.doesNotMatch(recoverJob, /pm2 delete/, "disk space recover job must not restart PM2");
+  assert.doesNotMatch(recoverJob, /pm2 start/, "disk space recover job must not start PM2 apps");
+  assert.doesNotMatch(recoverJob, /pm2 (restart|flush|save)/, "disk space recover job must not mutate PM2");
+  const recoverCode = recoverJob
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(recoverCode, /\bdeploy\.sh\b/, "disk space recover job must not call deploy.sh");
+  assert.match(recoverCode, /\brm -rf --/, "disk space recover must rm -rf only after allowlist gates");
+  assert.doesNotMatch(recoverJob, /docker\s+(prune|rm|volume rm)/, "disk space recover must not prune docker");
+  assert.doesNotMatch(recoverJob, /\bnginx\s+-s\b/, "disk space recover must not signal nginx");
+  assert.doesNotMatch(recoverCode, /\b(pkill|killall|kill)\b/, "disk space recover must not kill processes");
+  assert.doesNotMatch(
+    recoverCode,
+    /\bsource\s+[^\n]*\.(env\.production|env\.local)/,
+    "disk space recover job must not source env files",
+  );
+  assert.doesNotMatch(
+    recoverJob,
+    /cat\s+[^\n]*\.(env\.production|env\.local)/,
+    "disk space recover job must not cat env files",
+  );
+  assert.doesNotMatch(recoverCode, /DELETE FROM/i, "disk space recover must not DELETE SQL");
+  assert.doesNotMatch(recoverCode, /\.remove\(/, "disk space recover must not remove storage objects");
+  assert.doesNotMatch(recoverJob, /\$\{\{\s*inputs\./, "disk space recover must not execute arbitrary user input");
+  assert.doesNotMatch(diagnoseJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(workerRecoverJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(auditJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(cleanupJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(deployJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(recoverJob, /OPS_DISK_STORAGE_CLEANUP/);
+  assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(recoverJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.match(docsText, /OPS_DISK_SPACE_RECOVER/);
+  assert.match(docsText, /audiolad-disk-space-recover\.sh/);
+  assert.match(docsText, /36043301016/);
+  assert.match(docsText, /20260924-161850-35872951/);
+  assert.match(docsText, /\/tmp\/cursor-sandbox-cache/);
+  assert.match(docsText, /\/tmp\/node-compile-cache/);
+}
+
+function assertRemoteDiskSpaceRecoverScriptSyntax(workflowText) {
+  const remote = extractRemoteDiskSpaceRecoverScript(workflowText);
+  const scriptPath = join(tmpdir(), `audiolad-disk-space-recover-remote-${process.pid}.sh`);
+  writeFileSync(scriptPath, remote);
+  const syntax = spawnSync("bash", ["-n", scriptPath], { encoding: "utf8" });
+  rmSync(scriptPath, { force: true });
+  assert.equal(syntax.status, 0, `remote disk space recover bash -n failed: ${syntax.stderr}`);
+}
+
+function writeDiskSpaceRecoverFixture(root, options = {}) {
+  const deployRoot = join(root, "deploy");
+  const releasesDir = join(deployRoot, "releases");
+  const releaseCurrent = "20260924-173407-8ed63959";
+  const releasePrevious = "20260924-172732-9a1f1f38";
+  const releaseCandidate = "20260924-161850-35872951";
+  const releaseOther = "20260924-150000-aaaaaaaa";
+  const cacheCursor = options.cacheCursor ?? join(root, "cursor-sandbox-cache");
+  const cacheNode = options.cacheNode ?? join(root, "node-compile-cache");
+  const procRoot = join(root, "proc");
+  const renderStage = join(root, "audiolad-render-stage");
+  const timelineRuler = join(root, "audiolad-timeline-ruler");
+
+  mkdirSync(join(releasesDir, releaseCurrent), { recursive: true });
+  mkdirSync(join(releasesDir, releasePrevious), { recursive: true });
+  mkdirSync(join(releasesDir, releaseCandidate), { recursive: true });
+  mkdirSync(join(releasesDir, releaseOther), { recursive: true });
+  writeFileSync(join(releasesDir, releaseCurrent, "keep.txt"), "current");
+  writeFileSync(join(releasesDir, releasePrevious, "keep.txt"), "previous");
+  writeFileSync(join(releasesDir, releaseCandidate, "gone.txt"), "old-release");
+  writeFileSync(join(releasesDir, releaseOther, "keep.txt"), "other");
+
+  const currentTarget = options.currentTarget ?? join(releasesDir, releaseCurrent);
+  const previousTarget = options.previousTarget ?? join(releasesDir, releasePrevious);
+  if (options.currentAsDir) {
+    mkdirSync(join(deployRoot, "current"), { recursive: true });
+  } else {
+    symlinkSync(currentTarget, join(deployRoot, "current"));
+  }
+  if (options.previousAsDir) {
+    mkdirSync(join(deployRoot, "previous"), { recursive: true });
+  } else {
+    symlinkSync(previousTarget, join(deployRoot, "previous"));
+  }
+
+  if (options.cursorAsSymlink) {
+    const real = join(root, "cursor-sandbox-cache-real");
+    mkdirSync(real, { recursive: true });
+    writeFileSync(join(real, "keep.txt"), "symlink-target");
+    symlinkSync(real, cacheCursor);
+  } else if (!options.skipCursor) {
+    mkdirSync(cacheCursor, { recursive: true });
+    writeFileSync(join(cacheCursor, "cache.bin"), "cursor-cache");
+  }
+
+  if (options.nodeAsSymlink) {
+    const real = join(root, "node-compile-cache-real");
+    mkdirSync(real, { recursive: true });
+    writeFileSync(join(real, "keep.txt"), "symlink-target");
+    symlinkSync(real, cacheNode);
+  } else if (!options.skipNode) {
+    mkdirSync(cacheNode, { recursive: true });
+    writeFileSync(join(cacheNode, "cache.bin"), "node-cache");
+  }
+
+  mkdirSync(renderStage, { recursive: true });
+  mkdirSync(timelineRuler, { recursive: true });
+  writeFileSync(join(renderStage, "keep.txt"), "render");
+  writeFileSync(join(timelineRuler, "keep.txt"), "ruler");
+
+  mkdirSync(procRoot, { recursive: true });
+  if (options.liveCursorRef) {
+    const pidDir = join(procRoot, "4242");
+    mkdirSync(join(pidDir, "fd"), { recursive: true });
+    symlinkSync(cacheCursor, join(pidDir, "cwd"));
+  }
+  if (options.liveNodeFdRef) {
+    const pidDir = join(procRoot, "4343");
+    mkdirSync(join(pidDir, "fd"), { recursive: true });
+    symlinkSync(join(cacheNode, "cache.bin"), join(pidDir, "fd", "3"));
+  }
+
+  return {
+    deployRoot,
+    cacheCursor,
+    cacheNode,
+    procRoot,
+    renderStage,
+    timelineRuler,
+    releaseCurrent,
+    releasePrevious,
+    releaseCandidate,
+    releaseOther,
+    candidatePath: join(releasesDir, releaseCandidate),
+    currentPath: join(releasesDir, releaseCurrent),
+    previousPath: join(releasesDir, releasePrevious),
+    otherPath: join(releasesDir, releaseOther),
+  };
+}
+
+function runDiskSpaceRecoverHelper(fixture, extraEnv = {}) {
+  return spawnSync("bash", [diskSpaceRecoverPath], {
+    encoding: "utf8",
+    timeout: 20000,
+    env: {
+      ...process.env,
+      AUDIOLAD_DISK_SPACE_RECOVER_TEST: "1",
+      DEPLOY_ROOT: fixture.deployRoot,
+      CACHE_CURSOR: fixture.cacheCursor,
+      CACHE_NODE: fixture.cacheNode,
+      PROC_ROOT: fixture.procRoot,
+      DF_AVAIL_KB_BEFORE: "1000000",
+      DF_AVAIL_KB_AFTER: "5000000",
+      ...extraEnv,
+    },
+  });
+}
+
+function runDiskSpaceRecoverViaStdin(scriptText, fixture, extraEnv = {}) {
+  return spawnSync("bash", ["-s"], {
+    encoding: "utf8",
+    timeout: 20000,
+    input: scriptText,
+    env: {
+      ...process.env,
+      AUDIOLAD_DISK_SPACE_RECOVER_TEST: "1",
+      DEPLOY_ROOT: fixture.deployRoot,
+      CACHE_CURSOR: fixture.cacheCursor,
+      CACHE_NODE: fixture.cacheNode,
+      PROC_ROOT: fixture.procRoot,
+      DF_AVAIL_KB_BEFORE: "1000000",
+      DF_AVAIL_KB_AFTER: "5000000",
+      ...extraEnv,
+    },
+  });
+}
+
+function assertProtectedRecoverPaths(fixture) {
+  assert.equal(existsSync(join(fixture.currentPath, "keep.txt")), true, "current release must stay");
+  assert.equal(existsSync(join(fixture.previousPath, "keep.txt")), true, "previous release must stay");
+  assert.equal(existsSync(join(fixture.otherPath, "keep.txt")), true, "non-allowlisted release must stay");
+  assert.equal(existsSync(join(fixture.renderStage, "keep.txt")), true, "render-stage fixture must stay");
+  assert.equal(existsSync(join(fixture.timelineRuler, "keep.txt")), true, "timeline-ruler fixture must stay");
+}
+
+function assertDiskSpaceRecoverHelper(workflowText) {
+  const helperText = readFileSync(diskSpaceRecoverPath, "utf8");
+  const syntax = spawnSync("bash", ["-n", diskSpaceRecoverPath], { encoding: "utf8" });
+  assert.equal(syntax.status, 0, `disk space recover helper bash -n failed: ${syntax.stderr}`);
+  assert.match(helperText, /OPS_DISK_SPACE_RECOVER/);
+  assert.match(helperText, /20260924-161850-35872951/);
+  assert.match(helperText, /\/tmp\/cursor-sandbox-cache/);
+  assert.match(helperText, /\/tmp\/node-compile-cache/);
+  assert.match(helperText, /MIN_FREE_MB=3500/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /pm2 delete/);
+  const helperCode = helperText
+    .split("\n")
+    .filter((line) => !/^\s*#/.test(line))
+    .join("\n");
+  assert.doesNotMatch(helperCode, /\bdeploy\.sh\b/);
+  assert.doesNotMatch(helperCode, /\b(pkill|killall|kill)\b/);
+  assert.doesNotMatch(helperCode, /\/tmp\/audiolad-render-stage[^\n]*rm/);
+  assert.doesNotMatch(helperCode, /\/tmp\/audiolad-timeline-ruler[^\n]*rm/);
+  chmodSync(diskSpaceRecoverPath, 0o755);
+
+  const remote = extractRemoteDiskSpaceRecoverScript(workflowText);
+  assert.equal(
+    helperText.replace(/\s+$/, ""),
+    remote.replace(/\s+$/, ""),
+    "workflow remote disk space recover script must match helper source",
+  );
+
+  const happyRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(happyRoot);
+    const result = runDiskSpaceRecoverHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `disk space recover helper failed: ${output}`);
+    assert.match(output, /confirm=OPS_DISK_SPACE_RECOVER/);
+    assert.match(output, /CUTOVER=NO/);
+    assert.match(output, /audiolad_deploy=NOT_INVOKED/);
+    assert.match(output, /MODE=disk_space_recover/);
+    assert.match(output, new RegExp(`ITEM path=${fixture.candidatePath} .* action=DELETED`));
+    assert.match(output, new RegExp(`ITEM path=${fixture.cacheCursor} .* action=DELETED`));
+    assert.match(output, new RegExp(`ITEM path=${fixture.cacheNode} .* action=DELETED`));
+    assert.match(output, /CURRENT_RELEASE_INTACT=YES/);
+    assert.match(output, /PREVIOUS_RELEASE_INTACT=YES/);
+    assert.match(output, /FREE_MB_BEFORE=976/);
+    assert.match(output, /FREE_MB_AFTER=4882/);
+    assert.match(output, /FREED_MB=3906/);
+    assert.match(output, /RESULT=OK/);
+    assert.equal(existsSync(fixture.candidatePath), false, "allowlisted old release must be deleted");
+    assert.equal(existsSync(fixture.cacheCursor), false, "cursor sandbox cache must be deleted");
+    assert.equal(existsSync(fixture.cacheNode), false, "node compile cache must be deleted");
+    assertProtectedRecoverPaths(fixture);
+  } finally {
+    rmSync(happyRoot, { recursive: true, force: true });
+  }
+
+  const currentRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-current-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(currentRoot, {
+      currentTarget: join(currentRoot, "deploy", "releases", "20260924-161850-35872951"),
+    });
+    const result = runDiskSpaceRecoverHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `current-protection run must exit 0: ${output}`);
+    assert.match(output, /validation=REFUSED action=SKIPPED reason=equals_current/);
+    assert.equal(existsSync(fixture.candidatePath), true, "current-equal candidate must not be deleted");
+    assertProtectedRecoverPaths(fixture);
+  } finally {
+    rmSync(currentRoot, { recursive: true, force: true });
+  }
+
+  const previousRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-previous-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(previousRoot, {
+      previousTarget: join(previousRoot, "deploy", "releases", "20260924-161850-35872951"),
+    });
+    const result = runDiskSpaceRecoverHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `previous-protection run must exit 0: ${output}`);
+    assert.match(output, /validation=REFUSED action=SKIPPED reason=equals_previous/);
+    assert.equal(existsSync(fixture.candidatePath), true, "previous-equal candidate must not be deleted");
+    assertProtectedRecoverPaths(fixture);
+  } finally {
+    rmSync(previousRoot, { recursive: true, force: true });
+  }
+
+  const unresolvedRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-unresolved-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(unresolvedRoot, { currentAsDir: true });
+    const result = runDiskSpaceRecoverHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `unresolved current must exit 0: ${output}`);
+    assert.match(output, /CURRENT_RESOLVE=FAILED/);
+    assert.match(output, /action=SKIPPED reason=current_or_previous_unresolved/);
+    assert.equal(existsSync(fixture.candidatePath), true, "unresolved current must skip release delete");
+  } finally {
+    rmSync(unresolvedRoot, { recursive: true, force: true });
+  }
+
+  const symlinkRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-symlink-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(symlinkRoot, { cursorAsSymlink: true });
+    const result = runDiskSpaceRecoverHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `symlink cache run must exit 0: ${output}`);
+    assert.match(output, new RegExp(`ITEM path=${fixture.cacheCursor} .* validation=REFUSED action=SKIPPED reason=path_is_symlink`));
+    assert.equal(lstatSync(fixture.cacheCursor).isSymbolicLink(), true, "cache symlink itself must remain");
+    assert.equal(
+      existsSync(join(symlinkRoot, "cursor-sandbox-cache-real", "keep.txt")),
+      true,
+      "cache symlink target must not be followed or deleted",
+    );
+  } finally {
+    rmSync(symlinkRoot, { recursive: true, force: true });
+  }
+
+  const liveRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-live-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(liveRoot, { liveCursorRef: true, liveNodeFdRef: true });
+    const result = runDiskSpaceRecoverHelper(fixture);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `live-ref run must exit 0: ${output}`);
+    assert.match(output, /action=SKIPPED reason=live_process_ref pid=4242 ref=cwd/);
+    assert.match(output, /action=SKIPPED reason=live_process_ref pid=4343 ref=fd\/3/);
+    assert.equal(existsSync(join(fixture.cacheCursor, "cache.bin")), true, "live cwd cache must be skipped");
+    assert.equal(existsSync(join(fixture.cacheNode, "cache.bin")), true, "live fd cache must be skipped");
+    assert.doesNotMatch(output, /\b(pkill|killall|kill)\b/);
+  } finally {
+    rmSync(liveRoot, { recursive: true, force: true });
+  }
+
+  const needsSpaceRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-needs-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(needsSpaceRoot);
+    const result = runDiskSpaceRecoverHelper(fixture, {
+      DF_AVAIL_KB_BEFORE: "600000",
+      DF_AVAIL_KB_AFTER: "2000000",
+    });
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    assert.equal(result.status, 0, `NEEDS_MORE_SPACE run must exit 0: ${output}`);
+    assert.match(output, /FREE_MB_BEFORE=585/);
+    assert.match(output, /FREE_MB_AFTER=1953/);
+    assert.match(output, /RESULT=NEEDS_MORE_SPACE/);
+    assert.equal(existsSync(fixture.candidatePath), false, "allowlisted release still deleted before space check");
+    assertProtectedRecoverPaths(fixture);
+  } finally {
+    rmSync(needsSpaceRoot, { recursive: true, force: true });
+  }
+
+  const remoteRoot = mkdtempSync(join(tmpdir(), "audiolad-disk-space-recover-remote-"));
+  try {
+    const fixture = writeDiskSpaceRecoverFixture(remoteRoot);
+    const remoteResult = runDiskSpaceRecoverViaStdin(remote, fixture);
+    const remoteOutput = `${remoteResult.stdout ?? ""}${remoteResult.stderr ?? ""}`;
+    assert.equal(remoteResult.status, 0, `workflow bash -s disk space recover failed: ${remoteOutput}`);
+    assert.match(remoteOutput, /confirm=OPS_DISK_SPACE_RECOVER/);
+    assert.match(remoteOutput, /RESULT=OK/);
+    assert.match(remoteOutput, /action=DELETED reason=allowlisted_old_release/);
+    assert.match(remoteOutput, /action=DELETED reason=reproducible_cache/);
+    assert.equal(existsSync(fixture.candidatePath), false);
+    assertProtectedRecoverPaths(fixture);
+  } finally {
+    rmSync(remoteRoot, { recursive: true, force: true });
+  }
+}
+
 function extractRemoteStudioDupAssetDiagScript(workflowText) {
   const start = workflowText.indexOf("<<'REMOTE_STUDIO_DUP_ASSET_DIAG'\n");
   const end = workflowText.indexOf("\n          REMOTE_STUDIO_DUP_ASSET_DIAG\n", start);
@@ -2176,6 +2628,7 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
   const courseUpgradeStart = workflowText.indexOf("name: Ops course upgrade diagnostic");
   const deployStart = workflowText.indexOf("name: Deploy to production");
   const cleanupStart = workflowText.indexOf("name: Ops disk/Storage cleanup");
+  const diskSpaceRecoverStart = workflowText.indexOf("name: Ops disk space recover");
   const auditStart = workflowText.indexOf("name: Ops disk/Storage audit");
   const recoverStart = workflowText.indexOf("name: Ops Studio worker recover");
   assert.ok(dupStart >= 0 && deployStart > dupStart, "dup-asset diag job must precede deploy job");
@@ -2184,7 +2637,8 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
     "course-upgrade diag job must sit between dup-asset diag and deploy",
   );
   const dupJob = workflowText.slice(dupStart, courseUpgradeStart);
-  const cleanupJob = workflowText.slice(cleanupStart, dupStart);
+  const cleanupJob = workflowText.slice(cleanupStart, diskSpaceRecoverStart);
+  const diskSpaceRecoverJob = workflowText.slice(diskSpaceRecoverStart, dupStart);
   const auditJob = workflowText.slice(auditStart, cleanupStart);
   const recoverJob = workflowText.slice(recoverStart, auditStart);
   const diagnoseJob = workflowText.slice(
@@ -2235,13 +2689,21 @@ function assertStudioDuplicateAssetDiag(workflowText, docsText) {
   assert.doesNotMatch(recoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(auditJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(cleanupJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
+  assert.doesNotMatch(diskSpaceRecoverJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(deployJob, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.doesNotMatch(diagnoseJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(recoverJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(auditJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(cleanupJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(diskSpaceRecoverJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(dupJob, /OPS_COURSE_UPGRADE_DIAG/);
   assert.doesNotMatch(deployJob, /OPS_COURSE_UPGRADE_DIAG/);
+  assert.doesNotMatch(diagnoseJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(recoverJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(auditJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(cleanupJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(dupJob, /OPS_DISK_SPACE_RECOVER/);
+  assert.doesNotMatch(deployJob, /OPS_DISK_SPACE_RECOVER/);
   assert.match(docsText, /OPS_STUDIO_DUPLICATE_ASSET_DIAG/);
   assert.match(docsText, /audiolad-studio-duplicate-asset-diag\.sh/);
 }
