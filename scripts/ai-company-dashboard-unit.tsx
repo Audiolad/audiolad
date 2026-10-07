@@ -4,6 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
 import {
+  AI_COMPANY_OPEN_ROWS_KEY,
+  AI_COMPANY_SCROLL_KEY,
+  parseOpenRows,
+  serializeOpenRows,
+  toggleOpenRow,
+} from "../src/lib/admin/ai-company-disclosure";
+import {
   ADMIN_NAV_ITEMS,
   getVisibleAdminNavItems,
 } from "../src/lib/admin/nav";
@@ -345,6 +352,9 @@ assert.match(markup, /data-state="unknown"/);
 assert.match(markup, /data-state="attention"/);
 assert.match(markup, /grid-cols-2/);
 assert.match(markup, /lg:grid-cols-2/);
+assert.match(markup, /data-compact-row=/);
+assert.match(markup, /aria-expanded="false"/);
+assert.doesNotMatch(markup, /lg:grid-cols-3/);
 assert.match(markup, /sm:flex-row/);
 const historyMarkup = markup.slice(markup.indexOf('data-section="history"'));
 assert.doesNotMatch(historyMarkup, /Табло после QA/);
@@ -794,7 +804,9 @@ assert.match(liveMarkup, /История блокировок/);
 assert.match(liveMarkup, /Историческая блокировка/);
 assert.doesNotMatch(liveMarkup.slice(0, liveMarkup.indexOf("История блокировок")), /Старый блокер уже снят/);
 assert.match(liveMarkup, /grid-cols-2/);
-assert.match(liveMarkup, /lg:grid-cols-3/);
+assert.match(liveMarkup, /lg:grid-cols-2/);
+assert.doesNotMatch(liveMarkup, /lg:grid-cols-3/);
+assert.match(liveMarkup, /data-compact-row=/);
 assert.match(liveMarkup, /period=week/);
 assert.doesNotMatch(liveMarkup, /api_key|must-not-leak|Bearer /);
 
@@ -1350,7 +1362,10 @@ assert.match(stageOf("Блок без владельца").stageBadge.detail ?? 
 const stageMarkup = renderToStaticMarkup(
   <AiCompanyDashboardView model={stageModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
 );
-assert.match(stageMarkup, /flex flex-wrap items-start justify-between/);
+assert.match(stageMarkup, /flex min-h-12 w-full max-w-full flex-wrap items-center/);
+assert.match(stageMarkup, /aria-expanded="false"/);
+assert.match(stageMarkup, /aria-controls="ai-company-panel-/);
+assert.doesNotMatch(stageMarkup, /<summary[^>]*>Подробности/);
 assert.doesNotMatch(stageMarkup, /<button[^>]*data-stage-badge/);
 for (const tone of ["stale", "queue", "working", "review", "release", "site", "done", "cancelled", "decision", "blocked"] as const) {
   const span = stageMarkup.match(new RegExp(`<span(?=[^>]*data-stage-badge="${tone}")[^>]*>`));
@@ -1364,7 +1379,8 @@ assert.ok(staleSpan);
 assert.match(staleSpan[0], /Нет свежих данных/);
 assert.doesNotMatch(staleSpan[0], /executive_dispatched/);
 const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="queue"'));
-assert.match(todayMarkup, /Подробности/);
+assert.doesNotMatch(todayMarkup, /<summary[^>]*>Подробности/);
+assert.match(todayMarkup, /aria-expanded="false"/);
 assert.match(todayMarkup, /Идентификатор задачи/);
 assert.match(todayMarkup, /Технический статус/);
 assert.match(todayMarkup, /Текущий этап/);
@@ -1373,8 +1389,10 @@ assert.match(queueMarkup, /Технический статус/);
 assert.match(queueMarkup, /executive_dispatched \(технический статус\)/);
 assert.match(queueMarkup, /Текущий этап/);
 const freshAt = queueMarkup.indexOf("Свежая отправка");
-const freshHeading = queueMarkup.slice(freshAt, queueMarkup.indexOf("Подробности", freshAt));
-assert.doesNotMatch(freshHeading, /executive_dispatched/);
+const freshButton = queueMarkup.slice(freshAt, queueMarkup.indexOf("</button>", freshAt));
+assert.doesNotMatch(freshButton, /executive_dispatched/);
+assert.doesNotMatch(freshButton, /Идентификатор задачи/);
+assert.doesNotMatch(freshButton, /Технический статус/);
 assert.match(stageMarkup, /data-stage-badge="release"[^>]*>Ожидает выпуска/);
 assert.equal(stages.tasks.find((task) => task.id === "merged-794")?.merged, true);
 assert.equal(stages.tasks.find((task) => task.id === "merged-794")?.executiveRun?.merged, true);
@@ -1420,5 +1438,54 @@ const releaseRows = stageModel.todayReceived.filter((row) => row.detail.stageBad
 assert.equal(releaseRows.length, 0);
 const receivedTimes = stageModel.todayReceived.map((row) => row.timeLabel);
 assert.deepEqual(receivedTimes, [...receivedTimes].sort((left, right) => (left < right ? 1 : left > right ? -1 : 0)));
+
+const openedOnce = toggleOpenRow({}, "now:task-1");
+assert.equal(openedOnce["now:task-1"], true);
+assert.equal(toggleOpenRow(openedOnce, "now:task-1")["now:task-1"], false);
+const storedRows = serializeOpenRows({ "now:task-1": true, "queue:task-2": false, "role:qa": true });
+assert.deepEqual(parseOpenRows(storedRows), { "now:task-1": true, "role:qa": true });
+assert.equal(parseOpenRows(storedRows)["queue:brand-new"], undefined);
+assert.deepEqual(parseOpenRows("[]"), {});
+assert.deepEqual(parseOpenRows("not-json"), {});
+assert.equal(AI_COMPANY_OPEN_ROWS_KEY, "audiolad:ai-company:open-rows");
+assert.equal(AI_COMPANY_SCROLL_KEY, "audiolad:ai-company:scroll");
+const disclosureSource = readFileSync("src/lib/admin/ai-company-disclosure.ts", "utf8");
+assert.match(disclosureSource, /sessionStorage/);
+assert.match(disclosureSource, /scrollTo/);
+assert.match(dashboardSource, /useAiCompanyDisclosureState/);
+assert.doesNotMatch(dashboardSource, /<summary[^>]*>Подробности/);
+
+const activeAt = liveMarkup.indexOf("Сделать рабочее табло ИИ-компании");
+const activeButton = liveMarkup.slice(activeAt, liveMarkup.indexOf("</button>", activeAt));
+assert.doesNotMatch(activeButton, /b01cd5d3-052b-4e21-9236-184b3c5f2a5e/);
+assert.doesNotMatch(activeButton, /Технический статус|Выкладка \(deploy\)|Независимая проверка/);
+const activePanel = liveMarkup.indexOf('id="ai-company-panel-now-', activeAt);
+assert.ok(activePanel > liveMarkup.indexOf("</button>", activeAt));
+
+const openedMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView
+    model={stageModel}
+    filters={parseHistoryFilters({})}
+    sourceError={null}
+    onRefresh={() => undefined}
+    openDetails={{ "queue:fresh-dispatch": true }}
+    onToggleDetail={() => undefined}
+  />,
+);
+const openedQueue = openedMarkup.slice(openedMarkup.indexOf('data-section="queue"'), openedMarkup.indexOf('data-section="quotas"'));
+assert.match(openedQueue, /aria-expanded="true"/);
+assert.match(openedQueue, /id="ai-company-panel-queue-fresh-dispatch"/);
+assert.doesNotMatch(openedQueue, /id="ai-company-panel-queue-fresh-dispatch"[^>]*hidden/);
+const freshOpen = openedQueue.indexOf("Свежая отправка");
+const freshOpenButton = openedQueue.slice(openedQueue.lastIndexOf("<button", freshOpen), openedQueue.indexOf("</button>", freshOpen));
+assert.match(freshOpenButton, /aria-expanded="true"/);
+assert.doesNotMatch(freshOpenButton, /executive_dispatched/);
+const nowOpen = openedMarkup.slice(openedMarkup.indexOf('data-section="now"'), openedMarkup.indexOf('data-section="executors"'));
+const staleAt = nowOpen.indexOf("Старая отправка без старта");
+const staleButton = nowOpen.slice(nowOpen.lastIndexOf("<button", staleAt), nowOpen.indexOf("</button>", staleAt));
+assert.match(staleButton, /aria-expanded="false"/);
+assert.match(staleButton, /Нет свежих данных/);
+assert.doesNotMatch(staleButton, /executive_dispatched/);
+assert.doesNotMatch(staleButton, /Технический статус|Идентификатор задачи/);
 
 console.log("ai-company-dashboard-unit: ok");
