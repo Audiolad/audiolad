@@ -161,7 +161,13 @@ function testPageSplitsFailuresAndKeepsGuards() {
   const bundle = analyticsQueries.slice(bundleStart, analyticsQueries.indexOf("export async function getAdminAnalyticsBreakdownBundle"));
   const fatalAt = bundle.indexOf("admin_analytics_dashboard_failed");
   const listeningAt = bundle.indexOf('service.rpc("admin_analytics_listening_time"');
+  const windowsAt = bundle.indexOf("admin_analytics_listening_time_windows");
   assert.ok(fatalAt > 0 && listeningAt > fatalAt, "listening RPCs start only after summary/overview");
+  assert.ok(windowsAt > fatalAt, "rolling listening windows start only after summary/overview");
+  assert.equal(
+    (bundle.match(/service\.rpc\(\s*"admin_analytics_listening_time",/g) ?? []).length,
+    1,
+  );
   assert.match(bundle, /summary: summaryRes\.error\?\.message/);
   assert.match(bundle, /overview: overviewRes\.error\?\.message/);
 }
