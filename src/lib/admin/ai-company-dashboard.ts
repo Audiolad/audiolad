@@ -5,10 +5,8 @@
  * qa_pass, merge, green CI and deploy alone are not DONE.
  *
  * CORE_FIELD_MAP is the only place that names Company Core JSON keys.
- * Primary names follow the merged status contract (docs/ai-company-status.md,
- * STATUS_SUCCESS_SHAPE). Aliases tolerate the previous production payload.
- * This workspace cannot read the private company-core repo; if a primary
- * name differs from STATUS_SUCCESS_SHAPE, change it only in this map.
+ * Primary names are STATUS_SUCCESS_SHAPE at 8418dbaae5d19c78e0b4506d33f03255928a9afb.
+ * Later names in each list are fallbacks for the previous payload.
  */
 
 export const NO_DATA = "Нет данных";
@@ -48,18 +46,22 @@ export const CORE_FIELD_MAP = {
   root: {
     generatedAt: ["generated_at"],
     tasks: ["tasks"],
+    tasksPage: ["tasks_page"],
     activeTasks: ["active_tasks"],
     taskHistory: ["task_history", "completed_tasks"],
-    events: ["events", "recent_events"],
+    events: ["recent_events", "events"],
+    eventsPage: ["events_page"],
     agents: ["agents"],
     executors: ["executors"],
     executiveRuns: ["executive_runs"],
     heartbeats: ["heartbeats"],
-    currentGates: ["current_gates", "gates"],
-    archivedBlockers: ["archived_blockers", "archived_gates"],
+    currentGates: ["gates", "current_gates"],
+    archivedBlockers: ["gates_history", "archived_blockers", "archived_gates"],
+    gatesComplete: ["gates_complete"],
     costs: ["costs"],
     quotas: ["quotas"],
-    completeness: ["completeness"],
+    codex: ["codex"],
+    coverage: ["coverage", "completeness"],
   },
   query: {
     historyCursor: "history_cursor",
@@ -72,10 +74,10 @@ export const CORE_FIELD_MAP = {
     status: ["status"],
     stage: ["stage"],
     priority: ["priority"],
-    functionalRole: ["functional_role", "producer_agent_slug", "agent_slug", "role"],
-    actualExecutor: ["actual_executor", "executor"],
+    functionalRole: ["role", "functional_role", "producer_agent_slug", "agent_slug"],
+    actualExecutor: ["executor", "actual_executor"],
     fallbackExecutor: ["fallback_executor"],
-    nextStep: ["next_step"],
+    nextStep: ["next_action", "next_step"],
     resultType: ["result_type", "result_kind", "dod_kind", "task_type"],
     githubIssue: ["github_issue_number", "issue_number"],
     humanGate: ["human_gate"],
@@ -91,7 +93,7 @@ export const CORE_FIELD_MAP = {
     lastEventAt: ["last_event_at"],
     updatedAt: ["updated_at"],
     executiveRun: ["executive_run"],
-    verifiedProgress: ["verified_progress"],
+    verifiedProgress: ["progress", "verified_progress"],
     lastEvent: ["last_event"],
     brief: ["brief", "description", "body", "specification", "original_text", "original_brief"],
     source: ["source"],
@@ -110,7 +112,8 @@ export const CORE_FIELD_MAP = {
     ci: ["ci"],
     independentReview: ["independent_review"],
     deploy: ["deploy"],
-    productionProof: ["production_proof"],
+    done: ["done"],
+    productionProof: ["production_verified", "production_proof"],
   },
   progress: {
     done: ["done"],
@@ -177,6 +180,20 @@ export const CORE_FIELD_MAP = {
     nextCursor: ["next_cursor", "history_next_cursor"],
     tasksLimit: ["tasks_limit"],
     eventsLimit: ["events_limit"],
+  },
+  page: {
+    complete: ["complete"],
+    truncated: ["truncated"],
+    nextCursor: ["next_cursor"],
+    nextOffset: ["next_offset"],
+    limit: ["limit"],
+  },
+  gatesHistory: {
+    complete: ["gates_history_complete"],
+    truncated: ["gates_history_truncated"],
+    nextCursor: ["gates_history_next_cursor"],
+    nextOffset: ["gates_history_next_offset"],
+    limit: ["gates_history_limit"],
   },
   evidence: {
     status: ["status", "state", "verdict", "conclusion"],
@@ -329,6 +346,7 @@ export type ExecutiveRun = {
   ci: unknown;
   independentReview: unknown;
   deploy: unknown;
+  done: unknown;
   productionProof: unknown;
 };
 
@@ -439,6 +457,7 @@ export type Completeness = {
   nextCursor: string | null;
   tasksLimit: number | null;
   eventsLimit: number | null;
+  gatesComplete: boolean | null;
 };
 
 export type QuotaBucket = {
@@ -620,6 +639,7 @@ const EMPTY_COMPLETENESS: Completeness = {
   nextCursor: null,
   tasksLimit: null,
   eventsLimit: null,
+  gatesComplete: null,
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -844,7 +864,7 @@ function resultKindFrom(value: string | null): ResultKind {
 }
 
 function parseProgress(value: unknown): VerifiedProgress | null {
-  if (value == null) return null;
+  if (value == null || typeof value === "number" || typeof value === "string" || typeof value === "boolean") return null;
   const record = asRecord(value);
   if (!record) return null;
   const done = readNumber(record, CORE_FIELD_MAP.progress.done);
@@ -873,7 +893,8 @@ function parseExecutiveRun(value: unknown): ExecutiveRun | null {
     ci: readRaw(record, CORE_FIELD_MAP.executiveRun.ci),
     independentReview: readRaw(record, CORE_FIELD_MAP.executiveRun.independentReview),
     deploy: readRaw(record, CORE_FIELD_MAP.executiveRun.deploy),
-    productionProof: readRaw(record, CORE_FIELD_MAP.executiveRun.productionProof),
+    done: readStored(record, CORE_FIELD_MAP.executiveRun.done),
+    productionProof: readStored(record, CORE_FIELD_MAP.executiveRun.productionProof),
   };
   const last = readRaw(record, CORE_FIELD_MAP.executiveRun.lastEvent);
   if (typeof last === "string") run.lastEvent = clip(last);
@@ -996,7 +1017,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     brief: brief ? clip(brief, 20000) : null,
     source: readString(record, CORE_FIELD_MAP.task.source),
     executiveRun: run,
-    verifiedProgress: parseProgress(readRaw(record, CORE_FIELD_MAP.task.verifiedProgress)),
+    verifiedProgress: parseProgress(readStored(record, CORE_FIELD_MAP.task.verifiedProgress)),
   };
 }
 
@@ -1096,20 +1117,86 @@ function parseGate(value: unknown): GateFact | null {
   };
 }
 
-function parseCompleteness(value: unknown): Completeness {
-  const record = asRecord(value);
-  if (!record) return { ...EMPTY_COMPLETENESS };
+function firstBoolean(...values: Array<boolean | null>): boolean | null {
+  for (const value of values) {
+    if (value != null) return value;
+  }
+  return null;
+}
+
+function firstNumber(...values: Array<number | null>): number | null {
+  for (const value of values) {
+    if (value != null) return value;
+  }
+  return null;
+}
+
+function firstString(...values: Array<string | null>): string | null {
+  for (const value of values) {
+    if (value != null) return value;
+  }
+  return null;
+}
+
+function namedRecord(root: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  if (!(key in root)) return null;
+  return asRecord(root[key]);
+}
+
+function parseCompleteness(root: Record<string, unknown>): Completeness {
+  const coverageKey = CORE_FIELD_MAP.root.coverage.find((key) => key in root);
+  const coverage = coverageKey ? asRecord(root[coverageKey]) : null;
+  const tasksPage = namedRecord(root, CORE_FIELD_MAP.root.tasksPage[0]);
+  const eventsPage = namedRecord(root, CORE_FIELD_MAP.root.eventsPage[0]);
   return {
-    activeTasksComplete: readBoolean(record, CORE_FIELD_MAP.completeness.activeTasksComplete),
-    activeTasksTruncated: readBoolean(record, CORE_FIELD_MAP.completeness.activeTasksTruncated),
-    eventsComplete: readBoolean(record, CORE_FIELD_MAP.completeness.eventsComplete),
-    eventsTruncated: readBoolean(record, CORE_FIELD_MAP.completeness.eventsTruncated),
-    historyComplete: readBoolean(record, CORE_FIELD_MAP.completeness.historyComplete),
-    historyTruncated: readBoolean(record, CORE_FIELD_MAP.completeness.historyTruncated),
-    historyNextOffset: readNumber(record, CORE_FIELD_MAP.completeness.historyNextOffset),
-    nextCursor: readString(record, CORE_FIELD_MAP.completeness.nextCursor),
-    tasksLimit: readNumber(record, CORE_FIELD_MAP.completeness.tasksLimit),
-    eventsLimit: readNumber(record, CORE_FIELD_MAP.completeness.eventsLimit),
+    ...EMPTY_COMPLETENESS,
+    activeTasksComplete: firstBoolean(
+      readBoolean(tasksPage, CORE_FIELD_MAP.page.complete),
+      readBoolean(coverage, CORE_FIELD_MAP.completeness.activeTasksComplete),
+    ),
+    activeTasksTruncated: firstBoolean(
+      readBoolean(tasksPage, CORE_FIELD_MAP.page.truncated),
+      readBoolean(coverage, CORE_FIELD_MAP.completeness.activeTasksTruncated),
+    ),
+    eventsComplete: firstBoolean(
+      readBoolean(eventsPage, CORE_FIELD_MAP.page.complete),
+      readBoolean(coverage, CORE_FIELD_MAP.completeness.eventsComplete),
+    ),
+    eventsTruncated: firstBoolean(
+      readBoolean(eventsPage, CORE_FIELD_MAP.page.truncated),
+      readBoolean(coverage, CORE_FIELD_MAP.completeness.eventsTruncated),
+    ),
+    historyComplete: firstBoolean(
+      readBoolean(root, CORE_FIELD_MAP.gatesHistory.complete),
+      readBoolean(coverage, CORE_FIELD_MAP.completeness.historyComplete),
+    ),
+    historyTruncated: firstBoolean(
+      readBoolean(root, CORE_FIELD_MAP.gatesHistory.truncated),
+      readBoolean(coverage, CORE_FIELD_MAP.completeness.historyTruncated),
+    ),
+    historyNextOffset: firstNumber(
+      readNumber(root, CORE_FIELD_MAP.gatesHistory.nextOffset),
+      readNumber(coverage, CORE_FIELD_MAP.completeness.historyNextOffset),
+    ),
+    nextCursor: firstString(
+      readString(root, CORE_FIELD_MAP.gatesHistory.nextCursor),
+      readString(tasksPage, CORE_FIELD_MAP.page.nextCursor),
+      readString(eventsPage, CORE_FIELD_MAP.page.nextCursor),
+      readString(coverage, CORE_FIELD_MAP.completeness.nextCursor),
+    ),
+    tasksLimit: firstNumber(
+      readNumber(tasksPage, CORE_FIELD_MAP.page.limit),
+      readNumber(root, CORE_FIELD_MAP.gatesHistory.limit),
+      readNumber(coverage, CORE_FIELD_MAP.completeness.tasksLimit),
+    ),
+    eventsLimit: firstNumber(
+      readNumber(eventsPage, CORE_FIELD_MAP.page.limit),
+      readNumber(coverage, CORE_FIELD_MAP.completeness.eventsLimit),
+    ),
+    gatesComplete: firstBoolean(
+      readBoolean(root, CORE_FIELD_MAP.root.gatesComplete),
+      readBoolean(coverage, CORE_FIELD_MAP.root.gatesComplete),
+    ),
   };
 }
 
@@ -1134,10 +1221,20 @@ function confirmedSource(value: string | null): string | null {
   return clip(value, 120);
 }
 
+function readStored(record: Record<string, unknown> | null, keys: readonly string[]): unknown {
+  if (!record) return null;
+  for (const key of keys) {
+    if (SECRET_KEY.test(key)) continue;
+    if (key in record) return record[key];
+  }
+  return null;
+}
+
 function listFrom(record: Record<string, unknown>, keys: readonly string[]): unknown[] {
   for (const key of keys) {
+    if (!(key in record)) continue;
     const value = record[key];
-    if (Array.isArray(value)) return value;
+    return Array.isArray(value) ? value : [];
   }
   return [];
 }
@@ -1240,8 +1337,13 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
     listFrom(record, CORE_FIELD_MAP.root.activeTasks),
     listFrom(record, CORE_FIELD_MAP.root.taskHistory),
   ];
-  const quotas = asRecord(readRaw(record, CORE_FIELD_MAP.root.quotas));
-  const costs = parseQuotaBucket(readRaw(record, CORE_FIELD_MAP.root.costs));
+  const quotas = namedRecord(record, CORE_FIELD_MAP.root.quotas[0]);
+  const costs = parseQuotaBucket(readStored(record, CORE_FIELD_MAP.root.costs));
+  const codex = "codex" in record
+    ? parseQuotaBucket(record.codex)
+    : quotas
+      ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.codex))
+      : null;
   const events = dedupeEvents(
     listFrom(record, CORE_FIELD_MAP.root.events)
       .map((event) => parseEvent(event))
@@ -1266,9 +1368,9 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
     archivedBlockers: listFrom(record, CORE_FIELD_MAP.root.archivedBlockers)
       .map((item) => parseGate(item))
       .filter((item): item is GateFact => item !== null),
-    completeness: parseCompleteness(readRaw(record, CORE_FIELD_MAP.root.completeness)),
+    completeness: parseCompleteness(record),
     quotas: {
-      codex: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.codex)) : null,
+      codex,
       cursor: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.cursor)) : null,
       grok: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.grok)) : null,
       legacySpend: costs,
@@ -1572,12 +1674,13 @@ function engineeringPanel(task: CompanyTask, events: CompanyEvent[]): Engineerin
   const reviewValue = run?.independentReview ?? null;
   const deployValue = run?.deploy ?? null;
   const productionValue = run?.productionProof ?? null;
+  const productionBoolean = typeof productionValue === "boolean" ? productionValue : null;
   const applies = task.resultKind === "engineering";
   const reviewSha = evidenceSha(reviewValue);
   const reviewPass = isPass(reviewValue) && shaEqual(reviewSha, headSha);
   const ciPass = isPass(ciValue) || ["success", "green", "pass"].includes(normalizeToken(evidenceStatus(ciValue) ?? ""));
   const deployPass = isPass(deployValue) || ["deployed", "success"].includes(normalizeToken(evidenceStatus(deployValue) ?? ""));
-  const productionPass = isPass(productionValue);
+  const productionPass = productionBoolean === true || (productionBoolean == null && isPass(productionValue));
   const productionUrl = safeProductionUrl(readString(evidenceRecord(productionValue), CORE_FIELD_MAP.evidence.url));
 
   let reviewLabel = NO_DATA;
@@ -1592,11 +1695,15 @@ function engineeringPanel(task: CompanyTask, events: CompanyEvent[]): Engineerin
   const deployLabel = deployValue == null ? NO_DATA : `${evidenceStatus(deployValue) ?? "есть запись"}`;
   const productionFact = productionValue == null
     ? null
-    : joinFound([
-        evidenceStatus(productionValue),
-        productionUrl,
-        formatDateTime(readString(evidenceRecord(productionValue), CORE_FIELD_MAP.evidence.at)),
-      ]);
+    : productionBoolean == null
+      ? joinFound([
+          evidenceStatus(productionValue),
+          productionUrl,
+          formatDateTime(readString(evidenceRecord(productionValue), CORE_FIELD_MAP.evidence.at)),
+        ])
+      : productionBoolean
+        ? "сохранено: production_verified"
+        : "сохранено: production_verified = false";
   let productionLabel = NO_DATA;
   if (task.resultKind === "document") productionLabel = "не требуется для этого типа результата";
   else if (task.resultKind === "unknown") {
@@ -1801,6 +1908,9 @@ function boundaryText(status: CompanyStatus): { active: string; history: string 
     );
   } else if (completeness.activeTasksComplete === true) {
     activeNotes.push("Источник подтвердил полноту активных задач.");
+  }
+  if (completeness.gatesComplete === false) {
+    activeNotes.push("Источник сообщил, что список текущих решений обрезан.");
   }
   if (completeness.eventsTruncated === true || completeness.eventsComplete === false) {
     activeNotes.push("Источник сообщил, что лента событий обрезана.");
