@@ -133,6 +133,7 @@ function TaskDetail({ detail }: { detail: TaskDetailModel }) {
       <Fact label="Функциональная роль" value={detail.agent} />
       <Fact label="Фактический исполнитель" value={detail.executor} />
       <Fact label="Текущий этап" value={detail.stageBadge.label} />
+      <Fact label="Технический статус" value={detail.statusLabel} />
       <Fact label="Проверенный прогресс" value={detail.progress} />
       <Fact label="История состояний" value={detail.history} />
       <Fact label="Результаты" value={detail.results} />
@@ -179,13 +180,31 @@ function GateList({ gates }: { gates: GateCard[] }) {
   );
 }
 
-function TodayList({ rows, empty }: { rows: TodayRowModel[]; empty: string }) {
+function TodayList({
+  rows,
+  empty,
+  openDetails,
+  onToggleDetail,
+}: {
+  rows: TodayRowModel[];
+  empty: string;
+  openDetails?: Record<string, boolean>;
+  onToggleDetail?: (key: string, open: boolean) => void;
+}) {
   if (!rows.length) return <p className="rounded-xl border border-[#eadff8] bg-white p-4 text-sm text-[#796ba0]">{empty}</p>;
   return (
     <div className="space-y-2">
       {rows.map((row) => (
         <article key={row.key} className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm sm:p-4">
           <TaskHeading title={`${row.timeLabel} · ${row.title}`} badge={row.detail.stageBadge} />
+          <details
+            className="mt-2"
+            open={openDetails?.[row.key] ?? false}
+            onToggle={(event) => onToggleDetail?.(row.key, event.currentTarget.open)}
+          >
+            <summary className="min-h-11 cursor-pointer text-[#7042c5]">Подробности</summary>
+            <TaskDetail detail={row.detail} />
+          </details>
         </article>
       ))}
     </div>
@@ -390,14 +409,24 @@ export function AiCompanyDashboardView({
                 <h4 className="font-semibold">Получены сегодня · {model.todayReceived.length}</h4>
                 <p className="mt-1 text-xs text-[#796ba0]">Порядок: received_at, новые сверху.</p>
                 <div className="mt-2">
-                  <TodayList rows={model.todayReceived} empty={`${NO_DATA}: получения за московские сутки снимка нет.`} />
+                  <TodayList
+                    rows={model.todayReceived}
+                    empty={`${NO_DATA}: получения за московские сутки снимка нет.`}
+                    openDetails={openDetails}
+                    onToggleDetail={onToggleDetail}
+                  />
                 </div>
               </div>
               <div data-section="created">
                 <h4 className="font-semibold">Созданы сегодня · {model.todayCreated.length}</h4>
                 <p className="mt-1 text-xs text-[#796ba0]">Порядок: created_at, новые сверху. Это запасной список, не received_at и не updated_at.</p>
                 <div className="mt-2">
-                  <TodayList rows={model.todayCreated} empty={`${NO_DATA}: создания записи за эти сутки нет.`} />
+                  <TodayList
+                    rows={model.todayCreated}
+                    empty={`${NO_DATA}: создания записи за эти сутки нет.`}
+                    openDetails={openDetails}
+                    onToggleDetail={onToggleDetail}
+                  />
                 </div>
               </div>
               <div data-section="work-events">
@@ -425,6 +454,8 @@ export function AiCompanyDashboardView({
                   <TodayList
                     rows={model.todayCompleted}
                     empty={`${NO_DATA}: завершений по критерию готовности за эти сутки нет.`}
+                    openDetails={openDetails}
+                    onToggleDetail={onToggleDetail}
                   />
                 </div>
               </div>

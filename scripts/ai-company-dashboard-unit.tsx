@@ -1363,6 +1363,18 @@ const staleSpan = stageMarkup.match(/<span(?=[^>]*data-stage-badge="stale")[^>]*
 assert.ok(staleSpan);
 assert.match(staleSpan[0], /Нет свежих данных/);
 assert.doesNotMatch(staleSpan[0], /executive_dispatched/);
+const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="queue"'));
+assert.match(todayMarkup, /Подробности/);
+assert.match(todayMarkup, /Идентификатор задачи/);
+assert.match(todayMarkup, /Технический статус/);
+assert.match(todayMarkup, /Текущий этап/);
+const queueMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="queue"'), stageMarkup.indexOf('data-section="quotas"'));
+assert.match(queueMarkup, /Технический статус/);
+assert.match(queueMarkup, /executive_dispatched \(технический статус\)/);
+assert.match(queueMarkup, /Текущий этап/);
+const freshAt = queueMarkup.indexOf("Свежая отправка");
+const freshHeading = queueMarkup.slice(freshAt, queueMarkup.indexOf("Подробности", freshAt));
+assert.doesNotMatch(freshHeading, /executive_dispatched/);
 assert.match(stageMarkup, /data-stage-badge="release"[^>]*>Ожидает выпуска/);
 assert.equal(stages.tasks.find((task) => task.id === "merged-794")?.merged, true);
 assert.equal(stages.tasks.find((task) => task.id === "merged-794")?.executiveRun?.merged, true);
