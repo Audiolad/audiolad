@@ -613,7 +613,7 @@ BEGIN
     OR (v_payload -> 'week_prev' ->> 'unmeasured')::boolean
     OR (v_payload -> 'month' ->> 'partial')::boolean IS NOT TRUE
     OR (v_payload -> 'month' ->> 'listened_ms')::bigint <> 263585000
-    OR (v_payload -> 'month_prev' ->> 'unmeasured')::boolean
+    OR (v_payload -> 'month_prev' ->> 'unmeasured')::boolean IS NOT TRUE
     OR v_payload -> 'month_prev' -> 'listened_ms' IS DISTINCT FROM 'null'::jsonb
   THEN
     RAISE EXCEPTION 'partial listening windows wrong: %', v_payload;
