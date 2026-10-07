@@ -412,6 +412,10 @@ assert.equal(CORE_FIELD_MAP.executiveRun.independentReview[0], "review_status");
 assert.equal(CORE_FIELD_MAP.executiveRun.deploy[0], "deploy_status");
 assert.equal(CORE_FIELD_MAP.executiveRun.productionProof[0], "production_proof");
 assert.equal(CORE_FIELD_MAP.executiveRun.productionVerified[0], "production_verified");
+assert.equal(CORE_FIELD_MAP.executiveRun.merged[0], "merged");
+assert.equal(CORE_FIELD_MAP.task.merged[0], "merged");
+assert.equal(CORE_FIELD_MAP.task.releaseHold[0], "release_hold");
+assert.equal(CORE_FIELD_MAP.task.releaseHold[1], "hold_reason");
 assert.equal(CORE_FIELD_MAP.query.historyBefore, "history_before");
 assert.equal(CORE_FIELD_MAP.page.historyNextBefore[0], "history_next_before");
 assert.equal(CORE_FIELD_MAP.root.events[0], "recent_events");
@@ -631,6 +635,11 @@ assert.equal(liveModel.todayWorkEvents.some((event) => event.text.includes("oriy
 assert.equal(liveModel.todayCompleted.some((row) => row.title === "Исследование закрыто сегодня"), true);
 assert.equal(liveModel.todayCompleted.some((row) => row.title === "Слитый черновик без проверки"), false);
 assert.equal(liveModel.history.some((item) => item.title === "Слитый черновик без проверки"), false);
+const mergedDraft = liveModel.activeTasks.find((task) => task.title === "Слитый черновик без проверки");
+assert.ok(mergedDraft);
+assert.equal(mergedDraft.detail.stageBadge.label, "Ожидает выпуска");
+assert.equal(mergedDraft.detail.stageBadge.tone, "release");
+assert.doesNotMatch(mergedDraft.detail.stageBadge.detail ?? "", /деплоим|Завершена/);
 assert.equal(liveModel.history.some((item) => item.title === "Пилот Codex"), false);
 assert.equal(liveModel.activeTasks.some((task) => task.title === "Пилот Codex"), true);
 assert.match(
@@ -641,6 +650,15 @@ assert.match(
   liveModel.activeTasks.find((task) => task.title === "Пилот Codex")!.stage,
   /Пилот не отмечен успешным/,
 );
+assert.equal(liveModel.activeTasks.find((task) => task.title === "Пилот Codex")!.detail.stageBadge.label, "Заблокирована");
+assert.match(
+  liveModel.activeTasks.find((task) => task.title === "Пилот Codex")!.detail.stageBadge.detail ?? "",
+  /Пилот не отмечен успешным/,
+);
+const boardBadge = liveModel.activeTasks.find((task) => task.taskId === "b01cd5d3-052b-4e21-9236-184b3c5f2a5e")!;
+assert.equal(boardBadge.detail.stageBadge.label, "Нужно решение");
+assert.match(boardBadge.detail.stageBadge.detail ?? "", /^Сергей:/);
+assert.doesNotMatch(boardBadge.detail.stageBadge.detail ?? "", /Переназначьте|деплоим/);
 const measured = liveModel.activeTasks.find((task) => task.title === "Задача с единицами");
 assert.ok(measured);
 assert.match(measured.progress, /4 из 7/);
@@ -722,6 +740,8 @@ assert.match(shipped.progress, /100%/);
 assert.match(shipped.engineering.independentReview, new RegExp(headSha));
 assert.match(shipped.engineering.production, /audiolad\.ru/);
 assert.equal(exactModel.todayCompleted.length, 1);
+assert.equal(shipped.stageBadge.label, "Завершена");
+assert.equal(shipped.stageBadge.tone, "done");
 
 const capped = parseCompanyStatus({
   generated_at: "2026-10-07T06:39:00.000Z",
@@ -1042,8 +1062,16 @@ const shippedSha = coreModel.history.find((item) => item.title === "Точный
 assert.ok(shippedSha);
 assert.match(shippedSha.progress, /100%/);
 assert.match(shippedSha.engineering.production, new RegExp(headSha));
+assert.equal(shippedSha.stageBadge.label, "Завершена");
 const badSha = coreModel.activeTasks.find((task) => task.title === "Чужой SHA");
 assert.ok(badSha);
+assert.equal(badSha.detail.stageBadge.label, "Проверяется на сайте");
+assert.notEqual(badSha.detail.stageBadge.label, "Завершена");
+assert.notEqual(orch.detail.stageBadge.label, "В работе");
+assert.equal(orch.detail.stageBadge.label, "Нет свежих данных");
+assert.equal(late.detail.stageBadge.label, "Нужно решение");
+assert.match(late.detail.stageBadge.detail ?? "", /^Сергей:/);
+assert.doesNotMatch(late.detail.stageBadge.detail ?? "", /Oriy:/);
 assert.equal(badSha.engineering.dodSatisfied, false);
 assert.match(badSha.progress, /100% не ставится/);
 assert.match(badSha.engineering.independentReview, /другого SHA/);
@@ -1072,5 +1100,325 @@ assert.match(coreModel.historyBoundary, /история обрезана/);
 assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.connectionLabel, "работает");
 assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.runId, "run-late");
 assert.match(coreModel.agents.find((agent) => agent.slug === "qa")!.stateLabel, /Простаивает|свободен|нет свежих данных|Ожидает/);
+
+const stages = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  agents: [],
+  tasks: [
+    {
+      id: "stale-dispatch",
+      title: "Старая отправка без старта",
+      status: "executive_dispatched",
+      last_event_at: "2026-10-07T04:00:00.000Z",
+      last_event: { event_type: "executive_dispatched", summary: "run queued", at: "2026-10-07T04:00:00.000Z" },
+    },
+    {
+      id: "fresh-dispatch",
+      title: "Свежая отправка",
+      status: "executive_dispatched",
+      last_event_at: "2026-10-07T06:20:00.000Z",
+    },
+    {
+      id: "no-start",
+      title: "Без подтверждённого старта",
+      status: "in_progress",
+      last_event_at: "2026-10-07T06:30:00.000Z",
+    },
+    {
+      id: "started",
+      title: "Старт подтверждён",
+      status: "in_progress",
+      started_at: "2026-10-07T05:00:00.000Z",
+      last_event_at: "2026-10-07T06:20:00.000Z",
+      result_type: "engineering",
+    },
+    {
+      id: "stale-start",
+      title: "Старт без свежего события",
+      status: "in_progress",
+      started_at: "2026-10-07T04:00:00.000Z",
+      last_event_at: "2026-10-07T04:10:00.000Z",
+      result_type: "engineering",
+      progress: { done: 2, total: 5, formula: "старый прогресс", evidence_at: "2026-10-07T04:10:00.000Z" },
+    },
+    {
+      id: "newer-run",
+      title: "Свежий запуск после старой отправки",
+      status: "executive_dispatched",
+      last_event_at: "2026-10-07T04:00:00.000Z",
+      executive_status: "progress",
+      executive_run: { last_event: "progress", last_event_at: "2026-10-07T06:25:00.000Z" },
+    },
+    {
+      id: "in-review",
+      title: "Ждёт независимую проверку",
+      status: "in_review",
+      started_at: "2026-10-07T05:00:00.000Z",
+      result_type: "engineering",
+    },
+    {
+      id: "merged-794",
+      title: "Слито и не выпущено",
+      status: "merged",
+      github_issue_number: 794,
+      result_type: "engineering",
+      merged: true,
+      release_hold: "Слито в main, проверка health ещё не записана",
+      executive_run: {
+        merged: true,
+        head_sha: headSha,
+        ci_status: "success",
+        review_status: "pass",
+        review_sha: headSha,
+        deploy_status: "pending",
+        production_verified: false,
+        done: true,
+      },
+    },
+    {
+      id: "merged-795",
+      title: "Слито без просьбы выпускать",
+      status: "merged",
+      github_issue_number: 795,
+      result_type: "engineering",
+      hold_reason: "Сергей, деплоим?",
+      executive_run: { merged: "yes", deploy_status: "not_started", production_verified: false, done: true },
+    },
+    {
+      id: "on-site",
+      title: "Выпуск проверяется",
+      status: "in_progress",
+      result_type: "engineering",
+      started_at: "2026-10-07T01:00:00.000Z",
+      executive_run: {
+        head_sha: headSha,
+        deploy_status: "deployed",
+        production_verified: false,
+      },
+    },
+    {
+      id: "verified-site",
+      title: "Проверка на сайте сохранена",
+      status: "in_progress",
+      result_type: "engineering",
+      started_at: "2026-10-07T01:00:00.000Z",
+      completed_at: "2026-10-07T06:20:00.000Z",
+      progress: { done: 4, total: 4, formula: "критерии DoD", evidence_at: "2026-10-07T06:20:00.000Z" },
+      executive_run: {
+        head_sha: headSha,
+        ci_status: "success",
+        review_status: "pass",
+        review_sha: headSha,
+        deploy_status: "deployed",
+        production_verified: true,
+        production_proof: { verified: true, sha: headSha, evidence_at: "2026-10-07T06:25:00.000Z", source: "bridge" },
+        done: true,
+      },
+    },
+    {
+      id: "cancelled-task",
+      title: "Отменённая постановка",
+      status: "cancelled",
+      result_type: "document",
+    },
+    {
+      id: "need-sergey",
+      title: "Короткое решение",
+      status: "blocked",
+      blocked_reason: "Нет правки обложки",
+      decision_owner: "sergey",
+      result_type: "document",
+    },
+    {
+      id: "blocked-plain",
+      title: "Блок без владельца",
+      status: "blocked",
+      blocked_reason: "Нет файла обложки",
+    },
+    {
+      id: "doc-accepted",
+      title: "Документ принят",
+      status: "accepted",
+      result_type: "document",
+      received_at: "2026-10-07T02:00:00.000Z",
+      completed_at: "2026-10-07T06:10:00.000Z",
+      updated_at: "2026-10-06T01:00:00.000Z",
+    },
+    {
+      id: "doc-delivered",
+      title: "Исследование сдано событием",
+      status: "in_progress",
+      result_type: "research",
+      events: [{ event_type: "accepted", created_at: "2026-10-07T06:15:00.000Z" }],
+    },
+    {
+      id: "unknown-completed",
+      title: "Закрыто без времени",
+      status: "done",
+      result_type: "document",
+      updated_at: "2026-10-07T06:30:00.000Z",
+    },
+    {
+      id: "backend-then-frontend",
+      title: "Старый backend proof и неготовый frontend",
+      status: "in_progress",
+      result_type: "engineering",
+      operating_stage: "in_review",
+      executive_run: {
+        head_sha: headSha,
+        commit_sha: otherSha,
+        review_status: "independent_pass",
+        review_sha: headSha,
+        deploy_status: "merged_not_deployed_hold_oriy_6d560a68",
+        production_verified: false,
+        production_proof: { verified: true, sha: otherSha, source: "backend", evidence_at: "2026-10-06T12:00:00.000Z" },
+        done: true,
+      },
+    },
+    {
+      id: "sha-map",
+      title: "Разные SHA проверки и выпуска",
+      status: "in_progress",
+      result_type: "engineering",
+      started_at: "2026-10-07T06:00:00.000Z",
+      executive_run: {
+        head_sha: headSha,
+        commit_sha: otherSha,
+        ci_status: "success",
+        review_status: "independent_pass",
+        review_sha: headSha,
+        deploy_status: "deployed",
+        production_verified: true,
+        production_proof: { verified: true, sha: otherSha, evidence_at: "2026-10-07T06:20:00.000Z", source: "bridge" },
+      },
+    },
+  ],
+})!;
+const stageModel = buildAiCompanyDashboard(stages, parseHistoryFilters({}));
+const stageRows = [
+  ...stageModel.activeTasks.map((task) => task.detail),
+  ...stageModel.queue,
+  ...stageModel.history,
+  ...stageModel.todayReceived.map((row) => row.detail),
+  ...stageModel.todayCompleted.map((row) => row.detail),
+];
+function stageOf(title: string) {
+  const row = stageRows.find((item) => item.title === title);
+  assert.ok(row, title);
+  return row;
+}
+assert.equal(stageOf("Старая отправка без старта").stageBadge.label, "Нет свежих данных");
+assert.equal(stageOf("Старая отправка без старта").stageBadge.tone, "stale");
+assert.equal(stageOf("Свежая отправка").stageBadge.label, "В очереди");
+assert.notEqual(stageOf("Свежая отправка").stageBadge.label, "В работе");
+assert.equal(stageOf("Без подтверждённого старта").stageBadge.label, "Нет свежих данных");
+assert.notEqual(stageOf("Без подтверждённого старта").stageBadge.label, "В работе");
+assert.equal(stageOf("Старт подтверждён").stageBadge.label, "В работе");
+const staleStart = stageOf("Старт без свежего события");
+assert.equal(staleStart.stageBadge.label, "Нет свежих данных");
+assert.match(staleStart.stageBadge.detail ?? "", /Последняя подтверждённая стадия: В работе/);
+assert.notEqual(staleStart.stageBadge.label, "В работе");
+assert.equal(stageOf("Свежий запуск после старой отправки").stageBadge.label, "В работе");
+assert.notEqual(stageOf("Свежий запуск после старой отправки").stageBadge.label, "Нет свежих данных");
+assert.equal(stageOf("Ждёт независимую проверку").stageBadge.label, "На проверке");
+const waitingRelease = stageOf("Слито и не выпущено");
+assert.equal(waitingRelease.stageBadge.label, "Ожидает выпуска");
+assert.match(waitingRelease.stageBadge.detail ?? "", /проверка health/);
+assert.match(waitingRelease.stageBadge.detail ?? "", /^Oriy:/);
+assert.doesNotMatch(waitingRelease.stageBadge.detail ?? "", /деплоим/);
+assert.equal(stageModel.history.some((item) => item.title === "Слито и не выпущено"), false);
+assert.notEqual(waitingRelease.stageBadge.label, "Завершена");
+const silentRelease = stageOf("Слито без просьбы выпускать");
+assert.equal(silentRelease.stageBadge.label, "Ожидает выпуска");
+assert.match(silentRelease.stageBadge.detail ?? "", /Выпуск на сайт не подтверждён/);
+assert.match(silentRelease.stageBadge.detail ?? "", /^Oriy:/);
+assert.doesNotMatch(`${silentRelease.stageBadge.label} ${silentRelease.stageBadge.detail}`, /деплоим|деплой/);
+assert.equal(stageModel.history.some((item) => item.title === "Слито без просьбы выпускать"), false);
+assert.equal(stageOf("Выпуск проверяется").stageBadge.label, "Проверяется на сайте");
+const verified = stageOf("Проверка на сайте сохранена");
+assert.equal(verified.stageBadge.label, "Завершена");
+assert.match(verified.progress, /100%/);
+assert.equal(stageModel.history.some((item) => item.title === "Проверка на сайте сохранена"), true);
+assert.equal(stageOf("Отменённая постановка").stageBadge.label, "Отменена");
+assert.equal(stageModel.history.some((item) => item.title === "Отменённая постановка"), false);
+const sergeyDecision = stageOf("Короткое решение");
+assert.equal(sergeyDecision.stageBadge.label, "Нужно решение");
+assert.match(sergeyDecision.stageBadge.detail ?? "", /^Сергей: Нет правки обложки/);
+assert.equal(stageOf("Блок без владельца").stageBadge.label, "Заблокирована");
+assert.match(stageOf("Блок без владельца").stageBadge.detail ?? "", /Нет данных: Нет файла обложки/);
+
+const stageMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={stageModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
+);
+assert.match(stageMarkup, /flex flex-wrap items-start justify-between/);
+assert.doesNotMatch(stageMarkup, /<button[^>]*data-stage-badge/);
+for (const tone of ["stale", "queue", "working", "review", "release", "site", "done", "cancelled", "decision", "blocked"] as const) {
+  const span = stageMarkup.match(new RegExp(`<span(?=[^>]*data-stage-badge="${tone}")[^>]*>`));
+  assert.ok(span, tone);
+  assert.match(span[0], /whitespace-normal/);
+  assert.match(span[0], /break-words/);
+  assert.doesNotMatch(span[0], /truncate|overflow-hidden|whitespace-nowrap/);
+}
+const staleSpan = stageMarkup.match(/<span(?=[^>]*data-stage-badge="stale")[^>]*>[^<]*</);
+assert.ok(staleSpan);
+assert.match(staleSpan[0], /Нет свежих данных/);
+assert.doesNotMatch(staleSpan[0], /executive_dispatched/);
+const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="queue"'));
+assert.match(todayMarkup, /Подробности/);
+assert.match(todayMarkup, /Идентификатор задачи/);
+assert.match(todayMarkup, /Технический статус/);
+assert.match(todayMarkup, /Текущий этап/);
+const queueMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="queue"'), stageMarkup.indexOf('data-section="quotas"'));
+assert.match(queueMarkup, /Технический статус/);
+assert.match(queueMarkup, /executive_dispatched \(технический статус\)/);
+assert.match(queueMarkup, /Текущий этап/);
+const freshAt = queueMarkup.indexOf("Свежая отправка");
+const freshHeading = queueMarkup.slice(freshAt, queueMarkup.indexOf("Подробности", freshAt));
+assert.doesNotMatch(freshHeading, /executive_dispatched/);
+assert.match(stageMarkup, /data-stage-badge="release"[^>]*>Ожидает выпуска/);
+assert.equal(stages.tasks.find((task) => task.id === "merged-794")?.merged, true);
+assert.equal(stages.tasks.find((task) => task.id === "merged-794")?.executiveRun?.merged, true);
+assert.match(stages.tasks.find((task) => task.id === "merged-794")?.releaseHold ?? "", /health/);
+assert.equal(stages.tasks.find((task) => task.id === "merged-795")?.executiveRun?.merged, true);
+assert.equal(stages.tasks.find((task) => task.id === "backend-then-frontend")?.stage, "in_review");
+assert.equal(stages.tasks.find((task) => task.id === "sha-map")?.executiveRun?.mergeSha, otherSha);
+assert.equal(stages.tasks.find((task) => task.id === "sha-map")?.executiveRun?.headSha, headSha);
+
+const accepted = stageOf("Документ принят");
+assert.equal(accepted.stageBadge.label, "Завершена");
+assert.equal(accepted.stageBadge.tone, "done");
+assert.equal(stageModel.activeTasks.some((task) => task.title === "Документ принят"), false);
+assert.equal(stageModel.history.some((item) => item.title === "Документ принят"), true);
+assert.equal(stageModel.todayCompleted.some((row) => row.title === "Документ принят"), true);
+assert.ok(
+  stageModel.todayCompleted.findIndex((row) => row.title === "Исследование сдано событием") <
+    stageModel.todayCompleted.findIndex((row) => row.title === "Документ принят"),
+);
+const delivered = stageOf("Исследование сдано событием");
+assert.equal(delivered.stageBadge.label, "Завершена");
+assert.doesNotMatch(delivered.completedAt, /06\.10\.2026|updated/);
+const unknownTime = stageOf("Закрыто без времени");
+assert.equal(unknownTime.stageBadge.label, "Завершена");
+assert.equal(unknownTime.stageBadge.detail, "Время завершения не сохранено");
+assert.equal(unknownTime.completedAt, "Время завершения не сохранено");
+assert.equal(stageModel.todayCompleted.some((row) => row.title === "Закрыто без времени"), false);
+assert.equal(stageModel.history.some((item) => item.title === "Закрыто без времени"), true);
+assert.equal(stageModel.activeTasks.some((task) => task.title === "Закрыто без времени"), false);
+const partial = stageOf("Старый backend proof и неготовый frontend");
+assert.equal(partial.stageBadge.label, "Ожидает выпуска");
+assert.match(partial.stageBadge.detail ?? "", /^Oriy:/);
+assert.equal(partial.engineering.dodSatisfied, false);
+assert.notEqual(partial.stageBadge.label, "Завершена");
+const shaMap = stageOf("Разные SHA проверки и выпуска");
+assert.equal(shaMap.engineering.dodSatisfied, false);
+assert.notEqual(shaMap.stageBadge.label, "Завершена");
+assert.match(shaMap.engineering.independentReview, new RegExp(headSha));
+assert.match(shaMap.engineering.independentReview, new RegExp(otherSha));
+assert.match(shaMap.engineering.independentReview, /связь проверки с выпуском не подтверждена/);
+assert.match(shaMap.engineering.production, /не совпадает/);
+const releaseRows = stageModel.todayReceived.filter((row) => row.detail.stageBadge.label === "Ожидает выпуска");
+assert.equal(releaseRows.length, 0);
+const receivedTimes = stageModel.todayReceived.map((row) => row.timeLabel);
+assert.deepEqual(receivedTimes, [...receivedTimes].sort((left, right) => (left < right ? 1 : left > right ? -1 : 0)));
 
 console.log("ai-company-dashboard-unit: ok");
