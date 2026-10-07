@@ -8,6 +8,8 @@ import {
   PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS,
   PRODUCT_VIDEO_ORIENTATION_META,
   isProductVideoExportAuthorSlug,
+  productVideoCoverStoragePath,
+  productVideoOutputStoragePath,
 } from "../src/lib/product-video-export/contract";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,6 +39,45 @@ assert.equal(
   "Видеообложка 9:16 (вертикальное видео — Reels / YouTube Shorts / VK Клипы)",
 );
 
+const samplePractice = "31e04472-2693-4986-a973-3600d9a2e4a7";
+const sampleToken = "1a47fdcd-0f93-46dd-bb7c-04e1358f77b7";
+const landscapePath = productVideoCoverStoragePath(
+  samplePractice,
+  "landscape_16_9",
+  sampleToken,
+);
+const portraitPath = productVideoCoverStoragePath(
+  samplePractice,
+  "portrait_9_16",
+  sampleToken,
+);
+const outputPath = productVideoOutputStoragePath(
+  samplePractice,
+  sampleToken,
+  "landscape_16_9",
+  sampleToken,
+);
+assert.equal(
+  landscapePath,
+  `practices/${samplePractice}/video-covers/landscape_16_9/${sampleToken}.webp`,
+);
+assert.equal(
+  portraitPath,
+  `practices/${samplePractice}/video-covers/portrait_9_16/${sampleToken}.webp`,
+);
+assert.match(
+  landscapePath,
+  /^practices\/[0-9a-f-]{36}\/video-covers\/landscape_16_9\/[0-9a-f-]{36}\.webp$/,
+);
+assert.match(
+  portraitPath,
+  /^practices\/[0-9a-f-]{36}\/video-covers\/portrait_9_16\/[0-9a-f-]{36}\.webp$/,
+);
+assert.match(
+  outputPath,
+  /^practices\/[0-9a-f-]{36}\/video\/[0-9a-f-]{36}\/landscape_16_9\/[0-9a-f-]{36}\.mp4$/,
+);
+
 const ui = read("src/components/author-dashboard/AuthorProductVideoExport.tsx");
 assert.match(ui, /Видео для площадок/);
 assert.match(ui, /Создать MP4 из аудио/);
@@ -44,6 +85,8 @@ assert.match(ui, /Скачать MP4/);
 assert.match(ui, /Создать заново/);
 assert.match(ui, /audio_prepare_status/);
 assert.match(ui, /5_000/);
+assert.match(ui, /video_cover_path_rejected/);
+assert.match(ui, /video_cover_persist_failed/);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 assert.match(form, /AuthorProductVideoExport/);
@@ -67,6 +110,26 @@ assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /claim_product_video_render_job/);
 assert.match(migration, /renew_product_video_render_job_lease/);
 assert.match(migration, /service_role/);
+
+const pathFix = read(
+  "supabase/migrations/20261220131000_product_video_cover_path_check_fix.sql",
+);
+assert.match(pathFix, /product_video_assets_landscape_path_check/);
+assert.match(pathFix, /\[\.\]webp/);
+assert.match(pathFix, /\[\.\]mp4/);
+assert.match(
+  pathFix,
+  /DROP CONSTRAINT IF EXISTS product_video_assets_landscape_path_check/,
+);
+assert.match(
+  pathFix,
+  /DROP CONSTRAINT IF EXISTS product_video_render_jobs_output_path_check/,
+);
+
+const serverSrc = read("src/lib/product-video-export/server.ts");
+assert.match(serverSrc, /video_cover_path_rejected/);
+assert.match(serverSrc, /video_cover_persist_failed/);
+assert.match(serverSrc, /product_video_cover_update_error/);
 
 const deploy = read("deploy/scripts/deploy.sh");
 assert.match(deploy, /assert_product_video_export_worker_release_tree/);

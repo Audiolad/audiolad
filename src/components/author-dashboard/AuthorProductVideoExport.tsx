@@ -227,7 +227,10 @@ export default function AuthorProductVideoExport({
         throw new Error(
           payload.error === "invalid_video_cover"
             ? "Выберите корректное изображение JPEG, PNG или WebP."
-            : "Не удалось загрузить видеообложку.",
+            : payload.error === "video_cover_path_rejected" ||
+                payload.error === "video_cover_persist_failed"
+              ? "Не удалось сохранить видеообложку. Попробуйте ещё раз или обратитесь в поддержку."
+              : "Не удалось загрузить видеообложку.",
         );
       }
       setCovers((current) => ({
