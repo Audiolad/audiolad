@@ -47,6 +47,13 @@ export const PRODUCT_VIDEO_EXPORT_MAX_ATTEMPTS = 3;
 export const PRODUCT_VIDEO_EXPORT_IDLE_INTERVAL_MS = 5_000;
 export const PRODUCT_VIDEO_EXPORT_HEARTBEAT_INTERVAL_MS = 5 * 60_000;
 export const PRODUCT_VIDEO_EXPORT_STALL_MS = 10 * 60_000;
+/** Author cabinet polls active MP4 jobs. Fast enough to see the bar move. */
+export const PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS = 2_000;
+/**
+ * libx264 preset for a static cover. Chosen after the 16-minute still-image
+ * benchmark in docs/PRODUCT_VIDEO_RENDER_PRESET.md. Audio stays AAC 192k.
+ */
+export const PRODUCT_VIDEO_X264_PRESET = "veryfast";
 
 export function isProductVideoExportAuthorSlug(
   slug: string | null | undefined,
