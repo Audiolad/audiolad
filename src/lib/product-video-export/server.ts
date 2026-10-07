@@ -40,6 +40,7 @@ export type ProductVideoRenderJobState = {
   attempt_count: number;
   error_code: string | null;
   error_message_safe: string | null;
+  progress_percent: number | null;
   created_at: string;
   completed_at: string | null;
 };
@@ -339,7 +340,7 @@ export async function getProductVideoRenderStates(params: {
       service
         .from("product_video_render_jobs")
         .select(
-          "id, practice_id, author_id, audio_item_id, orientation, source_audio_path, source_cover_path, output_storage_path, status, attempt_count, error_code, error_message_safe, created_at, completed_at",
+          "id, practice_id, author_id, audio_item_id, orientation, source_audio_path, source_cover_path, output_storage_path, status, attempt_count, error_code, error_message_safe, progress_percent, created_at, completed_at",
         )
         .eq("practice_id", practiceId)
         .eq("audio_item_id", audioItemId)

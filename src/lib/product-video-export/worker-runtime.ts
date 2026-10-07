@@ -17,6 +17,10 @@ import {
   ProductVideoRenderStalledError,
   renderProductVideo,
 } from "./ffmpeg";
+import {
+  PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS,
+  createProductVideoProgressPersister,
+} from "./progress";
 
 export type ClaimedProductVideoRenderJob = {
   id: string;
@@ -35,6 +39,10 @@ export type ProductVideoRenderWorkerPort = {
   recoverStaleJobs: () => Promise<void>;
   claimJob: () => Promise<ClaimedProductVideoRenderJob | null>;
   renewLease: (job: ClaimedProductVideoRenderJob) => Promise<boolean>;
+  reportProgress: (
+    job: ClaimedProductVideoRenderJob,
+    percent: number,
+  ) => Promise<boolean>;
   executeJob: (
     job: ClaimedProductVideoRenderJob,
     signal: AbortSignal,
@@ -132,6 +140,19 @@ export function createProductVideoRenderWorkerPort(
       return data === true;
     },
 
+    async reportProgress(job, percent) {
+      const { data, error } = await service.rpc(
+        "report_product_video_render_progress",
+        {
+          p_job_id: job.id,
+          p_lease_token: job.lease_token,
+          p_progress_percent: percent,
+        },
+      );
+      if (error) throw error;
+      return data === true;
+    },
+
     async executeJob(job, signal) {
       const workspace = await mkdtemp(join(tmpdir(), "audiolad-product-video-"));
       try {
@@ -156,13 +177,28 @@ export function createProductVideoRenderWorkerPort(
           writeFile(audioPath, Buffer.from(await audioDownload.data.arrayBuffer())),
           writeFile(coverPath, Buffer.from(await coverDownload.data.arrayBuffer())),
         ]);
+        const persister = createProductVideoProgressPersister({
+          minIntervalMs: PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS,
+          write: async (percent) => {
+            try {
+              await this.reportProgress(job, percent);
+            } catch (error) {
+              console.error(
+                "product_video_progress_write_error",
+                error instanceof Error ? error.message : "unknown",
+              );
+            }
+          },
+        });
         const result = await renderProductVideo({
           audioPath,
           coverPath,
           outputPath,
           orientation: job.orientation,
           signal,
+          onProgress: (percent) => persister.note(percent),
         });
+        await persister.settle();
 
         const stillOwns = await this.renewLease(job);
         if (!stillOwns || signal.aborted) {
@@ -191,6 +227,7 @@ export function createProductVideoRenderWorkerPort(
         .from("product_video_render_jobs")
         .update({
           status: "completed",
+          progress_percent: 100,
           completed_at: new Date().toISOString(),
           lease_token: null,
           lease_expires_at: null,
