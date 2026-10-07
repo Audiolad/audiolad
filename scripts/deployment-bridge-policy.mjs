@@ -293,6 +293,53 @@ export function evaluateGate(facts) {
     };
   }
 
+  // Squash and other single-parent commits have no second parent. If the
+  // deploy SHA itself has no usable required evidence, a tree-identical
+  // merged PR head may supply it. Two-parent merges never use this path.
+  // A green deploy SHA already returned above, so a twin cannot veto it.
+  if (normalizedParents.length < 2 && facts.treeTwinSha != null && facts.treeTwinSha !== "") {
+    let twinSha;
+    try {
+      twinSha = assertCommitSha(facts.treeTwinSha);
+    } catch {
+      return { ok: false, error: "ci_malformed", deploySha: requestedSha, originMainSha };
+    }
+    if (twinSha === requestedSha) {
+      return { ok: false, error: "ci_malformed", deploySha: requestedSha, originMainSha };
+    }
+    const twinTree = facts.trees?.[twinSha];
+    try {
+      assertTreeSha(twinTree);
+    } catch {
+      return { ok: false, error: "ci_malformed", deploySha: requestedSha, originMainSha };
+    }
+    if (twinTree !== deployTree) {
+      return {
+        ok: false,
+        error: "tree_mismatch",
+        deploySha: requestedSha,
+        originMainSha,
+      };
+    }
+    const twinEvidence = subjectEvidence(facts.checks?.[twinSha], facts.statuses?.[twinSha]);
+    if (!twinEvidence.clean) {
+      return {
+        ok: false,
+        error: twinEvidence.error,
+        deploySha: requestedSha,
+        originMainSha,
+      };
+    }
+    if (twinEvidence.required) {
+      return {
+        ok: true,
+        deploySha: requestedSha,
+        ciSubjectSha: twinSha,
+        originMainSha,
+      };
+    }
+  }
+
   return {
     ok: false,
     error: "ci_not_green",
@@ -587,6 +634,97 @@ function normalizeStatuses(payload) {
   }));
 }
 
+function normalizeListedSha(value) {
+  return assertCommitSha(String(value ?? "").trim().toLowerCase());
+}
+
+// Head of the PR whose merge_commit_sha is exactly the deploy SHA.
+// Other associated PRs are ignored. Ambiguous or truncated lists fail closed.
+export function selectTreeTwinSha(pulls, deploySha) {
+  const normalizedDeploy = assertCommitSha(deploySha);
+  if (!Array.isArray(pulls)) {
+    throw new Error("ci_malformed");
+  }
+  if (pulls.length >= 100) {
+    throw new Error("ci_truncated");
+  }
+  const heads = [];
+  for (const pr of pulls) {
+    if (pr == null || typeof pr !== "object" || Array.isArray(pr)) {
+      throw new Error("ci_malformed");
+    }
+    const rawMerge = pr.merge_commit_sha;
+    if (rawMerge == null || rawMerge === "") {
+      continue;
+    }
+    let mergeSha;
+    try {
+      mergeSha = normalizeListedSha(rawMerge);
+    } catch {
+      throw new Error("ci_malformed");
+    }
+    if (mergeSha !== normalizedDeploy) {
+      continue;
+    }
+    const rawHead = pr.head && typeof pr.head === "object" ? pr.head.sha : null;
+    let headSha;
+    try {
+      headSha = normalizeListedSha(rawHead);
+    } catch {
+      throw new Error("ci_malformed");
+    }
+    if (headSha === normalizedDeploy) {
+      throw new Error("ci_malformed");
+    }
+    if (!heads.includes(headSha)) {
+      heads.push(headSha);
+    }
+  }
+  if (heads.length > 1) {
+    throw new Error("ci_malformed");
+  }
+  return heads[0] ?? null;
+}
+
+function commitTreeSha(payload, expectedSha) {
+  if (payload == null || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("ci_malformed");
+  }
+  let sha;
+  try {
+    sha = normalizeListedSha(payload.sha);
+  } catch {
+    throw new Error("ci_malformed");
+  }
+  if (sha !== expectedSha) {
+    throw new Error("ci_malformed");
+  }
+  try {
+    return assertTreeSha(String(payload.commit?.tree?.sha ?? "").trim().toLowerCase());
+  } catch {
+    throw new Error("ci_malformed");
+  }
+}
+
+async function discoverTreeTwin(deps, deploySha) {
+  const repository = assertRepository(deps.repository);
+  const pulls = await githubRequest(deps.request, {
+    token: deps.token,
+    method: "GET",
+    path: `/repos/${repository}/commits/${deploySha}/pulls?per_page=100`,
+  });
+  const headSha = selectTreeTwinSha(pulls, deploySha);
+  if (headSha == null) {
+    return null;
+  }
+  const commitPayload = await githubRequest(deps.request, {
+    token: deps.token,
+    method: "GET",
+    path: `/repos/${repository}/commits/${headSha}`,
+  });
+  return { sha: headSha, tree: commitTreeSha(commitPayload, headSha) };
+}
+
 async function loadCi(deps, sha) {
   assertCommitSha(sha);
   const repository = assertRepository(deps.repository);
@@ -654,14 +792,12 @@ export async function loadGateFacts(deps) {
     [commitSha]: assertTreeSha(treeResult.stdout.trim()),
   };
 
-  const ciSubjects = [commitSha];
   if (parents.length === 2) {
     const headTree = deps.git(["rev-parse", `${parents[1]}^{tree}`]);
     if (headTree.status !== 0) {
       throw new Error("git_tree_failed");
     }
     trees[parents[1]] = assertTreeSha(headTree.stdout.trim());
-    ciSubjects.push(parents[1]);
   } else if (parents.length > 2) {
     return {
       requestedSha: commitSha,
@@ -677,10 +813,30 @@ export async function loadGateFacts(deps) {
 
   const checks = {};
   const statuses = {};
-  for (const subject of ciSubjects) {
-    const loaded = await loadCi(deps, subject);
-    checks[subject] = loaded.checks;
-    statuses[subject] = loaded.statuses;
+  const deployCi = await loadCi(deps, commitSha);
+  checks[commitSha] = deployCi.checks;
+  statuses[commitSha] = deployCi.statuses;
+  if (parents.length === 2) {
+    const headCi = await loadCi(deps, parents[1]);
+    checks[parents[1]] = headCi.checks;
+    statuses[parents[1]] = headCi.statuses;
+  }
+
+  let treeTwinSha = null;
+  if (parents.length < 2) {
+    const deployEvidence = subjectEvidence(checks[commitSha], statuses[commitSha]);
+    if (deployEvidence.clean && !deployEvidence.required) {
+      const twin = await discoverTreeTwin(deps, commitSha);
+      if (twin) {
+        trees[twin.sha] = twin.tree;
+        treeTwinSha = twin.sha;
+        if (twin.tree === trees[commitSha]) {
+          const twinCi = await loadCi(deps, twin.sha);
+          checks[twin.sha] = twinCi.checks;
+          statuses[twin.sha] = twinCi.statuses;
+        }
+      }
+    }
   }
 
   return {
@@ -690,6 +846,7 @@ export async function loadGateFacts(deps) {
     isAncestor: true,
     parents,
     trees,
+    treeTwinSha,
     checks,
     statuses,
   };

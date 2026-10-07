@@ -17,8 +17,12 @@ on:
   repository_dispatch:
     types: [deployment-bridge]
 
+# pull-requests: read lets the gate resolve the merged PR head when a
+# squash SHA has no check runs. The token cannot edit pull requests.
+# Merging this workflow does not deploy production.
 permissions:
   contents: read
+  pull-requests: read
   checks: write
   statuses: write
 
