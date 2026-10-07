@@ -9,6 +9,8 @@
  * Later names in each list are fallbacks for the previous payload.
  */
 
+import { copySafeProse, formatAiCompanyTaskCopy } from "@/lib/admin/ai-company-task-copy";
+
 export const NO_DATA = "Нет данных";
 
 export const HEARTBEAT_STALE_MS = 60 * 60 * 1000;
@@ -420,6 +422,7 @@ export type CompanyTask = {
   lastEventAt: string | null;
   lastEventText: string | null;
   brief: string | null;
+  briefForCopy: string | null;
   source: string | null;
   merged: boolean | null;
   releaseHold: string | null;
@@ -596,6 +599,7 @@ export type TaskDetailModel = {
   outcome: string;
   completedAt: string;
   stageBadge: StageBadge;
+  copyText: string;
 };
 
 export type StageTone =
@@ -658,6 +662,7 @@ export type GateCard = {
   request: string;
   nextAction: string;
   historical: boolean;
+  copyText: string;
 };
 
 export type ExecutorCard = {
@@ -1135,6 +1140,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     lastEventAt: readString(record, CORE_FIELD_MAP.task.lastEventAt) ?? lastEvent.at ?? run?.lastEventAt ?? null,
     lastEventText: lastEvent.text ?? run?.lastEvent ?? null,
     brief: brief ? clip(brief, 20000) : null,
+    briefForCopy: brief ? copySafeProse(brief) : null,
     source: readString(record, CORE_FIELD_MAP.task.source),
     merged: readMergedFlag(record, CORE_FIELD_MAP.task.merged),
     releaseHold: readString(record, CORE_FIELD_MAP.task.releaseHold),
@@ -2051,6 +2057,7 @@ function presentGate(gate: GateFact, tasks: CompanyTask[], codexFallback: string
     request: shownRequest,
     nextAction,
     historical: gate.archived,
+    copyText: "",
   };
 }
 
@@ -2393,6 +2400,22 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   return staleStage("Нет данных", executedAt);
 }
 
+function snapshotCopyLabel(snapshotIso: string): string {
+  const at = formatDateTime(snapshotIso);
+  return at === NO_DATA ? at : `${at} МСК`;
+}
+
+function evidenceHref(task: CompanyTask): string | null {
+  const proof = evidenceRecord(task.executiveRun?.productionProof);
+  return safeProductionUrl(proof ? readString(proof, CORE_FIELD_MAP.evidence.url) : null);
+}
+
+function decisionKindFor(label: string): "decision" | "blocked" | "none" {
+  if (label === "Нужно решение") return "decision";
+  if (label === "Заблокирована") return "blocked";
+  return "none";
+}
+
 function buildTaskDetail(
   task: CompanyTask,
   events: CompanyEvent[],
@@ -2400,6 +2423,7 @@ function buildTaskDetail(
   codexDisconnected: boolean,
   snapshotIso: string,
   gates: GateFact[],
+  codexFallback: string | null,
 ): TaskDetailModel {
   const linked = linkedEvents(task, events);
   const receipt = taskReceipt(task, events);
@@ -2416,6 +2440,53 @@ function buildTaskDetail(
     .find(Boolean);
   const panel = engineeringPanel(task, events);
   const executor = taskExecutor(task);
+  const stageBadge = resolveStageBadge(task, events, snapshotIso, gates);
+  const relatedGate = gates.find(
+    (gate) =>
+      !gate.archived &&
+      gate.taskId != null &&
+      (gate.taskId === task.id || (task.githubIssueNumber != null && gate.taskId === String(task.githubIssueNumber))),
+  );
+  const gateFact = relatedGate ?? gateFromTask(task);
+  const presented = gateFact ? presentGate(gateFact, [task], codexFallback) : null;
+  const decisionKind = decisionKindFor(stageBadge.label);
+  const links = [
+    prHref ? { label: "PR", href: prHref } : null,
+    sourceHref ? { label: "Источник", href: sourceHref } : null,
+    evidenceHref(task) ? { label: "Evidence", href: evidenceHref(task) as string } : null,
+  ].filter((link): link is { label: string; href: string } => link != null);
+  const copyText = formatAiCompanyTaskCopy({
+    title: task.title,
+    taskId: task.id ?? NO_DATA,
+    runId: task.executiveRun?.runId ?? null,
+    brief: task.briefForCopy,
+    stageLabel: stageBadge.label,
+    stageDetail: stageBadge.detail,
+    executor: executor.id ? executorDisplayName(executor.id) : NO_DATA,
+    decisionKind: presented?.historical ? "none" : decisionKind,
+    decisionOwner: presented && presented.decisionOwner !== NO_DATA ? presented.decisionOwner : null,
+    reason: presented?.reason ?? stageBadge.detail,
+    requiredDecision: presented?.request ?? null,
+    requiredAction: presented?.nextAction ?? task.nextStep,
+    createdAt: formatDateTime(task.createdAt),
+    receivedAt: receipt
+      ? receipt.kind === "received"
+        ? formatDateTime(receipt.at)
+        : `${formatDateTime(receipt.at)} (создание записи, не получение и не обновление)`
+      : NO_DATA,
+    startedAt: formatDateTime(startedAt(task, events)),
+    lastEventAt: formatDateTime(task.lastEventAt),
+    completedAt: taskIsClosed(task, events)
+      ? completed
+        ? formatDateTime(completed)
+        : "Время завершения не сохранено"
+      : formatDateTime(null),
+    snapshotAt: snapshotCopyLabel(snapshotIso),
+    result: outcomeLabel(task, events, codexDisconnected),
+    nextStep: task.nextStep,
+    links,
+    note: presented?.historical ? "Историческая блокировка остаётся в истории и не требует нового решения." : null,
+  });
   return {
     key: task.id ?? (task.githubIssueNumber != null ? `issue-${task.githubIssueNumber}` : `task-${index}`),
     title: task.title,
@@ -2454,8 +2525,9 @@ function buildTaskDetail(
       ? completed
         ? formatDateTime(completed)
         : "Время завершения не сохранено"
-      : formatDateTime(null),
-    stageBadge: resolveStageBadge(task, events, snapshotIso, gates),
+        : formatDateTime(null),
+    stageBadge,
+    copyText,
   };
 }
 
@@ -2467,6 +2539,7 @@ function toTodayRow(
   codexDisconnected: boolean,
   snapshotIso: string,
   gates: GateFact[],
+  codexFallback: string | null,
 ): TodayRowModel {
   return {
     key: task.id ?? `today-${index}`,
@@ -2475,7 +2548,7 @@ function toTodayRow(
     taskId: task.id ?? NO_DATA,
     statusLabel: taskStatusLabel(task.status),
     agentLabel: roleLabel(task.producerAgentSlug),
-    detail: buildTaskDetail(task, events, index, codexDisconnected, snapshotIso, gates),
+    detail: buildTaskDetail(task, events, index, codexDisconnected, snapshotIso, gates, codexFallback),
   };
 }
 
@@ -2564,7 +2637,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
         nextStep: task.nextStep ? clip(task.nextStep, 400) : NO_DATA,
         codexNote,
         engineering: panel,
-        detail: buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates),
+        detail: buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
       } satisfies ActiveTaskCard;
     });
 
@@ -2572,7 +2645,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .filter(({ task }) => !taskIsClosed(task, status.events))
     .filter(({ task }) => !hasActivity(task, status.events) && !(task.id != null && currentIds.has(task.id)))
     .map(({ task, index }) =>
-      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates),
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
   const receiptKnown = status.tasks.some((task) => taskReceipt(task, status.events)?.kind === "received");
@@ -2581,7 +2654,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .filter((item) => item.receipt?.kind === "received" && sameMoscowDay(item.receipt.at, status.generatedAt))
     .sort((left, right) => compareNewest(left.receipt!.at, right.receipt!.at, left.index, right.index))
     .map((item) =>
-      toTodayRow(item.task, status.events, item.index, item.receipt!.at, codexDisconnected, status.generatedAt, status.currentGates),
+      toTodayRow(item.task, status.events, item.index, item.receipt!.at, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
   const todayCreated = indexed
@@ -2589,7 +2662,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .filter(({ task }) => sameMoscowDay(task.createdAt, status.generatedAt))
     .sort((left, right) => compareNewest(left.task.createdAt, right.task.createdAt, left.index, right.index))
     .map(({ task, index }) =>
-      toTodayRow(task, status.events, index, task.createdAt!, codexDisconnected, status.generatedAt, status.currentGates),
+      toTodayRow(task, status.events, index, task.createdAt!, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
   const todayWorkEvents = status.events
@@ -2619,7 +2692,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .filter((item) => sameMoscowDay(item.completedAt, status.generatedAt))
     .sort((left, right) => compareNewest(left.completedAt, right.completedAt, left.index, right.index))
     .map((item) =>
-      toTodayRow(item.task, status.events, item.index, item.completedAt!, codexDisconnected, status.generatedAt, status.currentGates),
+      toTodayRow(item.task, status.events, item.index, item.completedAt!, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
   const dated = closed.filter((item) => item.completedAt);
@@ -2637,7 +2710,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     )
     .sort((left, right) => (parseInstant(right.completedAt) ?? -1) - (parseInstant(left.completedAt) ?? -1))
     .map((item) =>
-      buildTaskDetail(item.task, status.events, item.index, codexDisconnected, status.generatedAt, status.currentGates),
+      buildTaskDetail(item.task, status.events, item.index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
   const history = filters.historyBefore
@@ -2655,6 +2728,70 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       return gate ? [gate] : [];
     }),
   ];
+  const copyTextForGate = (gate: GateFact, card: GateCard): string => {
+    if (card.historical) {
+      return formatAiCompanyTaskCopy({
+        title: card.taskTitle,
+        taskId: gate.taskId ?? NO_DATA,
+        runId: null,
+        brief: null,
+        stageLabel: "Историческая блокировка",
+        stageDetail: card.reason,
+        executor: NO_DATA,
+        decisionKind: "none",
+        decisionOwner: card.decisionOwner === NO_DATA ? null : card.decisionOwner,
+        reason: card.reason,
+        requiredDecision: null,
+        requiredAction: null,
+        createdAt: NO_DATA,
+        receivedAt: NO_DATA,
+        startedAt: NO_DATA,
+        lastEventAt: NO_DATA,
+        completedAt: NO_DATA,
+        snapshotAt: snapshotCopyLabel(status.generatedAt),
+        result: NO_DATA,
+        nextStep: null,
+        links: [],
+        note: `Историческая блокировка. Причина: ${card.reason}. Кто был записан владельцем: ${card.decisionOwner}.`,
+      });
+    }
+    const task = gate.taskId ? findTaskByReference(status.tasks, gate.taskId) : null;
+    if (task) {
+      return buildTaskDetail(
+        task,
+        status.events,
+        0,
+        codexDisconnected,
+        status.generatedAt,
+        status.currentGates,
+        codexFallback,
+      ).copyText;
+    }
+    return formatAiCompanyTaskCopy({
+      title: card.taskTitle,
+      taskId: gate.taskId ?? NO_DATA,
+      runId: null,
+      brief: null,
+      stageLabel: "Нужно решение",
+      stageDetail: card.reason,
+      executor: NO_DATA,
+      decisionKind: "decision",
+      decisionOwner: card.decisionOwner === NO_DATA ? null : card.decisionOwner,
+      reason: card.reason,
+      requiredDecision: card.request,
+      requiredAction: card.nextAction,
+      createdAt: NO_DATA,
+      receivedAt: NO_DATA,
+      startedAt: NO_DATA,
+      lastEventAt: NO_DATA,
+      completedAt: NO_DATA,
+      snapshotAt: snapshotCopyLabel(status.generatedAt),
+      result: NO_DATA,
+      nextStep: null,
+      links: [],
+      note: null,
+    });
+  };
   const decisions: GateCard[] = [];
   const seenDecisions = new Set<string>();
   for (const gate of decisionSources) {
@@ -2663,7 +2800,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     const dedupe = `${card.taskTitle}|${card.reason}`;
     if (seenDecisions.has(dedupe)) continue;
     seenDecisions.add(dedupe);
-    decisions.push(card);
+    decisions.push({ ...card, copyText: copyTextForGate(gate, card) });
   }
 
   const archivedBlockers = [
@@ -2685,8 +2822,9 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       return [gate];
     }),
   ].flatMap((gate) => {
-    const card = presentGate({ ...gate, archived: true }, status.tasks, codexFallback);
-    return card ? [card] : [];
+    const archivedGate = { ...gate, archived: true };
+    const card = presentGate(archivedGate, status.tasks, codexFallback);
+    return card ? [{ ...card, copyText: copyTextForGate(archivedGate, card) }] : [];
   });
 
   const executorCards = buildExecutors(status, now, codexDisconnected, codexFallback);

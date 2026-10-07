@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
+import { formatAiCompanyTaskCopy } from "../src/lib/admin/ai-company-task-copy";
 import {
   AI_COMPANY_OPEN_ROWS_KEY,
   AI_COMPANY_SCROLL_KEY,
@@ -1487,5 +1488,291 @@ assert.match(staleButton, /aria-expanded="false"/);
 assert.match(staleButton, /Нет свежих данных/);
 assert.doesNotMatch(staleButton, /executive_dispatched/);
 assert.doesNotMatch(staleButton, /Технический статус|Идентификатор задачи/);
+assert.doesNotMatch(staleButton, /Скопировать данные/);
+assert.match(nowOpen, /aria-label="Скопировать данные задачи"/);
+
+const plainCopy = formatAiCompanyTaskCopy({
+  title: "Обычная задача",
+  taskId: "copy-plain",
+  runId: "bc-copy-plain",
+  brief: null,
+  stageLabel: "В очереди",
+  stageDetail: null,
+  executor: "Cursor",
+  decisionKind: "none",
+  decisionOwner: null,
+  reason: null,
+  requiredDecision: null,
+  requiredAction: null,
+  createdAt: "Нет данных",
+  receivedAt: "07.10.2026, 09:00",
+  startedAt: "Нет данных",
+  lastEventAt: "07.10.2026, 09:10",
+  completedAt: "Нет данных",
+  snapshotAt: "07.10.2026, 09:39 МСК",
+  result: "Нет данных",
+  nextStep: "Сверить контракт",
+  links: [{ label: "PR", href: "https://github.com/Audiolad/audiolad/pull/801" }],
+  note: null,
+});
+assert.match(plainCopy, /Отдельное решение по этой задаче в снимке не записано/);
+assert.match(plainCopy, /Идентификатор запуска: bc-copy-plain/);
+assert.match(plainCopy, /PR: https:\/\/github.com\/Audiolad\/audiolad\/pull\/801/);
+assert.doesNotMatch(plainCopy, /Нужно решение\./);
+assert.doesNotMatch(plainCopy, /Founder Gate/);
+
+const blockedCopy = formatAiCompanyTaskCopy({
+  title: "Блок без владельца",
+  taskId: "copy-blocked",
+  runId: null,
+  brief: "Короткий блок",
+  stageLabel: "Заблокирована",
+  stageDetail: "Нет данных: Нет файла",
+  executor: "Нет данных",
+  decisionKind: "blocked",
+  decisionOwner: null,
+  reason: "Нет файла",
+  requiredDecision: null,
+  requiredAction: null,
+  createdAt: "Нет данных",
+  receivedAt: "Нет данных",
+  startedAt: "Нет данных",
+  lastEventAt: "Нет данных",
+  completedAt: "Нет данных",
+  snapshotAt: "07.10.2026, 09:39 МСК",
+  result: "Нет данных",
+  nextStep: null,
+  links: [],
+  note: null,
+});
+assert.match(blockedCopy, /Задача заблокирована/);
+assert.match(blockedCopy, /Кто вправе его принять: Нет данных/);
+assert.match(blockedCopy, /Постановка:\nКороткий блок/);
+assert.doesNotMatch(blockedCopy, /Кто вправе его принять: Oriy/);
+
+const oriyCopy = formatAiCompanyTaskCopy({
+  title: "Решение Ория",
+  taskId: "copy-oriy",
+  runId: "bc-oriy",
+  brief: "Постановка для Ория",
+  stageLabel: "Нужно решение",
+  stageDetail: "Oriy: Нужно подтвердить формулировку каталога",
+  executor: "Нет данных",
+  decisionKind: "decision",
+  decisionOwner: "Oriy",
+  reason: "Нужно подтвердить формулировку каталога",
+  requiredDecision: "Подтвердить текст",
+  requiredAction: "Орий отвечает в задаче",
+  createdAt: "Нет данных",
+  receivedAt: "Нет данных",
+  startedAt: "Нет данных",
+  lastEventAt: "Нет данных",
+  completedAt: "Нет данных",
+  snapshotAt: "07.10.2026, 09:39 МСК",
+  result: "Нет данных",
+  nextStep: null,
+  links: [],
+  note: null,
+});
+assert.match(oriyCopy, /Нужно решение\./);
+assert.match(oriyCopy, /Какое решение требуется: Подтвердить текст/);
+assert.match(oriyCopy, /Кто вправе его принять: Oriy/);
+assert.match(oriyCopy, /Почему: Нужно подтвердить формулировку каталога/);
+assert.doesNotMatch(oriyCopy, /Founder Gate/);
+assert.doesNotMatch(oriyCopy, /Кто вправе его принять: Сергей/);
+
+const founderCopy = formatAiCompanyTaskCopy({
+  title: "Решение Сергея",
+  taskId: "copy-sergey",
+  runId: null,
+  brief: "Постановка для Сергея",
+  stageLabel: "Нужно решение",
+  stageDetail: "Сергей: Нет правки обложки",
+  executor: "Нет данных",
+  decisionKind: "decision",
+  decisionOwner: "Сергей",
+  reason: "Нет правки обложки",
+  requiredDecision: "Приложить файл обложки",
+  requiredAction: "Сергей подтверждает файл",
+  createdAt: "Нет данных",
+  receivedAt: "Нет данных",
+  startedAt: "Нет данных",
+  lastEventAt: "Нет данных",
+  completedAt: "Нет данных",
+  snapshotAt: "07.10.2026, 09:39 МСК",
+  result: "Нет данных",
+  nextStep: null,
+  links: [],
+  note: null,
+});
+assert.match(founderCopy, /Кто вправе его принять: Сергей/);
+assert.match(founderCopy, /Какое решение требуется: Приложить файл обложки/);
+assert.doesNotMatch(founderCopy, /Кто вправе его принять: Oriy/);
+assert.doesNotMatch(founderCopy, /Founder Gate/);
+
+const missingCopy = formatAiCompanyTaskCopy({
+  title: "Пустая постановка",
+  taskId: "copy-empty",
+  runId: "not a run id",
+  brief: null,
+  stageLabel: "В очереди",
+  stageDetail: null,
+  executor: "Нет данных",
+  decisionKind: "none",
+  decisionOwner: null,
+  reason: null,
+  requiredDecision: null,
+  requiredAction: null,
+  createdAt: "Нет данных",
+  receivedAt: "Нет данных",
+  startedAt: "Нет данных",
+  lastEventAt: "Нет данных",
+  completedAt: "Нет данных",
+  snapshotAt: "Нет данных",
+  result: "Нет данных",
+  nextStep: null,
+  links: [{ label: "Внутреннее", href: "http://files.example/secret" }],
+  note: null,
+});
+assert.match(missingCopy, /Идентификатор запуска: Нет данных/);
+assert.match(missingCopy, /Постановка:\nНет данных/);
+assert.match(missingCopy, /Снимок источника: Нет данных/);
+assert.doesNotMatch(missingCopy, /http:\/\/files\.example/);
+
+const secretBrief = "Текст до секрета. api_key=super-secret-value CODEX_ACCESS_TOKEN=tok_live_123 user@example.com текст после.";
+const secretCopy = formatAiCompanyTaskCopy({
+  title: "Задача с секретом в постановке",
+  taskId: "copy-secret",
+  runId: "bc-secret",
+  brief: secretBrief,
+  stageLabel: "В очереди",
+  stageDetail: null,
+  executor: "Нет данных",
+  decisionKind: "none",
+  decisionOwner: null,
+  reason: null,
+  requiredDecision: null,
+  requiredAction: null,
+  createdAt: "Нет данных",
+  receivedAt: "Нет данных",
+  startedAt: "Нет данных",
+  lastEventAt: "Нет данных",
+  completedAt: "Нет данных",
+  snapshotAt: "07.10.2026, 09:39 МСК",
+  result: "Нет данных",
+  nextStep: null,
+  links: [],
+  note: null,
+});
+assert.match(secretCopy, /Текст до секрета/);
+assert.match(secretCopy, /текст после/);
+assert.doesNotMatch(secretCopy, /super-secret-value|tok_live_123|user@example.com/);
+
+const longBrief = `Первая строка постановки.\n\n${"А".repeat(600)}\nКОНЕЦ-ПОСТАНОВКИ`;
+const copyFixture = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [
+    {
+      id: "copy-plain",
+      title: "Обычная задача табло",
+      status: "queued",
+      executor: "cursor",
+      brief: longBrief,
+      executive_run: {
+        run_id: "bc-copy-plain",
+        pr_url: "https://github.com/Audiolad/audiolad/pull/801",
+      },
+    },
+    {
+      id: "copy-oriy",
+      title: "Решение Ория",
+      status: "blocked",
+      blocked_reason: "Нужно подтвердить формулировку каталога",
+      decision_owner: "oriy",
+      request: "Подтвердить текст",
+      brief: "Постановка для Ория",
+    },
+    {
+      id: "copy-sergey",
+      title: "Решение Сергея",
+      status: "blocked",
+      blocked_reason: "Нет правки обложки",
+      decision_owner: "Sergey",
+      request: "Приложить файл обложки",
+      next_action: "Сергей подтверждает файл",
+      brief: "Постановка для Сергея",
+    },
+    {
+      id: "copy-blocked",
+      title: "Блок без владельца",
+      status: "blocked",
+      blocked_reason: "Нет файла",
+    },
+    {
+      id: "copy-secret",
+      title: "Задача с секретом в постановке",
+      status: "queued",
+      brief: secretBrief,
+    },
+  ],
+  gates: [
+    {
+      id: "g-oriy",
+      task_id: "copy-oriy",
+      reason: "Нужно подтвердить формулировку каталога",
+      decision_owner: "oriy",
+      request: "Подтвердить текст",
+      next_action: "Орий отвечает в задаче",
+    },
+    {
+      id: "g-sergey",
+      task_id: "copy-sergey",
+      reason: "Нет правки обложки",
+      decision_owner: "Sergey",
+      request: "Приложить файл обложки",
+      next_action: "Сергей подтверждает файл",
+    },
+  ],
+})!;
+const copyModel = buildAiCompanyDashboard(copyFixture, parseHistoryFilters({}));
+const plainTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-plain");
+assert.ok(plainTask);
+assert.match(plainTask.copyText, /Идентификатор запуска: bc-copy-plain/);
+assert.match(plainTask.copyText, /КОНЕЦ-ПОСТАНОВКИ/);
+assert.match(plainTask.copyText, /Первая строка постановки\.\n/);
+assert.doesNotMatch(plainTask.brief, /\n/);
+assert.match(plainTask.copyText, /PR: https:\/\/github.com\/Audiolad\/audiolad\/pull\/801/);
+const oriyTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-oriy");
+const oriyGate = copyModel.decisions.find((gate) => gate.taskTitle === "Решение Ория");
+assert.ok(oriyTask && oriyGate);
+assert.equal(oriyGate.decisionOwner, "Oriy");
+assert.equal(oriyTask.copyText, oriyGate.copyText);
+assert.match(oriyTask.copyText, /Кто вправе его принять: Oriy/);
+assert.doesNotMatch(oriyTask.copyText, /Founder Gate/);
+const sergeyTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-sergey");
+const sergeyGate = copyModel.decisions.find((gate) => gate.taskTitle === "Решение Сергея");
+assert.ok(sergeyTask && sergeyGate);
+assert.equal(sergeyGate.decisionOwner, "Сергей");
+assert.equal(sergeyTask.copyText, sergeyGate.copyText);
+assert.match(sergeyTask.copyText, /Кто вправе его принять: Сергей/);
+assert.match(sergeyTask.copyText, /Какое решение требуется: Приложить файл обложки/);
+assert.doesNotMatch(sergeyTask.copyText, /Кто вправе его принять: Oriy/);
+const blockedTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-blocked");
+assert.ok(blockedTask);
+assert.equal(blockedTask.stageBadge.label, "Заблокирована");
+assert.match(blockedTask.copyText, /Задача заблокирована/);
+assert.match(blockedTask.copyText, /Кто вправе его принять: Нет данных/);
+const secretTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-secret");
+assert.ok(secretTask);
+assert.doesNotMatch(secretTask.copyText, /super-secret-value|tok_live_123|user@example.com/);
+assert.match(secretTask.copyText, /текст после/);
+
+const copyMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={copyModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
+);
+const plainAt = copyMarkup.indexOf("Обычная задача табло");
+const plainToggle = copyMarkup.slice(copyMarkup.lastIndexOf("<button", plainAt), copyMarkup.indexOf("</button>", plainAt));
+assert.doesNotMatch(plainToggle, /Скопировать данные/);
+assert.match(copyMarkup, /aria-label="Скопировать данные задачи"/);
 
 console.log("ai-company-dashboard-unit: ok");
