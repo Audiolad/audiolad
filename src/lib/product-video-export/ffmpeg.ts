@@ -4,8 +4,14 @@ import { stat } from "node:fs/promises";
 import {
   PRODUCT_VIDEO_EXPORT_STALL_MS,
   PRODUCT_VIDEO_ORIENTATION_META,
+  PRODUCT_VIDEO_X264_PRESET,
   type ProductVideoOrientation,
 } from "./contract";
+import {
+  consumeProductVideoFfmpegProgress,
+  createProductVideoFfmpegProgressState,
+  productVideoPercentFromProgress,
+} from "./progress";
 
 const TERM_GRACE_MS = 2_000;
 
@@ -45,20 +51,94 @@ async function terminate(child: ChildProcess): Promise<void> {
   await new Promise<void>((resolve) => child.once("close", () => resolve()));
 }
 
+async function probeAudioDurationUs(
+  audioPath: string,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  if (signal?.aborted) throw new ProductVideoRenderAbortedError();
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        audioPath,
+      ],
+      { stdio: ["ignore", "pipe", "ignore"] },
+    );
+    let stdout = "";
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      fn();
+    };
+    const onAbort = () => {
+      void terminate(child);
+    };
+    signal?.addEventListener("abort", onAbort);
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.once("error", (error) => finish(() => reject(error)));
+    child.once("close", (code) => {
+      finish(() => {
+        if (signal?.aborted) {
+          reject(new ProductVideoRenderAbortedError());
+          return;
+        }
+        if (code !== 0) {
+          resolve(null);
+          return;
+        }
+        const seconds = Number(stdout.trim());
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+          resolve(null);
+          return;
+        }
+        resolve(Math.round(seconds * 1_000_000));
+      });
+    });
+  });
+}
+
 export async function renderProductVideo(params: {
   audioPath: string;
   coverPath: string;
   outputPath: string;
   orientation: ProductVideoOrientation;
   signal?: AbortSignal;
+  onProgress?: (percent: number) => void;
 }): Promise<{ sizeBytes: number }> {
-  const { audioPath, coverPath, outputPath, orientation, signal } = params;
+  const { audioPath, coverPath, outputPath, orientation, signal, onProgress } = params;
   if (signal?.aborted) throw new ProductVideoRenderAbortedError();
+
+  let durationUs: number | null = null;
+  if (onProgress) {
+    try {
+      durationUs = await probeAudioDurationUs(audioPath, signal);
+    } catch (error) {
+      if (signal?.aborted || error instanceof ProductVideoRenderAbortedError) {
+        throw error instanceof ProductVideoRenderAbortedError
+          ? error
+          : new ProductVideoRenderAbortedError();
+      }
+      durationUs = null;
+    }
+  }
 
   const meta = PRODUCT_VIDEO_ORIENTATION_META[orientation];
   const filter =
     `scale=${meta.width}:${meta.height}:force_original_aspect_ratio=increase,` +
     `crop=${meta.width}:${meta.height},format=yuv420p`;
+  const progressState = createProductVideoFfmpegProgressState();
+  const knownDurationUs = durationUs;
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(
@@ -82,7 +162,7 @@ export async function renderProductVideo(params: {
         "-c:v",
         "libx264",
         "-preset",
-        "medium",
+        PRODUCT_VIDEO_X264_PRESET,
         "-tune",
         "stillimage",
         "-pix_fmt",
@@ -129,7 +209,21 @@ export async function renderProductVideo(params: {
 
     signal?.addEventListener("abort", onAbort);
     arm();
-    child.stdout?.on("data", arm);
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      arm();
+      if (!onProgress || knownDurationUs == null) return;
+      try {
+        for (const sample of consumeProductVideoFfmpegProgress(progressState, chunk)) {
+          if (sample.positionUs == null) continue;
+          const percent = productVideoPercentFromProgress(sample.positionUs, knownDurationUs);
+          if (percent == null) continue;
+          onProgress(percent);
+        }
+      } catch {
+        // A progress parse error must not stop the encode.
+      }
+    });
     child.stderr?.on("data", arm);
     child.once("error", (error) => finish(() => reject(error)));
     child.once("close", (code) => {
