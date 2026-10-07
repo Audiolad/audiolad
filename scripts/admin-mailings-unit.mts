@@ -829,6 +829,10 @@ assert.match(mailingActions, /isOwner:\s*session\.access\.roles\.includes\("owne
 assert.doesNotMatch(mailingActions, /payload\.isOwner|isOwner:\s*payload/);
 const mailingEditor = read("src/components/admin/MailingEditor.tsx");
 assert.match(mailingEditor, /Куда отправить тест/);
+assert.match(mailingEditor, /Яндекс — petpovss@yandex\.ru/);
+assert.match(mailingEditor, /АудиоЛад — 1@audiolad\.ru/);
+assert.match(mailingEditor, /petpovss@yandex\.ru/);
+assert.doesNotMatch(mailingEditor, /petrovss@yandex\.ru/);
 assert.doesNotMatch(mailingEditor, /Тестовый адрес/);
 assert.match(
   mailingEditor,

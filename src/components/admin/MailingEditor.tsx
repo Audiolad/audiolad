@@ -39,6 +39,15 @@ type EditorProps = {
 const fieldClass =
   "mt-1 w-full rounded-xl border border-[#e4d7f4] bg-white px-3 py-2 text-sm text-[#25135c] outline-none focus:border-[#7042c5]";
 
+export const MAILING_TEST_RECIPIENT_PRESETS = [
+  { label: "Яндекс — petpovss@yandex.ru", email: "petpovss@yandex.ru" },
+  { label: "АудиоЛад — 1@audiolad.ru", email: "1@audiolad.ru" },
+] as const;
+
+function isMailingTestPresetSelected(current: string, email: string): boolean {
+  return current.trim().toLowerCase() === email.toLowerCase();
+}
+
 function paragraphsFromText(value: string): string[] {
   return value
     .split(/\n+/)
@@ -305,10 +314,37 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
 
         {canSend ? (
           <div className="space-y-3 border-t border-[#e4d7f4] pt-4">
-            <div className="space-y-1">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Куда отправить тест</p>
+              <div className="flex flex-col items-start gap-2" role="group" aria-label="Готовые адреса для теста">
+                {MAILING_TEST_RECIPIENT_PRESETS.map((preset) => {
+                  const selected = isMailingTestPresetSelected(testEmail, preset.email);
+                  return (
+                    <button
+                      key={preset.email}
+                      type="button"
+                      aria-pressed={selected}
+                      className={`max-w-full rounded-full px-4 py-2 text-left text-sm font-semibold ${
+                        selected
+                          ? "bg-[#7042c5] text-white"
+                          : "border border-[#e4d7f4] text-[#7042c5]"
+                      }`}
+                      onClick={() => setTestEmail(preset.email)}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
               <label className="block text-sm font-semibold">
-                Куда отправить тест
-                <input className={fieldClass} value={testEmail} onChange={(event) => setTestEmail(event.target.value)} placeholder="один адрес" />
+                Адрес
+                <input
+                  className={fieldClass}
+                  value={testEmail}
+                  onChange={(event) => setTestEmail(event.target.value)}
+                  placeholder="один адрес"
+                  aria-label="Адрес для тестового письма"
+                />
               </label>
               <p className="text-xs text-[#7d70a2]">
                 Владелец может ввести один корректный адрес, чтобы проверить отображение в Mail.ru, Yandex, Gmail и других клиентах.
