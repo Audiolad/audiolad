@@ -362,6 +362,7 @@ export function describeJazzRelaxPassportActivity(input: {
     progress: null,
     indeterminate: false,
     statusNotice: null,
+    closeHint: null,
     ...startButton(),
   };
 }
