@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { AI_COMPANY_ROLES, NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
@@ -116,8 +116,74 @@ function HelpNote({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function TaskCopyButton({ text }: { text: string }) {
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  const [phase, setPhase] = useState<"idle" | "copied" | "fallback">("idle");
+
+  async function copy() {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(text);
+      setPhase("copied");
+    } catch {
+      setPhase("fallback");
+    }
+  }
+
+  return (
+    <div className="mt-3 max-w-full" data-task-copy="true">
+      <button
+        type="button"
+        aria-label="Скопировать данные задачи"
+        onClick={(event) => {
+          event.stopPropagation();
+          void copy();
+        }}
+        className="min-h-11 rounded-lg border border-[#7042c5] bg-white px-3 py-2 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+      >
+        Скопировать данные
+      </button>
+      {phase === "copied" ? (
+        <p className="mt-2 text-sm text-[#3f6212]" role="status">
+          Скопировано
+        </p>
+      ) : null}
+      {phase === "fallback" ? (
+        <div className="mt-2 max-w-full">
+          <p className="text-sm text-red-800" role="alert">
+            Буфер обмена недоступен. Текст ниже можно выделить целиком.
+          </p>
+          <textarea
+            ref={areaRef}
+            readOnly
+            value={text}
+            rows={8}
+            className="mt-2 box-border w-full max-w-full whitespace-pre-wrap rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
+            aria-label="Текст задачи для копирования"
+          />
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              const area = areaRef.current;
+              if (!area) return;
+              area.focus();
+              area.select();
+            }}
+            className="mt-2 min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+          >
+            Выделить всё
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
+    <>
+    <TaskCopyButton text={detail.copyText} />
     <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
       <Fact label="Идентификатор задачи" value={detail.taskId} />
       <Fact label="Полный исходный текст постановки" value={detail.brief} />
@@ -166,6 +232,7 @@ function TaskDetail({ detail }: { detail: TaskDetailModel }) {
       <Fact label="Итог" value={detail.outcome} />
       <Fact label="Дата завершения" value={detail.completedAt} />
     </dl>
+    </>
   );
 }
 
@@ -264,6 +331,7 @@ function GateList({
               className={attention ? "border-red-200 bg-white/80" : "border-[#eadff8] bg-white"}
               articleProps={{ "data-decision-owner": gate.decisionOwner }}
             >
+              <TaskCopyButton text={gate.copyText} />
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 {gate.historical ? <Fact label="Метка" value="Историческая блокировка" /> : null}
                 <Fact label="Причина" value={gate.reason} />
