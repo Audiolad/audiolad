@@ -9,10 +9,14 @@ import {
   reconcileAuthorDiscoverySuggestion,
 } from "@/lib/seo-queries/author-discovery";
 import {
+  AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING,
   AUTHOR_SEO_DISCOVERY_SURFACES,
+  authorDiscoverySupplementaryWarning,
   buildAuthorDiscoveryDatabaseMatches,
+  buildExactSeedDiscoveryNotice,
   parseAuthorSeoDiscoverySurface,
   shouldOmitFromWordstatAdditions,
+  type AuthorDiscoveryDatabaseMatch,
 } from "@/lib/seo-queries/author-discovery-status";
 import { SEO_DISCOVERY_DATABASE_LIMIT } from "@/lib/seo-queries/discovery-ranking";
 import {
@@ -84,8 +88,11 @@ export async function POST(request: Request) {
     const { user } = await requireAuthorMembership(authorId);
     assertProductCreateSeoDiscoveryEnabled({ authorId, publicationClass });
 
-    let databaseMatches: Array<Record<string, unknown>> = [];
+    let databaseMatches: AuthorDiscoveryDatabaseMatch[] = [];
     let seedNormalized: string | null = null;
+    let exactSeedNotice: ReturnType<typeof buildExactSeedDiscoveryNotice> = null;
+    let databaseWarning: string | null = null;
+    let databaseStage: string | null = null;
     const databaseNormalized = new Set<string>();
     try {
       const ranked = await loadRankedAnalyzedQueriesForSeed({
@@ -94,6 +101,8 @@ export async function POST(request: Request) {
         surface,
       });
       seedNormalized = ranked.seedNormalized;
+      databaseStage = ranked.supplementaryStage;
+      databaseWarning = authorDiscoverySupplementaryWarning(ranked.supplementaryStage);
       const built = buildAuthorDiscoveryDatabaseMatches({
         surface,
         authorId,
@@ -101,6 +110,17 @@ export async function POST(request: Request) {
         visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT,
       });
       databaseMatches = built.matches;
+      const exactItem = seedNormalized
+        ? ranked.matches.find((item) => item.normalizedQuery === seedNormalized) ??
+          null
+        : null;
+      exactSeedNotice = exactItem
+        ? buildExactSeedDiscoveryNotice({
+            authorId,
+            item: exactItem,
+            shownQueryIds: new Set(built.matches.map((item) => item.queryId)),
+          })
+        : null;
       for (const item of ranked.matches) {
         databaseNormalized.add(item.normalizedQuery);
       }
@@ -108,14 +128,16 @@ export async function POST(request: Request) {
         databaseNormalized.add(hidden);
       }
     } catch (loadError) {
-      console.error(
-        "author_seo_discovery_database_error",
-        loadError instanceof Error ? loadError.message : "unknown",
-      );
+      const stage =
+        loadError instanceof Error
+          ? loadError.message
+          : "seo_discovery_database_failed";
+      console.error("author_seo_discovery_database_error", stage);
       return NextResponse.json(
         {
           error: "Не удалось подобрать запросы из базы АудиоЛада. Попробуйте ещё раз.",
           code: "seo_discovery_database_failed",
+          stage,
         },
         { status: 500 },
       );
@@ -123,10 +145,24 @@ export async function POST(request: Request) {
 
     if (seedNormalized) databaseNormalized.add(seedNormalized);
 
-    const wordstat = await fetchWordstatSuggestions(phrase, {
-      userId: user.id,
-      numPhrases: wordstatNumPhrasesForDiscoverySurface(surface),
-    });
+    let wordstat: Awaited<ReturnType<typeof fetchWordstatSuggestions>>;
+    try {
+      wordstat = await fetchWordstatSuggestions(phrase, {
+        userId: user.id,
+        numPhrases: wordstatNumPhrasesForDiscoverySurface(surface),
+      });
+    } catch (wordstatErrorThrown) {
+      console.info("[wordstat] author_discovery_degraded", {
+        code: "UPSTREAM_ERROR",
+        authorId,
+        phraseLength: phrase.length,
+        thrown:
+          wordstatErrorThrown instanceof Error
+            ? wordstatErrorThrown.message
+            : "unknown",
+      });
+      wordstat = wordstatError("UPSTREAM_ERROR");
+    }
     if (!wordstat.ok) {
       const wordstatWarning =
         wordstat.error.code === "NO_RESULTS"
@@ -148,35 +184,57 @@ export async function POST(request: Request) {
         databaseMatches,
         results: [],
         wordstatWarning,
+        exactSeedNotice,
+        databaseWarning,
+        databaseStage,
       });
     }
 
-    let context;
+    let context: Awaited<ReturnType<typeof loadDiscoveryContextForPhrases>>;
     try {
       context = await loadDiscoveryContextForPhrases({
         authorId,
         phrases: wordstat.data.suggestions.map((item) => item.phrase),
       });
-    } catch (loadError) {
+    } catch (contextError) {
       console.error(
-        "author_seo_discovery_context_error",
-        loadError instanceof Error ? loadError.message : "unknown",
+        "seo_discovery_context_failed",
+        contextError instanceof Error ? contextError.message : "unknown",
       );
-      return NextResponse.json(
-        {
-          error: "Не удалось сопоставить результаты с SEO-базой. Попробуйте ещё раз.",
-          code: "seo_discovery_context_failed",
-        },
-        { status: 500 },
-      );
+      return NextResponse.json({
+        phrase: wordstat.data.phrase,
+        region: wordstat.data.region,
+        periodLabel: wordstat.data.periodLabel,
+        databaseMatches,
+        results: [],
+        wordstatWarning: AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING,
+        exactSeedNotice,
+        databaseWarning,
+        databaseStage,
+        contextStage: "seo_discovery_context_failed",
+      });
+    }
+    if (context.failedStage) {
+      console.error("seo_discovery_context_failed", context.failedStage);
+      return NextResponse.json({
+        phrase: wordstat.data.phrase,
+        region: wordstat.data.region,
+        periodLabel: wordstat.data.periodLabel,
+        databaseMatches,
+        exactSeedNotice,
+        databaseWarning,
+        databaseStage,
+        results: [],
+        wordstatWarning: AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING,
+        contextStage: context.failedStage,
+      });
     }
 
     const pending = [];
     for (const suggestion of wordstat.data.suggestions) {
       const normalized = await context.normalize(suggestion.phrase);
-      const query = normalized
-        ? context.queryByNormalized.get(normalized) ?? null
-        : null;
+      if (!normalized) continue;
+      const query = context.queryByNormalized.get(normalized) ?? null;
       const reservation = query
         ? context.reservationByQueryId.get(query.id) ?? null
         : null;
@@ -223,6 +281,9 @@ export async function POST(request: Request) {
       region: wordstat.data.region,
       periodLabel: wordstat.data.periodLabel,
       databaseMatches,
+      exactSeedNotice,
+      databaseWarning,
+      databaseStage,
       results,
     });
   } catch (error) {

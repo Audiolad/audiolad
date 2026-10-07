@@ -9,9 +9,12 @@ import {
   reconcileAuthorDiscoverySuggestion,
 } from "../src/lib/seo-queries/author-discovery.ts";
 import {
+  AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING,
   AUTHOR_SEO_DISCOVERY_SURFACES,
+  authorDiscoverySupplementaryWarning,
   authorSeoDiscoverySurfaceFromPanelVariant,
   buildAuthorDiscoveryDatabaseMatches,
+  buildExactSeedDiscoveryNotice,
   isHiddenFromProductCreateDiscovery,
   parseAuthorSeoDiscoverySurface,
   resolveAuthorDiscoveryReservationState,
@@ -41,8 +44,13 @@ import {
 } from "../src/lib/seo-queries/types.ts";
 import {
   SEO_DISCOVERY_IN_CHUNK_SIZE,
+  SEO_DISCOVERY_IN_ENCODED_BUDGET,
   chunkList,
+  chunkListByEncodedBudget,
+  loadDiscoveryContextForPhrases,
+  loadRankedAnalyzedQueriesForSeed,
 } from "../src/lib/seo-queries/author-discovery-repository.ts";
+import { normalizeSeoQueryText } from "../src/lib/seo-queries/published-query-occupancy.ts";
 
 const root = process.cwd();
 const read = (rel) => readFileSync(join(root, rel), "utf8");
@@ -654,6 +662,14 @@ assert.doesNotMatch(discoveryBeta, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 assert.match(discoveryRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(discoveryRoute, /seo_discovery_beta_disabled/);
 assert.match(discoveryRoute, /seo_discovery_context_failed/);
+assert.match(discoveryRoute, /results: \[\],\s*wordstatWarning: AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING/);
+assert.doesNotMatch(
+  discoveryRoute,
+  /Не удалось сопоставить результаты с SEO-базой/,
+);
+assert.match(panel, /exactSeedNotice/);
+assert.match(panel, /databaseWarning/);
+assert.match(panel, /item\.explanation/);
 assert.match(proposalsRoute, /isProductCreateSeoDiscoveryEnabled/);
 assert.match(proposalsRoute, /seo_discovery_beta_disabled/);
 
@@ -716,7 +732,7 @@ assert.match(ui, /discoveryEnabled \? \(/);
 // Chunked PostgREST .in() to avoid edge nginx 502 on long Cyrillic filters
 assert.match(discoveryRepo, /SEO_DISCOVERY_IN_CHUNK_SIZE/);
 assert.match(discoveryRepo, /chunkList\(/);
-assert.match(discoveryRepo, /for \(const batch of chunkList\(uniqueNormalized\)\)/);
+assert.match(discoveryRepo, /for \(const batch of chunkListByEncodedBudget\(uniqueNormalized\)\)/);
 assert.match(discoveryRepo, /for \(const batch of chunkList\(queryIds\)\)/);
 
 // AUTH_FAILED taxonomy present
@@ -1339,6 +1355,526 @@ function usedReservation(id) {
     }),
     true,
   );
+}
+
+const MASSAGE_PHRASE = "успокаивающая музыка для массажа";
+const MASSAGE_CANONICAL = normalizeSeoQueryText(MASSAGE_PHRASE);
+for (const variant of [
+  MASSAGE_PHRASE,
+  "  УСПОКАИВАЮЩАЯ   музыка для массажа ",
+  "Успокаивающая Музыка Для Массажа",
+]) {
+  assert.equal(normalizeSeoQueryText(variant), MASSAGE_CANONICAL);
+}
+
+function massageQuery(overrides = {}) {
+  return {
+    id: "q-massage",
+    query_text: MASSAGE_PHRASE,
+    normalized_query: MASSAGE_CANONICAL,
+    frequency: 120,
+    intent: "music",
+    recommended_format: "Музыка",
+    audio_fit: "high",
+    analysis_status: "analyzed",
+    seo_clusters: { name: "Массаж" },
+    ...overrides,
+  };
+}
+
+function createDiscoveryFake({
+  queries = [],
+  reservations = [],
+  practices = [],
+  proposals = [],
+  failStages = [],
+} = {}) {
+  const fail = new Set(failStages);
+  const inBatches = [];
+  function resultFor(state) {
+    if (state.type === "rpc") {
+      if (state.name === "normalize_seo_query") {
+        if (fail.has("normalize")) {
+          return { data: null, error: { message: "normalize_down" } };
+        }
+        const normalized = normalizeSeoQueryText(state.args?.p_query);
+        return { data: normalized || null, error: normalized ? null : { message: "empty" } };
+      }
+      return { data: null, error: null };
+    }
+    const eq = (column) =>
+      state.filters.find((filter) => filter[0] === "eq" && filter[1] === column)?.[2];
+    const inn = (column) =>
+      state.filters.find((filter) => filter[0] === "in" && filter[1] === column)?.[2];
+    if (state.table === "seo_queries") {
+      const normalizedIn = inn("normalized_query");
+      if (normalizedIn) {
+        inBatches.push(normalizedIn);
+        if (fail.has("queries")) return { data: null, error: { message: "queries" } };
+        const wanted = new Set(normalizedIn);
+        return {
+          data: queries.filter((row) => wanted.has(row.normalized_query)),
+          error: null,
+        };
+      }
+      if (eq("normalized_query")) {
+        if (fail.has("exact")) return { data: null, error: { message: "exact" } };
+        const analysis = eq("analysis_status");
+        return {
+          data: queries.filter((row) => {
+            if (row.normalized_query !== eq("normalized_query")) return false;
+            if (analysis && row.analysis_status !== analysis) return false;
+            return true;
+          }),
+          error: null,
+        };
+      }
+      if (state.or) {
+        if (fail.has("token")) return { data: null, error: { message: "token" } };
+        return { data: [], error: null };
+      }
+      return { data: [], error: null };
+    }
+    if (state.table === "seo_query_reservations") {
+      if (fail.has("reservations")) {
+        return { data: null, error: { message: "reservations" } };
+      }
+      const ids = new Set(inn("query_id") ?? []);
+      return {
+        data: reservations.filter((row) => ids.has(row.query_id)),
+        error: null,
+      };
+    }
+    if (state.table === "seo_query_proposals") {
+      if (fail.has("proposals")) return { data: null, error: { message: "proposals" } };
+      const ids = new Set(inn("query_id") ?? []);
+      return {
+        data: proposals.filter((row) => ids.has(row.query_id)),
+        error: null,
+      };
+    }
+    if (state.table === "practices") {
+      const select = state.select ?? "";
+      const occupancyRead = select.includes("primary_seo_query_id");
+      if (occupancyRead) {
+        if (fail.has("occupancy")) return { data: null, error: { message: "occupancy" } };
+        const ids = inn("primary_seo_query_id");
+        if (!ids) return { data: [], error: null };
+        const wanted = new Set(ids);
+        return {
+          data: practices.filter(
+            (row) =>
+              row.status === "published" &&
+              !row.deleted_at &&
+              wanted.has(row.primary_seo_query_id),
+          ),
+          error: null,
+        };
+      }
+      if (fail.has("products")) return { data: null, error: { message: "products" } };
+      const ids = new Set(inn("id") ?? []);
+      return {
+        data: practices
+          .filter((row) => ids.has(row.id))
+          .map((row) => ({ id: row.id, title: row.title })),
+        error: null,
+      };
+    }
+    return { data: [], error: null };
+  }
+  return {
+    inBatches,
+    rpc(name, args) {
+      return Promise.resolve(resultFor({ type: "rpc", name, args }));
+    },
+    from(table) {
+      const state = { type: "from", table, filters: [], select: "", or: null };
+      const builder = {
+        select(columns) {
+          state.select = columns;
+          return builder;
+        },
+        eq(column, value) {
+          state.filters.push(["eq", column, value]);
+          return builder;
+        },
+        in(column, value) {
+          state.filters.push(["in", column, value]);
+          return builder;
+        },
+        is() {
+          return builder;
+        },
+        not() {
+          return builder;
+        },
+        or(filter) {
+          state.or = filter;
+          return builder;
+        },
+        limit() {
+          return builder;
+        },
+        order() {
+          return builder;
+        },
+        range() {
+          return builder;
+        },
+        then(resolve, reject) {
+          return Promise.resolve(resultFor(state)).then(resolve, reject);
+        },
+      };
+      return builder;
+    },
+  };
+}
+
+async function rankedMassage(fake, surface = "opportunities") {
+  return loadRankedAnalyzedQueriesForSeed({
+    authorId: authorA,
+    seedPhrase: "  УСПОКАИВАЮЩАЯ   музыка для массажа ",
+    surface,
+    supabase: fake,
+  });
+}
+
+{
+  const fake = createDiscoveryFake({ queries: [massageQuery()] });
+  const ranked = await rankedMassage(fake);
+  assert.equal(ranked.seedNormalized, MASSAGE_CANONICAL);
+  assert.equal(ranked.matches[0].id, "q-massage");
+  assert.equal(ranked.matches[0].normalizedQuery, MASSAGE_CANONICAL);
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches.length, 1);
+  assert.equal(built.matches[0].queryId, "q-massage");
+  assert.equal(built.matches[0].status, "available");
+  assert.equal(built.matches[0].canReserve, true);
+  assert.equal(built.matches[0].canPropose, false);
+  assert.equal(built.matches[0].source, "database");
+}
+
+{
+  const fake = createDiscoveryFake({
+    queries: [massageQuery({ analysis_status: "not_analyzed" })],
+  });
+  const ranked = await rankedMassage(fake);
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches[0].queryId, "q-massage");
+  assert.equal(built.matches[0].status, "pending_review");
+  assert.equal(built.matches[0].statusLabel, "На проверке");
+  assert.equal(built.matches[0].canReserve, false);
+  assert.match(built.matches[0].explanation, /проверк/);
+}
+
+{
+  const fake = createDiscoveryFake({
+    queries: [massageQuery()],
+    failStages: ["token"],
+  });
+  const ranked = await rankedMassage(fake);
+  assert.equal(ranked.supplementaryStage, "seo_discovery_analyzed_token_load_failed");
+  assert.equal(ranked.matches[0].id, "q-massage");
+  assert.equal(
+    authorDiscoverySupplementaryWarning(ranked.supplementaryStage)?.length > 0,
+    true,
+  );
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches[0].canReserve, true);
+}
+
+{
+  const empty = await loadRankedAnalyzedQueriesForSeed({
+    authorId: authorA,
+    seedPhrase: "тема которой нет в базе",
+    supabase: createDiscoveryFake(),
+  });
+  assert.deepEqual(empty.matches, []);
+  assert.equal(empty.supplementaryStage, null);
+  await assert.rejects(
+    () =>
+      loadRankedAnalyzedQueriesForSeed({
+        authorId: authorA,
+        seedPhrase: MASSAGE_PHRASE,
+        supabase: createDiscoveryFake({
+          queries: [massageQuery()],
+          failStages: ["exact"],
+        }),
+      }),
+    /seo_discovery_analyzed_exact_load_failed/,
+  );
+}
+
+{
+  const fake = createDiscoveryFake({
+    queries: [massageQuery()],
+    failStages: ["occupancy"],
+  });
+  const ranked = await rankedMassage(fake);
+  assert.equal(ranked.ownershipKnown, false);
+  assert.equal(ranked.supplementaryStage, "seo_published_occupancy_load_failed");
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches[0].queryId, "q-massage");
+  assert.equal(built.matches[0].status, "unconfirmed");
+  assert.equal(built.matches[0].canReserve, false);
+  assert.notEqual(built.matches[0].statusLabel, "Свободен");
+}
+
+{
+  const fake = createDiscoveryFake({
+    queries: [massageQuery()],
+    failStages: ["reservations"],
+  });
+  const ranked = await rankedMassage(fake);
+  assert.equal(ranked.supplementaryStage, "seo_discovery_reservations_load_failed");
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches[0].status, "unconfirmed");
+  assert.equal(built.matches[0].canReserve, false);
+  assert.equal(built.matches[0].canPropose, false);
+}
+
+{
+  const occupiedReservation = {
+    id: "res-other",
+    query_id: "q-massage",
+    author_id: authorB,
+    status: "active",
+    product_id: null,
+    expires_at: future,
+  };
+  const ranked = await rankedMassage(
+    createDiscoveryFake({
+      queries: [massageQuery()],
+      reservations: [occupiedReservation],
+    }),
+  );
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches[0].status, "occupied");
+  assert.equal(built.matches[0].canReserve, false);
+}
+
+{
+  const ownReservation = {
+    id: "res-own",
+    query_id: "q-massage",
+    author_id: authorA,
+    status: "active",
+    product_id: null,
+    expires_at: future,
+  };
+  const ranked = await rankedMassage(
+    createDiscoveryFake({
+      queries: [massageQuery()],
+      reservations: [ownReservation],
+    }),
+  );
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches[0].status, "own");
+  assert.equal(built.matches[0].canReserve, false);
+}
+
+{
+  const publishedReservation = {
+    id: "res-published",
+    query_id: "q-massage",
+    author_id: authorA,
+    status: "used",
+    product_id: "prod-public",
+    expires_at: null,
+  };
+  const ranked = await rankedMassage(
+    createDiscoveryFake({
+      queries: [massageQuery()],
+      reservations: [publishedReservation],
+      practices: [{ id: "prod-public", title: "Аурафон массаж", status: "published" }],
+    }),
+    "product_create",
+  );
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches.length, 0);
+  assert.deepEqual(built.hiddenNormalizedQueries, [MASSAGE_CANONICAL]);
+  const notice = buildExactSeedDiscoveryNotice({
+    authorId: authorA,
+    item: ranked.matches[0],
+    shownQueryIds: new Set(built.matches.map((item) => item.queryId)),
+  });
+  assert.equal(notice.queryId, "q-massage");
+  assert.equal(notice.status, "published");
+  assert.equal(notice.canReserve, false);
+  assert.equal(notice.canPropose, false);
+  assert.match(notice.explanation, /опубликован/i);
+}
+
+{
+  // Private workspace: draft product linked to an active reservation stays unselectable.
+  const privateReservation = {
+    id: "res-private",
+    query_id: "q-massage",
+    author_id: authorA,
+    status: "active",
+    product_id: "prod-draft",
+    expires_at: future,
+  };
+  const ranked = await rankedMassage(
+    createDiscoveryFake({
+      queries: [massageQuery()],
+      reservations: [privateReservation],
+      practices: [{ id: "prod-draft", title: "Черновик кабинета", status: "draft" }],
+    }),
+    "product_create",
+  );
+  assert.equal(isHiddenFromProductCreateDiscovery(ranked.matches[0].reservation), true);
+  const built = buildAuthorDiscoveryDatabaseMatches({
+    surface: "product_create",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(built.matches.length, 0);
+  const notice = buildExactSeedDiscoveryNotice({
+    authorId: authorA,
+    item: ranked.matches[0],
+    shownQueryIds: new Set(),
+  });
+  assert.equal(notice.status, "own");
+  assert.equal(notice.canReserve, false);
+  assert.equal(notice.canPropose, false);
+  const opportunities = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: ranked.matches,
+  });
+  assert.equal(opportunities.matches[0].status, "own");
+  assert.equal(opportunities.matches[0].canReserve, false);
+}
+
+{
+  const longPhrases = Array.from({ length: 24 }, (_, index) =>
+    `${"успокаивающая музыка для массажа длинный кириллический вариант".repeat(2)} ${index}`,
+  );
+  assert.ok(
+    chunkListByEncodedBudget(longPhrases).some((batch) => batch.length < SEO_DISCOVERY_IN_CHUNK_SIZE),
+  );
+  for (const batch of chunkListByEncodedBudget(longPhrases)) {
+    assert.ok(batch.length <= SEO_DISCOVERY_IN_CHUNK_SIZE);
+    const encoded = batch.reduce(
+      (sum, item) => sum + encodeURIComponent(item).length + 1,
+      0,
+    );
+    assert.ok(encoded <= SEO_DISCOVERY_IN_ENCODED_BUDGET || batch.length === 1);
+  }
+  const fake = createDiscoveryFake({
+    queries: longPhrases.map((phrase, index) => ({
+      id: `q-long-${index}`,
+      query_text: phrase,
+      normalized_query: normalizeSeoQueryText(phrase),
+      analysis_status: "not_analyzed",
+    })),
+  });
+  const context = await loadDiscoveryContextForPhrases({
+    authorId: authorA,
+    phrases: longPhrases,
+    supabase: fake,
+  });
+  assert.equal(context.failedStage, null);
+  assert.equal(context.queryByNormalized.size, longPhrases.length);
+  assert.ok(fake.inBatches.length > 3);
+  for (const batch of fake.inBatches) {
+    assert.ok(batch.length <= SEO_DISCOVERY_IN_CHUNK_SIZE);
+    const encoded = batch.reduce(
+      (sum, item) => sum + encodeURIComponent(item).length + 1,
+      0,
+    );
+    assert.ok(encoded <= SEO_DISCOVERY_IN_ENCODED_BUDGET || batch.length === 1);
+  }
+}
+
+{
+  const suggestion = MASSAGE_PHRASE;
+  const base = {
+    queries: [massageQuery()],
+    reservations: [
+      {
+        id: "res-product",
+        query_id: "q-massage",
+        author_id: authorB,
+        status: "active",
+        product_id: "prod-1",
+        expires_at: future,
+      },
+    ],
+    practices: [{ id: "prod-1", title: "Чужой продукт", status: "draft" }],
+    proposals: [{ query_id: "q-massage" }],
+  };
+  const stages = [
+    ["normalize", "seo_discovery_normalize_failed", ["   "]],
+    ["queries", "seo_discovery_queries_load_failed", [suggestion]],
+    ["reservations", "seo_discovery_reservations_load_failed", [suggestion]],
+    ["products", "seo_discovery_products_load_failed", [suggestion]],
+    ["proposals", "seo_discovery_proposals_load_failed", [suggestion]],
+  ];
+  for (const [failStage, expected, phrases] of stages) {
+    const context = await loadDiscoveryContextForPhrases({
+      authorId: authorA,
+      phrases,
+      supabase: createDiscoveryFake({ ...base, failStages: [failStage] }),
+    });
+    assert.equal(context.failedStage, expected, failStage);
+  }
+  const kept = buildAuthorDiscoveryDatabaseMatches({
+    surface: "opportunities",
+    authorId: authorA,
+    items: (await rankedMassage(createDiscoveryFake({ queries: [massageQuery()] }))).matches,
+  });
+  assert.equal(kept.matches[0].queryId, "q-massage");
+  assert.equal(kept.matches[0].canReserve, true);
+  assert.equal(AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING.includes("нельзя взять в работу"), true);
+}
+
+{
+  const wordstatBranch = discoveryRoute.slice(
+    discoveryRoute.indexOf("if (!wordstat.ok)"),
+    discoveryRoute.indexOf("let context"),
+  );
+  assert.match(wordstatBranch, /results: \[\]/);
+  assert.doesNotMatch(wordstatBranch, /status:\s*500/);
+  const contextBranch = discoveryRoute.slice(
+    discoveryRoute.indexOf("seo_discovery_context_failed"),
+    discoveryRoute.indexOf("const pending"),
+  );
+  assert.match(contextBranch, /results: \[\]/);
+  assert.doesNotMatch(contextBranch, /status:\s*500/);
 }
 
 console.log("author-seo-discovery-unit: ok");

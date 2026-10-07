@@ -24,11 +24,27 @@ export type AuthorDiscoveryReservationStatus =
   | "own"
   | "published";
 
+export type AuthorDiscoveryDatabaseStatus =
+  | AuthorDiscoveryReservationStatus
+  | "pending_review"
+  | "not_applicable"
+  | "unconfirmed";
+
 export type AuthorDiscoveryReservationLabel =
   | "Свободен"
   | "Занят"
   | "У вас в работе"
   | "Опубликован";
+
+export type AuthorDiscoveryDatabaseLabel =
+  | AuthorDiscoveryReservationLabel
+  | "На проверке"
+  | "Не подходит для SEO-возможностей"
+  | "Статус не подтверждён";
+
+/** Shown when Wordstat suggestion reconciliation cannot be trusted. */
+export const AUTHOR_SEO_DISCOVERY_CONTEXT_WARNING =
+  "Показываем проверенные запросы из базы АудиоЛада. Дополнительные варианты не сопоставлены с базой, поэтому их нельзя взять в работу или отправить на проверку. Повторите поиск чуть позже.";
 
 export type DiscoveryReservationLike = {
   id: string;
@@ -176,6 +192,12 @@ export type AuthorDiscoveryDatabaseMatchInput = {
   queryText: string;
   normalizedQuery: string;
   frequency: number | null;
+  analysisStatus?: string | null;
+  /**
+   * False when reservation or published-occupancy reads failed.
+   * Unknown ownership must not be presented as a free query.
+   */
+  ownershipKnown?: boolean;
   reservation: DiscoveryReservationLike | null;
   publishedOccupancy?: PublishedSeoQueryOccupancy | null;
 };
@@ -183,8 +205,8 @@ export type AuthorDiscoveryDatabaseMatchInput = {
 export type AuthorDiscoveryDatabaseMatch = {
   phrase: string;
   frequency: number | null;
-  status: AuthorDiscoveryReservationStatus;
-  statusLabel: AuthorDiscoveryReservationLabel;
+  status: AuthorDiscoveryDatabaseStatus;
+  statusLabel: AuthorDiscoveryDatabaseLabel;
   queryId: string;
   reservationId: string | null;
   productId: string | null;
@@ -192,6 +214,17 @@ export type AuthorDiscoveryDatabaseMatch = {
   canReserve: boolean;
   canPropose: false;
   source: "database";
+  explanation: string | null;
+};
+
+export type ExactSeedDiscoveryNotice = {
+  queryId: string;
+  phrase: string;
+  status: AuthorDiscoveryDatabaseStatus;
+  statusLabel: AuthorDiscoveryDatabaseLabel;
+  canReserve: false;
+  canPropose: false;
+  explanation: string;
 };
 
 /**
@@ -231,6 +264,138 @@ export function takeRankedDiscoveryItemsUntilVisible<
   return walked;
 }
 
+function analysisBlocksReserve(analysisStatus: string | null | undefined): boolean {
+  return Boolean(analysisStatus) && analysisStatus !== "analyzed";
+}
+
+export function explanationForAuthorDiscoveryDatabaseStatus(
+  status: AuthorDiscoveryDatabaseStatus,
+): string | null {
+  switch (status) {
+    case "occupied":
+      return "Этот запрос занят и недоступен для нового продукта.";
+    case "published":
+      return "Этот запрос уже закреплён за опубликованным продуктом.";
+    case "own":
+      return "Этот запрос уже у вас в работе.";
+    case "pending_review":
+      return "Запрос уже есть в общей базе и ждёт проверки. Взять его в работу пока нельзя.";
+    case "not_applicable":
+      return "Этот запрос не подходит для SEO-возможностей.";
+    case "unconfirmed":
+      return "Запрос найден в базе, но не удалось подтвердить, свободен ли он. Повторите поиск перед тем, как брать его в работу.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Real state of one catalog row. Unknown reservation/occupancy is never "Свободен".
+ * Analysis that is not finished blocks reserve even when no reservation row exists.
+ */
+export function resolveAuthorDiscoveryDatabaseRowState(input: {
+  authorId: string;
+  item: AuthorDiscoveryDatabaseMatchInput;
+}): {
+  status: AuthorDiscoveryDatabaseStatus;
+  statusLabel: AuthorDiscoveryDatabaseLabel;
+  canReserve: boolean;
+  reservationId: string | null;
+  productId: string | null;
+  productTitle: string | null;
+  explanation: string | null;
+} {
+  const ownershipKnown = input.item.ownershipKnown !== false;
+  const analysisStatus = input.item.analysisStatus ?? "analyzed";
+
+  if (!ownershipKnown) {
+    if (analysisStatus === "not_applicable") {
+      return {
+        status: "not_applicable",
+        statusLabel: "Не подходит для SEO-возможностей",
+        canReserve: false,
+        reservationId: null,
+        productId: null,
+        productTitle: null,
+        explanation: explanationForAuthorDiscoveryDatabaseStatus("not_applicable"),
+      };
+    }
+    if (analysisBlocksReserve(analysisStatus)) {
+      return {
+        status: "pending_review",
+        statusLabel: "На проверке",
+        canReserve: false,
+        reservationId: null,
+        productId: null,
+        productTitle: null,
+        explanation: explanationForAuthorDiscoveryDatabaseStatus("pending_review"),
+      };
+    }
+    return {
+      status: "unconfirmed",
+      statusLabel: "Статус не подтверждён",
+      canReserve: false,
+      reservationId: null,
+      productId: null,
+      productTitle: null,
+      explanation: explanationForAuthorDiscoveryDatabaseStatus("unconfirmed"),
+    };
+  }
+
+  const reservationState = resolveAuthorDiscoveryReservationState({
+    authorId: input.authorId,
+    reservation: input.item.reservation,
+    publishedOccupancy: input.item.publishedOccupancy ?? null,
+  });
+  if (reservationState.status !== "available") {
+    return {
+      status: reservationState.status,
+      statusLabel: reservationState.statusLabel,
+      canReserve: false,
+      reservationId: reservationState.reservationId,
+      productId: reservationState.productId,
+      productTitle: reservationState.productTitle,
+      explanation: explanationForAuthorDiscoveryDatabaseStatus(
+        reservationState.status,
+      ),
+    };
+  }
+
+  if (analysisStatus === "not_applicable") {
+    return {
+      status: "not_applicable",
+      statusLabel: "Не подходит для SEO-возможностей",
+      canReserve: false,
+      reservationId: null,
+      productId: null,
+      productTitle: null,
+      explanation: explanationForAuthorDiscoveryDatabaseStatus("not_applicable"),
+    };
+  }
+
+  if (analysisBlocksReserve(analysisStatus)) {
+    return {
+      status: "pending_review",
+      statusLabel: "На проверке",
+      canReserve: false,
+      reservationId: null,
+      productId: null,
+      productTitle: null,
+      explanation: explanationForAuthorDiscoveryDatabaseStatus("pending_review"),
+    };
+  }
+
+  return {
+    status: "available",
+    statusLabel: "Свободен",
+    canReserve: true,
+    reservationId: null,
+    productId: null,
+    productTitle: null,
+    explanation: null,
+  };
+}
+
 export function buildAuthorDiscoveryDatabaseMatches(input: {
   surface: AuthorSeoDiscoverySurface;
   authorId: string;
@@ -244,7 +409,9 @@ export function buildAuthorDiscoveryDatabaseMatches(input: {
   const hiddenNormalizedQueries: string[] = [];
 
   for (const item of input.items) {
+    const ownershipKnown = item.ownershipKnown !== false;
     const hideForProductCreate =
+      ownershipKnown &&
       input.surface === AUTHOR_SEO_DISCOVERY_SURFACES.PRODUCT_CREATE &&
       isHiddenFromProductCreateDiscovery(
         item.reservation,
@@ -263,10 +430,9 @@ export function buildAuthorDiscoveryDatabaseMatches(input: {
       continue;
     }
 
-    const state = resolveAuthorDiscoveryReservationState({
+    const state = resolveAuthorDiscoveryDatabaseRowState({
       authorId: input.authorId,
-      reservation: item.reservation,
-      publishedOccupancy: item.publishedOccupancy ?? null,
+      item,
     });
 
     matches.push({
@@ -281,10 +447,52 @@ export function buildAuthorDiscoveryDatabaseMatches(input: {
       canReserve: state.canReserve,
       canPropose: false,
       source: "database",
+      explanation: state.explanation,
     });
   }
 
   return { matches, hiddenNormalizedQueries };
+}
+
+/**
+ * When product-create hides an exact catalog row, still explain that row.
+ * The notice cannot reserve or propose. Non-exact hidden rows stay silent.
+ */
+export function buildExactSeedDiscoveryNotice(input: {
+  authorId: string;
+  item: AuthorDiscoveryDatabaseMatchInput;
+  shownQueryIds: ReadonlySet<string>;
+}): ExactSeedDiscoveryNotice | null {
+  if (input.shownQueryIds.has(input.item.id)) return null;
+  const state = resolveAuthorDiscoveryDatabaseRowState({
+    authorId: input.authorId,
+    item: input.item,
+  });
+  return {
+    queryId: input.item.id,
+    phrase: input.item.queryText,
+    status: state.status,
+    statusLabel: state.statusLabel,
+    canReserve: false,
+    canPropose: false,
+    explanation:
+      state.explanation ??
+      "Запрос есть в базе, но выбрать его сейчас нельзя.",
+  };
+}
+
+export function authorDiscoverySupplementaryWarning(
+  stage: string | null | undefined,
+): string | null {
+  switch (stage) {
+    case "seo_discovery_analyzed_token_load_failed":
+      return "Точное совпадение из базы показано. Похожие запросы базы временно не загрузились.";
+    case "seo_published_occupancy_load_failed":
+    case "seo_discovery_reservations_load_failed":
+      return "Не удалось проверить, свободен ли запрос. Повторите поиск перед тем, как брать его в работу.";
+    default:
+      return null;
+  }
 }
 
 export function shouldOmitFromWordstatAdditions(input: {

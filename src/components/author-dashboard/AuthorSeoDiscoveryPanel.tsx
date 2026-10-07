@@ -30,6 +30,17 @@ export type AuthorSeoDiscoveryResult = {
   productTitle: string | null;
   canReserve: boolean;
   canPropose: boolean;
+  explanation?: string | null;
+};
+
+export type AuthorSeoExactSeedNotice = {
+  queryId: string;
+  phrase: string;
+  status: string;
+  statusLabel: string;
+  canReserve: false;
+  canPropose: false;
+  explanation: string;
 };
 
 export type AuthorSeoDiscoveryReservedEvent = {
@@ -82,6 +93,8 @@ export default function AuthorSeoDiscoveryPanel({
   const [discoverPhrase, setDiscoverPhrase] = useState("");
   const [discoverySeedPhrase, setDiscoverySeedPhrase] = useState<string | null>(null);
   const [databaseMatches, setDatabaseMatches] = useState<AuthorSeoDiscoveryResult[]>([]);
+  const [exactSeedNotice, setExactSeedNotice] = useState<AuthorSeoExactSeedNotice | null>(null);
+  const [databaseWarning, setDatabaseWarning] = useState<string | null>(null);
   const [discoverResults, setDiscoverResults] = useState<AuthorSeoDiscoveryResult[]>([]);
   const [discoverMessage, setDiscoverMessage] = useState<string | null>(null);
   const [wordstatWarning, setWordstatWarning] = useState<string | null>(null);
@@ -194,6 +207,8 @@ export default function AuthorSeoDiscoveryPanel({
     setWordstatWarning(null);
     setDiscoverResults([]);
     setDatabaseMatches([]);
+    setExactSeedNotice(null);
+    setDatabaseWarning(null);
     setDiscoverySeedPhrase(null);
     const response = await fetch("/api/author/seo/discovery", {
       method: "POST",
@@ -230,6 +245,19 @@ export default function AuthorSeoDiscoveryPanel({
         : phrase;
     setDiscoverySeedPhrase(seed);
     setDatabaseMatches(Array.isArray(payload.databaseMatches) ? payload.databaseMatches : []);
+    setExactSeedNotice(
+      payload.exactSeedNotice &&
+        typeof payload.exactSeedNotice === "object" &&
+        typeof payload.exactSeedNotice.phrase === "string" &&
+        typeof payload.exactSeedNotice.explanation === "string"
+        ? payload.exactSeedNotice
+        : null,
+    );
+    setDatabaseWarning(
+      typeof payload.databaseWarning === "string" && payload.databaseWarning.trim()
+        ? payload.databaseWarning.trim()
+        : null,
+    );
     setDiscoverResults(Array.isArray(payload.results) ? payload.results : []);
     const nextWordstatWarning =
       typeof payload.wordstatWarning === "string" && payload.wordstatWarning.trim()
@@ -352,10 +380,28 @@ export default function AuthorSeoDiscoveryPanel({
             <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
               Эти запросы уже проверены АудиоЛадом. Свободный запрос можно сразу взять в работу.
             </p>
+            {databaseWarning ? (
+              <p className="mt-2 text-sm text-[#4c3d78]">{databaseWarning}</p>
+            ) : null}
+            {exactSeedNotice ? (
+              <article className="mt-3 rounded-[18px] border border-[#eadff8] bg-[#faf6ff] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h4 className="text-base font-semibold text-[#25135c]">
+                    {exactSeedNotice.phrase}
+                  </h4>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#7042c5]">
+                    {exactSeedNotice.statusLabel}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-[#5f5484]">{exactSeedNotice.explanation}</p>
+              </article>
+            ) : null}
             {visibleDatabaseMatches.length === 0 ? (
+              exactSeedNotice ? null : (
               <p className="mt-3 text-sm text-[#796ba0]">
                 В базе АудиоЛада пока нет подходящих проверенных запросов.
               </p>
+              )
             ) : (
               <div className="mt-3 grid gap-3">
                 {visibleDatabaseMatches.map((item) => (
@@ -378,6 +424,9 @@ export default function AuthorSeoDiscoveryPanel({
                           : item.statusLabel}
                       </span>
                     </div>
+                    {item.explanation ? (
+                      <p className="mt-2 text-sm text-[#5f5484]">{item.explanation}</p>
+                    ) : null}
                     {(item.status === "own" || item.status === "published") &&
                     item.productTitle ? (
                       <p className="mt-2 text-sm text-[#5f5484]">Продукт: {item.productTitle}</p>
