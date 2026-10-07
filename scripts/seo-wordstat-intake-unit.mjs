@@ -161,4 +161,29 @@ assert.notEqual(topicResult.frequency, topicTotalCount);
 assert.equal(JSON.stringify(topicResult).includes(apiKey), false);
 assert.doesNotMatch(route, /console\.(?:log|info|warn|error).*?(?:API|key|token|folder)/i);
 
+const massagePhrase = "успокаивающая музыка для массажа";
+const massageRepository = createRepository();
+const massageCreated = await importWordstatIntakeItem(
+  { phrase: `  ${massagePhrase.toUpperCase()}  `, count: 640 },
+  massageRepository,
+  () => checkedAt,
+);
+assert.equal(massageCreated.status, "created");
+assert.equal(massageCreated.id, "q-1");
+assert.equal(massageRepository.records.length, 1);
+assert.equal(
+  massageRepository.records[0].normalized_query,
+  "успокаивающая музыка для массажа",
+);
+const massageRefreshed = await importWordstatIntakeItem(
+  { phrase: "  Успокаивающая   музыка для массажа ", count: 700 },
+  massageRepository,
+  () => checkedAt,
+);
+assert.equal(massageRefreshed.status, "refreshed");
+assert.equal(massageRefreshed.id, massageCreated.id);
+assert.equal(massageRepository.records.length, 1);
+assert.equal(massageRepository.records[0].frequency, 700);
+assert.equal(massageRepository.records[0].analysis_status, "analyzed");
+
 console.log("seo-wordstat-intake-unit: ok");

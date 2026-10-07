@@ -262,8 +262,10 @@ assert.match(discoveryRoute, /databaseMatches/);
 assert.match(discoveryRoute, /loadRankedAnalyzedQueriesForSeed/);
 assert.match(discoveryRoute, /visibleLimit: SEO_DISCOVERY_DATABASE_LIMIT/);
 assert.match(discoveryRoute, /fetchWordstatSuggestions/);
-// Wordstat block still returned even when DB empty — route always calls Wordstat
-assert.match(discoveryRoute, /const wordstat = await fetchWordstatSuggestions/);
+// Wordstat block still returned even when DB empty — route always calls Wordstat.
+// A thrown client degrades to the database matches instead of a generic 500.
+assert.match(discoveryRoute, /wordstat = await fetchWordstatSuggestions\(phrase, \{/);
+assert.match(discoveryRoute, /wordstat = wordstatError\("UPSTREAM_ERROR"\)/);
 
 const ui = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx");
 assert.match(ui, /Подходящие запросы из базы АудиоЛада/);
