@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import AiCompanyDashboard from "../src/components/admin/AiCompanyDashboard";
+import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
 import {
   ADMIN_NAV_ITEMS,
   getVisibleAdminNavItems,
 } from "../src/lib/admin/nav";
 import {
+  CORE_FIELD_MAP,
   buildAiCompanyDashboard,
+  classifyExecutor,
+  companyStatusRequestPath,
   isCompletedStatus,
   parseCompanyStatus,
   parseHistoryFilters,
@@ -165,7 +168,8 @@ const parsed = parseCompanyStatus(
 assert.ok(parsed, "status payload parses");
 assert.equal(isCompletedStatus("qa_pass"), false);
 assert.equal(isCompletedStatus("done"), true);
-assert.equal(isCompletedStatus("merged"), true);
+assert.equal(isCompletedStatus("merged"), false);
+assert.equal(isCompletedStatus("deployed"), false);
 
 const engineering = parsed!.agents.find((agent) => agent.slug === "engineering")!;
 const current = resolveCurrentTask(engineering, parsed!.tasks);
@@ -179,11 +183,11 @@ assert.equal(engineeringCard.tone, "working");
 assert.match(engineeringCard.latestResult, /Черновик табло готов/);
 assert.equal(engineeringCard.handoff, "Контроль качества (QA)");
 assert.equal(
-  model.attention.some((item) => item.includes("Продуктовый")),
+  model.decisions.some((item) => item.taskTitle.includes("Продуктовый")),
   false,
 );
 assert.equal(
-  model.attention.some((item) => item.includes("Ручное разрешение")),
+  model.decisions.some((item) => item.reason.includes("Ручное разрешение") && item.decisionOwner === "Сергей"),
   true,
 );
 
@@ -195,8 +199,8 @@ assert.match(qaCard.qaState, /RETURN/);
 assert.doesNotMatch(qaCard.qaState, /must-not-leak/);
 
 const productCard = model.agents.find((agent) => agent.slug === "product")!;
-assert.equal(productCard.tone, "idle");
-assert.match(productCard.stateLabel, /Не подключён \/ простаивает/);
+assert.equal(productCard.tone, "unknown");
+assert.match(productCard.stateLabel, /нет свежих данных/);
 
 const researchCard = model.agents.find((agent) => agent.slug === "research")!;
 assert.equal(researchCard.tone, "attention");
@@ -204,25 +208,31 @@ assert.match(researchCard.freshness, /старше 60 минут/);
 assert.match(researchCard.startedAt, /29\.09\.2026/);
 
 const uxCard = model.agents.find((agent) => agent.slug === "ux")!;
-assert.equal(uxCard.tone, "idle");
+assert.equal(uxCard.tone, "unknown");
 assert.equal(uxCard.currentTaskTitle, "Нет данных");
 
 assert.deepEqual(
-  model.todayRows.map((row) => row.title),
-  ["Получена сегодня", "Другая активная задача"],
+  model.todayReceived.map((row) => row.title),
+  ["Получена сегодня"],
+);
+assert.deepEqual(
+  model.todayCreated.map((row) => row.title),
+  ["Другая активная задача"],
 );
 assert.equal(
-  model.todayRows.some((row) => row.title === "Только обновлена сегодня"),
+  model.todayReceived.some((row) => row.title === "Только обновлена сегодня"),
   false,
 );
 assert.equal(
-  model.todayRows.some((row) => row.title === "Ждёт проверку"),
+  model.todayReceived.some((row) => row.title === "Ждёт проверку"),
   false,
 );
+assert.equal(model.todayCompleted.length, 0);
+assert.equal(model.todayWorkEvents.length, 2);
 
-const qaDetail = model.todayRows.find((row) => row.title === "Другая активная задача");
-assert.ok(qaDetail);
-assert.match(qaDetail.timeLabel, /создание записи/);
+const createdToday = model.todayCreated.find((row) => row.title === "Другая активная задача");
+assert.ok(createdToday);
+assert.match(createdToday.detail.receivedAt, /создание записи/);
 
 assert.equal(
   model.history.some((item) => item.title === "Табло после QA"),
@@ -276,7 +286,7 @@ const ambiguousCard = buildAiCompanyDashboard(ambiguous, parseHistoryFilters({})
   (agent) => agent.slug === "analytics",
 )!;
 assert.equal(ambiguousCard.currentTaskTitle, "Нет данных");
-assert.equal(ambiguousCard.tone, "idle");
+assert.equal(ambiguousCard.tone, "unknown");
 
 const singleWaiting = parseCompanyStatus(
   rawStatus({
@@ -312,7 +322,7 @@ const noReceipt = parseCompanyStatus(
   }),
 )!;
 const noReceiptModel = buildAiCompanyDashboard(noReceipt, parseHistoryFilters({}));
-assert.equal(noReceiptModel.todayRows.length, 0);
+assert.equal(noReceiptModel.todayReceived.length, 0);
 assert.match(noReceiptModel.todayNote, /Нет данных о времени получения/);
 
 const qaHistory = model.agents.find((agent) => agent.slug === "qa")!;
@@ -320,13 +330,18 @@ assert.match(qaHistory.qaState, /pull\/656/);
 assert.match(qaHistory.qaState, /skipped/);
 
 const markup = renderToStaticMarkup(
-  <AiCompanyDashboard model={model} filters={parseHistoryFilters({})} />,
+  <AiCompanyDashboardView model={model} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
 );
-assert.match(markup, /Сегодня в компании/);
-assert.match(markup, /История работы/);
+assert.match(markup, /Сейчас в работе/);
+assert.match(markup, /Сегодня/);
+assert.match(markup, /Получены сегодня/);
+assert.match(markup, /События работы сегодня/);
+assert.match(markup, /Завершены сегодня/);
+assert.match(markup, /Завершённые результаты/);
 assert.match(markup, /ИИ-компания/);
+assert.match(markup, /Обновить данные/);
 assert.match(markup, /data-state="working"/);
-assert.match(markup, /data-state="idle"/);
+assert.match(markup, /data-state="unknown"/);
 assert.match(markup, /data-state="attention"/);
 assert.match(markup, /grid-cols-2/);
 assert.match(markup, /lg:grid-cols-2/);
@@ -335,13 +350,29 @@ const historyMarkup = markup.slice(markup.indexOf('data-section="history"'));
 assert.doesNotMatch(historyMarkup, /Табло после QA/);
 assert.match(historyMarkup, /Старая готовая задача/);
 assert.doesNotMatch(markup, /must-not-leak/);
+assert.doesNotMatch(markup, /\$1\.25/);
 
 assert.equal(parseCompanyStatus({ tasks: [], agents: [] }), null);
 
 const page = readFileSync("src/app/(platform)/admin/ai-company/page.tsx", "utf8");
+const dashboardSource = readFileSync("src/components/admin/AiCompanyDashboard.tsx", "utf8");
 assert.match(page, /requireAdminPermission\("ai_company\.view"\)/);
 assert.match(page, /parseCompanyStatus/);
+assert.match(page, /companyStatusRequestPath/);
+assert.match(page, /<AiCompanyLiveRefresh/);
 assert.doesNotMatch(page, /updated_at/);
+assert.doesNotMatch(page, /httpEquiv|http-equiv/);
+assert.match(dashboardSource, /router\.refresh/);
+const liveRefresh = readFileSync("src/lib/admin/ai-company-live-refresh.ts", "utf8");
+assert.match(liveRefresh, /clearInterval/);
+assert.match(liveRefresh, /startScopedPageRefresh/);
+assert.match(dashboardSource, /data-section="now"/);
+assert.equal(companyStatusRequestPath(parseHistoryFilters({})), "/v1/status");
+assert.equal(
+  companyStatusRequestPath(parseHistoryFilters({ history_before: "2026-10-07T06:00:00.000Z" })),
+  "/v1/status?history_before=2026-10-07T06%3A00%3A00.000Z",
+);
+assert.equal(companyStatusRequestPath(parseHistoryFilters({ history_before: "page-2" })), "/v1/status");
 
 const navItem = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/ai-company");
 assert.ok(navItem);
@@ -362,5 +393,684 @@ for (const role of ["editor", "support", "analyst", "finance"] as const) {
     `${role} must not see AI company`,
   );
 }
+
+const overview = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin");
+assert.ok(overview);
+assert.equal(overview.label, "Обзор");
+assert.equal(overview.requiredPermission, "dashboard.view");
+assert.equal(CORE_FIELD_MAP.task.id[0], "id");
+assert.equal(CORE_FIELD_MAP.task.receivedAt[0], "received_at");
+assert.equal(CORE_FIELD_MAP.task.verifiedProgress[0], "progress");
+assert.equal(CORE_FIELD_MAP.task.verifiedProgress[1], "verified_progress");
+assert.equal(CORE_FIELD_MAP.task.functionalRole[0], "role");
+assert.equal(CORE_FIELD_MAP.task.functionalRole[1], "producer_agent_slug");
+assert.equal(CORE_FIELD_MAP.task.actualExecutor[0], "executor");
+assert.equal(CORE_FIELD_MAP.task.nextStep[0], "next_action");
+assert.equal(CORE_FIELD_MAP.executiveRun.headSha[0], "head_sha");
+assert.equal(CORE_FIELD_MAP.executiveRun.ci[0], "ci_status");
+assert.equal(CORE_FIELD_MAP.executiveRun.independentReview[0], "review_status");
+assert.equal(CORE_FIELD_MAP.executiveRun.deploy[0], "deploy_status");
+assert.equal(CORE_FIELD_MAP.executiveRun.productionProof[0], "production_proof");
+assert.equal(CORE_FIELD_MAP.executiveRun.productionVerified[0], "production_verified");
+assert.equal(CORE_FIELD_MAP.query.historyBefore, "history_before");
+assert.equal(CORE_FIELD_MAP.page.historyNextBefore[0], "history_next_before");
+assert.equal(CORE_FIELD_MAP.root.events[0], "recent_events");
+assert.equal(CORE_FIELD_MAP.root.currentGates[0], "gates");
+assert.equal(CORE_FIELD_MAP.root.archivedBlockers[0], "gates_history");
+assert.equal(CORE_FIELD_MAP.root.coverage[0], "coverage");
+assert.equal(CORE_FIELD_MAP.root.codex[0], "codex");
+assert.equal(classifyExecutor(["cursor", "grok-4.7"]), "cursor");
+assert.equal(classifyExecutor(["codex"]), "codex");
+assert.equal(classifyExecutor(["xai", "grok"]), "grok");
+
+const headSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const otherSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const live = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  agents: [
+    { slug: "engineering", status: "working", current_task_id: "b01cd5d3-052b-4e21-9236-184b3c5f2a5e", last_heartbeat_at: "2026-10-07T06:20:00.000Z" },
+    { slug: "orchestrator", status: "idle", last_heartbeat_at: "2026-10-07T06:30:00.000Z" },
+  ],
+  tasks: [
+    {
+      id: "b01cd5d3-052b-4e21-9236-184b3c5f2a5e",
+      title: "Сделать рабочее табло ИИ-компании",
+      status: "in_progress",
+      priority: "p1",
+      functional_role: "engineering",
+      fallback_executor: "cursor",
+      next_step: "Сверить контракт статуса с Company Core",
+      result_type: "engineering",
+      updated_at: "2026-10-07T06:39:00.000Z",
+      created_at: "2026-10-06T18:00:00.000Z",
+      received_at: "2026-10-06T18:05:00.000Z",
+      started_at: "2026-10-06T18:10:00.000Z",
+      last_event_at: "2026-10-07T06:35:00.000Z",
+      verified_progress: null,
+      progress_percent: 80,
+      dependencies: [{ target: "codex", status: "blocked", title: "Codex readiness" }],
+      executive_run: {
+        provider: "cursor",
+        channel: "cursor",
+        model: "grok-4.7",
+        run_id: "bc-669e1e69-a735-5804-a8e7-903a4d2a2fb0",
+        last_event: "run in progress",
+        head_sha: headSha,
+        pr_url: "https://github.com/Audiolad/audiolad/pull/700",
+        ci: { status: "success", sha: headSha },
+        independent_review: { verdict: "pass", sha: otherSha },
+        deploy: { status: "deployed" },
+        production_proof: null,
+      },
+    },
+    {
+      id: "received-today",
+      title: "Задача получена сегодня",
+      status: "queued",
+      functional_role: "product",
+      result_type: "document",
+      received_at: "2026-10-07T00:30:00.000Z",
+      updated_at: "2026-10-06T12:00:00.000Z",
+    },
+    {
+      id: "updated-only-today",
+      title: "Только обновлена седьмого",
+      status: "waiting",
+      functional_role: "analytics",
+      updated_at: "2026-10-07T06:00:00.000Z",
+      received_at: "2026-10-05T10:00:00.000Z",
+    },
+    {
+      id: "research-done-today",
+      title: "Исследование закрыто сегодня",
+      status: "done",
+      functional_role: "research",
+      result_type: "research",
+      received_at: "2026-10-01T10:00:00.000Z",
+      completed_at: "2026-10-07T05:00:00.000Z",
+      updated_at: "2026-10-04T05:00:00.000Z",
+    },
+    {
+      id: "merged-not-done",
+      title: "Слитый черновик без проверки",
+      status: "merged",
+      functional_role: "engineering",
+      result_type: "engineering",
+      received_at: "2026-09-01T10:00:00.000Z",
+      updated_at: "2026-10-07T06:00:00.000Z",
+      executive_run: { head_sha: headSha, ci: { status: "success", sha: headSha } },
+    },
+    {
+      id: "pilot-codex",
+      title: "Пилот Codex",
+      status: "done",
+      functional_role: "engineering",
+      result_type: "engineering",
+      dependencies: [{ target: "codex", status: "blocked", title: "Codex readiness" }],
+      executive_run: {
+        head_sha: headSha,
+        ci: { status: "success", sha: headSha },
+        independent_review: { verdict: "pass", sha: headSha },
+        deploy: { status: "deployed" },
+        production_proof: { status: "verified", url: "https://audiolad.ru/admin/ai-company" },
+      },
+    },
+    {
+      id: "measured",
+      title: "Задача с единицами",
+      status: "in_progress",
+      functional_role: "ux",
+      result_type: "document",
+      started_at: "2026-10-02T10:00:00.000Z",
+      verified_progress: {
+        done: 4,
+        total: 7,
+        formula: "закрытые критерии приёмки",
+        evidence_at: "2026-10-06T12:00:00.000Z",
+      },
+    },
+  ],
+  active_tasks: [
+    {
+      id: "older-active",
+      title: "Активная задача прошлого дня",
+      status: "in_progress",
+      priority: "p0",
+      functional_role: "qa",
+      started_at: "2026-10-03T08:00:00.000Z",
+      verified_progress: { percent: 90 },
+    },
+  ],
+  current_gates: [
+    {
+      id: "gate-oriy",
+      task_id: "b01cd5d3-052b-4e21-9236-184b3c5f2a5e",
+      reason: "Codex readiness: исполнитель не подключён",
+      decision_owner: "Sergey",
+      request: "Переназначьте задачу на другого исполнителя",
+      next_action: "Сергей меняет исполнителя",
+      kind: "readiness",
+      target: "codex",
+    },
+    {
+      id: "gate-product",
+      task_id: "received-today",
+      reason: "Нужно подтвердить формулировку для каталога",
+      decision_owner: "Oriy",
+      request: "Подтвердить текст",
+      next_action: "Орий отвечает в задаче",
+    },
+  ],
+  archived_blockers: [
+    {
+      id: "old-block",
+      task_id: "research-done-today",
+      reason: "Старый блокер уже снят",
+      decision_owner: "Oriy",
+      archived: true,
+    },
+  ],
+  executors: [
+    { provider: "cursor", model: "grok-4.7", connection_state: "online", last_heartbeat_at: "2026-10-07T06:30:00.000Z" },
+  ],
+  heartbeats: [
+    { service_key: "cursor", observed_at: "2026-10-07T06:30:00.000Z", state: "online" },
+    { service_key: "grok", observed_at: "2026-10-07T04:00:00.000Z", state: "online" },
+  ],
+  recent_events: [
+    {
+      event_type: "oriy:progress",
+      task_id: null,
+      created_at: "2026-10-07T06:35:00.000Z",
+      payload: {
+        task_id: "b01cd5d3-052b-4e21-9236-184b3c5f2a5e",
+        run_id: "bc-669e1e69-a735-5804-a8e7-903a4d2a2fb0",
+        message: "исполнитель пишет табло",
+      },
+    },
+  ],
+  costs: { amount_usd: 0 },
+  quotas: {
+    codex: { included_used: 0, included_limit: 0 },
+  },
+  completeness: {
+    active_tasks_complete: true,
+    events_complete: false,
+    history_complete: false,
+    next_cursor: "hist-2",
+  },
+});
+assert.ok(live);
+const liveModel = buildAiCompanyDashboard(live!, parseHistoryFilters({}));
+const boardTask = liveModel.activeTasks.find((task) => task.taskId === "b01cd5d3-052b-4e21-9236-184b3c5f2a5e");
+assert.ok(boardTask);
+assert.equal(boardTask.priority, "p1");
+assert.match(boardTask.functionalRole, /Инженер/);
+assert.equal(boardTask.executorLabel, "Cursor");
+assert.match(boardTask.executorNote, /не отдельный запуск xAI/);
+assert.match(boardTask.progress, /прогресс пока не измерен/);
+assert.doesNotMatch(boardTask.progress, /80/);
+assert.match(boardTask.lastEvent, /run in progress/);
+assert.match(boardTask.nextStep, /контракт статуса/);
+assert.match(boardTask.codexNote, /не подключён/);
+assert.match(boardTask.codexNote, /Cursor/);
+assert.equal(boardTask.engineering.ci, "success");
+assert.match(boardTask.engineering.independentReview, /другого SHA/);
+assert.equal(boardTask.engineering.deploy, "deployed");
+assert.equal(boardTask.engineering.production, "Нет данных");
+assert.equal(boardTask.engineering.dodSatisfied, false);
+assert.equal(liveModel.activeTasks.some((task) => task.title === "Активная задача прошлого дня"), true);
+assert.match(
+  liveModel.activeTasks.find((task) => task.title === "Активная задача прошлого дня")!.progress,
+  /прогресс пока не измерен/,
+);
+assert.equal(liveModel.todayReceived.some((row) => row.title === "Задача получена сегодня"), true);
+assert.equal(liveModel.todayReceived.some((row) => row.title === "Только обновлена седьмого"), false);
+assert.equal(liveModel.todayReceived.some((row) => row.title === "Сделать рабочее табло ИИ-компании"), false);
+assert.equal(liveModel.todayWorkEvents.some((event) => event.text.includes("oriy:progress")), true);
+assert.equal(liveModel.todayCompleted.some((row) => row.title === "Исследование закрыто сегодня"), true);
+assert.equal(liveModel.todayCompleted.some((row) => row.title === "Слитый черновик без проверки"), false);
+assert.equal(liveModel.history.some((item) => item.title === "Слитый черновик без проверки"), false);
+assert.equal(liveModel.history.some((item) => item.title === "Пилот Codex"), false);
+assert.equal(liveModel.activeTasks.some((task) => task.title === "Пилот Codex"), true);
+assert.match(
+  liveModel.activeTasks.find((task) => task.title === "Пилот Codex")!.detail.outcome,
+  /Пилот не отмечен успешным/,
+);
+assert.match(
+  liveModel.activeTasks.find((task) => task.title === "Пилот Codex")!.stage,
+  /Пилот не отмечен успешным/,
+);
+const measured = liveModel.activeTasks.find((task) => task.title === "Задача с единицами");
+assert.ok(measured);
+assert.match(measured.progress, /4 из 7/);
+assert.match(measured.progress, /закрытые критерии приёмки/);
+assert.match(measured.progress, /06\.10\.2026/);
+assert.doesNotMatch(measured.progress, /100%/);
+const codexGate = liveModel.decisions.find((gate) => gate.reason.includes("Codex readiness"));
+assert.ok(codexGate);
+assert.equal(codexGate.decisionOwner, "Сергей");
+assert.match(codexGate.nextAction, /Переназначение от Сергея не требуется/);
+assert.doesNotMatch(`${codexGate.request} ${codexGate.nextAction}`, /Переназначьте/);
+assert.match(codexGate.freshness, /Свежесть/);
+const productGate = liveModel.decisions.find((gate) => gate.reason.includes("формулировку"));
+assert.ok(productGate);
+assert.equal(productGate.decisionOwner, "Oriy");
+assert.equal(liveModel.decisions.some((gate) => gate.reason.includes("Старый блокер")), false);
+assert.equal(liveModel.archivedBlockers.some((gate) => gate.reason.includes("Старый блокер")), true);
+const codex = liveModel.executors.find((executor) => executor.id === "codex")!;
+assert.equal(codex.connection, "not_connected");
+const cursor = liveModel.executors.find((executor) => executor.id === "cursor")!;
+assert.equal(cursor.connection, "online");
+const grok = liveModel.executors.find((executor) => executor.id === "grok")!;
+assert.equal(grok.connection, "no_fresh_data");
+assert.match(liveModel.activeBoundary, /лента событий обрезана|событий/);
+assert.match(liveModel.historyBoundary, /история обрезана|История/);
+assert.equal(liveModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
+assert.equal(liveModel.quotas.find((line) => line.id === "codex")!.value, "Нет данных");
+assert.match(liveModel.quotas.find((line) => line.id === "cursor")!.checkPath, /Cursor/);
+
+const priced = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [],
+  agents: [],
+  quotas: {
+    codex: { source: "openai_usage", remaining: 12, limit: 50, reset_at: "2026-10-08T00:00:00.000Z", trustworthy: true },
+    cursor: { source: "cursor_pool", remaining: 0, limit: 20, trustworthy: true },
+    grok: { source: "unconfirmed", remaining: 3, trustworthy: false },
+  },
+  costs: { amount_usd: 0, source: "unknown" },
+})!;
+const pricedModel = buildAiCompanyDashboard(priced, parseHistoryFilters({}));
+assert.match(pricedModel.quotas.find((line) => line.id === "codex")!.value, /Остаток: 12 из 50/);
+assert.match(pricedModel.quotas.find((line) => line.id === "codex")!.value, /не расход/);
+assert.match(pricedModel.quotas.find((line) => line.id === "cursor")!.value, /Остаток: 0 из 20/);
+assert.match(pricedModel.quotas.find((line) => line.id === "cursor")!.value, /не расход/);
+assert.equal(pricedModel.quotas.find((line) => line.id === "grok")!.value, "Нет данных");
+assert.equal(pricedModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
+
+const exact = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [
+    {
+      id: "shipped",
+      title: "Инженерная задача закрыта",
+      status: "in_progress",
+      result_type: "engineering",
+      functional_role: "engineering",
+      started_at: "2026-10-07T01:00:00.000Z",
+      completed_at: "2026-10-07T06:00:00.000Z",
+      verified_progress: { done: 7, total: 7, formula: "критерии DoD", evidence_at: "2026-10-07T06:00:00.000Z" },
+      executive_run: {
+        provider: "cursor",
+        head_sha: headSha,
+        ci: { status: "success", sha: headSha },
+        independent_review: { verdict: "pass", sha: headSha },
+        deploy: { status: "deployed" },
+        production_proof: { status: "verified", url: "https://audiolad.ru/admin/ai-company", at: "2026-10-07T06:10:00.000Z" },
+      },
+    },
+  ],
+  agents: [],
+})!;
+const exactModel = buildAiCompanyDashboard(exact, parseHistoryFilters({}));
+assert.equal(exactModel.activeTasks.some((task) => task.title === "Инженерная задача закрыта"), false);
+const shipped = exactModel.history.find((item) => item.title === "Инженерная задача закрыта");
+assert.ok(shipped);
+assert.match(shipped.progress, /7 из 7/);
+assert.match(shipped.progress, /100%/);
+assert.match(shipped.engineering.independentReview, new RegExp(headSha));
+assert.match(shipped.engineering.production, /audiolad\.ru/);
+assert.equal(exactModel.todayCompleted.length, 1);
+
+const capped = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: Array.from({ length: 100 }, (_, index) => ({
+    id: `cap-${index}`,
+    title: `Задача ${index}`,
+    status: index === 0 ? "in_progress" : "done",
+    result_type: "document",
+    completed_at: index === 0 ? null : "2026-09-01T00:00:00.000Z",
+    started_at: index === 0 ? "2026-10-01T00:00:00.000Z" : null,
+  })),
+  recent_events: Array.from({ length: 50 }, (_, index) => ({
+    event_type: "executive:progress",
+    task_id: "cap-0",
+    created_at: `2026-10-07T06:${String(index % 60).padStart(2, "0")}:00.000Z`,
+  })),
+  agents: [],
+})!;
+const cappedModel = buildAiCompanyDashboard(capped, parseHistoryFilters({}));
+assert.match(cappedModel.activeBoundary, /100/);
+assert.match(cappedModel.activeBoundary, /50/);
+assert.equal(cappedModel.history.length, 20);
+const secondPage = buildAiCompanyDashboard(capped, parseHistoryFilters({ history_offset: "20" }));
+assert.equal(secondPage.history.length, 20);
+assert.notEqual(secondPage.history[0]?.title, cappedModel.history[0]?.title);
+
+const errorMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView
+    model={null}
+    filters={parseHistoryFilters({})}
+    sourceError="Company Core сейчас недоступен."
+    onRefresh={() => undefined}
+  />,
+);
+assert.match(errorMarkup, /Company Core недоступен/);
+assert.match(errorMarkup, /Нулевая активность не показана/);
+assert.doesNotMatch(errorMarkup, /Роли в работе/);
+assert.match(errorMarkup, /Свежесть: нет данных/);
+
+const liveMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={liveModel} filters={parseHistoryFilters({ period: "week" })} sourceError={null} onRefresh={() => undefined} />,
+);
+assert.match(liveMarkup, /data-section="now"/);
+assert.match(liveMarkup, /b01cd5d3-052b-4e21-9236-184b3c5f2a5e/);
+assert.match(liveMarkup, /data-connection="not_connected"/);
+assert.match(liveMarkup, /data-connection="online"/);
+assert.match(liveMarkup, /data-connection="no_fresh_data"/);
+assert.match(liveMarkup, /Нужно решение/);
+assert.match(liveMarkup, /История блокировок/);
+assert.match(liveMarkup, /Историческая блокировка/);
+assert.doesNotMatch(liveMarkup.slice(0, liveMarkup.indexOf("История блокировок")), /Старый блокер уже снят/);
+assert.match(liveMarkup, /grid-cols-2/);
+assert.match(liveMarkup, /lg:grid-cols-3/);
+assert.match(liveMarkup, /period=week/);
+assert.doesNotMatch(liveMarkup, /api_key|must-not-leak|Bearer /);
+
+const contract = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [
+    {
+      id: "contract-shape",
+      title: "Имена контракта статуса",
+      status: "in_progress",
+      priority: "p1",
+      role: "engineering",
+      stage: "review",
+      created_at: "2026-10-06T18:00:00.000Z",
+      received_at: "2026-10-06T18:05:00.000Z",
+      started_at: "2026-10-06T18:10:00.000Z",
+      completed_at: null,
+      last_event_at: "2026-10-07T06:40:00.000Z",
+      last_event: "событие контракта",
+      progress: null,
+      percent: 55,
+      verified_progress: { done: 1, total: 2, formula: "не должно читаться", evidence_at: "2026-10-07T06:00:00.000Z" },
+      executor: "cursor",
+      next_action: "Ждать сохранённое proof",
+      human_gate: null,
+      blocked_reason: null,
+      result_type: "engineering",
+      executive_run: {
+        done: true,
+        production_verified: false,
+        head_sha: headSha,
+        ci: { status: "success", sha: headSha },
+        independent_review: { verdict: "pass", sha: headSha },
+        deploy: { status: "deployed" },
+        production_proof: { status: "verified", url: "https://audiolad.ru/admin/ai-company" },
+      },
+    },
+    {
+      id: "contract-progress",
+      title: "Прогресс из progress",
+      status: "in_progress",
+      role: "product",
+      result_type: "document",
+      started_at: "2026-10-02T10:00:00.000Z",
+      progress: { done: 2, total: 5, formula: "проверенные пункты", evidence_at: "2026-10-06T12:00:00.000Z", percent: 99 },
+    },
+  ],
+  tasks_page: { complete: true },
+  agents: [],
+  executors: [],
+  heartbeats: [],
+  recent_events: [
+    { event_type: "executive:note", task_id: "contract-shape", created_at: "2026-10-07T06:40:00.000Z" },
+  ],
+  events: [
+    { event_type: "oriy:ignored", task_id: "contract-shape", created_at: "2026-10-07T06:41:00.000Z" },
+  ],
+  events_page: { complete: false },
+  gates: [
+    {
+      id: "gate-contract",
+      task_id: "contract-shape",
+      reason: "Нужно решение по контракту",
+      decision_owner: "Oriy",
+      request: "Сверить имена",
+      next_action: "Орий подтверждает имена",
+    },
+  ],
+  gates_history: [
+    { id: "gate-old", reason: "Архивный контрактный блокер", decision_owner: "Oriy", archived: true },
+  ],
+  gates_complete: true,
+  gates_history_complete: false,
+  codex: { connection: "not_connected", authenticated: false, gate: "CODEX_ACCESS_TOKEN", pilot_ok: false, readiness_task_id: "contract-shape" },
+  quotas: {
+    codex: { source: "openai_usage", remaining: 1, limit: 10, reset_at: "2026-10-08T00:00:00.000Z", trustworthy: true },
+    cursor: { source: "cursor_pool", remaining: 4, limit: 20, trustworthy: true },
+  },
+  coverage: {},
+  costs: { amount_usd: 0 },
+})!;
+const contractModel = buildAiCompanyDashboard(contract, parseHistoryFilters({}));
+const contractTask = contractModel.activeTasks.find((task) => task.taskId === "contract-shape");
+assert.ok(contractTask);
+assert.match(contractTask.progress, /прогресс пока не измерен/);
+assert.doesNotMatch(contractTask.progress, /55|1 из 2/);
+assert.equal(contractTask.executorLabel, "Cursor");
+assert.match(contractTask.nextStep, /Ждать сохранённое proof/);
+assert.match(contractTask.stage, /review/);
+assert.equal(contractTask.engineering.dodSatisfied, false);
+assert.match(contractTask.engineering.production, /production_verified = false/);
+assert.doesNotMatch(contractTask.engineering.production, /audiolad\.ru/);
+assert.equal(contract.events.some((event) => event.eventType === "oriy:ignored"), false);
+assert.equal(contract.events.some((event) => event.eventType === "executive:note"), true);
+const contractProgress = contractModel.activeTasks.find((task) => task.title === "Прогресс из progress");
+assert.ok(contractProgress);
+assert.match(contractProgress.progress, /2 из 5/);
+assert.doesNotMatch(contractProgress.progress, /99/);
+const contractGate = contractModel.decisions.find((gate) => gate.reason.includes("по контракту"));
+assert.ok(contractGate);
+assert.equal(contractGate.decisionOwner, "Oriy");
+assert.equal(contractModel.decisions.some((gate) => gate.reason.includes("Архивный контрактный")), false);
+assert.equal(contractModel.archivedBlockers.some((gate) => gate.reason.includes("Архивный контрактный")), true);
+assert.match(contractModel.activeBoundary, /лента событий обрезана|событий/);
+assert.match(contractModel.historyBoundary, /история обрезана/);
+assert.match(contractModel.quotas.find((line) => line.id === "codex")!.value, /Остаток: 1 из 10/);
+assert.equal(contractModel.executors.find((executor) => executor.id === "codex")!.connection, "not_connected");
+
+const aliasEvents = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [{ id: "alias-events", title: "Старое поле events", status: "in_progress", started_at: "2026-10-07T01:00:00.000Z" }],
+  agents: [],
+  events: [{ event_type: "progress", task_id: "alias-events", created_at: "2026-10-07T06:35:00.000Z" }],
+})!;
+assert.equal(aliasEvents.events.length, 1);
+
+const core = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [
+    {
+      id: "late",
+      title: "Поздняя полученная",
+      status: "queued",
+      role: "product",
+      producer_agent_slug: "engineering",
+      received_at: "2026-10-07T06:00:00.000Z",
+      created_at: "2026-10-07T01:00:00.000Z",
+      active: true,
+      progress: null,
+      percent: 40,
+      executor: { provider: "cursor", channel: "cursor", model: "grok-4.7", run_id: "run-late" },
+      next_action: "Продолжить",
+      last_event: { event_type: "progress", summary: "пишет", at: "2026-10-07T06:10:00.000Z" },
+      events: [{ event_type: "task:note", created_at: "2026-10-07T06:12:00.000Z" }],
+      events_complete: true,
+    },
+    { id: "early", title: "Ранняя полученная", status: "queued", role: "qa", received_at: "2026-10-07T02:00:00.000Z", active: true },
+    { id: "same-a", title: "Ничья А", status: "queued", received_at: "2026-10-07T03:00:00.000Z", active: true },
+    { id: "same-b", title: "Ничья Б", status: "queued", received_at: "2026-10-07T03:00:00.000Z", active: true },
+    { id: "no-date", title: "Без даты получения", status: "queued", created_at: "2026-10-07T05:00:00.000Z", updated_at: "2026-10-07T06:30:00.000Z", active: true },
+    { id: "created-late", title: "Создана позже", status: "queued", created_at: "2026-10-07T04:00:00.000Z", active: false },
+    { id: "created-early", title: "Создана раньше", status: "queued", created_at: "2026-10-07T01:30:00.000Z", active: false },
+    { id: "done-late", title: "Закрыта позже", status: "done", result_type: "document", completed_at: "2026-10-07T05:30:00.000Z", active: false },
+    { id: "done-early", title: "Закрыта раньше", status: "done", result_type: "document", completed_at: "2026-10-07T01:00:00.000Z", active: false },
+    {
+      id: "sha-ok",
+      title: "Точный SHA",
+      status: "in_progress",
+      role: "engineering",
+      result_type: "engineering",
+      active: true,
+      progress: { done: 3, total: 3, formula: "пункты", evidence_at: "2026-10-07T06:00:00.000Z" },
+      executive_run: {
+        ci_status: "success",
+        review_status: "pass",
+        review_sha: headSha,
+        deploy_status: "deployed",
+        head_sha: headSha,
+        commit_sha: headSha,
+        production_verified: true,
+        production_proof: { verified: true, sha: headSha, evidence_at: "2026-10-07T06:20:00.000Z", source: "bridge" },
+        done: true,
+      },
+    },
+    {
+      id: "sha-bad",
+      title: "Чужой SHA",
+      status: "in_progress",
+      role: "engineering",
+      result_type: "engineering",
+      active: true,
+      progress: { done: 3, total: 3, formula: "пункты", evidence_at: "2026-10-07T06:00:00.000Z" },
+      executive_run: {
+        ci_status: "success",
+        review_status: "pass",
+        review_sha: otherSha,
+        deploy_status: "deployed",
+        head_sha: headSha,
+        done: true,
+        production_verified: true,
+        production_proof: { verified: true, sha: otherSha, evidence_at: "2026-10-07T06:20:00.000Z", source: "bridge" },
+      },
+    },
+    {
+      id: "orch",
+      title: "Только executive",
+      status: "in_progress",
+      role: "orchestrator",
+      active: true,
+      executor: { provider: "executive", channel: "executive", model: "grok" },
+    },
+  ],
+  tasks_page: {
+    active_complete: true,
+    history_complete: false,
+    history_next_before: "2026-10-01T00:00:00.000Z",
+    history_limit: 20,
+  },
+  recent_events: [],
+  events_page: { complete: true },
+  gates: [
+    {
+      id: "CODEX_ACCESS_TOKEN",
+      task_id: "late",
+      reason: "CODEX_ACCESS_TOKEN: нужен новый доступ",
+      decision_owner: "sergey",
+      request: "Выдать токен Codex",
+      next_action: "Сергей решает доступ",
+      kind: "credential",
+    },
+    {
+      id: "english",
+      task_id: "early",
+      reason: "Missing execution context",
+      decision_owner: "oriy",
+      next_action: "Восстановить контекст",
+    },
+    {
+      id: "proof-pending",
+      task_id: "sha-bad",
+      reason: "production proof pending",
+      decision_owner: "oriy",
+      next_action: "Дождаться сохранённого proof",
+    },
+  ],
+  gates_history: [
+    { id: "old-639", task_id: "done-early", reason: "Историческая блокировка выпуска 639", decision_owner: "oriy", archived: true },
+  ],
+  agents: [{ slug: "qa", role: "qa", connection: "free", connection_freshness_at: "2026-10-07T06:00:00.000Z" }],
+  executors: [
+    { provider: "cursor", connection: "working", freshness_at: "2026-10-07T06:30:00.000Z", run_id: "run-late" },
+  ],
+  quotas: {
+    codex: { remaining: 3, limit: 9, source: "openai_usage", trustworthy: false, reset_at: "2026-10-08T00:00:00.000Z" },
+  },
+  costs: { confirmed: false, source: "ledger", amount_usd: 0 },
+})!;
+const coreModel = buildAiCompanyDashboard(core, parseHistoryFilters({}));
+assert.deepEqual(
+  coreModel.todayReceived.map((row) => row.title),
+  ["Поздняя полученная", "Ничья А", "Ничья Б", "Ранняя полученная"],
+);
+assert.equal(coreModel.todayReceived.some((row) => row.title === "Без даты получения"), false);
+assert.deepEqual(
+  coreModel.todayCreated.map((row) => row.title),
+  ["Без даты получения", "Создана позже", "Создана раньше"],
+);
+assert.deepEqual(
+  coreModel.todayCompleted.map((row) => row.title),
+  ["Закрыта позже", "Закрыта раньше"],
+);
+const late = coreModel.activeTasks.find((task) => task.taskId === "late");
+assert.ok(late);
+assert.match(late.functionalRole, /Продуктовый/);
+assert.equal(late.executorLabel, "Cursor");
+assert.match(late.executorNote, /не отдельный запуск xAI/);
+assert.match(late.progress, /прогресс пока не измерен/);
+assert.match(late.lastEvent, /progress: пишет/);
+const orch = coreModel.activeTasks.find((task) => task.title === "Только executive");
+assert.ok(orch);
+assert.equal(orch.executorLabel, "Grok");
+assert.match(orch.executorNote, /оркестрация/);
+assert.equal(core.events.some((event) => event.eventType === "task:note"), true);
+const shippedSha = coreModel.history.find((item) => item.title === "Точный SHA");
+assert.ok(shippedSha);
+assert.match(shippedSha.progress, /100%/);
+assert.match(shippedSha.engineering.production, new RegExp(headSha));
+const badSha = coreModel.activeTasks.find((task) => task.title === "Чужой SHA");
+assert.ok(badSha);
+assert.equal(badSha.engineering.dodSatisfied, false);
+assert.match(badSha.progress, /100% не ставится/);
+assert.match(badSha.engineering.independentReview, /другого SHA/);
+const tokenGate = coreModel.decisions.find((gate) => gate.reason.includes("новый доступ"));
+assert.ok(tokenGate);
+assert.equal(tokenGate.decisionOwner, "Сергей");
+assert.match(tokenGate.nextAction, /Сергей решает доступ/);
+assert.match(tokenGate.taskTitle, /Поздняя полученная/);
+const englishGate = coreModel.decisions.find((gate) => gate.taskTitle === "Ранняя полученная");
+assert.ok(englishGate);
+assert.equal(englishGate.decisionOwner, "Oriy");
+assert.match(englishGate.reason, /контекста исполнения/);
+assert.doesNotMatch(englishGate.reason, /Missing execution context/);
+const pendingGate = coreModel.decisions.find((gate) => gate.taskTitle === "Чужой SHA");
+assert.ok(pendingGate);
+assert.match(pendingGate.reason, /не считается закрытой/);
+assert.doesNotMatch(pendingGate.reason, /production proof pending/);
+assert.equal(coreModel.decisions.some((gate) => gate.reason.includes("639")), false);
+const historic = coreModel.archivedBlockers.find((gate) => gate.reason.includes("639"));
+assert.ok(historic);
+assert.equal(historic.historical, true);
+assert.equal(coreModel.quotas.find((line) => line.id === "codex")!.value, "Нет данных");
+assert.equal(coreModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
+assert.equal(coreModel.historyNextCursor, "2026-10-01T00:00:00.000Z");
+assert.match(coreModel.historyBoundary, /история обрезана/);
+assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.connectionLabel, "работает");
+assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.runId, "run-late");
+assert.match(coreModel.agents.find((agent) => agent.slug === "qa")!.stateLabel, /Простаивает|свободен|нет свежих данных|Ожидает/);
 
 console.log("ai-company-dashboard-unit: ok");
