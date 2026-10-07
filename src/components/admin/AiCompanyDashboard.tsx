@@ -119,10 +119,12 @@ function GateList({ gates }: { gates: GateCard[] }) {
         <li key={gate.key} className="rounded-xl bg-white/80 p-3" data-decision-owner={gate.decisionOwner}>
           <p className="font-semibold break-words">{gate.taskTitle}</p>
           <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+            {gate.historical ? <Fact label="Метка" value="Историческая блокировка" /> : null}
             <Fact label="Причина" value={gate.reason} />
-            <Fact label="Кто решает" value={gate.decisionOwner} />
+            <Fact label="Свежесть" value={gate.freshness} />
+            <Fact label="Кто разбирает" value={gate.decisionOwner} />
             <Fact label="Запрос" value={gate.request} />
-            <Fact label="Следующее действие" value={gate.nextAction} />
+            <Fact label="Следующий шаг" value={gate.nextAction} />
           </dl>
         </li>
       ))}
@@ -198,7 +200,7 @@ export function AiCompanyDashboardView({
   const nextHistory = model
     ? historyHref(filters, {
         historyOffset: model.historyNextOffset ?? undefined,
-        historyCursor: model.historyNextOffset == null ? model.historyNextCursor ?? undefined : undefined,
+        historyBefore: model.historyNextOffset == null ? model.historyNextCursor ?? undefined : undefined,
       })
     : null;
   const showNext = Boolean(model && (model.historyNextOffset != null || model.historyNextCursor));
@@ -267,7 +269,7 @@ export function AiCompanyDashboardView({
               Исполнители
             </h3>
             <p className="mt-1 text-sm text-[#796ba0]">
-              Grok — оркестратор. Codex и Cursor — исполнители. Состояние связи берётся из сигналов, а не из названия роли.
+              Фактические исполнители: запуск, задача и свежесть. Состояния: не подключён, свободен, нет данных, работает. Grok оркеструет и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor.
             </p>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
               {model.executors.map((executor) => (
@@ -281,6 +283,10 @@ export function AiCompanyDashboardView({
                   <p className="mt-1 text-sm">{executor.connectionLabel}</p>
                   <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
                   <dl className="mt-3 grid gap-2 text-sm">
+                    <Fact label="Состояние" value={executor.connectionLabel} />
+                    <Fact label="Задача" value={executor.currentTask} />
+                    <Fact label="Запуск" value={executor.runId} />
+                    <Fact label="Свежесть" value={executor.freshness} />
                     <Fact label="Последний сигнал" value={executor.heartbeat} />
                     <Fact label="Уточнение" value={executor.detail} />
                   </dl>
@@ -294,7 +300,7 @@ export function AiCompanyDashboardView({
               Роли компании
             </h3>
             <p className="mt-1 text-sm text-[#796ba0]">
-              Функциональные роли отдельно от фактических исполнителей.
+              Восемь функций компании, не восемь запущенных процессов. Product, Engineering, QA и Analytics назначает Grok по нужде. QA остаётся независимой. Старые роли не запускаются ради показателей.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {model.pulse.map((item) => (
@@ -341,13 +347,14 @@ export function AiCompanyDashboardView({
             <div className="mt-4 space-y-5">
               <div data-section="received">
                 <h4 className="font-semibold">Получены сегодня · {model.todayReceived.length}</h4>
+                <p className="mt-1 text-xs text-[#796ba0]">Порядок: received_at, новые сверху.</p>
                 <div className="mt-2">
                   <TodayList rows={model.todayReceived} empty={`${NO_DATA}: получения за московские сутки снимка нет.`} />
                 </div>
               </div>
               <div data-section="created">
                 <h4 className="font-semibold">Созданы сегодня · {model.todayCreated.length}</h4>
-                <p className="mt-1 text-xs text-[#796ba0]">Создание записи. Это не получение и не обновление.</p>
+                <p className="mt-1 text-xs text-[#796ba0]">Порядок: created_at, новые сверху. Это запасной список, не received_at и не updated_at.</p>
                 <div className="mt-2">
                   <TodayList rows={model.todayCreated} empty={`${NO_DATA}: создания записи за эти сутки нет.`} />
                 </div>
@@ -372,6 +379,7 @@ export function AiCompanyDashboardView({
               </div>
               <div data-section="completed-today">
                 <h4 className="font-semibold">Завершены сегодня · {model.todayCompleted.length}</h4>
+                <p className="mt-1 text-xs text-[#796ba0]">Порядок: completed_at, новые сверху.</p>
                 <div className="mt-2">
                   <TodayList
                     rows={model.todayCompleted}
@@ -491,7 +499,8 @@ export function AiCompanyDashboardView({
             ) : null}
             {model.archivedBlockers.length ? (
               <div className="mt-5" data-section="archived">
-                <h4 className="font-semibold">Архив блокировок</h4>
+                <h4 className="font-semibold">История блокировок</h4>
+                <p className="mt-1 text-xs text-[#796ba0]">Историческая или уже снятая блокировка. Текущие решения остаются в красном блоке.</p>
                 <GateList gates={model.archivedBlockers} />
               </div>
             ) : null}

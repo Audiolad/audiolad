@@ -366,9 +366,10 @@ assert.match(dashboardSource, /clearInterval/);
 assert.match(dashboardSource, /data-section="now"/);
 assert.equal(companyStatusRequestPath(parseHistoryFilters({})), "/v1/status");
 assert.equal(
-  companyStatusRequestPath(parseHistoryFilters({ history_cursor: "page-2" })),
-  "/v1/status?history_cursor=page-2",
+  companyStatusRequestPath(parseHistoryFilters({ history_before: "2026-10-07T06:00:00.000Z" })),
+  "/v1/status?history_before=2026-10-07T06%3A00%3A00.000Z",
 );
+assert.equal(companyStatusRequestPath(parseHistoryFilters({ history_before: "page-2" })), "/v1/status");
 
 const navItem = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/ai-company");
 assert.ok(navItem);
@@ -399,10 +400,17 @@ assert.equal(CORE_FIELD_MAP.task.receivedAt[0], "received_at");
 assert.equal(CORE_FIELD_MAP.task.verifiedProgress[0], "progress");
 assert.equal(CORE_FIELD_MAP.task.verifiedProgress[1], "verified_progress");
 assert.equal(CORE_FIELD_MAP.task.functionalRole[0], "role");
+assert.equal(CORE_FIELD_MAP.task.functionalRole[1], "producer_agent_slug");
 assert.equal(CORE_FIELD_MAP.task.actualExecutor[0], "executor");
 assert.equal(CORE_FIELD_MAP.task.nextStep[0], "next_action");
 assert.equal(CORE_FIELD_MAP.executiveRun.headSha[0], "head_sha");
-assert.equal(CORE_FIELD_MAP.executiveRun.productionProof[0], "production_verified");
+assert.equal(CORE_FIELD_MAP.executiveRun.ci[0], "ci_status");
+assert.equal(CORE_FIELD_MAP.executiveRun.independentReview[0], "review_status");
+assert.equal(CORE_FIELD_MAP.executiveRun.deploy[0], "deploy_status");
+assert.equal(CORE_FIELD_MAP.executiveRun.productionProof[0], "production_proof");
+assert.equal(CORE_FIELD_MAP.executiveRun.productionVerified[0], "production_verified");
+assert.equal(CORE_FIELD_MAP.query.historyBefore, "history_before");
+assert.equal(CORE_FIELD_MAP.page.historyNextBefore[0], "history_next_before");
 assert.equal(CORE_FIELD_MAP.root.events[0], "recent_events");
 assert.equal(CORE_FIELD_MAP.root.currentGates[0], "gates");
 assert.equal(CORE_FIELD_MAP.root.archivedBlockers[0], "gates_history");
@@ -638,10 +646,10 @@ assert.match(measured.progress, /06\.10\.2026/);
 assert.doesNotMatch(measured.progress, /100%/);
 const codexGate = liveModel.decisions.find((gate) => gate.reason.includes("Codex readiness"));
 assert.ok(codexGate);
-assert.equal(codexGate.decisionOwner, "Oriy");
-assert.match(codexGate.nextAction, /не подключён/);
+assert.equal(codexGate.decisionOwner, "Сергей");
 assert.match(codexGate.nextAction, /Переназначение от Сергея не требуется/);
 assert.doesNotMatch(`${codexGate.request} ${codexGate.nextAction}`, /Переназначьте/);
+assert.match(codexGate.freshness, /Свежесть/);
 const productGate = liveModel.decisions.find((gate) => gate.reason.includes("формулировку"));
 assert.ok(productGate);
 assert.equal(productGate.decisionOwner, "Oriy");
@@ -664,17 +672,17 @@ const priced = parseCompanyStatus({
   tasks: [],
   agents: [],
   quotas: {
-    codex: { source: "openai_usage", included_used: 12, included_limit: 50, resets_at: "2026-10-08T00:00:00.000Z" },
-    cursor: { source: "cursor_pool", spend_usd: 0, pool_usd: 20 },
-    grok: { source: "unconfirmed", spend_usd: 3 },
+    codex: { source: "openai_usage", remaining: 12, limit: 50, reset_at: "2026-10-08T00:00:00.000Z", trustworthy: true },
+    cursor: { source: "cursor_pool", remaining: 0, limit: 20, trustworthy: true },
+    grok: { source: "unconfirmed", remaining: 3, trustworthy: false },
   },
   costs: { amount_usd: 0, source: "unknown" },
 })!;
 const pricedModel = buildAiCompanyDashboard(priced, parseHistoryFilters({}));
-assert.match(pricedModel.quotas.find((line) => line.id === "codex")!.value, /12 из 50/);
-assert.match(pricedModel.quotas.find((line) => line.id === "codex")!.value, /не остаток лимита/);
-assert.match(pricedModel.quotas.find((line) => line.id === "cursor")!.value, /\$0/);
-assert.match(pricedModel.quotas.find((line) => line.id === "cursor")!.value, /не является остатком лимита/);
+assert.match(pricedModel.quotas.find((line) => line.id === "codex")!.value, /Остаток: 12 из 50/);
+assert.match(pricedModel.quotas.find((line) => line.id === "codex")!.value, /не расход/);
+assert.match(pricedModel.quotas.find((line) => line.id === "cursor")!.value, /Остаток: 0 из 20/);
+assert.match(pricedModel.quotas.find((line) => line.id === "cursor")!.value, /не расход/);
 assert.equal(pricedModel.quotas.find((line) => line.id === "grok")!.value, "Нет данных");
 assert.equal(pricedModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
 
@@ -759,8 +767,9 @@ assert.match(liveMarkup, /data-connection="not_connected"/);
 assert.match(liveMarkup, /data-connection="online"/);
 assert.match(liveMarkup, /data-connection="no_fresh_data"/);
 assert.match(liveMarkup, /Нужно решение/);
-assert.match(liveMarkup, /Архив блокировок/);
-assert.doesNotMatch(liveMarkup.slice(0, liveMarkup.indexOf("Архив блокировок")), /Старый блокер уже снят/);
+assert.match(liveMarkup, /История блокировок/);
+assert.match(liveMarkup, /Историческая блокировка/);
+assert.doesNotMatch(liveMarkup.slice(0, liveMarkup.indexOf("История блокировок")), /Старый блокер уже снят/);
 assert.match(liveMarkup, /grid-cols-2/);
 assert.match(liveMarkup, /lg:grid-cols-3/);
 assert.match(liveMarkup, /period=week/);
@@ -836,8 +845,11 @@ const contract = parseCompanyStatus({
   ],
   gates_complete: true,
   gates_history_complete: false,
-  codex: { source: "openai_usage", included_used: 1, included_limit: 10, resets_at: "2026-10-08T00:00:00.000Z" },
-  quotas: { cursor: { source: "cursor_pool", spend_usd: 1, pool_usd: 20 } },
+  codex: { connection: "not_connected", authenticated: false, gate: "CODEX_ACCESS_TOKEN", pilot_ok: false, readiness_task_id: "contract-shape" },
+  quotas: {
+    codex: { source: "openai_usage", remaining: 1, limit: 10, reset_at: "2026-10-08T00:00:00.000Z", trustworthy: true },
+    cursor: { source: "cursor_pool", remaining: 4, limit: 20, trustworthy: true },
+  },
   coverage: {},
   costs: { amount_usd: 0 },
 })!;
@@ -865,7 +877,8 @@ assert.equal(contractModel.decisions.some((gate) => gate.reason.includes("Арх
 assert.equal(contractModel.archivedBlockers.some((gate) => gate.reason.includes("Архивный контрактный")), true);
 assert.match(contractModel.activeBoundary, /лента событий обрезана|событий/);
 assert.match(contractModel.historyBoundary, /история обрезана/);
-assert.match(contractModel.quotas.find((line) => line.id === "codex")!.value, /1 из 10/);
+assert.match(contractModel.quotas.find((line) => line.id === "codex")!.value, /Остаток: 1 из 10/);
+assert.equal(contractModel.executors.find((executor) => executor.id === "codex")!.connection, "not_connected");
 
 const aliasEvents = parseCompanyStatus({
   generated_at: "2026-10-07T06:39:00.000Z",
@@ -874,5 +887,187 @@ const aliasEvents = parseCompanyStatus({
   events: [{ event_type: "progress", task_id: "alias-events", created_at: "2026-10-07T06:35:00.000Z" }],
 })!;
 assert.equal(aliasEvents.events.length, 1);
+
+const core = parseCompanyStatus({
+  generated_at: "2026-10-07T06:39:00.000Z",
+  tasks: [
+    {
+      id: "late",
+      title: "Поздняя полученная",
+      status: "queued",
+      role: "product",
+      producer_agent_slug: "engineering",
+      received_at: "2026-10-07T06:00:00.000Z",
+      created_at: "2026-10-07T01:00:00.000Z",
+      active: true,
+      progress: null,
+      percent: 40,
+      executor: { provider: "cursor", channel: "cursor", model: "grok-4.7", run_id: "run-late" },
+      next_action: "Продолжить",
+      last_event: { event_type: "progress", summary: "пишет", at: "2026-10-07T06:10:00.000Z" },
+      events: [{ event_type: "task:note", created_at: "2026-10-07T06:12:00.000Z" }],
+      events_complete: true,
+    },
+    { id: "early", title: "Ранняя полученная", status: "queued", role: "qa", received_at: "2026-10-07T02:00:00.000Z", active: true },
+    { id: "same-a", title: "Ничья А", status: "queued", received_at: "2026-10-07T03:00:00.000Z", active: true },
+    { id: "same-b", title: "Ничья Б", status: "queued", received_at: "2026-10-07T03:00:00.000Z", active: true },
+    { id: "no-date", title: "Без даты получения", status: "queued", created_at: "2026-10-07T05:00:00.000Z", updated_at: "2026-10-07T06:30:00.000Z", active: true },
+    { id: "created-late", title: "Создана позже", status: "queued", created_at: "2026-10-07T04:00:00.000Z", active: false },
+    { id: "created-early", title: "Создана раньше", status: "queued", created_at: "2026-10-07T01:30:00.000Z", active: false },
+    { id: "done-late", title: "Закрыта позже", status: "done", result_type: "document", completed_at: "2026-10-07T05:30:00.000Z", active: false },
+    { id: "done-early", title: "Закрыта раньше", status: "done", result_type: "document", completed_at: "2026-10-07T01:00:00.000Z", active: false },
+    {
+      id: "sha-ok",
+      title: "Точный SHA",
+      status: "in_progress",
+      role: "engineering",
+      result_type: "engineering",
+      active: true,
+      progress: { done: 3, total: 3, formula: "пункты", evidence_at: "2026-10-07T06:00:00.000Z" },
+      executive_run: {
+        ci_status: "success",
+        review_status: "pass",
+        review_sha: headSha,
+        deploy_status: "deployed",
+        head_sha: headSha,
+        commit_sha: headSha,
+        production_verified: true,
+        production_proof: { verified: true, sha: headSha, evidence_at: "2026-10-07T06:20:00.000Z", source: "bridge" },
+        done: true,
+      },
+    },
+    {
+      id: "sha-bad",
+      title: "Чужой SHA",
+      status: "in_progress",
+      role: "engineering",
+      result_type: "engineering",
+      active: true,
+      progress: { done: 3, total: 3, formula: "пункты", evidence_at: "2026-10-07T06:00:00.000Z" },
+      executive_run: {
+        ci_status: "success",
+        review_status: "pass",
+        review_sha: otherSha,
+        deploy_status: "deployed",
+        head_sha: headSha,
+        done: true,
+        production_verified: true,
+        production_proof: { verified: true, sha: otherSha, evidence_at: "2026-10-07T06:20:00.000Z", source: "bridge" },
+      },
+    },
+    {
+      id: "orch",
+      title: "Только executive",
+      status: "in_progress",
+      role: "orchestrator",
+      active: true,
+      executor: { provider: "executive", channel: "executive", model: "grok" },
+    },
+  ],
+  tasks_page: {
+    active_complete: true,
+    history_complete: false,
+    history_next_before: "2026-10-01T00:00:00.000Z",
+    history_limit: 20,
+  },
+  recent_events: [],
+  events_page: { complete: true },
+  gates: [
+    {
+      id: "CODEX_ACCESS_TOKEN",
+      task_id: "late",
+      reason: "CODEX_ACCESS_TOKEN: нужен новый доступ",
+      decision_owner: "sergey",
+      request: "Выдать токен Codex",
+      next_action: "Сергей решает доступ",
+      kind: "credential",
+    },
+    {
+      id: "english",
+      task_id: "early",
+      reason: "Missing execution context",
+      decision_owner: "oriy",
+      next_action: "Восстановить контекст",
+    },
+    {
+      id: "proof-pending",
+      task_id: "sha-bad",
+      reason: "production proof pending",
+      decision_owner: "oriy",
+      next_action: "Дождаться сохранённого proof",
+    },
+  ],
+  gates_history: [
+    { id: "old-639", task_id: "done-early", reason: "Историческая блокировка выпуска 639", decision_owner: "oriy", archived: true },
+  ],
+  agents: [{ slug: "qa", role: "qa", connection: "free", connection_freshness_at: "2026-10-07T06:00:00.000Z" }],
+  executors: [
+    { provider: "cursor", connection: "working", freshness_at: "2026-10-07T06:30:00.000Z", run_id: "run-late" },
+  ],
+  quotas: {
+    codex: { remaining: 3, limit: 9, source: "openai_usage", trustworthy: false, reset_at: "2026-10-08T00:00:00.000Z" },
+  },
+  costs: { confirmed: false, source: "ledger", amount_usd: 0 },
+})!;
+const coreModel = buildAiCompanyDashboard(core, parseHistoryFilters({}));
+assert.deepEqual(
+  coreModel.todayReceived.map((row) => row.title),
+  ["Поздняя полученная", "Ничья А", "Ничья Б", "Ранняя полученная"],
+);
+assert.equal(coreModel.todayReceived.some((row) => row.title === "Без даты получения"), false);
+assert.deepEqual(
+  coreModel.todayCreated.map((row) => row.title),
+  ["Без даты получения", "Создана позже", "Создана раньше"],
+);
+assert.deepEqual(
+  coreModel.todayCompleted.map((row) => row.title),
+  ["Закрыта позже", "Закрыта раньше"],
+);
+const late = coreModel.activeTasks.find((task) => task.taskId === "late");
+assert.ok(late);
+assert.match(late.functionalRole, /Продуктовый/);
+assert.equal(late.executorLabel, "Cursor");
+assert.match(late.executorNote, /не отдельный запуск xAI/);
+assert.match(late.progress, /прогресс пока не измерен/);
+assert.match(late.lastEvent, /progress: пишет/);
+const orch = coreModel.activeTasks.find((task) => task.title === "Только executive");
+assert.ok(orch);
+assert.equal(orch.executorLabel, "Grok");
+assert.match(orch.executorNote, /оркестрация/);
+assert.equal(core.events.some((event) => event.eventType === "task:note"), true);
+const shippedSha = coreModel.history.find((item) => item.title === "Точный SHA");
+assert.ok(shippedSha);
+assert.match(shippedSha.progress, /100%/);
+assert.match(shippedSha.engineering.production, new RegExp(headSha));
+const badSha = coreModel.activeTasks.find((task) => task.title === "Чужой SHA");
+assert.ok(badSha);
+assert.equal(badSha.engineering.dodSatisfied, false);
+assert.match(badSha.progress, /100% не ставится/);
+assert.match(badSha.engineering.independentReview, /другого SHA/);
+const tokenGate = coreModel.decisions.find((gate) => gate.reason.includes("новый доступ"));
+assert.ok(tokenGate);
+assert.equal(tokenGate.decisionOwner, "Сергей");
+assert.match(tokenGate.nextAction, /Сергей решает доступ/);
+assert.match(tokenGate.taskTitle, /Поздняя полученная/);
+const englishGate = coreModel.decisions.find((gate) => gate.taskTitle === "Ранняя полученная");
+assert.ok(englishGate);
+assert.equal(englishGate.decisionOwner, "Oriy");
+assert.match(englishGate.reason, /контекста исполнения/);
+assert.doesNotMatch(englishGate.reason, /Missing execution context/);
+const pendingGate = coreModel.decisions.find((gate) => gate.taskTitle === "Чужой SHA");
+assert.ok(pendingGate);
+assert.match(pendingGate.reason, /не считается закрытой/);
+assert.doesNotMatch(pendingGate.reason, /production proof pending/);
+assert.equal(coreModel.decisions.some((gate) => gate.reason.includes("639")), false);
+const historic = coreModel.archivedBlockers.find((gate) => gate.reason.includes("639"));
+assert.ok(historic);
+assert.equal(historic.historical, true);
+assert.equal(coreModel.quotas.find((line) => line.id === "codex")!.value, "Нет данных");
+assert.equal(coreModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
+assert.equal(coreModel.historyNextCursor, "2026-10-01T00:00:00.000Z");
+assert.match(coreModel.historyBoundary, /история обрезана/);
+assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.connectionLabel, "работает");
+assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.runId, "run-late");
+assert.match(coreModel.agents.find((agent) => agent.slug === "qa")!.stateLabel, /Простаивает|свободен|нет свежих данных|Ожидает/);
 
 console.log("ai-company-dashboard-unit: ok");

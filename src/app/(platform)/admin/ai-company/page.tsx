@@ -42,11 +42,18 @@ export default async function AiCompanyPage({
     status?: string;
     agent?: string;
     history_offset?: string;
-    history_cursor?: string;
+    history_before?: string;
   }>;
 }) {
   await requireAdminPermission("ai_company.view");
-  const filters = parseHistoryFilters(await searchParams);
+  const params = await searchParams;
+  const filters = parseHistoryFilters({
+    period: params.period,
+    status: params.status,
+    agent: params.agent,
+    history_offset: params.history_offset,
+    history_before: params.history_before,
+  });
   const { data, error } = await loadStatus(filters);
 
   if (!data) {

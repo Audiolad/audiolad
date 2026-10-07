@@ -64,7 +64,7 @@ export const CORE_FIELD_MAP = {
     coverage: ["coverage", "completeness"],
   },
   query: {
-    historyCursor: "history_cursor",
+    historyBefore: "history_before",
     historyLimit: "history_limit",
     historyOffset: "history_offset",
   },
@@ -74,7 +74,10 @@ export const CORE_FIELD_MAP = {
     status: ["status"],
     stage: ["stage"],
     priority: ["priority"],
-    functionalRole: ["role", "functional_role", "producer_agent_slug", "agent_slug"],
+    functionalRole: ["role", "producer_agent_slug", "functional_role", "agent_slug"],
+    active: ["active"],
+    taskEvents: ["events"],
+    eventsComplete: ["events_complete"],
     actualExecutor: ["executor", "actual_executor"],
     fallbackExecutor: ["fallback_executor"],
     nextStep: ["next_action", "next_step"],
@@ -108,12 +111,14 @@ export const CORE_FIELD_MAP = {
     lastEvent: ["last_event"],
     lastEventAt: ["last_event_at"],
     prUrl: ["pr_url", "pull_request_url"],
-    headSha: ["head_sha", "sha"],
-    ci: ["ci"],
-    independentReview: ["independent_review"],
-    deploy: ["deploy"],
+    headSha: ["head_sha", "commit_sha", "sha"],
+    ci: ["ci_status", "ci"],
+    independentReview: ["review_status", "independent_review"],
+    reviewSha: ["review_sha"],
+    deploy: ["deploy_status", "deploy"],
     done: ["done"],
-    productionProof: ["production_verified", "production_proof"],
+    productionVerified: ["production_verified"],
+    productionProof: ["production_proof"],
   },
   progress: {
     done: ["done"],
@@ -137,9 +142,10 @@ export const CORE_FIELD_MAP = {
     provider: ["provider"],
     channel: ["channel"],
     model: ["model"],
-    connectionState: ["connection_state", "state"],
-    lastHeartbeatAt: ["last_heartbeat_at", "observed_at"],
+    connectionState: ["connection", "connection_state", "state"],
+    lastHeartbeatAt: ["freshness_at", "connection_freshness_at", "last_heartbeat_at", "observed_at"],
     currentTaskId: ["current_task_id"],
+    runId: ["run_id"],
   },
   heartbeat: {
     serviceKey: ["service_key"],
@@ -158,11 +164,22 @@ export const CORE_FIELD_MAP = {
   },
   quota: {
     source: ["source", "confirmed_source"],
-    includedUsed: ["included_used", "used"],
-    includedLimit: ["included_limit", "limit"],
-    resetsAt: ["resets_at"],
-    spendUsd: ["spend_usd", "amount_usd"],
+    trustworthy: ["trustworthy"],
+    confirmed: ["confirmed"],
+    remaining: ["remaining"],
+    includedUsed: ["included_used"],
+    includedLimit: ["limit", "included_limit"],
+    resetsAt: ["reset_at", "resets_at"],
+    checkPath: ["check_path"],
+    spendUsd: ["amount_usd", "spend_usd"],
     poolUsd: ["pool_usd", "pool"],
+  },
+  codex: {
+    connection: ["connection"],
+    authenticated: ["authenticated"],
+    gate: ["gate"],
+    pilotOk: ["pilot_ok"],
+    readinessTaskId: ["readiness_task_id"],
   },
   quotaBucket: {
     codex: ["codex"],
@@ -182,6 +199,10 @@ export const CORE_FIELD_MAP = {
     eventsLimit: ["events_limit"],
   },
   page: {
+    activeComplete: ["active_complete", "complete"],
+    historyComplete: ["history_complete"],
+    historyNextBefore: ["history_next_before"],
+    historyLimit: ["history_limit", "limit"],
     complete: ["complete"],
     truncated: ["truncated"],
     nextCursor: ["next_cursor"],
@@ -197,9 +218,11 @@ export const CORE_FIELD_MAP = {
   },
   evidence: {
     status: ["status", "state", "verdict", "conclusion"],
-    sha: ["sha", "head_sha", "commit_sha"],
+    verified: ["verified"],
+    sha: ["sha", "head_sha", "commit_sha", "review_sha"],
     url: ["url", "pr_url", "production_url", "deploy_url"],
-    at: ["at", "evidence_at", "verified_at"],
+    at: ["evidence_at", "at", "verified_at"],
+    source: ["source"],
   },
 } as const;
 
@@ -331,7 +354,7 @@ export type HistoryFilters = {
   status: string;
   agent: string;
   historyOffset: number;
-  historyCursor: string;
+  historyBefore: string;
 };
 
 export type ExecutiveRun = {
@@ -345,8 +368,10 @@ export type ExecutiveRun = {
   headSha: string | null;
   ci: unknown;
   independentReview: unknown;
+  reviewSha: string | null;
   deploy: unknown;
   done: unknown;
+  productionVerified: unknown;
   productionProof: unknown;
 };
 
@@ -365,6 +390,8 @@ export type CompanyTask = {
   stage: string | null;
   priority: string | null;
   producerAgentSlug: string | null;
+  active: boolean | null;
+  eventsComplete: boolean | null;
   actualExecutor: string | null;
   fallbackExecutor: string | null;
   executorParts: Array<string | null>;
@@ -389,6 +416,7 @@ export type CompanyTask = {
   source: string | null;
   executiveRun: ExecutiveRun | null;
   verifiedProgress: VerifiedProgress | null;
+  taskEvents: CompanyEvent[];
 };
 
 export type DependencyFact = {
@@ -413,6 +441,7 @@ export type CompanyAgent = {
   slug: string;
   role: string;
   status: string;
+  connection: string | null;
   autonomyLevel: number | null;
   currentTaskId: string | null;
   lastHeartbeatAt: string | null;
@@ -432,6 +461,7 @@ export type ExecutorObservation = {
   connectionState: string | null;
   lastHeartbeatAt: string | null;
   currentTaskId: string | null;
+  runId: string | null;
 };
 
 export type GateFact = {
@@ -462,11 +492,23 @@ export type Completeness = {
 
 export type QuotaBucket = {
   source: string | null;
+  trustworthy: boolean | null;
+  confirmed: boolean | null;
+  remaining: string | null;
   includedUsed: string | null;
   includedLimit: string | null;
   resetsAt: string | null;
+  checkPath: string | null;
   spendUsd: string | null;
   poolUsd: string | null;
+};
+
+export type CodexFacts = {
+  connection: string | null;
+  authenticated: boolean | null;
+  gate: string | null;
+  pilotOk: boolean | null;
+  readinessTaskId: string | null;
 };
 
 export type CompanyStatus = {
@@ -478,6 +520,7 @@ export type CompanyStatus = {
   executorObservations: ExecutorObservation[];
   currentGates: GateFact[];
   archivedBlockers: GateFact[];
+  codexFacts: CodexFacts | null;
   completeness: Completeness;
   quotas: {
     codex: QuotaBucket | null;
@@ -580,9 +623,11 @@ export type GateCard = {
   key: string;
   taskTitle: string;
   reason: string;
+  freshness: string;
   decisionOwner: string;
   request: string;
   nextAction: string;
+  historical: boolean;
 };
 
 export type ExecutorCard = {
@@ -592,6 +637,9 @@ export type ExecutorCard = {
   connection: ConnectionState;
   connectionLabel: string;
   heartbeat: string;
+  freshness: string;
+  currentTask: string;
+  runId: string;
   detail: string;
 };
 
@@ -748,6 +796,7 @@ export function classifyExecutor(parts: Array<string | null | undefined>): Execu
   if (!blob.trim()) return null;
   if (/\bcursor\b|cursor[_-]cloud|cursor[_-]agent/.test(blob)) return "cursor";
   if (/\bcodex\b|\bopenai\b/.test(blob)) return "codex";
+  if (/\bexecutive\b/.test(blob)) return "grok";
   if (/\bgrok\b|\bxai\b/.test(blob)) return "grok";
   return null;
 }
@@ -783,6 +832,15 @@ function humanGateLabel(value: string | null): string {
   if (!value || !value.trim()) return NO_DATA;
   if (!isGate(value)) return "Не требуется";
   return value.trim();
+}
+
+function compareNewest(leftAt: string | null, rightAt: string | null, leftIndex: number, rightIndex: number): number {
+  const left = leftAt ? parseInstant(leftAt) : null;
+  const right = rightAt ? parseInstant(rightAt) : null;
+  if (left != null && right != null && left !== right) return right - left;
+  if (left != null && right == null) return -1;
+  if (left == null && right != null) return 1;
+  return leftIndex - rightIndex;
 }
 
 function parseInstant(value: string | null): number | null {
@@ -881,6 +939,9 @@ function parseProgress(value: unknown): VerifiedProgress | null {
 function parseExecutiveRun(value: unknown): ExecutiveRun | null {
   const record = asRecord(value);
   if (!record) return null;
+  const reviewFromStatus = "review_status" in record
+    ? { status: record.review_status, sha: readString(record, CORE_FIELD_MAP.executiveRun.reviewSha) }
+    : readRaw(record, ["independent_review"]);
   const run: ExecutiveRun = {
     provider: readString(record, CORE_FIELD_MAP.executiveRun.provider),
     channel: readString(record, CORE_FIELD_MAP.executiveRun.channel),
@@ -890,11 +951,13 @@ function parseExecutiveRun(value: unknown): ExecutiveRun | null {
     lastEventAt: readString(record, CORE_FIELD_MAP.executiveRun.lastEventAt),
     prUrl: readString(record, CORE_FIELD_MAP.executiveRun.prUrl),
     headSha: readString(record, CORE_FIELD_MAP.executiveRun.headSha),
-    ci: readRaw(record, CORE_FIELD_MAP.executiveRun.ci),
-    independentReview: readRaw(record, CORE_FIELD_MAP.executiveRun.independentReview),
-    deploy: readRaw(record, CORE_FIELD_MAP.executiveRun.deploy),
+    ci: "ci_status" in record ? record.ci_status : readRaw(record, ["ci"]),
+    independentReview: reviewFromStatus,
+    reviewSha: readString(record, CORE_FIELD_MAP.executiveRun.reviewSha) ?? evidenceSha(reviewFromStatus),
+    deploy: "deploy_status" in record ? record.deploy_status : readRaw(record, ["deploy"]),
     done: readStored(record, CORE_FIELD_MAP.executiveRun.done),
-    productionProof: readStored(record, CORE_FIELD_MAP.executiveRun.productionProof),
+    productionVerified: "production_verified" in record ? record.production_verified : null,
+    productionProof: "production_proof" in record ? record.production_proof : null,
   };
   const last = readRaw(record, CORE_FIELD_MAP.executiveRun.lastEvent);
   if (typeof last === "string") run.lastEvent = clip(last);
@@ -950,9 +1013,12 @@ function parseLastEventText(value: unknown): { text: string | null; at: string |
   if (typeof value === "string" && value.trim()) return { text: clip(value), at: null };
   const record = asRecord(value);
   if (!record) return { text: null, at: null };
+  const summary = readString(record, ["summary", "message"]);
+  const eventType = readString(record, ["event_type", "type", "name"]);
+  const text = summary && eventType && summary !== eventType ? `${eventType}: ${summary}` : summary ?? eventType;
   return {
-    text: readString(record, ["message", "summary", "event_type", "type", "name"]),
-    at: readString(record, ["created_at", "at", "last_event_at"]),
+    text,
+    at: readString(record, ["at", "created_at", "last_event_at"]),
   };
 }
 
@@ -963,7 +1029,8 @@ function executorPartsFrom(value: unknown): { label: string | null; parts: Array
   const provider = readString(record, CORE_FIELD_MAP.executiveRun.provider);
   const channel = readString(record, CORE_FIELD_MAP.executiveRun.channel);
   const model = readString(record, CORE_FIELD_MAP.executiveRun.model);
-  return { label: provider ?? channel ?? model, parts: [provider, channel, model] };
+  const runId = readString(record, CORE_FIELD_MAP.executor.runId);
+  return { label: provider ?? channel ?? model, parts: [provider, channel, model, runId] };
 }
 
 function parseTask(value: unknown, index: number): CompanyTask | null {
@@ -984,6 +1051,8 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     stage: readString(record, CORE_FIELD_MAP.task.stage),
     priority: readString(record, CORE_FIELD_MAP.task.priority),
     producerAgentSlug: readString(record, CORE_FIELD_MAP.task.functionalRole),
+    active: readBoolean(record, CORE_FIELD_MAP.task.active),
+    eventsComplete: readBoolean(record, CORE_FIELD_MAP.task.eventsComplete),
     actualExecutor: executor.label,
     fallbackExecutor: readString(record, CORE_FIELD_MAP.task.fallbackExecutor),
     executorParts: [...executor.parts, run?.provider ?? null, run?.channel ?? null, run?.model ?? null],
@@ -1018,6 +1087,10 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     source: readString(record, CORE_FIELD_MAP.task.source),
     executiveRun: run,
     verifiedProgress: parseProgress(readStored(record, CORE_FIELD_MAP.task.verifiedProgress)),
+    taskEvents: listFrom(record, CORE_FIELD_MAP.task.taskEvents)
+      .map((event) => parseEvent(event))
+      .filter((event): event is CompanyEvent => event !== null)
+      .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
   };
 }
 
@@ -1056,9 +1129,10 @@ function parseAgent(value: unknown): CompanyAgent | null {
     slug,
     role: readString(record, ["role", "functional_role"]) ?? slug,
     status: readString(record, ["status"]) ?? "",
+    connection: readString(record, ["connection", "connection_state"]),
     autonomyLevel: readNumber(record, ["autonomy_level"]),
     currentTaskId: readString(record, ["current_task_id", "task_id"]),
-    lastHeartbeatAt: readString(record, ["last_heartbeat_at"]),
+    lastHeartbeatAt: readString(record, ["connection_freshness_at", "last_heartbeat_at"]),
   };
 }
 
@@ -1085,6 +1159,7 @@ function parseExecutorObservation(value: unknown): ExecutorObservation | null {
     connectionState: readString(record, CORE_FIELD_MAP.executor.connectionState),
     lastHeartbeatAt: readString(record, CORE_FIELD_MAP.executor.lastHeartbeatAt),
     currentTaskId: readString(record, CORE_FIELD_MAP.executor.currentTaskId),
+    runId: readString(record, CORE_FIELD_MAP.executor.runId),
   };
 }
 
@@ -1151,7 +1226,7 @@ function parseCompleteness(root: Record<string, unknown>): Completeness {
   return {
     ...EMPTY_COMPLETENESS,
     activeTasksComplete: firstBoolean(
-      readBoolean(tasksPage, CORE_FIELD_MAP.page.complete),
+      readBoolean(tasksPage, CORE_FIELD_MAP.page.activeComplete),
       readBoolean(coverage, CORE_FIELD_MAP.completeness.activeTasksComplete),
     ),
     activeTasksTruncated: firstBoolean(
@@ -1167,6 +1242,7 @@ function parseCompleteness(root: Record<string, unknown>): Completeness {
       readBoolean(coverage, CORE_FIELD_MAP.completeness.eventsTruncated),
     ),
     historyComplete: firstBoolean(
+      readBoolean(tasksPage, CORE_FIELD_MAP.page.historyComplete),
       readBoolean(root, CORE_FIELD_MAP.gatesHistory.complete),
       readBoolean(coverage, CORE_FIELD_MAP.completeness.historyComplete),
     ),
@@ -1179,13 +1255,14 @@ function parseCompleteness(root: Record<string, unknown>): Completeness {
       readNumber(coverage, CORE_FIELD_MAP.completeness.historyNextOffset),
     ),
     nextCursor: firstString(
+      readString(tasksPage, CORE_FIELD_MAP.page.historyNextBefore),
       readString(root, CORE_FIELD_MAP.gatesHistory.nextCursor),
       readString(tasksPage, CORE_FIELD_MAP.page.nextCursor),
       readString(eventsPage, CORE_FIELD_MAP.page.nextCursor),
       readString(coverage, CORE_FIELD_MAP.completeness.nextCursor),
     ),
     tasksLimit: firstNumber(
-      readNumber(tasksPage, CORE_FIELD_MAP.page.limit),
+      readNumber(tasksPage, CORE_FIELD_MAP.page.historyLimit),
       readNumber(root, CORE_FIELD_MAP.gatesHistory.limit),
       readNumber(coverage, CORE_FIELD_MAP.completeness.tasksLimit),
     ),
@@ -1205,9 +1282,13 @@ function parseQuotaBucket(value: unknown): QuotaBucket | null {
   if (!record) return null;
   const bucket: QuotaBucket = {
     source: confirmedSource(readString(record, CORE_FIELD_MAP.quota.source)),
+    trustworthy: readBoolean(record, CORE_FIELD_MAP.quota.trustworthy),
+    confirmed: readBoolean(record, CORE_FIELD_MAP.quota.confirmed),
+    remaining: readString(record, CORE_FIELD_MAP.quota.remaining),
     includedUsed: readString(record, CORE_FIELD_MAP.quota.includedUsed),
     includedLimit: readString(record, CORE_FIELD_MAP.quota.includedLimit),
     resetsAt: readString(record, CORE_FIELD_MAP.quota.resetsAt),
+    checkPath: readString(record, CORE_FIELD_MAP.quota.checkPath),
     spendUsd: readString(record, CORE_FIELD_MAP.quota.spendUsd),
     poolUsd: readString(record, CORE_FIELD_MAP.quota.poolUsd),
   };
@@ -1283,6 +1364,9 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     createdAt: prefer(next.createdAt, previous.createdAt),
     lastEventAt: prefer(next.lastEventAt, previous.lastEventAt),
     lastEventText: prefer(next.lastEventText, previous.lastEventText),
+    active: next.active ?? previous.active,
+    eventsComplete: next.eventsComplete ?? previous.eventsComplete,
+    taskEvents: [...previous.taskEvents, ...next.taskEvents],
     executiveRun: next.executiveRun ?? previous.executiveRun,
     verifiedProgress: next.verifiedProgress ?? previous.verifiedProgress,
     dependencies: next.dependencies.length ? next.dependencies : previous.dependencies,
@@ -1322,6 +1406,19 @@ function dedupeEvents(events: CompanyEvent[]): CompanyEvent[] {
   return result;
 }
 
+function parseCodexFacts(value: unknown): CodexFacts | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const facts: CodexFacts = {
+    connection: readString(record, CORE_FIELD_MAP.codex.connection),
+    authenticated: readBoolean(record, CORE_FIELD_MAP.codex.authenticated),
+    gate: readString(record, CORE_FIELD_MAP.codex.gate),
+    pilotOk: readBoolean(record, CORE_FIELD_MAP.codex.pilotOk),
+    readinessTaskId: readString(record, CORE_FIELD_MAP.codex.readinessTaskId),
+  };
+  return Object.values(facts).some((item) => item != null) ? facts : null;
+}
+
 export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
   const record = asRecord(raw);
   if (!record) return null;
@@ -1339,19 +1436,20 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
   ];
   const quotas = namedRecord(record, CORE_FIELD_MAP.root.quotas[0]);
   const costs = parseQuotaBucket(readStored(record, CORE_FIELD_MAP.root.costs));
-  const codex = "codex" in record
-    ? parseQuotaBucket(record.codex)
-    : quotas
-      ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.codex))
-      : null;
-  const events = dedupeEvents(
-    listFrom(record, CORE_FIELD_MAP.root.events)
+  const tasks = attachRuns(mergeTasks(taskLists), listFrom(record, CORE_FIELD_MAP.root.executiveRuns));
+  const events = dedupeEvents([
+    ...listFrom(record, CORE_FIELD_MAP.root.events)
       .map((event) => parseEvent(event))
       .filter((event): event is CompanyEvent => event !== null),
-  );
+    ...tasks.flatMap((task) => task.taskEvents),
+  ]);
+  let completeness = parseCompleteness(record);
+  if (tasks.some((task) => task.eventsComplete === false) && completeness.eventsComplete == null) {
+    completeness = { ...completeness, eventsComplete: false };
+  }
   return {
     generatedAt,
-    tasks: attachRuns(mergeTasks(taskLists), listFrom(record, CORE_FIELD_MAP.root.executiveRuns)),
+    tasks,
     agents: listFrom(record, CORE_FIELD_MAP.root.agents)
       .map((agent) => parseAgent(agent))
       .filter((agent): agent is CompanyAgent => agent !== null),
@@ -1368,9 +1466,10 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
     archivedBlockers: listFrom(record, CORE_FIELD_MAP.root.archivedBlockers)
       .map((item) => parseGate(item))
       .filter((item): item is GateFact => item !== null),
-    completeness: parseCompleteness(record),
+    completeness,
+    codexFacts: parseCodexFacts("codex" in record ? record.codex : null),
     quotas: {
-      codex,
+      codex: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.codex)) : null,
       cursor: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.cursor)) : null,
       grok: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.grok)) : null,
       legacySpend: costs,
@@ -1390,37 +1489,40 @@ export function parseHistoryFilters(input: {
   status?: string | null;
   agent?: string | null;
   history_offset?: string | null;
-  history_cursor?: string | null;
+  history_before?: string | null;
 }): HistoryFilters {
   const period =
     input.period === "today" || input.period === "week" || input.period === "month"
       ? input.period
       : "all";
-  const cursor = (input.history_cursor ?? "").trim();
+  const cursor = (input.history_before ?? "").trim();
+  const historyBefore = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(cursor) && parseInstant(cursor) != null
+    ? cursor
+    : "";
   return {
     period,
     status: (input.status ?? "").trim(),
     agent: (input.agent ?? "").trim(),
     historyOffset: parseOffset(input.history_offset),
-    historyCursor: /^[A-Za-z0-9_.:-]{1,200}$/.test(cursor) ? cursor : "",
+    historyBefore,
   };
 }
 
 export function companyStatusRequestPath(filters: HistoryFilters): string {
-  if (!filters.historyCursor) return "/v1/status";
+  if (!filters.historyBefore) return "/v1/status";
   const params = new URLSearchParams();
-  params.set(CORE_FIELD_MAP.query.historyCursor, filters.historyCursor);
+  params.set(CORE_FIELD_MAP.query.historyBefore, filters.historyBefore);
   return `/v1/status?${params.toString()}`;
 }
 
-export function historyHref(filters: HistoryFilters, patch: { historyOffset?: number; historyCursor?: string }): string {
+export function historyHref(filters: HistoryFilters, patch: { historyOffset?: number; historyBefore?: string }): string {
   const params = new URLSearchParams();
   if (filters.period !== "all") params.set("period", filters.period);
   if (filters.status) params.set("status", filters.status);
   if (filters.agent) params.set("agent", filters.agent);
   const offset = patch.historyOffset ?? 0;
   if (offset > 0) params.set("history_offset", String(offset));
-  if (patch.historyCursor) params.set("history_cursor", patch.historyCursor);
+  if (patch.historyBefore) params.set("history_before", patch.historyBefore);
   const query = params.toString();
   return query ? `/admin/ai-company?${query}` : "/admin/ai-company";
 }
@@ -1520,7 +1622,7 @@ function agentState(
   now: number,
 ): { label: string; tone: AgentTone } {
   if (!agent) return { label: "нет свежих данных", tone: "unknown" };
-  const status = normalizeToken(agent.status);
+  const status = normalizeToken(agent.connection ?? agent.status);
   if (NOT_CONNECTED_STATUSES.has(status)) {
     return { label: "⚪ Не подключён", tone: "offline" };
   }
@@ -1674,14 +1776,25 @@ function engineeringPanel(task: CompanyTask, events: CompanyEvent[]): Engineerin
   const reviewValue = run?.independentReview ?? null;
   const deployValue = run?.deploy ?? null;
   const productionValue = run?.productionProof ?? null;
-  const productionBoolean = typeof productionValue === "boolean" ? productionValue : null;
+  const verifiedFlag = typeof run?.productionVerified === "boolean" ? run.productionVerified : null;
   const applies = task.resultKind === "engineering";
-  const reviewSha = evidenceSha(reviewValue);
+  const reviewSha = run?.reviewSha ?? evidenceSha(reviewValue);
   const reviewPass = isPass(reviewValue) && shaEqual(reviewSha, headSha);
   const ciPass = isPass(ciValue) || ["success", "green", "pass"].includes(normalizeToken(evidenceStatus(ciValue) ?? ""));
   const deployPass = isPass(deployValue) || ["deployed", "success"].includes(normalizeToken(evidenceStatus(deployValue) ?? ""));
-  const productionPass = productionBoolean === true || (productionBoolean == null && isPass(productionValue));
-  const productionUrl = safeProductionUrl(readString(evidenceRecord(productionValue), CORE_FIELD_MAP.evidence.url));
+  const proof = evidenceRecord(productionValue);
+  const proofHasContractShape = proof != null && ("verified" in proof || "sha" in proof);
+  const proofVerified = proof ? readBoolean(proof, CORE_FIELD_MAP.evidence.verified) : null;
+  const proofSha = proof ? readString(proof, CORE_FIELD_MAP.evidence.sha) : null;
+  const proofMatchesHead = Boolean(proofSha) && shaEqual(proofSha, headSha);
+  const productionPass = verifiedFlag === false
+    ? false
+    : proofHasContractShape
+      ? proofVerified === true && proofMatchesHead
+      : verifiedFlag === true
+        ? false
+        : isPass(productionValue);
+  const productionUrl = safeProductionUrl(readString(proof, CORE_FIELD_MAP.evidence.url));
 
   let reviewLabel = NO_DATA;
   if (reviewValue != null) {
@@ -1693,17 +1806,24 @@ function engineeringPanel(task: CompanyTask, events: CompanyEvent[]): Engineerin
 
   const ciLabel = ciValue == null ? NO_DATA : `${evidenceStatus(ciValue) ?? "есть запись"}`;
   const deployLabel = deployValue == null ? NO_DATA : `${evidenceStatus(deployValue) ?? "есть запись"}`;
-  const productionFact = productionValue == null
+  const productionFact = productionValue == null && verifiedFlag == null
     ? null
-    : productionBoolean == null
-      ? joinFound([
-          evidenceStatus(productionValue),
-          productionUrl,
-          formatDateTime(readString(evidenceRecord(productionValue), CORE_FIELD_MAP.evidence.at)),
-        ])
-      : productionBoolean
-        ? "сохранено: production_verified"
-        : "сохранено: production_verified = false";
+    : verifiedFlag === false
+      ? "сохранено: production_verified = false"
+      : proofHasContractShape
+        ? joinFound([
+            proofVerified === true ? "proof подтверждён" : "proof не подтверждён",
+            proofSha && headSha && !proofMatchesHead ? `SHA proof ${proofSha} не совпадает с головой ${headSha}` : proofSha,
+            formatDateTime(readString(proof, CORE_FIELD_MAP.evidence.at)),
+            readString(proof, CORE_FIELD_MAP.evidence.source),
+          ])
+        : verifiedFlag === true
+          ? "production_verified без сохранённого proof"
+          : joinFound([
+              evidenceStatus(productionValue),
+              productionUrl,
+              formatDateTime(readString(proof, CORE_FIELD_MAP.evidence.at)),
+            ]);
   let productionLabel = NO_DATA;
   if (task.resultKind === "document") productionLabel = "не требуется для этого типа результата";
   else if (task.resultKind === "unknown") {
@@ -1817,46 +1937,81 @@ function gateFromTask(task: CompanyTask): GateFact | null {
   };
 }
 
+function explainGateReason(reason: string): string {
+  const token = reason.trim().toLowerCase();
+  if (token.includes("missing execution context")) {
+    return "Нет сохранённого контекста исполнения: не записано, кто вёл задачу и на каком шаге она остановилась.";
+  }
+  if (token.includes("production proof pending")) {
+    return "Production-проверка ещё не сохранена. По этой фразе задача не считается закрытой.";
+  }
+  return clip(reason);
+}
+
+function isCredentialGate(gate: GateFact, text: string): boolean {
+  const blob = `${text} ${gate.id ?? ""} ${gate.kind ?? ""} ${gate.target ?? ""}`.toLowerCase();
+  return (
+    blob.includes("codex_access_token") ||
+    blob.includes("access_token") ||
+    blob.includes("новый доступ") ||
+    blob.includes("new access") ||
+    normalizeToken(gate.kind ?? "") === "credential"
+  );
+}
+
 function presentGate(gate: GateFact, tasks: CompanyTask[], codexFallback: string | null): GateCard | null {
   const task = gate.taskId ? findTaskByReference(tasks, gate.taskId) : null;
   const reasonSource = gate.reason ?? task?.blockedReason ?? task?.humanGate;
   if (!reasonSource || !isGate(reasonSource)) return null;
-  const reason = clip(reasonSource);
+  const reason = explainGateReason(reasonSource);
   const request = gate.request ? clip(gate.request) : NO_DATA;
-  const combined = `${reason} ${request} ${gate.nextAction ?? ""} ${gate.kind ?? ""} ${gate.target ?? ""}`;
-  const codexReadiness = isCodexReadinessText(combined) || gate.kind === "readiness" && (gate.target ?? "").toLowerCase().includes("codex");
-  const asksSergeyToReroute = isReroute(combined) && (ownerLabel(gate.decisionOwner) === "Сергей" || codexReadiness);
-  let decisionOwner = ownerLabel(gate.decisionOwner);
+  const combined = `${reasonSource} ${request} ${gate.nextAction ?? ""} ${gate.kind ?? ""} ${gate.target ?? ""}`;
+  const credential = isCredentialGate(gate, combined);
+  const asksReroute = isReroute(combined);
+  const decisionOwner = ownerLabel(gate.decisionOwner) ?? NO_DATA;
   let nextAction = gate.nextAction ? clip(gate.nextAction) : NO_DATA;
-  if (codexReadiness && (asksSergeyToReroute || decisionOwner === "Сергей" || decisionOwner == null)) {
-    decisionOwner = "Oriy";
+  let shownRequest = request;
+  if (!credential && asksReroute) {
     nextAction = codexFallback
-      ? `Codex не подключён. Запасной исполнитель: ${codexFallback}. Переназначение от Сергея не требуется.`
-      : "Codex не подключён. Переназначение от Сергея не требуется.";
+      ? `Запасного исполнителя выбирает Oriy: ${codexFallback}. Переназначение от Сергея не требуется.`
+      : "Запасного исполнителя выбирает Oriy. Переназначение от Сергея не требуется.";
+    shownRequest = "Просьба Сергею переназначить задачи не показывается.";
   }
+  const freshnessAt = task?.lastEventAt ?? task?.receivedAt ?? null;
+  const freshness = freshnessAt ? `Свежесть: ${formatDateTime(freshnessAt)} МСК` : "Свежесть: нет данных";
   return {
     key: gate.id ?? `${gate.taskId ?? "gate"}-${reason.slice(0, 40)}`,
     taskTitle: task?.title ?? gate.taskId ?? "Задача не сопоставлена",
     reason,
-    decisionOwner: decisionOwner ?? NO_DATA,
-    request: asksSergeyToReroute ? "Запрос на переназначение Сергеем не показывается." : request,
+    freshness,
+    decisionOwner,
+    request: shownRequest,
     nextAction,
+    historical: gate.archived,
   };
 }
 
-function codexDisconnectedFrom(tasks: CompanyTask[], gates: GateFact[]): boolean {
-  if (tasks.some((task) => task.dependencies.some((item) => item.codexReadiness && item.blocked))) return true;
-  return gates.some((gate) => {
-    const blob = `${gate.reason ?? ""} ${gate.kind ?? ""} ${gate.target ?? ""}`;
+function codexDisconnectedFrom(status: CompanyStatus): boolean {
+  const facts = status.codexFacts;
+  if (facts) {
+    if (facts.authenticated === false) return true;
+    const connection = normalizeToken(facts.connection ?? "");
+    if (NOT_CONNECTED_STATUSES.has(connection)) return true;
+    if (facts.connection) return false;
+  }
+  if (status.tasks.some((task) => task.dependencies.some((item) => item.codexReadiness && item.blocked))) return true;
+  return status.currentGates.some((gate) => {
+    const blob = `${gate.reason ?? ""} ${gate.kind ?? ""} ${gate.target ?? ""} ${gate.id ?? ""}`;
+    if (isCredentialGate(gate, blob)) return false;
     return isCodexReadinessText(blob) || (normalizeToken(gate.kind ?? "") === "readiness" && (gate.target ?? "").toLowerCase().includes("codex"));
   });
 }
 
 function connectionCopy(state: ConnectionState): string {
-  if (state === "online") return "🟢 На связи (Online)";
-  if (state === "idle") return "⚪ Простаивает (Idle)";
-  if (state === "not_connected") return "⚪ Не подключён";
-  return "нет свежих данных";
+  if (state === "online") return "работает";
+  if (state === "idle") return "свободен";
+  if (state === "not_connected") return "не подключён";
+  return "нет данных";
 }
 
 function deriveConnection(input: {
@@ -1870,29 +2025,35 @@ function deriveConnection(input: {
   if (input.forceDisconnected) return "not_connected";
   const explicit = input.explicit ? normalizeToken(input.explicit) : "";
   if (NOT_CONNECTED_STATUSES.has(explicit)) return "not_connected";
-  if (!input.hasRecord || parseInstant(input.heartbeatAt) == null) return "no_fresh_data";
+  if (["no_data", "no_fresh_data", "unknown"].includes(explicit)) return "no_fresh_data";
+  if (!input.hasRecord || parseInstant(input.heartbeatAt) == null || !isFresh(input.heartbeatAt, input.now)) {
+    return "no_fresh_data";
+  }
+  if (["free", "idle", "available"].includes(explicit)) return "idle";
+  if (["working", "online", "busy"].includes(explicit)) return "online";
   if (!isFresh(input.heartbeatAt, input.now)) return "no_fresh_data";
   if (input.busy || explicit === "online" || explicit === "working") return "online";
   if (["idle", "available", "waiting"].includes(explicit) || !explicit) return "idle";
   return "no_fresh_data";
 }
 
-function formatQuotaValue(bucket: QuotaBucket | null, kind: "included" | "pool"): string {
-  if (!bucket || !bucket.source) return NO_DATA;
-  if (kind === "included") {
-    const used = bucket.includedUsed ?? NO_DATA;
-    const limit = bucket.includedLimit ?? NO_DATA;
-    if (bucket.includedUsed == null && bucket.includedLimit == null && !bucket.resetsAt) return NO_DATA;
-    return `included usage: ${used} из ${limit}. Сброс: ${formatDateTime(bucket.resetsAt)}. Источник: ${bucket.source}. Это не остаток лимита.`;
+function quotaTrustworthy(bucket: QuotaBucket | null): boolean {
+  return Boolean(bucket?.source) && bucket?.trustworthy === true;
+}
+
+function formatQuotaValue(bucket: QuotaBucket | null): string {
+  if (!quotaTrustworthy(bucket) || !bucket) return NO_DATA;
+  if (bucket.remaining == null && bucket.includedLimit == null && bucket.includedUsed == null) return NO_DATA;
+  const limit = bucket.includedLimit ?? NO_DATA;
+  const reset = formatDateTime(bucket.resetsAt);
+  if (bucket.remaining != null) {
+    return `Остаток: ${bucket.remaining} из ${limit}. Сброс: ${reset}. Источник: ${bucket.source}. Это remaining, не расход и не included used.`;
   }
-  if (bucket.spendUsd == null && bucket.poolUsd == null) return NO_DATA;
-  const spend = bucket.spendUsd ?? NO_DATA;
-  const pool = bucket.poolUsd ?? NO_DATA;
-  return `Расход пула: ${spend === NO_DATA ? NO_DATA : `$${spend}`}. Пул: ${pool === NO_DATA ? NO_DATA : `$${pool}`}. Источник: ${bucket.source}. Ноль не означает бесплатную работу и не является остатком лимита.`;
+  return `Подтверждённый расход included: ${bucket.includedUsed ?? NO_DATA} из ${limit}. Сброс: ${reset}. Источник: ${bucket.source}. Поле remaining в ответе нет.`;
 }
 
 function legacySpendLabel(bucket: QuotaBucket | null): string {
-  if (!bucket?.source || bucket.spendUsd == null) return NO_DATA;
+  if (!bucket?.source || bucket.confirmed !== true || bucket.spendUsd == null) return NO_DATA;
   return `Зафиксированный расход $${bucket.spendUsd}. Источник: ${bucket.source}. Это не остаток лимита и не признак бесплатной работы.`;
 }
 
@@ -1971,11 +2132,14 @@ function sameMoscowDay(value: string | null, snapshot: string): boolean {
 
 function taskExecutor(task: CompanyTask): { id: ExecutorId | null; note: string } {
   const id = classifyExecutor(task.executorParts);
-  const model = task.executiveRun?.model;
+  const model = task.executiveRun?.model ?? task.executorParts.find((part) => part != null && /grok|xai/i.test(part)) ?? null;
+  const executive = task.executorParts.some((part) => part != null && /\bexecutive\b/i.test(part));
   const note =
     id === "cursor" && model && /grok|xai/i.test(model)
       ? "Модель Grok внутри Cursor — это исполнитель Cursor, не отдельный запуск xAI."
-      : "";
+      : executive && id === "grok"
+        ? "Поле executive — оркестрация, не фактический исполнитель."
+        : "";
   return { id, note };
 }
 
@@ -2071,7 +2235,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   const now = parseInstant(status.generatedAt) ?? Date.now();
   const boundaries = boundaryText(status);
   const indexed = status.tasks.map((task, index) => ({ task, index }));
-  const codexDisconnected = codexDisconnectedFrom(status.tasks, status.currentGates);
+  const codexDisconnected = codexDisconnectedFrom(status);
   const codexFallback = fallbackName(status.tasks);
 
   const agents = AI_COMPANY_ROLES.map(([slug, label]) => {
@@ -2108,8 +2272,8 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   );
 
   const activeTasks = indexed
-    .filter(({ task }) => !taskIsClosed(task, status.events))
-    .filter(({ task }) => hasActivity(task, status.events) || (task.id != null && currentIds.has(task.id)))
+    .filter(({ task }) => task.active !== false && !taskIsClosed(task, status.events))
+    .filter(({ task }) => task.active === true || hasActivity(task, status.events) || (task.id != null && currentIds.has(task.id)))
     .map(({ task, index }) => {
       const executor = taskExecutor(task);
       const panel = engineeringPanel(task, status.events);
@@ -2158,15 +2322,19 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   const todayReceived = indexed
     .map((item) => ({ ...item, receipt: taskReceipt(item.task, status.events) }))
     .filter((item) => item.receipt?.kind === "received" && sameMoscowDay(item.receipt.at, status.generatedAt))
-    .sort((left, right) => (parseInstant(left.receipt!.at) ?? 0) - (parseInstant(right.receipt!.at) ?? 0))
+    .sort((left, right) => compareNewest(left.receipt!.at, right.receipt!.at, left.index, right.index))
     .map((item) => toTodayRow(item.task, status.events, item.index, item.receipt!.at, codexDisconnected));
 
   const todayCreated = indexed
     .filter(({ task }) => taskReceipt(task, status.events)?.kind !== "received")
     .filter(({ task }) => sameMoscowDay(task.createdAt, status.generatedAt))
+    .sort((left, right) => compareNewest(left.task.createdAt, right.task.createdAt, left.index, right.index))
     .map(({ task, index }) => toTodayRow(task, status.events, index, task.createdAt!, codexDisconnected));
 
-  const todayWorkEvents = sortEvents(status.events.filter(isWorkEvent))
+  const todayWorkEvents = status.events
+    .filter(isWorkEvent)
+    .slice()
+    .sort((left, right) => compareNewest(left.createdAt, right.createdAt, 0, 0))
     .filter((event) => sameMoscowDay(event.createdAt, status.generatedAt))
     .map((event, index) => {
       const task = status.tasks.find((item) => eventMatchesTask(event, item));
@@ -2188,6 +2356,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .filter((item) => item.closed);
   const todayCompleted = closed
     .filter((item) => sameMoscowDay(item.completedAt, status.generatedAt))
+    .sort((left, right) => compareNewest(left.completedAt, right.completedAt, left.index, right.index))
     .map((item) => toTodayRow(item.task, status.events, item.index, item.completedAt!, codexDisconnected));
 
   const dated = closed.filter((item) => item.completedAt);
@@ -2206,11 +2375,11 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .sort((left, right) => (parseInstant(right.completedAt) ?? -1) - (parseInstant(left.completedAt) ?? -1))
     .map((item) => buildTaskDetail(item.task, status.events, item.index, codexDisconnected));
 
-  const history = filters.historyCursor
+  const history = filters.historyBefore
     ? historyAll
     : historyAll.slice(filters.historyOffset, filters.historyOffset + HISTORY_PAGE_SIZE);
   const historyNextOffset =
-    filters.historyCursor || filters.historyOffset + HISTORY_PAGE_SIZE >= historyAll.length
+    filters.historyBefore || filters.historyOffset + HISTORY_PAGE_SIZE >= historyAll.length
       ? null
       : filters.historyOffset + HISTORY_PAGE_SIZE;
 
@@ -2251,7 +2420,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       return [gate];
     }),
   ].flatMap((gate) => {
-    const card = presentGate({ ...gate, archived: false }, status.tasks, codexFallback);
+    const card = presentGate({ ...gate, archived: true }, status.tasks, codexFallback);
     return card ? [card] : [];
   });
 
@@ -2266,7 +2435,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   );
 
   const todayNote = receiptKnown
-    ? "Получение, создание записи, события работы и завершение считаются отдельно, по московским суткам снимка. Время обновления не подставляет получение и не подставляет завершение."
+    ? "Списки за сегодня: новые сверху. Полученные — по received_at. Созданные — по created_at, это отдельно обозначенный запасной порядок, не подмена получения. Завершённые — по completed_at. updated_at возраст задачи не задаёт. Неизвестная дата не подставляется."
     : "Нет данных о времени получения задач. Журнал получения не построен по времени обновления, чтобы старые задачи не выглядели полученными сегодня.";
 
   return {
@@ -2278,12 +2447,12 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     executors: executorCards,
     agents,
     pulse: [
-      { label: "Роли в работе", count: counts.working },
-      { label: "Роли ожидают", count: counts.waiting },
-      { label: "Роли требуют внимания", count: counts.attention },
-      { label: "Роли простаивают", count: counts.idle },
-      { label: "Роли не подключены", count: counts.offline },
-      { label: "Нет свежих данных о роли", count: counts.unknown },
+      { label: "Функций со свежей работой", count: counts.working },
+      { label: "Функций в ожидании", count: counts.waiting },
+      { label: "Функций, требующих внимания", count: counts.attention },
+      { label: "Функций без текущей работы", count: counts.idle },
+      { label: "Функций без подключения", count: counts.offline },
+      { label: "Функций без свежих данных", count: counts.unknown },
     ],
     todayReceived,
     todayCreated,
@@ -2301,20 +2470,20 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       {
         id: "codex",
         label: "Codex",
-        value: formatQuotaValue(status.quotas.codex, "included"),
-        checkPath: QUOTA_CHECK_PATHS.codex,
+        value: formatQuotaValue(status.quotas.codex),
+        checkPath: status.quotas.codex?.checkPath ?? QUOTA_CHECK_PATHS.codex,
       },
       {
         id: "cursor",
         label: "Cursor",
-        value: formatQuotaValue(status.quotas.cursor, "pool"),
-        checkPath: QUOTA_CHECK_PATHS.cursor,
+        value: formatQuotaValue(status.quotas.cursor),
+        checkPath: status.quotas.cursor?.checkPath ?? QUOTA_CHECK_PATHS.cursor,
       },
       {
         id: "grok",
         label: "Grok",
-        value: formatQuotaValue(status.quotas.grok, "pool"),
-        checkPath: QUOTA_CHECK_PATHS.grok,
+        value: formatQuotaValue(status.quotas.grok),
+        checkPath: status.quotas.grok?.checkPath ?? QUOTA_CHECK_PATHS.grok,
       },
       {
         id: "legacy",
@@ -2346,7 +2515,11 @@ function buildExecutors(
       ...observations.map((item) => item.lastHeartbeatAt),
       ...beats.map((beat) => beat.observedAt),
     ]);
-    const explicit = observations.map((item) => item.connectionState).find(Boolean) ?? beats.map((beat) => beat.state).find(Boolean) ?? null;
+    const explicit = spec.id === "codex" && status.codexFacts?.connection
+      ? status.codexFacts.connection
+      : observations.map((item) => item.connectionState).find(Boolean) ?? beats.map((beat) => beat.state).find(Boolean) ?? null;
+    const current = status.tasks.find((task) => taskExecutor(task).id === spec.id && task.active !== false && !taskIsClosed(task, status.events));
+    const runId = observations.map((item) => item.runId).find(Boolean) ?? current?.executiveRun?.runId ?? null;
     const busy = status.tasks.some((task) => taskExecutor(task).id === spec.id && !taskIsClosed(task, status.events));
     const connection = deriveConnection({
       explicit,
@@ -2371,6 +2544,9 @@ function buildExecutors(
       connection,
       connectionLabel: connectionCopy(connection),
       heartbeat: formatDateTime(heartbeatAt),
+      freshness: freshnessLabel(heartbeatAt, now),
+      currentTask: current?.title ?? NO_DATA,
+      runId: runId ?? NO_DATA,
       detail: joinFound(detailParts),
     };
   });
