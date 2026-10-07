@@ -186,8 +186,11 @@ export async function uploadProductVideoCover(params: {
     .upsert(row, { onConflict: "practice_id" });
   if (updateError) {
     await service.storage.from(PRODUCT_VIDEO_EXPORT_BUCKET).remove([path]);
-    console.error("product_video_cover_update_error", updateError.message);
-    throw new AuthorAccessError("internal_error", 500);
+    const code = /path_check/i.test(updateError.message)
+      ? "video_cover_path_rejected"
+      : "video_cover_persist_failed";
+    console.error("product_video_cover_update_error", code, updateError.message);
+    throw new AuthorAccessError(code, 500);
   }
 
   if (previous && previous !== path) {
