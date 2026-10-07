@@ -58,7 +58,8 @@ const OBSERVED = {
       event: "workflow_dispatch",
       countsAsThisTask: false,
     },
-    liveProductionDeployCommit: "88daaeb0689b9c6ba0d3efecceef276355a74336",
+    liveProductionDeployCommitAtIntake: "88daaeb0689b9c6ba0d3efecceef276355a74336",
+    liveProductionDeployCommitAfterMainAdvanced: "768e22a66c6413363145d25d52ec291999e03d10",
     liveProductionMatchesThisTask: false,
   },
 };
@@ -112,6 +113,10 @@ assert.equal(OBSERVED.probes.executiveEventsPost.httpStatus, 401);
 assert.equal(OBSERVED.deploymentBridge.historicalRepositoryDispatch.countsAsThisTask, false);
 assert.equal(OBSERVED.deploymentBridge.historicalWorkflowDispatchSuccess.event, "workflow_dispatch");
 assert.equal(OBSERVED.deploymentBridge.liveProductionMatchesThisTask, false);
+assert.notEqual(
+  OBSERVED.deploymentBridge.liveProductionDeployCommitAtIntake,
+  OBSERVED.deploymentBridge.liveProductionDeployCommitAfterMainAdvanced,
+);
 
 for (const stage of EVIDENCE_STAGES) {
   const record = evidenceRecord(stage);
