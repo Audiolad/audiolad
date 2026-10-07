@@ -102,6 +102,8 @@ export const CORE_FIELD_MAP = {
     source: ["source"],
     resultConsumer: ["result_consumer"],
     archived: ["archived"],
+    merged: ["merged"],
+    releaseHold: ["release_hold", "hold_reason"],
   },
   executiveRun: {
     provider: ["provider", "actual_provider"],
@@ -117,6 +119,7 @@ export const CORE_FIELD_MAP = {
     reviewSha: ["review_sha"],
     deploy: ["deploy_status", "deploy"],
     done: ["done"],
+    merged: ["merged"],
     productionVerified: ["production_verified"],
     productionProof: ["production_proof"],
   },
@@ -371,6 +374,7 @@ export type ExecutiveRun = {
   reviewSha: string | null;
   deploy: unknown;
   done: unknown;
+  merged: boolean | null;
   productionVerified: unknown;
   productionProof: unknown;
 };
@@ -414,6 +418,8 @@ export type CompanyTask = {
   lastEventText: string | null;
   brief: string | null;
   source: string | null;
+  merged: boolean | null;
+  releaseHold: string | null;
   executiveRun: ExecutiveRun | null;
   verifiedProgress: VerifiedProgress | null;
   taskEvents: CompanyEvent[];
@@ -537,6 +543,8 @@ export type EngineeringPanel = {
   production: string;
   dodSatisfied: boolean;
   applies: boolean;
+  deployPassed: boolean;
+  productionPassed: boolean;
 };
 
 export type AgentCardModel = {
@@ -584,6 +592,25 @@ export type TaskDetailModel = {
   humanGate: string;
   outcome: string;
   completedAt: string;
+  stageBadge: StageBadge;
+};
+
+export type StageTone =
+  | "queue"
+  | "working"
+  | "review"
+  | "release"
+  | "site"
+  | "done"
+  | "decision"
+  | "blocked"
+  | "cancelled"
+  | "stale";
+
+export type StageBadge = {
+  label: string;
+  tone: StageTone;
+  detail: string | null;
 };
 
 export type TodayRowModel = {
@@ -737,6 +764,17 @@ function readBoolean(record: Record<string, unknown> | null, keys: readonly stri
       if (token === "false") return false;
     }
   }
+  return null;
+}
+
+function readMergedFlag(record: Record<string, unknown> | null, keys: readonly string[]): boolean | null {
+  const stored = readBoolean(record, keys);
+  if (stored != null) return stored;
+  const text = readString(record, keys);
+  if (!text) return null;
+  const token = normalizeToken(text);
+  if (token === "merged" || token === "yes") return true;
+  if (token === "no" || token === "unmerged") return false;
   return null;
 }
 
@@ -956,6 +994,7 @@ function parseExecutiveRun(value: unknown): ExecutiveRun | null {
     reviewSha: readString(record, CORE_FIELD_MAP.executiveRun.reviewSha) ?? evidenceSha(reviewFromStatus),
     deploy: "deploy_status" in record ? record.deploy_status : readRaw(record, ["deploy"]),
     done: readStored(record, CORE_FIELD_MAP.executiveRun.done),
+    merged: readMergedFlag(record, CORE_FIELD_MAP.executiveRun.merged),
     productionVerified: "production_verified" in record ? record.production_verified : null,
     productionProof: "production_proof" in record ? record.production_proof : null,
   };
@@ -1085,6 +1124,8 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     lastEventText: lastEvent.text ?? run?.lastEvent ?? null,
     brief: brief ? clip(brief, 20000) : null,
     source: readString(record, CORE_FIELD_MAP.task.source),
+    merged: readMergedFlag(record, CORE_FIELD_MAP.task.merged),
+    releaseHold: readString(record, CORE_FIELD_MAP.task.releaseHold),
     executiveRun: run,
     verifiedProgress: parseProgress(readStored(record, CORE_FIELD_MAP.task.verifiedProgress)),
     taskEvents: listFrom(record, CORE_FIELD_MAP.task.taskEvents)
@@ -1371,6 +1412,8 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     verifiedProgress: next.verifiedProgress ?? previous.verifiedProgress,
     dependencies: next.dependencies.length ? next.dependencies : previous.dependencies,
     githubIssueNumber: next.githubIssueNumber ?? previous.githubIssueNumber,
+    merged: next.merged ?? previous.merged,
+    releaseHold: prefer(next.releaseHold, previous.releaseHold),
   };
 }
 
@@ -1837,6 +1880,8 @@ function engineeringPanel(task: CompanyTask, events: CompanyEvent[]): Engineerin
     production: productionLabel,
     dodSatisfied: applies && ciPass && reviewPass && deployPass && productionPass,
     applies,
+    deployPassed: deployPass,
+    productionPassed: productionPass,
   };
 }
 
@@ -2158,7 +2203,117 @@ function hasActivity(task: CompanyTask, events: CompanyEvent[]): boolean {
   return linkedEvents(task, events).some(isWorkEvent);
 }
 
-function buildTaskDetail(task: CompanyTask, events: CompanyEvent[], index: number, codexDisconnected: boolean): TaskDetailModel {
+const REVIEW_STATUSES = new Set(["review", "in_review", "code_review", "qa", "qa_pass", "qa_fail"]);
+const CANCELLED_STATUSES = new Set(["cancelled", "canceled", "abandoned", "отменена"]);
+const DISPATCH_TOKENS = new Set(["executive_dispatched", "dispatched"]);
+
+function isDeployAsk(text: string): boolean {
+  return /деплоим|деплой|\bdeploy\b/i.test(text);
+}
+
+function taskIsMerged(task: CompanyTask): boolean {
+  if (normalizeToken(task.status) === "merged") return true;
+  if (task.merged === true || task.executiveRun?.merged === true) return true;
+  return false;
+}
+
+function isDispatchSignal(task: CompanyTask, events: CompanyEvent[]): boolean {
+  if (DISPATCH_TOKENS.has(normalizeToken(task.status))) return true;
+  const latest = linkedEvents(task, events).at(-1);
+  if (latest && DISPATCH_TOKENS.has(normalizeToken(latest.bareType))) return true;
+  const text = normalizeToken(task.lastEventText ?? "");
+  return DISPATCH_TOKENS.has(text) || text.startsWith("executive_dispatched");
+}
+
+function dispatchIsStale(task: CompanyTask, events: CompanyEvent[], snapshotIso: string): boolean {
+  const latest = linkedEvents(task, events).filter((event) => event.createdAt).at(-1);
+  const at = task.lastEventAt ?? latest?.createdAt ?? null;
+  const observed = parseInstant(at);
+  const now = parseInstant(snapshotIso);
+  if (observed == null || now == null) return true;
+  return now - observed > HEARTBEAT_STALE_MS;
+}
+
+function gatesForTask(task: CompanyTask, gates: GateFact[]): GateFact[] {
+  const aliases = new Set(taskAliases(task));
+  return gates.filter((gate) => !gate.archived && gate.taskId != null && aliases.has(gate.taskId));
+}
+
+function isTechnicalHoldGate(gate: GateFact): boolean {
+  const reason = gate.reason ?? "";
+  if (/production proof pending/i.test(reason)) return true;
+  return isDeployAsk(reason) && !isCredentialGate(gate, reason);
+}
+
+function decisionStage(task: CompanyTask, gates: GateFact[]): StageBadge | null {
+  const own = gateFromTask(task);
+  const gate = [...gatesForTask(task, gates), ...(own ? [own] : [])].find(
+    (item) => item.reason && !isTechnicalHoldGate(item),
+  );
+  if (!gate?.reason) return null;
+  const owner = ownerLabel(gate.decisionOwner);
+  const reason = clip(explainGateReason(gate.reason), 180);
+  if (owner) return { label: "Нужно решение", tone: "decision", detail: `${owner}: ${reason}` };
+  return { label: "Заблокирована", tone: "blocked", detail: `Нет данных: ${reason}` };
+}
+
+function releaseDetail(task: CompanyTask): string {
+  const hold = task.releaseHold?.trim() ?? "";
+  if (hold && !isDeployAsk(hold)) return clip(hold, 180);
+  return "Слито в main. Выпуск на сайт не подтверждён.";
+}
+
+function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIso: string, gates: GateFact[]): StageBadge {
+  const status = normalizeToken(task.status);
+  if (CANCELLED_STATUSES.has(status)) return { label: "Отменена", tone: "cancelled", detail: null };
+  if (isPilotTask(task) && codexReadinessBlocked(task)) {
+    return {
+      label: "Заблокирована",
+      tone: "blocked",
+      detail: "Пилот не отмечен успешным: Codex не подключён",
+    };
+  }
+  const decision = decisionStage(task, gates);
+  if (decision) return decision;
+  if (taskIsClosed(task, events)) return { label: "Завершена", tone: "done", detail: null };
+  const panel = engineeringPanel(task, events);
+  if (task.resultKind !== "document" && panel.deployPassed && !panel.productionPassed) {
+    return {
+      label: "Проверяется на сайте",
+      tone: "site",
+      detail: "Выпуск записан. Проверка на сайте ещё не сохранена.",
+    };
+  }
+  if (taskIsMerged(task) && !panel.deployPassed) {
+    return { label: "Ожидает выпуска", tone: "release", detail: releaseDetail(task) };
+  }
+  if (REVIEW_STATUSES.has(status)) return { label: "На проверке", tone: "review", detail: null };
+  const started = parseInstant(task.startedAt) != null;
+  if (!started && isDispatchSignal(task, events)) {
+    return dispatchIsStale(task, events, snapshotIso)
+      ? { label: "Нет свежих данных", tone: "stale", detail: null }
+      : { label: "В очереди", tone: "queue", detail: null };
+  }
+  if (started) return { label: "В работе", tone: "working", detail: null };
+  if (BACKLOG_STATUSES.has(status)) return { label: "В очереди", tone: "queue", detail: null };
+  if (ATTENTION_STATUSES.has(status)) {
+    const owner = ownerLabel(task.decisionOwner);
+    const raw = task.blockedReason?.trim() ?? "";
+    const reason = raw && !isDeployAsk(raw) ? clip(raw, 180) : "Нет данных";
+    if (owner && reason !== "Нет данных") return { label: "Нужно решение", tone: "decision", detail: `${owner}: ${reason}` };
+    return { label: "Заблокирована", tone: "blocked", detail: `Нет данных: ${reason}` };
+  }
+  return { label: "Нет свежих данных", tone: "stale", detail: null };
+}
+
+function buildTaskDetail(
+  task: CompanyTask,
+  events: CompanyEvent[],
+  index: number,
+  codexDisconnected: boolean,
+  snapshotIso: string,
+  gates: GateFact[],
+): TaskDetailModel {
   const linked = linkedEvents(task, events);
   const receipt = taskReceipt(task, events);
   const completed = taskIsClosed(task, events) ? completionInstant(task, events) : null;
@@ -2209,10 +2364,19 @@ function buildTaskDetail(task: CompanyTask, events: CompanyEvent[], index: numbe
     humanGate: humanGateLabel(task.humanGate),
     outcome: outcomeLabel(task, events, codexDisconnected),
     completedAt: formatDateTime(completed),
+    stageBadge: resolveStageBadge(task, events, snapshotIso, gates),
   };
 }
 
-function toTodayRow(task: CompanyTask, events: CompanyEvent[], index: number, at: string, codexDisconnected: boolean): TodayRowModel {
+function toTodayRow(
+  task: CompanyTask,
+  events: CompanyEvent[],
+  index: number,
+  at: string,
+  codexDisconnected: boolean,
+  snapshotIso: string,
+  gates: GateFact[],
+): TodayRowModel {
   return {
     key: task.id ?? `today-${index}`,
     timeLabel: formatDateTime(at),
@@ -2220,7 +2384,7 @@ function toTodayRow(task: CompanyTask, events: CompanyEvent[], index: number, at
     taskId: task.id ?? NO_DATA,
     statusLabel: taskStatusLabel(task.status),
     agentLabel: roleLabel(task.producerAgentSlug),
-    detail: buildTaskDetail(task, events, index, codexDisconnected),
+    detail: buildTaskDetail(task, events, index, codexDisconnected, snapshotIso, gates),
   };
 }
 
@@ -2309,27 +2473,33 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
         nextStep: task.nextStep ? clip(task.nextStep, 400) : NO_DATA,
         codexNote,
         engineering: panel,
-        detail: buildTaskDetail(task, status.events, index, codexDisconnected),
+        detail: buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates),
       } satisfies ActiveTaskCard;
     });
 
   const queue = indexed
     .filter(({ task }) => !taskIsClosed(task, status.events))
     .filter(({ task }) => !hasActivity(task, status.events) && !(task.id != null && currentIds.has(task.id)))
-    .map(({ task, index }) => buildTaskDetail(task, status.events, index, codexDisconnected));
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates),
+    );
 
   const receiptKnown = status.tasks.some((task) => taskReceipt(task, status.events)?.kind === "received");
   const todayReceived = indexed
     .map((item) => ({ ...item, receipt: taskReceipt(item.task, status.events) }))
     .filter((item) => item.receipt?.kind === "received" && sameMoscowDay(item.receipt.at, status.generatedAt))
     .sort((left, right) => compareNewest(left.receipt!.at, right.receipt!.at, left.index, right.index))
-    .map((item) => toTodayRow(item.task, status.events, item.index, item.receipt!.at, codexDisconnected));
+    .map((item) =>
+      toTodayRow(item.task, status.events, item.index, item.receipt!.at, codexDisconnected, status.generatedAt, status.currentGates),
+    );
 
   const todayCreated = indexed
     .filter(({ task }) => taskReceipt(task, status.events)?.kind !== "received")
     .filter(({ task }) => sameMoscowDay(task.createdAt, status.generatedAt))
     .sort((left, right) => compareNewest(left.task.createdAt, right.task.createdAt, left.index, right.index))
-    .map(({ task, index }) => toTodayRow(task, status.events, index, task.createdAt!, codexDisconnected));
+    .map(({ task, index }) =>
+      toTodayRow(task, status.events, index, task.createdAt!, codexDisconnected, status.generatedAt, status.currentGates),
+    );
 
   const todayWorkEvents = status.events
     .filter(isWorkEvent)
@@ -2357,7 +2527,9 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   const todayCompleted = closed
     .filter((item) => sameMoscowDay(item.completedAt, status.generatedAt))
     .sort((left, right) => compareNewest(left.completedAt, right.completedAt, left.index, right.index))
-    .map((item) => toTodayRow(item.task, status.events, item.index, item.completedAt!, codexDisconnected));
+    .map((item) =>
+      toTodayRow(item.task, status.events, item.index, item.completedAt!, codexDisconnected, status.generatedAt, status.currentGates),
+    );
 
   const dated = closed.filter((item) => item.completedAt);
   const summaryToday = dated.filter((item) => withinPeriod(item.completedAt!, status.generatedAt, "today")).length;
@@ -2373,7 +2545,9 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
         : item.completedAt != null && withinPeriod(item.completedAt, status.generatedAt, filters.period),
     )
     .sort((left, right) => (parseInstant(right.completedAt) ?? -1) - (parseInstant(left.completedAt) ?? -1))
-    .map((item) => buildTaskDetail(item.task, status.events, item.index, codexDisconnected));
+    .map((item) =>
+      buildTaskDetail(item.task, status.events, item.index, codexDisconnected, status.generatedAt, status.currentGates),
+    );
 
   const history = filters.historyBefore
     ? historyAll

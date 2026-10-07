@@ -13,6 +13,8 @@ import type {
   GateCard,
   HistoryFilters,
   QuotaLine,
+  StageBadge,
+  StageTone,
   TaskDetailModel,
   TodayRowModel,
 } from "@/lib/admin/ai-company-dashboard";
@@ -33,11 +35,58 @@ const CONNECTION_CLASS: Record<ExecutorCard["connection"], string> = {
   no_fresh_data: "border-[#eadff8] bg-white",
 };
 
+const STAGE_BADGE_CLASS: Record<StageTone, string> = {
+  queue: "border-slate-300 bg-slate-100 text-slate-800",
+  working: "border-sky-300 bg-sky-100 text-sky-950",
+  review: "border-amber-300 bg-amber-100 text-amber-950",
+  release: "border-orange-300 bg-orange-100 text-orange-950",
+  site: "border-indigo-300 bg-indigo-100 text-indigo-950",
+  done: "border-green-300 bg-green-100 text-green-900",
+  decision: "border-red-300 bg-red-100 text-red-900",
+  blocked: "border-red-400 bg-red-50 text-red-950",
+  cancelled: "border-zinc-300 bg-zinc-200 text-zinc-800",
+  stale: "border-stone-300 bg-stone-100 text-stone-800",
+};
+
 type AiCompanyDashboardProps = {
   model: DashboardModel | null;
   filters: HistoryFilters;
   sourceError: string | null;
 };
+
+function StageBadgeLabel({ badge }: { badge: StageBadge }) {
+  return (
+    <span
+      data-stage-badge={badge.tone}
+      className={`ml-auto inline-block min-w-0 max-w-full whitespace-normal break-words rounded-full border px-2.5 py-1 text-xs font-semibold leading-snug ${STAGE_BADGE_CLASS[badge.tone]}`}
+    >
+      {badge.label}
+    </span>
+  );
+}
+
+function TaskHeading({
+  title,
+  badge,
+  subtle,
+  titleClassName = "",
+}: {
+  title: string;
+  badge: StageBadge;
+  subtle?: string;
+  titleClassName?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+      <div className="min-w-0 flex-1">
+        <h4 className={`break-words font-semibold ${titleClassName}`.trim()}>{title}</h4>
+        {subtle ? <p className="mt-1 break-all text-[#796ba0]">{subtle}</p> : null}
+        {badge.detail ? <p className="mt-1 break-words text-[#796ba0]">{badge.detail}</p> : null}
+      </div>
+      <StageBadgeLabel badge={badge} />
+    </div>
+  );
+}
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -83,7 +132,7 @@ function TaskDetail({ detail }: { detail: TaskDetailModel }) {
       </div>
       <Fact label="Функциональная роль" value={detail.agent} />
       <Fact label="Фактический исполнитель" value={detail.executor} />
-      <Fact label="Текущий этап" value={detail.stage} />
+      <Fact label="Текущий этап" value={detail.stageBadge.label} />
       <Fact label="Проверенный прогресс" value={detail.progress} />
       <Fact label="История состояний" value={detail.history} />
       <Fact label="Результаты" value={detail.results} />
@@ -136,12 +185,11 @@ function TodayList({ rows, empty }: { rows: TodayRowModel[]; empty: string }) {
     <div className="space-y-2">
       {rows.map((row) => (
         <article key={row.key} className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm sm:p-4">
-          <h4 className="break-words font-semibold">
-            {row.timeLabel} · {row.title}
-          </h4>
-          <p className="mt-1 break-all text-[#796ba0]">
-            {row.taskId} · {row.statusLabel} · {row.agentLabel}
-          </p>
+          <TaskHeading
+            title={`${row.timeLabel} · ${row.title}`}
+            badge={row.detail.stageBadge}
+            subtle={`${row.taskId} · ${row.agentLabel}`}
+          />
         </article>
       ))}
     </div>
@@ -154,13 +202,12 @@ function ActiveCard({ task }: { task: ActiveTaskCard }) {
       data-active-task={task.taskId}
       className="rounded-2xl border border-[#eadff8] bg-white p-4 sm:p-5"
     >
-      <h4 className="break-words text-lg font-semibold">{task.title}</h4>
-      <p className="mt-1 break-all text-xs text-[#796ba0]">{task.taskId}</p>
+      <TaskHeading title={task.title} badge={task.detail.stageBadge} subtle={task.taskId} titleClassName="text-lg" />
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <Fact label="Приоритет" value={task.priority} />
         <Fact label="Функциональная роль" value={task.functionalRole} />
         <Fact label="Фактический исполнитель" value={task.executorLabel} />
-        <Fact label="Этап" value={task.stage} />
+        <Fact label="Этап" value={task.detail.stageBadge.label} />
         <Fact label="Итог" value={task.detail.outcome} />
         <Fact label="Проверенный прогресс" value={task.progress} />
         <Fact label="Последнее событие" value={task.lastEvent} />
@@ -396,8 +443,7 @@ export function AiCompanyDashboardView({
               {model.queue.length ? (
                 model.queue.map((detail) => (
                   <article key={detail.key} className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm sm:p-4">
-                    <h4 className="break-words font-semibold">{detail.title}</h4>
-                    <p className="mt-1 text-[#796ba0]">{detail.statusLabel}</p>
+                    <TaskHeading title={detail.title} badge={detail.stageBadge} />
                     <details
                       className="mt-2"
                       open={openDetails[detail.key] ?? false}
@@ -471,9 +517,7 @@ export function AiCompanyDashboardView({
               {model.history.length ? (
                 model.history.map((detail) => (
                   <article key={detail.key} className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm sm:p-4">
-                    <h4 className="break-words font-semibold">
-                      {detail.title} · {detail.statusLabel}
-                    </h4>
+                    <TaskHeading title={detail.title} badge={detail.stageBadge} />
                     <details
                       className="mt-2"
                       open={openDetails[detail.key] ?? false}
