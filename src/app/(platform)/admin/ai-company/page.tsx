@@ -1,4 +1,5 @@
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
+import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   buildAiCompanyDashboard,
@@ -38,29 +39,27 @@ export default async function AiCompanyPage({
   await requireAdminPermission("ai_company.view");
   const filters = parseHistoryFilters(await searchParams);
   const { data, error } = await loadStatus();
-
-  if (!data) {
-    return (
-      <section aria-labelledby="ai-company-unavailable">
-        <meta httpEquiv="refresh" content="45" />
-        <h2 id="ai-company-unavailable" className="text-[21px] font-semibold">
-          ИИ-компания
-        </h2>
-        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
-          <strong>Требует внимания (Attention): нет достоверных данных</strong>
-          <p className="mt-2 text-sm">{error}</p>
-          <p className="mt-2 text-sm">Фиктивное состояние не подставлено. Повтор через 45 секунд.</p>
-        </div>
-      </section>
-    );
-  }
-
-  const model = buildAiCompanyDashboard(data, filters);
+  const model = data ? buildAiCompanyDashboard(data, filters) : null;
 
   return (
-    <section aria-labelledby="ai-company-heading">
-      <meta httpEquiv="refresh" content="45" />
-      <AiCompanyDashboard model={model} filters={filters} />
-    </section>
+    <>
+      <AiCompanyLiveRefresh />
+      {model ? (
+        <section aria-labelledby="ai-company-heading">
+          <AiCompanyDashboard model={model} filters={filters} />
+        </section>
+      ) : (
+        <section aria-labelledby="ai-company-unavailable">
+          <h2 id="ai-company-unavailable" className="text-[21px] font-semibold">
+            ИИ-компания
+          </h2>
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
+            <strong>Требует внимания (Attention): нет достоверных данных</strong>
+            <p className="mt-2 text-sm">{error}</p>
+            <p className="mt-2 text-sm">Фиктивное состояние не подставлено. Повтор через 45 секунд.</p>
+          </div>
+        </section>
+      )}
+    </>
   );
 }
