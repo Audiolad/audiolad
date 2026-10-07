@@ -359,10 +359,13 @@ const dashboardSource = readFileSync("src/components/admin/AiCompanyDashboard.ts
 assert.match(page, /requireAdminPermission\("ai_company\.view"\)/);
 assert.match(page, /parseCompanyStatus/);
 assert.match(page, /companyStatusRequestPath/);
+assert.match(page, /<AiCompanyLiveRefresh/);
 assert.doesNotMatch(page, /updated_at/);
 assert.doesNotMatch(page, /httpEquiv|http-equiv/);
 assert.match(dashboardSource, /router\.refresh/);
-assert.match(dashboardSource, /clearInterval/);
+const liveRefresh = readFileSync("src/lib/admin/ai-company-live-refresh.ts", "utf8");
+assert.match(liveRefresh, /clearInterval/);
+assert.match(liveRefresh, /startScopedPageRefresh/);
 assert.match(dashboardSource, /data-section="now"/);
 assert.equal(companyStatusRequestPath(parseHistoryFilters({})), "/v1/status");
 assert.equal(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AI_COMPANY_ROLES, NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
@@ -16,8 +16,6 @@ import type {
   TaskDetailModel,
   TodayRowModel,
 } from "@/lib/admin/ai-company-dashboard";
-
-const REFRESH_MS = 45_000;
 
 const TONE_CLASS: Record<AgentCardModel["tone"], string> = {
   working: "border-green-200 bg-green-50",
@@ -514,13 +512,6 @@ export function AiCompanyDashboardView({
 export default function AiCompanyDashboard(props: AiCompanyDashboardProps) {
   const router = useRouter();
   const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      router.refresh();
-    }, REFRESH_MS);
-    return () => window.clearInterval(id);
-  }, [router]);
 
   return (
     <div data-refresh="route" data-open-details={Object.keys(openDetails).filter((key) => openDetails[key]).join(" ")}>

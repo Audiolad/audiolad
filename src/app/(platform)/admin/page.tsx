@@ -1,20 +1,24 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 
 import AdminAnalyticsWorkbench from "@/components/admin/AdminAnalyticsWorkbench";
-import AuthorApplicationsAttentionCard from "@/components/admin/AuthorApplicationsAttentionCard";
+import AdminSectionError from "@/components/admin/AdminSectionError";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
+import AuthorApplicationsAttentionCard from "@/components/admin/AuthorApplicationsAttentionCard";
 import CommercialApplicationsAttentionCard from "@/components/admin/CommercialApplicationsAttentionCard";
 import { getAdminAnalyticsSummaryBundle } from "@/lib/admin/analytics-queries";
-import type { AuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention";
 import { getCachedAdminAuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention-cache";
-import type { CommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention";
 import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
 import {
   getFirstAllowedAdminPath,
   requireAdminPanelAccess,
   requireAdminPermission,
 } from "@/lib/admin/guard";
+import {
+  ADMIN_OVERVIEW_SECTION_ERRORS,
+  adminOverviewRetryHref,
+  loadAdminOverviewSections,
+} from "@/lib/admin/overview-blocks";
 import { getAdminOverviewStats } from "@/lib/admin/queries";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 
@@ -47,73 +51,69 @@ export default async function AdminOverviewPage({
     "analytics.view",
   );
   const params = await searchParams;
-
   const canViewAuthors = snapshotHasPermission(session.access, "authors.view");
+  const retryHref = adminOverviewRetryHref(params);
 
-  let overviewStats;
-  let analyticsSummary = null;
-  let commercialAttention: CommercialApplicationAttentionSummary | null = null;
-  let authorApplicationAttention: AuthorApplicationAttentionSummary | null = null;
-
-  try {
-    const commercialPromise = canViewAuthors
-      ? getCachedAdminCommercialApplicationAttentionSummary()
-      : Promise.resolve(null);
-    const authorApplicationPromise = canViewAuthors
-      ? getCachedAdminAuthorApplicationAttentionSummary()
-      : Promise.resolve(null);
-
-    if (canViewAnalytics) {
-      [overviewStats, analyticsSummary, commercialAttention, authorApplicationAttention] = await Promise.all([
-        getAdminOverviewStats(),
-        getAdminAnalyticsSummaryBundle({
-          period: params.period,
-          includeTest: params.includeTest,
-          authorId: params.authorId,
-          practiceId: params.practiceId,
-          utmSource: params.utmSource,
-          deviceType: params.deviceType,
-        }),
-        commercialPromise,
-        authorApplicationPromise,
-      ]);
-    } else {
-      [overviewStats, commercialAttention, authorApplicationAttention] = await Promise.all([
-        getAdminOverviewStats(),
-        commercialPromise,
-        authorApplicationPromise,
-      ]);
-    }
-  } catch (error) {
-    console.error("admin_overview_load_error", error);
-
-    return (
-      <div className="rounded-[22px] border border-[#efc7cf] bg-[#fff8f9] p-5 text-sm text-[#b34f63]">
-        Не удалось загрузить показатели. Попробуйте обновить страницу.
-      </div>
-    );
-  }
+  const loaded = await loadAdminOverviewSections({
+    stats: () => getAdminOverviewStats(),
+    analytics: canViewAnalytics
+      ? () =>
+          getAdminAnalyticsSummaryBundle({
+            period: params.period,
+            includeTest: params.includeTest,
+            authorId: params.authorId,
+            practiceId: params.practiceId,
+            utmSource: params.utmSource,
+            deviceType: params.deviceType,
+          })
+      : null,
+    commercial: canViewAuthors
+      ? () => getCachedAdminCommercialApplicationAttentionSummary()
+      : null,
+    authors: canViewAuthors
+      ? () => getCachedAdminAuthorApplicationAttentionSummary()
+      : null,
+    rethrow: unstable_rethrow,
+  });
 
   return (
     <div className="space-y-8">
-      {authorApplicationAttention ? (
-        <AuthorApplicationsAttentionCard summary={authorApplicationAttention} />
+      {loaded.authors.status === "ready" ? (
+        <AuthorApplicationsAttentionCard summary={loaded.authors.value} />
+      ) : null}
+      {loaded.authors.status === "failed" ? (
+        <AdminSectionError
+          message={ADMIN_OVERVIEW_SECTION_ERRORS.authors}
+          retryHref={retryHref}
+        />
       ) : null}
 
-      {commercialAttention ? (
-        <CommercialApplicationsAttentionCard summary={commercialAttention} />
+      {loaded.commercial.status === "ready" ? (
+        <CommercialApplicationsAttentionCard summary={loaded.commercial.value} />
+      ) : null}
+      {loaded.commercial.status === "failed" ? (
+        <AdminSectionError
+          message={ADMIN_OVERVIEW_SECTION_ERRORS.commercial}
+          retryHref={retryHref}
+        />
       ) : null}
 
-      {canViewAnalytics && analyticsSummary ? (
+      {loaded.analytics.status === "ready" ? (
         <section aria-labelledby="admin-analytics-heading">
           <Suspense
             fallback={
               <p className="text-sm text-[#796ba0]">Загружаем аналитику…</p>
             }
           >
-            <AdminAnalyticsWorkbench summary={analyticsSummary} />
+            <AdminAnalyticsWorkbench summary={loaded.analytics.value} />
           </Suspense>
         </section>
+      ) : null}
+      {loaded.analytics.status === "failed" ? (
+        <AdminSectionError
+          message={ADMIN_OVERVIEW_SECTION_ERRORS.analytics}
+          retryHref={retryHref}
+        />
       ) : null}
 
       <section aria-labelledby="admin-overview-heading">
@@ -125,7 +125,14 @@ export default async function AdminOverviewPage({
             Операционные показатели платформы. Периоды 7 и 30 дней рассчитываются независимо от выбранного периода аналитики.
           </p>
         </div>
-        <AdminStatGrid cards={overviewStats.cards} />
+        {loaded.stats.status === "ready" ? (
+          <AdminStatGrid cards={loaded.stats.value.cards} />
+        ) : (
+          <AdminSectionError
+            message={ADMIN_OVERVIEW_SECTION_ERRORS.stats}
+            retryHref={retryHref}
+          />
+        )}
       </section>
     </div>
   );

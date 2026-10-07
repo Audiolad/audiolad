@@ -1038,9 +1038,26 @@ export async function getAdminAnalyticsSummaryBundle(
     p_device_type: sharedFilters.p_device_type,
   };
 
+  // Summary and owner overview are the only hard failures. Run them before
+  // the listening stampede so a slow neighbor cannot cancel them.
+  const [summaryRes, overviewRes] = await Promise.all([
+    service.rpc("admin_analytics_p2_summary", {
+      ...sharedFilters,
+      p_prev_from: previous?.from ?? null,
+      p_prev_to: previous?.to ?? null,
+    }),
+    service.rpc("analytics_owner_overview", sharedFilters),
+  ]);
+
+  if (summaryRes.error || overviewRes.error) {
+    console.error("admin_analytics_summary_failed", {
+      summary: summaryRes.error?.message ?? null,
+      overview: overviewRes.error?.message ?? null,
+    });
+    throw new Error("admin_analytics_dashboard_failed");
+  }
+
   const [
-    summaryRes,
-    overviewRes,
     timeseriesRes,
     listeningRes,
     listeningSeriesRes,
@@ -1049,14 +1066,7 @@ export async function getAdminAnalyticsSummaryBundle(
     monthListeningRes,
     monthPrevListeningRes,
     filterOptions,
-  ] =
-    await Promise.all([
-    service.rpc("admin_analytics_p2_summary", {
-      ...sharedFilters,
-      p_prev_from: previous?.from ?? null,
-      p_prev_to: previous?.to ?? null,
-    }),
-    service.rpc("analytics_owner_overview", sharedFilters),
+  ] = await Promise.all([
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
     service.rpc("admin_analytics_listening_time", sharedFilters),
     service.rpc("admin_analytics_listening_time_timeseries", sharedFilters),
@@ -1082,11 +1092,6 @@ export async function getAdminAnalyticsSummaryBundle(
     }),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
-
-  if (summaryRes.error || overviewRes.error) {
-    console.error("admin_analytics_summary_failed", summaryRes.error?.message ?? overviewRes.error?.message);
-    throw new Error("admin_analytics_dashboard_failed");
-  }
 
   const summary = (summaryRes.data ?? {}) as SummarySnapshot;
   const funnel = buildFunnelLines(summary);

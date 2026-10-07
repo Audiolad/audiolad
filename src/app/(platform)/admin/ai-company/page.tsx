@@ -1,4 +1,5 @@
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
+import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   buildAiCompanyDashboard,
@@ -56,17 +57,14 @@ export default async function AiCompanyPage({
   });
   const { data, error } = await loadStatus(filters);
 
-  if (!data) {
-    return (
-      <AiCompanyDashboard model={null} filters={filters} sourceError={error} />
-    );
-  }
-
   return (
-    <AiCompanyDashboard
-      model={buildAiCompanyDashboard(data, filters)}
-      filters={filters}
-      sourceError={null}
-    />
+    <>
+      <AiCompanyLiveRefresh />
+      <AiCompanyDashboard
+        model={data ? buildAiCompanyDashboard(data, filters) : null}
+        filters={filters}
+        sourceError={data ? null : error}
+      />
+    </>
   );
 }
