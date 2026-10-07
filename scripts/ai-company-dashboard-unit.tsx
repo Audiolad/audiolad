@@ -1775,4 +1775,132 @@ const plainToggle = copyMarkup.slice(copyMarkup.lastIndexOf("<button", plainAt),
 assert.doesNotMatch(plainToggle, /Скопировать данные/);
 assert.match(copyMarkup, /aria-label="Скопировать данные задачи"/);
 
+const acceptanceStatus = parseCompanyStatus({
+  generated_at: "2026-10-07T18:00:00.000Z",
+  tasks: [
+    {
+      id: "presented-doc",
+      title: "Документ ждёт владельца",
+      status: "done",
+      result_type: "document",
+      completed_at: "2026-10-07T17:00:00.000Z",
+      updated_at: "2026-10-07T17:40:00.000Z",
+      owner_acceptance: {
+        state: "pending",
+        presented_at: "2026-10-07T17:10:00.000Z",
+        result_version: "result-4",
+        result_sha: "abc1234def",
+      },
+    },
+    {
+      id: "accepted-doc",
+      title: "Документ уже принят",
+      status: "done",
+      result_type: "document",
+      completed_at: "2026-10-07T16:00:00.000Z",
+      owner_acceptance: {
+        state: "accepted",
+        presented_at: "2026-10-07T15:00:00.000Z",
+        accepted_at: "2026-10-07T16:30:00.000Z",
+        actor: "sergey",
+        result_version: "result-2",
+      },
+    },
+    {
+      id: "returned-doc",
+      title: "Документ вернули",
+      status: "done",
+      result_type: "document",
+      completed_at: "2026-10-07T12:00:00.000Z",
+      next_action: "Исправить обложку",
+      decision_owner: "Sergey",
+      owner_acceptance: {
+        state: "returned",
+        return_note: "На сайте кнопки нет",
+        returned_at: "2026-10-07T16:40:00.000Z",
+      },
+    },
+    {
+      id: "routine-low",
+      title: "Обычный выпуск",
+      status: "done",
+      result_type: "engineering",
+      risk: "low",
+      completed_at: "2026-10-07T17:20:00.000Z",
+      executive_run: {
+        head_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ci_status: "success",
+        review_status: "independent_pass",
+        review_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        deploy_status: "deployed",
+        production_verified: true,
+        production_proof: { verified: true, sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evidence_at: "2026-10-07T17:20:00.000Z" },
+      },
+      owner_acceptance: { state: "pending", presented_at: "2026-10-07T17:20:00.000Z" },
+    },
+    {
+      id: "untagged-done",
+      title: "Закрыто без приёмки в снимке",
+      status: "accepted",
+      result_type: "document",
+      completed_at: "2026-10-07T11:00:00.000Z",
+    },
+  ],
+})!;
+const acceptanceModel = buildAiCompanyDashboard(acceptanceStatus, parseHistoryFilters({}));
+const presented = acceptanceModel.ownerReview.find((item) => item.taskId === "presented-doc");
+assert.ok(presented);
+assert.equal(presented.stageBadge.label, "На проверке");
+assert.equal(presented.stageBadge.tone, "acceptance");
+assert.match(presented.stageBadge.detail ?? "", /не PR/);
+assert.equal(presented.acceptance?.resultVersion, "result-4");
+assert.equal(presented.acceptance?.resultSha, "abc1234def");
+assert.equal(acceptanceModel.history.some((item) => item.taskId === "presented-doc"), false);
+assert.equal(acceptanceModel.acceptedArchive.some((item) => item.taskId === "presented-doc"), false);
+assert.doesNotMatch(presented.stageBadge.detail ?? "", /17:40|updated/);
+const acceptedRow = acceptanceModel.acceptedArchive.find((item) => item.taskId === "accepted-doc");
+assert.ok(acceptedRow);
+assert.equal(acceptedRow.stageBadge.label, "Принята");
+assert.match(acceptedRow.stageBadge.detail ?? "", /07\.10\.2026, 19:30/);
+assert.equal(acceptanceModel.history.some((item) => item.taskId === "accepted-doc"), false);
+assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "accepted-doc"), false);
+const returned = [...acceptanceModel.queue, ...acceptanceModel.activeTasks.map((item) => item.detail)].find(
+  (item) => item.taskId === "returned-doc",
+);
+assert.ok(returned);
+assert.notEqual(returned.stageBadge.label, "Завершена");
+assert.notEqual(returned.stageBadge.label, "Принята");
+assert.match(returned.stageBadge.detail ?? "", /На сайте кнопки нет/);
+assert.equal(returned.acceptance?.nextAction, "Исправить обложку");
+assert.equal(returned.acceptance?.decisionOwner, "Сергей");
+assert.equal(acceptanceModel.acceptedArchive.some((item) => item.taskId === "returned-doc"), false);
+const routine = acceptanceModel.history.find((item) => item.taskId === "routine-low");
+assert.ok(routine);
+assert.equal(routine.stageBadge.label, "Завершена");
+assert.equal(routine.acceptance?.applicable, false);
+assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "routine-low"), false);
+const untagged = acceptanceModel.history.find((item) => item.taskId === "untagged-done");
+assert.ok(untagged);
+assert.equal(untagged.stageBadge.label, "Завершена");
+assert.equal(untagged.acceptance, null);
+
+const acceptanceMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={acceptanceModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
+);
+assert.match(acceptanceMarkup, /data-section="owner-review"/);
+assert.match(acceptanceMarkup, /data-section="accepted"/);
+assert.match(acceptanceMarkup, /Архив \/ Принятые/);
+assert.match(acceptanceMarkup, /Проверил, принял/);
+assert.match(acceptanceMarkup, /Не работает \/ На доработку/);
+assert.match(acceptanceMarkup, /Приёмка пока недоступна/);
+assert.match(acceptanceMarkup, /Вернуть в работу/);
+const presentedAt = acceptanceMarkup.indexOf("Документ ждёт владельца");
+const presentedToggle = acceptanceMarkup.slice(
+  acceptanceMarkup.lastIndexOf("<button", presentedAt),
+  acceptanceMarkup.indexOf("</button>", presentedAt),
+);
+assert.doesNotMatch(presentedToggle, /Проверил, принял/);
+assert.match(acceptanceMarkup, /data-stage-badge="acceptance"[^>]*>На проверке/);
+assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принята/);
+
 console.log("ai-company-dashboard-unit: ok");

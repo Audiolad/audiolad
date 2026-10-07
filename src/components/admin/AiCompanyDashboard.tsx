@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
+import { ACCEPTANCE_UNAVAILABLE, createAcceptanceGate, type AcceptanceAction } from "@/lib/admin/ai-company-acceptance";
 import { AI_COMPANY_ROLES, NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
@@ -44,6 +45,8 @@ const STAGE_BADGE_CLASS: Record<StageTone, string> = {
   release: "border-orange-300 bg-orange-100 text-orange-950",
   site: "border-indigo-300 bg-indigo-100 text-indigo-950",
   done: "border-green-300 bg-green-100 text-green-900",
+  acceptance: "border-amber-300 bg-amber-100 text-amber-950",
+  accepted: "border-emerald-300 bg-emerald-100 text-emerald-950",
   decision: "border-red-300 bg-red-100 text-red-900",
   blocked: "border-red-400 bg-red-50 text-red-950",
   cancelled: "border-zinc-300 bg-zinc-200 text-zinc-800",
@@ -57,7 +60,11 @@ type AiCompanyDashboardProps = {
   model: DashboardModel | null;
   filters: HistoryFilters;
   sourceError: string | null;
+  acceptanceAvailable?: boolean;
 };
+
+const AcceptanceAvailability = createContext(false);
+const AcceptanceRefresh = createContext<() => void>(() => undefined);
 
 function knownValue(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -180,10 +187,152 @@ function TaskCopyButton({ text }: { text: string }) {
   );
 }
 
+function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
+  const available = useContext(AcceptanceAvailability);
+  const refresh = useContext(AcceptanceRefresh);
+  const view = detail.acceptance;
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [comment, setComment] = useState("");
+  const [remark, setRemark] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!view?.applicable || detail.taskId === NO_DATA) return null;
+
+  async function submit(action: AcceptanceAction) {
+    if (!view || !available || busy || gate.current.busy) return;
+    if (action === "reject" && !remark.trim()) {
+      setError("Нужно короткое замечание.");
+      setMessage(null);
+      return;
+    }
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/acceptance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            taskId: detail.taskId,
+            action,
+            comment: action === "reject" ? remark : comment,
+            resultVersion: view.resultVersion === NO_DATA ? null : view.resultVersion,
+            resultSha: view.resultSha === NO_DATA ? null : view.resultSha,
+            idempotencyKey: key,
+          }),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string; keepRow?: boolean };
+      });
+      if (outcome.ok === true) {
+        setMessage(outcome.message ?? "Решение сохранено.");
+        idempotencyKey.current = null;
+        refresh();
+      } else {
+        setError(outcome.message ?? "Решение не сохранено.");
+      }
+    } catch {
+      setError(ACCEPTANCE_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const locked = !available || busy;
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-owner-acceptance={view.state}>
+      <p className="font-semibold">Приёмка владельцем</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <Fact label="Версия результата" value={view.resultVersion} />
+        <Fact label="SHA результата" value={view.resultSha} />
+        <Fact label="Результат предъявлен" value={view.presentedAt} />
+        <Fact label="Решение записано" value={view.recordedAt} />
+        <Fact label="Кто подтвердил" value={view.actor} />
+        <Fact label="Кто разбирает доработку" value={view.decisionOwner} />
+        <Fact label="Следующее действие" value={view.nextAction} />
+        <Fact label="Комментарий приёмки" value={view.comment} />
+        <Fact label="Замечание" value={view.returnNote} />
+      </dl>
+      {available ? null : (
+        <p className="mt-2 text-sm text-[#9f1239]" role="status">
+          {ACCEPTANCE_UNAVAILABLE}
+        </p>
+      )}
+      {view.state === "accepted" ? (
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => void submit("reopen")}
+          className="mt-3 min-h-11 rounded-lg border border-[#7042c5] px-3 py-2 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+        >
+          Вернуть в работу
+        </button>
+      ) : (
+        <div className="mt-3 grid gap-2">
+          <label className="grid gap-1 text-xs text-[#796ba0]">
+            Комментарий, если нужен
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              rows={2}
+              maxLength={500}
+              className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
+              aria-label="Комментарий к приёмке"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => void submit("accept")}
+            className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+          >
+            Проверил, принял
+          </button>
+          <label className="grid gap-1 text-xs text-[#796ba0]">
+            Замечание для доработки
+            <textarea
+              value={remark}
+              onChange={(event) => setRemark(event.target.value)}
+              rows={2}
+              maxLength={500}
+              required
+              className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
+              aria-label="Замечание для доработки"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => void submit("reject")}
+            className="min-h-11 rounded-lg border border-[#9f1239] px-3 py-2 text-sm font-semibold text-[#9f1239] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9f1239] disabled:opacity-60"
+          >
+            Не работает / На доработку
+          </button>
+        </div>
+      )}
+      {message ? (
+        <p className="mt-2 text-sm text-[#166534]" role="status">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
     <>
     <TaskCopyButton text={detail.copyText} />
+    <OwnerAcceptanceControls detail={detail} />
     <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
       <Fact label="Идентификатор задачи" value={detail.taskId} />
       <Fact label="Полный исходный текст постановки" value={detail.brief} />
@@ -487,6 +636,7 @@ export function AiCompanyDashboardView({
   model,
   filters,
   sourceError,
+  acceptanceAvailable = false,
   onRefresh,
   openDetails = {},
   onToggleDetail,
@@ -505,6 +655,8 @@ export function AiCompanyDashboardView({
   const receiptMissing = model?.todayNote.startsWith("Нет данных") ?? false;
 
   return (
+    <AcceptanceAvailability.Provider value={acceptanceAvailable}>
+    <AcceptanceRefresh.Provider value={onRefresh}>
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -732,6 +884,36 @@ export function AiCompanyDashboardView({
             </div>
           </section>
 
+          <section aria-labelledby="ai-company-owner-review" data-section="owner-review">
+            <h3 id="ai-company-owner-review" className="text-xl font-semibold">
+              На проверке
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Результат исполнитель уже предъявил. Приёмка владельцем здесь отдельно от PR, выпуска и проверки на сайте.
+            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.ownerReview.length ? (
+                model.ownerReview.map((detail) => {
+                  const rowKey = `review:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-owner-review": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Результатов, ожидающих приёмки владельцем, в снимке нет.
+                </p>
+              )}
+            </div>
+          </section>
+
           <section aria-labelledby="ai-company-queue" data-section="queue">
             <h3 id="ai-company-queue" className="text-xl font-semibold">
               Очередь
@@ -847,13 +1029,45 @@ export function AiCompanyDashboardView({
               </div>
             ) : null}
           </section>
+
+          <section aria-labelledby="ai-company-accepted" data-section="accepted">
+            <h3 id="ai-company-accepted" className="text-xl font-semibold">
+              Архив / Принятые
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
+            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.acceptedArchive.length ? (
+                model.acceptedArchive.map((detail) => {
+                  const rowKey = `accepted:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-accepted-task": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Принятых результатов в снимке нет.
+                </p>
+              )}
+            </div>
+          </section>
         </>
       ) : null}
     </div>
+    </AcceptanceRefresh.Provider>
+    </AcceptanceAvailability.Provider>
   );
 }
 
-export default function AiCompanyDashboard(props: AiCompanyDashboardProps) {
+export default function AiCompanyDashboard({ acceptanceAvailable = false, ...props }: AiCompanyDashboardProps) {
   const router = useRouter();
   const { openDetails, onToggleDetail } = useAiCompanyDisclosureState();
 
@@ -861,6 +1075,7 @@ export default function AiCompanyDashboard(props: AiCompanyDashboardProps) {
     <div data-refresh="route" data-open-details={Object.keys(openDetails).filter((key) => openDetails[key]).join(" ")}>
       <AiCompanyDashboardView
         {...props}
+        acceptanceAvailable={acceptanceAvailable}
         onRefresh={() => router.refresh()}
         openDetails={openDetails}
         onToggleDetail={onToggleDetail}

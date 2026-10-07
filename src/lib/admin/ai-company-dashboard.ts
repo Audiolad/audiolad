@@ -9,6 +9,7 @@
  * Later names in each list are fallbacks for the previous payload.
  */
 
+import { safeAcceptanceSha, safeAcceptanceVersion } from "@/lib/admin/ai-company-acceptance";
 import { copySafeProse, formatAiCompanyTaskCopy } from "@/lib/admin/ai-company-task-copy";
 
 export const NO_DATA = "Нет данных";
@@ -107,6 +108,21 @@ export const CORE_FIELD_MAP = {
     archived: ["archived"],
     merged: ["merged"],
     releaseHold: ["release_hold", "hold_reason"],
+    ownerAcceptance: ["owner_acceptance"],
+    risk: ["risk"],
+  },
+  ownerAcceptance: {
+    state: ["state"],
+    required: ["required"],
+    routineRelease: ["routine_release"],
+    resultVersion: ["result_version", "version"],
+    resultSha: ["result_sha", "sha"],
+    presentedAt: ["presented_at"],
+    acceptedAt: ["accepted_at"],
+    returnedAt: ["returned_at"],
+    actor: ["actor", "accepted_by"],
+    comment: ["comment"],
+    returnNote: ["return_note", "remark"],
   },
   executiveRun: {
     provider: ["provider", "actual_provider"],
@@ -429,6 +445,21 @@ export type CompanyTask = {
   executiveRun: ExecutiveRun | null;
   verifiedProgress: VerifiedProgress | null;
   taskEvents: CompanyEvent[];
+  ownerAcceptance: OwnerAcceptanceFact | null;
+};
+
+export type OwnerAcceptanceState = "pending" | "accepted" | "returned";
+
+export type OwnerAcceptanceFact = {
+  applicable: boolean;
+  state: OwnerAcceptanceState;
+  resultVersion: string | null;
+  resultSha: string | null;
+  presentedAt: string | null;
+  recordedAt: string | null;
+  actor: string | null;
+  comment: string | null;
+  returnNote: string | null;
 };
 
 export type DependencyFact = {
@@ -600,6 +631,21 @@ export type TaskDetailModel = {
   completedAt: string;
   stageBadge: StageBadge;
   copyText: string;
+  acceptance: OwnerAcceptanceView | null;
+};
+
+export type OwnerAcceptanceView = {
+  applicable: boolean;
+  state: OwnerAcceptanceState;
+  resultVersion: string;
+  resultSha: string;
+  presentedAt: string;
+  recordedAt: string;
+  actor: string;
+  comment: string;
+  returnNote: string;
+  nextAction: string;
+  decisionOwner: string;
 };
 
 export type StageTone =
@@ -612,7 +658,9 @@ export type StageTone =
   | "decision"
   | "blocked"
   | "cancelled"
-  | "stale";
+  | "stale"
+  | "acceptance"
+  | "accepted";
 
 export type StageBadge = {
   label: string;
@@ -701,6 +749,8 @@ export type DashboardModel = {
   todayNote: string;
   queue: TaskDetailModel[];
   history: TaskDetailModel[];
+  ownerReview: TaskDetailModel[];
+  acceptedArchive: TaskDetailModel[];
   historySummary: string;
   historyBoundary: string;
   historyNextOffset: number | null;
@@ -1088,6 +1138,42 @@ function executorPartsFrom(value: unknown): { label: string | null; parts: Array
   return { label: provider ?? channel ?? model, parts: [provider, channel, model, runId] };
 }
 
+function parseOwnerAcceptance(record: Record<string, unknown>, resultKind: ResultKind): OwnerAcceptanceFact | null {
+  const source = asRecord(readRaw(record, CORE_FIELD_MAP.task.ownerAcceptance));
+  if (!source) return null;
+  const stateToken = normalizeToken(readString(source, CORE_FIELD_MAP.ownerAcceptance.state) ?? "");
+  const explicitState: OwnerAcceptanceState | null =
+    stateToken === "accepted" || stateToken === "pending" || stateToken === "returned" ? stateToken : null;
+  const presentedAt = readString(source, CORE_FIELD_MAP.ownerAcceptance.presentedAt);
+  const required = readBoolean(source, CORE_FIELD_MAP.ownerAcceptance.required);
+  const routineRelease = readBoolean(source, CORE_FIELD_MAP.ownerAcceptance.routineRelease) === true;
+  if (!explicitState && !presentedAt && required == null && !routineRelease) return null;
+  const risk = normalizeToken(readString(record, CORE_FIELD_MAP.task.risk) ?? "");
+  const routineRisk = (risk === "low" || risk === "medium") && resultKind === "engineering" && required !== true;
+  const applicable = routineRelease || required === false || routineRisk ? false : Boolean(explicitState || presentedAt || required === true);
+  const state: OwnerAcceptanceState = explicitState ?? "pending";
+  const recordedAt =
+    state === "accepted"
+      ? readString(source, CORE_FIELD_MAP.ownerAcceptance.acceptedAt)
+      : state === "returned"
+        ? readString(source, CORE_FIELD_MAP.ownerAcceptance.returnedAt)
+        : null;
+  const actor = readString(source, CORE_FIELD_MAP.ownerAcceptance.actor);
+  const comment = readString(source, CORE_FIELD_MAP.ownerAcceptance.comment);
+  const returnNote = readString(source, CORE_FIELD_MAP.ownerAcceptance.returnNote);
+  return {
+    applicable,
+    state,
+    resultVersion: safeAcceptanceVersion(readString(source, CORE_FIELD_MAP.ownerAcceptance.resultVersion)),
+    resultSha: safeAcceptanceSha(readString(source, CORE_FIELD_MAP.ownerAcceptance.resultSha)),
+    presentedAt,
+    recordedAt,
+    actor: actor ? copySafeProse(actor) : null,
+    comment: comment ? copySafeProse(comment) : null,
+    returnNote: returnNote ? copySafeProse(returnNote) : null,
+  };
+}
+
 function parseTask(value: unknown, index: number): CompanyTask | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -1098,6 +1184,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
   const lastEvent = parseLastEventText(readRaw(record, CORE_FIELD_MAP.task.lastEvent));
   const humanGateRaw = readRaw(record, CORE_FIELD_MAP.task.humanGate);
   const humanGateRecord = asRecord(humanGateRaw);
+  const resultKind = resultKindFrom(readString(record, CORE_FIELD_MAP.task.resultType));
   return {
     id: readString(record, CORE_FIELD_MAP.task.id),
     githubIssueNumber: readNumber(record, CORE_FIELD_MAP.task.githubIssue),
@@ -1113,7 +1200,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     fallbackExecutor: readString(record, CORE_FIELD_MAP.task.fallbackExecutor),
     executorParts: [...executor.parts, run?.provider ?? null, run?.channel ?? null, run?.model ?? null],
     nextStep: readString(record, CORE_FIELD_MAP.task.nextStep),
-    resultKind: resultKindFrom(readString(record, CORE_FIELD_MAP.task.resultType)),
+    resultKind,
     resultConsumer: readString(record, CORE_FIELD_MAP.task.resultConsumer),
     humanGate: humanGateRecord
       ? readString(humanGateRecord, CORE_FIELD_MAP.gate.reason)
@@ -1150,6 +1237,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
       .map((event) => parseEvent(event))
       .filter((event): event is CompanyEvent => event !== null)
       .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
+    ownerAcceptance: parseOwnerAcceptance(record, resultKind),
   };
 }
 
@@ -1433,6 +1521,7 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     githubIssueNumber: next.githubIssueNumber ?? previous.githubIssueNumber,
     merged: next.merged ?? previous.merged,
     releaseHold: prefer(next.releaseHold, previous.releaseHold),
+    ownerAcceptance: next.ownerAcceptance ?? previous.ownerAcceptance,
   };
 }
 
@@ -1921,7 +2010,16 @@ function formatProgress(progress: VerifiedProgress | null, dodSatisfied: boolean
   return `${fraction}.${percent} ${formula} ${evidence}`.replace(/\s+/g, " ").trim();
 }
 
+function ownerPlacement(task: CompanyTask): "review" | "archive" | "cycle" {
+  const acceptance = task.ownerAcceptance;
+  if (!acceptance?.applicable) return "cycle";
+  if (acceptance.state === "pending") return "review";
+  if (acceptance.state === "accepted") return "archive";
+  return "cycle";
+}
+
 function taskIsClosed(task: CompanyTask, events: CompanyEvent[]): boolean {
+  if (task.ownerAcceptance?.applicable && task.ownerAcceptance.state === "returned") return false;
   if (isPilotTask(task) && codexReadinessBlocked(task)) return false;
   if (CANCELLED_STATUSES.has(normalizeToken(task.status))) return false;
   const panel = engineeringPanel(task, events);
@@ -2345,6 +2443,22 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   const status = normalizeToken(task.status);
   const stageToken = normalizeToken(task.stage ?? "");
   if (CANCELLED_STATUSES.has(status)) return { label: "Отменена", tone: "cancelled", detail: null };
+  const acceptance = task.ownerAcceptance;
+  if (acceptance?.applicable && acceptance.state === "accepted") {
+    const when = formatDateTime(acceptance.recordedAt);
+    return {
+      label: "Принята",
+      tone: "accepted",
+      detail: when === NO_DATA ? "Приёмка владельцем сохранена. Время приёмки не передано." : `Принята ${when} МСК.`,
+    };
+  }
+  if (acceptance?.applicable && acceptance.state === "pending") {
+    return {
+      label: "На проверке",
+      tone: "acceptance",
+      detail: "Исполнитель предъявил результат. Приёмка владельцем не сохранена. Это не PR, не выпуск и не проверка на сайте.",
+    };
+  }
   if (isPilotTask(task) && codexReadinessBlocked(task)) {
     return {
       label: "Заблокирована",
@@ -2381,6 +2495,10 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   const executedAt = executionInstant(task, events);
   const freshExecution = isFreshInstant(executedAt, snapshotIso) && (started || hasFreshExecution(task, events, snapshotIso));
   if (freshExecution) return { label: "В работе", tone: "working", detail: null };
+  if (acceptance?.applicable && acceptance.state === "returned") {
+    const note = acceptance.returnNote?.trim() || "Нет данных";
+    return { label: "В очереди", tone: "queue", detail: `На доработку. ${note}` };
+  }
   if (started || hasFreshExecution(task, events, snapshotIso)) {
     return staleStage("В работе", executedAt ?? task.startedAt);
   }
@@ -2408,6 +2526,24 @@ function snapshotCopyLabel(snapshotIso: string): string {
 function evidenceHref(task: CompanyTask): string | null {
   const proof = evidenceRecord(task.executiveRun?.productionProof);
   return safeProductionUrl(proof ? readString(proof, CORE_FIELD_MAP.evidence.url) : null);
+}
+
+function acceptanceView(task: CompanyTask): OwnerAcceptanceView | null {
+  const fact = task.ownerAcceptance;
+  if (!fact) return null;
+  return {
+    applicable: fact.applicable,
+    state: fact.state,
+    resultVersion: fact.resultVersion ?? NO_DATA,
+    resultSha: fact.resultSha ?? NO_DATA,
+    presentedAt: formatDateTime(fact.presentedAt),
+    recordedAt: formatDateTime(fact.recordedAt),
+    actor: fact.actor ?? NO_DATA,
+    comment: fact.comment ?? NO_DATA,
+    returnNote: fact.returnNote ?? NO_DATA,
+    nextAction: task.nextStep ?? NO_DATA,
+    decisionOwner: ownerLabel(task.decisionOwner) ?? (task.decisionOwner ? copySafeProse(task.decisionOwner) : NO_DATA),
+  };
 }
 
 function decisionKindFor(label: string): "decision" | "blocked" | "none" {
@@ -2528,6 +2664,7 @@ function buildTaskDetail(
         : formatDateTime(null),
     stageBadge,
     copyText,
+    acceptance: acceptanceView(task),
   };
 }
 
@@ -2600,6 +2737,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   );
 
   const activeTasks = indexed
+    .filter(({ task }) => ownerPlacement(task) === "cycle")
     .filter(({ task }) => task.active !== false && !taskIsClosed(task, status.events))
     .filter(({ task }) => task.active === true || hasActivity(task, status.events) || (task.id != null && currentIds.has(task.id)))
     .map(({ task, index }) => {
@@ -2642,6 +2780,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     });
 
   const queue = indexed
+    .filter(({ task }) => ownerPlacement(task) === "cycle")
     .filter(({ task }) => !taskIsClosed(task, status.events))
     .filter(({ task }) => !hasActivity(task, status.events) && !(task.id != null && currentIds.has(task.id)))
     .map(({ task, index }) =>
@@ -2681,7 +2820,19 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       } satisfies WorkEventModel;
     });
 
+  const ownerReview = indexed
+    .filter(({ task }) => ownerPlacement(task) === "review")
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
+  const acceptedArchive = indexed
+    .filter(({ task }) => ownerPlacement(task) === "archive")
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
+
   const closed = indexed
+    .filter(({ task }) => ownerPlacement(task) === "cycle")
     .map((item) => ({
       ...item,
       closed: taskIsClosed(item.task, status.events),
@@ -2863,6 +3014,8 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     todayCompleted,
     todayNote,
     queue,
+    ownerReview,
+    acceptedArchive,
     history,
     historySummary: `Завершено по критерию готовности: ${closed.length}. С известной датой завершения: сегодня ${summaryToday}, неделя ${summaryWeek}, месяц ${summaryMonth}. Без даты завершения: ${closed.length - dated.length}. Страница истории: ${history.length} из ${historyAll.length}.`,
     historyBoundary: boundaries.history,

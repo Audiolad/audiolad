@@ -1,5 +1,6 @@
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
+import { probeOwnerAcceptanceAvailability } from "@/lib/admin/ai-company-acceptance";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   buildAiCompanyDashboard,
@@ -55,7 +56,13 @@ export default async function AiCompanyPage({
     history_offset: params.history_offset,
     history_before: params.history_before,
   });
-  const { data, error } = await loadStatus(filters);
+  const [{ data, error }, acceptanceAvailable] = await Promise.all([
+    loadStatus(filters),
+    probeOwnerAcceptanceAvailability({
+      base: process.env.COMPANY_CORE_URL ?? process.env.COMPANY_API_URL,
+      token: process.env.COMPANY_API_TOKEN,
+    }),
+  ]);
 
   return (
     <>
@@ -64,6 +71,7 @@ export default async function AiCompanyPage({
         model={data ? buildAiCompanyDashboard(data, filters) : null}
         filters={filters}
         sourceError={data ? null : error}
+        acceptanceAvailable={acceptanceAvailable}
       />
     </>
   );
