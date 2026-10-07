@@ -155,6 +155,23 @@ export function listeningWindowRpcArgs(
   };
 }
 
+/** One rolling window for admin_analytics_listening_time. Exact 7- or 30-day spans skip denominators. */
+export function listeningTimeWindowRpcArgs(
+  fromIso: string,
+  toIso: string,
+  filters: ListeningWindowFilters,
+) {
+  return {
+    p_from: fromIso,
+    p_to: toIso,
+    p_include_test: filters.p_include_test,
+    p_author_id: filters.p_author_id,
+    p_practice_id: filters.p_practice_id,
+    p_utm_source: filters.p_utm_source,
+    p_device_type: filters.p_device_type,
+  };
+}
+
 function measuredMilliseconds(value: unknown): number | null {
   if (typeof value === "boolean" || value == null) {
     return null;
