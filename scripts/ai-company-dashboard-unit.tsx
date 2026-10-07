@@ -384,6 +384,14 @@ assert.equal(
   "/v1/status?history_before=2026-10-07T06%3A00%3A00.000Z",
 );
 assert.equal(companyStatusRequestPath(parseHistoryFilters({ history_before: "page-2" })), "/v1/status");
+assert.equal(companyStatusRequestPath(parseHistoryFilters({}), "current"), "/v1/status?acceptance=current");
+assert.equal(companyStatusRequestPath(parseHistoryFilters({}), "archive"), "/v1/status?acceptance=archive");
+assert.equal(
+  companyStatusRequestPath(parseHistoryFilters({ history_before: "2026-10-07T06:00:00.000Z" }), "archive"),
+  "/v1/status?history_before=2026-10-07T06%3A00%3A00.000Z&acceptance=archive",
+);
+assert.match(page, /acceptance=current|loadStatus\(filters, "current"\)/);
+assert.doesNotMatch(page, /acceptance\/capabilities/);
 
 const navItem = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/ai-company");
 assert.ok(navItem);
@@ -1775,8 +1783,10 @@ const plainToggle = copyMarkup.slice(copyMarkup.lastIndexOf("<button", plainAt),
 assert.doesNotMatch(plainToggle, /Скопировать данные/);
 assert.match(copyMarkup, /aria-label="Скопировать данные задачи"/);
 
+const resultVersion = "ab".repeat(32);
 const acceptanceStatus = parseCompanyStatus({
   generated_at: "2026-10-07T18:00:00.000Z",
+  tasks_page: { acceptance_view: "all" },
   tasks: [
     {
       id: "presented-doc",
@@ -1785,12 +1795,10 @@ const acceptanceStatus = parseCompanyStatus({
       result_type: "document",
       completed_at: "2026-10-07T17:00:00.000Z",
       updated_at: "2026-10-07T17:40:00.000Z",
-      owner_acceptance: {
-        state: "pending",
-        presented_at: "2026-10-07T17:10:00.000Z",
-        result_version: "result-4",
-        result_sha: "abc1234def",
-      },
+      presentation: true,
+      user_acceptance: "none",
+      result_version: resultVersion,
+      executive_run: { production_verified: true },
     },
     {
       id: "accepted-doc",
@@ -1798,13 +1806,14 @@ const acceptanceStatus = parseCompanyStatus({
       status: "done",
       result_type: "document",
       completed_at: "2026-10-07T16:00:00.000Z",
-      owner_acceptance: {
-        state: "accepted",
-        presented_at: "2026-10-07T15:00:00.000Z",
-        accepted_at: "2026-10-07T16:30:00.000Z",
+      presentation: true,
+      result_version: resultVersion,
+      user_acceptance: {
+        decision: "accepted",
         actor: "sergey",
-        result_version: "result-2",
+        decided_at: "2026-10-07T16:30:00.000Z",
       },
+      executive_run: { production_verified: false },
     },
     {
       id: "returned-doc",
@@ -1813,11 +1822,14 @@ const acceptanceStatus = parseCompanyStatus({
       result_type: "document",
       completed_at: "2026-10-07T12:00:00.000Z",
       next_action: "Исправить обложку",
-      decision_owner: "Sergey",
-      owner_acceptance: {
-        state: "returned",
-        return_note: "На сайте кнопки нет",
-        returned_at: "2026-10-07T16:40:00.000Z",
+      owner: "executive",
+      presentation: true,
+      result_version: resultVersion,
+      user_acceptance: {
+        decision: "rejected",
+        comment: "На сайте кнопки нет",
+        decided_at: "2026-10-07T16:40:00.000Z",
+        actor: "sergey",
       },
     },
     {
@@ -1836,7 +1848,6 @@ const acceptanceStatus = parseCompanyStatus({
         production_verified: true,
         production_proof: { verified: true, sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evidence_at: "2026-10-07T17:20:00.000Z" },
       },
-      owner_acceptance: { state: "pending", presented_at: "2026-10-07T17:20:00.000Z" },
     },
     {
       id: "untagged-done",
@@ -1847,20 +1858,24 @@ const acceptanceStatus = parseCompanyStatus({
     },
   ],
 })!;
+assert.equal(acceptanceStatus.acceptanceContract, true);
+assert.equal(acceptanceStatus.acceptanceView, "all");
 const acceptanceModel = buildAiCompanyDashboard(acceptanceStatus, parseHistoryFilters({}));
 const presented = acceptanceModel.ownerReview.find((item) => item.taskId === "presented-doc");
 assert.ok(presented);
 assert.equal(presented.stageBadge.label, "На проверке");
 assert.equal(presented.stageBadge.tone, "acceptance");
-assert.match(presented.stageBadge.detail ?? "", /не PR/);
-assert.equal(presented.acceptance?.resultVersion, "result-4");
-assert.equal(presented.acceptance?.resultSha, "abc1234def");
+assert.match(presented.stageBadge.detail ?? "", /отдельный факт/);
+assert.equal(presented.acceptance?.resultVersion, resultVersion);
+assert.equal(presented.acceptance?.productionVerified, "да");
+assert.notEqual(presented.stageBadge.label, "Принято");
 assert.equal(acceptanceModel.history.some((item) => item.taskId === "presented-doc"), false);
 assert.equal(acceptanceModel.acceptedArchive.some((item) => item.taskId === "presented-doc"), false);
 assert.doesNotMatch(presented.stageBadge.detail ?? "", /17:40|updated/);
 const acceptedRow = acceptanceModel.acceptedArchive.find((item) => item.taskId === "accepted-doc");
 assert.ok(acceptedRow);
-assert.equal(acceptedRow.stageBadge.label, "Принята");
+assert.equal(acceptedRow.stageBadge.label, "Принято");
+assert.equal(acceptedRow.acceptance?.productionVerified, "нет");
 assert.match(acceptedRow.stageBadge.detail ?? "", /07\.10\.2026, 19:30/);
 assert.equal(acceptanceModel.history.some((item) => item.taskId === "accepted-doc"), false);
 assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "accepted-doc"), false);
@@ -1868,16 +1883,19 @@ const returned = [...acceptanceModel.queue, ...acceptanceModel.activeTasks.map((
   (item) => item.taskId === "returned-doc",
 );
 assert.ok(returned);
+assert.equal(returned.stageBadge.label, "На доработке");
 assert.notEqual(returned.stageBadge.label, "Завершена");
-assert.notEqual(returned.stageBadge.label, "Принята");
+assert.notEqual(returned.stageBadge.label, "Принято");
 assert.match(returned.stageBadge.detail ?? "", /На сайте кнопки нет/);
 assert.equal(returned.acceptance?.nextAction, "Исправить обложку");
-assert.equal(returned.acceptance?.decisionOwner, "Сергей");
+assert.equal(returned.acceptance?.owner, "executive");
 assert.equal(acceptanceModel.acceptedArchive.some((item) => item.taskId === "returned-doc"), false);
 const routine = acceptanceModel.history.find((item) => item.taskId === "routine-low");
 assert.ok(routine);
 assert.equal(routine.stageBadge.label, "Завершена");
-assert.equal(routine.acceptance?.applicable, false);
+assert.equal(routine.acceptance, null);
+assert.notEqual(routine.stageBadge.label, "На проверке");
+assert.notEqual(routine.stageBadge.label, "Принято");
 assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "routine-low"), false);
 const untagged = acceptanceModel.history.find((item) => item.taskId === "untagged-done");
 assert.ok(untagged);
@@ -1894,6 +1912,7 @@ assert.match(acceptanceMarkup, /Проверил, принял/);
 assert.match(acceptanceMarkup, /Не работает \/ На доработку/);
 assert.match(acceptanceMarkup, /Приёмка пока недоступна/);
 assert.match(acceptanceMarkup, /Вернуть в работу/);
+assert.match(acceptanceMarkup, /Проверено в рабочей системе/);
 const presentedAt = acceptanceMarkup.indexOf("Документ ждёт владельца");
 const presentedToggle = acceptanceMarkup.slice(
   acceptanceMarkup.lastIndexOf("<button", presentedAt),
@@ -1901,6 +1920,12 @@ const presentedToggle = acceptanceMarkup.slice(
 );
 assert.doesNotMatch(presentedToggle, /Проверил, принял/);
 assert.match(acceptanceMarkup, /data-stage-badge="acceptance"[^>]*>На проверке/);
-assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принята/);
+assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принято/);
+assert.match(acceptanceMarkup, /data-stage-badge="rework"[^>]*>На доработке/);
+const bare = parseCompanyStatus({
+  generated_at: "2026-10-07T18:00:00.000Z",
+  tasks: [{ id: "plain", title: "Без контракта", status: "done", result_type: "document", completed_at: "2026-10-07T12:00:00.000Z" }],
+})!;
+assert.equal(bare.acceptanceContract, false);
 
 console.log("ai-company-dashboard-unit: ok");

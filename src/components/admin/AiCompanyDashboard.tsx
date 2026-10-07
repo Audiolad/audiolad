@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
-import { ACCEPTANCE_UNAVAILABLE, createAcceptanceGate, type AcceptanceAction } from "@/lib/admin/ai-company-acceptance";
+import { ACCEPTANCE_UNAVAILABLE, createAcceptanceGate, validateRejectionComment, type AcceptanceDecision } from "@/lib/admin/ai-company-acceptance";
 import { AI_COMPANY_ROLES, NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
@@ -47,6 +47,7 @@ const STAGE_BADGE_CLASS: Record<StageTone, string> = {
   done: "border-green-300 bg-green-100 text-green-900",
   acceptance: "border-amber-300 bg-amber-100 text-amber-950",
   accepted: "border-emerald-300 bg-emerald-100 text-emerald-950",
+  rework: "border-rose-300 bg-rose-100 text-rose-950",
   decision: "border-red-300 bg-red-100 text-red-900",
   blocked: "border-red-400 bg-red-50 text-red-950",
   cancelled: "border-zinc-300 bg-zinc-200 text-zinc-800",
@@ -200,12 +201,20 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   const [error, setError] = useState<string | null>(null);
   if (!view?.applicable || detail.taskId === NO_DATA) return null;
 
-  async function submit(action: AcceptanceAction) {
+  async function submit(decision: AcceptanceDecision) {
     if (!view || !available || busy || gate.current.busy) return;
-    if (action === "reject" && !remark.trim()) {
-      setError("Нужно короткое замечание.");
+    if (view.resultVersion === NO_DATA) {
+      setError("В снимке нет версии результата.");
       setMessage(null);
       return;
+    }
+    if (decision === "rejected") {
+      const problem = validateRejectionComment(remark);
+      if (problem) {
+        setError(problem);
+        setMessage(null);
+        return;
+      }
     }
     const key = idempotencyKey.current ?? crypto.randomUUID();
     idempotencyKey.current = key;
@@ -219,10 +228,9 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
             taskId: detail.taskId,
-            action,
-            comment: action === "reject" ? remark : comment,
-            resultVersion: view.resultVersion === NO_DATA ? null : view.resultVersion,
-            resultSha: view.resultSha === NO_DATA ? null : view.resultSha,
+            decision,
+            comment: decision === "rejected" ? remark : comment,
+            resultVersion: view.resultVersion,
             idempotencyKey: key,
           }),
         });
@@ -248,14 +256,12 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
       <p className="font-semibold">Приёмка владельцем</p>
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
         <Fact label="Версия результата" value={view.resultVersion} />
-        <Fact label="SHA результата" value={view.resultSha} />
-        <Fact label="Результат предъявлен" value={view.presentedAt} />
+        <Fact label="Проверено в рабочей системе" value={view.productionVerified} />
         <Fact label="Решение записано" value={view.recordedAt} />
         <Fact label="Кто подтвердил" value={view.actor} />
-        <Fact label="Кто разбирает доработку" value={view.decisionOwner} />
+        <Fact label="Владелец доработки" value={view.owner} />
         <Fact label="Следующее действие" value={view.nextAction} />
-        <Fact label="Комментарий приёмки" value={view.comment} />
-        <Fact label="Замечание" value={view.returnNote} />
+        <Fact label="Комментарий" value={view.comment} />
       </dl>
       {available ? null : (
         <p className="mt-2 text-sm text-[#9f1239]" role="status">
@@ -287,7 +293,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           <button
             type="button"
             disabled={locked}
-            onClick={() => void submit("accept")}
+            onClick={() => void submit("accepted")}
             className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
           >
             Проверил, принял
@@ -297,7 +303,8 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
             <textarea
               value={remark}
               onChange={(event) => setRemark(event.target.value)}
-              rows={2}
+              rows={3}
+              minLength={8}
               maxLength={500}
               required
               className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
@@ -307,7 +314,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           <button
             type="button"
             disabled={locked}
-            onClick={() => void submit("reject")}
+            onClick={() => void submit("rejected")}
             className="min-h-11 rounded-lg border border-[#9f1239] px-3 py-2 text-sm font-semibold text-[#9f1239] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9f1239] disabled:opacity-60"
           >
             Не работает / На доработку
@@ -889,8 +896,13 @@ export function AiCompanyDashboardView({
               На проверке
             </h3>
             <p className="mt-1 text-sm text-[#796ba0]">
-              Результат исполнитель уже предъявил. Приёмка владельцем здесь отдельно от PR, выпуска и проверки на сайте.
+              Результат предъявлен. Приёмка владельцем здесь отдельно от проверки в рабочей системе.
             </p>
+            {acceptanceAvailable ? null : (
+              <p className="mt-2 text-sm text-[#9f1239]" role="status">
+                {ACCEPTANCE_UNAVAILABLE}
+              </p>
+            )}
             <div className="mt-2 flex flex-col gap-1.5">
               {model.ownerReview.length ? (
                 model.ownerReview.map((detail) => {

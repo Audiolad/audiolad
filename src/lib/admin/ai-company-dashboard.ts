@@ -9,7 +9,7 @@
  * Later names in each list are fallbacks for the previous payload.
  */
 
-import { safeAcceptanceSha, safeAcceptanceVersion } from "@/lib/admin/ai-company-acceptance";
+import { safeResultVersion } from "@/lib/admin/ai-company-acceptance";
 import { copySafeProse, formatAiCompanyTaskCopy } from "@/lib/admin/ai-company-task-copy";
 
 export const NO_DATA = "Нет данных";
@@ -108,21 +108,16 @@ export const CORE_FIELD_MAP = {
     archived: ["archived"],
     merged: ["merged"],
     releaseHold: ["release_hold", "hold_reason"],
-    ownerAcceptance: ["owner_acceptance"],
-    risk: ["risk"],
+    presentation: ["presentation"],
+    userAcceptance: ["user_acceptance"],
+    resultVersion: ["result_version"],
+    acceptanceOwner: ["owner"],
   },
-  ownerAcceptance: {
-    state: ["state"],
-    required: ["required"],
-    routineRelease: ["routine_release"],
-    resultVersion: ["result_version", "version"],
-    resultSha: ["result_sha", "sha"],
-    presentedAt: ["presented_at"],
-    acceptedAt: ["accepted_at"],
-    returnedAt: ["returned_at"],
-    actor: ["actor", "accepted_by"],
+  userAcceptance: {
+    decision: ["decision", "state"],
+    actor: ["actor"],
+    decidedAt: ["decided_at"],
     comment: ["comment"],
-    returnNote: ["return_note", "remark"],
   },
   executiveRun: {
     provider: ["provider", "actual_provider"],
@@ -445,21 +440,22 @@ export type CompanyTask = {
   executiveRun: ExecutiveRun | null;
   verifiedProgress: VerifiedProgress | null;
   taskEvents: CompanyEvent[];
+  acceptanceContract: boolean;
   ownerAcceptance: OwnerAcceptanceFact | null;
 };
 
-export type OwnerAcceptanceState = "pending" | "accepted" | "returned";
+export type OwnerAcceptanceState = "pending" | "accepted" | "rejected";
 
 export type OwnerAcceptanceFact = {
   applicable: boolean;
   state: OwnerAcceptanceState;
+  presented: boolean;
   resultVersion: string | null;
-  resultSha: string | null;
-  presentedAt: string | null;
   recordedAt: string | null;
   actor: string | null;
   comment: string | null;
-  returnNote: string | null;
+  owner: string | null;
+  productionVerified: boolean | null;
 };
 
 export type DependencyFact = {
@@ -571,6 +567,8 @@ export type CompanyStatus = {
     grok: QuotaBucket | null;
     legacySpend: QuotaBucket | null;
   };
+  acceptanceContract: boolean;
+  acceptanceView: "current" | "archive" | "all" | null;
 };
 
 export type EngineeringPanel = {
@@ -638,14 +636,12 @@ export type OwnerAcceptanceView = {
   applicable: boolean;
   state: OwnerAcceptanceState;
   resultVersion: string;
-  resultSha: string;
-  presentedAt: string;
   recordedAt: string;
   actor: string;
   comment: string;
-  returnNote: string;
   nextAction: string;
-  decisionOwner: string;
+  owner: string;
+  productionVerified: string;
 };
 
 export type StageTone =
@@ -660,7 +656,8 @@ export type StageTone =
   | "cancelled"
   | "stale"
   | "acceptance"
-  | "accepted";
+  | "accepted"
+  | "rework";
 
 export type StageBadge = {
   label: string;
@@ -1138,39 +1135,49 @@ function executorPartsFrom(value: unknown): { label: string | null; parts: Array
   return { label: provider ?? channel ?? model, parts: [provider, channel, model, runId] };
 }
 
-function parseOwnerAcceptance(record: Record<string, unknown>, resultKind: ResultKind): OwnerAcceptanceFact | null {
-  const source = asRecord(readRaw(record, CORE_FIELD_MAP.task.ownerAcceptance));
-  if (!source) return null;
-  const stateToken = normalizeToken(readString(source, CORE_FIELD_MAP.ownerAcceptance.state) ?? "");
-  const explicitState: OwnerAcceptanceState | null =
-    stateToken === "accepted" || stateToken === "pending" || stateToken === "returned" ? stateToken : null;
-  const presentedAt = readString(source, CORE_FIELD_MAP.ownerAcceptance.presentedAt);
-  const required = readBoolean(source, CORE_FIELD_MAP.ownerAcceptance.required);
-  const routineRelease = readBoolean(source, CORE_FIELD_MAP.ownerAcceptance.routineRelease) === true;
-  if (!explicitState && !presentedAt && required == null && !routineRelease) return null;
-  const risk = normalizeToken(readString(record, CORE_FIELD_MAP.task.risk) ?? "");
-  const routineRisk = (risk === "low" || risk === "medium") && resultKind === "engineering" && required !== true;
-  const applicable = routineRelease || required === false || routineRisk ? false : Boolean(explicitState || presentedAt || required === true);
-  const state: OwnerAcceptanceState = explicitState ?? "pending";
-  const recordedAt =
-    state === "accepted"
-      ? readString(source, CORE_FIELD_MAP.ownerAcceptance.acceptedAt)
-      : state === "returned"
-        ? readString(source, CORE_FIELD_MAP.ownerAcceptance.returnedAt)
-        : null;
-  const actor = readString(source, CORE_FIELD_MAP.ownerAcceptance.actor);
-  const comment = readString(source, CORE_FIELD_MAP.ownerAcceptance.comment);
-  const returnNote = readString(source, CORE_FIELD_MAP.ownerAcceptance.returnNote);
+function acceptanceDecision(value: unknown): "accepted" | "rejected" | "none" {
+  if (typeof value === "string") {
+    const token = normalizeToken(value);
+    if (token === "accepted" || token === "rejected") return token;
+    return "none";
+  }
+  const record = asRecord(value);
+  if (!record) return "none";
+  const token = normalizeToken(readString(record, CORE_FIELD_MAP.userAcceptance.decision) ?? "");
+  if (token === "accepted" || token === "rejected") return token;
+  return "none";
+}
+
+function presentationOn(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "string") {
+    const token = normalizeToken(value);
+    return Boolean(token) && !["none", "false", "null", "0"].includes(token);
+  }
+  return asRecord(value) != null;
+}
+
+function parseOwnerAcceptance(record: Record<string, unknown>, productionVerified: boolean | null): OwnerAcceptanceFact | null {
+  const contract = "user_acceptance" in record || "presentation" in record || "result_version" in record;
+  if (!contract) return null;
+  const decision = "user_acceptance" in record ? acceptanceDecision(record.user_acceptance) : "none";
+  const presented = "presentation" in record && presentationOn(record.presentation);
+  const state: OwnerAcceptanceState = decision === "accepted" ? "accepted" : decision === "rejected" ? "rejected" : "pending";
+  const applicable = decision === "accepted" || decision === "rejected" || (presented && decision === "none");
+  const source = asRecord(record.user_acceptance);
+  const actor = source ? readString(source, CORE_FIELD_MAP.userAcceptance.actor) : null;
+  const comment = source ? readString(source, CORE_FIELD_MAP.userAcceptance.comment) : null;
+  const owner = readString(record, CORE_FIELD_MAP.task.acceptanceOwner);
   return {
     applicable,
-    state,
-    resultVersion: safeAcceptanceVersion(readString(source, CORE_FIELD_MAP.ownerAcceptance.resultVersion)),
-    resultSha: safeAcceptanceSha(readString(source, CORE_FIELD_MAP.ownerAcceptance.resultSha)),
-    presentedAt,
-    recordedAt,
+    state: applicable ? state : "pending",
+    presented,
+    resultVersion: safeResultVersion(record.result_version),
+    recordedAt: source ? readString(source, CORE_FIELD_MAP.userAcceptance.decidedAt) : null,
     actor: actor ? copySafeProse(actor) : null,
     comment: comment ? copySafeProse(comment) : null,
-    returnNote: returnNote ? copySafeProse(returnNote) : null,
+    owner: owner ? copySafeProse(owner) : null,
+    productionVerified,
   };
 }
 
@@ -1237,7 +1244,8 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
       .map((event) => parseEvent(event))
       .filter((event): event is CompanyEvent => event !== null)
       .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
-    ownerAcceptance: parseOwnerAcceptance(record, resultKind),
+    acceptanceContract: "user_acceptance" in record || "presentation" in record || "result_version" in record,
+    ownerAcceptance: parseOwnerAcceptance(record, typeof run?.productionVerified === "boolean" ? run.productionVerified : null),
   };
 }
 
@@ -1521,6 +1529,7 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     githubIssueNumber: next.githubIssueNumber ?? previous.githubIssueNumber,
     merged: next.merged ?? previous.merged,
     releaseHold: prefer(next.releaseHold, previous.releaseHold),
+    acceptanceContract: next.acceptanceContract || previous.acceptanceContract,
     ownerAcceptance: next.ownerAcceptance ?? previous.ownerAcceptance,
   };
 }
@@ -1598,6 +1607,12 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
   if (tasks.some((task) => task.eventsComplete === false) && completeness.eventsComplete == null) {
     completeness = { ...completeness, eventsComplete: false };
   }
+  const tasksPage = asRecord(readStored(record, CORE_FIELD_MAP.root.tasksPage));
+  const acceptanceViewToken = normalizeToken(tasksPage ? readString(tasksPage, ["acceptance_view"]) ?? "" : "");
+  const acceptanceView =
+    acceptanceViewToken === "current" || acceptanceViewToken === "archive" || acceptanceViewToken === "all"
+      ? acceptanceViewToken
+      : null;
   return {
     generatedAt,
     tasks,
@@ -1625,6 +1640,8 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
       grok: quotas ? parseQuotaBucket(readRaw(quotas, CORE_FIELD_MAP.quotaBucket.grok)) : null,
       legacySpend: costs,
     },
+    acceptanceContract: tasks.some((task) => task.acceptanceContract) || acceptanceView != null,
+    acceptanceView,
   };
 }
 
@@ -1659,11 +1676,15 @@ export function parseHistoryFilters(input: {
   };
 }
 
-export function companyStatusRequestPath(filters: HistoryFilters): string {
-  if (!filters.historyBefore) return "/v1/status";
+export function companyStatusRequestPath(
+  filters: HistoryFilters,
+  acceptance: "current" | "archive" | "all" = "all",
+): string {
   const params = new URLSearchParams();
-  params.set(CORE_FIELD_MAP.query.historyBefore, filters.historyBefore);
-  return `/v1/status?${params.toString()}`;
+  if (filters.historyBefore) params.set(CORE_FIELD_MAP.query.historyBefore, filters.historyBefore);
+  if (acceptance === "current" || acceptance === "archive") params.set("acceptance", acceptance);
+  const query = params.toString();
+  return query ? `/v1/status?${query}` : "/v1/status";
 }
 
 export function historyHref(filters: HistoryFilters, patch: { historyOffset?: number; historyBefore?: string }): string {
@@ -2013,13 +2034,13 @@ function formatProgress(progress: VerifiedProgress | null, dodSatisfied: boolean
 function ownerPlacement(task: CompanyTask): "review" | "archive" | "cycle" {
   const acceptance = task.ownerAcceptance;
   if (!acceptance?.applicable) return "cycle";
-  if (acceptance.state === "pending") return "review";
   if (acceptance.state === "accepted") return "archive";
+  if (acceptance.state === "pending" && acceptance.presented) return "review";
   return "cycle";
 }
 
 function taskIsClosed(task: CompanyTask, events: CompanyEvent[]): boolean {
-  if (task.ownerAcceptance?.applicable && task.ownerAcceptance.state === "returned") return false;
+  if (task.ownerAcceptance?.applicable && task.ownerAcceptance.state === "rejected") return false;
   if (isPilotTask(task) && codexReadinessBlocked(task)) return false;
   if (CANCELLED_STATUSES.has(normalizeToken(task.status))) return false;
   const panel = engineeringPanel(task, events);
@@ -2447,16 +2468,24 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   if (acceptance?.applicable && acceptance.state === "accepted") {
     const when = formatDateTime(acceptance.recordedAt);
     return {
-      label: "Принята",
+      label: "Принято",
       tone: "accepted",
-      detail: when === NO_DATA ? "Приёмка владельцем сохранена. Время приёмки не передано." : `Принята ${when} МСК.`,
+      detail: when === NO_DATA ? "Приёмка владельцем сохранена. Время приёмки не передано." : `Принято ${when} МСК.`,
     };
   }
-  if (acceptance?.applicable && acceptance.state === "pending") {
+  if (acceptance?.applicable && acceptance.state === "rejected") {
+    const note = acceptance.comment?.trim() || "Нет данных";
+    return {
+      label: "На доработке",
+      tone: "rework",
+      detail: `Замечание: ${note}`,
+    };
+  }
+  if (acceptance?.applicable && acceptance.state === "pending" && acceptance.presented) {
     return {
       label: "На проверке",
       tone: "acceptance",
-      detail: "Исполнитель предъявил результат. Приёмка владельцем не сохранена. Это не PR, не выпуск и не проверка на сайте.",
+      detail: "Результат предъявлен. Приёмка владельцем не сохранена. Проверка в рабочей системе — отдельный факт, не приёмка.",
     };
   }
   if (isPilotTask(task) && codexReadinessBlocked(task)) {
@@ -2495,10 +2524,6 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   const executedAt = executionInstant(task, events);
   const freshExecution = isFreshInstant(executedAt, snapshotIso) && (started || hasFreshExecution(task, events, snapshotIso));
   if (freshExecution) return { label: "В работе", tone: "working", detail: null };
-  if (acceptance?.applicable && acceptance.state === "returned") {
-    const note = acceptance.returnNote?.trim() || "Нет данных";
-    return { label: "В очереди", tone: "queue", detail: `На доработку. ${note}` };
-  }
   if (started || hasFreshExecution(task, events, snapshotIso)) {
     return staleStage("В работе", executedAt ?? task.startedAt);
   }
@@ -2535,14 +2560,12 @@ function acceptanceView(task: CompanyTask): OwnerAcceptanceView | null {
     applicable: fact.applicable,
     state: fact.state,
     resultVersion: fact.resultVersion ?? NO_DATA,
-    resultSha: fact.resultSha ?? NO_DATA,
-    presentedAt: formatDateTime(fact.presentedAt),
     recordedAt: formatDateTime(fact.recordedAt),
     actor: fact.actor ?? NO_DATA,
     comment: fact.comment ?? NO_DATA,
-    returnNote: fact.returnNote ?? NO_DATA,
     nextAction: task.nextStep ?? NO_DATA,
-    decisionOwner: ownerLabel(task.decisionOwner) ?? (task.decisionOwner ? copySafeProse(task.decisionOwner) : NO_DATA),
+    owner: fact.owner ?? NO_DATA,
+    productionVerified: fact.productionVerified == null ? NO_DATA : fact.productionVerified ? "да" : "нет",
   };
 }
 
