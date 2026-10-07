@@ -28,6 +28,7 @@ import {
   presentRollingListeningPair,
   readListeningWindow,
   readListeningWindowsPayload,
+  listeningTimeWindowRpcArgs,
   rollingListeningBounds,
 } from "../src/lib/admin/format-listening-time";
 import {
@@ -808,6 +809,28 @@ function testFormatting() {
   const yesterday = resolveAdminAnalyticsPeriodRange("yesterday", now);
   assert.notEqual(yesterday.to, now.toISOString());
   assert.equal(rollingListeningBounds(yesterday.to ?? "").end, yesterday.to);
+  const calendarWeek = resolveAdminAnalyticsPeriodRange("7d", now);
+  assert.notEqual(
+    Date.parse(calendarWeek.to ?? "") - Date.parse(calendarWeek.from ?? ""),
+    7 * 86_400_000,
+  );
+  const rollingWeek = listeningTimeWindowRpcArgs(
+    rollingListeningBounds(now.toISOString()).weekFrom,
+    now.toISOString(),
+    {
+      p_include_test: false,
+      p_author_id: "a1111111-1111-4111-8111-111111111111",
+      p_practice_id: "c3333333-3333-4333-8333-333333333333",
+      p_utm_source: "telegram",
+      p_device_type: "mobile",
+    },
+  );
+  assert.equal(
+    Date.parse(rollingWeek.p_to) - Date.parse(rollingWeek.p_from),
+    7 * 86_400_000,
+  );
+  assert.equal(rollingWeek.p_author_id, "a1111111-1111-4111-8111-111111111111");
+  assert.equal(rollingWeek.p_utm_source, "telegram");
 
   const filters = listeningWindowRpcArgs("2026-10-07T11:16:00.000Z", {
     p_include_test: false,
@@ -917,8 +940,8 @@ function testSourceContracts() {
   assert.doesNotMatch(queries, /presentListeningTime\(\s*[^,]+,\s*overviewBase\.listeners/);
   assert.match(queries, /admin_analytics_listening_time/);
   assert.match(queries, /admin_analytics_listening_time_timeseries/);
-  assert.match(queries, /admin_analytics_listening_time_windows/);
-  assert.match(queries, /listeningWindowRpcArgs\(listeningBounds\.end, listeningFilters\)/);
+  assert.match(queries, /listeningTimeWindowRpcArgs\(/);
+  assert.match(queries, /Средние сейчас недоступны/);
   const bundleStart = queries.indexOf("export async function getAdminAnalyticsSummaryBundle");
   const bundle = queries.slice(
     bundleStart,
@@ -927,12 +950,21 @@ function testSourceContracts() {
   const selectedPeriodCalls = bundle.match(
     /service\.rpc\(\s*"admin_analytics_listening_time",/g,
   );
-  assert.equal(selectedPeriodCalls?.length, 1);
+  assert.equal(selectedPeriodCalls?.length, 5);
   assert.equal(
     (bundle.match(/admin_analytics_listening_time_windows/g) ?? []).length,
-    1,
+    0,
   );
-  assert.doesNotMatch(bundle, /weekPrevFrom|monthPrevFrom/);
+  assert.match(bundle, /weekPrevFrom/);
+  assert.match(bundle, /monthPrevFrom/);
+  const keepSum = read(
+    "supabase/migrations/20261223120000_admin_listening_time_keep_sum.sql",
+  );
+  assert.match(keepSum, /interval '7 days'/);
+  assert.match(keepSum, /interval '30 days'/);
+  assert.match(keepSum, /query_canceled/);
+  assert.doesNotMatch(keepSum, /CREATE INDEX|DROP TABLE|TRUNCATE|DELETE FROM/i);
+  assert.doesNotMatch(keepSum, /GRANT EXECUTE/);
   const windowsMigration = read(
     "supabase/migrations/20261222120000_admin_listening_time_windows.sql",
   );

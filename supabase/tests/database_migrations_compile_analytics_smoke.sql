@@ -597,6 +597,41 @@ BEGIN
     RAISE EXCEPTION 'filtered listening windows wrong: %', v_payload;
   END IF;
 
+  -- Exact 7/30-day rolling cards skip denominators. A calendar-length window does not.
+  SELECT public.admin_analytics_listening_time(
+    v_end - interval '7 days', v_end, false, NULL, v_practice, NULL, NULL
+  )
+  INTO v_payload;
+  IF (v_payload ->> 'listened_ms')::bigint <> 263580000
+    OR (v_payload ->> 'partial')::boolean
+    OR (v_payload ->> 'unmeasured')::boolean
+    OR v_payload -> 'measured_listeners' IS DISTINCT FROM 'null'::jsonb
+    OR v_payload -> 'measured_play_starts' IS DISTINCT FROM 'null'::jsonb
+  THEN
+    RAISE EXCEPTION 'exact 7-day total called denominators: %', v_payload;
+  END IF;
+
+  SELECT public.admin_analytics_listening_time(
+    v_end - interval '30 days', v_end, false, NULL, v_practice, NULL, NULL
+  )
+  INTO v_payload;
+  IF (v_payload ->> 'listened_ms')::bigint <> 263585000
+    OR v_payload -> 'measured_listeners' IS DISTINCT FROM 'null'::jsonb
+  THEN
+    RAISE EXCEPTION 'exact 30-day total called denominators: %', v_payload;
+  END IF;
+
+  SELECT public.admin_analytics_listening_time(
+    v_end - interval '7 days' - interval '1 minute', v_end, false, NULL, v_practice, NULL, NULL
+  )
+  INTO v_payload;
+  IF (v_payload ->> 'listened_ms')::bigint <> 263580000
+    OR (v_payload ->> 'measured_listeners')::integer IS DISTINCT FROM 0
+    OR (v_payload ->> 'measured_play_starts')::integer IS DISTINCT FROM 0
+  THEN
+    RAISE EXCEPTION 'calendar-length window dropped denominators: %', v_payload;
+  END IF;
+
   UPDATE public.playback_usage_settings
   SET listening_time_valid_from = v_end - interval '20 days'
   WHERE singleton;
