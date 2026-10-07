@@ -1,8 +1,10 @@
 import "server-only";
 
-import { resolvePublishedListedProductById } from "@/lib/mini-app/published-product-target";
+import { resolvePublishedDirectLinkProductById } from "@/lib/mini-app/published-product-target";
 import { parseMaxStartPayload, type MaxResolvedStartTarget } from "@/lib/max/startapp";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+export { setPublishedDirectLinkLookupForTests } from "@/lib/mini-app/published-product-target";
 
 type RelationSlug = { slug?: string | null } | Array<{ slug?: string | null }> | null;
 
@@ -19,7 +21,7 @@ export async function resolveMaxStartTarget(
   if (!parsed) return null;
 
   if (parsed.kind === "product") {
-    const found = await resolvePublishedListedProductById(parsed.practiceId);
+    const found = await resolvePublishedDirectLinkProductById(parsed.practiceId);
     if (!found.ok || !found.target) return null;
     return {
       kind: "product",

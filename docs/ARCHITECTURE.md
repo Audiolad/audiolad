@@ -310,6 +310,14 @@ Timeweb Cloud
 
 Поздние этапы (регистрация внутри MAX, библиотека) **не реализованы**.
 
+Точный product deep link `startapp=p_<uuid без дефисов>` после HMAC открывает
+опубликованный публично доступный продукт с прямой ссылкой: `listed` и
+`unlisted` (`isDirectLinkPublicVisibility` в
+`resolvePublishedDirectLinkProductById`). `selected_users`, черновики,
+снятые с публикации, удалённые и ещё не наступившее расписание не
+открываются. Обычный каталог по-прежнему не показывает unlisted. Формат
+payload не меняется. VK launch остаётся catalog-listed.
+
 ### Связь идентификаторов
 
 ```
