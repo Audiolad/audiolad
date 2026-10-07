@@ -226,6 +226,7 @@ function applyMigrations() {
   psqlFile(TEST_DB, migration("20261006120200_analytics_nullable_visitor_identity.sql"));
   psqlFile(TEST_DB, migration("20261006120400_analytics_owner_overview.sql"));
   psqlFile(TEST_DB, migration("20261209120000_owner_overview_sequential_completion.sql"));
+  psqlFile(TEST_DB, migration("20261221120000_admin_overview_analytics_timeout.sql"));
 }
 
 /**
@@ -465,6 +466,31 @@ WHERE occurred_at IN (
   '2026-07-23 10:02:00+00', '2026-07-23 11:00:00+00', '2026-07-23 12:00:00+00'
 );
 DELETE FROM public.author_members WHERE author_id = '${AUTHOR_ONE}' AND user_id = '${USER_HUMAN_ONE}';
+`);
+  const beforeLink = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  psql(TEST_DB, `
+INSERT INTO public.analytics_sessions(
+  id, anonymous_id, started_at, last_seen_at, device_type, is_staff, is_test, is_bot, traffic_class
+) VALUES
+  ('f1111111-1111-1111-1111-111111111111','p2-linked-past','2026-06-01 10:00:00+00','2026-06-01 10:00:00+00','desktop',false,false,false,'human'),
+  ('f2222222-2222-2222-2222-222222222222','p2-anon-return','2026-06-02 10:00:00+00','2026-07-22 10:00:00+00','desktop',false,false,false,'human');
+INSERT INTO public.analytics_identity_links(anonymous_id, user_id, linked_at, source)
+VALUES ('p2-linked-past','${USER_HUMAN_TWO}','2026-05-01 00:00:00+00','login');
+INSERT INTO public.analytics_events(
+  session_id, anonymous_session_id, user_id, event_name, practice_id, occurred_at, is_staff, is_test, is_bot, traffic_class
+) VALUES
+  ('f1111111-1111-1111-1111-111111111111','p2-linked-past',NULL,'audio_play_started','${PRACTICE_THREE}','2026-06-01 10:05:00+00',false,false,false,'human'),
+  ('f2222222-2222-2222-2222-222222222222','p2-anon-return',NULL,'audio_play_started','${PRACTICE_THREE}','2026-06-02 10:05:00+00',false,false,false,'human'),
+  ('f2222222-2222-2222-2222-222222222222','p2-anon-return',NULL,'audio_play_started','${PRACTICE_THREE}','2026-07-22 16:00:00+00',false,false,false,'human');
+`);
+  const afterLink = json(`SELECT public.analytics_owner_overview('${FROM}','${TO}',false,NULL,NULL,NULL,NULL)::text;`);
+  assertEqual(afterLink.listeners, beforeLink.listeners + 1, "anonymous in-window start adds one listener");
+  assertEqual(afterLink.returning_listeners, beforeLink.returning_listeners + 2, "linked history and anonymous history are returning");
+  assertEqual(afterLink.new_listeners, beforeLink.new_listeners - 1, "linked pre-period start moves that listener out of new");
+  psql(TEST_DB, `
+DELETE FROM public.analytics_events WHERE anonymous_session_id IN ('p2-linked-past','p2-anon-return');
+DELETE FROM public.analytics_identity_links WHERE anonymous_id = 'p2-linked-past';
+DELETE FROM public.analytics_sessions WHERE anonymous_id IN ('p2-linked-past','p2-anon-return');
 `);
 }
 
