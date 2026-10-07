@@ -33,7 +33,9 @@ import {
 } from "@/lib/music-passport/album-passport-display";
 import {
   buildJazzRelaxPassportView,
+  JAZZ_RELAX_PASSPORT_ENQUEUE_MAX_REQUESTS,
   jazzRelaxTrackEnqueueKind,
+  resolveJazzRelaxAlbumLaunch,
   selectJazzRelaxPassportEnqueue,
   type JazzRelaxPassportTrackView,
   type JazzRelaxPassportView,
@@ -670,6 +672,84 @@ async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
   });
 }
 
+const albumContinuations = new Map<string, Promise<void>>();
+const albumContinuationGate = new Set<string>();
+
+export function jazzRelaxAlbumContinuationInFlight(practiceId: string): boolean {
+  return albumContinuations.has(practiceId);
+}
+
+function presentPassportView(
+  practiceId: string,
+  view: JazzRelaxPassportView,
+): JazzRelaxPassportView {
+  const launch = resolveJazzRelaxAlbumLaunch({
+    tracks: view.tracks,
+    launchInFlight: jazzRelaxAlbumContinuationInFlight(practiceId),
+  });
+  return {
+    ...view,
+    albumLaunch: launch.albumLaunch,
+    launchInFlight: launch.launchInFlight,
+  };
+}
+
+/**
+ * After the request that accepts an album command returns, this process keeps
+ * copying the remaining masters into the existing analyzer queue. The browser
+ * is not the cursor. A second call for the same practice joins the same job.
+ * Already queued and succeeded runs are skipped by the one-track step.
+ */
+function ensureJazzRelaxAlbumContinuation(input: {
+  practiceId: string;
+  authorId: string | null | undefined;
+  productKind: string | null | undefined;
+  userId: string;
+  action: "start" | "reanalyze";
+  enqueueAfterAudioItemId: string;
+}): void {
+  if (albumContinuations.has(input.practiceId)) return;
+  const job = driveJazzRelaxAlbumContinuation(input).finally(() => {
+    if (albumContinuations.get(input.practiceId) === job) {
+      albumContinuations.delete(input.practiceId);
+    }
+  });
+  albumContinuations.set(input.practiceId, job);
+}
+
+async function driveJazzRelaxAlbumContinuation(input: {
+  practiceId: string;
+  authorId: string | null | undefined;
+  productKind: string | null | undefined;
+  userId: string;
+  action: "start" | "reanalyze";
+  enqueueAfterAudioItemId: string;
+}): Promise<void> {
+  let cursor: string | null = input.enqueueAfterAudioItemId;
+  try {
+    for (let step = 0; step < JAZZ_RELAX_PASSPORT_ENQUEUE_MAX_REQUESTS; step += 1) {
+      const view = await runJazzRelaxPassportAction({
+        ...input,
+        internalStep: true,
+        enqueueAfterAudioItemId: cursor,
+      });
+      if (!view.enqueueDeferred) return;
+      if (!view.enqueueCursor || view.enqueueCursor === cursor) return;
+      cursor = view.enqueueCursor;
+    }
+  } catch (error) {
+    const code = error instanceof JazzRelaxPassportError ? error.code : "failed";
+    console.error("jazz_relax_album_continuation_failed", code);
+  } finally {
+    try {
+      await syncPassports(input.practiceId);
+    } catch (error) {
+      const code = error instanceof JazzRelaxPassportError ? error.code : "failed";
+      console.error("jazz_relax_album_continuation_sync_failed", code);
+    }
+  }
+}
+
 export async function getJazzRelaxPassportStatus(input: {
   practiceId: string;
   authorId: string | null | undefined;
@@ -677,7 +757,7 @@ export async function getJazzRelaxPassportStatus(input: {
 }): Promise<JazzRelaxPassportView> {
   assertJazzRelaxMusicPassport(input);
   await syncPassports(input.practiceId);
-  return viewFor(input.practiceId);
+  return presentPassportView(input.practiceId, await viewFor(input.practiceId));
 }
 
 export async function runJazzRelaxPassportAction(input: {
@@ -688,8 +768,26 @@ export async function runJazzRelaxPassportAction(input: {
   action: "start" | "retry" | "reanalyze";
   audioItemId?: string | null;
   enqueueAfterAudioItemId?: string | null;
+  /** Server-side album continuation. The HTTP handler must not set this. */
+  internalStep?: boolean;
 }): Promise<JazzRelaxPassportView> {
   assertJazzRelaxMusicPassport(input);
+  const albumWide = !input.internalStep
+    && !input.audioItemId
+    && (input.action === "start" || input.action === "reanalyze");
+  if (
+    albumWide
+    && (
+      jazzRelaxAlbumContinuationInFlight(input.practiceId)
+      || albumContinuationGate.has(input.practiceId)
+    )
+  ) {
+    await syncPassports(input.practiceId);
+    const current = presentPassportView(input.practiceId, await viewFor(input.practiceId));
+    return { ...current, enqueueDeferred: false, enqueueCursor: null };
+  }
+  if (albumWide) albumContinuationGate.add(input.practiceId);
+  try {
   await syncPassports(input.practiceId);
   const tracks = await loadTracks(input.practiceId);
   const prepare = await loadPrepareState(tracks);
@@ -838,11 +936,33 @@ export async function runJazzRelaxPassportAction(input: {
 
   await syncPassports(input.practiceId);
   const view = await viewFor(input.practiceId);
-  return {
+  if (
+    albumWide
+    && batch.deferred
+    && batch.cursor
+    && (input.action === "start" || input.action === "reanalyze")
+  ) {
+    ensureJazzRelaxAlbumContinuation({
+      practiceId: input.practiceId,
+      authorId: input.authorId,
+      productKind: input.productKind,
+      userId: input.userId,
+      action: input.action,
+      enqueueAfterAudioItemId: batch.cursor,
+    });
+  }
+  const presented = presentPassportView(input.practiceId, {
     ...view,
     enqueueDeferred: batch.deferred,
     enqueueCursor: batch.cursor,
-  };
+  });
+  if (albumWide) {
+    return { ...presented, enqueueDeferred: false, enqueueCursor: null };
+  }
+  return presented;
+  } finally {
+    if (albumWide) albumContinuationGate.delete(input.practiceId);
+  }
 }
 
 export async function jazzRelaxAlbumFactsForDescription(input: {

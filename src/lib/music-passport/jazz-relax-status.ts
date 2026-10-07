@@ -43,6 +43,15 @@ export type JazzRelaxPassportView = {
   enqueueDeferred: boolean;
   /** Last master handled by this response. The next request resumes after it. */
   enqueueCursor: string | null;
+  /**
+   * idle — no accepted album command in progress.
+   * preparing — the server has not yet queued every eligible track.
+   * durable — every eligible track has a run row; the existing analyzer worker
+   * owns whatever is still queued or processing.
+   */
+  albumLaunch: "idle" | "preparing" | "durable";
+  /** True only while this server process is still copying masters into the queue. */
+  launchInFlight: boolean;
 };
 
 /**
@@ -127,6 +136,236 @@ export function jazzRelaxProgressLabel(readyCount: number, totalCount: number): 
   return `Музыкальный паспорт: ${readyCount} из ${totalCount} треков готовы`;
 }
 
+export const JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL = "Создаём музыкальный паспорт…";
+export const JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL = "Сохранить и создать музыкальный паспорт";
+export const JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL = "Перейти к оформлению";
+
+export type JazzRelaxPassportActivityKind =
+  | "saving"
+  | "enqueueing"
+  | "queued"
+  | "analyzing"
+  | "completed"
+  | "partial"
+  | "failed"
+  | "stale"
+  | "idle";
+
+/** What the wizard may claim about the passport action. Counts are facts only. */
+export type JazzRelaxPassportActivity = {
+  kind: JazzRelaxPassportActivityKind;
+  headline: string;
+  /** Ready-track sentence. Null until that count is a fact worth showing. */
+  readyLabel: string | null;
+  /** Determinate bar of finished tracks. Null while the share is unknown. */
+  progress: { ready: number; total: number } | null;
+  indeterminate: boolean;
+  buttonLabel: string;
+  buttonDisabled: boolean;
+  ariaBusy: boolean;
+  /** Extra fact that is not the headline. Poll failure lives in the headline. */
+  statusNotice: string | null;
+  /** Set only when the whole album command is already in the durable analyzer queue. */
+  closeHint: string | null;
+};
+
+export function jazzRelaxReadyTrackLabel(readyCount: number, totalCount: number): string {
+  return `Готово ${readyCount} из ${totalCount} треков`;
+}
+
+function startButton(): Pick<
+  JazzRelaxPassportActivity,
+  "buttonLabel" | "buttonDisabled" | "ariaBusy"
+> {
+  return {
+    buttonLabel: JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL,
+    buttonDisabled: false,
+    ariaBusy: false,
+  };
+}
+
+function creatingButton(): Pick<
+  JazzRelaxPassportActivity,
+  "buttonLabel" | "buttonDisabled" | "ariaBusy"
+> {
+  return {
+    buttonLabel: JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL,
+    buttonDisabled: true,
+    ariaBusy: true,
+  };
+}
+
+/**
+ * Visible stages for the Jazz Relax step-2 action.
+ * A spinner is allowed only while this client knows the stage from a fresh
+ * fact: the click itself, the enqueue loop, or a successful status read.
+ * A failed poll is stale, not proof that analysis is still running.
+ */
+export function describeJazzRelaxPassportActivity(input: {
+  saving: boolean;
+  enqueueing: boolean;
+  status: Pick<
+    JazzRelaxPassportView,
+    "phase" | "readyCount" | "totalCount" | "tracks" | "albumLaunch" | "launchInFlight"
+  > | null;
+  pollFailed: boolean;
+}): JazzRelaxPassportActivity {
+  const quiet = { statusNotice: null, closeHint: null };
+  if (input.saving) {
+    return {
+      kind: "saving",
+      headline: "Сохраняем…",
+      readyLabel: null,
+      progress: null,
+      indeterminate: true,
+      ...quiet,
+      ...creatingButton(),
+    };
+  }
+
+  if (input.pollFailed) {
+    const known = input.status && input.status.totalCount > 0
+      ? `Последние данные: готово ${input.status.readyCount} из ${input.status.totalCount} треков`
+      : null;
+    return {
+      kind: "stale",
+      headline: "Не удаётся обновить статус",
+      readyLabel: known,
+      progress: null,
+      indeterminate: false,
+      statusNotice: null,
+      closeHint: null,
+      ...startButton(),
+    };
+  }
+
+  const preparing = input.enqueueing || input.status?.albumLaunch === "preparing";
+  if (preparing) {
+    const busy = input.enqueueing || input.status?.launchInFlight === true;
+    const progress = input.status && input.status.readyCount > 0 && input.status.totalCount > 0
+      ? { ready: input.status.readyCount, total: input.status.totalCount }
+      : null;
+    return {
+      kind: "enqueueing",
+      headline: JAZZ_RELAX_PASSPORT_PREPARING_LABEL,
+      readyLabel: progress ? jazzRelaxReadyTrackLabel(progress.ready, progress.total) : null,
+      progress,
+      indeterminate: busy && progress === null,
+      ...quiet,
+      ...(busy ? creatingButton() : startButton()),
+    };
+  }
+
+  const status = input.status;
+  if (!status) {
+    return {
+      kind: "idle",
+      headline: "",
+      readyLabel: null,
+      progress: null,
+      indeterminate: false,
+      statusNotice: null,
+      closeHint: null,
+      ...startButton(),
+    };
+  }
+
+  if (status.phase === "completed") {
+    const progress = status.totalCount > 0
+      ? { ready: status.readyCount, total: status.totalCount }
+      : null;
+    return {
+      kind: "completed",
+      headline: "",
+      readyLabel: progress ? jazzRelaxReadyTrackLabel(progress.ready, progress.total) : null,
+      progress,
+      indeterminate: false,
+      statusNotice: null,
+      closeHint: null,
+      buttonLabel: JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL,
+      buttonDisabled: false,
+      ariaBusy: false,
+    };
+  }
+
+  if (status.phase === "running") {
+    const processing = status.tracks.some((track) => track.state === "processing");
+    const queued = status.tracks.some((track) => track.state === "queued");
+    const confirmedAnalysis = processing || status.readyCount > 0;
+    if (!confirmedAnalysis) {
+      const durable = status.albumLaunch === "durable";
+      return {
+        kind: "queued",
+        headline: durable ? "Музыкальный паспорт готовится" : "Треки в очереди",
+        readyLabel: null,
+        progress: null,
+        indeterminate: !durable,
+        statusNotice: durable ? "В очереди" : null,
+        closeHint: durable ? JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT : null,
+        ...creatingButton(),
+      };
+    }
+    const progress = status.totalCount > 0
+      ? { ready: status.readyCount, total: status.totalCount }
+      : null;
+    let statusNotice: string | null = null;
+    if (processing) statusNotice = "Анализируем";
+    else if (queued) statusNotice = "В очереди";
+    const durable = status.albumLaunch === "durable";
+    return {
+      kind: "analyzing",
+      headline: "Музыкальный паспорт готовится",
+      readyLabel: progress ? jazzRelaxReadyTrackLabel(progress.ready, progress.total) : null,
+      progress,
+      indeterminate: progress === null,
+      statusNotice,
+      closeHint: durable ? JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT : null,
+      ...creatingButton(),
+    };
+  }
+
+  if (status.phase === "partial") {
+    const progress = status.totalCount > 0
+      ? { ready: status.readyCount, total: status.totalCount }
+      : null;
+    return {
+      kind: "partial",
+      headline: "Музыкальный паспорт готов частично",
+      readyLabel: progress ? jazzRelaxReadyTrackLabel(progress.ready, progress.total) : null,
+      progress,
+      indeterminate: false,
+      statusNotice: null,
+      closeHint: null,
+      ...startButton(),
+    };
+  }
+
+  if (status.phase === "failed") {
+    return {
+      kind: "failed",
+      headline: "Не удалось создать музыкальный паспорт",
+      readyLabel: status.totalCount > 0
+        ? jazzRelaxReadyTrackLabel(status.readyCount, status.totalCount)
+        : null,
+      progress: null,
+      indeterminate: false,
+      statusNotice: null,
+      closeHint: null,
+      ...startButton(),
+    };
+  }
+
+  return {
+    kind: "idle",
+    headline: "",
+    readyLabel: null,
+    progress: null,
+    indeterminate: false,
+    statusNotice: null,
+    ...startButton(),
+  };
+}
+
 export function buildJazzRelaxPassportView(input: {
   tracks: JazzRelaxPassportTrackView[];
   completedAlbumPassportVersionId: string | null;
@@ -163,5 +402,43 @@ export function buildJazzRelaxPassportView(input: {
     progressLabel: jazzRelaxProgressLabel(readyCount, totalCount),
     enqueueDeferred: false,
     enqueueCursor: null,
+    albumLaunch: "idle",
+    launchInFlight: false,
   };
+}
+
+export const JAZZ_RELAX_PASSPORT_PREPARING_LABEL = "Подготавливаем запуск…";
+
+/** Shown only after every eligible track is already in the durable analyzer queue. */
+export const JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT =
+  "Музыкальный паспорт формируется на сервере. Можно закрыть страницу и вернуться позже — процесс продолжится";
+
+export function resolveJazzRelaxAlbumLaunch(input: {
+  tracks: readonly Pick<JazzRelaxPassportTrackView, "state" | "errorCode">[];
+  launchInFlight: boolean;
+}): { albumLaunch: JazzRelaxPassportView["albumLaunch"]; launchInFlight: boolean } {
+  const launchInFlight = input.launchInFlight;
+  const blocked = input.tracks.some((track) => (
+    track.state === "missing_audio"
+    || (track.state === "not_ready" && track.errorCode !== "not_started")
+  ));
+  const notStarted = input.tracks.some((track) => (
+    track.state === "not_ready" && track.errorCode === "not_started"
+  ));
+  const accepted = input.tracks.some((track) => (
+    track.state === "queued"
+    || track.state === "processing"
+    || track.state === "ready"
+    || track.state === "failed"
+  ));
+  const running = input.tracks.some((track) => (
+    track.state === "queued" || track.state === "processing"
+  ));
+  if (launchInFlight || (notStarted && accepted) || (blocked && accepted)) {
+    return { albumLaunch: "preparing", launchInFlight };
+  }
+  if (!blocked && !notStarted && running && input.tracks.length > 0) {
+    return { albumLaunch: "durable", launchInFlight: false };
+  }
+  return { albumLaunch: "idle", launchInFlight: false };
 }

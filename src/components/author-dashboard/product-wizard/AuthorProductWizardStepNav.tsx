@@ -6,6 +6,9 @@ type AuthorProductWizardStepNavProps = {
   busy: boolean;
   canSave: boolean;
   continueLabel?: string;
+  /** Jazz Relax passport action only. Save and the secondary continue stay on `busy`. */
+  continueDisabled?: boolean;
+  continueBusy?: boolean;
   /** Jazz Relax preview only. Other authors omit this and keep one continue button. */
   secondaryContinueLabel?: string;
   onBack: () => void;
@@ -20,6 +23,8 @@ export default function AuthorProductWizardStepNav({
   busy,
   canSave,
   continueLabel = "Сохранить и продолжить",
+  continueDisabled = false,
+  continueBusy = false,
   secondaryContinueLabel,
   onBack,
   onSave,
@@ -49,7 +54,8 @@ export default function AuthorProductWizardStepNav({
       {showContinue ? (
         <button
           type="button"
-          disabled={busy || !canSave}
+          disabled={busy || !canSave || continueDisabled}
+          aria-busy={continueBusy ? true : undefined}
           onClick={onSaveAndContinue}
           className="rounded-[22px] bg-[#7042c5] px-5 py-4 font-semibold text-white disabled:opacity-60"
         >
