@@ -11,11 +11,13 @@ import {
 
 import type { AudioItemRow } from "@/lib/author-products/types";
 import {
+  PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
   PRODUCT_VIDEO_ORIENTATIONS,
   PRODUCT_VIDEO_ORIENTATION_META,
   isProductVideoExportAuthorSlug,
   type ProductVideoOrientation,
 } from "@/lib/product-video-export/contract";
+import { productVideoRenderStatusView } from "@/lib/product-video-export/progress";
 
 type VideoAudioItem = Pick<
   AudioItemRow,
@@ -38,6 +40,7 @@ type RenderState = {
   status: "queued" | "processing" | "completed" | "failed" | "superseded";
   stale: boolean;
   error_message_safe: string | null;
+  progress_percent: number | null;
 };
 
 type Props = {
@@ -59,14 +62,61 @@ function key(audioId: string, orientation: ProductVideoOrientation) {
   return `${audioId}:${orientation}`;
 }
 
-function renderStatusLabel(state: RenderState | null): string {
-  if (!state) return "Не создано";
-  if (state.stale) return "Нужно пересоздать";
-  if (state.status === "queued") return "В очереди";
-  if (state.status === "processing") return "Создаётся…";
-  if (state.status === "completed") return "Готово";
-  if (state.status === "failed") return "Ошибка";
-  return "Нужно пересоздать";
+function readProgressPercent(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export function ProductVideoJobStatus({ state }: { state: RenderState | null }) {
+  if (!state) {
+    return <p className="mt-2 text-sm text-[#7d70a2]">Не создано</p>;
+  }
+  const view = productVideoRenderStatusView({
+    status: state.status,
+    stale: state.stale,
+    progressPercent: state.progress_percent,
+  });
+  const prominent =
+    !state.stale &&
+    (state.status === "queued" ||
+      state.status === "processing" ||
+      state.status === "completed" ||
+      state.status === "failed");
+  const tone =
+    state.status === "failed" && !state.stale
+      ? "text-base font-semibold text-[#9b3d3d]"
+      : prominent
+        ? "text-base font-semibold text-[#3f3560]"
+        : "text-sm font-medium text-[#3f3560]";
+  return (
+    <div className="mt-2">
+      <p className={tone} role="status" aria-live="polite">
+        {view.label}
+        {view.percent != null ? (
+          <span className="ml-2 tabular-nums">{view.percent}%</span>
+        ) : null}
+      </p>
+      {view.showBar && view.percent != null ? (
+        <div
+          className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#efe8f8]"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={view.percent}
+          aria-valuetext={`${view.percent}%`}
+          aria-label={view.label}
+        >
+          <div
+            className={`h-full rounded-full bg-[#7042c5] ${
+              view.animate
+                ? "motion-safe:transition-[width] motion-safe:duration-700 motion-safe:ease-out motion-reduce:transition-none"
+                : ""
+            }`}
+            style={{ width: `${view.percent}%` }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function AuthorProductVideoExport({
@@ -138,10 +188,13 @@ export default function AuthorProductVideoExport({
     );
   }, [enabled, resolvedPracticeId]);
 
-  const loadRenderStates = useCallback(async () => {
+  const loadRenderStates = useCallback(async (onlyAudioIds?: readonly string[]) => {
     if (!enabled || !resolvedPracticeId) return;
+    const items = onlyAudioIds
+      ? playableItems.filter((item) => onlyAudioIds.includes(item.id))
+      : playableItems;
     await Promise.all(
-      playableItems.map(async (item) => {
+      items.map(async (item) => {
         try {
           const response = await fetch(
             `/api/author/products/${resolvedPracticeId}/video/${item.id}`,
@@ -154,8 +207,13 @@ export default function AuthorProductVideoExport({
           setRenders((current) => {
             const next = { ...current };
             for (const orientation of PRODUCT_VIDEO_ORIENTATIONS) {
-              next[key(item.id, orientation)] =
-                payload.states?.[orientation] ?? null;
+              const incoming = payload.states?.[orientation] ?? null;
+              next[key(item.id, orientation)] = incoming
+                ? {
+                    ...incoming,
+                    progress_percent: readProgressPercent(incoming.progress_percent),
+                  }
+                : null;
             }
             return next;
           });
@@ -174,16 +232,32 @@ export default function AuthorProductVideoExport({
     void loadRenderStates();
   }, [loadRenderStates]);
 
-  const hasActiveRender = Object.values(renders).some(
-    (state) =>
-      state && !state.stale && (state.status === "queued" || state.status === "processing"),
-  );
+  const activeAudioIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const item of playableItems) {
+      const active = PRODUCT_VIDEO_ORIENTATIONS.some((orientation) => {
+        const state = renders[key(item.id, orientation)];
+        return (
+          state &&
+          !state.stale &&
+          (state.status === "queued" || state.status === "processing")
+        );
+      });
+      if (active) ids.push(item.id);
+    }
+    return ids;
+  }, [playableItems, renders]);
+  const activeAudioIdsRef = useRef(activeAudioIds);
+  activeAudioIdsRef.current = activeAudioIds;
+  const hasActiveRender = activeAudioIds.length > 0;
 
   useEffect(() => {
     if (!hasActiveRender) return;
     const timer = window.setInterval(() => {
-      void loadRenderStates();
-    }, 5_000);
+      const ids = activeAudioIdsRef.current;
+      if (ids.length === 0) return;
+      void loadRenderStates(ids);
+    }, PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS);
     return () => window.clearInterval(timer);
   }, [hasActiveRender, loadRenderStates]);
 
@@ -328,7 +402,11 @@ export default function AuthorProductVideoExport({
       }
       setRenders((current) => ({
         ...current,
-        [renderKey]: { ...payload.job!, stale: false },
+        [renderKey]: {
+          ...payload.job!,
+          stale: false,
+          progress_percent: readProgressPercent(payload.job?.progress_percent),
+        },
       }));
     } catch (error) {
       setRenderErrors((current) => ({
@@ -483,19 +561,19 @@ export default function AuthorProductVideoExport({
                       !active &&
                       !renderBusy[renderKey] &&
                       !disabled;
+                    const recreate =
+                      currentReady ||
+                      Boolean(state?.stale) ||
+                      state?.status === "failed";
                     return (
                       <div
                         key={orientation}
                         className="rounded-[16px] border border-[#eee6f7] p-3"
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-medium text-[#3f3560]">
-                            {meta.ratioLabel}
-                          </span>
-                          <span className="text-xs text-[#7d70a2]">
-                            {renderStatusLabel(state)}
-                          </span>
-                        </div>
+                        <p className="text-sm font-medium text-[#3f3560]">
+                          {meta.ratioLabel}
+                        </p>
+                        <ProductVideoJobStatus state={state} />
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
                             type="button"
@@ -505,7 +583,7 @@ export default function AuthorProductVideoExport({
                           >
                             {renderBusy[renderKey]
                               ? "Ставим в очередь…"
-                              : currentReady || state?.stale
+                              : recreate
                                 ? "Создать заново"
                                 : meta.buttonLabel}
                           </button>
@@ -523,10 +601,10 @@ export default function AuthorProductVideoExport({
                             Сначала загрузите видеообложку {meta.ratioLabel}.
                           </p>
                         ) : null}
-                        {state?.status === "failed" &&
-                        state.error_message_safe ? (
-                          <p className="mt-2 text-xs text-[#9b3d3d]">
-                            {state.error_message_safe}
+                        {state?.status === "failed" && !state.stale ? (
+                          <p className="mt-2 text-sm text-[#9b3d3d]" role="alert">
+                            {state.error_message_safe ||
+                              "Не удалось создать видео. Попробуйте ещё раз."}
                           </p>
                         ) : null}
                         {renderErrors[renderKey] ? (

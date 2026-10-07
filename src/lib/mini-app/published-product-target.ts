@@ -1,6 +1,10 @@
 import "server-only";
 
-import { applyPracticePublicAvailabilityFilter } from "@/lib/products/scheduled-publication";
+import { isDirectLinkPublicVisibility } from "@/lib/products/catalog-visibility";
+import {
+  applyPracticePublicAvailabilityFilter,
+  isPracticePubliclyAvailable,
+} from "@/lib/products/scheduled-publication";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type PublishedProductTarget = {
@@ -47,6 +51,63 @@ function readTarget(data: {
   return { authorSlug, productSlug };
 }
 
+type PublishedDirectLinkRow = {
+  slug?: string | null;
+  authors?: RelationSlug;
+  status?: string | null;
+  deleted_at?: string | null;
+  is_catalog_listed?: boolean | null;
+  catalog_visibility?: string | null;
+  scheduled_publish_at?: string | null;
+  published_at?: string | null;
+};
+
+/**
+ * Exact direct-link target. Listed and unlisted published products open.
+ * selected_users, drafts, deleted rows, and future schedules stay closed.
+ * Visibility uses isDirectLinkPublicVisibility — the same rule as the public PDP.
+ */
+export function readPublishedDirectLinkTarget(
+  data: PublishedDirectLinkRow | null,
+  now?: Date,
+): PublishedProductTarget | null {
+  if (!data || data.deleted_at) return null;
+  if (
+    !isPracticePubliclyAvailable({
+      status: data.status,
+      scheduledPublishAt: data.scheduled_publish_at,
+      publishedAt: data.published_at,
+      now,
+    })
+  ) {
+    return null;
+  }
+  if (
+    !isDirectLinkPublicVisibility(
+      data.catalog_visibility,
+      data.is_catalog_listed,
+    )
+  ) {
+    return null;
+  }
+  return readTarget(data);
+}
+
+type DirectLinkRowLookup = (
+  practiceId: string,
+) => Promise<
+  | { ok: true; row: PublishedDirectLinkRow | null }
+  | { ok: false; reason: "storage_unavailable" }
+>;
+
+let directLinkLookupOverride: DirectLinkRowLookup | null = null;
+
+export function setPublishedDirectLinkLookupForTests(
+  lookup: DirectLinkRowLookup | null,
+) {
+  directLinkLookupOverride = lookup;
+}
+
 const PUBLISHED_LISTED_COLUMNS = `
   id,
   slug,
@@ -61,7 +122,9 @@ const PUBLISHED_LISTED_COLUMNS = `
 
 /**
  * Published, publicly available, catalog-listed product.
+ * Used by VK launch and other listed-only opens.
  * Unpublished, scheduled-future, unlisted, and selected_users rows fail closed.
+ * MAX exact `p_<uuid>` deep links use resolvePublishedDirectLinkProductById.
  */
 export async function resolvePublishedListedProductById(
   practiceId: string,
@@ -108,4 +171,35 @@ export async function resolvePublishedListedProductBySlug(
 
   if (error) return { ok: false, reason: "storage_unavailable" };
   return { ok: true, target: readTarget(data) };
+}
+
+/**
+ * Published product addressable by a direct link: listed and unlisted.
+ * Does not admit the product into the ordinary catalog.
+ * selected_users, unpublished, deleted, and future-scheduled rows fail closed.
+ */
+export async function resolvePublishedDirectLinkProductById(
+  practiceId: string,
+): Promise<PublishedProductLookupResult> {
+  if (directLinkLookupOverride) {
+    const found = await directLinkLookupOverride(practiceId);
+    if (!found.ok) return found;
+    return { ok: true, target: readPublishedDirectLinkTarget(found.row) };
+  }
+
+  const supabase = createServiceRoleClient();
+  const { data, error } = await applyPracticePublicAvailabilityFilter(
+    supabase
+      .from("practices")
+      .select(PUBLISHED_LISTED_COLUMNS)
+      .eq("id", practiceId)
+      .eq("status", "published")
+      .is("deleted_at", null),
+  ).maybeSingle();
+
+  if (error) return { ok: false, reason: "storage_unavailable" };
+  return {
+    ok: true,
+    target: readPublishedDirectLinkTarget(data as PublishedDirectLinkRow | null),
+  };
 }
