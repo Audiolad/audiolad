@@ -24,8 +24,16 @@ import {
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
   listeningAverageLabels,
+  listeningWindowRpcArgs,
+  presentRollingListeningPair,
+  readListeningWindow,
+  readListeningWindowsPayload,
   rollingListeningBounds,
 } from "../src/lib/admin/format-listening-time";
+import {
+  resolveAdminAnalyticsPeriodRange,
+  type AdminAnalyticsPeriod,
+} from "../src/lib/admin/analytics-period";
 import {
   buildListenStatsHeartbeatBody,
   createPlaybackUsageEventId,
@@ -706,6 +714,114 @@ function testFormatting() {
   );
   assert.equal(partial.compactLabel, "—");
   assert.equal(partial.previousLabel, "0 мин 12 сек");
+
+  const previousWeekMs = (73 * 3600 + 13 * 60) * 1000;
+  const unavailableCurrent = readListeningWindow(null, true);
+  const measuredPrevious = readListeningWindow(
+    { listened_ms: previousWeekMs, partial: false, unmeasured: false },
+    false,
+  );
+  const symptom = presentRollingListeningPair(
+    unavailableCurrent,
+    measuredPrevious,
+    "2026-08-01T00:00:00.000Z",
+  );
+  assert.equal(symptom.label, "—");
+  assert.equal(symptom.previousLabel, "73 ч 13 мин");
+  assert.equal(symptom.deltaLabel, "—");
+  assert.equal(symptom.notice, "Текущее окно сейчас недоступно");
+  assert.notEqual(symptom.label, "0 мин 0 сек");
+
+  const measuredZero = readListeningWindow(
+    { listened_ms: 0, partial: false, unmeasured: false },
+    false,
+  );
+  assert.equal(measuredZero.status, "measured");
+  assert.equal(measuredZero.listenedMs, 0);
+  const zeroCard = presentRollingListeningPair(
+    measuredZero,
+    measuredPrevious,
+    "2026-08-01T00:00:00.000Z",
+  );
+  assert.equal(zeroCard.label, "0 мин 0 сек");
+  assert.equal(zeroCard.notice, null);
+  assert.match(zeroCard.deltaLabel, /▼/);
+
+  const unmeasuredCurrent = readListeningWindow(
+    { listened_ms: null, partial: false, unmeasured: true },
+    false,
+  );
+  assert.equal(unmeasuredCurrent.status, "unmeasured");
+  assert.equal(unmeasuredCurrent.listenedMs, null);
+  const unmeasuredCard = presentRollingListeningPair(
+    unmeasuredCurrent,
+    measuredPrevious,
+    "2026-10-07T11:16:00.000Z",
+  );
+  assert.equal(unmeasuredCard.label, "—");
+  assert.match(unmeasuredCard.notice ?? "", /Время прослушивания собирается с /);
+  assert.doesNotMatch(unmeasuredCard.notice ?? "", /недоступно/);
+
+  const partialCurrent = readListeningWindow(
+    { listened_ms: 12_000, partial: true, unmeasured: false },
+    false,
+  );
+  const partialCard = presentRollingListeningPair(
+    partialCurrent,
+    readListeningWindow({ listened_ms: null, unmeasured: true }, false),
+    "2026-10-01T00:00:00.000Z",
+  );
+  assert.equal(partialCard.label, "0 мин 12 сек");
+  assert.equal(partialCard.previousLabel, "—");
+  assert.equal(partialCard.deltaLabel, "—");
+  assert.match(partialCard.notice ?? "", /Время прослушивания собирается с /);
+
+  const brokenDto = readListeningWindow(
+    { listened_ms: null, partial: false, unmeasured: false },
+    false,
+  );
+  assert.equal(brokenDto.status, "unavailable");
+  assert.equal(brokenDto.listenedMs, null);
+
+  const bothDown = readListeningWindowsPayload(null, true);
+  assert.equal(bothDown.week.status, "unavailable");
+  assert.equal(bothDown.month.status, "unavailable");
+  assert.equal(
+    presentRollingListeningPair(bothDown.week, bothDown.weekPrev, null).notice,
+    "Окна сейчас недоступны",
+  );
+
+  const now = new Date("2026-10-07T11:16:00.000Z");
+  const periods: AdminAnalyticsPeriod[] = ["today", "yesterday", "7d", "30d", "all"];
+  for (const period of periods) {
+    const range = resolveAdminAnalyticsPeriodRange(period, now);
+    const end = range.to ?? now.toISOString();
+    const bounds = rollingListeningBounds(end);
+    assert.equal(bounds.end, new Date(Date.parse(end)).toISOString());
+    assert.equal(Date.parse(bounds.end) - Date.parse(bounds.weekFrom), 7 * 86_400_000);
+    assert.equal(Date.parse(bounds.weekFrom) - Date.parse(bounds.weekPrevFrom), 7 * 86_400_000);
+    assert.equal(bounds.weekPrevTo, bounds.weekFrom);
+    assert.equal(Date.parse(bounds.end) - Date.parse(bounds.monthFrom), 30 * 86_400_000);
+    assert.equal(Date.parse(bounds.monthFrom) - Date.parse(bounds.monthPrevFrom), 30 * 86_400_000);
+    assert.equal(bounds.monthPrevTo, bounds.monthFrom);
+  }
+  const yesterday = resolveAdminAnalyticsPeriodRange("yesterday", now);
+  assert.notEqual(yesterday.to, now.toISOString());
+  assert.equal(rollingListeningBounds(yesterday.to ?? "").end, yesterday.to);
+
+  const filters = listeningWindowRpcArgs("2026-10-07T11:16:00.000Z", {
+    p_include_test: false,
+    p_author_id: "a1111111-1111-4111-8111-111111111111",
+    p_practice_id: "c3333333-3333-4333-8333-333333333333",
+    p_utm_source: "telegram",
+    p_device_type: "mobile",
+  });
+  assert.equal(filters.p_to, "2026-10-07T11:16:00.000Z");
+  assert.equal(filters.p_author_id, "a1111111-1111-4111-8111-111111111111");
+  assert.equal(filters.p_practice_id, "c3333333-3333-4333-8333-333333333333");
+  assert.equal(filters.p_utm_source, "telegram");
+  assert.equal(filters.p_device_type, "mobile");
+  assert.equal(filters.p_include_test, false);
 }
 
 function testSourceContracts() {
@@ -801,6 +917,40 @@ function testSourceContracts() {
   assert.doesNotMatch(queries, /presentListeningTime\(\s*[^,]+,\s*overviewBase\.listeners/);
   assert.match(queries, /admin_analytics_listening_time/);
   assert.match(queries, /admin_analytics_listening_time_timeseries/);
+  assert.match(queries, /admin_analytics_listening_time_windows/);
+  assert.match(queries, /listeningWindowRpcArgs\(listeningBounds\.end, listeningFilters\)/);
+  const bundleStart = queries.indexOf("export async function getAdminAnalyticsSummaryBundle");
+  const bundle = queries.slice(
+    bundleStart,
+    queries.indexOf("export async function getAdminAnalyticsBreakdownBundle"),
+  );
+  const selectedPeriodCalls = bundle.match(
+    /service\.rpc\(\s*"admin_analytics_listening_time",/g,
+  );
+  assert.equal(selectedPeriodCalls?.length, 1);
+  assert.equal(
+    (bundle.match(/admin_analytics_listening_time_windows/g) ?? []).length,
+    1,
+  );
+  assert.doesNotMatch(bundle, /weekPrevFrom|monthPrevFrom/);
+  const windowsMigration = read(
+    "supabase/migrations/20261222120000_admin_listening_time_windows.sql",
+  );
+  const windowsBody = windowsMigration.slice(
+    windowsMigration.indexOf("AS $$"),
+    windowsMigration.lastIndexOf("$$;"),
+  );
+  assert.match(windowsMigration, /admin_analytics_listening_time_windows/);
+  assert.doesNotMatch(windowsBody, /admin_analytics_p2_window_metrics|analytics_events/);
+  assert.doesNotMatch(windowsMigration, /CREATE INDEX|DROP TABLE|TRUNCATE|DELETE FROM/i);
+  assert.doesNotMatch(
+    windowsMigration,
+    /GRANT EXECUTE[\s\S]*TO anon|GRANT EXECUTE[\s\S]*TO authenticated/,
+  );
+  assert.match(windowsMigration, /TO service_role/);
+  assert.match(funnel, /weeklyListeningNotice/);
+  assert.match(funnel, /monthlyListeningNotice/);
+  assert.match(funnel, /Текущее окно сейчас недоступно|metric\.notice/);
   assert.match(queries, /rawMs == null \? null : asNonNegativeInt\(rawMs\)/);
   assert.match(dictionary, /listening_time/);
   assert.match(dictionary, /avg_listen_per_listener/);

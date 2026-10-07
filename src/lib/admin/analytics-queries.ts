@@ -15,12 +15,13 @@ import {
 import { parseAdminIncludeTestParam } from "@/lib/admin/analytics-test-traffic";
 import {
   listeningAverageLabels,
-  compareQualifiedListeningWindows,
   formatListeningDuration,
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
+  listeningWindowRpcArgs,
+  presentRollingListeningPair,
+  readListeningWindowsPayload,
   rollingListeningBounds,
-  type QualifiedListeningWindow,
 } from "@/lib/admin/format-listening-time";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
@@ -106,9 +107,11 @@ export type AdminAnalyticsProductOverview = {
   weeklyListeningLabel: string;
   weeklyListeningPreviousLabel: string;
   weeklyListeningDeltaLabel: string;
+  weeklyListeningNotice: string | null;
   monthlyListeningLabel: string;
   monthlyListeningPreviousLabel: string;
   monthlyListeningDeltaLabel: string;
+  monthlyListeningNotice: string | null;
   startsPerListener: string;
   listenedMs: number | null;
   listeningTimeLabel: string;
@@ -635,51 +638,12 @@ const EMPTY_LISTENING_COMPARISON = {
   weeklyListeningLabel: "—",
   weeklyListeningPreviousLabel: "—",
   weeklyListeningDeltaLabel: "—",
+  weeklyListeningNotice: null,
   monthlyListeningLabel: "—",
   monthlyListeningPreviousLabel: "—",
   monthlyListeningDeltaLabel: "—",
+  monthlyListeningNotice: null,
 } as const;
-
-function qualifiedWindowFromRpc(
-  data: unknown,
-  errored: boolean,
-): QualifiedListeningWindow {
-  if (errored || !data || typeof data !== "object") {
-    return { listenedMs: null, fullWindow: false };
-  }
-
-  const raw = data as {
-    listened_ms?: number | null;
-    partial?: boolean;
-    unmeasured?: boolean;
-  };
-
-  if (raw.unmeasured === true || raw.listened_ms == null) {
-    return { listenedMs: null, fullWindow: false };
-  }
-
-  return {
-    listenedMs: asNonNegativeInt(raw.listened_ms),
-    fullWindow: raw.partial !== true,
-  };
-}
-
-function rollingListeningComparison(
-  current: QualifiedListeningWindow,
-  previous: QualifiedListeningWindow,
-): {
-  label: string;
-  previousLabel: string;
-  deltaLabel: string;
-} {
-  const compared = compareQualifiedListeningWindows(current, previous);
-
-  return {
-    label: compared.currentLabel,
-    previousLabel: compared.previousLabel,
-    deltaLabel: compared.compactLabel,
-  };
-}
 
 function formatAdminDecimal(numerator: number, denominator: number): string {
   if (denominator <= 0 || numerator <= 0) {
@@ -1057,39 +1021,23 @@ export async function getAdminAnalyticsSummaryBundle(
     throw new Error("admin_analytics_dashboard_failed");
   }
 
+  // Rolling totals only need SUM(listened_ms). The selected-period RPC still
+  // asks admin_analytics_listening_time for averages. Four extra copies of
+  // admin_analytics_p2_window_metrics were timing out the current windows.
   const [
     timeseriesRes,
     listeningRes,
     listeningSeriesRes,
-    weekListeningRes,
-    weekPrevListeningRes,
-    monthListeningRes,
-    monthPrevListeningRes,
+    listeningWindowsRes,
     filterOptions,
   ] = await Promise.all([
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
     service.rpc("admin_analytics_listening_time", sharedFilters),
     service.rpc("admin_analytics_listening_time_timeseries", sharedFilters),
-    service.rpc("admin_analytics_listening_time", {
-      ...listeningFilters,
-      p_from: listeningBounds.weekFrom,
-      p_to: listeningBounds.end,
-    }),
-    service.rpc("admin_analytics_listening_time", {
-      ...listeningFilters,
-      p_from: listeningBounds.weekPrevFrom,
-      p_to: listeningBounds.weekPrevTo,
-    }),
-    service.rpc("admin_analytics_listening_time", {
-      ...listeningFilters,
-      p_from: listeningBounds.monthFrom,
-      p_to: listeningBounds.end,
-    }),
-    service.rpc("admin_analytics_listening_time", {
-      ...listeningFilters,
-      p_from: listeningBounds.monthPrevFrom,
-      p_to: listeningBounds.monthPrevTo,
-    }),
+    service.rpc(
+      "admin_analytics_listening_time_windows",
+      listeningWindowRpcArgs(listeningBounds.end, listeningFilters),
+    ),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
 
@@ -1113,19 +1061,26 @@ export async function getAdminAnalyticsSummaryBundle(
   const overviewBase = buildProductOverview(
     (overviewRes.data ?? {}) as Record<string, unknown>,
   );
-  const weeklyListening = rollingListeningComparison(
-    qualifiedWindowFromRpc(weekListeningRes.data, Boolean(weekListeningRes.error)),
-    qualifiedWindowFromRpc(
-      weekPrevListeningRes.data,
-      Boolean(weekPrevListeningRes.error),
-    ),
+  if (listeningWindowsRes.error) {
+    const windowsMessage = listeningWindowsRes.error.message ?? "";
+    console.error("admin_analytics_listening_windows_failed", {
+      code: listeningWindowsRes.error.code ?? null,
+      timeout: /timeout/i.test(windowsMessage),
+    });
+  }
+  const listeningWindows = readListeningWindowsPayload(
+    listeningWindowsRes.data,
+    Boolean(listeningWindowsRes.error),
   );
-  const monthlyListening = rollingListeningComparison(
-    qualifiedWindowFromRpc(monthListeningRes.data, Boolean(monthListeningRes.error)),
-    qualifiedWindowFromRpc(
-      monthPrevListeningRes.data,
-      Boolean(monthPrevListeningRes.error),
-    ),
+  const weeklyListening = presentRollingListeningPair(
+    listeningWindows.week,
+    listeningWindows.weekPrev,
+    listeningWindows.validFrom,
+  );
+  const monthlyListening = presentRollingListeningPair(
+    listeningWindows.month,
+    listeningWindows.monthPrev,
+    listeningWindows.validFrom,
   );
   const listeningTime = presentListeningTime(
     listeningRes.error ? null : listeningSnapshot,
@@ -1180,9 +1135,11 @@ export async function getAdminAnalyticsSummaryBundle(
       weeklyListeningLabel: weeklyListening.label,
       weeklyListeningPreviousLabel: weeklyListening.previousLabel,
       weeklyListeningDeltaLabel: weeklyListening.deltaLabel,
+      weeklyListeningNotice: weeklyListening.notice,
       monthlyListeningLabel: monthlyListening.label,
       monthlyListeningPreviousLabel: monthlyListening.previousLabel,
       monthlyListeningDeltaLabel: monthlyListening.deltaLabel,
+      monthlyListeningNotice: monthlyListening.notice,
     },
     funnelEvents: funnel.events,
     funnelPeople: funnel.people,

@@ -117,6 +117,181 @@ export type QualifiedListeningWindow = {
   fullWindow: boolean;
 };
 
+/**
+ * measured — sum covers the whole window, including a real zero.
+ * unmeasured — the window ends at or before listening_time_valid_from.
+ * partial — the window starts before valid_from; listenedMs is the measured slice.
+ * unavailable — the RPC or DTO failed. Never rendered as zero.
+ */
+export type ListeningWindowStatus =
+  | "measured"
+  | "unmeasured"
+  | "partial"
+  | "unavailable";
+
+export type ListeningWindowReading = QualifiedListeningWindow & {
+  status: ListeningWindowStatus;
+};
+
+export type ListeningWindowFilters = {
+  p_include_test: boolean;
+  p_author_id: string | null;
+  p_practice_id: string | null;
+  p_utm_source: string | null;
+  p_device_type: string | null;
+};
+
+export function listeningWindowRpcArgs(
+  endIso: string,
+  filters: ListeningWindowFilters,
+) {
+  return {
+    p_to: endIso,
+    p_include_test: filters.p_include_test,
+    p_author_id: filters.p_author_id,
+    p_practice_id: filters.p_practice_id,
+    p_utm_source: filters.p_utm_source,
+    p_device_type: filters.p_device_type,
+  };
+}
+
+function measuredMilliseconds(value: unknown): number | null {
+  if (typeof value === "boolean" || value == null) {
+    return null;
+  }
+
+  const numeric = typeof value === "number" ? value : Number(value);
+
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return null;
+  }
+
+  return Math.floor(numeric);
+}
+
+/** Map one window object from admin_analytics_listening_time_windows. */
+export function readListeningWindow(
+  data: unknown,
+  errored = false,
+): ListeningWindowReading {
+  if (errored || data == null || typeof data !== "object") {
+    return { status: "unavailable", listenedMs: null, fullWindow: false };
+  }
+
+  const raw = data as {
+    listened_ms?: unknown;
+    partial?: unknown;
+    unmeasured?: unknown;
+  };
+
+  if (raw.unmeasured === true) {
+    return { status: "unmeasured", listenedMs: null, fullWindow: false };
+  }
+
+  const listenedMs = measuredMilliseconds(raw.listened_ms);
+
+  if (listenedMs == null) {
+    return { status: "unavailable", listenedMs: null, fullWindow: false };
+  }
+
+  const partial = raw.partial === true;
+
+  return {
+    status: partial ? "partial" : "measured",
+    listenedMs,
+    fullWindow: !partial,
+  };
+}
+
+export function readListeningWindowsPayload(
+  data: unknown,
+  errored = false,
+): {
+  validFrom: string | null;
+  week: ListeningWindowReading;
+  weekPrev: ListeningWindowReading;
+  month: ListeningWindowReading;
+  monthPrev: ListeningWindowReading;
+} {
+  const record =
+    !errored && data != null && typeof data === "object"
+      ? (data as Record<string, unknown>)
+      : null;
+  const failed = errored || record == null;
+  const validFrom = typeof record?.valid_from === "string" ? record.valid_from : null;
+
+  return {
+    validFrom,
+    week: readListeningWindow(record?.week, failed),
+    weekPrev: readListeningWindow(record?.week_prev, failed),
+    month: readListeningWindow(record?.month, failed),
+    monthPrev: readListeningWindow(record?.month_prev, failed),
+  };
+}
+
+function coverageNotice(
+  status: ListeningWindowStatus,
+  validFromIso: string | null,
+): string | null {
+  if (status !== "unmeasured" && status !== "partial") {
+    return null;
+  }
+
+  if (!validFromIso) {
+    return "Время прослушивания собирается с момента включения учёта";
+  }
+
+  return formatListeningTimeNotice(validFromIso);
+}
+
+/**
+ * One short Russian line for a rolling card.
+ * An RPC failure stays distinct from an unmeasured or partial window.
+ */
+export function rollingListeningNotice(
+  current: ListeningWindowReading,
+  previous: ListeningWindowReading,
+  validFromIso: string | null,
+): string | null {
+  if (current.status === "unavailable" && previous.status === "unavailable") {
+    return "Окна сейчас недоступны";
+  }
+
+  if (current.status === "unavailable") {
+    return "Текущее окно сейчас недоступно";
+  }
+
+  const currentCoverage = coverageNotice(current.status, validFromIso);
+
+  if (previous.status === "unavailable") {
+    return currentCoverage
+      ? `${currentCoverage}. Предыдущее окно сейчас недоступно`
+      : "Предыдущее окно сейчас недоступно";
+  }
+
+  return currentCoverage ?? coverageNotice(previous.status, validFromIso);
+}
+
+export function presentRollingListeningPair(
+  current: ListeningWindowReading,
+  previous: ListeningWindowReading,
+  validFromIso: string | null,
+): {
+  label: string;
+  previousLabel: string;
+  deltaLabel: string;
+  notice: string | null;
+} {
+  const compared = compareQualifiedListeningWindows(current, previous);
+
+  return {
+    label: compared.currentLabel,
+    previousLabel: compared.previousLabel,
+    deltaLabel: compared.compactLabel,
+    notice: rollingListeningNotice(current, previous, validFromIso),
+  };
+}
+
 export type QualifiedListeningComparison = {
   currentLabel: string;
   previousLabel: string;

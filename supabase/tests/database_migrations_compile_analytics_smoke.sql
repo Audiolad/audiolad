@@ -523,4 +523,120 @@ BEGIN
 END
 $$;
 
+-- Rolling admin listening cards: one bounded SUM, no denominator scan.
+-- A window that ends at or before valid_from is JSON null, not zero.
+DO $$
+DECLARE
+  v_practice uuid := 'c9111111-1111-4111-8111-111111111191';
+  v_other uuid := 'c9222222-2222-4222-8222-222222222192';
+  v_author uuid := 'a9111111-1111-4111-8111-111111111191';
+  v_end timestamptz := timestamptz '2026-10-07 14:16:00+03';
+  v_valid timestamptz := timestamptz '2026-08-01 00:00:00+03';
+  v_payload jsonb;
+  v_def text;
+BEGIN
+  IF to_regprocedure('public.admin_analytics_listening_time_windows(timestamptz,boolean,uuid,uuid,text,text)') IS NULL THEN
+    RAISE EXCEPTION 'admin_analytics_listening_time_windows is missing';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.admin_analytics_listening_time_windows(timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.admin_analytics_listening_time_windows(timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR has_function_privilege('public', 'public.admin_analytics_listening_time_windows(timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'public.admin_analytics_listening_time_windows(timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'listening window grants are not hardened';
+  END IF;
+
+  v_def := pg_get_functiondef('public.admin_analytics_listening_time_windows(timestamptz,boolean,uuid,uuid,text,text)'::regprocedure);
+  IF position('admin_analytics_p2_window_metrics' in v_def) > 0
+    OR position('analytics_events' in v_def) > 0
+  THEN
+    RAISE EXCEPTION 'listening windows must not scan denominators or analytics_events';
+  END IF;
+
+  UPDATE public.playback_usage_settings
+  SET listening_time_valid_from = v_valid
+  WHERE singleton;
+
+  INSERT INTO public.playback_usage_facts
+    (client_event_id, sample_seq, listening_key, anonymous_id, practice_id, listened_ms, position_ms, phase, occurred_at, author_id_snapshot)
+  VALUES
+    ('91111111-1111-4111-8111-111111111101', 1, 'listen-window-current', 'listen-window-a', v_practice, 263580000, 263580000, 'advance', v_end - interval '1 day', v_author),
+    ('91111111-1111-4111-8111-111111111102', 1, 'listen-window-prev', 'listen-window-b', v_practice, 5000, 5000, 'advance', v_end - interval '10 days', v_author),
+    ('91111111-1111-4111-8111-111111111103', 1, 'listen-window-other', 'listen-window-c', v_other, 9000, 9000, 'advance', v_end - interval '1 day', v_author),
+    ('91111111-1111-4111-8111-111111111104', 1, 'listen-window-old', 'listen-window-d', v_practice, 8000, 8000, 'advance', v_valid - interval '2 days', v_author);
+
+  SELECT public.admin_analytics_listening_time_windows(
+    v_end, false, NULL, v_practice, NULL, NULL
+  )
+  INTO v_payload;
+
+  IF (v_payload ->> 'end')::timestamptz IS DISTINCT FROM v_end
+    OR (v_payload -> 'week' ->> 'from')::timestamptz IS DISTINCT FROM v_end - interval '7 days'
+    OR (v_payload -> 'week_prev' ->> 'to')::timestamptz IS DISTINCT FROM v_end - interval '7 days'
+    OR (v_payload -> 'week_prev' ->> 'from')::timestamptz IS DISTINCT FROM v_end - interval '14 days'
+    OR (v_payload -> 'month' ->> 'from')::timestamptz IS DISTINCT FROM v_end - interval '30 days'
+    OR (v_payload -> 'month_prev' ->> 'from')::timestamptz IS DISTINCT FROM v_end - interval '60 days'
+    OR (v_payload -> 'month_prev' ->> 'to')::timestamptz IS DISTINCT FROM v_end - interval '30 days'
+  THEN
+    RAISE EXCEPTION 'listening window bounds drifted: %', v_payload;
+  END IF;
+
+  IF (v_payload -> 'week' ->> 'listened_ms')::bigint <> 263580000
+    OR (v_payload -> 'week' ->> 'partial')::boolean
+    OR (v_payload -> 'week' ->> 'unmeasured')::boolean
+    OR (v_payload -> 'week_prev' ->> 'listened_ms')::bigint <> 5000
+    OR (v_payload -> 'week_prev' ->> 'partial')::boolean
+    OR (v_payload -> 'week_prev' ->> 'unmeasured')::boolean
+    OR (v_payload -> 'month' ->> 'listened_ms')::bigint <> 263585000
+    OR (v_payload -> 'month' ->> 'partial')::boolean
+    OR (v_payload -> 'month_prev' ->> 'listened_ms')::bigint <> 0
+    OR (v_payload -> 'month_prev' ->> 'unmeasured')::boolean
+    OR (v_payload -> 'month_prev' ->> 'partial')::boolean
+  THEN
+    RAISE EXCEPTION 'filtered listening windows wrong: %', v_payload;
+  END IF;
+
+  UPDATE public.playback_usage_settings
+  SET listening_time_valid_from = v_end - interval '20 days'
+  WHERE singleton;
+
+  SELECT public.admin_analytics_listening_time_windows(
+    v_end, false, v_author, v_practice, NULL, NULL
+  )
+  INTO v_payload;
+
+  IF (v_payload -> 'week' ->> 'listened_ms')::bigint <> 263580000
+    OR (v_payload -> 'week' ->> 'partial')::boolean
+    OR (v_payload -> 'week_prev' ->> 'listened_ms')::bigint <> 5000
+    OR (v_payload -> 'week_prev' ->> 'partial')::boolean
+    OR (v_payload -> 'week_prev' ->> 'unmeasured')::boolean
+    OR (v_payload -> 'month' ->> 'partial')::boolean IS NOT TRUE
+    OR (v_payload -> 'month' ->> 'listened_ms')::bigint <> 263585000
+    OR (v_payload -> 'month_prev' ->> 'unmeasured')::boolean
+    OR v_payload -> 'month_prev' -> 'listened_ms' IS DISTINCT FROM 'null'::jsonb
+  THEN
+    RAISE EXCEPTION 'partial listening windows wrong: %', v_payload;
+  END IF;
+
+  UPDATE public.playback_usage_settings
+  SET listening_time_valid_from = v_end + interval '1 minute'
+  WHERE singleton;
+
+  SELECT public.admin_analytics_listening_time_windows(
+    v_end, false, NULL, NULL, NULL, NULL
+  )
+  INTO v_payload;
+
+  IF (v_payload -> 'week' ->> 'unmeasured')::boolean IS NOT TRUE
+    OR v_payload -> 'week' -> 'listened_ms' IS DISTINCT FROM 'null'::jsonb
+    OR (v_payload -> 'month' ->> 'unmeasured')::boolean IS NOT TRUE
+    OR v_payload -> 'month' -> 'listened_ms' IS DISTINCT FROM 'null'::jsonb
+    OR (v_payload -> 'week' ->> 'listened_ms') = '0'
+  THEN
+    RAISE EXCEPTION 'unmeasured listening windows became zero: %', v_payload;
+  END IF;
+END
+$$;
+
 ROLLBACK;

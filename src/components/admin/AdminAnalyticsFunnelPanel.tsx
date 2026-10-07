@@ -42,12 +42,14 @@ export default function AdminAnalyticsFunnelPanel({
             value: overview.weeklyListeningLabel,
             previous: overview.weeklyListeningPreviousLabel,
             delta: overview.weeklyListeningDeltaLabel,
+            notice: overview.weeklyListeningNotice,
           },
           {
             label: "Месячное время прослушивания",
             value: overview.monthlyListeningLabel,
             previous: overview.monthlyListeningPreviousLabel,
             delta: overview.monthlyListeningDeltaLabel,
+            notice: overview.monthlyListeningNotice,
           },
         ].map((metric) => (
           <article
@@ -56,6 +58,9 @@ export default function AdminAnalyticsFunnelPanel({
           >
             <p className="text-xs text-[#796ba0]">{metric.label}</p>
             <p className="mt-1 text-2xl font-semibold text-[#25135c]">{metric.value}</p>
+            {metric.notice ? (
+              <p className="mt-1 text-xs text-[#7042c5]">{metric.notice}</p>
+            ) : null}
             <p className="mt-1 text-xs text-[#9485b4]">
               {metric.delta} к пред. окну · {metric.previous}
             </p>
