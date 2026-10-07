@@ -23,6 +23,7 @@ import {
   loadGateFacts,
   publishDeploymentResult,
   selectCommitSha,
+  selectTreeTwinSha,
 } from "./deployment-bridge-policy.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -35,6 +36,8 @@ const HEAD = "b".repeat(40);
 const MERGE = "c".repeat(40);
 const TREE = "d".repeat(40);
 const OTHER_TREE = "e".repeat(40);
+const SQUASH = "2".repeat(40);
+const TWIN = "1".repeat(40);
 
 function greenChecks(extra = []) {
   return [
@@ -169,6 +172,200 @@ function testGateAllowsEqualTreeMerge() {
   assert.equal(decision.ok, true);
   assert.equal(decision.deploySha, MERGE);
   assert.equal(decision.ciSubjectSha, HEAD);
+}
+
+function squashFacts(overrides = {}) {
+  return {
+    requestedSha: SQUASH,
+    originMainSha: MAIN,
+    isCommit: true,
+    isAncestor: true,
+    parents: [MAIN],
+    trees: { [SQUASH]: TREE, [TWIN]: TREE },
+    checks: {
+      [SQUASH]: [],
+      [TWIN]: greenChecks(),
+    },
+    statuses: {
+      [SQUASH]: [],
+      [TWIN]: greenStatuses(),
+    },
+    treeTwinSha: TWIN,
+    ...overrides,
+  };
+}
+
+function testSelectTreeTwinSha() {
+  assert.equal(
+    selectTreeTwinSha(
+      [{ number: 794, merge_commit_sha: SQUASH, head: { sha: TWIN.toUpperCase() } }],
+      SQUASH,
+    ),
+    TWIN,
+  );
+  assert.equal(
+    selectTreeTwinSha(
+      [
+        { merge_commit_sha: null, head: { sha: HEAD } },
+        { merge_commit_sha: MAIN, head: { sha: HEAD } },
+        { merge_commit_sha: "", head: { sha: TWIN } },
+      ],
+      SQUASH,
+    ),
+    null,
+  );
+  assert.throws(
+    () =>
+      selectTreeTwinSha(
+        [
+          { merge_commit_sha: SQUASH, head: { sha: TWIN } },
+          { merge_commit_sha: SQUASH, head: { sha: HEAD } },
+        ],
+        SQUASH,
+      ),
+    /ci_malformed/,
+  );
+  assert.throws(
+    () => selectTreeTwinSha(Array.from({ length: 100 }, () => ({ merge_commit_sha: null })), SQUASH),
+    /ci_truncated/,
+  );
+  assert.throws(() => selectTreeTwinSha({}, SQUASH), /ci_malformed/);
+  assert.throws(
+    () => selectTreeTwinSha([{ merge_commit_sha: SQUASH, head: { sha: SQUASH } }], SQUASH),
+    /ci_malformed/,
+  );
+}
+
+function testSquashAcceptsTreeIdenticalPullHead() {
+  const decision = evaluateGate(squashFacts());
+  assert.equal(decision.ok, true);
+  assert.equal(decision.deploySha, SQUASH);
+  assert.equal(decision.ciSubjectSha, TWIN);
+
+  const runnerNoise = evaluateGate(
+    squashFacts({
+      checks: {
+        [SQUASH]: [],
+        [TWIN]: greenChecks([
+          {
+            name: "Audiolad Business Validation",
+            status: "completed",
+            conclusion: "success",
+          },
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "failure",
+          },
+        ]),
+      },
+    }),
+  );
+  assert.equal(runnerNoise.ok, true);
+  assert.equal(runnerNoise.deploySha, SQUASH);
+  assert.equal(runnerNoise.ciSubjectSha, TWIN);
+
+  const missingValidation = evaluateGate(
+    squashFacts({
+      checks: {
+        [SQUASH]: [],
+        [TWIN]: [
+          {
+            name: "Production / PR Safety Runner",
+            status: "completed",
+            conclusion: "success",
+          },
+        ],
+      },
+    }),
+  );
+  assert.equal(missingValidation.ok, false);
+  assert.equal(missingValidation.error, "ci_not_green");
+
+  const businessRegression = evaluateGate(
+    squashFacts({
+      checks: {
+        [SQUASH]: [],
+        [TWIN]: greenChecks([
+          {
+            name: "Audiolad Business Validation",
+            status: "completed",
+            conclusion: "failure",
+          },
+        ]),
+      },
+    }),
+  );
+  assert.equal(businessRegression.error, "ci_not_green");
+
+  const pendingTwin = evaluateGate(
+    squashFacts({
+      checks: {
+        [SQUASH]: [],
+        [TWIN]: [{ name: REQUIRED_CHECK_NAME, status: "in_progress", conclusion: null }],
+      },
+    }),
+  );
+  assert.equal(pendingTwin.error, "ci_pending");
+
+  const mismatch = evaluateGate(
+    squashFacts({
+      trees: { [SQUASH]: TREE, [TWIN]: OTHER_TREE },
+    }),
+  );
+  assert.equal(mismatch.error, "tree_mismatch");
+
+  const noTwin = evaluateGate(
+    squashFacts({
+      treeTwinSha: null,
+      checks: { [SQUASH]: [] },
+      statuses: { [SQUASH]: [] },
+    }),
+  );
+  assert.equal(noTwin.error, "ci_not_green");
+
+  const redDeployBlocks = evaluateGate(
+    squashFacts({
+      checks: {
+        [SQUASH]: [{ name: "extra", status: "completed", conclusion: "failure" }],
+        [TWIN]: greenChecks(),
+      },
+    }),
+  );
+  assert.equal(redDeployBlocks.error, "ci_not_green");
+
+  const deployShaEvidenceWins = evaluateGate(
+    squashFacts({
+      checks: {
+        [SQUASH]: greenChecks(),
+        [TWIN]: [{ name: REQUIRED_CHECK_NAME, status: "completed", conclusion: "failure" }],
+      },
+      statuses: {
+        [SQUASH]: greenStatuses(),
+        [TWIN]: [{ context: REQUIRED_STATUS_CONTEXT, state: "failure" }],
+      },
+    }),
+  );
+  assert.equal(deployShaEvidenceWins.ok, true);
+  assert.equal(deployShaEvidenceWins.ciSubjectSha, SQUASH);
+
+  const mergeDoesNotUseTwin = evaluateGate(
+    mergeFacts({
+      trees: { [MERGE]: TREE, [HEAD]: OTHER_TREE, [TWIN]: TREE },
+      checks: {
+        [MERGE]: [],
+        [HEAD]: [],
+        [TWIN]: greenChecks(),
+      },
+      statuses: {
+        [MERGE]: [],
+        [HEAD]: [],
+        [TWIN]: greenStatuses(),
+      },
+      treeTwinSha: TWIN,
+    }),
+  );
+  assert.equal(mergeDoesNotUseTwin.error, "tree_mismatch");
 }
 
 function testGateAllowsCiOnTheDeployShaItself() {
@@ -683,6 +880,7 @@ async function testRealMergeCommitUsesHeadCiOnlyWhenTreesMatch() {
     assert.equal(decision.ok, true, decision.error);
     assert.equal(decision.ciSubjectSha, head);
     assert.equal(requests.every((url) => url.includes(merge) || url.includes(head)), true);
+    assert.equal(requests.some((url) => url.includes("/pulls")), false);
     assert.equal(requests.some((url) => url.includes(base)), false);
 
     gitEnv(store, ["checkout", "-b", "feature", base]);
@@ -715,6 +913,159 @@ async function testRealMergeCommitUsesHeadCiOnlyWhenTreesMatch() {
       commitSha: diverged,
     });
     assert.equal(evaluateGate(divergedFacts).error, "tree_mismatch");
+  } finally {
+    rmSync(store, { recursive: true, force: true });
+  }
+}
+
+async function testSquashLoadUsesTreeIdenticalPullHead() {
+  const store = mkdtempSync(join(tmpdir(), "audiolad-bridge-squash-"));
+  try {
+    gitEnv(store, ["init", "-b", "main"]);
+    writeFileSync(join(store, "a.txt"), "a\n");
+    gitEnv(store, ["add", "a.txt"]);
+    gitEnv(store, ["commit", "-m", "base"]);
+    const base = gitEnv(store, ["rev-parse", "HEAD"]);
+    gitEnv(store, ["checkout", "-b", "pr"]);
+    writeFileSync(join(store, "b.txt"), "b\n");
+    gitEnv(store, ["add", "b.txt"]);
+    gitEnv(store, ["commit", "-m", "head"]);
+    const head = gitEnv(store, ["rev-parse", "HEAD"]);
+    const headTree = gitEnv(store, ["rev-parse", "HEAD^{tree}"]);
+    gitEnv(store, ["checkout", "main"]);
+    const squash = gitEnv(store, ["commit-tree", headTree, "-p", base, "-m", "squash (#794)"]);
+    gitEnv(store, ["reset", "--hard", squash]);
+    const ancestor = spawnSync("git", ["-C", store, "merge-base", "--is-ancestor", head, squash]);
+    assert.notEqual(ancestor.status, 0);
+    assert.equal(gitEnv(store, ["rev-parse", `${squash}^{tree}`]), headTree);
+
+    const git = (args) => {
+      const result = spawnSync("git", ["-C", store, ...args], { encoding: "utf8" });
+      return { status: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+    };
+
+    async function load(scene) {
+      const urls = [];
+      const facts = await loadGateFacts({
+        git,
+        request: async (url, init) => {
+          assert.equal(init.method, "GET");
+          urls.push(url);
+          if (url.includes("/pulls")) {
+            if (scene.forbidPulls) {
+              throw new Error("pulls lookup is only for a deploy SHA with no usable checks");
+            }
+            return jsonResponse(
+              scene.pulls ?? [{ number: 794, merge_commit_sha: squash, head: { sha: head } }],
+            );
+          }
+          if (url.includes("/check-runs")) {
+            if (url.includes(head) && scene.forbidHeadCi) {
+              throw new Error("head CI loaded without a matching tree");
+            }
+            if (url.includes(squash)) {
+              const subject = scene.deployChecks ?? [];
+              return jsonResponse({ total_count: subject.length, check_runs: subject });
+            }
+            if (url.includes(head)) {
+              const subject =
+                scene.headChecks ??
+                greenChecks([
+                  {
+                    name: "Audiolad Business Validation",
+                    status: "completed",
+                    conclusion: "success",
+                  },
+                  {
+                    name: "Production / PR Safety Runner",
+                    status: "completed",
+                    conclusion: "failure",
+                  },
+                ]);
+              return jsonResponse({ total_count: subject.length, check_runs: subject });
+            }
+            throw new Error(`unexpected check-runs ${url}`);
+          }
+          if (url.includes("/status")) {
+            if (url.includes(squash)) {
+              return jsonResponse({ statuses: scene.deployStatuses ?? [] });
+            }
+            if (url.includes(head)) {
+              return jsonResponse({ statuses: scene.headStatuses ?? greenStatuses() });
+            }
+            throw new Error(`unexpected status ${url}`);
+          }
+          if (url.endsWith(`/commits/${head}`)) {
+            if (scene.forbidHeadCommit) {
+              throw new Error("head commit loaded for an unrelated pull request");
+            }
+            return jsonResponse({
+              sha: head,
+              commit: { tree: { sha: scene.reportedTree ?? headTree } },
+            });
+          }
+          throw new Error(`unexpected ${url}`);
+        },
+        repository: "Audiolad/audiolad",
+        token: "t",
+        originMainSha: squash,
+        commitSha: squash,
+      });
+      return { facts, urls, decision: evaluateGate(facts) };
+    }
+
+    const matched = await load({});
+    assert.equal(matched.decision.ok, true, matched.decision.error);
+    assert.equal(matched.decision.deploySha, squash);
+    assert.equal(matched.decision.ciSubjectSha, head);
+    assert.equal(matched.facts.treeTwinSha, head);
+    assert.equal(matched.urls.some((url) => url.includes(base)), false);
+    assert.equal(matched.urls.some((url) => url.includes("/pulls")), true);
+
+    const movedHead = await load({ reportedTree: OTHER_TREE, forbidHeadCi: true });
+    assert.equal(movedHead.decision.ok, false);
+    assert.equal(movedHead.decision.error, "tree_mismatch");
+    assert.equal(movedHead.decision.deploySha, squash);
+
+    const unrelatedPr = await load({
+      pulls: [{ number: 1, merge_commit_sha: base, head: { sha: head } }],
+      forbidHeadCommit: true,
+      forbidHeadCi: true,
+    });
+    assert.equal(unrelatedPr.decision.error, "ci_not_green");
+    assert.equal(unrelatedPr.decision.deploySha, squash);
+
+    const missingEvidence = await load({
+      headChecks: [
+        {
+          name: "Production / PR Safety Runner",
+          status: "completed",
+          conclusion: "success",
+        },
+      ],
+      headStatuses: greenStatuses(),
+    });
+    assert.equal(missingEvidence.decision.error, "ci_not_green");
+
+    const ownEvidence = await load({
+      deployChecks: greenChecks(),
+      deployStatuses: greenStatuses(),
+      forbidPulls: true,
+      forbidHeadCommit: true,
+      forbidHeadCi: true,
+    });
+    assert.equal(ownEvidence.decision.ok, true, ownEvidence.decision.error);
+    assert.equal(ownEvidence.decision.deploySha, squash);
+    assert.equal(ownEvidence.decision.ciSubjectSha, squash);
+
+    const redOnSquash = await load({
+      deployChecks: [{ name: "extra", status: "completed", conclusion: "failure" }],
+      forbidPulls: true,
+      forbidHeadCommit: true,
+      forbidHeadCi: true,
+    });
+    assert.equal(redOnSquash.decision.error, "ci_not_green");
+    assert.equal(redOnSquash.decision.deploySha, squash);
   } finally {
     rmSync(store, { recursive: true, force: true });
   }
@@ -820,9 +1171,11 @@ function testWorkflowContract() {
 
   assert.deepEqual(workflow.permissions, {
     contents: "read",
+    "pull-requests": "read",
     checks: "write",
     statuses: "write",
   });
+  assert.equal(workflow.permissions["pull-requests"], "read");
   assert.equal(workflow.concurrency.group, "production-deploy");
   assert.equal(workflow.concurrency["cancel-in-progress"], false);
 
@@ -871,10 +1224,14 @@ function testWorkflowContract() {
   assert.equal(ignoredChecks.has(REQUIRED_CHECK_NAME), false);
   assert.equal(ignoredChecks.has("Production / PR Safety Runner"), true);
   assert.match(docs, /не деплоит/);
+  assert.match(docs, /merge_commit_sha/);
+  assert.match(docs, /pull-requests: read/);
 }
 
 async function main() {
   testSelectCommitSha();
+  testSelectTreeTwinSha();
+  testSquashAcceptsTreeIdenticalPullHead();
   testGateAllowsEqualTreeMerge();
   testGateAllowsCiOnTheDeployShaItself();
   testGateRejectsOffMainAndBadShapes();
@@ -884,6 +1241,7 @@ async function main() {
   await testPublication();
   await testLoadGateFactsDoesNotFetchCiOffMain();
   await testRealMergeCommitUsesHeadCiOnlyWhenTreesMatch();
+  await testSquashLoadUsesTreeIdenticalPullHead();
   testCliCompleteAndHealth();
   testWorkflowContract();
   console.log("deployment-bridge-unit: ok");

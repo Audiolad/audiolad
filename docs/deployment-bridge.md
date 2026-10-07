@@ -35,9 +35,11 @@ Wrapper на сервере сам проверяет, что аргумент �
 
 Секреты SSH остаются в GitHub Environment `production`. В workflow
 их нет. `GITHUB_TOKEN` этого workflow имеет только `contents: read`,
-`checks: write`, `statuses: write`. Писать статусы он может лишь в
-контекст `Deployment Bridge`. Контексты `PR Repository Validation` и
-`Production / PR Safety` он не выставляет.
+`pull-requests: read`, `checks: write`, `statuses: write`.
+`pull-requests: read` нужен гейту, чтобы прочитать голову уже слитого
+PR. Писать в pull request, отзывы и merge он не может. Писать статусы
+он может лишь в контекст `Deployment Bridge`. Контексты
+`PR Repository Validation` и `Production / PR Safety` он не выставляет.
 
 Environment `production` на момент реализации пускает только ветку
 `main` и не требует reviewer. Это и есть граница, которая не даёт
@@ -117,9 +119,23 @@ POST /repos/Audiolad/audiolad/dispatches
    (голове PR), а не на самом merge-коммите. Мост принимает этот CI
    только если tree второго родителя **равен** tree деплоя. Если main
    уехал и tree разошёлся, нужен зелёный CI уже на самом деплойном
-   SHA; иначе отказ `tree_mismatch`.
-6. Squash/rebase-коммит без CI на самом себе отклоняется: в истории
-   `main` нет второго родителя с тем же tree.
+   SHA; иначе отказ `tree_mismatch`. Чужой tree-twin для merge из
+   двух родителей не подставляется.
+6. Squash и любой другой коммит с одним родителем, на котором нет
+   пригодного CI, может опереться на голову слитого PR. Она берётся
+   только из `GET /repos/{repo}/commits/{deploy_sha}/pulls`, и только
+   если `merge_commit_sha` этой записи **равен** деплойному SHA.
+   Tree головы читается через `GET /commits/{head}` и должен
+   **совпадать** с tree деплоя. Команда деплоя при этом получает
+   исходный SHA, не голову PR. Если дерево головы разошлось — отказ
+   `tree_mismatch` (голова ветки сдвинулась после squash — это тоже
+   отказ, а не поиск другого коммита). Если у головы нет успешного
+   `PR Repository Validation` и успешного статуса
+   `Production / PR Safety`, либо на ней есть красный или
+   незавершённый check, — прежний отказ (`ci_not_green` /
+   `ci_pending`). Check `Production / PR Safety Runner` по-прежнему
+   не заменяет требуемый CI и не считается красным сам по себе.
+   Коммит без такой головы и без своего CI по-прежнему отклоняется.
 
 Пустой SHA не означает «взять tip main». Tip тоже нужно передать явно.
 
@@ -227,6 +243,12 @@ bootstrap из `docs/production-deploy-github-actions.md` не нужен,
 ```bash
 npm run test:deployment-bridge
 ```
+
+Тест покрывает squash с одним родителем: деплойный SHA остаётся
+запрошенным, а субъект CI — голова PR с тем же tree и зелёным
+требуемым CI. Этот прогон не вызывает dispatch и не деплоит.
+Боевой dispatch моста после merge сам деплоит, поэтому им правило
+не проверяют.
 
 ## Ограничения, которые нельзя принять за дыру
 
