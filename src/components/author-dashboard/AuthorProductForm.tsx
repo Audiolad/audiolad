@@ -15,7 +15,9 @@ import AuthorProductFormActions from "@/components/author-dashboard/product-form
 import AuthorPublicationScheduleSection from "@/components/author-dashboard/product-form-sections/AuthorPublicationScheduleSection";
 import AuthorProductWizardStepNav from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepNav";
 import AuthorProductWizardStepper from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepper";
-import JazzRelaxMusicPassportPanel from "@/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
+import JazzRelaxMusicPassportPanel, {
+  JazzRelaxPassportActivityNotice,
+} from "@/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
 import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
 import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
@@ -78,7 +80,10 @@ import {
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
 import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
-import type { JazzRelaxPassportView } from "@/lib/music-passport/jazz-relax-status";
+import {
+  describeJazzRelaxPassportActivity,
+  type JazzRelaxPassportView,
+} from "@/lib/music-passport/jazz-relax-status";
 import { isPracticeProductWizardEnabled } from "@/lib/author-products/practice-product-wizard";
 import {
   CATALOG_SECTION_FIELD_LABEL,
@@ -100,7 +105,10 @@ import {
   hasAudioProductAuthor,
 } from "@/lib/author-products/audio-product-author";
 import { musicTrackHasServerAudio } from "@/lib/author-products/music-track-lifecycle";
-import { validateMusicTrackTitleCyrillic } from "@/lib/author-products/music-track-title";
+import {
+  MUSIC_TRACK_TITLE_CYRILLIC_ERROR,
+  validateMusicTrackTitleCyrillic,
+} from "@/lib/author-products/music-track-title";
 import {
   AUDIO_POST_CUSTOM_TYPE_FIELD_LABEL,
   AUDIO_POST_CUSTOM_TYPE_LABEL,
@@ -849,8 +857,20 @@ export default function AuthorProductForm({
     audioItemId?: string;
   } | null>(null);
   const [passportPhase, setPassportPhase] = useState<JazzRelaxPassportView["phase"] | null>(null);
+  const [passportStatus, setPassportStatus] = useState<JazzRelaxPassportView | null>(null);
+  const [passportSaving, setPassportSaving] = useState(false);
+  const [passportEnqueueing, setPassportEnqueueing] = useState(false);
+  const [passportPollFailed, setPassportPollFailed] = useState(false);
   const onJazzRelaxPassportStatus = useCallback((status: JazzRelaxPassportView) => {
     setPassportPhase(status.phase);
+    setPassportStatus(status);
+    setPassportPollFailed(false);
+  }, []);
+  const onPassportEnqueueActive = useCallback((active: boolean) => {
+    setPassportEnqueueing(active);
+  }, []);
+  const onPassportPollFailed = useCallback((failed: boolean) => {
+    setPassportPollFailed(failed);
   }, []);
   const [form, setForm] = useState<FormState>(() =>
     applyAudioSprintTitleLock(
@@ -1194,9 +1214,11 @@ export default function AuthorProductForm({
       return;
     }
 
-    document
-      .querySelector<HTMLElement>("[data-submit-issue]")
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const issue = document.querySelector<HTMLElement>("[data-submit-issue]");
+    if (!issue) return;
+    issue.scrollIntoView({ behavior: "smooth", block: "center" });
+    const field = issue.querySelector<HTMLElement>("input, textarea, select");
+    field?.focus({ preventScroll: true });
   }, [submitIssueScrollKey]);
 
   const {
@@ -3714,44 +3736,67 @@ export default function AuthorProductForm({
     }
   }
 
+  const passportActivity = describeJazzRelaxPassportActivity({
+    saving: passportSaving,
+    enqueueing: passportEnqueueing,
+    status: passportStatus,
+    pollFailed: passportPollFailed,
+  });
+
   async function saveWizardStepAndContinue() {
     setError(null);
     setMessage(null);
-    const saved = await saveProduct();
-    if (!saved) {
-      return;
+    const creatingPassport = jazzRelaxMusicPassport
+      && wizardStep === 2
+      && passportPhase !== "completed";
+    if (creatingPassport) {
+      if (passportActivity.buttonDisabled) return;
+      setPassportSaving(true);
     }
-    setMessage("Черновик сохранён.");
-
-    if (musicProductWizard && wizardStep === 1) {
-      if (applyMusicAuthorFieldError()) {
-        requestScrollToFirstSubmitIssue();
+    try {
+      const saved = await saveProduct();
+      if (!saved) {
         return;
       }
-    }
-    if (musicProductWizard && wizardStep === 2) {
-      if (applyMusicTrackTitleErrors()) {
-        requestScrollToFirstSubmitIssue();
+
+      if (musicProductWizard && wizardStep === 1) {
+        if (applyMusicAuthorFieldError()) {
+          requestScrollToFirstSubmitIssue();
+          return;
+        }
+      }
+      if (musicProductWizard && wizardStep === 2) {
+        if (applyMusicTrackTitleErrors()) {
+          setMessage(null);
+          setError(MUSIC_TRACK_TITLE_CYRILLIC_ERROR);
+          requestScrollToFirstSubmitIssue();
+          return;
+        }
+      }
+
+      setMessage("Черновик сохранён.");
+
+      if (jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed") {
+        const next = nextProductWizardStep(wizardStep);
+        if (next) {
+          goToWizardStep(next);
+        }
         return;
       }
-    }
 
-    if (jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed") {
+      if (creatingPassport) {
+        setPassportPollFailed(false);
+        setPassportEnqueueing(true);
+        setPassportCommand({ nonce: Date.now(), action: "start" });
+        return;
+      }
+
       const next = nextProductWizardStep(wizardStep);
       if (next) {
         goToWizardStep(next);
       }
-      return;
-    }
-
-    if (jazzRelaxMusicPassport && wizardStep === 2) {
-      setPassportCommand({ nonce: Date.now(), action: "start" });
-      return;
-    }
-
-    const next = nextProductWizardStep(wizardStep);
-    if (next) {
-      goToWizardStep(next);
+    } finally {
+      if (creatingPassport) setPassportSaving(false);
     }
   }
 
@@ -5929,9 +5974,16 @@ export default function AuthorProductForm({
           <JazzRelaxMusicPassportPanel
             practiceId={practiceId}
             command={passportCommand}
+            saving={passportSaving}
             onStatus={onJazzRelaxPassportStatus}
+            onEnqueueActive={onPassportEnqueueActive}
+            onPollFailed={onPassportPollFailed}
           />
         </div>
+      ) : null}
+
+      {jazzRelaxMusicPassport && wizardStep === 2 ? (
+        <JazzRelaxPassportActivityNotice activity={passportActivity} live />
       ) : null}
 
       {wizardEnabled && wizardStep < PRODUCT_WIZARD_STEP_COUNT ? (
@@ -5941,10 +5993,14 @@ export default function AuthorProductForm({
           busy={busy}
           continueLabel={
             jazzRelaxMusicPassport && wizardStep === 2
-              ? passportPhase === "completed"
-                ? "Перейти к оформлению"
-                : "Сохранить и создать музыкальный паспорт"
+              ? passportActivity.buttonLabel
               : undefined
+          }
+          continueDisabled={
+            jazzRelaxMusicPassport && wizardStep === 2 && passportActivity.buttonDisabled
+          }
+          continueBusy={
+            jazzRelaxMusicPassport && wizardStep === 2 && passportActivity.ariaBusy
           }
           secondaryContinueLabel={
             jazzRelaxMusicPassport && wizardStep === 2

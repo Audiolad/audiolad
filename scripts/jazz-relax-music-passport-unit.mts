@@ -5,7 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { MUSIC_MASTERS_BUCKET } from "../src/lib/author-products/music-master-upload-contract";
 import { PRACTICE_AUDIO_BUCKET } from "../src/lib/author-products/product-audio-upload-contract";
-import { JazzRelaxPassportBody } from "../src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
+import {
+  JazzRelaxPassportActivityNotice,
+  JazzRelaxPassportBody,
+} from "../src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon";
 import {
   JAZZ_RELAX_AUTHOR_ID,
@@ -19,12 +22,20 @@ import {
 } from "../src/lib/music-passport/album-passport-display";
 import {
   buildJazzRelaxPassportView,
+  describeJazzRelaxPassportActivity,
+  JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL,
   JAZZ_RELAX_PASSPORT_ENQUEUE_BATCH_SIZE,
   JAZZ_RELAX_PASSPORT_ENQUEUE_MAX_REQUESTS,
+  JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL,
+  JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL,
   jazzRelaxPassportEnqueueShouldContinue,
   jazzRelaxProgressLabel,
   jazzRelaxTrackEnqueueKind,
+  JAZZ_RELAX_PASSPORT_PREPARING_LABEL,
+  JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT,
+  resolveJazzRelaxAlbumLaunch,
   selectJazzRelaxPassportEnqueue,
+  type JazzRelaxPassportTrackView,
 } from "../src/lib/music-passport/jazz-relax-status";
 import {
   jazzRelaxAnalysisStorageTarget,
@@ -66,7 +77,10 @@ assert.match(read("src/components/author-dashboard/product-wizard/AuthorProductW
 assert.match(read("src/components/author-dashboard/product-wizard/AuthorProductWizardStepNav.tsx"), /secondaryContinueLabel/);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
-assert.match(form, /Сохранить и создать музыкальный паспорт/);
+assert.match(form, /describeJazzRelaxPassportActivity/);
+assert.match(form, /passportActivity\.buttonLabel/);
+assert.match(form, /JazzRelaxPassportActivityNotice/);
+assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Сохранить и создать музыкальный паспорт/);
 assert.match(form, /Продолжить без музыкального паспорта/);
 assert.match(form, /continueWithoutMusicPassport/);
 assert.doesNotMatch(form, /jazzRelaxMustReturnToMaterials|jazzRelaxPassportCompleted/);
@@ -566,7 +580,8 @@ assert.match(panelSource, /Повторить анализ/);
 assert.doesNotMatch(panelSource, /developerJson/);
 assert.doesNotMatch(albumSource, /\bMusicPassport\b|<MusicPassport|mode="product"|data-music-passport-mode/);
 assert.doesNotMatch(albumSource, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
-assert.match(form, /passportPhase === "completed"\s*\?\s*"Перейти к оформлению"/);
+assert.match(form, /passportActivity\.buttonLabel/);
+assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Перейти к оформлению/);
 assert.match(form, /if \(jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed"\)/);
 assert.match(form, /Продолжить без музыкального паспорта/);
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /readAlbumPassportDisplay/);
@@ -912,6 +927,303 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.match(read("src/lib/music-analyzer-runs/python-plan.ts"), /candidate_a:\s*false/);
   assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce8325c537668195afce0a56fa68d40a08c|932c4ce/);
   assert.equal(read("src/lib/authors/aurafon.ts").includes("59c7e5b8-eae4-4394-82fb-b815a10be6c2"), true);
+}
+
+{
+  function surfaceTracks(
+    states: Array<JazzRelaxPassportTrackView["state"]>,
+  ): JazzRelaxPassportTrackView[] {
+    return states.map((state, index) => ({
+      audioItemId: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`,
+      title: `Трек ${index + 1}`,
+      state,
+      errorCode: state === "failed" ? "analyze_failed" : null,
+      passportVersionId: null,
+      runId: null,
+      productPassport: null,
+    }));
+  }
+
+  function viewFor(states: Array<JazzRelaxPassportTrackView["state"]>) {
+    return buildJazzRelaxPassportView({
+      tracks: surfaceTracks(states),
+      completedAlbumPassportVersionId: null,
+      album: null,
+      summary: [],
+    });
+  }
+
+  const saving = describeJazzRelaxPassportActivity({
+    saving: true,
+    enqueueing: false,
+    status: null,
+    pollFailed: false,
+  });
+  assert.equal(saving.kind, "saving");
+  assert.equal(saving.headline, "Сохраняем…");
+  assert.equal(saving.buttonLabel, JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL);
+  assert.equal(saving.buttonDisabled, true);
+  assert.equal(saving.ariaBusy, true);
+  assert.equal(saving.indeterminate, true);
+  assert.equal(saving.progress, null);
+  assert.equal(saving.readyLabel, null);
+
+  const enqueueing = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: true,
+    status: viewFor(["queued", "queued"]),
+    pollFailed: false,
+  });
+  assert.equal(enqueueing.kind, "enqueueing");
+  assert.equal(enqueueing.headline, JAZZ_RELAX_PASSPORT_PREPARING_LABEL);
+  assert.equal(enqueueing.closeHint, null);
+  assert.equal(enqueueing.progress, null);
+  assert.equal(enqueueing.buttonDisabled, true);
+
+  const queuedOnly = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: viewFor(Array.from({ length: 10 }, () => "queued" as const)),
+    pollFailed: false,
+  });
+  assert.equal(queuedOnly.kind, "queued");
+  assert.equal(queuedOnly.headline, "Треки в очереди");
+  assert.equal(queuedOnly.readyLabel, null);
+  assert.equal(queuedOnly.progress, null);
+  assert.equal(queuedOnly.buttonDisabled, true);
+  assert.equal(queuedOnly.indeterminate, true);
+
+  const oneReady = viewFor([
+    "ready",
+    ...Array.from({ length: 9 }, () => "processing" as const),
+  ]);
+  assert.equal(oneReady.phase, "running");
+  assert.equal(oneReady.readyCount, 1);
+  assert.equal(oneReady.totalCount, 10);
+  const analyzing = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: oneReady,
+    pollFailed: false,
+  });
+  assert.equal(analyzing.kind, "analyzing");
+  assert.equal(analyzing.headline, "Музыкальный паспорт готовится");
+  assert.equal(analyzing.readyLabel, "Готово 1 из 10 треков");
+  assert.equal(analyzing.statusNotice, "Анализируем");
+  assert.deepEqual(analyzing.progress, { ready: 1, total: 10 });
+  assert.equal(analyzing.buttonDisabled, true);
+  assert.equal(analyzing.buttonLabel, JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL);
+  const analyzingMarkup = renderToStaticMarkup(createElement(
+    JazzRelaxPassportActivityNotice,
+    { activity: analyzing, live: true },
+  ));
+  assert.match(analyzingMarkup, /Музыкальный паспорт готовится/);
+  assert.match(analyzingMarkup, /Готово 1 из 10 треков/);
+  assert.match(analyzingMarkup, /Доля готовых треков: 1 из 10/);
+  assert.match(analyzingMarkup, /aria-valuenow="1"/);
+  assert.match(analyzingMarkup, /aria-valuemax="10"/);
+  assert.match(analyzingMarkup, /aria-live="polite"/);
+  assert.match(analyzingMarkup, /aria-busy="true"/);
+  assert.match(analyzingMarkup, /role="progressbar"/);
+  assert.doesNotMatch(analyzingMarkup, /ETA|осталось|минут|секунд|%/);
+  assert.equal(analyzing.closeHint, null);
+  assert.doesNotMatch(analyzingMarkup, /Можно закрыть/);
+
+  const preparingStatus = {
+    ...viewFor(["queued", "not_ready", "not_ready"]),
+    albumLaunch: "preparing" as const,
+    launchInFlight: false,
+  };
+  const preparing = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: preparingStatus,
+    pollFailed: false,
+  });
+  assert.equal(preparing.headline, "Подготавливаем запуск…");
+  assert.equal(preparing.closeHint, null);
+  assert.equal(preparing.buttonDisabled, false);
+  assert.equal(preparing.indeterminate, false);
+  const preparingMarkup = renderToStaticMarkup(createElement(
+    JazzRelaxPassportActivityNotice,
+    { activity: preparing, live: true },
+  ));
+  assert.match(preparingMarkup, /Подготавливаем запуск…/);
+  assert.doesNotMatch(preparingMarkup, /Можно закрыть|data-passport-close/);
+
+  const durableQueued = {
+    ...viewFor(Array.from({ length: 10 }, () => "queued" as const)),
+    albumLaunch: "durable" as const,
+    launchInFlight: false,
+  };
+  const durableQueuedActivity = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: durableQueued,
+    pollFailed: false,
+  });
+  assert.equal(durableQueuedActivity.closeHint, JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT);
+  assert.equal(durableQueuedActivity.readyLabel, null);
+  assert.equal(durableQueuedActivity.progress, null);
+  assert.equal(durableQueuedActivity.buttonDisabled, true);
+  const durableQueuedMarkup = renderToStaticMarkup(createElement(
+    JazzRelaxPassportActivityNotice,
+    { activity: durableQueuedActivity, live: true },
+  ));
+  assert.match(durableQueuedMarkup, /Можно закрыть страницу и вернуться позже — процесс продолжится/);
+  assert.doesNotMatch(durableQueuedMarkup, /Готово 0|%/);
+
+  const durableOne = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: { ...oneReady, albumLaunch: "durable", launchInFlight: false },
+    pollFailed: false,
+  });
+  assert.equal(durableOne.readyLabel, "Готово 1 из 10 треков");
+  assert.equal(durableOne.closeHint, JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT);
+  assert.equal(durableOne.buttonDisabled, true);
+
+  assert.equal(resolveJazzRelaxAlbumLaunch({
+    tracks: [
+      { state: "not_ready", errorCode: "not_started" },
+      { state: "not_ready", errorCode: "not_started" },
+    ],
+    launchInFlight: false,
+  }).albumLaunch, "idle");
+  assert.equal(resolveJazzRelaxAlbumLaunch({
+    tracks: [
+      { state: "queued", errorCode: null },
+      { state: "not_ready", errorCode: "not_started" },
+    ],
+    launchInFlight: false,
+  }).albumLaunch, "preparing");
+  assert.equal(resolveJazzRelaxAlbumLaunch({
+    tracks: [
+      { state: "queued", errorCode: null },
+      { state: "processing", errorCode: null },
+    ],
+    launchInFlight: false,
+  }).albumLaunch, "durable");
+  assert.equal(resolveJazzRelaxAlbumLaunch({
+    tracks: [
+      { state: "missing_audio", errorCode: "missing_audio" },
+      { state: "queued", errorCode: null },
+    ],
+    launchInFlight: false,
+  }).albumLaunch, "preparing");
+  assert.equal(resolveJazzRelaxAlbumLaunch({
+    tracks: [{ state: "queued", errorCode: null }],
+    launchInFlight: true,
+  }).albumLaunch, "preparing");
+
+  const savingMarkup = renderToStaticMarkup(createElement(
+    JazzRelaxPassportActivityNotice,
+    { activity: saving, live: true },
+  ));
+  assert.match(savingMarkup, /Сохраняем…/);
+  assert.match(savingMarkup, /motion-reduce:animate-none/);
+  assert.doesNotMatch(savingMarkup, /aria-valuenow/);
+  assert.doesNotMatch(savingMarkup, /Готово /);
+
+  const stale = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: oneReady,
+    pollFailed: true,
+  });
+  assert.equal(stale.kind, "stale");
+  assert.equal(stale.headline, "Не удаётся обновить статус");
+  assert.equal(stale.buttonDisabled, false);
+  assert.equal(stale.buttonLabel, JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL);
+  assert.equal(stale.ariaBusy, false);
+  assert.equal(stale.indeterminate, false);
+  assert.equal(stale.progress, null);
+  assert.match(stale.readyLabel ?? "", /Последние данные: готово 1 из 10 треков/);
+  const staleMarkup = renderToStaticMarkup(createElement(
+    JazzRelaxPassportActivityNotice,
+    { activity: stale, live: true },
+  ));
+  assert.match(staleMarkup, /Не удаётся обновить статус/);
+  assert.match(staleMarkup, /aria-busy="false"/);
+  assert.doesNotMatch(staleMarkup, /role="progressbar"/);
+  assert.doesNotMatch(staleMarkup, /animate-pulse|Анализируем/);
+
+  const partialActivity = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: viewFor(["ready", "failed"]),
+    pollFailed: false,
+  });
+  assert.equal(partialActivity.kind, "partial");
+  assert.equal(partialActivity.buttonDisabled, false);
+  assert.equal(partialActivity.readyLabel, "Готово 1 из 2 треков");
+  assert.deepEqual(partialActivity.progress, { ready: 1, total: 2 });
+
+  const failedActivity = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: viewFor(["failed", "failed"]),
+    pollFailed: false,
+  });
+  assert.equal(failedActivity.kind, "failed");
+  assert.equal(failedActivity.buttonDisabled, false);
+  assert.equal(failedActivity.headline, "Не удалось создать музыкальный паспорт");
+
+  const done = describeJazzRelaxPassportActivity({
+    saving: false,
+    enqueueing: false,
+    status: buildJazzRelaxPassportView({
+      tracks: surfaceTracks(["ready", "ready"]),
+      completedAlbumPassportVersionId: "dddddddd-dddd-4ddd-8ddd-ddddddddddd9",
+      album: null,
+      summary: [],
+    }),
+    pollFailed: false,
+  });
+  assert.equal(done.buttonLabel, JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL);
+  assert.equal(done.buttonDisabled, false);
+  assert.equal(done.ariaBusy, false);
+
+  assert.equal(jazzRelaxTrackEnqueueKind({
+    action: "start",
+    runStatus: "queued",
+    hasPassport: false,
+  }), "skip");
+  assert.equal(jazzRelaxTrackEnqueueKind({
+    action: "start",
+    runStatus: "processing",
+    hasPassport: false,
+  }), "skip");
+  assert.equal(jazzRelaxTrackEnqueueKind({
+    action: "start",
+    runStatus: "succeeded",
+    hasPassport: true,
+  }), "compare");
+
+  const stepNav = read("src/components/author-dashboard/product-wizard/AuthorProductWizardStepNav.tsx");
+  assert.match(stepNav, /disabled=\{busy \|\| !canSave \|\| continueDisabled\}/);
+  assert.match(stepNav, /aria-busy=\{continueBusy \? true : undefined\}/);
+  assert.match(stepNav, /disabled=\{busy \|\| !canSave\}/);
+  assert.match(form, /continueDisabled=\{/);
+  assert.match(form, /MUSIC_TRACK_TITLE_CYRILLIC_ERROR/);
+  assert.match(form, /field\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(form, /setPassportSaving\(true\)/);
+  assert.match(form, /if \(passportActivity\.buttonDisabled\) return/);
+  const panelActivitySource = read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx");
+  assert.match(panelActivitySource, /Связь прервалась/);
+  assert.match(panelActivitySource, /onPollFailed\?\.\(true\)/);
+  assert.match(panelActivitySource, /motion-reduce:animate-none/);
+  assert.doesNotMatch(panelActivitySource, /reanalyze[\s\S]{0,80}useEffect/);
+  assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Создаём музыкальный паспорт/);
+  assert.doesNotMatch(panelActivitySource, /Можно закрыть страницу/);
+  assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Можно закрыть страницу и вернуться позже — процесс продолжится/);
+  assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /ensureJazzRelaxAlbumContinuation/);
+  assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /albumContinuations/);
+  assert.doesNotMatch(read("src/lib/music-passport/jazz-relax-pilot.ts"), /Можно закрыть страницу/);
+  assert.doesNotMatch(
+    read("src/lib/music-analyzer-runs/worker-runtime.ts"),
+    /ensureJazzRelaxAlbumContinuation|append_music_passport|music_album_passports/,
+  );
 }
 
 console.log("jazz-relax-music-passport-unit: ok");
