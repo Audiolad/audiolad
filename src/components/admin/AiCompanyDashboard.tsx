@@ -185,11 +185,7 @@ function TodayList({ rows, empty }: { rows: TodayRowModel[]; empty: string }) {
     <div className="space-y-2">
       {rows.map((row) => (
         <article key={row.key} className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm sm:p-4">
-          <TaskHeading
-            title={`${row.timeLabel} · ${row.title}`}
-            badge={row.detail.stageBadge}
-            subtle={`${row.taskId} · ${row.agentLabel}`}
-          />
+          <TaskHeading title={`${row.timeLabel} · ${row.title}`} badge={row.detail.stageBadge} />
         </article>
       ))}
     </div>

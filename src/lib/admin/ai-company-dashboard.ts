@@ -72,7 +72,8 @@ export const CORE_FIELD_MAP = {
     id: ["id", "task_id"],
     title: ["title"],
     status: ["status"],
-    stage: ["stage"],
+    stage: ["operating_stage", "stage"],
+    executiveStatus: ["executive_status"],
     priority: ["priority"],
     functionalRole: ["role", "producer_agent_slug", "functional_role", "agent_slug"],
     active: ["active"],
@@ -369,6 +370,7 @@ export type ExecutiveRun = {
   lastEventAt: string | null;
   prUrl: string | null;
   headSha: string | null;
+  mergeSha: string | null;
   ci: unknown;
   independentReview: unknown;
   reviewSha: string | null;
@@ -392,6 +394,7 @@ export type CompanyTask = {
   title: string;
   status: string;
   stage: string | null;
+  executiveStatus: string | null;
   priority: string | null;
   producerAgentSlug: string | null;
   active: boolean | null;
@@ -974,6 +977,13 @@ function parseProgress(value: unknown): VerifiedProgress | null {
   };
 }
 
+function distinctMergeSha(record: Record<string, unknown>): string | null {
+  const head = readString(record, ["head_sha"]);
+  const commit = readString(record, ["commit_sha"]);
+  if (!head || !commit) return null;
+  return head.trim().toLowerCase() === commit.trim().toLowerCase() ? null : commit;
+}
+
 function parseExecutiveRun(value: unknown): ExecutiveRun | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -989,6 +999,7 @@ function parseExecutiveRun(value: unknown): ExecutiveRun | null {
     lastEventAt: readString(record, CORE_FIELD_MAP.executiveRun.lastEventAt),
     prUrl: readString(record, CORE_FIELD_MAP.executiveRun.prUrl),
     headSha: readString(record, CORE_FIELD_MAP.executiveRun.headSha),
+    mergeSha: distinctMergeSha(record),
     ci: "ci_status" in record ? record.ci_status : readRaw(record, ["ci"]),
     independentReview: reviewFromStatus,
     reviewSha: readString(record, CORE_FIELD_MAP.executiveRun.reviewSha) ?? evidenceSha(reviewFromStatus),
@@ -1088,6 +1099,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     title: clip(title, 300),
     status: readString(record, CORE_FIELD_MAP.task.status) ?? "",
     stage: readString(record, CORE_FIELD_MAP.task.stage),
+    executiveStatus: readString(record, CORE_FIELD_MAP.task.executiveStatus),
     priority: readString(record, CORE_FIELD_MAP.task.priority),
     producerAgentSlug: readString(record, CORE_FIELD_MAP.task.functionalRole),
     active: readBoolean(record, CORE_FIELD_MAP.task.active),
@@ -1392,6 +1404,7 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     title: next.title.startsWith("Задача без названия") ? previous.title : next.title,
     status: next.status || previous.status,
     stage: prefer(next.stage, previous.stage),
+    executiveStatus: prefer(next.executiveStatus, previous.executiveStatus),
     priority: prefer(next.priority, previous.priority),
     producerAgentSlug: prefer(next.producerAgentSlug, previous.producerAgentSlug),
     actualExecutor: prefer(next.actualExecutor, previous.actualExecutor),
@@ -1709,10 +1722,9 @@ function startedAt(task: CompanyTask | null, events: CompanyEvent[]): string | n
 }
 
 function completionInstant(task: CompanyTask, events: CompanyEvent[]): string | null {
-  if (parseInstant(task.completedAt) != null) return task.completedAt;
-  if (!isCompletedStatus(task.status)) return null;
-  const completions = linkedEvents(task, events).filter((event) =>
-    COMPLETION_EVENT_TYPES.has(normalizeToken(event.bareType)),
+  if (parseInstant(task.completedAt) != null && task.completedAt) return task.completedAt;
+  const completions = linkedEvents(task, events).filter(
+    (event) => COMPLETION_EVENT_TYPES.has(normalizeToken(event.bareType)) && parseInstant(event.createdAt) != null,
   );
   return completions[completions.length - 1]?.createdAt ?? null;
 }
@@ -1804,7 +1816,9 @@ function evidenceSha(value: unknown): string | null {
 
 function isPass(value: unknown): boolean {
   const status = evidenceStatus(value);
-  return status != null && PASS_TOKENS.has(normalizeToken(status));
+  if (status == null) return false;
+  const token = normalizeToken(status);
+  return PASS_TOKENS.has(token) || token === "independent_pass";
 }
 
 function shaEqual(left: string | null, right: string | null): boolean {
@@ -1844,7 +1858,9 @@ function engineeringPanel(task: CompanyTask, events: CompanyEvent[]): Engineerin
     if (!headSha) reviewLabel = "SHA головы нет в источнике, точное совпадение не подтверждено";
     else if (!reviewSha) reviewLabel = `вердикт ${evidenceStatus(reviewValue) ?? NO_DATA}, SHA проверки нет`;
     else if (!shaEqual(reviewSha, headSha)) reviewLabel = `проверка другого SHA ${reviewSha}, голова ${headSha}`;
-    else reviewLabel = `SHA ${headSha}: ${evidenceStatus(reviewValue) ?? NO_DATA}`;
+    else if (run?.mergeSha) {
+      reviewLabel = `SHA проверки ${headSha}. SHA выпуска ${run.mergeSha} сохранён отдельно, связь проверки с выпуском не подтверждена`;
+    } else reviewLabel = `SHA ${headSha}: ${evidenceStatus(reviewValue) ?? NO_DATA}`;
   }
 
   const ciLabel = ciValue == null ? NO_DATA : `${evidenceStatus(ciValue) ?? "есть запись"}`;
@@ -1901,9 +1917,11 @@ function formatProgress(progress: VerifiedProgress | null, dodSatisfied: boolean
 
 function taskIsClosed(task: CompanyTask, events: CompanyEvent[]): boolean {
   if (isPilotTask(task) && codexReadinessBlocked(task)) return false;
+  if (CANCELLED_STATUSES.has(normalizeToken(task.status))) return false;
   const panel = engineeringPanel(task, events);
   if (task.resultKind === "engineering") return panel.dodSatisfied;
-  return isCompletedStatus(task.status);
+  if (isCompletedStatus(task.status)) return true;
+  return completionInstant(task, events) != null;
 }
 
 function isPilotTask(task: CompanyTask): boolean {
@@ -2225,15 +2243,6 @@ function isDispatchSignal(task: CompanyTask, events: CompanyEvent[]): boolean {
   return DISPATCH_TOKENS.has(text) || text.startsWith("executive_dispatched");
 }
 
-function dispatchIsStale(task: CompanyTask, events: CompanyEvent[], snapshotIso: string): boolean {
-  const latest = linkedEvents(task, events).filter((event) => event.createdAt).at(-1);
-  const at = task.lastEventAt ?? latest?.createdAt ?? null;
-  const observed = parseInstant(at);
-  const now = parseInstant(snapshotIso);
-  if (observed == null || now == null) return true;
-  return now - observed > HEARTBEAT_STALE_MS;
-}
-
 function gatesForTask(task: CompanyTask, gates: GateFact[]): GateFact[] {
   const aliases = new Set(taskAliases(task));
   return gates.filter((gate) => !gate.archived && gate.taskId != null && aliases.has(gate.taskId));
@@ -2259,12 +2268,75 @@ function decisionStage(task: CompanyTask, gates: GateFact[]): StageBadge | null 
 
 function releaseDetail(task: CompanyTask): string {
   const hold = task.releaseHold?.trim() ?? "";
-  if (hold && !isDeployAsk(hold)) return clip(hold, 180);
+  if (hold && !isDeployAsk(hold) && !/not_deployed|merged_not_deployed/i.test(hold)) return clip(hold, 180);
   return "Слито в main. Выпуск на сайт не подтверждён.";
+}
+
+function deployStatusToken(task: CompanyTask): string {
+  return normalizeToken(evidenceStatus(task.executiveRun?.deploy) ?? "");
+}
+
+function awaitsRelease(task: CompanyTask, panel: EngineeringPanel): boolean {
+  const token = deployStatusToken(task);
+  if (token.startsWith("merged_not_deployed") || token.includes("not_deployed")) return true;
+  return taskIsMerged(task) && !panel.deployPassed;
+}
+
+function newestInstant(values: Array<string | null | undefined>): string | null {
+  let best: string | null = null;
+  let bestAt = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    const at = parseInstant(value ?? null);
+    if (at == null || value == null) continue;
+    if (at >= bestAt) {
+      best = value;
+      bestAt = at;
+    }
+  }
+  return best;
+}
+
+function isFreshInstant(value: string | null, snapshotIso: string): boolean {
+  const observed = parseInstant(value);
+  const now = parseInstant(snapshotIso);
+  if (observed == null || now == null) return false;
+  return now - observed <= HEARTBEAT_STALE_MS;
+}
+
+function executionInstant(task: CompanyTask, events: CompanyEvent[]): string | null {
+  return newestInstant([
+    task.startedAt,
+    task.lastEventAt,
+    task.executiveRun?.lastEventAt,
+    ...linkedEvents(task, events).map((event) => event.createdAt),
+  ]);
+}
+
+function hasFreshExecution(task: CompanyTask, events: CompanyEvent[], snapshotIso: string): boolean {
+  const progressTokens = new Set(["progress", "task_progress", "started", "working", "in_progress"]);
+  const runText = normalizeToken(task.executiveRun?.lastEvent ?? "");
+  if (progressTokens.has(runText) && isFreshInstant(task.executiveRun?.lastEventAt ?? null, snapshotIso)) return true;
+  if (progressTokens.has(normalizeToken(task.executiveStatus ?? "")) && isFreshInstant(executionInstant(task, events), snapshotIso)) {
+    return true;
+  }
+  return linkedEvents(task, events).some(
+    (event) => progressTokens.has(normalizeToken(event.bareType)) && isFreshInstant(event.createdAt, snapshotIso),
+  );
+}
+
+function staleStage(lastLabel: string, at: string | null): StageBadge {
+  const when = formatDateTime(at);
+  const time = when === NO_DATA ? "время не сохранено" : when;
+  return {
+    label: "Нет свежих данных",
+    tone: "stale",
+    detail: `Последняя подтверждённая стадия: ${lastLabel} · ${time}`,
+  };
 }
 
 function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIso: string, gates: GateFact[]): StageBadge {
   const status = normalizeToken(task.status);
+  const stageToken = normalizeToken(task.stage ?? "");
   if (CANCELLED_STATUSES.has(status)) return { label: "Отменена", tone: "cancelled", detail: null };
   if (isPilotTask(task) && codexReadinessBlocked(task)) {
     return {
@@ -2273,10 +2345,21 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
       detail: "Пилот не отмечен успешным: Codex не подключён",
     };
   }
-  const decision = decisionStage(task, gates);
-  if (decision) return decision;
-  if (taskIsClosed(task, events)) return { label: "Завершена", tone: "done", detail: null };
   const panel = engineeringPanel(task, events);
+  const decision = decisionStage(task, gates);
+  if (awaitsRelease(task, panel)) {
+    const extra = decision?.detail ? ` Дополнительно: ${decision.detail}` : "";
+    return { label: "Ожидает выпуска", tone: "release", detail: `Oriy: ${releaseDetail(task)}${extra}` };
+  }
+  if (decision) return decision;
+  if (taskIsClosed(task, events)) {
+    const completed = completionInstant(task, events);
+    return {
+      label: "Завершена",
+      tone: "done",
+      detail: completed ? null : "Время завершения не сохранено",
+    };
+  }
   if (task.resultKind !== "document" && panel.deployPassed && !panel.productionPassed) {
     return {
       label: "Проверяется на сайте",
@@ -2284,17 +2367,21 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
       detail: "Выпуск записан. Проверка на сайте ещё не сохранена.",
     };
   }
-  if (taskIsMerged(task) && !panel.deployPassed) {
-    return { label: "Ожидает выпуска", tone: "release", detail: releaseDetail(task) };
+  if (REVIEW_STATUSES.has(status) || REVIEW_STATUSES.has(stageToken)) {
+    return { label: "На проверке", tone: "review", detail: null };
   }
-  if (REVIEW_STATUSES.has(status)) return { label: "На проверке", tone: "review", detail: null };
   const started = parseInstant(task.startedAt) != null;
-  if (!started && isDispatchSignal(task, events)) {
-    return dispatchIsStale(task, events, snapshotIso)
-      ? { label: "Нет свежих данных", tone: "stale", detail: null }
-      : { label: "В очереди", tone: "queue", detail: null };
+  const executedAt = executionInstant(task, events);
+  const freshExecution = isFreshInstant(executedAt, snapshotIso) && (started || hasFreshExecution(task, events, snapshotIso));
+  if (freshExecution) return { label: "В работе", tone: "working", detail: null };
+  if (started || hasFreshExecution(task, events, snapshotIso)) {
+    return staleStage("В работе", executedAt ?? task.startedAt);
   }
-  if (started) return { label: "В работе", tone: "working", detail: null };
+  if (isDispatchSignal(task, events)) {
+    return isFreshInstant(executedAt, snapshotIso)
+      ? { label: "В очереди", tone: "queue", detail: null }
+      : staleStage("В очереди", executedAt);
+  }
   if (BACKLOG_STATUSES.has(status)) return { label: "В очереди", tone: "queue", detail: null };
   if (ATTENTION_STATUSES.has(status)) {
     const owner = ownerLabel(task.decisionOwner);
@@ -2303,7 +2390,7 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
     if (owner && reason !== "Нет данных") return { label: "Нужно решение", tone: "decision", detail: `${owner}: ${reason}` };
     return { label: "Заблокирована", tone: "blocked", detail: `Нет данных: ${reason}` };
   }
-  return { label: "Нет свежих данных", tone: "stale", detail: null };
+  return staleStage("Нет данных", executedAt);
 }
 
 function buildTaskDetail(
@@ -2363,7 +2450,11 @@ function buildTaskDetail(
     engineering: panel,
     humanGate: humanGateLabel(task.humanGate),
     outcome: outcomeLabel(task, events, codexDisconnected),
-    completedAt: formatDateTime(completed),
+    completedAt: taskIsClosed(task, events)
+      ? completed
+        ? formatDateTime(completed)
+        : "Время завершения не сохранено"
+      : formatDateTime(null),
     stageBadge: resolveStageBadge(task, events, snapshotIso, gates),
   };
 }
