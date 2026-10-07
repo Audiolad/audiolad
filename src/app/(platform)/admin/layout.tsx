@@ -36,6 +36,7 @@ export default async function AdminLayout({
   const navItems = getVisibleAdminNavItems(session.access).map((item) => ({
     href: item.href,
     label: item.label,
+    matchPrefixes: item.activePrefixes ? [...item.activePrefixes] : undefined,
     badgeCount:
       item.href === "/admin/author-applications"
         ? authorApplicationAttentionCount

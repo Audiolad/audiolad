@@ -1,15 +1,23 @@
-import type { PlatformPermission } from "@/lib/auth/platform-permissions";
+import { isAdminNavPathActive } from "@/lib/admin/nav-active";
 import {
   snapshotHasPermission,
   type PlatformAccessSnapshot,
 } from "@/lib/auth/platform-access";
+import type { PlatformPermission } from "@/lib/auth/platform-permissions";
+
+export { isAdminNavPathActive };
 
 export type AdminNavItem = {
   href: string;
   label: string;
   requiredPermission: PlatformPermission;
+  /** Service routes that should highlight this item without appearing in the menu. */
+  activePrefixes?: readonly string[];
   match: (path: string) => boolean;
 };
+
+/** Kept off the top menu. Reachable from the authors section with authors.manage. */
+const CREATE_AUTHOR_SPACE_HREF = "/admin/authors/new";
 
 /**
  * Declarative admin navigation.
@@ -33,14 +41,10 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     href: "/admin/author-applications",
     label: "Заявки авторов",
     requiredPermission: "authors.view",
-    match: (path) => path.startsWith("/admin/author-applications"),
-  },
-  {
-    href: "/admin/authors/new",
-    label: "Создать студию",
-    requiredPermission: "authors.manage",
+    activePrefixes: [CREATE_AUTHOR_SPACE_HREF],
     match: (path) =>
-      path === "/admin/authors/new" || path.startsWith("/admin/authors/new/"),
+      path.startsWith("/admin/author-applications") ||
+      isAdminNavPathActive({ href: CREATE_AUTHOR_SPACE_HREF }, path),
   },
   {
     href: "/admin/authors/slug",

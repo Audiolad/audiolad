@@ -113,6 +113,7 @@ jobs:
           npm run test:admin-overview-incident
           npm run test:company-control-cycle-evidence
           npm run test:admin-mailings
+          npm run test:admin-nav-author-space
           npm run test:application-email-outbox-timer
           npm run build
           npm run typecheck
