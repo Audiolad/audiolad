@@ -2,20 +2,24 @@ import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   buildAiCompanyDashboard,
+  companyStatusRequestPath,
   parseCompanyStatus,
   parseHistoryFilters,
 } from "@/lib/admin/ai-company-dashboard";
 
 export const dynamic = "force-dynamic";
 
-async function loadStatus(): Promise<{ data: ReturnType<typeof parseCompanyStatus>; error: string | null }> {
+async function loadStatus(filters: ReturnType<typeof parseHistoryFilters>): Promise<{
+  data: ReturnType<typeof parseCompanyStatus>;
+  error: string | null;
+}> {
   const base = process.env.COMPANY_CORE_URL ?? process.env.COMPANY_API_URL;
   const token = process.env.COMPANY_API_TOKEN;
   if (!base || !token) {
     return { data: null, error: "Company Core не настроен: отсутствует URL или серверный токен." };
   }
   try {
-    const response = await fetch(`${base.replace(/\/$/, "")}/v1/status`, {
+    const response = await fetch(`${base.replace(/\/$/, "")}${companyStatusRequestPath(filters)}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
@@ -33,34 +37,29 @@ async function loadStatus(): Promise<{ data: ReturnType<typeof parseCompanyStatu
 export default async function AiCompanyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; status?: string; agent?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    status?: string;
+    agent?: string;
+    history_offset?: string;
+    history_cursor?: string;
+  }>;
 }) {
   await requireAdminPermission("ai_company.view");
   const filters = parseHistoryFilters(await searchParams);
-  const { data, error } = await loadStatus();
+  const { data, error } = await loadStatus(filters);
 
   if (!data) {
     return (
-      <section aria-labelledby="ai-company-unavailable">
-        <meta httpEquiv="refresh" content="45" />
-        <h2 id="ai-company-unavailable" className="text-[21px] font-semibold">
-          ИИ-компания
-        </h2>
-        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
-          <strong>Требует внимания (Attention): нет достоверных данных</strong>
-          <p className="mt-2 text-sm">{error}</p>
-          <p className="mt-2 text-sm">Фиктивное состояние не подставлено. Повтор через 45 секунд.</p>
-        </div>
-      </section>
+      <AiCompanyDashboard model={null} filters={filters} sourceError={error} />
     );
   }
 
-  const model = buildAiCompanyDashboard(data, filters);
-
   return (
-    <section aria-labelledby="ai-company-heading">
-      <meta httpEquiv="refresh" content="45" />
-      <AiCompanyDashboard model={model} filters={filters} />
-    </section>
+    <AiCompanyDashboard
+      model={buildAiCompanyDashboard(data, filters)}
+      filters={filters}
+      sourceError={null}
+    />
   );
 }
