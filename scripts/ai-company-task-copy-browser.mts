@@ -105,7 +105,10 @@ try {
   await area.waitFor();
   await row.locator("text=Выделить всё").click();
   const selected = await area.evaluate(
-    (node) => node.selectionStart === 0 && node.selectionEnd === node.value.length && node.value.includes("Сергей"),
+    (node) =>
+      (node as HTMLTextAreaElement).selectionStart === 0 &&
+      (node as HTMLTextAreaElement).selectionEnd === (node as HTMLTextAreaElement).value.length &&
+      (node as HTMLTextAreaElement).value.includes("Сергей"),
   );
   if (!selected) throw new Error("select-all did not select the fallback text");
   if ((await toggle.getAttribute("aria-expanded")) !== "true") throw new Error("fallback collapsed the row");
