@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { isAdminNavPathActive } from "@/lib/admin/nav-active";
+
 export type AdminNavLink = {
   href: string;
   label: string;
@@ -24,10 +26,10 @@ export default function AdminNav({ items }: AdminNavProps) {
   return (
     <nav className="flex flex-wrap gap-2" aria-label="Панель управления">
       {items.map((item) => {
-        const active =
-          item.href === "/admin"
-            ? pathname === "/admin"
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = isAdminNavPathActive(
+          { href: item.href, activePrefixes: item.matchPrefixes },
+          pathname,
+        );
         const badgeCount =
           typeof item.badgeCount === "number" && item.badgeCount > 0
             ? item.badgeCount

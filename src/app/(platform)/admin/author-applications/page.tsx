@@ -8,15 +8,42 @@ import {
 } from "@/lib/admin/application-status";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { listAdminAuthorApplications } from "@/lib/admin/queries";
+import { snapshotHasPermission } from "@/lib/auth/platform-access";
 
 export const dynamic = "force-dynamic";
+
+function AuthorApplicationsHeading({
+  canManageAuthors,
+}: {
+  canManageAuthors: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+      <h2 id="admin-applications-heading" className="text-[21px] font-semibold">
+        Заявки авторов
+      </h2>
+      {canManageAuthors ? (
+        <Link
+          href="/admin/authors/new"
+          className="text-sm font-medium text-[#7042c5]"
+        >
+          Создать авторское пространство
+        </Link>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function AdminAuthorApplicationsPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  await requireAdminPermission("authors.view");
+  const session = await requireAdminPermission("authors.view");
+  const canManageAuthors = snapshotHasPermission(
+    session.access,
+    "authors.manage",
+  );
   const params = await searchParams;
   const statuses = resolveAdminAuthorApplicationFilterStatuses(params.status);
 
@@ -28,9 +55,12 @@ export default async function AdminAuthorApplicationsPage({
     console.error("admin_applications_page_error", error);
 
     return (
-      <div className="rounded-[22px] border border-[#efc7cf] bg-[#fff8f9] p-5 text-sm text-[#b34f63]">
-        Не удалось загрузить заявки. Попробуйте обновить страницу.
-      </div>
+      <section aria-labelledby="admin-applications-heading">
+        <AuthorApplicationsHeading canManageAuthors={canManageAuthors} />
+        <div className="mt-4 rounded-[22px] border border-[#efc7cf] bg-[#fff8f9] p-5 text-sm text-[#b34f63]">
+          Не удалось загрузить заявки. Попробуйте обновить страницу.
+        </div>
+      </section>
     );
   }
 
@@ -38,9 +68,7 @@ export default async function AdminAuthorApplicationsPage({
 
   return (
     <section aria-labelledby="admin-applications-heading">
-      <h2 id="admin-applications-heading" className="text-[21px] font-semibold">
-        Заявки авторов
-      </h2>
+      <AuthorApplicationsHeading canManageAuthors={canManageAuthors} />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
