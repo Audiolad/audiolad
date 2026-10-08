@@ -376,6 +376,7 @@
     "test:music-passport-basic": "node scripts/music-passport-basic-sql-unit.mjs && npx tsx scripts/music-passport-contract-unit.mts",
     "test:jazz-relax-music-passport": "npx tsx scripts/jazz-relax-music-passport-unit.mts",
     "test:product-video-export": "npx tsx scripts/product-video-export-unit.mts",
+    "test:author-product-publish-preview-flow": "npx tsx scripts/author-product-publish-preview-flow-unit.mts",
     "run:seo-reservation-5d-reminder": "npx tsx scripts/process-seo-reservation-5d-reminders.ts",
     "test:seo-reservation-5d-reminder": "npx tsx scripts/seo-reservation-5d-reminder-unit.mts && bash scripts/seo-reservation-5d-reminder-timer-unit.sh"
   },

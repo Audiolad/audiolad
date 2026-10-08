@@ -14,6 +14,7 @@ type AuthorProductPostListenPromoSectionProps = {
   promoButtonText: string;
   promoUrl: string;
   promoOpenInNewTab: boolean;
+  error?: string | null;
   busy: boolean;
   onPromoEnabledChange: (enabled: boolean) => void;
   onPromoTitleChange: (value: string) => void;
@@ -30,6 +31,7 @@ export default function AuthorProductPostListenPromoSection({
   promoButtonText,
   promoUrl,
   promoOpenInNewTab,
+  error = null,
   busy,
   onPromoEnabledChange,
   onPromoTitleChange,
@@ -43,6 +45,15 @@ export default function AuthorProductPostListenPromoSection({
       <h2 className="text-[20px] font-semibold">
         Рекомендация после прослушивания
       </h2>
+      {error ? (
+        <p
+          data-submit-issue
+          role="alert"
+          className="rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]"
+        >
+          {error}
+        </p>
+      ) : null}
       <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-[#eee6f7] bg-[#fbf8ff] px-4 py-3">
         <input
           type="checkbox"
@@ -111,6 +122,9 @@ export default function AuthorProductPostListenPromoSection({
             className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8] disabled:bg-platform-surface"
             placeholder="https://"
           />
+          <span className="mt-1 block text-xs leading-5 text-[#7d70a2]">
+            Ссылка должна начинаться с https:// или с / (страница АудиоЛада).
+          </span>
         </label>
         <label className="flex cursor-pointer items-start gap-3 text-sm text-[#5f5484]">
           <input
