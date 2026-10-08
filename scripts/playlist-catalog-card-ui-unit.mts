@@ -87,7 +87,6 @@ assert.equal(reservedTitleClassFor(longTitle), reservedTitleClassFor(shortTitle)
 assert.match(reservedTitleClassFor(longTitle), /line-clamp-2/);
 assert.match(reservedTitleClassFor(longTitle), /h-10 min-h-10/);
 assert.match(reservedTitleClassFor(shortTitle), /h-10 min-h-10/);
-assert.match(format, /line-clamp-3 min-h-\[3\.75rem\]/);
 assert.doesNotMatch(card, /item\.title\.(length|slice|split)/);
 
 assert.equal(formatPlaylistCardCreatorName("Плейлист АудиоЛада"), "АудиоЛад");

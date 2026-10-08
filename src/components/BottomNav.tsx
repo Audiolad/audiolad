@@ -107,7 +107,7 @@ export default function BottomNav({
               prefetch={false}
               aria-label={item.title}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 max-[389px]:px-0 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${
+              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 px-1 py-1 max-[390px]:px-0 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] ${
                 isPlayerVariant
                   ? active
                     ? "font-semibold text-white focus-visible:outline-white"
@@ -118,7 +118,7 @@ export default function BottomNav({
               }`}
             >
               <Icon active={active} />
-              <span className="max-w-full truncate max-[389px]:text-[11px] max-[389px]:tracking-[-0.02em] max-[359px]:text-[10.5px]">{item.title}</span>
+              <span className="max-w-full truncate max-[390px]:text-[11px] max-[390px]:tracking-[-0.02em] max-[359px]:text-[10.5px]">{item.title}</span>
             </Link>
           );
         })}

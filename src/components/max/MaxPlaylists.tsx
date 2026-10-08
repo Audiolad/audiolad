@@ -363,7 +363,7 @@ export default function MaxPlaylists({
   }, [onRequestedSlugApplied, requestedSlug]);
 
   return (
-    <div className="mx-auto min-w-0 max-w-lg pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] pb-[calc(68px+env(safe-area-inset-bottom,0px)+1rem)]" data-max-playlists>
+    <div className="mx-auto min-w-0 max-w-lg pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]" data-max-playlists>
       <div hidden={slug !== null}>
         <MaxPlaylistCatalog onOpen={setSlug} />
       </div>

@@ -73,11 +73,11 @@ export default function PublicPlaylistPageView({
       data-public-playlist-page
     >
       <header
-        className="mt-5 min-w-0 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)] flex flex-col xl:grid xl:grid-cols-[minmax(260px,280px)_minmax(0,1fr)] xl:items-start xl:gap-x-0"
+        className="mt-5 min-w-0 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)] flex flex-col xl:grid xl:grid-cols-[minmax(260px,280px)_minmax(0,1fr)] xl:items-stretch xl:gap-x-0"
         data-public-playlist-hero
       >
         <div
-          className="w-full min-w-0 xl:col-start-1 xl:row-start-1 xl:w-full"
+          className="w-full min-w-0 xl:col-start-1 xl:row-start-1 xl:h-full xl:w-full xl:self-stretch"
           data-public-playlist-hero-cover
         >
           <PlaylistCover
@@ -85,7 +85,7 @@ export default function PublicPlaylistPageView({
             customCoverUrl={detail.coverUrl}
             mosaicCoverUrls={detail.mosaicCoverUrls}
             coverAlt={playlistCoverAlt}
-            className="w-full rounded-t-[27px] xl:rounded-t-none xl:rounded-l-[27px]"
+            className="w-full rounded-t-[27px] xl:h-full xl:aspect-auto xl:rounded-t-none xl:rounded-l-[27px]"
             decorative={false}
           />
         </div>
@@ -115,6 +115,7 @@ export default function PublicPlaylistPageView({
 
           <PlayAllButton
             variant="public"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[22px] bg-gradient-to-r from-[#6d35d7] via-[#7c3fe4] to-[#8e55e8] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(109,53,215,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
             playlistSlug={playlist.slug}
             title={playlist.title}
             items={items}

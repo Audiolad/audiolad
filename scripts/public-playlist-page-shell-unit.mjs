@@ -243,8 +243,8 @@ assert(view.includes('data-public-playlist-hero'), "hero is marked for layout ch
 assert(
   view.includes("flex flex-col xl:grid") &&
     view.includes("xl:grid-cols-[minmax(260px,280px)_minmax(0,1fr)]") &&
-    view.includes("xl:items-start"),
-  "desktop xl hero is cover-left / content-right, top-aligned",
+    view.includes("xl:items-stretch"),
+  "desktop xl hero is cover-left / content-right, stretched to avoid white gap under cover",
 );
 assert(
   view.includes("xl:col-start-1") && view.includes("xl:col-start-2"),
