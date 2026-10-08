@@ -96,7 +96,7 @@ function initialMaxPromoTarget(
       promoSlug: startTarget.promoSlug,
     };
   }
-  if (startTarget?.kind === "product") return null;
+  if (startTarget?.kind === "product" || startTarget?.kind === "playlist") return null;
   return readMaxPromoTargetFromLocation();
 }
 
@@ -153,7 +153,12 @@ export default function MaxAuthenticatedHome({
   const [playlistRequest, setPlaylistRequest] = useState<{
     id: number;
     slug: string;
-  } | null>(null);
+  } | null>(() =>
+    initialStartTarget?.kind === "playlist"
+      ? { id: 1, slug: initialStartTarget.playlistSlug }
+      : null,
+  );
+  const playlistRequestIdRef = useRef(initialStartTarget?.kind === "playlist" ? 1 : 0);
   const playRef = useRef<(() => void) | null>(null);
   const pauseRef = useRef<(() => void) | null>(null);
   const selectTrackRef = useRef<((index: number) => void) | null>(null);
@@ -187,6 +192,24 @@ export default function MaxAuthenticatedHome({
         setSelected({
           authorSlug: initialStartTarget.authorSlug,
           slug: initialStartTarget.productSlug,
+        });
+        return;
+      }
+
+      if (initialStartTarget?.kind === "playlist") {
+        setSelected(null);
+        setPromoTarget(null);
+        pendingPlayRef.current = false;
+        pendingTrackIndexRef.current = null;
+        setListenArmed(false);
+        setPlaying(false);
+        setActiveTrackId(null);
+        setDetail({ status: "idle" });
+        setPlayback({ status: "idle" });
+        setActiveTab("playlists");
+        setPlaylistRequest({
+          id: ++playlistRequestIdRef.current,
+          slug: initialStartTarget.playlistSlug,
         });
         return;
       }
@@ -255,10 +278,10 @@ export default function MaxAuthenticatedHome({
   function openLibraryPlaylist(slug: string) {
     const trimmed = slug.trim();
     if (!trimmed) return;
-    setPlaylistRequest((current) => ({
+    setPlaylistRequest({
       slug: trimmed,
-      id: (current?.id ?? 0) + 1,
-    }));
+      id: ++playlistRequestIdRef.current,
+    });
     selectMaxTab("playlists");
   }
 

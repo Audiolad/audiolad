@@ -26,12 +26,16 @@ export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "home";
 
 /**
  * Ordinary open starts on Home. Product and promo deeplinks, including a
- * location promo target, still open in the catalog context.
+ * location promo target, still open in the catalog context. Playlist deeplinks
+ * open Playlists and take precedence over location promo targets.
  */
 export function resolveInitialMaxPrimaryTab(
   startTarget: { kind?: string | null } | null | undefined,
   hasLocationPromo: boolean,
 ): MaxPrimaryTab {
+  if (startTarget?.kind === "playlist") {
+    return "playlists";
+  }
   if (startTarget?.kind === "product" || startTarget?.kind === "promo") {
     return "catalog";
   }

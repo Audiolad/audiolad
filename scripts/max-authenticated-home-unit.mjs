@@ -41,6 +41,38 @@ const maxHomeScreen = readFileSync(
   "utf8",
 );
 
+const playlistInitializer = home.slice(
+  home.indexOf("const [playlistRequest, setPlaylistRequest]"),
+  home.indexOf("const playRef"),
+);
+assert.match(
+  playlistInitializer,
+  /initialStartTarget\?\.kind === "playlist"\s*\? \{ id: 1, slug: initialStartTarget\.playlistSlug \}\s*: null/,
+);
+
+const playlistStart = home.indexOf('if (initialStartTarget?.kind === "playlist")');
+const locationPromoStart = home.indexOf("const locationPromo =", playlistStart);
+assert.ok(playlistStart >= 0 && locationPromoStart > playlistStart);
+const playlistBranch = home.slice(playlistStart, locationPromoStart);
+assert.match(playlistBranch, /setActiveTab\("playlists"\)/);
+assert.match(playlistBranch, /setPromoTarget\(null\)/);
+assert.match(
+  playlistBranch,
+  /setPlaylistRequest\(\{\s*id: \+\+playlistRequestIdRef\.current,\s*slug: initialStartTarget\.playlistSlug,\s*\}\)/,
+);
+assert.match(playlistBranch, /return;\s*\}\s*$/);
+assert.match(home, /<MaxPlaylists\b[^>]*requestedSlug=\{playlistRequest\}/);
+
+const initialPromo = home.slice(
+  home.indexOf("function initialMaxPromoTarget("),
+  home.indexOf("function homeShelfTarget("),
+);
+assert.match(
+  initialPromo,
+  /if \(startTarget\?\.kind === "product" \|\| startTarget\?\.kind === "playlist"\) return null;\s*return readMaxPromoTargetFromLocation\(\);/,
+  "playlist targets ignore location promo during initialization",
+);
+
 assert.match(bridge, /view\.phase === "linked_authenticated"/);
 assert.match(bridge, /<MaxAuthenticatedHome/);
 assert.match(home, /<MaxCatalogSearch/);

@@ -230,6 +230,19 @@ assert.equal(
 const editor = read(
   "src/components/playlists/editorial/EditorialPlaylistEditorClient.tsx",
 );
+assert.match(editor, /data-testid="editorial-playlist-max-link"/);
+assert.match(editor, /resolveMaxPlaylistEditorLink\(detail\.playlist\)/);
+const maxLinkBlock = editor.slice(
+  editor.indexOf('<div data-testid="editorial-playlist-max-link">'),
+  editor.indexOf('<label className="block" htmlFor={descriptionId}>'),
+);
+assert.match(maxLinkBlock, /Открыть в MAX/);
+assert.match(maxLinkBlock, /Скопировать/);
+assert.match(maxLinkBlock, /Ссылка на MAX появится после публикации плейлиста\./);
+assert.match(
+  maxLinkBlock,
+  /<a\s+href=\{maxPlaylistLink\.url\}\s+target="_blank"\s+rel="noopener noreferrer"[^>]*>\s*Открыть в MAX\s*<\/a>/,
+);
 assert.match(editor, /editorial-playlist-save-feedback/);
 assert.match(editor, /saveButton\.label/);
 assert.match(editor, /EDITORIAL_PLAYLIST_SAVE_ERROR_MESSAGE/);

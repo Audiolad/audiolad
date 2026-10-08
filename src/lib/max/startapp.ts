@@ -4,6 +4,7 @@ import {
   expandCompactUuid,
   parseProductStartPayload,
 } from "@/lib/mini-app/product-target";
+import { isValidPlaylistPublicSlug } from "@/lib/playlists/public-slug";
 
 export const MAX_MINI_APP_BOT_NAME = "id507305817690_1_bot";
 export const MAX_MINI_APP_DEEP_LINK_ORIGIN = "https://max.ru";
@@ -19,6 +20,10 @@ export type MaxStartTarget =
   | {
       kind: "promo";
       promoPageId: string;
+    }
+  | {
+      kind: "playlist";
+      playlistId: string;
     };
 
 export type MaxResolvedStartTarget =
@@ -33,6 +38,11 @@ export type MaxResolvedStartTarget =
       promoPageId: string;
       authorSlug: string;
       promoSlug: string;
+    }
+  | {
+      kind: "playlist";
+      playlistId: string;
+      playlistSlug: string;
     };
 
 export function buildMaxProductStartPayload(practiceId: string): string | null {
@@ -44,6 +54,11 @@ export function buildMaxPromoStartPayload(promoPageId: string): string | null {
   return compact ? `g_${compact}` : null;
 }
 
+export function buildMaxPlaylistStartPayload(playlistId: string): string | null {
+  const compact = compactUuid(playlistId);
+  return compact ? `l_${compact}` : null;
+}
+
 export function parseMaxStartPayload(
   payload: string | null | undefined,
 ): MaxStartTarget | null {
@@ -53,6 +68,12 @@ export function parseMaxStartPayload(
   const product = parseProductStartPayload(normalized);
   if (product) {
     return { kind: "product", practiceId: product.practiceId };
+  }
+
+  const playlistMatch = normalized.match(/^l_([0-9a-f]{32})$/i);
+  if (playlistMatch) {
+    const playlistId = expandCompactUuid(playlistMatch[1] ?? "");
+    return playlistId ? { kind: "playlist", playlistId } : null;
   }
 
   const match = normalized.match(/^g_([0-9a-f]{32})$/i);
@@ -82,9 +103,45 @@ export function buildMaxPromoDeepLink(promoPageId: string): string | null {
   return payload ? buildMaxMiniAppDeepLink(payload) : null;
 }
 
+export function buildMaxPlaylistDeepLink(playlistId: string): string | null {
+  const payload = buildMaxPlaylistStartPayload(playlistId);
+  return payload ? buildMaxMiniAppDeepLink(payload) : null;
+}
+
+export function resolveMaxPlaylistEditorLink(playlist: {
+  id: string;
+  visibility: string;
+  slug: string | null;
+  published_at: string | null;
+}): { status: "ready"; url: string } | { status: "unpublished" } {
+  if (
+    playlist.visibility !== "public" ||
+    !playlist.published_at ||
+    !isValidPlaylistPublicSlug(playlist.slug)
+  ) {
+    return { status: "unpublished" };
+  }
+
+  const url = buildMaxPlaylistDeepLink(playlist.id);
+  return url ? { status: "ready", url } : { status: "unpublished" };
+}
+
 export function readMaxResolvedStartTarget(value: unknown): MaxResolvedStartTarget | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as Record<string, unknown>;
+
+  if (
+    row.kind === "playlist" &&
+    typeof row.playlistId === "string" &&
+    UUID_RE.test(row.playlistId) &&
+    isValidPlaylistPublicSlug(row.playlistSlug)
+  ) {
+    return {
+      kind: "playlist",
+      playlistId: row.playlistId,
+      playlistSlug: row.playlistSlug.trim(),
+    };
+  }
 
   if (
     row.kind === "product" &&

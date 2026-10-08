@@ -53,6 +53,9 @@ assert.equal(resolveInitialMaxPrimaryTab({ kind: "product" }, false), "catalog")
 assert.equal(resolveInitialMaxPrimaryTab({ kind: "promo" }, false), "catalog");
 assert.equal(resolveInitialMaxPrimaryTab(null, true), "catalog");
 assert.equal(resolveInitialMaxPrimaryTab({ kind: "product" }, true), "catalog");
+assert.equal(resolveInitialMaxPrimaryTab({ kind: "promo" }, true), "catalog");
+assert.equal(resolveInitialMaxPrimaryTab({ kind: "playlist" }, false), "playlists");
+assert.equal(resolveInitialMaxPrimaryTab({ kind: "playlist" }, true), "playlists");
 assert.match(tabs, /export const MAX_INITIAL_PRIMARY_TAB: MaxPrimaryTab = "home"/);
 assert.match(shell, /resolveInitialMaxPrimaryTab\(/);
 assert.match(shell, /initialStartTarget\?\.kind === "promo"/);

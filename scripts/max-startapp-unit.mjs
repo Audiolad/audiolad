@@ -4,21 +4,136 @@ import { join } from "node:path";
 
 import {
   MAX_MINI_APP_BOT_NAME,
+  buildMaxPlaylistDeepLink,
+  buildMaxPlaylistStartPayload,
   buildMaxProductDeepLink,
   buildMaxPromoDeepLink,
   buildMaxProductStartPayload,
   buildMaxPromoStartPayload,
   parseMaxStartPayload,
   readMaxResolvedStartTarget,
+  resolveMaxPlaylistEditorLink,
 } from "../src/lib/max/startapp.ts";
 import {
   resolveMaxStartTarget,
+  setMaxPlaylistStartLookupForTests,
   setPublishedDirectLinkLookupForTests,
 } from "../src/lib/max/startapp-server.ts";
 
 const productId = "11111111-1111-4111-8111-111111111111";
 const promoId = "22222222-2222-4222-8222-222222222222";
 const silaVeryId = "31e04472-2693-4986-a973-3600d9a2e4a7";
+const playlistId = "abcdef12-3456-4789-8abc-def012345678";
+const playlistPayload = "l_abcdef12345647898abcdef012345678";
+const playlistUrl = "https://max.ru/id507305817690_1_bot?startapp=l_abcdef12345647898abcdef012345678";
+const playlistTarget = {
+  kind: "playlist",
+  playlistId,
+  playlistSlug: "morning-playlist",
+};
+
+assert.equal(buildMaxPlaylistStartPayload(playlistId), playlistPayload);
+assert.equal(buildMaxPlaylistDeepLink(playlistId), playlistUrl);
+assert.deepEqual(parseMaxStartPayload(buildMaxPlaylistStartPayload(playlistId)), {
+  kind: "playlist",
+  playlistId,
+});
+assert.deepEqual(
+  parseMaxStartPayload(new URL(buildMaxPlaylistDeepLink(playlistId)).searchParams.get("startapp")),
+  { kind: "playlist", playlistId },
+);
+assert.equal("playlistSlug" in parseMaxStartPayload(playlistPayload), false);
+
+for (const invalidId of [
+  "bad",
+  "",
+  "abcdef12-3456-0789-8abc-def012345678",
+  "abcdef12-3456-4789-7abc-def012345678",
+  "abcdef12-3456-4789-8abc-def01234567z",
+  "abcdef12-3456-4789-8abc-def01234567",
+]) {
+  assert.equal(buildMaxPlaylistStartPayload(invalidId), null, invalidId);
+  assert.equal(buildMaxPlaylistDeepLink(invalidId), null, invalidId);
+}
+
+for (const invalidPayload of [
+  "l_",
+  playlistPayload.slice(0, -1),
+  `${playlistPayload}0`,
+  `${playlistPayload.slice(0, -1)}z`,
+  `${playlistPayload}_morning-playlist`,
+  `x${playlistPayload}`,
+  `l_ ${playlistPayload.slice(2)}`,
+  `${playlistPayload.slice(0, 12)}\t${playlistPayload.slice(12)}`,
+  `${playlistPayload.slice(0, 12)}\n${playlistPayload.slice(12)}`,
+  "l_abcdef12345607898abcdef012345678",
+  "l_abcdef12345647897abcdef012345678",
+]) {
+  assert.equal(parseMaxStartPayload(invalidPayload), null, invalidPayload);
+}
+
+// Prefix and hex matching are case-insensitive; UUID output is lowercase.
+for (const acceptedPayload of [
+  playlistPayload.toUpperCase(),
+  `L_${playlistPayload.slice(2)}`,
+  `l_${playlistPayload.slice(2).toUpperCase()}`,
+  ` \t${playlistPayload}\n`,
+]) {
+  assert.deepEqual(parseMaxStartPayload(acceptedPayload), {
+    kind: "playlist",
+    playlistId,
+  }, acceptedPayload);
+}
+assert.equal(buildMaxPlaylistStartPayload(playlistId.toUpperCase()), playlistPayload);
+assert.equal(buildMaxPlaylistDeepLink(playlistId.toUpperCase()), playlistUrl);
+for (const [prefix, expected] of [
+  ["p", { kind: "product", practiceId: playlistId }],
+  ["g", { kind: "promo", promoPageId: playlistId }],
+]) {
+  assert.deepEqual(parseMaxStartPayload(`${prefix}_${playlistPayload.slice(2)}`), expected);
+  assert.deepEqual(parseMaxStartPayload(`${prefix.toUpperCase()}_${playlistPayload.slice(2).toUpperCase()}`), expected);
+}
+
+assert.deepEqual(readMaxResolvedStartTarget(playlistTarget), playlistTarget);
+assert.equal(readMaxResolvedStartTarget({ ...playlistTarget, playlistId: "bad" }), null);
+assert.equal(readMaxResolvedStartTarget({ kind: "playlist", playlistSlug: "morning-playlist" }), null);
+for (const invalidSlug of ["Morning-playlist", "ab", "../x", "", null, undefined]) {
+  assert.equal(
+    readMaxResolvedStartTarget({ ...playlistTarget, playlistSlug: invalidSlug }),
+    null,
+    `resolved playlist rejects slug ${String(invalidSlug)}`,
+  );
+}
+assert.equal(readMaxResolvedStartTarget({ kind: "playlist", playlistId }), null);
+
+function publishedPlaylistRow(overrides = {}) {
+  return {
+    id: playlistId,
+    slug: "morning-playlist",
+    visibility: "public",
+    published_at: "2020-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+assert.deepEqual(resolveMaxPlaylistEditorLink(publishedPlaylistRow()), {
+  status: "ready",
+  url: playlistUrl,
+});
+for (const [label, overrides] of [
+  ["private", { visibility: "private" }],
+  ["not published", { published_at: null }],
+  ["missing slug", { slug: null }],
+  ["uppercase slug", { slug: "Morning-playlist" }],
+  ["short slug", { slug: "ab" }],
+  ["path slug", { slug: "../x" }],
+  ["empty slug", { slug: "" }],
+  ["invalid id", { id: "bad" }],
+]) {
+  assert.deepEqual(resolveMaxPlaylistEditorLink(publishedPlaylistRow(overrides)), {
+    status: "unpublished",
+  }, label);
+}
 
 assert.equal(MAX_MINI_APP_BOT_NAME, "id507305817690_1_bot");
 assert.equal(
@@ -338,6 +453,53 @@ try {
   );
   assert.equal(await resolveMaxStartTarget(buildMaxProductStartPayload(practiceUuid(90))), null);
 } finally {
+  setPublishedDirectLinkLookupForTests(null);
+}
+
+try {
+  const playlistCases = [
+    ["public published", publishedPlaylistRow(), playlistTarget],
+    ["null row", null, null],
+    ["private", publishedPlaylistRow({ visibility: "private" }), null],
+    ["not published", publishedPlaylistRow({ published_at: null }), null],
+    ["null slug", publishedPlaylistRow({ slug: null }), null],
+    ["uppercase slug", publishedPlaylistRow({ slug: "Morning-playlist" }), null],
+    ["short slug", publishedPlaylistRow({ slug: "ab" }), null],
+    ["path slug", publishedPlaylistRow({ slug: "../x" }), null],
+    ["empty slug", publishedPlaylistRow({ slug: "" }), null],
+    ["mismatched id", publishedPlaylistRow({ id: productId }), null],
+  ];
+  for (const [label, row, expected] of playlistCases) {
+    let lookupCalls = 0;
+    setMaxPlaylistStartLookupForTests(async (id) => {
+      lookupCalls += 1;
+      assert.equal(id, playlistId, "lookup receives the UUID, never a slug");
+      return { ok: true, row };
+    });
+    assert.deepEqual(await resolveMaxStartTarget(playlistPayload), expected, label);
+    assert.equal(lookupCalls, 1, label);
+  }
+
+  setMaxPlaylistStartLookupForTests(async () => ({
+    ok: false,
+    reason: "storage_unavailable",
+  }));
+  assert.equal(await resolveMaxStartTarget(playlistPayload), null, "storage unavailable");
+  setMaxPlaylistStartLookupForTests(async () => {
+    throw new Error("playlist lookup failed");
+  });
+  assert.equal(await resolveMaxStartTarget(playlistPayload), null, "thrown lookup error");
+
+  let slugPayloadLookups = 0;
+  setMaxPlaylistStartLookupForTests(async () => {
+    slugPayloadLookups += 1;
+    return { ok: true, row: publishedPlaylistRow() };
+  });
+  assert.equal(await resolveMaxStartTarget(`${playlistPayload}_morning-playlist`), null);
+  assert.equal(await resolveMaxStartTarget("l_morning-playlist"), null);
+  assert.equal(slugPayloadLookups, 0, "payload cannot supply the playlist slug");
+} finally {
+  setMaxPlaylistStartLookupForTests(null);
   setPublishedDirectLinkLookupForTests(null);
 }
 

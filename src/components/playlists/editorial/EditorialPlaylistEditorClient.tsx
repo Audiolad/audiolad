@@ -18,6 +18,7 @@ import EditorialPracticePickerSheet from "@/components/playlists/EditorialPracti
 import PlaylistCover from "@/components/playlists/PlaylistCover";
 import PlaylistItemRow from "@/components/playlists/PlaylistItemRow";
 import PlaylistItemsSortableList from "@/components/playlists/PlaylistItemsSortableList";
+import { resolveMaxPlaylistEditorLink } from "@/lib/max/startapp";
 import { takeFirstPlaylistItemCoverUrls } from "@/lib/playlists/cover-presentation";
 import {
   editorialAuditActionLabel,
@@ -51,6 +52,7 @@ import {
   type EditorialPlaylistSaveUi,
 } from "@/lib/playlists/editorial-playlist-save-feedback";
 import { PLAYLIST_TOPIC_LIMIT } from "@/lib/playlists/playlist-topics";
+import { copyTextToClipboard } from "@/lib/playlists/public-url";
 import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_MAX_ITEMS, PLAYLIST_TITLE_MAX_LENGTH } from "@/lib/playlists/types";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 
@@ -117,7 +119,17 @@ export default function EditorialPlaylistEditorClient({
     error: null,
   });
   const [toast, setToast] = useState<string | null>(null);
+  const [maxLinkCopy, setMaxLinkCopy] = useState<{
+    url: string;
+    status: "copied" | "error";
+  } | null>(null);
   const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (maxLinkCopy?.status !== "copied") return;
+    const timer = window.setTimeout(() => setMaxLinkCopy(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [maxLinkCopy]);
 
   useEffect(() => {
     if (!toast) {
@@ -128,6 +140,11 @@ export default function EditorialPlaylistEditorClient({
     return () => window.clearTimeout(timer);
   }, [toast]);
   const published = detail.playlist.visibility === "public";
+  const maxPlaylistLink = resolveMaxPlaylistEditorLink(detail.playlist);
+  const maxLinkCopyStatus =
+    maxPlaylistLink.status === "ready" && maxLinkCopy?.url === maxPlaylistLink.url
+      ? maxLinkCopy.status
+      : null;
   const slugLocked = detail.slugLocked;
   const currentForm = {
     title,
@@ -185,6 +202,15 @@ export default function EditorialPlaylistEditorClient({
   }, [items]);
   const softCountWarning = itemsCount > 0 && itemsCount < 7;
   const diversityHint = detail.diversityHint;
+
+  async function handleCopyMaxPlaylistLink() {
+    if (maxPlaylistLink.status !== "ready") return;
+    const copied = await copyTextToClipboard(maxPlaylistLink.url);
+    setMaxLinkCopy({
+      url: maxPlaylistLink.url,
+      status: copied ? "copied" : "error",
+    });
+  }
 
   function refresh() {
     startTransition(() => {
@@ -639,6 +665,47 @@ export default function EditorialPlaylistEditorClient({
                 : "После первой публикации адрес плейлиста изменить нельзя."}
             </span>
           </label>
+
+          <div data-testid="editorial-playlist-max-link">
+            <h3 className="mb-2 text-sm font-medium">Открыть в MAX</h3>
+            {maxPlaylistLink.status === "ready" ? (
+              <>
+                <p className="break-all text-sm text-[#7d70a2]">
+                  {maxPlaylistLink.url}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyMaxPlaylistLink()}
+                    className="rounded-[18px] border border-[#ddcfef] px-4 py-2 text-sm font-medium"
+                    aria-live="polite"
+                  >
+                    {maxLinkCopyStatus === "copied" ? "Скопировано" : "Скопировать"}
+                  </button>
+                  <a
+                    href={maxPlaylistLink.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-[18px] border border-[#ddcfef] px-4 py-2 text-sm font-medium"
+                  >
+                    Открыть в MAX
+                  </a>
+                </div>
+                {maxLinkCopyStatus === "error" ? (
+                  <p className="mt-2 text-sm text-[#b34f63]" role="alert">
+                    Не удалось скопировать
+                  </p>
+                ) : null}
+                <p className="mt-2 text-xs text-[#7d70a2]">
+                  Открывает этот плейлист в мини-приложении АудиоЛад в MAX.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-[#7d70a2]">
+                Ссылка на MAX появится после публикации плейлиста.
+              </p>
+            )}
+          </div>
 
           <label className="block" htmlFor={descriptionId}>
             <span className="mb-2 block text-sm font-medium">Описание</span>
