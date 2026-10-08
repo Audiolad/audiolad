@@ -75,9 +75,17 @@ assert(shell.includes("getEditorialWorkspaceAccess"), "nav uses workspace helper
 
 const sidebarNav = read("src/components/listener/DesktopSidebarNav.tsx");
 assert(sidebarNav.includes("Редакция"), "nav group name");
-assert(sidebarNav.includes("Открытые плейлисты"), "nav section name");
 assert(sidebarNav.includes("showEditorialNav"), "nav gated");
-assert(sidebarNav.includes("/editorial/playlists"), "nav href");
+assert(sidebarNav.includes("getListenerSidebarNavItems"), "nav uses shared items");
+assert(sidebarNav.includes("item.title"), "nav renders shared item titles");
+
+const listenerNav = read("src/lib/navigation/listener-nav.ts");
+assert(listenerNav.includes("Открытые плейлисты"), "nav section name");
+assert(listenerNav.includes("/editorial/playlists"), "nav href");
+assert(
+  /if \(item.key === "editorial-playlists"\) \{\s*return options.showEditorialNav === true;/.test(listenerNav),
+  "shared playlists nav gated by showEditorialNav",
+);
 
 const listPage = read(
   "src/app/(platform)/(listener)/editorial/playlists/page.tsx",
