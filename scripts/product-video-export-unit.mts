@@ -144,7 +144,15 @@ assert.match(ffmpeg, /"\[vout\]"/);
 assert.match(ffmpeg, /"-tune",\s*"stillimage"/);
 assert.match(ffmpeg, /productVideoFilterComplex\(orientation\)/);
 assert.doesNotMatch(ffmpeg, /"-vf"/);
-assert.match(ffmpeg, /"-t", \(knownDurationUs \/ 1_000_000\)\.toFixed\(3\)/);
+assert.match(ffmpeg, /measureAudioStreamDurationUs/);
+assert.match(ffmpeg, /"-c",\s*"copy"/);
+assert.match(ffmpeg, /"-f",\s*"null"/);
+assert.match(ffmpeg, /PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US = 100_000/);
+assert.match(ffmpeg, /"-t", \(\(measuredDurationUs \+ PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US\) \/ 1_000_000\)\.toFixed\(3\)/);
+assert.match(ffmpeg, /measuredDurationUs = await measureAudioStreamDurationUs\(audioPath, signal\)/);
+assert.match(ffmpeg, /if \(durationUs == null && onProgress\)/);
+assert.doesNotMatch(ffmpeg, /measuredDurationUs = await probeAudioDurationUs/);
+assert.doesNotMatch(ffmpeg, /"-t",[^\n]*(?:knownDurationUs|probeAudioDurationUs)/);
 
 // «Это аудио» indicator: compact, bottom-right, inside the frame, same
 // physical size in both orientations, clear of platform controls.
@@ -489,17 +497,76 @@ if (ffmpegBin.status !== 0) {
     };
     const duration = Number(parsed.format?.duration);
     assert.ok(duration > 19.5 && duration < 20.5, `duration ${duration}`);
-    const streamDurations = spawnSync(
-      "ffprobe",
-      ["-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "csv=p=0", output],
-      { encoding: "utf8" },
-    ).stdout.trim().split("\n");
-    for (const line of streamDurations) {
-      const seconds = Number(line.split(",")[1]);
-      assert.ok(Math.abs(seconds - 20) <= 0.1, `stream duration ${line}`);
-    }
+    const probeStreamDurations = (file: string) => {
+      const run = spawnSync(
+        "ffprobe",
+        ["-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "json", file],
+        { encoding: "utf8" },
+      );
+      assert.equal(run.status, 0, run.stderr);
+      const streams = (JSON.parse(run.stdout) as {
+        streams: Array<{ codec_type: string; duration?: string }>;
+      }).streams;
+      const audio = Number(streams.find((stream) => stream.codec_type === "audio")?.duration);
+      const video = Number(streams.find((stream) => stream.codec_type === "video")?.duration);
+      assert.ok(Number.isFinite(audio) && Number.isFinite(video), run.stdout);
+      return { audio, video };
+    };
+    const assertVideoFollowsAudio = ({ audio, video }: { audio: number; video: number }) => {
+      assert.ok(video >= audio - 0.05 && video <= audio + 0.15, `video ${video}, audio ${audio}`);
+    };
+    const streamDurations = probeStreamDurations(output);
+    assert.ok(Math.abs(streamDurations.audio - 20) <= 0.05, `audio duration ${streamDurations.audio}`);
+    assertVideoFollowsAudio(streamDurations);
     assert.ok(parsed.streams?.some((stream) => stream.codec_type === "audio" && stream.codec_name === "aac"));
     assert.ok(parsed.streams?.some((stream) => stream.codec_type === "video" && stream.codec_name === "h264"));
+
+    // VBR MP3 without Xing: container duration may be a severe underestimate.
+    const vbrAudio = path.join(dir, "vbr-noxing.mp3");
+    const vbrOutput = path.join(dir, "vbr-noxing.mp4");
+    const vbrRun = spawnSync(
+      "ffmpeg",
+      [
+        "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+        "-i", "anoisesrc=d=30:c=pink:r=44100:a=0.3",
+        "-af", "volume='if(lt(mod(t,4),2),1,0.02)':eval=frame",
+        "-c:a", "libmp3lame", "-q:a", "4", "-write_xing", "0", vbrAudio,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(vbrRun.status, 0, vbrRun.stderr);
+    const decodedRun = spawnSync(
+      "ffmpeg",
+      ["-hide_banner", "-nostdin", "-v", "error", "-i", vbrAudio, "-map", "0:a:0", "-f", "null", "-progress", "pipe:1", "-nostats", "-"],
+      { encoding: "utf8" },
+    );
+    assert.equal(decodedRun.status, 0, decodedRun.stderr);
+    const decodedSamples = consumeProductVideoFfmpegProgress(
+      createProductVideoFfmpegProgressState(), decodedRun.stdout,
+    ).flatMap((sample) => sample.positionUs != null && sample.positionUs > 0 ? [sample.positionUs] : []);
+    assert.ok(decodedSamples.length > 0, decodedRun.stdout);
+    const decodedDuration = Math.max(...decodedSamples) / 1_000_000;
+    const estimateRun = spawnSync(
+      "ffprobe",
+      ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", vbrAudio],
+      { encoding: "utf8" },
+    );
+    assert.equal(estimateRun.status, 0, estimateRun.stderr);
+    const estimatedDuration = Number(estimateRun.stdout.trim());
+    assert.ok(Number.isFinite(estimatedDuration) && estimatedDuration > 0, estimateRun.stdout);
+    console.log(`product-video-export-unit: VBR decoded=${decodedDuration}s, ffprobe estimate=${estimatedDuration}s`);
+    if (Math.abs(estimatedDuration - decodedDuration) <= 1) {
+      console.log("product-video-export-unit: VBR estimate was close; still checking full audio and video durations");
+    }
+    await renderProductVideo({
+      audioPath: vbrAudio,
+      coverPath: cover,
+      outputPath: vbrOutput,
+      orientation: "landscape_16_9",
+    });
+    const vbrDurations = probeStreamDurations(vbrOutput);
+    assert.ok(vbrDurations.audio >= decodedDuration - 0.05, `VBR audio truncated: output ${vbrDurations.audio}s, decoded ${decodedDuration}s`);
+    assertVideoFollowsAudio(vbrDurations);
 
     // Indicator pixels: present at t=0, animated, and nothing else touched.
     for (const orientation of ["landscape_16_9", "portrait_9_16"] as const) {

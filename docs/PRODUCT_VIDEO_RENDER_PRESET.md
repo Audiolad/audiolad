@@ -52,13 +52,15 @@ Re-create only on owner request; there is no automatic mass re-render. In the au
 
 ### Cost
 
-Measured 2026-10-08 on a shared 8-vCPU box (load average 10–14 from other jobs, so wall time is noisy), FFmpeg 7.1, through the real `renderProductVideo()`. Audio: 960 s synthetic voice-band noise + drone, MP3 192 kbps; light 1920×1080 / 1080×1920 WebP cover. Runs were interleaved main / this change. CPU = user seconds incl. the Node wrapper.
+All numbers were measured on 2026-10-08 on a shared 8-vCPU box with FFmpeg 7.1. Other jobs kept the load average at 10–14, so single runs are noisy and the three measurements below do not agree exactly. Read them as a range, not one number. Main and this change were run interleaved.
 
-| Variant | Audio | Wall | CPU user | Output size |
+| Measurement | Audio | CPU user, main → indicator | Wall, main → indicator | Output size |
 | --- | ---: | ---: | ---: | ---: |
-| 16:9 main (no indicator) | 960 s | 68.4 s | 331 s | 27,092,066 B (video 961.28 s) |
-| 16:9 with indicator | 960 s | 83.1 s | 338 s | 27,579,400 B (+1.8%, video 960.00 s) |
-| 9:16 main (no indicator) | 960 s | 64.4 s | 322 s | 26,073,500 B (video 961.04 s) |
-| 9:16 with indicator | 960 s | 66.5 s | 323 s | 26,623,500 B (+2.1%, video 960.00 s) |
+| Real `renderProductVideo()`, 16:9 (incl. Node wrapper) | 960 s | 331 s → 338 s (+2%) | 68 s → 83 s | +1.8% |
+| Real `renderProductVideo()`, 9:16 (incl. Node wrapper) | 960 s | 322 s → 323 s (+0.4%) | 64 s → 67 s | +2.1% |
+| Independent review A/B, both orientations, 2 runs each | 180 s | 63–66 s → 68–70 s (+7–9%) | +3–30% | +1.6–2.0% |
+| Bare FFmpeg command, 16:9, final graph | 60 s | 21 s → 32 s (+45%) | 5.3 s → 8.6 s | +1.9% |
 
-A 60 s micro-benchmark of the bare FFmpeg command (16:9) isolates the overlay: main 21 s CPU; indicator with `overlay=format=auto` 47 s (full-frame pixel-format conversion every frame, rejected); final graph (YUVA loop + `format=yuv420`) 32 s; the same graph with a static indicator 21 s, so the remaining cost is x264 encoding the moving bars. Peak RSS is unchanged (about 1.35 GB vs 1.32 GB, dominated by x264). Lease (1800 s), heartbeat, progress, and stall watchdog are unaffected: FFmpeg still reports progress continuously.
+Expect roughly +2% to +45% CPU depending on duration and load. The extra work is x264 encoding the moving bars: the same graph with a static indicator costs the same as main (21 s on the 60 s bench). The filter itself is close to free. The rejected first version, `overlay=format=auto` with an RGBA input, converted the full frame every frame and took 47 s on the 60 s bench. Output grows by about 2%.
+
+Peak RSS is unchanged: about 1.35 GB vs 1.32 GB, dominated by x264. A 960 s export stays around 1.5 min, far inside the 1800 s lease. Heartbeat, progress, and the stall watchdog are unaffected: FFmpeg still reports progress continuously.

@@ -14,6 +14,7 @@ import {
 } from "./progress";
 
 const TERM_GRACE_MS = 2_000;
+export const PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US = 100_000;
 
 export class ProductVideoRenderAbortedError extends Error {
   readonly code = "worker_lease_lost";
@@ -49,6 +50,53 @@ async function terminate(child: ChildProcess): Promise<void> {
     return;
   }
   await new Promise<void>((resolve) => child.once("close", () => resolve()));
+}
+
+export async function measureAudioStreamDurationUs(
+  audioPath: string,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  if (signal?.aborted) throw new ProductVideoRenderAbortedError();
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "ffmpeg",
+      [
+        "-hide_banner", "-nostdin", "-v", "error", "-i", audioPath,
+        "-map", "0:a:0", "-c", "copy", "-f", "null",
+        "-progress", "pipe:1", "-nostats", "-",
+      ],
+      { stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const progressState = createProductVideoFfmpegProgressState();
+    let maximumPositionUs: number | null = null;
+    let settled = false;
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      if (signal?.aborted) reject(new ProductVideoRenderAbortedError());
+      else resolve(value);
+    };
+    const onAbort = () => {
+      void terminate(child);
+    };
+    const timer = setTimeout(() => {
+      void terminate(child);
+      finish(null);
+    }, 120_000);
+    signal?.addEventListener("abort", onAbort);
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      for (const sample of consumeProductVideoFfmpegProgress(progressState, chunk)) {
+        if (sample.positionUs != null && sample.positionUs > 0) {
+          maximumPositionUs = Math.max(maximumPositionUs ?? 0, sample.positionUs);
+        }
+      }
+    });
+    child.once("error", () => finish(null));
+    child.once("close", (code) => finish(code === 0 ? maximumPositionUs : null));
+  });
 }
 
 async function probeAudioDurationUs(
@@ -119,19 +167,34 @@ export async function renderProductVideo(params: {
   const { audioPath, coverPath, outputPath, orientation, signal, onProgress } = params;
   if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
-  // Audio duration drives progress and caps the output: with a looped cover
-  // and a filter graph, -shortest alone lets video run ~1 s past the audio.
-  let durationUs: number | null = null;
+  // Cap only from packet-accurate copy-demux duration, never a container
+  // estimate. Add 100 ms because out_time is the last packet start; -shortest
+  // still ends at the audio. When unmeasurable, use -shortest without a cap.
+  let measuredDurationUs: number | null = null;
   try {
-    durationUs = await probeAudioDurationUs(audioPath, signal);
+    measuredDurationUs = await measureAudioStreamDurationUs(audioPath, signal);
   } catch (error) {
     if (signal?.aborted || error instanceof ProductVideoRenderAbortedError) {
       throw error instanceof ProductVideoRenderAbortedError
         ? error
         : new ProductVideoRenderAbortedError();
     }
-    durationUs = null;
+    measuredDurationUs = null;
   }
+  let durationUs = measuredDurationUs;
+  if (durationUs == null && onProgress) {
+    try {
+      durationUs = await probeAudioDurationUs(audioPath, signal);
+    } catch (error) {
+      if (signal?.aborted || error instanceof ProductVideoRenderAbortedError) {
+        throw error instanceof ProductVideoRenderAbortedError
+          ? error
+          : new ProductVideoRenderAbortedError();
+      }
+      durationUs = null;
+    }
+  }
+  if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
   // Scaled cover + bottom-right «это аудио» indicator (see audio-indicator.ts).
   const filter = productVideoFilterComplex(orientation);
@@ -172,8 +235,8 @@ export async function renderProductVideo(params: {
         "-b:a",
         "192k",
         "-shortest",
-        ...(knownDurationUs != null
-          ? ["-t", (knownDurationUs / 1_000_000).toFixed(3)]
+        ...(measuredDurationUs != null
+          ? ["-t", ((measuredDurationUs + PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US) / 1_000_000).toFixed(3)]
           : []),
         "-movflags",
         "+faststart",
