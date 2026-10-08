@@ -175,7 +175,7 @@ assert.match(shell, /<MaxProfile/);
 assert.match(shell, /onUnlinkAccount/);
 assert.match(shell, /MAX_PLAYBACK_SESSION_PATH/);
 assert.match(shell, /MAX_PLAYBACK_PREVIEW_PATH/);
-assert.match(shell, /interactiveActionsEnabled=\{!guestMode\}/);
+assert.match(shell, /<MaxProductDetailView[\s\S]*guestMode=\{guestMode\}[\s\S]*onRequestLogin=\{onRequestLogin\}/);
 assert.match(shell, /<AudioladHorizontalLogo/);
 
 assert.deepEqual(

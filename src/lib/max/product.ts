@@ -11,6 +11,7 @@ import { isCoursePublication } from "@/lib/course-content/validators";
 import { resolveMaxExactPractice, type MaxExactPracticeDeps } from "@/lib/max/exact-product";
 import { mapCuratedMaxRecommendations } from "@/lib/max/product-recommendations";
 import { toMaxProductContentTracks, type MaxProductDetailView } from "@/lib/max/product-view";
+import { resolveMiniAppNextStep } from "@/lib/mini-app/next-step";
 import { getProductCoverDisplayUrl } from "@/lib/products/cover-display";
 import {
   getPublishedCatalogProducts,
@@ -223,6 +224,18 @@ export async function getMaxPublishedProduct(
         })
       : false;
 
+    const nextStep = resolveMiniAppNextStep({
+      productKind: practice.product_kind,
+      promo: {
+        promo_enabled: practice.promo_enabled,
+        promo_title: practice.promo_title,
+        promo_text: practice.promo_text,
+        promo_button_text: practice.promo_button_text,
+        promo_url: practice.promo_url,
+        promo_open_in_new_tab: practice.promo_open_in_new_tab,
+      },
+    });
+
     const coverUrl =
       getProductCoverDisplayUrl(
         product.coverUrl,
@@ -263,6 +276,7 @@ export async function getMaxPublishedProduct(
           aggregate: ratingAggregate,
         },
         appreciation: appreciationVisible && authorName ? { authorName } : null,
+        nextStep,
       },
     };
   } catch {

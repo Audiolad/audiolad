@@ -1,7 +1,9 @@
 import type {
   MaxProductContentTrack,
   MaxProductGallerySlide,
+  MaxProductRatingView,
 } from "@/lib/max/product-view";
+import { readMiniAppNextStep, type MiniAppNextStep } from "@/lib/mini-app/next-step";
 
 export type VkProductAppreciation = {
   authorName: string;
@@ -18,8 +20,17 @@ export type VkProductView = {
   priceLabel: string;
   isFree: boolean;
   appreciation: VkProductAppreciation | null;
+  /** Canonical public aggregate. VK has no verified identity: read-only here. */
+  rating: MaxProductRatingView;
+  /** Author-saved «Следующий шаг» (audio_post only); null hides the block. */
+  nextStep: MiniAppNextStep | null;
   gallery: MaxProductGallerySlide[];
   contents: MaxProductContentTrack[];
+};
+
+const DISABLED_RATING: MaxProductRatingView = {
+  enabled: false,
+  aggregate: { totalStars: 0, ratingCount: 0 },
 };
 
 const LEAKED_KEYS = [
@@ -73,6 +84,48 @@ function publicAppreciation(
   return { authorName };
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function publicRating(
+  value: {
+    enabled?: boolean | null;
+    aggregate?: { totalStars?: number | null; ratingCount?: number | null } | null;
+  } | null | undefined,
+): MaxProductRatingView {
+  const totalStars = value?.aggregate?.totalStars;
+  const ratingCount = value?.aggregate?.ratingCount;
+  if (
+    value?.enabled !== true ||
+    !isNonNegativeInteger(totalStars) ||
+    !isNonNegativeInteger(ratingCount)
+  ) {
+    return DISABLED_RATING;
+  }
+  return { enabled: true, aggregate: { totalStars, ratingCount } };
+}
+
+function readVkRating(value: unknown): MaxProductRatingView | null {
+  if (value == null) return DISABLED_RATING;
+  if (!isRecord(value)) return null;
+  if (Object.keys(value).some((key) => key !== "enabled" && key !== "aggregate")) return null;
+  const aggregate = value.aggregate;
+  if (typeof value.enabled !== "boolean" || !isRecord(aggregate)) return null;
+  if (
+    Object.keys(aggregate).some((key) => key !== "totalStars" && key !== "ratingCount")
+  ) {
+    return null;
+  }
+  if (!isNonNegativeInteger(aggregate.totalStars) || !isNonNegativeInteger(aggregate.ratingCount)) {
+    return null;
+  }
+  return {
+    enabled: value.enabled,
+    aggregate: { totalStars: aggregate.totalStars, ratingCount: aggregate.ratingCount },
+  };
+}
+
 function publicGallery(
   slides: readonly {
     id?: string | null;
@@ -105,6 +158,11 @@ export function toVkProductView(product: {
   priceLabel?: string | null;
   isFree?: boolean | null;
   appreciation?: { authorName?: string | null } | null;
+  rating?: {
+    enabled?: boolean | null;
+    aggregate?: { totalStars?: number | null; ratingCount?: number | null } | null;
+  } | null;
+  nextStep?: unknown;
   gallery?: readonly {
     id?: string | null;
     image_url?: string | null;
@@ -123,6 +181,8 @@ export function toVkProductView(product: {
     priceLabel: commerce.priceLabel,
     isFree: commerce.isFree,
     appreciation: publicAppreciation(product.appreciation),
+    rating: publicRating(product.rating),
+    nextStep: readMiniAppNextStep(product.nextStep),
     gallery: publicGallery(product.gallery),
     contents: product.contents.map((track) => ({
       audioItemId: track.audioItemId,
@@ -174,6 +234,9 @@ export function readVkProductView(value: unknown): VkProductView | null {
     appreciation = { authorName };
   }
 
+  const rating = readVkRating(value.rating);
+  if (!rating) return null;
+
   const contents = value.contents.flatMap((track) => {
     if (!isRecord(track)) return [];
     if (LEAKED_KEYS.some((key) => key in track)) return [];
@@ -203,6 +266,8 @@ export function readVkProductView(value: unknown): VkProductView | null {
     priceLabel,
     isFree: value.isFree,
     appreciation,
+    rating,
+    nextStep: readMiniAppNextStep(value.nextStep),
     gallery,
     contents,
   };

@@ -5,16 +5,25 @@ import { useEffect, useId, useState } from "react";
 import { FEATURED_CARD_PRIMARY_CTA_CLASS } from "@/components/home/FeaturedProductCard";
 import { readMaxInitData } from "@/lib/max/bridge";
 import { MAX_APPRECIATION_PATH } from "@/lib/max/host";
+import { MAX_SHELL_LOGIN_CTA } from "@/lib/max/session-shell";
 import { formatRubles } from "@/lib/products/price-format";
 
 const QUICK_AMOUNTS = [100, 300, 500, 1000] as const;
 const APPRECIATION_CTA_LABEL = "❤️ Поблагодарить автора";
 const APPRECIATION_CTA_HEART = "❤️";
+const MAX_APPRECIATION_GUEST_COPY =
+  "Чтобы поблагодарить автора, войдите в АудиоЛад — оплата пройдёт через ваш аккаунт.";
 
 type MaxAuthorAppreciationProps = {
   authorName: string;
   authorSlug: string;
   productSlug: string;
+  /**
+   * Unlinked MAX guest: the checkout route needs a linked account, so the
+   * block stays visible and the tap leads to the existing MAX login/link flow.
+   * No guest identity or checkout is invented here.
+   */
+  onRequestLogin?: (() => void) | null;
 };
 
 function parseAppreciationAmount(raw: string): number | null {
@@ -41,7 +50,10 @@ export default function MaxAuthorAppreciation({
   authorName,
   authorSlug,
   productSlug,
+  onRequestLogin = null,
 }: MaxAuthorAppreciationProps) {
+  const guestMode = typeof onRequestLogin === "function";
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
   const titleId = useId();
   const amountId = useId();
   const [open, setOpen] = useState(false);
@@ -66,7 +78,7 @@ export default function MaxAuthorAppreciation({
   }, [open]);
 
   async function submitCheckout() {
-    if (!selectedAmount || isSubmitting) return;
+    if (guestMode || !selectedAmount || isSubmitting) return;
     const initData = readMaxInitData();
     if (!initData) {
       setError("Не удалось подтвердить сессию MAX.");
@@ -114,7 +126,12 @@ export default function MaxAuthorAppreciation({
       >
         <button
           type="button"
+          data-max-appreciation-guest={guestMode ? "true" : "false"}
           onClick={() => {
+            if (guestMode) {
+              setGuestPromptOpen(true);
+              return;
+            }
             setError(null);
             setPaymentLink(null);
             setOpen(true);
@@ -127,9 +144,21 @@ export default function MaxAuthorAppreciation({
         <p className="author-appreciation-caption mt-2.5 text-sm leading-5 text-[#7d70a2]">
           Благодарность возвращается изобилием 🙏
         </p>
+        {guestMode && guestPromptOpen ? (
+          <div className="mt-3" role="status" aria-live="polite" data-max-appreciation-sign-in="">
+            <p className="text-sm leading-5 text-[#65577f]">{MAX_APPRECIATION_GUEST_COPY}</p>
+            <button
+              type="button"
+              onClick={() => onRequestLogin?.()}
+              className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#7042c5] px-5 py-2.5 text-sm font-semibold text-[#7042c5]"
+            >
+              {MAX_SHELL_LOGIN_CTA}
+            </button>
+          </div>
+        ) : null}
       </section>
 
-      {open ? (
+      {open && !guestMode ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-[#1f1633]/55 p-0 sm:items-center sm:p-4"
           role="dialog"

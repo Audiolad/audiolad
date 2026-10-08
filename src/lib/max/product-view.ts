@@ -1,3 +1,5 @@
+import { readMiniAppNextStep, type MiniAppNextStep } from "@/lib/mini-app/next-step";
+
 export type MaxProductGallerySlide = {
   id: string;
   image_url: string;
@@ -47,6 +49,8 @@ export type MaxProductDetailView = {
   recommendations: MaxProductRecommendationView[];
   rating: MaxProductRatingView;
   appreciation: { authorName: string } | null;
+  /** Author-saved «Следующий шаг» (audio_post only); null hides the block. */
+  nextStep: MiniAppNextStep | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -212,6 +216,7 @@ export function readMaxProductDetail(value: unknown): MaxProductDetailView | nul
       },
     },
     appreciation,
+    nextStep: readMiniAppNextStep(value.nextStep),
   };
 }
 
