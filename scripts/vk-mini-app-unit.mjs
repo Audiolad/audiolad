@@ -96,6 +96,7 @@ assert.equal(parseProductStartPayload("g_22222222222242228222222222222222"), nul
 assert.equal(parseProductStartPayload("p_bad"), null);
 assert.equal(parseProductStartPayload("aurafon/muzyka-dlya-krepkogo-sna"), null);
 assert.equal(parseVkLaunchToken("not-a-target"), null);
+assert.equal(parseVkLaunchToken("l_abcdef12345647898abcdef012345678"), null);
 assert.deepEqual(parseVkLaunchToken(VK_SMOKE_TOKEN), { kind: "smoke" });
 assert.deepEqual(readVkLaunchTarget({
   search: `?vk_app_id=54802101&vk_user_id=1&sign=abc&hash=${payload}`,

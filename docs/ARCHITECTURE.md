@@ -318,6 +318,16 @@ Timeweb Cloud
 открываются. Обычный каталог по-прежнему не показывает unlisted. Формат
 payload не меняется. VK launch остаётся catalog-listed.
 
+Playlist deep link `startapp=l_<uuid плейлиста без дефисов>` (MAX only,
+`buildMaxPlaylistDeepLink` в `src/lib/max/startapp.ts`) после HMAC
+разрешается на сервере (`resolveMaxStartTarget`) только для плейлиста с
+`visibility=public` и `published_at`, через publishable-ключ и публичный RLS;
+slug берётся из БД, не из payload. Mini App открывает вкладку «Плейлисты» и
+детальную страницу этого плейлиста. Приватные, снятые с публикации и
+несуществующие плейлисты не разрешаются (обычный старт). Ссылку «Открыть в
+MAX» показывает редактор `/editorial/playlists/[id]` только для
+опубликованного плейлиста. VK этот payload не принимает.
+
 ### Связь идентификаторов
 
 ```
