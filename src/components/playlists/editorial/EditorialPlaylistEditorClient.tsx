@@ -677,7 +677,7 @@ export default function EditorialPlaylistEditorClient({
                   <button
                     type="button"
                     onClick={() => void handleCopyMaxPlaylistLink()}
-                    className="rounded-[18px] border border-[#ddcfef] px-4 py-2 text-sm font-medium"
+                    className="inline-flex min-h-11 items-center justify-center rounded-[18px] border border-[#ddcfef] px-4 py-2 text-sm font-medium"
                     aria-live="polite"
                   >
                     {maxLinkCopyStatus === "copied" ? "Скопировано" : "Скопировать"}
@@ -686,7 +686,7 @@ export default function EditorialPlaylistEditorClient({
                     href={maxPlaylistLink.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-[18px] border border-[#ddcfef] px-4 py-2 text-sm font-medium"
+                    className="inline-flex min-h-11 items-center justify-center rounded-[18px] border border-[#ddcfef] px-4 py-2 text-sm font-medium"
                   >
                     Открыть в MAX
                   </a>
