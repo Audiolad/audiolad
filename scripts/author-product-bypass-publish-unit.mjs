@@ -122,7 +122,8 @@ function testPublishProductDirectFlow() {
   );
   assert.match(
     publishFn,
-    /if \(!saved\) \{\s*return;/,
+    // 7e416c9a: a failed save shows its concrete reason, then stops.
+    /if \(!saved\) \{\s*setError\(\s*lastSaveFailureReasonRef\.current \?\?[^}]*?requestScrollToFirstSubmitIssue\(\);\s*return;/,
     "failed save does not call publish API",
   );
 
