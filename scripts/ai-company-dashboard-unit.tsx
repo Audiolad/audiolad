@@ -185,11 +185,10 @@ assert.equal(current?.id, "task-wait");
 assert.equal(current?.status, "waiting");
 
 const model = buildAiCompanyDashboard(parsed!, parseHistoryFilters({}));
-const engineeringCard = model.agents.find((agent) => agent.slug === "engineering")!;
-assert.equal(engineeringCard.currentTaskTitle, "Ждёт проверку");
-assert.equal(engineeringCard.tone, "working");
-assert.match(engineeringCard.latestResult, /Черновик табло готов/);
-assert.equal(engineeringCard.handoff, "Контроль качества (QA)");
+// Permanent role cards are gone (Sergey 07.10 21:51): no agents/pulse in the model.
+assert.equal("agents" in model, false);
+assert.equal("pulse" in model, false);
+assert.ok(model.roleFilterOptions.every((option) => option.value.trim().length > 0));
 assert.equal(
   model.decisions.some((item) => item.taskTitle.includes("Продуктовый")),
   false,
@@ -198,26 +197,6 @@ assert.equal(
   model.decisions.some((item) => item.reason.includes("Ручное разрешение") && item.decisionOwner === "Сергей"),
   true,
 );
-
-const qaCard = model.agents.find((agent) => agent.slug === "qa")!;
-assert.equal(qaCard.tone, "waiting");
-assert.match(qaCard.stateLabel, /Ожидает/);
-assert.equal(qaCard.currentTaskTitle, "Табло после QA");
-assert.match(qaCard.qaState, /RETURN/);
-assert.doesNotMatch(qaCard.qaState, /must-not-leak/);
-
-const productCard = model.agents.find((agent) => agent.slug === "product")!;
-assert.equal(productCard.tone, "unknown");
-assert.match(productCard.stateLabel, /нет свежих данных/);
-
-const researchCard = model.agents.find((agent) => agent.slug === "research")!;
-assert.equal(researchCard.tone, "attention");
-assert.match(researchCard.freshness, /старше 60 минут/);
-assert.match(researchCard.startedAt, /29\.09\.2026/);
-
-const uxCard = model.agents.find((agent) => agent.slug === "ux")!;
-assert.equal(uxCard.tone, "unknown");
-assert.equal(uxCard.currentTaskTitle, "Нет данных");
 
 assert.deepEqual(
   model.todayReceived.map((row) => row.title),
@@ -275,11 +254,7 @@ const missingLink = parseCompanyStatus(
     ],
   }),
 )!;
-const missingModel = buildAiCompanyDashboard(missingLink, parseHistoryFilters({}));
-const orchestrator = missingModel.agents.find((agent) => agent.slug === "orchestrator")!;
-assert.equal(orchestrator.currentTaskTitle, "Нет данных");
-assert.equal(orchestrator.currentTaskTechnicalId, "missing-task");
-assert.equal(orchestrator.tone, "waiting");
+assert.equal(resolveCurrentTask(missingLink.agents[0], missingLink.tasks), null);
 
 const ambiguous = parseCompanyStatus(
   rawStatus({
@@ -290,11 +265,7 @@ const ambiguous = parseCompanyStatus(
     ],
   }),
 )!;
-const ambiguousCard = buildAiCompanyDashboard(ambiguous, parseHistoryFilters({})).agents.find(
-  (agent) => agent.slug === "analytics",
-)!;
-assert.equal(ambiguousCard.currentTaskTitle, "Нет данных");
-assert.equal(ambiguousCard.tone, "unknown");
+assert.equal(resolveCurrentTask(ambiguous.agents[0], ambiguous.tasks), null);
 
 const singleWaiting = parseCompanyStatus(
   rawStatus({
@@ -310,11 +281,7 @@ const singleWaiting = parseCompanyStatus(
     ],
   }),
 )!;
-const singleCard = buildAiCompanyDashboard(singleWaiting, parseHistoryFilters({})).agents.find(
-  (agent) => agent.slug === "ux",
-)!;
-assert.equal(singleCard.currentTaskTitle, "Единственное ожидание");
-assert.match(singleCard.waitReason, /Human Gate/);
+assert.equal(resolveCurrentTask(singleWaiting.agents[0], singleWaiting.tasks)?.title, "Единственное ожидание");
 
 const noReceipt = parseCompanyStatus(
   rawStatus({
@@ -333,9 +300,6 @@ const noReceiptModel = buildAiCompanyDashboard(noReceipt, parseHistoryFilters({}
 assert.equal(noReceiptModel.todayReceived.length, 0);
 assert.match(noReceiptModel.todayNote, /Нет данных о времени получения/);
 
-const qaHistory = model.agents.find((agent) => agent.slug === "qa")!;
-assert.match(qaHistory.qaState, /pull\/656/);
-assert.match(qaHistory.qaState, /skipped/);
 
 const markup = renderToStaticMarkup(
   <AiCompanyDashboardView model={model} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
@@ -343,14 +307,14 @@ const markup = renderToStaticMarkup(
 assert.match(markup, /Сейчас в работе/);
 assert.match(markup, /Сегодня/);
 assert.match(markup, /Получены сегодня/);
+assert.doesNotMatch(markup, /Роли компании|data-section="roles"|data-agent=/);
+assert.doesNotMatch(markup, /Функций со свежей работой/);
 assert.match(markup, /События работы сегодня/);
 assert.match(markup, /Завершены сегодня/);
 assert.match(markup, /Завершённые результаты/);
 assert.match(markup, /ИИ-компания/);
 assert.match(markup, /Обновить данные/);
-assert.match(markup, /data-state="working"/);
-assert.match(markup, /data-state="unknown"/);
-assert.match(markup, /data-state="attention"/);
+assert.doesNotMatch(markup, /data-state=/);
 assert.match(markup, /grid-cols-2/);
 assert.match(markup, /lg:grid-cols-2/);
 assert.match(markup, /data-compact-row=/);
@@ -384,6 +348,14 @@ assert.equal(
   "/v1/status?history_before=2026-10-07T06%3A00%3A00.000Z",
 );
 assert.equal(companyStatusRequestPath(parseHistoryFilters({ history_before: "page-2" })), "/v1/status");
+assert.equal(companyStatusRequestPath(parseHistoryFilters({}), "current"), "/v1/status?acceptance=current");
+assert.equal(companyStatusRequestPath(parseHistoryFilters({}), "archive"), "/v1/status?acceptance=archive");
+assert.equal(
+  companyStatusRequestPath(parseHistoryFilters({ history_before: "2026-10-07T06:00:00.000Z" }), "archive"),
+  "/v1/status?history_before=2026-10-07T06%3A00%3A00.000Z&acceptance=archive",
+);
+assert.match(page, /acceptance=current|loadStatus\(filters, "current"\)/);
+assert.doesNotMatch(page, /acceptance\/capabilities/);
 
 const navItem = ADMIN_NAV_ITEMS.find((item) => item.href === "/admin/ai-company");
 assert.ok(navItem);
@@ -1112,7 +1084,6 @@ assert.equal(coreModel.historyNextCursor, "2026-10-01T00:00:00.000Z");
 assert.match(coreModel.historyBoundary, /история обрезана/);
 assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.connectionLabel, "работает");
 assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.runId, "run-late");
-assert.match(coreModel.agents.find((agent) => agent.slug === "qa")!.stateLabel, /Простаивает|свободен|нет свежих данных|Ожидает/);
 
 const stages = parseCompanyStatus({
   generated_at: "2026-10-07T06:39:00.000Z",
@@ -1774,5 +1745,206 @@ const plainAt = copyMarkup.indexOf("Обычная задача табло");
 const plainToggle = copyMarkup.slice(copyMarkup.lastIndexOf("<button", plainAt), copyMarkup.indexOf("</button>", plainAt));
 assert.doesNotMatch(plainToggle, /Скопировать данные/);
 assert.match(copyMarkup, /aria-label="Скопировать данные задачи"/);
+
+const resultVersion = "ab".repeat(32);
+const acceptanceStatus = parseCompanyStatus({
+  generated_at: "2026-10-07T18:00:00.000Z",
+  tasks_page: { acceptance_view: "all" },
+  tasks: [
+    {
+      id: "presented-doc",
+      title: "Документ ждёт владельца",
+      status: "done",
+      result_type: "document",
+      completed_at: "2026-10-07T17:00:00.000Z",
+      updated_at: "2026-10-07T17:40:00.000Z",
+      presentation: "presented",
+      user_acceptance: "none",
+      acceptance: null,
+      result_version: resultVersion,
+      executive_run: { production_verified: true },
+    },
+    {
+      id: "accepted-doc",
+      title: "Документ уже принят",
+      status: "done",
+      result_type: "document",
+      completed_at: "2026-10-07T16:00:00.000Z",
+      presentation: "archived",
+      result_version: resultVersion,
+      user_acceptance: "accepted",
+      acceptance: {
+        decision: "accepted",
+        actor: "sergey",
+        decided_at: "2026-10-07T16:30:00.000Z",
+        comment: null,
+        result_version: resultVersion,
+      },
+      executive_run: { production_verified: false },
+    },
+    {
+      id: "returned-doc",
+      title: "Документ вернули",
+      status: "done",
+      result_type: "document",
+      completed_at: "2026-10-07T12:00:00.000Z",
+      next_action: "Исправить обложку",
+      presentation: "rework",
+      result_version: resultVersion,
+      user_acceptance: "rejected",
+      acceptance: {
+        decision: "rejected",
+        comment: "На сайте кнопки нет",
+        decided_at: "2026-10-07T16:40:00.000Z",
+        actor: "sergey",
+        result_version: resultVersion,
+      },
+    },
+    {
+      id: "routine-low",
+      title: "Обычный выпуск",
+      status: "done",
+      result_type: "engineering",
+      risk: "low",
+      completed_at: "2026-10-07T17:20:00.000Z",
+      executive_run: {
+        head_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ci_status: "success",
+        review_status: "independent_pass",
+        review_sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        deploy_status: "deployed",
+        production_verified: true,
+        production_proof: { verified: true, sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", evidence_at: "2026-10-07T17:20:00.000Z" },
+      },
+    },
+    {
+      id: "in-progress-doc",
+      title: "Документ ещё в работе",
+      status: "executive_in_progress",
+      result_type: "document",
+      active: true,
+      presentation: "in_progress",
+      user_acceptance: "none",
+      acceptance: null,
+      result_version: resultVersion,
+      executive_run: { production_verified: false, run_id: "bc-in-progress" },
+    },
+    {
+      id: "untagged-done",
+      title: "Закрыто без приёмки в снимке",
+      status: "accepted",
+      result_type: "document",
+      completed_at: "2026-10-07T11:00:00.000Z",
+    },
+  ],
+})!;
+assert.equal(acceptanceStatus.acceptanceContract, true);
+assert.equal(acceptanceStatus.acceptanceView, "all");
+const acceptanceModel = buildAiCompanyDashboard(acceptanceStatus, parseHistoryFilters({}));
+const presented = acceptanceModel.ownerReview.find((item) => item.taskId === "presented-doc");
+assert.ok(presented);
+assert.equal(presented.stageBadge.label, "На проверке");
+assert.equal(presented.stageBadge.tone, "acceptance");
+assert.match(presented.stageBadge.detail ?? "", /отдельный факт/);
+assert.equal(presented.acceptance?.resultVersion, resultVersion);
+assert.equal(presented.acceptance?.productionVerified, "да");
+assert.notEqual(presented.stageBadge.label, "Принято");
+assert.equal(acceptanceModel.history.some((item) => item.taskId === "presented-doc"), false);
+assert.equal(acceptanceModel.acceptedArchive.some((item) => item.taskId === "presented-doc"), false);
+assert.doesNotMatch(presented.stageBadge.detail ?? "", /17:40|updated/);
+const acceptedRow = acceptanceModel.acceptedArchive.find((item) => item.taskId === "accepted-doc");
+assert.ok(acceptedRow);
+assert.equal(acceptedRow.stageBadge.label, "Принято");
+assert.equal(acceptedRow.acceptance?.productionVerified, "нет");
+assert.match(acceptedRow.stageBadge.detail ?? "", /07\.10\.2026, 19:30/);
+assert.equal(acceptanceModel.history.some((item) => item.taskId === "accepted-doc"), false);
+assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "accepted-doc"), false);
+const returned = [...acceptanceModel.queue, ...acceptanceModel.activeTasks.map((item) => item.detail)].find(
+  (item) => item.taskId === "returned-doc",
+);
+assert.ok(returned);
+assert.equal(returned.stageBadge.label, "На доработке");
+assert.notEqual(returned.stageBadge.label, "Завершена");
+assert.notEqual(returned.stageBadge.label, "Принято");
+assert.match(returned.stageBadge.detail ?? "", /На сайте кнопки нет/);
+assert.equal(returned.acceptance?.nextAction, "Исправить обложку");
+assert.equal(returned.acceptance?.actor, "sergey");
+assert.equal(returned.acceptance?.comment, "На сайте кнопки нет");
+assert.match(returned.acceptance?.recordedAt ?? "", /07\.10\.2026, 19:40/);
+assert.equal("owner" in (returned.acceptance ?? {}), false);
+// presentation is a string enum: in_progress is not «На проверке» and gets no acceptance buttons.
+assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "in-progress-doc"), false);
+const inProgress = acceptanceModel.activeTasks.find((item) => item.detail.taskId === "in-progress-doc");
+assert.ok(inProgress, "in_progress task stays in the active cycle");
+assert.equal(inProgress.detail.acceptance?.applicable, false);
+assert.notEqual(inProgress.detail.stageBadge.label, "На проверке");
+assert.equal(acceptanceModel.acceptedArchive.some((item) => item.taskId === "returned-doc"), false);
+const routine = acceptanceModel.history.find((item) => item.taskId === "routine-low");
+assert.ok(routine);
+assert.equal(routine.stageBadge.label, "Завершена");
+assert.equal(routine.acceptance, null);
+assert.notEqual(routine.stageBadge.label, "На проверке");
+assert.notEqual(routine.stageBadge.label, "Принято");
+assert.equal(acceptanceModel.ownerReview.some((item) => item.taskId === "routine-low"), false);
+const untagged = acceptanceModel.history.find((item) => item.taskId === "untagged-done");
+assert.ok(untagged);
+assert.equal(untagged.stageBadge.label, "Завершена");
+assert.equal(untagged.acceptance, null);
+
+const acceptanceMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView
+    model={acceptanceModel}
+    filters={parseHistoryFilters({})}
+    sourceError={null}
+    acceptanceAvailable
+    canAccept
+    onRefresh={() => undefined}
+  />,
+);
+assert.match(acceptanceMarkup, /data-section="owner-review"/);
+assert.match(acceptanceMarkup, /data-section="accepted"/);
+assert.match(acceptanceMarkup, /Архив \/ Принятые/);
+assert.match(acceptanceMarkup, /Проверил, принял/);
+assert.match(acceptanceMarkup, /Не работает \/ На доработку/);
+assert.doesNotMatch(acceptanceMarkup, /Приёмка пока недоступна/);
+assert.match(acceptanceMarkup, /Вернуть в работу/);
+const unavailableMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={acceptanceModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
+);
+assert.match(unavailableMarkup, /Приёмка пока недоступна/);
+assert.doesNotMatch(unavailableMarkup, /Принятых результатов в снимке нет/);
+assert.match(acceptanceMarkup, /Проверено в рабочей системе/);
+const presentedAt = acceptanceMarkup.indexOf("Документ ждёт владельца");
+const presentedToggle = acceptanceMarkup.slice(
+  acceptanceMarkup.lastIndexOf("<button", presentedAt),
+  acceptanceMarkup.indexOf("</button>", presentedAt),
+);
+assert.doesNotMatch(presentedToggle, /Проверил, принял/);
+assert.match(acceptanceMarkup, /data-stage-badge="acceptance"[^>]*>На проверке/);
+assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принято/);
+assert.match(acceptanceMarkup, /data-stage-badge="rework"[^>]*>На доработке/);
+const bare = parseCompanyStatus({
+  generated_at: "2026-10-07T18:00:00.000Z",
+  tasks: [{ id: "plain", title: "Без контракта", status: "done", result_type: "document", completed_at: "2026-10-07T12:00:00.000Z" }],
+})!;
+assert.equal(bare.acceptanceContract, false);
+const legacyShape = parseCompanyStatus({
+  generated_at: "2026-10-07T18:00:00.000Z",
+  tasks: [
+    {
+      id: "legacy-shape",
+      title: "Старая форма полей",
+      status: "executive_in_progress",
+      active: true,
+      presentation: true,
+      user_acceptance: { decision: "accepted" },
+      result_version: resultVersion,
+    },
+  ],
+})!;
+assert.equal(legacyShape.acceptanceContract, false, "presentation:true / object user_acceptance is not the Core #28 contract");
+const legacyModel = buildAiCompanyDashboard(legacyShape, parseHistoryFilters({}));
+assert.equal(legacyModel.ownerReview.length, 0);
+assert.equal(legacyModel.acceptedArchive.length, 0);
 
 console.log("ai-company-dashboard-unit: ok");

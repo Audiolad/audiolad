@@ -2,15 +2,18 @@ import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
-  buildAiCompanyDashboard,
   companyStatusRequestPath,
+  composeAiCompanyBoard,
   parseCompanyStatus,
   parseHistoryFilters,
 } from "@/lib/admin/ai-company-dashboard";
 
 export const dynamic = "force-dynamic";
 
-async function loadStatus(filters: ReturnType<typeof parseHistoryFilters>): Promise<{
+async function loadStatus(
+  filters: ReturnType<typeof parseHistoryFilters>,
+  acceptance: "current" | "archive" | "all",
+): Promise<{
   data: ReturnType<typeof parseCompanyStatus>;
   error: string | null;
 }> {
@@ -20,7 +23,7 @@ async function loadStatus(filters: ReturnType<typeof parseHistoryFilters>): Prom
     return { data: null, error: "Company Core не настроен: отсутствует URL или серверный токен." };
   }
   try {
-    const response = await fetch(`${base.replace(/\/$/, "")}${companyStatusRequestPath(filters)}`, {
+    const response = await fetch(`${base.replace(/\/$/, "")}${companyStatusRequestPath(filters, acceptance)}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
@@ -46,7 +49,7 @@ export default async function AiCompanyPage({
     history_before?: string;
   }>;
 }) {
-  await requireAdminPermission("ai_company.view");
+  const session = await requireAdminPermission("ai_company.view");
   const params = await searchParams;
   const filters = parseHistoryFilters({
     period: params.period,
@@ -55,15 +58,20 @@ export default async function AiCompanyPage({
     history_offset: params.history_offset,
     history_before: params.history_before,
   });
-  const { data, error } = await loadStatus(filters);
+  const [current, archive] = await Promise.all([loadStatus(filters, "current"), loadStatus(filters, "archive")]);
+  const { model, acceptanceAvailable, sourceError } = composeAiCompanyBoard(current, archive, filters);
+  // Core records decisions as actor `sergey`: only the platform owner session gets live buttons.
+  const canAccept = session.access.roles.includes("owner");
 
   return (
     <>
       <AiCompanyLiveRefresh />
       <AiCompanyDashboard
-        model={data ? buildAiCompanyDashboard(data, filters) : null}
+        model={model}
         filters={filters}
-        sourceError={data ? null : error}
+        sourceError={sourceError}
+        acceptanceAvailable={acceptanceAvailable}
+        canAccept={canAccept}
       />
     </>
   );

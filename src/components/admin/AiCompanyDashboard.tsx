@@ -1,13 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
-import { AI_COMPANY_ROLES, NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
+import {
+  ACCEPTANCE_OWNER_ONLY,
+  ACCEPTANCE_UNAVAILABLE,
+  createAcceptanceGate,
+  validateRejectionComment,
+  type AcceptanceDecision,
+} from "@/lib/admin/ai-company-acceptance";
+import { NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
   ActiveTaskCard,
-  AgentCardModel,
   DashboardModel,
   EngineeringPanel,
   ExecutorCard,
@@ -20,15 +26,6 @@ import type {
   TodayRowModel,
   WorkEventModel,
 } from "@/lib/admin/ai-company-dashboard";
-
-const TONE_CLASS: Record<AgentCardModel["tone"], string> = {
-  working: "border-green-200 bg-green-50",
-  waiting: "border-amber-200 bg-amber-50",
-  attention: "border-red-200 bg-red-50",
-  idle: "border-slate-200 bg-slate-50",
-  offline: "border-slate-300 bg-slate-100",
-  unknown: "border-[#eadff8] bg-white",
-};
 
 const CONNECTION_CLASS: Record<ExecutorCard["connection"], string> = {
   online: "border-green-200 bg-green-50",
@@ -44,6 +41,9 @@ const STAGE_BADGE_CLASS: Record<StageTone, string> = {
   release: "border-orange-300 bg-orange-100 text-orange-950",
   site: "border-indigo-300 bg-indigo-100 text-indigo-950",
   done: "border-green-300 bg-green-100 text-green-900",
+  acceptance: "border-amber-300 bg-amber-100 text-amber-950",
+  accepted: "border-emerald-300 bg-emerald-100 text-emerald-950",
+  rework: "border-rose-300 bg-rose-100 text-rose-950",
   decision: "border-red-300 bg-red-100 text-red-900",
   blocked: "border-red-400 bg-red-50 text-red-950",
   cancelled: "border-zinc-300 bg-zinc-200 text-zinc-800",
@@ -57,7 +57,14 @@ type AiCompanyDashboardProps = {
   model: DashboardModel | null;
   filters: HistoryFilters;
   sourceError: string | null;
+  acceptanceAvailable?: boolean;
+  /** True only for a session with the platform `owner` role. Others see the board without live buttons. */
+  canAccept?: boolean;
 };
+
+const AcceptanceAvailability = createContext(false);
+const AcceptanceOwner = createContext(false);
+const AcceptanceRefresh = createContext<() => void>(() => undefined);
 
 function knownValue(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -180,10 +187,163 @@ function TaskCopyButton({ text }: { text: string }) {
   );
 }
 
+function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
+  const available = useContext(AcceptanceAvailability);
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const view = detail.acceptance;
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [comment, setComment] = useState("");
+  const [remark, setRemark] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!view?.applicable || detail.taskId === NO_DATA) return null;
+
+  async function submit(decision: AcceptanceDecision) {
+    if (!view || !available || !owner || busy || gate.current.busy) return;
+    if (view.resultVersion === NO_DATA) {
+      setError("В снимке нет версии результата.");
+      setMessage(null);
+      return;
+    }
+    if (decision === "rejected") {
+      const problem = validateRejectionComment(remark);
+      if (problem) {
+        setError(problem);
+        setMessage(null);
+        return;
+      }
+    }
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/acceptance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            taskId: detail.taskId,
+            decision,
+            comment: decision === "rejected" ? remark : comment,
+            resultVersion: view.resultVersion,
+            idempotencyKey: key,
+          }),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string; keepRow?: boolean };
+      });
+      if (outcome.ok === true) {
+        setMessage(outcome.message ?? "Решение сохранено.");
+        idempotencyKey.current = null;
+        refresh();
+      } else {
+        setError(outcome.message ?? "Решение не сохранено.");
+      }
+    } catch {
+      setError(ACCEPTANCE_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const locked = !available || !owner || busy;
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-owner-acceptance={view.state}>
+      <p className="font-semibold">Приёмка владельцем</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <Fact label="Версия результата" value={view.resultVersion} />
+        <Fact label="Проверено в рабочей системе" value={view.productionVerified} />
+        <Fact label="Решение записано" value={view.recordedAt} />
+        <Fact label="Кто подтвердил" value={view.actor} />
+        <Fact label="Следующее действие" value={view.nextAction} />
+        <Fact label="Комментарий" value={view.comment} />
+      </dl>
+      {available ? null : (
+        <p className="mt-2 text-sm text-[#9f1239]" role="status">
+          {ACCEPTANCE_UNAVAILABLE}
+        </p>
+      )}
+      {available && !owner ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="status" data-acceptance-owner-only>
+          {ACCEPTANCE_OWNER_ONLY}
+        </p>
+      ) : null}
+      {view.state === "accepted" ? (
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => void submit("reopen")}
+          className="mt-3 min-h-11 rounded-lg border border-[#7042c5] px-3 py-2 text-sm font-semibold text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+        >
+          Вернуть в работу
+        </button>
+      ) : (
+        <div className="mt-3 grid gap-2">
+          <label className="grid gap-1 text-xs text-[#796ba0]">
+            Комментарий, если нужен
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              rows={2}
+              maxLength={500}
+              className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
+              aria-label="Комментарий к приёмке"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => void submit("accepted")}
+            className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+          >
+            Проверил, принял
+          </button>
+          <label className="grid gap-1 text-xs text-[#796ba0]">
+            Замечание для доработки
+            <textarea
+              value={remark}
+              onChange={(event) => setRemark(event.target.value)}
+              rows={3}
+              minLength={8}
+              maxLength={500}
+              required
+              className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
+              aria-label="Замечание для доработки"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={locked}
+            onClick={() => void submit("rejected")}
+            className="min-h-11 rounded-lg border border-[#9f1239] px-3 py-2 text-sm font-semibold text-[#9f1239] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9f1239] disabled:opacity-60"
+          >
+            Не работает / На доработку
+          </button>
+        </div>
+      )}
+      {message ? (
+        <p className="mt-2 text-sm text-[#166534]" role="status">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
     <>
     <TaskCopyButton text={detail.copyText} />
+    <OwnerAcceptanceControls detail={detail} />
     <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
       <Fact label="Идентификатор задачи" value={detail.taskId} />
       <Fact label="Полный исходный текст постановки" value={detail.brief} />
@@ -487,6 +647,8 @@ export function AiCompanyDashboardView({
   model,
   filters,
   sourceError,
+  acceptanceAvailable = false,
+  canAccept = false,
   onRefresh,
   openDetails = {},
   onToggleDetail,
@@ -505,6 +667,9 @@ export function AiCompanyDashboardView({
   const receiptMissing = model?.todayNote.startsWith("Нет данных") ?? false;
 
   return (
+    <AcceptanceAvailability.Provider value={acceptanceAvailable}>
+    <AcceptanceOwner.Provider value={canAccept}>
+    <AcceptanceRefresh.Provider value={onRefresh}>
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -581,10 +746,10 @@ export function AiCompanyDashboardView({
             <h3 id="ai-company-executors" className="text-xl font-semibold">
               Исполнители
             </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">В строке — имя и достоверное состояние подключения.</p>
+            <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — имя и достоверное состояние подключения.</p>
             <HelpNote label="Справка об исполнителях">
               <p>
-                Фактические исполнители: запуск, задача и свежесть. Состояния: не подключён, свободен, нет данных, работает. Grok оркеструет и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor.
+                Фактические исполнители: провайдер и модель, запуск, задача и свежесть сигнала из Company Core. Состояния: не подключён, свободен, нет данных, работает. Grok — единственный оркестратор и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor. Неподключённый исполнитель — зависимость подключения, не активный исполнитель. Постоянных карточек должностей нет: исторические роли остаются в журнале задач.
               </p>
             </HelpNote>
             <div className="mt-2 flex flex-col gap-1.5">
@@ -599,66 +764,21 @@ export function AiCompanyDashboardView({
                     open={openDetails[rowKey] ?? false}
                     onToggle={onToggleDetail}
                     className={CONNECTION_CLASS[executor.connection]}
-                    articleProps={{ "data-executor": executor.id, "data-connection": executor.connection }}
+                    articleProps={{
+                      "data-executor": executor.id,
+                      "data-executor-kind": executor.kind,
+                      "data-connection": executor.connection,
+                    }}
                   >
                     <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
                     <dl className="mt-3 grid gap-2 text-sm">
                       <Fact label="Состояние" value={executor.connectionLabel} />
+                      <Fact label="Провайдер / модель" value={executor.providerModel} />
                       <Fact label="Задача" value={executor.currentTask} />
                       <Fact label="Запуск" value={executor.runId} />
                       <Fact label="Свежесть" value={executor.freshness} />
                       <Fact label="Последний сигнал" value={executor.heartbeat} />
                       <Fact label="Уточнение" value={executor.detail} />
-                    </dl>
-                  </CompactRow>
-                );
-              })}
-            </div>
-          </section>
-
-          <section aria-labelledby="ai-company-roles" data-section="roles">
-            <h3 id="ai-company-roles" className="text-xl font-semibold">
-              Роли компании
-            </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">В строке — роль и достоверное состояние. Это функции компании, не число запущенных процессов.</p>
-            <HelpNote label="Справка о ролях">
-              <p>
-                Восемь функций компании, не восемь запущенных процессов. Product, Engineering, QA и Analytics назначает Grok по нужде. QA остаётся независимой. Старые роли не запускаются ради показателей.
-              </p>
-            </HelpNote>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {model.pulse.map((item) => (
-                <div key={item.label} className="min-w-0">
-                  <div className="text-xs text-[#796ba0]">{item.label}</div>
-                  <div className="text-lg font-semibold tabular-nums">{item.count}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {model.agents.map((agent) => {
-                const rowKey = `role:${agent.slug}`;
-                return (
-                  <CompactRow
-                    key={rowKey}
-                    rowKey={rowKey}
-                    title={agent.label}
-                    aside={agent.stateLabel}
-                    open={openDetails[rowKey] ?? false}
-                    onToggle={onToggleDetail}
-                    className={TONE_CLASS[agent.tone]}
-                    articleProps={{ "data-agent": agent.slug, "data-state": agent.tone }}
-                  >
-                    <dl className="mt-3 grid gap-3 text-sm">
-                      <Fact label="Текущая задача" value={agent.currentTaskTitle} />
-                      <Fact label="Идентификатор текущей задачи" value={agent.currentTaskTechnicalId} />
-                      <Fact label="Текущий этап" value={agent.stage} />
-                      <Fact label="Время начала" value={agent.startedAt} />
-                      <Fact label="Последний сигнал жизнеспособности (heartbeat)" value={agent.heartbeat} />
-                      <Fact label="Свежесть сигнала" value={agent.freshness} />
-                      <Fact label="Последний измеримый результат" value={agent.latestResult} />
-                      <Fact label="Причина ожидания или блокировки" value={agent.waitReason} />
-                      <Fact label="Кому передан результат" value={agent.handoff} />
-                      <Fact label="Состояние контроля качества (QA)" value={agent.qaState} />
                     </dl>
                   </CompactRow>
                 );
@@ -732,6 +852,41 @@ export function AiCompanyDashboardView({
             </div>
           </section>
 
+          <section aria-labelledby="ai-company-owner-review" data-section="owner-review">
+            <h3 id="ai-company-owner-review" className="text-xl font-semibold">
+              На проверке
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Результат предъявлен. Приёмка владельцем здесь отдельно от проверки в рабочей системе.
+            </p>
+            {acceptanceAvailable ? null : (
+              <p className="mt-2 text-sm text-[#9f1239]" role="status">
+                {ACCEPTANCE_UNAVAILABLE}
+              </p>
+            )}
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.ownerReview.length ? (
+                model.ownerReview.map((detail) => {
+                  const rowKey = `review:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-owner-review": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Результатов, ожидающих приёмки владельцем, в снимке нет.
+                </p>
+              )}
+            </div>
+          </section>
+
           <section aria-labelledby="ai-company-queue" data-section="queue">
             <h3 id="ai-company-queue" className="text-xl font-semibold">
               Очередь
@@ -798,9 +953,9 @@ export function AiCompanyDashboardView({
                 Роль
                 <select name="agent" defaultValue={filters.agent} className="rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]">
                   <option value="">Все роли</option>
-                  {AI_COMPANY_ROLES.map(([slug, label]) => (
-                    <option key={slug} value={slug}>
-                      {label}
+                  {model.roleFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -847,13 +1002,54 @@ export function AiCompanyDashboardView({
               </div>
             ) : null}
           </section>
+
+          <section aria-labelledby="ai-company-accepted" data-section="accepted">
+            <h3 id="ai-company-accepted" className="text-xl font-semibold">
+              Архив / Принятые
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
+            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.acceptedArchiveError ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#9f1239]" role="status" data-archive-unavailable>
+                  {model.acceptedArchiveError}
+                </p>
+              ) : !acceptanceAvailable ? (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status">
+                  {ACCEPTANCE_UNAVAILABLE}
+                </p>
+              ) : model.acceptedArchive.length ? (
+                model.acceptedArchive.map((detail) => {
+                  const rowKey = `accepted:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-accepted-task": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Принятых результатов в снимке нет.
+                </p>
+              )}
+            </div>
+          </section>
         </>
       ) : null}
     </div>
+    </AcceptanceRefresh.Provider>
+    </AcceptanceOwner.Provider>
+    </AcceptanceAvailability.Provider>
   );
 }
 
-export default function AiCompanyDashboard(props: AiCompanyDashboardProps) {
+export default function AiCompanyDashboard({ acceptanceAvailable = false, canAccept = false, ...props }: AiCompanyDashboardProps) {
   const router = useRouter();
   const { openDetails, onToggleDetail } = useAiCompanyDisclosureState();
 
@@ -861,6 +1057,8 @@ export default function AiCompanyDashboard(props: AiCompanyDashboardProps) {
     <div data-refresh="route" data-open-details={Object.keys(openDetails).filter((key) => openDetails[key]).join(" ")}>
       <AiCompanyDashboardView
         {...props}
+        acceptanceAvailable={acceptanceAvailable}
+        canAccept={canAccept}
         onRefresh={() => router.refresh()}
         openDetails={openDetails}
         onToggleDetail={onToggleDetail}
