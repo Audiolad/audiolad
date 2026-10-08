@@ -144,7 +144,7 @@ assert.match(
 );
 assert.match(
   globals,
-  /--mobile-top-chrome-fallback-catalog:\s*calc\(\s*max\(0\.75rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\s*\+\s*0\.75rem\s*\)/,
+  /--mobile-top-chrome-fallback-catalog:\s*calc\(\s*max\(0\.75rem,\s*env\(safe-area-inset-top,\s*0px\)\)\s*\+\s*52px\s*\)/,
   "catalog spacer fallback matches the catalog chrome padding + 52px field",
 );
 assert.doesNotMatch(
@@ -154,8 +154,8 @@ assert.doesNotMatch(
 );
 assert.match(
   mobileTopChrome,
-  /catalog: "px-5 pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\] pb-3"/,
-  "catalog chrome keeps the accepted 0.75rem / pb-3 padding",
+  /catalog: "px-5 pt-\[max\(0\.75rem,env\(safe-area-inset-top,0px\)\)\] pb-0"/,
+  "catalog chrome keeps balanced spacing with 0.75rem top padding / pb-0",
 );
 assert.match(
   globals,
