@@ -251,10 +251,18 @@ assert(directionsPage.includes("canManageDirections"), "directions page manage-o
 assert(directionsPage.includes("notFound()"), "404 otherwise");
 
 const nav = read("src/components/listener/DesktopSidebarNav.tsx");
-assert(nav.includes("Направления"), "nav label");
 assert(nav.includes("showEditorialDirectionsNav"), "nav gated to manage");
-assert(nav.includes("/editorial/directions"), "nav href");
-assert(nav.includes("Открытые плейлисты"), "playlists nav remains");
+assert(nav.includes("getListenerSidebarNavItems"), "nav uses shared items");
+assert(nav.includes("item.title"), "nav renders shared item titles");
+
+const listenerNav = read("src/lib/navigation/listener-nav.ts");
+assert(listenerNav.includes("Направления"), "nav label");
+assert(listenerNav.includes("/editorial/directions"), "nav href");
+assert(listenerNav.includes("Открытые плейлисты"), "playlists nav remains");
+assert(
+  /if \(item.key === "editorial-directions"\) \{\s*return \(\s*options.showEditorialNav === true &&\s*options.showEditorialDirectionsNav === true/.test(listenerNav),
+  "shared directions nav gated by editorial and manage flags",
+);
 
 const profileNav = read("src/components/profile/ProfileSections.tsx");
 assert(
