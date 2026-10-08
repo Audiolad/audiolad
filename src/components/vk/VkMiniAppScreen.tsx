@@ -18,7 +18,9 @@ import MaxCatalogSearch, {
   type MaxCatalogTopicNavigationRequest,
 } from "@/components/max/MaxCatalogSearch";
 import MaxPlaylists from "@/components/max/MaxPlaylists";
+import MiniAppGuestRating from "@/components/mini-app/MiniAppGuestRating";
 import { MiniAppGuestTransportProvider } from "@/components/mini-app/MiniAppGuestTransport";
+import MiniAppNextStep from "@/components/mini-app/MiniAppNextStep";
 import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
 import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import VkAuthorAppreciation from "@/components/vk/VkAuthorAppreciation";
@@ -71,6 +73,11 @@ import {
   vkTabSelectionAfterSelect,
   type VkDetailOrigin,
 } from "@/lib/vk/shell";
+
+/** VK has no verified AudioLad identity here: rating is saved on the canonical site after sign-in. */
+const VK_RATING_SIGN_IN_COPY =
+  "Оценки сохраняются в аккаунте АудиоЛад. Откройте продукт на сайте и войдите, чтобы оценить.";
+const VK_RATING_SIGN_IN_LABEL = "Оценить на сайте";
 
 type VkProductSelection =
   | { kind: "token"; token: string }
@@ -516,12 +523,30 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
             </ol>
           ) : null}
 
+          <MiniAppGuestRating
+            key={`${product.authorSlug}/${product.productSlug}`}
+            enabled={product.rating.enabled}
+            aggregate={product.rating.aggregate}
+            surface="vk"
+            signInAction={{
+              message: VK_RATING_SIGN_IN_COPY,
+              label: VK_RATING_SIGN_IN_LABEL,
+              onPress: () => {
+                openVkCanonicalPracticePage(product.authorSlug, product.productSlug);
+              },
+            }}
+          />
+
           {product.appreciation ? (
             <VkAuthorAppreciation
               authorName={product.appreciation.authorName}
               authorSlug={product.authorSlug}
               productSlug={product.productSlug}
             />
+          ) : null}
+
+          {product.nextStep ? (
+            <MiniAppNextStep nextStep={product.nextStep} onOpenLink={openVkExternalHttps} surface="vk" />
           ) : null}
           <VkPublicFooter variant="product" />
         </>

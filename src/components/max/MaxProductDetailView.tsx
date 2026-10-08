@@ -12,6 +12,8 @@ import FeaturedProductCard, {
 import MaxAuthorAppreciation from "@/components/max/MaxAuthorAppreciation";
 import MaxProductRating from "@/components/max/MaxProductRating";
 import MaxProductLegalFooter from "@/components/max/MaxProductLegalFooter";
+import MiniAppGuestRating from "@/components/mini-app/MiniAppGuestRating";
+import MiniAppNextStep from "@/components/mini-app/MiniAppNextStep";
 import PracticeHeroGallery from "@/components/products/practice-page/PracticeHeroGallery";
 import type { PracticePageCoverData } from "@/components/products/practice-page/types";
 import { PRODUCT_FORMAT_LINE_CLASS } from "@/lib/author-products/format";
@@ -20,7 +22,9 @@ import {
   getProductCoverGradient,
   getProductCoverSymbol,
 } from "@/lib/products/cover-display";
+import { openMaxExternalLink } from "@/lib/max/bridge";
 import { formatMaxDuration } from "@/lib/max/format-duration";
+import { MAX_SHELL_LOGIN_CTA } from "@/lib/max/session-shell";
 import type { MaxProductDetailView as MaxProductDetailModel } from "@/lib/max/product-view";
 import type { MaxCatalogProduct } from "@/components/max/MaxCatalogSearch";
 
@@ -38,9 +42,15 @@ type MaxProductDetailViewProps = {
   listenSlot: ReactNode;
   onOpenRecommendation: (product: MaxCatalogProduct) => void;
   onOpenTopic: (topicKey: string) => void;
-  interactiveActionsEnabled?: boolean;
+  /** Unlinked MAX guest: blocks stay visible, writes go through the login/link action. */
+  guestMode?: boolean;
+  onRequestLogin?: () => void;
   trackPlayback: MaxProductTrackPlayback;
 };
+
+const MAX_RATING_GUEST_COPY = "Оценки сохраняются в аккаунте АудиоЛад. Войдите, чтобы оценить.";
+
+function noopLogin() {}
 
 function toHeroCover(slug: string, title: string, coverUrl: string | null): PracticePageCoverData {
   return {
@@ -65,9 +75,11 @@ export default function MaxProductDetailView({
   listenSlot,
   onOpenRecommendation,
   onOpenTopic,
-  interactiveActionsEnabled = true,
+  guestMode = false,
+  onRequestLogin,
   trackPlayback,
 }: MaxProductDetailViewProps) {
+  const requestLogin = onRequestLogin ?? noopLogin;
   const playableTrackIds = new Set(trackPlayback.playableTrackIds);
   const slides: CatalogSlide[] = product.gallery.map((slide, index) => ({
     id: slide.id,
@@ -115,24 +127,34 @@ export default function MaxProductDetailView({
         </FeaturedProductCard>
       </section>
 
-      {interactiveActionsEnabled ? (
-        <>
-          <MaxProductRating
-            key={`${authorSlug}/${productSlug}`}
-            authorSlug={authorSlug}
-            productSlug={productSlug}
-            enabled={product.rating.enabled}
-            initialAggregate={product.rating.aggregate}
-          />
+      {guestMode ? (
+        <MiniAppGuestRating
+          enabled={product.rating.enabled}
+          aggregate={product.rating.aggregate}
+          signInAction={{ message: MAX_RATING_GUEST_COPY, label: MAX_SHELL_LOGIN_CTA, onPress: requestLogin }}
+          surface="max"
+        />
+      ) : (
+        <MaxProductRating
+          key={`${authorSlug}/${productSlug}`}
+          authorSlug={authorSlug}
+          productSlug={productSlug}
+          enabled={product.rating.enabled}
+          initialAggregate={product.rating.aggregate}
+        />
+      )}
 
-          {product.appreciation ? (
-            <MaxAuthorAppreciation
-              authorName={product.appreciation.authorName}
-              authorSlug={authorSlug}
-              productSlug={productSlug}
-            />
-          ) : null}
-        </>
+      {product.appreciation ? (
+        <MaxAuthorAppreciation
+          authorName={product.appreciation.authorName}
+          authorSlug={authorSlug}
+          productSlug={productSlug}
+          onRequestLogin={guestMode ? requestLogin : null}
+        />
+      ) : null}
+
+      {product.nextStep ? (
+        <MiniAppNextStep nextStep={product.nextStep} onOpenLink={openMaxExternalLink} surface="max" />
       ) : null}
 
       {product.topics.length ? (
