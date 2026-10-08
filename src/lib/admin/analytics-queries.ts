@@ -18,9 +18,9 @@ import {
   formatListeningDuration,
   formatListeningTimeNotice,
   listenedMsToChartMinutes,
-  listeningWindowRpcArgs,
+  listeningTimeWindowRpcArgs,
   presentRollingListeningPair,
-  readListeningWindowsPayload,
+  readListeningWindow,
   rollingListeningBounds,
 } from "@/lib/admin/format-listening-time";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -361,14 +361,18 @@ function presentListeningTime(
   }
 
   const unmeasured = raw.unmeasured === true || raw.listened_ms == null;
-  const partial = raw.partial === true;
+  const partial = raw.partial === true && !unmeasured;
   const listenedMs = unmeasured ? null : asNonNegativeInt(raw.listened_ms);
   const validFrom = asOptionalIso(raw.valid_from);
+  const denominatorsKnown =
+    raw.measured_listeners != null && raw.measured_play_starts != null;
   const averages = listeningAverageLabels(
     listenedMs,
-    asNonNegativeInt(raw.measured_listeners),
-    asNonNegativeInt(raw.measured_play_starts),
+    denominatorsKnown ? asNonNegativeInt(raw.measured_listeners) : 0,
+    denominatorsKnown ? asNonNegativeInt(raw.measured_play_starts) : 0,
   );
+  const coverageNotice =
+    validFrom && (partial || unmeasured) ? formatListeningTimeNotice(validFrom) : null;
 
   return {
     listenedMs,
@@ -377,9 +381,10 @@ function presentListeningTime(
     averagePerListenerLabel: averages.perListener,
     averagePerStartLabel: averages.perStart,
     listeningTimeNotice:
-      validFrom && (partial || unmeasured)
-        ? formatListeningTimeNotice(validFrom)
-        : null,
+      coverageNotice ??
+      (!unmeasured && listenedMs != null && !denominatorsKnown
+        ? "Средние сейчас недоступны"
+        : null),
     listeningTimeUnmeasured: unmeasured,
     listeningTimePartial: partial,
   };
@@ -985,6 +990,28 @@ function resolveSharedQuery(input?: DashboardInput) {
   return { period, includeTest, range, previous, filters, sharedFilters };
 }
 
+function listeningValidFrom(data: unknown): string | null {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  const value = (data as { valid_from?: unknown }).valid_from;
+  return typeof value === "string" ? value : null;
+}
+
+function rollingWindowReading(
+  res: { data: unknown; error: { code?: string; message?: string } | null },
+  windowName: "week" | "week_prev" | "month" | "month_prev",
+) {
+  if (res.error) {
+    console.error("admin_analytics_listening_window_failed", {
+      window: windowName,
+      code: res.error.code ?? null,
+      timeout: /timeout/i.test(res.error.message ?? ""),
+    });
+  }
+  return readListeningWindow(res.data, Boolean(res.error));
+}
+
 /** Fast path for first paint: summary + timeseries only. */
 export async function getAdminAnalyticsSummaryBundle(
   input?: DashboardInput,
@@ -1021,23 +1048,46 @@ export async function getAdminAnalyticsSummaryBundle(
     throw new Error("admin_analytics_dashboard_failed");
   }
 
-  // Rolling totals only need SUM(listened_ms). The selected-period RPC still
-  // asks admin_analytics_listening_time for averages. Four extra copies of
-  // admin_analytics_p2_window_metrics were timing out the current windows.
+  // Each rolling card is its own exact 7- or 30-day SUM. One 60-day
+  // statement was canceled as a unit and blanked every card. Those exact
+  // intervals do not ask for denominators. The selected period still does.
+  const weekArgs = listeningTimeWindowRpcArgs(
+    listeningBounds.weekFrom,
+    listeningBounds.end,
+    listeningFilters,
+  );
+  const weekPrevArgs = listeningTimeWindowRpcArgs(
+    listeningBounds.weekPrevFrom,
+    listeningBounds.weekPrevTo,
+    listeningFilters,
+  );
+  const monthArgs = listeningTimeWindowRpcArgs(
+    listeningBounds.monthFrom,
+    listeningBounds.end,
+    listeningFilters,
+  );
+  const monthPrevArgs = listeningTimeWindowRpcArgs(
+    listeningBounds.monthPrevFrom,
+    listeningBounds.monthPrevTo,
+    listeningFilters,
+  );
   const [
     timeseriesRes,
     listeningRes,
     listeningSeriesRes,
-    listeningWindowsRes,
+    weekRes,
+    weekPrevRes,
+    monthRes,
+    monthPrevRes,
     filterOptions,
   ] = await Promise.all([
     service.rpc("admin_analytics_p2_timeseries", sharedFilters),
     service.rpc("admin_analytics_listening_time", sharedFilters),
     service.rpc("admin_analytics_listening_time_timeseries", sharedFilters),
-    service.rpc(
-      "admin_analytics_listening_time_windows",
-      listeningWindowRpcArgs(listeningBounds.end, listeningFilters),
-    ),
+    service.rpc("admin_analytics_listening_time", weekArgs),
+    service.rpc("admin_analytics_listening_time", weekPrevArgs),
+    service.rpc("admin_analytics_listening_time", monthArgs),
+    service.rpc("admin_analytics_listening_time", monthPrevArgs),
     loadFilterOptions().catch(() => ({ authors: [], practices: [] })),
   ]);
 
@@ -1061,27 +1111,27 @@ export async function getAdminAnalyticsSummaryBundle(
   const overviewBase = buildProductOverview(
     (overviewRes.data ?? {}) as Record<string, unknown>,
   );
-  if (listeningWindowsRes.error) {
-    const windowsMessage = listeningWindowsRes.error.message ?? "";
-    console.error("admin_analytics_listening_windows_failed", {
-      code: listeningWindowsRes.error.code ?? null,
-      timeout: /timeout/i.test(windowsMessage),
-    });
-  }
-  const listeningWindows = readListeningWindowsPayload(
-    listeningWindowsRes.data,
-    Boolean(listeningWindowsRes.error),
-  );
+  const weekReading = rollingWindowReading(weekRes, "week");
+  const weekPrevReading = rollingWindowReading(weekPrevRes, "week_prev");
+  const monthReading = rollingWindowReading(monthRes, "month");
+  const monthPrevReading = rollingWindowReading(monthPrevRes, "month_prev");
   const weeklyListening = presentRollingListeningPair(
-    listeningWindows.week,
-    listeningWindows.weekPrev,
-    listeningWindows.validFrom,
+    weekReading,
+    weekPrevReading,
+    listeningValidFrom(weekRes.data) ?? listeningValidFrom(weekPrevRes.data),
   );
   const monthlyListening = presentRollingListeningPair(
-    listeningWindows.month,
-    listeningWindows.monthPrev,
-    listeningWindows.validFrom,
+    monthReading,
+    monthPrevReading,
+    listeningValidFrom(monthRes.data) ?? listeningValidFrom(monthPrevRes.data),
   );
+  if (listeningRes.error) {
+    console.error("admin_analytics_listening_time_failed", {
+      period,
+      code: listeningRes.error.code ?? null,
+      timeout: /timeout/i.test(listeningRes.error.message ?? ""),
+    });
+  }
   const listeningTime = presentListeningTime(
     listeningRes.error ? null : listeningSnapshot,
     Boolean(listeningRes.error),

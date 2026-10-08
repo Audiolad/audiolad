@@ -28,6 +28,7 @@ import {
   presentRollingListeningPair,
   readListeningWindow,
   readListeningWindowsPayload,
+  listeningTimeWindowRpcArgs,
   rollingListeningBounds,
 } from "../src/lib/admin/format-listening-time";
 import {
@@ -808,6 +809,28 @@ function testFormatting() {
   const yesterday = resolveAdminAnalyticsPeriodRange("yesterday", now);
   assert.notEqual(yesterday.to, now.toISOString());
   assert.equal(rollingListeningBounds(yesterday.to ?? "").end, yesterday.to);
+  const calendarWeek = resolveAdminAnalyticsPeriodRange("7d", now);
+  assert.notEqual(
+    Date.parse(calendarWeek.to ?? "") - Date.parse(calendarWeek.from ?? ""),
+    7 * 86_400_000,
+  );
+  const rollingWeek = listeningTimeWindowRpcArgs(
+    rollingListeningBounds(now.toISOString()).weekFrom,
+    now.toISOString(),
+    {
+      p_include_test: false,
+      p_author_id: "a1111111-1111-4111-8111-111111111111",
+      p_practice_id: "c3333333-3333-4333-8333-333333333333",
+      p_utm_source: "telegram",
+      p_device_type: "mobile",
+    },
+  );
+  assert.equal(
+    Date.parse(rollingWeek.p_to) - Date.parse(rollingWeek.p_from),
+    7 * 86_400_000,
+  );
+  assert.equal(rollingWeek.p_author_id, "a1111111-1111-4111-8111-111111111111");
+  assert.equal(rollingWeek.p_utm_source, "telegram");
 
   const filters = listeningWindowRpcArgs("2026-10-07T11:16:00.000Z", {
     p_include_test: false,
@@ -917,8 +940,8 @@ function testSourceContracts() {
   assert.doesNotMatch(queries, /presentListeningTime\(\s*[^,]+,\s*overviewBase\.listeners/);
   assert.match(queries, /admin_analytics_listening_time/);
   assert.match(queries, /admin_analytics_listening_time_timeseries/);
-  assert.match(queries, /admin_analytics_listening_time_windows/);
-  assert.match(queries, /listeningWindowRpcArgs\(listeningBounds\.end, listeningFilters\)/);
+  assert.match(queries, /listeningTimeWindowRpcArgs\(/);
+  assert.match(queries, /Средние сейчас недоступны/);
   const bundleStart = queries.indexOf("export async function getAdminAnalyticsSummaryBundle");
   const bundle = queries.slice(
     bundleStart,
@@ -927,12 +950,58 @@ function testSourceContracts() {
   const selectedPeriodCalls = bundle.match(
     /service\.rpc\(\s*"admin_analytics_listening_time",/g,
   );
-  assert.equal(selectedPeriodCalls?.length, 1);
+  assert.equal(selectedPeriodCalls?.length, 5);
   assert.equal(
     (bundle.match(/admin_analytics_listening_time_windows/g) ?? []).length,
-    1,
+    0,
   );
-  assert.doesNotMatch(bundle, /weekPrevFrom|monthPrevFrom/);
+  assert.match(bundle, /weekPrevFrom/);
+  assert.match(
+    bundle,
+    /if \(listeningRes\.error\) \{\s*console\.error\("admin_analytics_listening_time_failed"/,
+  );
+  assert.match(bundle, /monthPrevFrom/);
+  const keepSum = read(
+    "supabase/migrations/20261223120000_admin_listening_time_keep_sum.sql",
+  );
+  assert.match(keepSum, /interval '7 days'/);
+  assert.match(keepSum, /interval '30 days'/);
+  assert.match(keepSum, /query_canceled/);
+  assert.doesNotMatch(keepSum, /CREATE INDEX|DROP TABLE|TRUNCATE|DELETE FROM/i);
+  assert.doesNotMatch(keepSum, /GRANT EXECUTE/);
+  const groupedSum = read(
+    "supabase/migrations/20261224120000_admin_listening_sum_grouped.sql",
+  );
+  const helperBody = groupedSum.slice(
+    groupedSum.indexOf("CREATE OR REPLACE FUNCTION public.playback_usage_admin_listened_ms("),
+    groupedSum.indexOf("COMMENT ON FUNCTION public.playback_usage_admin_listened_ms("),
+  );
+  assert.match(helperBody, /WITH g AS MATERIALIZED \(/);
+  assert.match(helperBody, /GROUP BY f\.session_id, f\.user_id, f\.anonymous_id, f\.practice_id, f\.author_id_snapshot/);
+  assert.match(helperBody, /SECURITY DEFINER/);
+  assert.match(helperBody, /is_platform_staff\(g\.user_id\)/);
+  assert.match(helperBody, /is_analytics_test_user\(g\.user_id\)/);
+  assert.match(helperBody, /author_members/);
+  assert.doesNotMatch(helperBody, /g\.occurred_at|g\.listened_ms > 0|admin_analytics_visitor_key/);
+  const listeningBody = groupedSum.slice(
+    groupedSum.indexOf("CREATE OR REPLACE FUNCTION public.admin_analytics_listening_time("),
+    groupedSum.indexOf("COMMENT ON FUNCTION public.admin_analytics_listening_time("),
+  );
+  assert.match(listeningBody, /v_listened := public\.playback_usage_admin_listened_ms\(/);
+  assert.doesNotMatch(listeningBody, /playback_usage_admin_facts\(/);
+  assert.match(listeningBody, /interval '7 days'/);
+  assert.match(listeningBody, /interval '30 days'/);
+  assert.match(listeningBody, /WHEN query_canceled THEN/);
+  assert.doesNotMatch(groupedSum, /CREATE INDEX|DROP TABLE|ALTER TABLE|TRUNCATE|DELETE FROM|UPDATE public\.|statement_timeout\s*=|ALTER ROLE|ALTER DATABASE/i);
+  assert.equal((groupedSum.match(/GRANT EXECUTE/g) ?? []).length, 1);
+  assert.match(
+    groupedSum,
+    /GRANT EXECUTE ON FUNCTION public\.playback_usage_admin_listened_ms\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text\s*\) TO service_role;/,
+  );
+  assert.match(
+    groupedSum,
+    /REVOKE ALL ON FUNCTION public\.playback_usage_admin_listened_ms\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text\s*\) FROM PUBLIC, anon, authenticated;/,
+  );
   const windowsMigration = read(
     "supabase/migrations/20261222120000_admin_listening_time_windows.sql",
   );
