@@ -9,6 +9,7 @@ import {
   PRODUCT_VIDEO_EXPORT_BUCKET,
   PRODUCT_VIDEO_EXPORT_LEASE_SECONDS,
   PRODUCT_VIDEO_EXPORT_MAX_ATTEMPTS,
+  PRODUCT_VIDEO_RENDER_RECIPE,
   parseProductVideoOrientation,
   type ProductVideoOrientation,
 } from "./contract";
@@ -228,6 +229,7 @@ export function createProductVideoRenderWorkerPort(
         .update({
           status: "completed",
           progress_percent: 100,
+          render_recipe: PRODUCT_VIDEO_RENDER_RECIPE,
           completed_at: new Date().toISOString(),
           lease_token: null,
           lease_expires_at: null,

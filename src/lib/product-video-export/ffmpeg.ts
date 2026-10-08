@@ -3,10 +3,10 @@ import { stat } from "node:fs/promises";
 
 import {
   PRODUCT_VIDEO_EXPORT_STALL_MS,
-  PRODUCT_VIDEO_ORIENTATION_META,
   PRODUCT_VIDEO_X264_PRESET,
   type ProductVideoOrientation,
 } from "./contract";
+import { productVideoFilterComplex } from "./audio-indicator";
 import {
   consumeProductVideoFfmpegProgress,
   createProductVideoFfmpegProgressState,
@@ -14,6 +14,7 @@ import {
 } from "./progress";
 
 const TERM_GRACE_MS = 2_000;
+export const PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US = 100_000;
 
 export class ProductVideoRenderAbortedError extends Error {
   readonly code = "worker_lease_lost";
@@ -49,6 +50,53 @@ async function terminate(child: ChildProcess): Promise<void> {
     return;
   }
   await new Promise<void>((resolve) => child.once("close", () => resolve()));
+}
+
+export async function measureAudioStreamDurationUs(
+  audioPath: string,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  if (signal?.aborted) throw new ProductVideoRenderAbortedError();
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      "ffmpeg",
+      [
+        "-hide_banner", "-nostdin", "-v", "error", "-i", audioPath,
+        "-map", "0:a:0", "-c", "copy", "-f", "null",
+        "-progress", "pipe:1", "-nostats", "-",
+      ],
+      { stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const progressState = createProductVideoFfmpegProgressState();
+    let maximumPositionUs: number | null = null;
+    let settled = false;
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      if (signal?.aborted) reject(new ProductVideoRenderAbortedError());
+      else resolve(value);
+    };
+    const onAbort = () => {
+      void terminate(child);
+    };
+    const timer = setTimeout(() => {
+      void terminate(child);
+      finish(null);
+    }, 120_000);
+    signal?.addEventListener("abort", onAbort);
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      for (const sample of consumeProductVideoFfmpegProgress(progressState, chunk)) {
+        if (sample.positionUs != null && sample.positionUs > 0) {
+          maximumPositionUs = Math.max(maximumPositionUs ?? 0, sample.positionUs);
+        }
+      }
+    });
+    child.once("error", () => finish(null));
+    child.once("close", (code) => finish(code === 0 ? maximumPositionUs : null));
+  });
 }
 
 async function probeAudioDurationUs(
@@ -119,8 +167,22 @@ export async function renderProductVideo(params: {
   const { audioPath, coverPath, outputPath, orientation, signal, onProgress } = params;
   if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
-  let durationUs: number | null = null;
-  if (onProgress) {
+  // Cap only from packet-accurate copy-demux duration, never a container
+  // estimate. Add 100 ms because out_time is the last packet start; -shortest
+  // still ends at the audio. When unmeasurable, use -shortest without a cap.
+  let measuredDurationUs: number | null = null;
+  try {
+    measuredDurationUs = await measureAudioStreamDurationUs(audioPath, signal);
+  } catch (error) {
+    if (signal?.aborted || error instanceof ProductVideoRenderAbortedError) {
+      throw error instanceof ProductVideoRenderAbortedError
+        ? error
+        : new ProductVideoRenderAbortedError();
+    }
+    measuredDurationUs = null;
+  }
+  let durationUs = measuredDurationUs;
+  if (durationUs == null && onProgress) {
     try {
       durationUs = await probeAudioDurationUs(audioPath, signal);
     } catch (error) {
@@ -132,11 +194,10 @@ export async function renderProductVideo(params: {
       durationUs = null;
     }
   }
+  if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
-  const meta = PRODUCT_VIDEO_ORIENTATION_META[orientation];
-  const filter =
-    `scale=${meta.width}:${meta.height}:force_original_aspect_ratio=increase,` +
-    `crop=${meta.width}:${meta.height},format=yuv420p`;
+  // Scaled cover + bottom-right «это аудио» indicator (see audio-indicator.ts).
+  const filter = productVideoFilterComplex(orientation);
   const progressState = createProductVideoFfmpegProgressState();
   const knownDurationUs = durationUs;
 
@@ -153,12 +214,12 @@ export async function renderProductVideo(params: {
         coverPath,
         "-i",
         audioPath,
+        "-filter_complex",
+        filter,
         "-map",
-        "0:v:0",
+        "[vout]",
         "-map",
         "1:a:0",
-        "-vf",
-        filter,
         "-c:v",
         "libx264",
         "-preset",
@@ -174,6 +235,9 @@ export async function renderProductVideo(params: {
         "-b:a",
         "192k",
         "-shortest",
+        ...(measuredDurationUs != null
+          ? ["-t", ((measuredDurationUs + PRODUCT_VIDEO_DURATION_CAP_HEADROOM_US) / 1_000_000).toFixed(3)]
+          : []),
         "-movflags",
         "+faststart",
         "-progress",
