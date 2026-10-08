@@ -21,6 +21,10 @@ export const LEGACY_TASK_CAP = 100;
 export const LEGACY_EVENT_CAP = 50;
 export const HISTORY_PAGE_SIZE = 20;
 
+/**
+ * Label dictionary for historical role values in task records (audit, history filter).
+ * Not rendered as company positions: the board shows one Grok orchestrator and real executors.
+ */
 export const AI_COMPANY_ROLES = [
   ["orchestrator", "Оркестратор (Orchestrator)"],
   ["research", "Исследователь (Research)"],
@@ -111,13 +115,16 @@ export const CORE_FIELD_MAP = {
     presentation: ["presentation"],
     userAcceptance: ["user_acceptance"],
     resultVersion: ["result_version"],
-    acceptanceOwner: ["owner"],
+    acceptance: ["acceptance"],
+    evidence: ["evidence"],
   },
-  userAcceptance: {
-    decision: ["decision", "state"],
+  /** Core #28 `tasks[].acceptance`: details of the last decision. `user_acceptance` itself is a string. */
+  acceptance: {
+    decision: ["decision"],
     actor: ["actor"],
     decidedAt: ["decided_at"],
     comment: ["comment"],
+    resultVersion: ["result_version"],
   },
   executiveRun: {
     provider: ["provider", "actual_provider"],
@@ -360,7 +367,6 @@ const SAFE_PAYLOAD_KEYS = [
   "model",
 ] as const;
 
-export type AgentTone = "working" | "waiting" | "attention" | "idle" | "offline" | "unknown";
 export type ConnectionState = "online" | "idle" | "not_connected" | "no_fresh_data";
 export type ExecutorId = "codex" | "cursor" | "grok";
 export type ResultKind = "engineering" | "document" | "unknown";
@@ -446,15 +452,19 @@ export type CompanyTask = {
 
 export type OwnerAcceptanceState = "pending" | "accepted" | "rejected";
 
+/** Core #28 `tasks[].presentation`. Only `presented` is «На проверке». */
+export type PresentationState = "in_progress" | "presented" | "rework" | "archived";
+
 export type OwnerAcceptanceFact = {
   applicable: boolean;
   state: OwnerAcceptanceState;
+  presentation: PresentationState;
   presented: boolean;
   resultVersion: string | null;
+  decision: string | null;
   recordedAt: string | null;
   actor: string | null;
   comment: string | null;
-  owner: string | null;
   productionVerified: boolean | null;
 };
 
@@ -582,23 +592,6 @@ export type EngineeringPanel = {
   productionPassed: boolean;
 };
 
-export type AgentCardModel = {
-  slug: string;
-  label: string;
-  stateLabel: string;
-  tone: AgentTone;
-  currentTaskTitle: string;
-  currentTaskTechnicalId: string;
-  stage: string;
-  startedAt: string;
-  heartbeat: string;
-  freshness: string;
-  latestResult: string;
-  waitReason: string;
-  handoff: string;
-  qaState: string;
-};
-
 export type TaskDetailModel = {
   key: string;
   title: string;
@@ -640,7 +633,6 @@ export type OwnerAcceptanceView = {
   actor: string;
   comment: string;
   nextAction: string;
-  owner: string;
   productionVerified: string;
 };
 
@@ -713,7 +705,10 @@ export type GateCard = {
 export type ExecutorCard = {
   id: ExecutorId;
   label: string;
+  /** orchestrator: the one Grok orchestrator; executor: a real runner; dependency: not connected, not an active executor. */
+  kind: "orchestrator" | "executor" | "dependency";
   roleNote: string;
+  providerModel: string;
   connection: ConnectionState;
   connectionLabel: string;
   heartbeat: string;
@@ -737,8 +732,8 @@ export type DashboardModel = {
   activeTasks: ActiveTaskCard[];
   activeBoundary: string;
   executors: ExecutorCard[];
-  agents: AgentCardModel[];
-  pulse: { label: string; count: number }[];
+  /** Role values present in this snapshot, for the history filter. Audit only, not company positions. */
+  roleFilterOptions: Array<{ value: string; label: string }>;
   todayReceived: TodayRowModel[];
   todayCreated: TodayRowModel[];
   todayWorkEvents: WorkEventModel[];
@@ -748,6 +743,8 @@ export type DashboardModel = {
   history: TaskDetailModel[];
   ownerReview: TaskDetailModel[];
   acceptedArchive: TaskDetailModel[];
+  /** Set when the archive list could not be read. Never shown as "no accepted results". */
+  acceptedArchiveError: string | null;
   historySummary: string;
   historyBoundary: string;
   historyNextOffset: number | null;
@@ -1135,49 +1132,55 @@ function executorPartsFrom(value: unknown): { label: string | null; parts: Array
   return { label: provider ?? channel ?? model, parts: [provider, channel, model, runId] };
 }
 
-function acceptanceDecision(value: unknown): "accepted" | "rejected" | "none" {
-  if (typeof value === "string") {
-    const token = normalizeToken(value);
-    if (token === "accepted" || token === "rejected") return token;
-    return "none";
-  }
-  const record = asRecord(value);
-  if (!record) return "none";
-  const token = normalizeToken(readString(record, CORE_FIELD_MAP.userAcceptance.decision) ?? "");
-  if (token === "accepted" || token === "rejected") return token;
-  return "none";
+const PRESENTATION_STATES: readonly PresentationState[] = ["in_progress", "presented", "rework", "archived"];
+
+/** Core #28: `user_acceptance` is the string accepted | rejected | none. Anything else is not the contract. */
+function userAcceptanceValue(value: unknown): "accepted" | "rejected" | "none" | null {
+  if (typeof value !== "string") return null;
+  const token = normalizeToken(value);
+  return token === "accepted" || token === "rejected" || token === "none" ? token : null;
 }
 
-function presentationOn(value: unknown): boolean {
-  if (value === true) return true;
-  if (typeof value === "string") {
-    const token = normalizeToken(value);
-    return Boolean(token) && !["none", "false", "null", "0"].includes(token);
-  }
-  return asRecord(value) != null;
+/** Core #28: `presentation` is the string enum in_progress | presented | rework | archived. */
+function presentationValue(value: unknown): PresentationState | null {
+  if (typeof value !== "string") return null;
+  const token = normalizeToken(value);
+  return (PRESENTATION_STATES as readonly string[]).includes(token) ? (token as PresentationState) : null;
 }
 
-function parseOwnerAcceptance(record: Record<string, unknown>, productionVerified: boolean | null): OwnerAcceptanceFact | null {
-  const contract = "user_acceptance" in record || "presentation" in record || "result_version" in record;
-  if (!contract) return null;
-  const decision = "user_acceptance" in record ? acceptanceDecision(record.user_acceptance) : "none";
-  const presented = "presentation" in record && presentationOn(record.presentation);
+/** The task speaks the Core #28 acceptance contract only with both enums in their real string shape. */
+function hasAcceptanceContract(record: Record<string, unknown>): boolean {
+  return userAcceptanceValue(record.user_acceptance) != null && presentationValue(record.presentation) != null;
+}
+
+function parseOwnerAcceptance(record: Record<string, unknown>, runVerified: boolean | null): OwnerAcceptanceFact | null {
+  const decision = userAcceptanceValue(record.user_acceptance);
+  const presentation = presentationValue(record.presentation);
+  if (decision == null || presentation == null) return null;
+  const presented = presentation === "presented";
+  const applicable = decision === "accepted" || decision === "rejected" || (decision === "none" && presented);
   const state: OwnerAcceptanceState = decision === "accepted" ? "accepted" : decision === "rejected" ? "rejected" : "pending";
-  const applicable = decision === "accepted" || decision === "rejected" || (presented && decision === "none");
-  const source = asRecord(record.user_acceptance);
-  const actor = source ? readString(source, CORE_FIELD_MAP.userAcceptance.actor) : null;
-  const comment = source ? readString(source, CORE_FIELD_MAP.userAcceptance.comment) : null;
-  const owner = readString(record, CORE_FIELD_MAP.task.acceptanceOwner);
+  // Details of the decision live only in the separate `acceptance` object (null while user_acceptance=none).
+  const details = decision === "none" ? null : asRecord(readRaw(record, CORE_FIELD_MAP.task.acceptance));
+  const evidence = asRecord(readRaw(record, CORE_FIELD_MAP.task.evidence));
+  const actor = details ? readString(details, CORE_FIELD_MAP.acceptance.actor) : null;
+  const comment = details ? readString(details, CORE_FIELD_MAP.acceptance.comment) : null;
+  const decidedAt =
+    (details ? readString(details, CORE_FIELD_MAP.acceptance.decidedAt) : null) ??
+    (decision !== "none" && evidence ? readString(evidence, CORE_FIELD_MAP.acceptance.decidedAt) : null);
+  const evidenceVerified = evidence && typeof evidence.production_verified === "boolean" ? evidence.production_verified : null;
+  const detailDecision = details ? readString(details, CORE_FIELD_MAP.acceptance.decision) : null;
   return {
     applicable,
-    state: applicable ? state : "pending",
+    state,
+    presentation,
     presented,
     resultVersion: safeResultVersion(record.result_version),
-    recordedAt: source ? readString(source, CORE_FIELD_MAP.userAcceptance.decidedAt) : null,
+    decision: detailDecision ? normalizeToken(detailDecision) : decision === "none" ? null : decision,
+    recordedAt: decidedAt && parseInstant(decidedAt) != null ? decidedAt : null,
     actor: actor ? copySafeProse(actor) : null,
     comment: comment ? copySafeProse(comment) : null,
-    owner: owner ? copySafeProse(owner) : null,
-    productionVerified,
+    productionVerified: runVerified ?? evidenceVerified,
   };
 }
 
@@ -1244,7 +1247,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
       .map((event) => parseEvent(event))
       .filter((event): event is CompanyEvent => event !== null)
       .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
-    acceptanceContract: "user_acceptance" in record || "presentation" in record || "result_version" in record,
+    acceptanceContract: hasAcceptanceContract(record),
     ownerAcceptance: parseOwnerAcceptance(record, typeof run?.productionVerified === "boolean" ? run.productionVerified : null),
   };
 }
@@ -1749,21 +1752,6 @@ export function resolveCurrentTask(agent: CompanyAgent | null, tasks: CompanyTas
   return open.length === 1 ? open[0] : null;
 }
 
-function heartbeatInstant(agent: CompanyAgent, heartbeats: CompanyHeartbeat[]): string | null {
-  const candidates = [agent.lastHeartbeatAt];
-  for (const heartbeat of heartbeats) {
-    const key = heartbeat.serviceKey;
-    const matchesAgent =
-      key === agent.slug ||
-      key.startsWith(`${agent.slug}-`) ||
-      key.startsWith(`${agent.slug}_`) ||
-      key.startsWith(`${agent.slug}.`);
-    const matchesTask = agent.currentTaskId != null && heartbeat.currentTaskId === agent.currentTaskId;
-    if ((matchesAgent || matchesTask) && heartbeat.observedAt) candidates.push(heartbeat.observedAt);
-  }
-  return latestInstant(candidates);
-}
-
 function latestInstant(values: Array<string | null>): string | null {
   let latest: string | null = null;
   let latestAt = Number.NEGATIVE_INFINITY;
@@ -1781,30 +1769,6 @@ function isFresh(at: string | null, now: number): boolean {
   const observed = parseInstant(at);
   if (observed == null) return false;
   return now - observed <= HEARTBEAT_STALE_MS;
-}
-
-function isStale(agent: CompanyAgent, heartbeatAt: string | null, now: number): boolean {
-  if (!WORKING_STATUSES.has(normalizeToken(agent.status))) return false;
-  return !isFresh(heartbeatAt, now);
-}
-
-function agentState(
-  agent: CompanyAgent | undefined,
-  heartbeatAt: string | null,
-  now: number,
-): { label: string; tone: AgentTone } {
-  if (!agent) return { label: "нет свежих данных", tone: "unknown" };
-  const status = normalizeToken(agent.connection ?? agent.status);
-  if (NOT_CONNECTED_STATUSES.has(status)) {
-    return { label: "⚪ Не подключён", tone: "offline" };
-  }
-  if (isStale(agent, heartbeatAt, now) || ATTENTION_STATUSES.has(status)) {
-    return { label: "🔴 Требует внимания (Attention)", tone: "attention" };
-  }
-  if (WORKING_STATUSES.has(status)) return { label: "🟢 Работает (Working)", tone: "working" };
-  if (WAITING_STATUSES.has(status)) return { label: "🟡 Ожидает (Waiting)", tone: "waiting" };
-  if (isFresh(heartbeatAt, now)) return { label: "⚪ Простаивает (Idle)", tone: "idle" };
-  return { label: "нет свежих данных", tone: "unknown" };
 }
 
 function freshnessLabel(heartbeatAt: string | null, now: number): string {
@@ -1878,33 +1842,6 @@ function isWorkEvent(event: CompanyEvent): boolean {
     return true;
   }
   return WORK_EVENT_TYPES.has(normalizeToken(event.bareType));
-}
-
-function sortEvents(events: CompanyEvent[]): CompanyEvent[] {
-  return events.slice().sort((left, right) => (parseInstant(left.createdAt) ?? 0) - (parseInstant(right.createdAt) ?? 0));
-}
-
-function cardEvents(agent: CompanyAgent | undefined, task: CompanyTask | null, events: CompanyEvent[]): CompanyEvent[] {
-  return sortEvents(
-    events.filter((event) => {
-      if (task && eventMatchesTask(event, task)) return true;
-      if (event.agentSlug !== agent?.slug) return false;
-      return !event.taskId;
-    }),
-  );
-}
-
-function latestResult(events: CompanyEvent[]): string {
-  const results = sortEvents(events.filter(isResultEvent));
-  const latest = results[results.length - 1];
-  if (!latest) return NO_DATA;
-  const text = payloadText(latest.payload, ["result", "outcome", "summary", "message"]);
-  const pr = payloadText(latest.payload, ["pr_url", "pull_request_url", "draft_pr"]);
-  return joinFound([
-    text ?? `${latest.channelPrefix ? `${latest.channelPrefix}:` : ""}${latest.bareType}`,
-    formatDateTime(latest.createdAt) === NO_DATA ? null : formatDateTime(latest.createdAt),
-    pr,
-  ]);
 }
 
 function qaLabel(task: CompanyTask | null, events: CompanyEvent[]): string {
@@ -2308,10 +2245,14 @@ function agentMatches(filter: string, slug: string | null): boolean {
   return filter === "marketing" && slug.includes("marketing");
 }
 
-function findAgent(status: CompanyStatus, slug: string): CompanyAgent | undefined {
-  return status.agents.find(
-    (agent) => agent.slug === slug || (slug === "marketing" && agent.slug.includes("marketing")),
-  );
+function buildRoleFilterOptions(tasks: CompanyTask[], selected: string): Array<{ value: string; label: string }> {
+  const seen = new Set<string>();
+  for (const task of tasks) {
+    const slug = task.producerAgentSlug?.trim();
+    if (slug) seen.add(slug);
+  }
+  if (selected) seen.add(selected);
+  return [...seen].sort().map((value) => ({ value, label: roleLabel(value) }));
 }
 
 function sameMoscowDay(value: string | null, snapshot: string): boolean {
@@ -2474,7 +2415,8 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
     };
   }
   if (acceptance?.applicable && acceptance.state === "rejected") {
-    const note = acceptance.comment?.trim() || "Нет данных";
+    // Core #28 writes the remark into acceptance.comment and also into next_action of the same task.
+    const note = acceptance.comment?.trim() || task.nextStep?.trim() || NO_DATA;
     return {
       label: "На доработке",
       tone: "rework",
@@ -2564,7 +2506,6 @@ function acceptanceView(task: CompanyTask): OwnerAcceptanceView | null {
     actor: fact.actor ?? NO_DATA,
     comment: fact.comment ?? NO_DATA,
     nextAction: task.nextStep ?? NO_DATA,
-    owner: fact.owner ?? NO_DATA,
     productionVerified: fact.productionVerified == null ? NO_DATA : fact.productionVerified ? "да" : "нет",
   };
 }
@@ -2726,34 +2667,6 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   const codexDisconnected = codexDisconnectedFrom(status);
   const codexFallback = fallbackName(status.tasks);
 
-  const agents = AI_COMPANY_ROLES.map(([slug, label]) => {
-    const agent = findAgent(status, slug);
-    const heartbeatAt = agent ? heartbeatInstant(agent, status.heartbeats) : null;
-    const state = agentState(agent, heartbeatAt, now);
-    const task = resolveCurrentTask(agent ?? null, status.tasks);
-    const events = cardEvents(agent, task, status.events);
-    const waitReason = task?.blockedReason
-      ? task.blockedReason
-      : task && isGate(task.humanGate)
-        ? `Ручное разрешение (Human Gate): ${task.humanGate}`
-        : NO_DATA;
-    return {
-      slug,
-      label,
-      stateLabel: state.label,
-      tone: state.tone,
-      currentTaskTitle: task?.title ?? NO_DATA,
-      currentTaskTechnicalId: agent?.currentTaskId ?? NO_DATA,
-      stage: task ? stageLabel(task) : NO_DATA,
-      startedAt: formatDateTime(startedAt(task, status.events)),
-      heartbeat: formatDateTime(heartbeatAt),
-      freshness: freshnessLabel(heartbeatAt, now),
-      latestResult: latestResult(events),
-      waitReason,
-      handoff: task?.resultConsumer ? displayKnownRole(task.resultConsumer) : NO_DATA,
-      qaState: qaLabel(task, events),
-    } satisfies AgentCardModel;
-  });
 
   const currentIds = new Set(
     status.agents.map((agent) => agent.currentTaskId).filter((id): id is string => Boolean(id)),
@@ -3003,13 +2916,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
 
   const executorCards = buildExecutors(status, now, codexDisconnected, codexFallback);
 
-  const counts = agents.reduce(
-    (accumulator, agent) => {
-      accumulator[agent.tone] += 1;
-      return accumulator;
-    },
-    { working: 0, waiting: 0, attention: 0, idle: 0, offline: 0, unknown: 0 },
-  );
+  const roleFilterOptions = buildRoleFilterOptions(status.tasks, filters.agent);
 
   const todayNote = receiptKnown
     ? "Списки за сегодня: новые сверху. Полученные — по received_at. Созданные — по created_at, это отдельно обозначенный запасной порядок, не подмена получения. Завершённые — по completed_at. updated_at возраст задачи не задаёт. Неизвестная дата не подставляется."
@@ -3022,15 +2929,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     activeTasks,
     activeBoundary: boundaries.active,
     executors: executorCards,
-    agents,
-    pulse: [
-      { label: "Функций со свежей работой", count: counts.working },
-      { label: "Функций в ожидании", count: counts.waiting },
-      { label: "Функций, требующих внимания", count: counts.attention },
-      { label: "Функций без текущей работы", count: counts.idle },
-      { label: "Функций без подключения", count: counts.offline },
-      { label: "Функций без свежих данных", count: counts.unknown },
-    ],
+    roleFilterOptions,
     todayReceived,
     todayCreated,
     todayWorkEvents,
@@ -3039,6 +2938,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     queue,
     ownerReview,
     acceptedArchive,
+    acceptedArchiveError: null,
     history,
     historySummary: `Завершено по критерию готовности: ${closed.length}. С известной датой завершения: сегодня ${summaryToday}, неделя ${summaryWeek}, месяц ${summaryMonth}. Без даты завершения: ${closed.length - dated.length}. Страница истории: ${history.length} из ${historyAll.length}.`,
     historyBoundary: boundaries.history,
@@ -3081,7 +2981,7 @@ function buildExecutors(
   codexFallback: string | null,
 ): ExecutorCard[] {
   const specs: Array<{ id: ExecutorId; label: string; roleNote: string }> = [
-    { id: "grok", label: "Grok", roleNote: "Оркестратор. Не исполнитель кода." },
+    { id: "grok", label: "Grok", roleNote: "Единственный оркестратор. Не исполнитель кода." },
     { id: "codex", label: "Codex", roleNote: "Исполнитель." },
     { id: "cursor", label: "Cursor", roleNote: "Исполнитель. Модель Grok внутри Cursor остаётся Cursor." },
   ];
@@ -3116,10 +3016,23 @@ function buildExecutors(
         ? "В наблюдении есть модель Grok на канале Cursor. Отдельный исполнитель xAI из этого не создаётся."
         : null,
     ];
+    const kind: ExecutorCard["kind"] =
+      spec.id === "grok" ? "orchestrator" : connection === "not_connected" ? "dependency" : "executor";
+    const evidenceRun = observations.find((item) => item.provider || item.model) ?? null;
+    const providerModel = joinFound([
+      evidenceRun?.provider ?? current?.executiveRun?.provider ?? null,
+      evidenceRun?.channel ?? current?.executiveRun?.channel ?? null,
+      evidenceRun?.model ?? current?.executiveRun?.model ?? null,
+    ]);
     return {
       id: spec.id,
       label: spec.label,
-      roleNote: spec.roleNote,
+      kind,
+      roleNote:
+        kind === "dependency"
+          ? `Не подключён: зависимость подключения, не активный исполнитель.${spec.id === "codex" ? "" : ` ${spec.roleNote}`}`
+          : spec.roleNote,
+      providerModel,
       connection,
       connectionLabel: connectionCopy(connection),
       heartbeat: formatDateTime(heartbeatAt),
@@ -3129,4 +3042,40 @@ function buildExecutors(
       detail: joinFound(detailParts),
     };
   });
+}
+
+export type CompanyStatusLoad = { data: CompanyStatus | null; error: string | null };
+
+export const ACCEPTED_ARCHIVE_UNAVAILABLE = "Архив принятых сейчас недоступен.";
+
+/**
+ * Page composition: `?acceptance=current` drives the board, `?acceptance=archive` only
+ * fills «Архив / Принятые». A failed or non-archive answer is shown as unavailable,
+ * never as an empty archive.
+ */
+export function composeAiCompanyBoard(
+  current: CompanyStatusLoad,
+  archive: CompanyStatusLoad,
+  filters: HistoryFilters,
+): { model: DashboardModel | null; acceptanceAvailable: boolean; sourceError: string | null } {
+  const acceptanceAvailable = Boolean(current.data?.acceptanceContract || archive.data?.acceptanceContract);
+  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters) : null;
+  if (!currentModel) return { model: null, acceptanceAvailable, sourceError: current.error };
+  if (!acceptanceAvailable) {
+    return { model: { ...currentModel, acceptedArchive: [], acceptedArchiveError: null }, acceptanceAvailable, sourceError: null };
+  }
+  let acceptedArchive: TaskDetailModel[] = [];
+  let acceptedArchiveError: string | null = null;
+  if (!archive.data) {
+    acceptedArchiveError = `${ACCEPTED_ARCHIVE_UNAVAILABLE} ${archive.error ?? "Company Core не ответил."}`.trim();
+  } else if (archive.data.acceptanceView !== "archive") {
+    acceptedArchiveError = `${ACCEPTED_ARCHIVE_UNAVAILABLE} Company Core не подтвердил выборку acceptance=archive.`;
+  } else {
+    acceptedArchive = buildAiCompanyDashboard(archive.data, filters).acceptedArchive;
+  }
+  return {
+    model: { ...currentModel, acceptedArchive, acceptedArchiveError },
+    acceptanceAvailable,
+    sourceError: null,
+  };
 }

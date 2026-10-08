@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  ACCEPTANCE_OWNER_ONLY,
   ACCEPTANCE_UNAVAILABLE,
   COMPANY_ACTOR,
+  acceptanceCommandPath,
   coreAcceptanceBody,
   createAcceptanceGate,
   handleOwnerAcceptanceRequest,
@@ -18,6 +20,17 @@ const key = "idem-key-1";
 const taskId = "f030fcae-be3a-4231-9987-24b97efe7501";
 const version = "ab".repeat(32);
 const nextVersion = "cd".repeat(32);
+const owner = { userId: "00000000-0000-4000-8000-0000000000aa", isOwner: true };
+const admin = { userId: "00000000-0000-4000-8000-0000000000bb", isOwner: false };
+
+// Task id: the same UUID rule as Core. Path segments never reach the Core URL.
+for (const bad of ["..", ".", "../acceptance", "a/b", "task-1", "f030fcae-be3a-4231-9987-24b97efe750", "f030fcae%2F..", ""]) {
+  const outcome = validateAcceptanceCommand({ taskId: bad, decision: "accepted", idempotencyKey: key, resultVersion: version });
+  assert.equal(outcome.ok, false, `task id ${JSON.stringify(bad)} is refused`);
+  if (!outcome.ok) assert.equal(outcome.code, "invalid_task_id");
+}
+assert.throws(() => acceptanceCommandPath(".."));
+assert.equal(acceptanceCommandPath(taskId), `/v1/tasks/${taskId}/acceptance`);
 
 assert.equal(safeResultVersion(version), version);
 assert.equal(safeResultVersion("result-4"), null);
@@ -68,7 +81,7 @@ const health = interpretAcceptanceResponse(200, { status: "healthy", production_
 assert.equal(health.ok, false);
 if (!health.ok) assert.equal(health.keepRow, true);
 
-const missingTime = interpretAcceptanceResponse(200, { task_id: taskId, decision: "accepted", archive: true });
+const missingTime = interpretAcceptanceResponse(200, { task_id: taskId, decision: "accepted", archive: true }, { taskId, decision: "accepted" });
 assert.equal(missingTime.ok, true);
 if (missingTime.ok) {
   assert.equal(missingTime.at, null);
@@ -77,7 +90,25 @@ if (missingTime.ok) {
   assert.equal(missingTime.decision, "accepted");
 }
 
-const stale = interpretAcceptanceResponse(409, { code: "stale_result", result_version: nextVersion });
+// A 200 about another task or another decision is not a confirmation.
+const otherTask = interpretAcceptanceResponse(
+  200,
+  { task_id: "11111111-1111-4111-8111-111111111111", decision: "accepted", decided_at: "2026-10-07T18:30:00.000Z" },
+  { taskId, decision: "accepted" },
+);
+assert.equal(otherTask.ok, false);
+if (!otherTask.ok) {
+  assert.equal(otherTask.code, "response_mismatch");
+  assert.equal(otherTask.keepRow, true);
+}
+const otherDecision = interpretAcceptanceResponse(200, { task_id: taskId, decision: "rejected" }, { taskId, decision: "accepted" });
+assert.equal(otherDecision.ok, false);
+if (!otherDecision.ok) assert.equal(otherDecision.code, "response_mismatch");
+const upperCase = interpretAcceptanceResponse(200, { task_id: taskId.toUpperCase(), decision: "accepted" }, { taskId, decision: "accepted" });
+assert.equal(upperCase.ok, true);
+
+// Core error bodies use `error` (company-api json(res, status, { error })).
+const stale = interpretAcceptanceResponse(409, { error: "stale_result", task_id: taskId, result_version: nextVersion });
 assert.equal(stale.ok, false);
 if (!stale.ok) {
   assert.equal(stale.code, "stale_result");
@@ -87,7 +118,7 @@ if (!stale.ok) {
 }
 
 for (const code of ["idempotency_conflict", "not_archived", "gate_open", "result_not_presented", "historical_blocked", "task_closed"]) {
-  const outcome = interpretAcceptanceResponse(409, { code });
+  const outcome = interpretAcceptanceResponse(409, { error: code, task_id: taskId });
   assert.equal(outcome.ok, false);
   if (!outcome.ok) assert.equal(outcome.keepRow, true);
 }
@@ -134,8 +165,11 @@ function fetchImpl(url: string | URL | Request, init?: RequestInit): Promise<Res
   });
   const payload = JSON.parse(raw || "{}") as { expected_result_version?: string; decision?: string; idempotency_key?: string };
   if (payload.expected_result_version === nextVersion) {
-    return Promise.resolve(Response.json({ code: "stale_result", result_version: version }, { status: 409 }));
+    return Promise.resolve(Response.json({ error: "stale_result", task_id: taskId, result_version: version }, { status: 409 }));
   }
+  // Success body as built by Core #28 user-acceptance.mjs (decision → user_acceptance / presentation strings).
+  const userAcceptance = payload.decision === "reopen" ? "none" : payload.decision;
+  const presentation = payload.decision === "accepted" ? "archived" : payload.decision === "rejected" ? "rework" : "presented";
   return Promise.resolve(
     Response.json({
       task_id: taskId,
@@ -144,8 +178,8 @@ function fetchImpl(url: string | URL | Request, init?: RequestInit): Promise<Res
       decided_at: "2026-10-07T18:30:00.000Z",
       result_version: version,
       comment: null,
-      user_acceptance: payload.decision,
-      presentation: true,
+      user_acceptance: userAcceptance,
+      presentation,
       next_action: null,
       owner: "executive",
       idempotent: calls.filter((call) => call.body.includes(payload.idempotency_key ?? "none")).length > 1,
@@ -158,6 +192,7 @@ function fetchImpl(url: string | URL | Request, init?: RequestInit): Promise<Res
 const saved = await handleOwnerAcceptanceRequest({
   base: "https://core.example",
   token: "server-token",
+  actor: owner,
   fetchImpl: fetchImpl as typeof fetch,
   body: { taskId, decision: "accepted", idempotencyKey: key, resultVersion: version },
 });
@@ -174,6 +209,7 @@ assert.doesNotMatch(calls.at(-1)?.body ?? "", /server-token|actor|production_ver
 const replay = await handleOwnerAcceptanceRequest({
   base: "https://core.example",
   token: "server-token",
+  actor: owner,
   fetchImpl: fetchImpl as typeof fetch,
   body: { taskId, decision: "accepted", idempotencyKey: key, resultVersion: version },
 });
@@ -184,6 +220,7 @@ assert.equal(calls.filter((call) => call.body.includes(`"idempotency_key":"${key
 const staleSave = await handleOwnerAcceptanceRequest({
   base: "https://core.example",
   token: "server-token",
+  actor: owner,
   fetchImpl: fetchImpl as typeof fetch,
   body: { taskId, decision: "accepted", idempotencyKey: "another-key", resultVersion: nextVersion },
 });
@@ -195,15 +232,33 @@ assert.equal(staleSave.body.resultVersion, version);
 const hidden = await handleOwnerAcceptanceRequest({
   base: null,
   token: null,
+  actor: owner,
   body: { taskId, decision: "accepted", idempotencyKey: key, resultVersion: version },
 });
 assert.equal(hidden.status, 503);
 assert.equal(hidden.body.message, ACCEPTANCE_UNAVAILABLE);
 
+// ai_company.view without the platform owner role may not decide as `sergey`: 403 before any Core call.
+const callsBefore = calls.length;
+const notOwner = await handleOwnerAcceptanceRequest({
+  base: "https://core.example",
+  token: "server-token",
+  actor: admin,
+  fetchImpl: fetchImpl as typeof fetch,
+  body: { taskId, decision: "accepted", idempotencyKey: "admin-key-1", resultVersion: version },
+});
+assert.equal(notOwner.status, 403);
+assert.equal(notOwner.body.code, "owner_required");
+assert.equal(notOwner.body.message, ACCEPTANCE_OWNER_ONLY);
+assert.equal(calls.length, callsBefore, "non-owner request never reaches Core");
+
 const route = readFileSync("src/app/api/admin/ai-company/acceptance/route.ts", "utf8");
 assert.match(route, /requireAdminPermission\("ai_company\.view"\)/);
 assert.match(route, /process\.env\.COMPANY_API_TOKEN/);
 assert.doesNotMatch(route, /localStorage|X-Audiolad-Actor|acceptance\/capabilities/);
+assert.match(route, /session\.access\.roles\.includes\("owner"\)/);
+assert.match(route, /sessionUserId: actor\.userId/);
+assert.doesNotMatch(route, /COMPANY_API_TOKEN[^)]*console|console[^;]*token/i);
 const permissions = readFileSync("src/lib/auth/platform-permissions.ts", "utf8");
 assert.doesNotMatch(permissions, /ai_company\.accept|ai_company\.manage/);
 

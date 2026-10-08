@@ -8,9 +8,11 @@
 import { copySafeProse } from "@/lib/admin/ai-company-task-copy";
 
 export const ACCEPTANCE_UNAVAILABLE = "Приёмка пока недоступна.";
+export const ACCEPTANCE_OWNER_ONLY = "Приёмку записывает только владелец платформы. Ваше решение не отправлено.";
 export const COMPANY_ACTOR = "sergey";
 
-const TASK_ID = /^[A-Za-z0-9_.:-]{1,120}$/;
+/** Same task id rule as Company Core (TASK_ID_RE in src/user-acceptance.mjs): a UUID, never a path segment. */
+const TASK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const RESULT_VERSION = /^[a-f0-9]{64}$/i;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9:._-]{8,115}$/;
 const SECRET_WORD = /token|secret|password|api[_-]?key|authorization|credential|bearer/i;
@@ -49,9 +51,25 @@ export type AcceptanceFailure = {
 
 export type AcceptanceOutcome = AcceptanceSuccess | AcceptanceFailure;
 
+export function isAcceptanceTaskId(value: unknown): value is string {
+  return typeof value === "string" && TASK_ID.test(value);
+}
+
 export function acceptanceCommandPath(taskId: string): string {
+  if (!TASK_ID.test(taskId)) throw new Error("invalid_task_id");
   return `/v1/tasks/${encodeURIComponent(taskId)}/acceptance`;
 }
+
+/**
+ * Who may record an owner decision. Core records every decision as actor `sergey`
+ * (X-Company-Actor), so Audiolad only forwards it for a session that holds the
+ * existing platform `owner` role. `ai_company.view` alone (default `admin` bundle)
+ * may look at the board but not decide as the owner. No new permission or role.
+ */
+export type AcceptanceSessionActor = {
+  userId: string;
+  isOwner: boolean;
+};
 
 export function safeResultVersion(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -74,7 +92,7 @@ export function validateAcceptanceCommand(input: unknown): { ok: true; command: 
   const taskId = typeof record.taskId === "string" ? record.taskId.trim() : "";
   const decision = record.decision;
   const idempotencyKey = typeof record.idempotencyKey === "string" ? record.idempotencyKey.trim() : "";
-  if (!TASK_ID.test(taskId) || SECRET_WORD.test(taskId)) return fail("invalid_task_id", "Некорректный идентификатор задачи.");
+  if (!TASK_ID.test(taskId)) return fail("invalid_task_id", "Некорректный идентификатор задачи.");
   if (decision !== "accepted" && decision !== "rejected" && decision !== "reopen") {
     return fail("invalid_decision", "Некорректное решение.");
   }
@@ -158,9 +176,14 @@ const ERROR_TEXT: Record<string, string> = {
   task_closed: "Задача закрыта для этой приёмки.",
   payload_too_large: "Запрос слишком большой.",
   internal_error: "Company Core не сохранил решение.",
+  owner_required: ACCEPTANCE_OWNER_ONLY,
 };
 
-export function interpretAcceptanceResponse(status: number, body: unknown): AcceptanceOutcome {
+export function interpretAcceptanceResponse(
+  status: number,
+  body: unknown,
+  expected?: { taskId: string; decision: AcceptanceDecision },
+): AcceptanceOutcome {
   const record = asRecord(body);
   const code = readCode(record);
   const currentVersion = safeResultVersion(record?.result_version);
@@ -184,6 +207,9 @@ export function interpretAcceptanceResponse(status: number, body: unknown): Acce
     TASK_ID.test(taskId) &&
     (decision === "accepted" || decision === "rejected" || decision === "reopen")
   ) {
+    if (expected && (taskId.toLowerCase() !== expected.taskId.toLowerCase() || decision !== expected.decision)) {
+      return fail("response_mismatch", "Company Core ответил про другую задачу или другое решение. Сохранение не подтверждено.");
+    }
     const message =
       decision === "accepted"
         ? "Решение сохранено. Строка уйдёт в «Архив / Принятые», когда снимок покажет user_acceptance=accepted."
@@ -244,7 +270,10 @@ export async function postOwnerAcceptance(input: {
       signal: AbortSignal.timeout(8000),
     });
     const payload = await response.json().catch(() => null);
-    return interpretAcceptanceResponse(response.status, payload);
+    return interpretAcceptanceResponse(response.status, payload, {
+      taskId: input.command.taskId,
+      decision: input.command.decision,
+    });
   } catch {
     return fail("unavailable", ACCEPTANCE_UNAVAILABLE);
   }
@@ -254,8 +283,12 @@ export async function handleOwnerAcceptanceRequest(input: {
   body: unknown;
   base: string | null | undefined;
   token: string | null | undefined;
+  actor: AcceptanceSessionActor;
   fetchImpl?: typeof fetch;
 }): Promise<{ status: number; body: Record<string, unknown> }> {
+  if (!input.actor.isOwner) {
+    return { status: 403, body: { ok: false, code: "owner_required", message: ACCEPTANCE_OWNER_ONLY, keepRow: true } };
+  }
   const command = validateAcceptanceCommand(input.body);
   if (!command.ok) {
     return {
@@ -280,7 +313,9 @@ export async function handleOwnerAcceptanceRequest(input: {
           ? 401
           : outcome.code === "actor_not_authenticated"
             ? 403
-            : outcome.code === "not_found"
+            : outcome.code === "response_mismatch" || outcome.code === "rejected"
+              ? 502
+              : outcome.code === "not_found"
               ? 404
               : outcome.code === "payload_too_large"
                 ? 413

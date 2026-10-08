@@ -3,12 +3,17 @@
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
-import { ACCEPTANCE_UNAVAILABLE, createAcceptanceGate, validateRejectionComment, type AcceptanceDecision } from "@/lib/admin/ai-company-acceptance";
-import { AI_COMPANY_ROLES, NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
+import {
+  ACCEPTANCE_OWNER_ONLY,
+  ACCEPTANCE_UNAVAILABLE,
+  createAcceptanceGate,
+  validateRejectionComment,
+  type AcceptanceDecision,
+} from "@/lib/admin/ai-company-acceptance";
+import { NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
   ActiveTaskCard,
-  AgentCardModel,
   DashboardModel,
   EngineeringPanel,
   ExecutorCard,
@@ -21,15 +26,6 @@ import type {
   TodayRowModel,
   WorkEventModel,
 } from "@/lib/admin/ai-company-dashboard";
-
-const TONE_CLASS: Record<AgentCardModel["tone"], string> = {
-  working: "border-green-200 bg-green-50",
-  waiting: "border-amber-200 bg-amber-50",
-  attention: "border-red-200 bg-red-50",
-  idle: "border-slate-200 bg-slate-50",
-  offline: "border-slate-300 bg-slate-100",
-  unknown: "border-[#eadff8] bg-white",
-};
 
 const CONNECTION_CLASS: Record<ExecutorCard["connection"], string> = {
   online: "border-green-200 bg-green-50",
@@ -62,9 +58,12 @@ type AiCompanyDashboardProps = {
   filters: HistoryFilters;
   sourceError: string | null;
   acceptanceAvailable?: boolean;
+  /** True only for a session with the platform `owner` role. Others see the board without live buttons. */
+  canAccept?: boolean;
 };
 
 const AcceptanceAvailability = createContext(false);
+const AcceptanceOwner = createContext(false);
 const AcceptanceRefresh = createContext<() => void>(() => undefined);
 
 function knownValue(value: string | null | undefined): string | null {
@@ -190,6 +189,7 @@ function TaskCopyButton({ text }: { text: string }) {
 
 function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   const available = useContext(AcceptanceAvailability);
+  const owner = useContext(AcceptanceOwner);
   const refresh = useContext(AcceptanceRefresh);
   const view = detail.acceptance;
   const gate = useRef(createAcceptanceGate());
@@ -202,7 +202,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   if (!view?.applicable || detail.taskId === NO_DATA) return null;
 
   async function submit(decision: AcceptanceDecision) {
-    if (!view || !available || busy || gate.current.busy) return;
+    if (!view || !available || !owner || busy || gate.current.busy) return;
     if (view.resultVersion === NO_DATA) {
       setError("В снимке нет версии результата.");
       setMessage(null);
@@ -250,7 +250,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
     }
   }
 
-  const locked = !available || busy;
+  const locked = !available || !owner || busy;
   return (
     <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-owner-acceptance={view.state}>
       <p className="font-semibold">Приёмка владельцем</p>
@@ -259,7 +259,6 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
         <Fact label="Проверено в рабочей системе" value={view.productionVerified} />
         <Fact label="Решение записано" value={view.recordedAt} />
         <Fact label="Кто подтвердил" value={view.actor} />
-        <Fact label="Владелец доработки" value={view.owner} />
         <Fact label="Следующее действие" value={view.nextAction} />
         <Fact label="Комментарий" value={view.comment} />
       </dl>
@@ -268,6 +267,11 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           {ACCEPTANCE_UNAVAILABLE}
         </p>
       )}
+      {available && !owner ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="status" data-acceptance-owner-only>
+          {ACCEPTANCE_OWNER_ONLY}
+        </p>
+      ) : null}
       {view.state === "accepted" ? (
         <button
           type="button"
@@ -644,6 +648,7 @@ export function AiCompanyDashboardView({
   filters,
   sourceError,
   acceptanceAvailable = false,
+  canAccept = false,
   onRefresh,
   openDetails = {},
   onToggleDetail,
@@ -663,6 +668,7 @@ export function AiCompanyDashboardView({
 
   return (
     <AcceptanceAvailability.Provider value={acceptanceAvailable}>
+    <AcceptanceOwner.Provider value={canAccept}>
     <AcceptanceRefresh.Provider value={onRefresh}>
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -740,10 +746,10 @@ export function AiCompanyDashboardView({
             <h3 id="ai-company-executors" className="text-xl font-semibold">
               Исполнители
             </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">В строке — имя и достоверное состояние подключения.</p>
+            <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — имя и достоверное состояние подключения.</p>
             <HelpNote label="Справка об исполнителях">
               <p>
-                Фактические исполнители: запуск, задача и свежесть. Состояния: не подключён, свободен, нет данных, работает. Grok оркеструет и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor.
+                Фактические исполнители: провайдер и модель, запуск, задача и свежесть сигнала из Company Core. Состояния: не подключён, свободен, нет данных, работает. Grok — единственный оркестратор и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor. Неподключённый исполнитель — зависимость подключения, не активный исполнитель. Постоянных карточек должностей нет: исторические роли остаются в журнале задач.
               </p>
             </HelpNote>
             <div className="mt-2 flex flex-col gap-1.5">
@@ -758,66 +764,21 @@ export function AiCompanyDashboardView({
                     open={openDetails[rowKey] ?? false}
                     onToggle={onToggleDetail}
                     className={CONNECTION_CLASS[executor.connection]}
-                    articleProps={{ "data-executor": executor.id, "data-connection": executor.connection }}
+                    articleProps={{
+                      "data-executor": executor.id,
+                      "data-executor-kind": executor.kind,
+                      "data-connection": executor.connection,
+                    }}
                   >
                     <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
                     <dl className="mt-3 grid gap-2 text-sm">
                       <Fact label="Состояние" value={executor.connectionLabel} />
+                      <Fact label="Провайдер / модель" value={executor.providerModel} />
                       <Fact label="Задача" value={executor.currentTask} />
                       <Fact label="Запуск" value={executor.runId} />
                       <Fact label="Свежесть" value={executor.freshness} />
                       <Fact label="Последний сигнал" value={executor.heartbeat} />
                       <Fact label="Уточнение" value={executor.detail} />
-                    </dl>
-                  </CompactRow>
-                );
-              })}
-            </div>
-          </section>
-
-          <section aria-labelledby="ai-company-roles" data-section="roles">
-            <h3 id="ai-company-roles" className="text-xl font-semibold">
-              Роли компании
-            </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">В строке — роль и достоверное состояние. Это функции компании, не число запущенных процессов.</p>
-            <HelpNote label="Справка о ролях">
-              <p>
-                Восемь функций компании, не восемь запущенных процессов. Product, Engineering, QA и Analytics назначает Grok по нужде. QA остаётся независимой. Старые роли не запускаются ради показателей.
-              </p>
-            </HelpNote>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {model.pulse.map((item) => (
-                <div key={item.label} className="min-w-0">
-                  <div className="text-xs text-[#796ba0]">{item.label}</div>
-                  <div className="text-lg font-semibold tabular-nums">{item.count}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {model.agents.map((agent) => {
-                const rowKey = `role:${agent.slug}`;
-                return (
-                  <CompactRow
-                    key={rowKey}
-                    rowKey={rowKey}
-                    title={agent.label}
-                    aside={agent.stateLabel}
-                    open={openDetails[rowKey] ?? false}
-                    onToggle={onToggleDetail}
-                    className={TONE_CLASS[agent.tone]}
-                    articleProps={{ "data-agent": agent.slug, "data-state": agent.tone }}
-                  >
-                    <dl className="mt-3 grid gap-3 text-sm">
-                      <Fact label="Текущая задача" value={agent.currentTaskTitle} />
-                      <Fact label="Идентификатор текущей задачи" value={agent.currentTaskTechnicalId} />
-                      <Fact label="Текущий этап" value={agent.stage} />
-                      <Fact label="Время начала" value={agent.startedAt} />
-                      <Fact label="Последний сигнал жизнеспособности (heartbeat)" value={agent.heartbeat} />
-                      <Fact label="Свежесть сигнала" value={agent.freshness} />
-                      <Fact label="Последний измеримый результат" value={agent.latestResult} />
-                      <Fact label="Причина ожидания или блокировки" value={agent.waitReason} />
-                      <Fact label="Кому передан результат" value={agent.handoff} />
-                      <Fact label="Состояние контроля качества (QA)" value={agent.qaState} />
                     </dl>
                   </CompactRow>
                 );
@@ -992,9 +953,9 @@ export function AiCompanyDashboardView({
                 Роль
                 <select name="agent" defaultValue={filters.agent} className="rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]">
                   <option value="">Все роли</option>
-                  {AI_COMPANY_ROLES.map(([slug, label]) => (
-                    <option key={slug} value={slug}>
-                      {label}
+                  {model.roleFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -1050,7 +1011,15 @@ export function AiCompanyDashboardView({
               Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
             </p>
             <div className="mt-2 flex flex-col gap-1.5">
-              {model.acceptedArchive.length ? (
+              {model.acceptedArchiveError ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#9f1239]" role="status" data-archive-unavailable>
+                  {model.acceptedArchiveError}
+                </p>
+              ) : !acceptanceAvailable ? (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status">
+                  {ACCEPTANCE_UNAVAILABLE}
+                </p>
+              ) : model.acceptedArchive.length ? (
                 model.acceptedArchive.map((detail) => {
                   const rowKey = `accepted:${detail.key}`;
                   return (
@@ -1075,11 +1044,12 @@ export function AiCompanyDashboardView({
       ) : null}
     </div>
     </AcceptanceRefresh.Provider>
+    </AcceptanceOwner.Provider>
     </AcceptanceAvailability.Provider>
   );
 }
 
-export default function AiCompanyDashboard({ acceptanceAvailable = false, ...props }: AiCompanyDashboardProps) {
+export default function AiCompanyDashboard({ acceptanceAvailable = false, canAccept = false, ...props }: AiCompanyDashboardProps) {
   const router = useRouter();
   const { openDetails, onToggleDetail } = useAiCompanyDisclosureState();
 
@@ -1088,6 +1058,7 @@ export default function AiCompanyDashboard({ acceptanceAvailable = false, ...pro
       <AiCompanyDashboardView
         {...props}
         acceptanceAvailable={acceptanceAvailable}
+        canAccept={canAccept}
         onRefresh={() => router.refresh()}
         openDetails={openDetails}
         onToggleDetail={onToggleDetail}
