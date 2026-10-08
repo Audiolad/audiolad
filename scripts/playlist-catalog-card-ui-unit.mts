@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import {
   formatPlaylistCardCreatorName,
   formatPlaylistCatalogMeta,
-  PLAYLIST_CARD_TITLE_CLASS,
 } from "../src/lib/playlists/format-item-count";
 import { PLAYLIST_LISTING_FORBIDDEN_FIELDS } from "../src/lib/playlists/listing-contract";
 
@@ -49,7 +48,7 @@ assert.match(card, /item\.coverUrl/, "card reads listing coverUrl only");
 assert.match(card, /data-playlist-catalog-cover-placeholder/, "missing cover uses placeholder");
 assert.match(card, /Нет обложки/, "placeholder is labeled");
 assert.match(card, /aspect-square/, "cover is 1:1");
-assert.match(card, /PLAYLIST_CARD_TITLE_CLASS/, "title uses reserved 3-line class");
+assert.match(card, /PLAYLIST_CARD_TITLE_CLASS/, "title uses reserved 2-line class");
 assert.match(card, /flex h-full min-w-0 flex-col/, "card stretches as a column");
 assert.match(card, /line-clamp-1 min-h-5/, "creator is one reserved line");
 assert.match(card, /PlaylistSaveButton/, "heart is a playlist save button");
@@ -79,13 +78,15 @@ const shortTitle = "Шум воды | Журчание воды | Звуки в�
 
 function reservedTitleClassFor(title: string): string {
   assert.equal(typeof title, "string");
-  return PLAYLIST_CARD_TITLE_CLASS;
+  const titleClass = card.match(/const PLAYLIST_CARD_TITLE_CLASS =\s*"([^"]+)"/)?.[1];
+  assert.ok(titleClass, "catalog card owns its 2-line title class");
+  return titleClass;
 }
 
 assert.equal(reservedTitleClassFor(longTitle), reservedTitleClassFor(shortTitle));
-assert.match(reservedTitleClassFor(longTitle), /line-clamp-3/);
-assert.match(reservedTitleClassFor(longTitle), /min-h-\[3\.75rem\]/);
-assert.match(reservedTitleClassFor(shortTitle), /min-h-\[3\.75rem\]/);
+assert.match(reservedTitleClassFor(longTitle), /line-clamp-2/);
+assert.match(reservedTitleClassFor(longTitle), /h-10 min-h-10/);
+assert.match(reservedTitleClassFor(shortTitle), /h-10 min-h-10/);
 assert.match(format, /line-clamp-3 min-h-\[3\.75rem\]/);
 assert.doesNotMatch(card, /item\.title\.(length|slice|split)/);
 

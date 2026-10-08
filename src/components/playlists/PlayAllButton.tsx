@@ -96,7 +96,11 @@ export default function PlayAllButton(props: PlayAllButtonProps) {
         type="button"
         disabled={loading}
         onClick={() => void handleClick()}
-        className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className={
+          props.variant === "public"
+            ? "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[22px] bg-gradient-to-r from-[#6d35d7] via-[#7c3fe4] to-[#8e55e8] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(109,53,215,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+            : "inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        }
       >
         {loading ? "Запуск…" : "Слушать всё"}
       </button>

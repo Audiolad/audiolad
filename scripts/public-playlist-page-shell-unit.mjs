@@ -255,8 +255,9 @@ assert(
   "mobile/tablet hero stays a vertical stack (xl only)",
 );
 assert(
-  view.includes("max-w-[280px]") && view.includes("mx-auto") && view.includes("xl:mx-0"),
-  "mobile cover stays a centered stack; desktop cover is not centered as a page hero",
+  view.includes("w-full min-w-0 xl:col-start-1") && view.includes("rounded-t-[27px]") &&
+    !view.includes("max-w-[280px]"),
+  "mobile cover fills the hero card; desktop cover keeps its own column",
 );
 
 assert(

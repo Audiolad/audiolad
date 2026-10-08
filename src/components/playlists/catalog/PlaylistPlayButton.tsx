@@ -49,7 +49,7 @@ export default function PlaylistPlayButton({ slug, title }: PlaylistPlayButtonPr
         aria-busy={busy}
         disabled={busy}
         onClick={handleClick}
-        className={`absolute bottom-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(36,19,63,0.28)] before:absolute before:-inset-1 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-70 ${
+        className={`absolute bottom-2 right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(36,19,63,0.28)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-70 ${
           isPlaying
             ? "bg-[#7042c5] text-white"
             : "bg-white/95 text-[#4b2f86]"

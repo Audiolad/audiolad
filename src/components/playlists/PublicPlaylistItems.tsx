@@ -85,7 +85,13 @@ export default function PublicPlaylistItems({
 
   return (
     <section
-      className="mt-5 space-y-1.5"
+      className="mt-5 min-w-0 space-y-3
+        [&_.playlist-item-row]:relative [&_.playlist-item-row]:max-h-none [&_.playlist-item-row]:min-h-[88px] [&_.playlist-item-row]:gap-3 [&_.playlist-item-row]:rounded-[18px] [&_.playlist-item-row]:p-3 [&_.playlist-item-row]:shadow-[0_6px_16px_rgba(91,62,145,0.05)]
+        [&_.playlist-item-row>button]:z-10 [&_.playlist-item-row>button]:h-16 [&_.playlist-item-row>button]:w-16
+        [&_.playlist-item-row>div>a]:break-words [&_.playlist-item-row>div>a]:[overflow-wrap:anywhere] [&_.playlist-item-row>div>a:not([aria-label])]:line-clamp-none [&_.playlist-item-row>div>a[aria-label]]:whitespace-normal
+        [&_.playlist-item-row>div>a:not([aria-label])]:after:absolute [&_.playlist-item-row>div>a:not([aria-label])]:after:inset-0 [&_.playlist-item-row>div>a:not([aria-label])]:after:rounded-[18px] [&_.playlist-item-row>div>a:not([aria-label])]:after:content-['']
+        [&_.playlist-item-row>div>a[aria-label]]:relative [&_.playlist-item-row>div>a[aria-label]]:z-10 [&_.playlist-item-row>div>a[aria-label]]:block [&_.playlist-item-row>div>a[aria-label]]:w-fit [&_.playlist-item-row>div>a[aria-label]]:min-w-11 [&_.playlist-item-row>div>a[aria-label]]:max-w-full [&_.playlist-item-row>div>a[aria-label]]:overflow-visible [&_.playlist-item-row>div>a[aria-label]]:after:absolute [&_.playlist-item-row>div>a[aria-label]]:after:inset-x-0 [&_.playlist-item-row>div>a[aria-label]]:after:-inset-y-3.5 [&_.playlist-item-row>div>a[aria-label]]:after:content-['']
+        [&_.playlist-item-row>div>p:first-child]:text-[#7d70a2] [&_.playlist-item-row>span]:text-[#7d70a2]"
       data-public-playlist-items
     >
       {rowError ? (
