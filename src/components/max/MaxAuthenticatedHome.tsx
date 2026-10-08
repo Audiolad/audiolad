@@ -571,7 +571,8 @@ export default function MaxAuthenticatedHome({
               }}
               onOpenRecommendation={openCatalogProduct}
               onOpenTopic={openCatalogTopic}
-              interactiveActionsEnabled={!guestMode}
+              guestMode={guestMode}
+              onRequestLogin={onRequestLogin}
               listenSlot={
                 <>
                   {playback.status === "loading" ? (

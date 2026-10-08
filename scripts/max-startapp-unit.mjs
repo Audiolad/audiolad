@@ -180,7 +180,7 @@ assert.match(home, /PLAY_ACTION_LABEL/);
 assert.match(home, /PREVIEW_ACTION_LABEL/);
 assert.match(home, /<MaxBottomNav/);
 assert.doesNotMatch(home, /!guestMode \? \(\s*<MaxBottomNav/);
-assert.match(home, /interactiveActionsEnabled=\{!guestMode\}/);
+assert.match(home, /<MaxProductDetailView[\s\S]*guestMode=\{guestMode\}[\s\S]*onRequestLogin=\{onRequestLogin\}/);
 assert.match(home, /slug: initialStartTarget\.productSlug/);
 assert.match(authorProductForm, /Адрес продукта в MAX/);
 assert.match(authorProductForm, /buildMaxProductDeepLink\(practiceId\)/);
