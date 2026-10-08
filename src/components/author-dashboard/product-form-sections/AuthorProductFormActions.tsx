@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { canWithdrawPracticeFromModeration } from "@/lib/author-products/moderation";
+import { shouldShowProductActionsError } from "@/lib/author-products/publish-preview-flow";
 
 type AuthorProductFormActionsProps = {
   mode: "create" | "edit";
@@ -184,9 +185,10 @@ export default function AuthorProductFormActions({
       ) : null}
 
       {error &&
-      ((isDraft && !canBypassProductModeration) || needsChanges) ? (
+      shouldShowProductActionsError({ isDraft, isUnpublished, needsChanges }) ? (
         <p
           data-submit-issue
+          role="alert"
           className="w-full rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]"
         >
           {error}

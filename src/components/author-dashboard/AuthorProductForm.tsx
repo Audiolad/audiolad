@@ -261,6 +261,12 @@ import {
   PUBLISH_PREVIEW_NOT_READY_MESSAGE,
   shouldOpenPublishPreviewFromForm,
 } from "@/lib/products/publish-preview";
+import {
+  firstProductSaveFailureReason,
+  formatPreviewSaveFailureMessage,
+  isPromoRecommendationErrorCode,
+} from "@/lib/author-products/publish-preview-flow";
+import { validatePromoRecommendation } from "@/lib/products/promo-recommendation";
 import { formatRubles } from "@/lib/products/price-format";
 import {
   DEFAULT_STUDIO_MUSIC_FIXED_RUBLES,
@@ -851,6 +857,8 @@ export default function AuthorProductForm({
   const router = useRouter();
   const [wizardStep, setWizardStep] =
     useState<ProductWizardStep>(initialWizardStep);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const lastSaveFailureReasonRef = useRef<string | null>(null);
   const [passportCommand, setPassportCommand] = useState<{
     nonce: number;
     action: "start" | "retry" | "reanalyze";
@@ -1930,23 +1938,31 @@ export default function AuthorProductForm({
   }
 
   async function saveProduct(): Promise<boolean> {
+    lastSaveFailureReasonRef.current = null;
+    // Every failed save records its concrete reason so callers such as the
+    // «Предпросмотр» CTA can show it next to the button (incident 7e416c9a).
+    const failSave = (reason: string | null): false => {
+      lastSaveFailureReasonRef.current = reason;
+      return false;
+    };
+
     if (isSubmitted) {
       setError(PRODUCT_UNDER_MODERATION_MESSAGE);
-      return false;
+      return failSave(PRODUCT_UNDER_MODERATION_MESSAGE);
     }
 
     if (!canEditPublicFields && canEditSchedule) {
       const existingPracticeId = practiceIdRef.current || practiceId;
       if (!existingPracticeId) {
         setError("Сначала сохраните продукт, затем задайте расписание.");
-        return false;
+        return failSave("Сначала сохраните продукт, затем задайте расписание.");
       }
       return savePublicationScheduleOnly(existingPracticeId);
     }
 
     if (!canEditPublicFields) {
       setError("Сейчас нельзя изменить продукт.");
-      return false;
+      return failSave("Сейчас нельзя изменить продукт.");
     }
 
     if (
@@ -1954,16 +1970,16 @@ export default function AuthorProductForm({
       !mskWallClockToUtcIso(form.publishDate, form.publishTime)
     ) {
       setError("Укажите дату и время публикации.");
-      return false;
+      return failSave("Укажите дату и время публикации.");
     }
     if (
       form.productKind === PRODUCT_KIND.MUSIC &&
       musicQueueHasLocalFile(musicQueueRef.current)
     ) {
-      setError(
-        "Сначала загрузите выбранные треки или уберите файлы, которые ещё не отправлены. Сохранение сейчас сотрёт их.",
-      );
-      return false;
+      const pendingUploadMessage =
+        "Сначала загрузите выбранные треки или уберите файлы, которые ещё не отправлены. Сохранение сейчас сотрёт их.";
+      setError(pendingUploadMessage);
+      return failSave(pendingUploadMessage);
     }
 
     const studioMusicPrice =
@@ -1978,16 +1994,19 @@ export default function AuthorProductForm({
       : null;
 
     if ((studioMusicPrice && !studioMusicPrice.ok) || (listenerPrice && !listenerPrice.ok)) {
-      setFieldErrors({
+      const priceFieldErrors = {
         ...(studioMusicPrice && !studioMusicPrice.ok
           ? { studioMusicPrice: "Укажите целую цену от 499 до 100 000 ₽." }
           : {}),
         ...(listenerPrice && !listenerPrice.ok
           ? { price: "Укажите целую цену от 49 до 100 000 ₽." }
           : {}),
-      });
+      };
+      setFieldErrors(priceFieldErrors);
       requestScrollToFirstSubmitIssue();
-      return false;
+      return failSave(
+        firstProductSaveFailureReason({ fieldErrors: priceFieldErrors }),
+      );
     }
 
     const formForSave = {
@@ -2006,6 +2025,7 @@ export default function AuthorProductForm({
     setMessage(null);
     setFieldErrors({});
     setTopicError(undefined);
+    setPromoError(null);
 
     if (form.productKind === PRODUCT_KIND.AUDIO_POST) {
       const formatCustomError = getAudioPostFormatFieldError(
@@ -2016,7 +2036,24 @@ export default function AuthorProductForm({
       if (formatCustomError) {
         setFieldErrors({ formatCustom: formatCustomError });
         setBusy(false);
-        return false;
+        requestScrollToFirstSubmitIssue();
+        return failSave(formatCustomError);
+      }
+
+      const promoCheck = validatePromoRecommendation({
+        promo_enabled: form.promoEnabled,
+        promo_title: form.promoTitle,
+        promo_text: form.promoText,
+        promo_button_text: form.promoButtonText,
+        promo_url: form.promoUrl,
+        promo_open_in_new_tab: form.promoOpenInNewTab,
+      });
+
+      if (!promoCheck.ok) {
+        setPromoError(promoCheck.message);
+        setBusy(false);
+        requestScrollToFirstSubmitIssue();
+        return failSave(promoCheck.message);
       }
     }
 
@@ -2024,7 +2061,7 @@ export default function AuthorProductForm({
       const ensured = await ensurePracticeId();
 
       if (!ensured) {
-        return false;
+        return failSave(null);
       }
 
       const id = ensured.practiceId;
@@ -2079,7 +2116,8 @@ export default function AuthorProductForm({
             fieldKey === "authorRecommendationsTitle"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
-            return false;
+            requestScrollToFirstSubmitIssue();
+            return failSave(fieldMessage);
           }
         }
 
@@ -2089,14 +2127,20 @@ export default function AuthorProductForm({
           error: payload.error,
           status: response.status,
         });
-        setError(
-          getProductSaveErrorMessage({
-            error: payload.error,
-            message: payload.message,
-            status: response.status,
-          }),
-        );
-        return false;
+        const saveErrorMessage = getProductSaveErrorMessage({
+          error: payload.error,
+          message: payload.message,
+          status: response.status,
+        });
+
+        if (isPromoRecommendationErrorCode(payload.error)) {
+          setPromoError(saveErrorMessage);
+          requestScrollToFirstSubmitIssue();
+          return failSave(saveErrorMessage);
+        }
+
+        setError(saveErrorMessage);
+        return failSave(saveErrorMessage);
       }
 
       const audioSaveResult = await saveAllAudioItemsFromState(
@@ -2116,7 +2160,7 @@ export default function AuthorProductForm({
 
         setError(audioSaveResult.message);
         await reloadSavedProduct(id);
-        return false;
+        return failSave(audioSaveResult.message);
       }
 
       const topicsSynced = await syncProductTopics(id);
@@ -2124,16 +2168,16 @@ export default function AuthorProductForm({
       if (!topicsSynced) {
         setError("Не удалось сохранить темы продукта.");
         await reloadSavedProduct(id);
-        return false;
+        return failSave("Не удалось сохранить темы продукта.");
       }
 
       const reloaded = await reloadSavedProduct(id);
 
       if (!reloaded) {
-        setError(
-          "Изменения сохранены, но не удалось обновить форму. Обновите страницу.",
-        );
-        return false;
+        const reloadFailedMessage =
+          "Изменения сохранены, но не удалось обновить форму. Обновите страницу.";
+        setError(reloadFailedMessage);
+        return failSave(reloadFailedMessage);
       }
 
       if (
@@ -2150,7 +2194,7 @@ export default function AuthorProductForm({
         if (!linkResult.ok) {
           setError(linkResult.message);
           setBusy(false);
-          return false;
+          return failSave(linkResult.message);
         }
         setSeoReservationContext({
           ...seoReservationContext,
@@ -2187,11 +2231,14 @@ export default function AuthorProductForm({
         practiceId: practiceIdRef.current,
         networkError: true,
       });
-      setError(getProductSaveErrorMessage({ networkError: true }));
+      const networkErrorMessage = getProductSaveErrorMessage({
+        networkError: true,
+      });
+      setError(networkErrorMessage);
       setEditorDirty(
         applyProductEditorSaveToDirty({ dirty: editorDirty, saved: false }),
       );
-      return false;
+      return failSave(networkErrorMessage);
     } finally {
       setBusy(false);
     }
@@ -2221,6 +2268,7 @@ export default function AuthorProductForm({
     setMessage(null);
     setFieldErrors({});
     setTopicError(undefined);
+    setPromoError(null);
 
     const previewTab = window.open("about:blank", "_blank");
 
@@ -2243,6 +2291,12 @@ export default function AuthorProductForm({
 
         if (!saved) {
           previewTab?.close();
+          // Never bounce silently: show the concrete save/validation reason
+          // next to «Предпросмотр» and scroll to the first marked field.
+          setError(
+            formatPreviewSaveFailureMessage(lastSaveFailureReasonRef.current),
+          );
+          requestScrollToFirstSubmitIssue();
           return false;
         }
 
@@ -2314,6 +2368,7 @@ export default function AuthorProductForm({
     setMessage(null);
     setFieldErrors({});
     setTopicError(undefined);
+    setPromoError(null);
 
     if (
       form.productKind === PRODUCT_KIND.PRACTICE &&
@@ -2383,6 +2438,11 @@ export default function AuthorProductForm({
         const saved = await saveProduct();
 
         if (!saved) {
+          setError(
+            lastSaveFailureReasonRef.current ??
+              "Не удалось сохранить продукт перед публикацией.",
+          );
+          requestScrollToFirstSubmitIssue();
           return;
         }
 
@@ -2550,6 +2610,7 @@ export default function AuthorProductForm({
     setMessage(null);
     setFieldErrors({});
     setTopicError(undefined);
+    setPromoError(null);
     setCoverSubmitError(null);
 
     if (
@@ -2593,6 +2654,9 @@ export default function AuthorProductForm({
       const id = ensured.practiceId;
       const saved = await saveProduct();
       if (!shouldSubmitProductAfterSave(saved)) {
+        if (lastSaveFailureReasonRef.current) {
+          setError(lastSaveFailureReasonRef.current);
+        }
         requestScrollToFirstSubmitIssue();
         return;
       }
@@ -5291,6 +5355,7 @@ export default function AuthorProductForm({
           promoButtonText={form.promoButtonText}
           promoUrl={form.promoUrl}
           promoOpenInNewTab={form.promoOpenInNewTab}
+          error={promoError}
           busy={busy}
           onPromoEnabledChange={(promoEnabled) =>
             setForm((current) => ({ ...current, promoEnabled }))
