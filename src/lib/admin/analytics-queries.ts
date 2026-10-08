@@ -1125,6 +1125,13 @@ export async function getAdminAnalyticsSummaryBundle(
     monthPrevReading,
     listeningValidFrom(monthRes.data) ?? listeningValidFrom(monthPrevRes.data),
   );
+  if (listeningRes.error) {
+    console.error("admin_analytics_listening_time_failed", {
+      period,
+      code: listeningRes.error.code ?? null,
+      timeout: /timeout/i.test(listeningRes.error.message ?? ""),
+    });
+  }
   const listeningTime = presentListeningTime(
     listeningRes.error ? null : listeningSnapshot,
     Boolean(listeningRes.error),
