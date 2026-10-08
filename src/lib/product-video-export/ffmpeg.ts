@@ -3,10 +3,10 @@ import { stat } from "node:fs/promises";
 
 import {
   PRODUCT_VIDEO_EXPORT_STALL_MS,
-  PRODUCT_VIDEO_ORIENTATION_META,
   PRODUCT_VIDEO_X264_PRESET,
   type ProductVideoOrientation,
 } from "./contract";
+import { productVideoFilterComplex } from "./audio-indicator";
 import {
   consumeProductVideoFfmpegProgress,
   createProductVideoFfmpegProgressState,
@@ -119,24 +119,22 @@ export async function renderProductVideo(params: {
   const { audioPath, coverPath, outputPath, orientation, signal, onProgress } = params;
   if (signal?.aborted) throw new ProductVideoRenderAbortedError();
 
+  // Audio duration drives progress and caps the output: with a looped cover
+  // and a filter graph, -shortest alone lets video run ~1 s past the audio.
   let durationUs: number | null = null;
-  if (onProgress) {
-    try {
-      durationUs = await probeAudioDurationUs(audioPath, signal);
-    } catch (error) {
-      if (signal?.aborted || error instanceof ProductVideoRenderAbortedError) {
-        throw error instanceof ProductVideoRenderAbortedError
-          ? error
-          : new ProductVideoRenderAbortedError();
-      }
-      durationUs = null;
+  try {
+    durationUs = await probeAudioDurationUs(audioPath, signal);
+  } catch (error) {
+    if (signal?.aborted || error instanceof ProductVideoRenderAbortedError) {
+      throw error instanceof ProductVideoRenderAbortedError
+        ? error
+        : new ProductVideoRenderAbortedError();
     }
+    durationUs = null;
   }
 
-  const meta = PRODUCT_VIDEO_ORIENTATION_META[orientation];
-  const filter =
-    `scale=${meta.width}:${meta.height}:force_original_aspect_ratio=increase,` +
-    `crop=${meta.width}:${meta.height},format=yuv420p`;
+  // Scaled cover + bottom-right «это аудио» indicator (see audio-indicator.ts).
+  const filter = productVideoFilterComplex(orientation);
   const progressState = createProductVideoFfmpegProgressState();
   const knownDurationUs = durationUs;
 
@@ -153,12 +151,12 @@ export async function renderProductVideo(params: {
         coverPath,
         "-i",
         audioPath,
+        "-filter_complex",
+        filter,
         "-map",
-        "0:v:0",
+        "[vout]",
         "-map",
         "1:a:0",
-        "-vf",
-        filter,
         "-c:v",
         "libx264",
         "-preset",
@@ -174,6 +172,9 @@ export async function renderProductVideo(params: {
         "-b:a",
         "192k",
         "-shortest",
+        ...(knownDurationUs != null
+          ? ["-t", (knownDurationUs / 1_000_000).toFixed(3)]
+          : []),
         "-movflags",
         "+faststart",
         "-progress",

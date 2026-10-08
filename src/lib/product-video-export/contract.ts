@@ -54,6 +54,47 @@ export const PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS = 2_000;
  * benchmark in docs/PRODUCT_VIDEO_RENDER_PRESET.md. Audio stays AAC 192k.
  */
 export const PRODUCT_VIDEO_X264_PRESET = "veryfast";
+/**
+ * Render recipe written to product_video_render_jobs.render_recipe on
+ * completion. Bump it whenever the burned-in picture changes, so a completed
+ * MP4 made with an older recipe shows «Нужно пересоздать» instead of being
+ * offered as current. v1 = scaled cover + bottom-right «это аудио» indicator.
+ */
+export const PRODUCT_VIDEO_RENDER_RECIPE = "cover-audio-indicator-v1";
+
+/** A completed job is current only if it was rendered with today's recipe. */
+export function isProductVideoRenderRecipeCurrent(
+  recipe: string | null | undefined,
+): boolean {
+  return recipe === PRODUCT_VIDEO_RENDER_RECIPE;
+}
+
+/**
+ * Stale = the job no longer matches the product: audio or cover changed, or a
+ * completed MP4 was rendered with an older recipe (e.g. before the audio
+ * indicator). Queued/processing jobs are rendered by the current worker, so
+ * the recipe check only applies to completed jobs. Stale jobs are not
+ * downloadable; the cabinet offers «Создать заново».
+ */
+export function isProductVideoRenderJobStale(input: {
+  status: string;
+  sourceAudioPath: string;
+  sourceCoverPath: string;
+  renderRecipe: string | null | undefined;
+  currentAudioPath: string | null | undefined;
+  currentCoverPath: string | null | undefined;
+}): boolean {
+  if (!input.currentAudioPath || input.sourceAudioPath !== input.currentAudioPath) {
+    return true;
+  }
+  if (!input.currentCoverPath || input.sourceCoverPath !== input.currentCoverPath) {
+    return true;
+  }
+  return (
+    input.status === "completed" &&
+    !isProductVideoRenderRecipeCurrent(input.renderRecipe)
+  );
+}
 
 export function isProductVideoExportAuthorSlug(
   slug: string | null | undefined,

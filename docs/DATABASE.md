@@ -1919,3 +1919,7 @@ Migration: `20261218120000_jazz_relax_album_passport.sql` (expand-only). Not a c
 ### Explicit non-goals
 
 No Sonic DNA, dayparts, or Engine. No fingerprints. No rights grants, country seeds, or playback-decision copy. No `music_lab_*` writes. No mass catalog analysis.
+
+## Product video export: `product_video_render_jobs.render_recipe`
+
+Migration `20261225120000_product_video_render_recipe.sql` adds a nullable `render_recipe text` to `public.product_video_render_jobs` (CHECK: NULL or `^[a-z0-9][a-z0-9-]{0,63}$`). The MP4 export worker writes `PRODUCT_VIDEO_RENDER_RECIPE` (`src/lib/product-video-export/contract.ts`, now `cover-audio-indicator-v1` = cover + bottom-right «это аудио» indicator) when it completes a job. A completed job with NULL or another recipe is shown to the author as «Нужно пересоздать» and is not downloadable as current; the old file stays in storage. No backfill, no re-render, no change to claim/lease/progress/recovery functions or RLS (table stays service_role only).

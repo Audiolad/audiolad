@@ -13,12 +13,21 @@ import {
   PRODUCT_VIDEO_EXPORT_AUTHOR_SLUGS,
   PRODUCT_VIDEO_EXPORT_PROGRESS_POLL_MS,
   PRODUCT_VIDEO_ORIENTATION_META,
+  PRODUCT_VIDEO_RENDER_RECIPE,
   PRODUCT_VIDEO_X264_PRESET,
   isProductVideoExportAuthorSlug,
+  isProductVideoRenderJobStale,
+  isProductVideoRenderRecipeCurrent,
   productVideoCoverStoragePath,
   productVideoOutputStoragePath,
 } from "../src/lib/product-video-export/contract";
 import { ProductVideoJobStatus } from "../src/components/author-dashboard/AuthorProductVideoExport";
+import {
+  PRODUCT_VIDEO_AUDIO_INDICATOR_LOOP_FRAMES,
+  productVideoAudioIndicatorLayout,
+  productVideoAudioIndicatorSource,
+  productVideoFilterComplex,
+} from "../src/lib/product-video-export/audio-indicator";
 import { renderProductVideo } from "../src/lib/product-video-export/ffmpeg";
 import {
   PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS,
@@ -130,6 +139,86 @@ assert.match(ffmpeg, /pipe:1/);
 assert.match(ffmpeg, /PRODUCT_VIDEO_X264_PRESET/);
 assert.match(ffmpeg, /onProgress/);
 assert.doesNotMatch(ffmpeg, /"-preset",\s*"medium"/);
+assert.match(ffmpeg, /"-filter_complex"/);
+assert.match(ffmpeg, /"\[vout\]"/);
+assert.match(ffmpeg, /"-tune",\s*"stillimage"/);
+assert.match(ffmpeg, /productVideoFilterComplex\(orientation\)/);
+assert.doesNotMatch(ffmpeg, /"-vf"/);
+assert.match(ffmpeg, /"-t", \(knownDurationUs \/ 1_000_000\)\.toFixed\(3\)/);
+
+// «Это аудио» indicator: compact, bottom-right, inside the frame, same
+// physical size in both orientations, clear of platform controls.
+assert.deepEqual(productVideoAudioIndicatorLayout("landscape_16_9"), {
+  frameWidth: 1920,
+  frameHeight: 1080,
+  width: 156,
+  height: 86,
+  marginRight: 68,
+  marginBottom: 118,
+  x: 1696,
+  y: 876,
+});
+assert.deepEqual(productVideoAudioIndicatorLayout("portrait_9_16"), {
+  frameWidth: 1080,
+  frameHeight: 1920,
+  width: 156,
+  height: 86,
+  marginRight: 140,
+  marginBottom: 364,
+  x: 784,
+  y: 1470,
+});
+for (const orientation of ["landscape_16_9", "portrait_9_16"] as const) {
+  const layout = productVideoAudioIndicatorLayout(orientation);
+  assert.ok(layout.x > layout.frameWidth / 2, "indicator is on the right half");
+  assert.ok(layout.y > layout.frameHeight / 2, "indicator is on the bottom half");
+  assert.ok(layout.x + layout.width <= layout.frameWidth);
+  assert.ok(layout.y + layout.height <= layout.frameHeight);
+  assert.ok(layout.width * layout.height < 0.01 * layout.frameWidth * layout.frameHeight);
+  const source = productVideoAudioIndicatorSource(orientation);
+  assert.match(source, /^color=c=black@0:s=156x86:r=25:d=2\.4,format=rgba,geq=/);
+  assert.match(source, /format=yuva420p,loop=loop=-1:size=60:start=0\[aind\]$/);
+  assert.doesNotMatch(source, /NaN|undefined|Infinity/);
+  const graph = productVideoFilterComplex(orientation);
+  assert.match(graph, /^\[0:v\]scale=\d+:\d+:force_original_aspect_ratio=increase,crop=\d+:\d+\[avbg\];/);
+  assert.ok(graph.includes(`overlay=x=${layout.x}:y=${layout.y}:format=yuv420,format=yuv420p[vout]`));
+  assert.doesNotMatch(graph, /format=auto/);
+  // Decorative, deterministic animation: only frame time T drives the bars.
+  assert.doesNotMatch(graph, /showfreqs|showspectrum|showwaves|astats|\[1:a\]/);
+}
+assert.equal(PRODUCT_VIDEO_AUDIO_INDICATOR_LOOP_FRAMES, 60);
+
+// Render recipe: old completed MP4s (NULL / other recipe) are not current.
+assert.equal(PRODUCT_VIDEO_RENDER_RECIPE, "cover-audio-indicator-v1");
+assert.equal(isProductVideoRenderRecipeCurrent(PRODUCT_VIDEO_RENDER_RECIPE), true);
+assert.equal(isProductVideoRenderRecipeCurrent(null), false);
+assert.equal(isProductVideoRenderRecipeCurrent(undefined), false);
+const freshJob = {
+  status: "completed",
+  sourceAudioPath: "a.mp3",
+  sourceCoverPath: "c.webp",
+  renderRecipe: PRODUCT_VIDEO_RENDER_RECIPE,
+  currentAudioPath: "a.mp3",
+  currentCoverPath: "c.webp",
+};
+assert.equal(isProductVideoRenderJobStale(freshJob), false);
+assert.equal(isProductVideoRenderJobStale({ ...freshJob, renderRecipe: null }), true);
+assert.equal(isProductVideoRenderJobStale({ ...freshJob, renderRecipe: "cover-v0" }), true);
+assert.equal(isProductVideoRenderJobStale({ ...freshJob, currentAudioPath: "b.mp3" }), true);
+assert.equal(isProductVideoRenderJobStale({ ...freshJob, currentCoverPath: null }), true);
+for (const status of ["queued", "processing", "failed"]) {
+  assert.equal(
+    isProductVideoRenderJobStale({ ...freshJob, status, renderRecipe: null }),
+    false,
+    `${status} job is rendered by the current worker`,
+  );
+}
+const recipeMigration = read(
+  "supabase/migrations/20261225120000_product_video_render_recipe.sql",
+);
+assert.match(recipeMigration, /ADD COLUMN IF NOT EXISTS render_recipe text NULL/);
+assert.doesNotMatch(recipeMigration, /UPDATE public\.product_video_render_jobs/);
+assert.doesNotMatch(recipeMigration, /CREATE OR REPLACE FUNCTION/);
 
 const migration = read(
   "supabase/migrations/20261220125000_product_video_export.sql",
@@ -162,6 +251,8 @@ assert.match(serverSrc, /video_cover_path_rejected/);
 assert.match(serverSrc, /video_cover_persist_failed/);
 assert.match(serverSrc, /product_video_cover_update_error/);
 assert.match(serverSrc, /progress_percent/);
+assert.match(serverSrc, /render_recipe/);
+assert.match(serverSrc, /isProductVideoRenderJobStale\(/);
 
 const progressMigration = read(
   "supabase/migrations/20261220140000_product_video_render_progress.sql",
@@ -188,6 +279,7 @@ assert.doesNotMatch(
 const workerRuntime = read("src/lib/product-video-export/worker-runtime.ts");
 assert.match(workerRuntime, /report_product_video_render_progress/);
 assert.match(workerRuntime, /progress_percent: 100/);
+assert.match(workerRuntime, /render_recipe: PRODUCT_VIDEO_RENDER_RECIPE/);
 assert.match(workerRuntime, /createProductVideoProgressPersister/);
 assert.match(workerRuntime, /PRODUCT_VIDEO_PROGRESS_WRITE_MIN_INTERVAL_MS/);
 
@@ -397,8 +489,70 @@ if (ffmpegBin.status !== 0) {
     };
     const duration = Number(parsed.format?.duration);
     assert.ok(duration > 19.5 && duration < 20.5, `duration ${duration}`);
+    const streamDurations = spawnSync(
+      "ffprobe",
+      ["-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "csv=p=0", output],
+      { encoding: "utf8" },
+    ).stdout.trim().split("\n");
+    for (const line of streamDurations) {
+      const seconds = Number(line.split(",")[1]);
+      assert.ok(Math.abs(seconds - 20) <= 0.1, `stream duration ${line}`);
+    }
     assert.ok(parsed.streams?.some((stream) => stream.codec_type === "audio" && stream.codec_name === "aac"));
     assert.ok(parsed.streams?.some((stream) => stream.codec_type === "video" && stream.codec_name === "h264"));
+
+    // Indicator pixels: present at t=0, animated, and nothing else touched.
+    for (const orientation of ["landscape_16_9", "portrait_9_16"] as const) {
+      const layout = productVideoAudioIndicatorLayout(orientation);
+      const greyCover = path.join(dir, `grey-${orientation}.png`);
+      const shortAudio = path.join(dir, "short.mp3");
+      const clip = path.join(dir, `clip-${orientation}.mp4`);
+      assert.equal(
+        spawnSync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", `color=c=0x808080:s=${layout.frameWidth}x${layout.frameHeight}`, "-frames:v", "1", greyCover]).status,
+        0,
+      );
+      assert.equal(
+        spawnSync("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=3", "-c:a", "libmp3lame", "-b:a", "128k", shortAudio]).status,
+        0,
+      );
+      await renderProductVideo({ audioPath: shortAudio, coverPath: greyCover, outputPath: clip, orientation });
+      const frameAt = (seconds: number) => {
+        const run = spawnSync(
+          "ffmpeg",
+          ["-hide_banner", "-loglevel", "error", "-ss", String(seconds), "-i", clip, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"],
+          { maxBuffer: 16 * 1024 * 1024 },
+        );
+        assert.equal(run.status, 0, String(run.stderr));
+        assert.equal(run.stdout.length, layout.frameWidth * layout.frameHeight);
+        return run.stdout as Buffer;
+      };
+      const region = (frame: Buffer, x0: number, y0: number, w: number, h: number) => {
+        const out: number[] = [];
+        for (let y = y0; y < y0 + h; y += 1) {
+          for (let x = x0; x < x0 + w; x += 1) out.push(frame[y * layout.frameWidth + x]!);
+        }
+        return out;
+      };
+      const first = frameAt(0);
+      const later = frameAt(0.6);
+      const box = (frame: Buffer) => region(frame, layout.x, layout.y, layout.width, layout.height);
+      const grey = 0x80;
+      const changedFromCover = box(first).filter((v) => Math.abs(v - grey) > 24).length;
+      assert.ok(changedFromCover > layout.width * layout.height * 0.5, `${orientation}: indicator missing in first frame`);
+      const firstBox = box(first);
+      const laterBox = box(later);
+      const animated = firstBox.filter((v, i) => Math.abs(v - laterBox[i]!) > 24).length;
+      assert.ok(animated > 20, `${orientation}: indicator bars did not move (${animated})`);
+      assert.ok(animated < firstBox.length * 0.25, `${orientation}: indicator flickers (${animated})`);
+      const topLeft = region(first, 0, 0, 200, 200);
+      assert.ok(topLeft.every((v) => Math.abs(v - grey) <= 3), `${orientation}: cover outside indicator changed`);
+      const probeClip = spawnSync(
+        "ffprobe",
+        ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,pix_fmt", "-of", "csv=p=0", clip],
+        { encoding: "utf8" },
+      );
+      assert.equal(probeClip.stdout.trim(), `${layout.frameWidth},${layout.frameHeight},yuv420p`);
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

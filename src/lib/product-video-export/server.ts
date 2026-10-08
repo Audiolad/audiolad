@@ -15,6 +15,7 @@ import {
   PRODUCT_VIDEO_EXPORT_MAX_IMAGE_BYTES,
   PRODUCT_VIDEO_ORIENTATION_META,
   isProductVideoExportAuthorSlug,
+  isProductVideoRenderJobStale,
   parseProductVideoOrientation,
   productVideoCoverColumn,
   productVideoCoverStoragePath,
@@ -43,6 +44,7 @@ export type ProductVideoRenderJobState = {
   progress_percent: number | null;
   created_at: string;
   completed_at: string | null;
+  render_recipe?: string | null;
 };
 
 export async function requireProductVideoExportAccess(practiceId: string) {
@@ -340,7 +342,7 @@ export async function getProductVideoRenderStates(params: {
       service
         .from("product_video_render_jobs")
         .select(
-          "id, practice_id, author_id, audio_item_id, orientation, source_audio_path, source_cover_path, output_storage_path, status, attempt_count, error_code, error_message_safe, progress_percent, created_at, completed_at",
+          "id, practice_id, author_id, audio_item_id, orientation, source_audio_path, source_cover_path, output_storage_path, status, attempt_count, error_code, error_message_safe, progress_percent, created_at, completed_at, render_recipe",
         )
         .eq("practice_id", practiceId)
         .eq("audio_item_id", audioItemId)
@@ -375,11 +377,14 @@ export async function getProductVideoRenderStates(params: {
     result[orientation] = {
       ...job,
       orientation,
-      stale:
-        !item?.audio_path ||
-        job.source_audio_path !== item.audio_path ||
-        !currentCover ||
-        job.source_cover_path !== currentCover,
+      stale: isProductVideoRenderJobStale({
+        status: job.status,
+        sourceAudioPath: job.source_audio_path,
+        sourceCoverPath: job.source_cover_path,
+        renderRecipe: job.render_recipe,
+        currentAudioPath: item?.audio_path,
+        currentCoverPath: currentCover,
+      }),
     };
   }
 
