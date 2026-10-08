@@ -265,6 +265,8 @@ import {
   firstProductSaveFailureReason,
   formatPreviewSaveFailureMessage,
   isPromoRecommendationErrorCode,
+  productFieldWizardStep,
+  PROMO_RECOMMENDATION_WIZARD_STEP,
 } from "@/lib/author-products/publish-preview-flow";
 import { validatePromoRecommendation } from "@/lib/products/promo-recommendation";
 import { formatRubles } from "@/lib/products/price-format";
@@ -1544,7 +1546,9 @@ export default function AuthorProductForm({
       : form.title.trim();
 
     if (!form.authorId || !titleForCreate) {
-      setError("Укажите автора и название, чтобы сохранить черновик.");
+      const message = "Укажите автора и название, чтобы сохранить черновик.";
+      lastSaveFailureReasonRef.current = message;
+      setError(message);
       return null;
     }
 
@@ -1588,12 +1592,12 @@ export default function AuthorProductForm({
         error: payload.error,
         status: response.status,
       });
-      setError(
-        getProductCreateErrorMessage({
-          error: payload.error,
-          status: response.status,
-        }),
-      );
+      const message = getProductCreateErrorMessage({
+        error: payload.error,
+        status: response.status,
+      });
+      lastSaveFailureReasonRef.current = message;
+      setError(message);
       return null;
     }
 
@@ -1800,9 +1804,9 @@ export default function AuthorProductForm({
     };
 
     if (!response.ok) {
-      setTopicError(
-        payload.message ?? "Не удалось сохранить темы продукта.",
-      );
+      const message = payload.message ?? "Не удалось сохранить темы продукта.";
+      lastSaveFailureReasonRef.current = message;
+      setTopicError(message);
       return false;
     }
 
@@ -1868,7 +1872,9 @@ export default function AuthorProductForm({
       form.publicationMode === PUBLICATION_MODE.SCHEDULED &&
       !mskWallClockToUtcIso(form.publishDate, form.publishTime)
     ) {
-      setError("Укажите дату и время публикации.");
+      const message = "Укажите дату и время публикации.";
+      lastSaveFailureReasonRef.current = message;
+      setError(message);
       return false;
     }
 
@@ -1893,21 +1899,22 @@ export default function AuthorProductForm({
       };
 
       if (!response.ok || !payload.product) {
-        setError(
-          getProductSaveErrorMessage({
-            error: payload.error,
-            message: payload.message,
-            status: response.status,
-          }),
-        );
+        const message = getProductSaveErrorMessage({
+          error: payload.error,
+          message: payload.message,
+          status: response.status,
+        });
+        lastSaveFailureReasonRef.current = message;
+        setError(message);
         return false;
       }
 
       const reloaded = await reloadSavedProduct(practiceIdForSave);
       if (!reloaded) {
-        setError(
-          "Изменения сохранены, но не удалось обновить форму. Обновите страницу.",
-        );
+        const message =
+          "Изменения сохранены, но не удалось обновить форму. Обновите страницу.";
+        lastSaveFailureReasonRef.current = message;
+        setError(message);
         return false;
       }
 
@@ -1930,7 +1937,9 @@ export default function AuthorProductForm({
       router.refresh();
       return true;
     } catch {
-      setError(getProductSaveErrorMessage({ networkError: true }));
+      const message = getProductSaveErrorMessage({ networkError: true });
+      lastSaveFailureReasonRef.current = message;
+      setError(message);
       return false;
     } finally {
       setBusy(false);
@@ -1957,7 +1966,16 @@ export default function AuthorProductForm({
         setError("Сначала сохраните продукт, затем задайте расписание.");
         return failSave("Сначала сохраните продукт, затем задайте расписание.");
       }
-      return savePublicationScheduleOnly(existingPracticeId);
+      const scheduleSaved = await savePublicationScheduleOnly(
+        existingPracticeId,
+      );
+      if (!scheduleSaved) {
+        return failSave(
+          lastSaveFailureReasonRef.current ??
+            "Не удалось сохранить расписание публикации.",
+        );
+      }
+      return true;
     }
 
     if (!canEditPublicFields) {
@@ -2003,6 +2021,12 @@ export default function AuthorProductForm({
           : {}),
       };
       setFieldErrors(priceFieldErrors);
+      const step = productFieldWizardStep(
+        studioMusicPrice && !studioMusicPrice.ok ? "studioMusicPrice" : "price",
+      );
+      if (wizardEnabled && step !== null && step !== wizardStep) {
+        goToWizardStep(step);
+      }
       requestScrollToFirstSubmitIssue();
       return failSave(
         firstProductSaveFailureReason({ fieldErrors: priceFieldErrors }),
@@ -2036,6 +2060,10 @@ export default function AuthorProductForm({
       if (formatCustomError) {
         setFieldErrors({ formatCustom: formatCustomError });
         setBusy(false);
+        const step = productFieldWizardStep("formatCustom");
+        if (wizardEnabled && step !== null && step !== wizardStep) {
+          goToWizardStep(step);
+        }
         requestScrollToFirstSubmitIssue();
         return failSave(formatCustomError);
       }
@@ -2052,6 +2080,9 @@ export default function AuthorProductForm({
       if (!promoCheck.ok) {
         setPromoError(promoCheck.message);
         setBusy(false);
+        if (wizardEnabled && wizardStep !== PROMO_RECOMMENDATION_WIZARD_STEP) {
+          goToWizardStep(PROMO_RECOMMENDATION_WIZARD_STEP);
+        }
         requestScrollToFirstSubmitIssue();
         return failSave(promoCheck.message);
       }
@@ -2061,7 +2092,7 @@ export default function AuthorProductForm({
       const ensured = await ensurePracticeId();
 
       if (!ensured) {
-        return failSave(null);
+        return failSave(lastSaveFailureReasonRef.current);
       }
 
       const id = ensured.practiceId;
@@ -2116,6 +2147,10 @@ export default function AuthorProductForm({
             fieldKey === "authorRecommendationsTitle"
           ) {
             setFieldErrors({ [fieldKey]: fieldMessage });
+            const step = productFieldWizardStep(fieldKey);
+            if (wizardEnabled && step !== null && step !== wizardStep) {
+              goToWizardStep(step);
+            }
             requestScrollToFirstSubmitIssue();
             return failSave(fieldMessage);
           }
@@ -2135,6 +2170,9 @@ export default function AuthorProductForm({
 
         if (isPromoRecommendationErrorCode(payload.error)) {
           setPromoError(saveErrorMessage);
+          if (wizardEnabled && wizardStep !== PROMO_RECOMMENDATION_WIZARD_STEP) {
+            goToWizardStep(PROMO_RECOMMENDATION_WIZARD_STEP);
+          }
           requestScrollToFirstSubmitIssue();
           return failSave(saveErrorMessage);
         }
@@ -2166,9 +2204,11 @@ export default function AuthorProductForm({
       const topicsSynced = await syncProductTopics(id);
 
       if (!topicsSynced) {
+        const topicFailureReason =
+          lastSaveFailureReasonRef.current ?? "Не удалось сохранить темы продукта.";
         setError("Не удалось сохранить темы продукта.");
         await reloadSavedProduct(id);
-        return failSave("Не удалось сохранить темы продукта.");
+        return failSave(topicFailureReason);
       }
 
       const reloaded = await reloadSavedProduct(id);
@@ -5357,24 +5397,30 @@ export default function AuthorProductForm({
           promoOpenInNewTab={form.promoOpenInNewTab}
           error={promoError}
           busy={busy}
-          onPromoEnabledChange={(promoEnabled) =>
-            setForm((current) => ({ ...current, promoEnabled }))
-          }
-          onPromoTitleChange={(promoTitle) =>
-            setForm((current) => ({ ...current, promoTitle }))
-          }
-          onPromoTextChange={(promoText) =>
-            setForm((current) => ({ ...current, promoText }))
-          }
-          onPromoButtonTextChange={(promoButtonText) =>
-            setForm((current) => ({ ...current, promoButtonText }))
-          }
-          onPromoUrlChange={(promoUrl) =>
-            setForm((current) => ({ ...current, promoUrl }))
-          }
-          onPromoOpenInNewTabChange={(promoOpenInNewTab) =>
-            setForm((current) => ({ ...current, promoOpenInNewTab }))
-          }
+          onPromoEnabledChange={(promoEnabled) => {
+            setPromoError(null);
+            setForm((current) => ({ ...current, promoEnabled }));
+          }}
+          onPromoTitleChange={(promoTitle) => {
+            setPromoError(null);
+            setForm((current) => ({ ...current, promoTitle }));
+          }}
+          onPromoTextChange={(promoText) => {
+            setPromoError(null);
+            setForm((current) => ({ ...current, promoText }));
+          }}
+          onPromoButtonTextChange={(promoButtonText) => {
+            setPromoError(null);
+            setForm((current) => ({ ...current, promoButtonText }));
+          }}
+          onPromoUrlChange={(promoUrl) => {
+            setPromoError(null);
+            setForm((current) => ({ ...current, promoUrl }));
+          }}
+          onPromoOpenInNewTabChange={(promoOpenInNewTab) => {
+            setPromoError(null);
+            setForm((current) => ({ ...current, promoOpenInNewTab }));
+          }}
         />
       ) : null}
 

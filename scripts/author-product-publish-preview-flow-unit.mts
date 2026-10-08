@@ -15,11 +15,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   PREVIEW_SAVE_FAILED_PREFIX,
+  PROMO_RECOMMENDATION_WIZARD_STEP,
   PRODUCT_VIDEO_EXPORT_STATES,
   canOpenPreviewOrPublishDespiteVideoExport,
   firstProductSaveFailureReason,
   formatPreviewSaveFailureMessage,
   isPromoRecommendationErrorCode,
+  productFieldWizardStep,
   shouldShowProductActionsError,
 } from "../src/lib/author-products/publish-preview-flow";
 import { validatePromoRecommendation } from "../src/lib/products/promo-recommendation";
@@ -60,6 +62,28 @@ function functionBody(source: string, signature: string): string {
 }
 
 // 1. Concrete reason instead of a silent bounce.
+for (const [fieldKey, step] of [
+  ["title", 1],
+  ["subtitle", 1],
+  ["audioProductAuthor", 1],
+  ["formatCustom", 1],
+  ["description", 3],
+  ["seoPrimaryQuery", 3],
+  ["seoSecondaryQueries", 3],
+  ["seoTitle", 3],
+  ["seoDescription", 3],
+  ["authorRecommendationsTitle", 3],
+  ["listeningNoticeTitle", 4],
+  ["listeningNoticeText", 4],
+  ["price", 4],
+  ["studioMusicPrice", 4],
+  ["seoAbout", null],
+  ["unknown", null],
+] as const) {
+  assert.equal(productFieldWizardStep(fieldKey), step, fieldKey);
+}
+assert.equal(PROMO_RECOMMENDATION_WIZARD_STEP, 4);
+
 assert.equal(
   formatPreviewSaveFailureMessage("Укажите корректную безопасную ссылку."),
   `${PREVIEW_SAVE_FAILED_PREFIX}: Укажите корректную безопасную ссылку.`,
@@ -247,6 +271,10 @@ assert.doesNotMatch(promoHtmlNoError, /data-submit-issue/);
 // 3. Form wiring for the established cause.
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 const saveProductBody = functionBody(form, "async function saveProduct(): Promise<boolean>");
+assert.match(saveProductBody, /goToWizardStep\(/);
+const ensurePracticeIdBody = functionBody(form, "async function ensurePracticeId(");
+assert.match(ensurePracticeIdBody, /lastSaveFailureReasonRef\.current\s*=/);
+assert.match(saveProductBody, /failSave\(lastSaveFailureReasonRef\.current/);
 assert.equal(
   (saveProductBody.match(/return false/g) ?? []).length,
   1,
@@ -256,7 +284,7 @@ assert.match(saveProductBody, /validatePromoRecommendation\(/);
 assert.match(saveProductBody, /isPromoRecommendationErrorCode\(payload\.error\)/);
 assert.match(
   saveProductBody,
-  /setFieldErrors\(\{ \[fieldKey\]: fieldMessage \}\);\s*requestScrollToFirstSubmitIssue\(\);\s*return failSave\(fieldMessage\);/,
+  /setFieldErrors\(\{ \[fieldKey\]: fieldMessage \}\);\s*const step = productFieldWizardStep\(fieldKey\);\s*if \(wizardEnabled && step !== null && step !== wizardStep\) \{\s*goToWizardStep\(step\);\s*\}\s*requestScrollToFirstSubmitIssue\(\);\s*return failSave\(fieldMessage\);/,
 );
 
 const previewBody = functionBody(form, "async function openPublishPreviewTab(): Promise<boolean>");

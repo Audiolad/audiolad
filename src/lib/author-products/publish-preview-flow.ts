@@ -10,6 +10,34 @@
 
 export const PREVIEW_SAVE_FAILED_PREFIX = "Не удалось открыть предпросмотр";
 
+export const PROMO_RECOMMENDATION_WIZARD_STEP = 4;
+
+/** Steps that mount the corresponding fields in AuthorProductForm. */
+export function productFieldWizardStep(fieldKey: string): 1 | 2 | 3 | 4 | null {
+  switch (fieldKey) {
+    case "title":
+    case "subtitle":
+    case "audioProductAuthor":
+    case "formatCustom":
+      return 1;
+    case "description":
+    case "seoPrimaryQuery":
+    case "seoSecondaryQueries":
+    case "seoTitle":
+    case "seoDescription":
+    case "authorRecommendationsTitle":
+      return 3;
+    case "listeningNoticeTitle":
+    case "listeningNoticeText":
+    case "price":
+    case "studioMusicPrice":
+      return 4;
+    default:
+      // seoAbout is a legacy error key with no rendered field.
+      return null;
+  }
+}
+
 const PREVIEW_SAVE_FAILED_FALLBACK_REASON = "проверьте отмеченные поля.";
 
 export function formatPreviewSaveFailureMessage(
