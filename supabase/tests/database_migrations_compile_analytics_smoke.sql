@@ -934,4 +934,197 @@ BEGIN
 END
 $$;
 
+-- Grouped listening buckets (20261226120000): reuse the preceding grouped SUM
+-- fixture (staff/test users, author member and bot/staff/test sessions survive).
+DO $$
+DECLARE
+  v_author_a uuid := 'ab111111-1111-4111-8111-1111111111a1';
+  v_author_b uuid := 'ab222222-2222-4222-8222-2222222222b2';
+  v_pa1 uuid := 'cb111111-1111-4111-8111-1111111111a1';
+  v_human uuid := 'db111111-1111-4111-8111-111111111101';
+  v_s_tg uuid := 'eb111111-1111-4111-8111-111111111101';
+  v_end timestamptz := timestamptz '2026-10-07 14:16:00+03';
+  v_monday timestamptz := timestamptz '2026-10-05 00:00:00+03';
+  v_midnight timestamptz := timestamptz '2026-10-06 00:00:00+03';
+  v_def text;
+  v_payload jsonb;
+  v_grouped bigint;
+  v_points bigint;
+  v_checked integer := 0;
+  v_rpc_checked integer := 0;
+  v_window record;
+  v_granularity text;
+  v_include boolean;
+  v_author uuid;
+  v_practice uuid;
+  v_utm text;
+  v_device text;
+BEGIN
+  IF to_regprocedure('public.playback_usage_admin_listened_ms_by_bucket(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text)') IS NULL THEN
+    RAISE EXCEPTION 'playback_usage_admin_listened_ms_by_bucket is missing';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.playback_usage_admin_listened_ms_by_bucket(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.playback_usage_admin_listened_ms_by_bucket(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text)', 'EXECUTE')
+    OR has_function_privilege('public', 'public.playback_usage_admin_listened_ms_by_bucket(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text)', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'public.playback_usage_admin_listened_ms_by_bucket(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text)', 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'grouped listening bucket helper grants are not hardened';
+  END IF;
+
+  v_def := pg_get_functiondef('public.playback_usage_admin_listened_ms_by_bucket(timestamptz,timestamptz,boolean,uuid,uuid,text,text,text,text)'::regprocedure);
+  IF position('AS MATERIALIZED' in v_def) = 0
+    OR position('SECURITY DEFINER' in v_def) = 0
+    OR position('playback_usage_admin_facts' in v_def) > 0
+  THEN
+    RAISE EXCEPTION 'grouped bucket helper lost MATERIALIZED or SECURITY DEFINER: %', v_def;
+  END IF;
+
+  v_def := pg_get_functiondef('public.admin_analytics_listening_time_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text)'::regprocedure);
+  IF position('playback_usage_admin_listened_ms_by_bucket(' in v_def) = 0
+    OR position('playback_usage_admin_facts' in v_def) > 0
+  THEN
+    RAISE EXCEPTION 'admin listening timeseries does not use grouped buckets: %', v_def;
+  END IF;
+
+  -- Same grouping keys across each boundary: bucket must participate in GROUP BY.
+  INSERT INTO public.playback_usage_facts
+    (client_event_id, sample_seq, listening_key, session_id, user_id, anonymous_id, practice_id, listened_ms, position_ms, phase, occurred_at, author_id_snapshot)
+  VALUES
+    ('94111111-1111-4111-8111-111111111301', 1, 'grouped-bucket-edges', v_s_tg, v_human, 'grouped-anon-tg', v_pa1, 100, 100, 'advance', v_monday - interval '1 second', v_author_a),
+    ('94111111-1111-4111-8111-111111111302', 2, 'grouped-bucket-edges', v_s_tg, v_human, 'grouped-anon-tg', v_pa1, 200, 300, 'advance', v_monday, v_author_a),
+    ('94111111-1111-4111-8111-111111111303', 3, 'grouped-bucket-edges', v_s_tg, v_human, 'grouped-anon-tg', v_pa1, 300, 600, 'advance', v_midnight - interval '1 second', v_author_a),
+    ('94111111-1111-4111-8111-111111111304', 4, 'grouped-bucket-edges', v_s_tg, v_human, 'grouped-anon-tg', v_pa1, 400, 1000, 'advance', v_midnight, v_author_a);
+
+  -- Isolated boundary values also guard against an empty/vacuous comparison.
+  FOR v_window IN
+    SELECT * FROM (VALUES (v_monday, 100::bigint, 200::bigint), (v_midnight, 300::bigint, 400::bigint))
+      AS w(edge, before_ms, after_ms)
+  LOOP
+    FOREACH v_granularity IN ARRAY ARRAY['day', 'week']::text[] LOOP
+      IF EXISTS (
+        WITH actual AS (
+          SELECT * FROM public.playback_usage_admin_listened_ms_by_bucket(
+            v_window.edge - interval '1 second', v_window.edge + interval '1 second',
+            false, v_author_a, v_pa1, NULL, NULL, v_granularity, 'Europe/Moscow'
+          )
+        ), expected AS (
+          SELECT date_trunc(v_granularity, e.occurred_at AT TIME ZONE 'Europe/Moscow') AS bucket_local,
+            sum(e.listened_ms)::bigint AS listened_ms
+          FROM (VALUES
+            (v_window.edge - interval '1 second', v_window.before_ms),
+            (v_window.edge, v_window.after_ms)
+          ) AS e(occurred_at, listened_ms)
+          GROUP BY 1
+        )
+        (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+        UNION ALL
+        (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+      ) THEN
+        RAISE EXCEPTION 'Moscow boundary buckets wrong for % at %', v_granularity, v_window.edge;
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  -- The preceding block intentionally left valid_from after the fixture window.
+  -- Move it before every RPC bucket inside this rollback-only transaction.
+  UPDATE public.playback_usage_settings
+  SET listening_time_valid_from = v_end - interval '157 days'
+  WHERE singleton;
+
+  FOR v_window IN
+    SELECT * FROM (VALUES
+      (NULL::timestamptz, NULL::timestamptz),
+      (v_end - interval '7 days', NULL::timestamptz),
+      (NULL::timestamptz, v_end),
+      (v_end - interval '7 days', v_end),
+      (v_end - interval '30 days', v_end),
+      (v_end - interval '14 days', v_end - interval '7 days'),
+      (v_end - interval '60 days', v_end - interval '30 days'),
+      (v_monday - interval '1 second', v_monday + interval '1 second'),
+      (v_end - interval '150 days', v_end)
+    ) AS w(p_from, p_to)
+  LOOP
+    FOREACH v_granularity IN ARRAY ARRAY['day', 'week']::text[] LOOP
+      FOREACH v_include IN ARRAY ARRAY[false, true] LOOP
+        FOREACH v_author IN ARRAY ARRAY[NULL, v_author_a, v_author_b]::uuid[] LOOP
+          FOREACH v_practice IN ARRAY ARRAY[NULL, v_pa1]::uuid[] LOOP
+            FOREACH v_utm IN ARRAY ARRAY[NULL, 'telegram']::text[] LOOP
+              FOREACH v_device IN ARRAY ARRAY[NULL, 'mobile']::text[] LOOP
+                IF EXISTS (
+                  WITH grouped AS (
+                    SELECT * FROM public.playback_usage_admin_listened_ms_by_bucket(
+                      v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device,
+                      v_granularity, 'Europe/Moscow'
+                    )
+                  ), canonical AS (
+                    SELECT date_trunc(v_granularity, f.occurred_at AT TIME ZONE 'Europe/Moscow') AS bucket_local,
+                      sum(f.listened_ms)::bigint AS listened_ms
+                    FROM public.playback_usage_admin_facts(
+                      v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                    ) AS f
+                    GROUP BY 1
+                  )
+                  (SELECT * FROM grouped EXCEPT SELECT * FROM canonical)
+                  UNION ALL
+                  (SELECT * FROM canonical EXCEPT SELECT * FROM grouped)
+                ) THEN
+                  RAISE EXCEPTION 'grouped buckets <> canonical for gran % from % to % include % author % practice % utm % device %',
+                    v_granularity, v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device;
+                END IF;
+                v_checked := v_checked + 1;
+
+                -- Explicit windows avoid the RPC's default range and 400-point cap.
+                IF v_window.p_from IS NOT NULL AND v_window.p_to IS NOT NULL
+                  AND v_granularity = (CASE WHEN v_window.p_to - v_window.p_from > interval '120 days' THEN 'week' ELSE 'day' END)
+                THEN
+                  SELECT public.admin_analytics_listening_time_timeseries(
+                    v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device
+                  ) INTO v_payload;
+                  SELECT coalesce(sum((p.point ->> 'listened_ms')::bigint), 0)::bigint
+                  INTO v_points FROM jsonb_array_elements(v_payload -> 'points') AS p(point);
+                  SELECT coalesce(sum(g.listened_ms), 0)::bigint INTO v_grouped
+                  FROM public.playback_usage_admin_listened_ms_by_bucket(
+                    v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device,
+                    v_granularity, 'Europe/Moscow'
+                  ) AS g;
+                  IF v_points IS DISTINCT FROM v_grouped
+                    OR (v_payload ->> 'granularity') IS DISTINCT FROM v_granularity
+                  THEN
+                    RAISE EXCEPTION 'timeseries points % <> helper % for gran % from % to % include % author % practice % utm % device %: %',
+                      v_points, v_grouped, v_granularity, v_window.p_from, v_window.p_to, v_include, v_author, v_practice, v_utm, v_device, v_payload;
+                  END IF;
+                  v_rpc_checked := v_rpc_checked + 1;
+                END IF;
+              END LOOP;
+            END LOOP;
+          END LOOP;
+        END LOOP;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+
+  IF v_checked <> 9 * 2 * 2 * 3 * 2 * 2 * 2 OR v_rpc_checked <> 6 * 2 * 3 * 2 * 2 * 2 THEN
+    RAISE EXCEPTION 'grouped bucket matrix incomplete: % comparisons, % RPCs', v_checked, v_rpc_checked;
+  END IF;
+
+  IF EXISTS (
+    WITH fallback AS (
+      SELECT * FROM public.playback_usage_admin_listened_ms_by_bucket(
+        NULL, NULL, false, v_author_a, NULL, NULL, NULL, 'unknown', 'Europe/Moscow'
+      )
+    ), daily AS (
+      SELECT * FROM public.playback_usage_admin_listened_ms_by_bucket(
+        NULL, NULL, false, v_author_a, NULL, NULL, NULL, 'day', 'Europe/Moscow'
+      )
+    )
+    (SELECT * FROM fallback EXCEPT SELECT * FROM daily)
+    UNION ALL
+    (SELECT * FROM daily EXCEPT SELECT * FROM fallback)
+  ) THEN
+    RAISE EXCEPTION 'unknown bucket granularity does not fall back to day';
+  END IF;
+END
+$$;
+
 ROLLBACK;
