@@ -1002,6 +1002,39 @@ function testSourceContracts() {
     groupedSum,
     /REVOKE ALL ON FUNCTION public\.playback_usage_admin_listened_ms\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text\s*\) FROM PUBLIC, anon, authenticated;/,
   );
+  const groupedTimeseries = read(
+    "supabase/migrations/20261226120000_admin_listening_timeseries_grouped.sql",
+  );
+  const bucketHelperBody = groupedTimeseries.slice(
+    groupedTimeseries.indexOf("CREATE OR REPLACE FUNCTION public.playback_usage_admin_listened_ms_by_bucket("),
+    groupedTimeseries.indexOf("COMMENT ON FUNCTION public.playback_usage_admin_listened_ms_by_bucket("),
+  );
+  assert.match(bucketHelperBody, /WITH g AS MATERIALIZED \(/);
+  assert.match(bucketHelperBody, /GROUP BY 1, f\.session_id, f\.user_id, f\.anonymous_id, f\.practice_id, f\.author_id_snapshot/);
+  assert.match(bucketHelperBody, /GROUP BY g\.bucket_local/);
+  assert.match(bucketHelperBody, /CASE WHEN p_granularity = 'week' THEN 'week' ELSE 'day' END/);
+  assert.match(bucketHelperBody, /f\.occurred_at AT TIME ZONE p_tz/);
+  assert.match(bucketHelperBody, /SECURITY DEFINER/);
+  assert.match(bucketHelperBody, /is_platform_staff\(g\.user_id\)/);
+  assert.match(bucketHelperBody, /is_analytics_test_user\(g\.user_id\)/);
+  assert.match(bucketHelperBody, /author_members/);
+  assert.doesNotMatch(bucketHelperBody, /playback_usage_admin_facts\(|g\.occurred_at|g\.listened_ms > 0|admin_analytics_visitor_key/);
+  const timeseriesBody = groupedTimeseries.slice(
+    groupedTimeseries.indexOf("CREATE OR REPLACE FUNCTION public.admin_analytics_listening_time_timeseries("),
+    groupedTimeseries.indexOf("COMMENT ON FUNCTION public.admin_analytics_listening_time_timeseries("),
+  );
+  assert.match(timeseriesBody, /FROM public\.playback_usage_admin_listened_ms_by_bucket\(/);
+  assert.doesNotMatch(timeseriesBody, /playback_usage_admin_facts\(/);
+  assert.doesNotMatch(groupedTimeseries, /CREATE INDEX|DROP TABLE|ALTER TABLE|TRUNCATE|DELETE FROM|UPDATE public\.|statement_timeout\s*=|ALTER ROLE|ALTER DATABASE/i);
+  assert.equal((groupedTimeseries.match(/GRANT EXECUTE/g) ?? []).length, 1);
+  assert.match(
+    groupedTimeseries,
+    /GRANT EXECUTE ON FUNCTION public\.playback_usage_admin_listened_ms_by_bucket\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text, text, text\s*\) TO service_role;/,
+  );
+  assert.match(
+    groupedTimeseries,
+    /REVOKE ALL ON FUNCTION public\.playback_usage_admin_listened_ms_by_bucket\(\s*timestamptz, timestamptz, boolean, uuid, uuid, text, text, text, text\s*\) FROM PUBLIC, anon, authenticated;/,
+  );
   const windowsMigration = read(
     "supabase/migrations/20261222120000_admin_listening_time_windows.sql",
   );
