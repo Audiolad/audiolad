@@ -6,6 +6,8 @@ import {
   audienceLabel,
   campaignStatusLabel,
   messageTypeLabel,
+  filterKindLabel,
+  recipientErrorLabel,
   recipientReasonLabel,
   recipientStatusLabel,
 } from "@/lib/admin/mailings/campaign-status";
@@ -55,6 +57,7 @@ export default async function AdminMailingDetailPage({
     if (!needle) return true;
     return row.email.toLowerCase().includes(needle) || (row.displayName ?? "").toLowerCase().includes(needle);
   });
+  const duplicateCount = recipients.filter((row) => row.suppressionReason === "duplicate").length;
   const rendered = renderManualCampaignEmail({
     subject: campaign.subject,
     preheader: campaign.preheader,
@@ -104,9 +107,9 @@ export default async function AdminMailingDetailPage({
             <p>Тип: {messageTypeLabel(campaign.messageType)}</p>
             <p>Создал: {campaign.createdBy}</p>
             <p>Запустил: {campaign.launchedBy ?? "—"} · {formatDate(campaign.queuedAt)}</p>
-            <p>Фильтр: {campaign.filter.kind}</p>
+            <p>Фильтр: {filterKindLabel(campaign.filter.kind)}</p>
             <p>
-              Всего {campaign.recipientTotal}, в очереди {campaign.recipientQueued}, отправлено {campaign.recipientSent}, ошибки {campaign.recipientFailed}, в стоп-листе {campaign.recipientSuppressed}, прочие {campaign.recipientExcluded}
+              Всего {campaign.recipientTotal}, в очереди {campaign.recipientQueued}, отправлено {campaign.recipientSent}, ошибки {campaign.recipientFailed}, в стоп-листе {campaign.recipientSuppressed}, дубли адресов {duplicateCount}, прочие {Math.max(0, campaign.recipientExcluded - duplicateCount)}
             </p>
           </div>
           {rendered.ok ? (
@@ -154,7 +157,21 @@ export default async function AdminMailingDetailPage({
                   <td className="px-3 py-3">{row.displayName ?? "—"}</td>
                   <td className="px-3 py-3">{recipientStatusLabel(row.status)}</td>
                   <td className="px-3 py-3">{formatDate(row.sentAt)}</td>
-                  <td className="px-3 py-3">{row.errorMessage ?? (row.suppressionReason ? recipientReasonLabel(row.suppressionReason) : "—")}</td>
+                  <td className="px-3 py-3">{row.errorMessage ? (
+                      (() => {
+                        const err = recipientErrorLabel(row.errorMessage);
+                        return (
+                          <>
+                            {err.label}
+                            {err.detail ? <span className="block break-words text-xs text-[#7d70a2]">{err.detail}</span> : null}
+                          </>
+                        );
+                      })()
+                    ) : row.suppressionReason ? (
+                      recipientReasonLabel(row.suppressionReason)
+                    ) : (
+                      "—"
+                    )}</td>
                 </tr>
               ))
             )}

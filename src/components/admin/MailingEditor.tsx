@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -12,7 +12,7 @@ import {
   searchMailingAuthorsAction,
   sendMailingTestAction,
 } from "@/app/(platform)/admin/mailings/actions";
-import { recipientReasonLabel } from "@/lib/admin/mailings/campaign-status";
+import { mailingCodeLabel, recipientReasonLabel } from "@/lib/admin/mailings/campaign-status";
 import { DUPLICATE_HELP_TEXT, formatRecipientSummary } from "@/lib/admin/mailings/summary-format";
 import type { RecipientListingEntry } from "@/lib/admin/mailings/recipients";
 import type { AuthorCampaignFilter } from "@/lib/admin/mailings/validation";
@@ -25,6 +25,19 @@ export function RecipientsDialog(props: {
   truncated: boolean;
   onClose: () => void;
 }) {
+  const { onClose } = props;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
   const ready = props.entries.filter((entry) => entry.status === "queued");
   const excluded = props.entries.filter((entry) => entry.status === "excluded");
   const row = (entry: RecipientListingEntry, index: number) => (
@@ -121,6 +134,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
   const [previewMeta, setPreviewMeta] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [listing, setListing] = useState<{ entries: RecipientListingEntry[]; total: number; truncated: boolean } | null>(null);
+  const closeListing = useCallback(() => setListing(null), []);
   const [testEmail, setTestEmail] = useState("");
   const [authorQuery, setAuthorQuery] = useState("");
   const [authorHits, setAuthorHits] = useState<Array<{ authorId: string; name: string; email: string | null }>>([]);
@@ -166,7 +180,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
           startTransition(async () => {
             const result = await saveMailingDraftAction(payload);
             if (!result.ok) {
-              setMessage(`Не удалось сохранить: ${result.code}`);
+              setMessage(`Не удалось сохранить: ${mailingCodeLabel(result.code)}`);
               return;
             }
             setMessage("Черновик сохранён");
@@ -332,7 +346,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
             entries={listing.entries}
             total={listing.total}
             truncated={listing.truncated}
-            onClose={() => setListing(null)}
+            onClose={closeListing}
           />
         ) : null}
 
@@ -347,7 +361,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
               startTransition(async () => {
                 const result = await previewMailingAction(payload);
                 if (!result.ok) {
-                  setMessage(`Предпросмотр: ${result.code}`);
+                  setMessage(`Предпросмотр: ${mailingCodeLabel(result.code)}`);
                   return;
                 }
                 setPreviewHtml(result.html);
@@ -364,7 +378,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
               startTransition(async () => {
                 const result = await previewMailingRecipientsAction(payload);
                 if (!result.ok) {
-                  setSummary(`Получатели: ${result.code}`);
+                  setSummary(`Получатели: ${mailingCodeLabel(result.code)}`);
                   return;
                 }
                 const item = result.summary;
@@ -381,7 +395,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
               startTransition(async () => {
                 const result = await listMailingRecipientsAction(payload);
                 if (!result.ok) {
-                  setSummary(`Получатели: ${result.code}`);
+                  setSummary(`Получатели: ${mailingCodeLabel(result.code)}`);
                   return;
                 }
                 setListing({ entries: result.entries, total: result.total, truncated: result.truncated });
@@ -438,7 +452,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
                 onClick={() => {
                   startTransition(async () => {
                     const result = await sendMailingTestAction({ ...payload, requestedEmail: testEmail });
-                    setMessage(result.ok ? `Тест отправлен на ${result.email}` : `Тест не отправлен: ${result.code}`);
+                    setMessage(result.ok ? `Тест отправлен на ${result.email}` : `Тест не отправлен: ${mailingCodeLabel(result.code)}`);
                   });
                 }}
               >
@@ -455,7 +469,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
                     }
                     startTransition(async () => {
                       const result = await launchMailingAction(campaignId);
-                      setMessage(result.ok ? `Запущено, к отправке ${result.ready}` : `Запуск не выполнен: ${result.code}`);
+                      setMessage(result.ok ? `Запущено, к отправке ${result.ready}` : `Запуск не выполнен: ${mailingCodeLabel(result.code)}`);
                       if (result.ok) router.refresh();
                     });
                   }}

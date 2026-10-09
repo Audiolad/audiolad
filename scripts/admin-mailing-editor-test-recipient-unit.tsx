@@ -223,6 +223,18 @@ async function main() {
     (closeButton as HTMLElement).click();
   });
   assert.doesNotMatch(listed.container.textContent ?? "", /Тест Один/);
+  Object.defineProperty(document.body, "style", { value: { overflow: "" }, configurable: true });
+  await act(async () => {
+    buttonByLabel(listed.container, "Показать получателей").click();
+  });
+  assert.equal(document.body.style.overflow, "hidden", "фон не скроллится при открытом списке");
+  await act(async () => {
+    const escape = new Event("keydown", { bubbles: true }) as Event & { key?: string };
+    escape.key = "Escape";
+    document.dispatchEvent(escape);
+  });
+  assert.doesNotMatch(listed.container.textContent ?? "", /Тест Один/, "Esc закрывает список");
+  assert.notEqual(document.body.style.overflow, "hidden");
   await listed.cleanup();
 
   const existing = await renderEditor({ canSend: true, campaignId: "10000000-0000-4000-8000-000000000001" });

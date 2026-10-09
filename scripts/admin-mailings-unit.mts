@@ -10,6 +10,9 @@ import {
   RECIPIENT_STATUSES,
   recipientReasonLabel,
   recipientStatusLabel,
+  filterKindLabel,
+  mailingCodeLabel,
+  recipientErrorLabel,
 } from "../src/lib/admin/mailings/campaign-status";
 import { formatRecipientSummary } from "../src/lib/admin/mailings/summary-format";
 import { launchAuthorCampaign } from "../src/lib/admin/mailings/launch";
@@ -400,6 +403,13 @@ assert.doesNotMatch(formatRecipientSummary({ found: 5, suppressed: 0, consentExc
   assert.ok(fnBody.indexOf("requireAdminPermission") < fnBody.indexOf("loadAuthorMailingCandidates"), "guard runs before data load");
   assert.ok(!/console\.|logMailingEvent/.test(fnBody), "list action must not log PII");
 }
+for (const code of ["cancelled", "message_type_invalid", "unsubscribe_not_configured", "preference", "consent_required", "filter_invalid", "smtp_send_failed", "send_failed", "no_eligible_recipients", "too_many_recipients"]) {
+  assert.match(mailingCodeLabel(code), /^[А-Яа-яЁё]/, `code ${code} has Russian label`);
+}
+assert.match(mailingCodeLabel("weird_new_code"), /Не удалось выполнить действие/);
+assert.equal(filterKindLabel("all_authors"), "Все авторы");
+assert.deepEqual(recipientErrorLabel("Connection timeout"), { label: "Ошибка отправки", detail: "Connection timeout" });
+assert.deepEqual(recipientErrorLabel("send_failed"), { label: "Не удалось отправить письмо", detail: null });
 const publishedPlan = planAuthorRecipients({
   candidates: [published, plain],
   filter: { version: 1, kind: "published_products" },

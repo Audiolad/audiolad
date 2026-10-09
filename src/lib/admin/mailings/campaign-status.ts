@@ -145,3 +145,77 @@ export const RECIPIENT_REASON_LABELS: Record<string, string> = {
 export function recipientReasonLabel(reason: string): string {
   return RECIPIENT_REASON_LABELS[reason] ?? reason;
 }
+
+/** Russian labels for every error/reason code the mailing flow can return or store. */
+export const MAILING_CODE_LABELS: Record<string, string> = {
+  // validation
+  subject_required: "Укажите тему письма",
+  subject_invalid: "Некорректная тема письма",
+  heading_required: "Укажите заголовок",
+  paragraphs_required: "Добавьте текст письма",
+  url_invalid: "Некорректная ссылка",
+  cta_incomplete: "Кнопка заполнена не полностью",
+  link_incomplete: "Ссылка заполнена не полностью",
+  audience_not_supported: "Аудитория не поддерживается",
+  sender_not_supported: "Отправитель не поддерживается",
+  filter_invalid: "Некорректный фильтр получателей",
+  message_type_invalid: "Некорректный тип письма",
+  content_too_long: "Слишком длинный текст письма",
+  too_many_recipients: "Слишком много получателей",
+  // launch / service
+  invalid_campaign: "Рассылка заполнена некорректно",
+  invalid_input: "Некорректные данные",
+  invalid_payload: "Некорректное содержимое письма",
+  invalid_outbox_row: "Некорректная запись очереди",
+  no_eligible_recipients: "Нет получателей к отправке",
+  not_found: "Не найдено",
+  not_draft: "Рассылка уже не черновик",
+  already_launched: "Рассылка уже запущена",
+  not_cancellable: "Рассылку нельзя отменить",
+  unsubscribe_not_configured: "Не настроена ссылка отписки",
+  delivery_persist_failed: "Не удалось сохранить результат отправки",
+  // transport
+  sender_not_enabled: "Отправитель не включён",
+  authors_smtp_not_configured: "Почта для авторов не настроена",
+  smtp_not_configured: "Почта не настроена",
+  smtp_send_failed: "Ошибка отправки по SMTP",
+  send_failed: "Не удалось отправить письмо",
+  template_render_failed: "Не удалось собрать письмо",
+  recipient_missing: "Не указан получатель",
+  test_recipient_not_allowed: "Этот адрес нельзя использовать для теста",
+  // gate / planner reasons
+  preference: "Отключено в настройках получателя",
+  consent_required: "Нужно согласие получателя",
+  cancelled: "Отменено",
+  expired: "Срок действия истёк",
+  invalid: "Некорректно",
+  not_configured: "Не настроено",
+};
+
+export const MAILING_FILTER_LABELS: Record<string, string> = {
+  all_authors: "Все авторы",
+  specific_authors: "Выбранные авторы",
+  published_products: "Авторы с опубликованными продуктами",
+  no_published_products: "Авторы без опубликованных продуктов",
+  commercial_authors: "Коммерческие авторы",
+};
+
+export function filterKindLabel(kind: string): string {
+  return MAILING_FILTER_LABELS[kind] ?? "Свой фильтр";
+}
+
+/** Russian text for any code; unknown codes get a generic Russian message plus the code in brackets. */
+export function mailingCodeLabel(code: string): string {
+  return (
+    MAILING_CODE_LABELS[code] ??
+    RECIPIENT_REASON_LABELS[code] ??
+    `Не удалось выполнить действие (код: ${code})`
+  );
+}
+
+/** Russian label for a stored recipient error. `detail` is the raw text for a muted secondary line. */
+export function recipientErrorLabel(raw: string): { label: string; detail: string | null } {
+  const known = MAILING_CODE_LABELS[raw] ?? RECIPIENT_REASON_LABELS[raw];
+  if (known) return { label: known, detail: null };
+  return { label: "Ошибка отправки", detail: raw };
+}
