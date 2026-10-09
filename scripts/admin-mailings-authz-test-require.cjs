@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- tsx loads this test as CommonJS, so the module mock has to patch require. */
 const Module = require("module");
 const orig = Module.prototype.require;
 const calls = { load: 0, gates: 0 };
