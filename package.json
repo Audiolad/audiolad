@@ -101,6 +101,7 @@
     "test:analytics-link-signup-sql": "node scripts/analytics-link-signup-sql-unit.mjs",
     "test:playback-usage": "npx tsx scripts/playback-usage-unit.mts",
     "test:listen-completion": "npx tsx scripts/listen-completion-zone-unit.mts",
+    "test:admin-analytics-period-e2e": "node scripts/admin-analytics-period-refetch-e2e.mjs",
     "test:stats-table-sort": "npx tsx scripts/stats-table-sort-unit.mts && npx tsx scripts/stats-query-navigation-unit.mts",
     "test:platform-analytics-p2": "npx tsx scripts/stats-table-sort-unit.mts && npx tsx scripts/stats-query-navigation-unit.mts && node scripts/platform-analytics-p2-client-unit.mjs && node scripts/platform-analytics-p2-sql-unit.mjs && npx tsx scripts/playback-analytics-canonical-unit.mjs && npx tsx scripts/playback-usage-unit.mts && npm run test:listen-completion",
     "test:run-from-target-sha-pin-reuse": "bash scripts/run-from-target-sha-pin-reuse-unit.sh",
