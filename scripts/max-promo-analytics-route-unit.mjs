@@ -107,7 +107,7 @@ try {
       promoPageId: "11111111-1111-4111-8111-111111111111",
     }),
   );
-  assert.equal(response.status, 403);
+  assert.equal(response.status, 201, "guest (unlinked) MAX user must reach public promo");
 } finally {
   setResolveMaxNativeUserForTests(null);
   setMaxPromoAnalyticsClientForTests(null);

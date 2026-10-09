@@ -134,7 +134,7 @@ try {
       promoSlug: "3-kvantmeditatsii-v-podarok",
     }),
   );
-  assert.equal(response.status, 403);
+  assert.equal(response.status, 200, "guest (unlinked) MAX user must reach public promo");
 
   setResolveMaxNativeUserForTests(async () => ({ ok: true, userId: "u" }));
   setGetMaxPromoPageForTests(async () => ({ ok: false, reason: "not_found" }));
