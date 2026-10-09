@@ -10,7 +10,7 @@ import {
   saveAuthorMailingDraft,
   searchAuthorMailingCandidates,
 } from "@/lib/admin/mailings/service";
-import { planAuthorRecipients } from "@/lib/admin/mailings/recipients";
+import { MAILING_LISTING_CAP, planAuthorRecipients } from "@/lib/admin/mailings/recipients";
 import { sendAuthorMailingTest } from "@/lib/admin/mailings/test-send";
 import {
   parseAuthorCampaignFilter,
@@ -147,6 +147,40 @@ export async function previewMailingRecipientsAction(payload: CampaignDraftInput
     return plan;
   }
   return { ok: true as const, summary: plan.summary };
+}
+
+/**
+ * Admin-only list of planned recipients (names + emails = PII). Called on button press only;
+ * same permission as the counter preview; result is returned to the caller, never cached/logged.
+ */
+export async function listMailingRecipientsAction(payload: CampaignDraftInput) {
+  await requireAdminPermission("mailings.view");
+  const draft = draftFromPayload(payload);
+  if (draft.messageType !== "author_operational" && draft.messageType !== "author_marketing") {
+    return { ok: false as const, code: "message_type_invalid" };
+  }
+  const filter = parseAuthorCampaignFilter(draft.filter);
+  if (!filter) {
+    return { ok: false as const, code: "filter_invalid" };
+  }
+  const candidates = await loadAuthorMailingCandidates();
+  const gates = await loadDeliveryGates(candidates);
+  const plan = planAuthorRecipients({
+    candidates,
+    filter,
+    messageType: draft.messageType,
+    gatesByEmail: gates,
+  });
+  if (!plan.ok) {
+    return plan;
+  }
+  return {
+    ok: true as const,
+    summary: plan.summary,
+    total: plan.listing.length,
+    truncated: plan.listing.length > MAILING_LISTING_CAP,
+    entries: plan.listing.slice(0, MAILING_LISTING_CAP),
+  };
 }
 
 export async function launchMailingAction(campaignId: string) {

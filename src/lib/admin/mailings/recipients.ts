@@ -12,6 +12,7 @@ import { isAuthorCommercialActiveAccess } from "@/lib/authors/access";
 import type { AuthorCampaignFilter } from "./validation";
 
 export const MAILING_RECIPIENT_LIMIT = 5000;
+export const MAILING_LISTING_CAP = 1000;
 
 export type AuthorMailingCandidate = {
   authorId: string;
@@ -50,8 +51,25 @@ export type RecipientPlanSummary = {
   suppressed: number;
   consentExcluded: number;
   invalidOrNoEmail: number;
+  /** Repeated addresses (one address receives the message once). Not part of excludedOther. */
+  duplicateEmails: number;
   excludedOther: number;
   ready: number;
+};
+
+export type RecipientListingReason =
+  | "duplicate"
+  | "consent"
+  | "suppressed"
+  | "invalid_email"
+  | "fixture";
+
+/** Admin-facing row for the «Показать получателей» list. Never persisted. */
+export type RecipientListingEntry = {
+  name: string | null;
+  email: string | null;
+  status: "queued" | "excluded";
+  reason: RecipientListingReason | null;
 };
 
 export function isMailingFixtureCandidate(input: {
@@ -107,7 +125,12 @@ export function planAuthorRecipients(input: {
   gatesByEmail?: ReadonlyMap<string, DeliveryGateFacts>;
   now?: Date;
 }):
-  | { ok: true; rows: PlannedRecipient[]; summary: RecipientPlanSummary }
+  | {
+      ok: true;
+      rows: PlannedRecipient[];
+      summary: RecipientPlanSummary;
+      listing: RecipientListingEntry[];
+    }
   | { ok: false; code: "filter_invalid" | "too_many_recipients" } {
   const now = input.now ?? new Date();
   const matched = input.candidates.filter((candidate) => matchesFilter(candidate, input.filter));
@@ -121,18 +144,27 @@ export function planAuthorRecipients(input: {
     suppressed: 0,
     consentExcluded: 0,
     invalidOrNoEmail: 0,
+    duplicateEmails: 0,
     excludedOther: 0,
     ready: 0,
   };
   const rows: PlannedRecipient[] = [];
+  const listing: RecipientListingEntry[] = [];
   const seenEmails = new Set<string>();
 
   for (const candidate of matched) {
     const displayName = candidate.displayName?.trim() || null;
     const firstName = firstNameFromFullName(candidate.fullName);
+    const listName = candidate.fullName?.trim() || displayName;
+    const list = (
+      email: string | null,
+      status: "queued" | "excluded",
+      reason: RecipientListingReason | null,
+    ) => listing.push({ name: listName, email, status, reason });
 
     if (candidate.isFixture) {
       summary.excludedOther += 1;
+      list(candidate.email?.trim() || null, "excluded", "fixture");
       if (candidate.email?.trim()) {
         const parsed = validateEmailFormat(candidate.email);
         rows.push({
@@ -153,11 +185,13 @@ export function planAuthorRecipients(input: {
     const parsed = candidate.email ? validateEmailFormat(candidate.email) : null;
     if (!parsed || !parsed.ok) {
       summary.invalidOrNoEmail += 1;
+      list(candidate.email?.trim() || null, "excluded", "invalid_email");
       continue;
     }
 
     if (seenEmails.has(parsed.normalizedEmail)) {
-      summary.excludedOther += 1;
+      summary.duplicateEmails += 1;
+      list(parsed.normalizedEmail, "excluded", "duplicate");
       rows.push({
         authorId: candidate.authorId,
         userId: candidate.userId,
@@ -188,6 +222,7 @@ export function planAuthorRecipients(input: {
 
     if (!decision.ok && decision.code === "suppressed") {
       summary.suppressed += 1;
+      list(parsed.normalizedEmail, "excluded", "suppressed");
       rows.push({
         authorId: candidate.authorId,
         userId: candidate.userId,
@@ -204,6 +239,7 @@ export function planAuthorRecipients(input: {
 
     if (!decision.ok) {
       summary.consentExcluded += 1;
+      list(parsed.normalizedEmail, "excluded", "consent");
       rows.push({
         authorId: candidate.authorId,
         userId: candidate.userId,
@@ -219,6 +255,7 @@ export function planAuthorRecipients(input: {
     }
 
     summary.ready += 1;
+    list(parsed.normalizedEmail, "queued", null);
     rows.push({
       authorId: candidate.authorId,
       userId: candidate.userId,
@@ -232,5 +269,5 @@ export function planAuthorRecipients(input: {
     });
   }
 
-  return { ok: true, rows, summary };
+  return { ok: true, rows, summary, listing };
 }
