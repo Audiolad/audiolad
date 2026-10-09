@@ -5,15 +5,72 @@ import { useRouter } from "next/navigation";
 
 import {
   launchMailingAction,
+  listMailingRecipientsAction,
   previewMailingAction,
   previewMailingRecipientsAction,
   saveMailingDraftAction,
   searchMailingAuthorsAction,
   sendMailingTestAction,
 } from "@/app/(platform)/admin/mailings/actions";
+import { recipientReasonLabel } from "@/lib/admin/mailings/campaign-status";
+import { DUPLICATE_HELP_TEXT, formatRecipientSummary } from "@/lib/admin/mailings/summary-format";
+import type { RecipientListingEntry } from "@/lib/admin/mailings/recipients";
 import type { AuthorCampaignFilter } from "@/lib/admin/mailings/validation";
 import { formatHumanSenderLabel, getSenderIdentity } from "@/lib/email/sender-identities";
 import { normalizeOptionalCampaignLink } from "@/lib/email/templates/manual-campaign";
+
+export function RecipientsDialog(props: {
+  entries: RecipientListingEntry[];
+  total: number;
+  truncated: boolean;
+  onClose: () => void;
+}) {
+  const ready = props.entries.filter((entry) => entry.status === "queued");
+  const excluded = props.entries.filter((entry) => entry.status === "excluded");
+  const row = (entry: RecipientListingEntry, index: number) => (
+    <li key={index} className="border-b border-[#efe6fa] py-2 text-sm">
+      <p className="font-semibold">{entry.name ?? "—"}</p>
+      <p className="break-all text-[#4b3a73]">{entry.email ?? "—"}</p>
+      {entry.reason ? (
+        <p className="text-xs text-[#5e2ca5]">
+          {recipientReasonLabel(entry.reason)}
+          {entry.reason === "duplicate" ? ` — ${DUPLICATE_HELP_TEXT}` : ""}
+        </p>
+      ) : null}
+    </li>
+  );
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Получатели рассылки"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+    >
+      <div className="flex max-h-[90dvh] w-full flex-col rounded-t-2xl bg-white p-4 sm:max-w-2xl sm:rounded-2xl">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Получатели</h2>
+          <button
+            type="button"
+            aria-label="Закрыть"
+            className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-[#e4d7f4] px-3 text-lg text-[#7042c5]"
+            onClick={props.onClose}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="overflow-y-auto overscroll-contain">
+          <h3 className="mt-2 text-sm font-semibold">К отправке ({ready.length})</h3>
+          <ul>{ready.map(row)}</ul>
+          <h3 className="mt-4 text-sm font-semibold">Исключены ({excluded.length})</h3>
+          <ul>{excluded.map(row)}</ul>
+          {props.truncated ? (
+            <p className="py-2 text-xs text-[#5e2ca5]">Показаны первые {props.entries.length} из {props.total}.</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type EditorProps = {
   campaignId?: string;
@@ -63,6 +120,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewMeta, setPreviewMeta] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [listing, setListing] = useState<{ entries: RecipientListingEntry[]; total: number; truncated: boolean } | null>(null);
   const [testEmail, setTestEmail] = useState("");
   const [authorQuery, setAuthorQuery] = useState("");
   const [authorHits, setAuthorHits] = useState<Array<{ authorId: string; name: string; email: string | null }>>([]);
@@ -269,6 +327,14 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
 
         {message ? <p className="text-sm text-[#5e2ca5]">{message}</p> : null}
         {summary ? <p className="text-sm text-[#25135c]">{summary}</p> : null}
+        {listing ? (
+          <RecipientsDialog
+            entries={listing.entries}
+            total={listing.total}
+            truncated={listing.truncated}
+            onClose={() => setListing(null)}
+          />
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <button type="submit" disabled={pending} className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">
@@ -302,13 +368,27 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
                   return;
                 }
                 const item = result.summary;
-                setSummary(
-                  `Найдено ${item.found}. Исключено suppressions ${item.suppressed}. Исключено согласия ${item.consentExcluded}. Некорректный email ${item.invalidOrNoEmail}. Прочие исключения ${item.excludedOther}. К отправке ${item.ready}.`,
-                );
+                setSummary(formatRecipientSummary(item, state.messageType));
               });
             }}
           >
             Посчитать получателей
+          </button>
+          <button
+            type="button"
+            className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm font-semibold text-[#7042c5]"
+            onClick={() => {
+              startTransition(async () => {
+                const result = await listMailingRecipientsAction(payload);
+                if (!result.ok) {
+                  setSummary(`Получатели: ${result.code}`);
+                  return;
+                }
+                setListing({ entries: result.entries, total: result.total, truncated: result.truncated });
+              });
+            }}
+          >
+            Показать получателей
           </button>
         </div>
 

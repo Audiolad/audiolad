@@ -112,3 +112,36 @@ export function audienceLabel(audienceType: string): string {
 
   return audienceType;
 }
+
+/** Display-only Russian labels; DB/API values stay unchanged. */
+export const RECIPIENT_STATUS_LABELS: Record<RecipientStatus, string> = {
+  queued: "В очереди",
+  sent: "Отправлено",
+  failed: "Ошибка",
+  suppressed: "В стоп-листе",
+  excluded: "Исключен",
+  cancelled: "Отменено",
+};
+
+export function recipientStatusLabel(status: string): string {
+  return (RECIPIENT_STATUS_LABELS as Record<string, string>)[status] ?? status;
+}
+
+export const RECIPIENT_REASON_LABELS: Record<string, string> = {
+  duplicate: "Дубль адреса",
+  fixture: "Тестовая запись",
+  invalid_email: "Некорректный email",
+  consent: "Нет согласия",
+  author_marketing_consent: "Нет согласия на рекламу",
+  author_marketing_preference: "Реклама отключена в настройках",
+  author_operational: "Служебные письма отключены",
+  suppressed: "В стоп-листе",
+  all: "Стоп-лист: все письма",
+  all_non_critical: "Стоп-лист: все, кроме критичных",
+  author_marketing: "Стоп-лист: реклама авторам",
+  marketing: "Стоп-лист: реклама",
+};
+
+export function recipientReasonLabel(reason: string): string {
+  return RECIPIENT_REASON_LABELS[reason] ?? reason;
+}

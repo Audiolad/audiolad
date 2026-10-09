@@ -6,6 +6,8 @@ import {
   audienceLabel,
   campaignStatusLabel,
   messageTypeLabel,
+  recipientReasonLabel,
+  recipientStatusLabel,
 } from "@/lib/admin/mailings/campaign-status";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 import { formatHumanSenderLabel, getSenderIdentity } from "@/lib/email/sender-identities";
@@ -104,7 +106,7 @@ export default async function AdminMailingDetailPage({
             <p>Запустил: {campaign.launchedBy ?? "—"} · {formatDate(campaign.queuedAt)}</p>
             <p>Фильтр: {campaign.filter.kind}</p>
             <p>
-              Всего {campaign.recipientTotal}, в очереди {campaign.recipientQueued}, отправлено {campaign.recipientSent}, ошибки {campaign.recipientFailed}, исключения {campaign.recipientSuppressed}, прочие {campaign.recipientExcluded}
+              Всего {campaign.recipientTotal}, в очереди {campaign.recipientQueued}, отправлено {campaign.recipientSent}, ошибки {campaign.recipientFailed}, в стоп-листе {campaign.recipientSuppressed}, прочие {campaign.recipientExcluded}
             </p>
           </div>
           {rendered.ok ? (
@@ -117,12 +119,12 @@ export default async function AdminMailingDetailPage({
         <input name="q" defaultValue={query.q ?? ""} placeholder="Поиск по email" className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm" />
         <select name="status" defaultValue={statusFilter} className="rounded-full border border-[#e4d7f4] px-4 py-2 text-sm">
           <option value="">Все статусы</option>
-          <option value="queued">queued</option>
-          <option value="sent">sent</option>
-          <option value="failed">failed</option>
-          <option value="suppressed">suppressed</option>
-          <option value="excluded">excluded</option>
-          <option value="cancelled">cancelled</option>
+          <option value="queued">В очереди</option>
+          <option value="sent">Отправлено</option>
+          <option value="failed">Ошибка</option>
+          <option value="suppressed">В стоп-листе</option>
+          <option value="excluded">Исключен</option>
+          <option value="cancelled">Отменено</option>
         </select>
         <button className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white" type="submit">
           Фильтр
@@ -150,9 +152,9 @@ export default async function AdminMailingDetailPage({
                 <tr key={row.id} className="border-t border-[#f0e8f8]">
                   <td className="px-3 py-3">{row.email}</td>
                   <td className="px-3 py-3">{row.displayName ?? "—"}</td>
-                  <td className="px-3 py-3">{row.status}</td>
+                  <td className="px-3 py-3">{recipientStatusLabel(row.status)}</td>
                   <td className="px-3 py-3">{formatDate(row.sentAt)}</td>
-                  <td className="px-3 py-3">{row.errorMessage ?? row.suppressionReason ?? "—"}</td>
+                  <td className="px-3 py-3">{row.errorMessage ?? (row.suppressionReason ? recipientReasonLabel(row.suppressionReason) : "—")}</td>
                 </tr>
               ))
             )}

@@ -62,6 +62,10 @@ const actions = {
     state().previews.push(payload);
     return { ok: false, code: "not_called" };
   },
+  async listMailingRecipientsAction(payload) {
+    state().previews.push(payload);
+    return global.__audioladMailingListing ?? { ok: false, code: "not_called" };
+  },
   async searchMailingAuthorsAction(query) {
     state().searches.push(query);
     return [];

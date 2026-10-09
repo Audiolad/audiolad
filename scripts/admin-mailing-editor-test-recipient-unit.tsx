@@ -193,6 +193,38 @@ async function main() {
   assert.match(opened.container.textContent ?? "", new RegExp(`Тест отправлен на ${YANDEX_EMAIL}`));
   await opened.cleanup();
 
+  (globalThis as { __audioladMailingListing?: unknown }).__audioladMailingListing = {
+    ok: true,
+    summary: {},
+    total: 3,
+    truncated: false,
+    entries: [
+      { name: "Тест Один", email: "one@example.com", status: "queued", reason: null },
+      { name: "Тест Два", email: "one@example.com", status: "excluded", reason: "duplicate" },
+      { name: "Тест Три", email: "very.long.address.for.wrapping@example.com", status: "excluded", reason: "consent" },
+    ],
+  };
+  const listed = await renderEditor({ canSend: false });
+  assert.equal(actionLog().previews.length, 0, "список не грузится до нажатия");
+  assert.doesNotMatch(listed.container.textContent ?? "", /Тест Один/);
+  await act(async () => {
+    buttonByLabel(listed.container, "Показать получателей").click();
+  });
+  const listedText = listed.container.textContent ?? "";
+  assert.equal(actionLog().previews.length, 1);
+  assert.match(listedText, /Тест Один/);
+  assert.match(listedText, /one@example\.com/);
+  assert.match(listedText, /Исключены \(2\)/);
+  assert.match(listedText, /Дубль адреса — один адрес получит письмо один раз/);
+  assert.match(listedText, /Нет согласия/);
+  const closeButton = elementsUnder(listed.container).find((el) => el.getAttribute("aria-label") === "Закрыть");
+  assert.ok(closeButton?.className.includes("h-11"));
+  await act(async () => {
+    (closeButton as HTMLElement).click();
+  });
+  assert.doesNotMatch(listed.container.textContent ?? "", /Тест Один/);
+  await listed.cleanup();
+
   const existing = await renderEditor({ canSend: true, campaignId: "10000000-0000-4000-8000-000000000001" });
   assert.equal(buttonByLabel(existing.container, YANDEX_LABEL).getAttribute("aria-pressed"), "false");
   assert.equal(buttonByLabel(existing.container, AUDIOLAD_LABEL).getAttribute("aria-pressed"), "false");

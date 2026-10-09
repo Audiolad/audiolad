@@ -4,7 +4,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getVisibleAdminNavItems } from "../src/lib/admin/nav";
-import { deriveCampaignRollup } from "../src/lib/admin/mailings/campaign-status";
+import {
+  deriveCampaignRollup,
+  RECIPIENT_REASON_LABELS,
+  RECIPIENT_STATUSES,
+  recipientReasonLabel,
+  recipientStatusLabel,
+} from "../src/lib/admin/mailings/campaign-status";
+import { formatRecipientSummary } from "../src/lib/admin/mailings/summary-format";
 import { launchAuthorCampaign } from "../src/lib/admin/mailings/launch";
 import {
   planAuthorRecipients,
@@ -343,6 +350,55 @@ if (plan.ok) {
   assert.equal(plan.summary.invalidOrNoEmail, 0);
   assert.equal(plan.rows.filter((row) => row.suppressionReason === "duplicate").length, 1);
   assert.equal(plan.rows.filter((row) => row.suppressionReason === "fixture").length, 1);
+}
+if (plan.ok) {
+  assert.equal(plan.summary.duplicateEmails, 1);
+  assert.equal(plan.summary.excludedOther, 1);
+  assert.equal(plan.listing.length, 5);
+  assert.equal(plan.listing.filter((entry) => entry.reason === "duplicate").length, 1);
+  assert.equal(plan.listing.filter((entry) => entry.status === "queued").length, 3);
+  assert.ok(plan.listing.every((entry) => entry.name !== undefined && entry.email !== undefined));
+}
+const dupOnly = planAuthorRecipients({
+  candidates: Array.from({ length: 4 }, (_, i) =>
+    candidate({
+      authorId: `2000000${i}-0000-4000-8000-00000000009${i}`,
+      email: i < 3 ? "same@Example.com" : "other@example.com",
+      fullName: `Тест Автор${i}`,
+    }),
+  ),
+  filter: { version: 1, kind: "all_authors" },
+  messageType: "author_operational",
+  now,
+});
+assert.equal(dupOnly.ok && dupOnly.summary.duplicateEmails, 2);
+assert.equal(dupOnly.ok && dupOnly.summary.excludedOther, 0);
+assert.equal(dupOnly.ok && dupOnly.summary.ready, 2);
+assert.equal(dupOnly.ok && dupOnly.summary.found, 4);
+assert.deepEqual(
+  dupOnly.ok && dupOnly.listing.filter((e) => e.reason === "duplicate").map((e) => [e.name, e.email]),
+  [["Тест Автор1", "same@example.com"], ["Тест Автор2", "same@example.com"]],
+);
+for (const status of RECIPIENT_STATUSES) {
+  const label = recipientStatusLabel(status);
+  assert.match(label, /^[А-Яа-яЁё\s-]+$/, `status ${status} must have a Russian label`);
+}
+for (const reason of Object.keys(RECIPIENT_REASON_LABELS)) {
+  assert.match(recipientReasonLabel(reason), /[А-Яа-яЁё]/);
+}
+assert.match(formatRecipientSummary({ found: 48, suppressed: 0, consentExcluded: 0, invalidOrNoEmail: 0, duplicateEmails: 11, excludedOther: 0, ready: 37 }, "author_operational"), /Дубли адресов 11\. Прочие исключения 0\. К отправке 37\./);
+assert.match(formatRecipientSummary({ found: 5, suppressed: 0, consentExcluded: 3, invalidOrNoEmail: 0, duplicateEmails: 0, excludedOther: 0, ready: 2 }, "author_marketing"), /Нет согласия на рекламу у 3 получателей/);
+assert.doesNotMatch(formatRecipientSummary({ found: 5, suppressed: 0, consentExcluded: 3, invalidOrNoEmail: 0, duplicateEmails: 0, excludedOther: 0, ready: 2 }, "author_operational"), /на рекламу/);
+{
+  const actionsSource = readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/app/(platform)/admin/mailings/actions.ts"),
+    "utf8",
+  );
+  const body = actionsSource.slice(actionsSource.indexOf("export async function listMailingRecipientsAction"));
+  const fnBody = body.slice(0, body.indexOf("\nexport async function launchMailingAction"));
+  assert.ok(fnBody.indexOf('await requireAdminPermission("mailings.view")') > 0, "list action is admin-guarded");
+  assert.ok(fnBody.indexOf("requireAdminPermission") < fnBody.indexOf("loadAuthorMailingCandidates"), "guard runs before data load");
+  assert.ok(!/console\.|logMailingEvent/.test(fnBody), "list action must not log PII");
 }
 const publishedPlan = planAuthorRecipients({
   candidates: [published, plain],
