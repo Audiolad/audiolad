@@ -132,6 +132,12 @@ export const RECIPIENT_REASON_LABELS: Record<string, string> = {
   fixture: "Тестовая запись",
   invalid_email: "Некорректный email",
   consent: "Нет согласия",
+  consent_required: "Нет согласия получателя",
+  preference: "Отключено в настройках получателя",
+  message_type_invalid: "Некорректный тип письма",
+  unsubscribe_not_configured: "Не настроена ссылка отписки",
+  invalid_input: "Некорректные данные",
+  cancelled: "Отменено",
   author_marketing_consent: "Нет согласия на рекламу",
   author_marketing_preference: "Реклама отключена в настройках",
   author_operational: "Служебные письма отключены",
@@ -142,8 +148,14 @@ export const RECIPIENT_REASON_LABELS: Record<string, string> = {
   marketing: "Стоп-лист: реклама",
 };
 
+/** Russian label for a stored/planned recipient reason; unknown codes → «Другая причина» + raw code as muted detail. */
+export function recipientReasonDisplay(reason: string): { label: string; detail: string | null } {
+  const known = RECIPIENT_REASON_LABELS[reason] ?? MAILING_CODE_LABELS[reason];
+  return known ? { label: known, detail: null } : { label: "Другая причина", detail: reason };
+}
+
 export function recipientReasonLabel(reason: string): string {
-  return RECIPIENT_REASON_LABELS[reason] ?? reason;
+  return recipientReasonDisplay(reason).label;
 }
 
 /** Russian labels for every error/reason code the mailing flow can return or store. */

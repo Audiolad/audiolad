@@ -8,7 +8,7 @@ import {
   messageTypeLabel,
   filterKindLabel,
   recipientErrorLabel,
-  recipientReasonLabel,
+  recipientReasonDisplay,
   recipientStatusLabel,
 } from "@/lib/admin/mailings/campaign-status";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
@@ -168,7 +168,15 @@ export default async function AdminMailingDetailPage({
                         );
                       })()
                     ) : row.suppressionReason ? (
-                      recipientReasonLabel(row.suppressionReason)
+                      (() => {
+                        const reason = recipientReasonDisplay(row.suppressionReason);
+                        return (
+                          <>
+                            {reason.label}
+                            {reason.detail ? <span className="block break-words text-xs text-[#7d70a2]">{reason.detail}</span> : null}
+                          </>
+                        );
+                      })()
                     ) : (
                       "—"
                     )}</td>

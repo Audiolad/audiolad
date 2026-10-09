@@ -12,7 +12,7 @@ import {
   searchMailingAuthorsAction,
   sendMailingTestAction,
 } from "@/app/(platform)/admin/mailings/actions";
-import { mailingCodeLabel, recipientReasonLabel } from "@/lib/admin/mailings/campaign-status";
+import { mailingCodeLabel, recipientReasonDisplay } from "@/lib/admin/mailings/campaign-status";
 import { DUPLICATE_HELP_TEXT, formatRecipientSummary } from "@/lib/admin/mailings/summary-format";
 import type { RecipientListingEntry } from "@/lib/admin/mailings/recipients";
 import type { AuthorCampaignFilter } from "@/lib/admin/mailings/validation";
@@ -46,7 +46,7 @@ export function RecipientsDialog(props: {
       <p className="break-all text-[#4b3a73]">{entry.email ?? "—"}</p>
       {entry.reason ? (
         <p className="text-xs text-[#5e2ca5]">
-          {recipientReasonLabel(entry.reason)}
+          {recipientReasonDisplay(entry.reason).label}
           {entry.reason === "duplicate" ? ` — ${DUPLICATE_HELP_TEXT}` : ""}
         </p>
       ) : null}

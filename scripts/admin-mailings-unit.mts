@@ -13,6 +13,7 @@ import {
   filterKindLabel,
   mailingCodeLabel,
   recipientErrorLabel,
+  recipientReasonDisplay,
 } from "../src/lib/admin/mailings/campaign-status";
 import { formatRecipientSummary } from "../src/lib/admin/mailings/summary-format";
 import { launchAuthorCampaign } from "../src/lib/admin/mailings/launch";
@@ -410,6 +411,31 @@ assert.match(mailingCodeLabel("weird_new_code"), /Не удалось выпол
 assert.equal(filterKindLabel("all_authors"), "Все авторы");
 assert.deepEqual(recipientErrorLabel("Connection timeout"), { label: "Ошибка отправки", detail: "Connection timeout" });
 assert.deepEqual(recipientErrorLabel("send_failed"), { label: "Не удалось отправить письмо", detail: null });
+{
+  // Every reason/code literal written to a recipient by launch.ts / delivery-gate.ts / enqueue.ts
+  // (markRecipient reason = enqueued.reason ?? enqueued.code) must have a Russian label.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const literals = new Set<string>();
+  for (const file of ["admin/mailings/launch.ts", "email/delivery-gate.ts", "email/enqueue.ts", "admin/mailings/recipients.ts"]) {
+    const source = readFileSync(path.join(here, "../src/lib", file), "utf8");
+    for (const match of source.matchAll(/\b(?:reason|code|suppressionReason):\s*"([a-z_]+)"/g)) {
+      literals.add(match[1]);
+    }
+    for (const match of source.matchAll(/return\s+"([a-z_]+)";/g)) {
+      literals.add(match[1]);
+    }
+  }
+  for (const extra of ["cancelled", "duplicate", "fixture", "invalid_email", "consent", "suppressed"]) literals.add(extra);
+  for (const code of ["preference", "consent_required", "message_type_invalid", "unsubscribe_not_configured", "invalid_input", "cancelled"]) {
+    assert.ok(literals.has(code), `literal scan should find ${code}`);
+  }
+  for (const code of literals) {
+    const display = recipientReasonDisplay(code);
+    assert.match(display.label, /^[А-Яа-яЁё]/, `reason ${code} needs a Russian label`);
+    assert.equal(display.detail, null, `reason ${code} must not fall back`);
+  }
+  assert.deepEqual(recipientReasonDisplay("brand_new_code"), { label: "Другая причина", detail: "brand_new_code" });
+}
 const publishedPlan = planAuthorRecipients({
   candidates: [published, plain],
   filter: { version: 1, kind: "published_products" },
