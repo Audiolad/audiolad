@@ -1,4 +1,4 @@
-import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
+import AiCompanyDashboard, { parseBoardTabParam } from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
@@ -47,6 +47,7 @@ export default async function AiCompanyPage({
     agent?: string;
     history_offset?: string;
     history_before?: string;
+    tab?: string;
   }>;
 }) {
   const session = await requireAdminPermission("ai_company.view");
@@ -72,6 +73,7 @@ export default async function AiCompanyPage({
         sourceError={sourceError}
         acceptanceAvailable={acceptanceAvailable}
         canAccept={canAccept}
+        initialTab={parseBoardTabParam(params.tab)}
       />
     </>
   );

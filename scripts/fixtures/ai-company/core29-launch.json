@@ -1,0 +1,2646 @@
+{
+  "generated_at": "2026-10-10T18:00:00.000Z",
+  "tasks": [
+    {
+      "id": "993e694f-6914-4b4b-88fe-e897141ddb83",
+      "github_issue_number": null,
+      "title": "Обновить справку для авторов",
+      "status": "planned",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.350Z",
+      "updated_at": "2026-10-10T19:14:11.350Z",
+      "received_at": "2026-10-10T19:14:11.350Z",
+      "started_at": null,
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.350Z",
+      "last_event": {
+        "event_type": "oriy_task_created",
+        "summary": "oriy_task_created",
+        "at": "2026-10-10T19:14:11.350Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Обновить справку для авторов",
+      "brief": "Обновить справку для авторов",
+      "stage": "В плане",
+      "progress": null,
+      "board_tab": "plan",
+      "launch": {
+        "requested_by": null,
+        "requested_at": null,
+        "admitted_at": null,
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": null,
+        "ack_at": null,
+        "execution_started_at": null,
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [],
+        "state": "planned",
+        "label": "В плане",
+        "can_launch": true
+      },
+      "active": false,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": null,
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": null,
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": null,
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "993e694f-6914-4b4b-88fe-e897141ddb83",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "993e694f-6914-4b4b-88fe-e897141ddb83",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.350Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+      "github_issue_number": null,
+      "title": "Добавить заметку к заказу",
+      "status": "executive_queued",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.336Z",
+      "updated_at": "2026-10-10T19:14:11.347Z",
+      "received_at": "2026-10-10T19:14:11.337Z",
+      "started_at": null,
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.349Z",
+      "last_event": {
+        "event_type": "launch_delivery_failed",
+        "summary": "launch_delivery_failed: webhook_request_failed",
+        "at": "2026-10-10T19:14:11.349Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Добавить заметку к заказу",
+      "brief": "Добавить заметку к заказу",
+      "stage": "Остановлена",
+      "progress": null,
+      "board_tab": "working",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.337Z",
+        "admitted_at": "2026-10-10T19:14:11.337Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": null,
+        "ack_at": null,
+        "execution_started_at": null,
+        "failure_reason": "webhook_request_failed",
+        "failure_label": "Нет связи с мостом Грога",
+        "retry_allowed": true,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.337Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.337Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 7/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.343Z",
+            "actor": "core",
+            "action": "delivery_failed",
+            "detail": "webhook_request_failed"
+          }
+        ],
+        "state": "failed",
+        "label": "Не отправлено",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": "Executive run failed task_id=ccb775af-e105-43df-8c1e-e8906bcf5488 agent_run_id=pending production_verified=false risk=LOW",
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": null,
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": null,
+        "last_event": "failed",
+        "last_event_at": "2026-10-10T19:14:11.349Z",
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_proof": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "launch_delivery_failed",
+          "agent_slug": "launch",
+          "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+          "payload": {
+            "reason": "webhook_request_failed",
+            "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488"
+          },
+          "created_at": "2026-10-10T19:14:11.349Z"
+        },
+        {
+          "event_type": "executive_dispatch_failed",
+          "agent_slug": "executive",
+          "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "connect ECONNREFUSED",
+            "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.346Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488"
+          },
+          "created_at": "2026-10-10T19:14:11.337Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+          "payload": {
+            "heavy": false,
+            "active": 7,
+            "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.337Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.337Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+      "github_issue_number": null,
+      "title": "Переписать модуль отчётов",
+      "status": "launch_pending",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.330Z",
+      "updated_at": "2026-10-10T19:14:11.331Z",
+      "received_at": "2026-10-10T19:14:11.330Z",
+      "started_at": null,
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.331Z",
+      "last_event": {
+        "event_type": "launch_requested",
+        "summary": "launch_requested",
+        "at": "2026-10-10T19:14:11.331Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Переписать модуль отчётов",
+      "brief": "Переписать модуль отчётов",
+      "stage": "Ожидает мощности",
+      "progress": null,
+      "board_tab": "plan",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.331Z",
+        "admitted_at": null,
+        "waiting_reason": "wip_heavy_full",
+        "waiting_label": "Ожидает: тяжёлая задача уже в работе",
+        "delivered_at": null,
+        "ack_at": null,
+        "execution_started_at": null,
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.331Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          }
+        ],
+        "state": "waiting",
+        "label": "Ожидает: тяжёлая задача уже в работе",
+        "can_launch": true
+      },
+      "active": false,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": null,
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": null,
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": null,
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87"
+          },
+          "created_at": "2026-10-10T19:14:11.331Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.330Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+      "github_issue_number": null,
+      "title": "Переписать модуль платежей",
+      "status": "executive_dispatched",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.318Z",
+      "updated_at": "2026-10-10T19:14:11.325Z",
+      "received_at": "2026-10-10T19:14:11.319Z",
+      "started_at": null,
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.329Z",
+      "last_event": {
+        "event_type": "launch_delivered",
+        "summary": "launch_delivered",
+        "at": "2026-10-10T19:14:11.329Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Переписать модуль платежей",
+      "brief": "Переписать модуль платежей",
+      "stage": "Передача в работу",
+      "progress": null,
+      "board_tab": "working",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.320Z",
+        "admitted_at": "2026-10-10T19:14:11.320Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": "2026-10-10T19:14:11.327Z",
+        "ack_at": null,
+        "execution_started_at": null,
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.320Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.320Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 6/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.325Z",
+            "actor": "core",
+            "action": "delivered",
+            "detail": "webhook"
+          }
+        ],
+        "state": "sent",
+        "label": "Ожидает подтверждения",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": "Executive run dispatched task_id=9b09233c-2491-4e86-a922-3f3610dbd7c3 agent_run_id=run-5b5ed0 production_verified=false risk=LOW",
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-5b5ed0",
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-5b5ed0",
+        "last_event": "dispatched",
+        "last_event_at": "2026-10-10T19:14:11.329Z",
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_proof": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "launch_delivered",
+          "agent_slug": "launch",
+          "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+          "payload": {
+            "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+            "response_status": 200
+          },
+          "created_at": "2026-10-10T19:14:11.329Z"
+        },
+        {
+          "event_type": "executive_dispatched",
+          "agent_slug": "executive",
+          "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "dispatched",
+            "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+            "agent_run_id": "run-5b5ed0",
+            "response_status": 200,
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.328Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+          "payload": {
+            "heavy": true,
+            "active": 6,
+            "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.320Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3"
+          },
+          "created_at": "2026-10-10T19:14:11.320Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.319Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "github_issue_number": null,
+      "title": "Исправить время прослушивания",
+      "status": "executive_dispatched",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.295Z",
+      "updated_at": "2026-10-10T19:14:11.304Z",
+      "received_at": "2026-10-10T19:14:11.296Z",
+      "started_at": "2026-10-10T19:14:11.314Z",
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.317Z",
+      "last_event": {
+        "event_type": "executive_production_verified",
+        "summary": "executive_production_verified: production_verified",
+        "at": "2026-10-10T19:14:11.317Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Исправить время прослушивания",
+      "brief": "Исправить время прослушивания",
+      "stage": "На проверке",
+      "progress": null,
+      "board_tab": "review",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.297Z",
+        "admitted_at": "2026-10-10T19:14:11.297Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": "2026-10-10T19:14:11.305Z",
+        "ack_at": "2026-10-10T19:14:11.309Z",
+        "execution_started_at": "2026-10-10T19:14:11.312Z",
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.297Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.297Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 5/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.303Z",
+            "actor": "core",
+            "action": "delivered",
+            "detail": "webhook"
+          }
+        ],
+        "state": "started",
+        "label": "Исполнение началось",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "presented",
+      "rework_open": false,
+      "result_version": "da7d0ac1e6191cb2a7ca9a90bd8045220eb0dd2c74b27c8c1ce4af1f6c81ca1a",
+      "acceptance": null,
+      "result_for_sergey": "Executive run production_verified task_id=438011fc-c5a4-4713-b276-d98d6dc5b409 agent_run_id=run-rev production_verified=true risk=LOW",
+      "evidence": {
+        "pr_url": null,
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": true,
+        "production_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "checked_at": "2026-10-10T19:14:11.317Z",
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-rev",
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-rev",
+        "last_event": "production_verified",
+        "last_event_at": "2026-10-10T19:14:11.317Z",
+        "pr_url": null,
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": true,
+        "production_proof": {
+          "verified": true,
+          "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "evidence_at": "2026-10-10T19:14:11.317Z",
+          "source": "executive_event"
+        },
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "executive_production_verified",
+          "agent_slug": "executive",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "event": "production_verified",
+            "merge": false,
+            "deploy": false,
+            "status": "production_verified",
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "agent_run_id": "run-rev",
+            "production_verified": true
+          },
+          "created_at": "2026-10-10T19:14:11.317Z"
+        },
+        {
+          "event_type": "executive_started",
+          "agent_slug": "executive",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "event": "started",
+            "merge": false,
+            "deploy": false,
+            "status": "started",
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "agent_run_id": "run-rev",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.314Z"
+        },
+        {
+          "event_type": "executive_accepted",
+          "agent_slug": "executive",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "event": "accepted",
+            "merge": false,
+            "deploy": false,
+            "status": "accepted",
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "agent_run_id": "run-rev",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.311Z"
+        },
+        {
+          "event_type": "launch_delivered",
+          "agent_slug": "launch",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "response_status": 200
+          },
+          "created_at": "2026-10-10T19:14:11.308Z"
+        },
+        {
+          "event_type": "executive_dispatched",
+          "agent_slug": "executive",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "dispatched",
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "agent_run_id": "run-d4e889",
+            "response_status": 200,
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.306Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "heavy": false,
+            "active": 5,
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.297Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409"
+          },
+          "created_at": "2026-10-10T19:14:11.297Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.296Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "github_issue_number": null,
+      "title": "Починить сортировку",
+      "status": "executive_dispatched",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.274Z",
+      "updated_at": "2026-10-10T19:14:11.281Z",
+      "received_at": "2026-10-10T19:14:11.275Z",
+      "started_at": "2026-10-10T19:14:11.291Z",
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.294Z",
+      "last_event": {
+        "event_type": "executive_pr_opened",
+        "summary": "executive_pr_opened: pr_opened",
+        "at": "2026-10-10T19:14:11.294Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Починить сортировку",
+      "brief": "Починить сортировку",
+      "stage": "Готовится изменение",
+      "progress": null,
+      "board_tab": "working",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.275Z",
+        "admitted_at": "2026-10-10T19:14:11.275Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": "2026-10-10T19:14:11.283Z",
+        "ack_at": "2026-10-10T19:14:11.285Z",
+        "execution_started_at": "2026-10-10T19:14:11.289Z",
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.275Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.275Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 4/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.281Z",
+            "actor": "core",
+            "action": "delivered",
+            "detail": "webhook"
+          }
+        ],
+        "state": "started",
+        "label": "Исполнение началось",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "presented",
+      "rework_open": false,
+      "result_version": "34218d286ffad59b64ceaf6fc07b4c64ea962fac001d50e79ae23163c13eef2a",
+      "acceptance": null,
+      "result_for_sergey": "Executive run pr_opened task_id=abc31203-ce52-4dbe-a221-65f316a52c31 agent_run_id=run-pr production_verified=false risk=LOW",
+      "evidence": {
+        "pr_url": "https://github.com/Audiolad/audiolad/pull/900",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-pr",
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-pr",
+        "last_event": "pr_opened",
+        "last_event_at": "2026-10-10T19:14:11.294Z",
+        "pr_url": "https://github.com/Audiolad/audiolad/pull/900",
+        "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_proof": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "executive_pr_opened",
+          "agent_slug": "executive",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "event": "pr_opened",
+            "merge": false,
+            "deploy": false,
+            "pr_url": "https://github.com/Audiolad/audiolad/pull/900",
+            "status": "pr_opened",
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "agent_run_id": "run-pr",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.294Z"
+        },
+        {
+          "event_type": "executive_started",
+          "agent_slug": "executive",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "event": "started",
+            "merge": false,
+            "deploy": false,
+            "status": "started",
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "agent_run_id": "run-pr",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.291Z"
+        },
+        {
+          "event_type": "executive_accepted",
+          "agent_slug": "executive",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "event": "accepted",
+            "merge": false,
+            "deploy": false,
+            "status": "accepted",
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "agent_run_id": "run-pr",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.288Z"
+        },
+        {
+          "event_type": "launch_delivered",
+          "agent_slug": "launch",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "response_status": 200
+          },
+          "created_at": "2026-10-10T19:14:11.285Z"
+        },
+        {
+          "event_type": "executive_dispatched",
+          "agent_slug": "executive",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "dispatched",
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "agent_run_id": "run-85ce78",
+            "response_status": 200,
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.284Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.275Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31"
+          },
+          "created_at": "2026-10-10T19:14:11.275Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+          "payload": {
+            "heavy": false,
+            "active": 4,
+            "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.275Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+      "github_issue_number": null,
+      "title": "Добавить экспорт отчёта",
+      "status": "executive_dispatched",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.261Z",
+      "updated_at": "2026-10-10T19:14:11.269Z",
+      "received_at": "2026-10-10T19:14:11.262Z",
+      "started_at": null,
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.273Z",
+      "last_event": {
+        "event_type": "launch_delivered",
+        "summary": "launch_delivered",
+        "at": "2026-10-10T19:14:11.273Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Добавить экспорт отчёта",
+      "brief": "Добавить экспорт отчёта",
+      "stage": "Передача в работу",
+      "progress": null,
+      "board_tab": "working",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.262Z",
+        "admitted_at": "2026-10-10T19:14:11.262Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": "2026-10-10T19:14:11.270Z",
+        "ack_at": null,
+        "execution_started_at": null,
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.262Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.262Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 3/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.269Z",
+            "actor": "core",
+            "action": "delivered",
+            "detail": "webhook"
+          }
+        ],
+        "state": "sent",
+        "label": "Ожидает подтверждения",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": "Executive run dispatched task_id=8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7 agent_run_id=run-834172 production_verified=false risk=LOW",
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-834172",
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-834172",
+        "last_event": "dispatched",
+        "last_event_at": "2026-10-10T19:14:11.273Z",
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_proof": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "launch_delivered",
+          "agent_slug": "launch",
+          "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+          "payload": {
+            "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+            "response_status": 200
+          },
+          "created_at": "2026-10-10T19:14:11.273Z"
+        },
+        {
+          "event_type": "executive_dispatched",
+          "agent_slug": "executive",
+          "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "dispatched",
+            "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+            "agent_run_id": "run-834172",
+            "response_status": 200,
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.271Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.262Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7"
+          },
+          "created_at": "2026-10-10T19:14:11.262Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+          "payload": {
+            "heavy": false,
+            "active": 3,
+            "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.262Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "github_issue_number": null,
+      "title": "Исправить подпись в календаре",
+      "status": "executive_dispatched",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.243Z",
+      "updated_at": "2026-10-10T19:14:11.253Z",
+      "received_at": "2026-10-10T19:14:11.244Z",
+      "started_at": null,
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.259Z",
+      "last_event": {
+        "event_type": "executive_accepted",
+        "summary": "executive_accepted: accepted",
+        "at": "2026-10-10T19:14:11.259Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Исправить подпись в календаре",
+      "brief": "Исправить подпись в календаре",
+      "stage": "Принята в работу",
+      "progress": null,
+      "board_tab": "working",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.244Z",
+        "admitted_at": "2026-10-10T19:14:11.244Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": "2026-10-10T19:14:11.254Z",
+        "ack_at": "2026-10-10T19:14:11.257Z",
+        "execution_started_at": null,
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.244Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.244Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 2/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.252Z",
+            "actor": "core",
+            "action": "delivered",
+            "detail": "webhook"
+          }
+        ],
+        "state": "acked",
+        "label": "Грог подтвердил, исполнение не началось",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": "Executive run accepted task_id=677619cd-59a1-4d80-aa81-838ce0e97873 agent_run_id=run-acked production_verified=false risk=LOW",
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-acked",
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-acked",
+        "last_event": "accepted",
+        "last_event_at": "2026-10-10T19:14:11.259Z",
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_proof": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "executive_accepted",
+          "agent_slug": "executive",
+          "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+          "payload": {
+            "event": "accepted",
+            "merge": false,
+            "deploy": false,
+            "status": "accepted",
+            "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+            "agent_run_id": "run-acked",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.259Z"
+        },
+        {
+          "event_type": "launch_delivered",
+          "agent_slug": "launch",
+          "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+          "payload": {
+            "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+            "response_status": 200
+          },
+          "created_at": "2026-10-10T19:14:11.257Z"
+        },
+        {
+          "event_type": "executive_dispatched",
+          "agent_slug": "executive",
+          "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "dispatched",
+            "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+            "agent_run_id": "run-1c0d10",
+            "response_status": 200,
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.255Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+          "payload": {
+            "heavy": false,
+            "active": 2,
+            "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.244Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.244Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873"
+          },
+          "created_at": "2026-10-10T19:14:11.244Z"
+        }
+      ],
+      "events_complete": true
+    },
+    {
+      "id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "github_issue_number": null,
+      "title": "Добавить фильтр в каталог",
+      "status": "executive_dispatched",
+      "priority": "p1",
+      "producer_agent_slug": "executive",
+      "result_consumer": "oriy",
+      "human_gate": "none",
+      "blocked_reason": null,
+      "next_action": null,
+      "created_at": "2026-10-10T19:14:11.199Z",
+      "updated_at": "2026-10-10T19:14:11.224Z",
+      "received_at": "2026-10-10T19:14:11.203Z",
+      "started_at": "2026-10-10T19:14:11.241Z",
+      "completed_at": null,
+      "last_event_at": "2026-10-10T19:14:11.241Z",
+      "last_event": {
+        "event_type": "executive_started",
+        "summary": "executive_started: started",
+        "at": "2026-10-10T19:14:11.241Z"
+      },
+      "source": "oriy",
+      "role": "orchestrator",
+      "goal": "Добавить фильтр в каталог",
+      "brief": "Добавить фильтр в каталог",
+      "stage": "Выполняется",
+      "progress": null,
+      "board_tab": "working",
+      "launch": {
+        "requested_by": "sergey",
+        "requested_at": "2026-10-10T19:14:11.207Z",
+        "admitted_at": "2026-10-10T19:14:11.207Z",
+        "waiting_reason": null,
+        "waiting_label": null,
+        "delivered_at": "2026-10-10T19:14:11.226Z",
+        "ack_at": "2026-10-10T19:14:11.232Z",
+        "execution_started_at": "2026-10-10T19:14:11.238Z",
+        "failure_reason": null,
+        "failure_label": null,
+        "retry_allowed": false,
+        "audit": [
+          {
+            "at": "2026-10-10T19:14:11.207Z",
+            "key": null,
+            "actor": "sergey",
+            "action": "requested",
+            "detail": "board"
+          },
+          {
+            "at": "2026-10-10T19:14:11.207Z",
+            "actor": "core",
+            "action": "admitted",
+            "detail": "wip 1/8"
+          },
+          {
+            "at": "2026-10-10T19:14:11.223Z",
+            "actor": "core",
+            "action": "delivered",
+            "detail": "webhook"
+          }
+        ],
+        "state": "started",
+        "label": "Исполнение началось",
+        "can_launch": false
+      },
+      "active": true,
+      "user_acceptance": "none",
+      "presentation": "in_progress",
+      "rework_open": false,
+      "result_version": "2ba5903c5b07899596fe74c819f876855bb41adecab98079dae3560b9a864b95",
+      "acceptance": null,
+      "result_for_sergey": "Executive run started task_id=65c7274c-3c36-41c6-9c97-d6fd88fd6d2a agent_run_id=run-started production_verified=false risk=LOW",
+      "evidence": {
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "review_sha": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_sha": null,
+        "checked_at": null,
+        "next_action": null,
+        "user_acceptance": "none",
+        "decided_at": null
+      },
+      "executor": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-started",
+        "orchestrator": "grok",
+        "xai_runner": false,
+        "model_in_cursor_pool": false
+      },
+      "executive_run": {
+        "provider": null,
+        "channel": null,
+        "model": null,
+        "run_id": "run-started",
+        "last_event": "started",
+        "last_event_at": "2026-10-10T19:14:11.241Z",
+        "pr_url": null,
+        "head_sha": null,
+        "commit_sha": null,
+        "ci_status": null,
+        "review_status": null,
+        "review_sha": null,
+        "deploy_status": null,
+        "production_verified": false,
+        "production_proof": null,
+        "merge_sha": null,
+        "deploy_sha": null,
+        "merge_recorded": false,
+        "deploy_recorded": false,
+        "done": false
+      },
+      "engineering_epoch": null,
+      "engineering_epoch_status": null,
+      "engineering_epoch_attempt": null,
+      "engineering_epoch_max_attempts": null,
+      "engineering_lifetime_attempts": null,
+      "engineering_runtime_fingerprint": null,
+      "engineering_previous_epoch": null,
+      "engineering_execution": null,
+      "events": [
+        {
+          "event_type": "executive_started",
+          "agent_slug": "executive",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "event": "started",
+            "merge": false,
+            "deploy": false,
+            "status": "started",
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+            "agent_run_id": "run-started",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.241Z"
+        },
+        {
+          "event_type": "executive_accepted",
+          "agent_slug": "executive",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "event": "accepted",
+            "merge": false,
+            "deploy": false,
+            "status": "accepted",
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+            "agent_run_id": "run-started",
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.236Z"
+        },
+        {
+          "event_type": "launch_delivered",
+          "agent_slug": "launch",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+            "response_status": 200
+          },
+          "created_at": "2026-10-10T19:14:11.231Z"
+        },
+        {
+          "event_type": "executive_dispatched",
+          "agent_slug": "executive",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "risk": "LOW",
+            "merge": false,
+            "deploy": false,
+            "reason": "dispatched",
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+            "agent_run_id": "run-bf796d",
+            "response_status": 200,
+            "production_verified": false
+          },
+          "created_at": "2026-10-10T19:14:11.228Z"
+        },
+        {
+          "event_type": "launch_admitted",
+          "agent_slug": "launch",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "heavy": false,
+            "active": 1,
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+            "max_heavy": 1,
+            "max_active": 8
+          },
+          "created_at": "2026-10-10T19:14:11.206Z"
+        },
+        {
+          "event_type": "launch_requested",
+          "agent_slug": "launch",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "actor": "sergey",
+            "source": "board",
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a"
+          },
+          "created_at": "2026-10-10T19:14:11.206Z"
+        },
+        {
+          "event_type": "oriy_task_created",
+          "agent_slug": "oriy",
+          "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+          "payload": {
+            "risk": "LOW",
+            "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+            "dispatch": false,
+            "priority": "p1",
+            "human_gate": "none",
+            "material_count": 0
+          },
+          "created_at": "2026-10-10T19:14:11.203Z"
+        }
+      ],
+      "events_complete": true
+    }
+  ],
+  "tasks_page": {
+    "active_complete": true,
+    "active_count": 7,
+    "history_included": 0,
+    "history_limit": 100,
+    "history_before": null,
+    "history_next_before": null,
+    "history_complete": true,
+    "omitted_history_count": 0,
+    "history_cursor_field": "updated_at",
+    "acceptance_view": "current"
+  },
+  "agents": [
+    {
+      "slug": "analytics",
+      "role": "Analytics",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    },
+    {
+      "slug": "engineering",
+      "role": "Engineering",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    },
+    {
+      "slug": "marketing-sales",
+      "role": "Marketing & Sales",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    },
+    {
+      "slug": "orchestrator",
+      "role": "Orchestrator",
+      "status": "idle",
+      "autonomy_level": 3,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "online",
+      "connection_label": "на связи",
+      "connection_freshness_at": "2026-10-10T19:14:11.350Z"
+    },
+    {
+      "slug": "product",
+      "role": "Product",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    },
+    {
+      "slug": "qa",
+      "role": "QA",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    },
+    {
+      "slug": "research",
+      "role": "Research",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    },
+    {
+      "slug": "ux",
+      "role": "UX",
+      "status": "idle",
+      "autonomy_level": 2,
+      "current_task_id": null,
+      "last_heartbeat_at": null,
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "connection_freshness_at": null
+    }
+  ],
+  "executors": [
+    {
+      "provider": "codex",
+      "role": "executor",
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "freshness_at": null,
+      "channel": null,
+      "model": null,
+      "run_id": null,
+      "xai_runner": false,
+      "gate": "CODEX_ACCESS_TOKEN",
+      "authenticated": false,
+      "execution_place": "absent"
+    },
+    {
+      "provider": "cursor",
+      "role": "executor",
+      "connection": "not_connected",
+      "connection_label": "не подключён",
+      "freshness_at": null,
+      "channel": null,
+      "model": null,
+      "run_id": null,
+      "xai_runner": false,
+      "gate": null,
+      "authenticated": null,
+      "execution_place": "cursor_cloud"
+    },
+    {
+      "provider": "grok",
+      "role": "orchestrator",
+      "connection": "online",
+      "connection_label": "на связи",
+      "freshness_at": "2026-10-10T19:14:11.346Z",
+      "channel": null,
+      "model": null,
+      "run_id": null,
+      "xai_runner": false,
+      "gate": null,
+      "authenticated": null,
+      "execution_place": "grok_control"
+    }
+  ],
+  "heartbeats": [],
+  "recent_events": [
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "993e694f-6914-4b4b-88fe-e897141ddb83",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "993e694f-6914-4b4b-88fe-e897141ddb83",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.350Z"
+    },
+    {
+      "event_type": "launch_delivery_failed",
+      "agent_slug": "launch",
+      "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+      "payload": {
+        "reason": "webhook_request_failed",
+        "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488"
+      },
+      "created_at": "2026-10-10T19:14:11.349Z"
+    },
+    {
+      "event_type": "executive_dispatch_failed",
+      "agent_slug": "executive",
+      "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "connect ECONNREFUSED",
+        "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.346Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.337Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488"
+      },
+      "created_at": "2026-10-10T19:14:11.337Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+      "payload": {
+        "heavy": false,
+        "active": 7,
+        "task_id": "ccb775af-e105-43df-8c1e-e8906bcf5488",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.337Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87"
+      },
+      "created_at": "2026-10-10T19:14:11.331Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "afb035d0-9dbe-4e5e-ab58-178ec5a53d87",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.330Z"
+    },
+    {
+      "event_type": "launch_delivered",
+      "agent_slug": "launch",
+      "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+      "payload": {
+        "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+        "response_status": 200
+      },
+      "created_at": "2026-10-10T19:14:11.329Z"
+    },
+    {
+      "event_type": "executive_dispatched",
+      "agent_slug": "executive",
+      "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "dispatched",
+        "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+        "agent_run_id": "run-5b5ed0",
+        "response_status": 200,
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.328Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3"
+      },
+      "created_at": "2026-10-10T19:14:11.320Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+      "payload": {
+        "heavy": true,
+        "active": 6,
+        "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.320Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "9b09233c-2491-4e86-a922-3f3610dbd7c3",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.319Z"
+    },
+    {
+      "event_type": "executive_production_verified",
+      "agent_slug": "executive",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "event": "production_verified",
+        "merge": false,
+        "deploy": false,
+        "status": "production_verified",
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "commit_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "agent_run_id": "run-rev",
+        "production_verified": true
+      },
+      "created_at": "2026-10-10T19:14:11.317Z"
+    },
+    {
+      "event_type": "executive_started",
+      "agent_slug": "executive",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "event": "started",
+        "merge": false,
+        "deploy": false,
+        "status": "started",
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "agent_run_id": "run-rev",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.314Z"
+    },
+    {
+      "event_type": "executive_accepted",
+      "agent_slug": "executive",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "event": "accepted",
+        "merge": false,
+        "deploy": false,
+        "status": "accepted",
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "agent_run_id": "run-rev",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.311Z"
+    },
+    {
+      "event_type": "launch_delivered",
+      "agent_slug": "launch",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "response_status": 200
+      },
+      "created_at": "2026-10-10T19:14:11.308Z"
+    },
+    {
+      "event_type": "executive_dispatched",
+      "agent_slug": "executive",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "dispatched",
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "agent_run_id": "run-d4e889",
+        "response_status": 200,
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.306Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409"
+      },
+      "created_at": "2026-10-10T19:14:11.297Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "heavy": false,
+        "active": 5,
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.297Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "438011fc-c5a4-4713-b276-d98d6dc5b409",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.296Z"
+    },
+    {
+      "event_type": "executive_pr_opened",
+      "agent_slug": "executive",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "event": "pr_opened",
+        "merge": false,
+        "deploy": false,
+        "pr_url": "https://github.com/Audiolad/audiolad/pull/900",
+        "status": "pr_opened",
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "agent_run_id": "run-pr",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.294Z"
+    },
+    {
+      "event_type": "executive_started",
+      "agent_slug": "executive",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "event": "started",
+        "merge": false,
+        "deploy": false,
+        "status": "started",
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "agent_run_id": "run-pr",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.291Z"
+    },
+    {
+      "event_type": "executive_accepted",
+      "agent_slug": "executive",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "event": "accepted",
+        "merge": false,
+        "deploy": false,
+        "status": "accepted",
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "agent_run_id": "run-pr",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.288Z"
+    },
+    {
+      "event_type": "launch_delivered",
+      "agent_slug": "launch",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "response_status": 200
+      },
+      "created_at": "2026-10-10T19:14:11.285Z"
+    },
+    {
+      "event_type": "executive_dispatched",
+      "agent_slug": "executive",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "dispatched",
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "agent_run_id": "run-85ce78",
+        "response_status": 200,
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.284Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.275Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31"
+      },
+      "created_at": "2026-10-10T19:14:11.275Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+      "payload": {
+        "heavy": false,
+        "active": 4,
+        "task_id": "abc31203-ce52-4dbe-a221-65f316a52c31",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.275Z"
+    },
+    {
+      "event_type": "launch_delivered",
+      "agent_slug": "launch",
+      "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+      "payload": {
+        "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+        "response_status": 200
+      },
+      "created_at": "2026-10-10T19:14:11.273Z"
+    },
+    {
+      "event_type": "executive_dispatched",
+      "agent_slug": "executive",
+      "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "dispatched",
+        "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+        "agent_run_id": "run-834172",
+        "response_status": 200,
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.271Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.262Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7"
+      },
+      "created_at": "2026-10-10T19:14:11.262Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+      "payload": {
+        "heavy": false,
+        "active": 3,
+        "task_id": "8d991aa2-0cb3-458c-8ce9-83a3cc5c18c7",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.262Z"
+    },
+    {
+      "event_type": "executive_accepted",
+      "agent_slug": "executive",
+      "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "payload": {
+        "event": "accepted",
+        "merge": false,
+        "deploy": false,
+        "status": "accepted",
+        "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+        "agent_run_id": "run-acked",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.259Z"
+    },
+    {
+      "event_type": "launch_delivered",
+      "agent_slug": "launch",
+      "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "payload": {
+        "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+        "response_status": 200
+      },
+      "created_at": "2026-10-10T19:14:11.257Z"
+    },
+    {
+      "event_type": "executive_dispatched",
+      "agent_slug": "executive",
+      "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "dispatched",
+        "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+        "agent_run_id": "run-1c0d10",
+        "response_status": 200,
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.255Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.244Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873"
+      },
+      "created_at": "2026-10-10T19:14:11.244Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+      "payload": {
+        "heavy": false,
+        "active": 2,
+        "task_id": "677619cd-59a1-4d80-aa81-838ce0e97873",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.244Z"
+    },
+    {
+      "event_type": "executive_started",
+      "agent_slug": "executive",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "event": "started",
+        "merge": false,
+        "deploy": false,
+        "status": "started",
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+        "agent_run_id": "run-started",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.241Z"
+    },
+    {
+      "event_type": "executive_accepted",
+      "agent_slug": "executive",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "event": "accepted",
+        "merge": false,
+        "deploy": false,
+        "status": "accepted",
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+        "agent_run_id": "run-started",
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.236Z"
+    },
+    {
+      "event_type": "launch_delivered",
+      "agent_slug": "launch",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+        "response_status": 200
+      },
+      "created_at": "2026-10-10T19:14:11.231Z"
+    },
+    {
+      "event_type": "executive_dispatched",
+      "agent_slug": "executive",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "risk": "LOW",
+        "merge": false,
+        "deploy": false,
+        "reason": "dispatched",
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+        "agent_run_id": "run-bf796d",
+        "response_status": 200,
+        "production_verified": false
+      },
+      "created_at": "2026-10-10T19:14:11.228Z"
+    },
+    {
+      "event_type": "launch_requested",
+      "agent_slug": "launch",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "actor": "sergey",
+        "source": "board",
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a"
+      },
+      "created_at": "2026-10-10T19:14:11.206Z"
+    },
+    {
+      "event_type": "launch_admitted",
+      "agent_slug": "launch",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "heavy": false,
+        "active": 1,
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+        "max_heavy": 1,
+        "max_active": 8
+      },
+      "created_at": "2026-10-10T19:14:11.206Z"
+    },
+    {
+      "event_type": "oriy_task_created",
+      "agent_slug": "oriy",
+      "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+      "payload": {
+        "risk": "LOW",
+        "task_id": "65c7274c-3c36-41c6-9c97-d6fd88fd6d2a",
+        "dispatch": false,
+        "priority": "p1",
+        "human_gate": "none",
+        "material_count": 0
+      },
+      "created_at": "2026-10-10T19:14:11.203Z"
+    }
+  ],
+  "events_page": {
+    "recent_events_limit": 50,
+    "recent_events_complete": false,
+    "recent_events_are_full_history": false,
+    "linked_by_task_id": true,
+    "prefixed_oriy_executive_included": true,
+    "prefixed_event_count": 25,
+    "per_task_limit": 40,
+    "events_before": null,
+    "tasks_with_omitted_events": 0
+  },
+  "gates": [
+    {
+      "id": "gate:CODEX_ACCESS_TOKEN",
+      "task_id": "b01cd5d3-052b-4e21-9236-184b3c5f2a5e",
+      "kind": "codex_authentication",
+      "gate": "CODEX_ACCESS_TOKEN",
+      "reason": "Codex на audiolad-company-core-01 не готов: срез 2026-10-07T08:42:09Z не нашёл команду codex, каталог ~/.codex и имя CODEX_ACCESS_TOKEN. В этом процессе токен тоже не задан. Platform API не замена.",
+      "decision_owner": "sergey",
+      "action_required": true,
+      "request": "Founder Gate: разрешить Codex locally и Codex access tokens, создать один конечный токен на служебную идентичность и положить только имя CODEX_ACCESS_TOKEN в env, который уже читает compose. Значение не присылать.",
+      "next_action": "Не объявлять Codex готовым и не включать процентную маршрутизацию, пока нет токена в процессе и подтверждённого status/usage.",
+      "opened_at": null,
+      "source": "host_env",
+      "resolved_at": null,
+      "resolution": null
+    }
+  ],
+  "gates_history": [],
+  "gates_complete": true,
+  "gates_history_complete": true,
+  "gates_history_limit": 100,
+  "execution": {
+    "process_kind": "unlabeled",
+    "process_host": null,
+    "process_label": "Место этого процесса не задано. Cloud VM Cursor и GitHub CI не являются Amsterdam и не являются Mac Сергея.",
+    "recorded_inventory_at": "2026-10-07T08:42:09Z",
+    "recorded_core_host": "audiolad-company-core-01",
+    "recorded_service_manager": "docker",
+    "client_independent_state": "recorded_docker_restart_not_disconnect_proven",
+    "client_session_dependency": "none_recorded_for_compose_services",
+    "disconnect_proof": "not_run",
+    "mcp_tools_this_process": "search_company_tasks,get_company_task_context,create_company_task,launch_company_task,add_task_clarification,record_human_gate_decision,request_task_stop,list_oriy_decisions,answer_oriy_decision,get_company_task_status,get_company_task_result,get_profile",
+    "mcp_decision_tools_present": true,
+    "mcp_live_amsterdam_verified": false,
+    "codex_ready": false,
+    "gate": "CODEX_ACCESS_TOKEN"
+  },
+  "codex": {
+    "connection": "not_connected",
+    "connection_label": "не подключён",
+    "authenticated": false,
+    "gate": "CODEX_ACCESS_TOKEN",
+    "gate_open": true,
+    "readiness_task_id": "b01cd5d3-052b-4e21-9236-184b3c5f2a5e",
+    "pilot": null,
+    "pilot_ok": false,
+    "percentage_routing": false,
+    "routing_module": "src/executor-routing.mjs",
+    "host_file_present": false,
+    "host_token_unproven": false,
+    "check_path": "Процесс читает CODEX_ACCESS_TOKEN из своего env. Имя в /opt/audiolad-company/runtime/.env само по себе процесс не авторизует: compose env_file его не подключает. Пилот Codex отсюда не запускается.",
+    "runtime_token_name_present": false,
+    "quota": {
+      "remaining": null,
+      "limit": null,
+      "reset_at": null,
+      "source": null,
+      "trustworthy": false,
+      "label": "нет данных",
+      "check_path": "Нет подтверждённого status/usage. Остаток не выдумывается. codexConnectionFact в src/executor-routing.mjs и host env CODEX_ACCESS_TOKEN. Значение токена в статус не входит."
+    }
+  },
+  "quotas": {
+    "codex": {
+      "remaining": null,
+      "limit": null,
+      "reset_at": null,
+      "source": null,
+      "trustworthy": false,
+      "label": "нет данных",
+      "check_path": "Нет подтверждённого status/usage. Остаток не выдумывается. codexConnectionFact в src/executor-routing.mjs и host env CODEX_ACCESS_TOKEN. Значение токена в статус не входит."
+    },
+    "cursor": {
+      "remaining": null,
+      "limit": null,
+      "reset_at": null,
+      "source": null,
+      "trustworthy": false,
+      "label": "нет данных",
+      "check_path": "Нет данных. Heartbeat health_metadata.quota с trustworthy=true для cursor. CURSOR_API_KEY не читается."
+    },
+    "grok": {
+      "remaining": null,
+      "limit": null,
+      "reset_at": null,
+      "source": null,
+      "trustworthy": false,
+      "label": "нет данных",
+      "check_path": "Нет данных. Отдельный xAI usage не читается. Модель Grok внутри Cursor не является остатком xAI."
+    }
+  },
+  "coverage": {
+    "active_oriy_without_issue": 7,
+    "active_engineering": 0,
+    "prefixed_events_linked": 25
+  },
+  "costs": {
+    "amount_usd": null,
+    "input_units": null,
+    "output_units": null,
+    "confirmed": false,
+    "source": null,
+    "label": "нет данных",
+    "check_path": "В costs нет подтверждённых строк. coalesce(sum)=0 не является остатком лимита и не означает бесплатный тариф.",
+    "remaining_limit_usd": null,
+    "zero_is_recorded_spend": false
+  }
+}

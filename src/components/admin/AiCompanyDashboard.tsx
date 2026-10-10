@@ -4,6 +4,10 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 
 import {
+  LAUNCH_OWNER_ONLY,
+  LAUNCH_UNAVAILABLE,
+} from "@/lib/admin/ai-company-launch";
+import {
   ACCEPTANCE_OWNER_ONLY,
   ACCEPTANCE_UNAVAILABLE,
   createAcceptanceGate,
@@ -13,6 +17,7 @@ import {
 import { NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
+  BoardTab,
   ActiveTaskCard,
   DashboardModel,
   EngineeringPanel,
@@ -50,6 +55,17 @@ const STAGE_BADGE_CLASS: Record<StageTone, string> = {
   stale: "border-stone-300 bg-stone-100 text-stone-800",
 };
 
+const BOARD_TAB_ITEMS: ReadonlyArray<{ id: BoardTab; label: string }> = [
+  { id: "plan", label: "План" },
+  { id: "working", label: "В работе" },
+  { id: "review", label: "Приёмка" },
+  { id: "archive", label: "Архив" },
+];
+
+export function parseBoardTabParam(value: string | null | undefined): BoardTab {
+  return BOARD_TAB_ITEMS.some((item) => item.id === value) ? (value as BoardTab) : "working";
+}
+
 const ROW_BUTTON =
   "flex min-h-12 w-full max-w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:h-14 sm:flex-nowrap";
 
@@ -60,6 +76,8 @@ type AiCompanyDashboardProps = {
   acceptanceAvailable?: boolean;
   /** True only for a session with the platform `owner` role. Others see the board without live buttons. */
   canAccept?: boolean;
+  /** The tab from ?tab=. Defaults to «В работе». */
+  initialTab?: BoardTab;
 };
 
 const AcceptanceAvailability = createContext(false);
@@ -300,7 +318,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
             onClick={() => void submit("accepted")}
             className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
           >
-            Проверил, принял
+            Принять
           </button>
           <label className="grid gap-1 text-xs text-[#796ba0]">
             Замечание для доработки
@@ -321,7 +339,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
             onClick={() => void submit("rejected")}
             className="min-h-11 rounded-lg border border-[#9f1239] px-3 py-2 text-sm font-semibold text-[#9f1239] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9f1239] disabled:opacity-60"
           >
-            Не работает / На доработку
+            На доработку
           </button>
         </div>
       )}
@@ -339,9 +357,94 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   );
 }
 
+function LaunchControls({ detail }: { detail: TaskDetailModel }) {
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const view = detail.launch;
+  if (!view || detail.taskId === NO_DATA) return null;
+
+  async function press() {
+    if (!owner || busy || gate.current.busy) return;
+    // One key per press series: a double click or a retry after a lost answer is the same request.
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/launch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ taskId: detail.taskId, idempotencyKey: key }),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string; deliveryFailed?: boolean };
+      });
+      if (outcome.ok === true) {
+        setMessage(outcome.message ?? "Запрос принят.");
+        // A failed delivery keeps the row; the next press is a new retry with a new key.
+        idempotencyKey.current = null;
+        refresh();
+      } else {
+        setError(outcome.message ?? "Запуск не выполнен.");
+      }
+    } catch {
+      setError(LAUNCH_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-launch-state={view.state}>
+      <p className="font-semibold">Запуск: {view.label}</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        {view.facts.map((fact) => (
+          <Fact key={fact.label} label={fact.label} value={fact.value} />
+        ))}
+        <Fact label="Журнал запуска" value={view.audit} />
+      </dl>
+      {view.canPress ? (
+        <>
+          {owner ? null : (
+            <p className="mt-2 text-sm text-[#9f1239]" role="status" data-launch-owner-only>
+              {LAUNCH_OWNER_ONLY}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={!owner || busy}
+            onClick={() => void press()}
+            data-launch-button
+            className="mt-3 min-h-11 rounded-lg bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+          >
+            {busy ? "Отправляю…" : view.buttonLabel}
+          </button>
+        </>
+      ) : null}
+      {message ? (
+        <p className="mt-2 text-sm text-[#166534]" role="status">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
     <>
+    <LaunchControls detail={detail} />
     <TaskCopyButton text={detail.copyText} />
     <OwnerAcceptanceControls detail={detail} />
     <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
@@ -649,6 +752,7 @@ export function AiCompanyDashboardView({
   sourceError,
   acceptanceAvailable = false,
   canAccept = false,
+  initialTab = "working",
   onRefresh,
   openDetails = {},
   onToggleDetail,
@@ -664,6 +768,21 @@ export function AiCompanyDashboardView({
       })
     : null;
   const showNext = Boolean(model && (model.historyNextOffset != null || model.historyNextCursor));
+  const [tab, setTab] = useState<BoardTab>(initialTab);
+  const tabCounts: Record<BoardTab, number> = {
+    plan: model?.plan.length ?? 0,
+    working: (model?.activeTasks.length ?? 0) + (model?.queue.length ?? 0) + (model?.decisions.length ?? 0),
+    review: model?.ownerReview.length ?? 0,
+    archive: model?.acceptedArchive.length ?? 0,
+  };
+  function selectTab(next: BoardTab) {
+    setTab(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", next);
+      window.history.replaceState(null, "", url);
+    }
+  }
   const receiptMissing = model?.todayNote.startsWith("Нет данных") ?? false;
 
   return (
@@ -703,6 +822,65 @@ export function AiCompanyDashboardView({
 
       {model ? (
         <>
+          <div
+            role="tablist"
+            aria-label="Разделы табло"
+            data-board-tabs
+            className="sticky top-0 z-20 -mx-1 grid grid-cols-4 gap-1 border-b border-[#eadff8] bg-[#fbf8ff]/95 px-1 py-1.5 backdrop-blur"
+          >
+            {BOARD_TAB_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`ai-company-tabbtn-${item.id}`}
+                aria-selected={tab === item.id}
+                aria-controls={`ai-company-tab-${item.id}`}
+                data-board-tab={item.id}
+                onClick={() => selectTab(item.id)}
+                className={`min-h-11 min-w-0 rounded-lg px-1 py-1.5 text-center text-xs font-semibold leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:text-sm ${
+                  tab === item.id ? "bg-[#7042c5] text-white" : "border border-[#eadff8] bg-white text-[#25135c]"
+                }`}
+              >
+                {item.label}
+                <span className="ml-1 tabular-nums opacity-80" data-tab-count={item.id}>{tabCounts[item.id]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div role="tabpanel" id="ai-company-tab-plan" aria-labelledby="ai-company-tabbtn-plan" data-tab-panel="plan" hidden={tab !== "plan"} className="space-y-5">
+          <section aria-labelledby="ai-company-plan" data-section="plan">
+            <h3 id="ai-company-plan" className="text-xl font-semibold">
+              План
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Задачи в плане не отправлены Грогу и не занимают мощность. Запуск — кнопка «В работу» внутри строки: та же команда, что у Oriy в Ядре.
+            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.plan.length ? (
+                model.plan.map((detail) => {
+                  const rowKey = `plan:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-plan-task": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  {NO_DATA}: задач в плане в полученном срезе нет.
+                </p>
+              )}
+            </div>
+          </section>
+          </div>
+
+          <div role="tabpanel" id="ai-company-tab-working" aria-labelledby="ai-company-tabbtn-working" data-tab-panel="working" hidden={tab !== "working"} className="space-y-5">
           <section aria-labelledby="ai-company-now" data-section="now">
             <h3 id="ai-company-now" className="text-xl font-semibold">
               Сейчас в работе
@@ -742,116 +920,158 @@ export function AiCompanyDashboardView({
             </section>
           ) : null}
 
-          <section aria-labelledby="ai-company-executors" data-section="executors">
-            <h3 id="ai-company-executors" className="text-xl font-semibold">
-              Исполнители
+          <section aria-labelledby="ai-company-queue" data-section="queue">
+            <h3 id="ai-company-queue" className="text-xl font-semibold">
+              Очередь
             </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — имя и достоверное состояние подключения.</p>
-            <HelpNote label="Справка об исполнителях">
-              <p>
-                Фактические исполнители: провайдер и модель, запуск, задача и свежесть сигнала из Company Core. Состояния: не подключён, свободен, нет данных, работает. Grok — единственный оркестратор и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor. Неподключённый исполнитель — зависимость подключения, не активный исполнитель. Постоянных карточек должностей нет: исторические роли остаются в журнале задач.
-              </p>
-            </HelpNote>
             <div className="mt-2 flex flex-col gap-1.5">
-              {model.executors.map((executor) => {
-                const rowKey = `executor:${executor.id}`;
-                return (
-                  <CompactRow
-                    key={rowKey}
-                    rowKey={rowKey}
-                    title={executor.label}
-                    aside={executor.connectionLabel}
-                    open={openDetails[rowKey] ?? false}
-                    onToggle={onToggleDetail}
-                    className={CONNECTION_CLASS[executor.connection]}
-                    articleProps={{
-                      "data-executor": executor.id,
-                      "data-executor-kind": executor.kind,
-                      "data-connection": executor.connection,
-                    }}
-                  >
-                    <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
-                    <dl className="mt-3 grid gap-2 text-sm">
-                      <Fact label="Состояние" value={executor.connectionLabel} />
-                      <Fact label="Провайдер / модель" value={executor.providerModel} />
-                      <Fact label="Задача" value={executor.currentTask} />
-                      <Fact label="Запуск" value={executor.runId} />
-                      <Fact label="Свежесть" value={executor.freshness} />
-                      <Fact label="Последний сигнал" value={executor.heartbeat} />
-                      <Fact label="Уточнение" value={executor.detail} />
-                    </dl>
-                  </CompactRow>
-                );
-              })}
+              {model.queue.length ? (
+                model.queue.map((detail) => {
+                  const rowKey = `queue:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Неначатых задач в очереди нет.
+                </p>
+              )}
             </div>
           </section>
 
-          <section aria-labelledby="ai-company-today" data-section="today">
-            <h3 id="ai-company-today" className="text-xl font-semibold">
-              Сегодня
-            </h3>
-            <p className="mt-1 text-xs text-[#796ba0]">
-              {receiptMissing ? model.todayNote : "Новые сверху. Возраст списка не берётся из updated_at."}
-            </p>
-            <HelpNote label="Справка о порядке списков">
-              <p>{model.todayNote}</p>
-              <p>Получены сегодня: порядок received_at, новые сверху.</p>
-              <p>Созданы сегодня: порядок created_at, новые сверху. Это запасной список, не received_at и не updated_at.</p>
-              <p>Завершены сегодня: порядок completed_at, новые сверху.</p>
-            </HelpNote>
-            <div className="mt-2 space-y-3">
-              <div data-section="received">
-                <h4 className="font-semibold">Получены сегодня · {model.todayReceived.length}</h4>
-                <TodayList
-                  rows={model.todayReceived}
-                  empty={`${NO_DATA}: получения за московские сутки снимка нет.`}
-                  openDetails={openDetails}
-                  onToggleDetail={onToggleDetail}
-                  rowPrefix="received"
-                />
-              </div>
-              <div data-section="created">
-                <h4 className="font-semibold">Созданы сегодня · {model.todayCreated.length}</h4>
-                <TodayList
-                  rows={model.todayCreated}
-                  empty={`${NO_DATA}: создания записи за эти сутки нет.`}
-                  openDetails={openDetails}
-                  onToggleDetail={onToggleDetail}
-                  rowPrefix="created"
-                />
-              </div>
-              <div data-section="work-events">
-                <h4 className="font-semibold">События работы сегодня · {model.todayWorkEvents.length}</h4>
-                <div className="mt-1.5 flex flex-col gap-1.5">
-                  {model.todayWorkEvents.length ? (
-                    model.todayWorkEvents.map((event) => (
-                      <WorkEventRow
-                        key={event.key}
-                        event={event}
-                        open={openDetails[`event:${event.key}`] ?? false}
-                        onToggle={onToggleDetail}
-                      />
-                    ))
-                  ) : (
-                    <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
-                      {NO_DATA}: событий работы за эти сутки нет.
+          <details data-section="more" className="rounded-2xl border border-[#eadff8] bg-white p-3">
+            <summary className="min-h-11 cursor-pointer text-sm font-semibold text-[#7042c5]">Исполнители, журнал за сегодня и квоты</summary>
+            <div className="mt-3 space-y-5">
+                <section aria-labelledby="ai-company-executors" data-section="executors">
+                  <h3 id="ai-company-executors" className="text-xl font-semibold">
+                    Исполнители
+                  </h3>
+                  <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — имя и достоверное состояние подключения.</p>
+                  <HelpNote label="Справка об исполнителях">
+                    <p>
+                      Фактические исполнители: провайдер и модель, запуск, задача и свежесть сигнала из Company Core. Состояния: не подключён, свободен, нет данных, работает. Grok — единственный оркестратор и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor. Неподключённый исполнитель — зависимость подключения, не активный исполнитель. Постоянных карточек должностей нет: исторические роли остаются в журнале задач.
                     </p>
-                  )}
-                </div>
-              </div>
-              <div data-section="completed-today">
-                <h4 className="font-semibold">Завершены сегодня · {model.todayCompleted.length}</h4>
-                <TodayList
-                  rows={model.todayCompleted}
-                  empty={`${NO_DATA}: завершений по критерию готовности за эти сутки нет.`}
-                  openDetails={openDetails}
-                  onToggleDetail={onToggleDetail}
-                  rowPrefix="completed"
-                />
-              </div>
+                  </HelpNote>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {model.executors.map((executor) => {
+                      const rowKey = `executor:${executor.id}`;
+                      return (
+                        <CompactRow
+                          key={rowKey}
+                          rowKey={rowKey}
+                          title={executor.label}
+                          aside={executor.connectionLabel}
+                          open={openDetails[rowKey] ?? false}
+                          onToggle={onToggleDetail}
+                          className={CONNECTION_CLASS[executor.connection]}
+                          articleProps={{
+                            "data-executor": executor.id,
+                            "data-executor-kind": executor.kind,
+                            "data-connection": executor.connection,
+                          }}
+                        >
+                          <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
+                          <dl className="mt-3 grid gap-2 text-sm">
+                            <Fact label="Состояние" value={executor.connectionLabel} />
+                            <Fact label="Провайдер / модель" value={executor.providerModel} />
+                            <Fact label="Задача" value={executor.currentTask} />
+                            <Fact label="Запуск" value={executor.runId} />
+                            <Fact label="Свежесть" value={executor.freshness} />
+                            <Fact label="Последний сигнал" value={executor.heartbeat} />
+                            <Fact label="Уточнение" value={executor.detail} />
+                          </dl>
+                        </CompactRow>
+                      );
+                    })}
+                  </div>
+                </section>
+                <section aria-labelledby="ai-company-today" data-section="today">
+                  <h3 id="ai-company-today" className="text-xl font-semibold">
+                    Сегодня
+                  </h3>
+                  <p className="mt-1 text-xs text-[#796ba0]">
+                    {receiptMissing ? model.todayNote : "Новые сверху. Возраст списка не берётся из updated_at."}
+                  </p>
+                  <HelpNote label="Справка о порядке списков">
+                    <p>{model.todayNote}</p>
+                    <p>Получены сегодня: порядок received_at, новые сверху.</p>
+                    <p>Созданы сегодня: порядок created_at, новые сверху. Это запасной список, не received_at и не updated_at.</p>
+                    <p>Завершены сегодня: порядок completed_at, новые сверху.</p>
+                  </HelpNote>
+                  <div className="mt-2 space-y-3">
+                    <div data-section="received">
+                      <h4 className="font-semibold">Получены сегодня · {model.todayReceived.length}</h4>
+                      <TodayList
+                        rows={model.todayReceived}
+                        empty={`${NO_DATA}: получения за московские сутки снимка нет.`}
+                        openDetails={openDetails}
+                        onToggleDetail={onToggleDetail}
+                        rowPrefix="received"
+                      />
+                    </div>
+                    <div data-section="created">
+                      <h4 className="font-semibold">Созданы сегодня · {model.todayCreated.length}</h4>
+                      <TodayList
+                        rows={model.todayCreated}
+                        empty={`${NO_DATA}: создания записи за эти сутки нет.`}
+                        openDetails={openDetails}
+                        onToggleDetail={onToggleDetail}
+                        rowPrefix="created"
+                      />
+                    </div>
+                    <div data-section="work-events">
+                      <h4 className="font-semibold">События работы сегодня · {model.todayWorkEvents.length}</h4>
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        {model.todayWorkEvents.length ? (
+                          model.todayWorkEvents.map((event) => (
+                            <WorkEventRow
+                              key={event.key}
+                              event={event}
+                              open={openDetails[`event:${event.key}`] ?? false}
+                              onToggle={onToggleDetail}
+                            />
+                          ))
+                        ) : (
+                          <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                            {NO_DATA}: событий работы за эти сутки нет.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div data-section="completed-today">
+                      <h4 className="font-semibold">Завершены сегодня · {model.todayCompleted.length}</h4>
+                      <TodayList
+                        rows={model.todayCompleted}
+                        empty={`${NO_DATA}: завершений по критерию готовности за эти сутки нет.`}
+                        openDetails={openDetails}
+                        onToggleDetail={onToggleDetail}
+                        rowPrefix="completed"
+                      />
+                    </div>
+                  </div>
+                </section>
+                <section aria-labelledby="ai-company-quotas" data-section="quotas">
+                  <h3 id="ai-company-quotas" className="text-xl font-semibold">
+                    Квоты и расход
+                  </h3>
+                  <div className="mt-3 grid gap-4 lg:grid-cols-2">
+                    {model.quotas.map((line) => (
+                      <QuotaCard key={line.id} line={line} />
+                    ))}
+                  </div>
+                </section>
             </div>
-          </section>
+          </details>
+          </div>
 
+          <div role="tabpanel" id="ai-company-tab-review" aria-labelledby="ai-company-tabbtn-review" data-tab-panel="review" hidden={tab !== "review"} className="space-y-5">
           <section aria-labelledby="ai-company-owner-review" data-section="owner-review">
             <h3 id="ai-company-owner-review" className="text-xl font-semibold">
               На проверке
@@ -886,15 +1106,28 @@ export function AiCompanyDashboardView({
               )}
             </div>
           </section>
+          </div>
 
-          <section aria-labelledby="ai-company-queue" data-section="queue">
-            <h3 id="ai-company-queue" className="text-xl font-semibold">
-              Очередь
+          <div role="tabpanel" id="ai-company-tab-archive" aria-labelledby="ai-company-tabbtn-archive" data-tab-panel="archive" hidden={tab !== "archive"} className="space-y-5">
+          <section aria-labelledby="ai-company-accepted" data-section="accepted">
+            <h3 id="ai-company-accepted" className="text-xl font-semibold">
+              Архив / Принятые
             </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
+            </p>
             <div className="mt-2 flex flex-col gap-1.5">
-              {model.queue.length ? (
-                model.queue.map((detail) => {
-                  const rowKey = `queue:${detail.key}`;
+              {model.acceptedArchiveError ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#9f1239]" role="status" data-archive-unavailable>
+                  {model.acceptedArchiveError}
+                </p>
+              ) : !acceptanceAvailable ? (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status">
+                  {ACCEPTANCE_UNAVAILABLE}
+                </p>
+              ) : model.acceptedArchive.length ? (
+                model.acceptedArchive.map((detail) => {
+                  const rowKey = `accepted:${detail.key}`;
                   return (
                     <TaskRow
                       key={rowKey}
@@ -902,25 +1135,15 @@ export function AiCompanyDashboardView({
                       rowKey={rowKey}
                       open={openDetails[rowKey] ?? false}
                       onToggle={onToggleDetail}
+                      articleProps={{ "data-accepted-task": detail.taskId }}
                     />
                   );
                 })
               ) : (
                 <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
-                  Неначатых задач в очереди нет.
+                  Принятых результатов в снимке нет.
                 </p>
               )}
-            </div>
-          </section>
-
-          <section aria-labelledby="ai-company-quotas" data-section="quotas">
-            <h3 id="ai-company-quotas" className="text-xl font-semibold">
-              Квоты и расход
-            </h3>
-            <div className="mt-3 grid gap-4 lg:grid-cols-2">
-              {model.quotas.map((line) => (
-                <QuotaCard key={line.id} line={line} />
-              ))}
             </div>
           </section>
 
@@ -931,6 +1154,7 @@ export function AiCompanyDashboardView({
             <p className="mt-1 text-sm text-[#796ba0]">{model.historySummary}</p>
             <p className="mt-1 text-sm text-[#796ba0]">{model.historyBoundary}</p>
             <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap" method="get">
+              <input type="hidden" name="tab" value="archive" />
               <label className="flex min-w-0 flex-col gap-1 text-xs text-[#796ba0]">
                 Период
                 <select name="period" defaultValue={filters.period} className="rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]">
@@ -985,7 +1209,7 @@ export function AiCompanyDashboardView({
               )}
             </div>
             {showNext && nextHistory ? (
-              <a className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={nextHistory}>
+              <a className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={`${nextHistory}${nextHistory.includes("?") ? "&" : "?"}tab=archive`}>
                 Следующая страница истории
               </a>
             ) : null}
@@ -1002,44 +1226,7 @@ export function AiCompanyDashboardView({
               </div>
             ) : null}
           </section>
-
-          <section aria-labelledby="ai-company-accepted" data-section="accepted">
-            <h3 id="ai-company-accepted" className="text-xl font-semibold">
-              Архив / Принятые
-            </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">
-              Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
-            </p>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {model.acceptedArchiveError ? (
-                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#9f1239]" role="status" data-archive-unavailable>
-                  {model.acceptedArchiveError}
-                </p>
-              ) : !acceptanceAvailable ? (
-                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status">
-                  {ACCEPTANCE_UNAVAILABLE}
-                </p>
-              ) : model.acceptedArchive.length ? (
-                model.acceptedArchive.map((detail) => {
-                  const rowKey = `accepted:${detail.key}`;
-                  return (
-                    <TaskRow
-                      key={rowKey}
-                      detail={detail}
-                      rowKey={rowKey}
-                      open={openDetails[rowKey] ?? false}
-                      onToggle={onToggleDetail}
-                      articleProps={{ "data-accepted-task": detail.taskId }}
-                    />
-                  );
-                })
-              ) : (
-                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
-                  Принятых результатов в снимке нет.
-                </p>
-              )}
-            </div>
-          </section>
+          </div>
         </>
       ) : null}
     </div>

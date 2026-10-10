@@ -117,6 +117,8 @@ export const CORE_FIELD_MAP = {
     resultVersion: ["result_version"],
     acceptance: ["acceptance"],
     evidence: ["evidence"],
+    boardTab: ["board_tab"],
+    launch: ["launch"],
   },
   /** Core #28 `tasks[].acceptance`: details of the last decision. `user_acceptance` itself is a string. */
   acceptance: {
@@ -448,6 +450,42 @@ export type CompanyTask = {
   taskEvents: CompanyEvent[];
   acceptanceContract: boolean;
   ownerAcceptance: OwnerAcceptanceFact | null;
+  boardTab: BoardTab | null;
+  launch: LaunchFact | null;
+};
+
+/** Core `tasks[].board_tab`: the four board tabs, decided by the server. */
+export type BoardTab = "plan" | "working" | "review" | "archive";
+const BOARD_TABS: readonly BoardTab[] = ["plan", "working", "review", "archive"];
+
+export type LaunchState = "none" | "planned" | "waiting" | "admitted" | "sent" | "acked" | "started" | "failed";
+const LAUNCH_STATES: readonly LaunchState[] = ["none", "planned", "waiting", "admitted", "sent", "acked", "started", "failed"];
+
+/** Core `tasks[].launch`: the real launch facts. Delivery, ACK and start are separate. */
+export type LaunchFact = {
+  state: LaunchState;
+  label: string | null;
+  canLaunch: boolean;
+  retryAllowed: boolean;
+  requestedBy: string | null;
+  requestedAt: string | null;
+  admittedAt: string | null;
+  deliveredAt: string | null;
+  ackAt: string | null;
+  executionStartedAt: string | null;
+  waitingLabel: string | null;
+  failureLabel: string | null;
+  audit: string[];
+};
+
+export type LaunchView = {
+  state: LaunchState;
+  label: string;
+  /** The «В работу» button: planned, waiting (a repeat press is idempotent) or a failed delivery (safe retry). */
+  canPress: boolean;
+  buttonLabel: string;
+  facts: Array<{ label: string; value: string }>;
+  audit: string;
 };
 
 export type OwnerAcceptanceState = "pending" | "accepted" | "rejected";
@@ -623,6 +661,7 @@ export type TaskDetailModel = {
   stageBadge: StageBadge;
   copyText: string;
   acceptance: OwnerAcceptanceView | null;
+  launch: LaunchView | null;
 };
 
 export type OwnerAcceptanceView = {
@@ -739,6 +778,8 @@ export type DashboardModel = {
   todayWorkEvents: WorkEventModel[];
   todayCompleted: TodayRowModel[];
   todayNote: string;
+  /** «План»: planned and waiting tasks. Not sent to Grok, no execution capacity held. */
+  plan: TaskDetailModel[];
   queue: TaskDetailModel[];
   history: TaskDetailModel[];
   ownerReview: TaskDetailModel[];
@@ -901,6 +942,8 @@ export function executorDisplayName(id: ExecutorId | null): string {
 function taskStatusLabel(status: string): string {
   const value = normalizeToken(status);
   if (!value) return NO_DATA;
+  if (value === "planned") return "В плане";
+  if (value === "launch_pending") return "Ожидает мощности";
   if (COMPLETED_STATUSES.has(value)) return "Выполнено (Completed)";
   if (value === "qa_pass") return "Контроль качества пройден (QA PASS)";
   if (value === "merged") return "Слито в git (Merged) — это не DONE";
@@ -1184,6 +1227,48 @@ function parseOwnerAcceptance(record: Record<string, unknown>, runVerified: bool
   };
 }
 
+function parseBoardTab(value: unknown): BoardTab | null {
+  if (typeof value !== "string") return null;
+  const token = normalizeToken(value);
+  return (BOARD_TABS as readonly string[]).includes(token) ? (token as BoardTab) : null;
+}
+
+function parseLaunch(value: unknown): LaunchFact | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const stateRaw = readString(record, ["state"]);
+  const state = stateRaw ? normalizeToken(stateRaw) : "";
+  if (!(LAUNCH_STATES as readonly string[]).includes(state)) return null;
+  const audit = Array.isArray(record.audit)
+    ? record.audit
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is Record<string, unknown> => entry !== null)
+        .map((entry) => {
+          const at = readString(entry, ["at"]);
+          const actor = readString(entry, ["actor"]);
+          const action = readString(entry, ["action"]);
+          return [at ? formatDateTime(at) : null, actor, action].filter(Boolean).join(" · ");
+        })
+        .filter(Boolean)
+        .slice(-10)
+    : [];
+  return {
+    state: state as LaunchState,
+    label: readString(record, ["label"]),
+    canLaunch: readBoolean(record, ["can_launch"]) === true,
+    retryAllowed: readBoolean(record, ["retry_allowed"]) === true,
+    requestedBy: readString(record, ["requested_by"]),
+    requestedAt: readString(record, ["requested_at"]),
+    admittedAt: readString(record, ["admitted_at"]),
+    deliveredAt: readString(record, ["delivered_at"]),
+    ackAt: readString(record, ["ack_at"]),
+    executionStartedAt: readString(record, ["execution_started_at"]),
+    waitingLabel: readString(record, ["waiting_label"]),
+    failureLabel: readString(record, ["failure_label"]),
+    audit,
+  };
+}
+
 function parseTask(value: unknown, index: number): CompanyTask | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -1247,6 +1332,8 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
       .map((event) => parseEvent(event))
       .filter((event): event is CompanyEvent => event !== null)
       .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
+    boardTab: parseBoardTab(readRaw(record, CORE_FIELD_MAP.task.boardTab)),
+    launch: parseLaunch(readRaw(record, CORE_FIELD_MAP.task.launch)),
     acceptanceContract: hasAcceptanceContract(record),
     ownerAcceptance: parseOwnerAcceptance(record, typeof run?.productionVerified === "boolean" ? run.productionVerified : null),
   };
@@ -1968,11 +2055,17 @@ function formatProgress(progress: VerifiedProgress | null, dodSatisfied: boolean
   return `${fraction}.${percent} ${formula} ${evidence}`.replace(/\s+/g, " ").trim();
 }
 
-function ownerPlacement(task: CompanyTask): "review" | "archive" | "cycle" {
+function ownerPlacement(task: CompanyTask): "plan" | "review" | "archive" | "cycle" {
+  // The server decides the plan tab: a planned or waiting task is not work and holds no capacity.
+  if (task.boardTab === "plan") return "plan";
   const acceptance = task.ownerAcceptance;
   if (!acceptance?.applicable) return "cycle";
   if (acceptance.state === "accepted") return "archive";
-  if (acceptance.state === "pending" && acceptance.presented) return "review";
+  if (acceptance.state === "pending" && acceptance.presented) {
+    // «Приёмка» only with real evidence. A Core that sends board_tab says when evidence is missing
+    // (a bare pull request): the task stays in work. An older Core without board_tab keeps the old rule.
+    return task.boardTab != null && task.boardTab !== "review" ? "cycle" : "review";
+  }
   return "cycle";
 }
 
@@ -2406,6 +2499,8 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   const stageToken = normalizeToken(task.stage ?? "");
   if (CANCELLED_STATUSES.has(status)) return { label: "Отменена", tone: "cancelled", detail: null };
   const acceptance = task.ownerAcceptance;
+  const launchBadge = launchStageBadge(task);
+  if (launchBadge && !(acceptance?.applicable && acceptance.state !== "pending")) return launchBadge;
   if (acceptance?.applicable && acceptance.state === "accepted") {
     const when = formatDateTime(acceptance.recordedAt);
     return {
@@ -2493,6 +2588,51 @@ function snapshotCopyLabel(snapshotIso: string): string {
 function evidenceHref(task: CompanyTask): string | null {
   const proof = evidenceRecord(task.executiveRun?.productionProof);
   return safeProductionUrl(proof ? readString(proof, CORE_FIELD_MAP.evidence.url) : null);
+}
+
+function launchStageBadge(task: CompanyTask): StageBadge | null {
+  const launch = task.launch;
+  if (!launch) return null;
+  switch (launch.state) {
+    case "planned":
+      return { label: "В плане", tone: "queue", detail: "Грогу не отправлена. Мощность не занята." };
+    case "waiting":
+      return { label: "Ожидает мощности", tone: "queue", detail: launch.waitingLabel ?? "Ждёт свободного места по лимитам работы." };
+    case "admitted":
+      return { label: "Допущена, не отправлена", tone: "stale", detail: "Допуск есть, передача в мост Грога ещё не подтверждена." };
+    case "failed":
+      return { label: "Не отправлена", tone: "blocked", detail: launch.failureLabel ?? "Причина не передана." };
+    case "sent":
+      return { label: "Ожидает подтверждения", tone: "stale", detail: "Передана в мост Грога. Подтверждения от исполнителя пока нет." };
+    case "acked":
+      return { label: "Принята Грогом, не начата", tone: "queue", detail: "Подтверждение получено. Начало исполнения ещё не зафиксировано." };
+    default:
+      return null;
+  }
+}
+
+function launchView(task: CompanyTask): LaunchView | null {
+  const launch = task.launch;
+  if (!launch || launch.state === "none") return null;
+  const canPress = launch.canLaunch || launch.retryAllowed;
+  const buttonLabel = launch.retryAllowed ? "Повторить отправку" : launch.state === "waiting" ? "Ожидает места (нажать повторно)" : "В работу";
+  const at = (value: string | null) => (value ? `${formatDateTime(value)} МСК` : NO_DATA);
+  return {
+    state: launch.state,
+    label: launch.label ?? NO_DATA,
+    canPress,
+    buttonLabel,
+    facts: [
+      { label: "Запрошено", value: launch.requestedAt ? `${at(launch.requestedAt)}${launch.requestedBy ? ` · ${launch.requestedBy}` : ""}` : NO_DATA },
+      { label: "Допущена к исполнению", value: at(launch.admittedAt) },
+      { label: "Передана в мост Грога", value: at(launch.deliveredAt) },
+      { label: "Подтверждение Грога (ACK)", value: at(launch.ackAt) },
+      { label: "Начало исполнения", value: at(launch.executionStartedAt) },
+      ...(launch.waitingLabel ? [{ label: "Почему ждёт", value: launch.waitingLabel }] : []),
+      ...(launch.failureLabel ? [{ label: "Причина сбоя", value: launch.failureLabel }] : []),
+    ],
+    audit: launch.audit.length ? launch.audit.join("\n") : NO_DATA,
+  };
 }
 
 function acceptanceView(task: CompanyTask): OwnerAcceptanceView | null {
@@ -2629,6 +2769,7 @@ function buildTaskDetail(
     stageBadge,
     copyText,
     acceptance: acceptanceView(task),
+    launch: launchView(task),
   };
 }
 
@@ -2714,6 +2855,12 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
         detail: buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
       } satisfies ActiveTaskCard;
     });
+
+  const plan = indexed
+    .filter(({ task }) => ownerPlacement(task) === "plan")
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
 
   const queue = indexed
     .filter(({ task }) => ownerPlacement(task) === "cycle")
@@ -2935,6 +3082,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     todayWorkEvents,
     todayCompleted,
     todayNote,
+    plan,
     queue,
     ownerReview,
     acceptedArchive,
