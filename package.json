@@ -142,6 +142,8 @@
     "test:author-support-mode": "npx tsx scripts/author-support-mode-unit.mjs && node scripts/author-support-sql-unit.mjs && node scripts/author-support-sql-integration.mjs && npm run test:author-product-edit-page-access && npm run test:author-product-draft-save",
     "test:admin-commercial-visibility": "npx tsx scripts/admin-commercial-applications-visibility-unit.mjs",
     "test:commercial-onboarding-after-approve": "npx tsx scripts/commercial-onboarding-after-approve-unit.mjs",
+    "test:author-payout-profiles-route": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-route-unit.mjs",
+    "test:author-payout-profiles-save": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-save-unit.mjs",
     "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs",
     "test:integration:private-catalog-race": "node scripts/private-to-catalog-player-race-smoke.mjs",
     "test:author-terms-acceptance": "npx tsx scripts/author-terms-acceptance-unit.mjs",
