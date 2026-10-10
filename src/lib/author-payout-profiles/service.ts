@@ -95,6 +95,23 @@ export class AuthorPayoutProfileError extends Error {
   }
 }
 
+/** Safe diagnostics for DB errors: Postgres/PostgREST code + constraint name only, never values. */
+export function describePayoutDbError(error: unknown): string {
+  if (!error || typeof error !== "object") {
+    return "unknown";
+  }
+  const record = error as { code?: unknown; message?: unknown };
+  const code = typeof record.code === "string" ? record.code : "no_code";
+  const message = typeof record.message === "string" ? record.message : "";
+  const constraint = /constraint "([a-z0-9_]+)"/i.exec(message)?.[1];
+  const column = /(?:column "([a-z0-9_]+)"|'([a-z0-9_]+)' column)/i.exec(message)
+    ?.slice(1)
+    .find(Boolean);
+  return [code, constraint && `constraint=${constraint}`, column && `column=${column}`]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function assertRecipientType(value: string): AuthorPayoutRecipientType {
   if (!isAuthorPayoutRecipientType(value)) {
     throw new AuthorPayoutProfileError("invalid_recipient_type", 400);
@@ -360,7 +377,7 @@ export async function saveAuthorPayoutProfileDraft(input: {
       .single();
 
     if (error || !data) {
-      console.error("author_payout_profile_insert_failed");
+      console.error("author_payout_profile_insert_failed", describePayoutDbError(error));
       throw new AuthorPayoutProfileError("save_failed", 500);
     }
 
@@ -407,7 +424,7 @@ export async function saveAuthorPayoutProfileDraft(input: {
     .maybeSingle();
 
   if (error) {
-    console.error("author_payout_profile_update_failed");
+    console.error("author_payout_profile_update_failed", describePayoutDbError(error));
     throw new AuthorPayoutProfileError("save_failed", 500);
   }
 
@@ -517,7 +534,7 @@ export async function submitAuthorPayoutProfile(input: {
     .maybeSingle();
 
   if (error) {
-    console.error("author_payout_profile_submit_failed");
+    console.error("author_payout_profile_submit_failed", describePayoutDbError(error));
     throw new AuthorPayoutProfileError("submit_failed", 500);
   }
 
