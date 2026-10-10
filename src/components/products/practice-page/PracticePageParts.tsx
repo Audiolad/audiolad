@@ -12,6 +12,7 @@ import {
 import ProductPriceOffer from "@/components/pricing/ProductPriceOffer";
 import LibraryAddButton from "@/components/LibraryAddButton";
 import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
+import PracticeBackToCatalogLink from "@/components/products/practice-page/PracticeBackToCatalogLink";
 import CatalogProductHeartButton from "@/components/products/CatalogProductHeartButton";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
@@ -59,12 +60,9 @@ function toolbarActionClassName(
 
 export function PracticeBackLink({ className = "" }: { className?: string }) {
   return (
-    <Link
-      href="/catalog"
+    <PracticeBackToCatalogLink
       className={`inline-flex items-center text-sm font-medium text-[#7042c5] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${className}`.trim()}
-    >
-      ← Назад в каталог
-    </Link>
+    />
   );
 }
 

@@ -9,6 +9,16 @@ import {
   CATALOG_LISTING_PAGE_SIZE,
   type CatalogListingQuery,
 } from "@/lib/catalog/listing-contract";
+import {
+  consumeHistoryTraversal,
+  ensureHistoryTraversalTracking,
+} from "@/lib/catalog/history-traversal";
+import {
+  isCatalogPath,
+  pickCatalogReturnSnapshot,
+  writeCatalogReturnSnapshot,
+} from "@/lib/catalog/return-state";
+import { readCatalogScrollY, restoreCatalogScroll } from "@/lib/catalog/return-scroll";
 import { useFlushPendingLibrarySave } from "@/lib/library/use-catalog-library-save";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 import {
@@ -19,6 +29,23 @@ import {
   mergeLoadedCatalogWindow,
   restoreWindowScrollY,
 } from "@/lib/public-content/live-sync";
+
+if (typeof window !== "undefined") {
+  // Must be listening before the visitor leaves, so Back is recognised.
+  ensureHistoryTraversalTracking();
+}
+
+function currentHref(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function getSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 type CatalogProductGridProps = {
   initialItems: CatalogCard[];
@@ -48,6 +75,12 @@ export default function CatalogProductGrid({
   const itemsRef = useRef(items);
   const nextCursorRef = useRef(nextCursor);
   const pendingScrollRef = useRef<number | null>(null);
+  const restoreTargetRef = useRef<{ y: number; count: number } | null>(null);
+  const restoreDecidedRef = useRef(false);
+  const hrefRef = useRef<string | null>(null);
+  const leavingRef = useRef(false);
+  const exitedToRef = useRef<string | null>(null);
+  const authRef = useRef(isAuthenticated);
 
   useEffect(() => {
     queryRef.current = query;
@@ -101,6 +134,148 @@ export default function CatalogProductGrid({
     pendingScrollRef.current = null;
     restoreWindowScrollY(scrollY);
   }, [items]);
+
+  // Back / Forward to the same catalog URL: bring back the loaded pages and the
+  // scroll position before the first paint. Fresh visits never restore.
+  useLayoutEffect(() => {
+    if (restoreDecidedRef.current) {
+      return;
+    }
+
+    restoreDecidedRef.current = true;
+    const storage = getSessionStorage();
+    const href = currentHref();
+    hrefRef.current = href;
+
+    const snapshot = pickCatalogReturnSnapshot({
+      storage,
+      href,
+      authenticated: authRef.current,
+      now: Date.now(),
+      isHistoryTraversal: consumeHistoryTraversal(),
+    });
+
+    if (!snapshot) {
+      return;
+    }
+
+    itemsRef.current = snapshot.items;
+    nextCursorRef.current = snapshot.nextCursor;
+    restoreTargetRef.current = { y: snapshot.scrollY, count: snapshot.items.length };
+    setItems(snapshot.items);
+    setNextCursor(snapshot.nextCursor);
+  }, []);
+
+  useLayoutEffect(() => {
+    const target = restoreTargetRef.current;
+
+    if (!target || items.length < target.count) {
+      return;
+    }
+
+    restoreTargetRef.current = null;
+    const cancel = restoreCatalogScroll(target.y);
+    // Cards may have changed while the visitor was away (price, saved heart):
+    // quietly re-sync; the existing refresh keeps the scroll position.
+    const timer = window.setTimeout(() => void refreshPublicPage(), 1200);
+
+    return () => {
+      cancel();
+      window.clearTimeout(timer);
+    };
+  }, [items, refreshPublicPage]);
+
+  // Keep the return snapshot current while the visitor is on this catalog URL.
+  useEffect(() => {
+    const storage = getSessionStorage();
+
+    const save = () => {
+      const href = hrefRef.current;
+
+      if (
+        !href ||
+        leavingRef.current ||
+        restoreTargetRef.current !== null ||
+        !isCatalogPath(window.location.pathname) ||
+        currentHref() !== href
+      ) {
+        return;
+      }
+
+      writeCatalogReturnSnapshot(storage, {
+        v: 1,
+        href,
+        authenticated: authRef.current,
+        items: itemsRef.current,
+        nextCursor: nextCursorRef.current,
+        scrollY: readCatalogScrollY(),
+        savedAt: Date.now(),
+        exitedTo: exitedToRef.current,
+      });
+    };
+
+    let timer: number | null = null;
+    const onScroll = () => {
+      if (timer != null) {
+        return;
+      }
+
+      timer = window.setTimeout(() => {
+        timer = null;
+        save();
+      }, 150);
+    };
+    const onUserScrollIntent = () => {
+      leavingRef.current = false;
+    };
+    const onClickCapture = (event: MouseEvent) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
+
+      if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank") {
+        return;
+      }
+
+      const url = new URL(anchor.href, window.location.href);
+
+      if (url.origin !== window.location.origin || isCatalogPath(url.pathname)) {
+        return;
+      }
+
+      // Freeze the position now: the next page may reset scroll before we unmount.
+      exitedToRef.current = url.pathname;
+      save();
+      leavingRef.current = true;
+    };
+
+    save();
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    document.addEventListener("touchmove", onUserScrollIntent, { passive: true });
+    document.addEventListener("wheel", onUserScrollIntent, { passive: true });
+    document.addEventListener("click", onClickCapture, true);
+    window.addEventListener("pagehide", save);
+
+    return () => {
+      if (timer != null) {
+        window.clearTimeout(timer);
+      }
+
+      document.removeEventListener("scroll", onScroll, true);
+      document.removeEventListener("touchmove", onUserScrollIntent);
+      document.removeEventListener("wheel", onUserScrollIntent);
+      document.removeEventListener("click", onClickCapture, true);
+      window.removeEventListener("pagehide", save);
+    };
+  }, [items, nextCursor]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursorRef.current || loadQueuedRef.current) {
