@@ -7,6 +7,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import * as tracking from "../src/lib/catalog/history-traversal";
 import {
   CATALOG_RETURN_MAX_ITEMS,
   CATALOG_RETURN_STORAGE_KEY,
@@ -275,7 +276,7 @@ for (const other of [
       writable: true,
     });
     delete g.__audioladCatalogHistoryTraversal;
-    const mod = await import(`../src/lib/catalog/history-traversal.ts?${Math.random()}`);
+    const mod = tracking; // tracker state lives on globalThis and is reset above
     mod.ensureHistoryTraversalTracking();
     const restore = () => {
       g.window = saved.window;
