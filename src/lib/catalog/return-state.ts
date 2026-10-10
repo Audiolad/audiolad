@@ -14,6 +14,8 @@
 import type { CatalogCard } from "@/lib/catalog/dto";
 
 export const CATALOG_RETURN_STORAGE_KEY = "audiolad:catalog-return:v1";
+/** Id of the viewer the stored snapshot belongs to (set on sign-in). */
+export const CATALOG_RETURN_VIEWER_KEY = "audiolad:catalog-return:viewer";
 export const CATALOG_RETURN_TTL_MS = 30 * 60 * 1000;
 export const CATALOG_RETURN_MAX_ITEMS = 240;
 
@@ -29,6 +31,8 @@ export type CatalogReturnSnapshot = {
   savedAt: number;
   /** Product (or other) pathname the visitor opened from the catalog. */
   exitedTo: string | null;
+  /** When the visitor clicked through to `exitedTo`; cleared once claimed. */
+  exitedAt?: number | null;
 };
 
 export type CatalogReturnStorage = Pick<
@@ -64,7 +68,10 @@ function isSnapshot(value: unknown): value is CatalogReturnSnapshot {
     typeof row.scrollY === "number" &&
     Number.isFinite(row.scrollY) &&
     typeof row.savedAt === "number" &&
-    (row.exitedTo === null || typeof row.exitedTo === "string")
+    (row.exitedTo === null || typeof row.exitedTo === "string") &&
+    (row.exitedAt === undefined ||
+      row.exitedAt === null ||
+      typeof row.exitedAt === "number")
   );
 }
 
@@ -152,12 +159,13 @@ export function pickCatalogReturnSnapshot(input: {
 
   const snapshot = readCatalogReturnSnapshot(input.storage, input.now);
 
-  if (
-    !snapshot ||
-    snapshot.href !== input.href ||
-    snapshot.authenticated !== input.authenticated ||
-    snapshot.items.length === 0
-  ) {
+  if (snapshot && snapshot.authenticated !== input.authenticated) {
+    // Guest <-> signed-in: cards carry viewer flags, never reuse them.
+    clearCatalogReturnSnapshot(input.storage);
+    return null;
+  }
+
+  if (!snapshot || snapshot.href !== input.href || snapshot.items.length === 0) {
     return null;
   }
 
@@ -172,17 +180,62 @@ function normalizePathname(pathname: string): string {
   }
 }
 
-/** Should "← Назад в каталог" on a product page behave as browser Back? */
-export function shouldUseHistoryBackToCatalog(input: {
+/** Key stored in `history.state` of the product entry opened from the catalog. */
+export const CATALOG_BACK_STATE_KEY = "__audioladOpenedFromCatalog";
+/** A click on a catalog card is claimed by the product page within this window. */
+export const CATALOG_EXIT_CLAIM_WINDOW_MS = 15_000;
+
+/**
+ * Called once when a product page mounts. True only for the history entry that
+ * was created by clicking a card of the catalog just now; the claim is single
+ * use, so later visits to the same product (Home -> product A) are not tagged.
+ */
+export function claimCatalogExit(input: {
   storage: CatalogReturnStorage | null;
   pathname: string;
   now: number;
 }): boolean {
   const snapshot = readCatalogReturnSnapshot(input.storage, input.now);
 
+  if (
+    !snapshot ||
+    snapshot.exitedTo === null ||
+    typeof snapshot.exitedAt !== "number" ||
+    input.now - snapshot.exitedAt < 0 ||
+    input.now - snapshot.exitedAt > CATALOG_EXIT_CLAIM_WINDOW_MS ||
+    normalizePathname(snapshot.exitedTo) !== normalizePathname(input.pathname)
+  ) {
+    return false;
+  }
+
+  try {
+    input.storage?.setItem(
+      CATALOG_RETURN_STORAGE_KEY,
+      JSON.stringify({ ...snapshot, exitedAt: null }),
+    );
+  } catch {
+    // ignore
+  }
+
+  return true;
+}
+
+/** Is the CURRENT history entry the one opened from the catalog? */
+export function isCatalogBackEntry(historyState: unknown): boolean {
   return Boolean(
-    snapshot &&
-      snapshot.exitedTo !== null &&
-      normalizePathname(snapshot.exitedTo) === normalizePathname(input.pathname),
+    historyState &&
+      typeof historyState === "object" &&
+      (historyState as Record<string, unknown>)[CATALOG_BACK_STATE_KEY] === true,
   );
+}
+
+/**
+ * Should "← Назад в каталог" behave as browser Back? Only when the previous
+ * history entry is the catalog, i.e. this very entry is tagged. A product page
+ * reached any other way (Home -> product) gets a normal link to /catalog.
+ */
+export function shouldUseHistoryBackToCatalog(input: {
+  historyState: unknown;
+}): boolean {
+  return isCatalogBackEntry(input.historyState);
 }

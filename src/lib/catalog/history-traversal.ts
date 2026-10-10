@@ -5,8 +5,12 @@
  *
  * `popstate` is the only signal Next's client router gives for history
  * traversal; a link click clears it so a fresh visit never restores old state.
- * On a full document load the Navigation Timing type is used instead
- * (back_forward / reload).
+ * On a full document load the Navigation Timing type (back_forward / reload)
+ * only matters when that document IS the catalog: after F5 / a back-forward
+ * document load on any other page the flag starts cleared, so a plain click on
+ * the "Каталог" tab never restores an old snapshot. The tracker is installed
+ * from the root providers (before the catalog grid chunk is imported), so the
+ * click / pushState listeners already exist when that click happens.
  */
 type Tracker = {
   traversal: boolean;
@@ -17,6 +21,11 @@ const TRACKER_KEY = "__audioladCatalogHistoryTraversal";
 type TrackerHost = typeof globalThis & { [TRACKER_KEY]?: Tracker };
 
 function initialTraversalFromNavigationTiming(): boolean {
+  // Only a document that is itself the catalog can be "returned to".
+  if (!/^\/catalog\/?$/.test(window.location.pathname)) {
+    return false;
+  }
+
   try {
     const entry = performance.getEntriesByType("navigation")[0] as
       | PerformanceNavigationTiming
@@ -55,6 +64,21 @@ function getTracker(): Tracker | null {
   window.addEventListener("popstate", () => {
     tracker.traversal = true;
   });
+
+  // router.push() / history.pushState is by definition a fresh navigation.
+  try {
+    const originalPushState = window.history.pushState;
+
+    window.history.pushState = function patchedPushState(
+      this: History,
+      ...args: Parameters<History["pushState"]>
+    ) {
+      tracker.traversal = false;
+      return originalPushState.apply(this, args);
+    };
+  } catch {
+    // ignore: click listener below still covers links
+  }
   document.addEventListener(
     "click",
     (event) => {

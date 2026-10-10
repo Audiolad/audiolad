@@ -5,6 +5,7 @@ import PwaSettingsSection from "@/components/pwa/PwaSettingsSection";
 import AnalyticsPrivacySection from "@/components/settings/AnalyticsPrivacySection";
 import UserAvatar from "@/components/profile/UserAvatar";
 import { platformMobileShellClass } from "@/lib/navigation/bottom-nav";
+import SignOutForm from "@/components/auth/SignOutForm";
 import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import { resolveProfileAvatarUrl } from "@/lib/profile/avatar";
 import {
@@ -240,14 +241,14 @@ export default async function SettingsPage() {
           </section>
 
           <section className="mt-8">
-            <form action={signOut}>
+            <SignOutForm action={signOut}>
               <button
                 type="submit"
                 className="w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63]"
               >
                 Выйти из аккаунта
               </button>
-            </form>
+            </SignOutForm>
           </section>
 
           <p className="mt-6 text-center text-xs text-[#a692b4]">

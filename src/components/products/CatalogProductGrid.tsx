@@ -80,6 +80,7 @@ export default function CatalogProductGrid({
   const hrefRef = useRef<string | null>(null);
   const leavingRef = useRef(false);
   const exitedToRef = useRef<string | null>(null);
+  const exitedAtRef = useRef<number | null>(null);
   const authRef = useRef(isAuthenticated);
 
   useEffect(() => {
@@ -185,49 +186,102 @@ export default function CatalogProductGrid({
     };
   }, [items, refreshPublicPage]);
 
-  // Keep the return snapshot current while the visitor is on this catalog URL.
+  // Keep the return snapshot current without serialising on every scroll tick:
+  // scrolling / paging only mark the state dirty (the scroll position is a
+  // cheap number kept in a ref); the JSON is written once after the visitor
+  // pauses (debounce, in idle time) and synchronously when the page is left
+  // (link click, pagehide, tab hidden, Back/Forward). Nothing is lost: the
+  // flush always uses the latest items, cursor and scroll position.
+  const scheduleSaveRef = useRef<() => void>(() => undefined);
+
   useEffect(() => {
     const storage = getSessionStorage();
+    let dirty = false;
+    let timer: number | null = null;
+    let idle: number | null = null;
+    let lastScrollY = readCatalogScrollY();
 
-    const save = () => {
+    const cancelPending = () => {
+      if (timer != null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+
+      if (idle != null) {
+        window.cancelIdleCallback?.(idle);
+        idle = null;
+      }
+    };
+
+    // `force` is for Back / Forward, where the URL already changed but the
+    // grid state still belongs to `hrefRef`.
+    const flush = (force = false) => {
+      cancelPending();
+
       const href = hrefRef.current;
 
       if (
+        !dirty ||
         !href ||
         leavingRef.current ||
         restoreTargetRef.current !== null ||
-        !isCatalogPath(window.location.pathname) ||
-        currentHref() !== href
+        (!force &&
+          (!isCatalogPath(window.location.pathname) || currentHref() !== href))
       ) {
         return;
       }
 
+      dirty = false;
       writeCatalogReturnSnapshot(storage, {
         v: 1,
         href,
         authenticated: authRef.current,
         items: itemsRef.current,
         nextCursor: nextCursorRef.current,
-        scrollY: readCatalogScrollY(),
+        scrollY: force ? lastScrollY : readCatalogScrollY(),
         savedAt: Date.now(),
         exitedTo: exitedToRef.current,
+        exitedAt: exitedAtRef.current,
       });
     };
 
-    let timer: number | null = null;
-    const onScroll = () => {
-      if (timer != null) {
+    const schedule = () => {
+      dirty = true;
+
+      if (timer != null || idle != null) {
         return;
       }
 
       timer = window.setTimeout(() => {
         timer = null;
-        save();
-      }, 150);
+
+        if (typeof window.requestIdleCallback === "function") {
+          idle = window.requestIdleCallback(() => {
+            idle = null;
+            flush();
+          }, { timeout: 1500 });
+        } else {
+          flush();
+        }
+      }, 600);
+    };
+
+    scheduleSaveRef.current = schedule;
+
+    const onScroll = () => {
+      lastScrollY = readCatalogScrollY();
+      schedule();
     };
     const onUserScrollIntent = () => {
       leavingRef.current = false;
     };
+    const onPageHide = () => flush();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    };
+    const onPopState = () => flush(true);
     const onClickCapture = (event: MouseEvent) => {
       if (
         event.button !== 0 ||
@@ -253,28 +307,42 @@ export default function CatalogProductGrid({
 
       // Freeze the position now: the next page may reset scroll before we unmount.
       exitedToRef.current = url.pathname;
-      save();
+      exitedAtRef.current = Date.now();
+      dirty = true;
+      flush();
       leavingRef.current = true;
     };
 
-    save();
+    // Entering (or coming back to) the catalog: one write so the previous
+    // "exited to" marker is dropped as soon as the visitor is here again.
+    dirty = true;
+    flush();
     document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     document.addEventListener("touchmove", onUserScrollIntent, { passive: true });
     document.addEventListener("wheel", onUserScrollIntent, { passive: true });
     document.addEventListener("click", onClickCapture, true);
-    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("popstate", onPopState);
 
     return () => {
-      if (timer != null) {
-        window.clearTimeout(timer);
-      }
-
+      // Unmount (client navigation away): last chance to persist pending state.
+      flush(true);
+      cancelPending();
+      scheduleSaveRef.current = () => undefined;
       document.removeEventListener("scroll", onScroll, true);
       document.removeEventListener("touchmove", onUserScrollIntent);
       document.removeEventListener("wheel", onUserScrollIntent);
       document.removeEventListener("click", onClickCapture, true);
-      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("popstate", onPopState);
     };
+  }, []);
+
+  // More pages loaded / refreshed: mark dirty, write later (not per render).
+  useEffect(() => {
+    scheduleSaveRef.current();
   }, [items, nextCursor]);
 
   const loadMore = useCallback(async () => {

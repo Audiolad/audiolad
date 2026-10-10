@@ -49,6 +49,7 @@ cpSync(join(fx, "data.ts"), join(app, "e2e-data.ts"));
 cpSync(join(fx, "layout.tsx"), join(app, "(e2e)/layout.tsx"));
 cpSync(join(fx, "catalog"), join(app, "(e2e)/catalog"), { recursive: true });
 cpSync(join(fx, "p"), join(app, "(e2e)/p"), { recursive: true });
+cpSync(join(fx, "home"), join(app, "(e2e)/home"), { recursive: true });
 mkdirSync(join(app, "api/catalog"), { recursive: true });
 cpSync(join(fx, "api-catalog/route.ts"), join(app, "api/catalog/route.ts"));
 
@@ -258,6 +259,44 @@ async function runScenarios(browserName, launcher, device) {
     await sleep(800);
     const loadedAfter = (await ids(page)).length;
     assert.ok(loadedAfter < loadedBefore, `expired state is not restored (${loadedAfter} < ${loadedBefore})`);
+  }
+
+  // 8) catalog -> product A -> Home -> product A -> "← Назад в каталог":
+  //    history Back would land on Home; it must lead to the catalog.
+  {
+    const href = await openCard(page, 1);
+    await page.getByTestId("to-home").click();
+    await page.getByTestId("home-title").waitFor();
+    await page.getByTestId("home-to-product").click();
+    await page.waitForURL(`**${href}`);
+    await page.getByTestId("product-title").waitFor();
+    await page.getByText("← Назад в каталог").click();
+    await page.waitForSelector("[data-catalog-product-grid] li");
+    assert.equal(new URL(page.url()).pathname, "/catalog", "back link after Home leads to the catalog, not Home");
+    assert.ok(!page.url().includes("/home"), "did not land on Home");
+  }
+
+  // 9) F5 on another page, then a plain click on the "Каталог" tab: fresh catalog,
+  //    old snapshot must not be restored.
+  {
+    await page.goto(`${base}/catalog?sort=price_desc`, { waitUntil: "networkidle" });
+    await loadPages(page, 30);
+    await scrollToCard(page, 25);
+    const deep = (await ids(page)).length;
+    assert.ok(deep >= 30, "setup: deep list before leaving");
+    await openCard(page, 25);
+    await page.getByTestId("to-home").click();
+    await page.getByTestId("home-title").waitFor();
+    const saved = await page.evaluate(() => sessionStorage.getItem("audiolad:catalog-return:v1"));
+    assert.ok(saved, "setup: a snapshot exists");
+    await page.reload({ waitUntil: "networkidle" }); // F5 on Home
+    await page.getByTestId("home-title").waitFor();
+    await page.getByTestId("tab-catalog").click();
+    await page.waitForURL(/\/catalog$/);
+    await page.waitForSelector("[data-catalog-product-grid] li");
+    await sleep(1800);
+    assert.equal((await ids(page)).length, 12, "tab click after F5 shows the first page only");
+    assert.ok((await scrollY(page)) < 50, "tab click after F5 starts at the top");
   }
 
   assert.deepEqual(errors, [], `page errors: ${errors.join("; ")}`);

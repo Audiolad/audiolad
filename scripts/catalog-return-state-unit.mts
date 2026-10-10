@@ -15,6 +15,9 @@ import {
   isCatalogPath,
   pickCatalogReturnSnapshot,
   readCatalogReturnSnapshot,
+  CATALOG_BACK_STATE_KEY,
+  CATALOG_EXIT_CLAIM_WINDOW_MS,
+  claimCatalogExit,
   shouldUseHistoryBackToCatalog,
   writeCatalogReturnSnapshot,
   type CatalogReturnSnapshot,
@@ -157,20 +160,159 @@ for (const other of [
   }
 }
 
-// standard "Back to catalog" link: history Back only if we came from this catalog
+// standard "Back to catalog" link: history Back only if THIS history entry was
+// opened from the catalog. Tiny history simulator: entries carry their own state.
+{
+  type Entry = { path: string; state: Record<string, unknown> };
+  const s = memoryStorage();
+  const entries: Entry[] = [{ path: "/catalog?sort=price_asc", state: {} }];
+  let index = 0;
+  const push = (path: string) => {
+    entries.splice(index + 1);
+    entries.push({ path, state: {} });
+    index += 1;
+  };
+  const here = () => entries[index];
+  const leaveCatalogVia = (path: string, at: number) => {
+    // grid click capture: remember where the card click goes
+    writeCatalogReturnSnapshot(s, snap({ exitedTo: path, exitedAt: at, savedAt: at }));
+  };
+  const mountProductPage = (at: number) => {
+    // PracticeBackToCatalogLink mount effect
+    if (claimCatalogExit({ storage: s, pathname: here().path, now: at })) {
+      here().state = { ...here().state, [CATALOG_BACK_STATE_KEY]: true };
+    }
+  };
+  const clickBackLink = () => {
+    if (shouldUseHistoryBackToCatalog({ historyState: here().state })) {
+      index -= 1; // router.back()
+      return "history-back";
+    }
+    push("/catalog");
+    return "link-to-catalog";
+  };
+
+  // catalog -> product A (card click) -> back link: history Back, lands on the catalog
+  leaveCatalogVia("/p/A", NOW);
+  push("/p/A");
+  mountProductPage(NOW + 100);
+  // simulate React strict mode double mount: second claim must not untag
+  mountProductPage(NOW + 110);
+  assert.equal(here().state[CATALOG_BACK_STATE_KEY], true, "entry opened from catalog is tagged");
+
+  // ... -> Home -> product A again (typed in a plain link) -> "Назад в каталог"
+  push("/");
+  push("/p/A");
+  mountProductPage(NOW + 5000);
+  assert.equal(here().state[CATALOG_BACK_STATE_KEY], undefined, "second visit to A is not tagged");
+  assert.equal(clickBackLink(), "link-to-catalog", "must NOT go back to Home");
+  assert.equal(here().path, "/catalog", "lands on the catalog");
+
+  // the first, tagged entry still goes back (e.g. after reload history.state survives)
+  index = 1;
+  assert.equal(here().path, "/p/A");
+  assert.equal(clickBackLink(), "history-back");
+  assert.equal(here().path, "/catalog?sort=price_asc");
+}
+
+// claim: single use, expires, pathname must match, direct visit never tags
 {
   const s = memoryStorage();
-  writeCatalogReturnSnapshot(s, snap({ exitedTo: "/practice/автор/слаг" }));
-  assert.equal(
-    shouldUseHistoryBackToCatalog({ storage: s, pathname: "/practice/%D0%B0%D0%B2%D1%82%D0%BE%D1%80/%D1%81%D0%BB%D0%B0%D0%B3", now: NOW }),
-    true,
-    "encoded vs decoded pathname still match",
-  );
-  assert.equal(shouldUseHistoryBackToCatalog({ storage: s, pathname: "/practice/other/slug", now: NOW }), false);
-  assert.equal(shouldUseHistoryBackToCatalog({ storage: s, pathname: "/practice/автор/слаг", now: NOW + CATALOG_RETURN_TTL_MS + 1 }), false);
-  assert.equal(shouldUseHistoryBackToCatalog({ storage: memoryStorage(), pathname: "/practice/a/b", now: NOW }), false, "direct visit -> plain link");
+  writeCatalogReturnSnapshot(s, snap({ exitedTo: "/practice/автор/слаг", exitedAt: NOW }));
+  assert.equal(claimCatalogExit({ storage: s, pathname: "/practice/%D0%B0%D0%B2%D1%82%D0%BE%D1%80/%D1%81%D0%BB%D0%B0%D0%B3", now: NOW + 50 }), true, "encoded vs decoded pathname");
+  assert.equal(claimCatalogExit({ storage: s, pathname: "/practice/автор/слаг", now: NOW + 60 }), false, "single use");
+
+  writeCatalogReturnSnapshot(s, snap({ exitedTo: "/p/A", exitedAt: NOW }));
+  assert.equal(claimCatalogExit({ storage: s, pathname: "/p/B", now: NOW + 10 }), false, "other product");
+  assert.equal(claimCatalogExit({ storage: s, pathname: "/p/A", now: NOW + CATALOG_EXIT_CLAIM_WINDOW_MS + 1 }), false, "late visit");
+  assert.equal(claimCatalogExit({ storage: memoryStorage(), pathname: "/p/A", now: NOW }), false, "direct visit");
   writeCatalogReturnSnapshot(s, snap({ exitedTo: null }));
-  assert.equal(shouldUseHistoryBackToCatalog({ storage: s, pathname: "/practice/a/b", now: NOW }), false);
+  assert.equal(claimCatalogExit({ storage: s, pathname: "/p/A", now: NOW }), false);
+  assert.equal(shouldUseHistoryBackToCatalog({ historyState: null }), false);
+  assert.equal(shouldUseHistoryBackToCatalog({ historyState: { __NA: true } }), false);
+}
+
+// sign-out / guest <-> signed-in change erases the snapshot
+{
+  const s = memoryStorage();
+  writeCatalogReturnSnapshot(s, snap({ authenticated: true }));
+  assert.equal(
+    pickCatalogReturnSnapshot({ storage: s, href: HREF, authenticated: false, now: NOW, isHistoryTraversal: true }),
+    null,
+  );
+  assert.equal(s.map.has(CATALOG_RETURN_STORAGE_KEY), false, "auth flag change erases the snapshot");
+  writeCatalogReturnSnapshot(s, snap({ authenticated: false }));
+  assert.equal(
+    pickCatalogReturnSnapshot({ storage: s, href: HREF, authenticated: true, now: NOW, isHistoryTraversal: true }),
+    null,
+  );
+  assert.equal(s.map.has(CATALOG_RETURN_STORAGE_KEY), false);
+}
+
+// history traversal tracker: F5 / back_forward document load on a NON-catalog
+// page must not leave the "traversal" flag set for the next plain tab click.
+{
+  type Listener = (event: unknown) => void;
+  const load = async (pathname: string, navType: string) => {
+    const listeners: Record<string, Listener[]> = {};
+    const add = (target: string) => (type: string, fn: Listener) =>
+      void (listeners[`${target}:${type}`] ??= []).push(fn);
+    const fire = (key: string, event: unknown = {}) =>
+      (listeners[key] ?? []).forEach((fn) => fn(event));
+    const history = { pushState: () => undefined };
+    const g = globalThis as Record<string, unknown>;
+    const saved = { window: g.window, document: g.document, performance: g.performance };
+    const fakeWindow = {
+      location: { pathname },
+      history,
+      addEventListener: add("window"),
+    };
+    g.window = fakeWindow;
+    g.document = { addEventListener: add("document") };
+    Object.defineProperty(globalThis, "performance", {
+      value: { getEntriesByType: () => [{ type: navType }] },
+      configurable: true,
+      writable: true,
+    });
+    delete g.__audioladCatalogHistoryTraversal;
+    const mod = await import(`../src/lib/catalog/history-traversal.ts?${Math.random()}`);
+    mod.ensureHistoryTraversalTracking();
+    const restore = () => {
+      g.window = saved.window;
+      g.document = saved.document;
+      Object.defineProperty(globalThis, "performance", { value: saved.performance, configurable: true, writable: true });
+      delete g.__audioladCatalogHistoryTraversal;
+    };
+    return { mod, fire, history: fakeWindow.history, restore };
+  };
+
+  // F5 on Home, then a tab click on "Каталог": fresh, not a traversal
+  let t = await load("/", "reload");
+  assert.equal(t.mod.consumeHistoryTraversal(), false, "reload on another page is not a traversal");
+  t.restore();
+
+  t = await load("/", "reload");
+  t.fire("document:click", { button: 0, target: { closest: () => ({}) } });
+  assert.equal(t.mod.consumeHistoryTraversal(), false, "click resets");
+  t.restore();
+
+  // back_forward document load on Home, then router.push('/catalog')
+  t = await load("/profile", "back_forward");
+  t.history.pushState();
+  assert.equal(t.mod.consumeHistoryTraversal(), false, "pushState is a fresh navigation");
+  t.restore();
+
+  // F5 / back_forward ON the catalog itself still restores
+  t = await load("/catalog", "reload");
+  assert.equal(t.mod.consumeHistoryTraversal(), true, "reload of the catalog keeps its place");
+  assert.equal(t.mod.consumeHistoryTraversal(), false, "consumed once");
+  t.restore();
+
+  // browser Back (popstate) is a traversal
+  t = await load("/p/A", "navigate");
+  t.fire("window:popstate");
+  assert.equal(t.mod.consumeHistoryTraversal(), true);
+  t.restore();
 }
 
 assert.equal(isCatalogPath("/catalog"), true);
@@ -185,6 +327,16 @@ assert.match(grid, /pickCatalogReturnSnapshot/, "grid restores through the teste
 assert.match(grid, /consumeHistoryTraversal\(\)/, "restore only on history traversal");
 assert.match(grid, /restoreCatalogScroll/, "scroll restored");
 assert.match(grid, /leavingRef/, "position frozen when leaving via a link");
+assert.match(grid, /pagehide/, "state flushed when the page is left");
+assert.match(grid, /visibilitychange/, "state flushed when the tab is hidden");
+assert.match(grid, /requestIdleCallback/, "writes are debounced into idle time");
+assert.doesNotMatch(grid, /setTimeout\(\(\) => \{\s*timer = null;\s*save\(\)/, "no per-scroll synchronous JSON write");
+const baseProviders = read("src/components/providers/BaseProviders.tsx");
+assert.match(baseProviders, /CatalogReturnRootTracker/, "tracker installed at the app root");
+const profile = read("src/components/profile/ProfileSections.tsx");
+const settings = read("src/app/(platform)/settings/page.tsx");
+assert.match(profile, /SignOutForm/, "profile sign-out erases the snapshot");
+assert.match(settings, /SignOutForm/, "settings sign-out erases the snapshot");
 const back = read("src/components/products/practice-page/PracticePageParts.tsx");
 assert.match(back, /PracticeBackToCatalogLink/, "product back link uses history-aware link");
 
