@@ -72,6 +72,7 @@ jobs:
           npm run test:author-product-price-input
           npm run test:author-payout-profiles
           npm run test:author-payout-profiles-save
+          npm run test:author-payout-profiles-route
           npm run test:product-video-export
           npm run test:author-product-publish-preview-flow
           npm run test:platform-analytics-p2

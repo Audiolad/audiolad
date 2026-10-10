@@ -46,6 +46,7 @@ import {
 } from "./types";
 import {
   hasAuthorPayoutProfileFieldErrors,
+  findUnsafeRawPayoutInput,
   normalizeAuthorPayoutProfileFormValues,
   sanitizeStaffFacingComment,
   validateAuthorPayoutProfileFormValues,
@@ -313,9 +314,12 @@ export async function saveAuthorPayoutProfileDraft(input: {
     normalizeAuthorPayoutProfileFormValues(input.body),
     previousFields,
   );
-  const errors = validateAuthorPayoutProfileFormValues(values, {
-    mode: "draft",
-  });
+  const errors = {
+    ...validateAuthorPayoutProfileFormValues(values, {
+      mode: "draft",
+    }),
+    ...findUnsafeRawPayoutInput(input.body),
+  };
 
   if (hasAuthorPayoutProfileFieldErrors(errors)) {
     throw new AuthorPayoutProfileError("validation_failed", 400, errors);
@@ -478,9 +482,12 @@ export async function submitAuthorPayoutProfile(input: {
     normalizeAuthorPayoutProfileFormValues(input.body),
     previousFields,
   );
-  const errors = validateAuthorPayoutProfileFormValues(values, {
-    mode: "submit",
-  });
+  const errors = {
+    ...validateAuthorPayoutProfileFormValues(values, {
+      mode: "submit",
+    }),
+    ...findUnsafeRawPayoutInput(input.body),
+  };
 
   if (hasAuthorPayoutProfileFieldErrors(errors)) {
     throw new AuthorPayoutProfileError("validation_failed", 400, errors);

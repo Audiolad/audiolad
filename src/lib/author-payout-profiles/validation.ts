@@ -42,6 +42,46 @@ function rejectUnsafeText(value: string): string | null {
   return null;
 }
 
+const RAW_TEXT_FIELDS = [
+  "legal_name",
+  "first_name",
+  "last_name",
+  "middle_name",
+  "inn",
+  "ogrnip",
+  "email",
+  "phone",
+  "card_number",
+  "bank_account",
+  "bank_bik",
+  "bank_name",
+  "bank_correspondent_account",
+  "registration_address",
+  "tax_residency_note",
+  "author_revision_comment",
+] as const satisfies readonly (keyof AuthorPayoutProfileFormValues)[];
+
+/**
+ * Unsafe-text check (`<`, `>`, control characters) over the RAW request body,
+ * for every text field, before any normalization (normalization strips
+ * non-digits / whitespace and would otherwise hide such characters).
+ * Runs in both draft and submit modes; format checks stay submit-only.
+ */
+export function findUnsafeRawPayoutInput(
+  input: Record<string, unknown>,
+): AuthorPayoutProfileFieldErrors {
+  const errors: AuthorPayoutProfileFieldErrors = {};
+  for (const key of RAW_TEXT_FIELDS) {
+    const value = input[key];
+    if (typeof value !== "string") continue;
+    const unsafe = rejectUnsafeText(value);
+    if (unsafe) {
+      errors[key] = unsafe;
+    }
+  }
+  return errors;
+}
+
 /** Russian personal INN (12 digits) with checksum. */
 export function isValidRussianPersonalInn(raw: string): boolean {
   const inn = stripSpaces(raw);

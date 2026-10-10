@@ -155,4 +155,36 @@ assert.match(describePayoutSaveFailure({ kind: "complete", httpStatus: 503, erro
 assert.match(describePayoutSaveFailure({ kind: "draft", httpStatus: 502 }), /^Не удалось сохранить черновик\./);
 assert.match(describePayoutSaveFailure({ kind: "complete", httpStatus: 403, error: "feature_not_available" }), /временно недоступно/);
 
+// 8. Unsafe text (<, >, control chars) is rejected on EVERY text field, in draft and
+//    submit, on the raw value (before normalization strips digits/whitespace).
+{
+  const fields = [
+    "email", "inn", "ogrnip", "bank_bik", "bank_account",
+    "bank_correspondent_account", "phone", "card_number",
+    "first_name", "last_name", "middle_name", "bank_name",
+    "legal_name", "registration_address", "tax_residency_note", "author_revision_comment",
+  ];
+  const bad = ["12<3", "12>3", "12\u00003", "12\u000B3", "12\u007F3"];
+  for (const field of fields) {
+    for (const value of bad) {
+      for (const run of [save, submit]) {
+        const db = createFakeSupabase();
+        await assert.rejects(
+          () => run(db, { ...base, [field]: value }),
+          (e) =>
+            e instanceof AuthorPayoutProfileError &&
+            e.code === "validation_failed" &&
+            e.fieldErrors?.[field] === "Недопустимые символы.",
+          `${run.name} ${field} ${JSON.stringify(value)}`,
+        );
+        assert.equal(db.tables.author_payout_profiles.length, 0, `${field}: nothing stored`);
+      }
+    }
+  }
+  // Ordinary whitespace in digit fields is still fine for a draft.
+  const db = createFakeSupabase();
+  const ok = await save(db, { ...base, card_number: "4111 1111\t1111 1111", inn: "5001 0073 2259" });
+  assert.equal(ok.status, "draft");
+}
+
 console.log("author-payout-profiles-save-unit: ok");
