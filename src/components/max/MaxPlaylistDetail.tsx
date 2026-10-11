@@ -387,63 +387,67 @@ export default function MaxPlaylistDetail({
     playback.status === "blocked" ? playback : null;
 
   return (
-    <div data-max-playlist-detail={slug}>
+    <div className="min-w-0" data-max-playlist-detail={slug}>
       <button
         type="button"
         onClick={onBack}
-        className="min-h-11 text-sm font-medium text-[#7042c5]"
+        className="min-h-11 min-w-11 text-sm font-medium text-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         ← Плейлисты
       </button>
 
       {detailState.status === "loading" ? (
-        <p className="mt-6 text-sm text-[#6c5d94]">Загружаем плейлист…</p>
+        <p className="mt-6 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)] p-4 text-sm text-[#6c5d94] sm:p-5">Загружаем плейлист…</p>
       ) : null}
       {detailState.status === "not_found" ? (
-        <p className="mt-6 text-sm text-[#6c5d94]">Плейлист недоступен.</p>
+        <p className="mt-6 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)] p-4 text-sm text-[#6c5d94] sm:p-5">Плейлист недоступен.</p>
       ) : null}
       {detailState.status === "error" ? (
-        <p className="mt-6 text-sm text-[#6c5d94]">Не удалось загрузить плейлист.</p>
+        <p className="mt-6 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)] p-4 text-sm text-[#6c5d94] sm:p-5">Не удалось загрузить плейлист.</p>
       ) : null}
 
       {detail ? (
         <>
-          <div className="mx-auto mt-4 w-full max-w-[280px]">
-            <PlaylistCover
-              title={detail.title}
-              customCoverUrl={detail.coverUrl}
-              mosaicCoverUrls={detail.mosaicCoverUrls}
-              className="w-full rounded-[28px] shadow-[0_16px_40px_rgba(91,62,145,0.14)]"
-              decorative={false}
-            />
+          <div className="mt-4 min-w-0 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)]">
+            <div className="w-full">
+              <PlaylistCover
+                title={detail.title}
+                customCoverUrl={detail.coverUrl}
+                mosaicCoverUrls={detail.mosaicCoverUrls}
+                className="w-full rounded-t-[27px]"
+                decorative={false}
+              />
+            </div>
+            <div className="min-w-0 p-4 sm:p-5">
+              <h1 className="break-words text-[24px] font-semibold leading-tight text-[#25135c] [overflow-wrap:anywhere] sm:text-[26px]">
+                {detail.title}
+              </h1>
+              <p className="mt-2 break-words text-sm leading-6 text-[#7d70a2] [overflow-wrap:anywhere]">{detail.ownerLabel}</p>
+              {detail.description ? (
+                <p className="mt-3 break-words text-sm font-medium leading-6 text-[#7042c5] [overflow-wrap:anywhere]">{detail.description}</p>
+              ) : null}
+              <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
+                {formatPlaylistItemCount(detail.itemsCount)}
+                {detail.totalDurationLabel ? ` · ${detail.totalDurationLabel}` : ""}
+              </p>
+              {canPlayAll ? (
+                <button
+                  type="button"
+                  onClick={playAll}
+                  className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[22px] bg-gradient-to-r from-[#6d35d7] via-[#7c3fe4] to-[#8e55e8] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(109,53,215,0.34)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                >
+                  Слушать всё
+                </button>
+              ) : null}
+            </div>
           </div>
-          <h1 className="mt-5 text-[28px] font-semibold leading-8 text-[#25135c]">
-            {detail.title}
-          </h1>
-          <p className="mt-2 text-sm text-[#7d70a2]">{detail.ownerLabel}</p>
-          {detail.description ? (
-            <p className="mt-3 text-sm leading-6 text-[#5c4f82]">{detail.description}</p>
-          ) : null}
-          <p className="mt-3 text-sm text-[#5c4f82]">
-            {formatPlaylistItemCount(detail.itemsCount)}
-            {detail.totalDurationLabel ? ` · ${detail.totalDurationLabel}` : ""}
-          </p>
-          {canPlayAll ? (
-            <button
-              type="button"
-              onClick={playAll}
-              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-            >
-              Слушать всё
-            </button>
-          ) : null}
           {detail.itemsCount === 0 ? (
-            <p className="mt-6 text-sm leading-6 text-[#7d70a2]">
+            <p className="mt-6 rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_30px_rgba(91,62,145,0.08)] p-4 text-sm leading-6 text-[#7d70a2] sm:p-5">
               В этом плейлисте пока нет доступных материалов.
             </p>
           ) : null}
           {detail.allUnavailable ? (
-            <p className="mt-6 rounded-[18px] border border-[#f0d0d8] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
+            <p className="mt-6 rounded-[28px] border border-[#f0d0d8] bg-[#fff8f9] p-4 text-sm leading-6 text-[#b34f63] sm:p-5">
               Материалы этой подборки сейчас недоступны.
             </p>
           ) : null}
@@ -529,7 +533,7 @@ export default function MaxPlaylistDetail({
               <button
                 type="button"
                 onClick={onRequestSignup}
-                className="w-full rounded-full border border-[#7042c5] px-5 py-4 text-[17px] font-medium text-[#7042c5]"
+                className="min-h-11 w-full rounded-full border border-[#7042c5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] px-5 py-4 text-[17px] font-medium text-[#7042c5]"
               >
                 {MAX_SHELL_SIGNUP_CTA}
               </button>
@@ -539,7 +543,7 @@ export default function MaxPlaylistDetail({
             <p className="mt-4 text-sm text-[#6c5d94]">Не удалось подготовить прослушивание.</p>
           ) : null}
 
-          <section className="mt-5 space-y-1.5" aria-label="Материалы плейлиста">
+          <section className="mt-5 space-y-3" aria-label="Материалы плейлиста">
             {detail.items.map((item, index) => {
               const playable = isMaxPlaylistItemPlayable(toMaxPlaylistQueueItem(item));
               const current = activeIndex === index && playback.status !== "idle";
@@ -548,7 +552,7 @@ export default function MaxPlaylistDetail({
                 <article
                   key={item.key}
                   data-max-playlist-item={item.key}
-                  className={`flex min-h-[76px] items-center gap-2 rounded-[16px] border px-2 py-1.5 ${
+                  className={`relative flex min-h-[88px] min-w-0 items-center gap-3 rounded-[18px] border p-3 ${
                     current
                       ? "border-[#7042c5] bg-[#f6f1fd]"
                       : "border-[#eadff8] bg-white"
@@ -565,7 +569,7 @@ export default function MaxPlaylistDetail({
                         : `${item.title} — недоступно`
                     }
                     onClick={() => playFrom(index)}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#7042c5] text-white disabled:opacity-40"
+                    className="absolute left-[22px] top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-[#7042c5]/95 text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                   >
                     {isPlayingThis ? (
                       <span aria-hidden="true" className="text-xs font-semibold">
@@ -577,14 +581,14 @@ export default function MaxPlaylistDetail({
                       </span>
                     )}
                   </button>
-                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[10px] bg-[#f4ecfb]">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[12px] bg-[#f4ecfb]">
                     {item.coverUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element -- item cover is already a display URL
                       <img src={item.coverUrl} alt="" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-semibold text-[#25135c]">{item.title}</p>
+                    <p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-[#25135c] [overflow-wrap:anywhere]">{item.title}</p>
                     <p className="line-clamp-1 text-xs text-[#7d70a2]">
                       {item.authorName || "\u00a0"}
                     </p>

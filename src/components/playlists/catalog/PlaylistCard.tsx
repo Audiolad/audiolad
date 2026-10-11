@@ -5,10 +5,12 @@ import PlaylistSaveButton from "@/components/playlists/catalog/PlaylistSaveButto
 import {
   formatPlaylistCardCreatorName,
   formatPlaylistCatalogMeta,
-  PLAYLIST_CARD_TITLE_CLASS,
 } from "@/lib/playlists/format-item-count";
 import type { PlaylistListingItem } from "@/lib/playlists/listing-contract";
 import { buildPlaylistCoverAlt } from "@/lib/seo/cover-alt";
+
+const PLAYLIST_CARD_TITLE_CLASS =
+  "line-clamp-2 h-10 min-h-10 break-words text-[14px] font-semibold leading-5 text-[#25135c] [overflow-wrap:anywhere] sm:text-[15px] sm:leading-5";
 
 type PlaylistCardProps = {
   item: PlaylistListingItem;
@@ -72,7 +74,7 @@ export default function PlaylistCard({
       <Link
         href={item.href}
         data-playlist-catalog-info-block
-        className="block flex-1 px-2.5 pb-2.5 pt-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className="block min-w-0 flex-1 p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
         <h3 className={PLAYLIST_CARD_TITLE_CLASS}>
           {item.title}
@@ -82,7 +84,7 @@ export default function PlaylistCard({
           {creatorName || "\u00a0"}
         </p>
 
-        <p data-playlist-catalog-card-meta className="mt-1 text-xs leading-4 text-[#7d70a2]">
+        <p data-playlist-catalog-card-meta className="mt-1 min-h-8 break-words text-xs leading-4 text-[#7d70a2]">
           {meta}
         </p>
       </Link>

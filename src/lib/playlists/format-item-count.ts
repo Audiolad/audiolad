@@ -11,13 +11,6 @@ const PLAYLIST_CARD_EDITORIAL_CREATOR_NAME = "АудиоЛад";
 const PLAYLIST_CARD_EDITORIAL_CREATOR_GENITIVE = "АудиоЛада";
 
 /**
- * Catalog card title: 3 lines reserved even when the title is short.
- * 3 × leading-5 (1.25rem) = 3.75rem. Class does not depend on title length.
- */
-export const PLAYLIST_CARD_TITLE_CLASS =
-  "line-clamp-3 min-h-[3.75rem] text-[14px] font-semibold leading-5 text-[#25135c] sm:text-[15px] sm:leading-5";
-
-/**
  * Card-only creator label. Listing API may still send «Плейлист АудиоЛада».
  * Does not live in the listing mapper.
  */

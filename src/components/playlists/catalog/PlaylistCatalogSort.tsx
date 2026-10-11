@@ -19,7 +19,7 @@ export default function PlaylistCatalogSort({
 }: PlaylistCatalogSortProps) {
   return (
     <nav className="mt-3" aria-label="Сортировка плейлистов" data-playlist-catalog-sort>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         {PLAYLIST_CATALOG_SORT_OPTIONS.map((option) => {
           const isActive = option.value === sort;
 
@@ -33,7 +33,7 @@ export default function PlaylistCatalogSort({
               })}
               prefetch={false}
               aria-current={isActive ? "page" : undefined}
-              className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+              className={`inline-flex min-h-11 min-w-11 max-w-full break-words [overflow-wrap:anywhere] items-center rounded-full border px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
                 isActive
                   ? "border-[#7042c5] bg-[#7042c5] text-white"
                   : "border-[#ddcfef] bg-white text-[#7042c5]"

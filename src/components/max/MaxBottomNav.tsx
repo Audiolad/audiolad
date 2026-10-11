@@ -55,14 +55,14 @@ export default function MaxBottomNav({
               aria-label={tab.label}
               aria-current={active ? "page" : undefined}
               onClick={() => onSelectTab(tab.id)}
-              className={`flex min-h-11 w-full min-w-11 flex-col items-center justify-center gap-1 px-1 py-1 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5] ${
+              className={`flex min-h-11 w-full min-w-11 flex-col items-center justify-center gap-1 px-1 py-1 max-[390px]:px-0 text-[12px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7042c5] ${
                 active
                   ? "font-semibold text-[#7042c5]"
                   : "font-medium text-[#81759f] hover:text-[#6f5f92]"
               }`}
             >
               <Icon active={active} />
-              <span className="max-w-full truncate">{tab.label}</span>
+              <span className="max-w-full truncate max-[390px]:text-[11px] max-[390px]:tracking-[-0.02em] max-[359px]:text-[10.5px]">{tab.label}</span>
             </button>
           );
         })}
