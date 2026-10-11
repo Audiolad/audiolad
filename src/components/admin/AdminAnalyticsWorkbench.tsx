@@ -35,6 +35,7 @@ import {
 } from "@/lib/admin/analytics-url-state";
 import {
   adminSummaryNeedsRefresh,
+  adminSummaryQueryKey,
   replaceStatsQuery,
   shouldReplaceStatsTableWithLoading,
   statsQueryHref,
@@ -118,29 +119,40 @@ export default function AdminAnalyticsWorkbench({
     [pathname, urlState],
   );
 
+  const renderedSummaryQuery = {
+    period: summary.period,
+    includeTest: summary.includeTest,
+    authorId: summary.filters.authorId,
+    practiceId: summary.filters.practiceId,
+    utmSource: summary.filters.utmSource,
+    deviceType: summary.filters.deviceType,
+  };
+  const urlSummaryQuery = {
+    period: urlState.period,
+    includeTest: urlState.includeTest,
+    authorId: urlState.authorId,
+    practiceId: urlState.practiceId,
+    utmSource: urlState.utmSource,
+    deviceType: urlState.deviceType,
+  };
   const summaryStale = adminSummaryNeedsRefresh(
-    {
-      period: summary.period,
-      includeTest: summary.includeTest,
-      authorId: summary.filters.authorId,
-      practiceId: summary.filters.practiceId,
-      utmSource: summary.filters.utmSource,
-      deviceType: summary.filters.deviceType,
-    },
-    {
-      period: urlState.period,
-      includeTest: urlState.includeTest,
-      authorId: urlState.authorId,
-      practiceId: urlState.practiceId,
-      utmSource: urlState.utmSource,
-      deviceType: urlState.deviceType,
-    },
+    renderedSummaryQuery,
+    urlSummaryQuery,
   );
+  const renderedSummaryKey = adminSummaryQueryKey(renderedSummaryQuery);
+  const urlSummaryKey = adminSummaryQueryKey(urlSummaryQuery);
 
+  // Keyed by BOTH keys, not by the `summaryStale` boolean. The boolean stays
+  // `true` for the whole 30 -> «Все» sequence (the first refresh has not
+  // landed yet), so an effect keyed by it never re-ran: the URL said «Все»
+  // while the page kept the previous period's numbers forever. A new URL key,
+  // or a refresh that landed with yet another rendered key, refreshes again.
+  // A refresh that changes nothing leaves both keys equal to their last
+  // values, so this cannot loop.
   useEffect(() => {
-    if (!summaryStale) return;
+    if (renderedSummaryKey === urlSummaryKey) return;
     router.refresh();
-  }, [router, summaryStale]);
+  }, [router, renderedSummaryKey, urlSummaryKey]);
 
   const breakdownQueryKey = [
     urlState.period,
@@ -278,7 +290,7 @@ export default function AdminAnalyticsWorkbench({
   const view: AdminAnalyticsView = urlState.view;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={summaryStale}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="admin-analytics-heading" className="text-[21px] font-semibold">
@@ -294,6 +306,12 @@ export default function AdminAnalyticsWorkbench({
               minute: "2-digit",
               timeZone: "Europe/Moscow",
             }).format(new Date(summary.generatedAt))}
+            {summaryStale ? (
+              <span role="status" data-testid="admin-analytics-refreshing">
+                {" "}
+                · Обновляем данные для выбранного периода…
+              </span>
+            ) : null}
           </p>
         </div>
 
