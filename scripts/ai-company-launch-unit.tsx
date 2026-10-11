@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { AiCompanyDashboardView, parseBoardTabParam } from "../src/components/admin/AiCompanyDashboard";
+import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
+import { parseBoardTabParam } from "../src/lib/admin/ai-company-dashboard";
 import {
   buildAiCompanyDashboard,
   composeAiCompanyBoard,

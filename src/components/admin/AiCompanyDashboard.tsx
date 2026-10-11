@@ -62,10 +62,6 @@ const BOARD_TAB_ITEMS: ReadonlyArray<{ id: BoardTab; label: string }> = [
   { id: "archive", label: "Архив" },
 ];
 
-export function parseBoardTabParam(value: string | null | undefined): BoardTab {
-  return BOARD_TAB_ITEMS.some((item) => item.id === value) ? (value as BoardTab) : "working";
-}
-
 const ROW_BUTTON =
   "flex min-h-12 w-full max-w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:h-14 sm:flex-nowrap";
 

@@ -1,9 +1,10 @@
-import AiCompanyDashboard, { parseBoardTabParam } from "@/components/admin/AiCompanyDashboard";
+import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   companyStatusRequestPath,
   composeAiCompanyBoard,
+  parseBoardTabParam,
   parseCompanyStatus,
   parseHistoryFilters,
 } from "@/lib/admin/ai-company-dashboard";
