@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 
-import { AiCompanyDashboardView, parseBoardTabParam } from "../src/components/admin/AiCompanyDashboard";
+import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
+import { parseBoardTabParam } from "../src/lib/admin/ai-company-dashboard";
 import { composeAiCompanyBoard, parseCompanyStatus, parseHistoryFilters } from "../src/lib/admin/ai-company-dashboard";
 import { useAiCompanyDisclosureState } from "../src/lib/admin/ai-company-disclosure";
 import raw from "./fixtures/ai-company/core29-launch.json";

@@ -458,6 +458,11 @@ export type CompanyTask = {
 export type BoardTab = "plan" | "working" | "review" | "archive";
 const BOARD_TABS: readonly BoardTab[] = ["plan", "working", "review", "archive"];
 
+/** Server-safe: used by the server page for ?tab=. Do not move into a "use client" module. */
+export function parseBoardTabParam(value: string | null | undefined): BoardTab {
+  return (BOARD_TABS as readonly string[]).includes(value ?? "") ? (value as BoardTab) : "working";
+}
+
 export type LaunchState = "none" | "planned" | "waiting" | "admitted" | "sent" | "acked" | "started" | "failed";
 const LAUNCH_STATES: readonly LaunchState[] = ["none", "planned", "waiting", "admitted", "sent", "acked", "started", "failed"];
 
