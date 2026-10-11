@@ -1350,13 +1350,13 @@ const staleSpan = stageMarkup.match(/<span(?=[^>]*data-stage-badge="stale")[^>]*
 assert.ok(staleSpan);
 assert.match(staleSpan[0], /Нет свежих данных/);
 assert.doesNotMatch(staleSpan[0], /executive_dispatched/);
-const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="queue"'));
+const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="quotas"'));
 assert.doesNotMatch(todayMarkup, /<summary[^>]*>Подробности/);
 assert.match(todayMarkup, /aria-expanded="false"/);
 assert.match(todayMarkup, /Идентификатор задачи/);
 assert.match(todayMarkup, /Технический статус/);
 assert.match(todayMarkup, /Текущий этап/);
-const queueMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="queue"'), stageMarkup.indexOf('data-section="quotas"'));
+const queueMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="queue"'), stageMarkup.indexOf('data-section="more"'));
 assert.match(queueMarkup, /Технический статус/);
 assert.match(queueMarkup, /executive_dispatched \(технический статус\)/);
 assert.match(queueMarkup, /Текущий этап/);
@@ -1444,7 +1444,7 @@ const openedMarkup = renderToStaticMarkup(
     onToggleDetail={() => undefined}
   />,
 );
-const openedQueue = openedMarkup.slice(openedMarkup.indexOf('data-section="queue"'), openedMarkup.indexOf('data-section="quotas"'));
+const openedQueue = openedMarkup.slice(openedMarkup.indexOf('data-section="queue"'), openedMarkup.indexOf('data-section="more"'));
 assert.match(openedQueue, /aria-expanded="true"/);
 assert.match(openedQueue, /id="ai-company-panel-queue-fresh-dispatch"/);
 assert.doesNotMatch(openedQueue, /id="ai-company-panel-queue-fresh-dispatch"[^>]*hidden/);
@@ -1904,8 +1904,8 @@ const acceptanceMarkup = renderToStaticMarkup(
 assert.match(acceptanceMarkup, /data-section="owner-review"/);
 assert.match(acceptanceMarkup, /data-section="accepted"/);
 assert.match(acceptanceMarkup, /Архив \/ Принятые/);
-assert.match(acceptanceMarkup, /Проверил, принял/);
-assert.match(acceptanceMarkup, /Не работает \/ На доработку/);
+assert.match(acceptanceMarkup, /Принять/);
+assert.match(acceptanceMarkup, /На доработку/);
 assert.doesNotMatch(acceptanceMarkup, /Приёмка пока недоступна/);
 assert.match(acceptanceMarkup, /Вернуть в работу/);
 const unavailableMarkup = renderToStaticMarkup(
@@ -1919,7 +1919,7 @@ const presentedToggle = acceptanceMarkup.slice(
   acceptanceMarkup.lastIndexOf("<button", presentedAt),
   acceptanceMarkup.indexOf("</button>", presentedAt),
 );
-assert.doesNotMatch(presentedToggle, /Проверил, принял/);
+assert.doesNotMatch(presentedToggle, /Принять/);
 assert.match(acceptanceMarkup, /data-stage-badge="acceptance"[^>]*>На проверке/);
 assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принято/);
 assert.match(acceptanceMarkup, /data-stage-badge="rework"[^>]*>На доработке/);

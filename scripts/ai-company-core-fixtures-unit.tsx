@@ -158,10 +158,10 @@ const ownerMarkup = render(model, true, true);
 const review = section(ownerMarkup, "owner-review");
 assert.match(review, /data-owner-review="22222222-2222-4222-8222-222222222222"/);
 assert.doesNotMatch(review, /data-owner-review="11111111-1111-4111-8111-111111111111"/);
-assert.doesNotMatch(buttonTag(review, "Проверил, принял"), /\sdisabled=""/);
-assert.doesNotMatch(buttonTag(review, "Не работает / На доработку"), /\sdisabled=""/);
+assert.doesNotMatch(buttonTag(review, "Принять"), /\sdisabled=""/);
+assert.doesNotMatch(buttonTag(review, "На доработку"), /\sdisabled=""/);
 const inProgressRow = rowMarkup(ownerMarkup, "data-active-task", IN_PROGRESS);
-assert.doesNotMatch(inProgressRow, /Проверил, принял|Не работает \/ На доработку|data-owner-acceptance/);
+assert.doesNotMatch(inProgressRow, /Принять|На доработку|data-owner-acceptance/);
 const archiveSection = section(ownerMarkup, "accepted");
 assert.match(archiveSection, /data-accepted-task="44444444-4444-4444-8444-444444444444"/);
 assert.match(archiveSection, /Вернуть в работу/);
@@ -171,8 +171,8 @@ assert.match(ownerMarkup, /Кто подтвердил<\/dt><dd[^>]*>sergey/);
 // Any admin with ai_company.view but no owner role: buttons locked, explained.
 const adminMarkup = render(model, true, false);
 const adminReview = section(adminMarkup, "owner-review");
-assert.match(buttonTag(adminReview, "Проверил, принял"), /\sdisabled=""/);
-assert.match(buttonTag(adminReview, "Не работает / На доработку"), /\sdisabled=""/);
+assert.match(buttonTag(adminReview, "Принять"), /\sdisabled=""/);
+assert.match(buttonTag(adminReview, "На доработку"), /\sdisabled=""/);
 assert.match(adminReview, /Приёмку записывает только владелец платформы/);
 assert.match(buttonTag(section(adminMarkup, "accepted"), "Вернуть в работу"), /\sdisabled=""/);
 
@@ -219,7 +219,7 @@ assert.deepEqual(
   plainOld.history.map((row) => row.key),
 );
 const oldMarkup = render(oldModel, oldBoard.acceptanceAvailable, true);
-assert.doesNotMatch(oldMarkup, /Проверил, принял|Не работает \/ На доработку|Вернуть в работу/);
+assert.doesNotMatch(oldMarkup, /Принять|На доработку|Вернуть в работу/);
 assert.match(section(oldMarkup, "owner-review"), /Приёмка пока недоступна/);
 assert.match(section(oldMarkup, "accepted"), /Приёмка пока недоступна/);
 
