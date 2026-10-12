@@ -233,3 +233,11 @@ proxyChecks()
     console.error(error);
     process.exit(1);
   });
+
+// Core 7a6fc09c: bare gateway 404 vs Core's JSON not_found.
+{
+  const bare = interpretLaunchResponse(404, null);
+  assert.equal(bare.ok ? "" : (bare as { code: string }).code, "core_route_unavailable");
+  const real = interpretLaunchResponse(404, { error: "not_found" });
+  assert.equal(real.ok ? "" : (real as { code: string }).code, "not_found");
+}

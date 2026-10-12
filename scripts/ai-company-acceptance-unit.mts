@@ -263,3 +263,13 @@ const permissions = readFileSync("src/lib/auth/platform-permissions.ts", "utf8")
 assert.doesNotMatch(permissions, /ai_company\.accept|ai_company\.manage/);
 
 console.log("ai-company-acceptance-unit: ok");
+
+// Core 7a6fc09c: a bare gateway 404 (nginx HTML, no Core JSON) is not "task not found".
+{
+  const bare = interpretAcceptanceResponse(404, null);
+  assert.equal(bare.ok, false);
+  assert.equal(bare.ok ? "" : bare.code, "core_route_unavailable");
+  assert.ok(!bare.ok && !bare.message.includes("Задача не найдена"));
+  const real = interpretAcceptanceResponse(404, { error: "not_found" });
+  assert.equal(real.ok ? "" : real.code, "not_found");
+}

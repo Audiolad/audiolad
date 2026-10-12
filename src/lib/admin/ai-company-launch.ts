@@ -56,6 +56,8 @@ const ERROR_TEXT: Record<string, string> = {
   invalid_idempotency_key: "Некорректный ключ повтора.",
   actor_in_body: "В запрос попало запрещённое поле. Запуск не отправлен.",
   not_found: "Задача не найдена.",
+  core_route_unavailable:
+    "Company Core недоступен для запуска: адрес запуска не открыт на шлюзе (ответ 404 без кода Core). Задача не потеряна, запуск не выполнен.",
   not_launchable: "Эту задачу нельзя запустить из текущего состояния. Обновите страницу.",
   historical_blocked_no_requeue: "Это историческая блокировка. Новый запуск по ней не выполняется.",
   internal_error: "Company Core не выполнил запуск.",
@@ -76,7 +78,8 @@ export function interpretLaunchResponse(status: number, body: unknown, expectedT
   const code = typeof rawCode === "string" ? rawCode : "";
   if (status === 401 || code === "unauthorized") return fail("unauthorized", ERROR_TEXT.unauthorized);
   if (status === 403) return fail("actor_not_authenticated", ERROR_TEXT.actor_not_authenticated);
-  if (status === 404) return fail("not_found", ERROR_TEXT.not_found);
+  if (code === "not_found") return fail("not_found", ERROR_TEXT.not_found);
+  if (status === 404) return fail("core_route_unavailable", ERROR_TEXT.core_route_unavailable);
   if (status === 500) return fail("internal_error", ERROR_TEXT.internal_error);
   if (status === 409 || status === 400) {
     return fail(code || "conflict", ERROR_TEXT[code] ?? "Запуск не выполнен. Строка остаётся на месте.");
@@ -151,6 +154,8 @@ function httpStatusFor(code: string): number {
       return 502;
     case "not_found":
       return 404;
+    case "core_route_unavailable":
+      return 502;
     case "internal_error":
       return 500;
     case "not_launchable":
