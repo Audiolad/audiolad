@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   LAUNCH_OWNER_ONLY,
@@ -79,6 +79,152 @@ type AiCompanyDashboardProps = {
 const AcceptanceAvailability = createContext(false);
 const AcceptanceOwner = createContext(false);
 const AcceptanceRefresh = createContext<() => void>(() => undefined);
+const AcceptanceQuickDone = createContext<(taskId: string) => void>(() => undefined);
+
+/** Row-level «Принять» is offered only where the expanded card would offer the same accept. */
+export function quickAcceptAllowed(detail: TaskDetailModel, available: boolean, owner: boolean): boolean {
+  const view = detail.acceptance;
+  return Boolean(
+    available &&
+      owner &&
+      view?.applicable &&
+      view.state !== "accepted" &&
+      view.resultVersion !== NO_DATA &&
+      detail.taskId !== NO_DATA,
+  );
+}
+
+/** Same payload as the expanded card's «Принять»: decision accepted, empty comment, snapshot result version. */
+export function quickAcceptPayload(detail: TaskDetailModel, idempotencyKey: string) {
+  return {
+    taskId: detail.taskId,
+    decision: "accepted" as const,
+    comment: "",
+    resultVersion: detail.acceptance?.resultVersion ?? NO_DATA,
+    idempotencyKey,
+  };
+}
+
+function QuickAcceptButton({ detail }: { detail: TaskDetailModel }) {
+  const available = useContext(AcceptanceAvailability);
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const done = useContext(AcceptanceQuickDone);
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (confirming) confirmRef.current?.focus();
+  }, [confirming]);
+  if (!quickAcceptAllowed(detail, available, owner)) return null;
+
+  async function accept() {
+    if (busy || gate.current.busy) return;
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/acceptance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(quickAcceptPayload(detail, key)),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string };
+      });
+      if (outcome.ok === true) {
+        idempotencyKey.current = null;
+        setConfirming(false);
+        done(detail.taskId);
+        refresh();
+      } else {
+        setError(outcome.message ?? "Решение не сохранено.");
+      }
+    } catch {
+      setError(ACCEPTANCE_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const titleId = `quick-accept-title-${detail.key}`.replace(/[^A-Za-z0-9_-]/g, "-");
+  return (
+    <div className="flex shrink-0 flex-col items-end" data-quick-accept={detail.taskId}>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={(event) => {
+          event.stopPropagation();
+          setError(null);
+          setConfirming(true);
+        }}
+        className="min-h-10 rounded-lg bg-[#7042c5] px-3 py-1.5 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+        data-quick-accept-button
+      >
+        Принять
+      </button>
+      {error && !confirming ? (
+        <span className="mt-1 max-w-[10rem] text-right text-xs text-[#9f1239]" role="alert" data-quick-accept-error>
+          {error}
+        </span>
+      ) : null}
+      {confirming ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (event.target === event.currentTarget && !busy) setConfirming(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !busy) setConfirming(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            className="box-border w-full max-w-sm rounded-2xl bg-white p-4 text-left text-[#25135c] shadow-xl"
+            data-quick-accept-dialog
+          >
+            <p id={titleId} className="font-semibold">
+              Принять результат?
+            </p>
+            <p className="mt-2 break-words text-sm text-[#5c4d86]">{detail.title}</p>
+            {error ? (
+              <p className="mt-2 text-sm text-[#9f1239]" role="alert" data-quick-accept-error>
+                {error}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirming(false)}
+                className="min-h-11 rounded-lg border border-[#eadff8] px-3 py-2 text-sm font-semibold text-[#5c4d86] disabled:opacity-60"
+              >
+                Отмена
+              </button>
+              <button
+                ref={confirmRef}
+                type="button"
+                disabled={busy}
+                onClick={() => void accept()}
+                className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+                data-quick-accept-confirm
+              >
+                {busy ? "Сохраняем…" : "Принять"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function knownValue(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -507,6 +653,7 @@ function CompactRow({
   children,
   className = "",
   articleProps,
+  actions,
 }: {
   rowKey: string;
   title: string;
@@ -519,17 +666,20 @@ function CompactRow({
   children: ReactNode;
   className?: string;
   articleProps?: Record<string, string>;
+  /** Rendered next to the toggle, outside it: pressing an action never expands the row. */
+  actions?: ReactNode;
 }) {
   const expanded = open === true;
   const panelId = panelDomId(rowKey);
   return (
     <article data-compact-row={rowKey} className={`max-w-full overflow-hidden rounded-xl border text-sm ${className}`} {...articleProps}>
+      <div className="flex max-w-full items-center">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => onToggle?.(rowKey, !expanded)}
-        className={ROW_BUTTON}
+        className={`${ROW_BUTTON} min-w-0 flex-1`}
       >
         <span className="line-clamp-2 min-w-0 flex-1 basis-full break-words font-semibold sm:basis-0 sm:line-clamp-1">
           {title}
@@ -548,6 +698,8 @@ function CompactRow({
           {expanded ? "▴" : "▾"}
         </span>
       </button>
+      {actions ? <div className="shrink-0 py-1.5 pr-3">{actions}</div> : null}
+      </div>
       <div
         id={panelId}
         hidden={!expanded}
@@ -614,6 +766,7 @@ function TaskRow({
   onToggle,
   extra,
   articleProps,
+  actions,
 }: {
   detail: TaskDetailModel;
   rowKey: string;
@@ -621,9 +774,11 @@ function TaskRow({
   onToggle?: (key: string, open: boolean) => void;
   extra?: ReactNode;
   articleProps?: Record<string, string>;
+  actions?: ReactNode;
 }) {
   return (
     <CompactRow
+      actions={actions}
       rowKey={rowKey}
       title={detail.title}
       aside={knownValue(detail.executor)}
@@ -765,10 +920,16 @@ export function AiCompanyDashboardView({
     : null;
   const showNext = Boolean(model && (model.historyNextOffset != null || model.historyNextCursor));
   const [tab, setTab] = useState<BoardTab>(initialTab);
+  // Rows accepted from the list leave «Приёмка» at once; the refreshed snapshot then shows them in «Архив».
+  const [quickAccepted, setQuickAccepted] = useState<ReadonlySet<string>>(() => new Set());
+  const ownerReview = (model?.ownerReview ?? []).filter((detail) => !quickAccepted.has(detail.taskId));
+  function markQuickAccepted(taskId: string) {
+    setQuickAccepted((prev) => new Set(prev).add(taskId));
+  }
   const tabCounts: Record<BoardTab, number> = {
     plan: model?.plan.length ?? 0,
     working: (model?.activeTasks.length ?? 0) + (model?.queue.length ?? 0) + (model?.decisions.length ?? 0),
-    review: model?.ownerReview.length ?? 0,
+    review: ownerReview.length,
     archive: (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0),
   };
   function selectTab(next: BoardTab) {
@@ -785,6 +946,7 @@ export function AiCompanyDashboardView({
     <AcceptanceAvailability.Provider value={acceptanceAvailable}>
     <AcceptanceOwner.Provider value={canAccept}>
     <AcceptanceRefresh.Provider value={onRefresh}>
+    <AcceptanceQuickDone.Provider value={markQuickAccepted}>
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -1083,8 +1245,8 @@ export function AiCompanyDashboardView({
               </p>
             )}
             <div className="mt-2 flex flex-col gap-1.5">
-              {model.ownerReview.length ? (
-                model.ownerReview.map((detail) => {
+              {ownerReview.length ? (
+                ownerReview.map((detail) => {
                   const rowKey = `review:${detail.key}`;
                   return (
                     <TaskRow
@@ -1094,6 +1256,7 @@ export function AiCompanyDashboardView({
                       open={openDetails[rowKey] ?? false}
                       onToggle={onToggleDetail}
                       articleProps={{ "data-owner-review": detail.taskId }}
+                      actions={<QuickAcceptButton detail={detail} />}
                     />
                   );
                 })
@@ -1228,6 +1391,7 @@ export function AiCompanyDashboardView({
         </>
       ) : null}
     </div>
+    </AcceptanceQuickDone.Provider>
     </AcceptanceRefresh.Provider>
     </AcceptanceOwner.Provider>
     </AcceptanceAvailability.Provider>
