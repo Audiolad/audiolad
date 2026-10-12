@@ -14,7 +14,18 @@ import {
   validateRejectionComment,
   type AcceptanceDecision,
 } from "@/lib/admin/ai-company-acceptance";
-import { NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
+import { NO_DATA, historyHref, type LifecycleAction } from "@/lib/admin/ai-company-dashboard";
+import {
+  EVIDENCE_REFERENCE_HINT,
+  EVIDENCE_TYPES,
+  EVIDENCE_TYPE_LABELS,
+  LIFECYCLE_LABELS,
+  LIFECYCLE_OWNER_ONLY,
+  LIFECYCLE_UNAVAILABLE,
+  validateEvidence,
+  validateReason,
+  type EvidenceType,
+} from "@/lib/admin/ai-company-lifecycle";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
   BoardTab,
@@ -583,10 +594,256 @@ function LaunchControls({ detail }: { detail: TaskDetailModel }) {
   );
 }
 
+const LIFECYCLE_BUTTON: Record<LifecycleAction, string> = {
+  defer: "border border-[#cdbbef] bg-white text-[#4b2a8a]",
+  cancel: "border border-[#f3b4c3] bg-white text-[#9f1239]",
+  complete: "border border-green-300 bg-white text-green-900",
+  stop: "border border-[#f3b4c3] bg-white text-[#9f1239]",
+};
+
+const FIELD = "mt-1 w-full rounded-lg border border-[#d9cdf0] bg-white px-3 py-2 text-sm";
+
+/**
+ * «Отложить в план», «Снять задачу», «Завершить с доказательствами», «Остановить».
+ * Buttons are exactly Core's allowed_actions (detail.lifecycle). One press opens a short dialog; its submit is the
+ * single confirmation. The row changes only after the next Core snapshot.
+ */
+export function LifecycleControls({ detail }: { detail: TaskDetailModel }) {
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const [open, setOpen] = useState<LifecycleAction | null>(null);
+  const [reason, setReason] = useState("");
+  const [after, setAfter] = useState<"defer" | "cancel">("defer");
+  const [evidenceType, setEvidenceType] = useState<EvidenceType>("document");
+  const [reference, setReference] = useState("");
+  const [description, setDescription] = useState("");
+  const [mergeSha, setMergeSha] = useState("");
+  const [deploySha, setDeploySha] = useState("");
+  const [source, setSource] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const view = detail.lifecycle;
+  if (!view || detail.taskId === NO_DATA) return null;
+
+  function start(action: LifecycleAction) {
+    idempotencyKey.current = null;
+    setOpen(action);
+    setReason("");
+    setAfter("defer");
+    setEvidenceType("document");
+    setReference("");
+    setDescription("");
+    setMergeSha("");
+    setDeploySha("");
+    setSource("");
+    setError(null);
+    setMessage(null);
+  }
+
+  async function submit(action: LifecycleAction) {
+    if (!owner || busy || gate.current.busy || !view) return;
+    const reasonError = validateReason(reason, action === "cancel" || action === "stop");
+    if (reasonError) {
+      setError(reasonError);
+      return;
+    }
+    let evidence: unknown[] | undefined;
+    if (action === "complete") {
+      const item = { type: evidenceType, reference, description, merge_sha: mergeSha, deploy_sha: deploySha, source };
+      const checked = validateEvidence(item);
+      if (!checked.ok) {
+        setError(checked.message);
+        return;
+      }
+      evidence = [checked.item];
+    }
+    // One key per dialog: a double click or a retry after a lost answer is the same request in Core.
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/lifecycle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            taskId: detail.taskId,
+            action,
+            expectedStatus: view.expectedStatus,
+            idempotencyKey: key,
+            reason: reason.trim() || undefined,
+            after: action === "stop" ? after : undefined,
+            evidence,
+          }),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string };
+      });
+      if (outcome.ok === true) {
+        setMessage(outcome.message ?? "Готово.");
+        setOpen(null);
+        refresh();
+      } else {
+        setError(outcome.message ?? "Действие не выполнено.");
+      }
+    } catch {
+      setError(LIFECYCLE_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const titleId = `lifecycle-${detail.taskId}`;
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-lifecycle-status={view.expectedStatus}>
+      {view.requiredDecision ? (
+        <p className="text-sm" data-required-decision>
+          <span className="font-semibold">Нужно решение: </span>
+          {view.requiredDecision}
+        </p>
+      ) : null}
+      {view.actions.length ? (
+        <>
+          {owner ? null : (
+            <p className="mt-2 text-sm text-[#9f1239]" role="status" data-lifecycle-owner-only>
+              {LIFECYCLE_OWNER_ONLY}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {view.actions.map((action) => (
+              <button
+                key={action}
+                type="button"
+                disabled={!owner || busy}
+                aria-expanded={open === action}
+                onClick={() => (open === action ? setOpen(null) : start(action))}
+                data-lifecycle-button={action}
+                className={`min-h-11 rounded-lg px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 ${LIFECYCLE_BUTTON[action]}`}
+              >
+                {LIFECYCLE_LABELS[action]}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+      {open && owner ? (
+        <form
+          role="dialog"
+          aria-labelledby={titleId}
+          data-lifecycle-dialog={open}
+          className="mt-3 rounded-lg border border-[#d9cdf0] bg-white p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit(open);
+          }}
+        >
+          <p id={titleId} className="font-semibold">
+            {LIFECYCLE_LABELS[open]}
+          </p>
+          <p className="mt-1 text-sm text-[#796ba0]">
+            {open === "defer"
+              ? "Задача уйдёт во вкладку «План». PR, история и уточнения сохранятся; вернуть — кнопкой «В работу»."
+              : open === "cancel"
+                ? "Задача уйдёт в «Архив». Ничего не удаляется, PR не закрывается."
+                : open === "stop"
+                  ? "Исполнитель получит команду остановиться. После его подтверждения задача уйдёт в план или в архив."
+                  : "Core сам проверит доказательство. Без подтверждения задача не закроется."}
+          </p>
+          {open === "stop" ? (
+            <fieldset className="mt-3 text-sm">
+              <legend className="text-[#796ba0]">После остановки</legend>
+              <label className="mr-4 inline-flex items-center gap-1">
+                <input type="radio" name={`after-${detail.taskId}`} checked={after === "defer"} onChange={() => setAfter("defer")} /> в план
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input type="radio" name={`after-${detail.taskId}`} checked={after === "cancel"} onChange={() => setAfter("cancel")} /> в архив
+              </label>
+            </fieldset>
+          ) : null}
+          {open === "complete" ? (
+            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[#796ba0]">Тип доказательства</span>
+                <select className={FIELD} value={evidenceType} onChange={(event) => setEvidenceType(event.target.value as EvidenceType)} data-evidence-type>
+                  {EVIDENCE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {EVIDENCE_TYPE_LABELS[type]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[#796ba0]">Ссылка или идентификатор</span>
+                <input className={FIELD} value={reference} placeholder={EVIDENCE_REFERENCE_HINT[evidenceType]} onChange={(event) => setReference(event.target.value)} data-evidence-reference />
+              </label>
+              {evidenceType === "code_delivery" ? (
+                <>
+                  <label className="block">
+                    <span className="text-[#796ba0]">SHA слияния</span>
+                    <input className={FIELD} value={mergeSha} onChange={(event) => setMergeSha(event.target.value)} />
+                  </label>
+                  <label className="block">
+                    <span className="text-[#796ba0]">SHA выкладки</span>
+                    <input className={FIELD} value={deploySha} onChange={(event) => setDeploySha(event.target.value)} />
+                  </label>
+                </>
+              ) : null}
+              {evidenceType === "external_confirmation" ? (
+                <label className="block">
+                  <span className="text-[#796ba0]">Источник</span>
+                  <input className={FIELD} value={source} placeholder="telegram, email, db_check…" onChange={(event) => setSource(event.target.value)} />
+                </label>
+              ) : null}
+              <label className="block sm:col-span-2">
+                <span className="text-[#796ba0]">Описание: что подтверждает</span>
+                <textarea className={FIELD} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} data-evidence-description />
+              </label>
+            </div>
+          ) : null}
+          <label className="mt-3 block text-sm">
+            <span className="text-[#796ba0]">{open === "cancel" || open === "stop" ? "Причина" : "Причина (необязательно)"}</span>
+            <textarea className={FIELD} rows={2} value={reason} onChange={(event) => {
+              setReason(event.target.value);
+              setError(null);
+            }} data-lifecycle-reason />
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              data-lifecycle-submit={open}
+              className="min-h-11 rounded-lg bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {busy ? "Отправляю…" : LIFECYCLE_LABELS[open]}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setOpen(null)} className="min-h-11 rounded-lg border border-[#d9cdf0] px-4 py-2 text-sm">
+              Отмена
+            </button>
+          </div>
+        </form>
+      ) : null}
+      {message ? (
+        <p className="mt-2 text-sm text-[#166534]" role="status">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
     <>
     <LaunchControls detail={detail} />
+    <LifecycleControls detail={detail} />
     <TaskCopyButton text={detail.copyText} />
     <OwnerAcceptanceControls detail={detail} />
     <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
