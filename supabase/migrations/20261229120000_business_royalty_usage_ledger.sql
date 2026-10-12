@@ -328,7 +328,9 @@ COMMENT ON FUNCTION public.business_royalty_compute(uuid, uuid) IS
 -- ---------------------------------------------------------------- recording a run
 -- Before any approval in the period: full preliminary calculation. After an approval: adjustment deltas only
 -- (new result - sum of approved entries per point/holder/layer). Previous preliminary calculation entries are
--- superseded; reversal entries are kept. Keys with a live reversal are frozen (excluded) for the period.
+-- superseded; reversal entries are kept. A key with a PRELIMINARY (undecided) reversal is frozen until the reversal
+-- is approved or voided. An APPROVED reversal is part of the approved net, so a later run accrues exactly
+-- new result - approved net (corrected inputs -> correct amount once; repeat run -> no rows).
 CREATE FUNCTION public.business_royalty_run_preliminary(p_period_id uuid, p_formula_version_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp AS $$
 DECLARE v_run uuid; v_no integer; v_month date; v_status text; v_op record; v_mode text; v_bad integer;
@@ -379,9 +381,9 @@ BEGIN
                GROUP BY 1, 2, 3) ap
       ON ap.location_id = k.location_id AND ap.rightsholder_id = k.rightsholder_id AND ap.rights_layer = k.rights_layer
     WHERE (v_mode = 'full' OR coalesce(c.amount_minor, 0) - coalesce(ap.amt, 0) <> 0)
-      -- Frozen exclusion: a key with a live reversal is not re-accrued by later runs (no +X, -X, +X).
+      -- Pending reversal freezes the key: no delta against a base that is still being decided.
       AND NOT EXISTS (SELECT 1 FROM public.business_royalty_accruals rv
-        WHERE rv.period_id = p_period_id AND rv.reverses_id IS NOT NULL AND rv.calculation_state IN ('preliminary', 'approved')
+        WHERE rv.period_id = p_period_id AND rv.reverses_id IS NOT NULL AND rv.calculation_state = 'preliminary'
           AND rv.location_id = k.location_id AND rv.rightsholder_id = k.rightsholder_id AND rv.rights_layer = k.rights_layer);
   RETURN v_run;
 END $$;
@@ -389,17 +391,24 @@ END $$;
 -- Explicit audited reversal of an approved entry: a new adjustment with the opposite amount and a reason.
 CREATE FUNCTION public.business_royalty_reverse_accrual(p_accrual_id uuid, p_reason text)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp AS $$
-DECLARE o public.business_royalty_accruals; v_id uuid; v_status text;
+DECLARE o public.business_royalty_accruals; v_id uuid; v_status text; v_period uuid;
 BEGIN
   IF p_reason IS NULL OR length(btrim(p_reason)) = 0 THEN RAISE EXCEPTION 'business_royalty_reason_required'; END IF;
+  SELECT period_id INTO v_period FROM public.business_royalty_accruals WHERE id = p_accrual_id;
+  IF v_period IS NULL THEN RAISE EXCEPTION 'business_royalty_reverse_requires_approved'; END IF;
+  -- Same period lock as run_preliminary (taken first): reversal and recalculation of one period are serialised.
+  SELECT status INTO v_status FROM public.business_royalty_periods WHERE id = v_period FOR UPDATE;
   SELECT * INTO o FROM public.business_royalty_accruals WHERE id = p_accrual_id FOR UPDATE;
   IF o.id IS NULL OR o.calculation_state <> 'approved' THEN RAISE EXCEPTION 'business_royalty_reverse_requires_approved'; END IF;
   IF o.reverses_id IS NOT NULL THEN RAISE EXCEPTION 'business_royalty_cannot_reverse_reversal'; END IF;
   IF EXISTS (SELECT 1 FROM public.business_royalty_accruals WHERE reverses_id = o.id AND calculation_state IN ('preliminary', 'approved')) THEN
     RAISE EXCEPTION 'business_royalty_already_reversed';
   END IF;
-  SELECT status INTO v_status FROM public.business_royalty_periods WHERE id = o.period_id;
   IF v_status = 'closed' THEN RAISE EXCEPTION 'business_royalty_period_closed'; END IF;
+  -- Pending calculation deltas of this key were computed against the pre-reversal base: supersede them.
+  UPDATE public.business_royalty_accruals SET calculation_state = 'superseded'
+    WHERE period_id = o.period_id AND location_id = o.location_id AND rightsholder_id = o.rightsholder_id
+      AND rights_layer = o.rights_layer AND calculation_state = 'preliminary' AND reverses_id IS NULL;
   INSERT INTO public.business_royalty_accruals (run_id, period_id, location_id, rightsholder_id, rights_layer, entry_kind,
       holder_ms, point_confirmed_ms, author_fund_minor, amount_minor, calculation_basis, settlement_mode,
       reverses_id, reason, operator_id_snapshot)
@@ -410,6 +419,14 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------- guards
+-- Locked month for rights changes: closed, or has approved accruals. A month with only preliminary runs stays
+-- changeable (the change is picked up by the next recalculation).
+CREATE FUNCTION public.business_royalty_period_locked(p_period_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SET search_path = public, pg_temp AS $$
+  SELECT EXISTS (SELECT 1 FROM public.business_royalty_periods p WHERE p.id = p_period_id AND p.status = 'closed')
+      OR EXISTS (SELECT 1 FROM public.business_royalty_accruals a WHERE a.period_id = p_period_id AND a.calculation_state = 'approved')
+$$;
+
 CREATE FUNCTION public.business_royalty_accrual_guard()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
 DECLARE v_status text;
@@ -489,6 +506,13 @@ BEGIN
             AND s.valid_from < coalesce(NEW.valid_until, 'infinity'::date) AND NEW.valid_from < coalesce(s.valid_until, 'infinity'::date)) THEN
         RAISE EXCEPTION 'business_royalty_share_overlap';
       END IF;
+      -- No retroactive start inside a locked month (closed, or with approved accruals); preliminary-only month is open.
+      IF EXISTS (SELECT 1 FROM public.business_royalty_periods p
+          WHERE (p.period_month + interval '1 month')::date > NEW.valid_from
+            AND p.period_month < coalesce(NEW.valid_until, 'infinity'::date)
+            AND public.business_royalty_period_locked(p.id)) THEN
+        RAISE EXCEPTION 'business_royalty_share_retroactive_start';
+      END IF;
     END IF;
     RETURN NEW;
   END IF;
@@ -496,10 +520,10 @@ BEGIN
   o := to_jsonb(OLD); n := to_jsonb(NEW);
   IF TG_TABLE_NAME = 'business_royalty_track_shares' THEN
     IF OLD.valid_until IS NULL AND NEW.valid_until IS NOT NULL AND (o - 'valid_until') = (n - 'valid_until') THEN
-      -- No retroactive end date inside months that are closed or already calculated.
+      -- No retroactive end date inside locked months (closed, or with approved accruals).
       IF EXISTS (SELECT 1 FROM public.business_royalty_periods p
           WHERE (p.period_month + interval '1 month')::date > NEW.valid_until
-            AND (p.status = 'closed' OR EXISTS (SELECT 1 FROM public.business_royalty_calc_runs cr WHERE cr.period_id = p.id))) THEN
+            AND public.business_royalty_period_locked(p.id)) THEN
         RAISE EXCEPTION 'business_royalty_share_retroactive_end';
       END IF;
       RETURN NEW;
@@ -509,7 +533,15 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'business_royalty_periods' THEN
     IF (o - 'status') = (n - 'status') AND (
         (OLD.status = 'open' AND NEW.status IN ('reconciliation', 'closed'))
-        OR (OLD.status = 'reconciliation' AND NEW.status = 'closed')) THEN RETURN NEW; END IF;
+        OR (OLD.status = 'reconciliation' AND NEW.status = 'closed')) THEN
+      -- Closing freezes calculation states: undecided (preliminary) entries, incl. reversals, must be approved or voided first.
+      IF NEW.status = 'closed' AND EXISTS (SELECT 1 FROM public.business_royalty_accruals a
+          WHERE a.period_id = NEW.id AND a.calculation_state = 'preliminary') THEN
+        RAISE EXCEPTION 'business_royalty_period_has_preliminary'
+          USING DETAIL = 'Approve or void all preliminary accruals (including reversals) of the period before closing it.';
+      END IF;
+      RETURN NEW;
+    END IF;
   ELSIF TG_TABLE_NAME = 'business_royalty_formula_versions' THEN
     IF (o - ARRAY['status', 'approved_by', 'approved_at', 'approval_document']) = (n - ARRAY['status', 'approved_by', 'approved_at', 'approval_document'])
        AND ((OLD.status = 'proposed' AND NEW.status IN ('approved', 'retired'))
@@ -563,6 +595,7 @@ REVOKE ALL ON FUNCTION public.business_royalty_allocation_issues(uuid) FROM PUBL
 REVOKE ALL ON FUNCTION public.business_royalty_compute(uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_run_preliminary(uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_reverse_accrual(uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_royalty_period_locked(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_accrual_guard() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_registry_guard() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_deduction_audit() FROM PUBLIC, anon, authenticated;

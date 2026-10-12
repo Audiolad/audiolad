@@ -54,13 +54,21 @@ assert.match(sql, /business_royalty_deduction_payment_other_period/);
 assert.match(sql, /deduction_payment_other_period/);
 assert.match(sql, /business_royalty_share_retroactive_end/);
 assert.match(sql, /business_royalty_deduction_status_events/);
+// Review #3 fixes @0749b9eb.
+assert.match(sql, /business_royalty_period_has_preliminary/, "no close with preliminary accruals");
+assert.match(sql, /business_royalty_share_retroactive_start/, "no retroactive share start");
+assert.match(sql, /CREATE FUNCTION public\.business_royalty_period_locked/, "locked month = closed or approved");
+assert.doesNotMatch(sql, /cr\.period_id = p\.id/, "preliminary-only month not locked");
+assert.match(sql, /rv\.calculation_state = 'preliminary'/, "only pending reversal freezes the key");
+assert.match(sql.slice(sql.indexOf("FUNCTION public.business_royalty_reverse_accrual"), sql.indexOf("-- ---------------------------------------------------------------- guards")),
+  /FROM public\.business_royalty_periods WHERE id = v_period FOR UPDATE;/, "reversal takes the period lock");
 for (const t of ["business_royalty_payment_allocations", "business_royalty_track_shares", "business_royalty_periods", "business_service_operators"]) {
   assert.ok(sql.includes(`'${t}'`), `${t} guarded`);
 }
 assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
 assert.match(sql, /REVOKE ALL ON public\.%I FROM PUBLIC, anon, authenticated/);
 for (const fn of sql.matchAll(/CREATE FUNCTION ([\s\S]*?)AS \$\$/g)) assert.ok(fn[1].includes("SET search_path = public, pg_temp"));
-for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays", "Rounding", "StateMachine", "RecalcAfterApproval", "Reversal", "AppendOnly", "Allocation", "MidMonthShare", "DeductionRounding", "RunNumbering", "ReversalSurvivesRecalc", "ReversalRepeatable", "NoReaccrue", "ClosedPeriodUpdate", "DeductionOtherPeriod", "ShareRetroEnd", "ReversalFormula"]) {
+for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays", "Rounding", "StateMachine", "RecalcAfterApproval", "Reversal", "AppendOnly", "Allocation", "MidMonthShare", "DeductionRounding", "RunNumbering", "ReversalSurvivesRecalc", "ReversalRepeatable", "NoReaccrue", "ClosedPeriodUpdate", "DeductionOtherPeriod", "ShareRetroEnd", "ReversalFormula", "CorrectionAfterReversal", "CloseWithPreliminary", "ShareRetroStart"]) {
   assert.ok(smoke.includes(`${s}:`), `smoke ${s}`);
 }
 for (const v of ["100000", "10000", "90000", "45000", "13500", "18000"]) assert.ok(smoke.includes(v), `exact example ${v}`);

@@ -267,7 +267,7 @@ BEGIN
 
   -- MidMonthShare: Olga holds the recording until 15 July, Boris from 15 July; plays on 10th and 20th.
   INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from, valid_until) VALUES
-    (pg_temp.u('tM'), pg_temp.u('olga'), 'recording', 10000, '2027-01-01', '2027-07-15'),
+    (pg_temp.u('tM'), pg_temp.u('olga'), 'recording', 10000, '2027-07-01', '2027-07-15'),
     (pg_temp.u('tM'), pg_temp.u('boris'), 'recording', 10000, '2027-07-15', NULL);
   PERFORM pg_temp.expect_err('MidMonthShare: overlap', format('INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from) VALUES (%L, %L, %L, 10000, %L)',
     pg_temp.u('tM'), pg_temp.u('olga'), 'recording', '2027-07-01'), 'business_royalty_share_overlap');
@@ -339,16 +339,19 @@ BEGIN
   UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE id = v2;
   PERFORM pg_temp.expect_err('ReversalRepeatable: after approved', format('SELECT public.business_royalty_reverse_accrual(%L, %L)', a_olga, 'x'), 'business_royalty_already_reversed');
   PERFORM pg_temp.expect_err('ReversalRepeatable: reverse a reversal', format('SELECT public.business_royalty_reverse_accrual(%L, %L)', v2, 'x'), 'business_royalty_cannot_reverse_reversal');
-  -- NoReaccrue: next runs do not re-accrue the reversed amount (+25000, -25000 stays 0, no new +).
+  -- NoReaccrue (revised after review #3): an approved reversal is part of the approved net; the next run accrues
+  -- new result - net exactly once (olga 2 plays r1 of 3 on L9 -> 2/3 of fund 50000 = 33333), repeat run adds nothing.
   r := public.business_royalty_run_preliminary(pg_temp.u('q09'), pg_temp.u('f1'));
-  PERFORM pg_temp.eq('NoReaccrue: no olga rows', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r AND rightsholder_id = pg_temp.u('olga')), 0);
-  PERFORM pg_temp.eq('NoReaccrue: olga approved net', (SELECT sum(amount_minor) FROM public.business_royalty_accruals
-    WHERE period_id = pg_temp.u('q09') AND rightsholder_id = pg_temp.u('olga') AND calculation_state = 'approved'), 0);
+  PERFORM pg_temp.eq('NoReaccrue: one olga row', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r AND rightsholder_id = pg_temp.u('olga')), 1);
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE run_id = r;
+  r := public.business_royalty_run_preliminary(pg_temp.u('q09'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('NoReaccrue: repeat run no rows', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 0);
+  PERFORM pg_temp.eq('NoReaccrue: olga approved net = recalculated value', (SELECT sum(amount_minor) FROM public.business_royalty_accruals
+    WHERE period_id = pg_temp.u('q09') AND rightsholder_id = pg_temp.u('olga') AND calculation_state = 'approved'),
+    (SELECT amount_minor FROM public.business_royalty_compute(pg_temp.u('q09'), pg_temp.u('f1')) WHERE rightsholder_id = pg_temp.u('olga')));
 
-  -- ClosedPeriodUpdate: after close, approve/void of preliminary rows rejected; payout progress allowed.
+  -- ClosedPeriodUpdate: after close, reverse rejected; payout progress allowed.
   UPDATE public.business_royalty_periods SET status = 'closed' WHERE id = pg_temp.u('q09');
-  PERFORM pg_temp.expect_err('ClosedPeriodUpdate: approve', format('UPDATE public.business_royalty_accruals SET calculation_state = %L WHERE run_id = %L', 'approved', r), 'business_royalty_period_closed');
-  PERFORM pg_temp.expect_err('ClosedPeriodUpdate: void', format('UPDATE public.business_royalty_accruals SET calculation_state = %L WHERE run_id = %L', 'void', r), 'business_royalty_period_closed');
   PERFORM pg_temp.expect_err('ClosedPeriodUpdate: reverse', format('SELECT public.business_royalty_reverse_accrual(%L, %L)', a_alex, 'x'), 'business_royalty_period_closed');
   UPDATE public.business_royalty_accruals SET payout_state = 'in_payout' WHERE id = a_alex;
 
@@ -365,6 +368,94 @@ BEGIN
   v := public.business_royalty_reverse_accrual((SELECT id FROM public.business_royalty_accruals WHERE run_id = r AND rightsholder_id = pg_temp.u('olga')), 'проверка формулы');
   UPDATE public.business_royalty_formula_versions SET status = 'retired' WHERE id = pg_temp.u('f3');
   PERFORM pg_temp.expect_err('ReversalFormula: retired', format('UPDATE public.business_royalty_accruals SET calculation_state = %L WHERE id = %L', 'approved', v), 'business_royalty_formula_not_approved');
+END $$;
+-- ---------------------------------------------------------------- review #3 fixes (PR #826 @0749b9eb)
+INSERT INTO public.music_rightsholders (id, display_name, entity_type) VALUES (pg_temp.u('h8'), 'Правообладатель 8', 'person');
+INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from)
+  VALUES (pg_temp.u('t8'), pg_temp.u('h8'), 'recording', 10000, '2028-01-01');
+INSERT INTO public.business_royalty_periods (id, period_month) VALUES
+  (pg_temp.u('c1'), '2028-01-01'), (pg_temp.u('c2'), '2028-02-01'), (pg_temp.u('c3'), '2028-03-01');
+DO $$
+DECLARE r uuid; v uuid; a8 uuid; n bigint;
+BEGIN
+  INSERT INTO public.business_royalty_payments (id, period_id, payment_reference, kind, amount_minor, allocation_rule, occurred_at) VALUES
+    (pg_temp.u('c1pay'), pg_temp.u('c1'), 'c1', 'payment', 1000, 'single_point', '2028-01-01'),
+    (pg_temp.u('c2pay'), pg_temp.u('c2'), 'c2', 'payment', 1000, 'single_point', '2028-02-01'),
+    (pg_temp.u('c3pay'), pg_temp.u('c3'), 'c3', 'payment', 1000, 'single_point', '2028-03-01');
+  INSERT INTO public.business_royalty_payment_allocations (payment_id, location_id) VALUES
+    (pg_temp.u('c1pay'), pg_temp.u('L8')), (pg_temp.u('c2pay'), pg_temp.u('L8')), (pg_temp.u('c3pay'), pg_temp.u('L8'));
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
+    ('2028-01-02', pg_temp.u('c1'), pg_temp.u('L8'), pg_temp.u('t8'), 600000, 'c1-1'),
+    ('2028-02-02', pg_temp.u('c2'), pg_temp.u('L8'), pg_temp.u('t8'), 600000, 'c2-1'),
+    ('2028-03-02', pg_temp.u('c3'), pg_temp.u('L8'), pg_temp.u('t8'), 600000, 'c3-1');
+
+  -- CorrectionAfterReversal: approved 500 -> reversal approved (net 0) -> corrected input (approved deduction 200,
+  -- base 800, fund 400) -> recalculation accrues 400 exactly once; repeat recalculation adds no rows.
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE run_id = r;
+  a8 := (SELECT id FROM public.business_royalty_accruals WHERE run_id = r AND rightsholder_id = pg_temp.u('h8'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: approved', (SELECT amount_minor FROM public.business_royalty_accruals WHERE id = a8), 500);
+  v := public.business_royalty_reverse_accrual(a8, 'неверный вычет');
+  -- Pending reversal freezes the key.
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: frozen while pending', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 0);
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE id = v;
+  INSERT INTO public.business_royalty_deductions (period_id, category, amount_minor, location_id, document_reference, status, approved_by, approved_at)
+    VALUES (pg_temp.u('c1'), 'acquiring_fee', 200, pg_temp.u('L8'), 'исправленный реестр', 'approved', 'smoke', now());
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: one row', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 1);
+  PERFORM pg_temp.eq('CorrectionAfterReversal: accrues 400', pg_temp.holder(r, 'h8'), 400);
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE run_id = r;
+  PERFORM pg_temp.eq('CorrectionAfterReversal: net 400', (SELECT sum(amount_minor) FROM public.business_royalty_accruals
+    WHERE period_id = pg_temp.u('c1') AND calculation_state = 'approved'), 400);
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: repeat no rows', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 0);
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: repeat again no rows', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 0);
+  -- Reversal supersedes pending deltas of its key (no double correction).
+  INSERT INTO public.business_royalty_deductions (period_id, category, amount_minor, location_id, document_reference, status, approved_by, approved_at)
+    VALUES (pg_temp.u('c1'), 'acquiring_fee', 200, pg_temp.u('L8'), 'ещё вычет', 'approved', 'smoke', now());
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: delta -100', pg_temp.holder(r, 'h8'), -100);
+  v := public.business_royalty_reverse_accrual((SELECT id FROM public.business_royalty_accruals WHERE period_id = pg_temp.u('c1')
+    AND calculation_state = 'approved' AND reverses_id IS NULL AND amount_minor = 400), 'проверка');
+  PERFORM pg_temp.eq('CorrectionAfterReversal: pending delta superseded', (SELECT count(*) FROM public.business_royalty_accruals
+    WHERE run_id = r AND calculation_state = 'preliminary'), 0);
+  UPDATE public.business_royalty_accruals SET calculation_state = 'void' WHERE id = v;
+  r := public.business_royalty_run_preliminary(pg_temp.u('c1'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('CorrectionAfterReversal: delta -100 once', pg_temp.holder(r, 'h8'), -100);
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE run_id = r;
+  PERFORM pg_temp.eq('CorrectionAfterReversal: final net 300', (SELECT sum(amount_minor) FROM public.business_royalty_accruals
+    WHERE period_id = pg_temp.u('c1') AND calculation_state = 'approved'),
+    (SELECT sum(amount_minor) FROM public.business_royalty_compute(pg_temp.u('c1'), pg_temp.u('f1'))));
+
+  -- CloseWithPreliminary: closing is rejected while preliminary accruals (incl. reversals) remain.
+  r := public.business_royalty_run_preliminary(pg_temp.u('c2'), pg_temp.u('f1'));
+  PERFORM pg_temp.expect_err('CloseWithPreliminary: open->closed', format('UPDATE public.business_royalty_periods SET status = %L WHERE id = %L', 'closed', pg_temp.u('c2')), 'business_royalty_period_has_preliminary');
+  UPDATE public.business_royalty_periods SET status = 'reconciliation' WHERE id = pg_temp.u('c2');
+  PERFORM pg_temp.expect_err('CloseWithPreliminary: reconciliation->closed', format('UPDATE public.business_royalty_periods SET status = %L WHERE id = %L', 'closed', pg_temp.u('c2')), 'business_royalty_period_has_preliminary');
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE run_id = r;
+  v := public.business_royalty_reverse_accrual((SELECT id FROM public.business_royalty_accruals WHERE run_id = r), 'проверка закрытия');
+  PERFORM pg_temp.expect_err('CloseWithPreliminary: pending reversal', format('UPDATE public.business_royalty_periods SET status = %L WHERE id = %L', 'closed', pg_temp.u('c2')), 'business_royalty_period_has_preliminary');
+  UPDATE public.business_royalty_accruals SET calculation_state = 'void' WHERE id = v;
+  UPDATE public.business_royalty_periods SET status = 'closed' WHERE id = pg_temp.u('c2');
+
+  -- ShareRetroStart: new share starting inside an approved (c1) or closed (c2) month rejected;
+  -- preliminary-only open month (c3) accepts both a new share and an end date, picked up by recalculation.
+  r := public.business_royalty_run_preliminary(pg_temp.u('c3'), pg_temp.u('f1'));
+  PERFORM pg_temp.expect_err('ShareRetroStart: approved month', format('INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from) VALUES (%L, %L, %L, 10000, %L)',
+    pg_temp.u('t9'), pg_temp.u('h8'), 'recording', '2028-01-15'), 'business_royalty_share_retroactive_start');
+  PERFORM pg_temp.expect_err('ShareRetroStart: closed month', format('INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from) VALUES (%L, %L, %L, 10000, %L)',
+    pg_temp.u('t9'), pg_temp.u('h8'), 'recording', '2028-02-15'), 'business_royalty_share_retroactive_start');
+  PERFORM pg_temp.expect_err('ShareRetroStart: spans locked month', format('INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from, valid_until) VALUES (%L, %L, %L, 10000, %L, %L)',
+    pg_temp.u('t9'), pg_temp.u('h8'), 'recording', '2027-12-01', '2028-01-02'), 'business_royalty_share_retroactive_start');
+  PERFORM pg_temp.expect_err('ShareRetroEnd: approved month', format('UPDATE public.business_royalty_track_shares SET valid_until = %L WHERE audio_item_id = %L', '2028-01-20', pg_temp.u('t8')), 'business_royalty_share_retroactive_end');
+  INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from)
+    VALUES (pg_temp.u('t9'), pg_temp.u('h8'), 'recording', 10000, '2028-03-05');
+  UPDATE public.business_royalty_track_shares SET valid_until = '2028-03-02' WHERE audio_item_id = pg_temp.u('t8');
+  r := public.business_royalty_run_preliminary(pg_temp.u('c3'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('ShareRetroStart: preliminary month recalculated', pg_temp.holder(r, 'h8'), 0);
+  PERFORM pg_temp.eq('ShareRetroStart: point held', (SELECT count(*) FROM public.business_royalty_point_results WHERE run_id = r AND status = 'held_no_plays'), 1);
 END $$;
 SELECT 'business_royalty_ledger_smoke ok';
 ROLLBACK;
