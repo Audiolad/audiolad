@@ -763,6 +763,10 @@ export type GateCard = {
   nextAction: string;
   historical: boolean;
   copyText: string;
+  /** Core task id of the gate's task; null when the gate is not matched to a task in the snapshot. */
+  taskId: string | null;
+  /** Same lifecycle buttons as the task card (Core allowed_actions + required_decision); null for history. */
+  lifecycle: LifecycleView | null;
 };
 
 export type ExecutorCard = {
@@ -2263,6 +2267,8 @@ function presentGate(gate: GateFact, tasks: CompanyTask[], codexFallback: string
     nextAction,
     historical: gate.archived,
     copyText: "",
+    taskId: task?.id ?? null,
+    lifecycle: task && !gate.archived ? lifecycleView(task) : null,
   };
 }
 

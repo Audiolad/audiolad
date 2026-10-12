@@ -608,7 +608,7 @@ const FIELD = "mt-1 w-full rounded-lg border border-[#d9cdf0] bg-white px-3 py-2
  * Buttons are exactly Core's allowed_actions (detail.lifecycle). One press opens a short dialog; its submit is the
  * single confirmation. The row changes only after the next Core snapshot.
  */
-export function LifecycleControls({ detail }: { detail: TaskDetailModel }) {
+export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "taskId" | "lifecycle"> }) {
   const owner = useContext(AcceptanceOwner);
   const refresh = useContext(AcceptanceRefresh);
   const gate = useRef(createAcceptanceGate());
@@ -1002,6 +1002,9 @@ function GateList({
               className={attention ? "border-red-200 bg-white/80" : "border-[#eadff8] bg-white"}
               articleProps={{ "data-decision-owner": gate.decisionOwner }}
             >
+              {gate.taskId && gate.lifecycle ? (
+                <LifecycleControls detail={{ taskId: gate.taskId, lifecycle: gate.lifecycle }} />
+              ) : null}
               <TaskCopyButton text={gate.copyText} />
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 {gate.historical ? <Fact label="Метка" value="Историческая блокировка" /> : null}
