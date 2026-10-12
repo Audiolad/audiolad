@@ -681,7 +681,11 @@ function CompactRow({
         onClick={() => onToggle?.(rowKey, !expanded)}
         className={`${ROW_BUTTON} min-w-0 flex-1`}
       >
-        <span className="line-clamp-2 min-w-0 flex-1 basis-full break-words font-semibold sm:basis-0 sm:line-clamp-1">
+        {/* The title lives only in the row header; expanded, it is shown in full there instead of a repeat in the panel. */}
+        <span
+          data-row-title
+          className={`min-w-0 flex-1 basis-full break-words font-semibold sm:basis-0 ${expanded ? "" : "line-clamp-2 sm:line-clamp-1"}`}
+        >
           {title}
         </span>
         {aside ? <span className="max-w-[9rem] shrink-0 truncate text-xs text-[#5c4d86]">{aside}</span> : null}
@@ -706,7 +710,6 @@ function CompactRow({
         className="border-t border-[#eadff8] px-3 pb-3"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="mt-3 break-words font-semibold">{title}</p>
         {children}
       </div>
     </article>

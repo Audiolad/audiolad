@@ -110,3 +110,18 @@ assert.equal(noArchive.decisions.length, 13);
 assert.equal(buildAiCompanyDashboard(load("stnow-current").data!, parseHistoryFilters({})).decisions.length, 13);
 
 console.log("ai-company board counts: 0/13/1/68 OK");
+
+// Sergey 12.10 19:14: an expanded row does not repeat its title inside the panel (all tabs).
+{
+  const titled = (html.split("<article data-compact-row=").slice(1));
+  let checked = 0;
+  for (const chunk of titled) {
+    const title = chunk.match(/data-row-title="[^"]*"[^>]*>([^<]+)</)?.[1];
+    if (!title) continue;
+    const panel = chunk.slice(chunk.indexOf('id="ai-company-panel-'));
+    assert.equal(panel.includes(`>${title}<`), false, `panel repeats title: ${title}`);
+    checked += 1;
+  }
+  assert.ok(checked >= 13 + 1 + 34, `rows checked: ${checked}`);
+}
+console.log("ai-company expanded rows: no duplicate title OK");
