@@ -677,8 +677,9 @@ export type TaskDetailModel = {
 };
 
 /** Owner lifecycle buttons handled by POST /api/admin/ai-company/lifecycle. launch/accept/rework have their own controls. */
-export type LifecycleAction = "defer" | "cancel" | "complete" | "stop";
-export const LIFECYCLE_ACTIONS: readonly LifecycleAction[] = ["defer", "cancel", "complete", "stop"];
+/** "return" = «Вернуть на доработку» from a manual-review gate (company-core POST /v1/tasks/{id}/return). */
+export type LifecycleAction = "return" | "defer" | "cancel" | "complete" | "stop";
+export const LIFECYCLE_ACTIONS: readonly LifecycleAction[] = ["return", "defer", "cancel", "complete", "stop"];
 
 export type LifecycleView = {
   /** Raw Core status, sent back as expected_status. */

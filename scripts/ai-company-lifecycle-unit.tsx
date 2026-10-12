@@ -1,6 +1,6 @@
 /**
  * Owner lifecycle buttons on /admin/ai-company (company-core #41, docs/lifecycle-api.md):
- * «Отложить в план», «Снять задачу», «Завершить с доказательствами», «Остановить».
+ * «Отложить в план», «Снять задачу», «Завершить с доказательствами», «Остановить», «Вернуть на доработку» (company-core #42).
  * Buttons come only from Core allowed_actions; required_decision is shown; the proxy sends one validated command.
  */
 import assert from "node:assert/strict";
@@ -122,7 +122,7 @@ assert.match(guest, /data-lifecycle-button="cancel"[^>]*disabled=""|disabled=""[
     human_gate: "sergey_manual_review",
     blocked_reason: "Ожидает ручной проверки Сергеем после работ над кабинетом ИИ-компании.",
     board_tab: "working",
-    allowed_actions: ["defer", "cancel", "complete"],
+    allowed_actions: ["return", "defer", "cancel", "complete"],
     required_decision: "Ручная проверка: sergey_manual_review — Ожидает ручной проверки Сергеем",
   });
   const old = gateRaw.tasks.find((task) => task.title === "Исправить время прослушивания")!;
@@ -133,7 +133,7 @@ assert.match(guest, /data-lifecycle-button="cancel"[^>]*disabled=""|disabled=""[
   const gateModel = composeAiCompanyBoard({ data: gateStatus, error: null }, { data: null, error: "нет" }, filters).model as DashboardModel;
   const card = gateModel.decisions.find((gate) => gate.taskId === gated.id);
   assert.ok(card, "human_gate task is a decision row");
-  assert.deepEqual(card.lifecycle?.actions, ["defer", "cancel", "complete"]);
+  assert.deepEqual(card.lifecycle?.actions, ["return", "defer", "cancel", "complete"]);
   assert.equal(card.lifecycle?.expectedStatus, "human_gate");
   const markup = renderToStaticMarkup(
     <AiCompanyDashboardView model={gateModel} filters={filters} sourceError={null} acceptanceAvailable canAccept initialTab="working" onRefresh={() => undefined} />,
@@ -141,13 +141,40 @@ assert.match(guest, /data-lifecycle-button="cancel"[^>]*disabled=""|disabled=""[
   const section = markup.slice(markup.indexOf('data-section="decisions"'), markup.indexOf('data-section="queue"'));
   const rowStart = section.lastIndexOf("<article", section.indexOf(">Добавить фильтр в каталог<"));
   const row = section.slice(rowStart, section.indexOf("</article>", rowStart));
-  assert.deepEqual([...row.matchAll(/data-lifecycle-button="(\w+)"/g)].map((m) => m[1]), ["defer", "cancel", "complete"]);
+  assert.deepEqual([...row.matchAll(/data-lifecycle-button="(\w+)"/g)].map((m) => m[1]), ["return", "defer", "cancel", "complete"]);
+  assert.match(row, />Вернуть на доработку</);
+  assert.equal(row.split(`data-lifecycle-button="return"`).length - 1, 1, "one «Вернуть на доработку» per card");
   assert.match(row, /Нужно решение: <\/span>Ручная проверка: sergey_manual_review/);
   assert.equal(section.split(`data-lifecycle-status="human_gate"`).length - 1, 1, "one control block per decision card");
   assert.equal(row.split(`data-lifecycle-button="cancel"`).length - 1, 1, "no duplicated buttons in the card");
   const oldStart = section.lastIndexOf("<article", section.indexOf(">Исправить время прослушивания<"));
   assert.ok(oldStart >= 0);
   assert.doesNotMatch(section.slice(oldStart, section.indexOf("</article>", oldStart)), /data-lifecycle-button/);
+}
+
+// --- «Вернуть на доработку» on a task card too (same LifecycleControls), when Core allows it.
+{
+  const cardRaw = JSON.parse(readFileSync("scripts/fixtures/ai-company/core29-launch.json", "utf8")) as typeof raw;
+  const t = cardRaw.tasks.find((task) => task.title === "Исправить время прослушивания")!;
+  t.allowed_actions = ["return", "defer", "cancel", "complete"];
+  const m = composeAiCompanyBoard({ data: parseCompanyStatus(cardRaw)!, error: null }, { data: null, error: "нет" }, filters).model as DashboardModel;
+  const rows: TaskDetailModel[] = [...m.plan, ...m.queue, ...m.ownerReview, ...m.activeTasks.map((c) => c.detail)];
+  const row = rows.find((r) => r.taskId === t.id);
+  assert.ok(row, "task card present");
+  assert.deepEqual(row.lifecycle?.actions, ["return", "defer", "cancel", "complete"]);
+  const cardMarkup = renderToStaticMarkup(
+    <AiCompanyDashboardView model={m} filters={filters} sourceError={null} acceptanceAvailable canAccept initialTab="review" onRefresh={() => undefined} />,
+  );
+  const block = blockOf(cardMarkup, t.id);
+  assert.equal(block.split(`data-lifecycle-button="return"`).length - 1, 1, "«Вернуть на доработку» once on the task card");
+  assert.match(block, />Вернуть на доработку</);
+}
+// Dialog copy (component source): «Что не так» is required for return; «Завершить» has one plain hint line.
+{
+  const src = readFileSync("src/components/admin/AiCompanyDashboard.tsx", "utf8");
+  assert.match(src, /"Что не так"/);
+  assert.match(src, /Только если работа уже сделана и есть доказательство \(ссылка на PR или страницу\)\./);
+  assert.doesNotMatch(src, /type="checkbox"/, "no toggles");
 }
 
 // --- Validation shared by the dialog and the proxy.
@@ -181,6 +208,12 @@ assert.equal(validateLifecycleCommand({ ...base, action: "launch" }).ok, false);
 assert.equal(validateLifecycleCommand({ ...base, action: "defer", expectedStatus: "" }).ok, false);
 assert.equal((validateLifecycleCommand({ ...base, action: "defer", actor: "sergey" }) as { code: string }).code, "actor_in_body");
 assert.equal((validateLifecycleCommand({ ...base, action: "defer", production_verified: true }) as { code: string }).code, "actor_in_body");
+assert.equal(validateLifecycleCommand({ ...base, action: "return" }).ok, false, "return needs «что не так»");
+assert.equal(validateLifecycleCommand({ ...base, action: "return", reason: "снять" }).ok, false);
+const ret = validateLifecycleCommand({ ...base, action: "return", reason: "Мобильный дизайн плейлиста не сделан" });
+assert.ok(ret.ok);
+assert.deepEqual(ret.ok && lifecycleCoreBody(ret.command), { idempotency_key: "abcdefgh-1", expected_status: "human_gate", reason: "Мобильный дизайн плейлиста не сделан" });
+assert.equal(lifecycleCommandPath(TASK, "return"), `/v1/tasks/${TASK}/return`);
 const cancelCmd = validateLifecycleCommand({ ...base, action: "cancel", reason: "поглощена другими PR", after: "defer", evidence: [] });
 assert.ok(cancelCmd.ok);
 assert.deepEqual(cancelCmd.ok && lifecycleCoreBody(cancelCmd.command), { idempotency_key: "abcdefgh-1", expected_status: "human_gate", reason: "поглощена другими PR" });
@@ -238,6 +271,8 @@ async function proxyChecks() {
   assert.equal(interpretLifecycleResponse(200, { task_id: "22222222-2222-4222-8222-222222222222" }, { taskId: TASK, action: "cancel" }).ok, false);
   const replay = interpretLifecycleResponse(200, { task_id: TASK, to_status: "cancelled", idempotent: true }, { taskId: TASK, action: "cancel" });
   assert.ok(replay.ok && replay.idempotent && replay.toStatus === "cancelled");
+  const back = interpretLifecycleResponse(200, { task_id: TASK, to_status: "executive_in_progress" }, { taskId: TASK, action: "return" });
+  assert.ok(back.ok && /возвращена исполнителю/.test(back.message));
   assert.match(String((interpretLifecycleResponse(409, { error: "production_proof_required" }, { taskId: TASK, action: "complete" }) as { message: string }).message), /на проде/);
 }
 

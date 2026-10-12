@@ -23,6 +23,7 @@ import {
   LIFECYCLE_OWNER_ONLY,
   LIFECYCLE_UNAVAILABLE,
   validateEvidence,
+  reasonRequired,
   validateReason,
   type EvidenceType,
 } from "@/lib/admin/ai-company-lifecycle";
@@ -595,6 +596,7 @@ function LaunchControls({ detail }: { detail: TaskDetailModel }) {
 }
 
 const LIFECYCLE_BUTTON: Record<LifecycleAction, string> = {
+  return: "border border-amber-300 bg-white text-amber-900",
   defer: "border border-[#cdbbef] bg-white text-[#4b2a8a]",
   cancel: "border border-[#f3b4c3] bg-white text-[#9f1239]",
   complete: "border border-green-300 bg-white text-green-900",
@@ -645,7 +647,7 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
 
   async function submit(action: LifecycleAction) {
     if (!owner || busy || gate.current.busy || !view) return;
-    const reasonError = validateReason(reason, action === "cancel" || action === "stop");
+    const reasonError = validateReason(reason, reasonRequired(action));
     if (reasonError) {
       setError(reasonError);
       return;
@@ -750,7 +752,9 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
                 ? "Задача уйдёт в «Архив». Ничего не удаляется, PR не закрывается."
                 : open === "stop"
                   ? "Исполнитель получит команду остановиться. После его подтверждения задача уйдёт в план или в архив."
-                  : "Core сам проверит доказательство. Без подтверждения задача не закроется."}
+                  : open === "return"
+                    ? "Задача вернётся исполнителю вместе с вашим комментарием."
+                    : "Только если работа уже сделана и есть доказательство (ссылка на PR или страницу)."}
           </p>
           {open === "stop" ? (
             <fieldset className="mt-3 text-sm">
@@ -804,7 +808,7 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
             </div>
           ) : null}
           <label className="mt-3 block text-sm">
-            <span className="text-[#796ba0]">{open === "cancel" || open === "stop" ? "Причина" : "Причина (необязательно)"}</span>
+            <span className="text-[#796ba0]">{open === "return" ? "Что не так" : reasonRequired(open) ? "Причина" : "Причина (необязательно)"}</span>
             <textarea className={FIELD} rows={2} value={reason} onChange={(event) => {
               setReason(event.target.value);
               setError(null);
