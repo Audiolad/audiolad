@@ -45,3 +45,4 @@ jobs:
           npm run test:business-rights-eligibility
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition
+          AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger

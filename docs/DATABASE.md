@@ -1984,3 +1984,13 @@ Migration: `20261228120000_business_spa_program_composition.sql`. Prepared in Gi
 - `business_spa_set_program_items(program_id, audio_item_ids[], exclusion_reason)`: atomic ordered composition for allowlisted pilot members (or service_role). Only published tracks, no duplicates, archived programs frozen. Tracks dropped from the list are soft-excluded with reason, never deleted; re-adding restores them.
 - `business_spa_program_composition(program_id, location_id)`: active items in order with `resolve_business_track_eligibility` decisions for `business_background_playback` and `offline_storage_cache`. `playable` only on ELIGIBLE background; `offline_cacheable` only when both are ELIGIBLE. UNKNOWN/DENIED = no. Location must belong to the program's organization.
 - No grants, rightsholders, allowlist rows or programs are seeded. Pilot candidate list (12 Aurafon tracks, loudness analysis) lives in `docs/business/spa-pilot-aurafon-v1.json` and is not a license.
+
+## Business royalty usage + accrual ledger (task 0e05333f)
+
+Migration: `20261229120000_business_royalty_usage_ledger.sql`. Prepared in Git; not applied to production by this task. Schema only, no data.
+
+- `business_service_operators` — operator role history (sole trader → LLC/buyer); not a rightsholder. `same_subject_rightsholder_id` marks when operator and rightsholder are one legal subject.
+- `business_royalty_rate_models` — rate options (`per_minute`, `revenue_share_pro_rata`, `location_pool`); `approved` requires person + document.
+- `business_royalty_periods`, `business_royalty_usage` — reporting periods and aggregated actual usage per track/rightsholder/layer/location.
+- `business_royalty_accruals` — append-only accrual history keyed by `music_rightsholders` (not by operator): basis, applied rate, amount, `calculation_status` (estimated/calculated/superseded/void), `settlement_mode` (payable/management), `payout_status`. Estimated or management rows can never be payable; `calculated` requires an approved rate model. Payouts reuse the existing author payout profiles (one payee = one account).
+- Universal for all rightsholders; no artist-specific rules. RLS on, no anon/authenticated access.
