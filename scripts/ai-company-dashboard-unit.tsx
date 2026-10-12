@@ -1325,11 +1325,14 @@ assert.match(verified.progress, /100%/);
 assert.equal(stageModel.history.some((item) => item.title === "Проверка на сайте сохранена"), true);
 assert.equal(stageOf("Отменённая постановка").stageBadge.label, "Отменена");
 assert.equal(stageModel.history.some((item) => item.title === "Отменённая постановка"), false);
-const sergeyDecision = stageOf("Короткое решение");
-assert.equal(sergeyDecision.stageBadge.label, "Нужно решение");
-assert.match(sergeyDecision.stageBadge.detail ?? "", /^Сергей: Нет правки обложки/);
-assert.equal(stageOf("Блок без владельца").stageBadge.label, "Заблокирована");
-assert.match(stageOf("Блок без владельца").stageBadge.detail ?? "", /Нет данных: Нет файла обложки/);
+// Core 7a6fc09c: a task waiting for a decision is in «Нужно решение», not in «Сейчас в работе».
+assert.equal(stageModel.activeTasks.some((task) => task.title === "Короткое решение" || task.title === "Блок без владельца"), false);
+const sergeyDecision = stageModel.decisions.find((gate) => gate.taskTitle === "Короткое решение");
+assert.ok(sergeyDecision);
+assert.match(sergeyDecision.copyText, /Стадия: Нужно решение\nУточнение стадии: Сергей: Нет правки обложки/);
+const plainBlock = stageModel.decisions.find((gate) => gate.taskTitle === "Блок без владельца");
+assert.ok(plainBlock);
+assert.match(plainBlock.copyText, /Стадия: Заблокирована\nУточнение стадии: Нет данных: Нет файла обложки/);
 
 const stageMarkup = renderToStaticMarkup(
   <AiCompanyDashboardView model={stageModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
@@ -1339,7 +1342,7 @@ assert.match(stageMarkup, /aria-expanded="false"/);
 assert.match(stageMarkup, /aria-controls="ai-company-panel-/);
 assert.doesNotMatch(stageMarkup, /<summary[^>]*>Подробности/);
 assert.doesNotMatch(stageMarkup, /<button[^>]*data-stage-badge/);
-for (const tone of ["stale", "queue", "working", "review", "release", "site", "done", "cancelled", "decision", "blocked"] as const) {
+for (const tone of ["stale", "queue", "working", "review", "release", "site", "done", "cancelled"] as const) {
   const span = stageMarkup.match(new RegExp(`<span(?=[^>]*data-stage-badge="${tone}")[^>]*>`));
   assert.ok(span, tone);
   assert.match(span[0], /whitespace-normal/);
@@ -1713,26 +1716,28 @@ assert.match(plainTask.copyText, /КОНЕЦ-ПОСТАНОВКИ/);
 assert.match(plainTask.copyText, /Первая строка постановки\.\n/);
 assert.doesNotMatch(plainTask.brief, /\n/);
 assert.match(plainTask.copyText, /PR: https:\/\/github.com\/Audiolad\/audiolad\/pull\/801/);
-const oriyTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-oriy");
+// Core 7a6fc09c: blocked / human_gate tasks are listed once, in «Нужно решение», not as executing work.
+const workingRows = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)];
+for (const id of ["copy-oriy", "copy-sergey", "copy-blocked"]) {
+  assert.equal(workingRows.some((item) => item.taskId === id), false, id);
+}
 const oriyGate = copyModel.decisions.find((gate) => gate.taskTitle === "Решение Ория");
-assert.ok(oriyTask && oriyGate);
+assert.ok(oriyGate);
 assert.equal(oriyGate.decisionOwner, "Oriy");
-assert.equal(oriyTask.copyText, oriyGate.copyText);
-assert.match(oriyTask.copyText, /Кто вправе его принять: Oriy/);
-assert.doesNotMatch(oriyTask.copyText, /Founder Gate/);
-const sergeyTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-sergey");
+assert.match(oriyGate.copyText, /Идентификатор задачи: copy-oriy/);
+assert.match(oriyGate.copyText, /Кто вправе его принять: Oriy/);
+assert.doesNotMatch(oriyGate.copyText, /Founder Gate/);
 const sergeyGate = copyModel.decisions.find((gate) => gate.taskTitle === "Решение Сергея");
-assert.ok(sergeyTask && sergeyGate);
+assert.ok(sergeyGate);
 assert.equal(sergeyGate.decisionOwner, "Сергей");
-assert.equal(sergeyTask.copyText, sergeyGate.copyText);
-assert.match(sergeyTask.copyText, /Кто вправе его принять: Сергей/);
-assert.match(sergeyTask.copyText, /Какое решение требуется: Приложить файл обложки/);
-assert.doesNotMatch(sergeyTask.copyText, /Кто вправе его принять: Oriy/);
-const blockedTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-blocked");
-assert.ok(blockedTask);
-assert.equal(blockedTask.stageBadge.label, "Заблокирована");
-assert.match(blockedTask.copyText, /Задача заблокирована/);
-assert.match(blockedTask.copyText, /Кто вправе его принять: Нет данных/);
+assert.match(sergeyGate.copyText, /Кто вправе его принять: Сергей/);
+assert.match(sergeyGate.copyText, /Какое решение требуется: Приложить файл обложки/);
+assert.doesNotMatch(sergeyGate.copyText, /Кто вправе его принять: Oriy/);
+const blockedGate = copyModel.decisions.find((gate) => gate.taskTitle === "Блок без владельца");
+assert.ok(blockedGate);
+assert.match(blockedGate.copyText, /Стадия: Заблокирована/);
+assert.match(blockedGate.copyText, /Задача заблокирована/);
+assert.match(blockedGate.copyText, /Кто вправе его принять: Нет данных/);
 const secretTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-secret");
 assert.ok(secretTask);
 assert.doesNotMatch(secretTask.copyText, /super-secret-value|tok_live_123|user@example.com/);
@@ -1946,5 +1951,46 @@ assert.equal(legacyShape.acceptanceContract, false, "presentation:true / object 
 const legacyModel = buildAiCompanyDashboard(legacyShape, parseHistoryFilters({}));
 assert.equal(legacyModel.ownerReview.length, 0);
 assert.equal(legacyModel.acceptedArchive.length, 0);
+
+// Core 7a6fc09c: tabs follow real Core state. Terminal tasks never sit in «В работе» or «Приёмка»
+// even when a Core still tags them working / review; decisions are separate from acceptance.
+{
+  const rv = "cd".repeat(32);
+  const real = parseCompanyStatus({
+    generated_at: "2026-10-12T14:30:00.000Z",
+    tasks_page: { acceptance_view: "current" },
+    tasks: [
+      { id: "exec-1", title: "Выполняется", status: "executive_dispatched", active: true, board_tab: "working", presentation: "in_progress", user_acceptance: "none", last_event_at: "2026-10-12T14:20:00.000Z", started_at: "2026-10-12T14:00:00.000Z" },
+      { id: "gate-1", title: "Ждёт решения", status: "human_gate", active: true, board_tab: "working", presentation: "in_progress", user_acceptance: "none", human_gate: "sergey_manual_review", blocked_reason: "Ожидает ручной проверки Сергеем" },
+      { id: "nd-1", title: "Нужно решение без причины", status: "needs_decision", active: true, board_tab: "working", presentation: "in_progress", user_acceptance: "none" },
+      { id: "done-w", title: "Готово, но working", status: "done", active: false, board_tab: "working", presentation: "in_progress", user_acceptance: "none", completed_at: "2026-10-12T07:22:00.000Z" },
+      { id: "acc-w", title: "Принято статусом, working", status: "accepted", active: false, board_tab: "working", presentation: "in_progress", user_acceptance: "none" },
+      { id: "await-1", title: "Ждёт приёмки", status: "human_gate", active: true, board_tab: "review", presentation: "presented", user_acceptance: "none", result_version: rv, human_gate: "sergey_acceptance", blocked_reason: "Ждёт приёмки" },
+      { id: "done-r", title: "Готово, но review", status: "done", active: false, board_tab: "review", presentation: "presented", user_acceptance: "none", result_version: rv, completed_at: "2026-10-11T07:00:00.000Z" },
+      { id: "cancel-1", title: "Отменена", status: "cancelled", active: false, board_tab: "archive", presentation: "in_progress", user_acceptance: "none", blocked_reason: "Старый блокер отменённой" },
+    ],
+    gates: [
+      { id: "task:await-1:human_gate", task_id: "await-1", kind: "human_gate", reason: "Ждёт приёмки", decision_owner: "sergey" },
+      { id: "task:done-w:blocker", task_id: "done-w", kind: "blocker", reason: "Блокер закрытой задачи", decision_owner: "sergey" },
+    ],
+  })!;
+  const m = buildAiCompanyDashboard(real, parseHistoryFilters({}));
+  const ids = (rows: { taskId: string }[]) => rows.map((row) => row.taskId).sort();
+  assert.deepEqual(ids(m.activeTasks), ["exec-1"]);
+  assert.deepEqual(ids(m.ownerReview), ["await-1"]);
+  assert.deepEqual(m.decisions.map((gate) => gate.taskTitle).sort(), ["Ждёт решения", "Нужно решение без причины"]);
+  assert.match(m.decisions.find((gate) => gate.taskTitle === "Нужно решение без причины")!.reason, /Нужно решение/);
+  assert.equal(m.decisions.some((gate) => /Ждёт приёмки|Блокер закрытой|Старый блокер/.test(gate.reason)), false);
+  assert.deepEqual(m.history.map((row) => row.taskId).sort(), ["acc-w", "done-r", "done-w"]);
+  assert.equal(m.closedCount, 3);
+  assert.equal(m.queue.length, 0);
+  const html = renderToStaticMarkup(
+    <AiCompanyDashboardView model={m} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
+  );
+  assert.match(html, /data-tab-count="working"[^>]*>3</);
+  assert.match(html, /data-tab-count="review"[^>]*>1</);
+  assert.match(html, /data-tab-count="archive"[^>]*>3</);
+  assert.match(html, /это не приёмка результата|Это не приёмка результата/);
+}
 
 console.log("ai-company-dashboard-unit: ok");
