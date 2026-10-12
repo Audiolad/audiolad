@@ -1,6 +1,6 @@
 /**
  * Owner lifecycle buttons for /admin/ai-company: «Отложить в план», «Снять задачу», «Завершить с доказательствами»,
- * «Остановить». One server proxy to Company Core POST /v1/tasks/{id}/{defer|cancel|complete|stop}
+ * «Остановить», «Вернуть на доработку». One server proxy to Company Core POST /v1/tasks/{id}/{return|defer|cancel|complete|stop}
  * (company-core docs/lifecycle-api.md). Same pattern as «В работу» and «Принять»: owner session only, the Core token
  * stays on the server, actor is always `sergey` in the header, never in the body. Core decides what is allowed
  * (allowed_actions) and re-checks it under a row lock; the browser never changes a status locally.
@@ -13,6 +13,7 @@ export const LIFECYCLE_UNAVAILABLE = "Действие пока недоступ
 export const LIFECYCLE_OWNER_ONLY = "Менять состояние задач может только владелец платформы. Запрос не отправлен.";
 
 export const LIFECYCLE_LABELS: Record<LifecycleAction, string> = {
+  return: "Вернуть на доработку",
   defer: "Отложить в план",
   cancel: "Снять задачу",
   complete: "Завершить с доказательствами",
@@ -82,6 +83,11 @@ export function lifecycleCommandPath(taskId: string, action: LifecycleAction): s
   return `/v1/tasks/${encodeURIComponent(taskId)}/${action}`;
 }
 
+/** Actions whose reason is required: «Снять», «Остановить», «Вернуть на доработку» (что не так). */
+export function reasonRequired(action: LifecycleAction): boolean {
+  return action === "cancel" || action === "stop" || action === "return";
+}
+
 /** A reason Core will accept: at least 8 characters and not just «stop/снять». Shared by the dialog and the proxy. */
 export function validateReason(reason: string, required: boolean): string | null {
   const value = reason.trim();
@@ -142,7 +148,7 @@ export function validateLifecycleCommand(input: unknown): { ok: true; command: L
   if (!STATUS_TOKEN.test(expectedStatus)) return fail("invalid_expected_status", "Нет состояния задачи из табло. Обновите страницу.");
   if (!IDEMPOTENCY_KEY.test(idempotencyKey)) return fail("invalid_idempotency_key", "Некорректный ключ повтора.");
   const reason = text(record.reason, 2000);
-  const reasonError = validateReason(reason, action === "cancel" || action === "stop");
+  const reasonError = validateReason(reason, reasonRequired(action));
   if (reasonError) return fail("invalid_reason", reasonError);
   let after: "defer" | "cancel" | null = null;
   if (action === "stop") {
@@ -182,7 +188,7 @@ const ERROR_TEXT: Record<string, string> = {
   already_terminal: "Задача уже закрыта.",
   stop_confirmation_pending: "Остановка уже запрошена, ждём подтверждения исполнителя.",
   executing_stop_required: "Исполнитель работает над задачей: сначала «Остановить».",
-  rework_open: "Задача на доработке: завершить её сейчас нельзя.",
+  rework_open: "Задача уже на доработке.",
   not_executing: "Исполнитель не работает над задачей: используйте «Отложить» или «Снять».",
   action_not_allowed: "Это действие для задачи сейчас не разрешено. Обновите страницу.",
   reason_required: "Укажите причину.",
@@ -196,6 +202,7 @@ const ERROR_TEXT: Record<string, string> = {
 };
 
 const DONE_TEXT: Record<LifecycleAction, string> = {
+  return: "Задача возвращена исполнителю на доработку с вашим комментарием.",
   defer: "Задача отложена в план. Вернуть — кнопкой «В работу».",
   cancel: "Задача снята и перенесена в архив. История и PR сохранены.",
   complete: "Задача завершена с доказательствами и перенесена в архив.",
