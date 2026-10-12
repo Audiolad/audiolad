@@ -96,17 +96,23 @@ export function activeDictation(): Session | null {
 }
 
 /**
- * One recognition session per press; a second press stops it. After stop/abort nothing more reaches the field:
- * late results of that recognizer are ignored, so a submitted or disabled form never gets appended text.
+ * One recognition session per press; a second press stops it.
+ * - stop() (Sergey's own second press): recognition.stop(); the phrase being recognized is kept — the final result
+ *   that arrives after stop is inserted, and if the session ends with only interim text, that text is inserted.
+ * - abort() (form disabled / submitted, unmount, another dictation started): recognition.abort(); every later
+ *   result of that recognizer is ignored, so nothing lands after submit.
  */
 export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandlers) {
   let recognition: RecognitionLike | null = null;
+  let stopping = false;
+  let pendingInterim = "";
   const self: Session & { readonly listening: boolean; start(): void; stop(): void } = {
     get listening() {
-      return recognition !== null;
+      return recognition !== null && !stopping;
     },
     start() {
-      if (recognition) return;
+      if (recognition && !stopping) return;
+      if (recognition) self.abort(); // a stop whose end never came
       if (activeSession && activeSession !== self) activeSession.abort();
       const r = new Ctor();
       r.lang = DICTATION_LANG;
@@ -123,7 +129,8 @@ export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandle
           if (item?.isFinal) handlers.onFinal(text);
           else interim += text;
         }
-        handlers.onInterim(interim.trim());
+        pendingInterim = interim.trim();
+        handlers.onInterim(pendingInterim);
       };
       r.onerror = (event) => {
         if (!live()) return;
@@ -132,9 +139,13 @@ export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandle
       };
       r.onend = () => {
         if (!live()) return;
+        // The session ended with words still unconfirmed: keep them (Sergey speaks, then presses stop).
+        if (pendingInterim) handlers.onFinal(pendingInterim);
         end();
       };
       recognition = r;
+      stopping = false;
+      pendingInterim = "";
       activeSession = self;
       try {
         r.start();
@@ -146,12 +157,14 @@ export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandle
     },
     stop() {
       const r = recognition;
-      if (!r) return;
-      end();
+      if (!r || stopping) return;
+      stopping = true;
+      handlers.onListening(false);
       try {
-        r.stop();
+        r.stop(); // results still being recognized arrive, then onend
       } catch {
-        // already stopped
+        if (pendingInterim) handlers.onFinal(pendingInterim);
+        end();
       }
     },
     abort() {
@@ -167,6 +180,8 @@ export function createDictation(Ctor: RecognitionCtor, handlers: DictationHandle
   };
   function end() {
     recognition = null;
+    stopping = false;
+    pendingInterim = "";
     if (activeSession === self) activeSession = null;
     handlers.onInterim("");
     handlers.onListening(false);

@@ -99,15 +99,49 @@ d.start();
 Fake.last!.onerror!({ error: "not-allowed" });
 assert.ok(log.some((l) => l.startsWith("error:Нет доступа к микрофону")));
 
-// --- after stop/abort nothing more lands (late results of the same recognizer are ignored)
+// --- manual stop keeps the phrase: stop() (not abort), final after stop inserted; interim-only flushed on end
 {
   const got: string[] = [];
   const s1 = createDictation(Fake, { onInterim: () => {}, onFinal: (t) => got.push(t), onError: () => {}, onListening: () => {} });
   s1.start();
   const rec = Fake.last!;
+  let aborted = 0;
+  rec.abort = () => { aborted += 1; };
+  rec.stop = () => { rec.stopped += 1; }; // a real recognizer delivers results, then end, asynchronously
+  rec.onresult!(result([["дизайн плей", false]]));
   s1.stop();
+  assert.equal(rec.stopped, 1, "manual stop uses recognition.stop()");
+  assert.equal(aborted, 0, "manual stop does not abort");
+  assert.equal(s1.listening, false, "indicator off right away");
+  rec.onresult!(result([["дизайн плейлиста не сделан", true]]));
+  rec.onend!();
+  assert.deepEqual(got, ["дизайн плейлиста не сделан"], "final after stop inserted, interim not duplicated");
+}
+{
+  const got: string[] = [];
+  const s2 = createDictation(Fake, { onInterim: () => {}, onFinal: (t) => got.push(t), onError: () => {}, onListening: () => {} });
+  s2.start();
+  const rec = Fake.last!;
+  rec.stop = () => {};
+  rec.onresult!(result([["только промежуточный", false]]));
+  s2.stop();
+  rec.onend!();
+  assert.deepEqual(got, ["только промежуточный"], "interim-only text inserted when the session ends");
+  rec.onresult!(result([["после конца", true]]));
+  assert.deepEqual(got, ["только промежуточный"]);
+}
+// --- abort (disable/submit/unmount/other dictation): late results and interim dropped
+{
+  const got: string[] = [];
+  const s3 = createDictation(Fake, { onInterim: () => {}, onFinal: (t) => got.push(t), onError: () => {}, onListening: () => {} });
+  s3.start();
+  const rec = Fake.last!;
+  rec.abort = () => {};
+  rec.onresult!(result([["недосказанное", false]]));
+  s3.abort();
   rec.onresult!(result([["поздний текст", true]]));
-  assert.deepEqual(got, [], "late final after stop ignored");
+  rec.onend!();
+  assert.deepEqual(got, [], "nothing lands after abort, interim not flushed");
 }
 
 // --- insertion point recomputed when the field was edited during dictation
@@ -153,6 +187,19 @@ function harness() {
   assert.equal(h.area.value, "Причина: не работает", "no text after disable");
   h.b.setDisabled(false);
   assert.equal(h.b.listening, false, "re-enabling does not restart");
+}
+{
+  // binding: speak, press stop → the phrase lands in the field
+  const h = harness();
+  h.area.value = "Что не так:";
+  h.b.toggle();
+  const rec = Fake.last!;
+  rec.stop = () => {};
+  rec.onresult!(result([["карточки съезжают", false]]));
+  h.b.toggle(); // second press = manual stop
+  rec.onresult!(result([["карточки съезжают на телефоне", true]]));
+  rec.onend!();
+  assert.equal(h.area.value, "Что не так: карточки съезжают на телефоне");
 }
 {
   // submit ends the session the same way
