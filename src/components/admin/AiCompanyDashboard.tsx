@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { VoiceDictationButton } from "@/components/admin/VoiceDictationButton";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
@@ -369,6 +370,8 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   const [busy, setBusy] = useState(false);
   const [comment, setComment] = useState("");
   const [remark, setRemark] = useState("");
+  const commentRef = useRef<HTMLTextAreaElement>(null);
+  const remarkRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!view?.applicable || detail.taskId === NO_DATA) return null;
@@ -458,6 +461,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           <label className="grid gap-1 text-xs text-[#796ba0]">
             Комментарий, если нужен
             <textarea
+              ref={commentRef}
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               rows={2}
@@ -465,6 +469,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
               className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
               aria-label="Комментарий к приёмке"
             />
+            <VoiceDictationButton field="acceptance-comment" fieldRef={commentRef} onChange={setComment} disabled={locked} />
           </label>
           <button
             type="button"
@@ -477,6 +482,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           <label className="grid gap-1 text-xs text-[#796ba0]">
             Замечание для доработки
             <textarea
+              ref={remarkRef}
               value={remark}
               onChange={(event) => setRemark(event.target.value)}
               rows={3}
@@ -486,6 +492,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
               className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
               aria-label="Замечание для доработки"
             />
+            <VoiceDictationButton field="acceptance-remark" fieldRef={remarkRef} onChange={setRemark} disabled={locked} />
           </label>
           <button
             type="button"
@@ -624,6 +631,8 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
   const [mergeSha, setMergeSha] = useState("");
   const [deploySha, setDeploySha] = useState("");
   const [source, setSource] = useState("");
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -803,16 +812,18 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
               ) : null}
               <label className="block sm:col-span-2">
                 <span className="text-[#796ba0]">Описание: что подтверждает</span>
-                <textarea className={FIELD} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} data-evidence-description />
+                <textarea ref={descriptionRef} className={FIELD} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} data-evidence-description />
+                <VoiceDictationButton field="evidence-description" fieldRef={descriptionRef} onChange={setDescription} disabled={busy} />
               </label>
             </div>
           ) : null}
           <label className="mt-3 block text-sm">
             <span className="text-[#796ba0]">{open === "return" ? "Что не так" : reasonRequired(open) ? "Причина" : "Причина (необязательно)"}</span>
-            <textarea className={FIELD} rows={2} value={reason} onChange={(event) => {
+            <textarea ref={reasonRef} className={FIELD} rows={2} value={reason} onChange={(event) => {
               setReason(event.target.value);
               setError(null);
             }} data-lifecycle-reason />
+            <VoiceDictationButton field="lifecycle-reason" fieldRef={reasonRef} onChange={(next) => { setReason(next); setError(null); }} disabled={busy} />
           </label>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
