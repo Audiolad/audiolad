@@ -13,22 +13,33 @@ const smoke = read("supabase/tests/business_royalty_ledger_smoke.sql");
 const sql = migration.replace(/--[^\n]*/g, "");
 
 assert.match(sql, /^\s*BEGIN;[\s\S]*COMMIT;\s*$/);
-assert.doesNotMatch(sql, /\b(INSERT INTO|UPDATE public\.|DELETE FROM)\b/i, "schema only, no data writes");
+assert.doesNotMatch(sql.replace(/AS \$\$[\s\S]*?\$\$;/g, ""), /\b(INSERT INTO|UPDATE public\.|DELETE FROM)\b/i, "schema only, no data writes outside functions");
 assert.doesNotMatch(sql, /ALTER TABLE public\.(?:music_|audio_items|playback_usage|author_)/i, "existing tables untouched");
 assert.doesNotMatch(sql, /aurafon|аурафон/i, "no artist-specific rules");
-assert.match(sql, /calculation_status IN \('estimated', 'calculated', 'superseded', 'void'\)/);
-assert.match(sql, /settlement_mode IN \('payable', 'management'\)/);
-assert.match(sql, /payout_status = 'not_payable'\s*OR \(calculation_status = 'calculated' AND settlement_mode = 'payable'\)/);
-assert.match(sql, /business_royalty_rate_not_approved/);
-assert.match(sql, /business_royalty_accrual_append_only/);
-assert.match(sql, /rightsholder_id uuid NOT NULL REFERENCES public\.music_rightsholders/);
-for (const t of ["business_service_operators", "business_royalty_rate_models", "business_royalty_periods", "business_royalty_usage", "business_royalty_accruals"]) {
+// Final concept 2026-10-12 10:20: per point x calendar month, fund = base x bps, base clamped >= 0.
+assert.match(sql, /period_month date NOT NULL UNIQUE CHECK \(extract\(day FROM period_month\) = 1\)/);
+assert.match(sql, /greatest\(m\.payments_minor - m\.deductions_minor, 0\)/);
+assert.match(sql, /author_fund_minor \+ audiolad_income_minor = base_minor/);
+assert.match(sql, /category IN \('sales_tax', 'acquiring_fee', 'direct_point_service_cost'\)/);
+assert.doesNotMatch(sql, /'(marketing|development|salar\w*|catalog\w*|infrastructure)'/i, "non-deductible categories absent");
+assert.match(sql, /document_reference text NOT NULL/);
+assert.match(sql, /allocation_rule IN \('single_point', 'equal', 'weighted', 'fixed_amounts'\)/);
+assert.match(sql, /dedup_key text NOT NULL UNIQUE/);
+assert.doesNotMatch(sql, /per_minute|revenue_share_pro_rata|location_pool/, "old rate options removed");
+assert.match(sql, /'held_no_plays'/);
+assert.match(sql, /calculation_state IN \('preliminary', 'approved', 'superseded', 'void'\)/);
+assert.match(sql, /payout_state = 'none' OR \(calculation_state = 'approved' AND settlement_mode = 'payable'\)/);
+assert.match(sql, /business_royalty_formula_not_approved/);
+assert.match(sql, /HAVING sum\(s\.share_bps\) = 10000/, "layer shares sum to 100%, no double minute");
+for (const t of ["business_service_operators", "business_royalty_formula_versions", "business_royalty_periods", "business_royalty_payments", "business_royalty_payment_allocations", "business_royalty_deductions", "business_royalty_track_shares", "business_royalty_plays", "business_royalty_calc_runs", "business_royalty_point_results", "business_royalty_accruals"]) {
   assert.ok(sql.includes(`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY`), `${t} RLS`);
 }
 for (const fn of sql.matchAll(/CREATE FUNCTION ([\s\S]*?)AS \$\$/g)) assert.ok(fn[1].includes("SET search_path = public, pg_temp"));
-for (const s of ["EstimatedNotPayable", "UnapprovedRate", "Immutable", "AppendOnly", "ManagementNeverPayable", "UniversalFormula", "OperatorChange"]) {
+for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays"]) {
   assert.ok(smoke.includes(`${s}:`), `smoke ${s}`);
 }
+for (const v of ["100000", "10000", "90000", "45000", "13500", "18000"]) assert.ok(smoke.includes(v), `exact example ${v}`);
+assert.ok(read("scripts/database-migrations-compile-isolated.mjs").includes("supabase/tests/business_royalty_ledger_smoke.sql"), "smoke runs in real compile CI");
 assert.match(smoke, /ROLLBACK;\s*$/);
 assert.ok(read("docs/DATABASE.md").includes("20261229120000_business_royalty_usage_ledger.sql"));
 assert.equal(JSON.parse(read("package.json")).scripts["test:business-royalty-ledger"], "node scripts/business-royalty-ledger-sql-unit.mjs");

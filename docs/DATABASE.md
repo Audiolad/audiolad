@@ -1987,10 +1987,15 @@ Migration: `20261228120000_business_spa_program_composition.sql`. Prepared in Gi
 
 ## Business royalty usage + accrual ledger (task 0e05333f)
 
-Migration: `20261229120000_business_royalty_usage_ledger.sql`. Prepared in Git; not applied to production by this task. Schema only, no data.
+Migration: `20261229120000_business_royalty_usage_ledger.sql`. Prepared in Git; not applied to production by this task. Schema + functions, no data. Final concept approved by Сергей Петров 2026-10-12 10:20 MSK.
 
-- `business_service_operators` — operator role history (sole trader → LLC/buyer); not a rightsholder. `same_subject_rightsholder_id` marks when operator and rightsholder are one legal subject.
-- `business_royalty_rate_models` — rate options (`per_minute`, `revenue_share_pro_rata`, `location_pool`); `approved` requires person + document.
-- `business_royalty_periods`, `business_royalty_usage` — reporting periods and aggregated actual usage per track/rightsholder/layer/location.
-- `business_royalty_accruals` — append-only accrual history keyed by `music_rightsholders` (not by operator): basis, applied rate, amount, `calculation_status` (estimated/calculated/superseded/void), `settlement_mode` (payable/management), `payout_status`. Estimated or management rows can never be payable; `calculated` requires an approved rate model. Payouts reuse the existing author payout profiles (one payee = one account).
-- Universal for all rightsholders; no artist-specific rules. RLS on, no anon/authenticated access.
+Per point (location) and calendar month: base = payments attributable to the point (refunds negative; shared payments split by a recorded `allocation_rule`) − approved deductions, clamped at 0; author fund = base × `author_fund_bps` (5000 = 50 %); AudioLad income = base − fund; royalty = fund × holder confirmed minutes / all confirmed minutes of admitted music on the point.
+
+- `business_service_operators` — operator role history; not a rightsholder.
+- `business_royalty_formula_versions` — versioned formula; `author_fund_bps` immutable; approval needs person + document.
+- `business_royalty_periods` (calendar month), `business_royalty_payments`, `business_royalty_payment_allocations`.
+- `business_royalty_deductions` — registry: `sales_tax` (preliminary, accountant TBD), `acquiring_fee`, `direct_point_service_cost`; document reference required; linked to a point or a payment. Marketing, development, salaries, catalog upkeep, ordinary infra are not categories.
+- `business_royalty_track_shares` — composition / recording holders separately; shares of a track over both layers must sum to 10000 to be admitted (no fixed 50/50, no double minute).
+- `business_royalty_plays` — confirmed plays, online = offline, unique `dedup_key`.
+- `business_royalty_calc_runs`, `business_royalty_point_results`, `business_royalty_accruals` — versioned runs; `calculation_state` preliminary/approved/superseded/void, `payout_state` none/in_payout/paid (only approved + payable); `settlement_mode` management when operator is the same subject as the holder. Points without confirmed plays are `held_no_plays` (fund not distributed until reconciliation).
+- `business_royalty_compute()` (pure), `business_royalty_run_preliminary()` (writes a new preliminary run). Append-only guards. RLS on; no anon/authenticated access. Smoke `supabase/tests/business_royalty_ledger_smoke.sql` runs in Database Migrations Real Compile.
