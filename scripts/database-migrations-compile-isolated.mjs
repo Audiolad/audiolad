@@ -185,6 +185,13 @@ applyFile(
   "post-apply business royalty ledger smoke",
   resolve(root, "supabase/tests/business_royalty_ledger_smoke.sql"),
 );
+if (!pending.has("20261230120000")) {
+  throw new Error("business SPA manifest migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply business SPA manifest smoke",
+  resolve(root, "supabase/tests/business_spa_manifest_smoke.sql"),
+);
 if (!pending.has("20261101120000")) {
   throw new Error("Wordstat music query seed migration was not included in the disposable replay");
 }

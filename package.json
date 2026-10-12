@@ -380,6 +380,7 @@
     "test:business-spa-programs": "node scripts/business-spa-programs-sql-unit.mjs",
     "test:business-spa-composition": "node scripts/business-spa-composition-sql-unit.mjs",
     "test:business-royalty-ledger": "node scripts/business-royalty-ledger-sql-unit.mjs",
+    "test:business-spa-manifest": "node scripts/business-spa-manifest-sql-unit.mjs && npx tsx scripts/business-spa-manifest-client-unit.mts",
     "test:business-rights-eligibility": "node scripts/business-rights-eligibility-sql-unit.mjs",
     "test:scheduled-publication": "npx tsx scripts/scheduled-publication-unit.mts && node scripts/scheduled-publication-sql-unit.mjs",
     "test:live-public-content-sync": "npx tsx scripts/live-public-content-sync-unit.mts && node scripts/public-content-revision-sql-unit.mjs",
