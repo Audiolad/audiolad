@@ -1,22 +1,23 @@
 -- Business royalty ledger, final concept approved by Сергей Петров 2026-10-12 10:20 MSK (task 0e05333f).
 -- Per point (location) and calendar month:
---   base           = payments attributable to the point - approved allowable deductions (clamped at 0)
---   author fund    = base x author_fund_bps (approved version: 5000 = 50%)
---   AudioLad income= base - author fund
---   royalty(holder)= author fund x holder confirmed minutes / all confirmed minutes of admitted music on the point
--- One mechanism for ALL rightsholders (no artist-specific rules). Ledger keyed by music_rightsholders,
--- never by the operator. Online and offline plays count equally; plays are deduplicated by event key.
--- Musical work (composition) and phonogram (recording) holders are accounted separately; shares of one
--- track over both layers sum to exactly 100% (no fixed 50/50, no double accrual of a minute).
--- Schema + functions only; this migration writes no data. Payouts reuse author payout profiles.
+--   base            = payments attributable to the point - approved allowable deductions (clamped at 0)
+--   author fund     = floor(base x author_fund_bps / 10000)   (approved version: 5000 = 50%)
+--   AudioLad income = base - author fund
+--   royalty(holder) = author fund x holder confirmed minutes / all confirmed minutes of admitted music on the point,
+--                     largest-remainder rounding so that the distributed sum equals the fund exactly.
+-- One mechanism for ALL rightsholders. Ledger keyed by music_rightsholders, never by the operator.
+-- Online = offline; plays deduplicated by dedup_key. Composition / recording holders separate; shares valid on
+-- the play date over both layers sum to exactly 100% (no fixed 50/50, no double minute).
+-- Inputs and history are append-only (TRUNCATE blocked). After an accrual is approved, recalculation only
+-- produces audited adjustment deltas. Schema + functions only; this migration writes no data.
 BEGIN;
 
+-- ---------------------------------------------------------------- registries
 CREATE TABLE public.business_service_operators (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   legal_name text NOT NULL CHECK (length(btrim(legal_name)) BETWEEN 1 AND 300),
   legal_form text NOT NULL CHECK (legal_form IN ('sole_trader', 'llc', 'other')),
   tax_id text NULL CHECK (tax_id IS NULL OR tax_id ~ '^[0-9]{10,12}$'),
-  -- Same legal subject as a rightsholder: that holder's accruals are management accounting (no real debt).
   same_subject_rightsholder_id uuid NULL REFERENCES public.music_rightsholders(id) ON DELETE RESTRICT,
   active_from date NOT NULL,
   active_until date NULL,
@@ -24,9 +25,8 @@ CREATE TABLE public.business_service_operators (
   CONSTRAINT business_service_operators_range_check CHECK (active_until IS NULL OR active_until > active_from)
 );
 COMMENT ON TABLE public.business_service_operators IS
-  'Service operator role history (sole trader -> LLC/buyer). Not a rightsholder; rights and accrual history stay with music_rightsholders.';
+  'Operator role history (sole trader -> LLC/buyer). Not a rightsholder. Append-only; only active_until may be set once.';
 
--- Versioned formula (history of formulas/rates).
 CREATE TABLE public.business_royalty_formula_versions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   version text NOT NULL UNIQUE CHECK (version ~ '^[a-z0-9_.-]{2,32}$'),
@@ -47,9 +47,10 @@ CREATE TABLE public.business_royalty_periods (
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reconciliation', 'closed')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE public.business_royalty_periods IS 'Calendar month reporting period (period_month = first day).';
+COMMENT ON TABLE public.business_royalty_periods IS
+  'Calendar month. Status forward-only open -> reconciliation -> closed; closed never reopens and accepts no inputs.';
 
--- Payments (and refunds as negative amounts) attributable to points.
+-- Refunds are recorded in the period of the refund (preliminary rule).
 CREATE TABLE public.business_royalty_payments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id uuid NOT NULL REFERENCES public.business_royalty_periods(id) ON DELETE RESTRICT,
@@ -67,7 +68,6 @@ CREATE TABLE public.business_royalty_payments (
   CONSTRAINT business_royalty_payments_ref_unique UNIQUE (payment_reference, kind)
 );
 
--- Transparent recorded allocation of one payment to one or more points.
 CREATE TABLE public.business_royalty_payment_allocations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   payment_id uuid NOT NULL REFERENCES public.business_royalty_payments(id) ON DELETE RESTRICT,
@@ -78,9 +78,8 @@ CREATE TABLE public.business_royalty_payment_allocations (
   CONSTRAINT business_royalty_payment_allocations_unique UNIQUE (payment_id, location_id)
 );
 
--- Deductions registry. Only allowable categories exist; marketing, development, salaries,
--- catalog upkeep and ordinary server infrastructure are NOT categories and cannot be deducted.
--- Tax methodology is preliminary (to be finalised with the accountant).
+-- Allowable categories only; marketing, development, salaries, catalog upkeep and ordinary infrastructure
+-- are not categories. sales_tax methodology is preliminary (accountant TBD).
 CREATE TABLE public.business_royalty_deductions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id uuid NOT NULL REFERENCES public.business_royalty_periods(id) ON DELETE RESTRICT,
@@ -98,10 +97,16 @@ CREATE TABLE public.business_royalty_deductions (
   CONSTRAINT business_royalty_deductions_approval_check CHECK (
     status <> 'approved' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL))
 );
-COMMENT ON TABLE public.business_royalty_deductions IS
-  'Allowable deductions only: sales_tax (preliminary, accountant TBD), acquiring_fee, direct_point_service_cost. Linked to a point or a payment (then split by that payment''s allocation). Marketing/development/salaries/catalog/infra are not deductible.';
 
--- Who holds which share of each track, separately per layer. Sum over both layers = 10000 for admitted music.
+CREATE TABLE public.business_royalty_deduction_status_events (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  deduction_id uuid NOT NULL REFERENCES public.business_royalty_deductions(id) ON DELETE RESTRICT,
+  from_status text NULL,
+  to_status text NOT NULL,
+  actor text NOT NULL DEFAULT current_user,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+
 CREATE TABLE public.business_royalty_track_shares (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   audio_item_id uuid NOT NULL,
@@ -115,14 +120,15 @@ CREATE TABLE public.business_royalty_track_shares (
   CONSTRAINT business_royalty_track_shares_range_check CHECK (valid_until IS NULL OR valid_until > valid_from)
 );
 CREATE INDEX business_royalty_track_shares_track_idx ON public.business_royalty_track_shares(audio_item_id);
+COMMENT ON TABLE public.business_royalty_track_shares IS
+  'Per-layer holder shares with validity [valid_from, valid_until). Matched to each play by play date (mid-month changes handled). No overlapping intervals per track/holder/layer. Append-only; valid_until may be set once.';
 
--- Confirmed plays; online and offline equal. dedup_key (e.g. player_id:client_event_id) is unique,
--- so a re-synced offline event or duplicate delivery is counted once.
 CREATE TABLE public.business_royalty_plays (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id uuid NOT NULL REFERENCES public.business_royalty_periods(id) ON DELETE RESTRICT,
   location_id uuid NOT NULL,
   audio_item_id uuid NOT NULL,
+  played_on date NOT NULL,
   played_ms bigint NOT NULL CHECK (played_ms > 0),
   offline boolean NOT NULL DEFAULT false,
   dedup_key text NOT NULL UNIQUE CHECK (length(dedup_key) BETWEEN 1 AND 200),
@@ -132,12 +138,13 @@ CREATE TABLE public.business_royalty_plays (
 );
 CREATE INDEX business_royalty_plays_period_location_idx ON public.business_royalty_plays(period_id, location_id);
 
--- Calculation runs (versioned history) and per-point results.
+-- ---------------------------------------------------------------- results
 CREATE TABLE public.business_royalty_calc_runs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id uuid NOT NULL REFERENCES public.business_royalty_periods(id) ON DELETE RESTRICT,
   formula_version_id uuid NOT NULL REFERENCES public.business_royalty_formula_versions(id) ON DELETE RESTRICT,
   run_no integer NOT NULL CHECK (run_no >= 1),
+  mode text NOT NULL CHECK (mode IN ('full', 'adjustment')),
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT business_royalty_calc_runs_unique UNIQUE (period_id, run_no)
 );
@@ -157,125 +164,185 @@ CREATE TABLE public.business_royalty_point_results (
   status text NOT NULL CHECK (status IN ('distributed', 'held_no_plays')),
   CONSTRAINT business_royalty_point_results_unique UNIQUE (run_id, location_id),
   CONSTRAINT business_royalty_point_results_split_check CHECK (author_fund_minor + audiolad_income_minor = base_minor),
-  CONSTRAINT business_royalty_point_results_dist_check CHECK (distributed_minor <= author_fund_minor),
-  CONSTRAINT business_royalty_point_results_hold_check CHECK (status <> 'held_no_plays' OR distributed_minor = 0)
+  CONSTRAINT business_royalty_point_results_dist_check CHECK (
+    (status = 'distributed' AND distributed_minor = author_fund_minor)
+    OR (status = 'held_no_plays' AND distributed_minor = 0))
 );
 
--- Accrual = per point x rightsholder x layer. States are separate:
--- calculation_state: preliminary -> approved (approved accrual) | superseded | void;
--- payout_state: none -> in_payout -> paid (actual payout), only for approved + payable.
+-- entry_kind: calculation (first full result) | adjustment (delta after approval, or explicit reversal).
+-- calculation_state forward-only: preliminary -> approved | superseded | void; approved/superseded/void terminal.
+-- payout_state forward-only: none -> in_payout -> paid; only approved + payable.
 CREATE TABLE public.business_royalty_accruals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  run_id uuid NOT NULL REFERENCES public.business_royalty_calc_runs(id) ON DELETE RESTRICT,
+  run_id uuid NULL REFERENCES public.business_royalty_calc_runs(id) ON DELETE RESTRICT,
   period_id uuid NOT NULL REFERENCES public.business_royalty_periods(id) ON DELETE RESTRICT,
   location_id uuid NOT NULL,
   rightsholder_id uuid NOT NULL REFERENCES public.music_rightsholders(id) ON DELETE RESTRICT,
   rights_layer text NOT NULL CHECK (rights_layer IN ('composition', 'recording')),
+  entry_kind text NOT NULL DEFAULT 'calculation' CHECK (entry_kind IN ('calculation', 'adjustment')),
   holder_ms numeric(20,4) NOT NULL CHECK (holder_ms >= 0),
-  point_confirmed_ms bigint NOT NULL CHECK (point_confirmed_ms > 0),
+  point_confirmed_ms bigint NOT NULL CHECK (point_confirmed_ms >= 0),
   author_fund_minor bigint NOT NULL CHECK (author_fund_minor >= 0),
-  amount_minor bigint NOT NULL CHECK (amount_minor >= 0),
+  amount_minor bigint NOT NULL,
   calculation_basis jsonb NOT NULL CHECK (jsonb_typeof(calculation_basis) = 'object'),
   settlement_mode text NOT NULL CHECK (settlement_mode IN ('payable', 'management')),
   calculation_state text NOT NULL DEFAULT 'preliminary'
     CHECK (calculation_state IN ('preliminary', 'approved', 'superseded', 'void')),
   payout_state text NOT NULL DEFAULT 'none' CHECK (payout_state IN ('none', 'in_payout', 'paid')),
+  reverses_id uuid NULL REFERENCES public.business_royalty_accruals(id) ON DELETE RESTRICT,
+  reason text NULL CHECK (reason IS NULL OR length(reason) <= 500),
+  actor text NOT NULL DEFAULT current_user,
   operator_id_snapshot uuid NULL REFERENCES public.business_service_operators(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT business_royalty_accruals_unique UNIQUE (run_id, location_id, rightsholder_id, rights_layer),
+  CONSTRAINT business_royalty_accruals_amount_check CHECK (entry_kind = 'adjustment' OR amount_minor >= 0),
+  CONSTRAINT business_royalty_accruals_reversal_check CHECK (
+    reverses_id IS NULL OR (entry_kind = 'adjustment' AND reason IS NOT NULL)),
+  CONSTRAINT business_royalty_accruals_run_check CHECK (run_id IS NOT NULL OR reverses_id IS NOT NULL),
   CONSTRAINT business_royalty_accruals_payout_check CHECK (
     payout_state = 'none' OR (calculation_state = 'approved' AND settlement_mode = 'payable'))
 );
+CREATE UNIQUE INDEX business_royalty_accruals_run_key_uidx
+  ON public.business_royalty_accruals(run_id, location_id, rightsholder_id, rights_layer) WHERE run_id IS NOT NULL;
+CREATE UNIQUE INDEX business_royalty_accruals_reverses_uidx
+  ON public.business_royalty_accruals(reverses_id) WHERE reverses_id IS NOT NULL;
 CREATE INDEX business_royalty_accruals_holder_idx ON public.business_royalty_accruals(rightsholder_id, period_id);
 
--- Pure computation (no writes). Returns one row per point x rightsholder x layer,
--- or one row with NULL rightsholder for a point that is held (no confirmed plays).
+-- ---------------------------------------------------------------- validation
+CREATE FUNCTION public.business_royalty_allocation_issues(p_period_id uuid)
+RETURNS TABLE (payment_id uuid, issue text)
+LANGUAGE sql STABLE SET search_path = public, pg_temp AS $$
+  SELECT p.id,
+    CASE
+      WHEN count(a.id) = 0 THEN 'unallocated'
+      WHEN p.allocation_rule = 'single_point' AND count(a.id) <> 1 THEN 'single_point_requires_one_point'
+      WHEN p.allocation_rule = 'fixed_amounts' AND (count(a.fixed_amount_minor) <> count(a.id)
+        OR sum(a.fixed_amount_minor) <> p.amount_minor) THEN 'fixed_amounts_sum_mismatch'
+      WHEN p.allocation_rule = 'weighted' AND count(a.weight) <> count(a.id) THEN 'weight_missing'
+    END
+  FROM public.business_royalty_payments p
+  LEFT JOIN public.business_royalty_payment_allocations a ON a.payment_id = p.id
+  WHERE p.period_id = p_period_id
+  GROUP BY p.id, p.allocation_rule, p.amount_minor
+  HAVING CASE
+      WHEN count(a.id) = 0 THEN true
+      WHEN p.allocation_rule = 'single_point' AND count(a.id) <> 1 THEN true
+      WHEN p.allocation_rule = 'fixed_amounts' AND (count(a.fixed_amount_minor) <> count(a.id)
+        OR sum(a.fixed_amount_minor) <> p.amount_minor) THEN true
+      WHEN p.allocation_rule = 'weighted' AND count(a.weight) <> count(a.id) THEN true
+      ELSE false END
+$$;
+COMMENT ON FUNCTION public.business_royalty_allocation_issues(uuid) IS
+  'Visible list of payments that cannot be attributed (unallocated / wrong single_point / fixed sum mismatch / missing weight). A run is rejected while any exist.';
+
+-- ---------------------------------------------------------------- computation (pure)
 CREATE FUNCTION public.business_royalty_compute(p_period_id uuid, p_formula_version_id uuid)
 RETURNS TABLE (
   location_id uuid, payments_minor bigint, deductions_minor bigint, raw_base_minor bigint, base_minor bigint,
   author_fund_minor bigint, audiolad_income_minor bigint, confirmed_ms bigint,
   rightsholder_id uuid, rights_layer text, holder_ms numeric, amount_minor bigint, point_status text)
 LANGUAGE sql STABLE SET search_path = public, pg_temp AS $$
-  WITH per AS (SELECT period_month AS m FROM public.business_royalty_periods WHERE id = p_period_id),
-  f AS (SELECT author_fund_bps FROM public.business_royalty_formula_versions WHERE id = p_formula_version_id),
-  pay AS (SELECT p.* FROM public.business_royalty_payments p WHERE p.period_id = p_period_id),
+  WITH f AS (SELECT author_fund_bps FROM public.business_royalty_formula_versions WHERE id = p_formula_version_id),
   alloc_raw AS (
-    SELECT a.payment_id, a.location_id, p.amount_minor AS pay_amount, p.allocation_rule,
+    SELECT a.payment_id, a.location_id, p.amount_minor AS pay_amount,
       CASE p.allocation_rule
         WHEN 'fixed_amounts' THEN a.fixed_amount_minor::numeric
         WHEN 'weighted' THEN p.amount_minor * a.weight / sum(a.weight) OVER (PARTITION BY a.payment_id)
         ELSE p.amount_minor::numeric / count(*) OVER (PARTITION BY a.payment_id)
-      END AS share_amt,
-      row_number() OVER (PARTITION BY a.payment_id ORDER BY a.location_id) AS rn,
-      count(*) OVER (PARTITION BY a.payment_id) AS n
-    FROM public.business_royalty_payment_allocations a JOIN pay p ON p.id = a.payment_id),
-  -- Truncate toward zero; the last point of a payment takes the remainder so allocations sum exactly.
+      END AS share
+    FROM public.business_royalty_payment_allocations a
+    JOIN public.business_royalty_payments p ON p.id = a.payment_id AND p.period_id = p_period_id),
+  alloc_f AS (SELECT *, floor(share)::bigint AS fl, share - floor(share) AS frac FROM alloc_raw),
+  -- Largest remainder: allocations of a payment sum to the payment exactly.
   alloc AS (
-    SELECT payment_id, alloc_raw.location_id, pay_amount,
-      CASE WHEN rn = n THEN pay_amount - coalesce(sum(trunc(share_amt)::bigint) OVER (PARTITION BY payment_id ORDER BY rn ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)
-           ELSE trunc(share_amt)::bigint END AS amt
-    FROM alloc_raw),
-  ded_approved AS (
-    SELECT d.* FROM public.business_royalty_deductions d WHERE d.period_id = p_period_id AND d.status = 'approved'),
+    SELECT payment_id, alloc_f.location_id, pay_amount,
+      fl + CASE WHEN row_number() OVER (PARTITION BY payment_id ORDER BY frac DESC, alloc_f.location_id)
+                     <= pay_amount - sum(fl) OVER (PARTITION BY payment_id) THEN 1 ELSE 0 END AS amt
+    FROM alloc_f),
+  ded_ok AS (SELECT d.* FROM public.business_royalty_deductions d WHERE d.period_id = p_period_id AND d.status = 'approved'),
+  ded_pay_f AS (
+    SELECT d.id AS did, d.amount_minor AS total, a.location_id,
+      floor(d.amount_minor::numeric * a.amt / a.pay_amount)::bigint AS fl,
+      d.amount_minor::numeric * a.amt / a.pay_amount - floor(d.amount_minor::numeric * a.amt / a.pay_amount) AS frac
+    FROM ded_ok d JOIN alloc a ON a.payment_id = d.payment_id),
+  -- Payment-linked deduction split by the payment allocation, largest remainder: sums to the document amount.
   ded AS (
-    SELECT d.location_id, d.amount_minor::numeric AS amt FROM ded_approved d WHERE d.location_id IS NOT NULL
+    SELECT d.location_id, d.amount_minor AS amt FROM ded_ok d WHERE d.location_id IS NOT NULL
     UNION ALL
-    SELECT a.location_id, d.amount_minor::numeric * a.amt / a.pay_amount
-    FROM ded_approved d JOIN alloc a ON a.payment_id = d.payment_id),
+    SELECT ded_pay_f.location_id, fl + CASE WHEN row_number() OVER (PARTITION BY did ORDER BY frac DESC, ded_pay_f.location_id)
+                     <= total - sum(fl) OVER (PARTITION BY did) THEN 1 ELSE 0 END
+    FROM ded_pay_f),
+  plays AS (
+    SELECT pl.* FROM public.business_royalty_plays pl WHERE pl.period_id = p_period_id AND pl.confirmed),
+  play_shares AS (
+    SELECT pl.id AS play_id, pl.location_id, pl.played_ms, s.rightsholder_id, s.rights_layer, s.share_bps
+    FROM plays pl JOIN public.business_royalty_track_shares s ON s.audio_item_id = pl.audio_item_id
+      AND s.valid_from <= pl.played_on AND (s.valid_until IS NULL OR s.valid_until > pl.played_on)),
+  admitted AS (SELECT play_id FROM play_shares GROUP BY play_id HAVING sum(share_bps) = 10000),
   points AS (
-    SELECT l AS location_id FROM (SELECT alloc.location_id AS l FROM alloc UNION SELECT ded.location_id FROM ded
-      UNION SELECT pl.location_id FROM public.business_royalty_plays pl WHERE pl.period_id = p_period_id) x),
+    SELECT alloc.location_id FROM alloc UNION SELECT ded.location_id FROM ded UNION SELECT plays.location_id FROM plays),
   money AS (
     SELECT pt.location_id,
       coalesce((SELECT sum(amt) FROM alloc WHERE alloc.location_id = pt.location_id), 0)::bigint AS payments_minor,
-      coalesce((SELECT round(sum(amt)) FROM ded WHERE ded.location_id = pt.location_id), 0)::bigint AS deductions_minor
+      coalesce((SELECT sum(amt) FROM ded WHERE ded.location_id = pt.location_id), 0)::bigint AS deductions_minor
     FROM points pt),
   base AS (
-    SELECT m.*, (m.payments_minor - m.deductions_minor) AS raw_base,
+    SELECT m.*, m.payments_minor - m.deductions_minor AS raw_base,
       greatest(m.payments_minor - m.deductions_minor, 0) AS base,
       floor(greatest(m.payments_minor - m.deductions_minor, 0) * (SELECT author_fund_bps FROM f) / 10000.0)::bigint AS fund
     FROM money m),
-  admitted AS (
-    SELECT s.audio_item_id FROM public.business_royalty_track_shares s, per
-    WHERE s.valid_from <= per.m AND (s.valid_until IS NULL OR s.valid_until > per.m)
-    GROUP BY s.audio_item_id HAVING sum(s.share_bps) = 10000),
-  plays AS (
-    SELECT pl.location_id, pl.audio_item_id, sum(pl.played_ms) AS ms
-    FROM public.business_royalty_plays pl JOIN admitted ad ON ad.audio_item_id = pl.audio_item_id
-    WHERE pl.period_id = p_period_id AND pl.confirmed GROUP BY 1, 2),
-  totals AS (SELECT plays.location_id, sum(ms)::bigint AS total_ms FROM plays GROUP BY 1),
+  totals AS (
+    SELECT pl.location_id, sum(pl.played_ms)::bigint AS total_ms
+    FROM plays pl JOIN admitted ad ON ad.play_id = pl.id GROUP BY 1),
   holders AS (
-    SELECT pl.location_id, s.rightsholder_id, s.rights_layer, sum(pl.ms * s.share_bps / 10000.0) AS hms
-    FROM plays pl JOIN public.business_royalty_track_shares s ON s.audio_item_id = pl.audio_item_id, per
-    WHERE s.valid_from <= per.m AND (s.valid_until IS NULL OR s.valid_until > per.m)
-    GROUP BY 1, 2, 3)
+    SELECT ps.location_id, ps.rightsholder_id, ps.rights_layer, sum(ps.played_ms * ps.share_bps / 10000.0) AS hms
+    FROM play_shares ps JOIN admitted ad ON ad.play_id = ps.play_id GROUP BY 1, 2, 3),
+  dist_f AS (
+    SELECT b.location_id, b.fund, t.total_ms, h.rightsholder_id, h.rights_layer, h.hms,
+      floor(b.fund * h.hms / t.total_ms)::bigint AS fl,
+      b.fund * h.hms / t.total_ms - floor(b.fund * h.hms / t.total_ms) AS frac
+    FROM base b JOIN totals t ON t.location_id = b.location_id
+    JOIN holders h ON h.location_id = b.location_id),
+  -- Largest remainder: holders of a point receive exactly the whole fund.
+  dist AS (
+    SELECT dist_f.location_id, rightsholder_id, rights_layer, hms,
+      fl + CASE WHEN row_number() OVER (PARTITION BY dist_f.location_id ORDER BY frac DESC, rightsholder_id, rights_layer)
+                     <= fund - sum(fl) OVER (PARTITION BY dist_f.location_id) THEN 1 ELSE 0 END AS amt
+    FROM dist_f)
   SELECT b.location_id, b.payments_minor, b.deductions_minor, b.raw_base, b.base, b.fund, b.base - b.fund,
-    coalesce(t.total_ms, 0), h.rightsholder_id, h.rights_layer, h.hms,
-    CASE WHEN h.rightsholder_id IS NULL THEN 0 ELSE floor(b.fund * h.hms / t.total_ms)::bigint END,
+    coalesce(t.total_ms, 0), d.rightsholder_id, d.rights_layer, d.hms, coalesce(d.amt, 0),
     CASE WHEN coalesce(t.total_ms, 0) = 0 THEN 'held_no_plays' ELSE 'distributed' END
   FROM base b
   LEFT JOIN totals t ON t.location_id = b.location_id
-  LEFT JOIN holders h ON h.location_id = b.location_id AND coalesce(t.total_ms, 0) > 0
+  LEFT JOIN dist d ON d.location_id = b.location_id
 $$;
 COMMENT ON FUNCTION public.business_royalty_compute(uuid, uuid) IS
-  'Pure calculation. Base clamped at 0 (fund never negative). Points without confirmed plays are held_no_plays: fund not distributed until reconciliation.';
+  'Pure calculation. Base clamped at 0. Largest-remainder rounding (allocations, deductions, royalties). Shares matched per play date. Points without confirmed plays are held_no_plays.';
 
--- Records a new preliminary run (history); previous preliminary accruals of the period become superseded.
+-- ---------------------------------------------------------------- recording a run
+-- Before any approval in the period: full preliminary calculation. After an approval: adjustment deltas only
+-- (new result - sum of approved entries per point/holder/layer). Previous preliminary entries are superseded.
 CREATE FUNCTION public.business_royalty_run_preliminary(p_period_id uuid, p_formula_version_id uuid)
 RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp AS $$
-DECLARE v_run uuid; v_no integer; v_month date; v_op record;
+DECLARE v_run uuid; v_no integer; v_month date; v_status text; v_op record; v_mode text; v_bad integer;
 BEGIN
-  SELECT period_month INTO v_month FROM public.business_royalty_periods WHERE id = p_period_id AND status <> 'closed';
-  IF v_month IS NULL THEN RAISE EXCEPTION 'business_royalty_period_not_open'; END IF;
+  -- Row lock serialises concurrent runs of one period (run numbering, supersede, delta base).
+  SELECT period_month, status INTO v_month, v_status FROM public.business_royalty_periods WHERE id = p_period_id FOR UPDATE;
+  IF v_month IS NULL THEN RAISE EXCEPTION 'business_royalty_period_not_found'; END IF;
+  IF v_status = 'closed' THEN RAISE EXCEPTION 'business_royalty_period_closed'; END IF;
+  SELECT count(*) INTO v_bad FROM public.business_royalty_allocation_issues(p_period_id);
+  IF v_bad > 0 THEN RAISE EXCEPTION 'business_royalty_payment_allocation_invalid'; END IF;
+  v_mode := CASE WHEN EXISTS (SELECT 1 FROM public.business_royalty_accruals
+    WHERE period_id = p_period_id AND calculation_state = 'approved') THEN 'adjustment' ELSE 'full' END;
   SELECT coalesce(max(run_no), 0) + 1 INTO v_no FROM public.business_royalty_calc_runs WHERE period_id = p_period_id;
-  INSERT INTO public.business_royalty_calc_runs (period_id, formula_version_id, run_no)
-    VALUES (p_period_id, p_formula_version_id, v_no) RETURNING id INTO v_run;
+  INSERT INTO public.business_royalty_calc_runs (period_id, formula_version_id, run_no, mode)
+    VALUES (p_period_id, p_formula_version_id, v_no, v_mode) RETURNING id INTO v_run;
   UPDATE public.business_royalty_accruals SET calculation_state = 'superseded'
-    WHERE period_id = p_period_id AND calculation_state = 'preliminary' AND run_id <> v_run;
+    WHERE period_id = p_period_id AND calculation_state = 'preliminary';
   SELECT * INTO v_op FROM public.business_service_operators o
     WHERE o.active_from <= v_month AND (o.active_until IS NULL OR o.active_until > v_month)
     ORDER BY o.active_from DESC LIMIT 1;
-  CREATE TEMP TABLE IF NOT EXISTS _roy_calc ON COMMIT DROP AS SELECT * FROM public.business_royalty_compute(p_period_id, p_formula_version_id) LIMIT 0;
+  CREATE TEMP TABLE IF NOT EXISTS _roy_calc ON COMMIT DROP AS
+    SELECT * FROM public.business_royalty_compute(p_period_id, p_formula_version_id) LIMIT 0;
   DELETE FROM _roy_calc;
   INSERT INTO _roy_calc SELECT * FROM public.business_royalty_compute(p_period_id, p_formula_version_id);
   INSERT INTO public.business_royalty_point_results (run_id, location_id, payments_minor, deductions_minor, raw_base_minor,
@@ -283,89 +350,189 @@ BEGIN
     SELECT v_run, c.location_id, max(c.payments_minor), max(c.deductions_minor), max(c.raw_base_minor), max(c.base_minor),
       max(c.author_fund_minor), max(c.audiolad_income_minor), max(c.confirmed_ms), sum(c.amount_minor), max(c.point_status)
     FROM _roy_calc c GROUP BY c.location_id;
-  INSERT INTO public.business_royalty_accruals (run_id, period_id, location_id, rightsholder_id, rights_layer, holder_ms,
-      point_confirmed_ms, author_fund_minor, amount_minor, calculation_basis, settlement_mode, operator_id_snapshot)
-    SELECT v_run, p_period_id, c.location_id, c.rightsholder_id, c.rights_layer, c.holder_ms, c.confirmed_ms,
-      c.author_fund_minor, c.amount_minor,
+  INSERT INTO public.business_royalty_accruals (run_id, period_id, location_id, rightsholder_id, rights_layer, entry_kind,
+      holder_ms, point_confirmed_ms, author_fund_minor, amount_minor, calculation_basis, settlement_mode, operator_id_snapshot)
+    SELECT v_run, p_period_id, k.location_id, k.rightsholder_id, k.rights_layer,
+      CASE v_mode WHEN 'full' THEN 'calculation' ELSE 'adjustment' END,
+      coalesce(c.holder_ms, 0), coalesce(c.confirmed_ms, 0), coalesce(c.author_fund_minor, 0),
+      coalesce(c.amount_minor, 0) - coalesce(ap.amt, 0),
       jsonb_build_object('payments_minor', c.payments_minor, 'deductions_minor', c.deductions_minor,
-        'base_minor', c.base_minor, 'raw_base_minor', c.raw_base_minor, 'formula_version_id', p_formula_version_id),
-      CASE WHEN c.rightsholder_id = v_op.same_subject_rightsholder_id THEN 'management' ELSE 'payable' END, v_op.id
-    FROM _roy_calc c WHERE c.rightsholder_id IS NOT NULL;
+        'base_minor', c.base_minor, 'raw_base_minor', c.raw_base_minor, 'new_amount_minor', coalesce(c.amount_minor, 0),
+        'approved_before_minor', coalesce(ap.amt, 0), 'formula_version_id', p_formula_version_id, 'mode', v_mode),
+      CASE WHEN k.rightsholder_id = v_op.same_subject_rightsholder_id THEN 'management' ELSE 'payable' END, v_op.id
+    FROM (SELECT c0.location_id, c0.rightsholder_id, c0.rights_layer FROM _roy_calc c0 WHERE c0.rightsholder_id IS NOT NULL
+          UNION
+          SELECT a0.location_id, a0.rightsholder_id, a0.rights_layer FROM public.business_royalty_accruals a0
+          WHERE a0.period_id = p_period_id AND a0.calculation_state = 'approved') k
+    LEFT JOIN _roy_calc c ON c.location_id = k.location_id AND c.rightsholder_id = k.rightsholder_id AND c.rights_layer = k.rights_layer
+    LEFT JOIN (SELECT a1.location_id, a1.rightsholder_id, a1.rights_layer, sum(a1.amount_minor) AS amt
+               FROM public.business_royalty_accruals a1 WHERE a1.period_id = p_period_id AND a1.calculation_state = 'approved'
+               GROUP BY 1, 2, 3) ap
+      ON ap.location_id = k.location_id AND ap.rightsholder_id = k.rightsholder_id AND ap.rights_layer = k.rights_layer
+    WHERE v_mode = 'full' OR coalesce(c.amount_minor, 0) - coalesce(ap.amt, 0) <> 0;
   RETURN v_run;
 END $$;
 
--- Guards: accruals append-only, money immutable; approval needs an approved formula.
+-- Explicit audited reversal of an approved entry: a new adjustment with the opposite amount and a reason.
+CREATE FUNCTION public.business_royalty_reverse_accrual(p_accrual_id uuid, p_reason text)
+RETURNS uuid LANGUAGE plpgsql SECURITY INVOKER SET search_path = public, pg_temp AS $$
+DECLARE o public.business_royalty_accruals; v_id uuid; v_status text;
+BEGIN
+  IF p_reason IS NULL OR length(btrim(p_reason)) = 0 THEN RAISE EXCEPTION 'business_royalty_reason_required'; END IF;
+  SELECT * INTO o FROM public.business_royalty_accruals WHERE id = p_accrual_id FOR UPDATE;
+  IF o.id IS NULL OR o.calculation_state <> 'approved' THEN RAISE EXCEPTION 'business_royalty_reverse_requires_approved'; END IF;
+  SELECT status INTO v_status FROM public.business_royalty_periods WHERE id = o.period_id;
+  IF v_status = 'closed' THEN RAISE EXCEPTION 'business_royalty_period_closed'; END IF;
+  INSERT INTO public.business_royalty_accruals (run_id, period_id, location_id, rightsholder_id, rights_layer, entry_kind,
+      holder_ms, point_confirmed_ms, author_fund_minor, amount_minor, calculation_basis, settlement_mode,
+      reverses_id, reason, operator_id_snapshot)
+    VALUES (NULL, o.period_id, o.location_id, o.rightsholder_id, o.rights_layer, 'adjustment', 0, 0, 0, -o.amount_minor,
+      jsonb_build_object('reversal_of', o.id), o.settlement_mode, o.id, p_reason, o.operator_id_snapshot)
+    RETURNING id INTO v_id;
+  RETURN v_id;
+END $$;
+
+-- ---------------------------------------------------------------- guards
 CREATE FUNCTION public.business_royalty_accrual_guard()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
 DECLARE v_status text;
 BEGIN
   IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'business_royalty_append_only'; END IF;
-  IF TG_OP = 'UPDATE' AND (NEW.run_id, NEW.location_id, NEW.rightsholder_id, NEW.rights_layer, NEW.holder_ms, NEW.amount_minor,
-      NEW.author_fund_minor, NEW.calculation_basis, NEW.settlement_mode)
-    IS DISTINCT FROM (OLD.run_id, OLD.location_id, OLD.rightsholder_id, OLD.rights_layer, OLD.holder_ms, OLD.amount_minor,
-      OLD.author_fund_minor, OLD.calculation_basis, OLD.settlement_mode) THEN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.calculation_state <> 'preliminary' OR NEW.payout_state <> 'none' THEN
+      RAISE EXCEPTION 'business_royalty_accrual_must_start_preliminary';
+    END IF;
+    SELECT status INTO v_status FROM public.business_royalty_periods WHERE id = NEW.period_id;
+    IF v_status = 'closed' THEN RAISE EXCEPTION 'business_royalty_period_closed'; END IF;
+    RETURN NEW;
+  END IF;
+  IF (NEW.run_id, NEW.period_id, NEW.location_id, NEW.rightsholder_id, NEW.rights_layer, NEW.entry_kind, NEW.holder_ms,
+      NEW.amount_minor, NEW.author_fund_minor, NEW.calculation_basis, NEW.settlement_mode, NEW.reverses_id, NEW.reason,
+      NEW.actor, NEW.operator_id_snapshot, NEW.created_at)
+    IS DISTINCT FROM (OLD.run_id, OLD.period_id, OLD.location_id, OLD.rightsholder_id, OLD.rights_layer, OLD.entry_kind, OLD.holder_ms,
+      OLD.amount_minor, OLD.author_fund_minor, OLD.calculation_basis, OLD.settlement_mode, OLD.reverses_id, OLD.reason,
+      OLD.actor, OLD.operator_id_snapshot, OLD.created_at) THEN
     RAISE EXCEPTION 'business_royalty_accrual_immutable';
   END IF;
-  IF NEW.calculation_state = 'approved' AND (TG_OP = 'INSERT' OR OLD.calculation_state <> 'approved') THEN
-    SELECT f.status INTO v_status FROM public.business_royalty_calc_runs r
-      JOIN public.business_royalty_formula_versions f ON f.id = r.formula_version_id WHERE r.id = NEW.run_id;
-    IF v_status IS DISTINCT FROM 'approved' THEN RAISE EXCEPTION 'business_royalty_formula_not_approved'; END IF;
+  IF NEW.calculation_state IS DISTINCT FROM OLD.calculation_state THEN
+    IF NOT (OLD.calculation_state = 'preliminary' AND NEW.calculation_state IN ('approved', 'superseded', 'void')) THEN
+      RAISE EXCEPTION 'business_royalty_accrual_state_transition';
+    END IF;
+    IF NEW.calculation_state = 'approved' THEN
+      IF NEW.run_id IS NOT NULL THEN
+        SELECT f.status INTO v_status FROM public.business_royalty_calc_runs r
+          JOIN public.business_royalty_formula_versions f ON f.id = r.formula_version_id WHERE r.id = NEW.run_id;
+        IF v_status IS DISTINCT FROM 'approved' THEN RAISE EXCEPTION 'business_royalty_formula_not_approved'; END IF;
+      END IF;
+    END IF;
+  END IF;
+  IF NEW.payout_state IS DISTINCT FROM OLD.payout_state THEN
+    IF NOT ((OLD.payout_state = 'none' AND NEW.payout_state = 'in_payout')
+         OR (OLD.payout_state = 'in_payout' AND NEW.payout_state = 'paid')) THEN
+      RAISE EXCEPTION 'business_royalty_payout_state_transition';
+    END IF;
   END IF;
   RETURN NEW;
 END $$;
 CREATE TRIGGER business_royalty_accruals_guard BEFORE INSERT OR UPDATE OR DELETE ON public.business_royalty_accruals
   FOR EACH ROW EXECUTE FUNCTION public.business_royalty_accrual_guard();
 
-CREATE FUNCTION public.business_royalty_history_guard()
+-- Append-only registries with narrowly allowed forward transitions.
+CREATE FUNCTION public.business_royalty_registry_guard()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+DECLARE o jsonb; n jsonb; v_status text; v_period uuid;
 BEGIN
   IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'business_royalty_append_only'; END IF;
-  IF TG_TABLE_NAME = 'business_royalty_deductions' THEN
-    IF (NEW.amount_minor, NEW.category, NEW.location_id, NEW.payment_id, NEW.document_reference)
-        IS DISTINCT FROM (OLD.amount_minor, OLD.category, OLD.location_id, OLD.payment_id, OLD.document_reference) THEN
-      RAISE EXCEPTION 'business_royalty_deduction_immutable';
+  IF TG_OP = 'INSERT' THEN
+    IF TG_TABLE_NAME = 'business_royalty_payment_allocations' THEN
+      SELECT period_id INTO v_period FROM public.business_royalty_payments WHERE id = NEW.payment_id;
+    ELSIF TG_TABLE_NAME IN ('business_royalty_payments', 'business_royalty_deductions', 'business_royalty_plays') THEN
+      v_period := NEW.period_id;
     END IF;
+    IF v_period IS NOT NULL THEN
+      SELECT status INTO v_status FROM public.business_royalty_periods WHERE id = v_period;
+      IF v_status = 'closed' THEN RAISE EXCEPTION 'business_royalty_period_closed'; END IF;
+    END IF;
+    IF TG_TABLE_NAME = 'business_royalty_plays' THEN
+      IF NOT EXISTS (SELECT 1 FROM public.business_royalty_periods p
+          WHERE p.id = NEW.period_id AND NEW.played_on >= p.period_month AND NEW.played_on < (p.period_month + interval '1 month')::date) THEN
+        RAISE EXCEPTION 'business_royalty_play_outside_period';
+      END IF;
+    ELSIF TG_TABLE_NAME = 'business_royalty_track_shares' THEN
+      IF EXISTS (SELECT 1 FROM public.business_royalty_track_shares s
+          WHERE s.audio_item_id = NEW.audio_item_id AND s.rightsholder_id = NEW.rightsholder_id AND s.rights_layer = NEW.rights_layer
+            AND s.valid_from < coalesce(NEW.valid_until, 'infinity'::date) AND NEW.valid_from < coalesce(s.valid_until, 'infinity'::date)) THEN
+        RAISE EXCEPTION 'business_royalty_share_overlap';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
+  -- UPDATE
+  o := to_jsonb(OLD); n := to_jsonb(NEW);
+  IF TG_TABLE_NAME = 'business_royalty_track_shares' THEN
+    IF OLD.valid_until IS NULL AND NEW.valid_until IS NOT NULL AND (o - 'valid_until') = (n - 'valid_until') THEN RETURN NEW; END IF;
+  ELSIF TG_TABLE_NAME = 'business_service_operators' THEN
+    IF OLD.active_until IS NULL AND NEW.active_until IS NOT NULL AND (o - 'active_until') = (n - 'active_until') THEN RETURN NEW; END IF;
+  ELSIF TG_TABLE_NAME = 'business_royalty_periods' THEN
+    IF (o - 'status') = (n - 'status') AND (
+        (OLD.status = 'open' AND NEW.status IN ('reconciliation', 'closed'))
+        OR (OLD.status = 'reconciliation' AND NEW.status = 'closed')) THEN RETURN NEW; END IF;
   ELSIF TG_TABLE_NAME = 'business_royalty_formula_versions' THEN
-    IF NEW.author_fund_bps IS DISTINCT FROM OLD.author_fund_bps THEN
-      RAISE EXCEPTION 'business_royalty_formula_immutable';
-    END IF;
+    IF (o - ARRAY['status', 'approved_by', 'approved_at', 'approval_document']) = (n - ARRAY['status', 'approved_by', 'approved_at', 'approval_document'])
+       AND ((OLD.status = 'proposed' AND NEW.status IN ('approved', 'retired'))
+         OR (OLD.status = 'approved' AND NEW.status = 'retired'
+             AND (o - 'status') = (n - 'status'))) THEN RETURN NEW; END IF;
+  ELSIF TG_TABLE_NAME = 'business_royalty_deductions' THEN
+    IF (o - ARRAY['status', 'approved_by', 'approved_at']) = (n - ARRAY['status', 'approved_by', 'approved_at'])
+       AND ((OLD.status = 'proposed' AND NEW.status IN ('approved', 'rejected'))
+         OR (OLD.status = 'approved' AND NEW.status = 'superseded'
+             AND (o - 'status') = (n - 'status'))) THEN RETURN NEW; END IF;
   END IF;
-  IF TG_TABLE_NAME IN ('business_royalty_point_results', 'business_royalty_calc_runs', 'business_royalty_plays', 'business_royalty_payments') THEN
-    RAISE EXCEPTION 'business_royalty_append_only';
-  END IF;
-  RETURN NEW;
+  RAISE EXCEPTION 'business_royalty_append_only';
 END $$;
-CREATE TRIGGER business_royalty_deductions_guard BEFORE UPDATE OR DELETE ON public.business_royalty_deductions
-  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_history_guard();
-CREATE TRIGGER business_royalty_formula_guard BEFORE UPDATE OR DELETE ON public.business_royalty_formula_versions
-  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_history_guard();
-CREATE TRIGGER business_royalty_point_results_guard BEFORE UPDATE OR DELETE ON public.business_royalty_point_results
-  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_history_guard();
-CREATE TRIGGER business_royalty_calc_runs_guard BEFORE UPDATE OR DELETE ON public.business_royalty_calc_runs
-  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_history_guard();
-CREATE TRIGGER business_royalty_plays_guard BEFORE UPDATE OR DELETE ON public.business_royalty_plays
-  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_history_guard();
-CREATE TRIGGER business_royalty_payments_guard BEFORE UPDATE OR DELETE ON public.business_royalty_payments
-  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_history_guard();
 
-ALTER TABLE public.business_service_operators ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_formula_versions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_periods ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_payment_allocations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_deductions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_track_shares ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_plays ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_calc_runs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_point_results ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.business_royalty_accruals ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.business_service_operators, public.business_royalty_formula_versions, public.business_royalty_periods,
-  public.business_royalty_payments, public.business_royalty_payment_allocations, public.business_royalty_deductions,
-  public.business_royalty_track_shares, public.business_royalty_plays, public.business_royalty_calc_runs,
-  public.business_royalty_point_results, public.business_royalty_accruals FROM PUBLIC, anon, authenticated;
+CREATE FUNCTION public.business_royalty_deduction_audit()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
+    INSERT INTO public.business_royalty_deduction_status_events (deduction_id, from_status, to_status)
+      VALUES (NEW.id, CASE WHEN TG_OP = 'UPDATE' THEN OLD.status END, NEW.status);
+  END IF;
+  RETURN NULL;
+END $$;
+CREATE TRIGGER business_royalty_deductions_audit AFTER INSERT OR UPDATE ON public.business_royalty_deductions
+  FOR EACH ROW EXECUTE FUNCTION public.business_royalty_deduction_audit();
+
+CREATE FUNCTION public.business_royalty_no_truncate()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN RAISE EXCEPTION 'business_royalty_append_only'; END $$;
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['business_service_operators', 'business_royalty_formula_versions', 'business_royalty_periods',
+    'business_royalty_payments', 'business_royalty_payment_allocations', 'business_royalty_deductions',
+    'business_royalty_deduction_status_events', 'business_royalty_track_shares', 'business_royalty_plays',
+    'business_royalty_calc_runs', 'business_royalty_point_results'] LOOP
+    EXECUTE format('CREATE TRIGGER %I BEFORE INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.business_royalty_registry_guard()', t || '_guard', t);
+  END LOOP;
+  FOREACH t IN ARRAY ARRAY['business_service_operators', 'business_royalty_formula_versions', 'business_royalty_periods',
+    'business_royalty_payments', 'business_royalty_payment_allocations', 'business_royalty_deductions',
+    'business_royalty_deduction_status_events', 'business_royalty_track_shares', 'business_royalty_plays',
+    'business_royalty_calc_runs', 'business_royalty_point_results', 'business_royalty_accruals'] LOOP
+    EXECUTE format('CREATE TRIGGER %I BEFORE TRUNCATE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.business_royalty_no_truncate()', t || '_no_truncate', t);
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC, anon, authenticated', t);
+  END LOOP;
+END $$;
+
+REVOKE ALL ON FUNCTION public.business_royalty_allocation_issues(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_compute(uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_run_preliminary(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_royalty_reverse_accrual(uuid, text) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.business_royalty_accrual_guard() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.business_royalty_history_guard() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_royalty_registry_guard() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_royalty_deduction_audit() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_royalty_no_truncate() FROM PUBLIC, anon, authenticated;
 
 COMMIT;

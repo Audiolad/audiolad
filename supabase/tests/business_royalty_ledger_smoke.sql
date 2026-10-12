@@ -1,6 +1,7 @@
 -- Isolated smoke for 20261229120000 (task 0e05333f, final concept 2026-10-12 10:20 MSK). Rolls back.
 BEGIN;
 CREATE FUNCTION pg_temp.u(text) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT md5($1)::uuid $$;
+CREATE FUNCTION pg_temp.d(text) RETURNS date LANGUAGE sql IMMUTABLE AS $$ SELECT CASE $1 WHEN 'p10' THEN date '2026-10-10' WHEN 'p11' THEN date '2026-11-10' WHEN 'p12' THEN date '2026-12-10' ELSE date '2027-01-10' END $$;
 CREATE FUNCTION pg_temp.eq(label text, got numeric, want numeric) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF got IS DISTINCT FROM want THEN RAISE EXCEPTION '% : got %, want %', label, got, want; END IF; END $$;
 CREATE FUNCTION pg_temp.holder(p_run uuid, p_holder text, p_loc text DEFAULT NULL) RETURNS numeric LANGUAGE sql AS $$
@@ -38,17 +39,17 @@ BEGIN
   INSERT INTO public.business_royalty_deductions (period_id, category, amount_minor, location_id, document_reference)
     VALUES (pg_temp.u('p10'), 'direct_point_service_cost', 5000, pg_temp.u('L1'), 'черновик');
   -- Offline: Olga 25 min online + 15 min offline (equal weight); duplicate offline sync ignored (Dedup).
-  INSERT INTO public.business_royalty_plays (period_id, location_id, audio_item_id, played_ms, offline, dedup_key) VALUES
-    (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tS'), 30*m, false, 'e1'),
-    (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 25*m, false, 'e2'),
-    (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 15*m, true, 'e3'),
-    (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tA'), 30*m, false, 'e4'),
-    (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tH'), 50*m, false, 'e5');  -- NotAdmitted: excluded from denominator
-  INSERT INTO public.business_royalty_plays (period_id, location_id, audio_item_id, played_ms, offline, dedup_key)
-    VALUES (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 15*m, true, 'e3') ON CONFLICT (dedup_key) DO NOTHING;
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, offline, dedup_key) VALUES
+    (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tS'), 30*m, false, 'e1'),
+    (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 25*m, false, 'e2'),
+    (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 15*m, true, 'e3'),
+    (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tA'), 30*m, false, 'e4'),
+    (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tH'), 50*m, false, 'e5');  -- NotAdmitted: excluded from denominator
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, offline, dedup_key)
+    VALUES (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 15*m, true, 'e3') ON CONFLICT (dedup_key) DO NOTHING;
   BEGIN
-    INSERT INTO public.business_royalty_plays (period_id, location_id, audio_item_id, played_ms, dedup_key)
-      VALUES (pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 15*m, 'e3');
+    INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key)
+      VALUES (pg_temp.d('p10'), pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tO'), 15*m, 'e3');
     RAISE EXCEPTION 'Dedup: duplicate event accepted';
   EXCEPTION WHEN unique_violation THEN NULL; END;
   r := public.business_royalty_run_preliminary(pg_temp.u('p10'), pg_temp.u('f1'));
@@ -84,7 +85,7 @@ BEGIN
       VALUES (pg_temp.u('p10'), 'marketing', 1, pg_temp.u('L1'), 'x');
     RAISE EXCEPTION 'expected'; EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN UPDATE public.business_royalty_formula_versions SET author_fund_bps = 4000 WHERE id = pg_temp.u('f1');
-    RAISE EXCEPTION 'expected'; EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'business_royalty_formula_immutable' THEN RAISE; END IF; END;
+    RAISE EXCEPTION 'expected'; EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'business_royalty_append_only' THEN RAISE; END IF; END;
 
   -- History: rerun -> run 2, run 1 preliminary superseded; then approve with approved formula.
   r2 := public.business_royalty_run_preliminary(pg_temp.u('p10'), pg_temp.u('f1'));
@@ -104,10 +105,10 @@ BEGIN
     (pg_temp.u('pay11'), pg_temp.u('L1'), 2), (pg_temp.u('pay11'), pg_temp.u('L2'), 1);
   INSERT INTO public.business_royalty_deductions (period_id, category, amount_minor, payment_id, document_reference, status, approved_by, approved_at)
     VALUES (pg_temp.u('p11'), 'sales_tax', 30000, pg_temp.u('pay11'), 'предварительно, до решения бухгалтера', 'approved', 'smoke', now());
-  INSERT INTO public.business_royalty_plays (period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
-    (pg_temp.u('p11'), pg_temp.u('L1'), pg_temp.u('tO'), 60*m, 'n1'),
-    (pg_temp.u('p11'), pg_temp.u('L1'), pg_temp.u('tA'), 30*m, 'n2'),
-    (pg_temp.u('p11'), pg_temp.u('L2'), pg_temp.u('tS'), 10*m, 'n3');
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
+    (pg_temp.d('p11'), pg_temp.u('p11'), pg_temp.u('L1'), pg_temp.u('tO'), 60*m, 'n1'),
+    (pg_temp.d('p11'), pg_temp.u('p11'), pg_temp.u('L1'), pg_temp.u('tA'), 30*m, 'n2'),
+    (pg_temp.d('p11'), pg_temp.u('p11'), pg_temp.u('L2'), pg_temp.u('tS'), 10*m, 'n3');
   r := public.business_royalty_run_preliminary(pg_temp.u('p11'), pg_temp.u('f1'));
   PERFORM pg_temp.eq('SharedPayment: L1 payments', (SELECT payments_minor FROM public.business_royalty_point_results WHERE run_id = r AND location_id = pg_temp.u('L1')), 200000);
   PERFORM pg_temp.eq('SharedPayment: L2 payments', (SELECT payments_minor FROM public.business_royalty_point_results WHERE run_id = r AND location_id = pg_temp.u('L2')), 100000);
@@ -128,8 +129,8 @@ BEGIN
     (pg_temp.u('a'), pg_temp.u('L1')), (pg_temp.u('b'), pg_temp.u('L1')), (pg_temp.u('c'), pg_temp.u('L2')), (pg_temp.u('d'), pg_temp.u('L2'));
   INSERT INTO public.business_royalty_deductions (period_id, category, amount_minor, location_id, document_reference, status, approved_by, approved_at)
     VALUES (pg_temp.u('p12'), 'direct_point_service_cost', 40000, pg_temp.u('L1'), 'акт', 'approved', 'smoke', now());
-  INSERT INTO public.business_royalty_plays (period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
-    (pg_temp.u('p12'), pg_temp.u('L1'), pg_temp.u('tO'), 10*m, 'd1'), (pg_temp.u('p12'), pg_temp.u('L2'), pg_temp.u('tS'), 10*m, 'd2');
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
+    (pg_temp.d('p12'), pg_temp.u('p12'), pg_temp.u('L1'), pg_temp.u('tO'), 10*m, 'd1'), (pg_temp.d('p12'), pg_temp.u('p12'), pg_temp.u('L2'), pg_temp.u('tS'), 10*m, 'd2');
   r := public.business_royalty_run_preliminary(pg_temp.u('p12'), pg_temp.u('f1'));
   SELECT * INTO pr FROM public.business_royalty_point_results WHERE run_id = r AND location_id = pg_temp.u('L1');
   PERFORM pg_temp.eq('NegativeClamp: raw base', pr.raw_base_minor, -20000);
@@ -149,6 +150,153 @@ BEGIN
   PERFORM pg_temp.eq('NoPlays: fund kept', pr.author_fund_minor, 50000);
   PERFORM pg_temp.eq('NoPlays: distributed', pr.distributed_minor, 0);
   PERFORM pg_temp.eq('NoPlays: accruals', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 0);
+END $$;
+
+-- ---------------------------------------------------------------- review fixes (PR #826 review @a84d92d9)
+CREATE FUNCTION pg_temp.expect_err(label text, stmt text, want text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  BEGIN EXECUTE stmt; EXCEPTION WHEN OTHERS THEN
+    IF want IS NOT NULL AND SQLERRM NOT LIKE want || '%' THEN RAISE EXCEPTION '% : got error %, want %', label, SQLERRM, want; END IF;
+    RETURN; END;
+  RAISE EXCEPTION '% : statement succeeded, expected %', label, want;
+END $$;
+INSERT INTO public.music_rightsholders (id, display_name, entity_type) VALUES (pg_temp.u('boris'), 'Борис', 'person');
+INSERT INTO public.business_royalty_periods (id, period_month) VALUES
+  (pg_temp.u('q02'), '2027-02-01'), (pg_temp.u('q03'), '2027-03-01'), (pg_temp.u('q04'), '2027-04-01'),
+  (pg_temp.u('q05'), '2027-05-01'), (pg_temp.u('q06'), '2027-06-01'), (pg_temp.u('q07'), '2027-07-01'), (pg_temp.u('q08'), '2027-08-01');
+DO $$
+DECLARE r uuid; r2 uuid; v uuid; pr record; m bigint := 60000;
+BEGIN
+  -- Rounding: fund 500.00 over three equal holders -> 166.67 + 166.67 + 166.66 = 500.00 exactly (largest remainder).
+  INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from) VALUES
+    (pg_temp.u('r1'), pg_temp.u('olga'), 'recording', 10000, '2027-01-01'),
+    (pg_temp.u('r2'), pg_temp.u('alex'), 'recording', 10000, '2027-01-01'),
+    (pg_temp.u('r3'), pg_temp.u('boris'), 'recording', 10000, '2027-01-01');
+  INSERT INTO public.business_royalty_payments (id, period_id, payment_reference, kind, amount_minor, allocation_rule, occurred_at)
+    VALUES (pg_temp.u('q02pay'), pg_temp.u('q02'), 'q02', 'payment', 100000, 'single_point', '2027-02-01');
+  INSERT INTO public.business_royalty_payment_allocations (payment_id, location_id) VALUES (pg_temp.u('q02pay'), pg_temp.u('L5'));
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
+    ('2027-02-02', pg_temp.u('q02'), pg_temp.u('L5'), pg_temp.u('r1'), 10*m, 'q02-1'),
+    ('2027-02-02', pg_temp.u('q02'), pg_temp.u('L5'), pg_temp.u('r2'), 10*m, 'q02-2'),
+    ('2027-02-02', pg_temp.u('q02'), pg_temp.u('L5'), pg_temp.u('r3'), 10*m, 'q02-3');
+  r := public.business_royalty_run_preliminary(pg_temp.u('q02'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('Rounding: distributed = fund', (SELECT sum(amount_minor) FROM public.business_royalty_accruals WHERE run_id = r), 50000);
+  PERFORM pg_temp.eq('Rounding: max', (SELECT max(amount_minor) FROM public.business_royalty_accruals WHERE run_id = r), 16667);
+  PERFORM pg_temp.eq('Rounding: min', (SELECT min(amount_minor) FROM public.business_royalty_accruals WHERE run_id = r), 16666);
+  PERFORM pg_temp.eq('Rounding: point distributed', (SELECT distributed_minor FROM public.business_royalty_point_results WHERE run_id = r), 50000);
+
+  -- StateMachine on approved run 2 of October.
+  r2 := (SELECT id FROM public.business_royalty_calc_runs WHERE period_id = pg_temp.u('p10') AND run_no = 2);
+  PERFORM pg_temp.expect_err('StateMachine: approved->preliminary', format(
+    'UPDATE public.business_royalty_accruals SET calculation_state = %L WHERE run_id = %L', 'preliminary', r2), 'business_royalty_accrual_state_transition');
+  PERFORM pg_temp.expect_err('StateMachine: approved->void', format(
+    'UPDATE public.business_royalty_accruals SET calculation_state = %L WHERE run_id = %L', 'void', r2), 'business_royalty_accrual_state_transition');
+  UPDATE public.business_royalty_accruals SET payout_state = 'paid' WHERE run_id = r2 AND rightsholder_id = pg_temp.u('olga');
+  PERFORM pg_temp.expect_err('StateMachine: paid->none', format(
+    'UPDATE public.business_royalty_accruals SET payout_state = %L WHERE run_id = %L AND rightsholder_id = %L', 'none', r2, pg_temp.u('olga')), 'business_royalty_payout_state_transition');
+  PERFORM pg_temp.expect_err('StateMachine: none->paid skip', format(
+    'UPDATE public.business_royalty_accruals SET payout_state = %L WHERE run_id = %L AND rightsholder_id = %L', 'paid', r2, pg_temp.u('alex')), 'business_royalty_payout_state_transition');
+  PERFORM pg_temp.expect_err('StateMachine: insert approved', format(
+    'INSERT INTO public.business_royalty_accruals (run_id, period_id, location_id, rightsholder_id, rights_layer, holder_ms, point_confirmed_ms, author_fund_minor, amount_minor, calculation_basis, settlement_mode, calculation_state) VALUES (%L, %L, %L, %L, %L, 0, 1, 0, 1, %L, %L, %L)',
+    r2, pg_temp.u('p10'), pg_temp.u('L9'), pg_temp.u('boris'), 'recording', '{}', 'payable', 'approved'), 'business_royalty_accrual_must_start_preliminary');
+
+  -- RecalcAfterApproval: one more confirmed play -> adjustment deltas only; approved + delta = new result.
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key)
+    VALUES ('2026-10-20', pg_temp.u('p10'), pg_temp.u('L1'), pg_temp.u('tA'), 10*m, 'e6');
+  r := public.business_royalty_run_preliminary(pg_temp.u('p10'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('RecalcAfterApproval: mode', (SELECT CASE mode WHEN 'adjustment' THEN 1 ELSE 0 END FROM public.business_royalty_calc_runs WHERE id = r), 1);
+  PERFORM pg_temp.eq('RecalcAfterApproval: only adjustments', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r AND entry_kind <> 'adjustment'), 0);
+  PERFORM pg_temp.eq('RecalcAfterApproval: approved count unchanged', (SELECT count(*) FROM public.business_royalty_accruals WHERE period_id = pg_temp.u('p10') AND calculation_state = 'approved'), 4);
+  PERFORM pg_temp.eq('RecalcAfterApproval: olga delta', pg_temp.holder(r, 'olga'), 16364 - 18000);
+  PERFORM pg_temp.eq('RecalcAfterApproval: alex delta', pg_temp.holder(r, 'alex'), 16364 - 13500);
+  PERFORM pg_temp.eq('RecalcAfterApproval: sergey delta', pg_temp.holder(r, 'sergey'), 12272 - 13500);
+  PERFORM pg_temp.eq('RecalcAfterApproval: approved+delta = fund', (SELECT sum(amount_minor) FROM public.business_royalty_accruals
+    WHERE period_id = pg_temp.u('p10') AND (calculation_state = 'approved' OR run_id = r)), 45000);
+  r := public.business_royalty_run_preliminary(pg_temp.u('p10'), pg_temp.u('f1'));
+  UPDATE public.business_royalty_accruals SET calculation_state = 'approved' WHERE run_id = r;
+  r := public.business_royalty_run_preliminary(pg_temp.u('p10'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('RecalcAfterApproval: no change -> no rows', (SELECT count(*) FROM public.business_royalty_accruals WHERE run_id = r), 0);
+
+  -- Reversal: explicit audited reversal entry; no second reversal; reason required.
+  v := public.business_royalty_reverse_accrual((SELECT id FROM public.business_royalty_accruals WHERE run_id = r2 AND rightsholder_id = pg_temp.u('alex')), 'ошибка в отчёте точки');
+  PERFORM pg_temp.eq('Reversal: amount', (SELECT amount_minor FROM public.business_royalty_accruals WHERE id = v), -13500);
+  PERFORM pg_temp.expect_err('Reversal: twice', format('SELECT public.business_royalty_reverse_accrual(%L, %L)',
+    (SELECT id FROM public.business_royalty_accruals WHERE run_id = r2 AND rightsholder_id = pg_temp.u('alex')), 'x'), NULL);
+  PERFORM pg_temp.expect_err('Reversal: reason', format('SELECT public.business_royalty_reverse_accrual(%L, %L)',
+    (SELECT id FROM public.business_royalty_accruals WHERE run_id = r2 AND rightsholder_id = pg_temp.u('olga')), ' '), 'business_royalty_reason_required');
+
+  -- AppendOnly registries.
+  PERFORM pg_temp.expect_err('AppendOnly: allocation update', format('UPDATE public.business_royalty_payment_allocations SET location_id = %L', pg_temp.u('Lx')), 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: share delete', 'DELETE FROM public.business_royalty_track_shares', 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: share bps', 'UPDATE public.business_royalty_track_shares SET share_bps = 1', 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: period month', format('UPDATE public.business_royalty_periods SET period_month = %L WHERE id = %L', '2030-01-01', pg_temp.u('p01')), 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: operator name', format('UPDATE public.business_service_operators SET legal_name = %L', 'x'), 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: truncate plays', 'TRUNCATE public.business_royalty_plays CASCADE', 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: truncate accruals', 'TRUNCATE public.business_royalty_accruals CASCADE', 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: deduction approved->proposed', format('UPDATE public.business_royalty_deductions SET status = %L WHERE period_id = %L AND status = %L', 'proposed', pg_temp.u('p10'), 'approved'), 'business_royalty_append_only');
+  UPDATE public.business_royalty_deductions SET status = 'rejected' WHERE period_id = pg_temp.u('p10') AND status = 'proposed';
+  PERFORM pg_temp.eq('AppendOnly: deduction audit', (SELECT count(*) FROM public.business_royalty_deduction_status_events e
+    JOIN public.business_royalty_deductions d ON d.id = e.deduction_id WHERE d.period_id = pg_temp.u('p10') AND e.to_status = 'rejected' AND e.from_status = 'proposed'), 1);
+  UPDATE public.business_royalty_periods SET status = 'closed' WHERE id = pg_temp.u('p01');
+  PERFORM pg_temp.expect_err('AppendOnly: closed reopen', format('UPDATE public.business_royalty_periods SET status = %L WHERE id = %L', 'open', pg_temp.u('p01')), 'business_royalty_append_only');
+  PERFORM pg_temp.expect_err('AppendOnly: closed play', format('INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES (%L, %L, %L, %L, 1, %L)',
+    '2027-01-05', pg_temp.u('p01'), pg_temp.u('L1'), pg_temp.u('tO'), 'closed-1'), 'business_royalty_period_closed');
+  PERFORM pg_temp.expect_err('AppendOnly: closed run', format('SELECT public.business_royalty_run_preliminary(%L, %L)', pg_temp.u('p01'), pg_temp.u('f1')), 'business_royalty_period_closed');
+  PERFORM pg_temp.expect_err('AppendOnly: play outside month', format('INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES (%L, %L, %L, %L, 1, %L)',
+    '2027-09-05', pg_temp.u('q02'), pg_temp.u('L1'), pg_temp.u('tO'), 'out-1'), 'business_royalty_play_outside_period');
+
+  -- Allocation: unallocated / single_point with two points / fixed sum mismatch are visible and block the run.
+  INSERT INTO public.business_royalty_payments (id, period_id, payment_reference, kind, amount_minor, allocation_rule, occurred_at) VALUES
+    (pg_temp.u('q03pay'), pg_temp.u('q03'), 'q03', 'payment', 50000, 'single_point', '2027-03-01'),
+    (pg_temp.u('q04pay'), pg_temp.u('q04'), 'q04', 'payment', 50000, 'single_point', '2027-04-01'),
+    (pg_temp.u('q05pay'), pg_temp.u('q05'), 'q05', 'payment', 100000, 'fixed_amounts', '2027-05-01'),
+    (pg_temp.u('q06pay'), pg_temp.u('q06'), 'q06', 'payment', 100000, 'fixed_amounts', '2027-06-01');
+  INSERT INTO public.business_royalty_payment_allocations (payment_id, location_id, fixed_amount_minor) VALUES
+    (pg_temp.u('q04pay'), pg_temp.u('L1'), NULL), (pg_temp.u('q04pay'), pg_temp.u('L2'), NULL),
+    (pg_temp.u('q05pay'), pg_temp.u('L1'), 70000), (pg_temp.u('q05pay'), pg_temp.u('L2'), 20000),
+    (pg_temp.u('q06pay'), pg_temp.u('L1'), 70000), (pg_temp.u('q06pay'), pg_temp.u('L2'), 30000);
+  PERFORM pg_temp.eq('Allocation: unallocated visible', (SELECT count(*) FROM public.business_royalty_allocation_issues(pg_temp.u('q03')) WHERE issue = 'unallocated'), 1);
+  PERFORM pg_temp.expect_err('Allocation: unallocated run', format('SELECT public.business_royalty_run_preliminary(%L, %L)', pg_temp.u('q03'), pg_temp.u('f1')), 'business_royalty_payment_allocation_invalid');
+  PERFORM pg_temp.eq('Allocation: single_point visible', (SELECT count(*) FROM public.business_royalty_allocation_issues(pg_temp.u('q04')) WHERE issue = 'single_point_requires_one_point'), 1);
+  PERFORM pg_temp.expect_err('Allocation: single_point run', format('SELECT public.business_royalty_run_preliminary(%L, %L)', pg_temp.u('q04'), pg_temp.u('f1')), 'business_royalty_payment_allocation_invalid');
+  PERFORM pg_temp.eq('Allocation: fixed mismatch visible', (SELECT count(*) FROM public.business_royalty_allocation_issues(pg_temp.u('q05')) WHERE issue = 'fixed_amounts_sum_mismatch'), 1);
+  PERFORM pg_temp.expect_err('Allocation: fixed mismatch run', format('SELECT public.business_royalty_run_preliminary(%L, %L)', pg_temp.u('q05'), pg_temp.u('f1')), 'business_royalty_payment_allocation_invalid');
+  r := public.business_royalty_run_preliminary(pg_temp.u('q06'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('Allocation: fixed L1 exact', (SELECT payments_minor FROM public.business_royalty_point_results WHERE run_id = r AND location_id = pg_temp.u('L1')), 70000);
+  PERFORM pg_temp.eq('Allocation: fixed L2 exact', (SELECT payments_minor FROM public.business_royalty_point_results WHERE run_id = r AND location_id = pg_temp.u('L2')), 30000);
+
+  -- MidMonthShare: Olga holds the recording until 15 July, Boris from 15 July; plays on 10th and 20th.
+  INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from, valid_until) VALUES
+    (pg_temp.u('tM'), pg_temp.u('olga'), 'recording', 10000, '2027-01-01', '2027-07-15'),
+    (pg_temp.u('tM'), pg_temp.u('boris'), 'recording', 10000, '2027-07-15', NULL);
+  PERFORM pg_temp.expect_err('MidMonthShare: overlap', format('INSERT INTO public.business_royalty_track_shares (audio_item_id, rightsholder_id, rights_layer, share_bps, valid_from) VALUES (%L, %L, %L, 10000, %L)',
+    pg_temp.u('tM'), pg_temp.u('olga'), 'recording', '2027-07-01'), 'business_royalty_share_overlap');
+  INSERT INTO public.business_royalty_payments (id, period_id, payment_reference, kind, amount_minor, allocation_rule, occurred_at)
+    VALUES (pg_temp.u('q07pay'), pg_temp.u('q07'), 'q07', 'payment', 20000, 'single_point', '2027-07-01');
+  INSERT INTO public.business_royalty_payment_allocations (payment_id, location_id) VALUES (pg_temp.u('q07pay'), pg_temp.u('L7'));
+  INSERT INTO public.business_royalty_plays (played_on, period_id, location_id, audio_item_id, played_ms, dedup_key) VALUES
+    ('2027-07-10', pg_temp.u('q07'), pg_temp.u('L7'), pg_temp.u('tM'), 10*m, 'q07-1'),
+    ('2027-07-20', pg_temp.u('q07'), pg_temp.u('L7'), pg_temp.u('tM'), 10*m, 'q07-2');
+  r := public.business_royalty_run_preliminary(pg_temp.u('q07'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('MidMonthShare: olga', pg_temp.holder(r, 'olga'), 5000);
+  PERFORM pg_temp.eq('MidMonthShare: boris', pg_temp.holder(r, 'boris'), 5000);
+  UPDATE public.business_royalty_track_shares SET valid_until = '2027-12-01' WHERE audio_item_id = pg_temp.u('tM') AND rightsholder_id = pg_temp.u('boris');
+  PERFORM pg_temp.expect_err('MidMonthShare: reopen', format('UPDATE public.business_royalty_track_shares SET valid_until = NULL WHERE audio_item_id = %L', pg_temp.u('tM')), 'business_royalty_append_only');
+
+  -- DeductionRounding: 1000 equal over 3 points (333.34/333.33/333.33); 100 deduction on the payment sums to 100.00 exactly.
+  INSERT INTO public.business_royalty_payments (id, period_id, payment_reference, kind, amount_minor, allocation_rule, occurred_at)
+    VALUES (pg_temp.u('q08pay'), pg_temp.u('q08'), 'q08', 'payment', 100000, 'equal', '2027-08-01');
+  INSERT INTO public.business_royalty_payment_allocations (payment_id, location_id) VALUES
+    (pg_temp.u('q08pay'), pg_temp.u('L1')), (pg_temp.u('q08pay'), pg_temp.u('L2')), (pg_temp.u('q08pay'), pg_temp.u('L3'));
+  INSERT INTO public.business_royalty_deductions (period_id, category, amount_minor, payment_id, document_reference, status, approved_by, approved_at)
+    VALUES (pg_temp.u('q08'), 'acquiring_fee', 10000, pg_temp.u('q08pay'), 'реестр эквайринга 08/2027', 'approved', 'smoke', now());
+  r := public.business_royalty_run_preliminary(pg_temp.u('q08'), pg_temp.u('f1'));
+  PERFORM pg_temp.eq('DeductionRounding: payments sum', (SELECT sum(payments_minor) FROM public.business_royalty_point_results WHERE run_id = r), 100000);
+  PERFORM pg_temp.eq('DeductionRounding: deductions sum', (SELECT sum(deductions_minor) FROM public.business_royalty_point_results WHERE run_id = r), 10000);
+  PERFORM pg_temp.eq('DeductionRounding: max point', (SELECT max(deductions_minor) FROM public.business_royalty_point_results WHERE run_id = r), 3334);
+
+  -- RunNumbering: runs of a period are numbered sequentially under a period row lock.
+  PERFORM pg_temp.eq('RunNumbering: p10', (SELECT max(run_no) FROM public.business_royalty_calc_runs WHERE period_id = pg_temp.u('p10')), 5);
 END $$;
 SELECT 'business_royalty_ledger_smoke ok';
 ROLLBACK;

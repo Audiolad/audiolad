@@ -30,12 +30,30 @@ assert.match(sql, /'held_no_plays'/);
 assert.match(sql, /calculation_state IN \('preliminary', 'approved', 'superseded', 'void'\)/);
 assert.match(sql, /payout_state = 'none' OR \(calculation_state = 'approved' AND settlement_mode = 'payable'\)/);
 assert.match(sql, /business_royalty_formula_not_approved/);
-assert.match(sql, /HAVING sum\(s\.share_bps\) = 10000/, "layer shares sum to 100%, no double minute");
-for (const t of ["business_service_operators", "business_royalty_formula_versions", "business_royalty_periods", "business_royalty_payments", "business_royalty_payment_allocations", "business_royalty_deductions", "business_royalty_track_shares", "business_royalty_plays", "business_royalty_calc_runs", "business_royalty_point_results", "business_royalty_accruals"]) {
-  assert.ok(sql.includes(`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY`), `${t} RLS`);
+assert.match(sql, /HAVING sum\(share_bps\) = 10000/, "layer shares sum to 100%, no double minute");
+// Review fixes @a84d92d9.
+assert.match(sql, /status = 'distributed' AND distributed_minor = author_fund_minor/, "distributed == fund");
+assert.ok((sql.match(/row_number\(\) OVER/g) || []).length >= 3, "largest remainder for allocations, deductions, royalties");
+assert.match(sql, /business_royalty_accrual_state_transition/);
+assert.match(sql, /business_royalty_payout_state_transition/);
+assert.match(sql, /business_royalty_accrual_must_start_preliminary/);
+assert.match(sql, /business_royalty_reverse_accrual/);
+assert.match(sql, /'adjustment'/);
+assert.match(sql, /FOR UPDATE;/, "period row lock for run numbering");
+assert.match(sql, /business_royalty_allocation_issues/);
+assert.match(sql, /'unallocated'/);
+assert.match(sql, /single_point_requires_one_point/);
+assert.match(sql, /fixed_amounts_sum_mismatch/);
+assert.match(sql, /BEFORE TRUNCATE/);
+assert.match(sql, /business_royalty_share_overlap/);
+assert.match(sql, /business_royalty_deduction_status_events/);
+for (const t of ["business_royalty_payment_allocations", "business_royalty_track_shares", "business_royalty_periods", "business_service_operators"]) {
+  assert.ok(sql.includes(`'${t}'`), `${t} guarded`);
 }
+assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
+assert.match(sql, /REVOKE ALL ON public\.%I FROM PUBLIC, anon, authenticated/);
 for (const fn of sql.matchAll(/CREATE FUNCTION ([\s\S]*?)AS \$\$/g)) assert.ok(fn[1].includes("SET search_path = public, pg_temp"));
-for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays"]) {
+for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays", "Rounding", "StateMachine", "RecalcAfterApproval", "Reversal", "AppendOnly", "Allocation", "MidMonthShare", "DeductionRounding", "RunNumbering"]) {
   assert.ok(smoke.includes(`${s}:`), `smoke ${s}`);
 }
 for (const v of ["100000", "10000", "90000", "45000", "13500", "18000"]) assert.ok(smoke.includes(v), `exact example ${v}`);
