@@ -772,6 +772,8 @@ export type QuotaLine = {
 export type DashboardModel = {
   generatedAtLabel: string;
   freshnessLabel: string;
+  /** «Нужно решение»: owner decisions of work still in «В работе». A human_gate / needs_decision /
+   * blocked task is listed here, not in activeTasks, and never mixed with «Приёмка». */
   decisions: GateCard[];
   activeTasks: ActiveTaskCard[];
   activeBoundary: string;
@@ -791,6 +793,8 @@ export type DashboardModel = {
   acceptedArchive: TaskDetailModel[];
   /** Set when the archive list could not be read. Never shown as "no accepted results". */
   acceptedArchiveError: string | null;
+  /** Tasks closed by Core in this snapshot (completed history, not counting cancelled), for the «Архив» tab count. */
+  closedCount: number;
   historySummary: string;
   historyBoundary: string;
   historyNextOffset: number | null;
@@ -2060,12 +2064,27 @@ function formatProgress(progress: VerifiedProgress | null, dodSatisfied: boolean
   return `${fraction}.${percent} ${formula} ${evidence}`.replace(/\s+/g, " ").trim();
 }
 
-function ownerPlacement(task: CompanyTask): "plan" | "review" | "archive" | "cycle" {
+/** Core terminal task statuses (company-core TERMINAL_TASK_STATUSES). */
+const TERMINAL_TASK_STATUSES = new Set(["done", "accepted", "completed", "cancelled", "canceled", "failed"]);
+/** Waiting for an owner decision that is not result acceptance: «Нужно решение», not «Выполняется». */
+const DECISION_TASK_STATUSES = new Set(["human_gate", "needs_decision", "blocked"]);
+
+function isDecisionTask(task: CompanyTask): boolean {
+  return DECISION_TASK_STATUSES.has(normalizeToken(task.status));
+}
+
+function ownerPlacement(task: CompanyTask): "plan" | "review" | "archive" | "closed" | "cycle" {
   // The server decides the plan tab: a planned or waiting task is not work and holds no capacity.
   if (task.boardTab === "plan") return "plan";
   const acceptance = task.ownerAcceptance;
+  if (acceptance?.applicable && acceptance.state === "accepted") return "archive";
+  // Core 7a6fc09c: a Core that sends board_tab is the source of truth for «Архив». A terminal task
+  // (done / accepted / cancelled ...) is closed even when an older Core still tags it working or review:
+  // it is never shown as executing work or as an open acceptance request.
+  if (task.boardTab === "archive" || (task.boardTab != null && TERMINAL_TASK_STATUSES.has(normalizeToken(task.status)))) {
+    return "closed";
+  }
   if (!acceptance?.applicable) return "cycle";
-  if (acceptance.state === "accepted") return "archive";
   if (acceptance.state === "pending" && acceptance.presented) {
     // «Приёмка» only with real evidence. A Core that sends board_tab says when evidence is missing
     // (a bare pull request): the task stays in work. An older Core without board_tab keeps the old rule.
@@ -2146,11 +2165,13 @@ function gateFromTask(task: CompanyTask): GateFact | null {
         : task.humanGate
       : null);
   const dependency = task.dependencies.find((item) => item.blocked);
-  if (!reason && !dependency) return null;
+  // A human_gate / needs_decision / blocked task is never silently dropped from «Нужно решение».
+  const statusReason = isDecisionTask(task) ? `Нужно решение: ${taskStatusLabel(task.status)}` : null;
+  if (!reason && !dependency && !statusReason) return null;
   return {
     id: task.id,
     taskId: task.id,
-    reason: reason ?? dependency?.text ?? null,
+    reason: reason ?? dependency?.text ?? statusReason,
     decisionOwner: task.decisionOwner ?? (legacyOwner ? task.humanGate : null),
     request: task.gateRequest,
     nextAction: task.gateNextAction,
@@ -2821,6 +2842,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   const activeTasks = indexed
     .filter(({ task }) => ownerPlacement(task) === "cycle")
     .filter(({ task }) => task.active !== false && !taskIsClosed(task, status.events))
+    .filter(({ task }) => !isDecisionTask(task))
     .filter(({ task }) => task.active === true || hasActivity(task, status.events) || (task.id != null && currentIds.has(task.id)))
     .map(({ task, index }) => {
       const executor = taskExecutor(task);
@@ -2871,6 +2893,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     .filter(({ task }) => ownerPlacement(task) === "cycle")
     .filter(({ task }) => !taskIsClosed(task, status.events))
     .filter(({ task }) => !hasActivity(task, status.events) && !(task.id != null && currentIds.has(task.id)))
+    .filter(({ task }) => !isDecisionTask(task))
     .map(({ task, index }) =>
       buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
@@ -2920,10 +2943,14 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     );
 
   const closed = indexed
-    .filter(({ task }) => ownerPlacement(task) === "cycle")
+    .filter(({ task }) => ownerPlacement(task) === "cycle" || ownerPlacement(task) === "closed")
     .map((item) => ({
       ...item,
-      closed: taskIsClosed(item.task, status.events),
+      // A Core-closed task with a completed status is history. Cancelled / failed stay out of
+      // «Завершённые результаты» exactly as before.
+      closed: ownerPlacement(item.task) === "closed"
+        ? isCompletedStatus(item.task.status)
+        : taskIsClosed(item.task, status.events),
       completedAt: completionInstant(item.task, status.events),
     }))
     .filter((item) => item.closed);
@@ -2960,13 +2987,20 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       ? null
       : filters.historyOffset + HISTORY_PAGE_SIZE;
 
+  // «Нужно решение» lists only decisions of work that is still in «В работе»: a gate of a task that
+  // waits for acceptance («Приёмка») or is closed («Архив») is not a separate decision (Core 7a6fc09c).
+  const gateInWorking = (gate: GateFact): boolean => {
+    if (!gate.taskId) return true;
+    const task = findTaskByReference(status.tasks, gate.taskId);
+    return task ? ownerPlacement(task) === "cycle" : true;
+  };
   const decisionSources = [
     ...status.currentGates.filter((gate) => !gate.archived),
     ...indexed.flatMap(({ task }) => {
       const gate = gateFromTask(task);
       return gate ? [gate] : [];
     }),
-  ];
+  ].filter(gateInWorking);
   const copyTextForGate = (gate: GateFact, card: GateCard): string => {
     if (card.historical) {
       return formatAiCompanyTaskCopy({
@@ -3092,6 +3126,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     ownerReview,
     acceptedArchive,
     acceptedArchiveError: null,
+    closedCount: closed.length,
     history,
     historySummary: `Завершено по критерию готовности: ${closed.length}. С известной датой завершения: сегодня ${summaryToday}, неделя ${summaryWeek}, месяц ${summaryMonth}. Без даты завершения: ${closed.length - dated.length}. Страница истории: ${history.length} из ${historyAll.length}.`,
     historyBoundary: boundaries.history,

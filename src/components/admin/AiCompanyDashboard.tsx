@@ -769,7 +769,7 @@ export function AiCompanyDashboardView({
     plan: model?.plan.length ?? 0,
     working: (model?.activeTasks.length ?? 0) + (model?.queue.length ?? 0) + (model?.decisions.length ?? 0),
     review: model?.ownerReview.length ?? 0,
-    archive: model?.acceptedArchive.length ?? 0,
+    archive: (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0),
   };
   function selectTab(next: BoardTab) {
     setTab(next);
@@ -905,7 +905,9 @@ export function AiCompanyDashboardView({
               <h3 id="ai-company-decisions" className="text-lg font-semibold text-red-900">
                 Нужно решение
               </h3>
-              <p className="mt-1 text-xs text-red-800">Текущие решения видны в списке. Владелец строки — тот, кто записан в источнике.</p>
+              <p className="mt-1 text-xs text-red-800">
+                Ждёт решения владельца. Это не приёмка результата: приёмка — во вкладке «Приёмка». Владелец строки — тот, кто записан в источнике.
+              </p>
               <GateList
                 gates={model.decisions}
                 openDetails={openDetails}
