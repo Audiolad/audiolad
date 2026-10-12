@@ -119,6 +119,8 @@ export const CORE_FIELD_MAP = {
     evidence: ["evidence"],
     boardTab: ["board_tab"],
     launch: ["launch"],
+    allowedActions: ["allowed_actions"],
+    requiredDecision: ["required_decision", "decision_needed"],
   },
   /** Core #28 `tasks[].acceptance`: details of the last decision. `user_acceptance` itself is a string. */
   acceptance: {
@@ -452,6 +454,10 @@ export type CompanyTask = {
   ownerAcceptance: OwnerAcceptanceFact | null;
   boardTab: BoardTab | null;
   launch: LaunchFact | null;
+  /** Core `tasks[].allowed_actions` (company-core #41). null = Core did not send the list: no lifecycle buttons. */
+  allowedActions: string[] | null;
+  /** Core `tasks[].required_decision`: what decision the task waits for, in Russian. */
+  requiredDecision: string | null;
 };
 
 /** Core `tasks[].board_tab`: the four board tabs, decided by the server. */
@@ -667,6 +673,19 @@ export type TaskDetailModel = {
   copyText: string;
   acceptance: OwnerAcceptanceView | null;
   launch: LaunchView | null;
+  lifecycle: LifecycleView | null;
+};
+
+/** Owner lifecycle buttons handled by POST /api/admin/ai-company/lifecycle. launch/accept/rework have their own controls. */
+export type LifecycleAction = "defer" | "cancel" | "complete" | "stop";
+export const LIFECYCLE_ACTIONS: readonly LifecycleAction[] = ["defer", "cancel", "complete", "stop"];
+
+export type LifecycleView = {
+  /** Raw Core status, sent back as expected_status. */
+  expectedStatus: string;
+  /** Exactly the lifecycle actions Core lists in allowed_actions, in a fixed order. */
+  actions: LifecycleAction[];
+  requiredDecision: string | null;
 };
 
 export type OwnerAcceptanceView = {
@@ -1244,6 +1263,11 @@ function parseBoardTab(value: unknown): BoardTab | null {
   return (BOARD_TABS as readonly string[]).includes(token) ? (token as BoardTab) : null;
 }
 
+function parseAllowedActions(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.filter((item): item is string => typeof item === "string").map((item) => normalizeToken(item));
+}
+
 function parseLaunch(value: unknown): LaunchFact | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -1345,6 +1369,8 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
       .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
     boardTab: parseBoardTab(readRaw(record, CORE_FIELD_MAP.task.boardTab)),
     launch: parseLaunch(readRaw(record, CORE_FIELD_MAP.task.launch)),
+    allowedActions: parseAllowedActions(readRaw(record, CORE_FIELD_MAP.task.allowedActions)),
+    requiredDecision: readString(record, CORE_FIELD_MAP.task.requiredDecision),
     acceptanceContract: hasAcceptanceContract(record),
     ownerAcceptance: parseOwnerAcceptance(record, typeof run?.productionVerified === "boolean" ? run.productionVerified : null),
   };
@@ -1632,6 +1658,8 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     releaseHold: prefer(next.releaseHold, previous.releaseHold),
     acceptanceContract: next.acceptanceContract || previous.acceptanceContract,
     ownerAcceptance: next.ownerAcceptance ?? previous.ownerAcceptance,
+    allowedActions: next.allowedActions ?? previous.allowedActions,
+    requiredDecision: prefer(next.requiredDecision, previous.requiredDecision),
   };
 }
 
@@ -2639,6 +2667,16 @@ function launchStageBadge(task: CompanyTask): StageBadge | null {
   }
 }
 
+/** Lifecycle buttons come only from Core's allowed_actions; the board adds no rules of its own. */
+export function lifecycleView(task: Pick<CompanyTask, "id" | "status" | "allowedActions" | "requiredDecision">): LifecycleView | null {
+  if (!task.id || !task.status || task.allowedActions == null) return null;
+  const allowed = new Set(task.allowedActions);
+  const actions = LIFECYCLE_ACTIONS.filter((action) => allowed.has(action));
+  const requiredDecision = task.requiredDecision?.trim() || null;
+  if (!actions.length && !requiredDecision) return null;
+  return { expectedStatus: task.status, actions, requiredDecision };
+}
+
 function launchView(task: CompanyTask): LaunchView | null {
   const launch = task.launch;
   if (!launch || launch.state === "none") return null;
@@ -2798,6 +2836,7 @@ function buildTaskDetail(
     copyText,
     acceptance: acceptanceView(task),
     launch: launchView(task),
+    lifecycle: lifecycleView(task),
   };
 }
 
