@@ -46,6 +46,13 @@ assert.match(sql, /single_point_requires_one_point/);
 assert.match(sql, /fixed_amounts_sum_mismatch/);
 assert.match(sql, /BEFORE TRUNCATE/);
 assert.match(sql, /business_royalty_share_overlap/);
+// Re-review fixes @c11158de.
+assert.match(sql, /reverses_id IS NOT NULL AND calculation_state IN \('preliminary', 'approved'\)/, "partial reverses unique index");
+assert.match(sql, /calculation_state = 'preliminary' AND reverses_id IS NULL/, "reversals not superseded");
+assert.match(sql, /business_royalty_already_reversed/);
+assert.match(sql, /business_royalty_deduction_payment_other_period/);
+assert.match(sql, /deduction_payment_other_period/);
+assert.match(sql, /business_royalty_share_retroactive_end/);
 assert.match(sql, /business_royalty_deduction_status_events/);
 for (const t of ["business_royalty_payment_allocations", "business_royalty_track_shares", "business_royalty_periods", "business_service_operators"]) {
   assert.ok(sql.includes(`'${t}'`), `${t} guarded`);
@@ -53,7 +60,7 @@ for (const t of ["business_royalty_payment_allocations", "business_royalty_track
 assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
 assert.match(sql, /REVOKE ALL ON public\.%I FROM PUBLIC, anon, authenticated/);
 for (const fn of sql.matchAll(/CREATE FUNCTION ([\s\S]*?)AS \$\$/g)) assert.ok(fn[1].includes("SET search_path = public, pg_temp"));
-for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays", "Rounding", "StateMachine", "RecalcAfterApproval", "Reversal", "AppendOnly", "Allocation", "MidMonthShare", "DeductionRounding", "RunNumbering"]) {
+for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "Management", "History", "SharedPayment", "MultiPoint", "Refunds", "NegativeClamp", "NoPlays", "Rounding", "StateMachine", "RecalcAfterApproval", "Reversal", "AppendOnly", "Allocation", "MidMonthShare", "DeductionRounding", "RunNumbering", "ReversalSurvivesRecalc", "ReversalRepeatable", "NoReaccrue", "ClosedPeriodUpdate", "DeductionOtherPeriod", "ShareRetroEnd", "ReversalFormula"]) {
   assert.ok(smoke.includes(`${s}:`), `smoke ${s}`);
 }
 for (const v of ["100000", "10000", "90000", "45000", "13500", "18000"]) assert.ok(smoke.includes(v), `exact example ${v}`);
