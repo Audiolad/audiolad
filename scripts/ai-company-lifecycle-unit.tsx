@@ -112,6 +112,44 @@ const guest = blockOf(render(false, "review"), review.id);
 assert.match(guest, new RegExp(LIFECYCLE_OWNER_ONLY.slice(0, 30)));
 assert.match(guest, /data-lifecycle-button="cancel"[^>]*disabled=""|disabled=""[^>]*data-lifecycle-button="cancel"/);
 
+// --- «Нужно решение» (human_gate, 7a6fc09c 21:00): the decision row is the only place such a task is shown,
+// so its expanded card carries the same Core lifecycle buttons and required_decision, exactly once.
+{
+  const gateRaw = JSON.parse(readFileSync("scripts/fixtures/ai-company/core29-launch.json", "utf8")) as typeof raw;
+  const gated = gateRaw.tasks.find((task) => task.title === "Добавить фильтр в каталог")!;
+  Object.assign(gated, {
+    status: "human_gate",
+    human_gate: "sergey_manual_review",
+    blocked_reason: "Ожидает ручной проверки Сергеем после работ над кабинетом ИИ-компании.",
+    board_tab: "working",
+    allowed_actions: ["defer", "cancel", "complete"],
+    required_decision: "Ручная проверка: sergey_manual_review — Ожидает ручной проверки Сергеем",
+  });
+  const old = gateRaw.tasks.find((task) => task.title === "Исправить время прослушивания")!;
+  Object.assign(old, { status: "human_gate", human_gate: "sergey_manual_review", blocked_reason: "Ожидает ручной проверки Сергеем.", board_tab: "working" });
+  delete old.allowed_actions; // an older Core: no list → no buttons on the decision row either
+  delete old.required_decision;
+  const gateStatus = parseCompanyStatus(gateRaw)!;
+  const gateModel = composeAiCompanyBoard({ data: gateStatus, error: null }, { data: null, error: "нет" }, filters).model as DashboardModel;
+  const card = gateModel.decisions.find((gate) => gate.taskId === gated.id);
+  assert.ok(card, "human_gate task is a decision row");
+  assert.deepEqual(card.lifecycle?.actions, ["defer", "cancel", "complete"]);
+  assert.equal(card.lifecycle?.expectedStatus, "human_gate");
+  const markup = renderToStaticMarkup(
+    <AiCompanyDashboardView model={gateModel} filters={filters} sourceError={null} acceptanceAvailable canAccept initialTab="working" onRefresh={() => undefined} />,
+  );
+  const section = markup.slice(markup.indexOf('data-section="decisions"'), markup.indexOf('data-section="queue"'));
+  const rowStart = section.lastIndexOf("<article", section.indexOf(">Добавить фильтр в каталог<"));
+  const row = section.slice(rowStart, section.indexOf("</article>", rowStart));
+  assert.deepEqual([...row.matchAll(/data-lifecycle-button="(\w+)"/g)].map((m) => m[1]), ["defer", "cancel", "complete"]);
+  assert.match(row, /Нужно решение: <\/span>Ручная проверка: sergey_manual_review/);
+  assert.equal(section.split(`data-lifecycle-status="human_gate"`).length - 1, 1, "one control block per decision card");
+  assert.equal(row.split(`data-lifecycle-button="cancel"`).length - 1, 1, "no duplicated buttons in the card");
+  const oldStart = section.lastIndexOf("<article", section.indexOf(">Исправить время прослушивания<"));
+  assert.ok(oldStart >= 0);
+  assert.doesNotMatch(section.slice(oldStart, section.indexOf("</article>", oldStart)), /data-lifecycle-button/);
+}
+
 // --- Validation shared by the dialog and the proxy.
 assert.equal(validateReason("", true), "Укажите причину.");
 assert.equal(validateReason("", false), null);
