@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
-import { composeAiCompanyBoard, parseCompanyStatus, parseHistoryFilters, type CompanyStatusLoad } from "../src/lib/admin/ai-company-dashboard";
+import { buildAiCompanyDashboard, composeAiCompanyBoard, parseCompanyStatus, parseHistoryFilters, type CompanyStatusLoad } from "../src/lib/admin/ai-company-dashboard";
 
 function raw(name: string): { tasks: Array<{ id: string; board_tab: string; status: string }> } {
   return JSON.parse(readFileSync(`scripts/fixtures/ai-company/${name}.json`, "utf8"));
@@ -78,5 +78,35 @@ assert.deepEqual(
 );
 assert.equal((html.match(/data-cancelled-task=/g) ?? []).length, 29);
 assert.match(html, /Архив \/ Отменённые/);
+
+// ce82ced8 merged card: copy covers every gate, not only the first.
+assert.ok(ce82[0].copyText.length > 0);
+
+// Independent review 6127647541: a gate of a task absent from current is hidden only when the active
+// list is provably complete and the archive snapshot holds the task with board_tab=archive.
+const ORPHANS = /f7b00288|b01cd5d3|CODEX_ACCESS_TOKEN/;
+function variant(mutate: (page: Record<string, unknown>) => void): CompanyStatusLoad {
+  const json = raw("stnow-current") as unknown as { tasks_page: Record<string, unknown> };
+  mutate(json.tasks_page);
+  const data = parseCompanyStatus(json);
+  assert.ok(data);
+  return { data, error: null };
+}
+const orphanCount = (m: { decisions: Array<{ key: string; taskTitle: string }> }) =>
+  m.decisions.filter((card) => ORPHANS.test(`${card.key} ${card.taskTitle}`)).length;
+for (const [label, current] of [
+  ["active_complete=false", variant((page) => (page.active_complete = false))],
+  ["active_complete missing", variant((page) => delete page.active_complete)],
+  ["truncated=true", variant((page) => (page.truncated = true))],
+] as const) {
+  const out = composeAiCompanyBoard(current, load("stnow-archive"), parseHistoryFilters({})).model!;
+  assert.equal(out.decisions.length, 13, `${label}: unproven absence keeps both gates as decisions`);
+  assert.equal(orphanCount(out), 2, label);
+}
+// Archive snapshot unavailable: absence is not proven, gates stay.
+const noArchive = composeAiCompanyBoard(load("stnow-current"), { data: null, error: "HTTP 502" }, parseHistoryFilters({})).model!;
+assert.equal(noArchive.decisions.length, 13);
+// Without the archive id list (direct build) nothing is hidden by absence.
+assert.equal(buildAiCompanyDashboard(load("stnow-current").data!, parseHistoryFilters({})).decisions.length, 13);
 
 console.log("ai-company board counts: 0/13/1/68 OK");
