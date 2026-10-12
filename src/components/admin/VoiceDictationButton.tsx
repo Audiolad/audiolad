@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
-import { createDictation, insertDictation, speechRecognitionCtor } from "@/lib/admin/voice-dictation";
+import { bindDictation, speechRecognitionCtor } from "@/lib/admin/voice-dictation";
 
 const noSubscribe = () => () => undefined;
 
 /**
  * Microphone button for a comment field (7a6fc09c): press, speak Russian, the recognized text is inserted at the
  * caret (or the end) and stays editable. Second press stops. Hidden when the browser has no Web Speech API.
- * No audio reaches this app; only text is written into the field.
+ * The session ends when the button becomes disabled (form busy), when the field's form is submitted, and on
+ * unmount; one dictation on the page at a time. No audio reaches this app; only text is written into the field.
  */
 export function VoiceDictationButton({
   field,
@@ -28,32 +29,40 @@ export function VoiceDictationButton({
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
   const changeRef = useRef(onChange);
-  const dictation = useRef<ReturnType<typeof createDictation> | null>(null);
+  const binding = useRef<ReturnType<typeof bindDictation> | null>(null);
 
   useEffect(() => {
     changeRef.current = onChange;
   }, [onChange]);
-  useEffect(() => () => dictation.current?.abort(), []);
+  // Form busy / disabled: end the session at once (late results are ignored).
+  useEffect(() => {
+    binding.current?.setDisabled(disabled);
+  }, [disabled]);
+  // Submit of the field's form ends the session too.
+  useEffect(() => {
+    const form = fieldRef.current?.form;
+    if (!form) return;
+    const onSubmit = () => binding.current?.submit();
+    form.addEventListener("submit", onSubmit, true);
+    return () => form.removeEventListener("submit", onSubmit, true);
+  }, [fieldRef]);
+  // Unmount: stop the microphone.
+  useEffect(() => () => binding.current?.dispose(), []);
 
-  function session() {
-    if (dictation.current) return dictation.current;
+  function bind() {
+    if (binding.current) return binding.current;
     const Ctor = speechRecognitionCtor();
     if (!Ctor) return null;
-    dictation.current = createDictation(Ctor, {
+    binding.current = bindDictation({
+      Ctor,
+      getField: () => fieldRef.current,
+      isFocused: () => typeof document !== "undefined" && document.activeElement === fieldRef.current,
+      onChange: (next) => changeRef.current(next),
       onInterim: setInterim,
       onListening: setListening,
       onError: setError,
-      onFinal: (text) => {
-        const area = fieldRef.current;
-        if (!area) return;
-        const caret = area.dataset.voiceCaret ? Number(area.dataset.voiceCaret) : null;
-        // The controlled textarea's DOM value is the current field value.
-        const next = insertDictation(area.value, caret, text);
-        area.dataset.voiceCaret = String(next.caret);
-        changeRef.current(next.value);
-      },
     });
-    return dictation.current;
+    return binding.current;
   }
 
   return (
@@ -66,18 +75,10 @@ export function VoiceDictationButton({
           aria-label={listening ? "Остановить диктовку" : "Надиктовать голосом"}
           title={listening ? "Остановить диктовку" : "Надиктовать голосом"}
           data-voice-button={field}
-          onMouseDown={() => {
-            // remember the caret before the textarea loses focus
-            const area = fieldRef.current;
-            if (area && document.activeElement === area) area.dataset.voiceCaret = String(area.selectionStart);
-            else if (area) delete area.dataset.voiceCaret;
-          }}
+          onMouseDown={() => bind()?.rememberCaret()}
           onClick={() => {
             setError(null);
-            const d = session();
-            if (!d) return;
-            if (listening) d.stop();
-            else d.start();
+            bind()?.toggle();
           }}
           className={`mt-1 inline-flex min-h-9 items-center gap-1 rounded-lg border px-3 py-1 text-sm font-semibold disabled:opacity-60 ${
             listening ? "border-[#9f1239] bg-[#fff1f2] text-[#9f1239]" : "border-[#d9cdf0] bg-white text-[#4b2a8a]"
