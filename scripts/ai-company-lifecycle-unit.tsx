@@ -160,7 +160,14 @@ assert.match(guest, /data-lifecycle-button="cancel"[^>]*disabled=""|disabled=""[
   const m = composeAiCompanyBoard({ data: parseCompanyStatus(cardRaw)!, error: null }, { data: null, error: "нет" }, filters).model as DashboardModel;
   const rows: TaskDetailModel[] = [...m.plan, ...m.queue, ...m.ownerReview, ...m.activeTasks.map((c) => c.detail)];
   const row = rows.find((r) => r.taskId === t.id);
-  if (row) assert.deepEqual(row.lifecycle?.actions, ["return", "defer", "cancel", "complete"]);
+  assert.ok(row, "task card present");
+  assert.deepEqual(row.lifecycle?.actions, ["return", "defer", "cancel", "complete"]);
+  const cardMarkup = renderToStaticMarkup(
+    <AiCompanyDashboardView model={m} filters={filters} sourceError={null} acceptanceAvailable canAccept initialTab="review" onRefresh={() => undefined} />,
+  );
+  const block = blockOf(cardMarkup, t.id);
+  assert.equal(block.split(`data-lifecycle-button="return"`).length - 1, 1, "«Вернуть на доработку» once on the task card");
+  assert.match(block, />Вернуть на доработку</);
 }
 // Dialog copy (component source): «Что не так» is required for return; «Завершить» has one plain hint line.
 {
