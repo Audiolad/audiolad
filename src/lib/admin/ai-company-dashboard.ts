@@ -795,6 +795,8 @@ export type DashboardModel = {
   acceptedArchiveError: string | null;
   /** Tasks closed by Core in this snapshot (completed history, not counting cancelled), for the «Архив» tab count. */
   closedCount: number;
+  /** Cancelled tasks Core places in «Архив» (board_tab archive). Counted in the tab, listed as «Отменена». */
+  cancelledArchive: TaskDetailModel[];
   historySummary: string;
   historyBoundary: string;
   historyNextOffset: number | null;
@@ -2942,6 +2944,14 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
+  // Cancelled tasks Core files under «Архив»: counted in the tab and listed there labelled «Отменена».
+  // They stay out of «Завершённые результаты», whose criterion is completion.
+  const cancelledArchive = indexed
+    .filter(({ task }) => ownerPlacement(task) === "closed" && CANCELLED_STATUSES.has(normalizeToken(task.status)))
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
+
   const closed = indexed
     .filter(({ task }) => ownerPlacement(task) === "cycle" || ownerPlacement(task) === "closed")
     .map((item) => ({
@@ -2989,10 +2999,13 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
 
   // «Нужно решение» lists only decisions of work that is still in «В работе»: a gate of a task that
   // waits for acceptance («Приёмка») or is closed («Архив») is not a separate decision (Core 7a6fc09c).
+  // A Core that sends board_tab lists every task it still counts as work, so a gate of a task that
+  // is not in this snapshot belongs to an archived task (Core board_tab is the count source of truth).
+  const boardTabContract = status.tasks.some((task) => task.boardTab != null);
   const gateInWorking = (gate: GateFact): boolean => {
     if (!gate.taskId) return true;
     const task = findTaskByReference(status.tasks, gate.taskId);
-    return task ? ownerPlacement(task) === "cycle" : true;
+    return task ? ownerPlacement(task) === "cycle" : !boardTabContract;
   };
   const decisionSources = [
     ...status.currentGates.filter((gate) => !gate.archived),
@@ -3065,14 +3078,24 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       note: null,
     });
   };
+  // One decision card per task (Core counts tasks, not gates): further gates of the same task add
+  // their reason to the existing card instead of a second card.
   const decisions: GateCard[] = [];
-  const seenDecisions = new Set<string>();
+  const decisionByTask = new Map<string, { index: number; reasons: string[] }>();
   for (const gate of decisionSources) {
     const card = presentGate(gate, status.tasks, codexFallback);
     if (!card) continue;
-    const dedupe = `${card.taskTitle}|${card.reason}`;
-    if (seenDecisions.has(dedupe)) continue;
-    seenDecisions.add(dedupe);
+    const task = gate.taskId ? findTaskByReference(status.tasks, gate.taskId) : null;
+    const taskKey = task ? `task:${task.id}` : gate.taskId ? `task:${gate.taskId}` : `gate:${card.key}`;
+    const seen = decisionByTask.get(taskKey);
+    if (seen) {
+      if (!seen.reasons.includes(card.reason)) {
+        seen.reasons.push(card.reason);
+        decisions[seen.index] = { ...decisions[seen.index], reason: seen.reasons.join(" · ") };
+      }
+      continue;
+    }
+    decisionByTask.set(taskKey, { index: decisions.length, reasons: [card.reason] });
     decisions.push({ ...card, copyText: copyTextForGate(gate, card) });
   }
 
@@ -3127,6 +3150,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     acceptedArchive,
     acceptedArchiveError: null,
     closedCount: closed.length,
+    cancelledArchive,
     history,
     historySummary: `Завершено по критерию готовности: ${closed.length}. С известной датой завершения: сегодня ${summaryToday}, неделя ${summaryWeek}, месяц ${summaryMonth}. Без даты завершения: ${closed.length - dated.length}. Страница истории: ${history.length} из ${historyAll.length}.`,
     historyBoundary: boundaries.history,

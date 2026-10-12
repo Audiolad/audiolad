@@ -930,7 +930,7 @@ export function AiCompanyDashboardView({
     plan: model?.plan.length ?? 0,
     working: (model?.activeTasks.length ?? 0) + (model?.queue.length ?? 0) + (model?.decisions.length ?? 0),
     review: ownerReview.length,
-    archive: (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0),
+    archive: (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0) + (model?.cancelledArchive?.length ?? 0),
   };
   function selectTab(next: BoardTab) {
     setTab(next);
@@ -1307,6 +1307,32 @@ export function AiCompanyDashboardView({
               )}
             </div>
           </section>
+
+          {model.cancelledArchive?.length ? (
+            <section aria-labelledby="ai-company-cancelled" data-section="cancelled">
+              <h3 id="ai-company-cancelled" className="text-xl font-semibold">
+                Архив / Отменённые
+              </h3>
+              <p className="mt-1 text-sm text-[#796ba0]">
+                Задачи, которые Company Core отменил и отнёс к архиву. История сохраняется, результатом они не считаются.
+              </p>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {model.cancelledArchive.map((detail) => {
+                  const rowKey = `cancelled:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-cancelled-task": detail.taskId }}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           <section aria-labelledby="ai-company-history" data-section="history">
             <h3 id="ai-company-history" className="text-xl font-semibold">

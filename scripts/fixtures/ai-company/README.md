@@ -22,3 +22,7 @@ Only gate names appear (for example `CODEX_ACCESS_TOKEN`); there are no secret v
   started / failed, with delivery, ACK and start as separate timestamps). Rows: started, acked, sent, a bare PR
   (presented but not review), production-verified review, a heavy task that waits for the heavy limit, a failed delivery,
   a plain plan task. `now` = 2026-10-10T18:00:00Z. No secret values.
+
+- `stnow-{current,archive}.json` — live Company Core `/v1/status?acceptance=current|archive` (Core main @ `f79a1244`,
+  read-only, 12.10.2026 18:24 MSK). Core `board_tab`: plan 0 / working 13 / review 1 / archive 68 (34 accepted in the
+  archive view; 29 cancelled + 4 done + 1 accepted in current). Only gate names appear; there are no secret values.
