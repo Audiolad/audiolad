@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
+import { AiCompanyDashboardView, quickAcceptAllowed, quickAcceptPayload } from "../src/components/admin/AiCompanyDashboard";
 import { formatAiCompanyTaskCopy } from "../src/lib/admin/ai-company-task-copy";
 import {
   AI_COMPANY_OPEN_ROWS_KEY,
@@ -17,6 +17,7 @@ import {
 } from "../src/lib/admin/nav";
 import {
   CORE_FIELD_MAP,
+  NO_DATA,
   buildAiCompanyDashboard,
   classifyExecutor,
   companyStatusRequestPath,
@@ -1925,6 +1926,27 @@ const presentedToggle = acceptanceMarkup.slice(
   acceptanceMarkup.indexOf("</button>", presentedAt),
 );
 assert.doesNotMatch(presentedToggle, /Принять/);
+// Row-level quick accept: sits next to the toggle (not inside it), only for presented rows, owner only.
+assert.match(acceptanceMarkup, /data-quick-accept="presented-doc"/);
+assert.equal((acceptanceMarkup.match(/data-quick-accept-button/g) ?? []).length, acceptanceModel.ownerReview.filter((d) => quickAcceptAllowed(d, true, true)).length);
+assert.doesNotMatch(acceptanceMarkup, /data-quick-accept="accepted-doc"/);
+assert.doesNotMatch(acceptanceMarkup, /data-quick-accept-dialog/);
+assert.equal(quickAcceptAllowed(presented, true, true), true);
+assert.equal(quickAcceptAllowed(presented, false, true), false);
+assert.equal(quickAcceptAllowed(presented, true, false), false);
+assert.equal(quickAcceptAllowed(acceptedRow, true, true), false);
+assert.equal(quickAcceptAllowed({ ...presented, acceptance: { ...presented.acceptance!, resultVersion: NO_DATA } }, true, true), false);
+assert.deepEqual(quickAcceptPayload(presented, "k-1"), {
+  taskId: "presented-doc",
+  decision: "accepted",
+  comment: "",
+  resultVersion,
+  idempotencyKey: "k-1",
+});
+const nonOwnerMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={acceptanceModel} filters={parseHistoryFilters({})} sourceError={null} acceptanceAvailable onRefresh={() => undefined} />,
+);
+assert.doesNotMatch(nonOwnerMarkup, /data-quick-accept-button/);
 assert.match(acceptanceMarkup, /data-stage-badge="acceptance"[^>]*>На проверке/);
 assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принято/);
 assert.match(acceptanceMarkup, /data-stage-badge="rework"[^>]*>На доработке/);
