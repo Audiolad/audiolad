@@ -1975,3 +1975,12 @@ ledger/A1/A2/A3 migrations. Outside production, optional SQL requires both
 container discovery. The scratch database must not already exist.
 Next step: run isolated smoke in an authorized test environment before applying
 this migration; pilot admission data is added separately after review.
+
+## Business SPA pilot PR2 — program composition with live rights decisions
+
+Migration: `20261228120000_business_spa_program_composition.sql`. Prepared in Git; not applied to production by this task.
+
+- `business_program_items.gain_db numeric(5,2)` (−30…+6 dB, nullable): player loudness offset from offline EBU R128 analysis (target −18 LUFS). Playback hint only.
+- `business_spa_set_program_items(program_id, audio_item_ids[], exclusion_reason)`: atomic ordered composition for allowlisted pilot members (or service_role). Only published tracks, no duplicates, archived programs frozen. Tracks dropped from the list are soft-excluded with reason, never deleted; re-adding restores them.
+- `business_spa_program_composition(program_id, location_id)`: active items in order with `resolve_business_track_eligibility` decisions for `business_background_playback` and `offline_storage_cache`. `playable` only on ELIGIBLE background; `offline_cacheable` only when both are ELIGIBLE. UNKNOWN/DENIED = no. Location must belong to the program's organization.
+- No grants, rightsholders, allowlist rows or programs are seeded. Pilot candidate list (12 Aurafon tracks, loudness analysis) lives in `docs/business/spa-pilot-aurafon-v1.json` and is not a license.
