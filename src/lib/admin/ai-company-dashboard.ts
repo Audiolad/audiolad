@@ -795,6 +795,8 @@ export type DashboardModel = {
   acceptedArchiveError: string | null;
   /** Tasks closed by Core in this snapshot (completed history, not counting cancelled), for the «Архив» tab count. */
   closedCount: number;
+  /** Cancelled tasks Core places in «Архив» (board_tab archive). Counted in the tab, listed as «Отменена». */
+  cancelledArchive: TaskDetailModel[];
   historySummary: string;
   historyBoundary: string;
   historyNextOffset: number | null;
@@ -2827,7 +2829,16 @@ export function snapshotFreshness(generatedAt: string, now = Date.now()): string
   return `Снимок ${formatDateTime(generatedAt)} МСК · возраст ${ageMin} мин`;
 }
 
-export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryFilters): DashboardModel {
+export type BoardBuildOptions = {
+  /** Task ids Core files under board_tab=archive in the separate `?acceptance=archive` snapshot. */
+  archivedTaskIds?: ReadonlySet<string>;
+};
+
+export function buildAiCompanyDashboard(
+  status: CompanyStatus,
+  filters: HistoryFilters,
+  options: BoardBuildOptions = {},
+): DashboardModel {
   const now = parseInstant(status.generatedAt) ?? Date.now();
   const boundaries = boundaryText(status);
   const indexed = status.tasks.map((task, index) => ({ task, index }));
@@ -2942,6 +2953,14 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
+  // Cancelled tasks Core files under «Архив»: counted in the tab and listed there labelled «Отменена».
+  // They stay out of «Завершённые результаты», whose criterion is completion.
+  const cancelledArchive = indexed
+    .filter(({ task }) => ownerPlacement(task) === "closed" && CANCELLED_STATUSES.has(normalizeToken(task.status)))
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
+
   const closed = indexed
     .filter(({ task }) => ownerPlacement(task) === "cycle" || ownerPlacement(task) === "closed")
     .map((item) => ({
@@ -2989,10 +3008,17 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
 
   // «Нужно решение» lists only decisions of work that is still in «В работе»: a gate of a task that
   // waits for acceptance («Приёмка») or is closed («Архив») is not a separate decision (Core 7a6fc09c).
+  // A gate of a task absent from this snapshot is hidden only when that absence is proven: the active
+  // task list is complete and not truncated, and the archive snapshot has the task with board_tab=archive.
+  // Otherwise it may be an open decision of an active task outside the page, so it stays visible.
+  const activeListComplete =
+    status.completeness.activeTasksComplete === true && status.completeness.activeTasksTruncated !== true;
+  const archivedTaskIds = options.archivedTaskIds ?? new Set<string>();
   const gateInWorking = (gate: GateFact): boolean => {
     if (!gate.taskId) return true;
     const task = findTaskByReference(status.tasks, gate.taskId);
-    return task ? ownerPlacement(task) === "cycle" : true;
+    if (task) return ownerPlacement(task) === "cycle";
+    return !(activeListComplete && archivedTaskIds.has(gate.taskId));
   };
   const decisionSources = [
     ...status.currentGates.filter((gate) => !gate.archived),
@@ -3065,14 +3091,30 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       note: null,
     });
   };
+  // One decision card per task (Core counts tasks, not gates): further gates of the same task add
+  // their reason to the existing card instead of a second card.
   const decisions: GateCard[] = [];
-  const seenDecisions = new Set<string>();
+  const decisionByTask = new Map<string, { index: number; reasons: string[] }>();
   for (const gate of decisionSources) {
     const card = presentGate(gate, status.tasks, codexFallback);
     if (!card) continue;
-    const dedupe = `${card.taskTitle}|${card.reason}`;
-    if (seenDecisions.has(dedupe)) continue;
-    seenDecisions.add(dedupe);
+    const task = gate.taskId ? findTaskByReference(status.tasks, gate.taskId) : null;
+    const taskKey = task ? `task:${task.id}` : gate.taskId ? `task:${gate.taskId}` : `gate:${card.key}`;
+    const seen = decisionByTask.get(taskKey);
+    if (seen) {
+      if (!seen.reasons.includes(card.reason)) {
+        seen.reasons.push(card.reason);
+        const merged = decisions[seen.index];
+        const extraCopy = copyTextForGate(gate, card);
+        decisions[seen.index] = {
+          ...merged,
+          reason: seen.reasons.join(" · "),
+          copyText: merged.copyText.includes(extraCopy) ? merged.copyText : `${merged.copyText}\n\n${extraCopy}`,
+        };
+      }
+      continue;
+    }
+    decisionByTask.set(taskKey, { index: decisions.length, reasons: [card.reason] });
     decisions.push({ ...card, copyText: copyTextForGate(gate, card) });
   }
 
@@ -3127,6 +3169,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     acceptedArchive,
     acceptedArchiveError: null,
     closedCount: closed.length,
+    cancelledArchive,
     history,
     historySummary: `Завершено по критерию готовности: ${closed.length}. С известной датой завершения: сегодня ${summaryToday}, неделя ${summaryWeek}, месяц ${summaryMonth}. Без даты завершения: ${closed.length - dated.length}. Страница истории: ${history.length} из ${historyAll.length}.`,
     historyBoundary: boundaries.history,
@@ -3247,7 +3290,12 @@ export function composeAiCompanyBoard(
   filters: HistoryFilters,
 ): { model: DashboardModel | null; acceptanceAvailable: boolean; sourceError: string | null } {
   const acceptanceAvailable = Boolean(current.data?.acceptanceContract || archive.data?.acceptanceContract);
-  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters) : null;
+  const archivedTaskIds = new Set<string>(
+    archive.data?.acceptanceView === "archive"
+      ? archive.data.tasks.filter((task) => task.boardTab === "archive").flatMap((task) => (task.id ? [task.id] : []))
+      : [],
+  );
+  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
   if (!currentModel) return { model: null, acceptanceAvailable, sourceError: current.error };
   if (!acceptanceAvailable) {
     return { model: { ...currentModel, acceptedArchive: [], acceptedArchiveError: null }, acceptanceAvailable, sourceError: null };

@@ -2011,7 +2011,10 @@ assert.equal(legacyModel.acceptedArchive.length, 0);
   );
   assert.match(html, /data-tab-count="working"[^>]*>3</);
   assert.match(html, /data-tab-count="review"[^>]*>1</);
-  assert.match(html, /data-tab-count="archive"[^>]*>3</);
+  // Core counts the cancelled task in «Архив»; the board lists it there labelled «Отменена».
+  assert.deepEqual(ids(m.cancelledArchive), ["cancel-1"]);
+  assert.match(html, /data-tab-count="archive"[^>]*>4</);
+  assert.match(html, /data-cancelled-task="cancel-1"/);
   assert.match(html, /это не приёмка результата|Это не приёмка результата/);
 }
 
