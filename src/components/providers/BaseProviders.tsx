@@ -7,6 +7,7 @@ import AnalyticsAuthLinker from "@/components/analytics/AnalyticsAuthLinker";
 import AnalyticsConsentBanner from "@/components/analytics/AnalyticsConsentBanner";
 import PlatformAnalyticsProvider from "@/components/analytics/PlatformAnalyticsProvider";
 import YandexMetrika from "@/components/analytics/YandexMetrika";
+import CatalogReturnRootTracker from "@/components/catalog/CatalogReturnRootTracker";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
 
 export default function BaseProviders({ children }: { children: ReactNode }) {
@@ -29,6 +30,7 @@ export default function BaseProviders({ children }: { children: ReactNode }) {
         <YandexMetrika />
       </Suspense>
       <AnalyticsAuthLinker />
+      <CatalogReturnRootTracker />
       <ClientErrorReporter />
       {children}
       <AnalyticsConsentBanner />

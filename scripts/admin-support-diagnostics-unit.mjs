@@ -515,7 +515,7 @@ assert.doesNotMatch(diagnosticsQuery, /approve_and_publish_practice/);
 assert.doesNotMatch(diagnosticsQuery, /from\("user_practices"\)/);
 
 const adminLayout = read("src/app/(platform)/admin/layout.tsx");
-assert.match(adminLayout, /requireAdminPanelAccess/);
+assert.match(adminLayout, /requireAdminLayoutAccess/);
 
 const guard = read("src/lib/admin/guard.ts");
 assert.match(guard, /supabase\.auth\.getUser\(\)/);

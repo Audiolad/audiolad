@@ -187,7 +187,7 @@ function MaxPlaylistCatalog({
           autoComplete="off"
           enterKeyHint="search"
           onChange={(event) => setDraft(event.target.value)}
-          className="h-[52px] w-full rounded-[18px] border border-[#ded1f1] bg-white px-4 text-base text-[#25135c] placeholder:text-[#9485b4] focus:outline focus:outline-2 focus:outline-[#7042c5]"
+          className="h-[52px] w-full rounded-[18px] border border-[#ded1f1] bg-white px-4 text-base text-[#25135c] placeholder:text-[#7d70a2] focus:outline focus:outline-2 focus:outline-[#7042c5]"
         />
       </form>
 
@@ -207,7 +207,7 @@ function MaxPlaylistCatalog({
                 setStatus("loading");
                 setSort(option.value);
               }}
-              className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-sm ${
+              className={`inline-flex min-h-11 min-w-11 max-w-full break-words [overflow-wrap:anywhere] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] items-center rounded-full border px-3 py-1.5 text-sm ${
                 active
                   ? "border-[#7042c5] bg-[#7042c5] text-white"
                   : "border-[#ddcfef] bg-white text-[#7042c5]"
@@ -235,7 +235,7 @@ function MaxPlaylistCatalog({
                 setStatus("loading");
                 setAccess(value);
               }}
-              className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-sm ${
+              className={`inline-flex min-h-11 min-w-11 max-w-full break-words [overflow-wrap:anywhere] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] items-center rounded-full border px-3 py-1.5 text-sm ${
                 active
                   ? "border-[#7042c5] bg-[#7042c5] text-white"
                   : "border-[#ddcfef] bg-white text-[#7042c5]"
@@ -257,7 +257,7 @@ function MaxPlaylistCatalog({
         <p className="mt-6 text-[15px] font-medium text-[#5f3f9d]">{emptyLabel}</p>
       ) : null}
       {status === "ready" && items.length > 0 ? (
-        <ul className="mt-5 -mx-4 grid grid-cols-2 gap-[6px] px-[6px]">
+        <ul className="mt-5 grid grid-cols-2 gap-3">
           {items.map((item) => (
             <li key={item.slug} className="min-w-0">
               <MaxPlaylistCard item={item} onOpen={onOpen} />
@@ -271,7 +271,7 @@ function MaxPlaylistCatalog({
           type="button"
           onClick={() => void loadMore()}
           disabled={loadingMore}
-          className="mt-4 min-h-11 w-full rounded-full border border-[#ddcfef] bg-white text-sm font-medium text-[#7042c5] disabled:opacity-60"
+          className="mt-4 min-h-11 w-full rounded-full border border-[#ddcfef] bg-white text-sm font-medium text-[#7042c5] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
         >
           {loadingMore ? "Загружаем…" : "Показать ещё"}
         </button>
@@ -363,7 +363,7 @@ export default function MaxPlaylists({
   }, [onRequestedSlugApplied, requestedSlug]);
 
   return (
-    <div className="mx-auto max-w-lg" data-max-playlists>
+    <div className="mx-auto min-w-0 max-w-lg pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]" data-max-playlists>
       <div hidden={slug !== null}>
         <MaxPlaylistCatalog onOpen={setSlug} />
       </div>

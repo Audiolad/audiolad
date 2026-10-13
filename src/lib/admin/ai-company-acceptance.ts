@@ -167,6 +167,8 @@ const ERROR_TEXT: Record<string, string> = {
   comment_required: "Нужно замечание от 8 до 500 символов.",
   invalid_comment: "Замечание не подходит: нужно 8–500 символов и не одно слово вроде ok или done.",
   not_found: "Задача не найдена.",
+  core_route_unavailable:
+    "Company Core недоступен для приёмки: адрес приёмки не открыт на шлюзе (ответ 404 без кода Core). Задача не потеряна, решение не записано.",
   stale_result: "Версия результата устарела. Обновите страницу и проверьте актуальный результат.",
   idempotency_conflict: "Этот повтор уже использован с другим решением. Обновите страницу.",
   not_archived: "Вернуть можно только принятую задачу.",
@@ -190,7 +192,10 @@ export function interpretAcceptanceResponse(
   if (status === 401 || code === "unauthorized") return fail("unauthorized", ERROR_TEXT.unauthorized);
   if (status === 403 || code === "actor_not_authenticated") return fail("actor_not_authenticated", ERROR_TEXT.actor_not_authenticated);
   if (status === 413 || code === "payload_too_large") return fail("payload_too_large", ERROR_TEXT.payload_too_large);
-  if (status === 404 || code === "not_found") return fail("not_found", ERROR_TEXT.not_found);
+  // Only Core's own JSON {error:"not_found"} means the task is missing. A bare 404 (HTML from the
+  // nginx gateway, no Core code) means the route is not exposed — Core 7a6fc09c root cause.
+  if (code === "not_found") return fail("not_found", ERROR_TEXT.not_found);
+  if (status === 404) return fail("core_route_unavailable", ERROR_TEXT.core_route_unavailable);
   if (status === 500 || code === "internal_error") return fail("internal_error", ERROR_TEXT.internal_error);
   if (code === "stale_result" || (status === 409 && code === "stale_result")) {
     const extra = currentVersion ? ` Актуальная версия: ${currentVersion}.` : "";
@@ -317,6 +322,8 @@ export async function handleOwnerAcceptanceRequest(input: {
               ? 502
               : outcome.code === "not_found"
               ? 404
+              : outcome.code === "core_route_unavailable"
+              ? 502
               : outcome.code === "payload_too_large"
                 ? 413
                 : outcome.code === "internal_error"

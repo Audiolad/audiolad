@@ -1,8 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { VoiceDictationButton } from "@/components/admin/VoiceDictationButton";
+
+import {
+  LAUNCH_OWNER_ONLY,
+  LAUNCH_UNAVAILABLE,
+} from "@/lib/admin/ai-company-launch";
 import {
   ACCEPTANCE_OWNER_ONLY,
   ACCEPTANCE_UNAVAILABLE,
@@ -10,9 +16,22 @@ import {
   validateRejectionComment,
   type AcceptanceDecision,
 } from "@/lib/admin/ai-company-acceptance";
-import { NO_DATA, historyHref } from "@/lib/admin/ai-company-dashboard";
+import { NO_DATA, historyHref, type LifecycleAction, type OwnerCommentView } from "@/lib/admin/ai-company-dashboard";
+import {
+  EVIDENCE_REFERENCE_HINT,
+  EVIDENCE_TYPES,
+  EVIDENCE_TYPE_LABELS,
+  LIFECYCLE_LABELS,
+  LIFECYCLE_OWNER_ONLY,
+  LIFECYCLE_UNAVAILABLE,
+  validateEvidence,
+  reasonRequired,
+  validateReason,
+  type EvidenceType,
+} from "@/lib/admin/ai-company-lifecycle";
 import { useAiCompanyDisclosureState } from "@/lib/admin/ai-company-disclosure";
 import type {
+  BoardTab,
   ActiveTaskCard,
   DashboardModel,
   EngineeringPanel,
@@ -28,10 +47,11 @@ import type {
 } from "@/lib/admin/ai-company-dashboard";
 
 const CONNECTION_CLASS: Record<ExecutorCard["connection"], string> = {
-  online: "border-green-200 bg-green-50",
-  idle: "border-slate-200 bg-slate-50",
-  not_connected: "border-slate-300 bg-slate-100",
-  no_fresh_data: "border-[#eadff8] bg-white",
+  verified: "border-green-200 bg-green-50",
+  unavailable: "border-red-200 bg-red-50",
+  check_failed: "border-amber-200 bg-amber-50",
+  stale: "border-slate-300 bg-slate-100",
+  no_data: "border-[#eadff8] bg-white",
 };
 
 const STAGE_BADGE_CLASS: Record<StageTone, string> = {
@@ -50,6 +70,13 @@ const STAGE_BADGE_CLASS: Record<StageTone, string> = {
   stale: "border-stone-300 bg-stone-100 text-stone-800",
 };
 
+const BOARD_TAB_ITEMS: ReadonlyArray<{ id: BoardTab; label: string }> = [
+  { id: "plan", label: "План" },
+  { id: "working", label: "В работе" },
+  { id: "review", label: "Приёмка" },
+  { id: "archive", label: "Архив" },
+];
+
 const ROW_BUTTON =
   "flex min-h-12 w-full max-w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:h-14 sm:flex-nowrap";
 
@@ -60,11 +87,159 @@ type AiCompanyDashboardProps = {
   acceptanceAvailable?: boolean;
   /** True only for a session with the platform `owner` role. Others see the board without live buttons. */
   canAccept?: boolean;
+  /** The tab from ?tab=. Defaults to «В работе». */
+  initialTab?: BoardTab;
 };
 
 const AcceptanceAvailability = createContext(false);
 const AcceptanceOwner = createContext(false);
 const AcceptanceRefresh = createContext<() => void>(() => undefined);
+const AcceptanceQuickDone = createContext<(taskId: string) => void>(() => undefined);
+
+/** Row-level «Принять» is offered only where the expanded card would offer the same accept. */
+export function quickAcceptAllowed(detail: TaskDetailModel, available: boolean, owner: boolean): boolean {
+  const view = detail.acceptance;
+  return Boolean(
+    available &&
+      owner &&
+      view?.applicable &&
+      view.state !== "accepted" &&
+      view.resultVersion !== NO_DATA &&
+      detail.taskId !== NO_DATA,
+  );
+}
+
+/** Same payload as the expanded card's «Принять»: decision accepted, empty comment, snapshot result version. */
+export function quickAcceptPayload(detail: TaskDetailModel, idempotencyKey: string) {
+  return {
+    taskId: detail.taskId,
+    decision: "accepted" as const,
+    comment: "",
+    resultVersion: detail.acceptance?.resultVersion ?? NO_DATA,
+    idempotencyKey,
+  };
+}
+
+function QuickAcceptButton({ detail }: { detail: TaskDetailModel }) {
+  const available = useContext(AcceptanceAvailability);
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const done = useContext(AcceptanceQuickDone);
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (confirming) confirmRef.current?.focus();
+  }, [confirming]);
+  if (!quickAcceptAllowed(detail, available, owner)) return null;
+
+  async function accept() {
+    if (busy || gate.current.busy) return;
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/acceptance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(quickAcceptPayload(detail, key)),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string };
+      });
+      if (outcome.ok === true) {
+        idempotencyKey.current = null;
+        setConfirming(false);
+        done(detail.taskId);
+        refresh();
+      } else {
+        setError(outcome.message ?? "Решение не сохранено.");
+      }
+    } catch {
+      setError(ACCEPTANCE_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const titleId = `quick-accept-title-${detail.key}`.replace(/[^A-Za-z0-9_-]/g, "-");
+  return (
+    <div className="flex shrink-0 flex-col items-end" data-quick-accept={detail.taskId}>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={(event) => {
+          event.stopPropagation();
+          setError(null);
+          setConfirming(true);
+        }}
+        className="min-h-10 rounded-lg bg-[#7042c5] px-3 py-1.5 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+        data-quick-accept-button
+      >
+        Принять
+      </button>
+      {error && !confirming ? (
+        <span className="mt-1 max-w-[10rem] text-right text-xs text-[#9f1239]" role="alert" data-quick-accept-error>
+          {error}
+        </span>
+      ) : null}
+      {confirming ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (event.target === event.currentTarget && !busy) setConfirming(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !busy) setConfirming(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            className="box-border w-full max-w-sm rounded-2xl bg-white p-4 text-left text-[#25135c] shadow-xl"
+            data-quick-accept-dialog
+          >
+            <p id={titleId} className="font-semibold">
+              Принять результат?
+            </p>
+            <p className="mt-2 break-words text-sm text-[#5c4d86]">{detail.title}</p>
+            {error ? (
+              <p className="mt-2 text-sm text-[#9f1239]" role="alert" data-quick-accept-error>
+                {error}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirming(false)}
+                className="min-h-11 rounded-lg border border-[#eadff8] px-3 py-2 text-sm font-semibold text-[#5c4d86] disabled:opacity-60"
+              >
+                Отмена
+              </button>
+              <button
+                ref={confirmRef}
+                type="button"
+                disabled={busy}
+                onClick={() => void accept()}
+                className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+                data-quick-accept-confirm
+              >
+                {busy ? "Сохраняем…" : "Принять"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function knownValue(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -197,6 +372,8 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   const [busy, setBusy] = useState(false);
   const [comment, setComment] = useState("");
   const [remark, setRemark] = useState("");
+  const commentRef = useRef<HTMLTextAreaElement>(null);
+  const remarkRef = useRef<HTMLTextAreaElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!view?.applicable || detail.taskId === NO_DATA) return null;
@@ -286,6 +463,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
           <label className="grid gap-1 text-xs text-[#796ba0]">
             Комментарий, если нужен
             <textarea
+              ref={commentRef}
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               rows={2}
@@ -293,6 +471,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
               className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
               aria-label="Комментарий к приёмке"
             />
+            <VoiceDictationButton field="acceptance-comment" fieldRef={commentRef} onChange={setComment} disabled={locked} />
           </label>
           <button
             type="button"
@@ -300,11 +479,12 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
             onClick={() => void submit("accepted")}
             className="min-h-11 rounded-lg bg-[#7042c5] px-3 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
           >
-            Проверил, принял
+            Принять
           </button>
           <label className="grid gap-1 text-xs text-[#796ba0]">
             Замечание для доработки
             <textarea
+              ref={remarkRef}
               value={remark}
               onChange={(event) => setRemark(event.target.value)}
               rows={3}
@@ -314,6 +494,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
               className="box-border w-full max-w-full rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]"
               aria-label="Замечание для доработки"
             />
+            <VoiceDictationButton field="acceptance-remark" fieldRef={remarkRef} onChange={setRemark} disabled={locked} />
           </label>
           <button
             type="button"
@@ -321,7 +502,7 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
             onClick={() => void submit("rejected")}
             className="min-h-11 rounded-lg border border-[#9f1239] px-3 py-2 text-sm font-semibold text-[#9f1239] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9f1239] disabled:opacity-60"
           >
-            Не работает / На доработку
+            На доработку
           </button>
         </div>
       )}
@@ -339,9 +520,376 @@ function OwnerAcceptanceControls({ detail }: { detail: TaskDetailModel }) {
   );
 }
 
+function LaunchControls({ detail }: { detail: TaskDetailModel }) {
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const view = detail.launch;
+  if (!view || detail.taskId === NO_DATA) return null;
+
+  async function press() {
+    if (!owner || busy || gate.current.busy) return;
+    // One key per press series: a double click or a retry after a lost answer is the same request.
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/launch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ taskId: detail.taskId, idempotencyKey: key }),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string; deliveryFailed?: boolean };
+      });
+      if (outcome.ok === true) {
+        setMessage(outcome.message ?? "Запрос принят.");
+        // A failed delivery keeps the row; the next press is a new retry with a new key.
+        idempotencyKey.current = null;
+        refresh();
+      } else {
+        setError(outcome.message ?? "Запуск не выполнен.");
+      }
+    } catch {
+      setError(LAUNCH_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-launch-state={view.state}>
+      <p className="font-semibold">Запуск: {view.label}</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        {view.facts.map((fact) => (
+          <Fact key={fact.label} label={fact.label} value={fact.value} />
+        ))}
+        <Fact label="Журнал запуска" value={view.audit} />
+      </dl>
+      {view.canPress ? (
+        <>
+          {owner ? null : (
+            <p className="mt-2 text-sm text-[#9f1239]" role="status" data-launch-owner-only>
+              {LAUNCH_OWNER_ONLY}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={!owner || busy}
+            onClick={() => void press()}
+            data-launch-button
+            className="mt-3 min-h-11 rounded-lg bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
+          >
+            {busy ? "Отправляю…" : view.buttonLabel}
+          </button>
+        </>
+      ) : null}
+      {message ? (
+        <p className="mt-2 text-sm text-[#166534]" role="status">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+const LIFECYCLE_BUTTON: Record<LifecycleAction, string> = {
+  return: "border border-amber-300 bg-white text-amber-900",
+  defer: "border border-[#cdbbef] bg-white text-[#4b2a8a]",
+  cancel: "border border-[#f3b4c3] bg-white text-[#9f1239]",
+  complete: "border border-green-300 bg-white text-green-900",
+  stop: "border border-[#f3b4c3] bg-white text-[#9f1239]",
+};
+
+const FIELD = "mt-1 w-full rounded-lg border border-[#d9cdf0] bg-white px-3 py-2 text-sm";
+
+/**
+ * «Отложить в план», «Снять задачу», «Завершить с доказательствами», «Остановить».
+ * Buttons are exactly Core's allowed_actions (detail.lifecycle). One press opens a short dialog; its submit is the
+ * single confirmation. The row changes only after the next Core snapshot.
+ */
+export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "taskId" | "lifecycle"> }) {
+  const owner = useContext(AcceptanceOwner);
+  const refresh = useContext(AcceptanceRefresh);
+  const gate = useRef(createAcceptanceGate());
+  const idempotencyKey = useRef<string | null>(null);
+  const [open, setOpen] = useState<LifecycleAction | null>(null);
+  const [reason, setReason] = useState("");
+  const [after, setAfter] = useState<"defer" | "cancel">("defer");
+  const [evidenceType, setEvidenceType] = useState<EvidenceType>("document");
+  const [reference, setReference] = useState("");
+  const [description, setDescription] = useState("");
+  const [mergeSha, setMergeSha] = useState("");
+  const [deploySha, setDeploySha] = useState("");
+  const [source, setSource] = useState("");
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const view = detail.lifecycle;
+  if (!view || detail.taskId === NO_DATA) return null;
+
+  function start(action: LifecycleAction) {
+    idempotencyKey.current = null;
+    setOpen(action);
+    setReason("");
+    setAfter("defer");
+    setEvidenceType("document");
+    setReference("");
+    setDescription("");
+    setMergeSha("");
+    setDeploySha("");
+    setSource("");
+    setError(null);
+    setMessage(null);
+  }
+
+  async function submit(action: LifecycleAction) {
+    if (!owner || busy || gate.current.busy || !view) return;
+    const reasonError = validateReason(reason, reasonRequired(action));
+    if (reasonError) {
+      setError(reasonError);
+      return;
+    }
+    let evidence: unknown[] | undefined;
+    if (action === "complete") {
+      const item = { type: evidenceType, reference, description, merge_sha: mergeSha, deploy_sha: deploySha, source };
+      const checked = validateEvidence(item);
+      if (!checked.ok) {
+        setError(checked.message);
+        return;
+      }
+      evidence = [checked.item];
+    }
+    // One key per dialog: a double click or a retry after a lost answer is the same request in Core.
+    const key = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = key;
+    setBusy(true);
+    setError(null);
+    try {
+      const outcome = await gate.current.run(async () => {
+        const response = await fetch("/api/admin/ai-company/lifecycle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            taskId: detail.taskId,
+            action,
+            expectedStatus: view.expectedStatus,
+            idempotencyKey: key,
+            reason: reason.trim() || undefined,
+            after: action === "stop" ? after : undefined,
+            evidence,
+          }),
+        });
+        return (await response.json()) as { ok?: boolean; message?: string };
+      });
+      if (outcome.ok === true) {
+        setMessage(outcome.message ?? "Готово.");
+        setOpen(null);
+        refresh();
+      } else {
+        setError(outcome.message ?? "Действие не выполнено.");
+      }
+    } catch {
+      setError(LIFECYCLE_UNAVAILABLE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const titleId = `lifecycle-${detail.taskId}`;
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fbf8ff] p-3" data-lifecycle-status={view.expectedStatus}>
+      {view.requiredDecision ? (
+        <p className="text-sm" data-required-decision>
+          <span className="font-semibold">Нужно решение: </span>
+          {view.requiredDecision}
+        </p>
+      ) : null}
+      {view.actions.length ? (
+        <>
+          {owner ? null : (
+            <p className="mt-2 text-sm text-[#9f1239]" role="status" data-lifecycle-owner-only>
+              {LIFECYCLE_OWNER_ONLY}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {view.actions.map((action) => (
+              <button
+                key={action}
+                type="button"
+                disabled={!owner || busy}
+                aria-expanded={open === action}
+                onClick={() => (open === action ? setOpen(null) : start(action))}
+                data-lifecycle-button={action}
+                className={`min-h-11 rounded-lg px-4 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 ${LIFECYCLE_BUTTON[action]}`}
+              >
+                {LIFECYCLE_LABELS[action]}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+      {open && owner ? (
+        <form
+          role="dialog"
+          aria-labelledby={titleId}
+          data-lifecycle-dialog={open}
+          className="mt-3 rounded-lg border border-[#d9cdf0] bg-white p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit(open);
+          }}
+        >
+          <p id={titleId} className="font-semibold">
+            {LIFECYCLE_LABELS[open]}
+          </p>
+          <p className="mt-1 text-sm text-[#796ba0]">
+            {open === "defer"
+              ? "Задача уйдёт во вкладку «План». PR, история и уточнения сохранятся; вернуть — кнопкой «В работу»."
+              : open === "cancel"
+                ? "Задача уйдёт в «Архив». Ничего не удаляется, PR не закрывается."
+                : open === "stop"
+                  ? "Исполнитель получит команду остановиться. После его подтверждения задача уйдёт в план или в архив."
+                  : open === "return"
+                    ? "Задача вернётся исполнителю вместе с вашим комментарием."
+                    : "Только если работа уже сделана и есть доказательство (ссылка на PR или страницу)."}
+          </p>
+          {open === "stop" ? (
+            <fieldset className="mt-3 text-sm">
+              <legend className="text-[#796ba0]">После остановки</legend>
+              <label className="mr-4 inline-flex items-center gap-1">
+                <input type="radio" name={`after-${detail.taskId}`} checked={after === "defer"} onChange={() => setAfter("defer")} /> в план
+              </label>
+              <label className="inline-flex items-center gap-1">
+                <input type="radio" name={`after-${detail.taskId}`} checked={after === "cancel"} onChange={() => setAfter("cancel")} /> в архив
+              </label>
+            </fieldset>
+          ) : null}
+          {open === "complete" ? (
+            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[#796ba0]">Тип доказательства</span>
+                <select className={FIELD} value={evidenceType} onChange={(event) => setEvidenceType(event.target.value as EvidenceType)} data-evidence-type>
+                  {EVIDENCE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {EVIDENCE_TYPE_LABELS[type]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-[#796ba0]">Ссылка или идентификатор</span>
+                <input className={FIELD} value={reference} placeholder={EVIDENCE_REFERENCE_HINT[evidenceType]} onChange={(event) => setReference(event.target.value)} data-evidence-reference />
+              </label>
+              {evidenceType === "code_delivery" ? (
+                <>
+                  <label className="block">
+                    <span className="text-[#796ba0]">SHA слияния</span>
+                    <input className={FIELD} value={mergeSha} onChange={(event) => setMergeSha(event.target.value)} />
+                  </label>
+                  <label className="block">
+                    <span className="text-[#796ba0]">SHA выкладки</span>
+                    <input className={FIELD} value={deploySha} onChange={(event) => setDeploySha(event.target.value)} />
+                  </label>
+                </>
+              ) : null}
+              {evidenceType === "external_confirmation" ? (
+                <label className="block">
+                  <span className="text-[#796ba0]">Источник</span>
+                  <input className={FIELD} value={source} placeholder="telegram, email, db_check…" onChange={(event) => setSource(event.target.value)} />
+                </label>
+              ) : null}
+              <label className="block sm:col-span-2">
+                <span className="text-[#796ba0]">Описание: что подтверждает</span>
+                <textarea ref={descriptionRef} className={FIELD} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} data-evidence-description />
+                <VoiceDictationButton field="evidence-description" fieldRef={descriptionRef} onChange={setDescription} disabled={busy} />
+              </label>
+            </div>
+          ) : null}
+          <label className="mt-3 block text-sm">
+            <span className="text-[#796ba0]">{open === "return" ? "Что не так" : reasonRequired(open) ? "Причина" : "Причина (необязательно)"}</span>
+            <textarea ref={reasonRef} className={FIELD} rows={2} value={reason} onChange={(event) => {
+              setReason(event.target.value);
+              setError(null);
+            }} data-lifecycle-reason />
+            <VoiceDictationButton field="lifecycle-reason" fieldRef={reasonRef} onChange={(next) => { setReason(next); setError(null); }} disabled={busy} />
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={busy}
+              data-lifecycle-submit={open}
+              className="min-h-11 rounded-lg bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {busy ? "Отправляю…" : LIFECYCLE_LABELS[open]}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setOpen(null)} className="min-h-11 rounded-lg border border-[#d9cdf0] px-4 py-2 text-sm">
+              Отмена
+            </button>
+          </div>
+        </form>
+      ) : null}
+      {message ? (
+        <p className="mt-2 text-sm text-[#166534]" role="status">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-sm text-[#9f1239]" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** «Комментарий Сергея (Отложено в план, 13.10 07:56 МСК): …», the latest; older ones folded. */
+export function OwnerComments({ comments }: { comments: OwnerCommentView[] | undefined }) {
+  if (!comments?.length) return null;
+  const [latest, ...older] = comments;
+  const head = (c: OwnerCommentView) => `Комментарий Сергея (${c.label}${c.when ? `, ${c.when}` : ""}): `;
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fffdf5] p-3 text-sm" data-owner-comments>
+      <p className="break-words" data-owner-comment={latest.action}>
+        <span className="font-semibold">{head(latest)}</span>
+        {latest.reason}
+      </p>
+      {older.length ? (
+        <details className="mt-1 text-[#796ba0]">
+          <summary className="cursor-pointer">Ранее ({older.length})</summary>
+          <ul className="mt-1 grid gap-1">
+            {older.map((c, index) => (
+              <li key={`${c.action}-${index}`} className="break-words" data-owner-comment-older={c.action}>
+                <span className="font-semibold">{head(c)}</span>
+                {c.reason}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
     <>
+    <OwnerComments comments={detail.ownerComments} />
+    <LaunchControls detail={detail} />
+    <LifecycleControls detail={detail} />
     <TaskCopyButton text={detail.copyText} />
     <OwnerAcceptanceControls detail={detail} />
     <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
@@ -408,6 +956,7 @@ function CompactRow({
   children,
   className = "",
   articleProps,
+  actions,
 }: {
   rowKey: string;
   title: string;
@@ -420,19 +969,26 @@ function CompactRow({
   children: ReactNode;
   className?: string;
   articleProps?: Record<string, string>;
+  /** Rendered next to the toggle, outside it: pressing an action never expands the row. */
+  actions?: ReactNode;
 }) {
   const expanded = open === true;
   const panelId = panelDomId(rowKey);
   return (
     <article data-compact-row={rowKey} className={`max-w-full overflow-hidden rounded-xl border text-sm ${className}`} {...articleProps}>
+      <div className="flex max-w-full items-center">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => onToggle?.(rowKey, !expanded)}
-        className={ROW_BUTTON}
+        className={`${ROW_BUTTON} min-w-0 flex-1`}
       >
-        <span className="line-clamp-2 min-w-0 flex-1 basis-full break-words font-semibold sm:basis-0 sm:line-clamp-1">
+        {/* The title lives only in the row header; expanded, it is shown in full there instead of a repeat in the panel. */}
+        <span
+          data-row-title
+          className={`min-w-0 flex-1 basis-full break-words font-semibold sm:basis-0 ${expanded ? "" : "line-clamp-2 sm:line-clamp-1"}`}
+        >
           {title}
         </span>
         {aside ? <span className="max-w-[9rem] shrink-0 truncate text-xs text-[#5c4d86]">{aside}</span> : null}
@@ -449,13 +1005,14 @@ function CompactRow({
           {expanded ? "▴" : "▾"}
         </span>
       </button>
+      {actions ? <div className="shrink-0 py-1.5 pr-3">{actions}</div> : null}
+      </div>
       <div
         id={panelId}
         hidden={!expanded}
         className="border-t border-[#eadff8] px-3 pb-3"
         onClick={(event) => event.stopPropagation()}
       >
-        <p className="mt-3 break-words font-semibold">{title}</p>
         {children}
       </div>
     </article>
@@ -491,6 +1048,10 @@ function GateList({
               className={attention ? "border-red-200 bg-white/80" : "border-[#eadff8] bg-white"}
               articleProps={{ "data-decision-owner": gate.decisionOwner }}
             >
+              <OwnerComments comments={gate.ownerComments} />
+              {gate.taskId && gate.lifecycle ? (
+                <LifecycleControls detail={{ taskId: gate.taskId, lifecycle: gate.lifecycle }} />
+              ) : null}
               <TaskCopyButton text={gate.copyText} />
               <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 {gate.historical ? <Fact label="Метка" value="Историческая блокировка" /> : null}
@@ -515,6 +1076,7 @@ function TaskRow({
   onToggle,
   extra,
   articleProps,
+  actions,
 }: {
   detail: TaskDetailModel;
   rowKey: string;
@@ -522,9 +1084,11 @@ function TaskRow({
   onToggle?: (key: string, open: boolean) => void;
   extra?: ReactNode;
   articleProps?: Record<string, string>;
+  actions?: ReactNode;
 }) {
   return (
     <CompactRow
+      actions={actions}
       rowKey={rowKey}
       title={detail.title}
       aside={knownValue(detail.executor)}
@@ -649,6 +1213,7 @@ export function AiCompanyDashboardView({
   sourceError,
   acceptanceAvailable = false,
   canAccept = false,
+  initialTab = "working",
   onRefresh,
   openDetails = {},
   onToggleDetail,
@@ -664,12 +1229,34 @@ export function AiCompanyDashboardView({
       })
     : null;
   const showNext = Boolean(model && (model.historyNextOffset != null || model.historyNextCursor));
+  const [tab, setTab] = useState<BoardTab>(initialTab);
+  // Rows accepted from the list leave «Приёмка» at once; the refreshed snapshot then shows them in «Архив».
+  const [quickAccepted, setQuickAccepted] = useState<ReadonlySet<string>>(() => new Set());
+  const ownerReview = (model?.ownerReview ?? []).filter((detail) => !quickAccepted.has(detail.taskId));
+  function markQuickAccepted(taskId: string) {
+    setQuickAccepted((prev) => new Set(prev).add(taskId));
+  }
+  const tabCounts: Record<BoardTab, number> = {
+    plan: model?.plan.length ?? 0,
+    working: (model?.activeTasks.length ?? 0) + (model?.queue.length ?? 0) + (model?.decisions.length ?? 0),
+    review: ownerReview.length,
+    archive: (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0) + (model?.cancelledArchive?.length ?? 0),
+  };
+  function selectTab(next: BoardTab) {
+    setTab(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", next);
+      window.history.replaceState(null, "", url);
+    }
+  }
   const receiptMissing = model?.todayNote.startsWith("Нет данных") ?? false;
 
   return (
     <AcceptanceAvailability.Provider value={acceptanceAvailable}>
     <AcceptanceOwner.Provider value={canAccept}>
     <AcceptanceRefresh.Provider value={onRefresh}>
+    <AcceptanceQuickDone.Provider value={markQuickAccepted}>
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
@@ -703,6 +1290,65 @@ export function AiCompanyDashboardView({
 
       {model ? (
         <>
+          <div
+            role="tablist"
+            aria-label="Разделы табло"
+            data-board-tabs
+            className="sticky top-0 z-20 -mx-1 grid grid-cols-4 gap-1 border-b border-[#eadff8] bg-[#fbf8ff]/95 px-1 py-1.5 backdrop-blur"
+          >
+            {BOARD_TAB_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`ai-company-tabbtn-${item.id}`}
+                aria-selected={tab === item.id}
+                aria-controls={`ai-company-tab-${item.id}`}
+                data-board-tab={item.id}
+                onClick={() => selectTab(item.id)}
+                className={`min-h-11 min-w-0 rounded-lg px-1 py-1.5 text-center text-xs font-semibold leading-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:text-sm ${
+                  tab === item.id ? "bg-[#7042c5] text-white" : "border border-[#eadff8] bg-white text-[#25135c]"
+                }`}
+              >
+                {item.label}
+                <span className="ml-1 tabular-nums opacity-80" data-tab-count={item.id}>{tabCounts[item.id]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div role="tabpanel" id="ai-company-tab-plan" aria-labelledby="ai-company-tabbtn-plan" data-tab-panel="plan" hidden={tab !== "plan"} className="space-y-5">
+          <section aria-labelledby="ai-company-plan" data-section="plan">
+            <h3 id="ai-company-plan" className="text-xl font-semibold">
+              План
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Задачи в плане не отправлены Грогу и не занимают мощность. Запуск — кнопка «В работу» внутри строки: та же команда, что у Oriy в Ядре.
+            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.plan.length ? (
+                model.plan.map((detail) => {
+                  const rowKey = `plan:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-plan-task": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  {NO_DATA}: задач в плане в полученном срезе нет.
+                </p>
+              )}
+            </div>
+          </section>
+          </div>
+
+          <div role="tabpanel" id="ai-company-tab-working" aria-labelledby="ai-company-tabbtn-working" data-tab-panel="working" hidden={tab !== "working"} className="space-y-5">
           <section aria-labelledby="ai-company-now" data-section="now">
             <h3 id="ai-company-now" className="text-xl font-semibold">
               Сейчас в работе
@@ -731,7 +1377,9 @@ export function AiCompanyDashboardView({
               <h3 id="ai-company-decisions" className="text-lg font-semibold text-red-900">
                 Нужно решение
               </h3>
-              <p className="mt-1 text-xs text-red-800">Текущие решения видны в списке. Владелец строки — тот, кто записан в источнике.</p>
+              <p className="mt-1 text-xs text-red-800">
+                Ждёт решения владельца. Это не приёмка результата: приёмка — во вкладке «Приёмка». Владелец строки — тот, кто записан в источнике.
+              </p>
               <GateList
                 gates={model.decisions}
                 openDetails={openDetails}
@@ -741,151 +1389,6 @@ export function AiCompanyDashboardView({
               />
             </section>
           ) : null}
-
-          <section aria-labelledby="ai-company-executors" data-section="executors">
-            <h3 id="ai-company-executors" className="text-xl font-semibold">
-              Исполнители
-            </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — имя и достоверное состояние подключения.</p>
-            <HelpNote label="Справка об исполнителях">
-              <p>
-                Фактические исполнители: провайдер и модель, запуск, задача и свежесть сигнала из Company Core. Состояния: не подключён, свободен, нет данных, работает. Grok — единственный оркестратор и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor. Неподключённый исполнитель — зависимость подключения, не активный исполнитель. Постоянных карточек должностей нет: исторические роли остаются в журнале задач.
-              </p>
-            </HelpNote>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {model.executors.map((executor) => {
-                const rowKey = `executor:${executor.id}`;
-                return (
-                  <CompactRow
-                    key={rowKey}
-                    rowKey={rowKey}
-                    title={executor.label}
-                    aside={executor.connectionLabel}
-                    open={openDetails[rowKey] ?? false}
-                    onToggle={onToggleDetail}
-                    className={CONNECTION_CLASS[executor.connection]}
-                    articleProps={{
-                      "data-executor": executor.id,
-                      "data-executor-kind": executor.kind,
-                      "data-connection": executor.connection,
-                    }}
-                  >
-                    <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
-                    <dl className="mt-3 grid gap-2 text-sm">
-                      <Fact label="Состояние" value={executor.connectionLabel} />
-                      <Fact label="Провайдер / модель" value={executor.providerModel} />
-                      <Fact label="Задача" value={executor.currentTask} />
-                      <Fact label="Запуск" value={executor.runId} />
-                      <Fact label="Свежесть" value={executor.freshness} />
-                      <Fact label="Последний сигнал" value={executor.heartbeat} />
-                      <Fact label="Уточнение" value={executor.detail} />
-                    </dl>
-                  </CompactRow>
-                );
-              })}
-            </div>
-          </section>
-
-          <section aria-labelledby="ai-company-today" data-section="today">
-            <h3 id="ai-company-today" className="text-xl font-semibold">
-              Сегодня
-            </h3>
-            <p className="mt-1 text-xs text-[#796ba0]">
-              {receiptMissing ? model.todayNote : "Новые сверху. Возраст списка не берётся из updated_at."}
-            </p>
-            <HelpNote label="Справка о порядке списков">
-              <p>{model.todayNote}</p>
-              <p>Получены сегодня: порядок received_at, новые сверху.</p>
-              <p>Созданы сегодня: порядок created_at, новые сверху. Это запасной список, не received_at и не updated_at.</p>
-              <p>Завершены сегодня: порядок completed_at, новые сверху.</p>
-            </HelpNote>
-            <div className="mt-2 space-y-3">
-              <div data-section="received">
-                <h4 className="font-semibold">Получены сегодня · {model.todayReceived.length}</h4>
-                <TodayList
-                  rows={model.todayReceived}
-                  empty={`${NO_DATA}: получения за московские сутки снимка нет.`}
-                  openDetails={openDetails}
-                  onToggleDetail={onToggleDetail}
-                  rowPrefix="received"
-                />
-              </div>
-              <div data-section="created">
-                <h4 className="font-semibold">Созданы сегодня · {model.todayCreated.length}</h4>
-                <TodayList
-                  rows={model.todayCreated}
-                  empty={`${NO_DATA}: создания записи за эти сутки нет.`}
-                  openDetails={openDetails}
-                  onToggleDetail={onToggleDetail}
-                  rowPrefix="created"
-                />
-              </div>
-              <div data-section="work-events">
-                <h4 className="font-semibold">События работы сегодня · {model.todayWorkEvents.length}</h4>
-                <div className="mt-1.5 flex flex-col gap-1.5">
-                  {model.todayWorkEvents.length ? (
-                    model.todayWorkEvents.map((event) => (
-                      <WorkEventRow
-                        key={event.key}
-                        event={event}
-                        open={openDetails[`event:${event.key}`] ?? false}
-                        onToggle={onToggleDetail}
-                      />
-                    ))
-                  ) : (
-                    <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
-                      {NO_DATA}: событий работы за эти сутки нет.
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div data-section="completed-today">
-                <h4 className="font-semibold">Завершены сегодня · {model.todayCompleted.length}</h4>
-                <TodayList
-                  rows={model.todayCompleted}
-                  empty={`${NO_DATA}: завершений по критерию готовности за эти сутки нет.`}
-                  openDetails={openDetails}
-                  onToggleDetail={onToggleDetail}
-                  rowPrefix="completed"
-                />
-              </div>
-            </div>
-          </section>
-
-          <section aria-labelledby="ai-company-owner-review" data-section="owner-review">
-            <h3 id="ai-company-owner-review" className="text-xl font-semibold">
-              На проверке
-            </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">
-              Результат предъявлен. Приёмка владельцем здесь отдельно от проверки в рабочей системе.
-            </p>
-            {acceptanceAvailable ? null : (
-              <p className="mt-2 text-sm text-[#9f1239]" role="status">
-                {ACCEPTANCE_UNAVAILABLE}
-              </p>
-            )}
-            <div className="mt-2 flex flex-col gap-1.5">
-              {model.ownerReview.length ? (
-                model.ownerReview.map((detail) => {
-                  const rowKey = `review:${detail.key}`;
-                  return (
-                    <TaskRow
-                      key={rowKey}
-                      detail={detail}
-                      rowKey={rowKey}
-                      open={openDetails[rowKey] ?? false}
-                      onToggle={onToggleDetail}
-                      articleProps={{ "data-owner-review": detail.taskId }}
-                    />
-                  );
-                })
-              ) : (
-                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
-                  Результатов, ожидающих приёмки владельцем, в снимке нет.
-                </p>
-              )}
-            </div>
-          </section>
 
           <section aria-labelledby="ai-company-queue" data-section="queue">
             <h3 id="ai-company-queue" className="text-xl font-semibold">
@@ -913,16 +1416,255 @@ export function AiCompanyDashboardView({
             </div>
           </section>
 
-          <section aria-labelledby="ai-company-quotas" data-section="quotas">
-            <h3 id="ai-company-quotas" className="text-xl font-semibold">
-              Квоты и расход
+          <details data-section="more" className="rounded-2xl border border-[#eadff8] bg-white p-3">
+            <summary className="min-h-11 cursor-pointer text-sm font-semibold text-[#7042c5]">Исполнители, журнал за сегодня и квоты</summary>
+            <div className="mt-3 space-y-5">
+                <section aria-labelledby="ai-company-executors" data-section="executors">
+                  <h3 id="ai-company-executors" className="text-xl font-semibold">
+                    Исполнители
+                  </h3>
+                  <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — подключение и занятость по фактам Company Core.</p>
+                  <HelpNote label="Справка об исполнителях">
+                    <p>
+                      Подключение: проверено, недоступно, не удалось проверить, данные устарели или нет данных. Нет данных — это не «отключён». Занятость: выполняет задачу, ожидает, свободен или неизвестно. Запуск считается текущим, только если прогресс подтверждён за последние 60 минут. Grok — единственный оркестратор. Модель Grok внутри Cursor остаётся Cursor.
+                    </p>
+                  </HelpNote>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {model.executors.map((executor) => {
+                      const rowKey = `executor:${executor.id}`;
+                      return (
+                        <CompactRow
+                          key={rowKey}
+                          rowKey={rowKey}
+                          title={`${executor.label} · ${executor.occupancyLabel}`}
+                          aside={executor.connectionLabel}
+                          open={openDetails[rowKey] ?? false}
+                          onToggle={onToggleDetail}
+                          className={CONNECTION_CLASS[executor.connection]}
+                          articleProps={{
+                            "data-executor": executor.id,
+                            "data-executor-kind": executor.kind,
+                            "data-connection": executor.connection,
+                            "data-occupancy": executor.occupancy,
+                          }}
+                        >
+                          <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
+                          <dl className="mt-3 grid gap-2 text-sm">
+                            <Fact label="Подключение" value={executor.connectionLabel} />
+                            <Fact label="Как проверено" value={executor.connectionSource} />
+                            <Fact label="Занятость" value={executor.occupancyLabel} />
+                            <Fact label="Последний сигнал" value={executor.heartbeat} />
+                            <Fact label="Источник сигнала" value={executor.signalSource} />
+                            <Fact label="Свежесть" value={executor.freshness} />
+                            {executor.providerModel !== NO_DATA ? <Fact label="Провайдер / модель" value={executor.providerModel} /> : null}
+                            {executor.detail !== NO_DATA ? <Fact label="Уточнение" value={executor.detail} /> : null}
+                          </dl>
+                          <div className="mt-3 text-sm" data-executor-runs={executor.id}>
+                            <p className="font-semibold">{executor.activeRunsLabel}</p>
+                            {executor.activeRuns.length > 0 ? (
+                              <ul className="mt-1 space-y-2">
+                                {executor.activeRuns.map((run) => (
+                                  <li key={`${run.taskId ?? run.title}:${run.runId}`} className="rounded-lg border border-[#eadff8] bg-white p-2" data-run-fresh={run.fresh ? "yes" : "no"}>
+                                    <p className="break-words font-medium">{run.title}</p>
+                                    <p className="break-words text-[#796ba0]">Задача: {run.taskId ? run.taskId.slice(0, 8) : NO_DATA} · Запуск: {run.runId}</p>
+                                    <p className="break-words text-[#796ba0]">Этап: {run.stage} · Прогресс: {run.lastProgress}{run.fresh ? "" : " (давно, не считается текущей работой)"}</p>
+                                    {run.taskHref || run.prHref ? (
+                                      <p className="mt-1 flex flex-wrap gap-3">
+                                        {run.taskHref ? <a className="text-[#7042c5] underline" href={run.taskHref}>Задача</a> : null}
+                                        {run.prHref ? <a className="text-[#7042c5] underline" href={run.prHref}>PR</a> : null}
+                                      </p>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </div>
+                        </CompactRow>
+                      );
+                    })}
+                  </div>
+                </section>
+                <section aria-labelledby="ai-company-today" data-section="today">
+                  <h3 id="ai-company-today" className="text-xl font-semibold">
+                    Сегодня
+                  </h3>
+                  <p className="mt-1 text-xs text-[#796ba0]">
+                    {receiptMissing ? model.todayNote : "Новые сверху. Возраст списка не берётся из updated_at."}
+                  </p>
+                  <HelpNote label="Справка о порядке списков">
+                    <p>{model.todayNote}</p>
+                    <p>Получены сегодня: порядок received_at, новые сверху.</p>
+                    <p>Созданы сегодня: порядок created_at, новые сверху. Это запасной список, не received_at и не updated_at.</p>
+                    <p>Завершены сегодня: порядок completed_at, новые сверху.</p>
+                  </HelpNote>
+                  <div className="mt-2 space-y-3">
+                    <div data-section="received">
+                      <h4 className="font-semibold">Получены сегодня · {model.todayReceived.length}</h4>
+                      <TodayList
+                        rows={model.todayReceived}
+                        empty={`${NO_DATA}: получения за московские сутки снимка нет.`}
+                        openDetails={openDetails}
+                        onToggleDetail={onToggleDetail}
+                        rowPrefix="received"
+                      />
+                    </div>
+                    <div data-section="created">
+                      <h4 className="font-semibold">Созданы сегодня · {model.todayCreated.length}</h4>
+                      <TodayList
+                        rows={model.todayCreated}
+                        empty={`${NO_DATA}: создания записи за эти сутки нет.`}
+                        openDetails={openDetails}
+                        onToggleDetail={onToggleDetail}
+                        rowPrefix="created"
+                      />
+                    </div>
+                    <div data-section="work-events">
+                      <h4 className="font-semibold">События работы сегодня · {model.todayWorkEvents.length}</h4>
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        {model.todayWorkEvents.length ? (
+                          model.todayWorkEvents.map((event) => (
+                            <WorkEventRow
+                              key={event.key}
+                              event={event}
+                              open={openDetails[`event:${event.key}`] ?? false}
+                              onToggle={onToggleDetail}
+                            />
+                          ))
+                        ) : (
+                          <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                            {NO_DATA}: событий работы за эти сутки нет.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div data-section="completed-today">
+                      <h4 className="font-semibold">Завершены сегодня · {model.todayCompleted.length}</h4>
+                      <TodayList
+                        rows={model.todayCompleted}
+                        empty={`${NO_DATA}: завершений по критерию готовности за эти сутки нет.`}
+                        openDetails={openDetails}
+                        onToggleDetail={onToggleDetail}
+                        rowPrefix="completed"
+                      />
+                    </div>
+                  </div>
+                </section>
+                <section aria-labelledby="ai-company-quotas" data-section="quotas">
+                  <h3 id="ai-company-quotas" className="text-xl font-semibold">
+                    Квоты и расход
+                  </h3>
+                  <div className="mt-3 grid gap-4 lg:grid-cols-2">
+                    {model.quotas.map((line) => (
+                      <QuotaCard key={line.id} line={line} />
+                    ))}
+                  </div>
+                </section>
+            </div>
+          </details>
+          </div>
+
+          <div role="tabpanel" id="ai-company-tab-review" aria-labelledby="ai-company-tabbtn-review" data-tab-panel="review" hidden={tab !== "review"} className="space-y-5">
+          <section aria-labelledby="ai-company-owner-review" data-section="owner-review">
+            <h3 id="ai-company-owner-review" className="text-xl font-semibold">
+              На проверке
             </h3>
-            <div className="mt-3 grid gap-4 lg:grid-cols-2">
-              {model.quotas.map((line) => (
-                <QuotaCard key={line.id} line={line} />
-              ))}
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Результат предъявлен. Приёмка владельцем здесь отдельно от проверки в рабочей системе.
+            </p>
+            {acceptanceAvailable ? null : (
+              <p className="mt-2 text-sm text-[#9f1239]" role="status">
+                {ACCEPTANCE_UNAVAILABLE}
+              </p>
+            )}
+            <div className="mt-2 flex flex-col gap-1.5">
+              {ownerReview.length ? (
+                ownerReview.map((detail) => {
+                  const rowKey = `review:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-owner-review": detail.taskId }}
+                      actions={<QuickAcceptButton detail={detail} />}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Результатов, ожидающих приёмки владельцем, в снимке нет.
+                </p>
+              )}
             </div>
           </section>
+          </div>
+
+          <div role="tabpanel" id="ai-company-tab-archive" aria-labelledby="ai-company-tabbtn-archive" data-tab-panel="archive" hidden={tab !== "archive"} className="space-y-5">
+          <section aria-labelledby="ai-company-accepted" data-section="accepted">
+            <h3 id="ai-company-accepted" className="text-xl font-semibold">
+              Архив / Принятые
+            </h3>
+            <p className="mt-1 text-sm text-[#796ba0]">
+              Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
+            </p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {model.acceptedArchiveError ? (
+                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#9f1239]" role="status" data-archive-unavailable>
+                  {model.acceptedArchiveError}
+                </p>
+              ) : !acceptanceAvailable ? (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status">
+                  {ACCEPTANCE_UNAVAILABLE}
+                </p>
+              ) : model.acceptedArchive.length ? (
+                model.acceptedArchive.map((detail) => {
+                  const rowKey = `accepted:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-accepted-task": detail.taskId }}
+                    />
+                  );
+                })
+              ) : (
+                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
+                  Принятых результатов в снимке нет.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {model.cancelledArchive?.length ? (
+            <section aria-labelledby="ai-company-cancelled" data-section="cancelled">
+              <h3 id="ai-company-cancelled" className="text-xl font-semibold">
+                Архив / Отменённые
+              </h3>
+              <p className="mt-1 text-sm text-[#796ba0]">
+                Задачи, которые Company Core отменил и отнёс к архиву. История сохраняется, результатом они не считаются.
+              </p>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {model.cancelledArchive.map((detail) => {
+                  const rowKey = `cancelled:${detail.key}`;
+                  return (
+                    <TaskRow
+                      key={rowKey}
+                      detail={detail}
+                      rowKey={rowKey}
+                      open={openDetails[rowKey] ?? false}
+                      onToggle={onToggleDetail}
+                      articleProps={{ "data-cancelled-task": detail.taskId }}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
           <section aria-labelledby="ai-company-history" data-section="history">
             <h3 id="ai-company-history" className="text-xl font-semibold">
@@ -931,6 +1673,7 @@ export function AiCompanyDashboardView({
             <p className="mt-1 text-sm text-[#796ba0]">{model.historySummary}</p>
             <p className="mt-1 text-sm text-[#796ba0]">{model.historyBoundary}</p>
             <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap" method="get">
+              <input type="hidden" name="tab" value="archive" />
               <label className="flex min-w-0 flex-col gap-1 text-xs text-[#796ba0]">
                 Период
                 <select name="period" defaultValue={filters.period} className="rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]">
@@ -985,7 +1728,7 @@ export function AiCompanyDashboardView({
               )}
             </div>
             {showNext && nextHistory ? (
-              <a className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={nextHistory}>
+              <a className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={`${nextHistory}${nextHistory.includes("?") ? "&" : "?"}tab=archive`}>
                 Следующая страница истории
               </a>
             ) : null}
@@ -1002,47 +1745,11 @@ export function AiCompanyDashboardView({
               </div>
             ) : null}
           </section>
-
-          <section aria-labelledby="ai-company-accepted" data-section="accepted">
-            <h3 id="ai-company-accepted" className="text-xl font-semibold">
-              Архив / Принятые
-            </h3>
-            <p className="mt-1 text-sm text-[#796ba0]">
-              Сюда задача попадает только после сохранённой приёмки. Технический выпуск и проверка на сайте остаются отдельными фактами.
-            </p>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {model.acceptedArchiveError ? (
-                <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-[#9f1239]" role="status" data-archive-unavailable>
-                  {model.acceptedArchiveError}
-                </p>
-              ) : !acceptanceAvailable ? (
-                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status">
-                  {ACCEPTANCE_UNAVAILABLE}
-                </p>
-              ) : model.acceptedArchive.length ? (
-                model.acceptedArchive.map((detail) => {
-                  const rowKey = `accepted:${detail.key}`;
-                  return (
-                    <TaskRow
-                      key={rowKey}
-                      detail={detail}
-                      rowKey={rowKey}
-                      open={openDetails[rowKey] ?? false}
-                      onToggle={onToggleDetail}
-                      articleProps={{ "data-accepted-task": detail.taskId }}
-                    />
-                  );
-                })
-              ) : (
-                <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]">
-                  Принятых результатов в снимке нет.
-                </p>
-              )}
-            </div>
-          </section>
+          </div>
         </>
       ) : null}
     </div>
+    </AcceptanceQuickDone.Provider>
     </AcceptanceRefresh.Provider>
     </AcceptanceOwner.Provider>
     </AcceptanceAvailability.Provider>

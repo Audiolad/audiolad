@@ -28,7 +28,7 @@ export default function MaxPlaylistCard({ item, onOpen }: MaxPlaylistCardProps) 
       onClick={() => onOpen(item.slug)}
       className="flex h-full min-w-0 w-full flex-col overflow-hidden rounded-[20px] border border-[#eadff8] bg-white text-left shadow-[0_6px_16px_rgba(91,62,145,0.06)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
     >
-      <div className="relative overflow-hidden bg-[#f4ecfb]">
+      <div className="relative w-full overflow-hidden bg-[#f4ecfb]">
         {hasCover ? (
           // eslint-disable-next-line @next/next/no-img-element -- listing coverUrl is already resolved
           <img
@@ -45,18 +45,18 @@ export default function MaxPlaylistCard({ item, onOpen }: MaxPlaylistCardProps) 
             ♫
           </div>
         )}
+        {accessLabel ? (
+          <p className="absolute left-2 top-2 max-w-[calc(100%-1rem)] rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold leading-4 text-[#7042c5]">{accessLabel}</p>
+        ) : null}
       </div>
-      <div className="flex-1 px-2.5 pb-2.5 pt-2">
-        <h3 className="line-clamp-3 min-h-[3.75rem] text-[14px] font-semibold leading-5 text-[#25135c]">
+      <div className="min-w-0 w-full flex-1 p-3">
+        <h3 className="line-clamp-2 h-10 min-h-10 break-words [overflow-wrap:anywhere] text-[14px] font-semibold leading-5 text-[#25135c]">
           {item.title}
         </h3>
         <p className="mt-1 line-clamp-1 min-h-5 text-sm text-[#7d70a2]">
           {creatorName || "\u00a0"}
         </p>
-        <p className="mt-1 text-xs leading-4 text-[#7d70a2]">{meta}</p>
-        {accessLabel ? (
-          <p className="mt-1 text-xs font-semibold leading-4 text-[#7042c5]">{accessLabel}</p>
-        ) : null}
+        <p className="mt-1 min-h-8 break-words text-xs leading-4 text-[#7d70a2]">{meta}</p>
       </div>
     </button>
   );

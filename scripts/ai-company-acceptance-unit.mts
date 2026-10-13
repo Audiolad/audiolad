@@ -253,13 +253,23 @@ assert.equal(notOwner.body.message, ACCEPTANCE_OWNER_ONLY);
 assert.equal(calls.length, callsBefore, "non-owner request never reaches Core");
 
 const route = readFileSync("src/app/api/admin/ai-company/acceptance/route.ts", "utf8");
-assert.match(route, /requireAdminPermission\("ai_company\.view"\)/);
+assert.match(route, /requireAiCompanyView\(\)/);
 assert.match(route, /process\.env\.COMPANY_API_TOKEN/);
 assert.doesNotMatch(route, /localStorage|X-Audiolad-Actor|acceptance\/capabilities/);
-assert.match(route, /session\.access\.roles\.includes\("owner"\)/);
+assert.match(route, /isOwner: isAiCompanyOwner\(session\.access\)/);
 assert.match(route, /sessionUserId: actor\.userId/);
 assert.doesNotMatch(route, /COMPANY_API_TOKEN[^)]*console|console[^;]*token/i);
 const permissions = readFileSync("src/lib/auth/platform-permissions.ts", "utf8");
 assert.doesNotMatch(permissions, /ai_company\.accept|ai_company\.manage/);
 
 console.log("ai-company-acceptance-unit: ok");
+
+// Core 7a6fc09c: a bare gateway 404 (nginx HTML, no Core JSON) is not "task not found".
+{
+  const bare = interpretAcceptanceResponse(404, null);
+  assert.equal(bare.ok, false);
+  assert.equal(bare.ok ? "" : bare.code, "core_route_unavailable");
+  assert.ok(!bare.ok && !bare.message.includes("Задача не найдена"));
+  const real = interpretAcceptanceResponse(404, { error: "not_found" });
+  assert.equal(real.ok ? "" : real.code, "not_found");
+}

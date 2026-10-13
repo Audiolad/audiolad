@@ -70,6 +70,9 @@ jobs:
           npm run test:production-deploy-gha
           npm run test:deployment-bridge
           npm run test:author-product-price-input
+          npm run test:author-payout-profiles
+          npm run test:author-payout-profiles-save
+          npm run test:author-payout-profiles-route
           npm run test:product-video-export
           npm run test:author-product-publish-preview-flow
           npm run test:platform-analytics-p2
@@ -114,6 +117,7 @@ jobs:
           npm run test:admin-overview-incident
           npm run test:company-control-cycle-evidence
           npm run test:admin-mailings
+          npm run test:catalog-return
           npm run test:admin-nav-author-space
           npm run test:application-email-outbox-timer
           npm run build

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readMaxAuthenticatedPost } from "@/lib/max/authenticated-post";
+import { readMaxVerifiedPost } from "@/lib/max/authenticated-post";
 import {
   sanitizeAnalyticsPosition,
   sanitizeAnalyticsString,
@@ -31,20 +31,20 @@ function fail(reason: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await readMaxAuthenticatedPost(request, [
+  const verified = await readMaxVerifiedPost(request, [
     "eventName",
     "promoPageId",
   ]);
-  if (!authenticated.ok) return authenticated.response;
+  if (!verified.ok) return verified.response;
 
-  const eventName = String(authenticated.body.eventName).trim();
+  const eventName = String(verified.body.eventName).trim();
   if (!isPromoPageAnalyticsEventName(eventName)) {
     return fail("invalid_event", 400);
   }
 
   const promoPageId = sanitizePromoPageId(
-    typeof authenticated.body.promoPageId === "string"
-      ? authenticated.body.promoPageId
+    typeof verified.body.promoPageId === "string"
+      ? verified.body.promoPageId
       : null,
   );
   if (!promoPageId) {
@@ -52,67 +52,67 @@ export async function POST(request: Request) {
   }
 
   const practiceId = sanitizeAnalyticsTrackId(
-    typeof authenticated.body.practiceId === "string"
-      ? authenticated.body.practiceId
+    typeof verified.body.practiceId === "string"
+      ? verified.body.practiceId
       : null,
   );
   const trackId = sanitizeAnalyticsTrackId(
-    typeof authenticated.body.trackId === "string"
-      ? authenticated.body.trackId
+    typeof verified.body.trackId === "string"
+      ? verified.body.trackId
       : null,
   );
   const anonymousSessionId = sanitizeAnalyticsString(
-    typeof authenticated.body.anonymousSessionId === "string"
-      ? authenticated.body.anonymousSessionId
+    typeof verified.body.anonymousSessionId === "string"
+      ? verified.body.anonymousSessionId
       : null,
     128,
   );
   const utmSource = sanitizeAnalyticsString(
-    typeof authenticated.body.utmSource === "string"
-      ? authenticated.body.utmSource
+    typeof verified.body.utmSource === "string"
+      ? verified.body.utmSource
       : null,
     128,
   );
   const utmMedium = sanitizeAnalyticsString(
-    typeof authenticated.body.utmMedium === "string"
-      ? authenticated.body.utmMedium
+    typeof verified.body.utmMedium === "string"
+      ? verified.body.utmMedium
       : null,
     128,
   );
   const utmCampaign = sanitizeAnalyticsString(
-    typeof authenticated.body.utmCampaign === "string"
-      ? authenticated.body.utmCampaign
+    typeof verified.body.utmCampaign === "string"
+      ? verified.body.utmCampaign
       : null,
     128,
   );
   const utmContent = sanitizeAnalyticsString(
-    typeof authenticated.body.utmContent === "string"
-      ? authenticated.body.utmContent
+    typeof verified.body.utmContent === "string"
+      ? verified.body.utmContent
       : null,
     128,
   );
   const referrer = sanitizeAnalyticsString(
-    typeof authenticated.body.referrer === "string"
-      ? authenticated.body.referrer
+    typeof verified.body.referrer === "string"
+      ? verified.body.referrer
       : null,
     512,
   );
   const currentPosition = sanitizeAnalyticsPosition(
-    typeof authenticated.body.currentPosition === "number"
-      ? authenticated.body.currentPosition
+    typeof verified.body.currentPosition === "number"
+      ? verified.body.currentPosition
       : null,
   );
   const duration = sanitizeAnalyticsPosition(
-    typeof authenticated.body.duration === "number"
-      ? authenticated.body.duration
+    typeof verified.body.duration === "number"
+      ? verified.body.duration
       : null,
   );
   const payload =
-    authenticated.body.payload &&
-    typeof authenticated.body.payload === "object" &&
-    !Array.isArray(authenticated.body.payload)
+    verified.body.payload &&
+    typeof verified.body.payload === "object" &&
+    !Array.isArray(verified.body.payload)
       ? sanitizePromoPageAnalyticsPayload(
-          authenticated.body.payload as Record<string, unknown>,
+          verified.body.payload as Record<string, unknown>,
         )
       : {};
 
