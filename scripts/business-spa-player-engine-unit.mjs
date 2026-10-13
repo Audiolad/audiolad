@@ -3,7 +3,8 @@
 // Covers review 2026-10-13 blockers 4–9 for #841.
 import assert from "node:assert/strict";
 
-import { SPA_CROSSFADE_MS, SpaPlayerEngine } from "../src/lib/business-app/spa-player-engine.ts";
+// SPA_ENGINE_MODULE lets scripts/business-spa-player-mutation-unit.mjs run this suite against mutants.
+const { SPA_CROSSFADE_MS, SpaPlayerEngine } = await import(process.env.SPA_ENGINE_MODULE ?? "../src/lib/business-app/spa-player-engine.ts");
 
 const DAY = 86400000;
 const T0 = Date.parse("2026-10-13T06:00:00Z");
@@ -27,7 +28,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     // Web Audio model: start exactly at prev's end on the audio clock (no timer latency).
     startAfter(prev) {
       if (!webAudio || prev.paused || prev.pending || !this._src || this.readyState < 4 || !this.paused || this.pending) return false;
-      const at = prev.startClock + prev.duration * 1000;
+      const at = Math.min(prev.startClock + prev.duration * 1000, prev.deadline ?? Infinity);
       if (at <= world.now) return false;
       this._t = 0;
       const p = { at, id: ++world.seq, fn: () => { this.pending = null; this.startClock = p.at; world.plays.push({ el: this.name, src: this._src, at: p.at, pos: 0, vol: this.volume, scheduled: true }); } };
@@ -36,7 +37,13 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
       world.timers.push(this.pending);
       return true;
     }
-    load() { if (this._src) { this.readyState = 4; queueMicrotask(() => { this.fire("loadedmetadata"); this.fire("canplaythrough"); }); } }
+    load() {
+      if (!this._src) return;
+      const src = this._src;
+      const done = () => { if (this._src !== src) return; this.readyState = 4; this.fire("loadedmetadata"); this.fire("canplaythrough"); };
+      if (world.loadDelay) world.timers.push({ at: world.now + world.loadDelay, id: ++world.seq, fn: done });
+      else { this.readyState = 4; queueMicrotask(() => { this.fire("loadedmetadata"); this.fire("canplaythrough"); }); }
+    }
     removeAttribute(n) { if (n === "src") { this.cancelPending(); this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; } }
     addEventListener(t, fn, o) { const a = this.listeners.get(t) ?? []; a.push({ fn, once: o?.once }); this.listeners.set(t, a); }
     removeEventListener(t, fn) { this.listeners.set(t, (this.listeners.get(t) ?? []).filter((l) => l.fn !== fn)); }
@@ -810,6 +817,149 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   const b = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
   assert.ok(b && b.at === T0 + 10000, `B exactly at the boundary (${b && b.at - T0})`);
   engine.dispose();
+}
+
+// ---- 22. Re-review A10 ----
+{
+  // (1) a late, stale prepare of B never disturbs B once it is audible.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60, 60], webAudio: true });
+  const sign = deps.sign;
+  let first = true;
+  deps.sign = async (aid, purpose) => {
+    if (aid === id(2) && first) { first = false; await new Promise((r) => world.timers.push({ at: world.now + 11000, id: ++world.seq, fn: r })); }
+    return sign(aid, purpose);
+  };
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(1000);
+  world.manifestRes = { ok: true, data: world.manifest() };
+  await engine.refresh(); // second prepare of B, fast
+  await world.advance(12000); // B starts at 10 s; the stale first response lands at ~11 s
+  const bStarts = world.plays.filter((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.equal(bStarts.length, 1, "B started once");
+  assert.equal(bStarts[0].at, T0 + 10000);
+  const b = audios.find((x) => x.src.endsWith(id(2)));
+  assert.ok(b && !b.paused && Math.abs(b.currentTime - 3) < 0.1, `B continuous (${b && b.currentTime})`);
+  engine.dispose();
+}
+{
+  // (2) a stale Wi-Fi->cache waiting for readiness never clears the newer source.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(2000);
+  world.loadDelay = 500;
+  world.online = false;
+  const sw = engine.switchToCache();
+  await flush();
+  world.online = true;
+  world.manifestRes = { ok: true, data: world.manifest(world.items.filter((x) => x.audio_item_id !== id(1))) };
+  const rp = engine.refresh();
+  await world.advance(16000); // stale readiness waits time out after 15 s
+  void sw; void rp;
+  await world.advance(1000);
+  assert.ok(audios.some((x) => !x.paused && x.src.endsWith(id(2))), "B playing; not cleared by the stale switch");
+  assert.equal(engine.status, "playing");
+  engine.dispose();
+}
+{
+  // (3) B not allowed at the boundary: C is prepared early and starts exactly at the boundary.
+  const { world, deps } = makeWorld({ durations: [10, 60, 60], webAudio: true, playableUntil: (i) => (i === 1 ? new Date(T0 + 8000) : null) });
+  const sign = deps.sign;
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  deps.sign = async (...a) => { await new Promise((r) => world.timers.push({ at: world.now + 700, id: ++world.seq, fn: r })); return sign(...a); };
+  await world.advance(12000);
+  const c = world.plays.find((p) => p.src.endsWith(id(3)) && p.pos === 0);
+  assert.ok(c && c.at === T0 + 10000, `C exactly at the boundary (${c && c.at - T0})`);
+  assert.ok(!world.plays.some((p) => p.src.endsWith(id(2))), "B never played");
+  engine.dispose();
+}
+{
+  // (4) known early deadline of A: B scheduled exactly at A's deadline on the audio clock.
+  const { world, deps } = makeWorld({ durations: [60, 60], webAudio: true, timerLatency: 2000, playableUntil: (i) => (i === 0 ? new Date(T0 + 5000) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(8000);
+  const b = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.ok(b && b.at === T0 + 5000 && b.scheduled, `B exactly at A's deadline (${b && b.at - T0})`);
+  engine.dispose();
+}
+{
+  // (5) pause while a resume-play() is pending: stays paused.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(2000);
+  const a = engine.activeEl();
+  a.pause(); // interruption dropped the node
+  const d = deferred();
+  const play = a.play.bind(a);
+  a.play = async () => { await d.p; return play(); };
+  const t = engine.tick();
+  await flush();
+  await engine.toggle();
+  assert.equal(engine.status, "paused");
+  d.res(); await t; await flush();
+  assert.ok(audios.every((x) => x.paused), "no sound after pause");
+  assert.equal(engine.status, "paused");
+  engine.dispose();
+}
+
+// ---- 23. Invariants I1–I9: table-driven through the single guard (mayStart/fresh) ----
+{
+  const cases = [
+    // [invariant, setup(world, engine) -> mutate state, expected mayStart for active slot]
+    ["I1 grant deadline passed", { playableUntil: (i) => (i === 0 ? new Date(T0 + 1000) : null) }, async (w) => { w.now = T0 + 2000; }, false],
+    ["I1 grant valid", {}, async () => {}, true],
+    ["I1 manifest expired", { expiresAt: T0 + 1000 }, async (w) => { w.now = T0 + 2000; }, false],
+    ["I1 deadline at scheduled moment", { playableUntil: (i) => (i === 0 ? new Date(T0 + 5000) : null) }, async () => {}, false, T0 + 6000],
+    ["I2 stream needs network", {}, async (w) => { w.online = false; }, false],
+    ["I3 offline copy expired (server deadline)", { cached: true, serverUntil: () => new Date(T0 + 3000).toISOString() }, async (w, e) => { w.online = false; await e.switchToCache(); w.now = T0 + 4000; }, false],
+    ["I3 offline copy valid", { cached: true }, async (w, e) => { w.online = false; await e.switchToCache(); }, true],
+    ["I4 track removed from manifest", {}, async (w, e) => { w.manifestRes = { ok: true, data: w.manifest(w.items.slice(1)) }; await e.refresh(); }, "removed"],
+    ["I5 no_access", {}, async (w, e) => { await e.revokeAccess(); }, false],
+  ];
+  for (const [name, opts, mutate, expected, atMs] of cases) {
+    const { world, deps } = makeWorld({ durations: [60, 60, 60], ...opts });
+    const engine = new SpaPlayerEngine(deps);
+    await engine.init(world.manifestRes.data);
+    if (opts.serverUntil) world.serverUntil = opts.serverUntil;
+    if (opts.cached) await engine.downloadAll();
+    await mutate(world, engine);
+    const t = engine.token(engine.active);
+    if (expected === "removed") assert.ok(engine.loadedActive()?.audioItemId !== id(1) && engine.loaded.every((l) => l?.audioItemId !== id(1)), name);
+    else assert.equal(engine.mayStart(t, atMs), expected, name);
+    engine.dispose();
+  }
+  // I8/I9: the token goes stale on refresh-load / clear / pause / no_access.
+  const stale = [
+    ["I8 newer load on slot", (e) => { e.slotOp[e.active] += 1; }],
+    ["I9 user pause", async (e) => { await e.toggle(); }],
+    ["I5 access epoch", async (e) => { await e.revokeAccess(); }],
+    ["I5 epoch alone (op started before no_access)", (e) => { e.accessEpoch += 1; }],
+  ];
+  for (const [name, act] of stale) {
+    const { world, deps } = makeWorld({ durations: [60, 60] });
+    const engine = new SpaPlayerEngine(deps);
+    await engine.init(world.manifestRes.data);
+    const t = engine.token(engine.active);
+    assert.equal(engine.fresh(t), true, `${name}: fresh before`);
+    await act(engine);
+    assert.equal(engine.fresh(t), false, `${name}: stale after`);
+    engine.dispose();
+  }
+  {
+    // I4 at the guard itself: a loaded source whose track is not in the manifest never starts.
+    const { world, deps } = makeWorld({ durations: [60, 60] });
+    const engine = new SpaPlayerEngine(deps);
+    await engine.init(world.manifestRes.data);
+    engine.loaded[engine.active] = { ...engine.loaded[engine.active], audioItemId: id(77) };
+    assert.equal(engine.mayStart(engine.token(engine.active)), false, "I4 guard: unknown track");
+    engine.dispose();
+  }
+  // I6/I7 behavioural: covered by sections 22(1)-(4); I9 pending resume by 22(5).
 }
 
 console.log("business-spa-player-engine-unit: all tests passed");

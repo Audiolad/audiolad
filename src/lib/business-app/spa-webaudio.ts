@@ -27,6 +27,10 @@ export class WebAudioTrack implements AudioLike {
   private listeners = new Map<string, Listener[]>();
   /** Wall-clock deadline (epoch ms) after which this slot must be silent. */
   private deadline: number | null = null;
+  /** Audio-clock time of the scheduled hard stop (null = none). */
+  stopWhen: number | null = null;
+  /** Bumped by pause(): a play() still awaiting resume() must not start afterwards. */
+  private gen = 0;
   readyState = 0;
 
   private readonly wallNow: () => number;
@@ -55,10 +59,14 @@ export class WebAudioTrack implements AudioLike {
 
   private applyStop(): void {
     const n = this.node;
-    if (!n || this.deadline === null) return;
+    if (!n || this.deadline === null) {
+      if (this.deadline === null) this.stopWhen = null;
+      return;
+    }
     const when = Math.max(this.ctx.currentTime, this.ctx.currentTime + (this.deadline - this.wallNow()) / 1000);
+    this.stopWhen = Math.max(when, this.startCtx);
     try {
-      n.stop(Math.max(when, this.startCtx));
+      n.stop(this.stopWhen);
     } catch {
       /* already stopped */
     }
@@ -69,7 +77,9 @@ export class WebAudioTrack implements AudioLike {
   }
   set src(v: string) {
     this.stopNode();
+    this.gen += 1;
     this.deadline = null;
+    this.stopWhen = null;
     this._src = v;
     this.buffer = null;
     this.readyState = 0;
@@ -125,7 +135,9 @@ export class WebAudioTrack implements AudioLike {
 
   async play(): Promise<void> {
     if (!this.buffer) throw new Error("not_ready");
+    const gen = this.gen;
     if (this.ctx.state !== "running") await this.ctx.resume();
+    if (gen !== this.gen) return; // paused meanwhile
     if (this.ctx.state !== "running") throw new Error("autoplay_blocked");
     if (this.playing) return;
     this.startNode(this.ctx.currentTime);
@@ -135,7 +147,9 @@ export class WebAudioTrack implements AudioLike {
   startAfter(prev: AudioLike): boolean {
     if (!(prev instanceof WebAudioTrack) || !prev.playing || !prev.buffer || !this.buffer || this.playing) return false;
     if (this.ctx.state !== "running") return false;
-    const when = prev.startCtx + (prev.buffer.duration - prev.offset);
+    // Start where prev really falls silent: natural end or its scheduled hard stop.
+    let when = prev.startCtx + (prev.buffer.duration - prev.offset);
+    if (prev.stopWhen !== null) when = Math.min(when, prev.stopWhen);
     if (when < this.ctx.currentTime + 0.01) return false;
     this.offset = 0;
     this.startNode(when);
@@ -143,6 +157,7 @@ export class WebAudioTrack implements AudioLike {
   }
 
   pause(): void {
+    this.gen += 1;
     if (!this.playing) return;
     const t = this.currentTime;
     this.stopNode();

@@ -127,6 +127,24 @@ type Segment = { audioItemId: string; startedAt: number; playedMs: number; offli
 
 export type EngineStatus = "idle" | "playing" | "paused" | "needs_gesture" | "no_access" | "empty" | "refresh_required" | "error";
 
+type StartToken = { slot: number; epoch: number; playOp: number; slotOp: number };
+
+/**
+ * INVARIANTS (enforced by SpaPlayerEngine.mayStart + fresh(); one test table per item in
+ * scripts/business-spa-player-engine-unit.mjs, section 23):
+ *  I1 grant/deadline: no slot is audible after min(playable_until, manifest expiry, copy deadline);
+ *     the stop is handed to the audio clock (stopAt) and the successor is scheduled on that stop.
+ *  I2 canStartTrack: every start (first, prepared, scheduled, resume, cache switch) passes it for
+ *     the source kind actually loaded, now and at the scheduled start moment.
+ *  I3 offline auth: a blob plays only while its own server deadline AND manifest deadline hold.
+ *  I4 removed track: a track missing from the manifest is never started and is stopped synchronously.
+ *  I5 no_access: stops everything; results of ops started before it are discarded.
+ *  I6 cache switch: stream→blob keeps position; a stale switch never touches a newer source.
+ *  I7 crossfade/gapless: the successor is chosen to be playable at the expected boundary and is
+ *     started exactly at it; an audible track is never restarted by a late load.
+ *  I8 refresh: an op superseded by refresh/clear/newer load (slotOp) leaves audio untouched.
+ *  I9 pause: after the user pauses, no pending play()/resume() may produce sound or "playing".
+ */
 export class SpaPlayerEngine {
   manifest: SpaManifest | null = null;
   index = -1;
@@ -137,7 +155,7 @@ export class SpaPlayerEngine {
   cacheUntil = new Map<string, number>();
 
   private active = 0;
-  private loaded: [Loaded | null, Loaded | null] = [null, null];
+  loaded: [Loaded | null, Loaded | null] = [null, null];
   private segment: Segment | null = null;
   private lastTime = 0;
   private tickTimer: unknown = null;
@@ -151,6 +169,12 @@ export class SpaPlayerEngine {
   /** Slot whose start is already scheduled on the audio clock (gapless path). */
   private scheduledSlot: number | null = null;
   private scheduledPaused = false;
+  /** Per-slot operation version: any source change bumps it; stale async ops abort. */
+  slotOp: [number, number] = [0, 0];
+  /** Bumped by pause/stop: a play() that resolves afterwards is undone. */
+  private playOp = 0;
+  private startOp = 0;
+  private appliedDeadline: [number | null, number | null] = [null, null];
   /** Bumped by revokeAccess: results of operations started before it are discarded. */
   private accessEpoch = 0;
   private readonly d: EngineDeps;
@@ -241,13 +265,55 @@ export class SpaPlayerEngine {
     return canStartTrack(item, now, this.cachedDate(item.audioItemId, atMs), online);
   }
 
-  private findPlayable(from: number): number {
+  private findPlayable(from: number, atMs?: number): number {
     const n = this.items.length;
     for (let k = 0; k < n; k++) {
       const i = (((from + k) % n) + n) % n;
-      if (this.allowed(this.items[i])) return i;
+      if (this.allowed(this.items[i]) && (atMs === undefined || this.allowed(this.items[i], "any", false, atMs))) return i;
     }
     return -1;
+  }
+
+  /** Wall time at which the active track will fall silent: natural end or its rights deadline. */
+  private boundaryMs(): number {
+    const cur = this.activeEl();
+    const natural = Number.isFinite(cur.duration) ? this.d.now() + Math.max(0, (cur.duration - cur.currentTime) * 1000) : Infinity;
+    const dl = this.deadlineFor(this.active);
+    return Math.min(natural, dl ?? Infinity);
+  }
+
+  /** Outgoing slot is done: natural end, or stopped at its known rights deadline. */
+  private outgoingDone(): boolean {
+    const cur = this.activeEl();
+    if (endedNaturally(cur)) return true;
+    const dl = this.deadlineFor(this.active);
+    return cur.paused && dl !== null && this.d.now() >= dl;
+  }
+
+  // ---------------- single start guard (invariants I1–I9, see INVARIANTS) ----------------
+  /** Snapshot of everything an async start depends on; stale ⇒ the op must not touch audio. */
+  token(slot: number): StartToken {
+    return { slot, epoch: this.accessEpoch, playOp: this.playOp, slotOp: this.slotOp[slot] };
+  }
+  fresh(t: StartToken): boolean {
+    return t.epoch === this.accessEpoch && t.playOp === this.playOp && t.slotOp === this.slotOp[t.slot] && this.status !== "no_access";
+  }
+  /**
+   * THE guard. Every path that makes a slot audible (play(), startAfter(), cache switch,
+   * resume) calls it immediately before touching audio and re-checks `fresh()` after
+   * every await. Enforces: I1 grant/manifest deadline now and at `atMs`, I2 canStartTrack
+   * for the loaded source kind, I3 offline copy valid (server + manifest deadline),
+   * I4 track still in the manifest, I5 no no_access, I8 op not superseded by
+   * refresh/clear/newer load, I9 not paused by the user since the op began.
+   */
+  mayStart(t: StartToken, atMs?: number): boolean {
+    if (!this.fresh(t)) return false;
+    const l = this.loaded[t.slot];
+    if (!l) return false;
+    const item = this.items.find((i) => i.audioItemId === l.audioItemId);
+    if (!item) return false;
+    if (!this.allowed(item, l.kind)) return false;
+    return atMs === undefined || this.allowed(item, l.kind, false, atMs);
   }
 
   // ---------------- sources ----------------
@@ -267,6 +333,7 @@ export class SpaPlayerEngine {
   }
 
   private clearSlot(slot: number): void {
+    this.slotOp[slot] += 1;
     if (slot === this.scheduledSlot) this.scheduledSlot = null;
     const el = this.d.audios[slot];
     const l = this.loaded[slot];
@@ -279,20 +346,24 @@ export class SpaPlayerEngine {
 
   private async loadSlot(slot: number, item: SpaManifestItem, positionSec = 0, atMs?: number): Promise<boolean> {
     const epoch = this.accessEpoch;
+    const op = ++this.slotOp[slot];
     const src = await this.sourceFor(item, atMs);
-    if (!src || epoch !== this.accessEpoch || this.status === "no_access") {
+    // Stale: access revoked, or anything else touched this slot meanwhile (newer load,
+    // clear, commit to active). Never disturb the newer source.
+    if (!src || epoch !== this.accessEpoch || this.status === "no_access" || op !== this.slotOp[slot]) {
       if (src?.kind === "blob") this.d.objectUrl.revoke(src.url);
       return false;
     }
     this.clearSlot(slot);
+    const myOp = this.slotOp[slot];
     const el = this.d.audios[slot];
     el.src = src.url;
     el.volume = gainToVolume(item.gainDb);
     this.loaded[slot] = src;
     el.load();
     await waitReady(el, this.d, 1);
-    if (epoch !== this.accessEpoch || this.loaded[slot] !== src) {
-      if (this.loaded[slot] === src) this.clearSlot(slot);
+    if (epoch !== this.accessEpoch || this.loaded[slot] !== src || myOp !== this.slotOp[slot]) {
+      if (this.loaded[slot] === src && myOp === this.slotOp[slot]) this.clearSlot(slot);
       return false;
     }
     if (positionSec > 0) {
@@ -316,10 +387,13 @@ export class SpaPlayerEngine {
       return;
     }
     const slot = this.active;
+    const before = this.startOp = this.startOp + 1;
     if (!(await this.loadSlot(slot, this.items[pi], pi === i ? positionSec : 0))) {
-      if (this.status !== "no_access") this.setStatus("error", "Не удалось загрузить трек.");
+      // Superseded by a newer start/clear: the newer operation owns the status.
+      if (before === this.startOp && this.status !== "no_access") this.setStatus("error", "Не удалось загрузить трек.");
       return;
     }
+    if (before !== this.startOp) return;
     this.index = pi;
     await this.playActive(auto);
   }
@@ -333,8 +407,15 @@ export class SpaPlayerEngine {
       if (this.status !== "no_access") this.setStatus("paused");
       return false;
     }
+    const t = this.token(this.active);
+    if (!this.mayStart(t)) return false;
     try {
       await this.activeEl().play();
+      if (!this.mayStart(t)) {
+        // Paused/stopped/replaced/expired while play() was pending (e.g. AudioContext.resume()).
+        if (t.slotOp === this.slotOp[t.slot]) this.d.audios[t.slot].pause();
+        return false;
+      }
     } catch {
       this.setStatus(auto ? "needs_gesture" : "error", auto ? null : "Браузер не дал запустить звук.");
       return false;
@@ -349,6 +430,7 @@ export class SpaPlayerEngine {
 
   async toggle(): Promise<void> {
     if (this.status === "playing") {
+      this.playOp += 1;
       this.settleScheduled();
       this.finishHandoff();
       this.activeEl().pause();
@@ -370,7 +452,11 @@ export class SpaPlayerEngine {
     if (this.index < 0) return;
     // Never replace an already-audible scheduled track; commit it first.
     if (this.scheduledStarted()) this.settleScheduled();
-    const ni = this.findPlayable(nextIndex(this.items.length, this.index));
+    // Successor must be playable at the expected boundary, not just now.
+    const boundary = this.boundaryMs();
+    const at = Number.isFinite(boundary) ? boundary + SPA_TICK_MS : undefined;
+    let ni = this.findPlayable(nextIndex(this.items.length, this.index), at);
+    if (ni < 0) ni = this.findPlayable(nextIndex(this.items.length, this.index));
     const slot = 1 - this.active;
     if (ni < 0 || ni === this.index) {
       if (ni < 0) this.clearSlot(slot);
@@ -378,11 +464,11 @@ export class SpaPlayerEngine {
     }
     const item = this.items[ni];
     if (this.loaded[slot]?.audioItemId === item.audioItemId && this.loaded[slot]?.ready) return;
-    const cur = this.activeEl();
-    const leftMs = Number.isFinite(cur.duration) ? Math.max(0, (cur.duration - cur.currentTime) * 1000) : 0;
-    if (!(await this.loadSlot(slot, item, 0, this.d.now() + leftMs + SPA_TICK_MS))) return;
+    if (!(await this.loadSlot(slot, item, 0, at))) return;
+    const op = this.slotOp[slot];
     const el = this.d.audios[slot];
     const ok = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
+    if (op !== this.slotOp[slot] || slot === this.active) return;
     const l = this.loaded[slot];
     if (l && l.audioItemId === item.audioItemId) l.ready = ok;
     if (ok) {
@@ -412,13 +498,13 @@ export class SpaPlayerEngine {
     const prep = this.loaded[slot];
     if (!next.startAfter || !prep || !prep.ready) return false;
     const ni = this.items.findIndex((i) => i.audioItemId === prep.audioItemId);
-    if (ni < 0 || ni !== this.findPlayable(nextIndex(this.items.length, this.index))) return false;
+    // Start moment = natural end OR the outgoing track's rights deadline, whichever first
+    // (the adapter schedules on min(end, stop) too). Rights must hold now AND then.
+    const startMs = Math.min(this.d.now() + remainingMs, this.boundaryMs());
+    remainingMs = Math.max(0, startMs - this.d.now());
+    if (ni < 0 || ni !== this.findPlayable(nextIndex(this.items.length, this.index), startMs + SPA_TICK_MS)) return false;
     const item = this.items[ni];
-    // Rights re-checked now and for the scheduled start moment.
-    // Rights must hold now AND at the scheduled start moment: grant, manifest expiry and,
-    // for blobs, the copy's server/manifest deadline.
-    const startMs = this.d.now() + remainingMs;
-    if (!this.allowed(item, prep.kind) || !this.allowed(item, prep.kind, false, startMs + SPA_TICK_MS)) return false;
+    if (!this.mayStart(this.token(slot), startMs + SPA_TICK_MS) || !this.allowed(item, prep.kind)) return false;
     next.currentTime = 0;
     next.volume = gainToVolume(item.gainDb);
     if (!next.startAfter(el)) return false;
@@ -438,14 +524,14 @@ export class SpaPlayerEngine {
       this.transitionTimer = null;
       if (this.scheduledSlot === null || this.status !== "playing") return;
       const cur = this.activeEl();
-      const left = (cur.duration - cur.currentTime) * 1000;
+      const left = Math.min((cur.duration - cur.currentTime) * 1000, this.boundaryMs() - this.d.now());
       // No positive tolerance: committing stops A, so wait until it is really at its end.
       if (!cur.paused && Number.isFinite(left) && left > 0) {
         this.armCommit(Math.max(5, left));
         return;
       }
       if (this.scheduledStarted()) this.commitScheduled();
-      else if (!cur.paused || endedNaturally(cur)) this.armCommit(5);
+      else if (!cur.paused || this.outgoingDone()) this.armCommit(5);
       // else: A stopped early; onEnded/tick move on.
     }, ms);
   }
@@ -475,7 +561,13 @@ export class SpaPlayerEngine {
 
   /** Hand the deadline to the audio clock (Web Audio slots), independent of JS latency. */
   private applyDeadline(slot: number): void {
-    this.d.audios[slot].stopAt?.(this.deadlineFor(slot));
+    const el = this.d.audios[slot];
+    const prev = this.appliedDeadline[slot];
+    const next = this.deadlineFor(slot);
+    el.stopAt?.(next);
+    this.appliedDeadline[slot] = next;
+    // The pending start of B was computed from A's old boundary: re-plan it.
+    if (slot === this.active && prev !== next && this.scheduledSlot !== null && !this.scheduledStarted()) this.unschedule();
   }
 
   private applyDeadlines(): void {
@@ -496,7 +588,7 @@ export class SpaPlayerEngine {
     const leftMs = Math.max(0, (cur.duration - cur.currentTime) * 1000);
     const started = this.scheduledStarted();
     // Outgoing stopped early or the scheduled node was dropped (suspension): not a valid plan.
-    const lost = !started && (this.d.audios[slot].paused !== this.scheduledPausedState() || (cur.paused && !endedNaturally(cur)));
+    const lost = !started && (this.d.audios[slot].paused !== this.scheduledPausedState() || (cur.paused && !this.outgoingDone()));
     const ok =
       !lost &&
       !!lo &&
@@ -524,7 +616,7 @@ export class SpaPlayerEngine {
     if (this.scheduledSlot === null) return false;
     const next = this.d.audios[this.scheduledSlot];
     if (next.paused) return false;
-    return next.currentTime > 0 || endedNaturally(this.activeEl());
+    return next.currentTime > 0 || this.outgoingDone();
   }
 
   /**
@@ -556,6 +648,7 @@ export class SpaPlayerEngine {
     const lo = this.loaded[slot];
     const ni = lo ? this.items.findIndex((i) => i.audioItemId === lo.audioItemId) : -1;
     this.closeSegment("complete");
+    this.slotOp[slot] += 1; // a late prepare for this slot must not replace the audible track
     this.active = slot;
     this.d.audios[from].pause();
     if (!lo || ni < 0) {
@@ -691,6 +784,7 @@ export class SpaPlayerEngine {
   }
 
   private stopAll(): void {
+    this.playOp += 1;
     this.cancelTransition();
     this.clearHandoff();
     this.closeSegment("skip");
@@ -857,9 +951,15 @@ export class SpaPlayerEngine {
       const url = this.d.objectUrl.create(copy.data);
       el.pause();
       el.src = url;
+      const op = ++this.slotOp[slot];
       this.loaded[slot] = { audioItemId: l.audioItemId, kind: "blob", url, ready: false };
       el.load();
       await waitReady(el, this.d, 1);
+      // Superseded while waiting (refresh/clear/newer load): leave the newer source alone.
+      if (op !== this.slotOp[slot]) {
+        this.d.objectUrl.revoke(url);
+        continue;
+      }
       try {
         el.currentTime = pos;
       } catch {
@@ -875,8 +975,15 @@ export class SpaPlayerEngine {
         continue;
       }
       this.applyDeadline(slot);
-      if (wasPlaying && slot === this.active && this.status === "playing") await el.play().catch(() => this.setStatus("needs_gesture"));
-      if (slot !== this.active) this.loaded[slot]!.ready = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
+      const st = this.token(slot);
+      if (wasPlaying && slot === this.active && this.status === "playing" && this.mayStart(st)) {
+        await el.play().catch(() => this.setStatus("needs_gesture"));
+        if (!this.mayStart(st) && st.slotOp === this.slotOp[slot]) el.pause();
+      }
+      if (slot !== this.active) {
+        const ready = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
+        if (op === this.slotOp[slot] && this.loaded[slot]) this.loaded[slot]!.ready = ready;
+      }
     }
     if (this.status === "playing") this.scheduleTransition();
     this.emit();

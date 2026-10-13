@@ -58,4 +58,27 @@ assert.equal(a.paused, true); assert.ok(Number.isNaN(a.duration));
   c.stopAt(null); await c.play(); c.stopAt(7000); wall = 8000; ctxListeners.forEach((f) => f());
   assert.equal(c.paused, true, "stopped once the deadline is past");
 }
+// A10 #5 / I9: pause while resume() is pending -> no sound afterwards.
+{
+  const d = new WebAudioTrack(ctx, () => 0);
+  d.src = "blob:d"; d.load(); await ready(d);
+  let release; ctx.state = "suspended";
+  ctx.resume = () => new Promise((r) => { release = () => { ctx.state = "running"; r(); }; });
+  const n0 = started.length;
+  const p = d.play();
+  d.pause();
+  release(); await p;
+  assert.equal(started.length, n0, "no node started after pause");
+  assert.equal(d.paused, true, "stays paused");
+  ctx.resume = async () => {};
+}
+// A10 #4 / I1+I7: successor is scheduled on prev's hard stop, not its natural end.
+{
+  let wall = 0;
+  const e = new WebAudioTrack(ctx, () => wall), f = new WebAudioTrack(ctx, () => wall);
+  e.src = "blob:e"; e.load(); await ready(e); f.src = "blob:f"; f.load(); await ready(f);
+  ctx.currentTime = 100; await e.play(); e.stopAt(5000);
+  assert.equal(f.startAfter(e), true);
+  assert.equal(started.at(-1).when, 105, "B starts exactly at A's deadline");
+}
 console.log("business-spa-webaudio-unit: all tests passed");
