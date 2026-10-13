@@ -19,16 +19,35 @@ const mutations = [
   ["I6 stale cache switch clears newer source", "if (op !== this.slotOp[slot]) {\n        this.d.objectUrl.revoke(url);\n        continue;", "if (false) {\n        this.d.objectUrl.revoke(url);\n        continue;"],
   ["I7 successor chosen by availability now", "let ni = this.findPlayable(nextIndex(this.items.length, this.index), at);", "let ni = this.findPlayable(nextIndex(this.items.length, this.index));"],
   ["I7 late load replaces audible slot", "|| op !== this.slotOp[slot]) {\n      if (src?.kind", ") {\n      if (src?.kind"],
+  // The intent ("keep playing" decided before a pause) is enforced in layers; the
+  // mutant removes the whole layer, as one guard (arrays = several replacements).
+  ["I9 intent of async ops ignored (refresh/advance/tick restart after pause)", [
+    ["playOp: intent, slotOp", "playOp: this.playOp, slotOp"],
+    ["if (intent !== this.playOp) return; // paused/stopped since the caller decided to play", ""],
+    ["    if (intent !== this.playOp) return;\n    if (!ok) {", "    if (!ok) {"],
+    ["if (intent !== this.playOp) return; // paused meanwhile: no fallback start", ""],
+    ["    if (intent !== this.playOp) return false;\n", ""],
+  ]],
+  ["I9 pause leaves the outgoing slot audible", [
+    ["for (const a of this.d.audios) a.pause();", "this.activeEl().pause();"],
+  ]],
+  ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
+  ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],
 ];
 let blind = 0;
 try {
   for (const [name, from, to] of mutations) {
-    if (!orig.includes(from)) { console.error(`mutation anchor missing: ${name}`); blind++; continue; }
-    writeFileSync(mutant, orig.replace(from, to));
+    const reps = Array.isArray(from) ? from : [[from, to]];
+    let code = orig;
+    const missing = reps.find(([f]) => !code.includes(f));
+    if (missing) { console.error(`mutation anchor missing: ${name}`); blind++; continue; }
+    for (const [f, t] of reps) code = code.replace(f, t);
+    writeFileSync(mutant, code);
+    // Killed only by a real assertion failure — a crash/timeout/syntax error is "blind".
     let failed = false;
     try {
       execFileSync("npx", ["tsx", suite], { env: { ...process.env, SPA_ENGINE_MODULE: mutant }, stdio: "pipe", timeout: 120000 });
-    } catch { failed = true; }
+    } catch (e) { failed = /AssertionError/.test(String(e.stderr ?? "") + String(e.stdout ?? "")); }
     console.log(`${failed ? "killed " : "SURVIVED"} ${name}`);
     if (!failed) blind++;
   }

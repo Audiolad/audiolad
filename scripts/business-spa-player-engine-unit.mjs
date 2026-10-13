@@ -962,4 +962,68 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   // I6/I7 behavioural: covered by sections 22(1)-(4); I9 pending resume by 22(5).
 }
 
+// ---- 24. Re-review A11 ----
+{
+  // (1) I9: refresh that removed A waits on the cache scan; a pause meanwhile is final.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60, 60] });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(2000);
+  const d = deferred();
+  const keys = deps.cache.keys;
+  deps.cache.keys = async () => { await d.p; return keys(); };
+  world.manifestRes = { ok: true, data: world.manifest(world.items.slice(1)) };
+  const rp = engine.refresh();
+  await flush();
+  if (engine.status === "playing") await engine.toggle();
+  assert.equal(engine.status, "paused");
+  d.res(); await rp; await flush(); await world.advance(2000);
+  assert.equal(engine.status, "paused", "refresh did not resume after pause");
+  assert.ok(audios.every((x) => x.paused), "silent after pause");
+  engine.dispose();
+}
+{
+  // (2) I9: pause during a fallback advance (B's play() pending) stops A too; no restart later.
+  const { world, deps, audios } = makeWorld({ durations: [5, 60, 60] });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  const d = deferred();
+  let hold = true;
+  for (const a of audios) {
+    const play = a.play.bind(a);
+    a.play = async () => { if (hold && a._src.endsWith(id(2))) { hold = false; await d.p; } return play(); };
+  }
+  for (let t = 0; t < 5000 && hold; t += 50) await world.advance(50); // stop as soon as B's play() is pending (A still audible)
+  assert.ok(!audios[0].paused, "A still audible while B's play() is pending");
+  assert.equal(hold, false, "B play pending");
+  if (engine.status === "playing") await engine.toggle();
+  assert.equal(engine.status, "paused");
+  assert.ok(audios.every((x) => x.paused), "A stopped by pause too");
+  d.res(); await flush(); await world.advance(3000);
+  assert.equal(engine.status, "paused", "old advance did not restart playback");
+  assert.ok(audios.every((x) => x.paused), "still silent");
+  engine.dispose();
+}
+{
+  // (3) I7: offline, B has no copy, C has: C is prepared right after the switch and plays.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60, 60], webAudio: true, offlineUntil: (i) => (i === 1 ? null : new Date(T0 + 7 * DAY)) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(2000);
+  world.loadDelay = 700;
+  world.online = false;
+  void engine.tick();
+  await world.advance(14000);
+  assert.equal(engine.status, "playing", "program keeps playing offline");
+  assert.ok(audios.some((x) => !x.paused && x.src.endsWith(id(3))), "C playing from cache");
+  const c = world.plays.find((p) => p.src.endsWith(id(3)) && p.pos === 0);
+  const aPlays = world.plays.filter((p) => p.src.endsWith(id(1)));
+  assert.ok(aPlays.every((p, k) => k === 0 || p.pos > 1), "A resumed from its position, never restarted from 0");
+  const lastA = aPlays.at(-1);
+  const aEnd = lastA.at + (10 - lastA.pos) * 1000;
+  assert.ok(c && c.scheduled && Math.abs(c.at - aEnd) < 1, `C exactly at A's end (${c && c.at - T0} vs ${aEnd - T0})`);
+  engine.dispose();
+}
+
 console.log("business-spa-player-engine-unit: all tests passed");
