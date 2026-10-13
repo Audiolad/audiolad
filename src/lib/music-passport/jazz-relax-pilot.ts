@@ -398,7 +398,49 @@ async function syncPassports(practiceId: string): Promise<void> {
   if (prepareFailed.size > 0 || inflight.size > 0) return;
   const draft = buildAlbumPassportDraft({ succeeded, failed });
   if (draft.status === "completed" && succeeded.length !== tracks.length) return;
-  await insertAlbum(practiceId, draft);
+  const albumPassportId = await insertAlbum(practiceId, draft);
+  if (albumPassportId && shouldRegisterAlbumPassport(draft.status)) {
+    await registerAlbumPassport(albumPassportId);
+  }
+}
+
+/**
+ * Core task 1313c2b7: a completed album passport is registered in the shared
+ * passport registry as soon as it is completed and saved. Publication state is
+ * irrelevant here (draft, published before or after completion). Partial,
+ * pending and failed passports are never registered.
+ */
+export function shouldRegisterAlbumPassport(status: AlbumPassportDraft["status"]): boolean {
+  return status === "completed";
+}
+
+/**
+ * Idempotent: the RPC returns the existing registration on repeats. A failure
+ * is logged and retried on the next sync (status read / server continuation),
+ * because insert_music_album_passport returns the same id for the same
+ * fingerprint. Never throws into the author flow.
+ */
+async function registerAlbumPassport(albumPassportId: string): Promise<boolean> {
+  try {
+    const { data, error } = await service().rpc("register_music_album_passport", {
+      p_album_passport_id: albumPassportId,
+    });
+    if (error || !data || typeof data !== "object") {
+      console.error("jazz_relax_album_passport_registration_failed", albumPassportId, error?.message ?? "empty");
+      return false;
+    }
+    if ((data as { created?: unknown }).created === true) {
+      console.info("jazz_relax_album_passport_registered", albumPassportId);
+    }
+    return true;
+  } catch (error) {
+    console.error(
+      "jazz_relax_album_passport_registration_failed",
+      albumPassportId,
+      error instanceof Error ? error.message : "unknown",
+    );
+    return false;
+  }
 }
 
 export function resolveJazzRelaxAnalysisAudio(input: {

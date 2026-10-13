@@ -139,6 +139,8 @@ export function jazzRelaxProgressLabel(readyCount: number, totalCount: number): 
 export const JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL = "Создаём музыкальный паспорт…";
 export const JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL = "Сохранить и создать музыкальный паспорт";
 export const JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL = "Перейти к оформлению";
+/** 1313c2b7: the passport is built on the server; the author is never blocked by it. */
+export const JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL = "Продолжить — паспорт создаётся в фоне";
 
 export type JazzRelaxPassportActivityKind =
   | "saving"
@@ -167,6 +169,12 @@ export type JazzRelaxPassportActivity = {
   statusNotice: string | null;
   /** Set only when the whole album command is already in the durable analyzer queue. */
   closeHint: string | null;
+  /**
+   * True when analysis is already accepted by the server. The step button then
+   * moves on to the next wizard step without starting anything new, so editing
+   * and publishing never wait for the passport.
+   */
+  continueInBackground: boolean;
 };
 
 export function jazzRelaxReadyTrackLabel(readyCount: number, totalCount: number): string {
@@ -181,6 +189,18 @@ function startButton(): Pick<
     buttonLabel: JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL,
     buttonDisabled: false,
     ariaBusy: false,
+  };
+}
+
+function backgroundButton(): Pick<
+  JazzRelaxPassportActivity,
+  "buttonLabel" | "buttonDisabled" | "ariaBusy" | "continueInBackground"
+> {
+  return {
+    buttonLabel: JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL,
+    buttonDisabled: false,
+    ariaBusy: false,
+    continueInBackground: true,
   };
 }
 
@@ -210,7 +230,7 @@ export function describeJazzRelaxPassportActivity(input: {
   > | null;
   pollFailed: boolean;
 }): JazzRelaxPassportActivity {
-  const quiet = { statusNotice: null, closeHint: null };
+  const quiet = { statusNotice: null, closeHint: null, continueInBackground: false };
   if (input.saving) {
     return {
       kind: "saving",
@@ -235,6 +255,7 @@ export function describeJazzRelaxPassportActivity(input: {
       indeterminate: false,
       statusNotice: null,
       closeHint: null,
+      continueInBackground: false,
       ...startButton(),
     };
   }
@@ -252,7 +273,9 @@ export function describeJazzRelaxPassportActivity(input: {
       progress,
       indeterminate: busy && progress === null,
       ...quiet,
-      ...(busy ? creatingButton() : startButton()),
+      // Only this tab's own enqueue request blocks the button. A server-side
+      // continuation keeps going without the browser.
+      ...(input.enqueueing ? creatingButton() : busy ? backgroundButton() : startButton()),
     };
   }
 
@@ -266,6 +289,7 @@ export function describeJazzRelaxPassportActivity(input: {
       indeterminate: false,
       statusNotice: null,
       closeHint: null,
+      continueInBackground: false,
       ...startButton(),
     };
   }
@@ -282,6 +306,7 @@ export function describeJazzRelaxPassportActivity(input: {
       indeterminate: false,
       statusNotice: null,
       closeHint: null,
+      continueInBackground: false,
       buttonLabel: JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL,
       buttonDisabled: false,
       ariaBusy: false,
@@ -302,7 +327,7 @@ export function describeJazzRelaxPassportActivity(input: {
         indeterminate: !durable,
         statusNotice: durable ? "В очереди" : null,
         closeHint: durable ? JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT : null,
-        ...creatingButton(),
+        ...backgroundButton(),
       };
     }
     const progress = status.totalCount > 0
@@ -320,7 +345,7 @@ export function describeJazzRelaxPassportActivity(input: {
       indeterminate: progress === null,
       statusNotice,
       closeHint: durable ? JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT : null,
-      ...creatingButton(),
+      ...backgroundButton(),
     };
   }
 
@@ -336,6 +361,7 @@ export function describeJazzRelaxPassportActivity(input: {
       indeterminate: false,
       statusNotice: null,
       closeHint: null,
+      continueInBackground: false,
       ...startButton(),
     };
   }
@@ -351,6 +377,7 @@ export function describeJazzRelaxPassportActivity(input: {
       indeterminate: false,
       statusNotice: null,
       closeHint: null,
+      continueInBackground: false,
       ...startButton(),
     };
   }
@@ -363,6 +390,7 @@ export function describeJazzRelaxPassportActivity(input: {
     indeterminate: false,
     statusNotice: null,
     closeHint: null,
+    continueInBackground: false,
     ...startButton(),
   };
 }
