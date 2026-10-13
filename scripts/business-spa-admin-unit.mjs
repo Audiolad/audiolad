@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   SPA_MAX_EVENT_MS,
-  compositionWithout,
   summarizeSpaPlayback,
 } from "../src/lib/business-app/spa-admin-report.ts";
 
@@ -25,7 +25,12 @@ assert.equal(s.byTrack.get(B)?.onlineMinutes, 360, "clamped to 6h per event");
 assert.equal(s.totalOfflineMinutes, 2.5);
 assert.equal(s.totalOnlineMinutes, 361);
 
-assert.deepEqual(compositionWithout([A, B], A), [B]);
-assert.throws(() => compositionWithout([B], A), /not_in_program/);
+// Removal goes through the atomic SQL function only (race fix, review 2026-10-13).
+const actions = readFileSync(new URL("../src/app/(platform)/admin/business-spa/actions.ts", import.meta.url), "utf8");
+const lib = readFileSync(new URL("../src/lib/business-app/spa-admin.ts", import.meta.url), "utf8");
+assert.match(actions, /excludeProgramTrack\(programId, audioItemId/);
+assert.doesNotMatch(actions, /set_program_items|setProgramTracks|loadActiveProgramTrackIds/);
+assert.match(lib, /rpc\("business_spa_exclude_program_item"/);
+assert.match(lib, /\.range\(from, from \+ SPA_ADMIN_LOG_PAGE - 1\)/, "log rows are paged");
 
 console.log("business-spa-admin-unit: all tests passed");

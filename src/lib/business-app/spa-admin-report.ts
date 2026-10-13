@@ -70,9 +70,3 @@ export function summarizeSpaPlayback(rows: readonly SpaPlaybackLogRow[]): SpaMin
   }
   return { byTrack, totalOnlineMinutes: round1(on), totalOfflineMinutes: round1(off) };
 }
-
-/** Active ids after removing one track; order preserved. Throws if not active. */
-export function compositionWithout(activeIdsInOrder: readonly string[], removeId: string): string[] {
-  if (!activeIdsInOrder.includes(removeId)) throw new Error("business_spa_track_not_in_program");
-  return activeIdsInOrder.filter((id) => id !== removeId);
-}

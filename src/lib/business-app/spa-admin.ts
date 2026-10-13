@@ -34,6 +34,25 @@ type ItemRow = {
   audio_items: { title: string | null; music_track_code: string | null } | null;
 };
 
+export const SPA_ADMIN_LOG_PAGE = 1000;
+
+/** All log rows of a program, paged (PostgREST caps a single response). */
+async function loadAllPlaybackRows(programId: string): Promise<{ data: SpaPlaybackLogRow[]; error: unknown }> {
+  const db = createServiceRoleClient();
+  const rows: SpaPlaybackLogRow[] = [];
+  for (let from = 0; ; from += SPA_ADMIN_LOG_PAGE) {
+    const { data, error } = await db
+      .from("business_playback_log")
+      .select("audio_item_id, played_ms, offline, event, received_at")
+      .eq("program_id", programId)
+      .order("id", { ascending: true })
+      .range(from, from + SPA_ADMIN_LOG_PAGE - 1);
+    if (error) return { data: [], error };
+    rows.push(...((data ?? []) as SpaPlaybackLogRow[]));
+    if (!data || data.length < SPA_ADMIN_LOG_PAGE) return { data: rows, error: null };
+  }
+}
+
 export async function loadSpaAdminPrograms(): Promise<SpaAdminProgram[]> {
   const db = createServiceRoleClient();
   const { data: programs, error } = await db
@@ -53,11 +72,7 @@ export async function loadSpaAdminPrograms(): Promise<SpaAdminProgram[]> {
         .eq("program_id", p.id)
         .order("excluded_at", { ascending: true, nullsFirst: true })
         .order("position", { ascending: true }),
-      db
-        .from("business_playback_log")
-        .select("audio_item_id, played_ms, offline, event, received_at")
-        .eq("program_id", p.id)
-        .limit(50000),
+      loadAllPlaybackRows(p.id),
     ]);
     if (itemsError || logsError) throw new Error("business_spa_admin_load_failed");
     const summary = summarizeSpaPlayback((logs ?? []) as SpaPlaybackLogRow[]);
@@ -84,25 +99,17 @@ export async function loadSpaAdminPrograms(): Promise<SpaAdminProgram[]> {
   return result;
 }
 
-export async function loadActiveProgramTrackIds(programId: string): Promise<string[]> {
+/**
+ * Removes ONE track via business_spa_exclude_program_item: the program row is locked
+ * and only that item changes, so concurrent removals can never re-activate each other.
+ */
+export async function excludeProgramTrack(programId: string, audioItemId: string, reason: string): Promise<boolean> {
   const db = createServiceRoleClient();
-  const { data, error } = await db
-    .from("business_program_items")
-    .select("audio_item_id")
-    .eq("program_id", programId)
-    .is("excluded_at", null)
-    .order("position", { ascending: true });
-  if (error) throw new Error("business_spa_admin_load_failed");
-  return (data ?? []).map((r) => r.audio_item_id as string);
-}
-
-/** Uses the PR2 RPC so exclusion/reordering stays in one audited code path. */
-export async function setProgramTracks(programId: string, ids: string[], reason: string): Promise<void> {
-  const db = createServiceRoleClient();
-  const { error } = await db.rpc("business_spa_set_program_items", {
+  const { data, error } = await db.rpc("business_spa_exclude_program_item", {
     p_program_id: programId,
-    p_audio_item_ids: ids,
-    p_exclusion_reason: reason,
+    p_audio_item_id: audioItemId,
+    p_reason: reason,
   });
   if (error) throw new Error("business_spa_admin_update_failed");
+  return data === true;
 }
