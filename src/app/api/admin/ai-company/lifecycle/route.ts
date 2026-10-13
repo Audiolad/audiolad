@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 
 import { handleOwnerLifecycleRequest } from "@/lib/admin/ai-company-lifecycle";
-import { requireAdminPermission } from "@/lib/admin/guard";
+import { aiCompanyOwnerOnlyResponse, isAiCompanyOwner, requireAiCompanyView } from "@/lib/admin/guard";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const session = await requireAdminPermission("ai_company.view");
+  const session = await requireAiCompanyView();
+  // Server-side owner gate before the body is read or Core is called: the read-only viewer gets 403.
+  if (!isAiCompanyOwner(session.access)) {
+    console.info("ai_company_lifecycle_audit", { sessionUserId: session.userId, sessionOwner: false, status: 403, code: "owner_required" });
+    return aiCompanyOwnerOnlyResponse();
+  }
   // Core records lifecycle actions as actor `sergey`; only the platform owner session may speak for it.
-  const actor = { userId: session.userId, isOwner: session.access.roles.includes("owner") };
+  const actor = { userId: session.userId, isOwner: isAiCompanyOwner(session.access) };
   const body = await request.json().catch(() => null);
   const result = await handleOwnerLifecycleRequest({
     body,
