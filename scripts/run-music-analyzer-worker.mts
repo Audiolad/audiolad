@@ -22,6 +22,7 @@ import {
   formatMusicAnalyzerWorkerBootLog,
 } from "../src/lib/music-analyzer-runs/worker-release";
 import { createMusicAnalyzerWorkerPort } from "../src/lib/music-analyzer-runs/worker-runtime";
+import { settleJazzRelaxPassportForAnalyzerRun } from "../src/lib/music-passport/jazz-relax-pilot";
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -41,7 +42,10 @@ async function main() {
   const service = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const port = createMusicAnalyzerWorkerPort(service);
+  const port = createMusicAnalyzerWorkerPort(service, {
+    // 1313c2b7: assemble + register the album passport when its last run finishes.
+    onRunSettled: settleJazzRelaxPassportForAnalyzerRun,
+  });
   const boot = await captureMusicAnalyzerBootRelease();
   const bootComparison = await compareMusicAnalyzerRelease({ boot });
   console.log(formatMusicAnalyzerWorkerBootLog(bootComparison));

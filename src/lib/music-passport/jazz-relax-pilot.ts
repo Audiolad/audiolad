@@ -342,7 +342,10 @@ function draftFromAlbumRow(row: AlbumRow): AlbumPassportDraft | null {
   };
 }
 
-async function syncPassports(practiceId: string): Promise<void> {
+async function syncPassports(
+  practiceId: string,
+  options: { strictRegistration?: boolean } = {},
+): Promise<void> {
   const links = await loadLinks(practiceId);
   const runs = await loadRuns(links.map((link) => link.analyzer_run_id));
   const passports = await loadPassportsByRun(links.map((link) => link.analyzer_run_id));
@@ -400,8 +403,69 @@ async function syncPassports(practiceId: string): Promise<void> {
   if (draft.status === "completed" && succeeded.length !== tracks.length) return;
   const albumPassportId = await insertAlbum(practiceId, draft);
   if (albumPassportId && shouldRegisterAlbumPassport(draft.status)) {
-    await registerAlbumPassport(albumPassportId);
+    const registered = await registerAlbumPassport(albumPassportId);
+    // The worker hook retries; author status reads stay non-blocking.
+    if (!registered && options.strictRegistration) {
+      throw new Error("album_passport_registration_failed");
+    }
   }
+}
+
+export const JAZZ_RELAX_SETTLE_MAX_ATTEMPTS = 3;
+
+/**
+ * Core task 1313c2b7: retry wrapper used by the analyzer worker hook. Looks up
+ * the product of a finished analyzer run and re-runs the idempotent sync that
+ * materializes track passports, assembles the album passport once all tracks
+ * are done and registers it when completed. Runs without any author request.
+ * Returns the outcome instead of throwing, so the worker never fails a run.
+ */
+export async function settleAnalyzerRunWithRetry(input: {
+  runId: string;
+  lookupPracticeId: (runId: string) => Promise<string | null>;
+  sync: (practiceId: string) => Promise<void>;
+  attempts?: number;
+  delayMs?: number;
+}): Promise<"synced" | "not_product_run" | "failed"> {
+  const attempts = Math.max(1, input.attempts ?? JAZZ_RELAX_SETTLE_MAX_ATTEMPTS);
+  let lastError = "unknown";
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const practiceId = await input.lookupPracticeId(input.runId);
+      if (!practiceId) return "not_product_run";
+      await input.sync(practiceId);
+      return "synced";
+    } catch (error) {
+      lastError = error instanceof JazzRelaxPassportError ? error.code : error instanceof Error ? error.message : "unknown";
+      if (attempt < attempts && (input.delayMs ?? 0) > 0) {
+        await new Promise((resolve) => setTimeout(resolve, (input.delayMs ?? 0) * attempt));
+      }
+    }
+  }
+  console.error("jazz_relax_passport_settle_failed", input.runId, lastError);
+  return "failed";
+}
+
+async function practiceIdForAnalyzerRun(runId: string): Promise<string | null> {
+  const { data, error } = await service()
+    .from("music_passport_analysis_links")
+    .select("practice_id")
+    .eq("analyzer_run_id", runId)
+    .maybeSingle();
+  if (error) throw new Error(`analysis_link_lookup_failed:${error.message}`);
+  const practiceId = (data as { practice_id?: unknown } | null)?.practice_id;
+  return typeof practiceId === "string" ? practiceId : null;
+}
+
+/** Analyzer worker hook: server-side assembly + registration on completion. */
+export async function settleJazzRelaxPassportForAnalyzerRun(runId: string): Promise<void> {
+  const outcome = await settleAnalyzerRunWithRetry({
+    runId,
+    lookupPracticeId: practiceIdForAnalyzerRun,
+    sync: (practiceId) => syncPassports(practiceId, { strictRegistration: true }),
+    delayMs: 1000,
+  });
+  if (outcome === "synced") console.info("jazz_relax_passport_settled", runId);
 }
 
 /**

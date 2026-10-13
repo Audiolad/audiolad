@@ -12,7 +12,10 @@ import {
   JAZZ_RELAX_PASSPORT_HELP_LINK_LABEL,
   JAZZ_RELAX_PASSPORT_HELP_SECTIONS,
 } from "../src/lib/music-passport/jazz-relax-help";
-import { shouldRegisterAlbumPassport } from "../src/lib/music-passport/jazz-relax-pilot";
+import {
+  settleAnalyzerRunWithRetry,
+  shouldRegisterAlbumPassport,
+} from "../src/lib/music-passport/jazz-relax-pilot";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
@@ -52,7 +55,7 @@ assert.equal(shouldRegisterAlbumPassport("pending"), false);
 assert.equal(shouldRegisterAlbumPassport("failed"), false);
 
 const pilot = read("src/lib/music-passport/jazz-relax-pilot.ts");
-assert.match(pilot, /const albumPassportId = await insertAlbum\(practiceId, draft\);\n\s+if \(albumPassportId && shouldRegisterAlbumPassport\(draft\.status\)\) \{\n\s+await registerAlbumPassport\(albumPassportId\);/);
+assert.match(pilot, /const albumPassportId = await insertAlbum\(practiceId, draft\);\n\s+if \(albumPassportId && shouldRegisterAlbumPassport\(draft\.status\)\) \{\n\s+const registered = await registerAlbumPassport\(albumPassportId\);/);
 assert.match(pilot, /rpc\("register_music_album_passport"/);
 assert.match(pilot, /jazz_relax_album_passport_registration_failed/);
 const registerBody = pilot.slice(pilot.indexOf("async function registerAlbumPassport"));
@@ -76,5 +79,56 @@ assert.match(migration, /REVOKE ALL ON FUNCTION public\.register_music_album_pas
 assert.match(migration, /passport_completed_at/);
 assert.match(migration, /album_passport_version/);
 assert.doesNotMatch(migration, /\bUPDATE\s+public\.|\bDELETE\s+FROM\b|INSERT INTO public\.music_passport_registrations[\s\S]*SELECT[\s\S]*FROM public\.music_album_passports\s*;/i);
+
+// --- Worker hook: server-side settle without the author ---------------------
+{
+  const synced: string[] = [];
+  assert.equal(await settleAnalyzerRunWithRetry({
+    runId: "run-a",
+    lookupPracticeId: async () => "practice-1",
+    sync: async (practiceId) => { synced.push(practiceId); },
+  }), "synced");
+  assert.deepEqual(synced, ["practice-1"]);
+
+  assert.equal(await settleAnalyzerRunWithRetry({
+    runId: "run-lab",
+    lookupPracticeId: async () => null,
+    sync: async () => { throw new Error("must not sync"); },
+  }), "not_product_run");
+
+  let calls = 0;
+  assert.equal(await settleAnalyzerRunWithRetry({
+    runId: "run-b",
+    lookupPracticeId: async () => "practice-2",
+    sync: async () => {
+      calls += 1;
+      if (calls < 3) throw new Error("album_passport_registration_failed");
+    },
+  }), "synced");
+  assert.equal(calls, 3, "transient registration failure is retried");
+
+  const origError = console.error;
+  const logged: string[] = [];
+  console.error = (...args: unknown[]) => { logged.push(args.join(" ")); };
+  try {
+    let tries = 0;
+    assert.equal(await settleAnalyzerRunWithRetry({
+      runId: "run-c",
+      lookupPracticeId: async () => "practice-3",
+      sync: async () => { tries += 1; throw new Error("db_down"); },
+      attempts: 2,
+    }), "failed");
+    assert.equal(tries, 2);
+  } finally {
+    console.error = origError;
+  }
+  assert.ok(logged.some((line) => line.includes("jazz_relax_passport_settle_failed") && line.includes("db_down")));
+}
+assert.match(pilot, /export async function settleJazzRelaxPassportForAnalyzerRun/);
+assert.match(pilot, /sync: \(practiceId\) => syncPassports\(practiceId, \{ strictRegistration: true \}\)/);
+assert.match(pilot, /\.from\("music_passport_analysis_links"\)[\s\S]{0,120}\.eq\("analyzer_run_id", runId\)/);
+assert.match(pilot, /if \(!registered && options\.strictRegistration\) \{\n\s+throw new Error\("album_passport_registration_failed"\)/);
+// Worker runtime stays generic: no passport tables or pilot imports in it.
+assert.doesNotMatch(read("src/lib/music-analyzer-runs/worker-runtime.ts"), /music-passport|register_music_album_passport|music_album_passports/);
 
 console.log("jazz-relax-passport-registration-unit: ok");
