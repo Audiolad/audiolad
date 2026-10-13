@@ -1576,8 +1576,9 @@ if (!process.env.SPA_FUZZ_ONLY) {
   engine.cachedAt.set(id(1), T0); engine.cacheUntil.set(id(1), T0 + 7 * DAY); // the first copy's index
   await world.advance(5000);
   hold.res(); await dl; await world.advance(300);
-  assert.ok(!world.cache.has(id(1)), "expired late write removed");
-  assert.ok(!engine.cachedAt.has(id(1)), "index agrees with the store");
+  // A22: the shorter-lived re-download never replaces the still-valid 7-day copy.
+  assert.ok(world.cache.has(id(1)) && world.cache.get(id(1)).until > T0 + DAY, "original valid copy kept");
+  assert.equal(engine.cacheUntil.get(id(1)), world.cache.get(id(1)).until, "index agrees with the store");
   deps.cache.put = put; world.serverUntil = null;
   await engine.downloadAll();
   assert.ok(world.cache.has(id(1)) && engine.cachedAt.has(id(1)), "A re-downloaded");
@@ -1665,6 +1666,79 @@ if (!process.env.SPA_FUZZ_ONLY) {
   await world.advance(5000);
   assert.ok(!world.cache.has(k), "unindexed expired copy swept");
   engine.dispose();
+}
+// ---- 35. Re-review A21 / single-writer cache (A22) ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) A21 #1: an old instance's re-check in flight across dispose() never deletes a copy.
+  const { world, deps } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const e1 = new SpaPlayerEngine(deps);
+  await e1.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  await e1.downloadAll();
+  const get = deps.cache.get; const hold = deferred(); let once = true;
+  deps.cache.get = async (k) => { const c = await get(k); if (once && k === id(1)) { once = false; await hold.p; } return c; };
+  Object.defineProperty(e1, "items", { get: () => [] }); // from the old instance's view the copy is no longer allowed
+  const rv = e1.revalidate(id(1));
+  await world.advance(50);
+  e1.dispose();
+  hold.res(); await rv; await world.advance(100);
+  deps.cache.get = get;
+  assert.ok(world.cache.has(id(1)), "closed instance did not delete the copy");
+  assert.equal(world.cache.size, 12);
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) A21 #2: a late re-download with a much shorter deadline never destroys the stored
+  // longer-valid copy; offline, A keeps playing from it.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  await engine.downloadAll();
+  if (engine.status === "playing") await engine.toggle();
+  engine.cachedAt.delete(id(1)); engine.cacheUntil.delete(id(1)); // forces a second download of A
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  const put = deps.cache.put; const hold = deferred();
+  deps.cache.put = async (k, ...r) => { if (k === id(1)) await hold.p; return put(k, ...r); };
+  const dl = engine.downloadAll();
+  await world.advance(5100);
+  hold.res(); await dl; await world.advance(300);
+  deps.cache.put = put;
+  assert.equal(world.cache.get(id(1))?.until, T0 + DAY, "1-day copy of A survives");
+  world.online = false;
+  await engine.startAt(0);
+  await world.advance(1000);
+  assert.ok(audios.some((x) => !x.paused && x.src === `blob:${id(1)}`), "A plays offline from the kept copy");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (3) a late write that replaced only an EXPIRED copy and expired itself: store + index empty.
+  const { world, deps } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  const k = id(1);
+  world.cache.set(k, { data: { url: `https://s/${k}` }, cachedAt: T0 - 10 * DAY, until: T0 - DAY });
+  world.serverUntil = () => new Date(T0 + 1000).toISOString();
+  const put = deps.cache.put; const hold = deferred();
+  deps.cache.put = async (kk, ...r) => { if (kk === k) await hold.p; return put(kk, ...r); };
+  const dl = engine.downloadAll();
+  await world.advance(100);
+  engine.cachedAt.set(k, T0); engine.cacheUntil.set(k, T0 + DAY); // stale index entry
+  await world.advance(1900);
+  hold.res(); await dl; await world.advance(200);
+  deps.cache.put = put;
+  assert.ok(!world.cache.has(k) && !engine.cachedAt.has(k), "expired late write removed, index empty");
+  engine.dispose();
+}
+{
+  // (4) a closed writer never touches the store.
+  const { SpaCacheWriter } = await import(process.env.SPA_ENGINE_MODULE ?? "../src/lib/business-app/spa-player-engine.ts");
+  const ops = [];
+  const store = { get: async () => ({ data: {}, cachedAt: 1, until: 2 }), put: async () => ops.push("put"), delete: async () => ops.push("del"), clear: async () => ops.push("clear"), keys: async () => [] };
+  const w = new SpaCacheWriter(store, () => 1e15, () => 10);
+  const p1 = w.put("x", {}, 5, 1e15); const p2 = w.remove("x", () => false, undefined, () => {});
+  w.close();
+  await p1; await p2; await w.clear();
+  assert.deepEqual(ops, [], "closed writer: no put/delete/clear");
 }
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {

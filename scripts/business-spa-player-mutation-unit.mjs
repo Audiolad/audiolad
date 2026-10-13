@@ -40,7 +40,7 @@ const mutations = [
   ["A17 hard stop armed only after play() resolved", [["    this.applyDeadline(this.active);\n    try {\n      await this.activeEl().play(", "    try {\n      await this.activeEl().play("]], "depth"], // tick re-applies deadlines every 250 ms; adapter-level guard tested in business-spa-webaudio-unit
   ["A17 start intent dropped before play() completes", [["      this.starting -= 1;\n    }", "      this.starting -= 1;\n      this.pendingStart = null;\n    }"]]],
   ["A17 toggle resume not registered as a pending start", [["      this.pendingStart = mine;\n      let ok: boolean;", "      let ok: boolean;"]]],
-  ["A17 dispose() does not cancel a running init()", [["    this.disposed = true;\n    this.playOp += 1;\n    this.bumpOp();", ""], [" && !this.disposed;\n  }", ";\n  }"]]],
+  ["A17 dispose() does not cancel a running init()", [["    this.disposed = true;\n    this.writer.close(); // a closed instance never writes or deletes cached copies (A22)\n    this.playOp += 1;\n    this.bumpOp();", "    this.writer.close();"], [" && !this.disposed;\n  }", ";\n  }"]]],
   ["A17 stale play() continuation silences the newer start", [["    const keep = !this.stillCurrent(t.op)", "    const keep = false && !this.stillCurrent(t.op)"]]],
   ["A17 forced stop during a pending start stalls the program", [["          this.setStatus(\"paused\");\n        }\n        return false;", "        }\n        return false;"]]],
   // ---- A17/A18 ----
@@ -49,7 +49,7 @@ const mutations = [
   ["A18 cache switch play() without the guard", [["        await el.play(() => this.mayStart(st)).catch(", "        await el.play().catch("]], "depth"], // post-play silenceStale + adapter guard test (webaudio-unit)
   ["A18 stale download put drops the current valid copy", [["        await this.dropOwnCopy(item.audioItemId, cachedAt);", "        await this.dropCache(item.audioItemId);"]]],
   // ---- A18/A19 ----
-  ["A19 a stale write overwrites a newer stored copy", [["      if (ex && ex.cachedAt >= cachedAt) return false;\n", ""]], "depth"] /* writes are serialized and a stale gen never writes */,
+  ["A19 a stale write overwrites a newer stored copy", [["if (ex.cachedAt >= cachedAt || (exValid", "if ((exValid"]], "depth"] /* writes are serialized and a stale gen never writes */,
   ["A19 sourceFor trusts the index instead of the copy actually read", [["      let copy = this.checkCopy(item.audioItemId, await this.d.cache.get(item.audioItemId), atMs);", "      let copy = await this.d.cache.get(item.audioItemId);"]], "depth"] /* mayStart re-checks the loaded copy's own deadline */,
   ["A19 a late server no_access is hidden by a generation change", [["      if (!signed.ok && signed.reason === \"no_access\" && acc === this.accessEpoch && !this.disposed) return this.revokeAccess();\n", ""]]],
   ["A19 scan drops a copy on a read taken before a concurrent write", [["await this.revalidate(id); // re-read under the write lock", "await this.dropCache(id);"]], "depth"] /* data-loss only: not a rights invariant the suite asserts */,
@@ -58,12 +58,15 @@ const mutations = [
   // ---- A19/A20 ----
   ["A20 a loaded blob's deadline comes from the shared index", [["      const eff = this.ownDeadline(lo);\n      d = eff", "      const at = this.cachedAt.get(item.audioItemId), un = this.cacheUntil.get(item.audioItemId);\n      const eff = at === undefined || un === undefined ? null : this.copyDeadline(item.audioItemId, at, un);\n      d = eff"], ["    return dl !== null && atMs < dl;", "    return true;"]]],
   ["A20 expiry deletes bypass the write lock", [["      void this.revalidate(id);", "      void this.d.cache.delete(id);"]]],
-  ["A20 a late put leaves an expired copy stored", [["      if (dl === null || this.d.now() >= dl) {\n        await this.d.cache.delete(id);", "      if (false) {\n        await this.d.cache.delete(id);"]], "depth"] /* stale-path revalidate + expiry purge also remove it */,
+  ["A20 a late put leaves an expired copy stored", [["      await this.cache.delete(id);\n      return \"expired\";", "      return \"expired\";"]], "depth"] /* stale-path revalidate + expiry purge also remove it */,
   // ---- A20/A21 ----
-  ["A21 removed late write keeps the stale index", [["        // index must say so too, else downloads skip it forever (A20 #1).\n        this.dropCacheIndex(id);", "        // index must say so too, else downloads skip it forever (A20 #1).\n        if (this.cachedAt.get(id) === cachedAt) this.dropCacheIndex(id);"]]],
+  ["A21 removed late write keeps the stale index", [["if (r === \"expired\" && !this.disposed) this.dropCacheIndex(id);", "if (false) this.dropCacheIndex(id);"]], "depth"] /* A22: an expired write replaced nothing valid; the stale-download revalidate drops the index too */,
   ["A21 a stale read rewrites the shared index", [["    // carries this copy's own metadata instead (ownDeadline/ownOk).", "    // carries this copy's own metadata instead (ownDeadline/ownOk).\n    this.cachedAt.set(id, copy.cachedAt);\n    this.cacheUntil.set(id, copy.until);"]]],
   ["A21 unindexed stored copies never swept", [["    this.sweepStored();\n", ""]]],
-  ["A21 cache I/O not locked across instances", [["this.d.cache.lock ? this.d.cache.lock(id, fn) : fn()", "fn()"]]],
+  ["A22 closed instance deletes after its locked read", [["      const ex = await this.cache.get(id);\n      if (this.closed) return { kind: \"skipped\" as const };", "      const ex = await this.cache.get(id);"]]],
+  ["A22 shorter-lived copy replaces a longer-valid one", [["if (ex.cachedAt >= cachedAt || (exValid && dlEx! > dlNew)) return \"kept\";", "if (ex.cachedAt >= cachedAt) return \"kept\";"]]],
+  ["A22 closed writer still writes", [["    const guarded = () => (this.closed ? Promise.resolve(closedValue) :", "    const guarded = () => (false ? Promise.resolve(closedValue) :"], ["this.cache.lock(id, () => (this.closed ? Promise.resolve(closedValue) : fn()))", "this.cache.lock(id, fn)"], ["    if (this.closed) return;\n    await this.cache.clear();", "    await this.cache.clear();"]]],
+  ["A21 cache I/O not locked across instances", [["this.cache.lock ? this.cache.lock(id, () => (this.closed ? Promise.resolve(closedValue) : fn())) : fn()", "fn()"]]],
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],

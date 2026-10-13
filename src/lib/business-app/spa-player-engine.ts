@@ -177,6 +177,84 @@ type StartToken = { slot: number; epoch: number; playOp: number; slotOp: number;
  *     lives until play() completes so a refresh/toggle meanwhile takes it over. dispose() and
  *     downloads/log sync (generation + access epoch, stillData) follow the same rule.
  */
+/**
+ * Single writer of the offline cache (A22). The LIVE engine instance owns one; every put /
+ * delete / clear of the shared store goes through it, serialized per track (in-instance
+ * chain + the store's cross-instance lock). Rules:
+ * - closed (engine disposed): never writes or deletes anything again — re-checked inside
+ *   the lock and after every await, right before each store mutation;
+ * - put: the new copy is verified first (valid now) and replaces the stored copy only if
+ *   its effective deadline is >= the stored copy's (and it is newer). So a late write can
+ *   never destroy a longer-valid copy; if it completes past its own deadline it is removed
+ *   again, and by the rule the replaced copy had expired as well;
+ * - remove: re-reads under the lock and deletes only if `keep(copy)` says no.
+ */
+export class SpaCacheWriter {
+  private chain = new Map<string, Promise<unknown>>();
+  private closed = false;
+  constructor(
+    private readonly cache: EngineDeps["cache"],
+    private readonly deadline: (id: string, cachedAt: number, until: number) => number | null,
+    private readonly now: () => number,
+  ) {}
+  close(): void {
+    this.closed = true;
+  }
+  get live(): boolean {
+    return !this.closed;
+  }
+  private run<T>(id: string, fn: () => Promise<T>, closedValue: T): Promise<T> {
+    const guarded = () => (this.closed ? Promise.resolve(closedValue) : this.cache.lock ? this.cache.lock(id, () => (this.closed ? Promise.resolve(closedValue) : fn())) : fn());
+    const r = (this.chain.get(id) ?? Promise.resolve()).catch(() => undefined).then(guarded);
+    this.chain.set(id, r.catch(() => undefined));
+    return r;
+  }
+  put(id: string, data: Blob, cachedAt: number, until: number): Promise<"stored" | "kept" | "expired" | "closed"> {
+    return this.run(id, async () => {
+      const valid = () => {
+        const dl = this.deadline(id, cachedAt, until);
+        return dl !== null && this.now() < dl ? dl : null;
+      };
+      if (valid() === null) return "expired"; // verified before anything is written
+      const ex = await this.cache.get(id);
+      if (this.closed) return "closed";
+      const dlNew = valid();
+      if (dlNew === null) return "expired";
+      if (ex) {
+        const dlEx = this.deadline(id, ex.cachedAt, ex.until);
+        const exValid = dlEx !== null && this.now() < dlEx;
+        if (ex.cachedAt >= cachedAt || (exValid && dlEx! > dlNew)) return "kept";
+      }
+      await this.cache.put(id, data, cachedAt, until);
+      if (valid() !== null) return "stored";
+      // Completed past its own deadline (the replaced copy, deadline <= ours, is expired too).
+      if (this.closed) return "closed"; // the live instance's sweep removes it
+      await this.cache.delete(id);
+      return "expired";
+    }, "closed" as const);
+  }
+  remove(
+    id: string,
+    keep: (copy: CachedCopy) => boolean,
+    onlyCachedAt: number | undefined,
+    beforeDelete: (copy: CachedCopy | null) => void,
+  ): Promise<{ kind: "kept"; copy: CachedCopy } | { kind: "removed" | "skipped" }> {
+    return this.run(id, async () => {
+      const ex = await this.cache.get(id);
+      if (this.closed) return { kind: "skipped" as const };
+      if (onlyCachedAt !== undefined && (!ex || ex.cachedAt !== onlyCachedAt)) return { kind: "skipped" as const };
+      if (ex && keep(ex)) return { kind: "kept" as const, copy: ex };
+      beforeDelete(ex);
+      if (ex) await this.cache.delete(id);
+      return { kind: "removed" as const };
+    }, { kind: "skipped" as const });
+  }
+  async clear(): Promise<void> {
+    if (this.closed) return;
+    await this.cache.clear();
+  }
+}
+
 export class SpaPlayerEngine {
   manifest: SpaManifest | null = null;
   index = -1;
@@ -226,8 +304,11 @@ export class SpaPlayerEngine {
   private accessEpoch = 0;
   private readonly d: EngineDeps;
 
+  /** The single cache writer owned by this (live) instance. */
+  private readonly writer: SpaCacheWriter;
   constructor(deps: EngineDeps) {
     this.d = deps;
+    this.writer = new SpaCacheWriter(deps.cache, (id, at, un) => this.copyDeadline(id, at, un), () => deps.now());
     this.wasOnline = deps.online();
     deps.audios.forEach((el, slot) => {
       el.addEventListener("ended", () => void this.onEnded(slot));
@@ -282,6 +363,7 @@ export class SpaPlayerEngine {
     // Cancels every in-flight async path (incl. a running init()/startAt()): they all
     // re-check stillCurrent() after their awaits and see disposed.
     this.disposed = true;
+    this.writer.close(); // a closed instance never writes or deletes cached copies (A22)
     this.playOp += 1;
     this.bumpOp();
     for (const s of [0, 1]) this.clearDeadlineTimer(s);
@@ -432,70 +514,42 @@ export class SpaPlayerEngine {
   }
 
   /**
-   * All cache writes/deletes of one id are serialized, and a write never replaces an equal or
-   * NEWER stored copy (by cachedAt): a stale download can't overwrite a newer copy (A18 #1).
+   * Stale download: drop only OUR copy, and only if it is not valid for the current state.
+   * All store mutations go through the single writer (SpaCacheWriter, A22).
    */
-  private cacheChain = new Map<string, Promise<unknown>>();
-  private serial<T>(id: string, fn: () => Promise<T>): Promise<T> {
-    // In-instance chain + cross-instance/tab lock on the SHARED store (A20 #3); after
-    // dispose() no further cache I/O is started (the next instance's scan owns the store).
-    const guarded = () => (this.disposed ? Promise.resolve(undefined as T) : this.d.cache.lock ? this.d.cache.lock(id, fn) : fn());
-    const run = (this.cacheChain.get(id) ?? Promise.resolve()).catch(() => undefined).then(guarded);
-    this.cacheChain.set(id, run.catch(() => undefined));
-    return run;
-  }
-  /** Stale download: drop only OUR copy, and only if it is not valid for the current state. */
   private dropOwnCopy(id: string, cachedAt: number): Promise<void> {
     return this.revalidate(id, cachedAt);
   }
   /**
-   * Serialized with writes: re-read what is STORED now and keep+index it if valid for the
-   * current manifest and its own server deadline; else remove it (index, blob sources,
-   * store). `onlyCachedAt`: touch only that specific copy. No decision on a stale read.
+   * Re-read what is STORED now (under the writer's per-id lock) and keep+index it if valid
+   * for the current manifest and its own server deadline; else remove it (blob sources,
+   * index, store). `onlyCachedAt`: touch only that specific copy. A closed instance does
+   * nothing at all (A21 #1).
    */
-  private revalidate(id: string, onlyCachedAt?: number): Promise<void> {
-    return this.serial(id, async () => {
-      const ex = await this.d.cache.get(id);
-      if (onlyCachedAt !== undefined && (!ex || ex.cachedAt !== onlyCachedAt)) return;
-      if (!ex) {
-        this.dropCacheIndex(id);
-        this.clearBlobSources(id);
-        return;
-      }
-      const cachedAt = ex.cachedAt;
-      // Still a valid copy for the CURRENT manifest + its own server deadline (and access
-      // unchanged)? Then it is kept and indexed — it may already be audible.
+  private async revalidate(id: string, onlyCachedAt?: number): Promise<void> {
+    const keepIt = (ex: CachedCopy) => {
       const item = this.items.find((i) => i.audioItemId === id);
       const dl = item?.offlineAllowed ? this.copyDeadline(id, ex.cachedAt, ex.until) : null;
-      if (dl !== null && this.d.now() < dl && this.status !== "no_access" && !this.disposed) {
-        if ((this.cachedAt.get(id) ?? -Infinity) <= ex.cachedAt) {
-          this.cachedAt.set(id, ex.cachedAt);
-          this.cacheUntil.set(id, ex.until);
-        }
-        return;
-      }
-      if (onlyCachedAt === undefined || this.cachedAt.get(id) === cachedAt) this.dropCacheIndex(id);
+      return dl !== null && this.d.now() < dl && this.status !== "no_access";
+    };
+    const r = await this.writer.remove(id, keepIt, onlyCachedAt, (gone) => {
+      // Synchronously before the delete: nothing keeps sounding from the removed copy.
+      if (onlyCachedAt === undefined || this.cachedAt.get(id) === gone?.cachedAt || !gone) this.dropCacheIndex(id);
       this.clearBlobSources(id);
-      await this.d.cache.delete(id);
     });
+    if (this.disposed || r.kind !== "kept") return;
+    if ((this.cachedAt.get(id) ?? -Infinity) <= r.copy.cachedAt) {
+      this.cachedAt.set(id, r.copy.cachedAt);
+      this.cacheUntil.set(id, r.copy.until);
+    }
   }
-  private putCopy(id: string, data: Blob, cachedAt: number, until: number): Promise<boolean> {
-    return this.serial(id, async () => {
-      const ex = await this.d.cache.get(id);
-      if (ex && ex.cachedAt >= cachedAt) return false;
-      await this.d.cache.put(id, data, cachedAt, until);
-      // Under the same lock: the copy just STORED must still be within its own deadline
-      // (the put may have completed late), else it is removed at once (A19 #3).
-      const dl = this.copyDeadline(id, cachedAt, until);
-      if (dl === null || this.d.now() >= dl) {
-        await this.d.cache.delete(id);
-        // The store is now EMPTY for this id (our write replaced whatever was there): the
-        // index must say so too, else downloads skip it forever (A20 #1).
-        this.dropCacheIndex(id);
-        return false;
-      }
-      return true;
-    });
+  /** Store a downloaded copy via the single writer; true if it is now the stored copy. */
+  private async putCopy(id: string, data: Blob, cachedAt: number, until: number): Promise<boolean> {
+    const r = await this.writer.put(id, data, cachedAt, until);
+    // Our own late-expired write was removed again: the store is empty for this id, so the
+    // index must say so too (A20 #1). (Only possible when it replaced nothing still valid.)
+    if (r === "expired" && !this.disposed) this.dropCacheIndex(id);
+    return r === "stored";
   }
 
   // ---------------- sources ----------------
@@ -1512,7 +1566,7 @@ export class SpaPlayerEngine {
     this.cachedAt.clear();
     this.cacheUntil.clear();
     this.generation += 1;
-    await this.d.cache.clear();
+    await this.writer.clear();
     this.d.storage.remove(this.resumeKey);
     this.d.storage.remove(this.orderKey);
     this.setStatus("no_access", "Доступ к пилоту закрыт.");
