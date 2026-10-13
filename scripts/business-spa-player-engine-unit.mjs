@@ -12,12 +12,12 @@ const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
 
 function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), playableUntil = () => null, expiresAt = T0 + 7 * DAY, timerLatency = 0, webAudio = false } = {}) {
-  const world = { now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [], stops: [] };
+  const world = { dataUntil: new WeakMap(), urlUntil: new Map(), now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [], stops: [] };
   const durationOf = new Map();
   class FakeAudio {
     constructor(name) { this.name = name; this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; this.volume = 1; this.listeners = new Map(); this.startClock = 0; this.endedFired = false; }
     get src() { return this._src; }
-    set src(v) { this.gen = (this.gen ?? 0) + 1; this.cancelPending?.(); this.deadline = null; this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
+    set src(v) { this.copyUntil = world.urlUntil.get(v) ?? null; this.gen = (this.gen ?? 0) + 1; this.cancelPending?.(); this.deadline = null; this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
     get duration() { return durationOf.get(this._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "")) ?? NaN; }
     // Like WebAudioTrack: a scheduled-but-not-started slot reports running (paused=false) at 0.
     get currentTime() { return this.paused || this.pending ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
@@ -110,12 +110,13 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     download: async (url) => { if (!world.online) return null; if (world.onDownload) await world.onDownload(url); return { url }; },
     cache: {
       get: async (k) => world.cache.get(k) ?? null,
-      put: async (k, data, cachedAt, until) => { world.cache.set(k, { data, cachedAt, until }); },
+      put: async (k, data, cachedAt, until) => { if (data && typeof data === "object") world.dataUntil.set(data, until); world.cache.set(k, { data, cachedAt, until }); },
       delete: async (k) => { world.cache.delete(k); },
       keys: async () => [...world.cache.keys()],
       clear: async () => world.cache.clear(),
     },
-    objectUrl: { create: (b) => `blob:${b.url.replace("https://s/", "")}`, revoke: () => {} },
+    // Remember the server until of the copy each blob URL was created from (its own rights).
+    objectUrl: { create: (b) => { const u = `blob:${b.url.replace("https://s/", "")}`; world.urlUntil.set(u, world.dataUntil.get(b) ?? null); return u; }, revoke: () => {} },
     storage: { get: (k) => world.storage.get(k) ?? null, set: (k, v) => world.storage.set(k, v), remove: (k) => world.storage.delete(k) },
     uuid: () => id(5000 + ++world.seq), onChange: () => {}, programId: id(100), playerId: id(900), zoneId: id(901),
   };
@@ -1484,6 +1485,69 @@ if (!process.env.SPA_FUZZ_ONLY) {
   engine.dispose();
 }
 
+// ---- 32. Re-review A19 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) a newer copy never extends the rights of an already playing older blob.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  await engine.downloadAll();
+  world.online = false;
+  void engine.tick();
+  await world.advance(800);
+  const A = audios.find((x) => !x.paused && x.src.startsWith("blob:"));
+  assert.ok(A, "old copy audible offline");
+  // A second copy with a 1-day until lands (written by another download) and is indexed.
+  const k = A.src.replace(/^blob:/, "");
+  world.cache.set(k, { data: { url: `https://s/${k}` }, cachedAt: world.now, until: T0 + DAY });
+  engine.cachedAt.set(k, world.now); engine.cacheUntil.set(k, T0 + DAY);
+  engine.applyDeadlines(); // what a refresh does: re-hands deadlines to the audio clock
+  while (world.now < T0 + 5500) {
+    await world.advance(100);
+    if (world.now >= T0 + 4000) assert.ok(!audios.some((x) => !x.paused && !x.pending && x.copyUntil === T0 + 4000), `old blob silent after its own until (${world.now - T0} ms)`);
+  }
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) late expiry deletes never remove newer valid copies.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  await engine.downloadAll();
+  const del = deps.cache.delete; const hold = deferred();
+  deps.cache.delete = async (k2) => { await hold.p; return del(k2); };
+  await world.advance(4500); // old copies expire; their deletes hang
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  void engine.downloadAll();
+  await world.advance(500);
+  hold.res(); await world.advance(1000);
+  assert.equal([...world.cache.values()].filter((c) => c.until === T0 + DAY).length, 12, "all new copies kept");
+  world.online = false;
+  await world.advance(3000);
+  assert.equal(engine.status, "playing", "offline playback from the new copies");
+  assert.ok(audios.some((x) => !x.paused && x.src.startsWith("blob:")));
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (3) a put that completes after its own deadline leaves nothing expired in storage.
+  const { world, deps } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll(); // first copies: 7 days
+  engine.cachedAt.delete(id(1)); engine.cacheUntil.delete(id(1)); // force a second download of A
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  const put = deps.cache.put; const hold = deferred();
+  deps.cache.put = async (k2, ...r) => { if (k2 === id(1)) await hold.p; return put(k2, ...r); };
+  const dl = engine.downloadAll();
+  await world.advance(5000);
+  hold.res(); await dl; await world.advance(1200);
+  const c = world.cache.get(id(1));
+  assert.ok(!c || world.now < c.until, "no expired copy left in storage");
+  engine.dispose();
+}
+
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -1510,6 +1574,7 @@ if (!process.env.SPA_FUZZ_ONLY) {
     // Late cache I/O (A17 #3): puts/gets resolve out of order with refreshes and downloads.
     const put = deps.cache.put; deps.cache.put = async (...a) => { await later(1500); return put(...a); };
     const get = deps.cache.get; deps.cache.get = async (...a) => { await later(400); return get(...a); };
+    const del = deps.cache.delete; deps.cache.delete = async (...a) => { await later(1500); return del(...a); }; // late deletes (A19 #2)
     const fetchM = deps.fetchManifest; deps.fetchManifest = async () => { const m = world.manifestRes; await later(900); if (!world.denied) world.manifestRes = m; const r = await fetchM(); if (!r.ok && r.reason === "no_access") denials++; return r; };
     world.loadDelayFn = () => pick(700);
     // Pending play()/resume() of random length (A16 #2/#3).
@@ -1542,12 +1607,15 @@ if (!process.env.SPA_FUZZ_ONLY) {
       const ids = new Set(engine.items.map((i) => i.audioItemId));
       if (revoked && audible.length) fail("I5 sound after no_access");
       if (invalidDrops.length) fail(`I6 valid copy dropped: ${invalidDrops.join(",")}`);
+      // Retention: no stored copy outlives its own server until (grace: tick + delayed I/O).
+      if (!revoked) for (const [k, c] of world.cache) if (world.now >= c.until + 5000) fail(`retention: copy ${k.slice(-2)} kept ${world.now - c.until} ms past its until`);
       if (engine.status !== "playing" && audible.length) fail(`I9 sound while ${engine.status}`);
       if (audible.length > 2) fail("more than two audible slots");
       for (const x of audible) {
         const aid = x._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "");
         if (!ids.has(aid)) fail(`I4 removed track audible ${aid.slice(-2)}`);
         if (x._src.startsWith("blob:") && !world.cache.has(aid)) fail(`I6 audible copy ${aid.slice(-2)} no longer stored`);
+        if (x._src.startsWith("blob:") && x.copyUntil != null && world.now >= x.copyUntil) fail(`I1/I3 blob ${aid.slice(-2)} audible past the until of ITS OWN copy by ${world.now - x.copyUntil} ms`);
         const sc = world.cache.get(aid);
         if (x._src.startsWith("blob:") && sc && world.now >= sc.until) fail(`I3 blob ${aid.slice(-2)} audible past its STORED server until by ${world.now - sc.until} ms`);
         const it = engine.items.find((i) => i.audioItemId === aid);

@@ -47,14 +47,18 @@ const mutations = [
   ["A18 <audio> slot may start with its deadline inside the track (+ slack)", [["      if (dl !== null && dl < from + Math.max(0, dur - pos) * 1000 + SPA_HTML_START_SLACK_MS) return false;", ""]]],
   ["A18 stale cache-switch play() continuation pauses the newer start", [["          this.silenceStale(st);\n          return;", "          if (st.slotOp === this.slotOp[slot]) el.pause();\n          return;"]]],
   ["A18 cache switch play() without the guard", [["        await el.play(() => this.mayStart(st)).catch(", "        await el.play().catch("]], "depth"], // post-play silenceStale + adapter guard test (webaudio-unit)
-  ["A18 stale download put drops the current valid copy", [["        if (!valid) await this.dropOwnCopy(item.audioItemId, cachedAt);", "        await this.dropCache(item.audioItemId);"]]],
+  ["A18 stale download put drops the current valid copy", [["        await this.dropOwnCopy(item.audioItemId, cachedAt);", "        await this.dropCache(item.audioItemId);"]]],
   // ---- A18/A19 ----
   ["A19 a stale write overwrites a newer stored copy", [["      if (ex && ex.cachedAt >= cachedAt) return false;\n", ""]], "depth"] /* writes are serialized and a stale gen never writes */,
-  ["A19 sourceFor trusts the index instead of the copy actually read", [["      let copy = this.checkCopy(item.audioItemId, await this.d.cache.get(item.audioItemId), atMs);", "      let copy = await this.d.cache.get(item.audioItemId);"]]],
+  ["A19 sourceFor trusts the index instead of the copy actually read", [["      let copy = this.checkCopy(item.audioItemId, await this.d.cache.get(item.audioItemId), atMs);", "      let copy = await this.d.cache.get(item.audioItemId);"]], "depth"] /* mayStart re-checks the loaded copy's own deadline */,
   ["A19 a late server no_access is hidden by a generation change", [["      if (!signed.ok && signed.reason === \"no_access\" && acc === this.accessEpoch && !this.disposed) return this.revokeAccess();\n", ""]]],
   ["A19 scan drops a copy on a read taken before a concurrent write", [["await this.revalidate(id); // re-read under the write lock", "await this.dropCache(id);"]], "depth"] /* data-loss only: not a rights invariant the suite asserts */,
-  ["A19 advance supersedes a start in flight", [["    if (this.pendingStart && this.starting > 0) return;\n", ""]]],
+  ["A19 advance supersedes a start in flight", [["    if (this.pendingStart && this.starting > 0) return;\n", ""]], "depth"] /* liveness only (reload churn), fuzz-found */,
   ["A19 no retry on reconnect after nothing was startable", [["          this.stalledIntent = null;\n          void this.startAt(", "          this.stalledIntent = null;\n          if (false) void this.startAt("]]],
+  // ---- A19/A20 ----
+  ["A20 a loaded blob's deadline comes from the shared index", [["      const eff = this.ownDeadline(lo);\n      d = eff", "      const at = this.cachedAt.get(item.audioItemId), un = this.cacheUntil.get(item.audioItemId);\n      const eff = at === undefined || un === undefined ? null : this.copyDeadline(item.audioItemId, at, un);\n      d = eff"], ["    if (!this.ownOk(l) || (atMs !== undefined && !this.ownOk(l, atMs))) return false;", ""], [" || !this.ownOk(l))))) {", ")))) {"], ["(this.cachedDate(lo.audioItemId) !== null && this.ownOk(lo))", "this.cachedDate(lo.audioItemId) !== null"]]],
+  ["A20 expiry deletes bypass the write lock", [["      void this.revalidate(id);", "      void this.d.cache.delete(id);"]]],
+  ["A20 a late put leaves an expired copy stored", [["      if (dl === null || this.d.now() >= dl) {\n        await this.d.cache.delete(id);", "      if (false) {\n        await this.d.cache.delete(id);"]], "depth"] /* stale-path revalidate + expiry purge also remove it */,
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],
