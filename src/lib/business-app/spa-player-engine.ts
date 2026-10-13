@@ -209,17 +209,17 @@ export class SpaCacheWriter {
     this.chain.set(id, r.catch(() => undefined));
     return r;
   }
-  put(id: string, data: Blob, cachedAt: number, until: number): Promise<"stored" | "kept" | "expired" | "closed"> {
+  put(id: string, data: Blob, cachedAt: number, until: number): Promise<"stored" | "kept" | "rejected" | "expired" | "closed"> {
     return this.run(id, async () => {
       const valid = () => {
         const dl = this.deadline(id, cachedAt, until);
         return dl !== null && this.now() < dl ? dl : null;
       };
-      if (valid() === null) return "expired"; // verified before anything is written
+      if (valid() === null) return "rejected"; // verified before anything is written
       const ex = await this.cache.get(id);
       if (this.closed) return "closed";
       const dlNew = valid();
-      if (dlNew === null) return "expired";
+      if (dlNew === null) return "rejected"; // nothing written: any stored copy is untouched (A22 #1)
       if (ex) {
         const dlEx = this.deadline(id, ex.cachedAt, ex.until);
         const exValid = dlEx !== null && this.now() < dlEx;
@@ -548,6 +548,7 @@ export class SpaPlayerEngine {
     const r = await this.writer.put(id, data, cachedAt, until);
     // Our own late-expired write was removed again: the store is empty for this id, so the
     // index must say so too (A20 #1). (Only possible when it replaced nothing still valid.)
+    // "rejected" = nothing was written or deleted: the index of a remaining copy stays (A22 #1).
     if (r === "expired" && !this.disposed) this.dropCacheIndex(id);
     return r === "stored";
   }
@@ -1566,10 +1567,18 @@ export class SpaPlayerEngine {
     this.cachedAt.clear();
     this.cacheUntil.clear();
     this.generation += 1;
-    await this.writer.clear();
     this.d.storage.remove(this.resumeKey);
     this.d.storage.remove(this.orderKey);
+    // Synchronously (A22 #2): no_access holds and nothing sounds from here on.
     this.setStatus("no_access", "Доступ к пилоту закрыт.");
+    const op = this.opEpoch, acc = this.accessEpoch, gen = this.generation;
+    await this.writer.clear();
+    // Something newer happened during the clear (access restored, refresh applied, resume,
+    // dispose): no late state change; only reconcile the index with what the clear removed.
+    if (op !== this.opEpoch || acc !== this.accessEpoch || gen !== this.generation || this.disposed || this.status !== "no_access") {
+      if (!this.disposed) void this.scanCache().catch(() => undefined);
+      return;
+    }
   }
 
   // ---------------- offline cache ----------------

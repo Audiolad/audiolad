@@ -1740,6 +1740,65 @@ if (!process.env.SPA_FUZZ_ONLY) {
   await p1; await p2; await w.clear();
   assert.deepEqual(ops, [], "closed writer: no put/delete/clear");
 }
+// ---- 36. Re-review A22 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) A22 #1: a re-download whose deadline passes before it is written writes nothing and
+  // must keep the index of the still-valid stored copy; offline A plays from it.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  await engine.downloadAll();
+  if (engine.status === "playing") await engine.toggle();
+  const k = id(1);
+  assert.equal(world.cache.get(k)?.until, T0 + DAY);
+  const get = deps.cache.get; const hold = deferred(); let once = true;
+  deps.cache.get = async (kk) => { const c = await get(kk); if (once && kk === k) { once = false; await hold.p; } return c; };
+  const p = engine.putCopy(k, { url: `https://s/${k}` }, world.now, T0 + 4000);
+  await world.advance(5100);
+  hold.res(); const stored = await p; await world.advance(50);
+  deps.cache.get = get;
+  assert.equal(stored, false, "nothing written");
+  assert.equal(world.cache.get(k)?.until, T0 + DAY, "1-day copy untouched");
+  assert.ok(engine.cachedAt.has(k), "index of the remaining valid copy kept");
+  world.online = false;
+  await engine.startAt(0);
+  await world.advance(1000);
+  assert.notEqual(engine.status, "error", "offline start works");
+  assert.ok(audios.some((x) => !x.paused && x.src === `blob:${k}`), "A plays offline from the kept copy");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) A22 #2: no_access is set (and sound stopped) synchronously; a clear that finishes after
+  // access was restored and the user resumed changes nothing.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(300);
+  const good = world.manifestRes;
+  const clear = deps.cache.clear; const hold = deferred();
+  deps.cache.clear = async () => { await clear(); await hold.p; };
+  const sign = deps.sign; let deny = true;
+  deps.sign = async (aid, purpose) => (purpose === "offline" && deny ? { ok: false, reason: "no_access" } : sign(aid, purpose));
+  const rv = engine.downloadAll(); // offline-sign no_access -> revokeAccess() awaits the clear
+  await world.advance(100);
+  assert.equal(engine.status, "no_access", "no_access immediately");
+  assert.ok(audios.every((x) => x.paused), "silent immediately");
+  deny = false;
+  world.manifestRes = good;
+  await engine.refresh();
+  if (engine.status !== "playing") await engine.startAt(0);
+  await world.advance(500);
+  assert.equal(engine.status, "playing", "resumed after access restored");
+  hold.res(); await rv; await world.advance(2000);
+  deps.cache.clear = clear; deps.sign = sign;
+  assert.equal(engine.status, "playing", "late clear did not set no_access");
+  const audible = audios.filter((x) => !x.paused && !x.pending);
+  assert.ok(audible.length >= 1, "still playing");
+  // invariant: audible implies status playing
+  for (let i = 0; i < 5; i++) { await world.advance(1000); if (audios.some((x) => !x.paused && !x.pending)) assert.equal(engine.status, "playing"); }
+  engine.dispose();
+}
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
