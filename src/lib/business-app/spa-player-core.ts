@@ -9,6 +9,9 @@ export type SpaResumeState = { audioItemId: string; positionSec: number; savedAt
 
 export type SpaLogEvent = {
   client_event_id: string;
+  /** Player/zone bound when the event is CREATED; retries never re-resolve them (dedupe key). */
+  player_id: string;
+  zone_id: string;
   audio_item_id: string;
   event: "complete" | "skip" | "error";
   started_at: string;
@@ -129,6 +132,8 @@ export function isLogEvent(v: unknown): v is SpaLogEvent {
   const e = v as Record<string, unknown>;
   return (
     typeof e.client_event_id === "string" && UUID.test(e.client_event_id) &&
+    typeof e.player_id === "string" && UUID.test(e.player_id) &&
+    typeof e.zone_id === "string" && UUID.test(e.zone_id) &&
     typeof e.audio_item_id === "string" && UUID.test(e.audio_item_id) &&
     (e.event === "complete" || e.event === "skip" || e.event === "error") &&
     typeof e.started_at === "string" && !Number.isNaN(Date.parse(e.started_at)) &&
@@ -136,4 +141,24 @@ export function isLogEvent(v: unknown): v is SpaLogEvent {
     typeof e.played_ms === "number" && Number.isFinite(e.played_ms) && e.played_ms >= 0 &&
     typeof e.offline === "boolean"
   );
+}
+
+export const SPA_SIGNED_URL_MAX_SECONDS = 3600;
+
+/**
+ * Signed-URL lifetime: never beyond the track's playable_until, the manifest expiry,
+ * or (for an offline download) the offline cache deadline. 0 = refuse to sign.
+ */
+export function spaSignedUrlTtlSeconds(
+  bounds: { playableUntil: Date | null; manifestExpiresAt: Date; offlineCacheUntil?: Date | null },
+  now: Date,
+): number {
+  const limits = [now.getTime() + SPA_SIGNED_URL_MAX_SECONDS * 1000, bounds.manifestExpiresAt.getTime()];
+  if (bounds.playableUntil) limits.push(bounds.playableUntil.getTime());
+  if (bounds.offlineCacheUntil !== undefined) {
+    if (!bounds.offlineCacheUntil) return 0;
+    limits.push(bounds.offlineCacheUntil.getTime());
+  }
+  const secs = Math.floor((Math.min(...limits) - now.getTime()) / 1000);
+  return secs >= 5 ? secs : 0;
 }

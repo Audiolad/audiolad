@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { parseSpaManifest } from "../src/lib/business-app/spa-manifest.ts";
 import {
   SPA_LOG_QUEUE_MAX,
+  spaSignedUrlTtlSeconds,
   ackLog,
   enqueueLog,
   formatOfflineLabel,
@@ -63,7 +65,7 @@ assert.match(formatOfflineLabel(null), /недоступен/);
 
 // log queue
 const ev = (n, extra = {}) => ({
-  client_event_id: id(n), audio_item_id: id(1), event: "complete",
+  client_event_id: id(n), player_id: id(900), zone_id: id(901), audio_item_id: id(1), event: "complete",
   started_at: "2026-10-13T06:00:00Z", ended_at: "2026-10-13T06:10:00Z", played_ms: 600000, offline: true, ...extra,
 });
 let q = enqueueLog([], ev(1));
@@ -78,5 +80,27 @@ assert.equal(parseLogQueue(JSON.stringify([ev(5), { junk: 1 }])).length, 1);
 let big = [];
 for (let i = 0; i < SPA_LOG_QUEUE_MAX + 3; i++) big = enqueueLog(big, ev(i + 10));
 assert.equal(big.length, SPA_LOG_QUEUE_MAX);
+
+// Event context is bound at creation: events without player/zone are rejected.
+assert.equal(isLogEvent(ev(3, { player_id: undefined })), false, "player bound at creation");
+assert.equal(isLogEvent(ev(3, { zone_id: "x" })), false);
+
+// Signed URL TTL never outlives playable_until / manifest expiry / offline deadline.
+const now = new Date("2026-10-13T06:00:00Z");
+const far = new Date(now.getTime() + 7 * DAY);
+assert.equal(spaSignedUrlTtlSeconds({ playableUntil: null, manifestExpiresAt: far }, now), 3600);
+assert.equal(spaSignedUrlTtlSeconds({ playableUntil: new Date(now.getTime() + 60000), manifestExpiresAt: far }, now), 60, "grant ends in 1 min");
+assert.equal(spaSignedUrlTtlSeconds({ playableUntil: new Date(now.getTime() - 1), manifestExpiresAt: far }, now), 0, "expired -> refuse");
+assert.equal(spaSignedUrlTtlSeconds({ playableUntil: null, manifestExpiresAt: new Date(now.getTime() + 120000) }, now), 120);
+assert.equal(spaSignedUrlTtlSeconds({ playableUntil: null, manifestExpiresAt: far, offlineCacheUntil: null }, now), 0, "offline without permission");
+assert.equal(spaSignedUrlTtlSeconds({ playableUntil: null, manifestExpiresAt: far, offlineCacheUntil: new Date(now.getTime() + 30000) }, now), 30);
+
+// Server: sync uses the event's bound player/zone, never the current assignment; signing is TTL-bounded.
+const actionsSrc = readFileSync(new URL("../src/app/business-app/spa/actions.ts", import.meta.url), "utf8");
+assert.match(actionsSrc, /player_id: e\.player_id/);
+assert.doesNotMatch(actionsSrc, /player_id: ctx\.playerId/);
+const pilotSrc = readFileSync(new URL("../src/lib/business-app/spa-pilot.ts", import.meta.url), "utf8");
+assert.match(pilotSrc, /createSignedUrl\(source\.path, ttl\)/);
+assert.match(pilotSrc, /business_spa_offline_not_allowed/);
 
 console.log("business-spa-player-core-unit: all tests passed");

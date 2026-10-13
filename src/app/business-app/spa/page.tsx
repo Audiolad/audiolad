@@ -20,7 +20,8 @@ export default async function BusinessSpaPilotPage() {
       programId={ctx.programId}
       programName={ctx.programName}
       initialManifest={manifest}
-      canLog={Boolean(ctx.playerId && ctx.zoneId)}
+      playerId={ctx.playerId}
+      zoneId={ctx.zoneId}
     />
   );
 }

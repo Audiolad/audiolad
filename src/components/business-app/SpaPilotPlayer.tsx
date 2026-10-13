@@ -2,7 +2,7 @@
 
 import { parseSpaManifest, type SpaManifest } from "@/lib/business-app/spa-manifest";
 
-type Props = { programId: string; programName: string; initialManifest: unknown; canLog: boolean };
+type Props = { programId: string; programName: string; initialManifest: unknown; playerId: string | null; zoneId: string | null };
 
 function safeParse(raw: unknown): SpaManifest | null {
   try {
