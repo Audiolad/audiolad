@@ -1105,7 +1105,7 @@ export class SpaPlayerEngine {
       const rop = this.bumpOp();
       const ok = await this.playActive(false, true, intent, rop);
       // Not startable any more (grant ended / forced stop while resuming): move on, no stall.
-      if (!ok && this.stillCurrent(rop) && intent === this.playOp && this.status === "paused" && this.index >= 0 && this.items.length > 0)
+      if (!ok && this.stillCurrent(rop) && intent === this.playOp && (this.status as EngineStatus) === "paused" && this.index >= 0 && this.items.length > 0)
         await this.startAt(nextIndex(this.items.length, Math.min(this.index, this.items.length - 1)), 0, false, intent);
       return;
     }
