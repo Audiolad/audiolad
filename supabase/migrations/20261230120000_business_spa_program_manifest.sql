@@ -72,10 +72,15 @@ BEGIN
     FROM public.business_program_items i
     JOIN public.audio_items ai ON ai.id = i.audio_item_id
     WHERE i.program_id = p_program_id AND i.excluded_at IS NULL
+      -- Caller-visible catalog only (published music + parent practice readable by caller).
+      AND public.business_spa_track_visible(i.audio_item_id)
   ), decided AS (
     SELECT it.*,
       (it.published AND coalesce(it.bbp->>'decision' = 'ELIGIBLE', false)) AS playable,
-      (it.published AND coalesce(it.bbp->>'decision' = 'ELIGIBLE' AND it.off->>'decision' = 'ELIGIBLE', false)) AS cacheable,
+      -- Offline needs a CITED offline grant: ELIGIBLE with empty grant ids is not a grant,
+      -- and least(cap, NULL) must never turn "no grant" into a 7-day cache (review 2026-10-13).
+      (it.published AND coalesce(it.bbp->>'decision' = 'ELIGIBLE', false)
+        AND public.business_spa_offline_grants_cited(it.off)) AS cacheable,
       public.business_spa_grants_valid_until(it.bbp) AS play_until
     FROM items it
   ), delivered AS (

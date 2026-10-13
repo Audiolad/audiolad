@@ -45,16 +45,23 @@ DECLARE
   t_excl uuid := gen_random_uuid();   -- softly excluded -> not counted
   g_open uuid := gen_random_uuid(); g_short uuid := gen_random_uuid(); g_exp uuid := gen_random_uuid();
   g_play2d uuid := gen_random_uuid(); t_play2d uuid := gen_random_uuid();
+  t_nocite uuid := gen_random_uuid(); -- ELIGIBLE offline but no cited grant -> online only
+  t_hidden uuid := gen_random_uuid(); -- parent practice becomes selected_users -> withheld
+  hidden_practice uuid := gen_random_uuid();
   program_a uuid := gen_random_uuid();
   m jsonb; m2 jsonb; it jsonb; n bigint; ts timestamptz;
 BEGIN
   INSERT INTO auth.users(id, email) VALUES (user_a, 'm-a@test.invalid'), (user_b, 'm-b@test.invalid'), (user_x, 'm-x@test.invalid');
   INSERT INTO public.authors(id, name, slug) VALUES (author_id, 'Манифест', 'spa-manifest-author');
-  INSERT INTO public.practices(id, author_id, title, slug, status, is_free, price, product_kind, publication_class, cover_url)
-    VALUES (practice_id, author_id, 'Manifest release', 'spa-manifest-release', 'draft', true, 0, 'music', 'release', 'https://example.test/m.webp');
+  PERFORM set_config('audiolad.allow_practice_publish', 'on', true);
+  INSERT INTO public.practices(id, author_id, title, slug, status, is_free, price, product_kind, publication_class, cover_url, catalog_visibility)
+    VALUES (practice_id, author_id, 'Manifest release', 'spa-manifest-release', 'published', true, 0, 'music', 'release', 'https://example.test/m.webp', 'listed'),
+           (hidden_practice, author_id, 'Hidden release', 'spa-manifest-hidden', 'published', true, 0, 'music', 'release', 'https://example.test/h.webp', 'listed');
   INSERT INTO public.audio_items(id, practice_id, title, position, music_track_code, duration_seconds, status)
   SELECT t, practice_id, 'T' || ord, ord, 'AL-T-9' || lpad(ord::text, 8, '0'), 300, 'published'
-  FROM unnest(ARRAY[t_full, t_short, t_play, t_unk, t_inel, t_cond, t_exp, t_unpub, t_excl, t_play2d]) WITH ORDINALITY AS x(t, ord);
+  FROM unnest(ARRAY[t_full, t_short, t_play, t_unk, t_inel, t_cond, t_exp, t_unpub, t_excl, t_play2d, t_nocite]) WITH ORDINALITY AS x(t, ord);
+  INSERT INTO public.audio_items(id, practice_id, title, position, music_track_code, duration_seconds, status)
+    VALUES (t_hidden, hidden_practice, 'Secret', 1, 'AL-T-999999999', 300, 'published');
 
   INSERT INTO public.music_rightsholders(id, display_name, entity_type) VALUES (holder, 'Manifest holder', 'person');
   INSERT INTO public.music_rights_grants(id, audio_item_id, rightsholder_id, rights_layer, use_type, territory_scope,
@@ -72,7 +79,9 @@ BEGIN
     (t_exp, 'business_background_playback', 'ELIGIBLE', jsonb_build_array(g_exp)), (t_exp, 'offline_storage_cache', 'ELIGIBLE', '[]'),
     (t_unpub, 'business_background_playback', 'ELIGIBLE', '[]'),
     (t_excl, 'business_background_playback', 'ELIGIBLE', '[]'),
-    (t_play2d, 'business_background_playback', 'ELIGIBLE', jsonb_build_array(g_play2d)), (t_play2d, 'offline_storage_cache', 'ELIGIBLE', '[]');
+    (t_play2d, 'business_background_playback', 'ELIGIBLE', jsonb_build_array(g_play2d)), (t_play2d, 'offline_storage_cache', 'ELIGIBLE', jsonb_build_array(g_play2d)),
+    (t_nocite, 'business_background_playback', 'ELIGIBLE', '[]'), (t_nocite, 'offline_storage_cache', 'ELIGIBLE', '[]'),
+    (t_hidden, 'business_background_playback', 'ELIGIBLE', '[]'), (t_hidden, 'offline_storage_cache', 'ELIGIBLE', jsonb_build_array(g_open));
 
   INSERT INTO public.business_organizations(id, name) VALUES (org_a, 'SPA A'), (org_b, 'SPA B');
   INSERT INTO public.business_organization_members(organization_id, user_id, role)
@@ -81,7 +90,9 @@ BEGIN
     VALUES (loc_a, org_a, 'A', 'spa', 'RU', 'Europe/Moscow'), (loc_b, org_b, 'B', 'spa', 'RU', 'Europe/Moscow');
   INSERT INTO public.business_programs(id, organization_id, name, status) VALUES (program_a, org_a, 'Pilot', 'active');
   INSERT INTO public.business_program_items(program_id, audio_item_id, position)
-  SELECT program_a, t, ord FROM unnest(ARRAY[t_full, t_short, t_play, t_unk, t_inel, t_cond, t_exp, t_unpub, t_excl, t_play2d]) WITH ORDINALITY AS x(t, ord);
+  SELECT program_a, t, ord FROM unnest(ARRAY[t_full, t_short, t_play, t_unk, t_inel, t_cond, t_exp, t_unpub, t_excl, t_play2d, t_nocite, t_hidden]) WITH ORDINALITY AS x(t, ord);
+  -- Stored reference whose parent practice later becomes restricted.
+  UPDATE public.practices SET catalog_visibility = 'selected_users' WHERE id = hidden_practice;
   UPDATE public.business_program_items SET excluded_at = now(), excluded_reason = 'pilot scope' WHERE audio_item_id = t_excl;
   UPDATE public.business_program_items SET gain_db = -7.5 WHERE audio_item_id = t_full;
   UPDATE public.audio_items SET status = 'draft' WHERE id = t_unpub;
@@ -106,10 +117,13 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub', user_a::text, true);
   m := public.business_spa_program_manifest(program_a, loc_a);
   IF m->>'manifest_version' <> 'business_spa_manifest_v1' THEN RAISE EXCEPTION 'Version: %', m->>'manifest_version'; END IF;
-  IF jsonb_array_length(m->'items') <> 4 OR NOT (SELECT array_agg((e->>'audio_item_id')::uuid ORDER BY (e->>'position')::int) = ARRAY[t_full, t_short, t_play, t_play2d] FROM jsonb_array_elements(m->'items') e)
+  IF jsonb_array_length(m->'items') <> 5 OR NOT (SELECT array_agg((e->>'audio_item_id')::uuid ORDER BY (e->>'position')::int) = ARRAY[t_full, t_short, t_play, t_play2d, t_nocite] FROM jsonb_array_elements(m->'items') e)
     THEN RAISE EXCEPTION 'EligibleOnly: %', m->'items'; END IF;
-  -- WithheldCount: unknown, ineligible, conditional, expired grant, unpublished (excluded not counted).
-  IF (m->>'withheld_count')::int <> 5 THEN RAISE EXCEPTION 'WithheldCount: %', m->>'withheld_count'; END IF;
+  -- WithheldCount: unknown, ineligible, conditional, expired grant, unpublished, hidden practice (excluded not counted).
+  IF (m->>'withheld_count')::int <> 6 THEN RAISE EXCEPTION 'WithheldCount: %', m->>'withheld_count'; END IF;
+  -- HiddenPractice: restricted parent practice -> no id/title/code in manifest.
+  IF m::text LIKE '%' || t_hidden || '%' OR m::text LIKE '%Secret%' OR m::text LIKE '%AL-T-999999999%' THEN
+    RAISE EXCEPTION 'HiddenPractice: metadata leaked'; END IF;
   IF m::text LIKE '%' || t_unk || '%' OR m::text LIKE '%' || t_inel || '%' OR m::text LIKE '%reason%' THEN
     RAISE EXCEPTION 'NoLeak: withheld track or reason codes in manifest'; END IF;
 
@@ -131,6 +145,9 @@ BEGIN
     IF (it->>'audio_item_id')::uuid = t_play2d AND NOT ((it->>'offline_cache_until')::timestamptz = ts + interval '2 days'
         AND (it->>'playable_until')::timestamptz = ts + interval '2 days') THEN
       RAISE EXCEPTION 'PlaybackGrantBound: %', it; END IF;
+    -- OfflineNeedsCitedGrant: ELIGIBLE offline without any cited grant -> no offline (no least(cap, NULL)).
+    IF (it->>'audio_item_id')::uuid = t_nocite AND ((it->>'offline_allowed')::boolean OR it->>'offline_cache_until' IS NOT NULL) THEN
+      RAISE EXCEPTION 'OfflineNeedsCitedGrant: %', it; END IF;
   END LOOP;
   -- ManifestExpiry: refresh no later than earliest playback grant end, never beyond 7 days.
   IF (m->>'expires_at')::timestamptz <> ts + interval '2 days' THEN RAISE EXCEPTION 'ManifestExpiry: %', m->>'expires_at'; END IF;
@@ -157,7 +174,7 @@ BEGIN
   UPDATE pg_temp.stub_decisions SET decision = 'UNKNOWN' WHERE audio_item_id = t_short AND use_type = 'business_background_playback';
   PERFORM set_config('request.jwt.claim.role', 'service_role', true);
   m2 := public.business_spa_program_manifest(program_a, loc_a);
-  IF jsonb_array_length(m2->'items') <> 3 OR m2->>'content_hash' = m->>'content_hash' THEN RAISE EXCEPTION 'Revocation: %', m2; END IF;
+  IF jsonb_array_length(m2->'items') <> 4 OR m2->>'content_hash' = m->>'content_hash' THEN RAISE EXCEPTION 'Revocation: %', m2; END IF;
 
   -- ReadOnly: manifest wrote nothing to rights, allowlist or usage tables.
   SELECT count(*) INTO n FROM public.music_rights_grants WHERE rightsholder_id = holder;
