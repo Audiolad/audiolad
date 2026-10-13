@@ -47,10 +47,11 @@ import type {
 } from "@/lib/admin/ai-company-dashboard";
 
 const CONNECTION_CLASS: Record<ExecutorCard["connection"], string> = {
-  online: "border-green-200 bg-green-50",
-  idle: "border-slate-200 bg-slate-50",
-  not_connected: "border-slate-300 bg-slate-100",
-  no_fresh_data: "border-[#eadff8] bg-white",
+  verified: "border-green-200 bg-green-50",
+  unavailable: "border-red-200 bg-red-50",
+  check_failed: "border-amber-200 bg-amber-50",
+  stale: "border-slate-300 bg-slate-100",
+  no_data: "border-[#eadff8] bg-white",
 };
 
 const STAGE_BADGE_CLASS: Record<StageTone, string> = {
@@ -1422,10 +1423,10 @@ export function AiCompanyDashboardView({
                   <h3 id="ai-company-executors" className="text-xl font-semibold">
                     Исполнители
                   </h3>
-                  <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — имя и достоверное состояние подключения.</p>
+                  <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — подключение и занятость по фактам Company Core.</p>
                   <HelpNote label="Справка об исполнителях">
                     <p>
-                      Фактические исполнители: провайдер и модель, запуск, задача и свежесть сигнала из Company Core. Состояния: не подключён, свободен, нет данных, работает. Grok — единственный оркестратор и не является отдельным runner. Модель Grok внутри Cursor остаётся Cursor. Неподключённый исполнитель — зависимость подключения, не активный исполнитель. Постоянных карточек должностей нет: исторические роли остаются в журнале задач.
+                      Подключение: проверено, недоступно, не удалось проверить, данные устарели или нет данных. Нет данных — это не «отключён». Занятость: выполняет задачу, ожидает, свободен или неизвестно. Запуск считается текущим, только если прогресс подтверждён за последние 60 минут. Grok — единственный оркестратор. Модель Grok внутри Cursor остаётся Cursor.
                     </p>
                   </HelpNote>
                   <div className="mt-2 flex flex-col gap-1.5">
@@ -1435,7 +1436,7 @@ export function AiCompanyDashboardView({
                         <CompactRow
                           key={rowKey}
                           rowKey={rowKey}
-                          title={executor.label}
+                          title={`${executor.label} · ${executor.occupancyLabel}`}
                           aside={executor.connectionLabel}
                           open={openDetails[rowKey] ?? false}
                           onToggle={onToggleDetail}
@@ -1444,18 +1445,40 @@ export function AiCompanyDashboardView({
                             "data-executor": executor.id,
                             "data-executor-kind": executor.kind,
                             "data-connection": executor.connection,
+                            "data-occupancy": executor.occupancy,
                           }}
                         >
                           <p className="mt-2 text-sm text-[#796ba0]">{executor.roleNote}</p>
                           <dl className="mt-3 grid gap-2 text-sm">
-                            <Fact label="Состояние" value={executor.connectionLabel} />
-                            <Fact label="Провайдер / модель" value={executor.providerModel} />
-                            <Fact label="Задача" value={executor.currentTask} />
-                            <Fact label="Запуск" value={executor.runId} />
-                            <Fact label="Свежесть" value={executor.freshness} />
+                            <Fact label="Подключение" value={executor.connectionLabel} />
+                            <Fact label="Как проверено" value={executor.connectionSource} />
+                            <Fact label="Занятость" value={executor.occupancyLabel} />
                             <Fact label="Последний сигнал" value={executor.heartbeat} />
-                            <Fact label="Уточнение" value={executor.detail} />
+                            <Fact label="Источник сигнала" value={executor.signalSource} />
+                            <Fact label="Свежесть" value={executor.freshness} />
+                            {executor.providerModel !== NO_DATA ? <Fact label="Провайдер / модель" value={executor.providerModel} /> : null}
+                            {executor.detail !== NO_DATA ? <Fact label="Уточнение" value={executor.detail} /> : null}
                           </dl>
+                          <div className="mt-3 text-sm" data-executor-runs={executor.id}>
+                            <p className="font-semibold">{executor.activeRunsLabel}</p>
+                            {executor.activeRuns.length > 0 ? (
+                              <ul className="mt-1 space-y-2">
+                                {executor.activeRuns.map((run) => (
+                                  <li key={`${run.taskId ?? run.title}:${run.runId}`} className="rounded-lg border border-[#eadff8] bg-white p-2" data-run-fresh={run.fresh ? "yes" : "no"}>
+                                    <p className="break-words font-medium">{run.title}</p>
+                                    <p className="break-words text-[#796ba0]">Задача: {run.taskId ? run.taskId.slice(0, 8) : NO_DATA} · Запуск: {run.runId}</p>
+                                    <p className="break-words text-[#796ba0]">Этап: {run.stage} · Прогресс: {run.lastProgress}{run.fresh ? "" : " (давно, не считается текущей работой)"}</p>
+                                    {run.taskHref || run.prHref ? (
+                                      <p className="mt-1 flex flex-wrap gap-3">
+                                        {run.taskHref ? <a className="text-[#7042c5] underline" href={run.taskHref}>Задача</a> : null}
+                                        {run.prHref ? <a className="text-[#7042c5] underline" href={run.prHref}>PR</a> : null}
+                                      </p>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </div>
                         </CompactRow>
                       );
                     })}

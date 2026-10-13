@@ -228,9 +228,12 @@ assert.doesNotMatch(ownerMarkup, /Роли компании|data-section="roles"
 const orchestrators = model.executors.filter((executor) => executor.kind === "orchestrator");
 assert.deepEqual(orchestrators.map((executor) => executor.id), ["grok"]);
 const codex = model.executors.find((executor) => executor.id === "codex")!;
-assert.equal(codex.connection, "not_connected");
-assert.equal(codex.kind, "dependency");
-assert.match(codex.roleNote, /зависимость подключения, не активный исполнитель/);
+// 9a63f86e: Core checks only CODEX_ACCESS_TOKEN in its own process; the real runner is the server CLI.
+assert.equal(codex.connection, "check_failed");
+assert.equal(codex.connectionLabel, "не удалось проверить");
+assert.equal(codex.kind, "executor");
+assert.match(codex.connectionSource, /ключ API Codex/);
+assert.doesNotMatch(`${codex.summary} ${codex.roleNote} ${codex.detail}`, /не подключ|заблокирован/);
 const cursor = model.executors.find((executor) => executor.id === "cursor")!;
 assert.equal(cursor.kind, "executor");
 assert.match(cursor.providerModel, /cursor/);
@@ -238,7 +241,8 @@ assert.match(cursor.providerModel, /grok-code-fast/);
 assert.equal(cursor.runId, "bc-11111111-run");
 const executorsSection = section(ownerMarkup, "executors");
 assert.match(executorsSection, /data-executor-kind="orchestrator"/);
-assert.match(executorsSection, /data-executor-kind="dependency"/);
+assert.match(executorsSection, /data-connection="check_failed"/);
+assert.doesNotMatch(executorsSection, /не подключён|data-executor-kind="dependency"/);
 assert.match(executorsSection, /Провайдер \/ модель/);
 const dashboardSource = readFileSync("src/components/admin/AiCompanyDashboard.tsx", "utf8");
 assert.doesNotMatch(dashboardSource, /AI_COMPANY_ROLES|Роли компании/);
