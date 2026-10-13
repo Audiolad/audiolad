@@ -47,3 +47,4 @@ jobs:
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger
           npm run test:business-spa-manifest
+          npm run test:business-spa-admin
