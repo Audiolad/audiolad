@@ -371,7 +371,22 @@ const SAFE_PAYLOAD_KEYS = [
   "model",
 ] as const;
 
-export type ConnectionState = "online" | "idle" | "not_connected" | "no_fresh_data";
+/** Result of the last connection check, not occupancy (9a63f86e). Missing data is never «не подключён». */
+export type ConnectionState = "verified" | "unavailable" | "check_failed" | "stale" | "no_data";
+/** Real occupancy from active runs in Core, separate from connection. */
+export type OccupancyState = "working" | "waiting" | "free" | "unknown";
+
+export type ExecutorRunView = {
+  taskId: string | null;
+  title: string;
+  taskHref: string | null;
+  prHref: string | null;
+  runId: string;
+  stage: string;
+  lastProgressAt: string | null;
+  lastProgress: string;
+  fresh: boolean;
+};
 export type ExecutorId = "codex" | "cursor" | "grok";
 export type ResultKind = "engineering" | "document" | "unknown";
 export type HistoryPeriod = "all" | "today" | "week" | "month";
@@ -822,14 +837,26 @@ export type GateCard = {
 export type ExecutorCard = {
   id: ExecutorId;
   label: string;
-  /** orchestrator: the one Grok orchestrator; executor: a real runner; dependency: not connected, not an active executor. */
-  kind: "orchestrator" | "executor" | "dependency";
+  /** orchestrator: the one Grok orchestrator; executor: a runner. Missing data never turns a runner into a dependency. */
+  kind: "orchestrator" | "executor";
   roleNote: string;
   providerModel: string;
   connection: ConnectionState;
   connectionLabel: string;
+  /** Where the connection fact comes from and what it actually checks. */
+  connectionSource: string;
+  occupancy: OccupancyState;
+  occupancyLabel: string;
+  /** Short row label: connection · occupancy. */
+  summary: string;
   heartbeat: string;
+  /** Source of «Последний сигнал». */
+  signalSource: string;
   freshness: string;
+  activeRuns: ExecutorRunView[];
+  /** «Нет активных запусков» or a count. */
+  activeRunsLabel: string;
+  /** Kept for compatibility: first active run title or «Нет активных запусков». */
   currentTask: string;
   runId: string;
   detail: string;
@@ -1957,8 +1984,8 @@ function freshnessLabel(heartbeatAt: string | null, now: number): string {
   const observed = parseInstant(heartbeatAt);
   if (observed == null) return NO_DATA;
   const when = formatDateTime(heartbeatAt);
-  if (now - observed > HEARTBEAT_STALE_MS) return `сигнал старше 60 минут, ${when}`;
-  return `сигнал свежий, ${when}`;
+  if (now - observed > HEARTBEAT_STALE_MS) return `данные устарели: сигнал старше 60 минут (${when} МСК)`;
+  return `свежие: сигнал моложе 60 минут (${when} МСК)`;
 }
 
 function taskReceipt(task: CompanyTask, events: CompanyEvent[]): Receipt | null {
@@ -2342,33 +2369,45 @@ function codexDisconnectedFrom(status: CompanyStatus): boolean {
 }
 
 function connectionCopy(state: ConnectionState): string {
-  if (state === "online") return "работает";
-  if (state === "idle") return "свободен";
-  if (state === "not_connected") return "не подключён";
+  if (state === "verified") return "проверено";
+  if (state === "unavailable") return "недоступно";
+  if (state === "check_failed") return "не удалось проверить";
+  if (state === "stale") return "данные устарели";
   return "нет данных";
 }
 
-function deriveConnection(input: {
+function occupancyCopy(state: OccupancyState): string {
+  if (state === "working") return "выполняет задачу";
+  if (state === "waiting") return "ожидает";
+  if (state === "free") return "свободен";
+  return "занятость неизвестна";
+}
+
+const ONLINE_STATUSES = new Set(["online", "ok", "working", "busy", "free", "idle", "available", "waiting", "connected", "verified"]);
+
+/**
+ * Connection = result of a real check with a timestamp. A provider record, an empty heartbeat or a
+ * missing timestamp is «нет данных», never «не подключён» (9a63f86e).
+ */
+export function deriveConnection(input: {
   explicit: string | null;
-  heartbeatAt: string | null;
-  hasRecord: boolean;
+  checkedAt: string | null;
   now: number;
-  busy: boolean;
-  forceDisconnected: boolean;
+  /** The explicit «not connected» comes from a check of a different access path (e.g. API token for a CLI runner). */
+  checkPathMismatch?: boolean;
 }): ConnectionState {
-  if (input.forceDisconnected) return "not_connected";
   const explicit = input.explicit ? normalizeToken(input.explicit) : "";
-  if (NOT_CONNECTED_STATUSES.has(explicit)) return "not_connected";
-  if (["no_data", "no_fresh_data", "unknown"].includes(explicit)) return "no_fresh_data";
-  if (!input.hasRecord || parseInstant(input.heartbeatAt) == null || !isFresh(input.heartbeatAt, input.now)) {
-    return "no_fresh_data";
+  const checked = parseInstant(input.checkedAt) != null;
+  if (NOT_CONNECTED_STATUSES.has(explicit) || ["error", "failed", "unavailable"].includes(explicit)) {
+    if (input.checkPathMismatch) return "check_failed";
+    return checked ? "unavailable" : "no_data";
   }
-  if (["free", "idle", "available"].includes(explicit)) return "idle";
-  if (["working", "online", "busy"].includes(explicit)) return "online";
-  if (!isFresh(input.heartbeatAt, input.now)) return "no_fresh_data";
-  if (input.busy || explicit === "online" || explicit === "working") return "online";
-  if (["idle", "available", "waiting"].includes(explicit) || !explicit) return "idle";
-  return "no_fresh_data";
+  if (["check_failed", "unverified"].includes(explicit)) return "check_failed";
+  if (!checked) return "no_data";
+  if (!isFresh(input.checkedAt, input.now)) return "stale";
+  if (!explicit || ONLINE_STATUSES.has(explicit)) return "verified";
+  if (["stale", "no_fresh_data"].includes(explicit)) return "stale";
+  return "no_data";
 }
 
 function quotaTrustworthy(bucket: QuotaBucket | null): boolean {
@@ -3241,7 +3280,7 @@ export function buildAiCompanyDashboard(
     return card ? [{ ...card, copyText: copyTextForGate(archivedGate, card) }] : [];
   });
 
-  const executorCards = buildExecutors(status, now, codexDisconnected, codexFallback);
+  const executorCards = buildExecutors(status, now);
 
   const roleFilterOptions = buildRoleFilterOptions(status.tasks, filters.agent);
 
@@ -3304,71 +3343,119 @@ export function buildAiCompanyDashboard(
   };
 }
 
-function buildExecutors(
-  status: CompanyStatus,
-  now: number,
-  codexDisconnected: boolean,
-  codexFallback: string | null,
-): ExecutorCard[] {
+const WAITING_TASK_TOKENS = ["human_gate", "needs_decision", "blocked", "waiting", "review"];
+
+function executorRunView(task: CompanyTask, now: number): ExecutorRunView {
+  const run = task.executiveRun;
+  const lastProgressAt = latestInstant([run?.lastEventAt ?? null, task.lastEventAt]);
+  return {
+    taskId: task.id,
+    title: task.title,
+    taskHref: issueHref(task.githubIssueNumber),
+    prHref: safeGithubUrl(run?.prUrl ?? null),
+    runId: run?.runId ?? task.executorParts.find((part) => part != null && /run/i.test(part)) ?? NO_DATA,
+    stage: run?.lastEvent ?? task.status ?? NO_DATA,
+    lastProgressAt,
+    lastProgress: lastProgressAt ? `${formatDateTime(lastProgressAt)} МСК` : NO_DATA,
+    fresh: isFresh(lastProgressAt, now),
+  };
+}
+
+function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
   const specs: Array<{ id: ExecutorId; label: string; roleNote: string }> = [
     { id: "grok", label: "Grok", roleNote: "Единственный оркестратор. Не исполнитель кода." },
-    { id: "codex", label: "Codex", roleNote: "Исполнитель." },
+    { id: "codex", label: "Codex", roleNote: "Исполнитель: Codex на сервере компании, запуск по SSH." },
     { id: "cursor", label: "Cursor", roleNote: "Исполнитель. Модель Grok внутри Cursor остаётся Cursor." },
   ];
+  const threshold = `${Math.round(HEARTBEAT_STALE_MS / 60000)} минут`;
   return specs.map((spec) => {
     const observations = status.executorObservations.filter(
       (item) => classifyExecutor([item.provider, item.channel, item.model]) === spec.id,
     );
     const beats = status.heartbeats.filter((beat) => classifyExecutor([beat.serviceKey, beat.state]) === spec.id);
-    const heartbeatAt = latestInstant([
+    const checkedAt = latestInstant([
       ...observations.map((item) => item.lastHeartbeatAt),
       ...beats.map((beat) => beat.observedAt),
     ]);
-    const explicit = spec.id === "codex" && status.codexFacts?.connection
-      ? status.codexFacts.connection
-      : observations.map((item) => item.connectionState).find(Boolean) ?? beats.map((beat) => beat.state).find(Boolean) ?? null;
-    const current = status.tasks.find((task) => taskExecutor(task).id === spec.id && task.active !== false && !taskIsClosed(task, status.events));
-    const runId = observations.map((item) => item.runId).find(Boolean) ?? current?.executiveRun?.runId ?? null;
-    const busy = status.tasks.some((task) => taskExecutor(task).id === spec.id && !taskIsClosed(task, status.events));
-    const connection = deriveConnection({
-      explicit,
-      heartbeatAt,
-      hasRecord: observations.length > 0 || beats.length > 0 || Boolean(heartbeatAt),
-      now,
-      busy,
-      forceDisconnected: spec.id === "codex" && codexDisconnected,
-    });
-    const detailParts = [
-      spec.id === "codex" && codexDisconnected
-        ? `Готовность Codex заблокирована. Запасной исполнитель: ${codexFallback ?? NO_DATA}.`
-        : null,
-      observations.some((item) => item.model && /grok|xai/i.test(item.model) && spec.id === "cursor")
-        ? "В наблюдении есть модель Grok на канале Cursor. Отдельный исполнитель xAI из этого не создаётся."
-        : null,
-    ];
-    const kind: ExecutorCard["kind"] =
-      spec.id === "grok" ? "orchestrator" : connection === "not_connected" ? "dependency" : "executor";
+    const facts = spec.id === "codex" ? status.codexFacts : null;
+    const explicit = facts?.connection
+      ?? observations.map((item) => item.connectionState).find(Boolean)
+      ?? beats.map((beat) => beat.state).find(Boolean)
+      ?? null;
+    // Core checks Codex only through CODEX_ACCESS_TOKEN in its own process; the real runner is the CLI on the server (ChatGPT login).
+    const tokenOnlyCheck = spec.id === "codex" && /codex_access_token/i.test(`${facts?.gate ?? ""}`);
+    const connection = deriveConnection({ explicit, checkedAt, now, checkPathMismatch: tokenOnlyCheck });
+    const tasks = status.tasks.filter(
+      (task) => taskExecutor(task).id === spec.id && task.active !== false && !taskIsClosed(task, status.events),
+    );
+    const runs = tasks
+      .map((task) => ({ task, view: executorRunView(task, now) }))
+      .sort((left, right) => (parseInstant(right.view.lastProgressAt) ?? 0) - (parseInstant(left.view.lastProgressAt) ?? 0));
+    const freshRuns = runs.filter((item) => item.view.fresh);
+    let occupancy: OccupancyState;
+    if (freshRuns.length > 0) {
+      const allWaiting = freshRuns.every((item) => {
+        const blob = `${item.task.status} ${item.task.humanGate ?? ""}`.toLowerCase();
+        return WAITING_TASK_TOKENS.some((token) => blob.includes(token));
+      });
+      occupancy = allWaiting ? "waiting" : "working";
+    } else if (runs.length === 0 && connection === "verified") {
+      occupancy = "free";
+    } else {
+      occupancy = "unknown";
+    }
+    const lastRunSignal = latestInstant(runs.map((item) => item.view.lastProgressAt));
+    const heartbeatAt = latestInstant([checkedAt, lastRunSignal]);
+    const signalSource = checkedAt && checkedAt === heartbeatAt
+      ? "проверка подключения в Company Core"
+      : lastRunSignal
+        ? "событие запуска в Company Core (start/progress)"
+        : "нет сигналов в Company Core";
+    const connectionSource = tokenOnlyCheck
+      ? "Company Core проверяет только ключ API Codex в своём процессе. Реальный канал — Codex на сервере компании по SSH со входом ChatGPT; его Company Core не проверяет и сигналов «жив» не получает. Поэтому подключение не подтверждено и не опровергнуто."
+      : checkedAt
+        ? `Проверка в Company Core, ${formatDateTime(checkedAt)} МСК. Срок свежести — ${threshold}.`
+        : "Company Core не прислал время проверки. Запись о провайдере не доказывает доступность.";
     const evidenceRun = observations.find((item) => item.provider || item.model) ?? null;
+    const current = runs[0]?.task ?? null;
     const providerModel = joinFound([
       evidenceRun?.provider ?? current?.executiveRun?.provider ?? null,
       evidenceRun?.channel ?? current?.executiveRun?.channel ?? null,
       evidenceRun?.model ?? current?.executiveRun?.model ?? null,
     ]);
+    const staleRuns = runs.length - freshRuns.length;
+    const detailParts = [
+      spec.id === "codex" && runs.length > 0 && !current?.executiveRun?.provider
+        ? "Исполнитель запуска определён по идентификатору запуска: Company Core не хранит провайдера."
+        : null,
+      staleRuns > 0
+        ? `Без подтверждённого прогресса дольше ${threshold}: ${staleRuns}. Такие запуски не считаются текущей работой.`
+        : null,
+      observations.some((item) => item.model && /grok|xai/i.test(item.model) && spec.id === "cursor")
+        ? "В наблюдении есть модель Grok на канале Cursor. Отдельный исполнитель xAI из этого не создаётся."
+        : null,
+    ];
+    const connectionLabel = connectionCopy(connection);
+    const occupancyLabel = occupancyCopy(occupancy);
     return {
       id: spec.id,
       label: spec.label,
-      kind,
-      roleNote:
-        kind === "dependency"
-          ? `Не подключён: зависимость подключения, не активный исполнитель.${spec.id === "codex" ? "" : ` ${spec.roleNote}`}`
-          : spec.roleNote,
+      kind: spec.id === "grok" ? "orchestrator" : "executor",
+      roleNote: spec.roleNote,
       providerModel,
       connection,
-      connectionLabel: connectionCopy(connection),
-      heartbeat: formatDateTime(heartbeatAt),
+      connectionLabel,
+      connectionSource,
+      occupancy,
+      occupancyLabel,
+      summary: `${connectionLabel} · ${occupancyLabel}`,
+      heartbeat: heartbeatAt ? `${formatDateTime(heartbeatAt)} МСК` : NO_DATA,
+      signalSource,
       freshness: freshnessLabel(heartbeatAt, now),
-      currentTask: current?.title ?? NO_DATA,
-      runId: runId ?? NO_DATA,
+      activeRuns: runs.map((item) => item.view),
+      activeRunsLabel: runs.length === 0 ? "Нет активных запусков" : `Активных запусков: ${runs.length}`,
+      currentTask: runs[0]?.view.title ?? "Нет активных запусков",
+      runId: (runs[0] && runs[0].view.runId !== NO_DATA ? runs[0].view.runId : null) ?? observations.map((item) => item.runId).find(Boolean) ?? NO_DATA,
       detail: joinFound(detailParts),
     };
   });

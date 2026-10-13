@@ -661,11 +661,12 @@ assert.equal(productGate.decisionOwner, "Oriy");
 assert.equal(liveModel.decisions.some((gate) => gate.reason.includes("Старый блокер")), false);
 assert.equal(liveModel.archivedBlockers.some((gate) => gate.reason.includes("Старый блокер")), true);
 const codex = liveModel.executors.find((executor) => executor.id === "codex")!;
-assert.equal(codex.connection, "not_connected");
+assert.equal(codex.connection, "no_data");
+assert.doesNotMatch(codex.connectionLabel, /не подключ/);
 const cursor = liveModel.executors.find((executor) => executor.id === "cursor")!;
-assert.equal(cursor.connection, "online");
+assert.equal(cursor.connection, "verified");
 const grok = liveModel.executors.find((executor) => executor.id === "grok")!;
-assert.equal(grok.connection, "no_fresh_data");
+assert.equal(grok.connection, "stale");
 assert.match(liveModel.activeBoundary, /лента событий обрезана|событий/);
 assert.match(liveModel.historyBoundary, /история обрезана|История/);
 assert.equal(liveModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
@@ -770,9 +771,9 @@ const liveMarkup = renderToStaticMarkup(
 );
 assert.match(liveMarkup, /data-section="now"/);
 assert.match(liveMarkup, /b01cd5d3-052b-4e21-9236-184b3c5f2a5e/);
-assert.match(liveMarkup, /data-connection="not_connected"/);
-assert.match(liveMarkup, /data-connection="online"/);
-assert.match(liveMarkup, /data-connection="no_fresh_data"/);
+assert.match(liveMarkup, /data-connection="no_data"/);
+assert.match(liveMarkup, /data-connection="verified"/);
+assert.match(liveMarkup, /data-connection="stale"/);
 assert.match(liveMarkup, /Нужно решение/);
 assert.match(liveMarkup, /История блокировок/);
 assert.match(liveMarkup, /Историческая блокировка/);
@@ -887,7 +888,7 @@ assert.equal(contractModel.archivedBlockers.some((gate) => gate.reason.includes(
 assert.match(contractModel.activeBoundary, /лента событий обрезана|событий/);
 assert.match(contractModel.historyBoundary, /история обрезана/);
 assert.match(contractModel.quotas.find((line) => line.id === "codex")!.value, /Остаток: 1 из 10/);
-assert.equal(contractModel.executors.find((executor) => executor.id === "codex")!.connection, "not_connected");
+assert.equal(contractModel.executors.find((executor) => executor.id === "codex")!.connection, "check_failed");
 
 const aliasEvents = parseCompanyStatus({
   generated_at: "2026-10-07T06:39:00.000Z",
@@ -1083,7 +1084,7 @@ assert.equal(coreModel.quotas.find((line) => line.id === "codex")!.value, "Не�
 assert.equal(coreModel.quotas.find((line) => line.id === "legacy")!.value, "Нет данных");
 assert.equal(coreModel.historyNextCursor, "2026-10-01T00:00:00.000Z");
 assert.match(coreModel.historyBoundary, /история обрезана/);
-assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.connectionLabel, "работает");
+assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.connectionLabel, "проверено");
 assert.equal(coreModel.executors.find((executor) => executor.id === "cursor")!.runId, "run-late");
 
 const stages = parseCompanyStatus({
