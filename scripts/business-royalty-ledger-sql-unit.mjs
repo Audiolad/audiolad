@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
-const migration = read("supabase/migrations/20261229120000_business_royalty_usage_ledger.sql");
+const migration = read("supabase/migrations/20261231140000_business_royalty_usage_ledger.sql");
 const smoke = read("supabase/tests/business_royalty_ledger_smoke.sql");
 const sql = migration.replace(/--[^\n]*/g, "");
 
@@ -74,7 +74,7 @@ for (const s of ["ExactExample", "Offline", "Dedup", "NotAdmitted", "Layers", "M
 for (const v of ["100000", "10000", "90000", "45000", "13500", "18000"]) assert.ok(smoke.includes(v), `exact example ${v}`);
 assert.ok(read("scripts/database-migrations-compile-isolated.mjs").includes("supabase/tests/business_royalty_ledger_smoke.sql"), "smoke runs in real compile CI");
 assert.match(smoke, /ROLLBACK;\s*$/);
-assert.ok(read("docs/DATABASE.md").includes("20261229120000_business_royalty_usage_ledger.sql"));
+assert.ok(read("docs/DATABASE.md").includes("20261231140000_business_royalty_usage_ledger.sql"));
 assert.equal(JSON.parse(read("package.json")).scripts["test:business-royalty-ledger"], "node scripts/business-royalty-ledger-sql-unit.mjs");
 assert.ok(read(".github/workflows/business-pr-validation.yml").includes("AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger"));
 console.log("business-royalty-ledger-sql-unit: contract ok");

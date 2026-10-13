@@ -1,4 +1,4 @@
--- Isolated smoke for 20261230120000 (task 0e05333f, Business SPA PR3 manifest). Rolls back.
+-- Isolated smoke for 20261231150000 (task 0e05333f, Business SPA PR3 manifest). Rolls back.
 -- Runs after the full disposable replay. The rights engine is replaced by a transaction-local
 -- stub (decision + cited grant ids) so manifest logic is tested in isolation; real grants rows
 -- carry valid_until. The real engine has its own smoke (business_rights_eligibility_smoke.sql).
