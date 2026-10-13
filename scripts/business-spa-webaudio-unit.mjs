@@ -81,4 +81,31 @@ assert.equal(a.paused, true); assert.ok(Number.isNaN(a.duration));
   assert.equal(f.startAfter(e), true);
   assert.equal(started.at(-1).when, 105, "B starts exactly at A's deadline");
 }
+// A16 #2 / I1+I2: rights expire while resume() is pending -> no node is ever started;
+// the stop is armed before the start (stopAt before play) and applied with the node.
+{
+  let wall = 0;
+  const g = new WebAudioTrack(ctx, () => wall);
+  g.src = "blob:g"; g.load(); await ready(g);
+  let release; ctx.state = "suspended";
+  ctx.resume = () => new Promise((r) => { release = () => { ctx.state = "running"; r(); }; });
+  const n0 = started.length;
+  let allowed = true;
+  g.stopAt(5000);
+  const p = g.play(() => allowed);
+  wall = 6000; allowed = false; release(); await p;
+  assert.equal(started.length, n0, "no node after the grant ended during resume()");
+  assert.equal(g.paused, true);
+  // guard says no (epoch superseded) even before the deadline.
+  wall = 0; g.stopAt(5000); ctx.state = "suspended";
+  const p2 = g.play(() => false); release(); await p2;
+  assert.equal(started.length, n0, "guard false -> no node");
+  // allowed: the node starts with its hard stop already scheduled (atomic).
+  ctx.state = "suspended"; let stopArg = null;
+  const p3 = g.play(() => true); release(); await p3;
+  assert.equal(started.length, n0 + 1, "started");
+  const n = started.at(-1).n; assert.ok(g.stopWhen !== null, "hard stop scheduled with the start");
+  void stopArg; void n;
+  ctx.resume = async () => {};
+}
 console.log("business-spa-webaudio-unit: all tests passed");

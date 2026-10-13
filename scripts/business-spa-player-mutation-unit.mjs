@@ -25,7 +25,7 @@ const mutations = [
   ], "depth"],
   // (advance's identity re-resolve is defence in depth: a manifest change bumps the epoch.)
   // ---- whole-operation epoch (A15) ----
-  ["OP stillCurrent ignores the epoch", [["return op === this.opEpoch && this.status !== \"no_access\";", "return this.status !== \"no_access\";"]]],
+  ["OP stillCurrent ignores the epoch", [["return op === this.opEpoch && this.status !== \"no_access\"", "return this.status !== \"no_access\""]]],
   ["OP bumpOp does not advance the epoch", [["    return ++this.opEpoch;", "    return this.opEpoch;"]]],
   ["OP advance fallback activation keeps the slot counter", [["      this.slotOp[slot] += 1; // slot activation: a pending load into it is now stale\n", ""]], "depth"],
   ["OP advance activates a stale prepared successor", [["ni >= 0 && ni === want && this.allowed", "ni >= 0 && this.allowed"]], "depth"],
@@ -35,13 +35,20 @@ const mutations = [
   // ---- A15 ----
   ["A15 stale init() continues after its cache scan", [["    if (!this.stillCurrent(wop)) return; // the user/refresh already took over: no stale start", ""]]],
   ["A15 cache scan decides with the manifest snapshot taken before its awaits", [["    const current = (id: string) => this.items.find((i) => i.audioItemId === id);", "    const snap = this.items;\n    const current = (id: string) => snap.find((i) => i.audioItemId === id);"]]],
-  ["A15 <audio> slot may start with its deadline inside the track", [["    if (el.stopAt) return true;\n    const dl = this.deadlineFor(slot);\n    if (dl === null) return true;", "    return true;\n    const dl = this.deadlineFor(slot);\n    if (dl === null) return true;"]]],
-  ["A15 <audio> slot keeps playing when a refresh moves the deadline inside it", [["    if (!el.stopAt && !el.paused && !this.hardStopOk(slot)) {", "    if (false) {"]]],
+  // ---- A16/A17 ----
+  ["A17 <audio> slot has no wall-clock forced stop at its deadline", [["    if (!el.stopAt) this.armForcedStop(slot, next);", ""]]],
+  ["A17 <audio> slot startable inside the forced-stop margin", [["      if (dl !== null && (atMs ?? this.d.now()) >= dl - SPA_HTML_DEADLINE_MARGIN_MS) return false;", ""]]],
+  ["A17 hard stop armed only after play() resolved", [["    this.applyDeadline(this.active);\n    try {\n      await this.activeEl().play(", "    try {\n      await this.activeEl().play("]], "depth"], // tick re-applies deadlines every 250 ms; adapter-level guard tested in business-spa-webaudio-unit
+  ["A17 start intent dropped before play() completes", [["      this.starting -= 1;\n    }", "      this.starting -= 1;\n      this.pendingStart = null;\n    }"]]],
+  ["A17 toggle resume not registered as a pending start", [["      this.pendingStart = mine;\n      let ok: boolean;", "      let ok: boolean;"]]],
+  ["A17 dispose() does not cancel a running init()", [["    this.disposed = true;\n    this.playOp += 1;\n    this.bumpOp();", ""], [" && !this.disposed;\n  }", ";\n  }"]]],
+  ["A17 stale play() continuation silences the newer start", [["    const keep = !this.stillCurrent(t.op)", "    const keep = false && !this.stillCurrent(t.op)"]]],
+  ["A17 forced stop during a pending start stalls the program", [["          this.setStatus(\"paused\");\n        }\n        return false;", "        }\n        return false;"]]],
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],
 ];
-let blind = 0;
+let blind = 0, killed = 0, layered = 0;
 try {
   // "depth" = a secondary layer that the whole-operation epoch already covers: its survival
   // is reported, not counted (removing epoch + layer together is covered by the OP mutants).
@@ -58,9 +65,11 @@ try {
     try {
       execFileSync("npx", ["tsx", suite], { env: { ...process.env, SPA_ENGINE_MODULE: mutant }, stdio: "pipe", timeout: 120000 });
     } catch (e) { failed = /AssertionError/.test(String(e.stderr ?? "") + String(e.stdout ?? "")); }
-    console.log(`${failed ? "killed " : depth ? "layered (covered by epoch)" : "SURVIVED"} ${name}`);
-    if (!failed && !depth) blind++;
+    console.log(`${failed ? "killed " : depth ? "layered (defence in depth)" : "SURVIVED"} ${name}`);
+    if (failed) killed++;
+    else if (depth) layered++;
+    else blind++;
   }
 } finally { rmSync(mutant, { force: true }); }
-if (blind) { console.error(`business-spa-player-mutation-unit: ${blind} mutant(s) survived`); process.exit(1); }
-console.log("business-spa-player-mutation-unit: all mutants killed");
+console.log(`business-spa-player-mutation-unit: ${mutations.length} mutants: ${killed} killed, ${layered} layered defence-in-depth survived (not counted; listed above), ${blind} blind`);
+if (blind) { console.error(`business-spa-player-mutation-unit: ${blind} mutant(s) survived or anchor missing`); process.exit(1); }

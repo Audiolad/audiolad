@@ -133,13 +133,21 @@ export class WebAudioTrack implements AudioLike {
     })();
   }
 
-  async play(): Promise<void> {
+  /**
+   * `guard` (the engine's mayStart for this start) is re-checked AFTER any await and
+   * immediately before a node is created: rights/epoch may have changed during resume().
+   * The hard stop (stopAt, set by the engine before play()) is applied atomically with the
+   * start inside startNode(), so no audible node ever exists without its stop.
+   */
+  async play(guard?: () => boolean): Promise<void> {
     if (!this.buffer) throw new Error("not_ready");
     const gen = this.gen;
     if (this.ctx.state !== "running") await this.ctx.resume();
-    if (gen !== this.gen) return; // paused meanwhile
+    if (gen !== this.gen) return; // paused/replaced meanwhile
     if (this.ctx.state !== "running") throw new Error("autoplay_blocked");
     if (this.playing) return;
+    if (guard && !guard()) return; // rights/epoch changed during resume(): never start
+    if (this.deadline !== null && this.wallNow() >= this.deadline) return; // already past its deadline
     this.startNode(this.ctx.currentTime);
   }
 
