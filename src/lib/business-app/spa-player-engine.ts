@@ -17,6 +17,21 @@
  *    (older generation) are discarded.
  *  - when the network drops, active and prepared stream sources switch to valid cached
  *    copies, keeping the position (checklist item 4).
+ *
+ * Re-review 2026-10-13 (Codex A2):
+ *  - every cached copy carries the server deadline returned by sign(…, "offline")
+ *    (`offline_cache_until` for THAT download); the effective deadline is
+ *    min(server deadline, manifest deadline from cachedAt) and is enforced on write,
+ *    on every play and on every tick;
+ *  - every tick purges ALL expired copies (any status, online or offline) and any
+ *    loaded blob source of them — before any network wait;
+ *  - expiry stop happens before the (non-blocking, single-flight) manifest refresh;
+ *    the Wi-Fi→cache switch re-checks rights right before play();
+ *  - transitions overlap by SPA_CROSSFADE_MS: the next pre-buffered element starts
+ *    before the current one ends and the two are cross-faded, so main-thread / timer
+ *    latency below the overlap can only shorten the fade, never create silence; a
+ *    stalled current track (media clock not advancing) re-schedules instead of
+ *    switching early.
  */
 
 import {
@@ -40,6 +55,8 @@ import {
 export const HAVE_ENOUGH_DATA = 4;
 export const SPA_TRANSITION_LOOKAHEAD_MS = 1500;
 export const SPA_TICK_MS = 250;
+export const SPA_CROSSFADE_MS = 400;
+const FADE_STEP_MS = 50;
 
 export type Result<T> = { ok: true; data: T } | { ok: false; reason: string };
 
@@ -58,7 +75,8 @@ export interface AudioLike {
   removeEventListener(type: string, fn: () => void): void;
 }
 
-export type CachedCopy = { data: Blob; cachedAt: number };
+/** `until`: server deadline (epoch ms) for this copy, from sign(…, "offline"). */
+export type CachedCopy = { data: Blob; cachedAt: number; until: number };
 
 export interface EngineDeps {
   audios: [AudioLike, AudioLike];
@@ -72,7 +90,7 @@ export interface EngineDeps {
   download(url: string): Promise<Blob | null>;
   cache: {
     get(id: string): Promise<CachedCopy | null>;
-    put(id: string, data: Blob, cachedAt: number): Promise<void>;
+    put(id: string, data: Blob, cachedAt: number, until: number): Promise<void>;
     delete(id: string): Promise<void>;
     keys(): Promise<string[]>;
     clear(): Promise<void>;
@@ -97,6 +115,8 @@ export class SpaPlayerEngine {
   status: EngineStatus = "idle";
   message: string | null = null;
   cachedAt = new Map<string, number>();
+  /** Effective deadline (epoch ms) per cached copy. */
+  cacheUntil = new Map<string, number>();
 
   private active = 0;
   private loaded: [Loaded | null, Loaded | null] = [null, null];
@@ -107,6 +127,9 @@ export class SpaPlayerEngine {
   private generation = 0;
   private order: string[] = [];
   private wasOnline = true;
+  private refreshing: Promise<void> | null = null;
+  private fadeTimer: unknown = null;
+  private handoffTimer: unknown = null;
   private readonly d: EngineDeps;
 
   constructor(deps: EngineDeps) {
@@ -157,6 +180,7 @@ export class SpaPlayerEngine {
   dispose(): void {
     if (this.tickTimer) this.d.clearTimer(this.tickTimer);
     if (this.transitionTimer) this.d.clearTimer(this.transitionTimer);
+    this.clearHandoff();
     this.tickTimer = null;
     this.closeSegment("skip");
     this.saveResume();
@@ -165,7 +189,17 @@ export class SpaPlayerEngine {
   // ---------------- permissions ----------------
   private cachedDate(id: string): Date | null {
     const at = this.cachedAt.get(id);
-    return at === undefined ? null : new Date(at);
+    const until = this.cacheUntil.get(id);
+    if (at === undefined || until === undefined || this.d.now() >= until) return null;
+    return new Date(at);
+  }
+
+  /** Effective deadline of a copy: min(server deadline, manifest deadline from cachedAt). */
+  private copyDeadline(id: string, cachedAt: number, serverUntil: number): number | null {
+    const item = this.items.find((i) => i.audioItemId === id);
+    const m = item ? offlineCacheDeadline(item, new Date(cachedAt)) : null;
+    if (!m || !Number.isFinite(serverUntil)) return null;
+    return Math.min(m.getTime(), serverUntil);
   }
 
   /**
@@ -258,7 +292,7 @@ export class SpaPlayerEngine {
   }
 
   /** Every play() goes through here: rights/cache/expiry re-checked immediately before. */
-  private async playActive(auto = false): Promise<boolean> {
+  private async playActive(auto = false, prepare = true): Promise<boolean> {
     const item = this.current;
     const l = this.loadedActive();
     if (!item || !l || l.audioItemId !== item.audioItemId || !this.allowed(item, l.kind)) {
@@ -275,12 +309,13 @@ export class SpaPlayerEngine {
     this.openSegment(item.audioItemId);
     this.lastTime = this.activeEl().currentTime;
     this.setStatus("playing");
-    void this.prepareNext();
+    if (prepare) void this.prepareNext();
     return true;
   }
 
   async toggle(): Promise<void> {
     if (this.status === "playing") {
+      this.finishHandoff();
       this.activeEl().pause();
       this.closeSegment("skip");
       this.cancelTransition();
@@ -325,14 +360,66 @@ export class SpaPlayerEngine {
     if (!Number.isFinite(el.duration) || el.duration <= 0) return;
     const remainingMs = (el.duration - el.currentTime) * 1000;
     if (remainingMs > SPA_TRANSITION_LOOKAHEAD_MS) return;
+    const pos = el.currentTime;
     this.transitionTimer = this.d.setTimer(() => {
       this.transitionTimer = null;
-      void this.advance();
-    }, Math.max(0, remainingMs));
+      if (this.status !== "playing") return;
+      const cur = this.activeEl();
+      const left = (cur.duration - cur.currentTime) * 1000;
+      // Media clock stalled (buffering) or drifted: re-plan from the real position.
+      if (left > SPA_CROSSFADE_MS + FADE_STEP_MS && (cur.currentTime <= pos || left > SPA_TRANSITION_LOOKAHEAD_MS)) {
+        this.scheduleTransition();
+        return;
+      }
+      void this.advance(Math.max(0, left));
+    }, Math.max(0, remainingMs - SPA_CROSSFADE_MS));
+  }
+
+  private clearHandoff(): void {
+    if (this.fadeTimer) this.d.clearTimer(this.fadeTimer);
+    if (this.handoffTimer) this.d.clearTimer(this.handoffTimer);
+    this.fadeTimer = null;
+    this.handoffTimer = null;
+  }
+
+  /** End an in-progress cross-fade now: silence the outgoing slot, full gain on the active one. */
+  private finishHandoff(): void {
+    const pending = this.fadeTimer !== null || this.handoffTimer !== null;
+    this.clearHandoff();
+    if (!pending) return;
+    const out = this.d.audios[1 - this.active];
+    out.pause();
+    const item = this.current;
+    if (item) this.activeEl().volume = gainToVolume(item.gainDb);
+  }
+
+  /** Cross-fade out→in over `ms`, then stop the outgoing slot and prepare the next track. */
+  private crossfade(outSlot: number, ms: number): void {
+    const out = this.d.audios[outSlot];
+    const inEl = this.activeEl();
+    const outItem = this.loaded[outSlot] ? this.items.find((i) => i.audioItemId === this.loaded[outSlot]!.audioItemId) : null;
+    const outGain = gainToVolume(outItem?.gainDb ?? null);
+    const inGain = gainToVolume(this.current?.gainDb ?? null);
+    const start = this.d.now();
+    const step = () => {
+      const k = ms <= 0 ? 1 : Math.min(1, (this.d.now() - start) / ms);
+      out.volume = outGain * (1 - k);
+      inEl.volume = inGain * k;
+      this.fadeTimer = k < 1 ? this.d.setTimer(step, FADE_STEP_MS) : null;
+    };
+    step();
+    this.handoffTimer = this.d.setTimer(() => {
+      this.handoffTimer = null;
+      if (this.fadeTimer) this.d.clearTimer(this.fadeTimer);
+      this.fadeTimer = null;
+      out.pause();
+      inEl.volume = inGain;
+      if (this.status === "playing") void this.prepareNext();
+    }, ms + 100);
   }
 
   /** Switch to the prepared slot (gapless) or fall back to a fresh load. */
-  private async advance(): Promise<void> {
+  private async advance(overlapMs = 0): Promise<void> {
     const from = this.index;
     const fromSlot = this.active;
     if (this.status !== "playing") return;
@@ -345,8 +432,10 @@ export class SpaPlayerEngine {
       this.index = ni;
       const el = this.d.audios[slot];
       el.currentTime = 0;
-      if (await this.playActive()) {
-        this.d.audios[fromSlot].pause();
+      if (overlapMs > 0) el.volume = 0;
+      if (await this.playActive(false, overlapMs <= 0)) {
+        if (overlapMs > 0) this.crossfade(fromSlot, overlapMs);
+        else this.d.audios[fromSlot].pause();
         return;
       }
     }
@@ -364,6 +453,7 @@ export class SpaPlayerEngine {
 
   private stopAll(): void {
     this.cancelTransition();
+    this.clearHandoff();
     this.closeSegment("skip");
     this.clearSlot(0);
     this.clearSlot(1);
@@ -382,34 +472,82 @@ export class SpaPlayerEngine {
     const online = this.d.online();
     if (online !== this.wasOnline) {
       this.wasOnline = online;
+      if (!online) this.switchPending = true;
       // Split the log segment exactly at the network change.
       if (this.segment) {
         const id = this.segment.audioItemId;
         this.closeSegment("skip");
         if (this.status === "playing") this.openSegment(id);
       }
-      if (!online) await this.switchToCache();
-      else {
+      if (online) {
         void this.flushLog();
         void this.refresh();
       }
     }
     this.accumulate(this.active);
-    if (online && this.manifest && manifestNeedsRefresh(this.manifest, new Date(this.d.now()))) await this.refresh();
+    // 1) Purge every expired cached copy (any status, any network) — no network waits first.
+    const stopActive = this.expireCopies();
+    // 2) Stop a current track that is no longer allowed, synchronously.
     const item = this.current;
     const l = this.loadedActive();
-    if (this.status === "playing" && item && l) {
-      if (!this.allowed(item, l.kind, true)) {
-        // Rights or cache window closed mid-track: stop it now and move on.
-        if (l.kind === "blob" && !this.allowed(item, "blob")) await this.dropCache(item.audioItemId);
-        this.closeSegment("skip");
-        this.clearSlot(this.active);
-        await this.startAt(nextIndex(this.items.length, this.index));
-        return;
-      }
-      this.scheduleTransition();
+    let stopped = false;
+    if (this.status === "playing" && item && (stopActive || !l || !this.allowed(item, l.kind, true))) {
+      stopped = true;
+      this.closeSegment("skip");
+      this.clearSlot(this.active);
+      this.clearSlot(1 - this.active);
+      this.clearHandoff();
+      this.setStatus("paused");
     }
+    // 3) Only now do anything that may wait.
+    if (!online && this.wasOnlineSwitchPending()) await this.switchToCache();
+    if (online && this.manifest && manifestNeedsRefresh(this.manifest, new Date(this.d.now()))) void this.refresh();
+    if (stopped || stopActive) {
+      if (this.index >= 0 && this.items.length > 0) await this.startAt(nextIndex(this.items.length, this.index));
+      return;
+    }
+    if (this.status === "playing") this.scheduleTransition();
     if (this.status === "playing" && this.index >= 0 && this.items.length > 0) this.saveResume();
+  }
+
+  private switchPending = false;
+  private wasOnlineSwitchPending(): boolean {
+    const p = this.switchPending;
+    this.switchPending = false;
+    return p;
+  }
+
+  /**
+   * Drop every cached copy past its effective deadline (or no longer in the manifest),
+   * synchronously from the in-memory index; clears loaded blob sources of those copies.
+   * Returns true when the active source was cleared.
+   */
+  private expireCopies(): boolean {
+    const now = this.d.now();
+    const ids = new Set(this.items.map((i) => i.audioItemId));
+    let activeHit = false;
+    for (const [id, until] of [...this.cacheUntil]) {
+      const at = this.cachedAt.get(id);
+      const eff = at === undefined ? null : this.copyDeadline(id, at, until);
+      if (ids.has(id) && eff !== null && now < eff) continue;
+      this.cachedAt.delete(id);
+      this.cacheUntil.delete(id);
+      void this.d.cache.delete(id);
+      for (const slot of [0, 1]) {
+        const lo = this.loaded[slot];
+        if (lo?.kind === "blob" && lo.audioItemId === id) {
+          if (slot === this.active && this.status === "playing") activeHit = true;
+          this.clearSlot(slot);
+        }
+      }
+    }
+    for (const id of [...this.cachedAt.keys()]) if (!this.cacheUntil.has(id)) this.cachedAt.delete(id);
+    if (activeHit) {
+      this.closeSegment("skip");
+      this.clearHandoff();
+      this.clearSlot(1 - this.active);
+    }
+    return activeHit;
   }
 
   /** Wi-Fi dropped: move active/prepared stream sources to valid cached copies. */
@@ -438,14 +576,29 @@ export class SpaPlayerEngine {
         /* ignore */
       }
       this.lastTime = pos;
-      if (wasPlaying) await el.play().catch(() => this.setStatus("needs_gesture"));
+      // Re-check right before play(): the copy may have expired / been revoked while loading.
+      const still = this.loaded[slot];
+      if (!item || !still || still.url !== url || !this.allowed(item, "blob")) {
+        this.clearSlot(slot);
+        continue;
+      }
+      if (wasPlaying && slot === this.active && this.status === "playing") await el.play().catch(() => this.setStatus("needs_gesture"));
       if (slot !== this.active) this.loaded[slot]!.ready = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
     }
     this.emit();
   }
 
   // ---------------- manifest refresh ----------------
-  async refresh(): Promise<void> {
+  refresh(): Promise<void> {
+    if (!this.refreshing) {
+      this.refreshing = this.doRefresh().finally(() => {
+        this.refreshing = null;
+      });
+    }
+    return this.refreshing;
+  }
+
+  private async doRefresh(): Promise<void> {
     if (!this.d.online()) return;
     const res = await this.d.fetchManifest();
     if (!res.ok) {
@@ -502,6 +655,7 @@ export class SpaPlayerEngine {
     this.manifest = null;
     this.index = -1;
     this.cachedAt.clear();
+    this.cacheUntil.clear();
     this.generation += 1;
     await this.d.cache.clear();
     this.d.storage.remove(this.resumeKey);
@@ -513,6 +667,7 @@ export class SpaPlayerEngine {
   private async dropCache(id: string): Promise<void> {
     await this.d.cache.delete(id);
     this.cachedAt.delete(id);
+    this.cacheUntil.delete(id);
   }
 
   async scanCache(): Promise<void> {
@@ -522,11 +677,19 @@ export class SpaPlayerEngine {
     for (const id of await this.d.cache.keys()) {
       const item = byId.get(id);
       const copy = item ? await this.d.cache.get(id) : null;
-      const deadline = item && copy ? offlineCacheDeadline(item, new Date(copy.cachedAt)) : null;
-      if (!item || !copy || !deadline || this.d.now() >= deadline.getTime()) await this.dropCache(id);
-      else this.cachedAt.set(id, copy.cachedAt);
+      const deadline = item && copy ? this.copyDeadline(id, copy.cachedAt, copy.until) : null;
+      if (!item || !copy || deadline === null || this.d.now() >= deadline) await this.dropCache(id);
+      else {
+        this.cachedAt.set(id, copy.cachedAt);
+        this.cacheUntil.set(id, copy.until);
+      }
     }
-    for (const id of [...this.cachedAt.keys()]) if (!byId.has(id)) this.cachedAt.delete(id);
+    for (const id of [...this.cachedAt.keys()]) if (!byId.has(id)) this.dropCacheIndex(id);
+  }
+
+  private dropCacheIndex(id: string): void {
+    this.cachedAt.delete(id);
+    this.cacheUntil.delete(id);
   }
 
   async downloadAll(): Promise<void> {
@@ -539,15 +702,24 @@ export class SpaPlayerEngine {
         if (signed.reason === "no_access") return this.revokeAccess();
         continue;
       }
+      // The server's deadline for THIS download is binding (it may be shorter than the
+      // client manifest says); no deadline = no offline copy.
+      const serverUntil = signed.data.offlineCacheUntil ? Date.parse(signed.data.offlineCacheUntil) : NaN;
+      if (!Number.isFinite(serverUntil)) continue;
       const blob = await this.d.download(signed.data.url);
       if (!blob) continue;
-      // Re-check against the LATEST manifest right before writing (stale download guard).
+      // Re-check against the LATEST manifest + server deadline right before writing.
       const latest = this.items.find((i) => i.audioItemId === item.audioItemId);
       const cachedAt = this.d.now();
-      const deadline = latest ? offlineCacheDeadline(latest, new Date(cachedAt)) : null;
-      if (gen !== this.generation || !latest || !latest.offlineAllowed || !deadline || cachedAt >= deadline.getTime()) continue;
-      await this.d.cache.put(item.audioItemId, blob, cachedAt);
+      const deadline = latest ? this.copyDeadline(item.audioItemId, cachedAt, serverUntil) : null;
+      if (gen !== this.generation || !latest || !latest.offlineAllowed || deadline === null || cachedAt >= deadline) continue;
+      await this.d.cache.put(item.audioItemId, blob, cachedAt, serverUntil);
+      if (gen !== this.generation || this.d.now() >= deadline) {
+        await this.dropCache(item.audioItemId);
+        continue;
+      }
       this.cachedAt.set(item.audioItemId, cachedAt);
+      this.cacheUntil.set(item.audioItemId, serverUntil);
       this.emit();
     }
   }

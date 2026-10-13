@@ -31,13 +31,18 @@ function browserCache(): EngineDeps["cache"] {
       if (typeof caches === "undefined") return null;
       const res = await (await open()).match(cacheKey(id));
       if (!res) return null;
-      return { data: await res.blob(), cachedAt: Number(res.headers.get("x-spa-cached-at")) || 0 };
+      return {
+        data: await res.blob(),
+        cachedAt: Number(res.headers.get("x-spa-cached-at")) || 0,
+        // Copies without a server deadline (older format) are treated as expired.
+        until: Number(res.headers.get("x-spa-cache-until")) || 0,
+      };
     },
-    async put(id, data, cachedAt) {
+    async put(id, data, cachedAt, until) {
       if (typeof caches === "undefined") return;
       await (await open()).put(
         cacheKey(id),
-        new Response(data, { headers: { "content-type": data.type || "audio/mpeg", "x-spa-cached-at": String(cachedAt) } }),
+        new Response(data, { headers: { "content-type": data.type || "audio/mpeg", "x-spa-cached-at": String(cachedAt), "x-spa-cache-until": String(until) } }),
       );
     },
     async delete(id) {
@@ -58,13 +63,14 @@ type View = {
   status: EngineStatus;
   current: SpaManifestItem | null;
   cachedAt: Map<string, number>;
+  cacheUntil: Map<string, number>;
   message: string | null;
 };
-const EMPTY_VIEW: View = { items: [], status: "idle", current: null, cachedAt: new Map(), message: null };
+const EMPTY_VIEW: View = { items: [], status: "idle", current: null, cachedAt: new Map(), cacheUntil: new Map(), message: null };
 
 function snapshot(e: SpaPlayerEngine | null): View {
   if (!e) return EMPTY_VIEW;
-  return { items: e.items, status: e.status, current: e.current, cachedAt: new Map(e.cachedAt), message: e.message };
+  return { items: e.items, status: e.status, current: e.current, cachedAt: new Map(e.cachedAt), cacheUntil: new Map(e.cacheUntil), message: e.message };
 }
 
 export default function SpaPilotPlayer({ programId, programName, initialManifest, playerId, zoneId }: Props) {
@@ -136,11 +142,14 @@ export default function SpaPilotPlayer({ programId, programName, initialManifest
     };
   }, [programId, playerId, zoneId, initialManifest]);
 
-  const { items, status, current, cachedAt, message } = view;
+  const { items, status, current, cachedAt, cacheUntil, message } = view;
   let until: Date | null = null;
   for (const item of items) {
     const at = cachedAt.get(item.audioItemId);
-    const d = at === undefined ? null : offlineCacheDeadline(item, new Date(at));
+    const m = at === undefined ? null : offlineCacheDeadline(item, new Date(at));
+    const server = cacheUntil.get(item.audioItemId);
+    // Label shows the binding deadline: min(manifest window, server deadline of the copy).
+    const d = m && server !== undefined ? new Date(Math.min(m.getTime(), server)) : null;
     if (d && (!until || d < until)) until = d;
   }
   const cachedCount = items.filter((i) => cachedAt.has(i.audioItemId)).length;
