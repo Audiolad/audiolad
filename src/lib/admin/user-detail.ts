@@ -56,6 +56,7 @@ const TEAM_ROLE_LABELS: Record<PlatformTeamRole, string> = {
   finance: "Финансы",
   classica_operator: "Оператор Classica",
   classica_moderator: "Модератор Classica",
+  ai_company_viewer: "Просмотр ИИ-компании",
 };
 
 function buildDisplayName(fullName: string | null, email: string | null): string {

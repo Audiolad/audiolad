@@ -176,7 +176,7 @@ function testAiCompanyRefreshIsScoped() {
   assert.doesNotMatch(aiCompanyPage, /httpEquiv|http-equiv/i);
   assert.doesNotMatch(aiCompanyPage, /<meta/);
   assert.match(aiCompanyPage, /<AiCompanyLiveRefresh/);
-  assert.match(aiCompanyPage, /requireAdminPermission\("ai_company\.view"\)/);
+  assert.match(aiCompanyPage, /requireAiCompanyView\(\)/);
   assert.match(liveRefresh, /router\.refresh\(\)/);
   assert.match(liveRefresh, /startScopedPageRefresh/);
   assert.doesNotMatch(liveRefresh, /location\.reload|httpEquiv|http-equiv/i);

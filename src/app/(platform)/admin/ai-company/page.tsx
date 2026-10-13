@@ -1,6 +1,6 @@
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
-import { requireAdminPermission } from "@/lib/admin/guard";
+import { isAiCompanyOwner, requireAiCompanyView } from "@/lib/admin/guard";
 import {
   companyStatusRequestPath,
   composeAiCompanyBoard,
@@ -51,7 +51,8 @@ export default async function AiCompanyPage({
     tab?: string;
   }>;
 }) {
-  const session = await requireAdminPermission("ai_company.view");
+  // Owner/admin with ai_company.view, or the read-only ai_company_viewer role.
+  const session = await requireAiCompanyView();
   const params = await searchParams;
   const filters = parseHistoryFilters({
     period: params.period,
@@ -63,7 +64,7 @@ export default async function AiCompanyPage({
   const [current, archive] = await Promise.all([loadStatus(filters, "current"), loadStatus(filters, "archive")]);
   const { model, acceptanceAvailable, sourceError } = composeAiCompanyBoard(current, archive, filters);
   // Core records decisions as actor `sergey`: only the platform owner session gets live buttons.
-  const canAccept = session.access.roles.includes("owner");
+  const canAccept = isAiCompanyOwner(session.access);
 
   return (
     <>

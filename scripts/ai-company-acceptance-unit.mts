@@ -253,10 +253,10 @@ assert.equal(notOwner.body.message, ACCEPTANCE_OWNER_ONLY);
 assert.equal(calls.length, callsBefore, "non-owner request never reaches Core");
 
 const route = readFileSync("src/app/api/admin/ai-company/acceptance/route.ts", "utf8");
-assert.match(route, /requireAdminPermission\("ai_company\.view"\)/);
+assert.match(route, /requireAiCompanyView\(\)/);
 assert.match(route, /process\.env\.COMPANY_API_TOKEN/);
 assert.doesNotMatch(route, /localStorage|X-Audiolad-Actor|acceptance\/capabilities/);
-assert.match(route, /session\.access\.roles\.includes\("owner"\)/);
+assert.match(route, /isOwner: isAiCompanyOwner\(session\.access\)/);
 assert.match(route, /sessionUserId: actor\.userId/);
 assert.doesNotMatch(route, /COMPANY_API_TOKEN[^)]*console|console[^;]*token/i);
 const permissions = readFileSync("src/lib/auth/platform-permissions.ts", "utf8");
