@@ -22,7 +22,9 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     // Like WebAudioTrack: a scheduled-but-not-started slot reports running (paused=false) at 0.
     get currentTime() { return this.paused || this.pending ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
     set currentTime(v) { this._t = v; if (!this.paused) this.startClock = world.now - v * 1000; }
-    async play() { if (!this._src) throw new Error("no src"); this._t = this.currentTime; this.paused = false; this.startClock = world.now - this._t * 1000; world.plays.push({ el: this.name, src: this._src, at: world.now, pos: this._t, vol: this.volume }); }
+    async play() { if (!this._src) throw new Error("no src"); this._t = this.currentTime; if (this.endedFired || this._t >= this.duration) { this._t = 0; this.endedFired = false; } // like HTMLMediaElement: play() after the end restarts
+      if (this._t < 0.05 && audios.some((o) => o !== this && !o.paused && !o.pending && o._src === this._src && o.currentTime > 0.5 && o.currentTime < o.duration - 0.5)) world.restarts = (world.restarts ?? 0) + 1;
+      this.paused = false; this.startClock = world.now - this._t * 1000; world.plays.push({ el: this.name, src: this._src, at: world.now, pos: this._t, vol: this.volume }); }
     pause() { if (this.pending) { this.cancelPending(); this.paused = true; this._t = 0; return; } if (!this.paused) { this._t = this.currentTime; this.paused = true; } }
     cancelPending() { if (this.pending) { world.timers = world.timers.filter((t) => t !== this.pending); this.pending = null; } }
     // Web Audio model: start exactly at prev's end on the audio clock (no timer latency).
@@ -31,6 +33,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
       const at = Math.min(prev.startClock + prev.duration * 1000, prev.deadline ?? Infinity);
       if (at <= world.now) return false;
       this._t = 0;
+      this.endedFired = false;
       const p = { at, id: ++world.seq, fn: () => { this.pending = null; this.startClock = p.at; world.plays.push({ el: this.name, src: this._src, at: p.at, pos: 0, vol: this.volume, scheduled: true }); } };
       this.pending = p;
       this.paused = false;
@@ -41,7 +44,8 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
       if (!this._src) return;
       const src = this._src;
       const done = () => { if (this._src !== src) return; this.readyState = 4; this.fire("loadedmetadata"); this.fire("canplaythrough"); };
-      if (world.loadDelay) world.timers.push({ at: world.now + world.loadDelay, id: ++world.seq, fn: done });
+      const ld = world.loadDelayFn ? world.loadDelayFn() : world.loadDelay;
+      if (ld) world.timers.push({ at: world.now + ld, id: ++world.seq, fn: done });
       else { this.readyState = 4; queueMicrotask(() => { this.fire("loadedmetadata"); this.fire("canplaythrough"); }); }
     }
     removeAttribute(n) { if (n === "src") { this.cancelPending(); this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; } }
@@ -107,7 +111,8 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   // Advance the fake clock event by event (timers and natural ends), flushing promises between.
   world.advance = async (ms) => {
     const until = world.now + ms;
-    for (;;) {
+    for (let guard = 0; ; guard++) {
+      if (guard > 100000) throw new Error(`fake clock stuck at ${world.now - T0} ms; audios ${JSON.stringify(audios.map((a) => [a.name, a._src.slice(-2), a.paused, !!a.pending, a.currentTime, a.duration, a.deadline != null ? a.deadline - T0 : null, a.endedFired]))}; timers ${JSON.stringify(world.timers.map((t) => t.at - T0).sort((x, y) => x - y).slice(0, 5))}`);
       await flush();
       const nextTimer = world.timers.reduce((m, t) => (m === null || t.at < m.at ? t : m), null);
       const nextEnd = audios.filter((a) => !a.paused && a._src && !a.pending).map((a) => Math.min(a.startClock + a.duration * 1000, a.deadline ?? Infinity)).reduce((m, x) => Math.min(m, x), Infinity);
@@ -938,7 +943,7 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
     ["I8 newer load on slot", (e) => { e.slotOp[e.active] += 1; }],
     ["I9 user pause", async (e) => { await e.toggle(); }],
     ["I5 access epoch", async (e) => { await e.revokeAccess(); }],
-    ["I5 epoch alone (op started before no_access)", (e) => { e.accessEpoch += 1; }],
+    ["I5/OP epoch alone (op started before a newer start/refresh/pause/no_access)", (e) => { e.opEpoch += 1; }],
   ];
   for (const [name, act] of stale) {
     const { world, deps } = makeWorld({ durations: [60, 60] });
@@ -1037,7 +1042,8 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   // Manifest order is by `position`: swap A and B (rights unchanged).
   const swapped = [{ ...world.items[1], position: 1 }, { ...world.items[0], position: 2 }, ...world.items.slice(2)];
   world.manifestRes = { ok: true, data: world.manifest(swapped) };
-  await engine.refresh();
+  const rp = engine.refresh(); // resolves once its restart has finished (needs the clock)
+  void rp;
   await world.advance(5000);
   await ip;
   assert.equal(engine.status, "playing", "still playing after reorder during load");
@@ -1062,7 +1068,8 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   assert.equal(hold, false, "B play pending");
   const [A, , C, D] = world.items;
   world.manifestRes = { ok: true, data: world.manifest([{ ...D, position: 1 }, { ...A, position: 2 }, { ...C, position: 3 }]) };
-  await engine.refresh();
+  const rp = engine.refresh(); // resolves once its restart has finished (needs the clock)
+  void rp;
   d.res(); await flush(); await world.advance(3000);
   assert.equal(engine.status, "playing");
   assert.equal(engine.current?.audioItemId, id(3), "successor of A by identity is C");
@@ -1072,6 +1079,158 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   const cEl = audios.find((x) => !x.paused && x.src.endsWith(id(3)));
   assert.ok(cEl && cEl.currentTime > 2, `C position preserved (${cEl && cEl.currentTime})`);
   engine.dispose();
+}
+
+// ---- 26. Re-review A14: whole-operation epoch ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) refresh removes A and waits on the cache scan; a tick meanwhile must not start C;
+  // B (the refresh's choice) plays and is never cut off.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(2000);
+  const keys = deps.cache.keys;
+  deps.cache.keys = async () => { await new Promise((r) => world.timers.push({ at: world.now + 1000, id: ++world.seq, fn: r })); return keys(); };
+  const sign = deps.sign; // B's signing spans several ticks
+  deps.sign = async (...x) => { await new Promise((r) => world.timers.push({ at: world.now + 600, id: ++world.seq, fn: r })); return sign(...x); };
+  world.manifestRes = { ok: true, data: world.manifest(world.items.slice(1)) };
+  void engine.refresh();
+  await world.advance(4000);
+  assert.ok(!world.plays.some((p) => p.src.endsWith(id(3))), "C never started");
+  assert.ok(audios.some((x) => !x.paused && !x.pending && x.src.endsWith(id(2))), "B audible");
+  const b = world.plays.filter((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.equal(b.length, 1, "B started once");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) fallback activation invalidates a late prepare of the same slot.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60, 60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9000);
+  const sign = deps.sign;
+  deps.sign = async (...a) => { await new Promise((r) => world.timers.push({ at: world.now + 1500, id: ++world.seq, fn: r })); return sign(...a); };
+  const [A, B, C, D] = world.items;
+  world.manifestRes = { ok: true, data: world.manifest([{ ...A, playable_until: new Date(T0 + 9600).toISOString() }, { ...C, position: 2 }, { ...B, position: 3 }, D]) };
+  void engine.refresh();
+  await world.advance(4000);
+  assert.equal(engine.status, "playing", "program continues");
+  const cur = engine.current?.audioItemId;
+  assert.ok(cur && audios.some((x) => !x.paused && !x.pending && x.src.endsWith(cur)), "engine.current is audible");
+  engine.dispose();
+}
+
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (3) the track becomes disallowed while it loads: the program moves on, no stall.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60, 60, 60] });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(2000);
+  const sign = deps.sign;
+  deps.sign = async (...x) => { await new Promise((r) => world.timers.push({ at: world.now + 500, id: ++world.seq, fn: r })); return sign(...x); };
+  const [, B, C, D] = world.items;
+  world.manifestRes = { ok: true, data: world.manifest([{ ...B, playable_until: new Date(world.now + 300).toISOString() }, C, D]) };
+  void engine.refresh();
+  await world.advance(4000);
+  assert.equal(engine.status, "playing", "no stall after B expired during its load");
+  assert.ok(audios.some((x) => !x.paused && x.src.endsWith(id(3))), "C plays");
+  engine.dispose();
+}
+
+// ---- 27. Randomized interleavings (seeded): invariants after every step ----
+{
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const SEEDS = Number(process.env.SPA_FUZZ_SEEDS ?? 150);
+  const FROM = Number(process.env.SPA_FUZZ_FROM ?? 1);
+  const failures = [];
+  for (let seed = FROM; seed <= SEEDS; seed++) {
+    const rnd = mulberry(seed);
+    const pick = (n) => Math.floor(rnd() * n);
+    const durations = Array.from({ length: 6 }, () => 4 + pick(8));
+    const webAudio = rnd() < 0.6;
+    const { world, deps, audios } = makeWorld({ durations, webAudio });
+    // Random resolution order: every sign / scan / manifest fetch / load resolves after a random delay.
+    const later = (max) => new Promise((r) => world.timers.push({ at: world.now + pick(max), id: ++world.seq, fn: r }));
+    const sign = deps.sign; deps.sign = async (...a) => { await later(900); return sign(...a); };
+    const keys = deps.cache.keys; deps.cache.keys = async () => { await later(900); return keys(); };
+    const fetchM = deps.fetchManifest; deps.fetchManifest = async () => { const m = world.manifestRes; await later(900); world.manifestRes = m; return fetchM(); };
+    world.loadDelayFn = () => pick(700);
+    const engine = new SpaPlayerEngine(deps);
+    let revoked = false;
+    let wantPlay = true;
+    const check = (step, what) => {
+      const fail = (msg) => { throw new Error(`seed ${seed} step ${step} (${what}): ${msg}`); };
+      const audible = audios.filter((x) => !x.paused && !x.pending && x._src);
+      const ids = new Set(engine.items.map((i) => i.audioItemId));
+      if (revoked && audible.length) fail("I5 sound after no_access");
+      if (engine.status !== "playing" && audible.length) fail(`I9 sound while ${engine.status}`);
+      if (audible.length > 2) fail("more than two audible slots");
+      for (const x of audible) {
+        const aid = x._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "");
+        if (!ids.has(aid)) fail(`I4 removed track audible ${aid.slice(-2)}`);
+        const it = engine.items.find((i) => i.audioItemId === aid);
+        if (it?.playableUntil && world.now >= it.playableUntil.getTime()) fail("I1 audible past deadline");
+      }
+    };
+    try {
+      void engine.init(world.manifestRes.data);
+      for (let step = 0; step < 30; step++) {
+        const r = rnd();
+        let what;
+        if (r < 0.35) { what = "time"; }
+        else if (r < 0.6) {
+          what = "refresh";
+          let list = world.items.map((x) => ({ ...x }));
+          if (rnd() < 0.5) list = list.filter((_, k) => k !== pick(list.length));
+          if (rnd() < 0.5) { const order = list.map((_, k) => k).sort(() => rnd() - 0.5); list = order.map((k, j) => ({ ...list[k], position: j + 1 })); }
+          if (rnd() < 0.2) { const k = pick(list.length); list[k] = { ...list[k], playable_until: new Date(world.now + pick(4000)).toISOString() }; }
+          world.manifestRes = { ok: true, data: world.manifest(list) };
+          void engine.refresh();
+        } else if (r < 0.75) { what = "toggle"; wantPlay = engine.status !== "playing"; void engine.toggle(); }
+        else if (r < 0.85) { what = "network"; world.online = !world.online; }
+        else if (r < 0.9) { what = "download"; void engine.downloadAll(); }
+        else { what = "tick"; void engine.tick(); }
+        await world.advance(50 + pick(2500));
+        if (process.env.SPA_FUZZ_TRACE) console.log(seed, step, what, world.online, engine.status, engine.current?.audioItemId.slice(-2), JSON.stringify(audios.map((x) => [x._src.slice(-2), x.paused, +x.currentTime.toFixed(1)])), engine.loaded.map((l) => l && l.kind + l.audioItemId.slice(-2)).join(","), world.now - T0, engine.opEpoch, engine.starting, JSON.stringify(engine.pendingStart), engine.playOp);
+        check(step, what);
+        if (world.restarts) throw new Error(`seed ${seed} step ${step} (${what}): I7 an audible track was restarted from 0`);
+        // Liveness: online, user wants playback, some track allowed for >10 s -> after a quiet
+        // period the engine must be playing and engine.current audible (no silent stall).
+        const okItems = engine.items.filter((i) => !i.playableUntil || i.playableUntil.getTime() > world.now + 10000);
+        // ("error"/"empty" are explicit user-visible outcomes, e.g. offline without copies.)
+        if (wantPlay && world.online && okItems.length && ["playing", "paused", "idle"].includes(engine.status)) {
+          await world.advance(4000);
+          // A deadline/end inside the window may legitimately cost one load: allow recovery.
+          const live = () => engine.status === "playing" && engine.current && audios.some((x) => !x.paused && !x.pending && x._src.endsWith(engine.current.audioItemId));
+          if (!live()) await world.advance(2500);
+          const cur = engine.current?.audioItemId;
+          const okNow = engine.items.some((i) => !i.playableUntil || i.playableUntil.getTime() > world.now + 2000);
+          if (okNow && (engine.status !== "playing" || !cur || !audios.some((x) => !x.paused && !x.pending && x._src.endsWith(cur))))
+            throw new Error(`seed ${seed} step ${step} (${what}): stalled: status ${engine.status}, current ${cur?.slice(-2)} not audible` + (process.env.SPA_FUZZ_TRACE ? ` msg=${engine.message} items=${JSON.stringify(engine.items.map((i) => [i.audioItemId.slice(-2), i.playableUntil ? i.playableUntil.getTime() - world.now : null]))} plays=${JSON.stringify(world.plays.slice(-4).map((p) => [p.el, p.src.slice(-2), p.at - T0, p.pos]))} signs=${world.signs.length} expires=${engine.manifest?.expiresAt?.getTime?.() - world.now}` : ""));
+          check(step, "quiet");
+        }
+      }
+      // Liveness: valid manifest, online, playing -> something audible and it is engine.current.
+      world.online = true;
+      world.manifestRes = { ok: true, data: world.manifest(world.items) };
+      void engine.refresh();
+      await world.advance(3000);
+      if (engine.status !== "playing") { void engine.toggle(); await world.advance(3000); }
+      check("final", "liveness");
+      if (engine.status === "playing") {
+        const cur = engine.current?.audioItemId;
+        if (!cur || !audios.some((x) => !x.paused && !x.pending && x._src.endsWith(cur))) throw new Error(`seed ${seed}: playing but engine.current (${cur?.slice(-2)}) not audible`);
+      }
+      // I5 last.
+      await engine.revokeAccess(); revoked = true;
+      await world.advance(1000);
+      check("revoked", "no_access");
+    } catch (e) {
+      failures.push(e.message.startsWith("seed ") ? e.message : `seed ${seed}: ${e.message}`);
+    }
+    engine.dispose();
+  }
+  assert.equal(failures.length, 0, `interleaving failures (${failures.length}/${SEEDS}):\n${failures.slice(0, 8).join("\n")}`);
 }
 
 console.log("business-spa-player-engine-unit: all tests passed");

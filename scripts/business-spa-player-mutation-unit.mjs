@@ -13,39 +13,35 @@ const mutations = [
   ["I1/I2 mayStart ignores rights now", "if (!this.allowed(item, l.kind)) return false;", ""],
   ["I1 mayStart ignores deadline at start moment", "return atMs === undefined || this.allowed(item, l.kind, false, atMs);", "return true;"],
   ["I4 mayStart ignores removed track", "if (!item) return false;\n    if (!this.allowed", "if (!item) return true;\n    if (!this.allowed"],
-  ["I5 fresh ignores access epoch", "t.epoch === this.accessEpoch && ", ""],
-  ["I8 fresh ignores slot op", "t.slotOp === this.slotOp[t.slot] && ", ""],
-  ["I9 fresh ignores user pause", "t.playOp === this.playOp && ", ""],
-  ["I6 stale cache switch clears newer source", "if (op !== this.slotOp[slot]) {\n        this.d.objectUrl.revoke(url);\n        continue;", "if (false) {\n        this.d.objectUrl.revoke(url);\n        continue;"],
+  ["I8 fresh ignores slot op", "return this.stillCurrent(t.op) && t.slotOp === this.slotOp[t.slot];", "return this.stillCurrent(t.op);"],
+  ["I6 stale cache switch clears newer source", "if (!this.stillCurrent(wop) || op !== this.slotOp[slot]) {\n        this.d.objectUrl.revoke(url);\n        continue;", "if (false) {\n        this.d.objectUrl.revoke(url);\n        continue;", "depth"],
   ["I7 successor chosen by availability now", "let ni = this.findPlayable(nextIndex(this.items.length, this.index), at);", "let ni = this.findPlayable(nextIndex(this.items.length, this.index));"],
-  ["I7 late load replaces audible slot", "|| op !== this.slotOp[slot]) {\n      if (src?.kind", ") {\n      if (src?.kind"],
-  // The intent ("keep playing" decided before a pause) is enforced in layers; the
-  // mutant removes the whole layer, as one guard (arrays = several replacements).
-  ["I9 intent of async ops ignored (refresh/advance/tick restart after pause)", [
-    ["playOp: intent, slotOp", "playOp: this.playOp, slotOp"],
-    ["if (intent !== this.playOp) return; // paused/stopped since the caller decided to play", ""],
-    ["    if (intent !== this.playOp) return;\n    if (!ok) {", "    if (!ok) {"],
-    ["if (superseded()) return; // paused / refreshed / restarted meanwhile: no fallback start", ""],
-    ["    if (intent !== this.playOp) return false;\n", ""],
-  ]],
+  ["I7 late load replaces audible slot", "if (!src || op !== this.slotOp[slot]) {", "if (!src) {", "depth"],
   ["I9 pause leaves the outgoing slot audible", [
     ["for (const a of this.d.audios) a.pause();", "this.activeEl().pause();"],
   ]],
   ["I8 startAt uses the index captured before the await", [
     ["    const ri = this.items.findIndex((x) => x.audioItemId === targetId);\n    if (ri < 0) return;", "    const ri = pi;\n    if (ri < 0) return;"],
-  ]],
-  // (advance's identity re-resolve is now only defence in depth: any manifest change bumps
-  // `generation`, which makes the old advance superseded — covered by the next mutant.)
-  ["I8 stale advance falls back after a refresh restarted playback", [
-    ["const superseded = () => intent !== this.playOp || gen !== this.generation || startOp !== this.startOp;", "const superseded = () => intent !== this.playOp;"],
-  ]],
+  ], "depth"],
+  // (advance's identity re-resolve is defence in depth: a manifest change bumps the epoch.)
+  // ---- whole-operation epoch (A15) ----
+  ["OP stillCurrent ignores the epoch", [["return op === this.opEpoch && this.status !== \"no_access\";", "return this.status !== \"no_access\";"]]],
+  ["OP bumpOp does not advance the epoch", [["    return ++this.opEpoch;", "    return this.opEpoch;"]]],
+  ["OP advance fallback activation keeps the slot counter", [["      this.slotOp[slot] += 1; // slot activation: a pending load into it is now stale\n", ""]], "depth"],
+  ["OP advance activates a stale prepared successor", [["ni >= 0 && ni === want && this.allowed", "ni >= 0 && this.allowed"]], "depth"],
+  ["OP refresh does not take over a superseded start", [["    if (ps && ps.intent === this.playOp) {", "    if (false) {"]]],
+  ["OP tick treats an empty slot during startAt as a stop", [["(!l && this.starting === 0)", "(!l)"]]],
+  ["OP startAt stalls when the track became disallowed during the load", [["if (!played && this.stillCurrent(wop) && intent === this.playOp && this.status === \"paused\" && attempt < this.items.length) {", "if (false) {"]]],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],
 ];
 let blind = 0;
 try {
-  for (const [name, from, to] of mutations) {
+  // "depth" = a secondary layer that the whole-operation epoch already covers: its survival
+  // is reported, not counted (removing epoch + layer together is covered by the OP mutants).
+  for (const [name, from, to, kind] of mutations) {
     const reps = Array.isArray(from) ? from : [[from, to]];
+    const depth = (Array.isArray(from) ? to : kind) === "depth";
     let code = orig;
     const missing = reps.find(([f]) => !code.includes(f));
     if (missing) { console.error(`mutation anchor missing: ${name}`); blind++; continue; }
@@ -56,8 +52,8 @@ try {
     try {
       execFileSync("npx", ["tsx", suite], { env: { ...process.env, SPA_ENGINE_MODULE: mutant }, stdio: "pipe", timeout: 120000 });
     } catch (e) { failed = /AssertionError/.test(String(e.stderr ?? "") + String(e.stdout ?? "")); }
-    console.log(`${failed ? "killed " : "SURVIVED"} ${name}`);
-    if (!failed) blind++;
+    console.log(`${failed ? "killed " : depth ? "layered (covered by epoch)" : "SURVIVED"} ${name}`);
+    if (!failed && !depth) blind++;
   }
 } finally { rmSync(mutant, { force: true }); }
 if (blind) { console.error(`business-spa-player-mutation-unit: ${blind} mutant(s) survived`); process.exit(1); }
