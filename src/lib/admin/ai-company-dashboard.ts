@@ -458,7 +458,53 @@ export type CompanyTask = {
   allowedActions: string[] | null;
   /** Core `tasks[].required_decision`: what decision the task waits for, in Russian. */
   requiredDecision: string | null;
+  /** Core `tasks[].owner_comments` (company-core #43): Sergey's lifecycle comments, newest first. */
+  ownerComments?: OwnerCommentFact[];
 };
+
+export type OwnerCommentFact = { action: string; label: string; reason: string; at: string | null };
+/** One line on the card: «Комментарий Сергея (Отложено в план, 13.10 07:56 МСК): …». */
+export type OwnerCommentView = { action: string; label: string; reason: string; when: string | null };
+
+const OWNER_COMMENT_LABELS: Record<string, string> = {
+  defer: "Отложено в план",
+  cancel: "Снято",
+  return: "Возвращено на доработку",
+  complete: "Завершено с доказательствами",
+  stop: "Остановка",
+};
+
+function parseOwnerComments(value: unknown): OwnerCommentFact[] {
+  if (!Array.isArray(value)) return [];
+  const out: OwnerCommentFact[] = [];
+  for (const raw of value) {
+    const record = asRecord(raw);
+    if (!record) continue;
+    const action = typeof record.action === "string" ? record.action.trim() : "";
+    const reason = typeof record.reason === "string" ? record.reason.replace(/\s+/g, " ").trim().slice(0, 1000) : "";
+    if (!action || !reason) continue;
+    const label = (typeof record.label === "string" && record.label.trim()) || OWNER_COMMENT_LABELS[action] || action;
+    const at = typeof record.at === "string" && Number.isFinite(Date.parse(record.at)) ? record.at : null;
+    out.push({ action, label, reason, at });
+  }
+  return out.slice(0, 5);
+}
+
+/** «13.10 07:56 МСК» in Moscow time. */
+export function formatMoscowShort(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("day")}.${get("month")} ${get("hour")}:${get("minute")} МСК`;
+}
+
+export function ownerCommentViews(task: Pick<CompanyTask, "ownerComments"> | null | undefined): OwnerCommentView[] {
+  return (task?.ownerComments ?? []).map((c) => ({ action: c.action, label: c.label, reason: c.reason, when: formatMoscowShort(c.at) }));
+}
 
 /** Core `tasks[].board_tab`: the four board tabs, decided by the server. */
 export type BoardTab = "plan" | "working" | "review" | "archive";
@@ -673,6 +719,8 @@ export type TaskDetailModel = {
   copyText: string;
   acceptance: OwnerAcceptanceView | null;
   launch: LaunchView | null;
+  /** Sergey's lifecycle comments, newest first; shown once on the card. */
+  ownerComments?: OwnerCommentView[];
   lifecycle: LifecycleView | null;
 };
 
@@ -767,6 +815,7 @@ export type GateCard = {
   /** Core task id of the gate's task; null when the gate is not matched to a task in the snapshot. */
   taskId: string | null;
   /** Same lifecycle buttons as the task card (Core allowed_actions + required_decision); null for history. */
+  ownerComments?: OwnerCommentView[];
   lifecycle: LifecycleView | null;
 };
 
@@ -1376,6 +1425,7 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
     launch: parseLaunch(readRaw(record, CORE_FIELD_MAP.task.launch)),
     allowedActions: parseAllowedActions(readRaw(record, CORE_FIELD_MAP.task.allowedActions)),
     requiredDecision: readString(record, CORE_FIELD_MAP.task.requiredDecision),
+    ownerComments: parseOwnerComments(readRaw(record, ["owner_comments"])),
     acceptanceContract: hasAcceptanceContract(record),
     ownerAcceptance: parseOwnerAcceptance(record, typeof run?.productionVerified === "boolean" ? run.productionVerified : null),
   };
@@ -1665,6 +1715,7 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     ownerAcceptance: next.ownerAcceptance ?? previous.ownerAcceptance,
     allowedActions: next.allowedActions ?? previous.allowedActions,
     requiredDecision: prefer(next.requiredDecision, previous.requiredDecision),
+    ownerComments: next.ownerComments?.length ? next.ownerComments : previous.ownerComments,
   };
 }
 
@@ -2270,6 +2321,7 @@ function presentGate(gate: GateFact, tasks: CompanyTask[], codexFallback: string
     copyText: "",
     taskId: task?.id ?? null,
     lifecycle: task && !gate.archived ? lifecycleView(task) : null,
+    ownerComments: ownerCommentViews(task),
   };
 }
 
@@ -2844,6 +2896,7 @@ function buildTaskDetail(
     acceptance: acceptanceView(task),
     launch: launchView(task),
     lifecycle: lifecycleView(task),
+    ownerComments: ownerCommentViews(task),
   };
 }
 

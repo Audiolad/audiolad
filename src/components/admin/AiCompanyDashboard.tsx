@@ -16,7 +16,7 @@ import {
   validateRejectionComment,
   type AcceptanceDecision,
 } from "@/lib/admin/ai-company-acceptance";
-import { NO_DATA, historyHref, type LifecycleAction } from "@/lib/admin/ai-company-dashboard";
+import { NO_DATA, historyHref, type LifecycleAction, type OwnerCommentView } from "@/lib/admin/ai-company-dashboard";
 import {
   EVIDENCE_REFERENCE_HINT,
   EVIDENCE_TYPES,
@@ -855,9 +855,38 @@ export function LifecycleControls({ detail }: { detail: Pick<TaskDetailModel, "t
   );
 }
 
+/** «Комментарий Сергея (Отложено в план, 13.10 07:56 МСК): …», the latest; older ones folded. */
+export function OwnerComments({ comments }: { comments: OwnerCommentView[] | undefined }) {
+  if (!comments?.length) return null;
+  const [latest, ...older] = comments;
+  const head = (c: OwnerCommentView) => `Комментарий Сергея (${c.label}${c.when ? `, ${c.when}` : ""}): `;
+  return (
+    <div className="mt-3 max-w-full rounded-xl border border-[#eadff8] bg-[#fffdf5] p-3 text-sm" data-owner-comments>
+      <p className="break-words" data-owner-comment={latest.action}>
+        <span className="font-semibold">{head(latest)}</span>
+        {latest.reason}
+      </p>
+      {older.length ? (
+        <details className="mt-1 text-[#796ba0]">
+          <summary className="cursor-pointer">Ранее ({older.length})</summary>
+          <ul className="mt-1 grid gap-1">
+            {older.map((c, index) => (
+              <li key={`${c.action}-${index}`} className="break-words" data-owner-comment-older={c.action}>
+                <span className="font-semibold">{head(c)}</span>
+                {c.reason}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function TaskDetail({ detail }: { detail: TaskDetailModel }) {
   return (
     <>
+    <OwnerComments comments={detail.ownerComments} />
     <LaunchControls detail={detail} />
     <LifecycleControls detail={detail} />
     <TaskCopyButton text={detail.copyText} />
@@ -1018,6 +1047,7 @@ function GateList({
               className={attention ? "border-red-200 bg-white/80" : "border-[#eadff8] bg-white"}
               articleProps={{ "data-decision-owner": gate.decisionOwner }}
             >
+              <OwnerComments comments={gate.ownerComments} />
               {gate.taskId && gate.lifecycle ? (
                 <LifecycleControls detail={{ taskId: gate.taskId, lifecycle: gate.lifecycle }} />
               ) : null}
