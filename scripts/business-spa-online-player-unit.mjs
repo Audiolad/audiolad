@@ -7,7 +7,7 @@ const { SpaOnlinePlayer } = await import("../src/lib/business-app/spa-online-pla
 const item = (n) => ({ audioItemId: `00000000-0000-4000-8000-00000000000${n}`, title: `T${n}`, playableUntil: null });
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-function make({ items = [item(1), item(2), item(3)], signFn, playFn } = {}) {
+function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {}) {
   const calls = [];
   const audio = {
     src: "",
@@ -19,7 +19,7 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn } = {}) {
     load() {},
   };
   const p = new SpaOnlinePlayer(
-    { audio, sign: async (id) => { calls.push(id); return signFn ? signFn(id) : { ok: true, data: { url: `https://s/${id}?token=x` } }; }, onChange() {} },
+    { audio, ...(clock ?? {}), sign: async (id) => { calls.push(id); return signFn ? signFn(id) : { ok: true, data: { url: `https://s/${id}?token=x` } }; }, onChange() {} },
     items,
   );
   return { p, audio, calls };
@@ -101,6 +101,53 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn } = {}) {
   await p.toggle();
   assert.equal(p.status, "paused");
   assert.ok(p.message);
+}
+
+// 9. Codex O1 #1: hard stop at playable_until even though the browser already buffered audio;
+//    resume after the deadline does not reuse the old URL.
+{
+  let t = 1_000_000;
+  const timers = [];
+  const clock = { now: () => t, setTimer: (fn, ms) => { const h = { fn, at: t + ms }; timers.push(h); return h; }, clearTimer: (h) => { const i = timers.indexOf(h); if (i >= 0) timers.splice(i, 1); } };
+  const advance = async (ms) => { t += ms; for (const h of [...timers]) if (h.at <= t) { timers.splice(timers.indexOf(h), 1); h.fn(); } await flush(); await flush(); };
+  const short = { ...item(1), playableUntil: new Date(t + 6100) };
+  const { p, audio, calls } = make({ items: [short], clock, signFn: (id) => (t >= short.playableUntil.getTime() ? { ok: false, reason: "expired" } : { ok: true, data: { url: "u" + id } }) });
+  await p.toggle();
+  assert.equal(p.status, "playing");
+  await advance(6200);
+  assert.notEqual(p.status, "playing");
+  assert.equal(audio.src, "");
+  assert.equal(audio.paused, true);
+  // pause before deadline, resume after deadline -> no sound, no reuse of old URL
+  const s2 = { ...item(2), playableUntil: new Date(t + 5000) };
+  const b = make({ items: [s2], clock, signFn: (id) => (t >= s2.playableUntil.getTime() ? { ok: false, reason: "expired" } : { ok: true, data: { url: "u" + id } }) });
+  await b.p.toggle(); await b.p.toggle();
+  assert.equal(b.p.status, "paused");
+  t += 6000;
+  await b.p.toggle();
+  assert.notEqual(b.p.status, "playing");
+  assert.equal(b.audio.paused, true);
+  // manifest shortens the window of the playing track -> stop at the new deadline
+  const s3 = { ...item(3), playableUntil: null };
+  const c = make({ items: [s3], clock });
+  await c.p.toggle();
+  await c.p.applyManifest([{ ...s3, playableUntil: new Date(t + 1000) }]);
+  await advance(1100);
+  assert.notEqual(c.p.status, "playing");
+  assert.equal(c.audio.paused, true);
+  void calls;
+}
+
+// 10. Codex O1 #2: repeated mid-stream errors on one track do not loop forever.
+{
+  const { p, calls } = make({ items: [item(1), item(2)] });
+  await p.toggle();
+  for (let k = 0; k < 8; k++) await p.onError();
+  assert.equal(p.status, "error");
+  assert.ok(calls.length <= 4, `signs=${calls.length}`);
+  // a fresh track (user press) gets its own retry budget
+  await p.playIndex(1);
+  assert.equal(p.status, "playing");
 }
 
 // 8. Wiring: online page uses the online player; no cache / download / offline sign.

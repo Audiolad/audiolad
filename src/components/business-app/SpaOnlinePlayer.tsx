@@ -36,6 +36,9 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
     const ctl = new Controller(
       {
         audio,
+        now: () => Date.now(),
+        setTimer: (fn, ms) => window.setTimeout(fn, ms),
+        clearTimer: (t) => window.clearTimeout(t as number),
         sign: async (id) => {
           try {
             const r = await getSpaTrackUrl(id, "stream");

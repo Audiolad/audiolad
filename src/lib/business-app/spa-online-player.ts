@@ -27,6 +27,9 @@ export type OnlineDeps = {
   audio: OnlineAudio;
   sign(audioItemId: string): Promise<OnlineSignResult>;
   onChange(): void;
+  now?: () => number;
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (t: unknown) => void;
 };
 
 /** Sign errors after which the track is skipped (removed / expired), not retried. */
@@ -40,6 +43,10 @@ export class SpaOnlinePlayer {
   /** Bumped on every user/automatic transition; stale async results are ignored. */
   private op = 0;
   private failures = 0;
+  /** Mid-stream error retries of the current track; reset only when another track starts or a track ends. */
+  private errorRetries = 0;
+  private retryTrackId: string | null = null;
+  private deadlineTimer: unknown = null;
   private disposed = false;
 
   constructor(
@@ -59,7 +66,50 @@ export class SpaOnlinePlayer {
     this.d.onChange();
   }
 
+  private now(): number {
+    return this.d.now ? this.d.now() : Date.now();
+  }
+
+  private clearDeadline() {
+    if (this.deadlineTimer !== null) (this.d.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>)))(this.deadlineTimer);
+    this.deadlineTimer = null;
+  }
+
+  /** Track's playable_until has passed (rights window over). */
+  private expired(item: SpaManifestItem | null): boolean {
+    return !!item?.playableUntil && item.playableUntil.getTime() <= this.now();
+  }
+
+  /** Hard stop at playable_until: audio already buffered by the browser must not keep sounding. */
+  private armDeadline(item: SpaManifestItem, op: number) {
+    this.clearDeadline();
+    if (!item.playableUntil) return;
+    const ms = Math.max(0, item.playableUntil.getTime() - this.now());
+    const set = this.d.setTimer ?? ((fn, t) => setTimeout(fn, t));
+    // setTimeout caps at ~24.8 days; re-arm in steps.
+    this.deadlineTimer = set(() => {
+      this.deadlineTimer = null;
+      if (op !== this.op || this.disposed) return;
+      if (!this.expired(item)) return this.armDeadline(item, op);
+      void this.onDeadline();
+    }, Math.min(ms, 2 ** 31 - 1));
+  }
+
+  private async onDeadline(): Promise<void> {
+    this.op++;
+    this.stopAudio();
+    const left = this.items.filter((i) => !this.expired(i));
+    this.items = left;
+    if (left.length === 0) {
+      this.index = -1;
+      return this.set("idle");
+    }
+    // Continue with the next still-allowed track (server re-checks on signing).
+    return this.playIndex(0);
+  }
+
   private stopAudio() {
+    this.clearDeadline();
     this.d.audio.pause();
     this.d.audio.removeAttribute("src");
     this.d.audio.load();
@@ -80,6 +130,10 @@ export class SpaOnlinePlayer {
     const op = ++this.op;
     const item = this.items[i];
     this.index = i;
+    if (this.retryTrackId !== item.audioItemId) {
+      this.retryTrackId = item.audioItemId;
+      this.errorRetries = 0;
+    }
     this.stopAudio();
     this.set("loading");
     const r = await this.d.sign(item.audioItemId);
@@ -95,6 +149,7 @@ export class SpaOnlinePlayer {
       await this.d.audio.play();
       if (op !== this.op || this.disposed) return;
       this.failures = 0;
+      this.armDeadline(item, op);
       this.set("playing");
     } catch {
       if (op !== this.op || this.disposed) return;
@@ -107,14 +162,19 @@ export class SpaOnlinePlayer {
     if (this.status === "no_access" || this.items.length === 0) return;
     if (this.status === "playing" || this.status === "loading") {
       this.op++;
+      this.clearDeadline();
       this.d.audio.pause();
       return this.set("paused");
     }
-    if (this.status === "paused" && this.d.audio.src) {
+    if (this.status === "paused" && this.d.audio.src && this.current && !this.expired(this.current)) {
       const op = ++this.op;
+      const item = this.current;
       try {
         await this.d.audio.play();
-        if (op === this.op && !this.disposed) this.set("playing");
+        if (op !== this.op || this.disposed) return;
+        if (this.expired(item)) return this.onDeadline();
+        this.armDeadline(item, op);
+        this.set("playing");
       } catch {
         // URL may have expired while paused: fetch a fresh one (re-checks access).
         if (op === this.op && !this.disposed) await this.playIndex(Math.max(this.index, 0));
@@ -132,14 +192,15 @@ export class SpaOnlinePlayer {
   /** <audio> "ended": continue with the next track (program loops). */
   onEnded(): Promise<void> {
     if (this.status !== "playing") return Promise.resolve();
+    this.retryTrackId = null;
     return this.next();
   }
 
   /** <audio> "error" while playing (e.g. signed URL expired mid-stream): re-sign and retry once per track. */
   onError(): Promise<void> {
     if (this.status !== "playing" && this.status !== "loading") return Promise.resolve();
-    this.failures++;
-    if (this.failures > 2) {
+    this.errorRetries++;
+    if (this.errorRetries > 2) {
       this.op++;
       this.stopAudio();
       this.set("error", "Ошибка воспроизведения. Проверьте интернет и нажмите «Играть».");
@@ -161,6 +222,9 @@ export class SpaOnlinePlayer {
     const idx = currentId ? items.findIndex((i) => i.audioItemId === currentId) : -1;
     if (idx >= 0) {
       this.index = idx;
+      // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
+      if (this.expired(items[idx])) return this.onDeadline();
+      if (this.status === "playing") this.armDeadline(items[idx], this.op);
       this.d.onChange();
       return;
     }
@@ -178,6 +242,7 @@ export class SpaOnlinePlayer {
   dispose() {
     this.disposed = true;
     this.op++;
+    this.clearDeadline();
     this.d.audio.pause();
   }
 }
