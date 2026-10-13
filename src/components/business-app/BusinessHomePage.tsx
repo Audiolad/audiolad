@@ -20,6 +20,7 @@ import {
   formatTrackTime,
 } from "@/lib/business-app/mock-data";
 import type { BusinessPointState } from "@/lib/business-app/point-state";
+import { BUSINESS_RIGHTS_HOME_CONTROL } from "@/lib/business-app/rights-status-copy";
 
 type BusinessHomePageProps = {
   /** Reviewer-only ?mockState= override; null → use real health signals. */
@@ -581,9 +582,9 @@ export default function BusinessHomePage({
                 tone={state === "autonomous" ? "warn" : "ok"}
               />
               <ControlCard
-                title="Документы в порядке"
-                detail="Лицензия активна"
-                tone="ok"
+                title={BUSINESS_RIGHTS_HOME_CONTROL.title}
+                detail={BUSINESS_RIGHTS_HOME_CONTROL.detail}
+                tone={BUSINESS_RIGHTS_HOME_CONTROL.tone}
               />
             </div>
           </section>

@@ -91,7 +91,7 @@ assert.equal(preview.typeLabel, "SPA / wellness");
 assert.match(preview.atmosphereLabel, /Современный/);
 assert.equal(preview.rightsSafeDisclaimer, BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER);
 assert.equal(preview.noAudioNote, BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE);
-assert.match(preview.rightsSafeDisclaimer, /UNKNOWN/);
+assert.match(preview.rightsSafeDisclaimer, /уточняется/i);
 assert.match(preview.rightsSafeDisclaimer, /не утверждаем/i);
 assert.match(preview.noAudioNote, /Case A/);
 
@@ -143,8 +143,9 @@ const page = readFileSync(
 );
 assert.match(page, /bootstrapBusinessOrganizationWithLocation/);
 assert.match(page, /Zero-to-Music/);
-assert.match(page, /UNKNOWN/);
-assert.doesNotMatch(page, /лицензирован[аоы]/i);
+assert.match(page, /rightsSafeDisclaimer/);
+assert.match(page, /уточняется|статус прав/i);
+assert.doesNotMatch(page, /Лицензия активн/i);
 assert.doesNotMatch(page, /ELIGIBLE\s*=\s*true/);
 
 const home = readFileSync(

@@ -3,9 +3,14 @@
  * Pure / browser-safe — no server-only imports.
  *
  * Policy: UNKNOWN ≠ ELIGIBLE. Never invent grants/license claims.
- * Full legal seeds / catalog freeze = HG-3/4 + P0-06.
+ * Owner-facing RU copy: rights-status-copy.ts (P1-08 / HG-3).
+ * Full legal seeds / catalog freeze = HG-FIRST-ELIGIBLE → freeze re-CONFIRM → HG-9.
  */
 
+import {
+  formatOwnerEligibilityDecisionLabel,
+  venueAirplayOwnerEmptyStateCopy,
+} from "@/lib/business-app/rights-status-copy";
 import { VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID } from "@/lib/business-app/venue-player";
 
 export const BUSINESS_ELIGIBILITY_DECISIONS = [
@@ -99,45 +104,12 @@ export function venueAirplayEmptyStateCopy(input: {
   probed: boolean;
   eligibleCount: number;
 }): { title: string; description: string } {
-  if (!input.hasLocation) {
-    return {
-      title: "Нет точки для проверки прав",
-      description:
-        "Сначала создайте организацию и точку на Главной. Без Location нельзя вызвать resolve_business_track_eligibility.",
-    };
-  }
-  if (!input.probed) {
-    return {
-      title: "Проверка eligibility…",
-      description:
-        "Читаем статус прав через A5 RPC. UNKNOWN не считается разрешением на эфир.",
-    };
-  }
-  if (input.eligibleCount === 0) {
-    return {
-      title: "Каталог для эфира пуст",
-      description:
-        "Нет треков со статусом ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Технический пилот-тон Player остаётся отдельно и не является eligible-каталогом. Реальные сиды прав / freeze-list — после решений HG-3/HG-4 (P0-06).",
-    };
-  }
-  return {
-    title: "Eligible для эфира",
-    description: `В пуле эфира: ${input.eligibleCount} трек(ов) со статусом ELIGIBLE.`,
-  };
+  return venueAirplayOwnerEmptyStateCopy(input);
 }
 
+/** Owner-facing badge (P1-08). Machine code still available via decision field. */
 export function formatEligibilityDecisionLabel(
   decision: BusinessEligibilityDecision,
 ): string {
-  switch (decision) {
-    case "ELIGIBLE":
-      return "ELIGIBLE";
-    case "INELIGIBLE":
-      return "INELIGIBLE";
-    case "CONDITIONAL":
-      return "CONDITIONAL";
-    case "UNKNOWN":
-    default:
-      return "UNKNOWN";
-  }
+  return formatOwnerEligibilityDecisionLabel(decision);
 }

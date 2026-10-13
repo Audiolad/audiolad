@@ -9,6 +9,11 @@ import {
   venueAirplayEmptyStateCopy,
   type BusinessEligibilityProbeRow,
 } from "@/lib/business-app/eligibility";
+import {
+  BUSINESS_RIGHTS_PROBE_FOOTNOTE,
+  formatEligibilityDecisionCode,
+  formatOwnerEligibilityDecisionExplanation,
+} from "@/lib/business-app/rights-status-copy";
 
 type ProbeState =
   | { status: "idle" }
@@ -52,10 +57,10 @@ export default function BusinessEligibilityProbePanel({
   if (domain.status === "anonymous") {
     return (
       <section className="rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-lg font-bold">Eligibility (A5)</h2>
+        <h2 className="text-lg font-bold">Статус прав на эфир</h2>
         <p className="mt-2 text-sm opacity-80">
-          Войдите как владелец, чтобы увидеть read-only статус прав для кандидатов
-          эфира. Без Location вызов RPC недоступен.
+          Войдите как владелец, чтобы увидеть статус прав для кандидатов эфира.
+          Без точки проверка недоступна.
         </p>
       </section>
     );
@@ -64,11 +69,9 @@ export default function BusinessEligibilityProbePanel({
   const empty =
     probe.status === "idle"
       ? {
-          title: compact
-            ? "Пул эфира (eligibility)"
-            : "Проверка eligibility",
+          title: compact ? "Пул эфира" : "Проверка статуса прав",
           description:
-            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав — после HG-3/HG-4.",
+            "Нажмите «Проверить», чтобы обновить статус. В эфир — только подтверждённая пригодность; «уточняется» ≠ разрешение на эфир.",
         }
       : venueAirplayEmptyStateCopy({
           hasLocation: Boolean(domain.location),
@@ -81,16 +84,13 @@ export default function BusinessEligibilityProbePanel({
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide opacity-60">
-            Rights Eligibility · read-only
+            Статус прав · только чтение
           </p>
           <h2 className="text-lg font-bold">
-            {compact && probe.status !== "idle" ? "Пул эфира (eligibility)" : empty.title}
+            {compact && probe.status !== "idle" ? "Пул эфира" : empty.title}
           </h2>
           <p className="mt-1 text-sm opacity-80">{empty.description}</p>
-          <p className="mt-1 text-xs opacity-50">
-            RPC <code>resolve_business_track_eligibility</code> · UNKNOWN ≠
-            ELIGIBLE · без claims «лицензировано»
-          </p>
+          <p className="mt-1 text-xs opacity-50">{BUSINESS_RIGHTS_PROBE_FOOTNOTE}</p>
         </div>
         <button
           type="button"
@@ -132,10 +132,16 @@ export default function BusinessEligibilityProbePanel({
                         ? "bg-red-500/30 text-red-100"
                         : "bg-amber-400/20 text-amber-100"
                   }`}
+                  title={formatEligibilityDecisionCode(row.decision)}
                 >
                   {formatEligibilityDecisionLabel(row.decision)}
                 </span>
               </div>
+              <p className="mt-1 text-xs opacity-70">
+                {formatOwnerEligibilityDecisionExplanation(row.decision)}
+                {" "}
+                · код <code>{formatEligibilityDecisionCode(row.decision)}</code>
+              </p>
               <p className="mt-1 break-all text-xs opacity-60">
                 audio_item: <code>{row.audioItemId}</code>
                 {row.trackCode ? (
@@ -159,7 +165,7 @@ export default function BusinessEligibilityProbePanel({
       ) : null}
 
       {probe.status === "loading" ? (
-        <p className="text-sm opacity-70">Вызов A5 eligibility…</p>
+        <p className="text-sm opacity-70">Обновляем статус прав…</p>
       ) : null}
     </section>
   );

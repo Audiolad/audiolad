@@ -4,7 +4,10 @@
  * Path: тип → атмосфера → preview → confirm → (create org/location) → Player/Music.
  * Atmosphere is UX preference only until P1-02 Sonic DNA; no DNA persistence here.
  * Preview is descriptive + UNKNOWN-safe — no Case A audio without CONFIRM, no rights claims.
+ * Rights disclaimer: rights-status-copy.ts (P1-08 / HG-3).
  */
+
+import { BUSINESS_RIGHTS_ONBOARDING_DISCLAIMER } from "@/lib/business-app/rights-status-copy";
 
 export const BUSINESS_ONBOARDING_STEPS = [
   "type",
@@ -101,7 +104,7 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
   ] as const;
 
 export const BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER =
-  "Каталог эфира пока без подтверждённых ELIGIBLE-треков. Статус прав — UNKNOWN, пока нет evidence и freeze-list. Мы не утверждаем, что музыка «лицензирована».";
+  BUSINESS_RIGHTS_ONBOARDING_DISCLAIMER;
 
 export const BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE =
   "Preview в этом шаге описательный: без воспроизведения треков Case A и без выдачи в эфир. Подключение плеера — после подтверждения точки.";
