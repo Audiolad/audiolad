@@ -18,7 +18,13 @@ function errorCode(error: unknown): string {
 
 export function createMusicAnalyzerWorkerPort(
   service: SupabaseClient,
-  options: { leaseSeconds?: number; maxAttempts?: number; env?: NodeJS.ProcessEnv } = {},
+  options: {
+    leaseSeconds?: number;
+    maxAttempts?: number;
+    env?: NodeJS.ProcessEnv;
+    /** Idempotent follow-up for a finished run (e.g. product passport assembly). */
+    onRunSettled?: (runId: string) => Promise<void>;
+  } = {},
 ): MusicAnalyzerWorkerPort {
   const leaseSeconds = options.leaseSeconds ?? MUSIC_ANALYZER_LEASE_SECONDS;
   const maxAttempts = options.maxAttempts ?? MUSIC_ANALYZER_MAX_ATTEMPTS;
@@ -99,6 +105,14 @@ export function createMusicAnalyzerWorkerPort(
       if (rpcError) throw rpcError;
       return data === true;
     },
+
+    ...(options.onRunSettled
+      ? {
+        async afterJobSettled(job: ClaimedMusicAnalyzerRun) {
+          await options.onRunSettled?.(job.id);
+        },
+      }
+      : {}),
 
     async releaseJob(job) {
       const { data, error } = await service.rpc("release_music_analyzer_run", {
