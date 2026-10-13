@@ -29,7 +29,8 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
       const at = prev.startClock + prev.duration * 1000;
       if (at <= world.now) return false;
       this._t = 0;
-      this.pending = { at, id: ++world.seq, fn: () => { this.pending = null; this.paused = false; this.startClock = at; world.plays.push({ el: this.name, src: this._src, at, pos: 0, vol: this.volume, scheduled: true }); } };
+      const p = { at, id: ++world.seq, fn: () => { this.pending = null; this.paused = false; this.startClock = p.at; world.plays.push({ el: this.name, src: this._src, at: p.at, pos: 0, vol: this.volume, scheduled: true }); } };
+      this.pending = p;
       world.timers.push(this.pending);
       return true;
     }
@@ -538,6 +539,57 @@ for (const lat of [0, 600, 2000]) {
   await world.advance(2000);
   assert.equal(engine.current.audioItemId, id(2));
   assert.ok(!bEl.paused, "B audible after the real transition");
+  engine.dispose();
+}
+
+// ---- 18. Re-review A6 ----
+{
+  // (1) suspension shifts B's start past its grant -> pending start cancelled by tick.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60, 60], webAudio: true, playableUntil: (i) => (i === 1 ? new Date(T0 + 12000) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(8000);
+  const a = audios.find((x) => x.src.endsWith(id(1)));
+  const b = audios.find((x) => x.pending);
+  assert.ok(a && b && b.src.endsWith(id(2)), "B scheduled");
+  a.startClock += 4000; b.pending.at += 4000; // context suspended 4 s: B would start at 14 s
+  await world.advance(4600);
+  assert.ok(!world.plays.some((p) => p.src.endsWith(id(2)) && p.at >= T0 + 12000), "B never starts after its grant");
+  assert.ok(!audios.some((x) => x.pending && x.src.endsWith(id(2))), "pending B start cancelled");
+  engine.dispose();
+}
+{
+  // (2) no positive commit tolerance: A late by 15 ms is not stopped early.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9000);
+  const a = audios.find((x) => x.src.endsWith(id(1)));
+  const b = audios.find((x) => x.pending);
+  a.startClock += 15; b.pending.at += 15;
+  await world.advance(1010); // wall 10.010 s, A ends at 10.015 s
+  assert.ok(!a.paused, "A still playing until its real end");
+  await world.advance(100);
+  const bs = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.equal(bs.at, T0 + 10015, "B starts exactly at A's end");
+  engine.dispose();
+}
+{
+  // (3) refresh right before the boundary with a slow cache scan keeps the exact schedule.
+  const { world, deps } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9900);
+  const keys = deps.cache.keys;
+  deps.cache.keys = () => new Promise((r) => { world.timers.push({ at: world.now + 300, id: ++world.seq, fn: () => r(keys()) }); });
+  world.manifestRes = { ok: true, data: world.manifest() };
+  const rp = engine.refresh();
+  await world.advance(500);
+  await rp;
+  const bs = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.ok(bs && bs.at === T0 + 10000 && bs.scheduled, "B still starts exactly on the audio clock");
+  assert.equal(engine.current.audioItemId, id(2));
+  assert.equal(engine.status, "playing");
   engine.dispose();
 }
 

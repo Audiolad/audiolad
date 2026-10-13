@@ -406,12 +406,41 @@ export class SpaPlayerEngine {
       if (this.scheduledSlot === null || this.status !== "playing") return;
       const cur = this.activeEl();
       const left = (cur.duration - cur.currentTime) * 1000;
-      if (!cur.paused && Number.isFinite(left) && left > 20) {
-        this.armCommit(Math.max(20, left));
+      // No positive tolerance: committing stops A, so wait until it is really at its end.
+      if (!cur.paused && Number.isFinite(left) && left > 0) {
+        this.armCommit(Math.max(5, left));
         return;
       }
       this.commitScheduled();
     }, ms);
+  }
+
+  /**
+   * Keep a pending audio-clock start only while it is still allowed at its CURRENT
+   * expected start (which moves if the AudioContext is suspended). Synchronous.
+   */
+  private validateScheduled(): void {
+    const slot = this.scheduledSlot;
+    if (slot === null) return;
+    const lo = this.loaded[slot];
+    const item = lo ? this.items.find((i) => i.audioItemId === lo.audioItemId) : undefined;
+    const cur = this.activeEl();
+    const leftMs = Math.max(0, (cur.duration - cur.currentTime) * 1000);
+    const started = cur.paused || !(leftMs > 0);
+    const ok =
+      !!lo &&
+      !!item &&
+      lo.ready &&
+      (started ? this.allowed(item, lo.kind, true) : this.allowed(item, lo.kind, false, this.d.now() + leftMs + SPA_TICK_MS));
+    if (ok) return;
+    if (started) {
+      // B is already audible: commit so the normal active-track checks stop it.
+      if (this.transitionTimer) this.d.clearTimer(this.transitionTimer);
+      this.transitionTimer = null;
+      this.commitScheduled();
+      return;
+    }
+    this.unschedule();
   }
 
   /** Drop a pending audio-clock start (rights may have changed); tick re-plans. */
@@ -593,6 +622,8 @@ export class SpaPlayerEngine {
     const stopActive = this.expireCopies();
     // 2a) During a cross-fade the outgoing slot is still audible: it must stay allowed too.
     this.checkOutgoing();
+    // 2b) A pending audio-clock start must stay allowed at its (possibly shifted) start.
+    if (this.status === "playing") this.validateScheduled();
     // 2) Stop a current track that is no longer allowed, synchronously.
     const item = this.current;
     const l = this.loadedActive();
@@ -736,8 +767,9 @@ export class SpaPlayerEngine {
     }
     const prevOrder = this.items.map((i) => i.audioItemId);
     if (!this.setManifest(res.data)) return;
-    // New rights (e.g. shortened playable_until): any pending audio-clock start is re-planned.
-    this.unschedule();
+    // New rights (e.g. shortened playable_until): re-validate a pending audio-clock start
+    // synchronously, before any await; an unchanged valid schedule is kept (no gap).
+    this.validateScheduled();
     this.generation += 1;
     await this.scanCache();
     // Drop any loaded source whose track left the program (even when paused).
