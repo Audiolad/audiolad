@@ -71,7 +71,7 @@ export function JazzRelaxPassportHelp({ defaultOpen = false }: { defaultOpen?: b
             onClick={() => setOpen(false)}
             className="rounded-[18px] bg-[#7042c5] px-5 py-3 text-sm font-semibold text-white"
           >
-            Понятно
+            Полезно
           </button>
         </div>
       </dialog>

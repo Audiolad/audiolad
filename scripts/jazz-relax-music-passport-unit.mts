@@ -586,6 +586,11 @@ assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Перейт�
 assert.match(form, /passportPhase === "completed" \|\| passportActivity\.continueInBackground/);
 assert.match(form, /&& !passportActivity\.continueInBackground;/);
 assert.match(form, /<JazzRelaxPassportHelp \/>/);
+{
+  const helpDialog = read("src/components/author-dashboard/product-wizard/JazzRelaxPassportHelp.tsx");
+  assert.match(helpDialog, />\s*Полезно\s*</);
+  assert.doesNotMatch(helpDialog, /Понятно/);
+}
 assert.match(form, /Продолжить без музыкального паспорта/);
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /readAlbumPassportDisplay/);
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /bind_description_album_passport/);
