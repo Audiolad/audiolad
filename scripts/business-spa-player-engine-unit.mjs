@@ -69,6 +69,8 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     }
   }
   const audios = [new FakeAudio("A"), new FakeAudio("B")];
+  // Like HTMLAudioElement: no audio-clock hard stop in the <audio> fallback.
+  if (!webAudio) for (const x of audios) x.stopAt = undefined;
   const items = durations.map((d, i) => ({
     position: i + 1, audio_item_id: id(i + 1), title: `Track ${i + 1}`, duration_seconds: d, gain_db: -6,
     playable_until: playableUntil(i)?.toISOString() ?? null, offline_allowed: offlineUntil(i) !== null,
@@ -162,8 +164,9 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   engine.dispose();
 }
 {
-  // Pause, then grant ends; resume must not play it.
-  const { world, deps } = makeWorld({ durations: [60, 60], playableUntil: (i) => (i === 0 ? new Date(T0 + 10000) : null) });
+  // Pause, then grant ends; resume must not play it. (Web Audio: a mid-track deadline needs the
+  // audio-clock hard stop; the <audio> fallback would not start A at all — section 28.)
+  const { world, deps } = makeWorld({ durations: [60, 60], webAudio: true, playableUntil: (i) => (i === 0 ? new Date(T0 + 10000) : null) });
   const engine = new SpaPlayerEngine(deps);
   await engine.init(world.manifestRes.data);
   await world.advance(2000);
@@ -418,16 +421,17 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   const { world, deps, audios } = makeWorld({ durations: [5, 60], playableUntil: (i) => (i === 0 ? new Date(T0 + 4650) : null) });
   const engine = new SpaPlayerEngine(deps);
   await engine.init(world.manifestRes.data);
-  await world.advance(4620); // cross-fade started at ~4600
-  assert.ok(audios.some((a) => !a.paused && a.src.endsWith(id(2))), "next track started (overlap)");
-  await world.advance(200); // tick at 4750 > deadline 4650
-  assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), "outgoing stream paused after its deadline");
+  // A15 №3: without an audio-clock hard stop, a track whose grant ends before its natural end
+  // is never started (a JS timer cannot guarantee the stop); B plays instead.
+  await world.advance(4820);
+  assert.ok(!world.plays.some((p) => p.src.endsWith(id(1))), "A (deadline inside the track) never audible on <audio>");
+  assert.ok(audios.some((a) => !a.paused && a.src.endsWith(id(2))), "B plays");
   engine.dispose();
 }
 
 // ---- 14. Re-review A3: refresh/scanCache unloads an expired paused blob ----
 {
-  const { world, deps, audios } = makeWorld({ durations: [600, 600], offlineUntil: () => new Date(T0 + 30_000) });
+  const { world, deps, audios } = makeWorld({ durations: [600, 600], webAudio: true, offlineUntil: () => new Date(T0 + 30_000) });
   const revoked = [];
   deps.objectUrl.revoke = (u) => revoked.push(u);
   const engine = new SpaPlayerEngine(deps);
@@ -927,7 +931,7 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
     ["I5 no_access", {}, async (w, e) => { await e.revokeAccess(); }, false],
   ];
   for (const [name, opts, mutate, expected, atMs] of cases) {
-    const { world, deps } = makeWorld({ durations: [60, 60, 60], ...opts });
+    const { world, deps } = makeWorld({ durations: [60, 60, 60], webAudio: true, ...opts });
     const engine = new SpaPlayerEngine(deps);
     await engine.init(world.manifestRes.data);
     if (opts.serverUntil) world.serverUntil = opts.serverUntil;
@@ -1137,6 +1141,108 @@ if (!process.env.SPA_FUZZ_ONLY) {
   engine.dispose();
 }
 
+// ---- 28. Re-review A15 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) a late init() (slow first cache scan) never overrides the user's pause.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const d = deferred();
+  const keys = deps.cache.keys;
+  let first = true;
+  deps.cache.keys = async () => { if (first) { first = false; await d.p; } return keys(); };
+  const engine = new SpaPlayerEngine(deps);
+  const ip = engine.init(world.manifestRes.data);
+  await flush();
+  world.manifestRes = { ok: true, data: world.manifest() };
+  void engine.refresh();
+  await world.advance(500);
+  if (engine.status !== "playing") await engine.toggle();
+  await world.advance(2000);
+  assert.equal(engine.status, "playing");
+  await engine.toggle();
+  assert.equal(engine.status, "paused");
+  d.res(); await ip; await world.advance(2000);
+  assert.equal(engine.status, "paused", "stale init did not resume");
+  assert.ok(audios.every((x) => x.paused), "silent");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) an old cache scan (old manifest without B) never drops B's newer valid copy.
+  const { world, deps } = makeWorld({ durations: [60, 60, 60], webAudio: true });
+  const [A, B, C] = world.items;
+  const d = deferred();
+  const keys = deps.cache.keys;
+  let first = true;
+  deps.cache.keys = async () => { if (first) { first = false; const k = await keys(); await d.p; return [...k, B.audio_item_id]; } return keys(); };
+  const engine = new SpaPlayerEngine(deps);
+  world.manifestRes = { ok: true, data: world.manifest([A, C]) };
+  const ip = engine.init(world.manifestRes.data);
+  await flush();
+  world.manifestRes = { ok: true, data: world.manifest([A, B, C]) };
+  void engine.refresh();
+  await world.advance(500);
+  await engine.downloadAll();
+  assert.ok(world.cache.has(B.audio_item_id), "B copy stored");
+  world.online = false;
+  d.res(); await ip; await world.advance(500);
+  assert.ok(world.cache.has(B.audio_item_id), "old scan did not drop B's new copy");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (3) <audio> fallback + 2 s timer latency: a refresh that moves A's deadline inside the
+  // track stops A synchronously; nothing is audible past the deadline.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60, 60], timerLatency: 2000 });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(1000);
+  const [A, B, C] = world.items;
+  world.manifestRes = { ok: true, data: world.manifest([{ ...A, playable_until: new Date(T0 + 5000).toISOString() }, B, C]) };
+  await engine.refresh();
+  assert.ok(audios.every((x) => x.paused || !x.src.endsWith(id(1))), "A stopped at once");
+  await world.advance(6000);
+  assert.ok(audios.every((x) => x.paused || !x.src.endsWith(id(1))), "A never audible again");
+  engine.dispose();
+}
+
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2b) B's copy existed before the scan; the old scan (manifest without B) must judge by
+  // the CURRENT manifest after its await and keep it.
+  const { world, deps } = makeWorld({ durations: [60, 60, 60], webAudio: true });
+  const [A, B, C] = world.items;
+  world.cache.set(B.audio_item_id, { data: { url: `https://s/${B.audio_item_id}` }, cachedAt: T0 - 1000, until: T0 + 5 * DAY });
+  const d = deferred();
+  const keys = deps.cache.keys;
+  let first = true;
+  deps.cache.keys = async () => { if (first) { first = false; const k = await keys(); await d.p; return k; } return keys(); };
+  const engine = new SpaPlayerEngine(deps);
+  world.manifestRes = { ok: true, data: world.manifest([A, C]) };
+  const ip = engine.init(world.manifestRes.data);
+  await flush();
+  world.manifestRes = { ok: true, data: world.manifest([A, B, C]) };
+  void engine.refresh();
+  await world.advance(500);
+  d.res(); await ip; await world.advance(500);
+  assert.ok(world.cache.has(B.audio_item_id), "old scan kept B's valid copy (current manifest has B)");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (4) a copy expiring while its blob is still loading ends the wait at once: the program
+  // moves on within a tick, not after the 15 s readiness timeout.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60, 60], webAudio: true });
+  world.serverUntil = (aid) => (aid === id(1) ? new Date(T0 + 3000).toISOString() : new Date(T0 + 5 * DAY).toISOString());
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(1000);
+  world.loadDelay = 2500;
+  world.online = false;
+  // Expiry at 3 s ends the pending wait for A's copy; B's copy (2.5 s load) plays well
+  // before the 15 s readiness timeout would have elapsed.
+  await world.advance(9000);
+  assert.equal(engine.status, "playing", "program continues offline");
+  assert.ok(audios.some((x) => !x.paused && !x.pending && x.src.startsWith("blob:") && !x.src.endsWith(id(1))), "next cached track plays within seconds");
+  engine.dispose();
+}
+
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -1169,7 +1275,7 @@ if (!process.env.SPA_FUZZ_ONLY) {
         const aid = x._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "");
         if (!ids.has(aid)) fail(`I4 removed track audible ${aid.slice(-2)}`);
         const it = engine.items.find((i) => i.audioItemId === aid);
-        if (it?.playableUntil && world.now >= it.playableUntil.getTime()) fail("I1 audible past deadline");
+        if (it?.playableUntil && world.now >= it.playableUntil.getTime()) fail(`I1 audible past deadline: ${x.name} ${aid.slice(-2)} by ${world.now - it.playableUntil.getTime()} ms, el.deadline ${x.deadline != null ? x.deadline - world.now : "none"}, webAudio ${webAudio}`);
       }
     };
     try {

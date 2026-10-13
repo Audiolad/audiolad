@@ -32,6 +32,12 @@ const mutations = [
   ["OP refresh does not take over a superseded start", [["    if (ps && ps.intent === this.playOp) {", "    if (false) {"]]],
   ["OP tick treats an empty slot during startAt as a stop", [["(!l && this.starting === 0)", "(!l)"]]],
   ["OP startAt stalls when the track became disallowed during the load", [["if (!played && this.stillCurrent(wop) && intent === this.playOp && this.status === \"paused\" && attempt < this.items.length) {", "if (false) {"]]],
+  // ---- A15 ----
+  ["A15 stale init() continues after its cache scan", [["    if (!this.stillCurrent(wop)) return; // the user/refresh already took over: no stale start", ""]]],
+  ["A15 cache scan decides with the manifest snapshot taken before its awaits", [["    const current = (id: string) => this.items.find((i) => i.audioItemId === id);", "    const snap = this.items;\n    const current = (id: string) => snap.find((i) => i.audioItemId === id);"]]],
+  ["A15 <audio> slot may start with its deadline inside the track", [["    if (el.stopAt) return true;\n    const dl = this.deadlineFor(slot);\n    if (dl === null) return true;", "    return true;\n    const dl = this.deadlineFor(slot);\n    if (dl === null) return true;"]]],
+  ["A15 <audio> slot keeps playing when a refresh moves the deadline inside it", [["    if (!el.stopAt && !el.paused && !this.hardStopOk(slot)) {", "    if (false) {"]]],
+  ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],
 ];
