@@ -10,8 +10,8 @@ const mutant = src.replace(/spa-player-engine\.ts$/, ".mutant-spa-player-engine.
 const suite = fileURLToPath(new URL("./business-spa-player-engine-unit.mjs", import.meta.url));
 const orig = readFileSync(src, "utf8");
 const mutations = [
-  ["I1/I2 mayStart ignores rights now", "if (!this.allowed(item, l.kind)) return false;", ""],
-  ["I1 mayStart ignores deadline at start moment", "return atMs === undefined || this.allowed(item, l.kind, false, atMs);", "return true;"],
+  ["I1/I2 mayStart ignores rights now", "if (!this.allowedFor(item, l)) return false;", ""],
+  ["I1 mayStart ignores deadline at start moment", "return atMs === undefined || this.allowedFor(item, l, false, atMs);", "return true;"],
   ["I4 mayStart ignores removed track", "if (!item) return false;\n    if (!this.allowed", "if (!item) return true;\n    if (!this.allowed"],
   ["I8 fresh ignores slot op", "return this.stillCurrent(t.op) && t.slotOp === this.slotOp[t.slot];", "return this.stillCurrent(t.op);"],
   ["I6 stale cache switch clears newer source", "if (!this.stillCurrent(wop) || op !== this.slotOp[slot]) {\n        this.d.objectUrl.revoke(url);\n        continue;", "if (false) {\n        this.d.objectUrl.revoke(url);\n        continue;", "depth"],
@@ -56,9 +56,14 @@ const mutations = [
   ["A19 advance supersedes a start in flight", [["    if (this.pendingStart && this.starting > 0) return;\n", ""]], "depth"] /* liveness only (reload churn), fuzz-found */,
   ["A19 no retry on reconnect after nothing was startable", [["          this.stalledIntent = null;\n          void this.startAt(", "          this.stalledIntent = null;\n          if (false) void this.startAt("]]],
   // ---- A19/A20 ----
-  ["A20 a loaded blob's deadline comes from the shared index", [["      const eff = this.ownDeadline(lo);\n      d = eff", "      const at = this.cachedAt.get(item.audioItemId), un = this.cacheUntil.get(item.audioItemId);\n      const eff = at === undefined || un === undefined ? null : this.copyDeadline(item.audioItemId, at, un);\n      d = eff"], ["    if (!this.ownOk(l) || (atMs !== undefined && !this.ownOk(l, atMs))) return false;", ""], [" || !this.ownOk(l))))) {", ")))) {"], ["(this.cachedDate(lo.audioItemId) !== null && this.ownOk(lo))", "this.cachedDate(lo.audioItemId) !== null"]]],
+  ["A20 a loaded blob's deadline comes from the shared index", [["      const eff = this.ownDeadline(lo);\n      d = eff", "      const at = this.cachedAt.get(item.audioItemId), un = this.cacheUntil.get(item.audioItemId);\n      const eff = at === undefined || un === undefined ? null : this.copyDeadline(item.audioItemId, at, un);\n      d = eff"], ["    return dl !== null && atMs < dl;", "    return true;"]]],
   ["A20 expiry deletes bypass the write lock", [["      void this.revalidate(id);", "      void this.d.cache.delete(id);"]]],
   ["A20 a late put leaves an expired copy stored", [["      if (dl === null || this.d.now() >= dl) {\n        await this.d.cache.delete(id);", "      if (false) {\n        await this.d.cache.delete(id);"]], "depth"] /* stale-path revalidate + expiry purge also remove it */,
+  // ---- A20/A21 ----
+  ["A21 removed late write keeps the stale index", [["        // index must say so too, else downloads skip it forever (A20 #1).\n        this.dropCacheIndex(id);", "        // index must say so too, else downloads skip it forever (A20 #1).\n        if (this.cachedAt.get(id) === cachedAt) this.dropCacheIndex(id);"]]],
+  ["A21 a stale read rewrites the shared index", [["    // carries this copy's own metadata instead (ownDeadline/ownOk).", "    // carries this copy's own metadata instead (ownDeadline/ownOk).\n    this.cachedAt.set(id, copy.cachedAt);\n    this.cacheUntil.set(id, copy.until);"]]],
+  ["A21 unindexed stored copies never swept", [["    this.sweepStored();\n", ""]]],
+  ["A21 cache I/O not locked across instances", [["this.d.cache.lock ? this.d.cache.lock(id, fn) : fn()", "fn()"]]],
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],

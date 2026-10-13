@@ -56,6 +56,12 @@ function browserCache(): EngineDeps["cache"] {
     async clear() {
       if (typeof caches !== "undefined") await caches.delete(CACHE_NAME);
     },
+    // One exclusive lock per copy across engine instances and tabs (Web Locks API), so a
+    // late delete/put of a disposed instance or another tab can't interleave (A20 #3).
+    lock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+      const locks = typeof navigator !== "undefined" ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
+      return locks ? (locks.request(`business-spa-cache:${id}`, fn) as Promise<T>) : fn();
+    },
   };
 }
 

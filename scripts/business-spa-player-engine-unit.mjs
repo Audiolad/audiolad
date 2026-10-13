@@ -12,7 +12,7 @@ const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
 
 function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), playableUntil = () => null, expiresAt = T0 + 7 * DAY, timerLatency = 0, webAudio = false } = {}) {
-  const world = { dataUntil: new WeakMap(), urlUntil: new Map(), now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [], stops: [] };
+  const world = { locks: new Map(), dataUntil: new WeakMap(), urlUntil: new Map(), now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [], stops: [] };
   const durationOf = new Map();
   class FakeAudio {
     constructor(name) { this.name = name; this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; this.volume = 1; this.listeners = new Map(); this.startClock = 0; this.endedFired = false; }
@@ -80,6 +80,15 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   const audios = [new FakeAudio("A"), new FakeAudio("B")];
   // Like HTMLAudioElement: no audio-clock hard stop in the <audio> fallback.
   if (!webAudio) for (const x of audios) x.stopAt = undefined;
+  world.allAudios = [...audios];
+  // A remounted player gets its own elements (as SpaPilotPlayer does per mount).
+  world.freshAudios = () => {
+    const n = world.allAudios.length;
+    const pair = [new FakeAudio(`A${n}`), new FakeAudio(`B${n}`)];
+    if (!webAudio) for (const x of pair) x.stopAt = undefined;
+    world.allAudios.push(...pair);
+    return pair;
+  };
   const items = durations.map((d, i) => ({
     position: i + 1, audio_item_id: id(i + 1), title: `Track ${i + 1}`, duration_seconds: d, gain_db: -6,
     playable_until: playableUntil(i)?.toISOString() ?? null, offline_allowed: offlineUntil(i) !== null,
@@ -114,6 +123,8 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
       delete: async (k) => { world.cache.delete(k); },
       keys: async () => [...world.cache.keys()],
       clear: async () => world.cache.clear(),
+      // Like navigator.locks: one exclusive lock per id SHARED by all engine instances.
+      lock: (k, fn) => { const prev = world.locks.get(k) ?? Promise.resolve(); const run = prev.catch(() => {}).then(fn); world.locks.set(k, run.catch(() => {})); return run; },
     },
     // Remember the server until of the copy each blob URL was created from (its own rights).
     objectUrl: { create: (b) => { const u = `blob:${b.url.replace("https://s/", "")}`; world.urlUntil.set(u, world.dataUntil.get(b) ?? null); return u; }, revoke: () => {} },
@@ -127,12 +138,12 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
       if (guard > 100000) throw new Error(`fake clock stuck at ${world.now - T0} ms; audios ${JSON.stringify(audios.map((a) => [a.name, a._src.slice(-2), a.paused, !!a.pending, a.currentTime, a.duration, a.deadline != null ? a.deadline - T0 : null, a.endedFired]))}; timers ${JSON.stringify(world.timers.map((t) => t.at - T0).sort((x, y) => x - y).slice(0, 5))}`);
       await flush();
       const nextTimer = world.timers.reduce((m, t) => (m === null || t.at < m.at ? t : m), null);
-      const nextEnd = audios.filter((a) => !a.paused && a._src && !a.pending).map((a) => Math.min(a.startClock + a.duration * 1000, a.deadline ?? Infinity)).reduce((m, x) => Math.min(m, x), Infinity);
+      const nextEnd = world.allAudios.filter((a) => !a.paused && a._src && !a.pending).map((a) => Math.min(a.startClock + a.duration * 1000, a.deadline ?? Infinity)).reduce((m, x) => Math.min(m, x), Infinity);
       const at = Math.min(nextTimer ? nextTimer.at : Infinity, nextEnd);
       if (at > until) { world.now = until; await flush(); return; }
       world.now = Math.max(world.now, at);
       if (nextTimer && nextTimer.at <= world.now) { world.timers = world.timers.filter((t) => t !== nextTimer); nextTimer.fn(); }
-      audios.forEach((a) => a.checkEnd());
+      world.allAudios.forEach((a) => a.checkEnd());
     }
   };
   // Buffering stall: the media clock of `el` stands still for `ms` of wall time.
@@ -1548,6 +1559,113 @@ if (!process.env.SPA_FUZZ_ONLY) {
   engine.dispose();
 }
 
+// ---- 33. Re-review A20 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) a late put that is removed for being expired leaves NO index for the missing copy.
+  const { world, deps } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll(); // 7-day copies, indexed
+  await world.advance(200);
+  engine.cachedAt.delete(id(1)); engine.cacheUntil.delete(id(1)); // a second download of A
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  const put = deps.cache.put; const hold = deferred();
+  deps.cache.put = async (k, ...r) => { if (k === id(1)) await hold.p; return put(k, ...r); };
+  const dl = engine.downloadAll();
+  await world.advance(100);
+  engine.cachedAt.set(id(1), T0); engine.cacheUntil.set(id(1), T0 + 7 * DAY); // the first copy's index
+  await world.advance(5000);
+  hold.res(); await dl; await world.advance(300);
+  assert.ok(!world.cache.has(id(1)), "expired late write removed");
+  assert.ok(!engine.cachedAt.has(id(1)), "index agrees with the store");
+  deps.cache.put = put; world.serverUntil = null;
+  await engine.downloadAll();
+  assert.ok(world.cache.has(id(1)) && engine.cachedAt.has(id(1)), "A re-downloaded");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) a stale read never rewrites the index / cuts a newer playing copy.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  await engine.downloadAll();
+  await engine.toggle(); // pause
+  world.online = false;
+  const get = deps.cache.get; const hold = deferred(); let first = true;
+  deps.cache.get = async (k) => { if (first && k === id(1)) { first = false; const c = await get(k); await hold.p; return c; } return get(k); };
+  void engine.startAt(0); // old start: read of the 4 s copy hangs
+  await world.advance(100);
+  const k = id(1);
+  world.cache.set(k, { data: { url: `https://s/${k}` }, cachedAt: world.now, until: T0 + DAY });
+  engine.cachedAt.set(k, world.now); engine.cacheUntil.set(k, T0 + DAY);
+  void engine.startAt(0); // new start plays the 1-day copy
+  await world.advance(500);
+  hold.res(); await world.advance(100);
+  assert.equal(engine.cacheUntil.get(k), T0 + DAY, "stale read did not rewrite the index");
+  await world.advance(5000);
+  assert.ok(audios.some((x) => !x.paused && x.src === `blob:${k}`), "new copy of A still playing");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (3) page reopened while the old instance's expiry deletes are still in flight: the new
+  // instance's valid copies survive (shared per-id lock).
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const e1 = new SpaPlayerEngine(deps);
+  e1.sweepStored = () => {}; // isolate the tick expiry path (the periodic sweep also locks)
+  await e1.init(world.manifestRes.data);
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  await e1.downloadAll();
+  const del = deps.cache.delete; const hold = deferred();
+  deps.cache.delete = async (k) => { await hold.p; return del(k); };
+  await world.advance(4500); // expiry: deletes hang
+  e1.dispose();
+  deps.cache.delete = del;
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  const e2 = new SpaPlayerEngine(deps);
+  void e2.init(world.manifestRes.data);
+  await world.advance(500);
+  const d2 = e2.downloadAll();
+  await world.advance(500);
+  hold.res(); await d2; await world.advance(1000);
+  assert.equal([...world.cache.values()].filter((c) => c.until === T0 + DAY).length, 12, "new copies survive the old instance's deletes");
+  assert.equal(e2.cachedAt.size, 12);
+  world.online = false;
+  await world.advance(3000);
+  assert.equal(e2.status, "playing");
+  assert.ok(audios.some((x) => !x.paused && x.src.startsWith("blob:")));
+  e2.dispose();
+}
+
+// ---- 34. Re-review A21 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1) play pressed while offline with nothing cached: once the network returns, the
+  // stalled play intent is retried (no second press needed).
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  if (engine.status === "playing") await engine.toggle();
+  world.online = false;
+  await engine.toggle();
+  await world.advance(1000);
+  assert.ok(!audios.some((x) => !x.paused), "nothing startable offline");
+  world.online = true;
+  await world.advance(3000);
+  assert.ok(audios.some((x) => !x.paused && !x.pending), "stalled play retried on reconnect");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) an unindexed stored copy (late conditional write) is still purged on expiry.
+  const { world, deps } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  const k = id(2);
+  world.cache.set(k, { data: { url: `https://s/${k}` }, cachedAt: world.now, until: T0 + 2000 });
+  engine.cachedAt.delete(k); engine.cacheUntil.delete(k);
+  await world.advance(5000);
+  assert.ok(!world.cache.has(k), "unindexed expired copy swept");
+  engine.dispose();
+}
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -1565,7 +1683,9 @@ if (!process.env.SPA_FUZZ_ONLY) {
     const webAudio = rnd() < 0.6;
     // <audio> slots get realistic JS timer latency up to 2 s (A17 #1).
     const lat = webAudio ? 0 : pick(2000);
-    const { world, deps, audios } = makeWorld({ durations, webAudio, timerLatency: lat });
+    const { world, deps } = makeWorld({ durations, webAudio, timerLatency: lat });
+    // Current player's elements; every element ever created must obey the invariants.
+    let audios = deps.audios;
     // Random resolution order: every sign / scan / manifest fetch / load resolves after a random delay.
     const later = (max) => new Promise((r) => world.timers.push({ at: world.now + pick(max), id: ++world.seq, fn: r }));
     let denials = 0; // no_access answers actually delivered to the engine
@@ -1579,7 +1699,7 @@ if (!process.env.SPA_FUZZ_ONLY) {
     world.loadDelayFn = () => pick(700);
     // Pending play()/resume() of random length (A16 #2/#3).
     world.playDelayFn = () => (rnd() < 0.4 ? pick(900) : 0);
-    const engine = new SpaPlayerEngine(deps);
+    let engine = new SpaPlayerEngine(deps);
     // Sampled liveness: <audio> transitions may cost JS timer latency (gap), so poll.
     const audibleWithin = async (ms) => {
       for (let t = 0; t < ms; t += 100) {
@@ -1590,8 +1710,9 @@ if (!process.env.SPA_FUZZ_ONLY) {
     // I6/I3: a copy the current state holds as VALID (indexed, in the manifest, offline
     // allowed, not expired) is never dropped (A17 #3: stale download put).
     const invalidDrops = [];
-    const dci = engine.dropCacheIndex.bind(engine);
-    engine.dropCacheIndex = (cid) => {
+    const watch = (eng) => {
+    const dci = eng.dropCacheIndex.bind(eng);
+    eng.dropCacheIndex = (cid) => {
       const it = engine.items.find((i) => i.audioItemId === cid);
       // Judged by the copy actually STORED (its own server until), not by the index.
       const sc = world.cache.get(cid);
@@ -1599,11 +1720,14 @@ if (!process.env.SPA_FUZZ_ONLY) {
       if (engine.status !== "no_access" && it && it.offlineAllowed && sdl !== null && world.now < sdl && engine.allowed(it, "stream", true)) invalidDrops.push(`${cid.slice(-2)}@${world.now - T0}`);
       dci(cid);
     };
+    };
+    watch(engine);
     let revoked = false;
     let wantPlay = true;
     const check = (step, what) => {
       const fail = (msg) => { throw new Error(`seed ${seed} step ${step} (${what}): ${msg}`); };
-      const audible = audios.filter((x) => !x.paused && !x.pending && x._src);
+      const audible = world.allAudios.filter((x) => !x.paused && !x.pending && x._src);
+      if (audible.some((x) => !audios.includes(x))) fail("sound from a disposed player instance");
       const ids = new Set(engine.items.map((i) => i.audioItemId));
       if (revoked && audible.length) fail("I5 sound after no_access");
       if (invalidDrops.length) fail(`I6 valid copy dropped: ${invalidDrops.join(",")}`);
@@ -1645,6 +1769,12 @@ if (!process.env.SPA_FUZZ_ONLY) {
           world.serverUntil = () => new Date(u).toISOString();
         }
         else if (r < 0.93) { what = "stall"; for (const x of audios) world.stall(x, pick(4000)); }
+        else if (r < 0.95) {
+          // Page left and reopened (A20 #3): the old instance's cache I/O may still be in
+          // flight against the SHARED store; the new instance must not lose valid copies.
+          what = "remount"; engine.dispose(); deps.audios = world.freshAudios(); audios = deps.audios; engine = new SpaPlayerEngine(deps); watch(engine); wantPlay = true;
+          void engine.init(world.manifestRes.ok ? world.manifestRes.data : world.manifest(world.items));
+        }
         else { what = "tick"; void engine.tick(); }
         // Server-side revocation at a random moment (A18 #2): any later sign/refresh answer is
         // no_access, whatever the manifest generation; the engine must end in no_access.
