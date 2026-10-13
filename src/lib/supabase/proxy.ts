@@ -12,6 +12,14 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SerializeOptions } from "cookie";
 
+import {
+  getSupabaseCookieOptions,
+  hostnameFromHeaders,
+  planSupabaseCookieScope,
+  SUPABASE_COOKIE_SCOPE_MARKER,
+  SUPABASE_COOKIE_SCOPE_MARKER_VALUE,
+} from "./cookie-domain";
+
 type SupabaseCookieToSet = {
   name: string;
   value: string;
@@ -78,7 +86,73 @@ function createPassthroughResponse(
 export async function updateSession(
   request: NextRequest,
   options?: UpdateSessionOptions,
-) {
+): Promise<NextResponse> {
+  const hostname = hostnameFromHeaders(request.headers);
+  const cookieOptions = getSupabaseCookieOptions(hostname);
+  // Snapshot before Supabase mutates request.cookies during refresh.
+  const originalRequestCookies = request.cookies
+    .getAll()
+    .map(({ name, value }) => ({ name, value }));
+  const written: SupabaseCookieToSet[] = [];
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // Pre-plan (no writes yet) to know whether this host has legacy cookies.
+  const prePlan = planSupabaseCookieScope({
+    hostname,
+    supabaseUrl,
+    requestCookies: originalRequestCookies,
+    written: [],
+  });
+
+  if (prePlan.mode !== "none") {
+    // One-time per-host migration of legacy host-only cookies. Legacy twins
+    // cannot be told apart from shared domain cookies in the Cookie header, so
+    // this request is NOT processed: the browser gets the expiries (legacy values are never re-issued)
+    // and repeats the same request (307 keeps method and body) carrying only
+    // domain-scoped cookies. No Supabase read/write and no server action runs
+    // on the ambiguous cookie set, so logout/refresh never race the migration.
+    const reload = new NextResponse(null, {
+      status: 307,
+      headers: {
+        location: `${request.nextUrl.pathname}${request.nextUrl.search}`,
+        "cache-control": "no-store",
+      },
+    });
+    for (const line of prePlan.lines) {
+      reload.headers.append("set-cookie", line);
+    }
+    return reload;
+  }
+
+  const finalize = (response: NextResponse): NextResponse => {
+    const plan = planSupabaseCookieScope({
+      hostname,
+      supabaseUrl,
+      requestCookies: [
+        {
+          name: SUPABASE_COOKIE_SCOPE_MARKER,
+          value: SUPABASE_COOKIE_SCOPE_MARKER_VALUE,
+        },
+      ],
+      written,
+    });
+    // Appended after Next's own cookie serialization: raw lines can carry two
+    // same-name cookies (host-only expiry + Domain=.audiolad.ru write).
+    for (const line of plan.lines) {
+      response.headers.append("set-cookie", line);
+    }
+    return response;
+  };
+
+  return finalize(await updateSessionInner(request, options, cookieOptions, written));
+}
+
+async function updateSessionInner(
+  request: NextRequest,
+  options: UpdateSessionOptions | undefined,
+  cookieOptions: { domain?: string },
+  written: SupabaseCookieToSet[],
+): Promise<NextResponse> {
   const rewritePathname = options?.rewritePathname;
 
   let supabaseResponse = createPassthroughResponse(request, rewritePathname);
@@ -90,12 +164,18 @@ export async function updateSession(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
 
-        setAll(cookiesToSet, headers) {
+        setAll(rawCookiesToSet, headers) {
+          const cookiesToSet = rawCookiesToSet.map((c) => ({
+            ...c,
+            options: { ...c.options, ...cookieOptions },
+          }));
+          written.push(...cookiesToSet);
           pendingCookies = cookiesToSet;
           pendingHeaders = headers;
 

@@ -1,6 +1,13 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 
-export default function NotFound() {
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import { resolveNotFoundCatalogHref } from "@/lib/business-app/not-found-link";
+
+export default async function NotFound() {
+  const catalogHref = resolveNotFoundCatalogHref(
+    getHostnameFromHeaders(await headers()),
+  );
   return (
     <main style={{
       minHeight: "100vh",
@@ -18,7 +25,7 @@ export default function NotFound() {
         Такой страницы пока нет
       </p>
       <Link
-        href="/catalog"
+        href={catalogHref}
         style={{
           padding: "18px 28px",
           borderRadius: "999px",
