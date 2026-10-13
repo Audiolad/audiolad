@@ -21,6 +21,7 @@ type PlayAllButtonProps =
     }
   | {
       variant: "public";
+      className?: string;
       playlistSlug: string;
       title: string;
       items: PublicPlaylistItemView[];
@@ -96,7 +97,11 @@ export default function PlayAllButton(props: PlayAllButtonProps) {
         type="button"
         disabled={loading}
         onClick={() => void handleClick()}
-        className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        className={
+          props.variant === "public"
+            ? (props.className ?? "inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]")
+            : "inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-sm font-medium text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+        }
       >
         {loading ? "Запуск…" : "Слушать всё"}
       </button>
