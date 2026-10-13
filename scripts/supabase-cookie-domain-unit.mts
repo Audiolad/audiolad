@@ -66,6 +66,23 @@ const late = planSupabaseCookieScope({
 });
 assert.ok(!late.lines.some((l) => l.includes("old-A")));
 
+// C4 B4: hidden legacy cookies (not sent in this request, e.g. Lax unsuffixed
+// in the MAX iframe while shared chunks .0/.1 are sent) are expired too,
+// before the marker ends the migration for this host.
+const hidden = planSupabaseCookieScope({
+  hostname: "max.audiolad.ru",
+  supabaseUrl: URL_,
+  requestCookies: [{ name: `${KEY}.0`, value: "B0" }, { name: `${KEY}.1`, value: "B1" }],
+  written: [],
+});
+for (const n of [KEY, `${KEY}.0`, `${KEY}.1`, `${KEY}.9`, `${KEY}-code-verifier`, `${KEY}-user`, `${KEY}-user.2`]) {
+  const l = hidden.lines.find((x) => x.startsWith(`${n}=;`));
+  assert.ok(l && !l.includes("Domain=") && l.includes("Max-Age=0") && l.includes("SameSite=None") && l.includes("Secure"), `expire ${n}`);
+}
+const markerAt = hidden.lines.findIndex((l) => l.startsWith(`${SUPABASE_COOKIE_SCOPE_MARKER}=`));
+assert.equal(markerAt, hidden.lines.length - 1, "marker set after all expiries");
+assert.ok(new Set(hidden.lines.map((l) => l.split("=")[0])).size === hidden.lines.length, "no duplicate lines");
+
 // C3 B1: real Host wins over client X-Forwarded-Host.
 const H = (o: Record<string, string>) => ({ get: (n: string) => o[n] ?? null });
 assert.equal(hostnameFromHeaders(H({ host: "audiolad.ru", "x-forwarded-host": "localhost" })), "audiolad.ru");
@@ -73,7 +90,7 @@ assert.equal(hostnameFromHeaders(H({ host: "localhost:3000", "x-forwarded-host":
 assert.equal(hostnameFromHeaders(H({ "x-forwarded-host": "business.audiolad.ru" })), "business.audiolad.ru");
 
 // Marker present: only writes cause host-only expiry (refresh / logout).
-const refresh = planSupabaseCookieScope({
+const refresh = planSupabaseCookieScope({ // marker present
   hostname: "business.audiolad.ru",
   supabaseUrl: URL_,
   requestCookies: [{ name: KEY, value: "old" }, { name: SUPABASE_COOKIE_SCOPE_MARKER, value: "d1" }],

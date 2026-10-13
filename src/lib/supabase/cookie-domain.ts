@@ -151,6 +151,19 @@ export type SupabaseCookieScopePlan = {
   legacyNames: string[];
 };
 
+/** Max chunk index covered by the migration (SDK chunks ~3180 B each). */
+export const SUPABASE_AUTH_MAX_CHUNKS = 10;
+
+/** Every cookie name @supabase/ssr may use for this storage key. */
+export function allSupabaseAuthCookieNames(storageKey: string): string[] {
+  const names: string[] = [];
+  for (const base of [storageKey, `${storageKey}-code-verifier`, `${storageKey}-user`]) {
+    names.push(base);
+    for (let i = 0; i < SUPABASE_AUTH_MAX_CHUNKS; i += 1) names.push(`${base}.${i}`);
+  }
+  return names;
+}
+
 /**
  * Per-host migration of legacy host-only Supabase cookies (production only).
  * The marker is HOST-ONLY on purpose: each host migrates its own legacy twins.
@@ -200,6 +213,13 @@ export function planSupabaseCookieScope(input: {
     return { lines, mode: "none", legacyNames: [] };
   }
 
+  // Expire EVERY possible auth cookie name, not only the ones sent: the
+  // browser may hide some host-only cookies from this request (e.g. Lax ones
+  // in the MAX cross-site iframe) and the marker below ends the migration for
+  // this host, so nothing hidden may survive it (C4 B4).
+  for (const name of allSupabaseAuthCookieNames(storageKey)) {
+    expireHostOnly(name);
+  }
   for (const cookie of legacy) {
     expireHostOnly(cookie.name);
   }
