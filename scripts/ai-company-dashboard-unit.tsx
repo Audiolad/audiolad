@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { AiCompanyDashboardView } from "../src/components/admin/AiCompanyDashboard";
+import { AiCompanyDashboardView, quickAcceptAllowed, quickAcceptPayload } from "../src/components/admin/AiCompanyDashboard";
 import { formatAiCompanyTaskCopy } from "../src/lib/admin/ai-company-task-copy";
 import {
   AI_COMPANY_OPEN_ROWS_KEY,
@@ -17,6 +17,7 @@ import {
 } from "../src/lib/admin/nav";
 import {
   CORE_FIELD_MAP,
+  NO_DATA,
   buildAiCompanyDashboard,
   classifyExecutor,
   companyStatusRequestPath,
@@ -1325,11 +1326,14 @@ assert.match(verified.progress, /100%/);
 assert.equal(stageModel.history.some((item) => item.title === "Проверка на сайте сохранена"), true);
 assert.equal(stageOf("Отменённая постановка").stageBadge.label, "Отменена");
 assert.equal(stageModel.history.some((item) => item.title === "Отменённая постановка"), false);
-const sergeyDecision = stageOf("Короткое решение");
-assert.equal(sergeyDecision.stageBadge.label, "Нужно решение");
-assert.match(sergeyDecision.stageBadge.detail ?? "", /^Сергей: Нет правки обложки/);
-assert.equal(stageOf("Блок без владельца").stageBadge.label, "Заблокирована");
-assert.match(stageOf("Блок без владельца").stageBadge.detail ?? "", /Нет данных: Нет файла обложки/);
+// Core 7a6fc09c: a task waiting for a decision is in «Нужно решение», not in «Сейчас в работе».
+assert.equal(stageModel.activeTasks.some((task) => task.title === "Короткое решение" || task.title === "Блок без владельца"), false);
+const sergeyDecision = stageModel.decisions.find((gate) => gate.taskTitle === "Короткое решение");
+assert.ok(sergeyDecision);
+assert.match(sergeyDecision.copyText, /Стадия: Нужно решение\nУточнение стадии: Сергей: Нет правки обложки/);
+const plainBlock = stageModel.decisions.find((gate) => gate.taskTitle === "Блок без владельца");
+assert.ok(plainBlock);
+assert.match(plainBlock.copyText, /Стадия: Заблокирована\nУточнение стадии: Нет данных: Нет файла обложки/);
 
 const stageMarkup = renderToStaticMarkup(
   <AiCompanyDashboardView model={stageModel} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
@@ -1339,7 +1343,7 @@ assert.match(stageMarkup, /aria-expanded="false"/);
 assert.match(stageMarkup, /aria-controls="ai-company-panel-/);
 assert.doesNotMatch(stageMarkup, /<summary[^>]*>Подробности/);
 assert.doesNotMatch(stageMarkup, /<button[^>]*data-stage-badge/);
-for (const tone of ["stale", "queue", "working", "review", "release", "site", "done", "cancelled", "decision", "blocked"] as const) {
+for (const tone of ["stale", "queue", "working", "review", "release", "site", "done", "cancelled"] as const) {
   const span = stageMarkup.match(new RegExp(`<span(?=[^>]*data-stage-badge="${tone}")[^>]*>`));
   assert.ok(span, tone);
   assert.match(span[0], /whitespace-normal/);
@@ -1350,13 +1354,13 @@ const staleSpan = stageMarkup.match(/<span(?=[^>]*data-stage-badge="stale")[^>]*
 assert.ok(staleSpan);
 assert.match(staleSpan[0], /Нет свежих данных/);
 assert.doesNotMatch(staleSpan[0], /executive_dispatched/);
-const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="queue"'));
+const todayMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="today"'), stageMarkup.indexOf('data-section="quotas"'));
 assert.doesNotMatch(todayMarkup, /<summary[^>]*>Подробности/);
 assert.match(todayMarkup, /aria-expanded="false"/);
 assert.match(todayMarkup, /Идентификатор задачи/);
 assert.match(todayMarkup, /Технический статус/);
 assert.match(todayMarkup, /Текущий этап/);
-const queueMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="queue"'), stageMarkup.indexOf('data-section="quotas"'));
+const queueMarkup = stageMarkup.slice(stageMarkup.indexOf('data-section="queue"'), stageMarkup.indexOf('data-section="more"'));
 assert.match(queueMarkup, /Технический статус/);
 assert.match(queueMarkup, /executive_dispatched \(технический статус\)/);
 assert.match(queueMarkup, /Текущий этап/);
@@ -1444,7 +1448,7 @@ const openedMarkup = renderToStaticMarkup(
     onToggleDetail={() => undefined}
   />,
 );
-const openedQueue = openedMarkup.slice(openedMarkup.indexOf('data-section="queue"'), openedMarkup.indexOf('data-section="quotas"'));
+const openedQueue = openedMarkup.slice(openedMarkup.indexOf('data-section="queue"'), openedMarkup.indexOf('data-section="more"'));
 assert.match(openedQueue, /aria-expanded="true"/);
 assert.match(openedQueue, /id="ai-company-panel-queue-fresh-dispatch"/);
 assert.doesNotMatch(openedQueue, /id="ai-company-panel-queue-fresh-dispatch"[^>]*hidden/);
@@ -1713,26 +1717,28 @@ assert.match(plainTask.copyText, /КОНЕЦ-ПОСТАНОВКИ/);
 assert.match(plainTask.copyText, /Первая строка постановки\.\n/);
 assert.doesNotMatch(plainTask.brief, /\n/);
 assert.match(plainTask.copyText, /PR: https:\/\/github.com\/Audiolad\/audiolad\/pull\/801/);
-const oriyTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-oriy");
+// Core 7a6fc09c: blocked / human_gate tasks are listed once, in «Нужно решение», not as executing work.
+const workingRows = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)];
+for (const id of ["copy-oriy", "copy-sergey", "copy-blocked"]) {
+  assert.equal(workingRows.some((item) => item.taskId === id), false, id);
+}
 const oriyGate = copyModel.decisions.find((gate) => gate.taskTitle === "Решение Ория");
-assert.ok(oriyTask && oriyGate);
+assert.ok(oriyGate);
 assert.equal(oriyGate.decisionOwner, "Oriy");
-assert.equal(oriyTask.copyText, oriyGate.copyText);
-assert.match(oriyTask.copyText, /Кто вправе его принять: Oriy/);
-assert.doesNotMatch(oriyTask.copyText, /Founder Gate/);
-const sergeyTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-sergey");
+assert.match(oriyGate.copyText, /Идентификатор задачи: copy-oriy/);
+assert.match(oriyGate.copyText, /Кто вправе его принять: Oriy/);
+assert.doesNotMatch(oriyGate.copyText, /Founder Gate/);
 const sergeyGate = copyModel.decisions.find((gate) => gate.taskTitle === "Решение Сергея");
-assert.ok(sergeyTask && sergeyGate);
+assert.ok(sergeyGate);
 assert.equal(sergeyGate.decisionOwner, "Сергей");
-assert.equal(sergeyTask.copyText, sergeyGate.copyText);
-assert.match(sergeyTask.copyText, /Кто вправе его принять: Сергей/);
-assert.match(sergeyTask.copyText, /Какое решение требуется: Приложить файл обложки/);
-assert.doesNotMatch(sergeyTask.copyText, /Кто вправе его принять: Oriy/);
-const blockedTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-blocked");
-assert.ok(blockedTask);
-assert.equal(blockedTask.stageBadge.label, "Заблокирована");
-assert.match(blockedTask.copyText, /Задача заблокирована/);
-assert.match(blockedTask.copyText, /Кто вправе его принять: Нет данных/);
+assert.match(sergeyGate.copyText, /Кто вправе его принять: Сергей/);
+assert.match(sergeyGate.copyText, /Какое решение требуется: Приложить файл обложки/);
+assert.doesNotMatch(sergeyGate.copyText, /Кто вправе его принять: Oriy/);
+const blockedGate = copyModel.decisions.find((gate) => gate.taskTitle === "Блок без владельца");
+assert.ok(blockedGate);
+assert.match(blockedGate.copyText, /Стадия: Заблокирована/);
+assert.match(blockedGate.copyText, /Задача заблокирована/);
+assert.match(blockedGate.copyText, /Кто вправе его принять: Нет данных/);
 const secretTask = [...copyModel.queue, ...copyModel.activeTasks.map((task) => task.detail)].find((item) => item.taskId === "copy-secret");
 assert.ok(secretTask);
 assert.doesNotMatch(secretTask.copyText, /super-secret-value|tok_live_123|user@example.com/);
@@ -1904,8 +1910,8 @@ const acceptanceMarkup = renderToStaticMarkup(
 assert.match(acceptanceMarkup, /data-section="owner-review"/);
 assert.match(acceptanceMarkup, /data-section="accepted"/);
 assert.match(acceptanceMarkup, /Архив \/ Принятые/);
-assert.match(acceptanceMarkup, /Проверил, принял/);
-assert.match(acceptanceMarkup, /Не работает \/ На доработку/);
+assert.match(acceptanceMarkup, /Принять/);
+assert.match(acceptanceMarkup, /На доработку/);
 assert.doesNotMatch(acceptanceMarkup, /Приёмка пока недоступна/);
 assert.match(acceptanceMarkup, /Вернуть в работу/);
 const unavailableMarkup = renderToStaticMarkup(
@@ -1919,7 +1925,28 @@ const presentedToggle = acceptanceMarkup.slice(
   acceptanceMarkup.lastIndexOf("<button", presentedAt),
   acceptanceMarkup.indexOf("</button>", presentedAt),
 );
-assert.doesNotMatch(presentedToggle, /Проверил, принял/);
+assert.doesNotMatch(presentedToggle, /Принять/);
+// Row-level quick accept: sits next to the toggle (not inside it), only for presented rows, owner only.
+assert.match(acceptanceMarkup, /data-quick-accept="presented-doc"/);
+assert.equal((acceptanceMarkup.match(/data-quick-accept-button/g) ?? []).length, acceptanceModel.ownerReview.filter((d) => quickAcceptAllowed(d, true, true)).length);
+assert.doesNotMatch(acceptanceMarkup, /data-quick-accept="accepted-doc"/);
+assert.doesNotMatch(acceptanceMarkup, /data-quick-accept-dialog/);
+assert.equal(quickAcceptAllowed(presented, true, true), true);
+assert.equal(quickAcceptAllowed(presented, false, true), false);
+assert.equal(quickAcceptAllowed(presented, true, false), false);
+assert.equal(quickAcceptAllowed(acceptedRow, true, true), false);
+assert.equal(quickAcceptAllowed({ ...presented, acceptance: { ...presented.acceptance!, resultVersion: NO_DATA } }, true, true), false);
+assert.deepEqual(quickAcceptPayload(presented, "k-1"), {
+  taskId: "presented-doc",
+  decision: "accepted",
+  comment: "",
+  resultVersion,
+  idempotencyKey: "k-1",
+});
+const nonOwnerMarkup = renderToStaticMarkup(
+  <AiCompanyDashboardView model={acceptanceModel} filters={parseHistoryFilters({})} sourceError={null} acceptanceAvailable onRefresh={() => undefined} />,
+);
+assert.doesNotMatch(nonOwnerMarkup, /data-quick-accept-button/);
 assert.match(acceptanceMarkup, /data-stage-badge="acceptance"[^>]*>На проверке/);
 assert.match(acceptanceMarkup, /data-stage-badge="accepted"[^>]*>Принято/);
 assert.match(acceptanceMarkup, /data-stage-badge="rework"[^>]*>На доработке/);
@@ -1946,5 +1973,49 @@ assert.equal(legacyShape.acceptanceContract, false, "presentation:true / object 
 const legacyModel = buildAiCompanyDashboard(legacyShape, parseHistoryFilters({}));
 assert.equal(legacyModel.ownerReview.length, 0);
 assert.equal(legacyModel.acceptedArchive.length, 0);
+
+// Core 7a6fc09c: tabs follow real Core state. Terminal tasks never sit in «В работе» or «Приёмка»
+// even when a Core still tags them working / review; decisions are separate from acceptance.
+{
+  const rv = "cd".repeat(32);
+  const real = parseCompanyStatus({
+    generated_at: "2026-10-12T14:30:00.000Z",
+    tasks_page: { acceptance_view: "current" },
+    tasks: [
+      { id: "exec-1", title: "Выполняется", status: "executive_dispatched", active: true, board_tab: "working", presentation: "in_progress", user_acceptance: "none", last_event_at: "2026-10-12T14:20:00.000Z", started_at: "2026-10-12T14:00:00.000Z" },
+      { id: "gate-1", title: "Ждёт решения", status: "human_gate", active: true, board_tab: "working", presentation: "in_progress", user_acceptance: "none", human_gate: "sergey_manual_review", blocked_reason: "Ожидает ручной проверки Сергеем" },
+      { id: "nd-1", title: "Нужно решение без причины", status: "needs_decision", active: true, board_tab: "working", presentation: "in_progress", user_acceptance: "none" },
+      { id: "done-w", title: "Готово, но working", status: "done", active: false, board_tab: "working", presentation: "in_progress", user_acceptance: "none", completed_at: "2026-10-12T07:22:00.000Z" },
+      { id: "acc-w", title: "Принято статусом, working", status: "accepted", active: false, board_tab: "working", presentation: "in_progress", user_acceptance: "none" },
+      { id: "await-1", title: "Ждёт приёмки", status: "human_gate", active: true, board_tab: "review", presentation: "presented", user_acceptance: "none", result_version: rv, human_gate: "sergey_acceptance", blocked_reason: "Ждёт приёмки" },
+      { id: "done-r", title: "Готово, но review", status: "done", active: false, board_tab: "review", presentation: "presented", user_acceptance: "none", result_version: rv, completed_at: "2026-10-11T07:00:00.000Z" },
+      { id: "cancel-1", title: "Отменена", status: "cancelled", active: false, board_tab: "archive", presentation: "in_progress", user_acceptance: "none", blocked_reason: "Старый блокер отменённой" },
+    ],
+    gates: [
+      { id: "task:await-1:human_gate", task_id: "await-1", kind: "human_gate", reason: "Ждёт приёмки", decision_owner: "sergey" },
+      { id: "task:done-w:blocker", task_id: "done-w", kind: "blocker", reason: "Блокер закрытой задачи", decision_owner: "sergey" },
+    ],
+  })!;
+  const m = buildAiCompanyDashboard(real, parseHistoryFilters({}));
+  const ids = (rows: { taskId: string }[]) => rows.map((row) => row.taskId).sort();
+  assert.deepEqual(ids(m.activeTasks), ["exec-1"]);
+  assert.deepEqual(ids(m.ownerReview), ["await-1"]);
+  assert.deepEqual(m.decisions.map((gate) => gate.taskTitle).sort(), ["Ждёт решения", "Нужно решение без причины"]);
+  assert.match(m.decisions.find((gate) => gate.taskTitle === "Нужно решение без причины")!.reason, /Нужно решение/);
+  assert.equal(m.decisions.some((gate) => /Ждёт приёмки|Блокер закрытой|Старый блокер/.test(gate.reason)), false);
+  assert.deepEqual(m.history.map((row) => row.taskId).sort(), ["acc-w", "done-r", "done-w"]);
+  assert.equal(m.closedCount, 3);
+  assert.equal(m.queue.length, 0);
+  const html = renderToStaticMarkup(
+    <AiCompanyDashboardView model={m} filters={parseHistoryFilters({})} sourceError={null} onRefresh={() => undefined} />,
+  );
+  assert.match(html, /data-tab-count="working"[^>]*>3</);
+  assert.match(html, /data-tab-count="review"[^>]*>1</);
+  // Core counts the cancelled task in «Архив»; the board lists it there labelled «Отменена».
+  assert.deepEqual(ids(m.cancelledArchive), ["cancel-1"]);
+  assert.match(html, /data-tab-count="archive"[^>]*>4</);
+  assert.match(html, /data-cancelled-task="cancel-1"/);
+  assert.match(html, /это не приёмка результата|Это не приёмка результата/);
+}
 
 console.log("ai-company-dashboard-unit: ok");

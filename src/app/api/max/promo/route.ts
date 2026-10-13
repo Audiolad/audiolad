@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readMaxAuthenticatedPost } from "@/lib/max/authenticated-post";
+import { readMaxVerifiedPost } from "@/lib/max/authenticated-post";
 import { getMaxPromoPage } from "@/lib/max/promo";
 
 export const dynamic = "force-dynamic";
@@ -21,14 +21,14 @@ function fail(reason: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  const authenticated = await readMaxAuthenticatedPost(request, [
+  const verified = await readMaxVerifiedPost(request, [
     "authorSlug",
     "promoSlug",
   ]);
-  if (!authenticated.ok) return authenticated.response;
+  if (!verified.ok) return verified.response;
 
-  const authorSlug = String(authenticated.body.authorSlug).trim();
-  const promoSlug = String(authenticated.body.promoSlug).trim();
+  const authorSlug = String(verified.body.authorSlug).trim();
+  const promoSlug = String(verified.body.promoSlug).trim();
   const result = await (getMaxPromoPageImpl ?? getMaxPromoPage)(authorSlug, promoSlug);
 
   if (!result.ok) {

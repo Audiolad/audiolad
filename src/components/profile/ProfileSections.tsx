@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import SignOutForm from "@/components/auth/SignOutForm";
 import PwaSettingsMenuItem from "@/components/pwa/PwaSettingsMenuItem";
 import { getProfileApplicationCopy } from "@/lib/profile/application-copy";
 import { SETTINGS_LEGAL_SECTION_ID } from "@/lib/profile/constants";
@@ -391,14 +392,14 @@ type ProfileSignOutSectionProps = {
 export function ProfileSignOutSection({ signOutAction }: ProfileSignOutSectionProps) {
   return (
     <section className="mt-8 min-w-0">
-      <form action={signOutAction}>
+      <SignOutForm action={signOutAction}>
         <button
           type="submit"
           className="min-h-11 w-full rounded-[20px] border border-[#efc7cf] bg-[#fff8f9] px-5 py-4 font-semibold text-[#b34f63] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b34f63]"
         >
           Выйти
         </button>
-      </form>
+      </SignOutForm>
     </section>
   );
 }

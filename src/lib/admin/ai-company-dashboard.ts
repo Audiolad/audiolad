@@ -117,6 +117,10 @@ export const CORE_FIELD_MAP = {
     resultVersion: ["result_version"],
     acceptance: ["acceptance"],
     evidence: ["evidence"],
+    boardTab: ["board_tab"],
+    launch: ["launch"],
+    allowedActions: ["allowed_actions"],
+    requiredDecision: ["required_decision", "decision_needed"],
   },
   /** Core #28 `tasks[].acceptance`: details of the last decision. `user_acceptance` itself is a string. */
   acceptance: {
@@ -448,6 +452,97 @@ export type CompanyTask = {
   taskEvents: CompanyEvent[];
   acceptanceContract: boolean;
   ownerAcceptance: OwnerAcceptanceFact | null;
+  boardTab: BoardTab | null;
+  launch: LaunchFact | null;
+  /** Core `tasks[].allowed_actions` (company-core #41). null = Core did not send the list: no lifecycle buttons. */
+  allowedActions: string[] | null;
+  /** Core `tasks[].required_decision`: what decision the task waits for, in Russian. */
+  requiredDecision: string | null;
+  /** Core `tasks[].owner_comments` (company-core #43): Sergey's lifecycle comments, newest first. */
+  ownerComments?: OwnerCommentFact[];
+};
+
+export type OwnerCommentFact = { action: string; label: string; reason: string; at: string | null };
+/** One line on the card: «Комментарий Сергея (Отложено в план, 13.10 07:56 МСК): …». */
+export type OwnerCommentView = { action: string; label: string; reason: string; when: string | null };
+
+const OWNER_COMMENT_LABELS: Record<string, string> = {
+  defer: "Отложено в план",
+  cancel: "Снято",
+  return: "Возвращено на доработку",
+  complete: "Завершено с доказательствами",
+  stop: "Остановка",
+};
+
+function parseOwnerComments(value: unknown): OwnerCommentFact[] {
+  if (!Array.isArray(value)) return [];
+  const out: OwnerCommentFact[] = [];
+  for (const raw of value) {
+    const record = asRecord(raw);
+    if (!record) continue;
+    const action = typeof record.action === "string" ? record.action.trim() : "";
+    const reason = typeof record.reason === "string" ? record.reason.replace(/\s+/g, " ").trim().slice(0, 1000) : "";
+    if (!action || !reason) continue;
+    const label = (typeof record.label === "string" && record.label.trim()) || OWNER_COMMENT_LABELS[action] || action;
+    const at = typeof record.at === "string" && Number.isFinite(Date.parse(record.at)) ? record.at : null;
+    out.push({ action, label, reason, at });
+  }
+  return out.slice(0, 5);
+}
+
+/** «13.10 07:56 МСК» in Moscow time. */
+export function formatMoscowShort(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("day")}.${get("month")} ${get("hour")}:${get("minute")} МСК`;
+}
+
+export function ownerCommentViews(task: Pick<CompanyTask, "ownerComments"> | null | undefined): OwnerCommentView[] {
+  return (task?.ownerComments ?? []).map((c) => ({ action: c.action, label: c.label, reason: c.reason, when: formatMoscowShort(c.at) }));
+}
+
+/** Core `tasks[].board_tab`: the four board tabs, decided by the server. */
+export type BoardTab = "plan" | "working" | "review" | "archive";
+const BOARD_TABS: readonly BoardTab[] = ["plan", "working", "review", "archive"];
+
+/** Server-safe: used by the server page for ?tab=. Do not move into a "use client" module. */
+export function parseBoardTabParam(value: string | null | undefined): BoardTab {
+  return (BOARD_TABS as readonly string[]).includes(value ?? "") ? (value as BoardTab) : "working";
+}
+
+export type LaunchState = "none" | "planned" | "waiting" | "admitted" | "sent" | "acked" | "started" | "failed";
+const LAUNCH_STATES: readonly LaunchState[] = ["none", "planned", "waiting", "admitted", "sent", "acked", "started", "failed"];
+
+/** Core `tasks[].launch`: the real launch facts. Delivery, ACK and start are separate. */
+export type LaunchFact = {
+  state: LaunchState;
+  label: string | null;
+  canLaunch: boolean;
+  retryAllowed: boolean;
+  requestedBy: string | null;
+  requestedAt: string | null;
+  admittedAt: string | null;
+  deliveredAt: string | null;
+  ackAt: string | null;
+  executionStartedAt: string | null;
+  waitingLabel: string | null;
+  failureLabel: string | null;
+  audit: string[];
+};
+
+export type LaunchView = {
+  state: LaunchState;
+  label: string;
+  /** The «В работу» button: planned, waiting (a repeat press is idempotent) or a failed delivery (safe retry). */
+  canPress: boolean;
+  buttonLabel: string;
+  facts: Array<{ label: string; value: string }>;
+  audit: string;
 };
 
 export type OwnerAcceptanceState = "pending" | "accepted" | "rejected";
@@ -623,6 +718,23 @@ export type TaskDetailModel = {
   stageBadge: StageBadge;
   copyText: string;
   acceptance: OwnerAcceptanceView | null;
+  launch: LaunchView | null;
+  /** Sergey's lifecycle comments, newest first; shown once on the card. */
+  ownerComments?: OwnerCommentView[];
+  lifecycle: LifecycleView | null;
+};
+
+/** Owner lifecycle buttons handled by POST /api/admin/ai-company/lifecycle. launch/accept/rework have their own controls. */
+/** "return" = «Вернуть на доработку» from a manual-review gate (company-core POST /v1/tasks/{id}/return). */
+export type LifecycleAction = "return" | "defer" | "cancel" | "complete" | "stop";
+export const LIFECYCLE_ACTIONS: readonly LifecycleAction[] = ["return", "defer", "cancel", "complete", "stop"];
+
+export type LifecycleView = {
+  /** Raw Core status, sent back as expected_status. */
+  expectedStatus: string;
+  /** Exactly the lifecycle actions Core lists in allowed_actions, in a fixed order. */
+  actions: LifecycleAction[];
+  requiredDecision: string | null;
 };
 
 export type OwnerAcceptanceView = {
@@ -700,6 +812,11 @@ export type GateCard = {
   nextAction: string;
   historical: boolean;
   copyText: string;
+  /** Core task id of the gate's task; null when the gate is not matched to a task in the snapshot. */
+  taskId: string | null;
+  /** Same lifecycle buttons as the task card (Core allowed_actions + required_decision); null for history. */
+  ownerComments?: OwnerCommentView[];
+  lifecycle: LifecycleView | null;
 };
 
 export type ExecutorCard = {
@@ -728,6 +845,8 @@ export type QuotaLine = {
 export type DashboardModel = {
   generatedAtLabel: string;
   freshnessLabel: string;
+  /** «Нужно решение»: owner decisions of work still in «В работе». A human_gate / needs_decision /
+   * blocked task is listed here, not in activeTasks, and never mixed with «Приёмка». */
   decisions: GateCard[];
   activeTasks: ActiveTaskCard[];
   activeBoundary: string;
@@ -739,12 +858,18 @@ export type DashboardModel = {
   todayWorkEvents: WorkEventModel[];
   todayCompleted: TodayRowModel[];
   todayNote: string;
+  /** «План»: planned and waiting tasks. Not sent to Grok, no execution capacity held. */
+  plan: TaskDetailModel[];
   queue: TaskDetailModel[];
   history: TaskDetailModel[];
   ownerReview: TaskDetailModel[];
   acceptedArchive: TaskDetailModel[];
   /** Set when the archive list could not be read. Never shown as "no accepted results". */
   acceptedArchiveError: string | null;
+  /** Tasks closed by Core in this snapshot (completed history, not counting cancelled), for the «Архив» tab count. */
+  closedCount: number;
+  /** Cancelled tasks Core places in «Архив» (board_tab archive). Counted in the tab, listed as «Отменена». */
+  cancelledArchive: TaskDetailModel[];
   historySummary: string;
   historyBoundary: string;
   historyNextOffset: number | null;
@@ -901,6 +1026,8 @@ export function executorDisplayName(id: ExecutorId | null): string {
 function taskStatusLabel(status: string): string {
   const value = normalizeToken(status);
   if (!value) return NO_DATA;
+  if (value === "planned") return "В плане";
+  if (value === "launch_pending") return "Ожидает мощности";
   if (COMPLETED_STATUSES.has(value)) return "Выполнено (Completed)";
   if (value === "qa_pass") return "Контроль качества пройден (QA PASS)";
   if (value === "merged") return "Слито в git (Merged) — это не DONE";
@@ -1184,6 +1311,53 @@ function parseOwnerAcceptance(record: Record<string, unknown>, runVerified: bool
   };
 }
 
+function parseBoardTab(value: unknown): BoardTab | null {
+  if (typeof value !== "string") return null;
+  const token = normalizeToken(value);
+  return (BOARD_TABS as readonly string[]).includes(token) ? (token as BoardTab) : null;
+}
+
+function parseAllowedActions(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.filter((item): item is string => typeof item === "string").map((item) => normalizeToken(item));
+}
+
+function parseLaunch(value: unknown): LaunchFact | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const stateRaw = readString(record, ["state"]);
+  const state = stateRaw ? normalizeToken(stateRaw) : "";
+  if (!(LAUNCH_STATES as readonly string[]).includes(state)) return null;
+  const audit = Array.isArray(record.audit)
+    ? record.audit
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is Record<string, unknown> => entry !== null)
+        .map((entry) => {
+          const at = readString(entry, ["at"]);
+          const actor = readString(entry, ["actor"]);
+          const action = readString(entry, ["action"]);
+          return [at ? formatDateTime(at) : null, actor, action].filter(Boolean).join(" · ");
+        })
+        .filter(Boolean)
+        .slice(-10)
+    : [];
+  return {
+    state: state as LaunchState,
+    label: readString(record, ["label"]),
+    canLaunch: readBoolean(record, ["can_launch"]) === true,
+    retryAllowed: readBoolean(record, ["retry_allowed"]) === true,
+    requestedBy: readString(record, ["requested_by"]),
+    requestedAt: readString(record, ["requested_at"]),
+    admittedAt: readString(record, ["admitted_at"]),
+    deliveredAt: readString(record, ["delivered_at"]),
+    ackAt: readString(record, ["ack_at"]),
+    executionStartedAt: readString(record, ["execution_started_at"]),
+    waitingLabel: readString(record, ["waiting_label"]),
+    failureLabel: readString(record, ["failure_label"]),
+    audit,
+  };
+}
+
 function parseTask(value: unknown, index: number): CompanyTask | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -1247,6 +1421,11 @@ function parseTask(value: unknown, index: number): CompanyTask | null {
       .map((event) => parseEvent(event))
       .filter((event): event is CompanyEvent => event !== null)
       .map((event) => ({ ...event, taskId: event.taskId ?? readString(record, CORE_FIELD_MAP.task.id) })),
+    boardTab: parseBoardTab(readRaw(record, CORE_FIELD_MAP.task.boardTab)),
+    launch: parseLaunch(readRaw(record, CORE_FIELD_MAP.task.launch)),
+    allowedActions: parseAllowedActions(readRaw(record, CORE_FIELD_MAP.task.allowedActions)),
+    requiredDecision: readString(record, CORE_FIELD_MAP.task.requiredDecision),
+    ownerComments: parseOwnerComments(readRaw(record, ["owner_comments"])),
     acceptanceContract: hasAcceptanceContract(record),
     ownerAcceptance: parseOwnerAcceptance(record, typeof run?.productionVerified === "boolean" ? run.productionVerified : null),
   };
@@ -1534,6 +1713,9 @@ function mergeTaskPair(previous: CompanyTask, next: CompanyTask): CompanyTask {
     releaseHold: prefer(next.releaseHold, previous.releaseHold),
     acceptanceContract: next.acceptanceContract || previous.acceptanceContract,
     ownerAcceptance: next.ownerAcceptance ?? previous.ownerAcceptance,
+    allowedActions: next.allowedActions ?? previous.allowedActions,
+    requiredDecision: prefer(next.requiredDecision, previous.requiredDecision),
+    ownerComments: next.ownerComments?.length ? next.ownerComments : previous.ownerComments,
   };
 }
 
@@ -1968,11 +2150,32 @@ function formatProgress(progress: VerifiedProgress | null, dodSatisfied: boolean
   return `${fraction}.${percent} ${formula} ${evidence}`.replace(/\s+/g, " ").trim();
 }
 
-function ownerPlacement(task: CompanyTask): "review" | "archive" | "cycle" {
+/** Core terminal task statuses (company-core TERMINAL_TASK_STATUSES). */
+const TERMINAL_TASK_STATUSES = new Set(["done", "accepted", "completed", "cancelled", "canceled", "failed"]);
+/** Waiting for an owner decision that is not result acceptance: «Нужно решение», not «Выполняется». */
+const DECISION_TASK_STATUSES = new Set(["human_gate", "needs_decision", "blocked"]);
+
+function isDecisionTask(task: CompanyTask): boolean {
+  return DECISION_TASK_STATUSES.has(normalizeToken(task.status));
+}
+
+function ownerPlacement(task: CompanyTask): "plan" | "review" | "archive" | "closed" | "cycle" {
+  // The server decides the plan tab: a planned or waiting task is not work and holds no capacity.
+  if (task.boardTab === "plan") return "plan";
   const acceptance = task.ownerAcceptance;
+  if (acceptance?.applicable && acceptance.state === "accepted") return "archive";
+  // Core 7a6fc09c: a Core that sends board_tab is the source of truth for «Архив». A terminal task
+  // (done / accepted / cancelled ...) is closed even when an older Core still tags it working or review:
+  // it is never shown as executing work or as an open acceptance request.
+  if (task.boardTab === "archive" || (task.boardTab != null && TERMINAL_TASK_STATUSES.has(normalizeToken(task.status)))) {
+    return "closed";
+  }
   if (!acceptance?.applicable) return "cycle";
-  if (acceptance.state === "accepted") return "archive";
-  if (acceptance.state === "pending" && acceptance.presented) return "review";
+  if (acceptance.state === "pending" && acceptance.presented) {
+    // «Приёмка» only with real evidence. A Core that sends board_tab says when evidence is missing
+    // (a bare pull request): the task stays in work. An older Core without board_tab keeps the old rule.
+    return task.boardTab != null && task.boardTab !== "review" ? "cycle" : "review";
+  }
   return "cycle";
 }
 
@@ -2048,11 +2251,13 @@ function gateFromTask(task: CompanyTask): GateFact | null {
         : task.humanGate
       : null);
   const dependency = task.dependencies.find((item) => item.blocked);
-  if (!reason && !dependency) return null;
+  // A human_gate / needs_decision / blocked task is never silently dropped from «Нужно решение».
+  const statusReason = isDecisionTask(task) ? `Нужно решение: ${taskStatusLabel(task.status)}` : null;
+  if (!reason && !dependency && !statusReason) return null;
   return {
     id: task.id,
     taskId: task.id,
-    reason: reason ?? dependency?.text ?? null,
+    reason: reason ?? dependency?.text ?? statusReason,
     decisionOwner: task.decisionOwner ?? (legacyOwner ? task.humanGate : null),
     request: task.gateRequest,
     nextAction: task.gateNextAction,
@@ -2114,6 +2319,9 @@ function presentGate(gate: GateFact, tasks: CompanyTask[], codexFallback: string
     nextAction,
     historical: gate.archived,
     copyText: "",
+    taskId: task?.id ?? null,
+    lifecycle: task && !gate.archived ? lifecycleView(task) : null,
+    ownerComments: ownerCommentViews(task),
   };
 }
 
@@ -2406,6 +2614,8 @@ function resolveStageBadge(task: CompanyTask, events: CompanyEvent[], snapshotIs
   const stageToken = normalizeToken(task.stage ?? "");
   if (CANCELLED_STATUSES.has(status)) return { label: "Отменена", tone: "cancelled", detail: null };
   const acceptance = task.ownerAcceptance;
+  const launchBadge = launchStageBadge(task);
+  if (launchBadge && !(acceptance?.applicable && acceptance.state !== "pending")) return launchBadge;
   if (acceptance?.applicable && acceptance.state === "accepted") {
     const when = formatDateTime(acceptance.recordedAt);
     return {
@@ -2493,6 +2703,61 @@ function snapshotCopyLabel(snapshotIso: string): string {
 function evidenceHref(task: CompanyTask): string | null {
   const proof = evidenceRecord(task.executiveRun?.productionProof);
   return safeProductionUrl(proof ? readString(proof, CORE_FIELD_MAP.evidence.url) : null);
+}
+
+function launchStageBadge(task: CompanyTask): StageBadge | null {
+  const launch = task.launch;
+  if (!launch) return null;
+  switch (launch.state) {
+    case "planned":
+      return { label: "В плане", tone: "queue", detail: "Грогу не отправлена. Мощность не занята." };
+    case "waiting":
+      return { label: "Ожидает мощности", tone: "queue", detail: launch.waitingLabel ?? "Ждёт свободного места по лимитам работы." };
+    case "admitted":
+      return { label: "Допущена, не отправлена", tone: "stale", detail: "Допуск есть, передача в мост Грога ещё не подтверждена." };
+    case "failed":
+      return { label: "Не отправлена", tone: "blocked", detail: launch.failureLabel ?? "Причина не передана." };
+    case "sent":
+      return { label: "Ожидает подтверждения", tone: "stale", detail: "Передана в мост Грога. Подтверждения от исполнителя пока нет." };
+    case "acked":
+      return { label: "Принята Грогом, не начата", tone: "queue", detail: "Подтверждение получено. Начало исполнения ещё не зафиксировано." };
+    default:
+      return null;
+  }
+}
+
+/** Lifecycle buttons come only from Core's allowed_actions; the board adds no rules of its own. */
+export function lifecycleView(task: Pick<CompanyTask, "id" | "status" | "allowedActions" | "requiredDecision">): LifecycleView | null {
+  if (!task.id || !task.status || task.allowedActions == null) return null;
+  const allowed = new Set(task.allowedActions);
+  const actions = LIFECYCLE_ACTIONS.filter((action) => allowed.has(action));
+  const requiredDecision = task.requiredDecision?.trim() || null;
+  if (!actions.length && !requiredDecision) return null;
+  return { expectedStatus: task.status, actions, requiredDecision };
+}
+
+function launchView(task: CompanyTask): LaunchView | null {
+  const launch = task.launch;
+  if (!launch || launch.state === "none") return null;
+  const canPress = launch.canLaunch || launch.retryAllowed;
+  const buttonLabel = launch.retryAllowed ? "Повторить отправку" : launch.state === "waiting" ? "Ожидает места (нажать повторно)" : "В работу";
+  const at = (value: string | null) => (value ? `${formatDateTime(value)} МСК` : NO_DATA);
+  return {
+    state: launch.state,
+    label: launch.label ?? NO_DATA,
+    canPress,
+    buttonLabel,
+    facts: [
+      { label: "Запрошено", value: launch.requestedAt ? `${at(launch.requestedAt)}${launch.requestedBy ? ` · ${launch.requestedBy}` : ""}` : NO_DATA },
+      { label: "Допущена к исполнению", value: at(launch.admittedAt) },
+      { label: "Передана в мост Грога", value: at(launch.deliveredAt) },
+      { label: "Подтверждение Грога (ACK)", value: at(launch.ackAt) },
+      { label: "Начало исполнения", value: at(launch.executionStartedAt) },
+      ...(launch.waitingLabel ? [{ label: "Почему ждёт", value: launch.waitingLabel }] : []),
+      ...(launch.failureLabel ? [{ label: "Причина сбоя", value: launch.failureLabel }] : []),
+    ],
+    audit: launch.audit.length ? launch.audit.join("\n") : NO_DATA,
+  };
 }
 
 function acceptanceView(task: CompanyTask): OwnerAcceptanceView | null {
@@ -2629,6 +2894,9 @@ function buildTaskDetail(
     stageBadge,
     copyText,
     acceptance: acceptanceView(task),
+    launch: launchView(task),
+    lifecycle: lifecycleView(task),
+    ownerComments: ownerCommentViews(task),
   };
 }
 
@@ -2660,7 +2928,16 @@ export function snapshotFreshness(generatedAt: string, now = Date.now()): string
   return `Снимок ${formatDateTime(generatedAt)} МСК · возраст ${ageMin} мин`;
 }
 
-export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryFilters): DashboardModel {
+export type BoardBuildOptions = {
+  /** Task ids Core files under board_tab=archive in the separate `?acceptance=archive` snapshot. */
+  archivedTaskIds?: ReadonlySet<string>;
+};
+
+export function buildAiCompanyDashboard(
+  status: CompanyStatus,
+  filters: HistoryFilters,
+  options: BoardBuildOptions = {},
+): DashboardModel {
   const now = parseInstant(status.generatedAt) ?? Date.now();
   const boundaries = boundaryText(status);
   const indexed = status.tasks.map((task, index) => ({ task, index }));
@@ -2675,6 +2952,7 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
   const activeTasks = indexed
     .filter(({ task }) => ownerPlacement(task) === "cycle")
     .filter(({ task }) => task.active !== false && !taskIsClosed(task, status.events))
+    .filter(({ task }) => !isDecisionTask(task))
     .filter(({ task }) => task.active === true || hasActivity(task, status.events) || (task.id != null && currentIds.has(task.id)))
     .map(({ task, index }) => {
       const executor = taskExecutor(task);
@@ -2715,10 +2993,17 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       } satisfies ActiveTaskCard;
     });
 
+  const plan = indexed
+    .filter(({ task }) => ownerPlacement(task) === "plan")
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
+
   const queue = indexed
     .filter(({ task }) => ownerPlacement(task) === "cycle")
     .filter(({ task }) => !taskIsClosed(task, status.events))
     .filter(({ task }) => !hasActivity(task, status.events) && !(task.id != null && currentIds.has(task.id)))
+    .filter(({ task }) => !isDecisionTask(task))
     .map(({ task, index }) =>
       buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
@@ -2767,11 +3052,23 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
     );
 
+  // Cancelled tasks Core files under «Архив»: counted in the tab and listed there labelled «Отменена».
+  // They stay out of «Завершённые результаты», whose criterion is completion.
+  const cancelledArchive = indexed
+    .filter(({ task }) => ownerPlacement(task) === "closed" && CANCELLED_STATUSES.has(normalizeToken(task.status)))
+    .map(({ task, index }) =>
+      buildTaskDetail(task, status.events, index, codexDisconnected, status.generatedAt, status.currentGates, codexFallback),
+    );
+
   const closed = indexed
-    .filter(({ task }) => ownerPlacement(task) === "cycle")
+    .filter(({ task }) => ownerPlacement(task) === "cycle" || ownerPlacement(task) === "closed")
     .map((item) => ({
       ...item,
-      closed: taskIsClosed(item.task, status.events),
+      // A Core-closed task with a completed status is history. Cancelled / failed stay out of
+      // «Завершённые результаты» exactly as before.
+      closed: ownerPlacement(item.task) === "closed"
+        ? isCompletedStatus(item.task.status)
+        : taskIsClosed(item.task, status.events),
       completedAt: completionInstant(item.task, status.events),
     }))
     .filter((item) => item.closed);
@@ -2808,13 +3105,27 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       ? null
       : filters.historyOffset + HISTORY_PAGE_SIZE;
 
+  // «Нужно решение» lists only decisions of work that is still in «В работе»: a gate of a task that
+  // waits for acceptance («Приёмка») or is closed («Архив») is not a separate decision (Core 7a6fc09c).
+  // A gate of a task absent from this snapshot is hidden only when that absence is proven: the active
+  // task list is complete and not truncated, and the archive snapshot has the task with board_tab=archive.
+  // Otherwise it may be an open decision of an active task outside the page, so it stays visible.
+  const activeListComplete =
+    status.completeness.activeTasksComplete === true && status.completeness.activeTasksTruncated !== true;
+  const archivedTaskIds = options.archivedTaskIds ?? new Set<string>();
+  const gateInWorking = (gate: GateFact): boolean => {
+    if (!gate.taskId) return true;
+    const task = findTaskByReference(status.tasks, gate.taskId);
+    if (task) return ownerPlacement(task) === "cycle";
+    return !(activeListComplete && archivedTaskIds.has(gate.taskId));
+  };
   const decisionSources = [
     ...status.currentGates.filter((gate) => !gate.archived),
     ...indexed.flatMap(({ task }) => {
       const gate = gateFromTask(task);
       return gate ? [gate] : [];
     }),
-  ];
+  ].filter(gateInWorking);
   const copyTextForGate = (gate: GateFact, card: GateCard): string => {
     if (card.historical) {
       return formatAiCompanyTaskCopy({
@@ -2879,14 +3190,30 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
       note: null,
     });
   };
+  // One decision card per task (Core counts tasks, not gates): further gates of the same task add
+  // their reason to the existing card instead of a second card.
   const decisions: GateCard[] = [];
-  const seenDecisions = new Set<string>();
+  const decisionByTask = new Map<string, { index: number; reasons: string[] }>();
   for (const gate of decisionSources) {
     const card = presentGate(gate, status.tasks, codexFallback);
     if (!card) continue;
-    const dedupe = `${card.taskTitle}|${card.reason}`;
-    if (seenDecisions.has(dedupe)) continue;
-    seenDecisions.add(dedupe);
+    const task = gate.taskId ? findTaskByReference(status.tasks, gate.taskId) : null;
+    const taskKey = task ? `task:${task.id}` : gate.taskId ? `task:${gate.taskId}` : `gate:${card.key}`;
+    const seen = decisionByTask.get(taskKey);
+    if (seen) {
+      if (!seen.reasons.includes(card.reason)) {
+        seen.reasons.push(card.reason);
+        const merged = decisions[seen.index];
+        const extraCopy = copyTextForGate(gate, card);
+        decisions[seen.index] = {
+          ...merged,
+          reason: seen.reasons.join(" · "),
+          copyText: merged.copyText.includes(extraCopy) ? merged.copyText : `${merged.copyText}\n\n${extraCopy}`,
+        };
+      }
+      continue;
+    }
+    decisionByTask.set(taskKey, { index: decisions.length, reasons: [card.reason] });
     decisions.push({ ...card, copyText: copyTextForGate(gate, card) });
   }
 
@@ -2935,10 +3262,13 @@ export function buildAiCompanyDashboard(status: CompanyStatus, filters: HistoryF
     todayWorkEvents,
     todayCompleted,
     todayNote,
+    plan,
     queue,
     ownerReview,
     acceptedArchive,
     acceptedArchiveError: null,
+    closedCount: closed.length,
+    cancelledArchive,
     history,
     historySummary: `Завершено по критерию готовности: ${closed.length}. С известной датой завершения: сегодня ${summaryToday}, неделя ${summaryWeek}, месяц ${summaryMonth}. Без даты завершения: ${closed.length - dated.length}. Страница истории: ${history.length} из ${historyAll.length}.`,
     historyBoundary: boundaries.history,
@@ -3059,7 +3389,12 @@ export function composeAiCompanyBoard(
   filters: HistoryFilters,
 ): { model: DashboardModel | null; acceptanceAvailable: boolean; sourceError: string | null } {
   const acceptanceAvailable = Boolean(current.data?.acceptanceContract || archive.data?.acceptanceContract);
-  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters) : null;
+  const archivedTaskIds = new Set<string>(
+    archive.data?.acceptanceView === "archive"
+      ? archive.data.tasks.filter((task) => task.boardTab === "archive").flatMap((task) => (task.id ? [task.id] : []))
+      : [],
+  );
+  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
   if (!currentModel) return { model: null, acceptanceAvailable, sourceError: current.error };
   if (!acceptanceAvailable) {
     return { model: { ...currentModel, acceptedArchive: [], acceptedArchiveError: null }, acceptanceAvailable, sourceError: null };

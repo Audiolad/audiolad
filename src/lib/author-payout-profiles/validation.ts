@@ -42,6 +42,46 @@ function rejectUnsafeText(value: string): string | null {
   return null;
 }
 
+const RAW_TEXT_FIELDS = [
+  "legal_name",
+  "first_name",
+  "last_name",
+  "middle_name",
+  "inn",
+  "ogrnip",
+  "email",
+  "phone",
+  "card_number",
+  "bank_account",
+  "bank_bik",
+  "bank_name",
+  "bank_correspondent_account",
+  "registration_address",
+  "tax_residency_note",
+  "author_revision_comment",
+] as const satisfies readonly (keyof AuthorPayoutProfileFormValues)[];
+
+/**
+ * Unsafe-text check (`<`, `>`, control characters) over the RAW request body,
+ * for every text field, before any normalization (normalization strips
+ * non-digits / whitespace and would otherwise hide such characters).
+ * Runs in both draft and submit modes; format checks stay submit-only.
+ */
+export function findUnsafeRawPayoutInput(
+  input: Record<string, unknown>,
+): AuthorPayoutProfileFieldErrors {
+  const errors: AuthorPayoutProfileFieldErrors = {};
+  for (const key of RAW_TEXT_FIELDS) {
+    const value = input[key];
+    if (typeof value !== "string") continue;
+    const unsafe = rejectUnsafeText(value);
+    if (unsafe) {
+      errors[key] = unsafe;
+    }
+  }
+  return errors;
+}
+
 /** Russian personal INN (12 digits) with checksum. */
 export function isValidRussianPersonalInn(raw: string): boolean {
   const inn = stripSpaces(raw);
@@ -290,34 +330,10 @@ export function validateAuthorPayoutProfileFormValues(
   checkUnsafe("author_revision_comment", values.author_revision_comment);
 
   if (!requireSubmit) {
-    if (values.inn && !isValidRussianPersonalInn(values.inn)) {
-      errors.inn = "Укажите корректный ИНН (12 цифр).";
-    }
-    if (values.ogrnip && !isValidOgrnip(values.ogrnip)) {
-      errors.ogrnip = "Укажите корректный ОГРНИП (15 цифр).";
-    }
-    if (values.bank_bik && !isValidBik(values.bank_bik)) {
-      errors.bank_bik = "БИК должен содержать 9 цифр.";
-    }
-    if (values.bank_account && !isValidBankAccount(values.bank_account)) {
-      errors.bank_account = "Номер счёта должен содержать 20 цифр.";
-    }
-    if (
-      values.bank_correspondent_account &&
-      !isValidBankAccount(values.bank_correspondent_account)
-    ) {
-      errors.bank_correspondent_account =
-        "Корреспондентский счёт должен содержать 20 цифр.";
-    }
-    if (values.card_number && !isValidCardNumberLength(values.card_number)) {
-      errors.card_number = "Проверьте номер карты.";
-    }
-    if (values.email && !isValidEmail(values.email)) {
-      errors.email = "Укажите корректный email.";
-    }
-    if (values.phone && !isValidPhone(values.phone)) {
-      errors.phone = "Укажите телефон в формате +7…";
-    }
+    // A draft is allowed to be incomplete or still contain a typo: format
+    // checks (INN/BIK/account/card/phone/email...) run only on submit.
+    // Otherwise a half-typed value (or a stale hidden field) makes the draft
+    // impossible to save. Unsafe-text checks above still apply.
     return errors;
   }
 
@@ -358,7 +374,13 @@ export function validateAuthorPayoutProfileFormValues(
       "Подтвердите, что вы применяете налог на профессиональный доход.";
   }
 
-  if (values.ogrnip && !isValidOgrnip(values.ogrnip)) {
+  // OGRNIP is only stored for individual entrepreneurs (see payload.ts); a
+  // stale value for other recipient types must not block saving.
+  if (
+    type === "individual_entrepreneur" &&
+    values.ogrnip &&
+    !isValidOgrnip(values.ogrnip)
+  ) {
     errors.ogrnip = "Укажите корректный ОГРНИП (15 цифр).";
   }
 

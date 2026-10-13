@@ -10,6 +10,7 @@ import {
   maskInn,
   maskPhone,
 } from "@/lib/author-payout-profiles/masking";
+import { describePayoutSaveFailure } from "@/lib/author-payout-profiles/save-error-message";
 import { sensitivePayloadToFormValues } from "@/lib/author-payout-profiles/payload";
 import type {
   AuthorPayoutMethod,
@@ -76,6 +77,23 @@ const METHOD_OPTIONS: Array<{
     description: "Расчётный или личный счёт",
   },
 ];
+
+async function readSaveResponse(response: Response): Promise<{
+  error?: string;
+  fieldErrors?: AuthorPayoutProfileFieldErrors;
+  profile?: AuthorPayoutProfilePublicView;
+}> {
+  try {
+    return (await response.json()) as {
+      error?: string;
+      fieldErrors?: AuthorPayoutProfileFieldErrors;
+      profile?: AuthorPayoutProfilePublicView;
+    };
+  } catch {
+    // Non-JSON body (proxy 413/502 etc.): still report by HTTP status.
+    return {};
+  }
+}
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -201,11 +219,17 @@ export default function AuthorPayoutProfileForm({
       ogrnip: values.ogrnip,
       email: values.email,
       phone: values.phone,
-      card_number: values.card_number,
-      bank_account: values.bank_account,
-      bank_bik: values.bank_bik,
+      // Send only fields relevant to the chosen method: stale hidden values
+      // (from a previously selected method) must not block saving.
+      card_number: values.payout_method === "card" ? values.card_number : "",
+      bank_account:
+        values.payout_method === "bank_account" ? values.bank_account : "",
+      bank_bik: values.payout_method === "bank_account" ? values.bank_bik : "",
       bank_name: values.bank_name,
-      bank_correspondent_account: values.bank_correspondent_account,
+      bank_correspondent_account:
+        values.payout_method === "bank_account"
+          ? values.bank_correspondent_account
+          : "",
       is_npd_declared: values.is_npd_declared,
       details_confirmed: values.details_confirmed,
       author_revision_comment: values.author_revision_comment,
@@ -224,18 +248,17 @@ export default function AuthorPayoutProfileForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
-      const payload = (await response.json()) as {
-        error?: string;
-        fieldErrors?: AuthorPayoutProfileFieldErrors;
-        profile?: AuthorPayoutProfilePublicView;
-      };
+      const payload = await readSaveResponse(response);
 
       if (!response.ok) {
         if (payload.fieldErrors) setFieldErrors(payload.fieldErrors);
         setError(
-          payload.error === "feature_not_available"
-            ? "Заполнение данных для выплат временно недоступно. Попробуйте позднее."
-            : "Не удалось сохранить черновик.",
+          describePayoutSaveFailure({
+            kind: "draft",
+            httpStatus: response.status,
+            error: payload.error,
+            fieldErrors: payload.fieldErrors,
+          }),
         );
         return;
       }
@@ -269,18 +292,17 @@ export default function AuthorPayoutProfileForm({
           action: "submit",
         }),
       });
-      const payload = (await response.json()) as {
-        error?: string;
-        fieldErrors?: AuthorPayoutProfileFieldErrors;
-        profile?: AuthorPayoutProfilePublicView;
-      };
+      const payload = await readSaveResponse(response);
 
       if (!response.ok) {
         if (payload.fieldErrors) setFieldErrors(payload.fieldErrors);
         setError(
-          payload.error === "feature_not_available"
-            ? "Заполнение данных для выплат временно недоступно. Попробуйте позднее."
-            : "Не удалось сохранить данные.",
+          describePayoutSaveFailure({
+            kind: "complete",
+            httpStatus: response.status,
+            error: payload.error,
+            fieldErrors: payload.fieldErrors,
+          }),
         );
         return;
       }

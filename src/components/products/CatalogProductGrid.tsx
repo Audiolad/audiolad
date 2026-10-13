@@ -9,6 +9,16 @@ import {
   CATALOG_LISTING_PAGE_SIZE,
   type CatalogListingQuery,
 } from "@/lib/catalog/listing-contract";
+import {
+  consumeHistoryTraversal,
+  ensureHistoryTraversalTracking,
+} from "@/lib/catalog/history-traversal";
+import {
+  isCatalogPath,
+  pickCatalogReturnSnapshot,
+  writeCatalogReturnSnapshot,
+} from "@/lib/catalog/return-state";
+import { readCatalogScrollY, restoreCatalogScroll } from "@/lib/catalog/return-scroll";
 import { useFlushPendingLibrarySave } from "@/lib/library/use-catalog-library-save";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 import {
@@ -19,6 +29,23 @@ import {
   mergeLoadedCatalogWindow,
   restoreWindowScrollY,
 } from "@/lib/public-content/live-sync";
+
+if (typeof window !== "undefined") {
+  // Must be listening before the visitor leaves, so Back is recognised.
+  ensureHistoryTraversalTracking();
+}
+
+function currentHref(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function getSessionStorage(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 type CatalogProductGridProps = {
   initialItems: CatalogCard[];
@@ -48,6 +75,13 @@ export default function CatalogProductGrid({
   const itemsRef = useRef(items);
   const nextCursorRef = useRef(nextCursor);
   const pendingScrollRef = useRef<number | null>(null);
+  const restoreTargetRef = useRef<{ y: number; count: number } | null>(null);
+  const restoreDecidedRef = useRef(false);
+  const hrefRef = useRef<string | null>(null);
+  const leavingRef = useRef(false);
+  const exitedToRef = useRef<string | null>(null);
+  const exitedAtRef = useRef<number | null>(null);
+  const authRef = useRef(isAuthenticated);
 
   useEffect(() => {
     queryRef.current = query;
@@ -101,6 +135,215 @@ export default function CatalogProductGrid({
     pendingScrollRef.current = null;
     restoreWindowScrollY(scrollY);
   }, [items]);
+
+  // Back / Forward to the same catalog URL: bring back the loaded pages and the
+  // scroll position before the first paint. Fresh visits never restore.
+  useLayoutEffect(() => {
+    if (restoreDecidedRef.current) {
+      return;
+    }
+
+    restoreDecidedRef.current = true;
+    const storage = getSessionStorage();
+    const href = currentHref();
+    hrefRef.current = href;
+
+    const snapshot = pickCatalogReturnSnapshot({
+      storage,
+      href,
+      authenticated: authRef.current,
+      now: Date.now(),
+      isHistoryTraversal: consumeHistoryTraversal(),
+    });
+
+    if (!snapshot) {
+      return;
+    }
+
+    itemsRef.current = snapshot.items;
+    nextCursorRef.current = snapshot.nextCursor;
+    restoreTargetRef.current = { y: snapshot.scrollY, count: snapshot.items.length };
+    setItems(snapshot.items);
+    setNextCursor(snapshot.nextCursor);
+  }, []);
+
+  useLayoutEffect(() => {
+    const target = restoreTargetRef.current;
+
+    if (!target || items.length < target.count) {
+      return;
+    }
+
+    restoreTargetRef.current = null;
+    const cancel = restoreCatalogScroll(target.y);
+    // Cards may have changed while the visitor was away (price, saved heart):
+    // quietly re-sync; the existing refresh keeps the scroll position.
+    const timer = window.setTimeout(() => void refreshPublicPage(), 1200);
+
+    return () => {
+      cancel();
+      window.clearTimeout(timer);
+    };
+  }, [items, refreshPublicPage]);
+
+  // Keep the return snapshot current without serialising on every scroll tick:
+  // scrolling / paging only mark the state dirty (the scroll position is a
+  // cheap number kept in a ref); the JSON is written once after the visitor
+  // pauses (debounce, in idle time) and synchronously when the page is left
+  // (link click, pagehide, tab hidden, Back/Forward). Nothing is lost: the
+  // flush always uses the latest items, cursor and scroll position.
+  const scheduleSaveRef = useRef<() => void>(() => undefined);
+
+  useEffect(() => {
+    const storage = getSessionStorage();
+    let dirty = false;
+    let timer: number | null = null;
+    let idle: number | null = null;
+    let lastScrollY = readCatalogScrollY();
+
+    const cancelPending = () => {
+      if (timer != null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+
+      if (idle != null) {
+        window.cancelIdleCallback?.(idle);
+        idle = null;
+      }
+    };
+
+    // `force` is for Back / Forward, where the URL already changed but the
+    // grid state still belongs to `hrefRef`.
+    const flush = (force = false) => {
+      cancelPending();
+
+      const href = hrefRef.current;
+
+      if (
+        !dirty ||
+        !href ||
+        leavingRef.current ||
+        restoreTargetRef.current !== null ||
+        (!force &&
+          (!isCatalogPath(window.location.pathname) || currentHref() !== href))
+      ) {
+        return;
+      }
+
+      dirty = false;
+      writeCatalogReturnSnapshot(storage, {
+        v: 1,
+        href,
+        authenticated: authRef.current,
+        items: itemsRef.current,
+        nextCursor: nextCursorRef.current,
+        scrollY: force ? lastScrollY : readCatalogScrollY(),
+        savedAt: Date.now(),
+        exitedTo: exitedToRef.current,
+        exitedAt: exitedAtRef.current,
+      });
+    };
+
+    const schedule = () => {
+      dirty = true;
+
+      if (timer != null || idle != null) {
+        return;
+      }
+
+      timer = window.setTimeout(() => {
+        timer = null;
+
+        if (typeof window.requestIdleCallback === "function") {
+          idle = window.requestIdleCallback(() => {
+            idle = null;
+            flush();
+          }, { timeout: 1500 });
+        } else {
+          flush();
+        }
+      }, 600);
+    };
+
+    scheduleSaveRef.current = schedule;
+
+    const onScroll = () => {
+      lastScrollY = readCatalogScrollY();
+      schedule();
+    };
+    const onUserScrollIntent = () => {
+      leavingRef.current = false;
+    };
+    const onPageHide = () => flush();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
+    };
+    const onPopState = () => flush(true);
+    const onClickCapture = (event: MouseEvent) => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const anchor = (event.target as Element | null)?.closest?.("a[href]");
+
+      if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank") {
+        return;
+      }
+
+      const url = new URL(anchor.href, window.location.href);
+
+      if (url.origin !== window.location.origin || isCatalogPath(url.pathname)) {
+        return;
+      }
+
+      // Freeze the position now: the next page may reset scroll before we unmount.
+      exitedToRef.current = url.pathname;
+      exitedAtRef.current = Date.now();
+      dirty = true;
+      flush();
+      leavingRef.current = true;
+    };
+
+    // Entering (or coming back to) the catalog: one write so the previous
+    // "exited to" marker is dropped as soon as the visitor is here again.
+    dirty = true;
+    flush();
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    document.addEventListener("touchmove", onUserScrollIntent, { passive: true });
+    document.addEventListener("wheel", onUserScrollIntent, { passive: true });
+    document.addEventListener("click", onClickCapture, true);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("popstate", onPopState);
+
+    return () => {
+      // Unmount (client navigation away): last chance to persist pending state.
+      flush(true);
+      cancelPending();
+      scheduleSaveRef.current = () => undefined;
+      document.removeEventListener("scroll", onScroll, true);
+      document.removeEventListener("touchmove", onUserScrollIntent);
+      document.removeEventListener("wheel", onUserScrollIntent);
+      document.removeEventListener("click", onClickCapture, true);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, []);
+
+  // More pages loaded / refreshed: mark dirty, write later (not per render).
+  useEffect(() => {
+    scheduleSaveRef.current();
+  }, [items, nextCursor]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursorRef.current || loadQueuedRef.current) {

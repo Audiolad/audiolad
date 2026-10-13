@@ -41,6 +41,20 @@ function sanitizeAuthorBody(body: Record<string, unknown>) {
   return next;
 }
 
+async function readAuthorBody(
+  request: Request,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const parsed = (await request.json()) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return sanitizeAuthorBody(parsed as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
 function featureDisabledResponse() {
   return jsonWithNoStore({ error: "feature_not_available" }, { status: 403 });
 }
@@ -146,9 +160,10 @@ export async function PUT(request: Request) {
       return featureDisabledResponse();
     }
 
-    const body = sanitizeAuthorBody(
-      (await request.json()) as Record<string, unknown>,
-    );
+    const body = await readAuthorBody(request);
+    if (!body) {
+      return jsonWithNoStore({ error: "invalid_request" }, { status: 400 });
+    }
     const authorId = resolveAuthorId(request, body);
 
     if (!authorId) {
@@ -189,9 +204,10 @@ export async function POST(request: Request) {
       return featureDisabledResponse();
     }
 
-    const body = sanitizeAuthorBody(
-      (await request.json()) as Record<string, unknown>,
-    );
+    const body = await readAuthorBody(request);
+    if (!body) {
+      return jsonWithNoStore({ error: "invalid_request" }, { status: 400 });
+    }
     const authorId = resolveAuthorId(request, body);
     const action =
       typeof body.action === "string" ? body.action.trim() : "submit";
