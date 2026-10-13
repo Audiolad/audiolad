@@ -7,6 +7,7 @@ import { formatOfflineLabel } from "@/lib/business-app/spa-player-core";
 import { SpaPlayerEngine, type AudioLike, type EngineDeps, type EngineStatus } from "@/lib/business-app/spa-player-engine";
 import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { offlineCacheDeadline } from "@/lib/business-app/spa-manifest";
+import { WebAudioTrack } from "@/lib/business-app/spa-webaudio";
 
 type Props = { programId: string; programName: string; initialManifest: unknown; playerId: string | null; zoneId: string | null };
 
@@ -82,8 +83,15 @@ export default function SpaPilotPlayer({ programId, programName, initialManifest
 
   useEffect(() => {
     if (!refA.current || !refB.current) return;
+    // Web Audio slots give sample-accurate, latency-proof transitions (checklist item 2);
+    // <audio> elements remain the fallback where AudioContext is unavailable.
+    const Ctx = typeof window !== "undefined" ? window.AudioContext : undefined;
+    const audioCtx = Ctx ? new Ctx() : null;
+    const audios: [AudioLike, AudioLike] = audioCtx
+      ? [new WebAudioTrack(audioCtx), new WebAudioTrack(audioCtx)]
+      : [refA.current as unknown as AudioLike, refB.current as unknown as AudioLike];
     const deps: EngineDeps = {
-      audios: [refA.current as unknown as AudioLike, refB.current as unknown as AudioLike],
+      audios,
       now: () => Date.now(),
       online: () => navigator.onLine,
       setTimer: (fn, ms) => window.setTimeout(fn, ms),
@@ -138,6 +146,8 @@ export default function SpaPilotPlayer({ programId, programName, initialManifest
       window.clearInterval(r1);
       window.clearInterval(r2);
       engine.dispose();
+      audios.forEach((a) => a.pause());
+      void audioCtx?.close();
       engineRef.current = null;
     };
   }, [programId, playerId, zoneId, initialManifest]);

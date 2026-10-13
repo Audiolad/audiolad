@@ -10,20 +10,31 @@ const T0 = Date.parse("2026-10-13T06:00:00Z");
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
 
-function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), playableUntil = () => null, expiresAt = T0 + 7 * DAY, timerLatency = 0 } = {}) {
+function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), playableUntil = () => null, expiresAt = T0 + 7 * DAY, timerLatency = 0, webAudio = false } = {}) {
   const world = { now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [] };
   const durationOf = new Map();
   class FakeAudio {
     constructor(name) { this.name = name; this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; this.volume = 1; this.listeners = new Map(); this.startClock = 0; this.endedFired = false; }
     get src() { return this._src; }
-    set src(v) { this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
+    set src(v) { this.cancelPending?.(); this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
     get duration() { return durationOf.get(this._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "")) ?? NaN; }
     get currentTime() { return this.paused ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
     set currentTime(v) { this._t = v; if (!this.paused) this.startClock = world.now - v * 1000; }
     async play() { if (!this._src) throw new Error("no src"); this._t = this.currentTime; this.paused = false; this.startClock = world.now - this._t * 1000; world.plays.push({ el: this.name, src: this._src, at: world.now, pos: this._t, vol: this.volume }); }
-    pause() { if (!this.paused) { this._t = this.currentTime; this.paused = true; } }
+    pause() { this.cancelPending(); if (!this.paused) { this._t = this.currentTime; this.paused = true; } }
+    cancelPending() { if (this.pending) { world.timers = world.timers.filter((t) => t !== this.pending); this.pending = null; } }
+    // Web Audio model: start exactly at prev's end on the audio clock (no timer latency).
+    startAfter(prev) {
+      if (!webAudio || prev.paused || !this._src || this.readyState < 4 || !this.paused || this.pending) return false;
+      const at = prev.startClock + prev.duration * 1000;
+      if (at <= world.now) return false;
+      this._t = 0;
+      this.pending = { at, id: ++world.seq, fn: () => { this.pending = null; this.paused = false; this.startClock = at; world.plays.push({ el: this.name, src: this._src, at, pos: 0, vol: this.volume, scheduled: true }); } };
+      world.timers.push(this.pending);
+      return true;
+    }
     load() { if (this._src) { this.readyState = 4; queueMicrotask(() => { this.fire("loadedmetadata"); this.fire("canplaythrough"); }); } }
-    removeAttribute(n) { if (n === "src") { this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; } }
+    removeAttribute(n) { if (n === "src") { this.cancelPending(); this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; } }
     addEventListener(t, fn, o) { const a = this.listeners.get(t) ?? []; a.push({ fn, once: o?.once }); this.listeners.set(t, a); }
     removeEventListener(t, fn) { this.listeners.set(t, (this.listeners.get(t) ?? []).filter((l) => l.fn !== fn)); }
     fire(t) { const a = this.listeners.get(t) ?? []; this.listeners.set(t, a.filter((l) => !l.once)); a.forEach((l) => l.fn()); }
@@ -410,6 +421,61 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   await engine.refresh();
   assert.ok(audios.every((a) => !a.src.startsWith("blob:")), "expired paused blob unloaded");
   assert.ok(revoked.length > 0, "object URL revoked");
+  engine.dispose();
+}
+
+// ---- 15. Re-review A4: Web Audio slots — exact transitions under ANY main-thread latency ----
+for (const lat of [0, 600, 2000]) {
+  const durations = [7, 5, 9, 6, 8, 5, 7, 6, 9, 5, 8, 6];
+  const { world, deps } = makeWorld({ durations, timerLatency: lat, webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(durations.reduce((a, b) => a + b, 0) * 1000 + 3000 + 12 * lat);
+  const starts = world.plays.filter((p) => p.pos === 0);
+  assert.ok(starts.length >= 13, `latency ${lat}: 13 starts, got ${starts.length}`);
+  for (let k = 1; k <= 12; k++) {
+    const end = starts[k - 1].at + durations[(k - 1) % 12] * 1000;
+    assert.equal(starts[k].at, end, `latency ${lat}ms: transition ${k} exact (gap ${starts[k].at - end}ms)`);
+    assert.ok(starts[k].scheduled, `transition ${k} scheduled on the audio clock`);
+  }
+  assert.equal(starts[12].src, `https://s/${id(1)}`, "wraps to the first track");
+  assert.ok(world.plays.every((p) => p.vol > 0.4), "never silent");
+  engine.dispose();
+}
+{
+  // Pause before the scheduled start cancels it.
+  const { world, deps, audios } = makeWorld({ durations: [5, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(4000); // scheduled at ~3500
+  await engine.toggle();
+  await world.advance(3000);
+  assert.ok(audios.every((a) => a.paused), "paused: scheduled next start cancelled");
+  engine.dispose();
+}
+{
+  // Next track whose grant ends before its scheduled start is not scheduled.
+  const { world, deps } = makeWorld({ durations: [5, 60, 60], webAudio: true, playableUntil: (i) => (i === 1 ? new Date(T0 + 4900) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(6000);
+  assert.ok(!world.plays.some((p) => p.src.endsWith(id(2)) && p.scheduled), "not scheduled on the audio clock past its grant");
+  assert.ok(world.plays.filter((p) => p.src.endsWith(id(2))).every((p) => p.at < T0 + 4900), "never started after its grant end");
+  assert.ok(deps.audios.every((a) => a.paused || !a.src.endsWith(id(2))), "not playing after its grant end");
+  engine.dispose();
+}
+
+// ---- 16. Re-review A4: early end of a cross-fade still prepares the next track ----
+{
+  const { world, deps, audios } = makeWorld({ durations: [5, 6, 60], playableUntil: (i) => (i === 0 ? new Date(T0 + 4650) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(5000); // A->B cross-fade, A's grant ends inside the overlap
+  assert.ok(audios.some((a) => a.src.endsWith(id(3)) && a.readyState >= 4), "next track (C) prepared after the early handoff end");
+  const bStart = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0).at;
+  await world.advance(7000);
+  const cStart = world.plays.find((p) => p.src.endsWith(id(3)) && p.pos === 0);
+  assert.ok(cStart && cStart.at <= bStart + 6000, "B->C without a gap");
   engine.dispose();
 }
 

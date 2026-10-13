@@ -32,6 +32,14 @@
  *    latency below the overlap can only shorten the fade, never create silence; a
  *    stalled current track (media clock not advancing) re-schedules instead of
  *    switching early.
+ *
+ * Re-review 2026-10-13 (Codex A4):
+ *  - when the slots support `startAfter` (Web Audio, see spa-webaudio.ts) the next
+ *    track is scheduled on the AUDIO clock as soon as the current one is within
+ *    LOOKAHEAD of its end, so main-thread latency of any size cannot create a gap;
+ *    the JS timer only does the bookkeeping afterwards. The overlap path stays as a
+ *    fallback for HTMLAudio slots.
+ *  - ending a cross-fade early (outgoing grant expired) still prepares the next track.
  */
 
 import {
@@ -73,6 +81,11 @@ export interface AudioLike {
   removeAttribute(name: string): void;
   addEventListener(type: string, fn: () => void, opts?: { once?: boolean }): void;
   removeEventListener(type: string, fn: () => void): void;
+  /**
+   * Optional sample-accurate scheduling (Web Audio slots): start from 0 exactly when
+   * `prev` ends on the audio clock. Returns false when not possible (fallback: overlap).
+   */
+  startAfter?(prev: AudioLike): boolean;
 }
 
 /** `until`: server deadline (epoch ms) for this copy, from sign(…, "offline"). */
@@ -130,6 +143,8 @@ export class SpaPlayerEngine {
   private refreshing: Promise<void> | null = null;
   private fadeTimer: unknown = null;
   private handoffTimer: unknown = null;
+  /** Slot whose start is already scheduled on the audio clock (gapless path). */
+  private scheduledSlot: number | null = null;
   private readonly d: EngineDeps;
 
   constructor(deps: EngineDeps) {
@@ -243,6 +258,7 @@ export class SpaPlayerEngine {
   }
 
   private clearSlot(slot: number): void {
+    if (slot === this.scheduledSlot) this.scheduledSlot = null;
     const el = this.d.audios[slot];
     const l = this.loaded[slot];
     el.pause();
@@ -346,11 +362,59 @@ export class SpaPlayerEngine {
     const ok = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
     const l = this.loaded[slot];
     if (l && l.audioItemId === item.audioItemId) l.ready = ok;
+    if (ok) this.scheduleTransition();
   }
 
   private cancelTransition(): void {
     if (this.transitionTimer) this.d.clearTimer(this.transitionTimer);
     this.transitionTimer = null;
+    if (this.scheduledSlot !== null) {
+      this.d.audios[this.scheduledSlot].pause();
+      this.scheduledSlot = null;
+    }
+  }
+
+  /** Gapless path: schedule the prepared slot on the audio clock. */
+  private trySchedule(el: AudioLike, remainingMs: number): boolean {
+    const slot = 1 - this.active;
+    const next = this.d.audios[slot];
+    const prep = this.loaded[slot];
+    if (!next.startAfter || !prep || !prep.ready) return false;
+    const ni = this.items.findIndex((i) => i.audioItemId === prep.audioItemId);
+    if (ni < 0 || ni !== this.findPlayable(nextIndex(this.items.length, this.index))) return false;
+    const item = this.items[ni];
+    // Rights re-checked now and for the scheduled start moment.
+    if (!this.allowed(item, prep.kind) || !canStartTrack(item, new Date(this.d.now() + remainingMs), this.cachedDate(item.audioItemId), prep.kind === "stream")) return false;
+    next.currentTime = 0;
+    next.volume = gainToVolume(item.gainDb);
+    if (!next.startAfter(el)) return false;
+    this.scheduledSlot = slot;
+    this.transitionTimer = this.d.setTimer(() => {
+      this.transitionTimer = null;
+      this.commitScheduled();
+    }, Math.max(0, remainingMs));
+    return true;
+  }
+
+  /** Bookkeeping after an audio-clock transition (audio already switched). */
+  private commitScheduled(): void {
+    const slot = this.scheduledSlot;
+    this.scheduledSlot = null;
+    if (slot === null || this.status !== "playing") return;
+    const from = this.active;
+    const lo = this.loaded[slot];
+    const ni = lo ? this.items.findIndex((i) => i.audioItemId === lo.audioItemId) : -1;
+    this.closeSegment("complete");
+    this.active = slot;
+    this.d.audios[from].pause();
+    if (!lo || ni < 0) return; // tick sees no valid source and moves on
+    this.index = ni;
+    // Next tick re-checks rights (continuing) and stops it if needed.
+    this.openSegment(lo.audioItemId);
+    this.lastTime = this.activeEl().currentTime;
+    this.saveResume();
+    this.emit();
+    void this.prepareNext();
   }
 
   /** Called every tick and on timeupdate: schedule the next track at the media end time. */
@@ -359,6 +423,9 @@ export class SpaPlayerEngine {
     const el = this.activeEl();
     if (!Number.isFinite(el.duration) || el.duration <= 0) return;
     const remainingMs = (el.duration - el.currentTime) * 1000;
+    // Audio-clock slots: schedule as soon as the next track is ready (no dependency on a
+    // tick landing inside a lookahead window, so even multi-second stalls cannot gap).
+    if (this.trySchedule(el, remainingMs)) return;
     if (remainingMs > SPA_TRANSITION_LOOKAHEAD_MS) return;
     const pos = el.currentTime;
     this.transitionTimer = this.d.setTimer(() => {
@@ -449,6 +516,13 @@ export class SpaPlayerEngine {
   private async onEnded(slot: number): Promise<void> {
     // Fallback only: normally advance() already ran from the media-clock schedule.
     if (slot !== this.active || this.status !== "playing") return;
+    if (this.scheduledSlot !== null) {
+      // Audio already switched on the audio clock; just do the bookkeeping now.
+      if (this.transitionTimer) this.d.clearTimer(this.transitionTimer);
+      this.transitionTimer = null;
+      this.commitScheduled();
+      return;
+    }
     this.cancelTransition();
     await this.advance();
   }
@@ -522,6 +596,8 @@ export class SpaPlayerEngine {
     if (!lo || !item || !this.allowed(item, lo.kind, true)) {
       this.finishHandoff();
       this.d.audios[slot].pause();
+      // The cancelled handoff would have prepared the next track: do it now.
+      if (this.status === "playing") void this.prepareNext();
     }
   }
 
