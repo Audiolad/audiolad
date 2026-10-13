@@ -12,6 +12,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { SerializeOptions } from "cookie";
 
+import {
+  buildSupabaseCookieScopeHeaders,
+  getSupabaseCookieOptions,
+  hostnameFromHeaders,
+} from "./cookie-domain";
+
 type SupabaseCookieToSet = {
   name: string;
   value: string;
@@ -78,7 +84,43 @@ function createPassthroughResponse(
 export async function updateSession(
   request: NextRequest,
   options?: UpdateSessionOptions,
-) {
+): Promise<NextResponse> {
+  const hostname = hostnameFromHeaders(request.headers);
+  const cookieOptions = getSupabaseCookieOptions(hostname);
+  // Snapshot before Supabase mutates request.cookies during refresh.
+  const originalRequestCookies = request.cookies
+    .getAll()
+    .map(({ name, value }) => ({ name, value }));
+  const written: SupabaseCookieToSet[] = [];
+
+  const finalize = (response: NextResponse): NextResponse => {
+    const proto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+      request.nextUrl.protocol.replace(":", "");
+    const lines = buildSupabaseCookieScopeHeaders({
+      hostname,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      requestCookies: originalRequestCookies,
+      written,
+      secure: proto === "https",
+    });
+    // Appended after Next's own cookie serialization: raw lines can carry two
+    // same-name cookies (host-only expiry + Domain=.audiolad.ru write).
+    for (const line of lines) {
+      response.headers.append("set-cookie", line);
+    }
+    return response;
+  };
+
+  return finalize(await updateSessionInner(request, options, cookieOptions, written));
+}
+
+async function updateSessionInner(
+  request: NextRequest,
+  options: UpdateSessionOptions | undefined,
+  cookieOptions: { domain?: string },
+  written: SupabaseCookieToSet[],
+): Promise<NextResponse> {
   const rewritePathname = options?.rewritePathname;
 
   let supabaseResponse = createPassthroughResponse(request, rewritePathname);
@@ -90,12 +132,18 @@ export async function updateSession(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
 
-        setAll(cookiesToSet, headers) {
+        setAll(rawCookiesToSet, headers) {
+          const cookiesToSet = rawCookiesToSet.map((c) => ({
+            ...c,
+            options: { ...c.options, ...cookieOptions },
+          }));
+          written.push(...cookiesToSet);
           pendingCookies = cookiesToSet;
           pendingHeaders = headers;
 

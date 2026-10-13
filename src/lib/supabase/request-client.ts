@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+
+import { getSupabaseCookieOptions, hostnameFromHeaders } from "./cookie-domain";
 
 function getBearerToken(request?: Request): string | null {
   if (!request) {
@@ -40,11 +42,15 @@ export async function createClientFromRequest(request?: Request) {
   }
 
   const cookieStore = await cookies();
+  const cookieOptions = getSupabaseCookieOptions(
+    hostnameFromHeaders(await headers()),
+  );
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -52,7 +58,7 @@ export async function createClientFromRequest(request?: Request) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, { ...options, ...cookieOptions });
             });
           } catch {
             // Server component cookie writes may be unavailable.
