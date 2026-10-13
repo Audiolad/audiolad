@@ -25,12 +25,36 @@ export class WebAudioTrack implements AudioLike {
   private playing = false;
   private token = 0;
   private listeners = new Map<string, Listener[]>();
+  /** Wall-clock deadline (epoch ms) after which this slot must be silent. */
+  private deadline: number | null = null;
   readyState = 0;
 
-  constructor(ctx: AudioContext) {
+  private readonly wallNow: () => number;
+
+  constructor(ctx: AudioContext, wallNow: () => number = () => Date.now()) {
     this.ctx = ctx;
+    this.wallNow = wallNow;
     this.gain = ctx.createGain();
     this.gain.connect(ctx.destination);
+    // The audio clock stands still while suspended: re-map the wall deadline on resume.
+    ctx.addEventListener?.("statechange", () => this.applyStop());
+  }
+
+  /** Hard stop on the audio clock at wall time `epochMs` (rights deadline). */
+  stopAt(epochMs: number | null): void {
+    this.deadline = epochMs;
+    this.applyStop();
+  }
+
+  private applyStop(): void {
+    const n = this.node;
+    if (!n || this.deadline === null) return;
+    const when = Math.max(this.ctx.currentTime, this.ctx.currentTime + (this.deadline - this.wallNow()) / 1000);
+    try {
+      n.stop(Math.max(when, this.startCtx));
+    } catch {
+      /* already stopped */
+    }
   }
 
   get src(): string {
@@ -38,6 +62,7 @@ export class WebAudioTrack implements AudioLike {
   }
   set src(v: string) {
     this.stopNode();
+    this.deadline = null;
     this._src = v;
     this.buffer = null;
     this.readyState = 0;
@@ -144,15 +169,18 @@ export class WebAudioTrack implements AudioLike {
     node.connect(this.gain);
     node.onended = () => {
       if (node !== this.node) return;
+      const pos = this.currentTime;
       this.node = null;
       this.playing = false;
-      this.offset = this.duration;
+      // Stopped by the rights deadline: keep the real position; natural end: duration.
+      this.offset = this.deadline !== null && this.wallNow() >= this.deadline - 50 ? pos : this.duration;
       this.fire("ended");
     };
     node.start(when, this.offset);
     this.node = node;
     this.startCtx = when;
     this.playing = true;
+    this.applyStop();
   }
 
   private stopNode(): void {

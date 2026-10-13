@@ -11,12 +11,12 @@ const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
 
 function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), playableUntil = () => null, expiresAt = T0 + 7 * DAY, timerLatency = 0, webAudio = false } = {}) {
-  const world = { now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [] };
+  const world = { now: T0, online: true, timers: [], seq: 0, plays: [], ends: [], manifestRes: null, signs: [], cache: new Map(), storage: new Map(), synced: [], stops: [] };
   const durationOf = new Map();
   class FakeAudio {
     constructor(name) { this.name = name; this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; this.volume = 1; this.listeners = new Map(); this.startClock = 0; this.endedFired = false; }
     get src() { return this._src; }
-    set src(v) { this.cancelPending?.(); this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
+    set src(v) { this.cancelPending?.(); this.deadline = null; this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
     get duration() { return durationOf.get(this._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "")) ?? NaN; }
     get currentTime() { return this.paused ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
     set currentTime(v) { this._t = v; if (!this.paused) this.startClock = world.now - v * 1000; }
@@ -39,7 +39,13 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     addEventListener(t, fn, o) { const a = this.listeners.get(t) ?? []; a.push({ fn, once: o?.once }); this.listeners.set(t, a); }
     removeEventListener(t, fn) { this.listeners.set(t, (this.listeners.get(t) ?? []).filter((l) => l.fn !== fn)); }
     fire(t) { const a = this.listeners.get(t) ?? []; this.listeners.set(t, a.filter((l) => !l.once)); a.forEach((l) => l.fn()); }
+    stopAt(ms) { if (webAudio) this.deadline = ms; }
     checkEnd() {
+      if (!this.paused && this._src && this.deadline != null && world.now >= this.deadline) {
+        this._t = this.currentTime; this.paused = true; world.stops.push({ src: this._src, at: world.now });
+        deps.setTimer(() => this.fire("ended"), 40);
+        return;
+      }
       if (!this.paused && this._src && !this.endedFired && world.now >= this.startClock + this.duration * 1000) {
         this.endedFired = true; this._t = this.duration; this.paused = true;
         world.ends.push({ el: this.name, src: this._src, at: this.startClock + this.duration * 1000 });
@@ -94,7 +100,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     for (;;) {
       await flush();
       const nextTimer = world.timers.reduce((m, t) => (m === null || t.at < m.at ? t : m), null);
-      const nextEnd = audios.filter((a) => !a.paused && a._src).map((a) => a.startClock + a.duration * 1000).reduce((m, x) => Math.min(m, x), Infinity);
+      const nextEnd = audios.filter((a) => !a.paused && a._src).map((a) => Math.min(a.startClock + a.duration * 1000, a.deadline ?? Infinity)).reduce((m, x) => Math.min(m, x), Infinity);
       const at = Math.min(nextTimer ? nextTimer.at : Infinity, nextEnd);
       if (at > until) { world.now = until; await flush(); return; }
       world.now = Math.max(world.now, at);
@@ -678,6 +684,77 @@ function holdEngine(world, audios) {
   await engine.tick();
   assert.equal(engine.current.audioItemId, id(2));
   assert.ok(!engine.activeEl().paused);
+  engine.dispose();
+}
+
+// ---- 20. Re-review A8 ----
+const deferred = () => { let res; const p = new Promise((r) => { res = r; }); return { p, res }; };
+{
+  // (1) refresh removes the audible A while the cache scan is slow: A stops before the scan.
+  for (const empty of [false, true]) {
+    const { world, deps, audios } = makeWorld({ durations: [60, 60, 60], webAudio: true });
+    const engine = new SpaPlayerEngine(deps);
+    await engine.init(world.manifestRes.data);
+    await world.advance(2000);
+    const scan = deferred();
+    deps.cache.keys = () => scan.p.then(() => []);
+    world.manifestRes = { ok: true, data: world.manifest(empty ? [] : world.items.filter((x) => x.audio_item_id !== id(1))) };
+    const rp = engine.refresh();
+    await flush();
+    assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), `removed A silent before the scan finishes (empty=${empty})`);
+    await engine.tick();
+    assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), "tick does not revive A");
+    scan.res(); await rp; await flush();
+    if (empty) assert.ok(audios.every((a) => a.paused), "empty program silent");
+    else assert.equal(engine.current.audioItemId, id(2));
+    engine.dispose();
+  }
+}
+{
+  // (2) stale successful refresh / sign after revokeAccess never resumes playback.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  const fm = deferred();
+  deps.fetchManifest = () => fm.p;
+  const rp = engine.refresh();
+  const sg = deferred();
+  const sign = deps.sign;
+  deps.sign = async (...a) => { await sg.p; return sign(...a); };
+  const sp = engine.startAt(1);
+  await engine.revokeAccess();
+  fm.res({ ok: true, data: world.manifest() });
+  sg.res();
+  await rp; await sp; await flush();
+  await world.advance(1000);
+  assert.equal(engine.status, "no_access");
+  assert.equal(engine.manifest, null);
+  assert.ok(audios.every((a) => a.paused), "nothing plays after revoke");
+  engine.dispose();
+}
+{
+  // (3) prepared copy that would expire before the boundary: stream prepared instead, no gap.
+  const { world, deps } = makeWorld({ durations: [10, 60], webAudio: true });
+  world.serverUntil = () => new Date(T0 + 8000).toISOString();
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  const sign = deps.sign;
+  deps.sign = async (...a) => { await new Promise((r) => world.timers.push({ at: world.now + 700, id: ++world.seq, fn: r })); return sign(...a); };
+  await world.advance(12000);
+  const b = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.ok(b && b.at === T0 + 10000, `B exactly at the boundary (${b && b.at - T0})`);
+  assert.ok(!b.src.startsWith("blob:"), "B from stream, not the expiring copy");
+  engine.dispose();
+}
+{
+  // (4) grant deadline enforced on the audio clock despite 2 s main-thread latency.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60], webAudio: true, timerLatency: 2000, playableUntil: (i) => (i === 0 ? new Date(T0 + 5000) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(5001);
+  assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), "A silent at its grant deadline");
+  assert.equal(world.stops[0]?.at, T0 + 5000);
   engine.dispose();
 }
 

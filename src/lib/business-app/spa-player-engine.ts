@@ -86,6 +86,11 @@ export interface AudioLike {
    * `prev` ends on the audio clock. Returns false when not possible (fallback: overlap).
    */
   startAfter?(prev: AudioLike): boolean;
+  /**
+   * Optional hard stop on the audio clock at wall time `epochMs` (null = none), so a grant
+   * / copy deadline is enforced even if the main thread is late. Fires `ended`.
+   */
+  stopAt?(epochMs: number | null): void;
 }
 
 /** `until`: server deadline (epoch ms) for this copy, from sign(…, "offline"). */
@@ -145,6 +150,8 @@ export class SpaPlayerEngine {
   private handoffTimer: unknown = null;
   /** Slot whose start is already scheduled on the audio clock (gapless path). */
   private scheduledSlot: number | null = null;
+  /** Bumped by revokeAccess: results of operations started before it are discarded. */
+  private accessEpoch = 0;
   private readonly d: EngineDeps;
 
   constructor(deps: EngineDeps) {
@@ -243,8 +250,9 @@ export class SpaPlayerEngine {
   }
 
   // ---------------- sources ----------------
-  private async sourceFor(item: SpaManifestItem): Promise<Loaded | null> {
-    if (this.allowed(item, "blob")) {
+  private async sourceFor(item: SpaManifestItem, atMs?: number): Promise<Loaded | null> {
+    // A copy is used only if it is still valid when the track will actually start.
+    if (this.allowed(item, "blob") && (atMs === undefined || this.allowed(item, "blob", false, atMs))) {
       const copy = await this.d.cache.get(item.audioItemId);
       if (copy) return { audioItemId: item.audioItemId, kind: "blob", url: this.d.objectUrl.create(copy.data), ready: false };
     }
@@ -268,9 +276,13 @@ export class SpaPlayerEngine {
     this.loaded[slot] = null;
   }
 
-  private async loadSlot(slot: number, item: SpaManifestItem, positionSec = 0): Promise<boolean> {
-    const src = await this.sourceFor(item);
-    if (!src) return false;
+  private async loadSlot(slot: number, item: SpaManifestItem, positionSec = 0, atMs?: number): Promise<boolean> {
+    const epoch = this.accessEpoch;
+    const src = await this.sourceFor(item, atMs);
+    if (!src || epoch !== this.accessEpoch || this.status === "no_access") {
+      if (src?.kind === "blob") this.d.objectUrl.revoke(src.url);
+      return false;
+    }
     this.clearSlot(slot);
     const el = this.d.audios[slot];
     el.src = src.url;
@@ -278,6 +290,10 @@ export class SpaPlayerEngine {
     this.loaded[slot] = src;
     el.load();
     await waitReady(el, this.d, 1);
+    if (epoch !== this.accessEpoch || this.loaded[slot] !== src) {
+      if (this.loaded[slot] === src) this.clearSlot(slot);
+      return false;
+    }
     if (positionSec > 0) {
       try {
         el.currentTime = positionSec;
@@ -313,7 +329,7 @@ export class SpaPlayerEngine {
     const l = this.loadedActive();
     if (!item || !l || l.audioItemId !== item.audioItemId || !this.allowed(item, l.kind)) {
       this.clearSlot(this.active);
-      this.setStatus("paused");
+      if (this.status !== "no_access") this.setStatus("paused");
       return false;
     }
     try {
@@ -322,6 +338,7 @@ export class SpaPlayerEngine {
       this.setStatus(auto ? "needs_gesture" : "error", auto ? null : "Браузер не дал запустить звук.");
       return false;
     }
+    this.applyDeadline(this.active);
     this.openSegment(item.audioItemId);
     this.lastTime = this.activeEl().currentTime;
     this.setStatus("playing");
@@ -360,7 +377,9 @@ export class SpaPlayerEngine {
     }
     const item = this.items[ni];
     if (this.loaded[slot]?.audioItemId === item.audioItemId && this.loaded[slot]?.ready) return;
-    if (!(await this.loadSlot(slot, item))) return;
+    const cur = this.activeEl();
+    const leftMs = Number.isFinite(cur.duration) ? Math.max(0, (cur.duration - cur.currentTime) * 1000) : 0;
+    if (!(await this.loadSlot(slot, item, 0, this.d.now() + leftMs + SPA_TICK_MS))) return;
     const el = this.d.audios[slot];
     const ok = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
     const l = this.loaded[slot];
@@ -395,6 +414,7 @@ export class SpaPlayerEngine {
     next.volume = gainToVolume(item.gainDb);
     if (!next.startAfter(el)) return false;
     this.scheduledSlot = slot;
+    this.applyDeadline(slot);
     this.armCommit(Math.max(0, remainingMs));
     return true;
   }
@@ -416,6 +436,33 @@ export class SpaPlayerEngine {
       }
       this.commitScheduled();
     }, ms);
+  }
+
+  /** Earliest wall time at which the track loaded in `slot` must fall silent. */
+  private deadlineFor(slot: number): number | null {
+    const lo = this.loaded[slot];
+    const m = this.manifest;
+    const item = lo ? this.items.find((i) => i.audioItemId === lo.audioItemId) : undefined;
+    if (!lo || !m || !item) return null;
+    let d = m.expiresAt.getTime();
+    if (item.playableUntil) d = Math.min(d, item.playableUntil.getTime());
+    if (lo.kind === "blob") {
+      const at = this.cachedAt.get(item.audioItemId);
+      const until = this.cacheUntil.get(item.audioItemId);
+      const eff = at === undefined || until === undefined ? null : this.copyDeadline(item.audioItemId, at, until);
+      d = eff === null ? this.d.now() : Math.min(d, eff);
+    }
+    return d;
+  }
+
+  /** Hand the deadline to the audio clock (Web Audio slots), independent of JS latency. */
+  private applyDeadline(slot: number): void {
+    this.d.audios[slot].stopAt?.(this.deadlineFor(slot));
+  }
+
+  private applyDeadlines(): void {
+    this.applyDeadline(0);
+    this.applyDeadline(1);
   }
 
   /**
@@ -491,6 +538,7 @@ export class SpaPlayerEngine {
       return;
     }
     this.index = ni;
+    this.applyDeadline(slot);
     // Next tick re-checks rights (continuing) and stops it if needed.
     // The new track has been audible since its audio-clock start: count it from 0.
     const el = this.activeEl();
@@ -657,10 +705,11 @@ export class SpaPlayerEngine {
     // 2b) A pending audio-clock start must stay allowed at its (possibly shifted) start.
     if (this.status === "playing") this.validateScheduled();
     // 2) Stop a current track that is no longer allowed, synchronously.
-    const item = this.current;
+    // The track is identified by what is LOADED, not by index (index may lag a refresh).
     const l = this.loadedActive();
+    const item = l ? this.items.find((i) => i.audioItemId === l.audioItemId) : undefined;
     let stopped = false;
-    if (this.status === "playing" && item && (stopActive || !l || !this.allowed(item, l.kind, true))) {
+    if (this.status === "playing" && (stopActive || !l || !item || !this.allowed(item, l.kind, true))) {
       stopped = true;
       this.closeSegment("skip");
       this.clearSlot(this.active);
@@ -672,7 +721,8 @@ export class SpaPlayerEngine {
     if (!online && this.wasOnlineSwitchPending()) await this.switchToCache();
     if (online && this.manifest && manifestNeedsRefresh(this.manifest, new Date(this.d.now()))) void this.refresh();
     if (stopped || stopActive) {
-      if (this.index >= 0 && this.items.length > 0) await this.startAt(nextIndex(this.items.length, this.index));
+      if (this.items.length === 0) this.setStatus("empty");
+      else if (this.index >= 0) await this.startAt(nextIndex(this.items.length, Math.min(this.index, this.items.length - 1)));
       return;
     }
     if (this.status === "playing") this.scheduleTransition();
@@ -708,6 +758,7 @@ export class SpaPlayerEngine {
     const now = this.d.now();
     const ids = new Set(this.items.map((i) => i.audioItemId));
     let activeHit = false;
+    let reprepare = false;
     for (const [id, until] of [...this.cacheUntil]) {
       const at = this.cachedAt.get(id);
       const eff = at === undefined ? null : this.copyDeadline(id, at, until);
@@ -719,6 +770,7 @@ export class SpaPlayerEngine {
         const lo = this.loaded[slot];
         if (lo?.kind === "blob" && lo.audioItemId === id) {
           if (slot === this.active && this.status === "playing") activeHit = true;
+          else if (this.status === "playing") reprepare = true;
           this.clearSlot(slot);
         }
       }
@@ -729,8 +781,11 @@ export class SpaPlayerEngine {
       const lo = this.loaded[slot];
       if (lo?.kind !== "blob" || this.cachedDate(lo.audioItemId) !== null) continue;
       if (slot === this.active && this.status === "playing") activeHit = true;
+      else if (this.status === "playing") reprepare = true;
       this.clearSlot(slot);
     }
+    // A cleared prepared copy is replaced right away (e.g. by the stream), not at the boundary.
+    if (reprepare && !activeHit) void this.prepareNext();
     if (activeHit) {
       this.closeSegment("skip");
       this.clearHandoff();
@@ -774,6 +829,7 @@ export class SpaPlayerEngine {
         this.clearSlot(slot);
         continue;
       }
+      this.applyDeadline(slot);
       if (wasPlaying && slot === this.active && this.status === "playing") await el.play().catch(() => this.setStatus("needs_gesture"));
       if (slot !== this.active) this.loaded[slot]!.ready = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
     }
@@ -793,19 +849,20 @@ export class SpaPlayerEngine {
 
   private async doRefresh(): Promise<void> {
     if (!this.d.online()) return;
+    const epoch = this.accessEpoch;
     const res = await this.d.fetchManifest();
+    // A response to a request started before access was revoked is never applied.
+    if (epoch !== this.accessEpoch) return;
     if (!res.ok) {
       if (res.reason === "no_access") await this.revokeAccess();
       return; // network/server errors: keep playing within existing bounds
     }
     const prevOrder = this.items.map((i) => i.audioItemId);
     if (!this.setManifest(res.data)) return;
-    // New rights (e.g. shortened playable_until): re-validate a pending audio-clock start
-    // synchronously, before any await; an unchanged valid schedule is kept (no gap).
+    // Everything below up to the first await is synchronous: the audible state is made
+    // consistent with the new manifest before any other callback can run.
     this.validateScheduled();
     this.generation += 1;
-    await this.scanCache();
-    // Drop any loaded source whose track left the program (even when paused).
     const ids = new Set(this.items.map((i) => i.audioItemId));
     const activeLoaded = this.loadedActive();
     const wasPlaying = this.status === "playing";
@@ -816,25 +873,33 @@ export class SpaPlayerEngine {
       this.index = -1;
       this.d.storage.remove(this.resumeKey);
       this.setStatus("empty");
+      await this.scanCache();
       return;
     }
+    let restartAt: number | null = null;
     if (activeLoaded && !ids.has(activeLoaded.audioItemId)) {
       this.closeSegment("skip");
       this.clearSlot(this.active);
       const r = resolveResume(this.items, { audioItemId: activeLoaded.audioItemId, positionSec: 0, savedAt: this.d.now() }, prevOrder);
       this.index = r.index;
       this.d.storage.remove(this.resumeKey);
-      if (wasPlaying) await this.startAt(r.index);
+      if (wasPlaying) restartAt = r.index;
       else this.setStatus("paused");
     } else if (activeLoaded) {
       this.index = this.items.findIndex((i) => i.audioItemId === activeLoaded.audioItemId);
-      if (wasPlaying) void this.prepareNext();
     }
+    this.applyDeadlines();
     this.saveOrder();
+    this.emit();
+    await this.scanCache();
+    if (epoch !== this.accessEpoch) return;
+    if (restartAt !== null) await this.startAt(restartAt);
+    else if (activeLoaded && wasPlaying && this.status === "playing") void this.prepareNext();
     if (this.status === "playing") this.scheduleTransition();
     this.emit();
     void this.downloadAll();
   }
+
 
   private setManifest(raw: unknown): boolean {
     try {
@@ -848,6 +913,7 @@ export class SpaPlayerEngine {
 
   /** Server said the user is no longer allowed: stop and wipe protected local data. */
   async revokeAccess(): Promise<void> {
+    this.accessEpoch += 1;
     this.stopAll();
     this.manifest = null;
     this.index = -1;
