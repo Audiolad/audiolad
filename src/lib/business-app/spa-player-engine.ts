@@ -396,6 +396,8 @@ export class SpaPlayerEngine {
     }
     const slot = this.active;
     const before = this.startOp = this.startOp + 1;
+    // Identity, not position: a refresh during the load may reorder the manifest (I8).
+    const targetId = this.items[pi].audioItemId;
     this.starting += 1;
     let ok: boolean;
     try {
@@ -410,7 +412,9 @@ export class SpaPlayerEngine {
       return;
     }
     if (before !== this.startOp) return;
-    this.index = pi;
+    const ri = this.items.findIndex((x) => x.audioItemId === targetId);
+    if (ri < 0) return; // removed meanwhile: the refresh that removed it owns the restart
+    this.index = ri;
     await this.playActive(auto, true, intent);
   }
 
@@ -762,6 +766,7 @@ export class SpaPlayerEngine {
   private async advance(overlapMs = 0): Promise<void> {
     const intent = this.playOp;
     const from = this.index;
+    const fromId = this.items[from]?.audioItemId ?? null;
     const fromSlot = this.active;
     if (this.status !== "playing") return;
     this.closeSegment("complete");
@@ -785,7 +790,9 @@ export class SpaPlayerEngine {
     }
     this.active = fromSlot;
     this.d.audios[fromSlot].pause();
-    await this.startAt(nextIndex(this.items.length, from), 0, false, intent);
+    // Re-resolve "the track after A" by identity: the manifest may have changed during the await.
+    const fi = fromId ? this.items.findIndex((x) => x.audioItemId === fromId) : -1;
+    await this.startAt(nextIndex(this.items.length, fi >= 0 ? fi : Math.min(from, this.items.length - 1)), 0, false, intent);
   }
 
   private async onEnded(slot: number): Promise<void> {
@@ -1061,6 +1068,7 @@ export class SpaPlayerEngine {
       return;
     }
     let restartAt: number | null = null;
+    let restartId: string | null = null;
     const intent = this.playOp;
     if (activeLoaded && !ids.has(activeLoaded.audioItemId)) {
       this.closeSegment("skip");
@@ -1068,7 +1076,10 @@ export class SpaPlayerEngine {
       const r = resolveResume(this.items, { audioItemId: activeLoaded.audioItemId, positionSec: 0, savedAt: this.d.now() }, prevOrder);
       this.index = r.index;
       this.d.storage.remove(this.resumeKey);
-      if (wasPlaying) restartAt = r.index;
+      if (wasPlaying) {
+        restartAt = r.index;
+        restartId = this.items[r.index]?.audioItemId ?? null;
+      }
       else this.setStatus("paused");
     } else if (activeLoaded) {
       this.index = this.items.findIndex((i) => i.audioItemId === activeLoaded.audioItemId);
@@ -1078,7 +1089,11 @@ export class SpaPlayerEngine {
     this.emit();
     await this.scanCache();
     if (epoch !== this.accessEpoch) return;
-    if (restartAt !== null) await this.startAt(restartAt, 0, false, intent);
+    if (restartAt !== null) {
+      // Identity after the await (a newer refresh may have reordered/removed it).
+      const ri = restartId ? this.items.findIndex((x) => x.audioItemId === restartId) : -1;
+      await this.startAt(ri >= 0 ? ri : Math.min(restartAt, this.items.length - 1), 0, false, intent);
+    }
     else if (activeLoaded && wasPlaying && this.status === "playing") void this.prepareNext();
     if (this.status === "playing") this.scheduleTransition();
     this.emit();

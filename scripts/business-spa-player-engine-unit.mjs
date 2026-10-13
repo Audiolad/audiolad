@@ -1026,4 +1026,47 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   engine.dispose();
 }
 
+// ---- 25. Re-review A12: identity survives awaits (manifest reordered during a load) ----
+{
+  const durations = Array.from({ length: 12 }, () => 60);
+  const { world, deps, audios } = makeWorld({ durations });
+  world.loadDelay = 700;
+  const engine = new SpaPlayerEngine(deps);
+  const ip = engine.init(world.manifestRes.data); // startAt(A) is now waiting for readiness
+  await world.advance(200);
+  // Manifest order is by `position`: swap A and B (rights unchanged).
+  const swapped = [{ ...world.items[1], position: 1 }, { ...world.items[0], position: 2 }, ...world.items.slice(2)];
+  world.manifestRes = { ok: true, data: world.manifest(swapped) };
+  await engine.refresh();
+  await world.advance(5000);
+  await ip;
+  assert.equal(engine.status, "playing", "still playing after reorder during load");
+  assert.equal(engine.current?.audioItemId, id(1), "engine index follows A by identity");
+  assert.ok(audios.some((x) => !x.paused && x.src.endsWith(id(1))), "A audible");
+  engine.dispose();
+}
+{
+  // Fallback advance: while B's play() is pending a refresh removes B and moves A to 2nd
+  // place; the successor of A is resolved by identity (C), A is not restarted.
+  const { world, deps, audios } = makeWorld({ durations: [5, 60, 60, 60] });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  const d = deferred();
+  let hold = true;
+  for (const a of audios) {
+    const play = a.play.bind(a);
+    a.play = async () => { if (hold && a._src.endsWith(id(2))) { hold = false; await d.p; } return play(); };
+  }
+  for (let t = 0; t < 6000 && hold; t += 50) await world.advance(50);
+  assert.equal(hold, false, "B play pending");
+  const [A, , C, D] = world.items;
+  world.manifestRes = { ok: true, data: world.manifest([{ ...D, position: 1 }, { ...A, position: 2 }, { ...C, position: 3 }]) };
+  await engine.refresh();
+  d.res(); await flush(); await world.advance(3000);
+  assert.equal(engine.status, "playing");
+  assert.equal(engine.current?.audioItemId, id(3), "successor of A by identity is C");
+  assert.ok(!world.plays.some((p, k) => k > 0 && p.src.endsWith(id(1)) && p.pos === 0), "A not restarted");
+  engine.dispose();
+}
+
 console.log("business-spa-player-engine-unit: all tests passed");

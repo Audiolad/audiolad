@@ -31,6 +31,12 @@ const mutations = [
   ["I9 pause leaves the outgoing slot audible", [
     ["for (const a of this.d.audios) a.pause();", "this.activeEl().pause();"],
   ]],
+  ["I8 startAt uses the index captured before the await", [
+    ["    const ri = this.items.findIndex((x) => x.audioItemId === targetId);\n    if (ri < 0) return;", "    const ri = pi;\n    if (ri < 0) return;"],
+  ]],
+  ["I8 advance falls back by the index captured before the await", [
+    ["const fi = fromId ? this.items.findIndex((x) => x.audioItemId === fromId) : -1;", "const fi = from;"],
+  ]],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],
 ];
