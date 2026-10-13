@@ -16,6 +16,9 @@ export async function refreshSpaManifest(): Promise<SpaActionResult<unknown>> {
   }
 }
 
+/** Offline mode is deferred to the next stage (no user-visible toggle, no env switch). */
+const SPA_OFFLINE_ENABLED = false;
+
 const SIGN_ERRORS: Record<string, string> = {
   business_spa_track_not_in_manifest: "not_in_manifest",
   business_spa_offline_not_allowed: "offline_not_allowed",
@@ -27,6 +30,9 @@ export async function getSpaTrackUrl(
   purpose: "stream" | "offline" = "stream",
 ): Promise<SpaActionResult<SpaSignedTrack>> {
   if (!isUuid(audioItemId) || (purpose !== "stream" && purpose !== "offline")) return { ok: false, reason: "invalid_request" };
+  // Stage 1 (Sergey 2026-10-13 19:16 MSK): online only. Offline downloads are deferred;
+  // the offline code path stays in the repo for the next stage but is refused here.
+  if (purpose === "offline" && !SPA_OFFLINE_ENABLED) return { ok: false, reason: "offline_not_allowed" };
   const ctx = await loadSpaPilotContext();
   if (!ctx) return { ok: false, reason: "no_access" };
   try {

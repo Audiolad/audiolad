@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import SpaPilotPlayer from "@/components/business-app/SpaPilotPlayer";
+// Stage 1 (Sergey 2026-10-13): online player. The offline SpaPilotPlayer is deferred, not deleted.
+import SpaOnlinePlayer from "@/components/business-app/SpaOnlinePlayer";
 import { fetchSpaManifestRaw, loadSpaPilotContext } from "@/lib/business-app/spa-pilot";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +17,6 @@ export default async function BusinessSpaPilotPage() {
     manifest = null;
   }
   return (
-    <SpaPilotPlayer
-      programId={ctx.programId}
-      programName={ctx.programName}
-      initialManifest={manifest}
-      playerId={ctx.playerId}
-      zoneId={ctx.zoneId}
-    />
+    <SpaOnlinePlayer programName={ctx.programName} initialManifest={manifest} />
   );
 }
