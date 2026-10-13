@@ -49,3 +49,4 @@ jobs:
           npm run test:business-spa-manifest
           npm run test:business-spa-admin
           npm run test:business-spa-player-core
+          npm run test:business-spa-player-engine
