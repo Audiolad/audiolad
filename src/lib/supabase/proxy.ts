@@ -104,51 +104,38 @@ export async function updateSession(
     written: [],
   });
 
-  if (prePlan.mode === "expire_only") {
-    // Subdomain legacy host-only cookies cannot be told apart from the shared
-    // domain cookies in the Cookie header. Never read them: expire the
-    // host-only twins and, for safe methods, reload so the browser sends only
-    // the domain-scoped session.
-    if (request.method === "GET" || request.method === "HEAD") {
-      const reload = new NextResponse(null, {
-        status: 307,
-        headers: {
-          location: `${request.nextUrl.pathname}${request.nextUrl.search}`,
-          "cache-control": "no-store",
-        },
-      });
-      for (const line of prePlan.lines) {
-        reload.headers.append("set-cookie", line);
-      }
-      return reload;
+  if (prePlan.mode !== "none") {
+    // One-time per-host migration of legacy host-only cookies. Legacy twins
+    // cannot be told apart from shared domain cookies in the Cookie header, so
+    // this request is NOT processed: the browser gets the expiries/re-issue
+    // and repeats the same request (307 keeps method and body) carrying only
+    // domain-scoped cookies. No Supabase read/write and no server action runs
+    // on the ambiguous cookie set, so logout/refresh never race the migration.
+    const reload = new NextResponse(null, {
+      status: 307,
+      headers: {
+        location: `${request.nextUrl.pathname}${request.nextUrl.search}`,
+        "cache-control": "no-store",
+      },
+    });
+    for (const line of prePlan.lines) {
+      reload.headers.append("set-cookie", line);
     }
-    for (const name of prePlan.legacyNames) {
-      request.cookies.delete(name);
-    }
+    return reload;
   }
 
   const finalize = (response: NextResponse): NextResponse => {
-    const plan =
-      prePlan.mode === "expire_only"
-        ? {
-            lines: [
-              ...prePlan.lines,
-              ...planSupabaseCookieScope({
-                hostname,
-                supabaseUrl,
-                requestCookies: [
-                  { name: SUPABASE_COOKIE_SCOPE_MARKER, value: SUPABASE_COOKIE_SCOPE_MARKER_VALUE },
-                ],
-                written,
-              }).lines,
-            ],
-          }
-        : planSupabaseCookieScope({
-            hostname,
-            supabaseUrl,
-            requestCookies: originalRequestCookies,
-            written,
-          });
+    const plan = planSupabaseCookieScope({
+      hostname,
+      supabaseUrl,
+      requestCookies: [
+        {
+          name: SUPABASE_COOKIE_SCOPE_MARKER,
+          value: SUPABASE_COOKIE_SCOPE_MARKER_VALUE,
+        },
+      ],
+      written,
+    });
     // Appended after Next's own cookie serialization: raw lines can carry two
     // same-name cookies (host-only expiry + Domain=.audiolad.ru write).
     for (const line of plan.lines) {

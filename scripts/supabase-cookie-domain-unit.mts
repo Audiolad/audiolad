@@ -118,7 +118,47 @@ console.log("supabase-cookie-domain-unit: ok");
   const setCookies = res.headers.getSetCookie();
   assert.ok(setCookies.some((l) => l.startsWith(`${KEY}=;`) && !l.includes("Domain=")));
   assert.ok(!setCookies.some((l) => l.includes("stale-B")));
-  assert.ok(setCookies.some((l) => l.startsWith(`${SUPABASE_COOKIE_SCOPE_MARKER}=`)));
+  assert.ok(setCookies.some((l) => l.startsWith(`${SUPABASE_COOKIE_SCOPE_MARKER}=`) && l.includes("SameSite=None") && l.includes("Secure")));
+
+  // POST (server action) on subdomain with legacy cookies: also 307, never processed.
+  const post = await updateSession(
+    new NextRequest("http://127.0.0.1:3000/spa", {
+      method: "POST",
+      headers: { host: "business.audiolad.ru", cookie: `${KEY}=stale-B` },
+      body: "x",
+    }),
+  );
+  assert.equal(post.status, 307);
+
+  // Apex legacy (e.g. logout POST): 307 with re-issue, request not processed,
+  // so a logout cannot race the re-issued cookie.
+  const apex = await updateSession(
+    new NextRequest("http://127.0.0.1:3000/profile", {
+      method: "POST",
+      headers: { host: "audiolad.ru", cookie: `${KEY}=base64-sess` },
+      body: "x",
+    }),
+  );
+  assert.equal(apex.status, 307);
+  const apexCookies = apex.headers.getSetCookie();
+  assert.ok(apexCookies.some((l) => l.startsWith(`${KEY}=base64-sess;`) && l.includes("Domain=.audiolad.ru")));
+  assert.ok(apexCookies.some((l) => l.startsWith(`${KEY}=;`) && !l.includes("Domain=")));
+
+  // Repeat after migration (marker sent, as in MAX iframe too): no 307 loop.
+  // Dev host: never migrates.
+  const dev = await updateSession(
+    new NextRequest("http://localhost:3000/catalog", {
+      headers: { host: "localhost:3000", cookie: `${KEY}=x` },
+    }),
+  ).catch(() => null);
+  assert.ok(dev === null || dev.status !== 307, "dev not migrated");
+  const marker = planSupabaseCookieScope({
+    hostname: "business.audiolad.ru",
+    supabaseUrl: URL_,
+    requestCookies: [{ name: KEY, value: "d" }, { name: SUPABASE_COOKIE_SCOPE_MARKER, value: "d1" }],
+    written: [],
+  });
+  assert.equal(marker.mode, "none", "no repeat 307 once marker present");
 }
 
 console.log("supabase-cookie-domain-unit: proxy ok");

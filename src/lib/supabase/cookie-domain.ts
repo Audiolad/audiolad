@@ -135,7 +135,9 @@ export type SupabaseCookieScopePlan = {
    * - `reissue`: apex legacy cookies re-issued with Domain (session kept);
    * - `expire_only`: subdomain legacy host-only cookies expired, NOT re-issued
    *   (a stale host-only session must never be promoted to all subdomains,
-   *   e.g. after logout elsewhere). Request must be treated as anonymous.
+   *   e.g. after logout elsewhere).
+   * Any mode other than `none` makes the proxy answer 307 (same URL) without
+   * processing the request.
    */
   mode: "none" | "reissue" | "expire_only";
   /** Supabase auth cookie names present in the request (for expire_only). */
@@ -209,9 +211,12 @@ export function planSupabaseCookieScope(input: {
     }
   }
   lines.push(
+    // SameSite=None (+Secure): must reach the server whenever any auth cookie
+    // does, including the MAX cross-site iframe (SameSite=None session),
+    // otherwise the migration 307 would repeat. Carries no authority.
     serialize(SUPABASE_COOKIE_SCOPE_MARKER, SUPABASE_COOKIE_SCOPE_MARKER_VALUE, {
       path: "/",
-      sameSite: "lax",
+      sameSite: "none",
       secure: true,
       httpOnly: true,
       maxAge: 400 * 24 * 60 * 60,
