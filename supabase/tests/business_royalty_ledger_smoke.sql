@@ -1,4 +1,4 @@
--- Isolated smoke for 20261229120000 (task 0e05333f, final concept 2026-10-12 10:20 MSK). Rolls back.
+-- Isolated smoke for 20261231140000 (task 0e05333f, final concept 2026-10-12 10:20 MSK). Rolls back.
 BEGIN;
 CREATE FUNCTION pg_temp.u(text) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT md5($1)::uuid $$;
 CREATE FUNCTION pg_temp.d(text) RETURNS date LANGUAGE sql IMMUTABLE AS $$ SELECT CASE $1 WHEN 'p10' THEN date '2026-10-10' WHEN 'p11' THEN date '2026-11-10' WHEN 'p12' THEN date '2026-12-10' ELSE date '2027-01-10' END $$;

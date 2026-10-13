@@ -1927,7 +1927,7 @@ Migration `20261225120000_product_video_render_recipe.sql` adds a nullable `rend
 
 ## Business SPA pilot PR1 — programs and player event log
 
-Migration: `20261227130000_business_spa_programs_playback_log.sql`.
+Migration: `20261231120000_business_spa_programs_playback_log.sql`.
 Prepared in Git; application to any database is not part of this task.
 
 - `business_programs`: organization-owned named programs; extensible `kind` slug
@@ -1978,7 +1978,7 @@ this migration; pilot admission data is added separately after review.
 
 ## Business SPA pilot PR2 — program composition with live rights decisions
 
-Migration: `20261228130000_business_spa_program_composition.sql`. Prepared in Git; not applied to production by this task.
+Migration: `20261231130000_business_spa_program_composition.sql`. Prepared in Git; not applied to production by this task.
 
 - `business_program_items.gain_db numeric(5,2)` (−30…+6 dB, nullable): player loudness offset from offline EBU R128 analysis (target −18 LUFS). Playback hint only.
 - `business_spa_set_program_items(program_id, audio_item_ids[], exclusion_reason)`: atomic ordered composition for allowlisted pilot members (or service_role). Only published tracks, no duplicates, archived programs frozen. Tracks dropped from the list are soft-excluded with reason, never deleted; re-adding restores them.
@@ -1987,7 +1987,7 @@ Migration: `20261228130000_business_spa_program_composition.sql`. Prepared in Gi
 
 ## Business royalty usage + accrual ledger (task 0e05333f)
 
-Migration: `20261229120000_business_royalty_usage_ledger.sql`. Prepared in Git; not applied to production by this task. Schema + functions, no data. Final concept approved by Сергей Петров 2026-10-12 10:20 MSK.
+Migration: `20261231140000_business_royalty_usage_ledger.sql`. Prepared in Git; not applied to production by this task. Schema + functions, no data. Final concept approved by Сергей Петров 2026-10-12 10:20 MSK.
 
 Per point (location) and calendar month: base = payments attributable to the point (refunds negative; shared payments split by a recorded `allocation_rule`) − approved deductions, clamped at 0; author fund = base × `author_fund_bps` (5000 = 50 %); AudioLad income = base − fund; royalty = fund × holder confirmed minutes / all confirmed minutes of admitted music on the point.
 
@@ -2003,7 +2003,7 @@ Per point (location) and calendar month: base = payments attributable to the poi
 
 ## Business SPA pilot PR3 — player manifest (task 0e05333f)
 
-Migration: `20261230120000_business_spa_program_manifest.sql`. Prepared in Git; not applied to production by this task. Functions only, no tables, no data, read-only.
+Migration: `20261231150000_business_spa_program_manifest.sql`. Prepared in Git; not applied to production by this task. Functions only, no tables, no data, read-only.
 
 - `business_spa_program_manifest(program_id, location_id) → jsonb` (`business_spa_manifest_v1`): for allowlisted pilot members (or service_role) of the program's organization and a location of the same organization. Archived programs are rejected.
 - Only active, published items with an `ELIGIBLE` `business_background_playback` decision from `resolve_business_track_eligibility` are delivered (UNKNOWN / INELIGIBLE / CONDITIONAL = withheld). Withheld items are only counted (`withheld_count`); no ids or reason codes leak.

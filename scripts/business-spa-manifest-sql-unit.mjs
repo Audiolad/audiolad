@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
-const migration = read("supabase/migrations/20261230120000_business_spa_program_manifest.sql");
+const migration = read("supabase/migrations/20261231150000_business_spa_program_manifest.sql");
 const smoke = read("supabase/tests/business_spa_manifest_smoke.sql");
 const sql = migration.replace(/--[^\n]*/g, "");
 
@@ -46,6 +46,6 @@ assert.match(smoke, /SET LOCAL ROLE authenticated/);
 assert.match(smoke, /ROLLBACK;\s*$/);
 assert.ok(read("scripts/database-migrations-compile-isolated.mjs").includes("supabase/tests/business_spa_manifest_smoke.sql"), "smoke runs in real replay");
 assert.ok(read(".github/workflows/database-migrations-compile-isolated.yml").includes("supabase/tests/business_spa_manifest_smoke.sql"));
-assert.ok(read("docs/DATABASE.md").includes("20261230120000_business_spa_program_manifest.sql"));
+assert.ok(read("docs/DATABASE.md").includes("20261231150000_business_spa_program_manifest.sql"));
 assert.ok(read(".github/workflows/business-pr-validation.yml").includes("npm run test:business-spa-manifest"));
 console.log("business-spa-manifest-sql-unit: contract ok");
