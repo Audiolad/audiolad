@@ -19,14 +19,24 @@ for (const fn of sql.matchAll(/CREATE FUNCTION ([\s\S]*?)AS \$\$/g)) {
   assert.ok(fn[1].includes("SET search_path = public, pg_temp"), "fixed function search_path");
 }
 // Pilot access + tenant scope on every entry point.
-assert.equal([...sql.matchAll(/NOT public\.has_business_pilot_access\(v_org\)/g)].length, 2);
+assert.equal([...sql.matchAll(/NOT public\.has_business_pilot_access\(v_org\)/g)].length, 3, "setter, single exclusion, reader");
 assert.match(sql, /business_spa_location_scope_mismatch/);
 assert.match(sql, /l\.organization_id = v_org/);
 // Rights: only the existing engine, fail-closed on anything but ELIGIBLE.
 assert.ok(sql.includes("resolve_business_track_eligibility(i.audio_item_id, p_location_id, NULL, 'business_background_playback')"));
 assert.ok(sql.includes("resolve_business_track_eligibility(i.audio_item_id, p_location_id, NULL, 'offline_storage_cache')"));
 assert.match(sql, /coalesce\(it\.bbp->>'decision' = 'ELIGIBLE', false\)/);
-assert.match(sql, /it\.bbp->>'decision' = 'ELIGIBLE' AND it\.off->>'decision' = 'ELIGIBLE'/);
+// Offline needs ELIGIBLE playback AND an ELIGIBLE offline decision that cites at least one grant.
+assert.match(sql, /coalesce\(it\.bbp->>'decision' = 'ELIGIBLE', false\) AND public\.business_spa_offline_grants_cited\(it\.off\)/);
+assert.match(sql, /jsonb_array_length\([\s\S]*recording_grant_ids[\s\S]*composition_grant_ids[\s\S]*\) > 0/);
+// Catalog visibility: setter, reader and direct-write trigger share one gate.
+assert.match(sql, /public\.can_current_viewer_read_practice\(ai\.practice_id\)/);
+assert.match(sql, /p\.product_kind = 'music'/);
+assert.match(sql, /NOT public\.business_spa_track_visible\(x\)/);
+assert.match(sql, /AND public\.business_spa_track_visible\(i\.audio_item_id\)/);
+assert.match(sql, /BEFORE INSERT OR UPDATE OF audio_item_id, excluded_at ON public\.business_program_items/);
+// Single removal locks the program and never re-activates others.
+assert.match(sql, /business_spa_exclude_program_item[\s\S]*FOR UPDATE/);
 assert.doesNotMatch(sql, /CREATE (?:OR REPLACE )?FUNCTION public\.resolve_business_track_eligibility/);
 assert.doesNotMatch(sql, /INSERT INTO public\.(?:business_pilot_allowlist|playback_usage_facts|music_rights_grants|music_rightsholders)/i);
 assert.doesNotMatch(sql, /ALTER TABLE public\.(?:playback_usage|audio_items|music_)/i);
@@ -36,7 +46,7 @@ assert.match(sql, /business_spa_program_archived/);
 assert.doesNotMatch(sql, /TO anon\s*;/);
 assert.match(sql, /REVOKE ALL ON FUNCTION public\.business_spa_set_program_items\(uuid, uuid\[\], text\) FROM PUBLIC, anon/);
 assert.match(sql, /REVOKE ALL ON FUNCTION public\.business_spa_program_composition\(uuid, uuid\) FROM PUBLIC, anon/);
-for (const scenario of ["NoAllowlist", "Compose", "Idempotent", "SoftExclude", "Reorder", "Readd", "Duplicates", "Unpublished", "FailClosed", "LocationScope", "CrossOrganization", "NoRightsWrites", "GainRange", "ArchivedProgram"]) {
+for (const scenario of ["NoAllowlist", "Compose", "Idempotent", "SoftExclude", "Reorder", "Readd", "Duplicates", "Unpublished", "FailClosed", "LocationScope", "CrossOrganization", "NoRightsWrites", "GainRange", "ArchivedProgram", "OfflineNeedsCitedGrant", "HiddenTrack", "NonMusic", "ExcludeOne"]) {
   assert.ok(smoke.includes(`${scenario}:`), `smoke ${scenario}`);
 }
 assert.match(smoke, /SET LOCAL ROLE authenticated/);
@@ -67,7 +77,7 @@ function runIsolatedSql() {
     "supabase/migrations/20261201120000_business_domain_core.sql",
     "supabase/migrations/20261202120000_business_player_foundation.sql",
     "supabase/migrations/20261203120000_business_playback_attribution.sql",
-    "supabase/migrations/20261227120000_business_spa_programs_playback_log.sql",
+    "supabase/migrations/20261227130000_business_spa_programs_playback_log.sql",
   ].map(read);
   const args = ["exec", "-i", container, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1"];
   execFileSync("docker", [...args, "-d", "postgres", "-c", `CREATE DATABASE ${dbName};`], { stdio: "pipe" });

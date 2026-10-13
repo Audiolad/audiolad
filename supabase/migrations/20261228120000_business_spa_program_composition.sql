@@ -8,6 +8,58 @@ ALTER TABLE public.business_program_items
 COMMENT ON COLUMN public.business_program_items.gain_db IS
   'Player loudness normalisation offset (dB) from offline EBU R128 analysis. Playback hint only, not a rights or quality decision.';
 
+-- Catalog visibility gate shared by every SPA reader/writer (review 2026-10-13):
+-- published music track whose parent practice the CURRENT caller may read under the
+-- existing catalog rule (can_current_viewer_read_practice). No service-role bypass:
+-- server calls without a user see only public (listed/unlisted) practices.
+CREATE FUNCTION public.business_spa_track_visible(p_audio_item_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.audio_items ai
+    JOIN public.practices p ON p.id = ai.practice_id
+    WHERE ai.id = p_audio_item_id
+      AND ai.status = 'published'
+      AND p.product_kind = 'music'
+      AND public.can_current_viewer_read_practice(ai.practice_id)
+  );
+$$;
+REVOKE ALL ON FUNCTION public.business_spa_track_visible(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.business_spa_track_visible(uuid) TO authenticated, service_role;
+
+-- Offline permission needs an actually cited grant. The resolver may return ELIGIBLE
+-- with empty grant-id arrays when the country rule requires neither right; that is
+-- not an offline_storage_cache grant. Empty = no grants; NULL valid_until on cited
+-- grants = open-ended (handled separately by business_spa_grants_valid_until).
+CREATE FUNCTION public.business_spa_offline_grants_cited(p_eligibility jsonb)
+RETURNS boolean LANGUAGE sql IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT coalesce(p_eligibility->>'decision' = 'ELIGIBLE', false)
+    AND (coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(p_eligibility->'recording_grant_ids') = 'array' THEN p_eligibility->'recording_grant_ids' END), 0)
+       + coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(p_eligibility->'composition_grant_ids') = 'array' THEN p_eligibility->'composition_grant_ids' END), 0)) > 0;
+$$;
+REVOKE ALL ON FUNCTION public.business_spa_offline_grants_cited(jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.business_spa_offline_grants_cited(jsonb) TO authenticated, service_role;
+
+-- Direct-write path (RLS insert/update) gets the same gate as the setter: an active
+-- item must reference a track the writer may see. Exclusion is always allowed.
+CREATE FUNCTION public.business_spa_item_visibility_guard()
+RETURNS trigger LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.excluded_at IS NULL AND NOT public.business_spa_track_visible(NEW.audio_item_id) THEN
+    RAISE EXCEPTION 'business_spa_track_not_visible' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.business_spa_item_visibility_guard() FROM PUBLIC, anon, authenticated;
+CREATE TRIGGER business_spa_item_visibility_guard BEFORE INSERT OR UPDATE OF audio_item_id, excluded_at ON public.business_program_items
+  FOR EACH ROW EXECUTE FUNCTION public.business_spa_item_visibility_guard();
+
 -- Atomic ordered composition: listed tracks become active in the given order,
 -- previously active tracks not listed are excluded (soft, with reason), never deleted.
 CREATE FUNCTION public.business_spa_set_program_items(
@@ -38,8 +90,7 @@ BEGIN
      OR cardinality(p_audio_item_ids) <> (SELECT count(DISTINCT x) FROM unnest(p_audio_item_ids) x) THEN
     RAISE EXCEPTION 'business_spa_composition_invalid' USING ERRCODE = '22023';
   END IF;
-  IF EXISTS (SELECT 1 FROM unnest(p_audio_item_ids) x
-             WHERE NOT EXISTS (SELECT 1 FROM public.audio_items ai WHERE ai.id = x AND ai.status = 'published')) THEN
+  IF EXISTS (SELECT 1 FROM unnest(p_audio_item_ids) x WHERE NOT public.business_spa_track_visible(x)) THEN
     RAISE EXCEPTION 'business_spa_track_not_published' USING ERRCODE = '23514';
   END IF;
 
@@ -63,6 +114,33 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.business_spa_set_program_items(uuid, uuid[], text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.business_spa_set_program_items(uuid, uuid[], text) TO authenticated, service_role;
+
+-- Remove ONE track (admin "снять с Business"). Locks the program row so concurrent
+-- removals serialize; never re-activates other items (review 2026-10-13).
+CREATE FUNCTION public.business_spa_exclude_program_item(p_program_id uuid, p_audio_item_id uuid, p_reason text DEFAULT 'removed_by_admin')
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_org uuid;
+  v_hit integer;
+BEGIN
+  SELECT organization_id INTO v_org FROM public.business_programs WHERE id = p_program_id FOR UPDATE;
+  IF v_org IS NULL THEN
+    RAISE EXCEPTION 'business_spa_program_not_found' USING ERRCODE = 'P0002';
+  END IF;
+  IF auth.role() IS DISTINCT FROM 'service_role' AND NOT public.has_business_pilot_access(v_org) THEN
+    RAISE EXCEPTION 'business_spa_pilot_access_denied' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.business_program_items
+     SET excluded_at = now(), excluded_reason = coalesce(nullif(btrim(p_reason), ''), 'removed_by_admin')
+   WHERE program_id = p_program_id AND audio_item_id = p_audio_item_id AND excluded_at IS NULL;
+  GET DIAGNOSTICS v_hit = ROW_COUNT;
+  RETURN v_hit > 0;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.business_spa_exclude_program_item(uuid, uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.business_spa_exclude_program_item(uuid, uuid, text) TO authenticated, service_role;
 
 -- Read model for admin/player: composition with live rights decisions per use type.
 -- playable/offline_cacheable are true only on an ELIGIBLE decision; UNKNOWN = deny.
@@ -105,11 +183,13 @@ BEGIN
     FROM public.business_program_items i
     JOIN public.audio_items ai ON ai.id = i.audio_item_id
     WHERE i.program_id = p_program_id AND i.excluded_at IS NULL
+      -- Stored references the caller may not see are withheld entirely (no metadata).
+      AND public.business_spa_track_visible(i.audio_item_id)
   )
   SELECT it.position, it.audio_item_id, it.music_track_code::text, it.title::text, it.duration_seconds::integer, it.gain_db,
     it.bbp->>'decision', it.off->>'decision',
     coalesce(it.bbp->>'decision' = 'ELIGIBLE', false),
-    coalesce(it.bbp->>'decision' = 'ELIGIBLE' AND it.off->>'decision' = 'ELIGIBLE', false),
+    coalesce(it.bbp->>'decision' = 'ELIGIBLE', false) AND public.business_spa_offline_grants_cited(it.off),
     it.bbp, it.off
   FROM items it ORDER BY it.position;
 END;
