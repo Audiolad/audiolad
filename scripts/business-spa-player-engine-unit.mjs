@@ -18,19 +18,21 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     get src() { return this._src; }
     set src(v) { this.cancelPending?.(); this.deadline = null; this._src = v; this._t = 0; this.paused = true; this.readyState = 0; this.endedFired = false; }
     get duration() { return durationOf.get(this._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "")) ?? NaN; }
-    get currentTime() { return this.paused ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
+    // Like WebAudioTrack: a scheduled-but-not-started slot reports running (paused=false) at 0.
+    get currentTime() { return this.paused || this.pending ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
     set currentTime(v) { this._t = v; if (!this.paused) this.startClock = world.now - v * 1000; }
     async play() { if (!this._src) throw new Error("no src"); this._t = this.currentTime; this.paused = false; this.startClock = world.now - this._t * 1000; world.plays.push({ el: this.name, src: this._src, at: world.now, pos: this._t, vol: this.volume }); }
-    pause() { this.cancelPending(); if (!this.paused) { this._t = this.currentTime; this.paused = true; } }
+    pause() { if (this.pending) { this.cancelPending(); this.paused = true; this._t = 0; return; } if (!this.paused) { this._t = this.currentTime; this.paused = true; } }
     cancelPending() { if (this.pending) { world.timers = world.timers.filter((t) => t !== this.pending); this.pending = null; } }
     // Web Audio model: start exactly at prev's end on the audio clock (no timer latency).
     startAfter(prev) {
-      if (!webAudio || prev.paused || !this._src || this.readyState < 4 || !this.paused || this.pending) return false;
+      if (!webAudio || prev.paused || prev.pending || !this._src || this.readyState < 4 || !this.paused || this.pending) return false;
       const at = prev.startClock + prev.duration * 1000;
       if (at <= world.now) return false;
       this._t = 0;
-      const p = { at, id: ++world.seq, fn: () => { this.pending = null; this.paused = false; this.startClock = p.at; world.plays.push({ el: this.name, src: this._src, at: p.at, pos: 0, vol: this.volume, scheduled: true }); } };
+      const p = { at, id: ++world.seq, fn: () => { this.pending = null; this.startClock = p.at; world.plays.push({ el: this.name, src: this._src, at: p.at, pos: 0, vol: this.volume, scheduled: true }); } };
       this.pending = p;
+      this.paused = false;
       world.timers.push(this.pending);
       return true;
     }
@@ -41,6 +43,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     fire(t) { const a = this.listeners.get(t) ?? []; this.listeners.set(t, a.filter((l) => !l.once)); a.forEach((l) => l.fn()); }
     stopAt(ms) { if (webAudio) this.deadline = ms; }
     checkEnd() {
+      if (this.pending) return;
       if (!this.paused && this._src && this.deadline != null && world.now >= this.deadline) {
         this._t = this.currentTime; this.paused = true; world.stops.push({ src: this._src, at: world.now });
         deps.setTimer(() => this.fire("ended"), 40);
@@ -100,7 +103,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     for (;;) {
       await flush();
       const nextTimer = world.timers.reduce((m, t) => (m === null || t.at < m.at ? t : m), null);
-      const nextEnd = audios.filter((a) => !a.paused && a._src).map((a) => Math.min(a.startClock + a.duration * 1000, a.deadline ?? Infinity)).reduce((m, x) => Math.min(m, x), Infinity);
+      const nextEnd = audios.filter((a) => !a.paused && a._src && !a.pending).map((a) => Math.min(a.startClock + a.duration * 1000, a.deadline ?? Infinity)).reduce((m, x) => Math.min(m, x), Infinity);
       const at = Math.min(nextTimer ? nextTimer.at : Infinity, nextEnd);
       if (at > until) { world.now = until; await flush(); return; }
       world.now = Math.max(world.now, at);
@@ -755,6 +758,57 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   await world.advance(5001);
   assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), "A silent at its grant deadline");
   assert.equal(world.stops[0]?.at, T0 + 5000);
+  engine.dispose();
+}
+
+// ---- 21. Re-review A9 ----
+{
+  // (1) Wi-Fi->cache waiting on cache.get while refresh removes A: A never comes back.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(2000);
+  const g = deferred();
+  const get = deps.cache.get;
+  deps.cache.get = async (k) => { await g.p; return get(k); };
+  world.online = false;
+  const sw = engine.switchToCache();
+  world.online = true;
+  world.manifestRes = { ok: true, data: world.manifest(world.items.filter((x) => x.audio_item_id !== id(1))) };
+  const rp = engine.refresh();
+  g.res();
+  await sw; await rp; await flush();
+  await world.advance(1000);
+  assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), "removed A not revived by a stale switch");
+  engine.dispose();
+}
+{
+  // (2) A stopped early by its deadline with B scheduled at A's natural end: B starts now.
+  const { world, deps, audios } = makeWorld({ durations: [60, 60], webAudio: true, timerLatency: 2000, playableUntil: (i) => (i === 0 ? new Date(T0 + 5000) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(16000);
+  const b = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.ok(b && b.at <= T0 + 5000 + 2500, `B started soon after A's deadline (${b && b.at - T0})`);
+  assert.ok(!b.scheduled || b.at < T0 + 60000, "not waiting for A's natural end");
+  assert.ok(audios.some((a) => !a.paused && a.src.endsWith(id(2))), "B audible at 16 s");
+  assert.equal(engine.current.audioItemId, id(2));
+  engine.dispose();
+}
+{
+  // (3) prepared copy expiring before the boundary after Wi-Fi->cache; stream B on time.
+  const { world, deps } = makeWorld({ durations: [10, 60], webAudio: true, timerLatency: 2000 });
+  world.serverUntil = () => new Date(T0 + 8000).toISOString();
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  world.online = false;
+  await world.advance(1000);
+  world.online = true;
+  await world.advance(11000);
+  const b = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.ok(b && b.at === T0 + 10000, `B exactly at the boundary (${b && b.at - T0})`);
   engine.dispose();
 }
 

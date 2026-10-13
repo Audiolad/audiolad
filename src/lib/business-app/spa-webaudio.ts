@@ -37,7 +37,14 @@ export class WebAudioTrack implements AudioLike {
     this.gain = ctx.createGain();
     this.gain.connect(ctx.destination);
     // The audio clock stands still while suspended: re-map the wall deadline on resume.
-    ctx.addEventListener?.("statechange", () => this.applyStop());
+    // Interruption: drop the node so nothing can sound again without a JS play() call
+    // (the engine resumes via playActive, which re-checks rights and deadlines). On any
+    // state change a passed deadline also stops immediately.
+    ctx.addEventListener?.("statechange", () => {
+      if (this.ctx.state !== "running") this.pause();
+      else if (this.deadline !== null && this.wallNow() >= this.deadline) this.pause();
+      else this.applyStop();
+    });
   }
 
   /** Hard stop on the audio clock at wall time `epochMs` (rights deadline). */
