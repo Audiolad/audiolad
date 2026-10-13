@@ -1,0 +1,232 @@
+{
+ "task": "0e05333f",
+ "verified_at": "2026-10-12T09:40:00+03:00",
+ "source": "prod audio_items read-only (BEGIN READ ONLY) + EBU R128 (ffmpeg ebur128, full file) + librosa 0.11 on 3x60s excerpts",
+ "loudness_target_lufs": -18,
+ "rights_status": "Owner statement 2026-10-12 (Сергей Петров: master + composition). NOT registered as music_rights_grants; resolve_business_track_eligibility = UNKNOWN for all 12 until a signed grant is registered. This file is not a license.",
+ "excluded": [
+  "AL-T-000000730",
+  "AL-T-000000732",
+  "AL-T-000000726",
+  "AL-T-000000762"
+ ],
+ "excluded_reason": "Джаз Релакс — нет отдельного подтверждения прав",
+ "tracks": [
+  {
+   "track_code": "AL-T-000000348",
+   "audio_item_id": "2d894ab2-1e5d-4609-8885-69cd8b6959f4",
+   "title": "Музыка для массажа и спа",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 3860,
+   "loudness_lufs_i": -11.0,
+   "loudness_range_lu": 5.0,
+   "true_peak_dbtp": 0.5,
+   "proposed_gain_db": -7.0,
+   "spectral_centroid_hz": 1593,
+   "onset_strength_mean": 0.906,
+   "bpm_estimates_unreliable": [
+    136.0,
+    136.0,
+    136.0
+   ]
+  },
+  {
+   "track_code": "AL-T-000000437",
+   "audio_item_id": "730c3edb-4b04-4773-ae47-d828148aea59",
+   "title": "Музыка для спа-процедур",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 3716,
+   "loudness_lufs_i": -9.4,
+   "loudness_range_lu": 1.3,
+   "true_peak_dbtp": 0.3,
+   "proposed_gain_db": -8.6,
+   "spectral_centroid_hz": 640,
+   "onset_strength_mean": 0.897,
+   "bpm_estimates_unreliable": [
+    117.5,
+    117.5,
+    117.5
+   ]
+  },
+  {
+   "track_code": "AL-T-000000314",
+   "audio_item_id": "56375762-dfb4-4c60-823a-1c606fabe8ea",
+   "title": "Музыка для спа-релакса",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 3812,
+   "loudness_lufs_i": -11.2,
+   "loudness_range_lu": 6.2,
+   "true_peak_dbtp": 0.8,
+   "proposed_gain_db": -6.8,
+   "spectral_centroid_hz": 1084,
+   "onset_strength_mean": 0.962,
+   "bpm_estimates_unreliable": [
+    123.0,
+    172.3,
+    172.3
+   ]
+  },
+  {
+   "track_code": "AL-T-000000161",
+   "audio_item_id": "ec36c0d2-a46b-42c3-84ae-af8708a67f3b",
+   "title": "Музыка для спа-салонов",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 3797,
+   "loudness_lufs_i": -9.7,
+   "loudness_range_lu": 2.7,
+   "true_peak_dbtp": 1.8,
+   "proposed_gain_db": -8.3,
+   "spectral_centroid_hz": 1488,
+   "onset_strength_mean": 1.272,
+   "bpm_estimates_unreliable": [
+    99.4,
+    99.4,
+    99.4
+   ]
+  },
+  {
+   "track_code": "AL-T-000000317",
+   "audio_item_id": "dd06264c-ef85-4a43-b63d-58e9594dd5f4",
+   "title": "Фоновая музыка для спа",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 3924,
+   "loudness_lufs_i": -9.2,
+   "loudness_range_lu": 3.5,
+   "true_peak_dbtp": 1.2,
+   "proposed_gain_db": -8.8,
+   "spectral_centroid_hz": 1534,
+   "onset_strength_mean": 0.994,
+   "bpm_estimates_unreliable": [
+    103.4,
+    103.4,
+    103.4
+   ]
+  },
+  {
+   "track_code": "AL-T-000000419",
+   "audio_item_id": "8a4b484d-6f7a-450d-bc4b-8f070136b3d4",
+   "title": "Музыка для медитации без слов – 15 минут",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 918,
+   "loudness_lufs_i": -10.4,
+   "loudness_range_lu": 6.2,
+   "true_peak_dbtp": -0.8,
+   "proposed_gain_db": -7.6,
+   "spectral_centroid_hz": 382,
+   "onset_strength_mean": 0.675,
+   "bpm_estimates_unreliable": [
+    117.5,
+    117.5,
+    117.5
+   ]
+  },
+  {
+   "track_code": "AL-T-000000180",
+   "audio_item_id": "22a772c2-d281-4511-8a9a-da37a36bb064",
+   "title": "Спокойная музыка для медитации",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 1844,
+   "loudness_lufs_i": -9.6,
+   "loudness_range_lu": 2.3,
+   "true_peak_dbtp": -0.6,
+   "proposed_gain_db": -8.4,
+   "spectral_centroid_hz": 718,
+   "onset_strength_mean": 0.888,
+   "bpm_estimates_unreliable": [
+    143.6,
+    143.6,
+    143.6
+   ]
+  },
+  {
+   "track_code": "AL-T-000000271",
+   "audio_item_id": "b1183038-9986-416b-8ea6-a95c0ee488c9",
+   "title": "Расслабляющая музыка для медитации и релаксации",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 1906,
+   "loudness_lufs_i": -9.4,
+   "loudness_range_lu": 4.6,
+   "true_peak_dbtp": -0.6,
+   "proposed_gain_db": -8.6,
+   "spectral_centroid_hz": 704,
+   "onset_strength_mean": 0.803,
+   "bpm_estimates_unreliable": [
+    136.0,
+    99.4,
+    136.0
+   ]
+  },
+  {
+   "track_code": "AL-T-000000159",
+   "audio_item_id": "470b8ab6-6c8e-421a-a434-191ff99ca3ee",
+   "title": "Медитация для сна без слов",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 1871,
+   "loudness_lufs_i": -10.9,
+   "loudness_range_lu": 2.4,
+   "true_peak_dbtp": -0.1,
+   "proposed_gain_db": -7.1,
+   "spectral_centroid_hz": 1040,
+   "onset_strength_mean": 1.015,
+   "bpm_estimates_unreliable": [
+    107.7,
+    107.7,
+    107.7
+   ]
+  },
+  {
+   "track_code": "AL-T-000000038",
+   "audio_item_id": "907b12b6-14fc-44b5-98cf-e9abd4411a3e",
+   "title": "Золотой резонанс",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 131,
+   "loudness_lufs_i": -11.5,
+   "loudness_range_lu": 5.7,
+   "true_peak_dbtp": 0.0,
+   "proposed_gain_db": -6.5,
+   "spectral_centroid_hz": 571,
+   "onset_strength_mean": 0.817,
+   "bpm_estimates_unreliable": [
+    123.0,
+    129.2,
+    129.2
+   ]
+  },
+  {
+   "track_code": "AL-T-000000025",
+   "audio_item_id": "3480bc22-765c-4a5e-9445-ccc150ea8644",
+   "title": "Бархатный покой",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 105,
+   "loudness_lufs_i": -12.4,
+   "loudness_range_lu": 4.5,
+   "true_peak_dbtp": 0.0,
+   "proposed_gain_db": -5.6,
+   "spectral_centroid_hz": 579,
+   "onset_strength_mean": 0.824,
+   "bpm_estimates_unreliable": [
+    184.6,
+    89.1,
+    89.1
+   ]
+  },
+  {
+   "track_code": "AL-T-000000063",
+   "audio_item_id": "3796ed82-b7a4-498e-b14d-14990782253a",
+   "title": "Резонанс умиротворения",
+   "artist_alias": "Аурафон",
+   "duration_seconds": 167,
+   "loudness_lufs_i": -12.5,
+   "loudness_range_lu": 6.9,
+   "true_peak_dbtp": -0.2,
+   "proposed_gain_db": -5.5,
+   "spectral_centroid_hz": 1074,
+   "onset_strength_mean": 0.977,
+   "bpm_estimates_unreliable": [
+    123.0,
+    123.0,
+    123.0
+   ]
+  }
+ ]
+}

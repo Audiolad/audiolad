@@ -1923,3 +1923,92 @@ No Sonic DNA, dayparts, or Engine. No fingerprints. No rights grants, country se
 ## Product video export: `product_video_render_jobs.render_recipe`
 
 Migration `20261225120000_product_video_render_recipe.sql` adds a nullable `render_recipe text` to `public.product_video_render_jobs` (CHECK: NULL or `^[a-z0-9][a-z0-9-]{0,63}$`). The MP4 export worker writes `PRODUCT_VIDEO_RENDER_RECIPE` (`src/lib/product-video-export/contract.ts`, now `cover-audio-indicator-v1` = cover + bottom-right «это аудио» indicator) when it completes a job. A completed job with NULL or another recipe is shown to the author as «Нужно пересоздать» and is not downloadable as current; the old file stays in storage. No backfill, no re-render, no change to claim/lease/progress/recovery functions or RLS (table stays service_role only).
+
+
+## Business SPA pilot PR1 — programs and player event log
+
+Migration: `20261227130000_business_spa_programs_playback_log.sql`.
+Prepared in Git; application to any database is not part of this task.
+
+- `business_programs`: organization-owned named programs; extensible `kind` slug
+  (default `spa`), `draft/active/archived`, creator and timestamps. Organization
+  cannot be changed after creation; `updated_at` reuses the Business Domain helper.
+- `business_program_items`: references to `audio_items` only, position >= 1,
+  unique `(program_id, audio_item_id)`, added_by, exclusion time/reason. No copied
+  media files, metadata, passports or legal fields. Program/track identity is fixed;
+  exclusion and ordering remain editable. FK deletion uses RESTRICT.
+- `business_pilot_allowlist`: `(organization_id, user_id)` admission, enabled,
+  note, added_by, created_at. No production users seeded. Only `service_role`
+  manages admission; authenticated members can read their own enabled admission.
+- `business_playback_log`: player/zone/organization/track/program references,
+  client start/end time, nonnegative `played_ms`, `start/complete/skip/error`,
+  UUID `client_event_id`, offline flag and server-set `received_at`. Unique
+  `(player_id, client_event_id)` supports insert with `ON CONFLICT DO NOTHING`.
+  Authenticated access is SELECT/INSERT only; events cannot be edited or deleted.
+  No batch RPC is introduced in PR1; delivery can use conflict-ignore inserts.
+
+RLS on all four tables requires both an enabled admission for `auth.uid()` in
+that organization and existing owner/manager membership via
+`is_business_organization_member`. `has_business_pilot_access` is a self-only
+STABLE SECURITY DEFINER helper with fixed `search_path = public, pg_temp`.
+Anonymous access is revoked; `service_role` has full table privileges.
+
+The log trigger validates player organization, zone organization and assignment
+at `started_at` (including historical assignments for delayed offline delivery),
+and program organization. Optional `usage_fact_id` links only an existing
+`playback_usage_facts` row with `usage_kind=business` and matching
+organization/player/zone/track. Raw client times and `played_ms` are telemetry,
+not trusted media-time or Proof of Play; no canonical facts are generated here.
+The A3 ledger remains the source for accepted usage; do not add the two totals.
+
+Program membership and logging never grant delivery or cache authorization.
+Server delivery must still call `resolve_business_track_eligibility` separately
+for `business_background_playback` and `offline_storage_cache`. No eligibility
+or rights columns are added, and no existing rights/passport functions change.
+
+Validation: `AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs`
+always runs text contracts without DB discovery or connections. Smoke SQL is
+prepared for a disposable isolated DB only, using the existing A3 stub and real
+ledger/A1/A2/A3 migrations. Outside production, optional SQL requires both
+`AUDIOLAD_BUSINESS_SPA_ISOLATED_SQL=1` and an explicit
+`AUDIOLAD_BUSINESS_SPA_TEST_CONTAINER` ending in `-test-db`; no production
+container discovery. The scratch database must not already exist.
+Next step: run isolated smoke in an authorized test environment before applying
+this migration; pilot admission data is added separately after review.
+
+## Business SPA pilot PR2 — program composition with live rights decisions
+
+Migration: `20261228130000_business_spa_program_composition.sql`. Prepared in Git; not applied to production by this task.
+
+- `business_program_items.gain_db numeric(5,2)` (−30…+6 dB, nullable): player loudness offset from offline EBU R128 analysis (target −18 LUFS). Playback hint only.
+- `business_spa_set_program_items(program_id, audio_item_ids[], exclusion_reason)`: atomic ordered composition for allowlisted pilot members (or service_role). Only published tracks, no duplicates, archived programs frozen. Tracks dropped from the list are soft-excluded with reason, never deleted; re-adding restores them.
+- `business_spa_program_composition(program_id, location_id)`: active items in order with `resolve_business_track_eligibility` decisions for `business_background_playback` and `offline_storage_cache`. `playable` only on ELIGIBLE background; `offline_cacheable` only when both are ELIGIBLE. UNKNOWN/DENIED = no. Location must belong to the program's organization.
+- No grants, rightsholders, allowlist rows or programs are seeded. Pilot candidate list (12 Aurafon tracks, loudness analysis) lives in `docs/business/spa-pilot-aurafon-v1.json` and is not a license.
+
+## Business royalty usage + accrual ledger (task 0e05333f)
+
+Migration: `20261229120000_business_royalty_usage_ledger.sql`. Prepared in Git; not applied to production by this task. Schema + functions, no data. Final concept approved by Сергей Петров 2026-10-12 10:20 MSK.
+
+Per point (location) and calendar month: base = payments attributable to the point (refunds negative; shared payments split by a recorded `allocation_rule`) − approved deductions, clamped at 0; author fund = base × `author_fund_bps` (5000 = 50 %); AudioLad income = base − fund; royalty = fund × holder confirmed minutes / all confirmed minutes of admitted music on the point.
+
+- `business_service_operators` — operator role history; not a rightsholder.
+- `business_royalty_formula_versions` — versioned formula; `author_fund_bps` immutable; approval needs person + document.
+- `business_royalty_periods` (calendar month), `business_royalty_payments`, `business_royalty_payment_allocations`.
+- `business_royalty_deductions` — registry: `sales_tax` (preliminary, accountant TBD), `acquiring_fee`, `direct_point_service_cost`; document reference required; linked to a point or a payment. Marketing, development, salaries, catalog upkeep, ordinary infra are not categories.
+- `business_royalty_track_shares` — composition / recording holders separately; shares of a track over both layers must sum to 10000 to be admitted (no fixed 50/50, no double minute).
+- `business_royalty_plays` — confirmed plays, online = offline, unique `dedup_key`.
+- `business_royalty_calc_runs`, `business_royalty_point_results`, `business_royalty_accruals` — versioned runs; `calculation_state` preliminary/approved/superseded/void, `payout_state` none/in_payout/paid (only approved + payable); `settlement_mode` management when operator is the same subject as the holder. Points without confirmed plays are `held_no_plays` (fund not distributed until reconciliation).
+- Review fixes (@a84d92d9): largest-remainder rounding everywhere (payment allocations, payment-linked deductions, royalties) with invariant distributed = fund; forward-only accrual state machine (preliminary → approved|superseded|void; payout none → in_payout → paid), approved entries change only via `business_royalty_reverse_accrual()` (audited adjustment with reason) or adjustment deltas from a re-run after approval; `business_royalty_allocation_issues()` lists unallocated / invalid single_point / fixed sum mismatch payments and blocks the run; all inputs append-only (shares/operators may be closed once; periods forward-only, closed never reopens and accepts no inputs), TRUNCATE blocked, deduction status changes audited in `business_royalty_deduction_status_events`; shares matched per play date (`played_on`), overlapping share intervals rejected; runs serialised by a period row lock.
+- `business_royalty_compute()` (pure), `business_royalty_run_preliminary()` (writes a new preliminary run). Append-only guards. RLS on; no anon/authenticated access. Smoke `supabase/tests/business_royalty_ledger_smoke.sql` runs in Database Migrations Real Compile.
+
+## Business SPA pilot PR3 — player manifest (task 0e05333f)
+
+Migration: `20261230120000_business_spa_program_manifest.sql`. Prepared in Git; not applied to production by this task. Functions only, no tables, no data, read-only.
+
+- `business_spa_program_manifest(program_id, location_id) → jsonb` (`business_spa_manifest_v1`): for allowlisted pilot members (or service_role) of the program's organization and a location of the same organization. Archived programs are rejected.
+- Only active, published items with an `ELIGIBLE` `business_background_playback` decision from `resolve_business_track_eligibility` are delivered (UNKNOWN / INELIGIBLE / CONDITIONAL = withheld). Withheld items are only counted (`withheld_count`); no ids or reason codes leak.
+- Offline: `offline_allowed` only on an additional `ELIGIBLE` `offline_storage_cache` decision. One universal rule for all rightsholders: `offline_cache_until = least(generated_at + 7 days, earliest valid_until of cited offline grants, earliest valid_until of cited playback grants)`. The license term (term of the exclusive right) lives in grant `valid_until`; the 7-day cache cap is independent of it.
+- `playable_until` = earliest `valid_until` of cited playback grants; tracks whose grant has ended are withheld. `expires_at` = least(+7 days, earliest `playable_until`) — client refreshes before starting new tracks. `content_hash` is stable across calls for the same composition.
+- `business_spa_grants_valid_until(eligibility jsonb)` — service-only helper; `business_spa_offline_cache_max()` = 7 days.
+- Client contract: `src/lib/business-app/spa-manifest.ts` (fail-closed parse, re-clamps cache to 7 days from download, never extends server bounds).
+- Smoke `supabase/tests/business_spa_manifest_smoke.sql` runs in the real disposable replay (engine stubbed per transaction, real grant rows). No grants, rights activation, allowlist rows or programs are created.
