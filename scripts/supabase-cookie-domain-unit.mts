@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   planSupabaseCookieScope,
+  hostnameFromHeaders,
   getSupabaseCookieOptions,
   parseCookieHeader,
   resolveSupabaseCookieDomain,
@@ -33,7 +34,7 @@ assert.deepEqual(
 assert.deepEqual(getSupabaseCookieOptions("localhost:3000"), {});
 assert.deepEqual(getSupabaseCookieOptions("business.audiolad.ru"), { domain: ".audiolad.ru", secure: true });
 
-// Legacy migration: re-issue with Domain, expire host-only, set marker.
+// Legacy migration on apex: expire host-only only, NEVER re-issue (C3 B3).
 const legacyPlan = planSupabaseCookieScope({
   hostname: "audiolad.ru",
   supabaseUrl: URL_,
@@ -44,14 +45,32 @@ const legacyPlan = planSupabaseCookieScope({
   ],
   written: [],
 });
-assert.equal(legacyPlan.mode, "reissue");
+assert.equal(legacyPlan.mode, "expire_only");
 const legacy = legacyPlan.lines;
 const expiry = (n: string) =>
   legacy.find((l) => l.startsWith(`${n}=;`) && !l.includes("Domain=") && l.includes("Max-Age=0"));
 assert.ok(expiry(`${KEY}.0`) && expiry(`${KEY}.1`), "host-only expired");
-assert.ok(legacy.some((l) => l.startsWith(`${KEY}.0=base64-aaa;`) && l.includes("Domain=.audiolad.ru") && l.includes("Secure")));
+assert.ok(!legacy.some((l) => l.includes("base64-aaa") || l.includes("bbb")), "legacy values never re-issued");
+assert.ok(!legacy.some((l) => l.includes("Domain=")), "no Domain write during migration");
+// C3 B2: expiries must be accepted in the MAX cross-site iframe.
+for (const l of legacy) assert.ok(l.includes("SameSite=None") && l.includes("Secure"), l);
 assert.ok(legacy.some((l) => l.startsWith(`${SUPABASE_COOKIE_SCOPE_MARKER}=`) && !l.includes("Domain=")), "marker is host-only (per host)");
 assert.ok(!legacy.some((l) => l.startsWith("other=")), "non-auth cookies untouched");
+
+// Late apex visit after shared login B + logout: legacy A is not resurrected.
+const late = planSupabaseCookieScope({
+  hostname: "audiolad.ru",
+  supabaseUrl: URL_,
+  requestCookies: [{ name: KEY, value: "old-A" }],
+  written: [],
+});
+assert.ok(!late.lines.some((l) => l.includes("old-A")));
+
+// C3 B1: real Host wins over client X-Forwarded-Host.
+const H = (o: Record<string, string>) => ({ get: (n: string) => o[n] ?? null });
+assert.equal(hostnameFromHeaders(H({ host: "audiolad.ru", "x-forwarded-host": "localhost" })), "audiolad.ru");
+assert.equal(hostnameFromHeaders(H({ host: "localhost:3000", "x-forwarded-host": "audiolad.ru" })), "localhost");
+assert.equal(hostnameFromHeaders(H({ "x-forwarded-host": "business.audiolad.ru" })), "business.audiolad.ru");
 
 // Marker present: only writes cause host-only expiry (refresh / logout).
 const refresh = planSupabaseCookieScope({
@@ -90,7 +109,7 @@ const both = planSupabaseCookieScope({
   requestCookies: [{ name: KEY, value: "stale" }],
   written: [{ name: KEY, value: "fresh", options: { domain: ".audiolad.ru" } }],
 }).lines;
-assert.ok(!both.some((l) => l.startsWith(`${KEY}=stale`)));
+assert.ok(!both.some((l) => l.includes("stale")));
 assert.equal(both.filter((l) => l.startsWith(`${KEY}=;`)).length, 1);
 
 // Duplicate-name parse: first wins (same as @supabase/ssr default parser).
@@ -130,19 +149,18 @@ console.log("supabase-cookie-domain-unit: ok");
   );
   assert.equal(post.status, 307);
 
-  // Apex legacy (e.g. logout POST): 307 with re-issue, request not processed,
-  // so a logout cannot race the re-issued cookie.
+  // Apex legacy (e.g. logout POST): 307 with expiries only, request not processed.
   const apex = await updateSession(
     new NextRequest("http://127.0.0.1:3000/profile", {
       method: "POST",
-      headers: { host: "audiolad.ru", cookie: `${KEY}=base64-sess` },
+      headers: { host: "audiolad.ru", "x-forwarded-host": "localhost", cookie: `${KEY}=base64-sess` },
       body: "x",
     }),
   );
-  assert.equal(apex.status, 307);
+  assert.equal(apex.status, 307, "spoofed X-Forwarded-Host does not skip migration");
   const apexCookies = apex.headers.getSetCookie();
-  assert.ok(apexCookies.some((l) => l.startsWith(`${KEY}=base64-sess;`) && l.includes("Domain=.audiolad.ru")));
-  assert.ok(apexCookies.some((l) => l.startsWith(`${KEY}=;`) && !l.includes("Domain=")));
+  assert.ok(!apexCookies.some((l) => l.includes("base64-sess")));
+  assert.ok(apexCookies.some((l) => l.startsWith(`${KEY}=;`) && !l.includes("Domain=") && l.includes("SameSite=None") && l.includes("Secure")));
 
   // Repeat after migration (marker sent, as in MAX iframe too): no 307 loop.
   // Dev host: never migrates.

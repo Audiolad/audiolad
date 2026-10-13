@@ -107,7 +107,7 @@ export async function updateSession(
   if (prePlan.mode !== "none") {
     // One-time per-host migration of legacy host-only cookies. Legacy twins
     // cannot be told apart from shared domain cookies in the Cookie header, so
-    // this request is NOT processed: the browser gets the expiries/re-issue
+    // this request is NOT processed: the browser gets the expiries (legacy values are never re-issued)
     // and repeats the same request (307 keeps method and body) carrying only
     // domain-scoped cookies. No Supabase read/write and no server action runs
     // on the ambiguous cookie set, so logout/refresh never race the migration.

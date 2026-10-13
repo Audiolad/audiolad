@@ -7,9 +7,10 @@
  * keeps host-only cookies — derived from the actual request/document host,
  * there is no user-visible toggle.
  *
- * Legacy host-only cookies (written before this change) are migrated in the
- * proxy: re-issued with the domain scope and the host-only copy expired, so no
- * two same-name cookies linger. Every later write/removal also expires the
+ * Legacy host-only cookies (written before this change) are NEVER re-issued
+ * with the domain scope (a stale host-only session must not be promoted to all
+ * subdomains or overwrite a live shared session): the proxy only expires them,
+ * so a user with a legacy-only session logs in once more. Every later write/removal also expires the
  * host-only variant, so logout clears both and logs out on all subdomains.
  */
 import type { SerializeOptions } from "cookie";
@@ -95,27 +96,34 @@ export function getSupabaseCookieOptions(
   return domain ? { domain, secure: true } : {};
 }
 
-/** The only host where legacy host-only cookies are re-issued (login lives here). */
-export function isSessionOriginHost(hostname: string | null | undefined): boolean {
-  return normalize(hostname) === PRODUCTION_COOKIE_PARENT_DOMAIN;
-}
-
+/**
+ * Hostname of the request. The real `Host` header wins: `X-Forwarded-Host` is
+ * client-controllable (Next keeps an incoming value), so it is used only when
+ * `Host` is absent.
+ */
 export function hostnameFromHeaders(headers: {
   get(name: string): string | null;
 }): string {
-  return normalize(headers.get("x-forwarded-host")?.split(",")[0] ?? headers.get("host"));
+  const host = normalize(headers.get("host"));
+  if (host) return host;
+  return normalize(headers.get("x-forwarded-host")?.split(",")[0]);
 }
 
-/** `Set-Cookie` line that expires the legacy host-only variant (no Domain). */
+/**
+ * `Set-Cookie` line that expires the legacy host-only variant (no Domain).
+ * When Secure (production/https) it is `SameSite=None; Secure`, so the browser
+ * accepts it in the MAX cross-site iframe too (a Lax Set-Cookie is rejected
+ * there). Deletion matches by name/domain/path, so it removes Lax cookies as well.
+ */
 export function serializeHostOnlyExpiry(
   name: string,
-  options: Pick<SerializeOptions, "path" | "secure" | "sameSite"> = {},
+  options: Pick<SerializeOptions, "path" | "secure"> = {},
 ): string {
   return serialize(name, "", {
     path: options.path ?? "/",
     maxAge: 0,
     expires: new Date(0),
-    sameSite: options.sameSite ?? "lax",
+    sameSite: options.secure ? "none" : "lax",
     secure: options.secure,
     httpOnly: false,
   });
@@ -132,14 +140,13 @@ export type SupabaseCookieScopePlan = {
   lines: string[];
   /**
    * - `none`: nothing to migrate on this host;
-   * - `reissue`: apex legacy cookies re-issued with Domain (session kept);
-   * - `expire_only`: subdomain legacy host-only cookies expired, NOT re-issued
-   *   (a stale host-only session must never be promoted to all subdomains,
-   *   e.g. after logout elsewhere).
+   * - `expire_only`: legacy host-only cookies expired on ANY host, never
+   *   re-issued (a stale host-only session must never be promoted to all
+   *   subdomains or overwrite an existing shared session, e.g. after logout).
    * Any mode other than `none` makes the proxy answer 307 (same URL) without
    * processing the request.
    */
-  mode: "none" | "reissue" | "expire_only";
+  mode: "none" | "expire_only";
   /** Supabase auth cookie names present in the request (for expire_only). */
   legacyNames: string[];
 };
@@ -174,7 +181,6 @@ export function planSupabaseCookieScope(input: {
     lines.push(serializeHostOnlyExpiry(name, { secure: true }));
   };
 
-  const writtenNames = new Set(input.written.map((c) => c.name));
   for (const cookie of input.written) {
     if (cookieNameLooksLikeSupabaseAuth(cookie.name, storageKey)) {
       expireHostOnly(cookie.name);
@@ -194,21 +200,8 @@ export function planSupabaseCookieScope(input: {
     return { lines, mode: "none", legacyNames: [] };
   }
 
-  const reissue = isSessionOriginHost(input.hostname);
   for (const cookie of legacy) {
     expireHostOnly(cookie.name);
-    if (reissue && !writtenNames.has(cookie.name)) {
-      lines.push(
-        serialize(cookie.name, cookie.value, {
-          domain,
-          path: "/",
-          sameSite: "lax",
-          secure: true,
-          httpOnly: false,
-          maxAge: 400 * 24 * 60 * 60,
-        }),
-      );
-    }
   }
   lines.push(
     // SameSite=None (+Secure): must reach the server whenever any auth cookie
@@ -225,7 +218,7 @@ export function planSupabaseCookieScope(input: {
 
   return {
     lines,
-    mode: reissue ? "reissue" : "expire_only",
+    mode: "expire_only",
     legacyNames: legacy.map((c) => c.name),
   };
 }
