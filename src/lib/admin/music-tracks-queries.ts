@@ -1,5 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+type ServiceClient = ReturnType<typeof createServiceRoleClient>;
+
 export type AdminMusicTrackRow = {
   id: string;
   trackCode: string;
@@ -34,8 +36,30 @@ type AudioRow = {
 
 const PAGE_SIZE = 1000;
 
-async function loadAllMusicPractices(): Promise<PracticeRow[]> {
-  const service = createServiceRoleClient();
+/**
+ * Max ids per PostgREST `in.(...)` filter. Ids go into the GET query string;
+ * production gateway answers 502 once the URL passes ~4 KB (100 UUIDs failed,
+ * 80 passed on 2026-10-13). 40 UUIDs keep the URL well under 2 KB.
+ */
+export const ADMIN_MUSIC_TRACKS_ID_CHUNK_SIZE = 40;
+
+export function chunkIds<T>(
+  ids: readonly T[],
+  size = ADMIN_MUSIC_TRACKS_ID_CHUNK_SIZE,
+): T[][] {
+  if (!Number.isInteger(size) || size <= 0) {
+    throw new Error("chunk_size_invalid");
+  }
+  const chunks: T[][] = [];
+  for (let offset = 0; offset < ids.length; offset += size) {
+    chunks.push(ids.slice(offset, offset + size));
+  }
+  return chunks;
+}
+
+async function loadAllMusicPractices(
+  service: ServiceClient,
+): Promise<PracticeRow[]> {
   const rows: PracticeRow[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -44,6 +68,7 @@ async function loadAllMusicPractices(): Promise<PracticeRow[]> {
       .select("id, title, author_id")
       .eq("product_kind", "music")
       .is("deleted_at", null)
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) {
@@ -61,16 +86,13 @@ async function loadAllMusicPractices(): Promise<PracticeRow[]> {
   return rows;
 }
 
-async function loadAuthors(authorIds: string[]): Promise<AuthorRow[]> {
-  if (authorIds.length === 0) {
-    return [];
-  }
-
-  const service = createServiceRoleClient();
+async function loadAuthors(
+  service: ServiceClient,
+  authorIds: string[],
+): Promise<AuthorRow[]> {
   const rows: AuthorRow[] = [];
 
-  for (let offset = 0; offset < authorIds.length; offset += PAGE_SIZE) {
-    const ids = authorIds.slice(offset, offset + PAGE_SIZE);
+  for (const ids of chunkIds(authorIds)) {
     const { data, error } = await service
       .from("authors")
       .select("id, name, slug")
@@ -86,17 +108,13 @@ async function loadAuthors(authorIds: string[]): Promise<AuthorRow[]> {
   return rows;
 }
 
-async function loadAudioItems(practiceIds: string[]): Promise<AudioRow[]> {
-  if (practiceIds.length === 0) {
-    return [];
-  }
-
-  const service = createServiceRoleClient();
+async function loadAudioItems(
+  service: ServiceClient,
+  practiceIds: string[],
+): Promise<AudioRow[]> {
   const rows: AudioRow[] = [];
 
-  for (let offset = 0; offset < practiceIds.length; offset += PAGE_SIZE) {
-    const ids = practiceIds.slice(offset, offset + PAGE_SIZE);
-
+  for (const ids of chunkIds(practiceIds)) {
     for (let from = 0; ; from += PAGE_SIZE) {
       const { data, error } = await service
         .from("audio_items")
@@ -104,6 +122,7 @@ async function loadAudioItems(practiceIds: string[]): Promise<AudioRow[]> {
         .in("practice_id", ids)
         .order("practice_id", { ascending: true })
         .order("position", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, from + PAGE_SIZE - 1);
 
       if (error) {
@@ -122,8 +141,10 @@ async function loadAudioItems(practiceIds: string[]): Promise<AudioRow[]> {
   return rows;
 }
 
-export async function listAdminMusicTracks(): Promise<AdminMusicTrackRow[]> {
-  const practices = await loadAllMusicPractices();
+export async function listAdminMusicTracks(
+  service: ServiceClient = createServiceRoleClient(),
+): Promise<AdminMusicTrackRow[]> {
+  const practices = await loadAllMusicPractices(service);
 
   if (practices.length === 0) {
     return [];
@@ -135,9 +156,10 @@ export async function listAdminMusicTracks(): Promise<AdminMusicTrackRow[]> {
   const authorIds = [
     ...new Set(practices.map((practice) => practice.author_id)),
   ];
-  const authors = await loadAuthors(authorIds);
+  const authors = await loadAuthors(service, authorIds);
   const authorById = new Map(authors.map((author) => [author.id, author]));
   const audioItems = await loadAudioItems(
+    service,
     practices.map((practice) => practice.id),
   );
 
@@ -169,7 +191,5 @@ export async function listAdminMusicTracks(): Promise<AdminMusicTrackRow[]> {
       } satisfies AdminMusicTrackRow;
     })
     .filter((row): row is AdminMusicTrackRow => row !== null)
-    .sort((left, right) =>
-      left.trackCode.localeCompare(right.trackCode, "ru"),
-    );
+    .sort((left, right) => left.trackCode.localeCompare(right.trackCode, "ru"));
 }
