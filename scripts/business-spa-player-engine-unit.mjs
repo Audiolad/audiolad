@@ -1055,7 +1055,8 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   let hold = true;
   for (const a of audios) {
     const play = a.play.bind(a);
-    a.play = async () => { if (hold && a._src.endsWith(id(2))) { hold = false; await d.p; } return play(); };
+    // Like WebAudioTrack (gen check): a play() whose source was replaced meanwhile does nothing.
+    a.play = async () => { if (hold && a._src.endsWith(id(2))) { hold = false; const src = a._src; await d.p; if (a._src !== src) return; } return play(); };
   }
   for (let t = 0; t < 6000 && hold; t += 50) await world.advance(50);
   assert.equal(hold, false, "B play pending");
@@ -1066,6 +1067,10 @@ const deferred = () => { let res; const p = new Promise((r) => { res = r; }); re
   assert.equal(engine.status, "playing");
   assert.equal(engine.current?.audioItemId, id(3), "successor of A by identity is C");
   assert.ok(!world.plays.some((p, k) => k > 0 && p.src.endsWith(id(1)) && p.pos === 0), "A not restarted");
+  const cStarts = world.plays.filter((p) => p.src.endsWith(id(3)) && p.pos === 0);
+  assert.equal(cStarts.length, 1, `C started exactly once (${cStarts.length})`);
+  const cEl = audios.find((x) => !x.paused && x.src.endsWith(id(3)));
+  assert.ok(cEl && cEl.currentTime > 2, `C position preserved (${cEl && cEl.currentTime})`);
   engine.dispose();
 }
 

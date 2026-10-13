@@ -25,7 +25,7 @@ const mutations = [
     ["playOp: intent, slotOp", "playOp: this.playOp, slotOp"],
     ["if (intent !== this.playOp) return; // paused/stopped since the caller decided to play", ""],
     ["    if (intent !== this.playOp) return;\n    if (!ok) {", "    if (!ok) {"],
-    ["if (intent !== this.playOp) return; // paused meanwhile: no fallback start", ""],
+    ["if (superseded()) return; // paused / refreshed / restarted meanwhile: no fallback start", ""],
     ["    if (intent !== this.playOp) return false;\n", ""],
   ]],
   ["I9 pause leaves the outgoing slot audible", [
@@ -34,8 +34,10 @@ const mutations = [
   ["I8 startAt uses the index captured before the await", [
     ["    const ri = this.items.findIndex((x) => x.audioItemId === targetId);\n    if (ri < 0) return;", "    const ri = pi;\n    if (ri < 0) return;"],
   ]],
-  ["I8 advance falls back by the index captured before the await", [
-    ["const fi = fromId ? this.items.findIndex((x) => x.audioItemId === fromId) : -1;", "const fi = from;"],
+  // (advance's identity re-resolve is now only defence in depth: any manifest change bumps
+  // `generation`, which makes the old advance superseded — covered by the next mutant.)
+  ["I8 stale advance falls back after a refresh restarted playback", [
+    ["const superseded = () => intent !== this.playOp || gen !== this.generation || startOp !== this.startOp;", "const superseded = () => intent !== this.playOp;"],
   ]],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],

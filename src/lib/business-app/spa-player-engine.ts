@@ -438,6 +438,8 @@ export class SpaPlayerEngine {
         return false;
       }
     } catch {
+      // A play() rejected because its source was replaced/cleared meanwhile is not a user-facing error.
+      if (!this.fresh(t)) return false;
       this.setStatus(auto ? "needs_gesture" : "error", auto ? null : "Браузер не дал запустить звук.");
       return false;
     }
@@ -767,6 +769,11 @@ export class SpaPlayerEngine {
     const intent = this.playOp;
     const from = this.index;
     const fromId = this.items[from]?.audioItemId ?? null;
+    // Whole-operation freshness: a refresh (generation) or another start (startOp) while
+    // we wait means a newer operation owns playback; this advance must not fall back.
+    const gen = this.generation;
+    const startOp = this.startOp;
+    const superseded = () => intent !== this.playOp || gen !== this.generation || startOp !== this.startOp;
     const fromSlot = this.active;
     if (this.status !== "playing") return;
     this.closeSegment("complete");
@@ -786,7 +793,7 @@ export class SpaPlayerEngine {
         else this.d.audios[fromSlot].pause();
         return;
       }
-      if (intent !== this.playOp) return; // paused meanwhile: no fallback start
+      if (superseded()) return; // paused / refreshed / restarted meanwhile: no fallback start
     }
     this.active = fromSlot;
     this.d.audios[fromSlot].pause();
