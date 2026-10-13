@@ -331,6 +331,7 @@ export class SpaPlayerEngine {
 
   async toggle(): Promise<void> {
     if (this.status === "playing") {
+      this.settleScheduled();
       this.finishHandoff();
       this.activeEl().pause();
       this.closeSegment("skip");
@@ -349,6 +350,8 @@ export class SpaPlayerEngine {
 
   private async prepareNext(): Promise<void> {
     if (this.index < 0) return;
+    // Never replace an already-audible scheduled track; commit it first.
+    if (this.scheduledStarted()) this.settleScheduled();
     const ni = this.findPlayable(nextIndex(this.items.length, this.index));
     const slot = 1 - this.active;
     if (ni < 0 || ni === this.index) {
@@ -426,7 +429,7 @@ export class SpaPlayerEngine {
     const item = lo ? this.items.find((i) => i.audioItemId === lo.audioItemId) : undefined;
     const cur = this.activeEl();
     const leftMs = Math.max(0, (cur.duration - cur.currentTime) * 1000);
-    const started = cur.paused || !(leftMs > 0);
+    const started = this.scheduledStarted();
     const ok =
       !!lo &&
       !!item &&
@@ -441,6 +444,27 @@ export class SpaPlayerEngine {
       return;
     }
     this.unschedule();
+  }
+
+  /** True when the scheduled slot is already audible (outgoing slot finished on the audio clock). */
+  private scheduledStarted(): boolean {
+    if (this.scheduledSlot === null) return false;
+    const cur = this.activeEl();
+    return cur.paused || !((cur.duration - cur.currentTime) * 1000 > 0);
+  }
+
+  /**
+   * Before any operation that replaces/pauses sources: if the audio-clock transition has
+   * already happened, commit it first so engine state matches what is audible; otherwise
+   * drop the pending start (tick re-plans).
+   */
+  private settleScheduled(): void {
+    if (this.scheduledSlot === null) return;
+    if (this.scheduledStarted()) {
+      if (this.transitionTimer) this.d.clearTimer(this.transitionTimer);
+      this.transitionTimer = null;
+      this.commitScheduled();
+    } else this.unschedule();
   }
 
   /** Drop a pending audio-clock start (rights may have changed); tick re-plans. */
@@ -460,7 +484,12 @@ export class SpaPlayerEngine {
     this.closeSegment("complete");
     this.active = slot;
     this.d.audios[from].pause();
-    if (!lo || ni < 0) return; // tick sees no valid source and moves on
+    if (!lo || ni < 0) {
+      // B left the program: it must not keep sounding. Stop it; tick moves on.
+      this.clearSlot(slot);
+      this.emit();
+      return;
+    }
     this.index = ni;
     // Next tick re-checks rights (continuing) and stops it if needed.
     // The new track has been audible since its audio-clock start: count it from 0.
@@ -602,6 +631,9 @@ export class SpaPlayerEngine {
   }
 
   async tick(): Promise<void> {
+    // Invariant: engine state follows what is audible. An audio-clock transition that
+    // already happened is committed before anything else looks at the active slot.
+    if (this.scheduledStarted()) this.settleScheduled();
     const online = this.d.online();
     if (online !== this.wasOnline) {
       this.wasOnline = online;
@@ -709,8 +741,9 @@ export class SpaPlayerEngine {
 
   /** Wi-Fi dropped: move active/prepared stream sources to valid cached copies. */
   async switchToCache(): Promise<void> {
-    // Replacing sources cancels audio-clock starts; drop the schedule, tick re-plans.
-    this.unschedule();
+    // Replacing sources cancels audio-clock starts: commit an already-audible B first
+    // (it then switches to its cached copy like any active track), else drop the schedule.
+    this.settleScheduled();
     for (const slot of [this.active, 1 - this.active]) {
       const l = this.loaded[slot];
       if (!l || l.kind !== "stream") continue;

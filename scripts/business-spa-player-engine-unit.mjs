@@ -593,4 +593,92 @@ for (const lat of [0, 600, 2000]) {
   engine.dispose();
 }
 
+// ---- 19. Re-review A7 + state-machine invariants ----
+// Helper: let the audio-clock transition happen but hold back every engine callback
+// (ended event + commit timer), so the engine still believes A is active.
+function holdEngine(world, audios) {
+  for (const a of audios) a.fire = () => {};
+  world.timers = world.timers.filter((t) => audios.some((a) => a.pending === t));
+}
+{
+  // (1) Wi-Fi drops right after the boundary: B (already audible) keeps playing from cache.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(9000);
+  holdEngine(world, audios);
+  await world.advance(1100); // audio clock: B started at 10.000 s
+  const b = audios.find((x) => x.src.endsWith(id(2)));
+  assert.ok(b && !b.paused, "B audible after the boundary");
+  assert.equal(engine.current.audioItemId, id(1), "engine has not committed yet");
+  world.online = false;
+  await engine.switchToCache();
+  await flush();
+  assert.equal(engine.current.audioItemId, id(2), "B committed before switching");
+  assert.ok(audios.some((x) => !x.paused && x.src === `blob:${id(2)}`), "B continues from its cached copy");
+  assert.ok(Math.abs(engine.activeEl().currentTime - 0.1) < 0.05, `B keeps its position (${engine.activeEl().currentTime})`);
+  assert.equal(engine.status, "playing");
+  engine.dispose();
+}
+{
+  // (2) B removed from the program by refresh after it started: it stops.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9000);
+  holdEngine(world, audios);
+  await world.advance(1100);
+  assert.ok(audios.some((x) => !x.paused && x.src.endsWith(id(2))), "B audible");
+  world.manifestRes = { ok: true, data: world.manifest(world.items.filter((x) => x.audio_item_id !== id(2))) };
+  await engine.refresh();
+  await flush();
+  assert.ok(audios.every((x) => x.paused || !x.src.endsWith(id(2))), "removed B no longer playing");
+  engine.dispose();
+}
+{
+  // (2b) commitScheduled for a B that vanished from the manifest stops it directly.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9000);
+  holdEngine(world, audios);
+  await world.advance(1100);
+  engine.manifest = { ...engine.manifest, items: engine.manifest.items.filter((i) => i.audioItemId !== id(2)) };
+  await engine.tick();
+  assert.ok(audios.every((x) => x.paused || !x.src.endsWith(id(2))), "B stopped on commit");
+  engine.dispose();
+}
+{
+  // (3) Invariant: pause right after an uncommitted boundary pauses B (what is audible), and
+  // resume continues B — not A from its end.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9000);
+  holdEngine(world, audios);
+  await world.advance(3000);
+  await engine.toggle();
+  assert.ok(audios.every((x) => x.paused), "everything paused");
+  assert.equal(engine.current.audioItemId, id(2));
+  await engine.toggle();
+  await flush();
+  assert.equal(engine.current.audioItemId, id(2), "resumes B");
+  assert.ok(engine.activeEl().currentTime >= 1.9, `at B position (${engine.activeEl().currentTime})`);
+  engine.dispose();
+}
+{
+  // (4) Invariant: tick commits an uncommitted boundary even if ended/timer never arrive.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(9000);
+  holdEngine(world, audios);
+  await world.advance(1100);
+  await engine.tick();
+  assert.equal(engine.current.audioItemId, id(2));
+  assert.ok(!engine.activeEl().paused);
+  engine.dispose();
+}
+
 console.log("business-spa-player-engine-unit: all tests passed");
