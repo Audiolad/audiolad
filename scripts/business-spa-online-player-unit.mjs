@@ -150,6 +150,53 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   assert.equal(p.status, "playing");
 }
 
+// 11. Codex O2 #1: window shortened while play() is pending -> stop at the NEW deadline.
+{
+  let t = 5_000_000;
+  const timers = [];
+  const clock = { now: () => t, setTimer: (fn, ms) => { const h = { fn, at: t + ms }; timers.push(h); return h; }, clearTimer: (h) => { const i = timers.indexOf(h); if (i >= 0) timers.splice(i, 1); } };
+  const advance = async (ms) => { t += ms; for (const h of [...timers]) if (h.at <= t) { timers.splice(timers.indexOf(h), 1); h.fn(); } await flush(); await flush(); };
+  let releasePlay;
+  const it = { ...item(1), playableUntil: null };
+  const { p, audio } = make({ items: [it], clock, playFn: () => new Promise((r) => (releasePlay = r)) });
+  const pending = p.toggle();
+  await flush();
+  await p.applyManifest([{ ...it, playableUntil: new Date(t + 1000) }]);
+  releasePlay(); await pending; await flush();
+  assert.equal(p.status, "playing");
+  assert.equal(timers.length, 1, "deadline armed from the fresh manifest");
+  await advance(1100);
+  assert.notEqual(p.status, "playing");
+  assert.equal(audio.paused, true);
+  // deadline already passed when play() resolves -> immediate stop
+  let rel2;
+  const it2 = { ...item(2), playableUntil: null };
+  const b = make({ items: [it2], clock, playFn: () => new Promise((r) => (rel2 = r)) });
+  const pend2 = b.p.toggle();
+  await flush();
+  await b.p.applyManifest([{ ...it2, playableUntil: new Date(t + 500) }]);
+  t += 1000;
+  rel2(); await pend2; await flush();
+  assert.notEqual(b.p.status, "playing");
+  assert.equal(b.audio.paused, true);
+}
+
+// 12. Codex O2 #2: a refresh with an expired window never un-pauses the player.
+{
+  let t = 9_000_000;
+  const clock = { now: () => t, setTimer: () => ({}), clearTimer: () => {} };
+  const a = { ...item(1), playableUntil: new Date(t + 1000) };
+  const { p, audio, calls } = make({ items: [a, item(2)], clock });
+  await p.toggle(); await p.toggle();
+  assert.equal(p.status, "paused");
+  const n = calls.length;
+  t += 2500;
+  await p.applyManifest([a, item(2)]);
+  assert.equal(p.status, "paused");
+  assert.equal(audio.paused, true);
+  assert.equal(calls.length, n, "no new track started");
+}
+
 // 8. Wiring: online page uses the online player; no cache / download / offline sign.
 {
   const page = readFileSync(new URL("../src/app/business-app/spa/page.tsx", import.meta.url), "utf8");

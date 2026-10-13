@@ -80,9 +80,20 @@ export class SpaOnlinePlayer {
     return !!item?.playableUntil && item.playableUntil.getTime() <= this.now();
   }
 
-  /** Hard stop at playable_until: audio already buffered by the browser must not keep sounding. */
-  private armDeadline(item: SpaManifestItem, op: number) {
+  /** Latest manifest entry for a track (windows can change while we await). */
+  private fresh(id: string): SpaManifestItem | null {
+    return this.items.find((i) => i.audioItemId === id) ?? null;
+  }
+
+  /**
+   * Hard stop at playable_until: audio already buffered by the browser must not keep
+   * sounding. Always reads the CURRENT manifest entry, so a window shortened during an
+   * await is honoured.
+   */
+  private armDeadline(id: string, op: number) {
     this.clearDeadline();
+    const item = this.fresh(id);
+    if (!item) return void this.onDeadline(true);
     if (!item.playableUntil) return;
     const ms = Math.max(0, item.playableUntil.getTime() - this.now());
     const set = this.d.setTimer ?? ((fn, t) => setTimeout(fn, t));
@@ -90,22 +101,30 @@ export class SpaOnlinePlayer {
     this.deadlineTimer = set(() => {
       this.deadlineTimer = null;
       if (op !== this.op || this.disposed) return;
-      if (!this.expired(item)) return this.armDeadline(item, op);
-      void this.onDeadline();
+      const cur = this.fresh(id);
+      if (cur && !this.expired(cur)) return this.armDeadline(id, op);
+      void this.onDeadline(true);
     }, Math.min(ms, 2 ** 31 - 1));
   }
 
-  private async onDeadline(): Promise<void> {
+  /** `resume`: continue with another track only if playback was active (never override a pause). */
+  private async onDeadline(resume: boolean): Promise<void> {
     this.op++;
     this.stopAudio();
     const left = this.items.filter((i) => !this.expired(i));
     this.items = left;
-    if (left.length === 0) {
-      this.index = -1;
-      return this.set("idle");
-    }
+    this.index = -1;
+    if (left.length === 0 || !resume) return this.set(left.length === 0 ? "idle" : "paused");
     // Continue with the next still-allowed track (server re-checks on signing).
     return this.playIndex(0);
+  }
+
+  /** After play() resolved: re-read the window, stop if it ended meanwhile, else arm the stop. */
+  private afterPlay(id: string, op: number): Promise<void> | void {
+    const cur = this.fresh(id);
+    if (!cur || this.expired(cur)) return this.onDeadline(true);
+    this.armDeadline(id, op);
+    this.set("playing");
   }
 
   private stopAudio() {
@@ -149,8 +168,7 @@ export class SpaOnlinePlayer {
       await this.d.audio.play();
       if (op !== this.op || this.disposed) return;
       this.failures = 0;
-      this.armDeadline(item, op);
-      this.set("playing");
+      return this.afterPlay(item.audioItemId, op);
     } catch {
       if (op !== this.op || this.disposed) return;
       // Autoplay policy (no user gesture yet) or a network/decode error.
@@ -172,9 +190,7 @@ export class SpaOnlinePlayer {
       try {
         await this.d.audio.play();
         if (op !== this.op || this.disposed) return;
-        if (this.expired(item)) return this.onDeadline();
-        this.armDeadline(item, op);
-        this.set("playing");
+        return this.afterPlay(item.audioItemId, op);
       } catch {
         // URL may have expired while paused: fetch a fresh one (re-checks access).
         if (op === this.op && !this.disposed) await this.playIndex(Math.max(this.index, 0));
@@ -223,8 +239,8 @@ export class SpaOnlinePlayer {
     if (idx >= 0) {
       this.index = idx;
       // The window may have changed (e.g. shortened): re-arm the hard stop from the new manifest.
-      if (this.expired(items[idx])) return this.onDeadline();
-      if (this.status === "playing") this.armDeadline(items[idx], this.op);
+      if (this.expired(items[idx])) return this.onDeadline(wasActive);
+      if (this.status === "playing") this.armDeadline(currentId as string, this.op);
       this.d.onChange();
       return;
     }
