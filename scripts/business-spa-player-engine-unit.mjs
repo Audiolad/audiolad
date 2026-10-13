@@ -479,4 +479,66 @@ for (const lat of [0, 600, 2000]) {
   engine.dispose();
 }
 
+// ---- 17. Re-review A5 ----
+{
+  // (1) refresh shortens the grant of an already scheduled next track -> start cancelled.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(2000);
+  assert.ok(audios.some((a) => a.pending), "B scheduled on the audio clock");
+  const list = world.items.map((x) => (x.audio_item_id === id(2) ? { ...x, playable_until: new Date(T0 + 5000).toISOString() } : x));
+  world.manifestRes = { ok: true, data: world.manifest(list) };
+  await engine.refresh();
+  await world.advance(10000);
+  assert.ok(!world.plays.some((p) => p.src.endsWith(id(2)) && p.at >= T0 + 5000), "no start of B after its shortened grant");
+  engine.dispose();
+}
+{
+  // (1b) blob whose server deadline is before the scheduled start is never scheduled/played.
+  const { world, deps } = makeWorld({ durations: [10, 60], webAudio: true });
+  world.serverUntil = () => new Date(T0 + 8000).toISOString();
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(12000);
+  assert.ok(!world.plays.some((p) => p.src.startsWith("blob:") && p.at >= T0 + 8000), "no blob start past its server deadline");
+  assert.ok(world.plays.some((p) => p.src === `https://s/${id(2)}`), "B streamed instead");
+  engine.dispose();
+}
+{
+  // (2) Wi-Fi->cache with a scheduled next start: schedule re-planned, B starts exactly on time.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(5000);
+  world.online = false;
+  await world.advance(7000);
+  const b = world.plays.find((p) => p.src.endsWith(id(2)) && p.pos === 0);
+  assert.ok(b && b.src.startsWith("blob:"), "B plays from cache");
+  assert.ok(Math.abs(b.at - (T0 + 10000)) <= 1, `B starts on time (${b && b.at - T0})`);
+  assert.ok(audios.some((a) => !a.paused && a.src.endsWith(id(2))), "B audible");
+  assert.equal(engine.status, "playing");
+  engine.dispose();
+}
+{
+  // (3) AudioContext suspended 2 s: commit waits for the real audio-clock end.
+  const { world, deps, audios } = makeWorld({ durations: [10, 60], webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(8000);
+  const a = audios.find((x) => x.src.endsWith(id(1)));
+  const bEl = audios.find((x) => x.pending);
+  assert.ok(a && bEl, "A playing, B scheduled");
+  a.startClock += 2000; bEl.pending.at += 2000; // audio clock frozen for 2 s
+  await world.advance(2500); // wall 10.5 s, audio 8.5 s
+  assert.equal(engine.current.audioItemId, id(1), "engine still on A");
+  assert.ok(!a.paused, "A not stopped early");
+  await world.advance(2000);
+  assert.equal(engine.current.audioItemId, id(2));
+  assert.ok(!bEl.paused, "B audible after the real transition");
+  engine.dispose();
+}
+
 console.log("business-spa-player-engine-unit: all tests passed");

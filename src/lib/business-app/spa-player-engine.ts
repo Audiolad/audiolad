@@ -202,10 +202,10 @@ export class SpaPlayerEngine {
   }
 
   // ---------------- permissions ----------------
-  private cachedDate(id: string): Date | null {
+  private cachedDate(id: string, atMs = this.d.now()): Date | null {
     const at = this.cachedAt.get(id);
     const until = this.cacheUntil.get(id);
-    if (at === undefined || until === undefined || this.d.now() >= until) return null;
+    if (at === undefined || until === undefined || atMs >= until) return null;
     return new Date(at);
   }
 
@@ -222,15 +222,15 @@ export class SpaPlayerEngine {
    * source kind right now? A stream that is already playing may continue from the
    * browser buffer while offline until playable_until; a new stream start needs network.
    */
-  allowed(item: SpaManifestItem, kind: "blob" | "stream" | "any" = "any", continuing = false): boolean {
+  allowed(item: SpaManifestItem, kind: "blob" | "stream" | "any" = "any", continuing = false, atMs = this.d.now()): boolean {
     const m = this.manifest;
     if (!m || this.status === "no_access") return false;
-    const now = new Date(this.d.now());
+    const now = new Date(atMs);
     if (manifestNeedsRefresh(m, now)) return false;
     const online = this.d.online();
     if (kind === "stream") return (online || continuing) && canStartTrack(item, now, null, true);
-    if (kind === "blob") return canStartTrack(item, now, this.cachedDate(item.audioItemId), false);
-    return canStartTrack(item, now, this.cachedDate(item.audioItemId), online);
+    if (kind === "blob") return canStartTrack(item, now, this.cachedDate(item.audioItemId, atMs), false);
+    return canStartTrack(item, now, this.cachedDate(item.audioItemId, atMs), online);
   }
 
   private findPlayable(from: number): number {
@@ -384,16 +384,40 @@ export class SpaPlayerEngine {
     if (ni < 0 || ni !== this.findPlayable(nextIndex(this.items.length, this.index))) return false;
     const item = this.items[ni];
     // Rights re-checked now and for the scheduled start moment.
-    if (!this.allowed(item, prep.kind) || !canStartTrack(item, new Date(this.d.now() + remainingMs), this.cachedDate(item.audioItemId), prep.kind === "stream")) return false;
+    // Rights must hold now AND at the scheduled start moment: grant, manifest expiry and,
+    // for blobs, the copy's server/manifest deadline.
+    const startMs = this.d.now() + remainingMs;
+    if (!this.allowed(item, prep.kind) || !this.allowed(item, prep.kind, false, startMs + SPA_TICK_MS)) return false;
     next.currentTime = 0;
     next.volume = gainToVolume(item.gainDb);
     if (!next.startAfter(el)) return false;
     this.scheduledSlot = slot;
+    this.armCommit(Math.max(0, remainingMs));
+    return true;
+  }
+
+  /**
+   * Wall-clock timer is only a hint: commit when the outgoing slot has really finished on
+   * the audio clock (it stops advancing while the AudioContext is suspended).
+   */
+  private armCommit(ms: number): void {
     this.transitionTimer = this.d.setTimer(() => {
       this.transitionTimer = null;
+      if (this.scheduledSlot === null || this.status !== "playing") return;
+      const cur = this.activeEl();
+      const left = (cur.duration - cur.currentTime) * 1000;
+      if (!cur.paused && Number.isFinite(left) && left > 20) {
+        this.armCommit(Math.max(20, left));
+        return;
+      }
       this.commitScheduled();
-    }, Math.max(0, remainingMs));
-    return true;
+    }, ms);
+  }
+
+  /** Drop a pending audio-clock start (rights may have changed); tick re-plans. */
+  private unschedule(): void {
+    if (this.scheduledSlot === null) return;
+    this.cancelTransition();
   }
 
   /** Bookkeeping after an audio-clock transition (audio already switched). */
@@ -410,8 +434,12 @@ export class SpaPlayerEngine {
     if (!lo || ni < 0) return; // tick sees no valid source and moves on
     this.index = ni;
     // Next tick re-checks rights (continuing) and stops it if needed.
+    // The new track has been audible since its audio-clock start: count it from 0.
+    const el = this.activeEl();
     this.openSegment(lo.audioItemId);
-    this.lastTime = this.activeEl().currentTime;
+    if (this.segment) this.segment.startedAt = this.d.now() - Math.max(0, el.currentTime) * 1000;
+    this.lastTime = 0;
+    this.accumulate(this.active);
     this.saveResume();
     this.emit();
     void this.prepareNext();
@@ -650,6 +678,8 @@ export class SpaPlayerEngine {
 
   /** Wi-Fi dropped: move active/prepared stream sources to valid cached copies. */
   async switchToCache(): Promise<void> {
+    // Replacing sources cancels audio-clock starts; drop the schedule, tick re-plans.
+    this.unschedule();
     for (const slot of [this.active, 1 - this.active]) {
       const l = this.loaded[slot];
       if (!l || l.kind !== "stream") continue;
@@ -683,6 +713,7 @@ export class SpaPlayerEngine {
       if (wasPlaying && slot === this.active && this.status === "playing") await el.play().catch(() => this.setStatus("needs_gesture"));
       if (slot !== this.active) this.loaded[slot]!.ready = await waitReady(el, this.d, HAVE_ENOUGH_DATA);
     }
+    if (this.status === "playing") this.scheduleTransition();
     this.emit();
   }
 
@@ -705,6 +736,8 @@ export class SpaPlayerEngine {
     }
     const prevOrder = this.items.map((i) => i.audioItemId);
     if (!this.setManifest(res.data)) return;
+    // New rights (e.g. shortened playable_until): any pending audio-clock start is re-planned.
+    this.unschedule();
     this.generation += 1;
     await this.scanCache();
     // Drop any loaded source whose track left the program (even when paused).
@@ -733,6 +766,7 @@ export class SpaPlayerEngine {
       if (wasPlaying) void this.prepareNext();
     }
     this.saveOrder();
+    if (this.status === "playing") this.scheduleTransition();
     this.emit();
     void this.downloadAll();
   }
