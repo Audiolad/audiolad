@@ -24,6 +24,7 @@ import {
   buildJazzRelaxPassportView,
   describeJazzRelaxPassportActivity,
   JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL,
+  JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL,
   JAZZ_RELAX_PASSPORT_ENQUEUE_BATCH_SIZE,
   JAZZ_RELAX_PASSPORT_ENQUEUE_MAX_REQUESTS,
   JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL,
@@ -582,7 +583,9 @@ assert.doesNotMatch(albumSource, /\bMusicPassport\b|<MusicPassport|mode="product
 assert.doesNotMatch(albumSource, /59c7e5b8-eae4-4394-82fb-b815a10be6c2/);
 assert.match(form, /passportActivity\.buttonLabel/);
 assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Перейти к оформлению/);
-assert.match(form, /if \(jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed"\)/);
+assert.match(form, /passportPhase === "completed" \|\| passportActivity\.continueInBackground/);
+assert.match(form, /&& !passportActivity\.continueInBackground;/);
+assert.match(form, /<JazzRelaxPassportHelp \/>/);
 assert.match(form, /Продолжить без музыкального паспорта/);
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /readAlbumPassportDisplay/);
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /bind_description_album_passport/);
@@ -979,6 +982,7 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.equal(enqueueing.closeHint, null);
   assert.equal(enqueueing.progress, null);
   assert.equal(enqueueing.buttonDisabled, true);
+  assert.equal(enqueueing.continueInBackground, false);
 
   const queuedOnly = describeJazzRelaxPassportActivity({
     saving: false,
@@ -990,7 +994,9 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.equal(queuedOnly.headline, "Треки в очереди");
   assert.equal(queuedOnly.readyLabel, null);
   assert.equal(queuedOnly.progress, null);
-  assert.equal(queuedOnly.buttonDisabled, true);
+  assert.equal(queuedOnly.buttonDisabled, false);
+  assert.equal(queuedOnly.continueInBackground, true);
+  assert.equal(queuedOnly.buttonLabel, JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL);
   assert.equal(queuedOnly.indeterminate, true);
 
   const oneReady = viewFor([
@@ -1011,8 +1017,9 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.equal(analyzing.readyLabel, "Готово 1 из 10 треков");
   assert.equal(analyzing.statusNotice, "Анализируем");
   assert.deepEqual(analyzing.progress, { ready: 1, total: 10 });
-  assert.equal(analyzing.buttonDisabled, true);
-  assert.equal(analyzing.buttonLabel, JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL);
+  assert.equal(analyzing.buttonDisabled, false);
+  assert.equal(analyzing.continueInBackground, true);
+  assert.equal(analyzing.buttonLabel, JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL);
   const analyzingMarkup = renderToStaticMarkup(createElement(
     JazzRelaxPassportActivityNotice,
     { activity: analyzing, live: true },
@@ -1023,7 +1030,7 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.match(analyzingMarkup, /aria-valuenow="1"/);
   assert.match(analyzingMarkup, /aria-valuemax="10"/);
   assert.match(analyzingMarkup, /aria-live="polite"/);
-  assert.match(analyzingMarkup, /aria-busy="true"/);
+  assert.match(analyzingMarkup, /aria-busy="false"/);
   assert.match(analyzingMarkup, /role="progressbar"/);
   assert.doesNotMatch(analyzingMarkup, /ETA|осталось|минут|секунд|%/);
   assert.equal(analyzing.closeHint, null);
@@ -1043,6 +1050,9 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.equal(preparing.headline, "Подготавливаем запуск…");
   assert.equal(preparing.closeHint, null);
   assert.equal(preparing.buttonDisabled, false);
+  // Launch not fully accepted: the button resumes the launch, it does not skip it.
+  assert.equal(preparing.continueInBackground, false);
+  assert.equal(preparing.buttonLabel, JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL);
   assert.equal(preparing.indeterminate, false);
   const preparingMarkup = renderToStaticMarkup(createElement(
     JazzRelaxPassportActivityNotice,
@@ -1065,7 +1075,8 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.equal(durableQueuedActivity.closeHint, JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT);
   assert.equal(durableQueuedActivity.readyLabel, null);
   assert.equal(durableQueuedActivity.progress, null);
-  assert.equal(durableQueuedActivity.buttonDisabled, true);
+  assert.equal(durableQueuedActivity.buttonDisabled, false);
+  assert.equal(durableQueuedActivity.continueInBackground, true);
   const durableQueuedMarkup = renderToStaticMarkup(createElement(
     JazzRelaxPassportActivityNotice,
     { activity: durableQueuedActivity, live: true },
@@ -1081,7 +1092,8 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   });
   assert.equal(durableOne.readyLabel, "Готово 1 из 10 треков");
   assert.equal(durableOne.closeHint, JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT);
-  assert.equal(durableOne.buttonDisabled, true);
+  assert.equal(durableOne.buttonDisabled, false);
+  assert.equal(durableOne.continueInBackground, true);
 
   assert.equal(resolveJazzRelaxAlbumLaunch({
     tracks: [

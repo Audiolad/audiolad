@@ -285,6 +285,84 @@ await running;
 assert.deepEqual(recorded.completed, ["run-1"]);
 assert.equal(recorded.failed.length, 0);
 
+// 1313c2b7: after a run is sealed the worker calls the optional settle hook
+// once; a throwing hook never fails or re-fails the run.
+{
+  const settled: string[] = [];
+  const hookRecorded = { completed: [] as string[], failed: [] as string[] };
+  const errors: string[] = [];
+  const hookPort: MusicAnalyzerWorkerPort = {
+    ...port,
+    async claimJob() {
+      return hookRecorded.completed.length === 0 ? { ...claimed, id: "run-hook" } : null;
+    },
+    async completeJob(job) {
+      hookRecorded.completed.push(job.id);
+      return true;
+    },
+    async failJob(job) {
+      hookRecorded.failed.push(job.id);
+      return true;
+    },
+    async afterJobSettled(job) {
+      settled.push(job.id);
+      throw new Error("hook_boom");
+    },
+  };
+  const hookWorker = createMusicAnalyzerWorker(hookPort, {
+    idleIntervalMs: 15,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 40,
+    logger: { info() {}, error(message) { errors.push(message); } },
+  });
+  const hookRunning = hookWorker.run();
+  const hookStart = Date.now();
+  while (settled.length === 0 && Date.now() - hookStart < 1500) await delay(10);
+  hookWorker.requestShutdown();
+  await hookRunning;
+  assert.deepEqual(hookRecorded.completed, ["run-hook"]);
+  assert.deepEqual(settled, ["run-hook"]);
+  assert.equal(hookRecorded.failed.length, 0, "settle hook errors must not fail the sealed run");
+  assert.ok(errors.some((line) => line.includes("music_analyzer_after_settle_failed")));
+}
+{
+  const settled: string[] = [];
+  let claimedOnce = false;
+  const failPort: MusicAnalyzerWorkerPort = {
+    ...port,
+    async claimJob() {
+      if (claimedOnce) return null;
+      claimedOnce = true;
+      return { ...claimed, id: "run-fail" };
+    },
+    async executeJob() {
+      throw new Error("analyze_failed");
+    },
+    async failJob() {
+      return true;
+    },
+    async afterJobSettled(job) {
+      settled.push(job.id);
+    },
+  };
+  const failWorker = createMusicAnalyzerWorker(failPort, {
+    idleIntervalMs: 15,
+    heartbeatIntervalMs: 10_000,
+    shutdownDrainMs: 40,
+    logger: { info() {}, error() {} },
+  });
+  const failRunning = failWorker.run();
+  const failStart = Date.now();
+  while (settled.length === 0 && Date.now() - failStart < 1500) await delay(10);
+  failWorker.requestShutdown();
+  await failRunning;
+  assert.deepEqual(settled, ["run-fail"], "a persisted failure (last track) also settles the album");
+}
+const workerRuntimeSource = read("src/lib/music-analyzer-runs/worker-runtime.ts");
+assert.match(workerRuntimeSource, /onRunSettled\?: \(runId: string\) => Promise<void>/);
+const workerRunner = read("scripts/run-music-analyzer-worker.mts");
+assert.match(workerRunner, /onRunSettled: settleJazzRelaxPassportForAnalyzerRun/);
+
 const workspace = read("src/components/music-analyzer-runs/RunsWorkspace.tsx");
 assert.match(workspace, /fileForSignedUpload\(file, file\.name, mime\)/);
 assert.match(workspace, /classifySignedUploadError\(uploaded\.error\)/);

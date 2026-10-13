@@ -15,6 +15,7 @@ import AuthorProductFormActions from "@/components/author-dashboard/product-form
 import AuthorPublicationScheduleSection from "@/components/author-dashboard/product-form-sections/AuthorPublicationScheduleSection";
 import AuthorProductWizardStepNav from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepNav";
 import AuthorProductWizardStepper from "@/components/author-dashboard/product-wizard/AuthorProductWizardStepper";
+import { JazzRelaxPassportHelp } from "@/components/author-dashboard/product-wizard/JazzRelaxPassportHelp";
 import JazzRelaxMusicPassportPanel, {
   JazzRelaxPassportActivityNotice,
 } from "@/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
@@ -3852,7 +3853,8 @@ export default function AuthorProductForm({
     setMessage(null);
     const creatingPassport = jazzRelaxMusicPassport
       && wizardStep === 2
-      && passportPhase !== "completed";
+      && passportPhase !== "completed"
+      && !passportActivity.continueInBackground;
     if (creatingPassport) {
       if (passportActivity.buttonDisabled) return;
       setPassportSaving(true);
@@ -3880,7 +3882,11 @@ export default function AuthorProductForm({
 
       setMessage("Черновик сохранён.");
 
-      if (jazzRelaxMusicPassport && wizardStep === 2 && passportPhase === "completed") {
+      if (
+        jazzRelaxMusicPassport
+        && wizardStep === 2
+        && (passportPhase === "completed" || passportActivity.continueInBackground)
+      ) {
         const next = nextProductWizardStep(wizardStep);
         if (next) {
           goToWizardStep(next);
@@ -6096,6 +6102,8 @@ export default function AuthorProductForm({
       {jazzRelaxMusicPassport && wizardStep === 2 ? (
         <JazzRelaxPassportActivityNotice activity={passportActivity} live />
       ) : null}
+
+      {jazzRelaxMusicPassport && wizardStep === 2 ? <JazzRelaxPassportHelp /> : null}
 
       {wizardEnabled && wizardStep < PRODUCT_WIZARD_STEP_COUNT ? (
         <AuthorProductWizardStepNav

@@ -50,6 +50,11 @@ export type MusicAnalyzerWorkerPort = {
   ) => Promise<boolean>;
   failJob: (job: ClaimedMusicAnalyzerRun, error: unknown) => Promise<boolean>;
   releaseJob: (job: ClaimedMusicAnalyzerRun) => Promise<boolean>;
+  /**
+   * Optional server-side follow-up after a run is persisted as finished
+   * (sealed or failed). Must be idempotent. Errors never affect the run.
+   */
+  afterJobSettled?: (job: ClaimedMusicAnalyzerRun) => Promise<void>;
 };
 
 export type MusicAnalyzerWorkerLogger = {
@@ -288,6 +293,7 @@ export function createMusicAnalyzerWorker(
           persisted,
           code: error instanceof Error ? error.message : "analyze_failed",
         }));
+        if (persisted) await settle(job);
         return;
       }
       if (abandon.current || lostOwnership || jobAbort.signal.aborted) {
@@ -300,6 +306,7 @@ export function createMusicAnalyzerWorker(
           event: completed ? "music_analyzer_run_sealed" : "music_analyzer_seal_skipped",
           jobId: job.id,
         }));
+        if (completed) await settle(job);
       } catch (error) {
         await port.failJob(job, error);
         logger.error(JSON.stringify({
@@ -310,6 +317,19 @@ export function createMusicAnalyzerWorker(
       }
     } finally {
       stopHeartbeat();
+    }
+  }
+
+  async function settle(job: ClaimedMusicAnalyzerRun): Promise<void> {
+    if (!port.afterJobSettled) return;
+    try {
+      await port.afterJobSettled(job);
+    } catch (error) {
+      logger.error(JSON.stringify({
+        event: "music_analyzer_after_settle_failed",
+        jobId: job.id,
+        error: error instanceof Error ? error.message : "unknown_error",
+      }));
     }
   }
 
