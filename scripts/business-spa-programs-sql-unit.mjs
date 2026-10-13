@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
-const migrationPath = "supabase/migrations/20261227120000_business_spa_programs_playback_log.sql";
+const migrationPath = "supabase/migrations/20261227130000_business_spa_programs_playback_log.sql";
 const migration = read(migrationPath);
 const smoke = read("supabase/tests/business_spa_programs_smoke.sql");
 const sql = migration.replace(/--[^\n]*/g, "");
@@ -75,7 +75,7 @@ for (const scenario of ["NoAllowlist", "SelfEnrollment", "AllowlistWithoutMember
 assert.match(smoke, /ON CONFLICT \(player_id, client_event_id\) DO NOTHING/);
 assert.match(smoke, /SET LOCAL ROLE authenticated/);
 assert.match(smoke, /ROLLBACK;/);
-assert.ok(read("docs/DATABASE.md").includes("20261227120000_business_spa_programs_playback_log.sql"));
+assert.ok(read("docs/DATABASE.md").includes("20261227130000_business_spa_programs_playback_log.sql"));
 assert.equal(JSON.parse(read("package.json")).scripts["test:business-spa-programs"], "node scripts/business-spa-programs-sql-unit.mjs");
 assert.ok(read(".github/workflows/business-pr-validation.yml").includes("AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs"));
 console.log("business-spa-programs-sql-unit: contract ok");

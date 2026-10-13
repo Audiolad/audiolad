@@ -1927,7 +1927,7 @@ Migration `20261225120000_product_video_render_recipe.sql` adds a nullable `rend
 
 ## Business SPA pilot PR1 — programs and player event log
 
-Migration: `20261227120000_business_spa_programs_playback_log.sql`.
+Migration: `20261227130000_business_spa_programs_playback_log.sql`.
 Prepared in Git; application to any database is not part of this task.
 
 - `business_programs`: organization-owned named programs; extensible `kind` slug
