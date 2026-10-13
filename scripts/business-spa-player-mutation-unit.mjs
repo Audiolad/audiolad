@@ -37,13 +37,17 @@ const mutations = [
   ["A15 cache scan decides with the manifest snapshot taken before its awaits", [["    const current = (id: string) => this.items.find((i) => i.audioItemId === id);", "    const snap = this.items;\n    const current = (id: string) => snap.find((i) => i.audioItemId === id);"]]],
   // ---- A16/A17 ----
   ["A17 <audio> slot has no wall-clock forced stop at its deadline", [["    if (!el.stopAt) this.armForcedStop(slot, next);", ""]]],
-  ["A17 <audio> slot startable inside the forced-stop margin", [["      if (dl !== null && (atMs ?? this.d.now()) >= dl - SPA_HTML_DEADLINE_MARGIN_MS) return false;", ""]]],
   ["A17 hard stop armed only after play() resolved", [["    this.applyDeadline(this.active);\n    try {\n      await this.activeEl().play(", "    try {\n      await this.activeEl().play("]], "depth"], // tick re-applies deadlines every 250 ms; adapter-level guard tested in business-spa-webaudio-unit
   ["A17 start intent dropped before play() completes", [["      this.starting -= 1;\n    }", "      this.starting -= 1;\n      this.pendingStart = null;\n    }"]]],
   ["A17 toggle resume not registered as a pending start", [["      this.pendingStart = mine;\n      let ok: boolean;", "      let ok: boolean;"]]],
   ["A17 dispose() does not cancel a running init()", [["    this.disposed = true;\n    this.playOp += 1;\n    this.bumpOp();", ""], [" && !this.disposed;\n  }", ";\n  }"]]],
   ["A17 stale play() continuation silences the newer start", [["    const keep = !this.stillCurrent(t.op)", "    const keep = false && !this.stillCurrent(t.op)"]]],
   ["A17 forced stop during a pending start stalls the program", [["          this.setStatus(\"paused\");\n        }\n        return false;", "        }\n        return false;"]]],
+  // ---- A17/A18 ----
+  ["A18 <audio> slot may start with its deadline inside the track (+ slack)", [["      if (dl !== null && dl < from + Math.max(0, dur - pos) * 1000 + SPA_HTML_START_SLACK_MS) return false;", ""]]],
+  ["A18 stale cache-switch play() continuation pauses the newer start", [["          this.silenceStale(st);\n          return;", "          if (st.slotOp === this.slotOp[slot]) el.pause();\n          return;"]]],
+  ["A18 cache switch play() without the guard", [["        await el.play(() => this.mayStart(st)).catch(", "        await el.play().catch("]], "depth"], // post-play silenceStale + adapter guard test (webaudio-unit)
+  ["A18 stale download put drops the current valid copy", [["        if (!valid) await this.dropCache(item.audioItemId);", "        await this.dropCache(item.audioItemId);"]]],
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],

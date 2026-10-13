@@ -68,7 +68,13 @@ export const SPA_CROSSFADE_MS = 400;
  * HTMLAudio fallback (no audio-clock stop): a wall-clock timer force-stops the slot this
  * long BEFORE its rights deadline (absorbs timer latency), independent of the media clock.
  */
-export const SPA_HTML_DEADLINE_MARGIN_MS = 1000;
+export const SPA_HTML_DEADLINE_MARGIN_MS = 3000;
+/**
+ * HTMLAudio fallback: a JS timer cannot guarantee a stop (throttling, buffering moves the
+ * natural end). So an <audio> slot may only START if its deadline lies beyond its remaining
+ * duration plus this slack; the forced-stop timer is the backup layer (A17 #1).
+ */
+export const SPA_HTML_START_SLACK_MS = 60_000;
 const FADE_STEP_MS = 50;
 
 export type Result<T> = { ok: true; data: T } | { ok: false; reason: string };
@@ -140,8 +146,10 @@ type StartToken = { slot: number; epoch: number; playOp: number; slotOp: number;
  * scripts/business-spa-player-engine-unit.mjs, section 23):
  *  I1 grant/deadline: no slot is audible after min(playable_until, manifest expiry, copy deadline);
  *     the stop is armed BEFORE play() and handed to the audio clock (stopAt, applied atomically
- *     with the node; adapters re-check the guard after resume()); <audio> slots get a wall-clock
- *     forced stop SPA_HTML_DEADLINE_MARGIN_MS before the deadline, independent of the media clock.
+ *     with the node; adapters re-check the guard after resume()). <audio> slots (no audio-clock
+ *     stop) only START if the deadline lies beyond remaining duration + SPA_HTML_START_SLACK_MS;
+ *     a deadline moved into a playing <audio> track is enforced by a wall-clock forced stop
+ *     SPA_HTML_DEADLINE_MARGIN_MS early (backup layer, independent of the media clock).
  *  I2 canStartTrack: every start (first, prepared, scheduled, resume, cache switch) passes it for
  *     the source kind actually loaded, now and at the scheduled start moment.
  *  I3 offline auth: a blob plays only while its own server deadline AND manifest deadline hold.
@@ -374,7 +382,11 @@ export class SpaPlayerEngine {
     // <audio> slot: inside the forced-stop margin it would be cut at once — not startable.
     if (!this.d.audios[t.slot].stopAt) {
       const dl = this.deadlineFor(t.slot);
-      if (dl !== null && (atMs ?? this.d.now()) >= dl - SPA_HTML_DEADLINE_MARGIN_MS) return false;
+      const el = this.d.audios[t.slot];
+      const dur = Number.isFinite(el.duration) ? el.duration : (item.durationSeconds ?? Infinity);
+      const pos = atMs === undefined ? el.currentTime : 0;
+      const from = atMs ?? this.d.now();
+      if (dl !== null && dl < from + Math.max(0, dur - pos) * 1000 + SPA_HTML_START_SLACK_MS) return false;
     }
     return atMs === undefined || this.allowed(item, l.kind, false, atMs);
   }
@@ -557,9 +569,7 @@ export class SpaPlayerEngine {
         // Superseded by a newer op that wants this very slot audible (same source, same play
         // intent, still the active slot, still allowed): leave it to that op — pausing here
         // would silence the newer start (A17). Otherwise silence it.
-        const keep = !this.stillCurrent(t.op) && t.slotOp === this.slotOp[t.slot] && t.playOp === this.playOp
-          && t.slot === this.active && this.status !== "no_access" && this.mayStart({ ...t, op: this.opEpoch });
-        if (!keep && t.slotOp === this.slotOp[t.slot]) this.d.audios[t.slot].pause();
+        this.silenceStale(t);
         // Still our operation (e.g. the grant ran out / forced stop during resume()): not
         // startable — startAt moves on to the next allowed track instead of stalling.
         if (this.stillCurrent(t.op)) {
@@ -580,6 +590,19 @@ export class SpaPlayerEngine {
     this.setStatus("playing");
     if (prepare) void this.prepareNext();
     return true;
+  }
+
+  /**
+   * A play() whose token went stale while pending. Superseded by a newer op that wants this
+   * very slot audible (same source, same play intent, active slot, still allowed): leave it to
+   * that op — pausing would silence the newer start (A17). Otherwise silence it.
+   * Shared by every path that awaits play() (playActive, switchToCache).
+   */
+  private silenceStale(t: StartToken): void {
+    if (t.slotOp !== this.slotOp[t.slot]) return; // the slot was replaced: not ours to touch
+    const keep = !this.stillCurrent(t.op) && t.playOp === this.playOp && t.slot === this.active
+      && this.status === "playing" && this.mayStart({ ...t, op: this.opEpoch });
+    if (!keep) this.d.audios[t.slot].pause();
   }
 
   async toggle(): Promise<void> {
@@ -1079,7 +1102,11 @@ export class SpaPlayerEngine {
     // A startAt() load in flight is not an interruption: the active slot is silent by design.
     if (this.starting === 0 && this.status === "playing" && this.loadedActive() && act.paused && !endedNaturally(act) && this.scheduledSlot === null && !this.handoffTimer) {
       this.closeSegment("skip");
-      await this.playActive(false, true, intent);
+      const rop = this.bumpOp();
+      const ok = await this.playActive(false, true, intent, rop);
+      // Not startable any more (grant ended / forced stop while resuming): move on, no stall.
+      if (!ok && this.stillCurrent(rop) && intent === this.playOp && this.status === "paused" && this.index >= 0 && this.items.length > 0)
+        await this.startAt(nextIndex(this.items.length, Math.min(this.index, this.items.length - 1)), 0, false, intent);
       return;
     }
     if (this.status === "playing") this.scheduleTransition();
@@ -1209,12 +1236,16 @@ export class SpaPlayerEngine {
         continue;
       }
       this.applyDeadline(slot);
-      const st = this.token(slot);
+      const st = this.token(slot, this.playOp, wop);
       if (wasPlaying && slot === this.active && this.status === "playing" && this.mayStart(st)) {
-        await el.play().catch(() => {
-          if (this.stillCurrent(wop)) this.setStatus("needs_gesture");
+        // Same guard as playActive: adapters re-check it after resume(), before sound (A17 #2).
+        await el.play(() => this.mayStart(st)).catch(() => {
+          if (this.fresh(st)) this.setStatus("needs_gesture");
         });
-        if (!this.mayStart(st) && st.slotOp === this.slotOp[slot]) el.pause();
+        if (!this.mayStart(st)) {
+          this.silenceStale(st);
+          return; // stale continuation: the newer op owns the slots
+        }
       }
       if (slot !== this.active) {
         const ready = await this.ready(slot, HAVE_ENOUGH_DATA);
@@ -1431,7 +1462,14 @@ export class SpaPlayerEngine {
       if (!this.stillData(gen, acc) || !latest || !latest.offlineAllowed || deadline === null || cachedAt >= deadline) continue;
       await this.d.cache.put(item.audioItemId, blob, cachedAt, serverUntil);
       if (!this.stillData(gen, acc) || this.d.now() >= deadline) {
-        await this.dropCache(item.audioItemId);
+        // Our put went stale. Never touch a copy the CURRENT state indexes (a newer download
+        // stored it and it may be audible, A17 #3): its own deadline governs it. Only an
+        // unindexed leftover — or a copy that is itself expired now — is removed.
+        const idx = this.cachedAt.has(item.audioItemId);
+        const cur = this.items.find((i) => i.audioItemId === item.audioItemId);
+        const valid = idx && cur && this.cachedDate(item.audioItemId) !== null;
+        if (!valid) await this.dropCache(item.audioItemId);
+        if (!this.stillData(gen, acc)) return;
         continue;
       }
       this.cachedAt.set(item.audioItemId, cachedAt);
