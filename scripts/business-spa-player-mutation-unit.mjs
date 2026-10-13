@@ -70,6 +70,7 @@ const mutations = [
   ["A23 rejected (unwritten) download drops the remaining copy's index", [["if (dlNew === null) return \"rejected\";", "if (dlNew === null) return \"expired\";"]]],
   ["A23 no_access set only after the cache clear", [["    this.setStatus(\"no_access\", \"Доступ к пилоту закрыт.\");\n    const op", "    const op"], ["    await this.writer.clear();\n", "    await this.writer.clear();\n    this.setStatus(\"no_access\", \"Доступ к пилоту закрыт.\");\n"]]],
   ["A23 late clear re-applies no_access over a newer state", [["    await this.writer.clear();\n", "    await this.writer.clear();\n    this.setStatus(\"no_access\", \"Доступ к пилоту закрыт.\");\n"]]],
+  ["A24 stale clear leaves index entries of deleted copies", [["      if (!copy && this.cachedAt.get(id) === at) {", "      if (false) {"]]],
   ["A21 cache I/O not locked across instances", [["this.cache.lock ? this.cache.lock(id, () => (this.closed ? Promise.resolve(closedValue) : fn())) : fn()", "fn()"]]],
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],

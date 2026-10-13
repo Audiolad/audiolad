@@ -1799,6 +1799,39 @@ if (!process.env.SPA_FUZZ_ONLY) {
   for (let i = 0; i < 5; i++) { await world.advance(1000); if (audios.some((x) => !x.paused && !x.pending)) assert.equal(engine.status, "playing"); }
   engine.dispose();
 }
+// ---- 37. Re-review A23 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // A23 #1: a stale clear that deletes copies stored after access was restored must not
+  // leave a false index; the copies are re-downloaded and offline playback keeps working.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(300);
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  const clear = deps.cache.clear; const hold = deferred();
+  deps.cache.clear = async () => { await hold.p; await clear(); }; // deletion happens late
+  const sign = deps.sign; let deny = true;
+  deps.sign = async (aid, purpose) => (purpose === "offline" && deny ? { ok: false, reason: "no_access" } : sign(aid, purpose));
+  const rv = engine.downloadAll();
+  await world.advance(100);
+  assert.equal(engine.status, "no_access");
+  deny = false;
+  await engine.refresh();
+  await engine.downloadAll();
+  assert.equal(world.cache.size, 12, "copies stored after access restored");
+  if (engine.status !== "playing") await engine.startAt(0);
+  await world.advance(500);
+  hold.res(); await rv; await world.advance(3000);
+  deps.cache.clear = clear; deps.sign = sign;
+  for (const k of engine.cachedAt.keys()) assert.ok(world.cache.has(k), `index ${k} has a stored copy`);
+  assert.equal(world.cache.size, 12, "late-cleared copies re-downloaded");
+  world.online = false;
+  await engine.startAt(5);
+  await world.advance(1000);
+  assert.notEqual(engine.status, "error", "offline start works");
+  assert.ok(audios.some((x) => !x.paused && x.src === `blob:${id(6)}`), "track 6 plays offline from a stored copy");
+  engine.dispose();
+}
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };

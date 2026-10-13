@@ -1576,7 +1576,9 @@ export class SpaPlayerEngine {
     // Something newer happened during the clear (access restored, refresh applied, resume,
     // dispose): no late state change; only reconcile the index with what the clear removed.
     if (op !== this.opEpoch || acc !== this.accessEpoch || gen !== this.generation || this.disposed || this.status !== "no_access") {
-      if (!this.disposed) void this.scanCache().catch(() => undefined);
+      // The clear may have removed copies stored after access was restored (A23 #1): drop
+      // index entries whose copy is gone, then re-download what is still allowed.
+      if (!this.disposed) void this.reconcileIndex().then(() => this.scanCache()).then(() => this.downloadAll()).catch(() => undefined);
       return;
     }
   }
@@ -1600,6 +1602,18 @@ export class SpaPlayerEngine {
       .finally(() => {
         this.sweeping = false;
       });
+  }
+
+  /** Drop index entries whose stored copy no longer exists (an entry re-set meanwhile is kept). */
+  async reconcileIndex(): Promise<void> {
+    for (const id of [...this.cachedAt.keys()]) {
+      const at = this.cachedAt.get(id);
+      const copy = await this.d.cache.get(id);
+      if (this.disposed || !this.manifest) return;
+      if (!copy && this.cachedAt.get(id) === at) {
+        this.dropCacheIndex(id); // a loaded blob keeps its own copy metadata (ownDeadline)
+      }
+    }
   }
 
   async scanCache(): Promise<void> {
