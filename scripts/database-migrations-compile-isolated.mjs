@@ -171,7 +171,7 @@ applyFile(
   "post-apply music publish playable smoke",
   resolve(root, "supabase/tests/music_publish_playable_smoke.sql"),
 );
-if (!pending.has("20261228120000")) {
+if (!pending.has("20261228130000")) {
   throw new Error("business SPA composition migration was not included in the disposable replay");
 }
 applyFile(

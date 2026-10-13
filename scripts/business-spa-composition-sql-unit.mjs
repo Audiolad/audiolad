@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
-const migration = read("supabase/migrations/20261228120000_business_spa_program_composition.sql");
+const migration = read("supabase/migrations/20261228130000_business_spa_program_composition.sql");
 const smoke = read("supabase/tests/business_spa_composition_smoke.sql");
 const sql = migration.replace(/--[^\n]*/g, "");
 
@@ -59,7 +59,7 @@ for (const code of ["AL-T-000000730", "AL-T-000000732", "AL-T-000000726", "AL-T-
 }
 for (const t of pilot.tracks) assert.ok(t.proposed_gain_db >= -30 && t.proposed_gain_db <= 6, `${t.track_code} gain`);
 assert.match(pilot.rights_status, /not a license/i);
-assert.ok(read("docs/DATABASE.md").includes("20261228120000_business_spa_program_composition.sql"));
+assert.ok(read("docs/DATABASE.md").includes("20261228130000_business_spa_program_composition.sql"));
 assert.equal(JSON.parse(read("package.json")).scripts["test:business-spa-composition"], "node scripts/business-spa-composition-sql-unit.mjs");
 assert.ok(read(".github/workflows/business-pr-validation.yml").includes("AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition"));
 console.log("business-spa-composition-sql-unit: contract ok");

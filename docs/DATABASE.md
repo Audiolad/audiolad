@@ -1978,7 +1978,7 @@ this migration; pilot admission data is added separately after review.
 
 ## Business SPA pilot PR2 — program composition with live rights decisions
 
-Migration: `20261228120000_business_spa_program_composition.sql`. Prepared in Git; not applied to production by this task.
+Migration: `20261228130000_business_spa_program_composition.sql`. Prepared in Git; not applied to production by this task.
 
 - `business_program_items.gain_db numeric(5,2)` (−30…+6 dB, nullable): player loudness offset from offline EBU R128 analysis (target −18 LUFS). Playback hint only.
 - `business_spa_set_program_items(program_id, audio_item_ids[], exclusion_reason)`: atomic ordered composition for allowlisted pilot members (or service_role). Only published tracks, no duplicates, archived programs frozen. Tracks dropped from the list are soft-excluded with reason, never deleted; re-adding restores them.
