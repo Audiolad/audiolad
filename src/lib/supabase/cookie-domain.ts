@@ -42,7 +42,7 @@ export function serialize(
   return parts.join("; ");
 }
 
-/** Parse `document.cookie`; for duplicate names the LAST (newest) wins. */
+/** Parse `document.cookie`; for duplicate names the FIRST wins (same as @supabase/ssr default). */
 export function parseCookieHeader(header: string): Array<{ name: string; value: string }> {
   const map = new Map<string, string>();
   for (const pair of header.split(/; */)) {
@@ -57,7 +57,7 @@ export function parseCookieHeader(header: string): Array<{ name: string; value: 
     } catch {
       // keep raw
     }
-    map.set(name, value);
+    if (!map.has(name)) map.set(name, value);
   }
   return [...map].map(([name, value]) => ({ name, value }));
 }
@@ -84,11 +84,20 @@ export function resolveSupabaseCookieDomain(
   return undefined;
 }
 
+/**
+ * Options merged into every Supabase cookie write. Production (https only)
+ * adds `Secure` so a later write cannot silently drop it.
+ */
 export function getSupabaseCookieOptions(
   hostname: string | null | undefined,
-): { domain?: string } {
+): { domain?: string; secure?: boolean } {
   const domain = resolveSupabaseCookieDomain(hostname);
-  return domain ? { domain } : {};
+  return domain ? { domain, secure: true } : {};
+}
+
+/** The only host where legacy host-only cookies are re-issued (login lives here). */
+export function isSessionOriginHost(hostname: string | null | undefined): boolean {
+  return normalize(hostname) === PRODUCTION_COOKIE_PARENT_DOMAIN;
 }
 
 export function hostnameFromHeaders(headers: {
@@ -118,28 +127,41 @@ export type SupabaseCookieWrite = {
   options: SerializeOptions;
 };
 
+export type SupabaseCookieScopePlan = {
+  /** Raw `Set-Cookie` lines to append after Next's own cookie serialization. */
+  lines: string[];
+  /**
+   * - `none`: nothing to migrate on this host;
+   * - `reissue`: apex legacy cookies re-issued with Domain (session kept);
+   * - `expire_only`: subdomain legacy host-only cookies expired, NOT re-issued
+   *   (a stale host-only session must never be promoted to all subdomains,
+   *   e.g. after logout elsewhere). Request must be treated as anonymous.
+   */
+  mode: "none" | "reissue" | "expire_only";
+  /** Supabase auth cookie names present in the request (for expire_only). */
+  legacyNames: string[];
+};
+
 /**
- * Extra raw `Set-Cookie` lines the proxy must append (after Next's own cookie
- * serialization) on a production host:
- * - for every Supabase cookie written in this response: expire the host-only twin;
- * - once per browser (marker absent): re-issue each request Supabase auth
- *   cookie with the domain scope and expire its host-only twin, then set marker.
+ * Per-host migration of legacy host-only Supabase cookies (production only).
+ * The marker is HOST-ONLY on purpose: each host migrates its own legacy twins.
+ * Also: every Supabase cookie written in this response expires its host-only twin.
  */
-export function buildSupabaseCookieScopeHeaders(input: {
+export function planSupabaseCookieScope(input: {
   hostname: string;
   supabaseUrl: string | undefined;
   requestCookies: ReadonlyArray<{ name: string; value: string }>;
   written: ReadonlyArray<SupabaseCookieWrite>;
-  secure: boolean;
-}): string[] {
+}): SupabaseCookieScopePlan {
+  const none: SupabaseCookieScopePlan = { lines: [], mode: "none", legacyNames: [] };
   const domain = resolveSupabaseCookieDomain(input.hostname);
-  if (!domain || !input.supabaseUrl) return [];
+  if (!domain || !input.supabaseUrl) return none;
 
   let storageKey: string;
   try {
     storageKey = getSupabaseAuthStorageKey(input.supabaseUrl);
   } catch {
-    return [];
+    return none;
   }
 
   const lines: string[] = [];
@@ -147,7 +169,7 @@ export function buildSupabaseCookieScopeHeaders(input: {
   const expireHostOnly = (name: string) => {
     if (expired.has(name)) return;
     expired.add(name);
-    lines.push(serializeHostOnlyExpiry(name, { secure: input.secure }));
+    lines.push(serializeHostOnlyExpiry(name, { secure: true }));
   };
 
   const writtenNames = new Set(input.written.map((c) => c.name));
@@ -166,35 +188,41 @@ export function buildSupabaseCookieScopeHeaders(input: {
     cookieNameLooksLikeSupabaseAuth(c.name, storageKey),
   );
 
-  if (!markerPresent && legacy.length > 0) {
-    for (const cookie of legacy) {
-      expireHostOnly(cookie.name);
-      if (!writtenNames.has(cookie.name)) {
-        lines.push(
-          serialize(cookie.name, cookie.value, {
-            domain,
-            path: "/",
-            sameSite: "lax",
-            secure: input.secure,
-            httpOnly: false,
-            maxAge: 400 * 24 * 60 * 60,
-          }),
-        );
-      }
-    }
-    lines.push(
-      serialize(SUPABASE_COOKIE_SCOPE_MARKER, SUPABASE_COOKIE_SCOPE_MARKER_VALUE, {
-        domain,
-        path: "/",
-        sameSite: "lax",
-        secure: input.secure,
-        httpOnly: true,
-        maxAge: 400 * 24 * 60 * 60,
-      }),
-    );
+  if (markerPresent || legacy.length === 0) {
+    return { lines, mode: "none", legacyNames: [] };
   }
 
-  return lines;
+  const reissue = isSessionOriginHost(input.hostname);
+  for (const cookie of legacy) {
+    expireHostOnly(cookie.name);
+    if (reissue && !writtenNames.has(cookie.name)) {
+      lines.push(
+        serialize(cookie.name, cookie.value, {
+          domain,
+          path: "/",
+          sameSite: "lax",
+          secure: true,
+          httpOnly: false,
+          maxAge: 400 * 24 * 60 * 60,
+        }),
+      );
+    }
+  }
+  lines.push(
+    serialize(SUPABASE_COOKIE_SCOPE_MARKER, SUPABASE_COOKIE_SCOPE_MARKER_VALUE, {
+      path: "/",
+      sameSite: "lax",
+      secure: true,
+      httpOnly: true,
+      maxAge: 400 * 24 * 60 * 60,
+    }),
+  );
+
+  return {
+    lines,
+    mode: reissue ? "reissue" : "expire_only",
+    legacyNames: legacy.map((c) => c.name),
+  };
 }
 
 /** Browser: expire host-only twins of names just written with the domain scope. */
