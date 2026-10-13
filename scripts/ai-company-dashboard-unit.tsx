@@ -332,7 +332,7 @@ assert.equal(parseCompanyStatus({ tasks: [], agents: [] }), null);
 
 const page = readFileSync("src/app/(platform)/admin/ai-company/page.tsx", "utf8");
 const dashboardSource = readFileSync("src/components/admin/AiCompanyDashboard.tsx", "utf8");
-assert.match(page, /requireAdminPermission\("ai_company\.view"\)/);
+assert.match(page, /requireAiCompanyView\(\)/);
 assert.match(page, /parseCompanyStatus/);
 assert.match(page, /companyStatusRequestPath/);
 assert.match(page, /<AiCompanyLiveRefresh/);

@@ -123,7 +123,7 @@ export default function PlaylistGrid({
 
   return (
     <section
-      className={`mt-5 ${platformBottomContentPaddingClass}`}
+      className={`mt-5 min-w-0 pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] ${platformBottomContentPaddingClass}`}
       aria-label={ariaLabel}
     >
       <ul data-playlist-catalog-grid className="catalog-product-grid">

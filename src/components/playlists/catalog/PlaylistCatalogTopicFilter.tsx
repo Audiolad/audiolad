@@ -18,7 +18,7 @@ type PlaylistCatalogTopicFilterProps = {
 };
 
 function optionClassName(isActive: boolean) {
-  return `flex min-h-11 w-full items-center rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+  return `flex min-h-11 w-full items-center break-words [overflow-wrap:anywhere] rounded-full border px-4 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
     isActive
       ? "border-[#7042c5] bg-[#7042c5] text-white"
       : "border-[#ddcfef] bg-white text-[#7042c5]"
@@ -78,7 +78,7 @@ export default function PlaylistCatalogTopicFilter({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+        className={`inline-flex min-h-11 min-w-11 max-w-full break-words [overflow-wrap:anywhere] items-center rounded-full border px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
           activeTitle
             ? "border-[#7042c5] bg-[#7042c5] text-white"
             : "border-[#ddcfef] bg-white text-[#7042c5]"
@@ -111,7 +111,7 @@ export default function PlaylistCatalogTopicFilter({
                 <button
                   type="button"
                   onClick={closeSheet}
-                  className="rounded-full px-2 py-1 text-sm text-[#7d70a2] hover:bg-[#f7f1fc]"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 py-1 text-sm text-[#7d70a2] hover:bg-[#f7f1fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                   aria-label="Закрыть"
                 >
                   Закрыть

@@ -2,7 +2,7 @@ import AdminNav from "@/components/admin/AdminNav";
 import AdminShell from "@/components/admin/AdminShell";
 import { getCachedAdminAuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention-cache";
 import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
-import { requireAdminPanelAccess } from "@/lib/admin/guard";
+import { requireAdminLayoutAccess } from "@/lib/admin/guard";
 import { getVisibleAdminNavItems } from "@/lib/admin/nav";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 import type { ReactNode } from "react";
@@ -14,7 +14,7 @@ export default async function AdminLayout({
 }: {
   children: ReactNode;
 }) {
-  const session = await requireAdminPanelAccess();
+  const session = await requireAdminLayoutAccess();
   const canViewAuthors = snapshotHasPermission(session.access, "authors.view");
 
   let commercialNewCount = 0;

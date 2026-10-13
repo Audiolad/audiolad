@@ -56,6 +56,7 @@ export const PLATFORM_TEAM_ROLES = [
   "finance",
   "classica_operator",
   "classica_moderator",
+  "ai_company_viewer",
 ] as const;
 
 export type PlatformTeamRole = (typeof PLATFORM_TEAM_ROLES)[number];
@@ -124,6 +125,9 @@ export const PLATFORM_ROLE_PERMISSIONS: Record<
     "classica.production.access",
     "classica.production.moderate",
   ],
+  // Read-only view of /admin/ai-company (7a6fc09c, Grok's account). Deliberately NOT admin_panel.access:
+  // that code also means "platform admin" for paid content, access links, course access and user tools.
+  ai_company_viewer: ["ai_company.view"],
 };
 
 export function isPlatformPermission(
