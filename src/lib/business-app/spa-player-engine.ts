@@ -400,11 +400,11 @@ export class SpaPlayerEngine {
     const outItem = this.loaded[outSlot] ? this.items.find((i) => i.audioItemId === this.loaded[outSlot]!.audioItemId) : null;
     const outGain = gainToVolume(outItem?.gainDb ?? null);
     const inGain = gainToVolume(this.current?.gainDb ?? null);
+    inEl.volume = inGain;
     const start = this.d.now();
     const step = () => {
       const k = ms <= 0 ? 1 : Math.min(1, (this.d.now() - start) / ms);
       out.volume = outGain * (1 - k);
-      inEl.volume = inGain * k;
       this.fadeTimer = k < 1 ? this.d.setTimer(step, FADE_STEP_MS) : null;
     };
     step();
@@ -432,7 +432,9 @@ export class SpaPlayerEngine {
       this.index = ni;
       const el = this.d.audios[slot];
       el.currentTime = 0;
-      if (overlapMs > 0) el.volume = 0;
+      // Incoming track starts at full gain immediately (no fade-in): any timer latency can
+      // only shorten the overlap, never produce silence.
+      el.volume = gainToVolume(this.items[ni].gainDb);
       if (await this.playActive(false, overlapMs <= 0)) {
         if (overlapMs > 0) this.crossfade(fromSlot, overlapMs);
         else this.d.audios[fromSlot].pause();
@@ -487,6 +489,8 @@ export class SpaPlayerEngine {
     this.accumulate(this.active);
     // 1) Purge every expired cached copy (any status, any network) — no network waits first.
     const stopActive = this.expireCopies();
+    // 2a) During a cross-fade the outgoing slot is still audible: it must stay allowed too.
+    this.checkOutgoing();
     // 2) Stop a current track that is no longer allowed, synchronously.
     const item = this.current;
     const l = this.loadedActive();
@@ -508,6 +512,17 @@ export class SpaPlayerEngine {
     }
     if (this.status === "playing") this.scheduleTransition();
     if (this.status === "playing" && this.index >= 0 && this.items.length > 0) this.saveResume();
+  }
+
+  private checkOutgoing(): void {
+    if (this.handoffTimer === null && this.fadeTimer === null) return;
+    const slot = 1 - this.active;
+    const lo = this.loaded[slot];
+    const item = lo ? this.items.find((i) => i.audioItemId === lo.audioItemId) : null;
+    if (!lo || !item || !this.allowed(item, lo.kind, true)) {
+      this.finishHandoff();
+      this.d.audios[slot].pause();
+    }
   }
 
   private switchPending = false;
@@ -542,6 +557,13 @@ export class SpaPlayerEngine {
       }
     }
     for (const id of [...this.cachedAt.keys()]) if (!this.cacheUntil.has(id)) this.cachedAt.delete(id);
+    // Any loaded blob whose copy is no longer valid in the index (any status) is unloaded too.
+    for (const slot of [0, 1]) {
+      const lo = this.loaded[slot];
+      if (lo?.kind !== "blob" || this.cachedDate(lo.audioItemId) !== null) continue;
+      if (slot === this.active && this.status === "playing") activeHit = true;
+      this.clearSlot(slot);
+    }
     if (activeHit) {
       this.closeSegment("skip");
       this.clearHandoff();
@@ -665,9 +687,9 @@ export class SpaPlayerEngine {
 
   // ---------------- offline cache ----------------
   private async dropCache(id: string): Promise<void> {
+    this.dropCacheIndex(id);
+    this.clearBlobSources(id);
     await this.d.cache.delete(id);
-    this.cachedAt.delete(id);
-    this.cacheUntil.delete(id);
   }
 
   async scanCache(): Promise<void> {
@@ -685,6 +707,17 @@ export class SpaPlayerEngine {
       }
     }
     for (const id of [...this.cachedAt.keys()]) if (!byId.has(id)) this.dropCacheIndex(id);
+  }
+
+  /** Unload (and revoke) any slot holding a blob of this copy; playing state is handled by tick. */
+  private clearBlobSources(id: string): void {
+    for (const slot of [0, 1]) {
+      const lo = this.loaded[slot];
+      if (lo?.kind !== "blob" || lo.audioItemId !== id) continue;
+      if (slot !== this.active) this.finishHandoff();
+      else this.closeSegment("skip");
+      this.clearSlot(slot);
+    }
   }
 
   private dropCacheIndex(id: string): void {

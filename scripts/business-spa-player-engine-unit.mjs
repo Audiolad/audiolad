@@ -20,7 +20,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
     get duration() { return durationOf.get(this._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "")) ?? NaN; }
     get currentTime() { return this.paused ? this._t : Math.min(this.duration, (world.now - this.startClock) / 1000); }
     set currentTime(v) { this._t = v; if (!this.paused) this.startClock = world.now - v * 1000; }
-    async play() { if (!this._src) throw new Error("no src"); this._t = this.currentTime; this.paused = false; this.startClock = world.now - this._t * 1000; world.plays.push({ el: this.name, src: this._src, at: world.now, pos: this._t }); }
+    async play() { if (!this._src) throw new Error("no src"); this._t = this.currentTime; this.paused = false; this.startClock = world.now - this._t * 1000; world.plays.push({ el: this.name, src: this._src, at: world.now, pos: this._t, vol: this.volume }); }
     pause() { if (!this.paused) { this._t = this.currentTime; this.paused = true; } }
     load() { if (this._src) { this.readyState = 4; queueMicrotask(() => { this.fire("loadedmetadata"); this.fire("canplaythrough"); }); } }
     removeAttribute(n) { if (n === "src") { this._src = ""; this._t = 0; this.paused = true; this.readyState = 0; } }
@@ -294,6 +294,7 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   for (let k = 1; k <= 12; k++) {
     const end = starts[k - 1].at + durations[(k - 1) % 12] * 1000;
     assert.ok(starts[k].at <= end, `no silence with 250ms timer latency: transition ${k} starts ${starts[k].at - end}ms after end`);
+    assert.ok(starts[k].vol > 0.4, `incoming track audible from its first sample (vol ${starts[k].vol}) — no fade-in silence`);
   }
   engine.dispose();
 }
@@ -376,6 +377,39 @@ function makeWorld({ durations, offlineUntil = () => new Date(T0 + 7 * DAY), pla
   await world.advance(300);
   assert.ok(!world.plays.some((p) => p.src.startsWith("blob:")), "expired cached copy never played");
   void audios;
+  engine.dispose();
+}
+
+// ---- 13. Re-review A3: outgoing stream stops at its grant deadline during the overlap ----
+{
+  const { world, deps, audios } = makeWorld({ durations: [5, 60], playableUntil: (i) => (i === 0 ? new Date(T0 + 4650) : null) });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(4620); // cross-fade started at ~4600
+  assert.ok(audios.some((a) => !a.paused && a.src.endsWith(id(2))), "next track started (overlap)");
+  await world.advance(200); // tick at 4750 > deadline 4650
+  assert.ok(audios.every((a) => a.paused || !a.src.endsWith(id(1))), "outgoing stream paused after its deadline");
+  engine.dispose();
+}
+
+// ---- 14. Re-review A3: refresh/scanCache unloads an expired paused blob ----
+{
+  const { world, deps, audios } = makeWorld({ durations: [600, 600], offlineUntil: () => new Date(T0 + 30_000) });
+  const revoked = [];
+  deps.objectUrl.revoke = (u) => revoked.push(u);
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  world.online = false;
+  await world.advance(300); // switched to blob
+  assert.equal(engine.loadedActive().kind, "blob");
+  await engine.toggle(); // pause
+  world.now = T0 + 31_000; // no tick in between
+  world.online = true;
+  world.manifestRes = { ok: true, data: world.manifest() };
+  await engine.refresh();
+  assert.ok(audios.every((a) => !a.src.startsWith("blob:")), "expired paused blob unloaded");
+  assert.ok(revoked.length > 0, "object URL revoked");
   engine.dispose();
 }
 
