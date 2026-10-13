@@ -41,6 +41,7 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/help": `${BUSINESS_SITE_PATH}/help`,
   "/onboarding": `${BUSINESS_SITE_PATH}/onboarding`,
   "/player": `${BUSINESS_SITE_PATH}/player`,
+  "/spa": `${BUSINESS_SITE_PATH}/spa`,
 };
 
 export function resolveBusinessInternalPath(
