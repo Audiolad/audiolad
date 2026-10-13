@@ -15,6 +15,8 @@ import { copySafeProse, formatAiCompanyTaskCopy } from "@/lib/admin/ai-company-t
 export const NO_DATA = "Нет данных";
 
 export const HEARTBEAT_STALE_MS = 60 * 60 * 1000;
+/** Codex CLI probe runs every 10 minutes; older than 20 minutes is «Нет свежей проверки» (same TTL as Core). */
+export const CODEX_PROBE_STALE_MS = 20 * 60 * 1000;
 
 /** Caps observed on the pre-contract payload. Equal length is a boundary, not proof of completeness. */
 export const LEGACY_TASK_CAP = 100;
@@ -668,6 +670,22 @@ export type CodexFacts = {
   gate: string | null;
   pilotOk: boolean | null;
   readinessTaskId: string | null;
+  /** Real Codex CLI probe over SSH (Core codex.cli_probe, 9a63f86e rework). null when Core has none. */
+  cliProbe: CodexCliProbe | null;
+};
+
+/** Core codex.cli_probe: `codex --version` + `codex login status` over SSH and tracked runs. */
+export type CodexCliProbe = {
+  status: "verified" | "failed" | "stale" | "absent";
+  checkedAt: string | null;
+  transport: string | null;
+  cliAvailable: boolean | null;
+  cliVersion: string | null;
+  chatgptAuthorized: boolean | null;
+  reason: string | null;
+  busy: boolean;
+  currentRun: { runId: string; taskId: string | null; startedAt: string | null; heartbeatAt: string | null } | null;
+  untrackedExecCount: number | null;
 };
 
 export type CompanyStatus = {
@@ -1787,8 +1805,78 @@ function parseCodexFacts(value: unknown): CodexFacts | null {
     gate: readString(record, CORE_FIELD_MAP.codex.gate),
     pilotOk: readBoolean(record, CORE_FIELD_MAP.codex.pilotOk),
     readinessTaskId: readString(record, CORE_FIELD_MAP.codex.readinessTaskId),
+    cliProbe: parseCodexCliProbe(record.cli_probe),
   };
   return Object.values(facts).some((item) => item != null) ? facts : null;
+}
+
+const CLI_PROBE_STATUSES = new Set(["verified", "failed", "stale", "absent"]);
+
+function parseCodexCliProbe(value: unknown): CodexCliProbe | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const status = readString(record, ["status"]);
+  if (!status || !CLI_PROBE_STATUSES.has(status)) return null;
+  const run = asRecord(record.current_run);
+  const runId = run ? readString(run, ["run_id"]) : null;
+  return {
+    status: status as CodexCliProbe["status"],
+    checkedAt: readString(record, ["checked_at"]),
+    transport: readString(record, ["transport"]),
+    cliAvailable: readBoolean(record, ["cli_available"]),
+    cliVersion: readString(record, ["cli_version"]),
+    chatgptAuthorized: readBoolean(record, ["chatgpt_authorized"]),
+    reason: readString(record, ["reason"]),
+    busy: readBoolean(record, ["busy"]) === true && Boolean(runId),
+    currentRun: run && runId
+      ? {
+          runId,
+          taskId: readString(run, ["task_id"]),
+          startedAt: readString(run, ["started_at"]),
+          heartbeatAt: readString(run, ["heartbeat_at"]),
+        }
+      : null,
+    untrackedExecCount: readNumber(record, ["untracked_exec_count"]),
+  };
+}
+
+/**
+ * Codex card from the real CLI probe (9a63f86e rework). Connection only from a fresh probe; occupancy only
+ * from a live tracked run. Core tasks/runs that name Codex are assignments, not occupancy.
+ */
+function codexFromCliProbe(probe: CodexCliProbe, now: number): {
+  connection: ConnectionState;
+  occupancy: OccupancyState;
+  connectionSource: string;
+} | null {
+  if (probe.status === "absent") return null;
+  const at = probe.checkedAt ? `${formatDateTime(probe.checkedAt)} МСК` : NO_DATA;
+  const checkedMs = parseInstant(probe.checkedAt);
+  const fresh = probe.status !== "stale" && checkedMs != null && now - checkedMs <= CODEX_PROBE_STALE_MS;
+  if (probe.status === "verified" && fresh) {
+    const parts = [
+      probe.chatgptAuthorized === true ? "Авторизован в ChatGPT" : null,
+      probe.cliAvailable === true ? `CLI доступен${probe.cliVersion ? ` (${probe.cliVersion})` : ""}` : null,
+      `Проверено в ${at}`,
+    ].filter(Boolean);
+    return {
+      connection: "verified",
+      occupancy: probe.busy ? "working" : "free",
+      connectionSource: `${parts.join(" · ")}. Проба Codex CLI${probe.transport === "ssh" ? " по SSH" : ""} в Company Core.`,
+    };
+  }
+  if (probe.status === "failed" && fresh) {
+    return {
+      connection: "unavailable",
+      occupancy: "unknown",
+      connectionSource: `Недоступен. ${probe.reason ?? "Проба Codex CLI завершилась ошибкой."} Проверено в ${at}.`,
+    };
+  }
+  return {
+    connection: "stale",
+    occupancy: "unknown",
+    connectionSource: `Нет свежей проверки. Последняя проба Codex CLI: ${at}.`,
+  };
 }
 
 export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
@@ -3383,8 +3471,9 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       ?? beats.map((beat) => beat.state).find(Boolean)
       ?? null;
     // Core checks Codex only through CODEX_ACCESS_TOKEN in its own process; the real runner is the CLI on the server (ChatGPT login).
-    const tokenOnlyCheck = spec.id === "codex" && /codex_access_token/i.test(`${facts?.gate ?? ""}`);
-    const connection = deriveConnection({ explicit, checkedAt, now, checkPathMismatch: tokenOnlyCheck });
+    const cli = spec.id === "codex" && facts?.cliProbe ? codexFromCliProbe(facts.cliProbe, now) : null;
+    const tokenOnlyCheck = !cli && spec.id === "codex" && /codex_access_token/i.test(`${facts?.gate ?? ""}`);
+    const connection = cli ? cli.connection : deriveConnection({ explicit, checkedAt, now, checkPathMismatch: tokenOnlyCheck });
     const tasks = status.tasks.filter(
       (task) => taskExecutor(task).id === spec.id && task.active !== false && !taskIsClosed(task, status.events),
     );
@@ -3393,7 +3482,9 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       .sort((left, right) => (parseInstant(right.view.lastProgressAt) ?? 0) - (parseInstant(left.view.lastProgressAt) ?? 0));
     const freshRuns = runs.filter((item) => item.view.fresh);
     let occupancy: OccupancyState;
-    if (freshRuns.length > 0) {
+    if (cli) {
+      occupancy = cli.occupancy;
+    } else if (freshRuns.length > 0) {
       const allWaiting = freshRuns.every((item) => {
         const blob = `${item.task.status} ${item.task.humanGate ?? ""}`.toLowerCase();
         return WAITING_TASK_TOKENS.some((token) => blob.includes(token));
@@ -3406,12 +3497,17 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     }
     const lastRunSignal = latestInstant(runs.map((item) => item.view.lastProgressAt));
     const heartbeatAt = latestInstant([checkedAt, lastRunSignal]);
-    const signalSource = checkedAt && checkedAt === heartbeatAt
+    const probeAt = cli && facts?.cliProbe ? facts.cliProbe.checkedAt : null;
+    const signalSource = cli
+      ? (probeAt ? "проба Codex CLI (version, login status, отслеживаемые запуски)" : "нет сигналов в Company Core")
+      : checkedAt && checkedAt === heartbeatAt
       ? "проверка подключения в Company Core"
       : lastRunSignal
         ? "событие запуска в Company Core (start/progress)"
         : "нет сигналов в Company Core";
-    const connectionSource = tokenOnlyCheck
+    const connectionSource = cli
+      ? cli.connectionSource
+      : tokenOnlyCheck
       ? "Company Core проверяет только ключ API Codex в своём процессе. Реальный канал — Codex на сервере компании по SSH со входом ChatGPT; его Company Core не проверяет и сигналов «жив» не получает. Поэтому подключение не подтверждено и не опровергнуто."
       : checkedAt
         ? `Проверка в Company Core, ${formatDateTime(checkedAt)} МСК. Срок свежести — ${threshold}.`
@@ -3424,7 +3520,22 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       evidenceRun?.model ?? current?.executiveRun?.model ?? null,
     ]);
     const staleRuns = runs.length - freshRuns.length;
+    const tracked = cli ? facts?.cliProbe?.currentRun ?? null : null;
+    const trackedTask = tracked?.taskId
+      ? status.tasks.find((task) => task.id === tracked.taskId || (task.id ?? "").startsWith(tracked.taskId ?? "\u0000")) ?? null
+      : null;
+    const untracked = cli ? facts?.cliProbe?.untrackedExecCount ?? null : null;
     const detailParts = [
+      tracked
+        ? `Выполняет: отслеживаемый запуск ${tracked.runId}${trackedTask ? ` («${clip(trackedTask.title, 80)}»)` : ""}, начат ${formatDateTime(tracked.startedAt)} МСК, пульс ${formatDateTime(tracked.heartbeatAt)} МСК.`
+        : null,
+      cli && runs.length > 0
+        ? `Назначено Codex в Company Core: ${runs.length}. Это назначение, а не подтверждённая занятость Codex.`
+        : null,
+      cli && untracked != null && untracked > 0
+        ? `Процессов codex exec без регистрации запуска: ${untracked}. Они не считаются занятостью: нет run-id владельца и пульса.`
+        : null,
+      spec.id === "codex" ? "Работа Грога на своём боксе не приписывается Codex." : null,
       spec.id === "codex" && runs.length > 0 && !current?.executiveRun?.provider
         ? "Исполнитель запуска определён по идентификатору запуска: Company Core не хранит провайдера."
         : null,
@@ -3449,13 +3560,17 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       occupancy,
       occupancyLabel,
       summary: `${connectionLabel} · ${occupancyLabel}`,
-      heartbeat: heartbeatAt ? `${formatDateTime(heartbeatAt)} МСК` : NO_DATA,
+      heartbeat: cli ? (probeAt ? `${formatDateTime(probeAt)} МСК` : NO_DATA) : heartbeatAt ? `${formatDateTime(heartbeatAt)} МСК` : NO_DATA,
       signalSource,
-      freshness: freshnessLabel(heartbeatAt, now),
+      freshness: freshnessLabel(cli ? probeAt : heartbeatAt, now),
       activeRuns: runs.map((item) => item.view),
-      activeRunsLabel: runs.length === 0 ? "Нет активных запусков" : `Активных запусков: ${runs.length}`,
-      currentTask: runs[0]?.view.title ?? "Нет активных запусков",
-      runId: (runs[0] && runs[0].view.runId !== NO_DATA ? runs[0].view.runId : null) ?? observations.map((item) => item.runId).find(Boolean) ?? NO_DATA,
+      activeRunsLabel: cli
+        ? (tracked ? "Отслеживаемый запуск Codex: 1" : runs.length === 0 ? "Нет активных запусков" : `Назначено Codex: ${runs.length} · не подтверждает занятость`)
+        : runs.length === 0 ? "Нет активных запусков" : `Активных запусков: ${runs.length}`,
+      currentTask: cli
+        ? (tracked ? (trackedTask?.title ?? tracked.runId) : "Нет отслеживаемого запуска Codex")
+        : runs[0]?.view.title ?? "Нет активных запусков",
+      runId: cli ? (tracked?.runId ?? NO_DATA) : (runs[0] && runs[0].view.runId !== NO_DATA ? runs[0].view.runId : null) ?? observations.map((item) => item.runId).find(Boolean) ?? NO_DATA,
       detail: joinFound(detailParts),
     };
   });
