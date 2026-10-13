@@ -1375,13 +1375,15 @@ if (!process.env.SPA_FUZZ_ONLY) {
   world.manifestRes = { ok: true, data: world.manifest() };
   await engine.refresh();
   await world.advance(200);
-  await engine.downloadAll();
-  assert.equal(world.cache.size, 12, "new download stored all copies");
+  const nd = engine.downloadAll(); // A's write waits behind the stale one (serialized writes)
+  await world.advance(200);
+  hold.res(); await old; await nd;
+  assert.equal(world.cache.size, 12, "all copies stored");
   world.online = false;
   await world.advance(1500);
   const active = () => audios.find((x) => !x.paused && !x.pending);
   assert.ok(active()?.src.startsWith("blob:"), "playing from the copy offline");
-  hold.res(); await old; await world.advance(1000);
+  await world.advance(1000);
   assert.ok(world.cache.has(id(1)), "stale put did not drop the current copy");
   assert.ok(engine.cachedAt.has(id(1)), "index kept");
   assert.equal(engine.status, "playing");
@@ -1412,6 +1414,76 @@ if (!process.env.SPA_FUZZ_ONLY) {
   engine.dispose();
 }
 
+// ---- 31. Re-review A18 ----
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1a) A18 #1 exactly: old download (server until T0+4 s) with a late put(A); a refresh + new
+  // download (until T0+1 day). The newest copy wins in storage, and offline at 6.5 s A is
+  // never audible from a copy whose own until has passed.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(200);
+  world.serverUntil = () => new Date(T0 + 4000).toISOString();
+  const put = deps.cache.put;
+  const hold = deferred();
+  let first = true;
+  deps.cache.put = async (k, ...r) => { if (first && k === id(1)) { first = false; await hold.p; } return put(k, ...r); };
+  const old = engine.downloadAll();
+  await world.advance(100);
+  world.serverUntil = () => new Date(T0 + DAY).toISOString();
+  world.manifestRes = { ok: true, data: world.manifest() };
+  await engine.refresh();
+  const nd = engine.downloadAll();
+  await world.advance(100);
+  hold.res(); await old; await nd; await world.advance(100);
+  const st = world.cache.get(id(1));
+  assert.ok(st && st.until === T0 + DAY, "the newer copy is the stored one");
+  assert.equal(engine.cacheUntil.get(id(1)), st.until, "index matches the stored copy");
+  world.online = false;
+  await world.advance(6500 - (world.now - T0));
+  for (const x of audios) if (!x.paused && x.src.startsWith("blob:")) {
+    const c = world.cache.get(x.src.replace(/^blob:/, ""));
+    assert.ok(c && world.now < c.until, "no blob audible past its own stored until");
+  }
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (1b) the copy actually read decides: the store holds A with until T0+4 s while the index
+  // says one day (overwritten behind our back) -> after 4 s A is never played from it.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await engine.downloadAll();
+  await world.advance(500);
+  const c = world.cache.get(id(1));
+  world.cache.set(id(1), { ...c, cachedAt: c.cachedAt - 1, until: T0 + 4000 });
+  await world.advance(6500 - (world.now - T0));
+  world.online = false;
+  void engine.tick();
+  await world.advance(500);
+  assert.ok(!audios.some((x) => !x.paused && x.src === `blob:${id(1)}`), "A not audible from a copy past its stored until");
+  engine.dispose();
+}
+if (!process.env.SPA_FUZZ_ONLY) {
+  // (2) A18 #2: a server no_access to an offline sign that resolves after a refresh changed
+  // the generation is still applied.
+  const { world, deps, audios } = makeWorld({ durations: Array.from({ length: 12 }, () => 60), webAudio: true });
+  const engine = new SpaPlayerEngine(deps);
+  await engine.init(world.manifestRes.data);
+  await world.advance(300);
+  const sign = deps.sign;
+  const hold = deferred();
+  deps.sign = async (aid, purpose) => { if (purpose === "offline") { await hold.p; return { ok: false, reason: "no_access" }; } return sign(aid, purpose); };
+  const dl = engine.downloadAll();
+  await world.advance(100);
+  world.manifestRes = { ok: true, data: world.manifest(world.items.map((x) => ({ ...x, offline_allowed: false, offline_cache_until: null }))) };
+  await engine.refresh();
+  hold.res(); await dl; await world.advance(2000);
+  assert.equal(engine.status, "no_access", "late no_access applied");
+  assert.ok(audios.every((x) => x.paused), "silent");
+  engine.dispose();
+}
+
 // ---- 27. Randomized interleavings (seeded): invariants after every step ----
 {
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -1420,7 +1492,7 @@ if (!process.env.SPA_FUZZ_ONLY) {
   const failures = [];
   // Seeds that once found real bugs (A17: forced stop during a pending start; stale play()
   // continuation silencing a newer start) always run as regressions.
-  const REGRESSION = process.env.SPA_FUZZ_FROM ? [] : [1417, 1452];
+  const REGRESSION = process.env.SPA_FUZZ_FROM ? [] : [1417, 1452, 297, 864, 1596, 295];
   const seeds = [...Array.from({ length: Math.max(0, SEEDS - FROM + 1) }, (_, k) => FROM + k), ...REGRESSION.filter((x) => x > SEEDS)];
   for (const seed of seeds) {
     const rnd = mulberry(seed);
@@ -1432,12 +1504,13 @@ if (!process.env.SPA_FUZZ_ONLY) {
     const { world, deps, audios } = makeWorld({ durations, webAudio, timerLatency: lat });
     // Random resolution order: every sign / scan / manifest fetch / load resolves after a random delay.
     const later = (max) => new Promise((r) => world.timers.push({ at: world.now + pick(max), id: ++world.seq, fn: r }));
-    const sign = deps.sign; deps.sign = async (...a) => { await later(900); return sign(...a); };
+    let denials = 0; // no_access answers actually delivered to the engine
+    const sign = deps.sign; deps.sign = async (...a) => { await later(900); const r = await sign(...a); if (!r.ok && r.reason === "no_access") denials++; return r; };
     const keys = deps.cache.keys; deps.cache.keys = async () => { await later(900); return keys(); };
     // Late cache I/O (A17 #3): puts/gets resolve out of order with refreshes and downloads.
     const put = deps.cache.put; deps.cache.put = async (...a) => { await later(1500); return put(...a); };
     const get = deps.cache.get; deps.cache.get = async (...a) => { await later(400); return get(...a); };
-    const fetchM = deps.fetchManifest; deps.fetchManifest = async () => { const m = world.manifestRes; await later(900); world.manifestRes = m; return fetchM(); };
+    const fetchM = deps.fetchManifest; deps.fetchManifest = async () => { const m = world.manifestRes; await later(900); if (!world.denied) world.manifestRes = m; const r = await fetchM(); if (!r.ok && r.reason === "no_access") denials++; return r; };
     world.loadDelayFn = () => pick(700);
     // Pending play()/resume() of random length (A16 #2/#3).
     world.playDelayFn = () => (rnd() < 0.4 ? pick(900) : 0);
@@ -1455,7 +1528,10 @@ if (!process.env.SPA_FUZZ_ONLY) {
     const dci = engine.dropCacheIndex.bind(engine);
     engine.dropCacheIndex = (cid) => {
       const it = engine.items.find((i) => i.audioItemId === cid);
-      if (engine.status !== "no_access" && it && it.offlineAllowed && engine.cachedAt.has(cid) && engine.cachedDate(cid) !== null && engine.allowed(it, "blob")) invalidDrops.push(`${cid.slice(-2)}@${world.now - T0}`);
+      // Judged by the copy actually STORED (its own server until), not by the index.
+      const sc = world.cache.get(cid);
+      const sdl = sc && it ? engine.copyDeadline(cid, sc.cachedAt, sc.until) : null;
+      if (engine.status !== "no_access" && it && it.offlineAllowed && sdl !== null && world.now < sdl && engine.allowed(it, "stream", true)) invalidDrops.push(`${cid.slice(-2)}@${world.now - T0}`);
       dci(cid);
     };
     let revoked = false;
@@ -1472,6 +1548,8 @@ if (!process.env.SPA_FUZZ_ONLY) {
         const aid = x._src.replace(/^blob:/, "").replace(/^https:\/\/s\//, "");
         if (!ids.has(aid)) fail(`I4 removed track audible ${aid.slice(-2)}`);
         if (x._src.startsWith("blob:") && !world.cache.has(aid)) fail(`I6 audible copy ${aid.slice(-2)} no longer stored`);
+        const sc = world.cache.get(aid);
+        if (x._src.startsWith("blob:") && sc && world.now >= sc.until) fail(`I3 blob ${aid.slice(-2)} audible past its STORED server until by ${world.now - sc.until} ms`);
         const it = engine.items.find((i) => i.audioItemId === aid);
         if (it?.playableUntil && world.now >= it.playableUntil.getTime()) fail(`I1 audible past deadline: ${x.name} ${aid.slice(-2)} by ${world.now - it.playableUntil.getTime()} ms, el.deadline ${x.deadline != null ? x.deadline - world.now : "none"}, webAudio ${webAudio}`);
       }
@@ -1492,9 +1570,32 @@ if (!process.env.SPA_FUZZ_ONLY) {
           void engine.refresh();
         } else if (r < 0.75) { what = "toggle"; wantPlay = engine.status !== "playing"; void engine.toggle(); }
         else if (r < 0.8) { what = "network"; world.online = !world.online; }
-        else if (r < 0.88) { what = "download"; void engine.downloadAll(); }
+        else if (r < 0.88) {
+          what = "download"; void engine.downloadAll();
+          // Server deadlines differ per download (stale writes must never win), A18 #1.
+          const u = world.now + 2000 + pick(20000);
+          world.serverUntil = () => new Date(u).toISOString();
+        }
         else if (r < 0.93) { what = "stall"; for (const x of audios) world.stall(x, pick(4000)); }
         else { what = "tick"; void engine.tick(); }
+        // Server-side revocation at a random moment (A18 #2): any later sign/refresh answer is
+        // no_access, whatever the manifest generation; the engine must end in no_access.
+        if (!revoked && step > 3 && rnd() < 0.04) {
+          what += "+deny";
+          world.online = true;
+          world.denied = true;
+          world.manifestRes = { ok: false, reason: "no_access" };
+          const d0 = denials;
+          void engine.downloadAll(); void engine.refresh();
+          await world.advance(4000);
+          // Every delivered no_access answer must take effect (whatever the generation).
+          if (denials > d0 && engine.status !== "no_access") throw new Error(`seed ${seed} step ${step}: server no_access not applied (status ${engine.status})`);
+          revoked = engine.status === "no_access";
+          check(step, "denied");
+          revoked = false; // access restored below for the liveness phase
+          world.denied = false;
+          break;
+        }
         await world.advance(50 + pick(2500));
         if (process.env.SPA_FUZZ_TRACE) console.log(seed, step, what, world.online, engine.status, engine.current?.audioItemId.slice(-2), JSON.stringify(audios.map((x) => [x._src.slice(-2), x.paused, +x.currentTime.toFixed(1)])), engine.loaded.map((l) => l && l.kind + l.audioItemId.slice(-2)).join(","), world.now - T0, engine.opEpoch, engine.starting, JSON.stringify(engine.pendingStart), engine.playOp);
         check(step, what);

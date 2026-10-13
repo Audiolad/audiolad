@@ -31,10 +31,10 @@ const mutations = [
   ["OP advance activates a stale prepared successor", [["ni >= 0 && ni === want && this.allowed", "ni >= 0 && this.allowed"]], "depth"],
   ["OP refresh does not take over a superseded start", [["    if (ps && ps.intent === this.playOp) {", "    if (false) {"]]],
   ["OP tick treats an empty slot during startAt as a stop", [["(!l && this.starting === 0)", "(!l)"]]],
-  ["OP startAt stalls when the track became disallowed during the load", [["if (!played && this.stillCurrent(wop) && intent === this.playOp && this.status === \"paused\" && attempt < this.items.length) {", "if (false) {"]]],
+  ["OP startAt stalls when the track became disallowed during the load", [["if (!played && this.stillCurrent(wop) && intent === this.playOp && this.status === \"paused\") {", "if (false) {"]]],
   // ---- A15 ----
   ["A15 stale init() continues after its cache scan", [["    if (!this.stillCurrent(wop)) return; // the user/refresh already took over: no stale start", ""]]],
-  ["A15 cache scan decides with the manifest snapshot taken before its awaits", [["    const current = (id: string) => this.items.find((i) => i.audioItemId === id);", "    const snap = this.items;\n    const current = (id: string) => snap.find((i) => i.audioItemId === id);"]]],
+  ["A15 cache scan decides with the manifest snapshot taken before its awaits", [["    const current = (id: string) => this.items.find((i) => i.audioItemId === id);", "    const snap = this.items;\n    const current = (id: string) => snap.find((i) => i.audioItemId === id);"]], "depth"] /* revalidate() re-reads under the write lock */,
   // ---- A16/A17 ----
   ["A17 <audio> slot has no wall-clock forced stop at its deadline", [["    if (!el.stopAt) this.armForcedStop(slot, next);", ""]]],
   ["A17 hard stop armed only after play() resolved", [["    this.applyDeadline(this.active);\n    try {\n      await this.activeEl().play(", "    try {\n      await this.activeEl().play("]], "depth"], // tick re-applies deadlines every 250 ms; adapter-level guard tested in business-spa-webaudio-unit
@@ -47,7 +47,14 @@ const mutations = [
   ["A18 <audio> slot may start with its deadline inside the track (+ slack)", [["      if (dl !== null && dl < from + Math.max(0, dur - pos) * 1000 + SPA_HTML_START_SLACK_MS) return false;", ""]]],
   ["A18 stale cache-switch play() continuation pauses the newer start", [["          this.silenceStale(st);\n          return;", "          if (st.slotOp === this.slotOp[slot]) el.pause();\n          return;"]]],
   ["A18 cache switch play() without the guard", [["        await el.play(() => this.mayStart(st)).catch(", "        await el.play().catch("]], "depth"], // post-play silenceStale + adapter guard test (webaudio-unit)
-  ["A18 stale download put drops the current valid copy", [["        if (!valid) await this.dropCache(item.audioItemId);", "        await this.dropCache(item.audioItemId);"]]],
+  ["A18 stale download put drops the current valid copy", [["        if (!valid) await this.dropOwnCopy(item.audioItemId, cachedAt);", "        await this.dropCache(item.audioItemId);"]]],
+  // ---- A18/A19 ----
+  ["A19 a stale write overwrites a newer stored copy", [["      if (ex && ex.cachedAt >= cachedAt) return false;\n", ""]], "depth"] /* writes are serialized and a stale gen never writes */,
+  ["A19 sourceFor trusts the index instead of the copy actually read", [["      let copy = this.checkCopy(item.audioItemId, await this.d.cache.get(item.audioItemId), atMs);", "      let copy = await this.d.cache.get(item.audioItemId);"]]],
+  ["A19 a late server no_access is hidden by a generation change", [["      if (!signed.ok && signed.reason === \"no_access\" && acc === this.accessEpoch && !this.disposed) return this.revokeAccess();\n", ""]]],
+  ["A19 scan drops a copy on a read taken before a concurrent write", [["await this.revalidate(id); // re-read under the write lock", "await this.dropCache(id);"]], "depth"] /* data-loss only: not a rights invariant the suite asserts */,
+  ["A19 advance supersedes a start in flight", [["    if (this.pendingStart && this.starting > 0) return;\n", ""]]],
+  ["A19 no retry on reconnect after nothing was startable", [["          this.stalledIntent = null;\n          void this.startAt(", "          this.stalledIntent = null;\n          if (false) void this.startAt("]]],
   ["A15 clearing a slot does not end pending readiness waits", [["    for (const f of [...this.slotWaiters[slot]]) f();", ""]], "depth"],
   ["I7 no successor prepared after cache switch drops B", "if (this.status === \"playing\" && !this.loaded[1 - this.active]) await this.prepareNext();", ""],
   ["I6 tick treats in-flight load as interruption", "if (this.starting === 0 && this.status", "if (this.status"],

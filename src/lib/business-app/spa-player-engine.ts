@@ -208,6 +208,8 @@ export class SpaPlayerEngine {
   private opEpoch = 0;
   /** startAt() in flight: a refresh that supersedes it takes over this start (same track/position). */
   private disposed = false;
+  /** playOp of a start that gave up (nothing startable); a reconnect retries it (no user pause). */
+  private stalledIntent: number | null = null;
   /** Per-slot wall-clock forced-stop timers for slots without an audio-clock stop (<audio>). */
   private deadlineTimer: [unknown, unknown] = [null, null];
   private pendingStart: { id: string; pos: number; auto: boolean; intent: number } | null = null;
@@ -391,11 +393,90 @@ export class SpaPlayerEngine {
     return atMs === undefined || this.allowed(item, l.kind, false, atMs);
   }
 
+  /**
+   * The copy ACTUALLY read decides (A18 #1): its own cachedAt/server until (+ manifest
+   * deadline) must hold now and at `atMs`. The index is re-synced to what is stored, so the
+   * guard, deadlines and expiry purge all use the real copy's metadata.
+   */
+  private checkCopy(id: string, copy: CachedCopy | null, atMs?: number): CachedCopy | null {
+    if (!copy) return null;
+    if (this.cachedAt.get(id) !== copy.cachedAt || this.cacheUntil.get(id) !== copy.until) {
+      this.cachedAt.set(id, copy.cachedAt);
+      this.cacheUntil.set(id, copy.until);
+    }
+    const dl = this.copyDeadline(id, copy.cachedAt, copy.until);
+    const now = this.d.now();
+    if (dl === null || now >= dl || (atMs !== undefined && atMs >= dl)) return null;
+    const item = this.items.find((i) => i.audioItemId === id);
+    if (!item || !this.allowed(item, "blob") || (atMs !== undefined && !this.allowed(item, "blob", false, atMs))) return null;
+    return copy;
+  }
+
+  /**
+   * All cache writes/deletes of one id are serialized, and a write never replaces an equal or
+   * NEWER stored copy (by cachedAt): a stale download can't overwrite a newer copy (A18 #1).
+   */
+  private cacheChain = new Map<string, Promise<unknown>>();
+  private serial<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const run = (this.cacheChain.get(id) ?? Promise.resolve()).catch(() => undefined).then(fn);
+    this.cacheChain.set(id, run.catch(() => undefined));
+    return run;
+  }
+  /** Stale download: drop only OUR copy, and only if it is not valid for the current state. */
+  private dropOwnCopy(id: string, cachedAt: number): Promise<void> {
+    return this.revalidate(id, cachedAt);
+  }
+  /**
+   * Serialized with writes: re-read what is STORED now and keep+index it if valid for the
+   * current manifest and its own server deadline; else remove it (index, blob sources,
+   * store). `onlyCachedAt`: touch only that specific copy. No decision on a stale read.
+   */
+  private revalidate(id: string, onlyCachedAt?: number): Promise<void> {
+    return this.serial(id, async () => {
+      const ex = await this.d.cache.get(id);
+      if (onlyCachedAt !== undefined && (!ex || ex.cachedAt !== onlyCachedAt)) return;
+      if (!ex) {
+        this.dropCacheIndex(id);
+        this.clearBlobSources(id);
+        return;
+      }
+      const cachedAt = ex.cachedAt;
+      // Still a valid copy for the CURRENT manifest + its own server deadline (and access
+      // unchanged)? Then it is kept and indexed — it may already be audible.
+      const item = this.items.find((i) => i.audioItemId === id);
+      const dl = item?.offlineAllowed ? this.copyDeadline(id, ex.cachedAt, ex.until) : null;
+      if (dl !== null && this.d.now() < dl && this.status !== "no_access" && !this.disposed) {
+        if ((this.cachedAt.get(id) ?? -Infinity) <= ex.cachedAt) {
+          this.cachedAt.set(id, ex.cachedAt);
+          this.cacheUntil.set(id, ex.until);
+        }
+        return;
+      }
+      if (onlyCachedAt === undefined || this.cachedAt.get(id) === cachedAt) this.dropCacheIndex(id);
+      this.clearBlobSources(id);
+      await this.d.cache.delete(id);
+    });
+  }
+  private putCopy(id: string, data: Blob, cachedAt: number, until: number): Promise<boolean> {
+    return this.serial(id, async () => {
+      const ex = await this.d.cache.get(id);
+      if (ex && ex.cachedAt >= cachedAt) return false;
+      await this.d.cache.put(id, data, cachedAt, until);
+      return true;
+    });
+  }
+
   // ---------------- sources ----------------
-  private async sourceFor(item: SpaManifestItem, atMs?: number, wop = this.opEpoch): Promise<Loaded | null> {
+  private async sourceFor(item: SpaManifestItem, atMs?: number, wop = this.opEpoch, slot?: number): Promise<Loaded | null> {
     // A copy is used only if it is still valid when the track will actually start.
     if (this.allowed(item, "blob") && (atMs === undefined || this.allowed(item, "blob", false, atMs))) {
-      const copy = await this.d.cache.get(item.audioItemId);
+      let copy = this.checkCopy(item.audioItemId, await this.d.cache.get(item.audioItemId), atMs);
+      // <audio> slot: a copy whose deadline falls inside the track (+ slack) is not startable
+      // there; prefer the stream when one may be started (else the guard refuses anyway).
+      if (copy && slot !== undefined && !this.d.audios[slot].stopAt && this.allowed(item, "stream", false, atMs)) {
+        const dl = this.copyDeadline(item.audioItemId, copy.cachedAt, copy.until);
+        if (dl !== null && dl < (atMs ?? this.d.now()) + (item.durationSeconds ?? 0) * 1000 + SPA_HTML_START_SLACK_MS) copy = null;
+      }
       if (!this.stillCurrent(wop)) return null; // superseded: do not sign/create anything
       if (copy) return { audioItemId: item.audioItemId, kind: "blob", url: this.d.objectUrl.create(copy.data), ready: false };
     }
@@ -446,7 +527,7 @@ export class SpaPlayerEngine {
 
   private async loadSlot(slot: number, item: SpaManifestItem, positionSec = 0, atMs?: number, wop = this.opEpoch): Promise<boolean> {
     const op = ++this.slotOp[slot];
-    const src = await this.sourceFor(item, atMs, wop);
+    const src = await this.sourceFor(item, atMs, wop, slot);
     if (!this.stillCurrent(wop)) {
       if (src?.kind === "blob") this.d.objectUrl.revoke(src.url);
       return false;
@@ -534,9 +615,11 @@ export class SpaPlayerEngine {
     const played = await this.playActive(auto, true, intent, wop);
     // The track stopped being allowed while it loaded (e.g. its grant ended): playActive
     // paused; the program moves on to the next allowed track instead of stalling.
-    if (!played && this.stillCurrent(wop) && intent === this.playOp && this.status === "paused" && attempt < this.items.length) {
-      const ci = this.items.findIndex((x) => x.audioItemId === targetId);
-      await this.startAt(nextIndex(this.items.length, ci >= 0 ? ci : ri), 0, auto, intent, attempt + 1);
+    if (!played && this.stillCurrent(wop) && intent === this.playOp && this.status === "paused") {
+      if (attempt < this.items.length) {
+        const ci = this.items.findIndex((x) => x.audioItemId === targetId);
+        await this.startAt(nextIndex(this.items.length, ci >= 0 ? ci : ri), 0, auto, intent, attempt + 1);
+      } else this.stalledIntent = intent; // nothing startable right now: retry when online again
     }
   }
 
@@ -977,6 +1060,9 @@ export class SpaPlayerEngine {
     const fromId = this.items[from]?.audioItemId ?? null;
     const fromSlot = this.active;
     if (this.status !== "playing") return;
+    // A start in flight owns the active slot (it is being replaced): advancing now would
+    // supersede it and restart the load over and over (A19 fuzz-found churn).
+    if (this.pendingStart && this.starting > 0) return;
     const wop = this.bumpOp(); // advance = new operation; in-flight prepares/restarts go stale
     this.closeSegment("complete");
     const slot = 1 - fromSlot;
@@ -1061,6 +1147,10 @@ export class SpaPlayerEngine {
       if (online) {
         void this.flushLog();
         void this.refresh();
+        if (this.status === "paused" && this.stalledIntent === this.playOp && this.index >= 0 && this.items.length > 0) {
+          this.stalledIntent = null;
+          void this.startAt(this.index, 0, true, this.playOp);
+        }
       }
     }
     this.accumulate(this.active);
@@ -1192,7 +1282,8 @@ export class SpaPlayerEngine {
       const el = this.d.audios[slot];
       // The prepared slot must be valid when it will start, not just now.
       const atMs = slot === this.active ? this.d.now() : this.d.now() + Math.max(0, (this.activeEl().duration - this.activeEl().currentTime) * 1000) + SPA_TICK_MS;
-      const copy = found && this.allowed(found, "blob") && this.allowed(found, "blob", false, atMs) ? await this.d.cache.get(found.audioItemId) : null;
+      const copy = found && this.allowed(found, "blob") && this.allowed(found, "blob", false, atMs)
+        ? this.checkCopy(found.audioItemId, await this.d.cache.get(found.audioItemId), atMs) : null;
       if (!this.stillCurrent(wop)) return;
       // Stale after the await? (refresh removed/replaced the source, access revoked)
       const item = this.items.find((i) => i.audioItemId === l.audioItemId);
@@ -1383,7 +1474,7 @@ export class SpaPlayerEngine {
   private async dropCache(id: string): Promise<void> {
     this.dropCacheIndex(id);
     this.clearBlobSources(id);
-    await this.d.cache.delete(id);
+    await this.serial(id, () => this.d.cache.delete(id));
   }
 
   async scanCache(): Promise<void> {
@@ -1401,7 +1492,7 @@ export class SpaPlayerEngine {
       const item = current(id);
       if (newer(id)) continue;
       const deadline = item && copy ? this.copyDeadline(id, copy.cachedAt, copy.until) : null;
-      if (!item || !copy || deadline === null || this.d.now() >= deadline) await this.dropCache(id);
+      if (!item || !copy || deadline === null || this.d.now() >= deadline) await this.revalidate(id); // re-read under the write lock
       else {
         this.cachedAt.set(id, copy.cachedAt);
         this.cacheUntil.set(id, copy.until);
@@ -1443,11 +1534,11 @@ export class SpaPlayerEngine {
       if (!this.stillData(gen, acc) || !this.d.online()) return;
       if (!item.offlineAllowed || this.cachedAt.has(item.audioItemId)) continue;
       const signed = await this.d.sign(item.audioItemId, "offline");
+      // A server no_access is applied on the access epoch ALONE, before any staleness check
+      // (a manifest refresh meanwhile must not hide it, A18 #2) — like sourceFor/flushLog.
+      if (!signed.ok && signed.reason === "no_access" && acc === this.accessEpoch && !this.disposed) return this.revokeAccess();
       if (!this.stillData(gen, acc)) return;
-      if (!signed.ok) {
-        if (signed.reason === "no_access") return this.revokeAccess();
-        continue;
-      }
+      if (!signed.ok) continue;
       // The server's deadline for THIS download is binding (it may be shorter than the
       // client manifest says); no deadline = no offline copy.
       const serverUntil = signed.data.offlineCacheUntil ? Date.parse(signed.data.offlineCacheUntil) : NaN;
@@ -1460,7 +1551,11 @@ export class SpaPlayerEngine {
       const cachedAt = this.d.now();
       const deadline = latest ? this.copyDeadline(item.audioItemId, cachedAt, serverUntil) : null;
       if (!this.stillData(gen, acc) || !latest || !latest.offlineAllowed || deadline === null || cachedAt >= deadline) continue;
-      await this.d.cache.put(item.audioItemId, blob, cachedAt, serverUntil);
+      const wrote = await this.putCopy(item.audioItemId, blob, cachedAt, serverUntil);
+      if (!wrote) {
+        if (!this.stillData(gen, acc)) return;
+        continue; // a newer copy is stored: it (and its own metadata) stays authoritative
+      }
       if (!this.stillData(gen, acc) || this.d.now() >= deadline) {
         // Our put went stale. Never touch a copy the CURRENT state indexes (a newer download
         // stored it and it may be audible, A17 #3): its own deadline governs it. Only an
@@ -1468,7 +1563,8 @@ export class SpaPlayerEngine {
         const idx = this.cachedAt.has(item.audioItemId);
         const cur = this.items.find((i) => i.audioItemId === item.audioItemId);
         const valid = idx && cur && this.cachedDate(item.audioItemId) !== null;
-        if (!valid) await this.dropCache(item.audioItemId);
+        // ...and only OUR copy (by cachedAt): a newer write queued meanwhile stays (A19).
+        if (!valid) await this.dropOwnCopy(item.audioItemId, cachedAt);
         if (!this.stillData(gen, acc)) return;
         continue;
       }
