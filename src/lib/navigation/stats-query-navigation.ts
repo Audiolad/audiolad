@@ -66,14 +66,39 @@ function summaryField(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
+const SUMMARY_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Mirrors the server's normalisation (`asOptionalUuid` / `asOptionalDevice` /
+ * `asOptionalUtm` in analytics-queries.ts). A junk filter in the URL is
+ * dropped by the server, so the rendered summary can never echo it back. If
+ * the key compared the raw value the page would look permanently stale.
+ */
+function summaryUuid(value: string | null | undefined): string {
+  const trimmed = summaryField(value);
+  return SUMMARY_UUID_RE.test(trimmed) ? trimmed : "";
+}
+
+function summaryDevice(value: string | null | undefined): string {
+  return value === "mobile" || value === "tablet" || value === "desktop"
+    ? value
+    : "";
+}
+
+function summaryUtm(value: string | null | undefined): string {
+  const trimmed = summaryField(value);
+  return trimmed.length > 120 ? "" : trimmed;
+}
+
 export function adminSummaryQueryKey(query: AdminSummaryQuery): string {
   return [
     query.period,
     query.includeTest ? "1" : "0",
-    summaryField(query.authorId),
-    summaryField(query.practiceId),
-    summaryField(query.utmSource),
-    summaryField(query.deviceType),
+    summaryUuid(query.authorId),
+    summaryUuid(query.practiceId),
+    summaryUtm(query.utmSource),
+    summaryDevice(query.deviceType),
   ].join("|");
 }
 

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   adminSummaryNeedsRefresh,
+  adminSummaryQueryKey,
   applyAuthorStatsSearchPatch,
   isPlainPrimaryClick,
   pushStatsQuery,
@@ -107,6 +108,54 @@ function testSummaryRefreshIgnoresSort() {
   );
 }
 
+function testSummaryKeyMirrorsServerNormalisation() {
+  const base = {
+    period: "7d",
+    includeTest: false,
+    authorId: null,
+    practiceId: null,
+    utmSource: null,
+    deviceType: null,
+  };
+  // Junk filters are dropped by the server (asOptionalUuid/Device/Utm), so
+  // the rendered summary never echoes them. They must not look stale forever.
+  for (const junk of [
+    { authorId: "not-a-uuid" },
+    { practiceId: "123" },
+    { deviceType: "fridge" },
+    { utmSource: "x".repeat(121) },
+  ]) {
+    assert.equal(adminSummaryNeedsRefresh(base, { ...base, ...junk }), false);
+  }
+  const uuid = "11111111-1111-4111-8111-111111111111";
+  assert.equal(
+    adminSummaryNeedsRefresh(base, { ...base, deviceType: "mobile" }),
+    true,
+  );
+  assert.equal(
+    adminSummaryNeedsRefresh(base, { ...base, utmSource: " vk " }),
+    true,
+  );
+  assert.equal(
+    adminSummaryQueryKey({ ...base, authorId: ` ${uuid} ` }),
+    adminSummaryQueryKey({ ...base, authorId: uuid }),
+  );
+}
+
+function testRefreshEffectIsKeyedByQueryNotBoolean() {
+  // Regression: the effect was keyed by the `summaryStale` boolean. Pressing
+  // «30» then «Все» before the first refresh landed kept the boolean `true`,
+  // the effect never re-ran, and the page showed the old period's data while
+  // the URL and the active button said «Все».
+  const workbench = read("src/components/admin/AdminAnalyticsWorkbench.tsx");
+  assert.match(
+    workbench,
+    /\[router, renderedSummaryKey, urlSummaryKey\]/,
+  );
+  assert.doesNotMatch(workbench, /\[router, summaryStale\]/);
+  assert.match(workbench, /admin-analytics-refreshing/);
+}
+
 function testTableStaysMounted() {
   assert.equal(shouldReplaceStatsTableWithLoading(false), true);
   assert.equal(shouldReplaceStatsTableWithLoading(true), false);
@@ -160,6 +209,8 @@ function main() {
   testHistoryDoesNotScroll();
   testHrefAndAuthorPatch();
   testSummaryRefreshIgnoresSort();
+  testSummaryKeyMirrorsServerNormalisation();
+  testRefreshEffectIsKeyedByQueryNotBoolean();
   testTableStaysMounted();
   testCallSites();
   console.log("stats-query-navigation-unit: ok");
