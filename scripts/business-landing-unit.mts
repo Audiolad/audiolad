@@ -127,7 +127,8 @@ assert.equal(toAbsoluteSitemapUrl("/b", PRODUCTION_APP_ORIGIN), "https://audiola
 
 const nextConfig = read("next.config.ts");
 assert.doesNotMatch(nextConfig, /source:\s*["']\/b(?:\/|["'])/);
-assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 7);
+assert.equal((nextConfig.match(/X-Robots-Tag/g) ?? []).length, 8);
+assert.match(nextConfig, /source:\s*"\/embed\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/auth\/:path\*"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/classica\/production"[\s\S]*X-Robots-Tag/);
 assert.match(nextConfig, /source:\s*"\/classica\/production\/:path\*"[\s\S]*X-Robots-Tag/);
