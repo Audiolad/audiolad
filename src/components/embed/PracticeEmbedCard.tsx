@@ -135,13 +135,16 @@ export default function PracticeEmbedCard(props: Props) {
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
   return (
-    <main className="flex min-h-dvh items-start justify-center bg-transparent p-0">
+    // Narrow frames (<560px, partner mobile) keep the vertical card. Wide frames
+    // (partner desktop) switch to the AudioLad desktop practice-hero layout:
+    // square cover left, info + «Слушать» right, filling the frame height.
+    <main className="flex min-h-dvh items-start justify-center bg-transparent p-0 min-[560px]:h-dvh">
       <article
         data-practice-embed="true"
         data-practice-embed-mode={props.mode}
-        className="w-full max-w-[420px] overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(36,19,63,0.12)]"
+        className="w-full max-w-[420px] overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(36,19,63,0.12)] min-[560px]:grid min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7] min-[560px]:shadow-none"
       >
-        <div className="relative aspect-square w-full overflow-hidden bg-[#efe7fb]">
+        <div className="relative aspect-square w-full overflow-hidden bg-[#efe7fb] min-[560px]:h-full min-[560px]:w-auto">
           {props.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -153,7 +156,7 @@ export default function PracticeEmbedCard(props: Props) {
             />
           ) : null}
         </div>
-        <div className="px-5 pb-5 pt-5">
+        <div className="px-5 pb-5 pt-5 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
           {props.typeLabel ? (
             <span className="inline-flex w-fit rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
               {props.typeLabel}
