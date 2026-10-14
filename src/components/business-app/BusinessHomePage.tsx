@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 
+import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
+import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
@@ -17,6 +19,9 @@ import {
   type BusinessOwnerHomeSignals,
 } from "@/lib/business-app/owner-home-signals";
 
+import {
+  ageOwnerHomeSignals,
+} from "@/lib/business-app/owner-home-live-refresh";
 import {
   buildBusinessHomeStatusCopy,
   formatBusinessAge,
@@ -144,7 +149,8 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
   const domain = useBusinessDomain();
   const rawSignals =
     domain.status === "authenticated" ? domain.signals ?? null : null;
-  const signals = mergeLiveConnectivity(rawSignals);
+  const elapsedSeconds = useOwnerHomeElapsed(rawSignals);
+  const signals = mergeLiveConnectivity(ageOwnerHomeSignals(rawSignals, elapsedSeconds));
 
   const ownerFirstName =
     domain.status === "authenticated" ? domain.owner.firstName : "гость";
@@ -246,6 +252,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         </p>
       </header>
 
+      <BusinessOwnerHomeLiveRefresh />
       <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">
           <StatusBanner locationName={locationName || "Точка"} signals={signals} playback={playback} />
