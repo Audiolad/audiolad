@@ -104,7 +104,7 @@ export default function SpaDesignPreview() {
 
   const nowPlaying = (
     <section className={`${styles.card} ${styles.nowPlaying}`} aria-labelledby="np">
-      <p className={styles.eyebrow} id="np">{hasTrack ? "Сейчас звучит" : "Последним звучало"}</p>
+      <p className={styles.eyebrow} id="np">{state === "playing" ? "Сейчас звучит" : state === "paused" ? "На паузе" : "Последним звучало"}</p>
       <div className={styles.trackRow}>
         {/* eslint-disable-next-line @next/next/no-img-element -- static mockup asset */}
         <img className={styles.cover} src={COVER} alt={`Обложка «${track.title}»`} width={88} height={88} />
