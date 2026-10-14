@@ -3,6 +3,7 @@ import BusinessSupportDiagnosticPage from "../src/components/business-app/Busine
 import { anonymousSupportDiagnostics, buildSupportDiagnostics } from "../src/lib/business-app/support-diagnostics";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import BusinessHomePage, { type BusinessHomePageProps } from "../src/components/business-app/BusinessHomePage";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
@@ -16,8 +17,13 @@ const context: Extract<BusinessOwnerHomeContext, { status: "authenticated" }> = 
   signals: { ...emptyBusinessOwnerHomeSignals(), playerCount: 1, primaryHealthStatus: "online", secondsSinceHeartbeat: 30 },
 };
 const render = (signals = context.signals, props: BusinessHomePageProps = {}) => renderToStaticMarkup(
-  <BusinessDomainProvider value={{ ...context, signals }}><BusinessHomePage {...props} /></BusinessDomainProvider>,
+  <AppRouterContext.Provider value={fakeRouter}>
+    <BusinessDomainProvider value={{ ...context, signals }}><BusinessHomePage {...props} /></BusinessDomainProvider>
+  </AppRouterContext.Provider>,
 );
+// Live refresh (c02fe282) uses router.refresh(); SSR render needs an app router.
+const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
+assert.match(readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8"), /<BusinessOwnerHomeLiveRefresh \/>/);
 const track = { title: "Реальный трек", coverUrl: "/real-cover.webp" };
 for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, { ...context.signals!, secondsSinceHeartbeat: 301 }, { ...context.signals!, lastBusinessPlayAt: new Date().toISOString(), lastPlayMinutesAgo: 0 }]) {
   const html = render(signals, { currentTrack: track });
