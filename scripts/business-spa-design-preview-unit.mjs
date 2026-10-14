@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Offline source-contract checks. These do not replace React/browser or access tests.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const route = read("src/app/business-app/spa/design-preview/page.tsx");
@@ -16,28 +16,47 @@ assert.match(route, /export const dynamic = ["']force-dynamic["']/);
 assert.match(route, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(route, /googleBot:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(client, /<strong>Макет — не реальные данные<\/strong>/);
-for (const id of ["home", "day", "atmosphere", "license", "alerts", "locations"]) {
+for (const id of ["home", "music", "locations", "more", "license", "alerts"]) {
   assert.ok(client.includes(`["${id}",`), `missing screen ${id}`);
 }
 for (const id of ["playing", "paused", "offline", "closed", "failed"]) {
   assert.match(client, new RegExp(`\\b${id}: \\{ label:`), `missing state ${id}`);
 }
-// Oriy 2026-10-14: connectivity != playback; closed hours are calm, long tracks never red.
-for (const title of ["Музыка играет", "Воспроизведение остановлено", "Нет связи с плеером", "Точка закрыта", "Музыка не играет"]) {
-  assert.ok(client.includes(`title: "${title}"`), `missing status title ${title}`);
+// mock-v3 (Oriy 2026-10-14): status names the point + last check; link and sound are distinct signals.
+for (const id of ["playing", "paused", "offline", "closed", "failed"]) {
+  const line = client.split("\n").find((l) => l.startsWith(`  ${id}: { label:`)) || "";
+  for (const key of ["title: `", "${POINT}", "checked: \"", "link: [", "sound: ["]) assert.ok(line.includes(key), `state ${id} missing ${key}`);
 }
+assert.match(client, /Проверено минуту назад/);
 assert.match(client, /closed: \{[^}]*tone: "closed"/);
 assert.match(client, /failed: \{[^}]*tone: "bad"/);
-assert.equal((client.match(/tone: "bad"/g) || []).length, 1, "only confirmed playback failure may be red");
-assert.match(client, /Что сейчас играет/);
-assert.match(client, /Что звучало/);
+assert.equal((client.match(/"bad"/g) || []).length, 2, "only confirmed playback failure may be red (tone + sound signal)");
+// Bottom nav on phone; side nav on desktop lists every section.
+assert.match(client, /\["home", "Главная"\], \["music", "Музыка"\], \["locations", "Точки"\], \["more", "Ещё"\]/);
+assert.match(client, /className=\{styles\.bottomNav\}/);
+assert.match(client, /className=\{styles\.sideNav\}/);
+assert.doesNotMatch(css, /overflow-x:\s*auto/, "no horizontally scrolling tabs");
+// Phone home order: status -> now playing -> atmosphere -> next change -> history link.
+assert.match(client, /\{statusCard\}\{nowPlaying\}\{atmosphereCard\}\{nextChange\}\{historyLink\}/);
+assert.match(client, /screen === "music" && <div className=\{styles\.stack\}>\{dayFull\}\{atmosphereCard\}\{historyCard\}/);
+// Real cover asset, thin progress, explicit playback location, renamed action.
+assert.match(client, /const COVER = "\/business\/design-preview\/now-playing-cover\.webp"/);
+assert.ok(existsSync(new URL("../public/business/design-preview/now-playing-cover.webp", import.meta.url)));
+assert.match(css, /\.progress \{ height:3px;/);
+assert.match(client, /Управление музыкой ↗/);
+assert.match(client, /Играет на плеере точки · \$\{PLAYER\}/);
+assert.doesNotMatch(client, /Открыть плеер точки/);
+// Atmosphere: single range slider, auto badge + reset, reactions tied to current track.
+assert.match(client, /type="range"/);
+assert.match(client, /aria-label="Спокойнее — Энергичнее"/);
+assert.match(client, /Автоматически/);
+assert.match(client, /Вернуть автоматический режим/);
+assert.match(client, /К треку «\{track\.title\}»/);
+assert.doesNotMatch(client, /\[0, 1, 2, 3, 4\]/);
 assert.match(client, /const needsAction = state === "offline" \|\| state === "failed";/);
 assert.match(client, /\{needsAction && alertsCard\}/, "home shows notifications only when action is needed");
 assert.doesNotMatch(css, /min-height:\s*(?:[0-3]?\d|4[0-7])px/, "touch targets must be >= 48px");
-assert.match(css, /\.slider button \{ width:48px; height:48px;/);
-assert.match(client, /disabled=\{!hasTrack\}/);
 assert.match(client, /aria-live="polite"/);
-assert.match(client, /aria-pressed=\{screen === id\}/);
 assert.match(css, /\.phone\s*\{\s*max-width:\s*390px/);
 assert.match(css, /@container \(min-width: 680px\)/);
 assert.match(css, /:focus-visible/);
