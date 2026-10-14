@@ -111,13 +111,13 @@ export async function updateSession(
     // and repeats the same request (307 keeps method and body) carrying only
     // domain-scoped cookies. No Supabase read/write and no server action runs
     // on the ambiguous cookie set, so logout/refresh never race the migration.
-    const reload = new NextResponse(null, {
-      status: 307,
-      headers: {
-        location: `${request.nextUrl.pathname}${request.nextUrl.search}`,
-        "cache-control": "no-store",
-      },
-    });
+    // Location MUST be absolute: Next's middleware adapter parses it with
+    // `new NextURL(location)` (no base) and a relative "/path" throws
+    // "TypeError: Invalid URL" -> plain-text 500 for every request carrying a
+    // legacy auth cookie (task 9c000895). Next relativizes same-host
+    // redirects itself, so the browser still sees "/path?query".
+    const reload = NextResponse.redirect(request.nextUrl.clone(), 307);
+    reload.headers.set("cache-control", "no-store");
     for (const line of prePlan.lines) {
       reload.headers.append("set-cookie", line);
     }
