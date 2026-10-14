@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { deriveBusinessPointState } from "../src/lib/business-app/owner-home-signals.ts";
+import { deriveBusinessPointState, deriveOwnerOverallStatus } from "../src/lib/business-app/owner-home-signals.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -179,6 +179,11 @@ for (const c of [copy(null), copy({}), copy({ primaryHealthStatus: "never_seen",
 }
 assert.equal(formatBusinessAge(null), null);
 assert.equal(formatBusinessAge(-1), null);
+for (const minutes of [0, 0.1, 29 / 60]) assert.equal(formatBusinessAge(minutes), "только что");
+for (const minutes of [0.5, 0.75, 59 / 60]) assert.equal(formatBusinessAge(minutes), "меньше минуты назад");
+assert.equal(formatBusinessAge(1), "1 мин назад");
+assert.equal(formatBusinessAge(NaN), null);
+assert.equal(formatBusinessAge(Infinity), null);
 assert.equal(formatBusinessAge(5), "5 мин назад");
 
 // Connectivity is measured by heartbeat age, independent of RPC health labels.
@@ -232,4 +237,14 @@ assert.equal((nowMs - Date.parse(trackStartedAt)) / 60_000, 45);
 assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: atAge(30) }).kind, "confirmed");
 assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: trackStartedAt }).kind, "stale");
 assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: trackStartedAt }).tone, "neutral");
+// Overall priority and truthfulness across every independent signal combination.
+for (const connectivity of [copy(null), copy({}), copy({ secondsSinceHeartbeat: 301 }), buildBusinessHomeStatusCopy(base, true)]) {
+  for (const sound of [playback(), playback({ playbackConfirmedAt: atAge(301) }), ...["playing", "paused", "stopped", "error"].map(playbackState => playback({ playbackState, playbackConfirmedAt: atAge(0) })), playback({ errorConfirmed: true })]) {
+    const overall = deriveOwnerOverallStatus(connectivity, sound);
+    assert.equal(overall.tone === "error", sound.tone === "error");
+    assert.equal(overall.title.includes("Музыка играет"), sound.kind === "confirmed");
+    assert.equal(overall.title, sound.tone === "error" ? sound.title : sound.kind === "confirmed" ? "Музыка играет — воспроизведение подтверждено" : connectivity.title);
+    assert.deepEqual(deriveOwnerOverallStatus(connectivity, sound), overall);
+  }
+}
 console.log("business-app-owner-home-signals-unit: ok");
