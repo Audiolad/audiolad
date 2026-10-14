@@ -228,6 +228,7 @@
     "test:max-session-unlink": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-unlink-external-identity-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-session-unlink-route-unit.mjs",
     "test:business-app-domain-bind": "npx tsx scripts/business-app-domain-bind-unit.mjs",
     "test:business-app-venue-player": "npx tsx scripts/business-app-venue-player-unit.mjs",
+    "test:business-spa-design-preview": "node scripts/business-spa-design-preview-unit.mjs",
     "test:business-spa-player-core": "npx tsx scripts/business-spa-player-core-unit.mjs",
     "test:business-spa-player-engine": "npx tsx scripts/business-spa-online-player-unit.mjs && npx tsx scripts/business-spa-player-engine-unit.mjs && npx tsx scripts/business-spa-webaudio-unit.mjs && node scripts/business-spa-player-mutation-unit.mjs",
     "test:business-spa-admin": "npx tsx scripts/business-spa-admin-unit.mjs",
