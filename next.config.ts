@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 import { resolveCdnAssetPrefix } from "./src/lib/cdn-asset-prefix";
+import { buildEmbedFrameAncestorsPolicy } from "./src/lib/embed/frame-policy";
 import { buildVkFrameAncestorsPolicy } from "./src/lib/vk/frame-policy";
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,18 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "private, no-store" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
+      {
+        source: "/embed/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+          {
+            key: "Content-Security-Policy",
+            value: buildEmbedFrameAncestorsPolicy(),
+          },
         ],
       },
       {
