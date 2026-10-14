@@ -59,4 +59,10 @@ assert.match(page, /authorPreview: false/);
 assert.match(page, /audioItemId=\{mode === "play"/);
 assert.ok(!page.includes("createServiceRoleClient"), "embed page must not use service role");
 
+const providers = await readFile(
+  new URL("../src/components/providers/BaseProviders.tsx", import.meta.url),
+  "utf8",
+);
+assert.match(providers, /pathname\.startsWith\("\/embed\/"\)/, "no third-party analytics inside partner frames");
+
 console.log("practice-embed-unit: ok");

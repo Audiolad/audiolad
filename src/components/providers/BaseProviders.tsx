@@ -19,7 +19,10 @@ export default function BaseProviders({ children }: { children: ReactNode }) {
     pathname === "/auth/recovery" ||
     pathname === "/auth/reset-password" ||
     pathname === "/vk" ||
-    pathname.startsWith("/vk/")
+    pathname.startsWith("/vk/") ||
+    // Partner embeds run in a third-party frame: no Metrika, consent banner or
+    // auth linker there. Listening minutes still accrue via listen-stats.
+    pathname.startsWith("/embed/")
   ) {
     return <>{children}</>;
   }
