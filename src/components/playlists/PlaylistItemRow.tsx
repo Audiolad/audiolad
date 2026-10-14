@@ -120,6 +120,30 @@ export default function PlaylistItemRow({
       {coverPlayback ? (
         <button
           type="button"
+          data-row-play-mobile
+          disabled={!playEnabled || coverPlaybackBusy}
+          onClick={coverPlayback.onPlayPause}
+          aria-label={
+            !playEnabled
+              ? `Слушать ${item.title} — недоступно`
+              : coverPlayback.isPlaying
+                ? `Пауза: ${item.title}`
+                : `Слушать ${item.title}`
+          }
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f1eafc] text-[#7042c5] transition-colors active:bg-[#e4d8f8] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] sm:hidden"
+        >
+          {coverPlayback.isPlaying ? (
+            <PauseIcon className="h-4 w-4" />
+          ) : (
+            <PlayIcon className="ml-0.5 h-4 w-4" />
+          )}
+        </button>
+      ) : null}
+
+      {coverPlayback ? (
+        <button
+          type="button"
+          data-row-play-cover
           disabled={!playEnabled || coverPlaybackBusy}
           onClick={coverPlayback.onPlayPause}
           aria-label={
@@ -143,7 +167,7 @@ export default function PlaylistItemRow({
           />
           {playEnabled ? (
             <span
-              className="pointer-events-none absolute bottom-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#7042c5] text-white"
+              className="pointer-events-none absolute bottom-0.5 right-0.5 hidden h-5 w-5 items-center justify-center rounded-full bg-[#7042c5] text-white sm:flex"
               aria-hidden
             >
               {coverPlayback.isPlaying ? (
