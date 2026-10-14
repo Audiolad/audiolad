@@ -3,43 +3,49 @@
 import { useState } from "react";
 import styles from "./design-preview.module.css";
 
-// DESIGN MOCKUP ONLY (c02fe282 mock-v2). Every name, track, time and status
-// below is invented sample data. Nothing here reads a player, a heartbeat or
-// playback events; buttons only switch the mockup.
+// DESIGN MOCKUP ONLY (c02fe282 mock-v3). Every point, time and status below is
+// sample data. Track titles and covers are real Audiolad catalog items used as
+// illustration only. Nothing here reads a player, a heartbeat or playback
+// events; controls only switch the mockup.
 
 const screens = [
   ["home", "Главная"],
-  ["day", "Музыкальный день"],
-  ["atmosphere", "Атмосфера"],
+  ["music", "Музыка"],
+  ["locations", "Точки"],
+  ["more", "Ещё"],
   ["license", "Лицензия и документы"],
   ["alerts", "Уведомления"],
-  ["locations", "Мои точки"],
+  ["company", "Компания и оплата"],
+  ["support", "Поддержка"],
 ] as const;
 type Screen = (typeof screens)[number][0];
+type Tab = "home" | "music" | "locations" | "more";
+const tabOf = (s: Screen): Tab => (s === "license" || s === "alerts" || s === "company" || s === "support" ? "more" : s);
 
-// Connectivity (technical heartbeat) and actual playback are separate signals.
-// A long track (20–60 min) never turns anything red: freshness is judged by the
-// player heartbeat, not by how recently a new track started.
+const POINT = "SPA «Тихий сад»";
+const PLAYER = "Ресепшн";
+
+// Two distinct signals: connectivity (player heartbeat) and sound confirmation.
+// Only a confirmed playback failure is red. A long track never turns anything red.
 const states = {
-  playing: { label: "Играет", tone: "ok", icon: "♪", title: "Музыка играет", detail: "Плеер на связи, музыка звучит.", action: null },
-  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: "Воспроизведение остановлено", detail: "Плеер на связи. Музыку поставили на паузу на устройстве точки.", action: "Продолжить можно на устройстве, к которому подключены колонки." },
-  offline: { label: "Нет связи (рабочее время)", tone: "warn", icon: "!", title: "Нет связи с плеером", detail: "Плеер не выходил на связь 5 минут. Сейчас рабочие часы точки.", action: "Проверьте, включено ли устройство точки и есть ли интернет." },
-  closed: { label: "Нет связи (точка закрыта)", tone: "closed", icon: "☾", title: "Точка закрыта", detail: "Сейчас нерабочие часы. Плеер может быть выключен — это нормально.", action: null },
-  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: "Музыка не играет", detail: "Плеер на связи, но подтверждено, что звук не воспроизводится.", action: "Откройте плеер на устройстве точки или напишите в поддержку." },
+  playing: { label: "Играет", tone: "ok", icon: "♪", title: `В ${POINT} музыка играет`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["ok", "подтверждён"], action: null },
+  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["calm", "пауза на плеере точки"], action: "Продолжить можно в плеере точки на ресепшн." },
+  offline: { label: "Нет связи 5 минут (рабочее время)", tone: "warn", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 5 минут назад", link: ["warn", "нет 5 минут"], sound: ["closed", "сейчас не проверить"], action: "Проверьте, включено ли устройство на ресепшн и есть ли интернет." },
+  closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "не нужна, точка закрыта"], sound: ["closed", "нерабочие часы"], action: null },
+  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["bad", "не воспроизводится"], action: "Откройте плеер точки на ресепшн или напишите в поддержку." },
 } as const;
 type PreviewState = keyof typeof states;
 
-const track = { title: "Тёплый туман", artist: "Аудиолад · пример", program: "Утро в SPA", length: 42 * 60, position: 17 * 60 + 35 };
+const COVER = "/business/design-preview/now-playing-cover.webp";
+const track = { title: "Музыка для релакса пианино", author: "Тихий час", program: "Утро в SPA", length: 42 * 60, position: 17 * 60 + 35 };
 const history = [
-  ["10:12", "Тёплый туман", "42 мин"],
-  ["09:31", "Медленная вода", "38 мин"],
-  ["09:02", "Лёгкий бриз", "27 мин"],
-  ["08:30", "Открытие дня", "31 мин"],
+  ["10:12", "Музыка для релакса пианино", "Тихий час", COVER],
+  ["09:31", "Музыка для медитации в стиле дзен", "Еленба", "/business/design-preview/history-cover-zen.webp"],
 ] as const;
 const dayArc = [
-  ["08:30", "Открытие", "Мягко и светло", "past"],
-  ["10:00", "Утро", "Спокойно", "now"],
-  ["13:00", "День", "Ровно, чуть живее", "next"],
+  ["08:30", "Открытие дня", "Мягко и светло", "past"],
+  ["10:00", "Утро в SPA", "Спокойно", "now"],
+  ["13:00", "Дневное спокойствие", "Ровно, чуть живее", "next"],
   ["18:00", "Вечер", "Глубже и тише", "later"],
   ["21:00", "Закрытие", "Тихое завершение", "later"],
 ] as const;
@@ -49,25 +55,48 @@ const venues = [
   ["SPA «Тихий сад» · Химки", "Точка закрыта", "closed"],
 ] as const;
 
+const AUTO_ENERGY = 25;
+const moodText = (v: number) =>
+  v < 20 ? "Очень спокойная, тихая музыка" : v < 45 ? "Спокойная, мягкая музыка для отдыха" : v < 70 ? "Ровная музыка, чуть живее" : "Бодрая, энергичная музыка";
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+const Icon = ({ name }: { name: Tab }) => {
+  const d = {
+    home: "M4 11 12 4l8 7v9h-5v-6H9v6H4z",
+    music: "M9 18a3 3 0 1 1-2-2.8V5l11-2v12a3 3 0 1 1-2-2.8V6.4L9 7.7z",
+    locations: "M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zm0-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+    more: "M4 7h16M4 12h16M4 17h10",
+  }[name];
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  );
+};
 
 export default function SpaDesignPreview() {
   const [screen, setScreen] = useState<Screen>("home");
   const [state, setState] = useState<PreviewState>("playing");
   const [frame, setFrame] = useState<"desktop" | "phone">("desktop");
-  const [energy, setEnergy] = useState(2);
+  const [energy, setEnergy] = useState(AUTO_ENERGY);
+  const [auto, setAuto] = useState(true);
   const status = states[state];
   const hasTrack = state === "playing" || state === "paused";
   // Notifications only when the owner must act (Bible: notification = action needed).
   const needsAction = state === "offline" || state === "failed";
   const progress = Math.round((track.position / track.length) * 100);
+  const tab = tabOf(screen);
 
   const statusCard = (
     <section className={`${styles.status} ${styles[status.tone]}`} aria-live="polite" data-testid="status">
       <span className={styles.statusIcon} aria-hidden="true">{status.icon}</span>
       <div>
         <h3>{status.title}</h3>
-        <p>{status.detail}</p>
+        <p className={styles.checked}>{status.checked}</p>
+        <ul className={styles.signals} aria-label="Сигналы точки">
+          <li><span className={`${styles.dot} ${styles[status.link[0]]}`} aria-hidden="true" />Связь: {status.link[1]}</li>
+          <li><span className={`${styles.dot} ${styles[status.sound[0]]}`} aria-hidden="true" />Звук: {status.sound[1]}</li>
+        </ul>
         {status.action && <p className={styles.action}>{status.action}</p>}
       </div>
     </section>
@@ -75,75 +104,114 @@ export default function SpaDesignPreview() {
 
   const nowPlaying = (
     <section className={`${styles.card} ${styles.nowPlaying}`} aria-labelledby="np">
-      <p className={styles.eyebrow} id="np">Что сейчас играет</p>
+      <p className={styles.eyebrow} id="np">{state === "playing" ? "Сейчас звучит" : state === "paused" ? "На паузе" : "Последним звучало"}</p>
+      <div className={styles.trackRow}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static mockup asset */}
+        <img className={styles.cover} src={COVER} alt={`Обложка «${track.title}»`} width={88} height={88} />
+        <div>
+          <h3 className={styles.trackTitle}>{track.title}</h3>
+          <p className={styles.muted}>{track.author} · программа «{track.program}»</p>
+          <p className={styles.muted}>Аудиолад</p>
+        </div>
+      </div>
       {hasTrack ? (
         <>
-          <div className={styles.trackRow}>
-            <div className={styles.cover} aria-hidden="true" />
-            <div>
-              <h3 className={styles.trackTitle}>{track.title}</h3>
-              <p className={styles.muted}>{track.artist} · программа «{track.program}»</p>
-            </div>
-          </div>
           <div className={styles.progress} role="progressbar" aria-label="Прогресс трека" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
             <span style={{ width: `${progress}%` }} />
           </div>
           <p className={styles.time}><span>{fmt(track.position)}</span><span>{fmt(track.length)}</span></p>
-          <p className={styles.note}>Длинный трек — 42 минуты. Это нормально: связь с плеером проверяется отдельно.</p>
-          <button type="button" className={styles.secondary} disabled={!hasTrack}>Открыть плеер точки</button>
         </>
       ) : (
-        <p className={styles.muted}>{state === "closed" ? "Точка закрыта. Музыка начнётся с открытием в 08:30." : "Сейчас нельзя подтвердить, что звучит. Ниже — последнее, что звучало."}</p>
+        <p className={styles.note}>{state === "closed" ? "Точка закрыта. Музыка начнётся с открытием в 08:30." : "Сейчас нельзя подтвердить, что звучит."}</p>
       )}
+      <p className={styles.where} data-testid="where">
+        <span className={`${styles.dot} ${styles[state === "playing" ? "ok" : state === "paused" ? "calm" : "closed"]}`} aria-hidden="true" />
+        {state === "playing" ? `Играет на плеере точки · ${PLAYER}` : state === "paused" ? `На паузе на плеере точки · ${PLAYER}` : `Плеер точки · ${PLAYER}`}
+      </p>
+      <button type="button" className={styles.primaryWide}>Управление музыкой ↗</button>
+      <p className={styles.note}>Откроется отдельный плеер точки — его использует персонал.</p>
+    </section>
+  );
+
+  const reaction = (
+    <div className={styles.reaction}>
+      <p className={styles.muted}>К треку «{track.title}»:</p>
+      <div className={styles.row}>
+        <button type="button" className={styles.secondary} disabled={!hasTrack}>Больше такого</button>
+        <button type="button" className={styles.secondary} disabled={!hasTrack}>Меньше такого</button>
+      </div>
+    </div>
+  );
+
+  const atmosphereCard = (
+    <section className={styles.card} aria-labelledby="atm" data-testid="atmosphere">
+      <div className={styles.cardHead}>
+        <h3 id="atm">Атмосфера</h3>
+        <span className={styles.badge}>{auto ? "Автоматически" : "Настроено вручную"}</span>
+      </div>
+      <p className={styles.mood}>{moodText(energy)}</p>
+      <label className={styles.range}>
+        <span className={styles.rangeLabels}><span>Спокойнее</span><span>Энергичнее</span></span>
+        <input type="range" min={0} max={100} step={5} value={energy} aria-label="Спокойнее — Энергичнее" aria-valuetext={moodText(energy)}
+          onChange={(e) => { setEnergy(Number(e.target.value)); setAuto(false); }} />
+      </label>
+      {!auto && (
+        <button type="button" className={styles.link} onClick={() => { setEnergy(AUTO_ENERGY); setAuto(true); }}>Вернуть автоматический режим</button>
+      )}
+      {reaction}
+      <p className={styles.note}>Пример элемента. Управление музыкой в макете не подключено.</p>
+    </section>
+  );
+
+  const nextChange = (
+    <section className={styles.card} aria-labelledby="next">
+      <h3 id="next">Музыкальный день</h3>
+      <div className={styles.nextRow}>
+        <div><strong>Утро в SPA</strong><p className={styles.muted}>Следом: «Дневное спокойствие»</p></div>
+        <span className={styles.timePill}>13:00</span>
+      </div>
+    </section>
+  );
+
+  const historyLink = (
+    <button type="button" className={styles.listLink} onClick={() => setScreen("music")}>
+      <span>История звучания</span><span aria-hidden="true">›</span>
+    </button>
+  );
+
+  const dayFull = (
+    <section className={styles.card} aria-labelledby="day">
+      <h3 id="day">Музыкальный день</h3>
+      <ol className={styles.arcFull}>
+        {dayArc.map(([t, name, mood, when]) => (
+          <li key={t} className={styles[when]} aria-current={when === "now" ? "step" : undefined}>
+            <strong>{name}</strong><span>{t} · {mood}</span>
+          </li>
+        ))}
+      </ol>
+      <p className={styles.note}>Аудиолад сам ведёт музыку через день. Поправите атмосферу — день подстроится.</p>
     </section>
   );
 
   const historyCard = (
     <section className={styles.card} aria-labelledby="hist">
-      <p className={styles.eyebrow} id="hist">Что звучало</p>
+      <h3 id="hist">История звучания</h3>
       <ol className={styles.history}>
-        {history.map(([t, name, len]) => <li key={t}><span className={styles.muted}>{t}</span><span>{name}</span><span className={styles.muted}>{len}</span></li>)}
-      </ol>
-    </section>
-  );
-
-  const dayCard = (full: boolean) => (
-    <section className={styles.card} aria-labelledby="day">
-      <p className={styles.eyebrow} id="day">Музыкальный день</p>
-      {!full && <h3>Сейчас «Утро» · в 13:00 — «День»</h3>}
-      <ol className={full ? styles.arcFull : styles.arc}>
-        {dayArc.map(([t, name, mood, when]) => (
-          <li key={t} className={styles[when]} aria-current={when === "now" ? "step" : undefined}>
-            <strong>{name}</strong><span className={styles.muted}>{t}{full ? ` · ${mood}` : ""}</span>
-          </li>
+        {history.map(([t, name, author, cover]) => (
+          <li key={t}>
+            <span className={styles.muted}>{t}</span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- static mockup asset */}
+            <img src={cover} alt="" width={40} height={40} />
+            <span>{name}<br /><span className={styles.muted}>{author}</span></span></li>
         ))}
       </ol>
-      {full && <p className={styles.note}>Аудиолад сам ведёт музыку через день. Вы можете поправить атмосферу — день подстроится.</p>}
-    </section>
-  );
-
-  const atmosphereCard = (
-    <section className={styles.card} aria-labelledby="atm">
-      <p className={styles.eyebrow} id="atm">Атмосфера</p>
-      <div className={styles.slider} role="group" aria-label="Энергия музыки">
-        <span>Спокойнее</span>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <button type="button" key={i} aria-label={`Уровень ${i + 1}`} aria-pressed={energy === i} onClick={() => setEnergy(i)} />
-        ))}
-        <span>Энергичнее</span>
-      </div>
-      <div className={styles.row}>
-        <button type="button" className={styles.secondary}>Больше такого</button>
-        <button type="button" className={styles.secondary}>Меньше такого</button>
-      </div>
-      <p className={styles.note}>В макете кнопки ничего не меняют в музыке.</p>
     </section>
   );
 
   const licenseCard = (
     <section className={styles.card} aria-labelledby="lic">
-      <p className={styles.eyebrow} id="lic">Лицензия и документы</p>
-      <h3>Музыка точки лицензирована · пример</h3>
+      <h3 id="lic">Лицензия и документы</h3>
+      <p>Музыка точки лицензирована · пример</p>
       <dl className={styles.facts}>
         <div><dt>Точка</dt><dd>SPA «Тихий сад» · Тверская</dd></div>
         <div><dt>Период</dt><dd>01.10.2026 — 30.09.2027</dd></div>
@@ -158,7 +226,7 @@ export default function SpaDesignPreview() {
 
   const alertsCard = (
     <section className={styles.card} aria-labelledby="al">
-      <p className={styles.eyebrow} id="al">Уведомления</p>
+      <h3 id="al">Уведомления</h3>
       {needsAction ? (
         <div className={`${styles.alert} ${styles[status.tone]}`}><strong>{status.title}</strong><p>{status.action}</p></div>
       ) : (
@@ -170,23 +238,61 @@ export default function SpaDesignPreview() {
 
   const locationsCard = (
     <section className={styles.card} aria-labelledby="loc">
-      <p className={styles.eyebrow} id="loc">Мои точки</p>
-      <h3>2 играют · 1 закрыта · 0 требуют действий</h3>
+      <h3 id="loc">Мои точки</h3>
+      <p className={styles.muted}>2 играют · 1 закрыта · действий не требуется</p>
       <ul className={styles.venues}>
         {venues.map(([name, st, tone]) => <li key={name}><span className={`${styles.dot} ${styles[tone]}`} aria-hidden="true" /><span>{name}</span><span className={styles.muted}>{st}</span></li>)}
       </ul>
     </section>
   );
 
+  const moreCard = (
+    <section className={styles.card} aria-labelledby="more">
+      <h3 id="more">Ещё</h3>
+      <div className={styles.menu}>
+        <button type="button" className={styles.listLink} onClick={() => setScreen("license")}><span>Лицензия и документы</span><span aria-hidden="true">›</span></button>
+        <button type="button" className={styles.listLink} onClick={() => setScreen("alerts")}><span>Уведомления</span><span aria-hidden="true">›</span></button>
+        <button type="button" className={styles.listLink} onClick={() => setScreen("company")}><span>Компания и оплата</span><span aria-hidden="true">›</span></button>
+        <button type="button" className={styles.listLink} onClick={() => setScreen("support")}><span>Поддержка</span><span aria-hidden="true">›</span></button>
+      </div>
+    </section>
+  );
+
+  const companyCard = (
+    <section className={styles.card} aria-labelledby="co">
+      <h3 id="co">Компания и оплата</h3>
+      <dl className={styles.facts}>
+        <div><dt>Компания</dt><dd>ООО «Тихий сад» · пример</dd></div>
+        <div><dt>Тариф</dt><dd>Аудиолад Бизнес · 3 точки</dd></div>
+        <div><dt>Оплачено до</dt><dd>30.09.2027</dd></div>
+      </dl>
+      <button type="button" className={styles.secondary}>Счета и акты</button>
+    </section>
+  );
+
+  const supportCard = (
+    <section className={styles.card} aria-labelledby="sup">
+      <h3 id="sup">Поддержка</h3>
+      <p className={styles.muted}>Ответим в рабочее время в течение 15 минут.</p>
+      <div className={styles.row}>
+        <button type="button" className={styles.secondary}>Написать в MAX</button>
+        <button type="button" className={styles.secondary}>Позвонить</button>
+      </div>
+    </section>
+  );
+
+  const tabs: [Tab, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["more", "Ещё"]];
+  const sideNav: [Screen, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["license", "Лицензия и документы"], ["alerts", "Уведомления"], ["company", "Компания и оплата"], ["support", "Поддержка"]];
+
   return (
     <section className={styles.preview} aria-label="Согласование дизайна кабинета владельца">
       <header className={styles.reviewHeader}>
-        <p className={styles.eyebrow}>Аудиолад Бизнес · макеты v2</p>
-        <h1>Спокойствие начинается с ясности</h1>
+        <p className={styles.eyebrow}>Аудиолад Бизнес · макеты v3</p>
+        <h1>Пульт звуковой атмосферы</h1>
       </header>
       <div className={styles.banner}>
         <strong>Макет — не реальные данные</strong>
-        <p>Все точки, треки, время и статусы вымышлены. Кнопки меняют только макет. Звука и сохранения нет.</p>
+        <p>Точки, время и статусы вымышлены; треки и обложки — примеры из каталога Аудиолад. Кнопки меняют только макет. Звука и сохранения нет.</p>
       </div>
       <div className={styles.controls}>
         <label>Экран
@@ -208,28 +314,46 @@ export default function SpaDesignPreview() {
       </div>
       <div className={`${styles.frame} ${frame === "phone" ? styles.phone : styles.desktop}`} data-testid="mock">
         <div className={styles.mockHeader}>
-          <span className={styles.monogram} aria-hidden="true">а</span>
-          <div><strong>SPA «Тихий сад»</strong><p>Тверская · пример точки</p></div>
+          <div><strong>{POINT}</strong><p>Тверская · ваша точка</p></div>
           <span className={styles.badge}>Макет</span>
         </div>
-        <nav className={styles.screenNav} aria-label="Экраны макета">
-          {screens.map(([id, label]) => (
-            <button type="button" key={id} aria-pressed={screen === id} onClick={() => setScreen(id)}>{label}</button>
-          ))}
-        </nav>
-        <div className={styles.content}>
-          {screen === "home" && (
-            <div className={styles.grid}>
-              <div className={styles.main}>{statusCard}{nowPlaying}{historyCard}</div>
-              <div className={styles.side}>{needsAction && alertsCard}{dayCard(false)}{atmosphereCard}</div>
-            </div>
+        <div className={styles.shell}>
+          {frame === "desktop" && (
+            <nav className={styles.sideNav} aria-label="Разделы кабинета">
+              {sideNav.map(([id, label]) => (
+                <button type="button" key={id} aria-current={screen === id ? "page" : undefined} onClick={() => setScreen(id)}>{label}</button>
+              ))}
+            </nav>
           )}
-          {screen === "day" && <div className={styles.stack}>{statusCard}{dayCard(true)}</div>}
-          {screen === "atmosphere" && <div className={styles.stack}>{nowPlaying}{atmosphereCard}</div>}
-          {screen === "license" && <div className={styles.stack}>{licenseCard}</div>}
-          {screen === "alerts" && <div className={styles.stack}>{statusCard}{alertsCard}</div>}
-          {screen === "locations" && <div className={styles.stack}>{locationsCard}</div>}
+          <div className={styles.content}>
+            {screen === "home" && (
+              frame === "phone" ? (
+                <div className={styles.stack}>{statusCard}{nowPlaying}{atmosphereCard}{nextChange}{historyLink}</div>
+              ) : (
+                <div className={styles.grid}>
+                  <div className={styles.main}>{statusCard}{nowPlaying}</div>
+                  <div className={styles.side}>{needsAction && alertsCard}{atmosphereCard}{nextChange}{historyLink}</div>
+                </div>
+              )
+            )}
+            {screen === "music" && <div className={styles.stack}>{dayFull}{atmosphereCard}{historyCard}</div>}
+            {screen === "locations" && <div className={styles.stack}>{locationsCard}</div>}
+            {screen === "more" && <div className={styles.stack}>{moreCard}</div>}
+            {screen === "license" && <div className={styles.stack}>{licenseCard}</div>}
+            {screen === "alerts" && <div className={styles.stack}>{alertsCard}</div>}
+            {screen === "company" && <div className={styles.stack}>{companyCard}</div>}
+            {screen === "support" && <div className={styles.stack}>{supportCard}</div>}
+          </div>
         </div>
+        {frame === "phone" && (
+          <nav className={styles.bottomNav} aria-label="Разделы кабинета">
+            {tabs.map(([id, label]) => (
+              <button type="button" key={id} aria-current={tab === id ? "page" : undefined} onClick={() => setScreen(id)}>
+                <Icon name={id} /><span>{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
       </div>
     </section>
   );
