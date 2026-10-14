@@ -1,0 +1,19 @@
+{
+  "id": "/?app=audiolad-business",
+  "name": "АудиоЛад Бизнес",
+  "short_name": "АудиоЛад Бизнес",
+  "description": "Легальная фоновая музыка для бизнеса: плеер, точки и документы.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4edfb",
+  "theme_color": "#f4edfb",
+  "lang": "ru",
+  "icons": [
+    { "src": "/business/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/business/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/business/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/business/brand/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}
