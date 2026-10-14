@@ -23,7 +23,7 @@ const listenerNav = read("src/lib/navigation/listener-nav.ts");
 const EN_DASH = "\u2013";
 const EM_DASH = "\u2014";
 const INTRO =
-  `АудиоЛад ${EN_DASH} платформа авторского аудио: медитации, аудиопрактики, музыка, аудиокурсы.`;
+  `АудиоЛад ${EN_DASH} платформа авторского аудио: музыка, аудиопрактики, медитации, обучение.`;
 
 assert.doesNotMatch(
   guestHome,
@@ -146,9 +146,9 @@ assert.match(
 assert.match(slidesBlock, /href: MEDITATION_AUTHORS_LANDING_PROMO_LINK\.href/);
 
 const hrefOrder = [
-  'href: "/catalog"',
-  'href: "/catalog?access=free"',
   'href: "/catalog?class=release"',
+  'href: "/catalog?access=free"',
+  'href: "/catalog"',
   'href: "/playlists/catalog"',
   'href: "/catalog?access=paid"',
   'buildAuthRouteHref("/auth/sign-up", "/my-practices")',
