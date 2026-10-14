@@ -31,3 +31,24 @@
 - **Телефон — главный пульт** (Rockbot Remote): mobile-first, крупная кнопка, но управление только тем, что реально работает.
 - **Повторы и offline — будущие технические этапы** (антиповтор, offline-буфер как у Soundsuit), в макете — пометка «Концепт · позже».
 - **Прогрессивное раскрытие** (Rockbot «add tools as your business grows»): расписание, роли, сети — в Enterprise Console, не в кабинете одной точки.
+
+## Раунд 2 (2026-10-14): Tunify, Mood Media, CloudCover, SoundMachine, storePlay
+
+| Сервис | Факт (первичный источник) | Источник |
+|---|---|---|
+| Tunify | Приложения iOS/Android/web, Sonos/Bluesound; смартфон как пульт; расписания (в т.ч. «вокруг открытия/закрытия»), аудиосообщения; MyTunify: точки и зоны, отчёты. **Нет настоящего offline**: при обрыве доигрывают «ещё несколько песен», при долгом сбое советуют телефон с 4G | https://www.tunify.com/en/product/apps-integrations · https://www.tunify.com/en/product/schedule-playlists · https://www.tunify.com/en/product/mytunify · https://help.tunify.com/en/articles/6104335-does-tunify-work-without-internet-connection |
+| Mood Media (Mood:Mix / Mood Media App) | Mix до 5 программ, like/block, лимит 5 пропусков в час, расписание; веб: логины сотрудников, смена точки (admin). SMB-тарифы $15.30–36.50/мес; «Less repetition – no looping of playlists» | https://apps.apple.com/us/app/mood-mix/id847536656 · http://moodappleton.com/products/mix/ · https://us.moodmedia.com/shop/solutions/audio/music-for-business-engage · https://us.moodmedia.com/sound/business-music-solutions/ |
+| Pandora CloudCover | Пульт: станции, пауза, skip, удалить трек навсегда; расписание drag-and-drop; dashboard точек/зон, «real-time monitoring», мульти-доступ; сообщения и signage в старших тарифах; от $16.95/мес | https://cloudcovermusic.com/ · https://play.google.com/store/apps/details?id=com.cloudcovermusic.player |
+| SoundMachine | Станции по отраслям, импорт из Spotify/Apple Music, расписания, мульти-точки, PRO-лицензии (ASCAP/BMI/SESAC/GMR) — по собственному блогу вендора | https://sound-machine.com/blog/2025/09/01/the-best-music-services-for-business/ |
+| storePlay (AU) | 24-часовые каналы, favourite/skip персоналом (favourite играет вдвое чаще), выравнивание громкости, crossfade 10 с, device dashboard | https://support.sonos.com/en-au/services/storeplay |
+| Qsic | Первичный источник в этом раунде не найден — не описываем | — |
+
+### VoC раунда 2 (факт)
+- Mood:Mix Android снят с Google Play 27.08.2024, рейтинг 2.69/5 (58 оценок); жалобы: «Plays 2 songs at once», не принимает длинный email при входе, бедные плейлисты (appbrain). iPad: просьба об offline для йоги — «streaming can be very unreliable» (App Store).
+- CloudCover: «You cannot see what track will play next … no progress bar … only play/pause, dislike, skip»; «more and more issues with stations not working» (Google Play).
+
+### Выводы (интерпретация)
+- Минимальный пульт CloudCover раздражает тех, кто ждёт «плеер», — но для SPA-владельца наша цель другая: **статус и уверенность**, а не DJ-пульт. Важно объяснить это в UI (карточка «Воспроизведение — на устройстве точки»).
+- Честный offline встречается редко (Tunify прямо признаёт его отсутствие) — наш текст «В онлайн-пилоте автономного воспроизведения нет» соответствует рынку и не хуже конкурентов.
+- Расписание «вокруг открытия/закрытия» (Tunify) — хорошая модель для будущего концепта «Атмосфера и время суток» у SPA.
+- Лёгкое влияние персонала (favourite/skip, лимиты пропусков у Mood) — кандидат в P2, не в Owner MVP.
