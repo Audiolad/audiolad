@@ -262,3 +262,41 @@
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+.business-app-owner-compact-status {
+  border-radius: 12px;
+  background: var(--biz-bg);
+  padding: 0.75rem;
+  color: var(--biz-text);
+}
+
+.business-app-owner-compact-status[data-tone="ok"] {
+  background: var(--biz-green-bg);
+}
+
+.business-app-owner-compact-status[data-tone="error"] {
+  background: var(--biz-red-bg);
+  color: #8f2a2a;
+}
+
+.business-app-owner-signal-details summary {
+  display: list-item;
+  min-height: 48px;
+  align-content: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.business-app-owner-desktop-signals {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .business-app-owner-compact-status {
+    display: none;
+  }
+
+  .business-app-owner-desktop-signals {
+    display: grid;
+  }
+}

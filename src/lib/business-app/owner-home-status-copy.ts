@@ -6,6 +6,7 @@ import { deriveOwnerConnectivitySignal, type BusinessOwnerHomeSignals } from "@/
  */
 export function formatBusinessAge(minutes: number | null): string | null {
   if (minutes == null || !Number.isFinite(minutes) || minutes < 0) return null;
+  if (minutes < 0.5) return "только что";
   if (minutes < 1) return "меньше минуты назад";
   if (minutes < 60) return `${Math.round(minutes)} мин назад`;
   const hours = Math.round(minutes / 60);
