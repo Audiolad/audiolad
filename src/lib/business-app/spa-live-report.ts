@@ -35,8 +35,20 @@ export class SpaLiveEvidence {
     this.playing = true;
   }
 
-  onTimeUpdate(currentTime: number, nowMs: number) {
+  /**
+   * `elementPaused === false` means the audio element itself reports that it is playing; that
+   * is evidence even when no "playing" event was observed (e.g. sound that was already playing
+   * when reporting started, or play/pause via OS media keys).
+   */
+  onTimeUpdate(currentTime: number, nowMs: number, elementPaused?: boolean) {
     if (!Number.isFinite(currentTime)) return;
+    if (elementPaused === false && !this.playing) {
+      // Baseline only: confirmation still needs currentTime to advance after this sample.
+      this.playing = true;
+      this.previousTime = this.reportedTime = currentTime;
+      return;
+    }
+    if (elementPaused === true) this.playing = false;
     if (this.playing && currentTime > this.previousTime) this.lastAdvanceAt = nowMs;
     this.previousTime = currentTime;
   }
@@ -47,6 +59,18 @@ export class SpaLiveEvidence {
     this.reportedTime = this.previousTime;
     return { state, audioItemId, playingConfirmed, errorCode: state === "error" ? "playback_failed" : null };
   }
+}
+
+export type SpaAudioSnapshot = { paused: boolean; ended: boolean };
+
+/**
+ * Reported state comes from the real audio element, not from the UI controller: a track the
+ * element is playing is "playing" even if the controller thinks it is paused, and vice versa.
+ */
+export function deriveSpaPlaybackState(controllerStatus: string | undefined, audio: SpaAudioSnapshot, hasTrack: boolean): SpaPlaybackState {
+  if (controllerStatus === "error") return "error";
+  if (!hasTrack || audio.ended) return "stopped";
+  return audio.paused ? "paused" : "playing";
 }
 
 /** Reporting is best effort; even a synchronous failure must not reach the player. */
