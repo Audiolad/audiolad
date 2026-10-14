@@ -33,6 +33,7 @@ jobs:
           npx tsx scripts/business-landing-unit.mts
           npm run test:business-app-domain-bind
           npm run test:business-app-proxy-routing
+          npm run test:business-brand-icons
           npm run test:business-app-venue-player
           npm run test:business-app-eligibility
           npm run test:business-app-owner-home-signals

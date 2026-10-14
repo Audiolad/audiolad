@@ -237,6 +237,8 @@
     "test:business-app-owner-home-signals": "npx tsx scripts/business-owner-home-live-refresh-unit.mts && npx tsx scripts/business-app-owner-home-signals-unit.mjs && npx tsx scripts/business-spa-live-state-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/business-app-owner-home-render-unit.tsx",
     "test:business-app-support-diagnostics": "npx tsx scripts/business-app-support-diagnostics-unit.mjs",
     "test:business-app-onboarding-wizard": "npx tsx scripts/business-app-onboarding-wizard-unit.mjs",
+    "test:business-brand-icons": "npx tsx scripts/business-brand-icons-unit.mjs",
+    "test:host-brand-head-render": "node scripts/host-brand-head-render.mjs",
     "test:business-app-proxy-routing": "npx tsx scripts/business-app-proxy-routing-unit.mjs",
     "test:mini-app-audio-post-parity": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/mini-app-audio-post-parity-unit.mjs",
     "test:vk-mini-app": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/vk-mini-app-unit.mjs && npm run test:mini-app-audio-post-parity && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/vk-appreciation-route-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/mini-app-gallery-unit.mjs && npm run test:mini-app-home-footer",

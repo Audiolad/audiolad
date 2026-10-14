@@ -5,6 +5,7 @@ import {
   isBusinessSitePath,
   resolveBusinessInternalPath,
 } from "./host";
+import { isBusinessBrandAssetPath } from "./brand-icons";
 
 /**
  * Public files the business host must still serve.
@@ -55,6 +56,11 @@ export function resolveBusinessProxyAction(
   if (
     (BUSINESS_PUBLIC_ASSET_PATHS as readonly string[]).includes(pathname)
   ) {
+    return { action: "pass_through" };
+  }
+
+  // Lavender brand assets (manifest/.ico are not excluded by the proxy matcher).
+  if (isBusinessBrandAssetPath(pathname)) {
     return { action: "pass_through" };
   }
 
