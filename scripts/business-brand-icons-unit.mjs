@@ -62,4 +62,12 @@ assert.match(layout, /export async function generateMetadata/);
 assert.match(layout, /getHostBrandMetadata\(hostname\)/);
 assert.doesNotMatch(layout, /export const metadata\b/);
 
+// Next file-convention icons in the root segment are injected on EVERY host
+// (incl. business) — they must stay out of src/app.
+for (const f of ["favicon.ico", "icon.svg", "icon.png", "icon.ico", "apple-icon.svg", "apple-icon.png"]) {
+  assert.ok(!existsSync(join(root, "src/app", f)), `src/app/${f} would leak onto business host`);
+}
+assert.ok(existsSync(pub("/favicon.ico")));
+assert.equal(classic.icons.icon[0].url, "/favicon.ico?favicon.2vob68tjqpejf.ico");
+
 console.log("business-brand-icons-unit: ok");

@@ -7,11 +7,19 @@ export const BUSINESS_BRAND_ASSET_PREFIX = "/business/brand/";
 
 type HostBrandMetadata = Pick<Metadata, "manifest" | "icons">;
 
-/** audiolad.ru (and every non-business host) — unchanged classic icons. */
+/**
+ * audiolad.ru (and every non-business host) — unchanged classic icons.
+ * The first entry reproduces byte-for-byte the link Next used to inject from the
+ * former file-convention `src/app/favicon.ico` (removed so it no longer leaks
+ * onto business.audiolad.ru); `/favicon.ico` itself is served from `public/`.
+ */
+export const CLASSIC_FILE_FAVICON_HREF = "/favicon.ico?favicon.2vob68tjqpejf.ico";
+
 export const CLASSIC_BRAND_METADATA: HostBrandMetadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
+      { url: CLASSIC_FILE_FAVICON_HREF, sizes: "256x256", type: "image/x-icon" },
       { url: "/favicon.ico" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
