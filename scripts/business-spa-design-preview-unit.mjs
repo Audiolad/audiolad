@@ -16,7 +16,7 @@ assert.match(route, /export const dynamic = ["']force-dynamic["']/);
 assert.match(route, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(route, /googleBot:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(client, /<strong>Макет — не реальные данные<\/strong>/);
-for (const id of ["home", "music", "locations", "more", "license", "alerts"]) {
+for (const id of ["home", "music", "locations", "more", "license", "alerts", "company", "support"]) {
   assert.ok(client.includes(`["${id}",`), `missing screen ${id}`);
 }
 for (const id of ["playing", "paused", "offline", "closed", "failed"]) {
@@ -46,6 +46,13 @@ assert.match(css, /\.progress \{ height:3px;/);
 assert.match(client, /Управление музыкой ↗/);
 assert.match(client, /Играет на плеере точки · \$\{PLAYER\}/);
 assert.doesNotMatch(client, /Открыть плеер точки/);
+assert.match(client, /state === "playing" \? `Играет на плеере точки/, "only confirmed playback says Играет");
+assert.match(client, /На паузе на плеере точки/);
+// Desktop side nav lists every section reachable from phone «Ещё».
+for (const label of ["Лицензия и документы", "Уведомления", "Компания и оплата", "Поддержка"]) {
+  assert.ok(client.split("const sideNav")[1].split("\n")[0].includes(label), `desktop nav missing ${label}`);
+}
+assert.match(client, /closed: \{[^\n]*checked: "Последняя связь/);
 // Atmosphere: single range slider, auto badge + reset, reactions tied to current track.
 assert.match(client, /type="range"/);
 assert.match(client, /aria-label="Спокойнее — Энергичнее"/);

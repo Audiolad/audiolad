@@ -15,10 +15,12 @@ const screens = [
   ["more", "Ещё"],
   ["license", "Лицензия и документы"],
   ["alerts", "Уведомления"],
+  ["company", "Компания и оплата"],
+  ["support", "Поддержка"],
 ] as const;
 type Screen = (typeof screens)[number][0];
 type Tab = "home" | "music" | "locations" | "more";
-const tabOf = (s: Screen): Tab => (s === "license" || s === "alerts" ? "more" : s);
+const tabOf = (s: Screen): Tab => (s === "license" || s === "alerts" || s === "company" || s === "support" ? "more" : s);
 
 const POINT = "SPA «Тихий сад»";
 const PLAYER = "Ресепшн";
@@ -29,7 +31,7 @@ const states = {
   playing: { label: "Играет", tone: "ok", icon: "♪", title: `В ${POINT} музыка играет`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["ok", "подтверждён"], action: null },
   paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["calm", "пауза на плеере точки"], action: "Продолжить можно в плеере точки на ресепшн." },
   offline: { label: "Нет связи 5 минут (рабочее время)", tone: "warn", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 5 минут назад", link: ["warn", "нет 5 минут"], sound: ["closed", "сейчас не проверить"], action: "Проверьте, включено ли устройство на ресепшн и есть ли интернет." },
-  closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Откроется в 08:30 · музыка включится сама", link: ["closed", "не нужна, точка закрыта"], sound: ["closed", "нерабочие часы"], action: null },
+  closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "не нужна, точка закрыта"], sound: ["closed", "нерабочие часы"], action: null },
   failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["bad", "не воспроизводится"], action: "Откройте плеер точки на ресепшн или напишите в поддержку." },
 } as const;
 type PreviewState = keyof typeof states;
@@ -123,8 +125,8 @@ export default function SpaDesignPreview() {
         <p className={styles.note}>{state === "closed" ? "Точка закрыта. Музыка начнётся с открытием в 08:30." : "Сейчас нельзя подтвердить, что звучит."}</p>
       )}
       <p className={styles.where} data-testid="where">
-        <span className={`${styles.dot} ${styles[hasTrack ? "ok" : "closed"]}`} aria-hidden="true" />
-        {hasTrack ? `Играет на плеере точки · ${PLAYER}` : `Плеер точки · ${PLAYER}`}
+        <span className={`${styles.dot} ${styles[state === "playing" ? "ok" : state === "paused" ? "calm" : "closed"]}`} aria-hidden="true" />
+        {state === "playing" ? `Играет на плеере точки · ${PLAYER}` : state === "paused" ? `На паузе на плеере точки · ${PLAYER}` : `Плеер точки · ${PLAYER}`}
       </p>
       <button type="button" className={styles.primaryWide}>Управление музыкой ↗</button>
       <p className={styles.note}>Откроется отдельный плеер точки — его использует персонал.</p>
@@ -250,14 +252,37 @@ export default function SpaDesignPreview() {
       <div className={styles.menu}>
         <button type="button" className={styles.listLink} onClick={() => setScreen("license")}><span>Лицензия и документы</span><span aria-hidden="true">›</span></button>
         <button type="button" className={styles.listLink} onClick={() => setScreen("alerts")}><span>Уведомления</span><span aria-hidden="true">›</span></button>
-        <button type="button" className={styles.listLink}><span>Компания и оплата</span><span aria-hidden="true">›</span></button>
-        <button type="button" className={styles.listLink}><span>Поддержка</span><span aria-hidden="true">›</span></button>
+        <button type="button" className={styles.listLink} onClick={() => setScreen("company")}><span>Компания и оплата</span><span aria-hidden="true">›</span></button>
+        <button type="button" className={styles.listLink} onClick={() => setScreen("support")}><span>Поддержка</span><span aria-hidden="true">›</span></button>
+      </div>
+    </section>
+  );
+
+  const companyCard = (
+    <section className={styles.card} aria-labelledby="co">
+      <h3 id="co">Компания и оплата</h3>
+      <dl className={styles.facts}>
+        <div><dt>Компания</dt><dd>ООО «Тихий сад» · пример</dd></div>
+        <div><dt>Тариф</dt><dd>Аудиолад Бизнес · 3 точки</dd></div>
+        <div><dt>Оплачено до</dt><dd>30.09.2027</dd></div>
+      </dl>
+      <button type="button" className={styles.secondary}>Счета и акты</button>
+    </section>
+  );
+
+  const supportCard = (
+    <section className={styles.card} aria-labelledby="sup">
+      <h3 id="sup">Поддержка</h3>
+      <p className={styles.muted}>Ответим в рабочее время в течение 15 минут.</p>
+      <div className={styles.row}>
+        <button type="button" className={styles.secondary}>Написать в MAX</button>
+        <button type="button" className={styles.secondary}>Позвонить</button>
       </div>
     </section>
   );
 
   const tabs: [Tab, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["more", "Ещё"]];
-  const sideNav: [Screen, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["license", "Лицензия и документы"], ["alerts", "Уведомления"]];
+  const sideNav: [Screen, string][] = [["home", "Главная"], ["music", "Музыка"], ["locations", "Точки"], ["license", "Лицензия и документы"], ["alerts", "Уведомления"], ["company", "Компания и оплата"], ["support", "Поддержка"]];
 
   return (
     <section className={styles.preview} aria-label="Согласование дизайна кабинета владельца">
@@ -316,6 +341,8 @@ export default function SpaDesignPreview() {
             {screen === "more" && <div className={styles.stack}>{moreCard}</div>}
             {screen === "license" && <div className={styles.stack}>{licenseCard}</div>}
             {screen === "alerts" && <div className={styles.stack}>{alertsCard}</div>}
+            {screen === "company" && <div className={styles.stack}>{companyCard}</div>}
+            {screen === "support" && <div className={styles.stack}>{supportCard}</div>}
           </div>
         </div>
         {frame === "phone" && (
