@@ -58,6 +58,8 @@ export default function SpaDesignPreview() {
   const [energy, setEnergy] = useState(2);
   const status = states[state];
   const hasTrack = state === "playing" || state === "paused";
+  // Notifications only when the owner must act (Bible: notification = action needed).
+  const needsAction = state === "offline" || state === "failed";
   const progress = Math.round((track.position / track.length) * 100);
 
   const statusCard = (
@@ -157,7 +159,7 @@ export default function SpaDesignPreview() {
   const alertsCard = (
     <section className={styles.card} aria-labelledby="al">
       <p className={styles.eyebrow} id="al">Уведомления</p>
-      {state === "offline" || state === "failed" ? (
+      {needsAction ? (
         <div className={`${styles.alert} ${styles[status.tone]}`}><strong>{status.title}</strong><p>{status.action}</p></div>
       ) : (
         <p className={styles.muted}>Ничего делать не нужно. Мы напишем, только если потребуется ваше действие.</p>
@@ -219,7 +221,7 @@ export default function SpaDesignPreview() {
           {screen === "home" && (
             <div className={styles.grid}>
               <div className={styles.main}>{statusCard}{nowPlaying}{historyCard}</div>
-              <div className={styles.side}>{dayCard(false)}{atmosphereCard}{alertsCard}</div>
+              <div className={styles.side}>{needsAction && alertsCard}{dayCard(false)}{atmosphereCard}</div>
             </div>
           )}
           {screen === "day" && <div className={styles.stack}>{statusCard}{dayCard(true)}</div>}
