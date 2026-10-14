@@ -217,3 +217,48 @@
     display: contents;
   }
 }
+
+/* Owner home V3: neutral missing data, red only for confirmed playback failure. */
+.business-app-owner-home .business-app-btn,
+.business-app-owner-home .business-app-chip {
+  min-height: 48px;
+}
+
+.business-app-owner-signals {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+}
+
+.business-app-owner-signals li {
+  border-radius: 12px;
+  background: var(--biz-bg);
+  padding: 0.75rem;
+  color: var(--biz-text);
+}
+
+.business-app-owner-signals li[data-tone="ok"] {
+  background: var(--biz-green-bg);
+}
+
+.business-app-owner-signals li[data-tone="error"] {
+  background: var(--biz-red-bg);
+  color: #8f2a2a;
+}
+
+.business-app-owner-signals p {
+  margin-top: 0.25rem;
+  color: var(--biz-text-muted);
+  font-size: 0.9rem;
+}
+
+.business-app-owner-disabled {
+  color: var(--biz-text-muted);
+  box-shadow: none;
+}
+
+.business-app-owner-disabled :disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

@@ -28,6 +28,11 @@ for (const id of ["playing", "paused", "offline", "closed", "failed"]) {
   for (const key of ["title: `", "${POINT}", "checked: \"", "link: [", "sound: ["]) assert.ok(line.includes(key), `state ${id} missing ${key}`);
 }
 assert.match(client, /Проверено минуту назад/);
+assert.match(client, /Плеер на связи/);
+assert.match(client, /Воспроизведение подтверждено/);
+assert.doesNotMatch(client, /Связь:|Звук:/);
+assert.match(client, /offline: \{[^\n]*tone: "closed"/);
+assert.match(client, /Музыка на точке может продолжать играть/);
 assert.match(client, /closed: \{[^}]*tone: "closed"/);
 assert.match(client, /failed: \{[^}]*tone: "bad"/);
 assert.equal((client.match(/"bad"/g) || []).length, 2, "only confirmed playback failure may be red (tone + sound signal)");

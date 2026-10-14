@@ -172,3 +172,67 @@ export function mapHealthRpcRows(rawRows: unknown): BusinessPlayerHealthRow[] {
     };
   });
 }
+
+export type OwnerSignalTone = "neutral" | "ok" | "error";
+export type OwnerConnectivitySignal = {
+  kind: "closed" | "no_data" | "online" | "offline";
+  tone: OwnerSignalTone;
+  title: string;
+  detail: string;
+};
+
+/** Heartbeat proves connectivity only. Opening hours are not available today. */
+export function deriveOwnerConnectivitySignal(input: {
+  playerCount?: number;
+  primaryHealthStatus?: string | null;
+  secondsSinceHeartbeat?: number | null;
+  isClosedNow?: boolean;
+}): OwnerConnectivitySignal {
+  if (input.isClosedNow === true) {
+    return { kind: "closed", tone: "neutral", title: "Точка закрыта", detail: "Связь с плеером сейчас не требуется." };
+  }
+  const seconds = input.secondsSinceHeartbeat;
+  if (!input.playerCount || !["online", "stale", "offline"].includes(input.primaryHealthStatus ?? "") ||
+    seconds == null || !Number.isFinite(seconds) || seconds < 0) {
+    return { kind: "no_data", tone: "neutral", title: "Нет данных о плеере", detail: "Кабинет пока не получил сигналов от плеера этой точки." };
+  }
+  if (seconds <= 300) {
+    return { kind: "online", tone: "ok", title: "Плеер на связи", detail: "Связь с плеером не подтверждает, что музыка звучит сейчас." };
+  }
+  return { kind: "offline", tone: "neutral", title: "Нет связи с плеером", detail: "Музыка на точке может продолжать играть." };
+}
+
+export type OwnerPlaybackSignalInput = {
+  playbackConfirmedAt?: string | null;
+  playbackState?: "playing" | "paused" | "stopped" | "error" | null;
+  errorConfirmed?: boolean;
+  nowMs: number;
+};
+export type OwnerPlaybackSignal = {
+  kind: "confirmed" | "unconfirmed" | "stale" | "paused" | "stopped" | "error";
+  tone: OwnerSignalTone;
+  title: string;
+  detail: string;
+};
+
+/** Periodic sound confirmation, independent of heartbeats, PoP and track length. */
+export function deriveOwnerPlaybackSignal(input: OwnerPlaybackSignalInput): OwnerPlaybackSignal {
+  if (input.errorConfirmed === true) {
+    return { kind: "error", tone: "error", title: "Сбой воспроизведения подтверждён", detail: "Откройте плеер точки или обратитесь в поддержку." };
+  }
+  const confirmedMs = input.playbackConfirmedAt ? Date.parse(input.playbackConfirmedAt) : NaN;
+  const ageMs = input.nowMs - confirmedMs;
+  if (!Number.isFinite(ageMs) || ageMs < 0) {
+    return { kind: "unconfirmed", tone: "neutral", title: "Воспроизведение не подтверждено", detail: "Кабинет пока не получает подтверждений звука." };
+  }
+  if (ageMs > 300_000) {
+    return { kind: "stale", tone: "neutral", title: "Нет свежего подтверждения звука", detail: "Музыка на точке может продолжать играть." };
+  }
+  if (input.playbackState === "playing") {
+    return { kind: "confirmed", tone: "ok", title: "Воспроизведение подтверждено", detail: "Получено свежее подтверждение от плеера точки." };
+  }
+  if (input.playbackState === "paused" || input.playbackState === "stopped") {
+    return { kind: input.playbackState, tone: "neutral", title: input.playbackState === "paused" ? "Воспроизведение на паузе" : "Воспроизведение остановлено", detail: "Получено подтверждение состояния от плеера точки." };
+  }
+  return { kind: "unconfirmed", tone: "neutral", title: "Воспроизведение не подтверждено", detail: "Кабинет пока не получает подтверждений звука." };
+}
