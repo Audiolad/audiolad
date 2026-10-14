@@ -2012,3 +2012,16 @@ Migration: `20261231150000_business_spa_program_manifest.sql`. Prepared in Git; 
 - `business_spa_grants_valid_until(eligibility jsonb)` — service-only helper; `business_spa_offline_cache_max()` = 7 days.
 - Client contract: `src/lib/business-app/spa-manifest.ts` (fail-closed parse, re-clamps cache to 7 days from download, never extends server bounds).
 - Smoke `supabase/tests/business_spa_manifest_smoke.sql` runs in the real disposable replay (engine stubbed per transaction, real grant rows). No grants, rights activation, allowlist rows or programs are created.
+
+### c02fe282 real-1b — подготовлено, не применено
+
+`supabase/migrations/20261231160000_business_player_live_state.sql` добавляет
+`business_player_live_state` (PK/FK player_id, organization_id, last_seen_at,
+playback_state, playback_confirmed_at, audio_item_id, track_started_at, error_code,
+updated_at). Все FK — ON DELETE RESTRICT. RLS включён, прямых grants клиентам нет.
+Запись через `report_business_spa_player_live_state(uuid,text,uuid,boolean,text)`:
+пилотный доступ, активное назначение, проверка доступного трека, серверное время,
+один upsert. Чтение через `get_business_owner_player_live_state(uuid)` по location:
+точный predicate членства из health RPC, название только разрешённого трека, без URL.
+Старые таблицы и данные не меняются. Решение о применении отдельно принимает Сергей.
+Подробности и откат: [11-real-1-migration.md](business/ux-c02fe282/11-real-1-migration.md).

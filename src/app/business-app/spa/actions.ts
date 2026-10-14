@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchSpaManifestRaw, isUuid, loadSpaPilotContext, signSpaTrack, type SpaSignedTrack } from "@/lib/business-app/spa-pilot";
 import { isLogEvent, type SpaLogEvent } from "@/lib/business-app/spa-player-core";
 
+import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
+
 export type SpaActionResult<T> = { ok: true; data: T } | { ok: false; reason: string };
 
 export async function refreshSpaManifest(): Promise<SpaActionResult<unknown>> {
@@ -91,4 +93,24 @@ export async function syncSpaPlaybackLog(events: unknown): Promise<SpaActionResu
   }
   // Dropped (out-of-window/invalid) events are acknowledged too so the queue cannot jam.
   return { ok: true, data: valid.map((e) => e.client_event_id) };
+}
+
+/** User-session RPC only; the assigned player is never accepted from the browser. */
+export async function reportSpaPlayerLiveState(input: unknown): Promise<SpaActionResult<null>> {
+  try {
+    const ctx = await loadSpaPilotContext();
+    if (!ctx?.playerId) return { ok: false, reason: "no_access" };
+    if (!isSpaLiveReport(input)) return { ok: false, reason: "invalid_request" };
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("report_business_spa_player_live_state", {
+      p_player_id: ctx.playerId,
+      p_state: input.state,
+      p_audio_item_id: input.audioItemId,
+      p_playing_confirmed: input.playingConfirmed,
+      p_error_code: input.errorCode,
+    });
+    return error ? { ok: false, reason: "report_failed" } : { ok: true, data: null };
+  } catch {
+    return { ok: false, reason: "report_failed" };
+  }
 }

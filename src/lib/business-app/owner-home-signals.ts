@@ -1,3 +1,4 @@
+import type { SpaPlaybackState } from "./spa-live-report";
 import type { BusinessPointState } from "@/lib/business-app/point-state";
 
 export type BusinessPlayerHealthStatus =
@@ -28,6 +29,14 @@ export type BusinessOwnerHomeSignals = {
   lastBusinessPlayAt: string | null;
   /** Minutes since last business play; null if none. */
   lastPlayMinutesAgo: number | null;
+  lastSeenSeconds?: number | null;
+  playbackState?: SpaPlaybackState | null;
+  playbackConfirmedAt?: string | null;
+  /** Server-computed age of playbackConfirmedAt at load time. */
+  playbackConfirmedSecondsAgo?: number | null;
+  currentTrack?: { title: string } | null;
+  /** Connectivity only; never proof that audio is advancing. */
+  liveConnected?: boolean | null;
   source: "player_health";
 };
 
@@ -40,6 +49,7 @@ export function emptyBusinessOwnerHomeSignals(): BusinessOwnerHomeSignals {
     stoppedMinutes: null,
     lastBusinessPlayAt: null,
     lastPlayMinutesAgo: null,
+    ...mapOwnerLiveState(null, ""),
     source: "player_health",
   };
 }
@@ -235,4 +245,28 @@ export function deriveOwnerPlaybackSignal(input: OwnerPlaybackSignalInput): Owne
     return { kind: input.playbackState, tone: "neutral", title: input.playbackState === "paused" ? "Воспроизведение на паузе" : "Воспроизведение остановлено", detail: "Получено подтверждение состояния от плеера точки." };
   }
   return { kind: "unconfirmed", tone: "neutral", title: "Воспроизведение не подтверждено", detail: "Кабинет пока не получает подтверждений звука." };
+}
+
+export const BUSINESS_LIVE_CONNECTIVITY_SECONDS = 5 * 60;
+
+export function mapOwnerLiveState(raw: unknown, organizationId: string, nowMs = Date.now()): Pick<BusinessOwnerHomeSignals,
+  "lastSeenSeconds" | "playbackState" | "playbackConfirmedAt" | "playbackConfirmedSecondsAgo" | "currentTrack" | "liveConnected"> {
+  const empty = { lastSeenSeconds: null, playbackState: null, playbackConfirmedAt: null, playbackConfirmedSecondsAgo: null, currentTrack: null, liveConnected: null };
+  if (!Array.isArray(raw)) return empty;
+  const rows = raw.filter((r) => r && typeof r === "object" && r.organization_id === organizationId
+    && typeof r.last_seen_at === "string" && Number.isFinite(Date.parse(r.last_seen_at)));
+  rows.sort((a, b) => Date.parse(b.last_seen_at) - Date.parse(a.last_seen_at));
+  const row = rows[0];
+  if (!row) return empty;
+  const lastSeenSeconds = Math.max(0, (nowMs - Date.parse(row.last_seen_at)) / 1000);
+  const confirmedAt: string | null = typeof row.playback_confirmed_at === "string" && Number.isFinite(Date.parse(row.playback_confirmed_at)) ? row.playback_confirmed_at : null;
+  const playbackState: SpaPlaybackState | null = ["playing", "paused", "stopped", "error"].includes(row.playback_state) ? row.playback_state : null;
+  return {
+    lastSeenSeconds,
+    liveConnected: lastSeenSeconds <= BUSINESS_LIVE_CONNECTIVITY_SECONDS,
+    playbackState,
+    playbackConfirmedAt: confirmedAt,
+    playbackConfirmedSecondsAgo: confirmedAt ? Math.max(0, (nowMs - Date.parse(confirmedAt)) / 1000) : null,
+    currentTrack: typeof row.current_track_title === "string" ? { title: row.current_track_title } : null,
+  };
 }

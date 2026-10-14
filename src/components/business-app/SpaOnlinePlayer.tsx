@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getSpaTrackUrl, refreshSpaManifest } from "@/app/business-app/spa/actions";
+import { getSpaTrackUrl, refreshSpaManifest, reportSpaPlayerLiveState } from "@/app/business-app/spa/actions";
+import { SpaLiveEvidence, sendSpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
@@ -33,6 +34,17 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    const evidence = new SpaLiveEvidence();
+    let lastState = "";
+    let lastTrack: string | null = null;
+    const report = () => {
+      const c = ctlRef.current;
+      const state: SpaPlaybackState = c?.status === "error" ? "error"
+        : audio.ended ? "stopped" : c?.status === "paused" || (c?.status === "playing" && audio.paused) ? "paused"
+          : c?.status === "playing" ? "playing" : "stopped";
+      sendSpaLiveReport(reportSpaPlayerLiveState,
+        evidence.report(state, c?.current?.audioItemId ?? null, Date.now()));
+    };
     const ctl = new Controller(
       {
         audio,
@@ -49,14 +61,35 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         },
         onChange: () => {
           const c = ctlRef.current;
-          if (c) setView({ items: c.items, status: c.status, current: c.current, message: c.message });
+          if (c) {
+            setView({ items: c.items, status: c.status, current: c.current, message: c.message });
+            const track = c.current?.audioItemId ?? null;
+            if (c.status === "loading" || c.status === "paused" || c.status === "idle" || c.status === "error" || c.status === "no_access" || track !== lastTrack) evidence.reset();
+            if (c.status !== lastState || track !== lastTrack) {
+              lastState = c.status;
+              lastTrack = track;
+              report();
+            }
+          }
         },
       },
       parseItems(initialManifest),
     );
     ctlRef.current = ctl;
-    const onEnded = () => void ctl.onEnded();
-    const onError = () => void ctl.onError();
+    const onPlaying = () => { evidence.onPlaying(audio.currentTime); report(); };
+    const onTimeUpdate = () => evidence.onTimeUpdate(audio.currentTime, Date.now());
+    const onPause = () => { evidence.reset(audio.currentTime); report(); };
+    const onEnded = () => {
+      evidence.reset();
+      if (ctl.items.length === 0) {
+        sendSpaLiveReport(reportSpaPlayerLiveState, evidence.report("stopped", null, Date.now()));
+      }
+      void ctl.onEnded();
+    };
+    const onError = () => { evidence.reset(); void ctl.onError(); };
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
     const refresh = async () => {
@@ -68,9 +101,15 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         // offline / transient: keep current list; the server still gates every URL.
       }
     };
+    report();
+    const heartbeat = window.setInterval(report, 60_000);
     const timer = window.setInterval(() => void refresh(), MANIFEST_REFRESH_MS);
     return () => {
       window.clearInterval(timer);
+      window.clearInterval(heartbeat);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       ctl.dispose();
