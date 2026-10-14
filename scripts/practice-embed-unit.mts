@@ -66,3 +66,11 @@ const providers = await readFile(
 assert.match(providers, /pathname\.startsWith\("\/embed\/"\)/, "no third-party analytics inside partner frames");
 
 console.log("practice-embed-unit: ok");
+
+// Wide frames (partner desktop) use the horizontal practice-hero layout; narrow ones stay vertical.
+{
+  const card = await readFile(new URL("../src/components/embed/PracticeEmbedCard.tsx", import.meta.url), "utf8");
+  assert.match(card, /max-w-\[420px\][^"]*shadow-\[0_10px_30px/, "mobile card keeps 420px + shadow");
+  assert.match(card, /min-\[560px\]:grid-cols-\[auto_minmax\(0,1fr\)\]/, "desktop card is horizontal");
+  assert.match(card, /min-\[560px\]:shadow-none/, "desktop card has no clipped shadow");
+}
