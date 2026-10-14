@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { SpaLiveEvidence, isSpaLiveReport, sendSpaLiveReport } from "../src/lib/business-app/spa-live-report.ts";
 import * as signals from "../src/lib/business-app/owner-home-signals.ts";
+import * as live from "../src/lib/business-app/spa-live-report.ts";
 
 const id = "00000000-0000-4000-8000-000000000001";
 const evidence = new SpaLiveEvidence();
@@ -36,14 +37,42 @@ for (const patch of [{ state: "loading" }, { audioItemId: "bad" }, { audioItemId
 }
 
 const now = Date.parse("2026-10-14T12:00:00Z");
-const row = { organization_id: "org", last_seen_at: new Date(now - 300000).toISOString(), playback_state: "playing", playback_confirmed_at: new Date(now - 1000).toISOString(), current_track_title: "Allowed" };
+const iso = (ms) => new Date(ms).toISOString();
+const row = { organization_id: "org", last_seen_at: iso(now - 300000), playback_state: "playing", playback_reported_at: iso(now - 1000), playing_confirmed_at: iso(now - 1000), current_track_title: "Allowed" };
 assert.equal(signals.mapOwnerLiveState([row], "org", now).liveConnected, true);
 assert.equal(signals.mapOwnerLiveState([row], "org", now + 1).liveConnected, false);
 assert.deepEqual(signals.mapOwnerLiveState([row], "org", now).currentTrack, { title: "Allowed" });
 assert.equal(signals.mapOwnerLiveState([row], "other", now).currentTrack, null);
 assert.equal(signals.mapOwnerLiveState(null, "org", now).lastSeenSeconds, null);
-assert.equal(signals.mapOwnerLiveState([{ ...row, last_seen_at: "invalid" }], "org", now).playbackState, null);
 assert.equal(signals.mapOwnerLiveState([{ ...row, current_track_title: null }], "org", now).currentTrack, null);
+// Separation: heartbeat-only row -> connectivity, no playback state, no track.
+const hbOnly = signals.mapOwnerLiveState([{ organization_id: "org", last_seen_at: iso(now - 10000), playback_state: null, playback_reported_at: null, playing_confirmed_at: null, current_track_title: null }], "org", now);
+assert.equal(hbOnly.liveConnected, true);
+assert.equal(hbOnly.playbackState, null);
+assert.equal(hbOnly.playbackConfirmedAt, null);
+// A stale reported state (> 5 min) with a lost heartbeat is dropped: never shown as current, track hidden.
+const staleState = signals.mapOwnerLiveState([{ ...row, last_seen_at: iso(now - 600000), playback_state: "paused", playback_reported_at: iso(now - 301000) }], "org", now);
+assert.equal(staleState.playbackState, null);
+assert.equal(staleState.currentTrack, null);
+// Long pause (> 5 min since report) still reads as paused while the heartbeat is fresh.
+const longPause = signals.mapOwnerLiveState([{ ...row, last_seen_at: iso(now - 30000), playback_state: "paused", playback_reported_at: iso(now - 1800000) }], "org", now);
+assert.equal(longPause.playbackState, "paused");
+// ...but an old "playing" report is never current.
+assert.equal(signals.mapOwnerLiveState([{ ...row, last_seen_at: iso(now - 30000), playback_reported_at: iso(now - 1800000) }], "org", now).playbackState, null);
+// State without heartbeat: connectivity stays unknown (null), not "online".
+assert.equal(signals.mapOwnerLiveState([{ ...row, last_seen_at: null }], "org", now).liveConnected, null);
+assert.equal(signals.mapOwnerLiveState([{ ...row, last_seen_at: "invalid" }], "org", now).lastSeenSeconds, null);
+
+// Device session secret: stable per tab, valid format, survives blocked storage.
+const store = new Map();
+const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+let n = 0;
+const rnd = () => `0000000${++n}-aaaa-bbbb-cccc-dddddddddddd`;
+const s1 = live.getSpaDeviceSecret(storage, rnd);
+assert.match(s1, /^[A-Za-z0-9_-]{32,128}$/);
+assert.equal(live.getSpaDeviceSecret(storage, rnd), s1);
+const blocked = { getItem: () => { throw Error("blocked"); }, setItem: () => { throw Error("blocked"); } };
+assert.match(live.getSpaDeviceSecret(blocked, rnd), /^[A-Za-z0-9_-]{32,128}$/);
 
 // Execute the actual server modules with dependency mocks; no DB connections.
 function load(path, imports) {
@@ -65,17 +94,27 @@ const actions = load("../src/app/business-app/spa/actions.ts", {
   "@/lib/business-app/spa-player-core": {},
   "@/lib/business-app/spa-live-report": { isSpaLiveReport },
 });
-assert.equal((await actions.reportSpaPlayerLiveState(valid)).reason, "no_access");
+const secret = "s".repeat(40);
+assert.equal((await actions.reportSpaPlayerPlayback(secret, valid)).reason, "no_access");
+assert.equal((await actions.reportSpaPlayerHeartbeat(secret)).reason, "no_access");
 context = { playerId: null };
-assert.equal((await actions.reportSpaPlayerLiveState(valid)).reason, "no_access");
+assert.equal((await actions.reportSpaPlayerPlayback(secret, valid)).reason, "no_access");
 context = { playerId: id };
-assert.equal((await actions.reportSpaPlayerLiveState({ ...valid, state: "bad" })).reason, "invalid_request");
+assert.equal((await actions.reportSpaPlayerPlayback(secret, { ...valid, state: "bad" })).reason, "invalid_request");
+assert.equal((await actions.reportSpaPlayerPlayback("short", valid)).reason, "invalid_request");
+assert.equal((await actions.reportSpaPlayerHeartbeat("bad secret with spaces and long enough!!")).reason, "invalid_request");
 assert.equal(calls.length, 0);
-assert.equal((await actions.reportSpaPlayerLiveState(valid)).ok, true);
-assert.equal(calls[0][0], "report_business_spa_player_live_state");
-assert.equal(calls[0][1].p_player_id, id);
+assert.equal((await actions.reportSpaPlayerHeartbeat(secret)).ok, true);
+assert.equal(calls[0][0], "report_business_spa_player_heartbeat");
+assert.deepEqual(calls[0][1], { p_player_id: id, p_device_secret: secret });
+assert.equal((await actions.reportSpaPlayerPlayback(secret, valid)).ok, true);
+assert.equal(calls[1][0], "report_business_spa_player_playback");
+assert.equal(calls[1][1].p_player_id, id);
+assert.equal(calls[1][1].p_playing_confirmed, true);
 rpcError = { code: "42883" };
-assert.equal((await actions.reportSpaPlayerLiveState(valid)).reason, "report_failed");
+assert.equal((await actions.reportSpaPlayerPlayback(secret, valid)).reason, "report_failed");
+assert.equal((await actions.reportSpaPlayerHeartbeat(secret)).reason, "report_failed");
+rpcError = null;
 
 let liveResult = { data: [row], error: null };
 let throwLive = false;
@@ -106,11 +145,22 @@ assert.equal((await loader.loadBusinessOwnerHomeSignals({ ...input, locationId: 
 const sql = readFileSync(new URL("../supabase/migrations/20261231160000_business_player_live_state.sql", import.meta.url), "utf8");
 const activeSql = sql.split("/* Rollback")[0];
 assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
-assert.match(sql, /REVOKE ALL ON TABLE public.business_player_live_state FROM PUBLIC, anon, authenticated/);
-assert.equal((activeSql.match(/SECURITY DEFINER/g) ?? []).length, 2);
-assert.match(sql, /NOT public.has_business_pilot_access\(v_org\)/);
-assert.match(sql, /NOT public.is_business_organization_member\(p_organization_id, v_user_id\)/);
-assert.match(sql, /a.unassigned_at IS NULL AND a.assigned_at <= v_now/);
+for (const t of ["business_player_device_heartbeat", "business_player_playback_state", "business_player_listening_history"]) {
+  assert.match(sql, new RegExp(`REVOKE ALL ON TABLE public.${t} FROM PUBLIC, anon, authenticated`));
+  assert.match(sql, new RegExp(`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY`));
+}
+assert.equal((activeSql.match(/SECURITY DEFINER/g) ?? []).length, 5);
+assert.match(sql, /REVOKE ALL ON FUNCTION public.business_spa_session_player\(timestamptz\) FROM PUBLIC, anon, authenticated/);
+assert.match(sql, /v_player IS DISTINCT FROM p_player_id/);
+assert.match(sql, /REVOKE ALL ON FUNCTION public.business_player_live_claim\(uuid, text, timestamptz\) FROM PUBLIC, anon, authenticated/);
+assert.match(sql, /device_session_conflict/);
+// Rollback keeps data: no DROP anywhere in the rollback plan, only REVOKE.
+const rollback = sql.split("/* Rollback")[1];
+assert.doesNotMatch(rollback, /DROP TABLE|DROP FUNCTION|TRUNCATE|DELETE FROM/);
+assert.match(rollback, /REVOKE EXECUTE/);
+assert.match(sql, /public.has_business_pilot_access\(al.organization_id\)/);
+assert.match(sql, /NOT public.is_business_organization_member\(v_org, v_user_id\)/);
+assert.match(sql, /a.unassigned_at IS NULL AND a.assigned_at <= p_now/);
 assert.match(sql, /ON CONFLICT \(player_id\) DO UPDATE/);
 assert.doesNotMatch(activeSql, /\b(?:DELETE FROM|DROP TABLE|ALTER TABLE public.business_player_runtime|UPDATE public.business_player_runtime)\b/);
 assert.match(sql, /business_spa_track_visible/);
@@ -139,6 +189,7 @@ let cleanup;
 let refs = 0;
 let controllerRef;
 const reports = [];
+let heartbeats = 0;
 const oldWindow = globalThis.window;
 globalThis.window = {
   setInterval: (fn) => { intervals.set(++intervalId, fn); return intervalId; },
@@ -155,7 +206,8 @@ try {
     "@/app/business-app/spa/actions": {
       getSpaTrackUrl: async () => ({ ok: true, data: { url: "https://example.test/track" } }),
       refreshSpaManifest: async () => ({ ok: false, reason: "temporary" }),
-      reportSpaPlayerLiveState: async (r) => { reports.push(r); throw Error("report transport fails"); },
+      reportSpaPlayerPlayback: async (_secret, r) => { reports.push(r); throw Error("report transport fails"); },
+      reportSpaPlayerHeartbeat: async () => { heartbeats++; throw Error("heartbeat transport fails"); },
     },
     "@/lib/business-app/spa-live-report": liveModule,
     "@/lib/business-app/spa-manifest": { parseSpaManifest },
@@ -167,7 +219,9 @@ try {
     offline_cache_max_seconds: 604800, withheld_count: 0, content_hash: "test",
     items: [{ position: 1, audio_item_id: id, title: "Track", playable_until: null, offline_allowed: false }],
   } });
-  assert.equal(reports.at(-1).state, "stopped", "initial heartbeat");
+  // Separation: opening the page sends a connectivity heartbeat only, no playback state.
+  assert.equal(heartbeats, 1, "initial heartbeat");
+  assert.equal(reports.length, 0, "no playback state before anything plays");
   const ctl = controllerRef.current;
   await ctl.toggle();
   assert.equal(ctl.status, "playing", "report failures do not stop playback");
@@ -181,6 +235,7 @@ try {
   }
   heartbeat();
   assert.equal(reports.at(-1).playingConfirmed, false, "stall in real wiring");
+  assert.ok(heartbeats >= 47, "heartbeat keeps going every minute, independent of playback");
   await ctl.toggle();
   assert.equal(reports.at(-1).state, "paused");
   await ctl.toggle();

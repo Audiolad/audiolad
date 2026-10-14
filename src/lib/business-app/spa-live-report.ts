@@ -53,3 +53,15 @@ export class SpaLiveEvidence {
 export function sendSpaLiveReport(send: (report: SpaLiveReport) => Promise<unknown>, report: SpaLiveReport): void {
   try { void send(report).catch(() => {}); } catch { /* Playback continues. */ }
 }
+
+/** Per-tab device session secret (random, kept in sessionStorage so a reload keeps the claim). */
+export function getSpaDeviceSecret(storage: Pick<Storage, "getItem" | "setItem"> | null, random: () => string): string {
+  const KEY = "audiolad.spa.device-session";
+  try {
+    const existing = storage?.getItem(KEY);
+    if (existing && /^[A-Za-z0-9_-]{32,128}$/.test(existing)) return existing;
+  } catch { /* storage blocked */ }
+  const fresh = (random() + random()).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
+  try { storage?.setItem(KEY, fresh); } catch { /* storage blocked */ }
+  return fresh;
+}

@@ -192,6 +192,13 @@ applyFile(
   "post-apply business SPA manifest smoke",
   resolve(root, "supabase/tests/business_spa_manifest_smoke.sql"),
 );
+if (!pending.has("20261231160000")) {
+  throw new Error("business player live state migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply business player live state smoke",
+  resolve(root, "supabase/tests/business_player_live_state_smoke.sql"),
+);
 if (!pending.has("20261101120000")) {
   throw new Error("Wordstat music query seed migration was not included in the disposable replay");
 }

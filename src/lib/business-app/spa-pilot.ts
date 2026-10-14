@@ -45,6 +45,8 @@ export async function loadSpaPilotContext(): Promise<SpaPilotContext | null> {
     .select("organization_id")
     .eq("user_id", user.id)
     .eq("enabled", true)
+    // Same deterministic choice as business_spa_session_player() in the DB.
+    .order("organization_id", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (!allow?.organization_id) return null;
@@ -68,6 +70,7 @@ export async function loadSpaPilotContext(): Promise<SpaPilotContext | null> {
     .select("id")
     .eq("organization_id", orgId)
     .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (!location) return null;
@@ -83,6 +86,10 @@ export async function loadSpaPilotContext(): Promise<SpaPilotContext | null> {
       .in("zone_id", zoneIds)
       .is("unassigned_at", null)
       .eq("business_players.organization_id", orgId)
+      .eq("business_players.status", "active")
+      .lte("assigned_at", new Date().toISOString())
+      .order("assigned_at", { ascending: false })
+      .order("player_id", { ascending: true })
       .limit(1)
       .maybeSingle();
     if (assignment) {

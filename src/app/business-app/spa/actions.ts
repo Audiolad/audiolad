@@ -95,15 +95,38 @@ export async function syncSpaPlaybackLog(events: unknown): Promise<SpaActionResu
   return { ok: true, data: valid.map((e) => e.client_event_id) };
 }
 
-/** User-session RPC only; the assigned player is never accepted from the browser. */
-export async function reportSpaPlayerLiveState(input: unknown): Promise<SpaActionResult<null>> {
+const DEVICE_SECRET = /^[A-Za-z0-9_-]{32,128}$/;
+
+/**
+ * Live signals (c02fe282 real-1b). User-session RPCs only; the assigned player comes from the
+ * server context, never from the browser. The device secret binds writes to one device session.
+ */
+export async function reportSpaPlayerHeartbeat(deviceSecret: unknown): Promise<SpaActionResult<null>> {
   try {
+    if (typeof deviceSecret !== "string" || !DEVICE_SECRET.test(deviceSecret)) return { ok: false, reason: "invalid_request" };
     const ctx = await loadSpaPilotContext();
     if (!ctx?.playerId) return { ok: false, reason: "no_access" };
-    if (!isSpaLiveReport(input)) return { ok: false, reason: "invalid_request" };
     const supabase = await createClient();
-    const { error } = await supabase.rpc("report_business_spa_player_live_state", {
+    const { error } = await supabase.rpc("report_business_spa_player_heartbeat", {
       p_player_id: ctx.playerId,
+      p_device_secret: deviceSecret,
+    });
+    return error ? { ok: false, reason: "report_failed" } : { ok: true, data: null };
+  } catch {
+    return { ok: false, reason: "report_failed" };
+  }
+}
+
+export async function reportSpaPlayerPlayback(deviceSecret: unknown, input: unknown): Promise<SpaActionResult<null>> {
+  try {
+    if (typeof deviceSecret !== "string" || !DEVICE_SECRET.test(deviceSecret)) return { ok: false, reason: "invalid_request" };
+    if (!isSpaLiveReport(input)) return { ok: false, reason: "invalid_request" };
+    const ctx = await loadSpaPilotContext();
+    if (!ctx?.playerId) return { ok: false, reason: "no_access" };
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("report_business_spa_player_playback", {
+      p_player_id: ctx.playerId,
+      p_device_secret: deviceSecret,
       p_state: input.state,
       p_audio_item_id: input.audioItemId,
       p_playing_confirmed: input.playingConfirmed,

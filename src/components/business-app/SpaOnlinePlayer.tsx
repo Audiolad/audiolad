@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getSpaTrackUrl, refreshSpaManifest, reportSpaPlayerLiveState } from "@/app/business-app/spa/actions";
-import { SpaLiveEvidence, sendSpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
+import { getSpaTrackUrl, refreshSpaManifest, reportSpaPlayerHeartbeat, reportSpaPlayerPlayback } from "@/app/business-app/spa/actions";
+import { getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
@@ -35,6 +35,12 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
     const audio = audioRef.current;
     if (!audio) return;
     const evidence = new SpaLiveEvidence();
+    const deviceSecret = getSpaDeviceSecret(
+      typeof window !== "undefined" ? window.sessionStorage : null,
+      () => crypto.randomUUID(),
+    );
+    const sendPlayback = (r: Parameters<typeof reportSpaPlayerPlayback>[1]) => reportSpaPlayerPlayback(deviceSecret, r);
+    const heartbeatOnce = () => { try { void reportSpaPlayerHeartbeat(deviceSecret).catch(() => {}); } catch { /* best effort */ } };
     let lastState = "";
     let lastTrack: string | null = null;
     const report = () => {
@@ -42,7 +48,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
       const state: SpaPlaybackState = c?.status === "error" ? "error"
         : audio.ended ? "stopped" : c?.status === "paused" || (c?.status === "playing" && audio.paused) ? "paused"
           : c?.status === "playing" ? "playing" : "stopped";
-      sendSpaLiveReport(reportSpaPlayerLiveState,
+      sendSpaLiveReport(sendPlayback,
         evidence.report(state, c?.current?.audioItemId ?? null, Date.now()));
     };
     const ctl = new Controller(
@@ -82,7 +88,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
     const onEnded = () => {
       evidence.reset();
       if (ctl.items.length === 0) {
-        sendSpaLiveReport(reportSpaPlayerLiveState, evidence.report("stopped", null, Date.now()));
+        sendSpaLiveReport(sendPlayback, evidence.report("stopped", null, Date.now()));
       }
       void ctl.onEnded();
     };
@@ -101,8 +107,12 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         // offline / transient: keep current list; the server still gates every URL.
       }
     };
-    report();
-    const heartbeat = window.setInterval(report, 60_000);
+    // (1) connectivity heartbeat and (2) playback state are separate reports.
+    heartbeatOnce();
+    const heartbeat = window.setInterval(() => {
+      heartbeatOnce();
+      if (ctlRef.current?.current) report();
+    }, 60_000);
     const timer = window.setInterval(() => void refresh(), MANIFEST_REFRESH_MS);
     return () => {
       window.clearInterval(timer);
