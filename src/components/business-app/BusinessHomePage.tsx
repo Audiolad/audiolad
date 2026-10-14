@@ -11,60 +11,10 @@ import {
 } from "@/lib/business-app/greeting";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 
-/**
- * Owner Home (c02fe282 P0-1). Shows only what the cabinet actually knows:
- * player heartbeat and the last registered playback event. No URL override,
- * no mock track, no unverified "all good" / licence claims.
- */
-
-function formatAge(minutes: number | null): string | null {
-  if (minutes == null || !Number.isFinite(minutes) || minutes < 0) return null;
-  if (minutes < 1) return "меньше минуты назад";
-  if (minutes < 60) return `${Math.round(minutes)} мин назад`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} ч назад`;
-  return `${Math.round(hours / 24)} дн назад`;
-}
-
-function heartbeatText(signals: BusinessOwnerHomeSignals | null): {
-  title: string;
-  detail: string;
-} {
-  if (!signals || signals.playerCount === 0) {
-    return {
-      title: "Нет данных о плеерах",
-      detail:
-        "Кабинет не получил сведений о подключённых плеерах этой точки.",
-    };
-  }
-  const seconds = signals.secondsSinceHeartbeat;
-  const age =
-    seconds != null && Number.isFinite(seconds) && seconds >= 0
-      ? formatAge(seconds / 60)
-      : null;
-  if (signals.primaryHealthStatus === "online") {
-    return {
-      title: "Есть связь с плеером",
-      detail: age
-        ? `Последний сигнал от плеера: ${age}. Это не подтверждает, что музыка звучит сейчас.`
-        : "Это не подтверждает, что музыка звучит сейчас.",
-    };
-  }
-  if (signals.primaryHealthStatus === "stale") {
-    return {
-      title: "Данные о связи устарели",
-      detail: age
-        ? `Последний сигнал от плеера: ${age}.`
-        : "Время последнего сигнала неизвестно.",
-    };
-  }
-  return {
-    title: "Плеер давно не выходил на связь",
-    detail: age
-      ? `Последний сигнал от плеера: ${age}. Причина кабинету неизвестна.`
-      : "Плеер ещё не выходил на связь или время сигнала неизвестно.",
-  };
-}
+import {
+  buildBusinessHomeStatusCopy,
+  formatBusinessAge,
+} from "@/lib/business-app/owner-home-status-copy";
 
 function StatusBanner({
   locationName,
@@ -73,7 +23,7 @@ function StatusBanner({
   locationName: string;
   signals: BusinessOwnerHomeSignals | null;
 }) {
-  const hb = heartbeatText(signals);
+  const hb = buildBusinessHomeStatusCopy(signals);
   return (
     <section
       className="business-app-card business-app-span-full"
@@ -138,7 +88,7 @@ export default function BusinessHomePage() {
         ? "Создайте организацию и первую точку — это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
-  const lastPlayAge = formatAge(signals?.lastPlayMinutesAgo ?? null);
+  const lastPlayAge = formatBusinessAge(signals?.lastPlayMinutesAgo ?? null);
 
   if (domain.status === "anonymous") {
     return (

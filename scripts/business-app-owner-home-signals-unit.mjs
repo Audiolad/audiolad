@@ -113,7 +113,7 @@ assert.doesNotMatch(home, /Всё работает|Лицензия активн
 assert.doesNotMatch(home, /Интернет работает|Соединение стабильно|Музыка остановилась/);
 assert.doesNotMatch(home, /Сейчас играет|progressbar|Пропустить|Больше такого/);
 assert.match(home, /Лицензия: нет подтверждённых данных/);
-assert.match(home, /не подтверждает, что музыка звучит/);
+assert.match(home, /buildBusinessHomeStatusCopy/);
 assert.doesNotMatch(home, /useState/);
 assert.doesNotMatch(home, /initialState/);
 assert.doesNotMatch(home, /BUSINESS_HOME_MOCK\.stoppedMinutes/);
@@ -146,5 +146,39 @@ assert.match(loadSrc, /get_business_player_health/);
 assert.match(loadSrc, /playback_usage_facts/);
 assert.match(loadSrc, /usage_kind/);
 assert.doesNotMatch(loadSrc, /ELIGIBLE|music_rights_grants/);
+
+// c02fe282 P0-1: behavioural status copy.
+const { buildBusinessHomeStatusCopy, formatBusinessAge } = await import(
+  "../src/lib/business-app/owner-home-status-copy.ts"
+);
+const base = {
+  pointState: "stopped",
+  playerCount: 1,
+  primaryHealthStatus: "online",
+  secondsSinceHeartbeat: 30,
+  stoppedMinutes: null,
+  lastBusinessPlayAt: null,
+  lastPlayMinutesAgo: null,
+  source: "player_health",
+};
+const copy = (patch) =>
+  patch === null ? buildBusinessHomeStatusCopy(null) : buildBusinessHomeStatusCopy({ ...base, ...patch });
+assert.equal(copy(null).kind, "no_data");
+assert.equal(copy({ playerCount: 0 }).kind, "no_data");
+const onlineCopy = copy({});
+assert.equal(onlineCopy.kind, "online");
+assert.match(onlineCopy.detail, /не подтверждает, что музыка звучит/);
+assert.equal(copy({ primaryHealthStatus: "stale", secondsSinceHeartbeat: 600 }).kind, "stale");
+assert.equal(copy({ primaryHealthStatus: "offline", secondsSinceHeartbeat: 7200 }).kind, "offline");
+assert.equal(copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: null }).kind, "unknown");
+assert.equal(copy({ primaryHealthStatus: "none", secondsSinceHeartbeat: null }).kind, "unknown");
+assert.equal(copy({ primaryHealthStatus: "offline", secondsSinceHeartbeat: null }).kind, "unknown");
+assert.equal(copy({ primaryHealthStatus: "stale", secondsSinceHeartbeat: -5 }).kind, "unknown");
+for (const c of [copy(null), copy({}), copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: null })]) {
+  assert.doesNotMatch(c.title + c.detail, /Всё работает|Музыка играет|остановил/);
+}
+assert.equal(formatBusinessAge(null), null);
+assert.equal(formatBusinessAge(-1), null);
+assert.equal(formatBusinessAge(5), "5 мин назад");
 
 console.log("business-app-owner-home-signals-unit: ok");
