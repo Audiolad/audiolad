@@ -209,7 +209,7 @@ const nowMs = Date.parse("2026-10-14T12:00:00Z");
 const playback = (patch = {}) => deriveOwnerPlaybackSignal({ nowMs, ...patch });
 const atAge = (seconds) => new Date(nowMs - seconds * 1000).toISOString();
 assert.equal(playback().title, "Воспроизведение не подтверждено");
-for (const state of [null, "playing", "paused", "stopped", "error"]) {
+for (const state of [null, "playing", "error"]) {
   for (const timestamp of [null, "invalid", atAge(-1)]) {
     assert.equal(playback({ playbackState: state, playbackConfirmedAt: timestamp }).kind, "unconfirmed");
   }
@@ -221,7 +221,12 @@ for (const seconds of [0, 299, 300]) {
   assert.equal(confirmed.title, "Воспроизведение подтверждено");
   assert.equal(confirmed.kind, "confirmed");
 }
+// Paused/stopped are fresh reported states (mapper drops stale ones), independent of confirmation.
 for (const state of ["paused", "stopped"]) {
+  for (const timestamp of [null, atAge(30), atAge(3000)]) {
+    assert.equal(playback({ playbackState: state, playbackConfirmedAt: timestamp }).kind, state);
+    assert.doesNotMatch(playback({ playbackState: state, playbackConfirmedAt: timestamp }).title, /подтверждено/);
+  }
   assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(30) }).kind, state);
   assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(30) }).tone, "neutral");
 }

@@ -1,3 +1,4 @@
+import type { SpaPlaybackState } from "./spa-live-report";
 import type { BusinessPointState } from "@/lib/business-app/point-state";
 
 export type BusinessPlayerHealthStatus =
@@ -28,6 +29,14 @@ export type BusinessOwnerHomeSignals = {
   lastBusinessPlayAt: string | null;
   /** Minutes since last business play; null if none. */
   lastPlayMinutesAgo: number | null;
+  lastSeenSeconds?: number | null;
+  playbackState?: SpaPlaybackState | null;
+  playbackConfirmedAt?: string | null;
+  /** Server-computed age of playbackConfirmedAt at load time. */
+  playbackConfirmedSecondsAgo?: number | null;
+  currentTrack?: { title: string } | null;
+  /** Connectivity only; never proof that audio is advancing. */
+  liveConnected?: boolean | null;
   source: "player_health";
 };
 
@@ -40,6 +49,7 @@ export function emptyBusinessOwnerHomeSignals(): BusinessOwnerHomeSignals {
     stoppedMinutes: null,
     lastBusinessPlayAt: null,
     lastPlayMinutesAgo: null,
+    ...mapOwnerLiveState(null, ""),
     source: "player_health",
   };
 }
@@ -220,6 +230,10 @@ export function deriveOwnerPlaybackSignal(input: OwnerPlaybackSignalInput): Owne
   if (input.errorConfirmed === true) {
     return { kind: "error", tone: "error", title: "Сбой воспроизведения подтверждён", detail: "Откройте плеер точки или обратитесь в поддержку." };
   }
+  // Paused/stopped are reported states (caller passes only fresh ones), not sound confirmation.
+  if (input.playbackState === "paused" || input.playbackState === "stopped") {
+    return { kind: input.playbackState, tone: "neutral", title: input.playbackState === "paused" ? "Воспроизведение на паузе" : "Воспроизведение остановлено", detail: "Плеер точки сообщил это состояние." };
+  }
   const confirmedMs = input.playbackConfirmedAt ? Date.parse(input.playbackConfirmedAt) : NaN;
   const ageMs = input.nowMs - confirmedMs;
   if (!Number.isFinite(ageMs) || ageMs < 0) {
@@ -231,10 +245,50 @@ export function deriveOwnerPlaybackSignal(input: OwnerPlaybackSignalInput): Owne
   if (input.playbackState === "playing") {
     return { kind: "confirmed", tone: "ok", title: "Воспроизведение подтверждено", detail: "Получено свежее подтверждение от плеера точки." };
   }
-  if (input.playbackState === "paused" || input.playbackState === "stopped") {
-    return { kind: input.playbackState, tone: "neutral", title: input.playbackState === "paused" ? "Воспроизведение на паузе" : "Воспроизведение остановлено", detail: "Получено подтверждение состояния от плеера точки." };
-  }
   return { kind: "unconfirmed", tone: "neutral", title: "Воспроизведение не подтверждено", detail: "Кабинет пока не получает подтверждений звука." };
+}
+
+export const BUSINESS_LIVE_CONNECTIVITY_SECONDS = 5 * 60;
+
+const isoOrNull = (v: unknown): string | null =>
+  typeof v === "string" && Number.isFinite(Date.parse(v)) ? v : null;
+
+/**
+ * Maps get_business_owner_player_live_state rows. Heartbeat (connectivity), reported playback
+ * state and confirmed playing are kept as separate fields. A playback state older than the
+ * 5-minute window is dropped (unknown, neutral), never shown as current.
+ */
+export function mapOwnerLiveState(raw: unknown, organizationId: string, nowMs = Date.now()): Pick<BusinessOwnerHomeSignals,
+  "lastSeenSeconds" | "playbackState" | "playbackConfirmedAt" | "playbackConfirmedSecondsAgo" | "currentTrack" | "liveConnected"> {
+  const empty = { lastSeenSeconds: null, playbackState: null, playbackConfirmedAt: null, playbackConfirmedSecondsAgo: null, currentTrack: null, liveConnected: null };
+  if (!Array.isArray(raw)) return empty;
+  const ageS = (iso: string | null) => (iso ? Math.max(0, (nowMs - Date.parse(iso)) / 1000) : null);
+  const rows = raw
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && (r as Record<string, unknown>).organization_id === organizationId)
+    .map((r) => ({ r, seen: isoOrNull(r.last_seen_at), reported: isoOrNull(r.playback_reported_at) }))
+    .filter((x) => x.seen || x.reported)
+    .sort((a, b) => Date.parse(b.seen ?? b.reported!) - Date.parse(a.seen ?? a.reported!));
+  const top = rows[0];
+  if (!top) return empty;
+  const lastSeenSeconds = ageS(top.seen);
+  const reportedAge = ageS(top.reported);
+  const rawState = top.r.playback_state;
+  const heartbeatFresh = lastSeenSeconds != null && lastSeenSeconds <= BUSINESS_LIVE_CONNECTIVITY_SECONDS;
+  // A recent report is current. A long pause/stop/error stays current while the device is still
+  // on the line (it only reports on change). "playing" itself never counts as sound here.
+  const stateFresh = (reportedAge != null && reportedAge <= BUSINESS_LIVE_CONNECTIVITY_SECONDS)
+    || (heartbeatFresh && reportedAge != null && rawState !== "playing");
+  const playbackState: SpaPlaybackState | null = stateFresh && typeof rawState === "string"
+    && ["playing", "paused", "stopped", "error"].includes(rawState) ? rawState as SpaPlaybackState : null;
+  const confirmedAt = isoOrNull(top.r.playing_confirmed_at);
+  return {
+    lastSeenSeconds,
+    liveConnected: lastSeenSeconds == null ? null : lastSeenSeconds <= BUSINESS_LIVE_CONNECTIVITY_SECONDS,
+    playbackState,
+    playbackConfirmedAt: confirmedAt,
+    playbackConfirmedSecondsAgo: ageS(confirmedAt),
+    currentTrack: playbackState && typeof top.r.current_track_title === "string" ? { title: top.r.current_track_title } : null,
+  };
 }
 
 /** Compact status: connectivity alone never proves sound or a playback failure. */

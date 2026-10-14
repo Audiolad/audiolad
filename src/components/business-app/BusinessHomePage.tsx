@@ -102,6 +102,38 @@ function ComingSoon({ title, children }: { title: string; children?: ReactNode }
   );
 }
 
+/**
+ * The /spa player reports live state (part B). Its last-seen time is a connectivity
+ * heartbeat too; use whichever heartbeat is fresher. Never implies sound.
+ */
+export function mergeLiveConnectivity(signals: BusinessOwnerHomeSignals | null): BusinessOwnerHomeSignals | null {
+  if (!signals) return null;
+  const live = signals.lastSeenSeconds;
+  if (live == null || !Number.isFinite(live) || live < 0) return signals;
+  const hb = signals.secondsSinceHeartbeat;
+  if (hb != null && Number.isFinite(hb) && hb >= 0 && hb <= live) return signals;
+  return {
+    ...signals,
+    playerCount: Math.max(1, signals.playerCount),
+    primaryHealthStatus: live <= 300 ? "online" : "offline",
+    secondsSinceHeartbeat: live,
+  };
+}
+
+/** Red only for an error reported by a player that is still on the line. */
+export function livePlaybackInput(signals: BusinessOwnerHomeSignals | null): OwnerPlaybackSignalInput {
+  // "Now" is the server time the signals were loaded (no client clock in render).
+  const confirmedMs = signals?.playbackConfirmedAt ? Date.parse(signals.playbackConfirmedAt) : NaN;
+  const age = signals?.playbackConfirmedSecondsAgo;
+  const nowMs = Number.isFinite(confirmedMs) && age != null && Number.isFinite(age) ? confirmedMs + age * 1000 : NaN;
+  return {
+    nowMs,
+    playbackState: signals?.playbackState ?? null,
+    playbackConfirmedAt: signals?.playbackConfirmedAt ?? null,
+    errorConfirmed: signals?.playbackState === "error" && signals?.liveConnected === true,
+  };
+}
+
 export type BusinessHomePageProps = {
   currentTrack?: { title: string; coverUrl?: string } | null;
   /** Part B only: no live server confirmation source is connected in Part A. */
@@ -110,8 +142,9 @@ export type BusinessHomePageProps = {
 
 export default function BusinessHomePage({ currentTrack, playbackConfirmation }: BusinessHomePageProps = {}) {
   const domain = useBusinessDomain();
-  const signals =
+  const rawSignals =
     domain.status === "authenticated" ? domain.signals ?? null : null;
+  const signals = mergeLiveConnectivity(rawSignals);
 
   const ownerFirstName =
     domain.status === "authenticated" ? domain.owner.firstName : "гость";
@@ -131,7 +164,11 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         ? "Создайте организацию и первую точку — это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
-  const playback = deriveOwnerPlaybackSignal(playbackConfirmation ?? { nowMs: 0 });
+  const playback = deriveOwnerPlaybackSignal(
+    playbackConfirmation ?? livePlaybackInput(signals),
+  );
+  const shownTrack: { title: string; coverUrl?: string } | null =
+    currentTrack ?? signals?.currentTrack ?? null;
   const lastPlayAge = formatBusinessAge(signals?.lastPlayMinutesAgo ?? null);
 
   if (domain.status === "anonymous") {
@@ -216,13 +253,13 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
             <h2 id="playback-data-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
               Сейчас звучит
             </h2>
-            {playback.kind === "confirmed" && currentTrack ? (
+            {playback.kind === "confirmed" && shownTrack ? (
               <div className="mt-4 flex items-center gap-4">
-                {currentTrack.coverUrl && (
+                {shownTrack.coverUrl && (
                   // eslint-disable-next-line @next/next/no-img-element -- optional real player artwork
-                  <img src={currentTrack.coverUrl} alt={`Обложка «${currentTrack.title}»`} width={72} height={72} className="rounded-xl object-cover" />
+                  <img src={shownTrack.coverUrl} alt={`Обложка «${shownTrack.title}»`} width={72} height={72} className="rounded-xl object-cover" />
                 )}
-                <p className="font-semibold text-[var(--biz-text)]">{currentTrack.title}</p>
+                <p className="font-semibold text-[var(--biz-text)]">{shownTrack.title}</p>
               </div>
             ) : (
               <p className="mt-3 text-[var(--biz-text-muted)]">

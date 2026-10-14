@@ -2,6 +2,7 @@ import {
   deriveBusinessPointState,
   emptyBusinessOwnerHomeSignals,
   mapHealthRpcRows,
+  mapOwnerLiveState,
   type BusinessOwnerHomeSignals,
 } from "@/lib/business-app/owner-home-signals";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +29,17 @@ export async function loadBusinessOwnerHomeSignals(input: {
   }
 
   const players = mapHealthRpcRows(healthData);
+  let live = mapOwnerLiveState(null, input.organizationId);
+  // User RPC enforces the existing owner membership predicate and track eligibility.
+  // Missing migration, permission errors and network failures remain neutral.
+  if (input.locationId) {
+    try {
+      const { data, error } = await supabase.rpc("get_business_owner_player_live_state", {
+        p_location_id: input.locationId,
+      });
+      if (!error) live = mapOwnerLiveState(data, input.organizationId);
+    } catch { /* Not migrated yet or temporarily unavailable. */ }
+  }
 
   let lastBusinessPlayAt: string | null = null;
   try {
@@ -73,6 +85,7 @@ export async function loadBusinessOwnerHomeSignals(input: {
     stoppedMinutes: derived.stoppedMinutes,
     lastBusinessPlayAt,
     lastPlayMinutesAgo: derived.lastPlayMinutesAgo,
+    ...live,
     source: "player_health",
   };
 }

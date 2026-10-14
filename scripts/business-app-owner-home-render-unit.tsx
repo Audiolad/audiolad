@@ -54,6 +54,21 @@ for (const playbackConfirmation of [{ ...confirmed, playbackState: "paused" as c
   assert.doesNotMatch(render(context.signals, { currentTrack: track, playbackConfirmation }), /Реальный трек|real-cover/);
 }
 assert.match(render(context.signals, { playbackConfirmation: { nowMs, errorConfirmed: true } }), /data-tone="error"/);
+// Part B: live state from the /spa player.
+const fresh = new Date().toISOString();
+const live = { ...emptyBusinessOwnerHomeSignals(), lastSeenSeconds: 20, liveConnected: true, playbackState: "playing" as const, playbackConfirmedAt: fresh, playbackConfirmedSecondsAgo: 20, currentTrack: { title: "Живой трек" } };
+const liveHtml = render(live);
+assert.match(liveHtml, /Плеер на связи/);
+assert.match(liveHtml, /Воспроизведение подтверждено/);
+assert.match(liveHtml, /Живой трек/);
+const notConfirmed = render({ ...live, playbackConfirmedAt: null });
+assert.match(notConfirmed, /Воспроизведение не подтверждено/);
+assert.doesNotMatch(notConfirmed, /Живой трек/);
+const lost = render({ ...live, lastSeenSeconds: 900, liveConnected: false, playbackConfirmedAt: new Date(Date.now() - 900_000).toISOString(), playbackConfirmedSecondsAgo: 900 });
+assert.match(lost, /Нет связи с плеером/);
+assert.doesNotMatch(lost, /data-tone="error"|Живой трек|остановлен/);
+assert.match(render({ ...live, playbackState: "error" }), /data-tone="error"/);
+assert.doesNotMatch(render({ ...live, playbackState: "error", lastSeenSeconds: 900, liveConnected: false }), /data-tone="error"/);
 assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 0 }), /Последний сигнал от плеера: только что/);
 assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 29 }), /Последний сигнал от плеера: только что/);
 assert.match(render(context.signals), /Последний сигнал от плеера: меньше минуты назад/);
