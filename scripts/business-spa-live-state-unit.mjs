@@ -152,7 +152,11 @@ assert.equal((await actions.reportSpaPlayerPlayback(secret, valid)).reason, "rep
 assert.equal((await actions.reportSpaPlayerHeartbeat(secret)).reason, "report_failed");
 rpcError = null;
 
-let liveResult = { data: [row], error: null };
+// The loader reads the real clock (Date.now), so its fixture must be relative to the real clock,
+// not the fixed `now` used for the pure mapOwnerLiveState checks above.
+const liveNow = Date.now();
+const liveRow = { ...row, last_seen_at: iso(liveNow - 1000), playback_reported_at: iso(liveNow - 1000), playing_confirmed_at: iso(liveNow - 1000) };
+let liveResult = { data: [liveRow], error: null };
 let throwLive = false;
 const loader = load("../src/lib/business-app/load-owner-home-signals.ts", {
   "@/lib/business-app/owner-home-signals": signals,
@@ -174,7 +178,7 @@ assert.equal((await loader.loadBusinessOwnerHomeSignals(input)).lastSeenSeconds,
 throwLive = true;
 assert.equal((await loader.loadBusinessOwnerHomeSignals(input)).playbackState, null);
 throwLive = false;
-liveResult = { data: [row], error: null };
+liveResult = { data: [liveRow], error: null };
 assert.equal((await loader.loadBusinessOwnerHomeSignals({ ...input, organizationId: "other" })).currentTrack, null);
 assert.equal((await loader.loadBusinessOwnerHomeSignals({ ...input, locationId: null })).lastSeenSeconds, null);
 
