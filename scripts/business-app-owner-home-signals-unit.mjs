@@ -106,7 +106,15 @@ const home = readFileSync(
   "utf8",
 );
 assert.match(home, /domain\.signals/);
-assert.match(home, /mockStateOverride/);
+// c02fe282 P0-1: no URL override, no fake track, no unverified claims.
+assert.doesNotMatch(home, /mockStateOverride|mockState/);
+assert.doesNotMatch(home, /BUSINESS_HOME_MOCK|mock-data/);
+assert.doesNotMatch(home, /Всё работает|Лицензия активна|Документы в порядке|Всё под контролем/);
+assert.doesNotMatch(home, /Интернет работает|Соединение стабильно|Музыка остановилась/);
+assert.doesNotMatch(home, /Сейчас играет|progressbar|Пропустить|Больше такого/);
+assert.match(home, /Лицензия: нет подтверждённых данных/);
+assert.match(home, /не подтверждает, что музыка звучит/);
+assert.doesNotMatch(home, /useState/);
 assert.doesNotMatch(home, /initialState/);
 assert.doesNotMatch(home, /BUSINESS_HOME_MOCK\.stoppedMinutes/);
 
@@ -114,8 +122,13 @@ const page = readFileSync(
   join(repoRoot, "src/app/business-app/page.tsx"),
   "utf8",
 );
-assert.match(page, /mockStateOverride/);
-assert.match(page, /isBusinessPointState/);
+assert.doesNotMatch(page, /mockStateOverride|isBusinessPointState|BUSINESS_MOCK_STATE_QUERY|searchParams/);
+
+const greetingSrc = readFileSync(
+  join(repoRoot, "src/lib/business-app/greeting.ts"),
+  "utf8",
+);
+assert.doesNotMatch(greetingSrc, /Всё отлично|играет как запланировано|работает автономно/);
 
 const signalsSrc = readFileSync(
   join(repoRoot, "src/lib/business-app/owner-home-signals.ts"),
