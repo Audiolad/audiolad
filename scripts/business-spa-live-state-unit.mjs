@@ -125,7 +125,10 @@ const actions = load("../src/app/business-app/spa/actions.ts", {
   "@/lib/supabase/server": { createClient: async () => ({ rpc: async (...args) => { calls.push(args); return { error: rpcError }; } }) },
   "@/lib/business-app/spa-pilot": { loadSpaPilotContext: async () => context },
   "@/lib/business-app/spa-player-core": {},
-  "@/lib/business-app/spa-live-report": { isSpaLiveReport },
+  // c02fe282 stable-report: actions delegate to the shared handler (also used by the route).
+  "@/lib/business-app/spa-player-report": load("../src/lib/business-app/spa-player-report.ts", {
+    "@/lib/business-app/spa-live-report": { isSpaLiveReport },
+  }),
 });
 const secret = "s".repeat(40);
 assert.equal((await actions.reportSpaPlayerPlayback(secret, valid)).reason, "no_access");
@@ -232,15 +235,19 @@ try {
   const component = load("../src/components/business-app/SpaOnlinePlayer.tsx", {
     "react": {
       useRef: () => { const ref = { current: refs++ === 0 ? audio : null }; if (refs === 2) controllerRef = ref; return ref; },
-      useState: (init) => [init(), () => {}],
+      useState: (init) => [typeof init === "function" ? init() : init, () => {}],
       useEffect: (effect) => { cleanup = effect(); },
     },
     "react/jsx-runtime": require("react/jsx-runtime"),
-    "@/app/business-app/spa/actions": {
-      getSpaTrackUrl: async () => ({ ok: true, data: { url: "https://example.test/track" } }),
-      refreshSpaManifest: async () => ({ ok: false, reason: "temporary" }),
-      reportSpaPlayerPlayback: async (_secret, r) => { reports.push(r); throw Error("report transport fails"); },
-      reportSpaPlayerHeartbeat: async () => { heartbeats++; throw Error("heartbeat transport fails"); },
+    // c02fe282 stable-report: the player uses build-independent route handlers, not server actions.
+    "@/lib/business-app/spa-player-client": {
+      fetchSpaTrackUrl: async () => ({ ok: true, data: { url: "https://example.test/track" } }),
+      fetchSpaManifest: async () => ({ ok: false, reason: "temporary" }),
+      postSpaReport: async (p) => {
+        if (p.kind === "heartbeat") { heartbeats++; throw Error("heartbeat transport fails"); }
+        reports.push(p.report); throw Error("report transport fails");
+      },
+      watchSpaBuild: () => () => {},
     },
     "@/lib/business-app/spa-live-report": liveModule,
     "@/lib/business-app/spa-manifest": { parseSpaManifest },

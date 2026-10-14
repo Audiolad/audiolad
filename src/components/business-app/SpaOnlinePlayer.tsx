@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getSpaTrackUrl, refreshSpaManifest, reportSpaPlayerHeartbeat, reportSpaPlayerPlayback } from "@/app/business-app/spa/actions";
-import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
+import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
+import { fetchSpaManifest, fetchSpaTrackUrl, postSpaReport, watchSpaBuild } from "@/lib/business-app/spa-player-client";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
@@ -30,6 +30,10 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
   const [view, setView] = useState<View>(() => ({ items: parseItems(initialManifest), status: "idle", current: null, message: null }));
+  const [newBuild, setNewBuild] = useState(false);
+
+  // A newer deploy only shows a gentle hint; never auto-reload (music must not stop).
+  useEffect(() => watchSpaBuild(() => setNewBuild(true)), []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -39,8 +43,8 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
       typeof window !== "undefined" ? window.sessionStorage : null,
       () => crypto.randomUUID(),
     );
-    const sendPlayback = (r: Parameters<typeof reportSpaPlayerPlayback>[1]) => reportSpaPlayerPlayback(deviceSecret, r);
-    const heartbeatOnce = () => { try { void reportSpaPlayerHeartbeat(deviceSecret).catch(() => {}); } catch { /* best effort */ } };
+    const sendPlayback = (r: SpaLiveReport) => postSpaReport({ kind: "playback", deviceSecret, report: r });
+    const heartbeatOnce = () => { try { void postSpaReport({ kind: "heartbeat", deviceSecret }).catch(() => {}); } catch { /* best effort */ } };
     let lastState = "";
     let lastTrack: string | null = null;
     const report = () => {
@@ -59,7 +63,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         clearTimer: (t) => window.clearTimeout(t as number),
         sign: async (id) => {
           try {
-            const r = await getSpaTrackUrl(id, "stream");
+            const r = await fetchSpaTrackUrl(id);
             return r.ok ? { ok: true, data: { url: r.data.url } } : r;
           } catch {
             return { ok: false, reason: "network" };
@@ -100,7 +104,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
     audio.addEventListener("error", onError);
     const refresh = async () => {
       try {
-        const r = await refreshSpaManifest();
+        const r = await fetchSpaManifest();
         if (!r.ok && r.reason === "no_access") return void ctl.applyManifest(null);
         if (r.ok) void ctl.applyManifest(parseItems(r.data));
       } catch {
@@ -175,6 +179,11 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
           </ol>
         </>
       )}
+      {newBuild ? (
+        <p data-testid="spa-new-build" style={{ fontSize: 13, opacity: 0.7 }}>
+          Доступна новая версия страницы. Музыка продолжит играть; обновите страницу, когда будет удобно.
+        </p>
+      ) : null}
       <audio ref={audioRef} preload="none" playsInline />
     </section>
   );

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchSpaManifestRaw, isUuid, loadSpaPilotContext, signSpaTrack, type SpaSignedTrack } from "@/lib/business-app/spa-pilot";
 import { isLogEvent, type SpaLogEvent } from "@/lib/business-app/spa-player-core";
 
-import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
+import { handleSpaReport } from "@/lib/business-app/spa-player-report";
 
 export type SpaActionResult<T> = { ok: true; data: T } | { ok: false; reason: string };
 
@@ -95,48 +95,23 @@ export async function syncSpaPlaybackLog(events: unknown): Promise<SpaActionResu
   return { ok: true, data: valid.map((e) => e.client_event_id) };
 }
 
-const DEVICE_SECRET = /^[A-Za-z0-9_-]{32,128}$/;
-
 /**
- * Live signals (c02fe282 real-1b). User-session RPCs only; the assigned player comes from the
- * server context, never from the browser. The device secret binds writes to one device session.
+ * Kept for compatibility only. /spa reports through the stable route handler
+ * POST /api/business/player/report (server action IDs change per build → 404 in open tabs).
  */
-export async function reportSpaPlayerHeartbeat(deviceSecret: unknown): Promise<SpaActionResult<null>> {
-  try {
-    if (typeof deviceSecret !== "string" || !DEVICE_SECRET.test(deviceSecret)) return { ok: false, reason: "invalid_request" };
-    const ctx = await loadSpaPilotContext();
-    if (!ctx?.playerId) return { ok: false, reason: "no_access" };
-    // The RPC re-derives the caller's own player and refuses any other id.
-    const sessionPlayer = ctx.playerId;
+const reportDeps = {
+  loadPlayerId: async () => (await loadSpaPilotContext())?.playerId ?? null,
+  rpc: async (fn: string, args: Record<string, unknown>) => {
     const supabase = await createClient();
-    const { error } = await supabase.rpc("report_business_spa_player_heartbeat", {
-      p_player_id: sessionPlayer,
-      p_device_secret: deviceSecret,
-    });
-    return error ? { ok: false, reason: "report_failed" } : { ok: true, data: null };
-  } catch {
-    return { ok: false, reason: "report_failed" };
-  }
+    const { error } = await supabase.rpc(fn, args);
+    return { error };
+  },
+};
+
+export async function reportSpaPlayerHeartbeat(deviceSecret: unknown): Promise<SpaActionResult<null>> {
+  return handleSpaReport({ kind: "heartbeat", deviceSecret }, reportDeps);
 }
 
 export async function reportSpaPlayerPlayback(deviceSecret: unknown, input: unknown): Promise<SpaActionResult<null>> {
-  try {
-    if (typeof deviceSecret !== "string" || !DEVICE_SECRET.test(deviceSecret)) return { ok: false, reason: "invalid_request" };
-    if (!isSpaLiveReport(input)) return { ok: false, reason: "invalid_request" };
-    const ctx = await loadSpaPilotContext();
-    if (!ctx?.playerId) return { ok: false, reason: "no_access" };
-    const sessionPlayer = ctx.playerId;
-    const supabase = await createClient();
-    const { error } = await supabase.rpc("report_business_spa_player_playback", {
-      p_player_id: sessionPlayer,
-      p_device_secret: deviceSecret,
-      p_state: input.state,
-      p_audio_item_id: input.audioItemId,
-      p_playing_confirmed: input.playingConfirmed,
-      p_error_code: input.errorCode,
-    });
-    return error ? { ok: false, reason: "report_failed" } : { ok: true, data: null };
-  } catch {
-    return { ok: false, reason: "report_failed" };
-  }
+  return handleSpaReport({ kind: "playback", deviceSecret, report: input }, reportDeps);
 }
