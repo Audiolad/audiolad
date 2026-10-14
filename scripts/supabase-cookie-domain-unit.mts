@@ -150,7 +150,12 @@ console.log("supabase-cookie-domain-unit: ok");
   });
   const res = await updateSession(req, { rewritePathname: "/business-app/spa" });
   assert.equal(res.status, 307);
-  assert.equal(res.headers.get("location"), "/spa?x=1");
+  const loc = res.headers.get("location") ?? "";
+  // Must be absolute: Next's adapter does `new NextURL(location)` without a
+  // base; a relative Location threw "Invalid URL" -> 500 in prod (9c000895).
+  assert.doesNotThrow(() => new URL(loc), "307 Location must be absolute");
+  assert.equal(new URL(loc).pathname + new URL(loc).search, "/spa?x=1");
+  assert.equal(res.headers.get("cache-control"), "no-store");
   const setCookies = res.headers.getSetCookie();
   assert.ok(setCookies.some((l) => l.startsWith(`${KEY}=;`) && !l.includes("Domain=")));
   assert.ok(!setCookies.some((l) => l.includes("stale-B")));
@@ -165,6 +170,7 @@ console.log("supabase-cookie-domain-unit: ok");
     }),
   );
   assert.equal(post.status, 307);
+  assert.doesNotThrow(() => new URL(post.headers.get("location") ?? ""));
 
   // Apex legacy (e.g. logout POST): 307 with expiries only, request not processed.
   const apex = await updateSession(
