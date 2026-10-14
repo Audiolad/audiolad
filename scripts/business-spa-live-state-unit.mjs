@@ -36,6 +36,39 @@ for (const patch of [{ state: "loading" }, { audioItemId: "bad" }, { audioItemId
   assert.equal(isSpaLiveReport({ ...valid, ...patch }), false);
 }
 
+// c02fe282 live-fix: track already playing before reporting started (no "playing" event).
+{
+  const e = new SpaLiveEvidence();
+  e.reset();
+  e.onTimeUpdate(300, 1000, false);
+  assert.equal(e.report("playing", id, 1000).playingConfirmed, false, "first element sample is only a baseline");
+  e.onTimeUpdate(300.25, 1250, false);
+  e.onTimeUpdate(301, 2000, false);
+  assert.equal(e.report("playing", id, 2000).playingConfirmed, true, "already-playing element with advancing time is confirmed");
+  for (let s = 1; s <= 120; s++) e.onTimeUpdate(301 + s, 2000 + s * 1000, false);
+  assert.equal(e.report("playing", id, 122000).playingConfirmed, true, "periodic report keeps confirming");
+  e.onTimeUpdate(421, 123000, true);
+  e.onTimeUpdate(421, 180000, true);
+  assert.equal(e.report("playing", id, 180000).playingConfirmed, false, "paused element is never confirmed");
+  const f = new SpaLiveEvidence();
+  f.onTimeUpdate(50, 1000, false);
+  f.onTimeUpdate(50, 60000, false);
+  assert.equal(f.report("playing", id, 60000).playingConfirmed, false, "not-paused but stalled currentTime is not confirmed");
+}
+{
+  const d = live.deriveSpaPlaybackState;
+  assert.equal(d("paused", { paused: false, ended: false }, true), "playing", "controller says paused, element plays → playing");
+  assert.equal(d("playing", { paused: true, ended: false }, true), "paused", "controller says playing, element paused → paused");
+  assert.equal(d("playing", { paused: false, ended: true }, true), "stopped");
+  assert.equal(d("idle", { paused: true, ended: false }, false), "stopped");
+  assert.equal(d("error", { paused: false, ended: false }, true), "error");
+  assert.equal(d(undefined, { paused: false, ended: false }, false), "stopped", "no track → never playing");
+}
+const src = readFileSync(new URL("../src/components/business-app/SpaOnlinePlayer.tsx", import.meta.url), "utf8");
+assert.match(src, /deriveSpaPlaybackState\(c\?\.status, audio,/, "periodic report derives state from the audio element");
+assert.match(src, /evidence\.onTimeUpdate\(audio\.currentTime, Date\.now\(\), audio\.paused \|\| audio\.ended\)/);
+assert.doesNotMatch(src, /c\?\.status === "playing" \? "playing"/, "controller status alone must not decide playing");
+
 const now = Date.parse("2026-10-14T12:00:00Z");
 const iso = (ms) => new Date(ms).toISOString();
 const row = { organization_id: "org", last_seen_at: iso(now - 300000), playback_state: "playing", playback_reported_at: iso(now - 1000), playing_confirmed_at: iso(now - 1000), current_track_title: "Allowed" };
