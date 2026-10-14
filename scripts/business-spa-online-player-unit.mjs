@@ -204,7 +204,9 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   assert.doesNotMatch(page, /<SpaPilotPlayer/);
   const comp = readFileSync(new URL("../src/components/business-app/SpaOnlinePlayer.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(comp, /caches\.|localStorage|indexedDB|"offline"|spa-player-engine|downloadAll/);
-  assert.match(comp, /getSpaTrackUrl\(id, "stream"\)/);
+  // c02fe282 stable-report: signing goes through the build-independent route (stream only).
+  assert.match(comp, /fetchSpaTrackUrl\(id\)/);
+  assert.match(readFileSync(new URL("../src/app/api/business/player/track-url/route.ts", import.meta.url), "utf8"), /signSpaTrack\(ctx, id, "stream"\)/);
   const actions = readFileSync(new URL("../src/app/business-app/spa/actions.ts", import.meta.url), "utf8");
   assert.match(actions, /const SPA_OFFLINE_ENABLED = false;/);
   assert.match(actions, /purpose === "offline" && !SPA_OFFLINE_ENABLED\) return \{ ok: false, reason: "offline_not_allowed" \}/);
