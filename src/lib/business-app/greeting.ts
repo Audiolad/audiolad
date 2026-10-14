@@ -24,14 +24,6 @@ export function buildBusinessGreeting(
   return `${prefix}, ${firstName}!`;
 }
 
-export function buildBusinessGreetingSubtitle(
-  state: "healthy" | "autonomous" | "stopped",
-): string {
-  if (state === "healthy") {
-    return "Всё отлично. Музыка играет как запланировано.";
-  }
-  if (state === "autonomous") {
-    return "Интернет временно недоступен. Точка работает автономно.";
-  }
-  return "Нужно внимание: плеер в точке не отвечает.";
+export function buildBusinessGreetingSubtitle(): string {
+  return "Состояние вашей точки и последние данные.";
 }
