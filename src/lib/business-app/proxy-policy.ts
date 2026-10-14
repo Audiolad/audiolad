@@ -19,6 +19,10 @@ export const BUSINESS_PUBLIC_ASSET_PATHS = [
 export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/client-errors",
   "/api/health/build",
+  // c02fe282: stable (build-independent) /spa player endpoints.
+  "/api/business/player/report",
+  "/api/business/player/track-url",
+  "/api/business/player/manifest",
 ] as const;
 
 /**
