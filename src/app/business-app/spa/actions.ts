@@ -106,9 +106,11 @@ export async function reportSpaPlayerHeartbeat(deviceSecret: unknown): Promise<S
     if (typeof deviceSecret !== "string" || !DEVICE_SECRET.test(deviceSecret)) return { ok: false, reason: "invalid_request" };
     const ctx = await loadSpaPilotContext();
     if (!ctx?.playerId) return { ok: false, reason: "no_access" };
+    // The RPC re-derives the caller's own player and refuses any other id.
+    const sessionPlayer = ctx.playerId;
     const supabase = await createClient();
     const { error } = await supabase.rpc("report_business_spa_player_heartbeat", {
-      p_player_id: ctx.playerId,
+      p_player_id: sessionPlayer,
       p_device_secret: deviceSecret,
     });
     return error ? { ok: false, reason: "report_failed" } : { ok: true, data: null };
@@ -123,9 +125,10 @@ export async function reportSpaPlayerPlayback(deviceSecret: unknown, input: unkn
     if (!isSpaLiveReport(input)) return { ok: false, reason: "invalid_request" };
     const ctx = await loadSpaPilotContext();
     if (!ctx?.playerId) return { ok: false, reason: "no_access" };
+    const sessionPlayer = ctx.playerId;
     const supabase = await createClient();
     const { error } = await supabase.rpc("report_business_spa_player_playback", {
-      p_player_id: ctx.playerId,
+      p_player_id: sessionPlayer,
       p_device_secret: deviceSecret,
       p_state: input.state,
       p_audio_item_id: input.audioItemId,
