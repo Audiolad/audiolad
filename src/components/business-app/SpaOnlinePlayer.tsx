@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { getSpaTrackUrl, refreshSpaManifest, reportSpaPlayerHeartbeat, reportSpaPlayerPlayback } from "@/app/business-app/spa/actions";
-import { getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
+import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
@@ -45,9 +45,9 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
     let lastTrack: string | null = null;
     const report = () => {
       const c = ctlRef.current;
-      const state: SpaPlaybackState = c?.status === "error" ? "error"
-        : audio.ended ? "stopped" : c?.status === "paused" || (c?.status === "playing" && audio.paused) ? "paused"
-          : c?.status === "playing" ? "playing" : "stopped";
+      // Sample the element itself so a track that was already playing is confirmed too.
+      evidence.onTimeUpdate(audio.currentTime, Date.now(), audio.paused || audio.ended);
+      const state: SpaPlaybackState = deriveSpaPlaybackState(c?.status, audio, Boolean(c?.current));
       sendSpaLiveReport(sendPlayback,
         evidence.report(state, c?.current?.audioItemId ?? null, Date.now()));
     };
@@ -70,7 +70,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
           if (c) {
             setView({ items: c.items, status: c.status, current: c.current, message: c.message });
             const track = c.current?.audioItemId ?? null;
-            if (c.status === "loading" || c.status === "paused" || c.status === "idle" || c.status === "error" || c.status === "no_access" || track !== lastTrack) evidence.reset();
+            if (c.status === "loading" || (c.status === "paused" && audio.paused) || c.status === "idle" || c.status === "error" || c.status === "no_access" || track !== lastTrack) evidence.reset();
             if (c.status !== lastState || track !== lastTrack) {
               lastState = c.status;
               lastTrack = track;
@@ -83,7 +83,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
     );
     ctlRef.current = ctl;
     const onPlaying = () => { evidence.onPlaying(audio.currentTime); report(); };
-    const onTimeUpdate = () => evidence.onTimeUpdate(audio.currentTime, Date.now());
+    const onTimeUpdate = () => evidence.onTimeUpdate(audio.currentTime, Date.now(), audio.paused || audio.ended);
     const onPause = () => { evidence.reset(audio.currentTime); report(); };
     const onEnded = () => {
       evidence.reset();
