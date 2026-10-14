@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -9,7 +9,12 @@ import {
   buildBusinessGreeting,
   buildBusinessGreetingSubtitle,
 } from "@/lib/business-app/greeting";
-import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
+import {
+  deriveOwnerPlaybackSignal,
+  type OwnerPlaybackSignal,
+  type OwnerPlaybackSignalInput,
+  type BusinessOwnerHomeSignals,
+} from "@/lib/business-app/owner-home-signals";
 
 import {
   buildBusinessHomeStatusCopy,
@@ -19,25 +24,41 @@ import {
 function StatusBanner({
   locationName,
   signals,
+  playback,
 }: {
   locationName: string;
   signals: BusinessOwnerHomeSignals | null;
+  playback: OwnerPlaybackSignal;
 }) {
   const hb = buildBusinessHomeStatusCopy(signals);
+  const checkedAge = hb.kind !== "no_data"
+    ? formatBusinessAge((signals?.secondsSinceHeartbeat ?? 0) / 60)
+    : null;
   return (
     <section
-      className="business-app-card business-app-span-full"
+      className="business-app-card"
       aria-live="polite"
       data-testid="owner-home-status"
     >
-      <p className="text-sm font-semibold uppercase tracking-wide text-[var(--biz-text-muted)]">
-        Что известно о точке
-      </p>
-      <p className="mt-1 text-lg font-semibold text-[var(--biz-text)]">{locationName}</p>
-      <h2 className="mt-2 text-[1.35rem] font-bold leading-tight text-[var(--biz-text)]">
-        {hb.title}
+      <h2 className="text-[1.35rem] font-bold leading-tight text-[var(--biz-text)]">
+        {locationName}
       </h2>
-      <p className="mt-1 text-[1.02rem] text-[var(--biz-text-muted)]">{hb.detail}</p>
+      <p className="mt-1 text-sm text-[var(--biz-text-muted)]">
+        {checkedAge ? `Последний сигнал от плеера: ${checkedAge}` : "Последний сигнал от плеера: нет данных"}
+      </p>
+      <ul className="business-app-owner-signals mt-4" aria-label="Сигналы точки">
+        <li data-tone={hb.tone}>
+          <strong>{hb.title}</strong>
+          <p>{hb.detail}</p>
+        </li>
+        <li data-tone={playback.tone}>
+          <strong>{playback.title}</strong>
+          <p>{playback.detail}</p>
+        </li>
+      </ul>
+      <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
+        Лицензия: нет подтверждённых данных
+      </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <a
           href="/player"
@@ -56,16 +77,22 @@ function StatusBanner({
   );
 }
 
-function InfoRow({ title, detail }: { title: string; detail: string }) {
+function ComingSoon({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[var(--biz-border)] bg-white px-3.5 py-3">
-      <p className="font-semibold text-[var(--biz-text)]">{title}</p>
-      <p className="mt-0.5 text-sm text-[var(--biz-text-muted)]">{detail}</p>
-    </div>
+    <section className="business-app-card business-app-owner-disabled" role="group" aria-disabled="true">
+      <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">{title} <span className="business-app-chip">скоро</span></h2>
+      {children}
+    </section>
   );
 }
 
-export default function BusinessHomePage() {
+export type BusinessHomePageProps = {
+  currentTrack?: { title: string; coverUrl?: string } | null;
+  /** Part B only: no live server confirmation source is connected in Part A. */
+  playbackConfirmation?: OwnerPlaybackSignalInput;
+};
+
+export default function BusinessHomePage({ currentTrack, playbackConfirmation }: BusinessHomePageProps = {}) {
   const domain = useBusinessDomain();
   const signals =
     domain.status === "authenticated" ? domain.signals ?? null : null;
@@ -88,6 +115,7 @@ export default function BusinessHomePage() {
         ? "Создайте организацию и первую точку — это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
+  const playback = deriveOwnerPlaybackSignal(playbackConfirmation ?? { nowMs: 0 });
   const lastPlayAge = formatBusinessAge(signals?.lastPlayMinutesAgo ?? null);
 
   if (domain.status === "anonymous") {
@@ -165,52 +193,46 @@ export default function BusinessHomePage() {
         </p>
       </header>
 
-      <div className="business-app-home-grid">
-        <StatusBanner locationName={locationName || "Точка"} signals={signals} />
-
+      <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">
+          <StatusBanner locationName={locationName || "Точка"} signals={signals} playback={playback} />
           <section className="business-app-card" aria-labelledby="playback-data-title">
-            <h2
-              id="playback-data-title"
-              className="text-[1.15rem] font-bold text-[var(--biz-text)]"
-            >
-              Данные о воспроизведении
+            <h2 id="playback-data-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
+              Сейчас звучит
             </h2>
-            <p className="mt-3 text-[1.02rem] text-[var(--biz-text)]">
-              {lastPlayAge
-                ? `Последнее зарегистрированное событие воспроизведения: ${lastPlayAge}.`
-                : "Событий воспроизведения пока нет или они недоступны."}
-            </p>
-            <p className="mt-1 text-sm text-[var(--biz-text-muted)]">
-              Что звучит прямо сейчас, кабинет не знает. Управление музыкой — в
-              плеере на устройстве точки.
-            </p>
+            {playback.kind === "confirmed" && currentTrack ? (
+              <div className="mt-4 flex items-center gap-4">
+                {currentTrack.coverUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- optional real player artwork
+                  <img src={currentTrack.coverUrl} alt={`Обложка «${currentTrack.title}»`} width={72} height={72} className="rounded-xl object-cover" />
+                )}
+                <p className="font-semibold text-[var(--biz-text)]">{currentTrack.title}</p>
+              </div>
+            ) : (
+              <p className="mt-3 text-[var(--biz-text-muted)]">
+                Что звучит сейчас — появится, когда плеер точки начнёт присылать подтверждения
+              </p>
+            )}
+            {lastPlayAge && (
+              <p className="mt-3 text-sm text-[var(--biz-text-muted)]">
+                Последнее зарегистрированное событие воспроизведения: {lastPlayAge}.
+              </p>
+            )}
           </section>
         </div>
-
         <div className="business-app-home-stack">
-          <section className="business-app-card" aria-labelledby="facts-title">
-            <h2
-              id="facts-title"
-              className="text-[1.15rem] font-bold text-[var(--biz-text)]"
-            >
-              Сведения
-            </h2>
-            <div className="mt-4 grid gap-2.5">
-              <InfoRow
-                title="Лицензия: нет подтверждённых данных"
-                detail="Кабинет пока не проверяет документы и права использования."
-              />
-              <InfoRow
-                title="Интернет точки кабинетом не проверяется"
-                detail="Доступен только возраст последнего сигнала от плеера."
-              />
-              <InfoRow
-                title="Расписание и атмосфера — позже"
-                detail="Эти функции ещё не подключены."
-              />
+          <ComingSoon title="Атмосфера">
+            <p className="mt-3 text-[var(--biz-text-muted)]">Спокойнее — Энергичнее</p>
+            <input type="range" min="0" max="100" disabled aria-disabled="true" aria-label="Атмосфера — скоро" className="mt-2 w-full min-h-12" />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Больше такого · скоро</button>
+              <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Меньше такого · скоро</button>
             </div>
-          </section>
+          </ComingSoon>
+          <ComingSoon title="Следующая смена музыкального дня">
+            <p className="mt-3 text-[var(--biz-text-muted)]">Расписание точки пока не подключено.</p>
+          </ComingSoon>
+          <ComingSoon title="История звучания" />
         </div>
       </div>
     </div>

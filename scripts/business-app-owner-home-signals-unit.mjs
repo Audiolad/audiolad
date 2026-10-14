@@ -111,7 +111,7 @@ assert.doesNotMatch(home, /mockStateOverride|mockState/);
 assert.doesNotMatch(home, /BUSINESS_HOME_MOCK|mock-data/);
 assert.doesNotMatch(home, /Всё работает|Лицензия активна|Документы в порядке|Всё под контролем/);
 assert.doesNotMatch(home, /Интернет работает|Соединение стабильно|Музыка остановилась/);
-assert.doesNotMatch(home, /Сейчас играет|progressbar|Пропустить|Больше такого/);
+assert.doesNotMatch(home, /Сейчас играет|progressbar|Пропустить/);
 assert.match(home, /Лицензия: нет подтверждённых данных/);
 assert.match(home, /buildBusinessHomeStatusCopy/);
 assert.doesNotMatch(home, /useState/);
@@ -168,12 +168,12 @@ assert.equal(copy({ playerCount: 0 }).kind, "no_data");
 const onlineCopy = copy({});
 assert.equal(onlineCopy.kind, "online");
 assert.match(onlineCopy.detail, /не подтверждает, что музыка звучит/);
-assert.equal(copy({ primaryHealthStatus: "stale", secondsSinceHeartbeat: 600 }).kind, "stale");
+assert.equal(copy({ primaryHealthStatus: "stale", secondsSinceHeartbeat: 600 }).kind, "offline");
 assert.equal(copy({ primaryHealthStatus: "offline", secondsSinceHeartbeat: 7200 }).kind, "offline");
-assert.equal(copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: null }).kind, "unknown");
-assert.equal(copy({ primaryHealthStatus: "none", secondsSinceHeartbeat: null }).kind, "unknown");
-assert.equal(copy({ primaryHealthStatus: "offline", secondsSinceHeartbeat: null }).kind, "unknown");
-assert.equal(copy({ primaryHealthStatus: "stale", secondsSinceHeartbeat: -5 }).kind, "unknown");
+assert.equal(copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: null }).kind, "no_data");
+assert.equal(copy({ primaryHealthStatus: "none", secondsSinceHeartbeat: null }).kind, "no_data");
+assert.equal(copy({ primaryHealthStatus: "offline", secondsSinceHeartbeat: null }).kind, "no_data");
+assert.equal(copy({ primaryHealthStatus: "stale", secondsSinceHeartbeat: -5 }).kind, "no_data");
 for (const c of [copy(null), copy({}), copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: null })]) {
   assert.doesNotMatch(c.title + c.detail, /Всё работает|Музыка играет|остановил/);
 }
@@ -181,4 +181,55 @@ assert.equal(formatBusinessAge(null), null);
 assert.equal(formatBusinessAge(-1), null);
 assert.equal(formatBusinessAge(5), "5 мин назад");
 
+// Connectivity is measured by heartbeat age, independent of RPC health labels.
+for (const status of ["online", "stale", "offline"]) {
+  assert.equal(copy({ primaryHealthStatus: status, secondsSinceHeartbeat: 300 }).title, "Плеер на связи");
+  const lost = copy({ primaryHealthStatus: status, secondsSinceHeartbeat: 301 });
+  assert.equal(lost.title, "Нет связи с плеером");
+  assert.equal(lost.tone, "neutral");
+  assert.match(lost.detail, /может продолжать играть/);
+}
+for (const seconds of [null, NaN, Infinity, -1]) {
+  assert.equal(copy({ secondsSinceHeartbeat: seconds }).tone, "neutral");
+  assert.equal(copy({ secondsSinceHeartbeat: seconds }).title, "Нет данных о плеере");
+}
+assert.equal(copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: 1 }).title, "Нет данных о плеере");
+assert.equal(copy({ primaryHealthStatus: "unknown", secondsSinceHeartbeat: 1 }).title, "Нет данных о плеере");
+assert.equal(buildBusinessHomeStatusCopy(base, true).title, "Точка закрыта");
+assert.equal(buildBusinessHomeStatusCopy(base, true).tone, "neutral");
+assert.equal(buildBusinessHomeStatusCopy(base, false).kind, "online");
+
+const { deriveOwnerPlaybackSignal } = await import("../src/lib/business-app/owner-home-signals.ts");
+const nowMs = Date.parse("2026-10-14T12:00:00Z");
+const playback = (patch = {}) => deriveOwnerPlaybackSignal({ nowMs, ...patch });
+const atAge = (seconds) => new Date(nowMs - seconds * 1000).toISOString();
+assert.equal(playback().title, "Воспроизведение не подтверждено");
+for (const state of [null, "playing", "paused", "stopped", "error"]) {
+  for (const timestamp of [null, "invalid", atAge(-1)]) {
+    assert.equal(playback({ playbackState: state, playbackConfirmedAt: timestamp }).kind, "unconfirmed");
+  }
+  assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(301) }).kind, "stale");
+  assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(301) }).tone, "neutral");
+}
+for (const seconds of [0, 299, 300]) {
+  const confirmed = playback({ playbackState: "playing", playbackConfirmedAt: atAge(seconds) });
+  assert.equal(confirmed.title, "Воспроизведение подтверждено");
+  assert.equal(confirmed.kind, "confirmed");
+}
+for (const state of ["paused", "stopped"]) {
+  assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(30) }).kind, state);
+  assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(30) }).tone, "neutral");
+}
+for (const state of [null, "error"]) {
+  assert.equal(playback({ playbackState: state, playbackConfirmedAt: atAge(30) }).kind, "unconfirmed");
+}
+assert.equal(playback({ errorConfirmed: true }).tone, "error");
+assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: atAge(0), errorConfirmed: true }).kind, "error");
+assert.equal(playback({ playbackState: "error", errorConfirmed: false }).tone, "neutral");
+// A 45-minute track still playing: periodic confirmation stays fresh regardless of track start.
+const trackStartedAt = atAge(45 * 60);
+assert.equal((nowMs - Date.parse(trackStartedAt)) / 60_000, 45);
+assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: atAge(30) }).kind, "confirmed");
+assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: trackStartedAt }).kind, "stale");
+assert.equal(playback({ playbackState: "playing", playbackConfirmedAt: trackStartedAt }).tone, "neutral");
 console.log("business-app-owner-home-signals-unit: ok");

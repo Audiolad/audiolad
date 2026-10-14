@@ -28,11 +28,11 @@ const PLAYER = "Ресепшн";
 // Two distinct signals: connectivity (player heartbeat) and sound confirmation.
 // Only a confirmed playback failure is red. A long track never turns anything red.
 const states = {
-  playing: { label: "Играет", tone: "ok", icon: "♪", title: `В ${POINT} музыка играет`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["ok", "подтверждён"], action: null },
-  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["calm", "пауза на плеере точки"], action: "Продолжить можно в плеере точки на ресепшн." },
-  offline: { label: "Нет связи 5 минут (рабочее время)", tone: "warn", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 5 минут назад", link: ["warn", "нет 5 минут"], sound: ["closed", "сейчас не проверить"], action: "Проверьте, включено ли устройство на ресепшн и есть ли интернет." },
-  closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "не нужна, точка закрыта"], sound: ["closed", "нерабочие часы"], action: null },
-  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "на связи"], sound: ["bad", "не воспроизводится"], action: "Откройте плеер точки на ресепшн или напишите в поддержку." },
+  playing: { label: "Играет", tone: "ok", icon: "♪", title: `В ${POINT} музыка играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["ok", "Воспроизведение подтверждено"], action: null },
+  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["calm", "Воспроизведение на паузе"], action: "Продолжить можно в плеере точки на ресепшн." },
+  offline: { label: "Нет связи более 5 минут", tone: "closed", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 6 минут назад", link: ["closed", "Нет связи с плеером"], sound: ["closed", "Нет свежего подтверждения звука"], action: "Музыка на точке может продолжать играть." },
+  closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "Точка закрыта"], sound: ["closed", "Воспроизведение не подтверждено"], action: null },
+  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["bad", "Сбой воспроизведения подтверждён"], action: "Откройте плеер точки на ресепшн или напишите в поддержку." },
 } as const;
 type PreviewState = keyof typeof states;
 
@@ -94,8 +94,8 @@ export default function SpaDesignPreview() {
         <h3>{status.title}</h3>
         <p className={styles.checked}>{status.checked}</p>
         <ul className={styles.signals} aria-label="Сигналы точки">
-          <li><span className={`${styles.dot} ${styles[status.link[0]]}`} aria-hidden="true" />Связь: {status.link[1]}</li>
-          <li><span className={`${styles.dot} ${styles[status.sound[0]]}`} aria-hidden="true" />Звук: {status.sound[1]}</li>
+          <li><span className={`${styles.dot} ${styles[status.link[0]]}`} aria-hidden="true" />{status.link[1]}</li>
+          <li><span className={`${styles.dot} ${styles[status.sound[0]]}`} aria-hidden="true" />{status.sound[1]}</li>
         </ul>
         {status.action && <p className={styles.action}>{status.action}</p>}
       </div>
