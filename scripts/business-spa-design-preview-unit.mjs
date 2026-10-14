@@ -16,17 +16,25 @@ assert.match(route, /export const dynamic = ["']force-dynamic["']/);
 assert.match(route, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(route, /googleBot:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(client, /<strong>Макет — не реальные данные<\/strong>/);
-assert.match(client, /Концепт · позже/);
-assert.match(client, /function Concept[\s\S]*?return <div[^;]+<\/div>;/);
-const conceptBody = client.slice(client.indexOf("function Concept"), client.indexOf("export default"));
-assert.doesNotMatch(conceptBody, /<(?:button|a|input|select)\b|onClick/);
-
-for (const id of ["home", "player", "atmosphere", "venue", "help", "profile"]) {
+for (const id of ["home", "day", "atmosphere", "license", "alerts", "locations"]) {
   assert.ok(client.includes(`["${id}",`), `missing screen ${id}`);
 }
-for (const id of ["playing", "paused", "empty", "offline", "error"]) {
+for (const id of ["playing", "paused", "offline", "closed", "failed"]) {
   assert.match(client, new RegExp(`\\b${id}: \\{ label:`), `missing state ${id}`);
 }
+// Oriy 2026-10-14: connectivity != playback; closed hours are calm, long tracks never red.
+for (const title of ["Музыка играет", "Воспроизведение остановлено", "Нет связи с плеером", "Точка закрыта", "Музыка не играет"]) {
+  assert.ok(client.includes(`title: "${title}"`), `missing status title ${title}`);
+}
+assert.match(client, /closed: \{[^}]*tone: "closed"/);
+assert.match(client, /failed: \{[^}]*tone: "bad"/);
+assert.equal((client.match(/tone: "bad"/g) || []).length, 1, "only confirmed playback failure may be red");
+assert.match(client, /Что сейчас играет/);
+assert.match(client, /Что звучало/);
+assert.match(client, /const needsAction = state === "offline" \|\| state === "failed";/);
+assert.match(client, /\{needsAction && alertsCard\}/, "home shows notifications only when action is needed");
+assert.doesNotMatch(css, /min-height:\s*(?:[0-3]?\d|4[0-7])px/, "touch targets must be >= 48px");
+assert.match(css, /\.slider button \{ width:48px; height:48px;/);
 assert.match(client, /disabled=\{!hasTrack\}/);
 assert.match(client, /aria-live="polite"/);
 assert.match(client, /aria-pressed=\{screen === id\}/);

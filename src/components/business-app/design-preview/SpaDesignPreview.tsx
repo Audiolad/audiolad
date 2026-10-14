@@ -1,72 +1,215 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import styles from "./design-preview.module.css";
 
+// DESIGN MOCKUP ONLY (c02fe282 mock-v2). Every name, track, time and status
+// below is invented sample data. Nothing here reads a player, a heartbeat or
+// playback events; buttons only switch the mockup.
+
 const screens = [
-  ["home", "Главная / статус музыки"],
-  ["player", "Плеер точки"],
-  ["atmosphere", "Атмосфера и время суток [концепт]"],
-  ["venue", "Точка и лицензия"],
-  ["help", "Помощь"],
-  ["profile", "Профиль"],
+  ["home", "Главная"],
+  ["day", "Музыкальный день"],
+  ["atmosphere", "Атмосфера"],
+  ["license", "Лицензия и документы"],
+  ["alerts", "Уведомления"],
+  ["locations", "Мои точки"],
 ] as const;
 type Screen = (typeof screens)[number][0];
 
+// Connectivity (technical heartbeat) and actual playback are separate signals.
+// A long track (20–60 min) never turns anything red: freshness is judged by the
+// player heartbeat, not by how recently a new track started.
 const states = {
-  playing: { label: "Играет", title: "Музыка играет · пример", detail: "Показан образец подтверждённого воспроизведения. Это не статус вашей точки.", hint: "В рабочем кабинете здесь нужны источник и время подтверждения." },
-  paused: { label: "Пауза", title: "Музыка на паузе · пример", detail: "В этом сценарии воспроизведение приостановлено на устройстве точки.", hint: "Продолжить можно на устройстве, к которому подключены колонки." },
-  empty: { label: "Нет музыки", title: "Пока нет доступной музыки · пример", detail: "В этом сценарии программа пуста. Наличие программы само по себе не подтверждает права.", hint: "Уточните доступность программы у поддержки." },
-  offline: { label: "Offline / нет подключения", title: "Нет подключения · пример", detail: "Текущий статус звучания неизвестен. Проверьте интернет на устройстве точки.", hint: "В текущем онлайн-пилоте автономное воспроизведение не предусмотрено." },
-  error: { label: "Ошибка", title: "Не удалось получить статус · пример", detail: "В этом сценарии произошла ошибка. Мы не можем подтвердить, звучит ли музыка.", hint: "Проверьте подключение и откройте подсказки в разделе помощи." },
+  playing: { label: "Играет", tone: "ok", icon: "♪", title: "Музыка играет", detail: "Плеер на связи, музыка звучит.", action: null },
+  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: "Воспроизведение остановлено", detail: "Плеер на связи. Музыку поставили на паузу на устройстве точки.", action: "Продолжить можно на устройстве, к которому подключены колонки." },
+  offline: { label: "Нет связи (рабочее время)", tone: "warn", icon: "!", title: "Нет связи с плеером", detail: "Плеер не выходил на связь 5 минут. Сейчас рабочие часы точки.", action: "Проверьте, включено ли устройство точки и есть ли интернет." },
+  closed: { label: "Нет связи (точка закрыта)", tone: "closed", icon: "☾", title: "Точка закрыта", detail: "Сейчас нерабочие часы. Плеер может быть выключен — это нормально.", action: null },
+  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: "Музыка не играет", detail: "Плеер на связи, но подтверждено, что звук не воспроизводится.", action: "Откройте плеер на устройстве точки или напишите в поддержку." },
 } as const;
 type PreviewState = keyof typeof states;
 
-function Concept({ children }: { children: ReactNode }) {
-  return <div className={styles.concept}><span className={styles.badge}>Концепт · позже</span>{children}</div>;
-}
+const track = { title: "Тёплый туман", artist: "Аудиолад · пример", program: "Утро в SPA", length: 42 * 60, position: 17 * 60 + 35 };
+const history = [
+  ["10:12", "Тёплый туман", "42 мин"],
+  ["09:31", "Медленная вода", "38 мин"],
+  ["09:02", "Лёгкий бриз", "27 мин"],
+  ["08:30", "Открытие дня", "31 мин"],
+] as const;
+const dayArc = [
+  ["08:30", "Открытие", "Мягко и светло", "past"],
+  ["10:00", "Утро", "Спокойно", "now"],
+  ["13:00", "День", "Ровно, чуть живее", "next"],
+  ["18:00", "Вечер", "Глубже и тише", "later"],
+  ["21:00", "Закрытие", "Тихое завершение", "later"],
+] as const;
+const venues = [
+  ["SPA «Тихий сад» · Тверская", "Музыка играет", "ok"],
+  ["SPA «Тихий сад» · Арбат", "Музыка играет", "ok"],
+  ["SPA «Тихий сад» · Химки", "Точка закрыта", "closed"],
+] as const;
+
+const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 export default function SpaDesignPreview() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [state, setState] = useState<PreviewState>("paused");
-  const [frame, setFrame] = useState("phone");
+  const [state, setState] = useState<PreviewState>("playing");
+  const [frame, setFrame] = useState<"desktop" | "phone">("desktop");
+  const [energy, setEnergy] = useState(2);
   const status = states[state];
   const hasTrack = state === "playing" || state === "paused";
+  // Notifications only when the owner must act (Bible: notification = action needed).
+  const needsAction = state === "offline" || state === "failed";
+  const progress = Math.round((track.position / track.length) * 100);
+
+  const statusCard = (
+    <section className={`${styles.status} ${styles[status.tone]}`} aria-live="polite" data-testid="status">
+      <span className={styles.statusIcon} aria-hidden="true">{status.icon}</span>
+      <div>
+        <h3>{status.title}</h3>
+        <p>{status.detail}</p>
+        {status.action && <p className={styles.action}>{status.action}</p>}
+      </div>
+    </section>
+  );
+
+  const nowPlaying = (
+    <section className={`${styles.card} ${styles.nowPlaying}`} aria-labelledby="np">
+      <p className={styles.eyebrow} id="np">Что сейчас играет</p>
+      {hasTrack ? (
+        <>
+          <div className={styles.trackRow}>
+            <div className={styles.cover} aria-hidden="true" />
+            <div>
+              <h3 className={styles.trackTitle}>{track.title}</h3>
+              <p className={styles.muted}>{track.artist} · программа «{track.program}»</p>
+            </div>
+          </div>
+          <div className={styles.progress} role="progressbar" aria-label="Прогресс трека" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+            <span style={{ width: `${progress}%` }} />
+          </div>
+          <p className={styles.time}><span>{fmt(track.position)}</span><span>{fmt(track.length)}</span></p>
+          <p className={styles.note}>Длинный трек — 42 минуты. Это нормально: связь с плеером проверяется отдельно.</p>
+          <button type="button" className={styles.secondary} disabled={!hasTrack}>Открыть плеер точки</button>
+        </>
+      ) : (
+        <p className={styles.muted}>{state === "closed" ? "Точка закрыта. Музыка начнётся с открытием в 08:30." : "Сейчас нельзя подтвердить, что звучит. Ниже — последнее, что звучало."}</p>
+      )}
+    </section>
+  );
+
+  const historyCard = (
+    <section className={styles.card} aria-labelledby="hist">
+      <p className={styles.eyebrow} id="hist">Что звучало</p>
+      <ol className={styles.history}>
+        {history.map(([t, name, len]) => <li key={t}><span className={styles.muted}>{t}</span><span>{name}</span><span className={styles.muted}>{len}</span></li>)}
+      </ol>
+    </section>
+  );
+
+  const dayCard = (full: boolean) => (
+    <section className={styles.card} aria-labelledby="day">
+      <p className={styles.eyebrow} id="day">Музыкальный день</p>
+      {!full && <h3>Сейчас «Утро» · в 13:00 — «День»</h3>}
+      <ol className={full ? styles.arcFull : styles.arc}>
+        {dayArc.map(([t, name, mood, when]) => (
+          <li key={t} className={styles[when]} aria-current={when === "now" ? "step" : undefined}>
+            <strong>{name}</strong><span className={styles.muted}>{t}{full ? ` · ${mood}` : ""}</span>
+          </li>
+        ))}
+      </ol>
+      {full && <p className={styles.note}>Аудиолад сам ведёт музыку через день. Вы можете поправить атмосферу — день подстроится.</p>}
+    </section>
+  );
+
+  const atmosphereCard = (
+    <section className={styles.card} aria-labelledby="atm">
+      <p className={styles.eyebrow} id="atm">Атмосфера</p>
+      <div className={styles.slider} role="group" aria-label="Энергия музыки">
+        <span>Спокойнее</span>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <button type="button" key={i} aria-label={`Уровень ${i + 1}`} aria-pressed={energy === i} onClick={() => setEnergy(i)} />
+        ))}
+        <span>Энергичнее</span>
+      </div>
+      <div className={styles.row}>
+        <button type="button" className={styles.secondary}>Больше такого</button>
+        <button type="button" className={styles.secondary}>Меньше такого</button>
+      </div>
+      <p className={styles.note}>В макете кнопки ничего не меняют в музыке.</p>
+    </section>
+  );
+
+  const licenseCard = (
+    <section className={styles.card} aria-labelledby="lic">
+      <p className={styles.eyebrow} id="lic">Лицензия и документы</p>
+      <h3>Музыка точки лицензирована · пример</h3>
+      <dl className={styles.facts}>
+        <div><dt>Точка</dt><dd>SPA «Тихий сад» · Тверская</dd></div>
+        <div><dt>Период</dt><dd>01.10.2026 — 30.09.2027</dd></div>
+        <div><dt>Покрывает</dt><dd>Фоновая музыка в зале и кабинетах</dd></div>
+      </dl>
+      <div className={styles.row}>
+        <button type="button" className={styles.secondary}>Скачать паспорт лицензии</button>
+        <button type="button" className={styles.secondary}>QR для проверки</button>
+      </div>
+    </section>
+  );
+
+  const alertsCard = (
+    <section className={styles.card} aria-labelledby="al">
+      <p className={styles.eyebrow} id="al">Уведомления</p>
+      {needsAction ? (
+        <div className={`${styles.alert} ${styles[status.tone]}`}><strong>{status.title}</strong><p>{status.action}</p></div>
+      ) : (
+        <p className={styles.muted}>Ничего делать не нужно. Мы напишем, только если потребуется ваше действие.</p>
+      )}
+      <p className={styles.note}>Канал: MAX · почта. Без рекламы и «отчётов ради отчётов».</p>
+    </section>
+  );
+
+  const locationsCard = (
+    <section className={styles.card} aria-labelledby="loc">
+      <p className={styles.eyebrow} id="loc">Мои точки</p>
+      <h3>2 играют · 1 закрыта · 0 требуют действий</h3>
+      <ul className={styles.venues}>
+        {venues.map(([name, st, tone]) => <li key={name}><span className={`${styles.dot} ${styles[tone]}`} aria-hidden="true" /><span>{name}</span><span className={styles.muted}>{st}</span></li>)}
+      </ul>
+    </section>
+  );
 
   return (
-    <section className={styles.preview} aria-label="Согласование дизайна SPA-кабинета">
+    <section className={styles.preview} aria-label="Согласование дизайна кабинета владельца">
       <header className={styles.reviewHeader}>
-        <p className={styles.eyebrow}>Аудиолад Бизнес · исследование 01</p>
+        <p className={styles.eyebrow}>Аудиолад Бизнес · макеты v2</p>
         <h1>Спокойствие начинается с ясности</h1>
-        <p>Кабинет владельца одной SPA-точки. Макеты для согласования Сергеем.</p>
       </header>
       <div className={styles.banner}>
         <strong>Макет — не реальные данные</strong>
-        <p>Все имена, треки и состояния вымышлены. Кнопки меняют только макет. Звука и сохранения нет.</p>
+        <p>Все точки, треки, время и статусы вымышлены. Кнопки меняют только макет. Звука и сохранения нет.</p>
       </div>
       <div className={styles.controls}>
         <label>Экран
-          <select value={screen} onChange={(e) => setScreen(e.target.value as Screen)}>
+          <select value={screen} onChange={(e) => setScreen(e.target.value as Screen)} data-testid="screen">
             {screens.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
           </select>
         </label>
-        <label>Состояние музыки
-          <select value={state} onChange={(e) => setState(e.target.value as PreviewState)}>
+        <label>Состояние
+          <select value={state} onChange={(e) => setState(e.target.value as PreviewState)} data-testid="state">
             {Object.entries(states).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}
           </select>
         </label>
-        <label>Рамка просмотра
-          <select value={frame} onChange={(e) => setFrame(e.target.value)}>
-            <option value="phone">Телефон · 390px</option>
+        <label>Рамка
+          <select value={frame} onChange={(e) => setFrame(e.target.value as "desktop" | "phone")} data-testid="frame">
             <option value="desktop">Десктоп</option>
+            <option value="phone">Телефон · 390px</option>
           </select>
         </label>
       </div>
-      <p className={styles.frameNote}>На узком экране рамка сжимается по доступной ширине. Внешнее меню — действующая оболочка кабинета.</p>
-      <div className={`${styles.frame} ${frame === "phone" ? styles.phone : styles.desktop}`}>
+      <div className={`${styles.frame} ${frame === "phone" ? styles.phone : styles.desktop}`} data-testid="mock">
         <div className={styles.mockHeader}>
           <span className={styles.monogram} aria-hidden="true">а</span>
-          <div><strong>Аудиолад Бизнес</strong><p>SPA «Тихий сад» · пример точки</p></div>
+          <div><strong>SPA «Тихий сад»</strong><p>Тверская · пример точки</p></div>
           <span className={styles.badge}>Макет</span>
         </div>
         <nav className={styles.screenNav} aria-label="Экраны макета">
@@ -75,61 +218,17 @@ export default function SpaDesignPreview() {
           ))}
         </nav>
         <div className={styles.content}>
-          <header className={styles.pageHeading}>
-            <p className={styles.eyebrow}>{screen === "player" ? "Устройство точки · пример" : "Кабинет владельца · пример"}</p>
-            <h2>{screens.find(([id]) => id === screen)?.[1]}</h2>
-            <p>{screen === "home" ? "Одна точка. Самое нужное — перед вами." : "Вариант интерфейса для обсуждения."}</p>
-          </header>
-          <section className={styles.status} aria-live="polite" aria-atomic="true">
-            <span className={styles.badge}>Сценарий макета · {status.label}</span>
-            <h3>{status.title}</h3><p>{status.detail}</p>
-            <p className={styles.hint}>{status.hint}</p>
-          </section>
-          <div className={styles.grid}>
-            {(screen === "home" || screen === "player") && <>
-              <section className={styles.card}>
-                <p className={styles.eyebrow}>Программа · пример</p>
-                <div className={styles.track}>
-                  <div className={styles.art} aria-hidden="true">♪</div>
-                  <div><h3>{hasTrack ? "Мягкий свет" : "Трек не подтверждён"}</h3><p>{hasTrack ? "Тихое пространство · вымышленная программа" : "Данные о текущем треке отсутствуют в этом сценарии."}</p></div>
-                </div>
-                <p className={styles.hint}>Воспроизведение — на устройстве точки. Телефон владельца показывает состояние.</p>
-                {screen === "home" ? <button type="button" className={styles.primary} onClick={() => setScreen("player")}>Посмотреть макет плеера</button> : <>
-                  <button type="button" className={styles.primary} disabled={!hasTrack} onClick={() => setState(state === "playing" ? "paused" : "playing")}>
-                    {state === "playing" ? "Пауза · в макете" : "Играть · в макете"}
-                  </button>
-                  <p className={styles.hint}>Кнопка только переключает сценарий. Аудио не воспроизводится.</p>
-                  <Concept><p>Громкость и следующий трек</p></Concept>
-                </>}
-              </section>
-              <section className={styles.card}>
-                <p className={styles.eyebrow}>Ваша точка · пример</p><h3>SPA «Тихий сад»</h3>
-                <dl><dt>Зона</dt><dd>Зона отдыха · пример</dd><dt>Лицензия</dt><dd>Не проверена в макете</dd><dt>Данные статуса</dt><dd>Демонстрационные, без времени проверки</dd></dl>
-                <button type="button" onClick={() => setScreen("venue")}>Точка и лицензия · макет</button>
-              </section>
-            </>}
-            {screen === "atmosphere" && <section className={styles.card}>
-              <Concept><h3>Ритм вашего пространства</h3><p>Мягкая атмосфера в течение дня. Расписание ниже — идея, оно не применяется к музыке.</p>
-                <ol className={styles.dayparts}>
-                  <li><span>09:00–12:00 · пример</span><strong>Тихое утро</strong><p>Плавное начало дня</p></li>
-                  <li><span>12:00–17:00 · пример</span><strong>Ровный день</strong><p>Ненавязчивый фон для процедур</p></li>
-                  <li><span>17:00–21:00 · пример</span><strong>Мягкий вечер</strong><p>Спокойное завершение</p></li>
-                </ol>
-                <p>Настройка атмосферы, времени и автозапуск — концепции для отдельного этапа.</p>
-              </Concept>
-            </section>}
-            {screen === "venue" && <>
-              <section className={styles.card}><h3>Одна точка, одна зона</h3><dl><dt>Название</dt><dd>SPA «Тихий сад» · пример</dd><dt>Категория</dt><dd>SPA / wellness · пример</dd><dt>Часовой пояс</dt><dd>Москва · пример</dd><dt>Зона</dt><dd>Зона отдыха · пример</dd></dl><Concept><p>Изменение данных точки</p></Concept></section>
-              <section className={styles.card}><h3>Лицензия: нет подтверждённых данных</h3><p>Макет не проверяет документы и не подтверждает право публичного использования музыки.</p><Concept><p>Документ, срок и территория использования. Загрузка документа — после подключения реального источника.</p></Concept></section>
-            </>}
-            {screen === "help" && <>
-              <section className={styles.card}><h3>Если музыка не слышна</h3><ol className={styles.steps}><li>Проверьте колонки и громкость на устройстве точки.</li><li>Проверьте интернет на этом устройстве.</li><li>Откройте плеер на устройстве точки и посмотрите сообщение.</li></ol><button type="button" onClick={() => setScreen("player")}>Посмотреть макет плеера</button></section>
-              <section className={styles.card}><h3>Помощь без лишних шагов</h3><details><summary>Что означает «нет подключения»?</summary><p>Связь потеряна. Это не доказывает ни звучание, ни остановку музыки. Для текущего онлайн-пилота нужен интернет.</p></details><details><summary>Почему лицензия не проверена?</summary><p>Здесь нет доступа к документам. Демонстрационный статус не является разрешением на использование музыки.</p></details><Concept><p>Связаться с поддержкой и передать диагностику. Заявка из макета не отправляется.</p></Concept></section>
-            </>}
-            {screen === "profile" && <section className={styles.card}><h3>Анна · вымышленный владелец</h3><dl><dt>Роль</dt><dd>Владелец одной SPA-точки · пример</dd><dt>Почта</dt><dd>owner@example.invalid · пример</dd></dl><Concept><p>Редактирование профиля и управление сеансом</p></Concept><p className={styles.hint}>Это карточка концепции профиля, данные вашей сессии сюда не передаются.</p></section>}
-          </div>
-          {(state === "offline" || state === "error" || state === "empty") && screen !== "help" && <button type="button" onClick={() => setScreen("help")}>Посмотреть помощь · макет</button>}
-          <footer className={styles.footer}>Макет — не реальные данные · Применение дизайна ожидает согласования Сергея</footer>
+          {screen === "home" && (
+            <div className={styles.grid}>
+              <div className={styles.main}>{statusCard}{nowPlaying}{historyCard}</div>
+              <div className={styles.side}>{needsAction && alertsCard}{dayCard(false)}{atmosphereCard}</div>
+            </div>
+          )}
+          {screen === "day" && <div className={styles.stack}>{statusCard}{dayCard(true)}</div>}
+          {screen === "atmosphere" && <div className={styles.stack}>{nowPlaying}{atmosphereCard}</div>}
+          {screen === "license" && <div className={styles.stack}>{licenseCard}</div>}
+          {screen === "alerts" && <div className={styles.stack}>{statusCard}{alertsCard}</div>}
+          {screen === "locations" && <div className={styles.stack}>{locationsCard}</div>}
         </div>
       </div>
     </section>
