@@ -569,16 +569,17 @@ export default function MaxPlaylistDetail({
                         : `${item.title} — недоступно`
                     }
                     onClick={() => playFrom(index)}
-                    className="absolute left-[22px] top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-[#7042c5]/95 text-white disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+                    data-max-playlist-row-play
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f1eafc] text-[#7042c5] transition-colors active:bg-[#e4d8f8] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
                   >
                     {isPlayingThis ? (
-                      <span aria-hidden="true" className="text-xs font-semibold">
-                        II
-                      </span>
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+                        <path d="M7 5.5h3.5v13H7V5.5Zm6.5 0H17v13h-3.5V5.5Z" />
+                      </svg>
                     ) : (
-                      <span aria-hidden="true" className="ml-0.5 text-xs">
-                        ▶
-                      </span>
+                      <svg viewBox="0 0 24 24" className="ml-0.5 h-4 w-4" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2c.6-.4.6-1.3 0-1.7L9.6 4.9C8.9 4.5 8 5 8 5.8Z" />
+                      </svg>
                     )}
                   </button>
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[12px] bg-[#f4ecfb]">
