@@ -290,3 +290,15 @@ export function mapOwnerLiveState(raw: unknown, organizationId: string, nowMs = 
     currentTrack: playbackState && typeof top.r.current_track_title === "string" ? { title: top.r.current_track_title } : null,
   };
 }
+
+/** Compact status: connectivity alone never proves sound or a playback failure. */
+export function deriveOwnerOverallStatus(
+  connectivity: OwnerConnectivitySignal,
+  playback: OwnerPlaybackSignal,
+): { title: string; tone: OwnerSignalTone } {
+  if (playback.tone === "error") return { title: playback.title, tone: "error" };
+  if (playback.kind === "confirmed") {
+    return { title: "Музыка играет — воспроизведение подтверждено", tone: "ok" };
+  }
+  return { title: connectivity.title, tone: connectivity.tone === "ok" ? "ok" : "neutral" };
+}

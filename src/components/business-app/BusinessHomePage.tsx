@@ -10,6 +10,7 @@ import {
   buildBusinessGreetingSubtitle,
 } from "@/lib/business-app/greeting";
 import {
+  deriveOwnerOverallStatus,
   deriveOwnerPlaybackSignal,
   type OwnerPlaybackSignal,
   type OwnerPlaybackSignalInput,
@@ -31,6 +32,19 @@ function StatusBanner({
   playback: OwnerPlaybackSignal;
 }) {
   const hb = buildBusinessHomeStatusCopy(signals);
+  const overall = deriveOwnerOverallStatus(hb, playback);
+  const signalItems = (
+    <>
+      <li data-tone={hb.tone}>
+        <strong>{hb.title}</strong>
+        <p>{hb.detail}</p>
+      </li>
+      <li data-tone={playback.tone}>
+        <strong>{playback.title}</strong>
+        <p>{playback.detail}</p>
+      </li>
+    </>
+  );
   const checkedAge = hb.kind !== "no_data"
     ? formatBusinessAge((signals?.secondsSinceHeartbeat ?? 0) / 60)
     : null;
@@ -46,15 +60,17 @@ function StatusBanner({
       <p className="mt-1 text-sm text-[var(--biz-text-muted)]">
         {checkedAge ? `Последний сигнал от плеера: ${checkedAge}` : "Последний сигнал от плеера: нет данных"}
       </p>
-      <ul className="business-app-owner-signals mt-4" aria-label="Сигналы точки">
-        <li data-tone={hb.tone}>
-          <strong>{hb.title}</strong>
-          <p>{hb.detail}</p>
-        </li>
-        <li data-tone={playback.tone}>
-          <strong>{playback.title}</strong>
-          <p>{playback.detail}</p>
-        </li>
+      <div className="business-app-owner-compact-status mt-4" data-tone={overall.tone}>
+        <strong data-testid="owner-home-overall-status">{overall.title}</strong>
+        <details className="business-app-owner-signal-details">
+          <summary className="business-app-focus-ring">Подробнее</summary>
+          <ul className="business-app-owner-signals" aria-label="Сигналы точки">
+            {signalItems}
+          </ul>
+        </details>
+      </div>
+      <ul className="business-app-owner-signals business-app-owner-desktop-signals mt-4" aria-label="Сигналы точки">
+        {signalItems}
       </ul>
       <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
         Лицензия: нет подтверждённых данных
@@ -70,7 +86,7 @@ function StatusBanner({
           href="/help"
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"
         >
-          Диагностика для поддержки
+          Проверить работу музыки
         </Link>
       </div>
     </section>
