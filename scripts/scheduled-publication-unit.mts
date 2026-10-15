@@ -36,6 +36,7 @@ import {
 const FUTURE = "2026-10-15T07:00:00.000Z";
 const PAST = "2020-01-01T00:00:00.000Z";
 const NOW = new Date("2026-09-30T12:00:00.000Z");
+const REAL_CLOCK_FUTURE = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
 assert.equal(
   isPracticePubliclyAvailable({
@@ -132,7 +133,7 @@ assert.equal(
     is_catalog_listed: true,
     slug: "utro",
     author_id: "author",
-    scheduled_publish_at: FUTURE,
+    scheduled_publish_at: REAL_CLOCK_FUTURE,
     published_at: null,
   }),
   false,
@@ -395,7 +396,7 @@ assert.equal(
 );
 const farFutureFree = {
   ...freePractice,
-  scheduled_publish_at: "2099-06-01T07:00:00.000Z",
+  scheduled_publish_at: REAL_CLOCK_FUTURE,
 };
 const farFutureAccess = await resolveProductAccess(supabase, farFutureFree, null);
 assert.equal(farFutureAccess.canListen, false);
