@@ -41,6 +41,7 @@ import {
   resolveProductAccess,
 } from "@/lib/products/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { resolvePlayableAudioItemRows } from "@/lib/listen/validated-active-music-delivery";
 import { shouldBlockPublicPracticeAccess } from "@/lib/fixtures/test-fixture-marker";
 import {
   getPracticeAuthorSlug,
@@ -62,6 +63,7 @@ type AudioItemRow = {
   position: number;
   duration_seconds: number | null;
   audio_path: string | null;
+  active_music_delivery_asset_id?: string | null;
   cover_url: string | null;
   updated_at: string | null;
   status: string;
@@ -274,7 +276,7 @@ async function loadListenTracks(
   let query = supabase
     .from("audio_items")
     .select(
-      "id, title, description, position, duration_seconds, audio_path, cover_url, cover_image, updated_at, status",
+      "id, title, description, position, duration_seconds, audio_path, active_music_delivery_asset_id, cover_url, cover_image, updated_at, status",
     )
     .eq("practice_id", practice.id)
     .order("position", { ascending: true });
@@ -304,7 +306,7 @@ async function loadListenTracks(
     query = serviceRole
       .from("audio_items")
       .select(
-        "id, title, description, position, duration_seconds, audio_path, cover_url, cover_image, updated_at, status",
+        "id, title, description, position, duration_seconds, audio_path, active_music_delivery_asset_id, cover_url, cover_image, updated_at, status",
       )
       .eq("practice_id", practice.id)
       .in("id", [...accessibleIds])
@@ -327,9 +329,13 @@ async function loadListenTracks(
     use_shared_cover: practice.use_shared_cover ?? true,
   };
 
-  const tracks = ((audioItems ?? []) as AudioItemRow[])
-    .filter((item) => item.audio_path?.trim())
-    .map((item) => mapRowToListenTrack(item, practiceContext));
+  const playableRows = await resolvePlayableAudioItemRows(
+    (audioItems ?? []) as AudioItemRow[],
+    practice.product_kind,
+  );
+  const tracks = playableRows.map((item) =>
+    mapRowToListenTrack(item, practiceContext),
+  );
 
   if (tracks.length > 0) {
     return tracks;

@@ -8,6 +8,7 @@
     "start": "node scripts/lib/guard-production-start.mjs && next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:history-listen-audio": "npx tsx scripts/history-listen-audio-unit.mts",
     "test:shared-audio-warmup": "npx tsx scripts/shared-audio-warmup-unit.mts",
     "test:analytics-consent-playback-hit-test": "node scripts/analytics-consent-playback-hit-test.mjs",
     "test:supabase-cookie-domain": "npx tsx scripts/supabase-cookie-domain-unit.mts",
