@@ -1099,6 +1099,12 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
     assertPreparingNotice(panelMarkup, showActivityNotice === false ? 0 : 1);
   }
 
+  // Album re-analysis must reach the wizard's single notice while the panel notice is hidden.
+  assert.match(
+    read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx"),
+    /onReanalyzeAll=\{\(\) => \{\s*setPending\(true\);[\s\S]*?onEnqueueActive\?\.\(true\);[\s\S]*?onEnqueueActive\?\.\(false\);/,
+  );
+
   const durableQueued = {
     ...viewFor(Array.from({ length: 10 }, () => "queued" as const)),
     albumLaunch: "durable" as const,

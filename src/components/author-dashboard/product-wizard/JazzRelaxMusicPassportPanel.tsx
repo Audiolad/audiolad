@@ -440,9 +440,14 @@ export default function JazzRelaxMusicPassportPanel({
           }}
           onReanalyzeAll={() => {
             setPending(true);
+            // The wizard hides this panel's notice, so it must learn about the enqueue too.
+            onEnqueueActive?.(true);
             void postAction("reanalyze")
               .catch(() => setError("Не удалось запустить анализ."))
-              .finally(() => setPending(false));
+              .finally(() => {
+                setPending(false);
+                onEnqueueActive?.(false);
+              });
           }}
         />
       ) : null}
