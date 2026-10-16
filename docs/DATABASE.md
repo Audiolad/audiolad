@@ -2025,3 +2025,15 @@ updated_at). Все FK — ON DELETE RESTRICT. RLS включён, прямых 
 точный predicate членства из health RPC, название только разрешённого трека, без URL.
 Старые таблицы и данные не меняются. Решение о применении отдельно принимает Сергей.
 Подробности и откат: [11-real-1-migration.md](business/ux-c02fe282/11-real-1-migration.md).
+
+### Business rightsholder onboarding — 8d9cd0af / PR-1
+
+Forward-only migration `20270101120000_business_rightsholder_onboarding.sql` adds
+owner-account verification, private evidence, versioned program documents,
+append-only legal consents/moderation, product opt-in snapshots and scoped suspensions.
+Owner identity uses `author_members.role = 'owner'`; moderators bind the rightsholder.
+No legal versions are seeded: submit/opt-in fail with
+`business_program_documents_not_published` until both approved documents are published.
+Verification and opt-in do not create Rights Grants or change track eligibility.
+Full schema/RPC lifecycle, RLS, backup and manual rollback:
+[business/rightsholder-onboarding-8d9cd0af.md](business/rightsholder-onboarding-8d9cd0af.md).
