@@ -242,6 +242,22 @@ console.log("business-app-client-documents-unit OK");
   const r3 = buildPlaybackReport({ at: new Date("2026-10-16T12:05:00Z"), windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:05:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: aba });
   assert.deepEqual(r3.tracks.map((t) => t.rightsholders), [["Правообладатель А"], ["Правообладатель Б"], ["Правообладатель А"]]);
   assert.deepEqual(r3.tracks.map((t) => t.coversT), [false, true, false]);
+  // Review r4 B1: A … (Б, no fact) … A is two rows; T=12:05 is not covered.
+  const r4a = buildPlaybackReport({ at: new Date("2026-10-16T12:05:00Z"), windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: aba });
+  assert.deepEqual(r4a.tracks.map((t) => t.rightsholders), [["Правообладатель А"], ["Правообладатель А"]]);
+  assert.deepEqual(r4a.tracks.map((t) => t.coversT), [false, false]);
+  // Same holder with no change in between still merges into one row (old behaviour).
+  const plain = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T11:55:00Z")], titles: new Map(), rightsholders: aba });
+  assert.equal(plain.tracks.length, 1);
+  // Review r4 B2: at the exact change instant only the new holder covers T.
+  const r4b = buildPlaybackReport({ at: new Date("2026-10-16T12:10:00Z"), windowMinutes: 30, timezone: "Europe/Moscow", facts: [{ ...fact("2026-10-16T12:10:01Z"), listened_ms: 2000 }], titles: new Map(), rightsholders: map });
+  assert.deepEqual(r4b.tracks.map((t) => [t.rightsholders[0], t.coversT]), [["Правообладатель А", false], ["Правообладатель Б", true]]);
+  // Review r4 B3: overlapping facts (two players) are aggregated, no duplicate rows; listened preserved.
+  const r4c = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [{ ...fact("2026-10-16T12:10:01Z"), listened_ms: 2000 }, { ...fact("2026-10-16T12:10:02Z"), listened_ms: 3000 }], titles: new Map(), rightsholders: map });
+  assert.deepEqual(r4c.tracks.map((t) => t.rightsholders[0]), ["Правообладатель А", "Правообладатель Б"]);
+  assert.equal(r4c.tracks.reduce((n, t) => n + t.listenedMs, 0), 5000);
+  const keys = r4c.tracks.map((t) => `${t.audioItemId}-${t.firstAt}`);
+  assert.equal(new Set(keys).size, keys.length);
   assert.equal(both.registryUnavailable, false);
   // Review r1 B1: a failed registry read is "unavailable", never "no record".
   const down = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T12:00:00Z")], titles: new Map(), registryUnavailable: true });

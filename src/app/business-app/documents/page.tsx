@@ -133,8 +133,8 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                       </tr>
                     </thead>
                     <tbody>
-                      {result.report.tracks.map((t) => (
-                        <tr key={`${t.audioItemId}-${t.firstAt}`}>
+                      {result.report.tracks.map((t, i) => (
+                        <tr key={`${t.audioItemId}-${t.firstAt}-${i}`}>
                           <td>{t.title}</td>
                           <td>{formatVenueTime(t.firstAt, result.report.timezone)}</td>
                           <td>{formatVenueTime(t.lastAt, result.report.timezone)}</td>

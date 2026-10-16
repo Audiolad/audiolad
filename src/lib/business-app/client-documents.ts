@@ -188,46 +188,25 @@ export function buildPlaybackReport(input: {
   const atMs = input.at.getTime();
   const from = atMs - w;
   const to = atMs + w;
-  type Run = { id: string | null; startMs: number; lastMs: number; listened: number; holders: string[]; sig: string };
-  const runs: Run[] = [];
-  /** Current (latest) run per track: a run continues only while the holder set stays the same. */
-  const current = new Map<string, Run>();
   let count = 0;
-  const sorted = [...input.facts]
-    .filter((f) => {
-      const t = Date.parse(f.occurred_at);
-      return Number.isFinite(t) && t >= from && t <= to;
-    })
-    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
-  for (const f of sorted) {
-    count += 1;
+  const byTrack = new Map<string, { id: string | null; spans: { s: number; e: number }[] }>();
+  for (const f of input.facts) {
     const t = Date.parse(f.occurred_at);
-    const listened = toNum(f.listened_ms);
-    const trackKey = f.audio_item_id ?? "__unknown__";
-    // Holder is matched to the playback time of each fact, not to the search instant;
-    // the fact interval is split at registry period boundaries, so a change of holder
-    // or a gap without a registry record always starts a separate row.
-    const periods = f.audio_item_id ? input.rightsholders?.get(f.audio_item_id) : undefined;
-    for (const seg of splitByRegistryPeriods(periods, t - listened, t)) {
-      const sig = seg.holders.join("\u0001");
-      const run = current.get(trackKey);
-      if (run && run.sig === sig) {
-        run.startMs = Math.min(run.startMs, seg.fromMs);
-        run.lastMs = Math.max(run.lastMs, seg.toMs);
-        run.listened += seg.toMs - seg.fromMs;
-      } else {
-        const next: Run = {
-          id: f.audio_item_id ?? null,
-          startMs: seg.fromMs,
-          lastMs: seg.toMs,
-          listened: seg.toMs - seg.fromMs,
-          holders: seg.holders,
-          sig,
-        };
-        runs.push(next);
-        current.set(trackKey, next);
-      }
-    }
+    if (!Number.isFinite(t) || t < from || t > to) continue;
+    count += 1;
+    const key = f.audio_item_id ?? "__unknown__";
+    const entry = byTrack.get(key) ?? { id: f.audio_item_id ?? null, spans: [] };
+    entry.spans.push({ s: t - toNum(f.listened_ms), e: t });
+    byTrack.set(key, entry);
+  }
+  // Holder is matched to the playback time, not to the search instant: per track,
+  // time is swept over elementary segments cut at fact edges and registry period
+  // boundaries, so a change of holder or a gap without a registry record (even
+  // between facts) always starts a separate row. Overlapping facts (several players)
+  // are aggregated, never duplicated.
+  const runs: Run[] = [];
+  for (const { id, spans } of byTrack.values()) {
+    runs.push(...sweepTrack(id, spans, id ? input.rightsholders?.get(id) : undefined));
   }
   const tracks: PlaybackReportTrack[] = [...runs]
     .sort((a, b) => a.startMs - b.startMs)
@@ -237,7 +216,10 @@ export function buildPlaybackReport(input: {
       firstAt: new Date(g.startMs).toISOString(),
       lastAt: new Date(g.lastMs).toISOString(),
       listenedMs: g.listened,
-      coversT: g.startMs <= atMs && atMs <= g.lastMs,
+      coversT:
+        g.startMs <= atMs &&
+        (atMs < g.lastMs ||
+          (atMs === g.lastMs && !runs.some((o) => o !== g && o.id === g.id && o.startMs === atMs))),
       rightsholders: g.holders,
     }));
   return {
@@ -249,6 +231,56 @@ export function buildPlaybackReport(input: {
     factCount: count,
     registryUnavailable: input.registryUnavailable === true,
   };
+}
+
+type Run = { id: string | null; startMs: number; lastMs: number; listened: number; holders: string[]; sig: string };
+
+function sweepTrack(
+  id: string | null,
+  spans: readonly { s: number; e: number }[],
+  periods: readonly RegistryHolderPeriod[] | undefined,
+): Run[] {
+  if (spans.length === 0) return [];
+  const lo = Math.min(...spans.map((x) => x.s));
+  const hi = Math.max(...spans.map((x) => x.e));
+  const cuts = new Set<number>();
+  for (const x of spans) {
+    cuts.add(x.s);
+    cuts.add(x.e);
+  }
+  for (const p of periods ?? []) {
+    if (p.fromMs > lo && p.fromMs < hi) cuts.add(p.fromMs);
+    if (p.untilMs !== null && p.untilMs > lo && p.untilMs < hi) cuts.add(p.untilMs);
+  }
+  const pts = [...cuts].sort((x, y) => x - y);
+  const out: Run[] = [];
+  let cur: Run | null = null;
+  const visit = (from: number, to: number, holders: string[], covered: number) => {
+    const sig = holders.join("\u0001");
+    if (cur && cur.sig === sig) {
+      if (covered > 0 || to === from) cur.lastMs = Math.max(cur.lastMs, to);
+      cur.listened += covered * (to - from);
+      return;
+    }
+    if (covered === 0) {
+      cur = null; // gap with a different holder set: the next covered time starts a new row
+      return;
+    }
+    cur = { id, startMs: from, lastMs: to, listened: covered * (to - from), holders, sig };
+    out.push(cur);
+  };
+  for (let i = 0; i < pts.length; i += 1) {
+    const p = pts[i];
+    // Zero-length facts (no listened_ms) are points.
+    if (spans.some((x) => x.s === p && x.e === p)) visit(p, p, holdersAt(periods, p), 1);
+    if (i + 1 < pts.length) {
+      const q = pts[i + 1];
+      const covered = spans.filter((x) => x.s <= p && x.e >= q && x.e > x.s).length;
+      visit(p, q, holdersAt(periods, (p + q) / 2), covered);
+    }
+  }
+  // A row ends at its last covered instant.
+  return out;
 }
 
 export type RegistryHolderPeriod = { name: string; fromMs: number; untilMs: number | null };
@@ -280,30 +312,6 @@ export function rightsholdersFromRegistry(
     const list = out.get(g.audio_item_id) ?? [];
     list.push({ name, fromMs: Number.isNaN(fromMs) ? Number.NEGATIVE_INFINITY : fromMs, untilMs: untilMs !== null && Number.isNaN(untilMs) ? null : untilMs });
     out.set(g.audio_item_id, list);
-  }
-  return out;
-}
-
-/**
- * Split the playback interval [fromMs, toMs] at registry period boundaries;
- * each segment carries the holders valid throughout it (possibly none).
- */
-export function splitByRegistryPeriods(
-  periods: readonly RegistryHolderPeriod[] | undefined,
-  fromMs: number,
-  toMs: number,
-): { fromMs: number; toMs: number; holders: string[] }[] {
-  const cuts = new Set<number>([fromMs, toMs]);
-  for (const p of periods ?? []) {
-    if (p.fromMs > fromMs && p.fromMs < toMs) cuts.add(p.fromMs);
-    if (p.untilMs !== null && p.untilMs > fromMs && p.untilMs < toMs) cuts.add(p.untilMs);
-  }
-  const pts = [...cuts].sort((x, y) => x - y);
-  if (pts.length === 1) return [{ fromMs, toMs, holders: holdersAt(periods, toMs) }];
-  const out: { fromMs: number; toMs: number; holders: string[] }[] = [];
-  for (let i = 0; i + 1 < pts.length; i += 1) {
-    const mid = (pts[i] + pts[i + 1]) / 2;
-    out.push({ fromMs: pts[i], toMs: pts[i + 1], holders: holdersAt(periods, mid) });
   }
   return out;
 }
