@@ -27,6 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Start disposable onboarding SQL database
+        run: |
+          docker run --detach --name audiolad-onboarding-test-ci \
+            -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16
+          for attempt in $(seq 1 30); do
+            if docker exec audiolad-onboarding-test-ci pg_isready -U postgres; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+
       - name: Validate Audiolad Business
         run: |
           set -euo pipefail
@@ -44,6 +54,8 @@ jobs:
           npm run test:business-playback-attribution
           npm run test:business-rights-foundation
           npm run test:business-rights-eligibility
+          AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-rightsholder-onboarding
+          npm run test:business-rightsholder-examples-ui
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger
@@ -51,3 +63,7 @@ jobs:
           npm run test:business-spa-admin
           npm run test:business-spa-player-core
           npm run test:business-spa-player-engine
+
+      - name: Remove disposable onboarding SQL database
+        if: always()
+        run: docker rm --force audiolad-onboarding-test-ci
