@@ -106,15 +106,6 @@ export const PROVIDERS: Record<RightsholderProvider, ProviderConfig> = {
     },
     fields: [
       {
-        key: "generation_refs",
-        label: "Ссылки или ID генераций треков продукта",
-        hint: "По одной в строке: ссылки https://suno.com/s/… или ID генераций. Можно другой набор, по которому восстанавливается происхождение треков.",
-        placeholder: "https://suno.com/s/…\nhttps://suno.com/s/…",
-        required: true,
-        multiline: true,
-        requiredMessage: "Добавьте ссылки или ID генераций",
-      },
-      {
         key: "paid_plan",
         label: "Тариф Suno",
         hint: "Например, Pro или Premier — как в квитанции.",
