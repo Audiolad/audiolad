@@ -213,7 +213,20 @@ console.log("business-app-client-documents-unit OK");
   const early = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z")], titles: new Map(), rightsholders: map });
   assert.deepEqual(early.tracks[0].rightsholders, ["Правообладатель А"]);
   const both = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: map });
-  assert.deepEqual(both.tracks[0].rightsholders, ["Правообладатель А", "Правообладатель Б"]);
+  // Review r2: holder change inside the window = separate rows with their own periods.
+  assert.equal(both.tracks.length, 2);
+  assert.deepEqual(both.tracks.map((t) => t.rightsholders), [["Правообладатель А"], ["Правообладатель Б"]]);
+  assert.ok(both.tracks[0].lastAt < both.tracks[1].firstAt);
+  // A fact without a registry record is not hidden behind another fact's holder.
+  const onlyB = rightsholdersFromRegistry(
+    [{ audio_item_id: "a", rightsholder_id: "h2", status: "verified", valid_from: "2026-10-16T12:10:00Z", valid_until: null }],
+    [{ id: "h2", display_name: "Правообладатель Б" }],
+  );
+  const gap = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: onlyB });
+  assert.deepEqual(gap.tracks.map((t) => t.rightsholders), [[], ["Правообладатель Б"]]);
+  // Fact interval overlapping the change shows both holders.
+  const edge = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [{ ...fact("2026-10-16T12:10:01Z"), listened_ms: 2000 }], titles: new Map(), rightsholders: map });
+  assert.deepEqual(edge.tracks[0].rightsholders, ["Правообладатель А", "Правообладатель Б"]);
   assert.equal(both.registryUnavailable, false);
   // Review r1 B1: a failed registry read is "unavailable", never "no record".
   const down = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T12:00:00Z")], titles: new Map(), registryUnavailable: true });

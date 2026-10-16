@@ -203,10 +203,13 @@ export function buildPlaybackReport(input: {
     count += 1;
     const t = Date.parse(f.occurred_at);
     const listened = toNum(f.listened_ms);
-    const key = f.audio_item_id ?? "__unknown__";
-    const g = groups.get(key);
     // Holder is matched to the time of this playback fact, not to the search instant.
-    const factHolders = f.audio_item_id ? holdersAt(input.rightsholders?.get(f.audio_item_id), t) : [];
+    // A change of holder (or a fact without a registry record) starts a separate row.
+    const factHolders = f.audio_item_id
+      ? holdersAt(input.rightsholders?.get(f.audio_item_id), t, t - listened)
+      : [];
+    const key = `${f.audio_item_id ?? "__unknown__"}|${factHolders.join("\u0001")}`;
+    const g = groups.get(key);
     if (!g) {
       groups.set(key, {
         id: f.audio_item_id ?? null,
@@ -219,7 +222,6 @@ export function buildPlaybackReport(input: {
       g.startMs = Math.min(g.startMs, t - listened);
       g.lastMs = Math.max(g.lastMs, t);
       g.listened += listened;
-      for (const h of factHolders) if (!g.holders.includes(h)) g.holders.push(h);
     }
   }
   const tracks: PlaybackReportTrack[] = [...groups.values()]
@@ -277,11 +279,15 @@ export function rightsholdersFromRegistry(
   return out;
 }
 
-/** Holders whose registry period covers the instant tMs. */
-export function holdersAt(periods: readonly RegistryHolderPeriod[] | undefined, tMs: number): string[] {
+/** Holders whose registry period overlaps the playback interval [fromMs, toMs]. */
+export function holdersAt(
+  periods: readonly RegistryHolderPeriod[] | undefined,
+  toMs: number,
+  fromMs: number = toMs,
+): string[] {
   const res: string[] = [];
   for (const p of periods ?? []) {
-    if (p.fromMs <= tMs && (p.untilMs === null || tMs < p.untilMs) && !res.includes(p.name)) res.push(p.name);
+    if (p.fromMs <= toMs && (p.untilMs === null || fromMs < p.untilMs) && !res.includes(p.name)) res.push(p.name);
   }
-  return res;
+  return res.sort((a, b) => a.localeCompare(b, "ru"));
 }
