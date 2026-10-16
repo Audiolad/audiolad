@@ -32,7 +32,20 @@ export default function SimpleMarkdown({ source }: { source: string }) {
     if (line.startsWith(">")) {
       const buf: string[] = [];
       while (i < lines.length && lines[i].startsWith(">")) { buf.push(lines[i].replace(/^>\s?/, "")); i += 1; }
-      out.push(<blockquote key={k} className="mt-4 border-l-4 border-[#d9c9f2] pl-4 italic">{inline(buf.join(" "), k)}</blockquote>);
+      // Each source line of a quote (address lines, numbered points, «Приложения» items, signature) is its own
+      // paragraph; an empty «>» line adds extra space. Non-italic text in a light box for readability.
+      const paras: { text: string; gap: boolean }[] = [];
+      let gap = false;
+      for (const b of buf) {
+        if (b.trim() === "") { gap = true; continue; }
+        paras.push({ text: b.trim(), gap: gap && paras.length > 0 });
+        gap = false;
+      }
+      out.push(
+        <blockquote key={k} data-md="quote" className="mt-4 rounded-lg border-l-4 border-[#d9c9f2] bg-[#f8f5fd] px-4 py-3 not-italic">
+          {paras.map((pp, j) => <p key={j} className={j === 0 ? undefined : pp.gap ? "mt-4" : "mt-2"}>{inline(pp.text, `${k}q${j}`)}</p>)}
+        </blockquote>,
+      );
       continue;
     }
     if (line.trim().startsWith("|")) {
@@ -63,7 +76,9 @@ export default function SimpleMarkdown({ source }: { source: string }) {
       continue;
     }
     const buf: string[] = [];
-    while (i < lines.length && lines[i].trim() !== "" && !/^(#{1,4}\s|>|\s*\|)/.test(lines[i]) && !isItem(lines[i])) { buf.push(lines[i]); i += 1; }
+    // A numbered clause line («1.1. …», «2.3. …») starts its own paragraph instead of joining the previous one.
+    const isClause = (s: string) => /^\s*\d+\.\d+\.\s/.test(s);
+    while (i < lines.length && lines[i].trim() !== "" && !/^(#{1,4}\s|>|\s*\|)/.test(lines[i]) && !isItem(lines[i]) && !(buf.length && isClause(lines[i]))) { buf.push(lines[i]); i += 1; }
     out.push(<p key={k} className="mt-3">{buf.flatMap((b, j) => (j ? [<br key={`${k}br${j}`} />, ...inline(b, `${k}l${j}`)] : inline(b, `${k}l${j}`)))}</p>);
   }
   return <div className="text-[15px] leading-7 text-[#4c3d78]">{out}</div>;
