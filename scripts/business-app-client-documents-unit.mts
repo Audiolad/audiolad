@@ -141,3 +141,33 @@ console.log("business-app-client-documents-unit OK");
   }
   console.log("business-app-client-documents-unit: card links OK");
 }
+
+// 8dcba9d1 (16.10 16:46): «А. Образец ответа на претензию» renders as separate paragraphs, not one merged italic quote.
+{
+  const { CLIENT_DOCUMENT_SOURCES } = await import("../src/lib/business-app/client-document-content");
+  const { PUBLIC_PROGRAM_DOCUMENTS } = await import("../src/lib/business-rightsholder/program-documents");
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const md = await import("../src/components/legal/SimpleMarkdown");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const SimpleMarkdown: any = typeof (md as any).default === "function" ? (md as any).default : (md as any).default.default;
+  const render = (s: string) => renderToStaticMarkup(createElement(SimpleMarkdown, { source: s }));
+  const html = render(CLIENT_DOCUMENT_SOURCES["claim-reply-kit"].markdown);
+  const quote = /<blockquote[^>]*>([\s\S]*?)<\/blockquote>/.exec(html);
+  assert.ok(quote, "sample quote rendered");
+  assert.doesNotMatch(quote[0], /class="[^"]*(?<!not-)italic/, "sample is not italic");
+  const paras = [...quote[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].map((m) => m[1].replace(/<[^>]+>/g, ""));
+  const starts = ["Кому:", "От:", "Исх. №", "1. ", "2. ", "3. ", "4. ", "5. ", "Приложения:", "1) ", "2) ", "3) ", "4) ", "[должность, ФИО, подпись]"];
+  assert.equal(paras.length, starts.length, `sample paragraphs: ${paras.length}`);
+  starts.forEach((s, j) => assert.ok(paras[j].startsWith(s), `paragraph ${j} starts with ${s}: ${paras[j].slice(0, 30)}`));
+  // No merged quote / clause blocks anywhere in the 7 public document sources.
+  const all = [...Object.values(CLIENT_DOCUMENT_SOURCES).map((s) => s.markdown), ...Object.values(PUBLIC_PROGRAM_DOCUMENTS).map((d) => d.markdown)];
+  for (const src of all) {
+    const out = render(src);
+    for (const p of out.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)) {
+      assert.ok((p[1].match(/(^|<br\/>)\d+\.\d+\.\s/g) ?? []).length <= 1, `clause lines merged: ${p[1].slice(0, 60)}`);
+    }
+    assert.doesNotMatch(out, /<blockquote[^>]*>[^<]/, "quote text wrapped in paragraphs");
+  }
+  console.log("business-app-client-documents-unit: claim reply sample paragraphs OK");
+}
