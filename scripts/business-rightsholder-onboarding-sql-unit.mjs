@@ -9,6 +9,12 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const sql = read('supabase/migrations/20270101120000_business_rightsholder_onboarding.sql');
 // 20270102120000: provider choice (Suno / MusicGPT / other). Additive; applied after the base migration.
 const providers = read('supabase/migrations/20270102120000_business_rightsholder_providers.sql');
+// 20270103120000: Suno single link — function-only relax of the generation_refs rule.
+const sunoSingleLink = read('supabase/migrations/20270103120000_business_rightsholder_suno_single_link.sql');
+const sunoSingleLinkRollback = read('docs/business/rightsholder-suno-single-link-8d9cd0af-rollback.sql');
+assert.doesNotMatch(sunoSingleLink.replace(/--[^\n]*/g, ''), /ALTER\s+TABLE|DROP\s|INSERT|UPDATE|DELETE|GRANT|REVOKE/i, 'suno single-link migration is function-only');
+assert.doesNotMatch(sunoSingleLink.replace(/--[^\n]*/g, ''), /generation_refs_required/);
+assert.match(sunoSingleLinkRollback, /business_suno_generation_refs_required/);
 const providersRollback = read('docs/business/rightsholder-providers-8d9cd0af-rollback.sql');
 const providersClean = providers.replace(/--[^\n]*/g, '');
 assert.match(providersClean, /^\s*BEGIN;/);
@@ -364,13 +370,18 @@ BEGIN
   -- Existing rows keep working: legacy rows get '{}' and keep their NOT NULL links.
   PERFORM providers_test.check_true((SELECT bool_and(provider_details = '{}'::jsonb AND service_track_url IS NOT NULL) FROM public.business_rightsholder_verifications),'legacy rows untouched');
 
-  -- SUNO: link + generation refs required; two files (generation + paid_period).
+  -- SUNO: link required (generation refs optional since 20270103120000); two files (generation + paid_period).
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000004',false);
   SET LOCAL ROLE authenticated;
   d := 'SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-000000000014'',''30000000-0000-0000-0000-000000000014'',''suno'',NULL,''Spa jazz'',''https://suno.com/s/abc'',''{"generation_refs":"https://suno.com/s/abc\nhttps://suno.com/s/def","paid_plan":"Pro"}''::jsonb)';
   PERFORM providers_test.expect_error(replace(d,'https://suno.com/s/abc''','https://evil.example/s/abc'''),'business_service_link_invalid');
   PERFORM providers_test.expect_error(replace(d,',''https://suno.com/s/abc''',',NULL'),'business_service_link_invalid');
-  PERFORM providers_test.expect_error(replace(d,'"generation_refs":"https://suno.com/s/abc\nhttps://suno.com/s/def",',''),'business_suno_generation_refs_required');
+  -- 20270103120000: generation_refs no longer required for Suno (one track link is enough).
+  -- helper is not granted to authenticated (by design); check it as the owner.
+  RESET ROLE;
+  PERFORM providers_test.check_true(public.business_onboarding_provider_error('suno',NULL,'https://suno.com/s/abc','{"paid_plan":"Pro"}'::jsonb) IS NULL,'suno without generation_refs is valid');
+  PERFORM providers_test.check_true(public.business_onboarding_provider_error('suno',NULL,'https://suno.com/s/abc','{}'::jsonb) IS NULL,'suno with empty details is valid');
+  SET LOCAL ROLE authenticated;
   PERFORM providers_test.expect_error(replace(d,'"paid_plan"','"plan_name"'),'business_provider_details_invalid');
   PERFORM providers_test.expect_error(replace(d,'"Pro"','5'),'business_provider_details_invalid');
   PERFORM providers_test.expect_error(regexp_replace(d,'''\{.*\}''::jsonb','''["x"]''::jsonb'),'business_provider_details_invalid');
@@ -483,7 +494,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     psql(db, [stub, read('supabase/migrations/20261205120000_music_rights_foundation.sql'),
       read('supabase/migrations/20261206120200_business_rights_eligibility.sql'),
       "CREATE TABLE public.unrelated_existing(value text); INSERT INTO public.unrelated_existing VALUES ('keep me');",
-      sql, sql, providers, providers,
+      sql, sql, providers, providers, sunoSingleLink, sunoSingleLinkRollback, sunoSingleLink,
       "SELECT 1 / CASE WHEN count(*) = 0 THEN 1 ELSE 0 END FROM public.business_program_document_versions;",
       smoke].join('\n'));
     // Two independent PG sessions race to submit the same needs_info case.
@@ -516,7 +527,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       WHERE v.owner_user_id = '00000000-0000-0000-0000-000000000002';`);
     psql(db, providersSmoke);
     // Re-run twice WITH history and compare complete rows, including row counts.
-    psql(db, [captureRows, sql, sql, providers, providers, assertRowsUnchanged, unrelatedCheck].join('\n'));
+    psql(db, [captureRows, sql, sql, providers, providers, sunoSingleLink, sunoSingleLinkRollback, sunoSingleLink, assertRowsUnchanged, unrelatedCheck].join('\n'));
     // Providers rollback refuses to drop provider data and leaves every row intact.
     assert.throws(() => execFileSync('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1'],
       {input: providersRollback, stdio:['pipe','pipe','pipe']}), (err) => {

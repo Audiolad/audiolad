@@ -33,12 +33,15 @@ for (const id of PROVIDER_ORDER) {
 assert.match(PROVIDERS.suno.evidence[0].example.src!, /suno-generation\.webp$/);
 assert.match(PROVIDERS.suno.evidence[1].example.src!, /suno-pro-receipt\.webp$/);
 
-// SUNO: link + generation refs + both files required.
+// SUNO: link + both files required; generation refs field removed (8d9cd0af 16:23).
 let e = v({ provider: "suno" });
-assert.ok(e.trackUrl && e["field:generation_refs"] && e.generation && e.paid_period);
+assert.ok(e.trackUrl && e.generation && e.paid_period);
+assert.equal(e["field:generation_refs"], undefined);
+assert.ok(!PROVIDERS.suno.fields.some((f) => f.key === "generation_refs"));
+assert.equal(PROVIDERS.suno.link.hint, "Share → Copy link на странице трека.");
 e = v({ provider: "suno", trackUrl: "https://suno.com.evil/s/x" });
 assert.ok(e.trackUrl);
-e = v({ provider: "suno", trackUrl: "https://suno.com/s/abc", fields: { generation_refs: "abc\ndef" },
+e = v({ provider: "suno", trackUrl: "https://suno.com/s/abc",
   files: { generation: file("g.png", "image/png"), paid_period: file("r.pdf") } });
 assert.deepEqual(e, {});
 
@@ -65,8 +68,8 @@ assert.ok(e.generation);
 // RPC args: ai_service_other only for "other"; provider_details only allowed keys; empty link -> null.
 const other = buildDraftDetails(base({ provider: "other", trackUrl: "  ", fields: { ai_service_other: " Студия ", method_description: "Сам", generation_refs: "leak" } }));
 assert.deepEqual(other, { aiServiceOther: "Студия", serviceTrackUrl: null, providerDetails: { method_description: "Сам" } });
-const suno = buildDraftDetails(base({ provider: "suno", trackUrl: "https://suno.com/s/a", fields: { generation_refs: "a", ai_service_other: "x", plan_name: "y" } }));
-assert.deepEqual(suno, { aiServiceOther: null, serviceTrackUrl: "https://suno.com/s/a", providerDetails: { generation_refs: "a" } });
+const suno = buildDraftDetails(base({ provider: "suno", trackUrl: "https://suno.com/s/a", fields: { generation_refs: "a", paid_plan: "Pro", ai_service_other: "x", plan_name: "y" } }));
+assert.deepEqual(suno, { aiServiceOther: null, serviceTrackUrl: "https://suno.com/s/a", providerDetails: { paid_plan: "Pro" } });
 assert.deepEqual(evidenceKindsToUpload(base({ provider: "other", files: { paid_period: file("a.pdf") } })), ["paid_period"]);
 
 console.log("business-rightsholder-providers-unit: ok");
