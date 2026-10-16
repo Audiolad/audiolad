@@ -157,6 +157,23 @@ export function venueLocalToUtc(local: unknown, timeZone: string): Date | null {
   return new Date(guess);
 }
 
+/** Russian-only label of the venue time zone: «часовой пояс точки, всемирное время +03:00» (no Latin IANA id in the UI). */
+export function formatVenueZoneRu(iso: string, timeZone: string): string {
+  const tz = isValidTimeZone(timeZone) ? timeZone : "Europe/Moscow";
+  const at = new Date(iso);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(at);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
+  const offMin = Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 60000);
+  const sign = offMin < 0 ? "−" : "+";
+  const abs = Math.abs(offMin);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `часовой пояс точки, всемирное время ${sign}${hh}:${mm}`;
+}
+
 export function formatVenueTime(iso: string, timeZone: string): string {
   const tz = isValidTimeZone(timeZone) ? timeZone : "Europe/Moscow";
   return new Intl.DateTimeFormat("ru-RU", {

@@ -5,6 +5,7 @@ import {
   CLIENT_DOCUMENTS,
   PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES,
   formatVenueTime,
+  formatVenueZoneRu,
 } from "@/lib/business-app/client-documents";
 import { loadPlaybackReport } from "@/lib/business-app/load-playback-report";
 
@@ -60,8 +61,9 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
           Получили претензию или пришла проверка? Ничего не подписывайте по
           существу и не платите на месте. Сообщите нам через раздел «Помощь»
-          как можно раньше, не позднее 3 рабочих дней. Обязательные по закону
-          действия выполняйте в срок — см. п. 2.2 «Порядка защиты клиента».
+          как можно раньше — сроки и исключения (обязательные по закону действия,
+          поздно полученный иск, отсутствие нашего ответа) указаны в пп. 2.1–2.2
+          «Порядка защиты клиента».
         </p>
       </section>
 
@@ -115,9 +117,9 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
             {result.kind === "ok" ? (
               <div className="mt-4">
                 <p className="text-sm text-[var(--biz-text-muted)]">
-                  {result.locationName} · {result.report.timezone} · интервал{" "}
+                  {result.locationName} · {formatVenueZoneRu(result.report.fromUtc, result.report.timezone)} · интервал{" "}
                   {formatVenueTime(result.report.fromUtc, result.report.timezone)} —{" "}
-                  {formatVenueTime(result.report.toUtc, result.report.timezone)} (по времени точки)
+                  {formatVenueTime(result.report.toUtc, result.report.timezone)}
                 </p>
                 {result.report.tracks.length === 0 ? (
                   <p className="mt-3 text-sm">
