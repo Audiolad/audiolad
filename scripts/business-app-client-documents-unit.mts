@@ -3,26 +3,33 @@ import { readFileSync } from "node:fs";
 
 import {
   CLIENT_DOCUMENTS,
-  CLIENT_DOCUMENT_DRAFT_LABEL,
+  CLIENT_DOCUMENT_EDITION_LABEL,
+  CLIENT_DOCUMENT_REQUISITES,
   buildPlaybackReport,
   clampWindowMinutes,
   venueLocalToUtc,
 } from "../src/lib/business-app/client-documents";
 import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query";
 
-// Every listed document is a draft pending legal review.
+// Редакция r4 от 16.10.2026 (owner decision): approved, no draft/lawyer marks, requisites present.
 assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
-  assert.equal(d.status, "draft_pending_legal_review");
-  assert.match(d.version, /draft/);
+  assert.equal(d.status, "approved");
+  assert.equal(d.version, "r4-2026-10-16");
+  assert.doesNotMatch(d.version, /draft/);
 }
-assert.equal(CLIENT_DOCUMENT_DRAFT_LABEL, "Черновик, требует проверки юриста");
+assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 16.10.2026");
+assert.match(CLIENT_DOCUMENT_REQUISITES, /Петров Сергей Сергеевич/);
+assert.match(CLIENT_DOCUMENT_REQUISITES, /ИНН 507305817690/);
+assert.match(CLIENT_DOCUMENT_REQUISITES, /ОГРНИП 316505300063237/);
 // No "without RAO/VOIS" promise anywhere in client copy.
 const page = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
 const allCopy = page + JSON.stringify(CLIENT_DOCUMENTS);
 assert.doesNotMatch(allCopy, /без\s+(РАО|ВОИС)/i);
 assert.doesNotMatch(page, /BusinessEmptySection/);
-assert.match(page, /CLIENT_DOCUMENT_DRAFT_LABEL/);
+assert.match(page, /CLIENT_DOCUMENT_EDITION_LABEL/);
+assert.match(page, /CLIENT_DOCUMENT_REQUISITES/);
+assert.doesNotMatch(allCopy + CLIENT_DOCUMENT_REQUISITES, /черновик|юрист|паспорт|355045|Ставрополь/i);
 
 // Timezone conversion.
 assert.equal(venueLocalToUtc("2026-10-16T15:00", "Europe/Moscow")?.toISOString(), "2026-10-16T12:00:00.000Z");

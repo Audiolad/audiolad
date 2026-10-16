@@ -5,15 +5,16 @@
  * a migration, see docs/business/rights-8dcba9d1/15_PLAYBACK_REPORT_DESIGN.md).
  */
 
-export const CLIENT_DOCUMENT_DRAFT_LABEL =
-  "Черновик, требует проверки юриста";
+export const CLIENT_DOCUMENT_EDITION_LABEL = "Редакция от 16.10.2026";
+export const CLIENT_DOCUMENT_REQUISITES =
+  "ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237";
 
 export type ClientDocumentEntry = {
   id: string;
   title: string;
   version: string;
   versionDate: string;
-  status: "draft_pending_legal_review";
+  status: "approved";
   summary: string;
 };
 
@@ -21,43 +22,43 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
     title: "Лицензия на публичное исполнение в заведении (документ точки)",
-    version: "0.1-draft",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary:
-      "Проект документа о лицензии на музыку AudioLad в вашей точке (только через плеер AudioLad). Будет выдан после проверки юристом.",
+      "Документ о лицензии на музыку AudioLad в вашей точке (только через плеер AudioLad).",
   },
   {
     id: "b2b-terms",
     title: "Условия AudioLad Business",
-    version: "r3-draft",
-    versionDate: "2026-10-14",
-    status: "draft_pending_legal_review",
+    version: "r4-2026-10-16",
+    versionDate: "2026-10-16",
+    status: "approved",
     summary: "Условия лицензирования музыки для бизнеса.",
   },
   {
     id: "claims-procedure",
     title: "Порядок защиты при претензиях РАО/ВОИС и других лиц",
-    version: "0.1-draft",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary:
       "Что делать, если пришла претензия или проверка: сроки, документы, помощь и условия возмещения.",
   },
   {
     id: "claim-reply-kit",
     title: "Шаблон ответа на претензию и перечень документов",
-    version: "0.1-draft",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary: "Не отправляйте ответ без согласования с AudioLad.",
   },
   {
     id: "rightsholder-link",
     title: "Правообладатель каталогов «Аурафон» и «Джаз Релакс»",
-    version: "0.1-draft",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary:
       "«Аурафон» и «Джаз Релакс» — творческие псевдонимы. Правообладатель: ИП Петров Сергей Сергеевич.",
   },

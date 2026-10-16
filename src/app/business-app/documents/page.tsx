@@ -1,5 +1,6 @@
 import {
-  CLIENT_DOCUMENT_DRAFT_LABEL,
+  CLIENT_DOCUMENT_EDITION_LABEL,
+  CLIENT_DOCUMENT_REQUISITES,
   CLIENT_DOCUMENTS,
   PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES,
   formatVenueTime,
@@ -29,8 +30,8 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Документы
         </h1>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Все документы ниже — черновики. Они ещё проверяются юристом и пока не
-          являются подписанными документами.
+          Действующие документы AudioLad Business. Правообладатель и оператор:{" "}
+          <span data-testid="client-documents-requisites">{CLIENT_DOCUMENT_REQUISITES}</span>.
         </p>
         <ul className="mt-4 flex flex-col gap-3">
           {CLIENT_DOCUMENTS.map((doc) => (
@@ -42,7 +43,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               <div className="font-semibold text-[var(--biz-text)]">{doc.title}</div>
               <div className="mt-1 text-xs text-[var(--biz-text-muted)]">
                 Версия {doc.version} от {doc.versionDate} ·{" "}
-                <span className="font-semibold">{CLIENT_DOCUMENT_DRAFT_LABEL}</span>
+                <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
               </div>
               <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
             </li>
@@ -61,7 +62,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         </h2>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Отчёт по данным сервера AudioLad. Время — по часовому поясу точки.
-          {" "}{CLIENT_DOCUMENT_DRAFT_LABEL}.
+          
         </p>
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm">Войдите, чтобы построить отчёт.</p>

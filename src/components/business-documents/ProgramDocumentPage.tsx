@@ -2,6 +2,7 @@ import LegalPageShell from "@/components/legal/LegalPageShell";
 import SimpleMarkdown from "@/components/legal/SimpleMarkdown";
 import {
   documentEditionLabel,
+  PROGRAM_DOCUMENT_REQUISITES,
   type PublicProgramDocument,
 } from "@/lib/business-rightsholder/program-documents";
 
@@ -18,6 +19,9 @@ export default function ProgramDocumentPage({ doc }: { doc: PublicProgramDocumen
             Это черновик. Текст ещё проверяется юристом и может измениться; утверждённая редакция будет опубликована на этой же странице.
           </p>
         ) : null}
+        <p className="mt-3 text-sm leading-6 text-[#6f61a3]" data-testid="document-requisites">
+          {PROGRAM_DOCUMENT_REQUISITES.name} · ИНН {PROGRAM_DOCUMENT_REQUISITES.inn} · ОГРНИП {PROGRAM_DOCUMENT_REQUISITES.ogrnip}
+        </p>
         <SimpleMarkdown source={doc.markdown} />
         <p className="mt-8 break-all text-xs text-[#8c7dab]">SHA-256 текста: {doc.sha256}</p>
       </article>
