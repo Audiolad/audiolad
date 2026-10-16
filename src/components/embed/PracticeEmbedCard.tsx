@@ -133,23 +133,40 @@ export default function PracticeEmbedCard(props: Props) {
   }, [loadSignedUrl]);
 
   // Report the card's natural height to the partner page so it can size the iframe to fit the
-  // full square cover + text without clipping (and without an inner scroller). Partners that
-  // ignore the message keep their fixed frame height.
+  // full square cover + text without clipping (and without an inner scroller). `wide` tells the
+  // partner the frame is in the >=560px horizontal layout, which fills the frame height: there the
+  // partner must drop any measured height and use its own. The partner may ask for the current
+  // value at any time (`audiolad:embed-height-request`), so a message sent before its listener
+  // was ready is not lost. Partners that ignore the message keep their fixed frame height.
   const articleRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const el = articleRef.current;
-    if (!el || window.parent === window || typeof ResizeObserver === "undefined") return;
-    let last = 0;
-    const post = () => {
+    if (!el || window.parent === window) return;
+    let last = "";
+    const post = (force = false) => {
       const height = Math.ceil(el.getBoundingClientRect().height);
-      if (height <= 0 || height === last) return;
-      last = height;
-      window.parent.postMessage({ type: "audiolad:embed-height", height }, "*");
+      const wide = window.innerWidth >= 560;
+      const key = `${height}:${wide}`;
+      if (height <= 0 || (!force && key === last)) return;
+      last = key;
+      window.parent.postMessage({ type: "audiolad:embed-height", height, wide }, "*");
     };
-    const observer = new ResizeObserver(post);
-    observer.observe(el);
-    post();
-    return () => observer.disconnect();
+    const onResize = () => post();
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
+      const data = event.data as { type?: unknown } | null;
+      if (data && data.type === "audiolad:embed-height-request") post(true);
+    };
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
+    observer?.observe(el);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("message", onMessage);
+    post(true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("message", onMessage);
+    };
   }, []);
 
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
