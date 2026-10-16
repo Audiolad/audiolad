@@ -5,7 +5,7 @@ DO $$
 DECLARE t text; has_rows boolean;
 BEGIN
   FOREACH t IN ARRAY ARRAY['business_program_document_versions','business_rightsholder_accounts',
-    'business_rightsholder_verifications','business_verification_evidence','business_legal_consents',
+    'business_rightsholder_verifications','business_rightsholder_verification_attempts','business_verification_evidence','business_legal_consents',
     'business_product_optins','business_onboarding_suspensions','business_rightsholder_moderation_audit'] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
       EXECUTE format('LOCK TABLE public.%I IN ACCESS EXCLUSIVE MODE',t);
@@ -28,6 +28,7 @@ DROP POLICY IF EXISTS business_onboarding_evidence_delete_fence ON storage.objec
 -- The reserve RPC returns the evidence row type, so must be removed before that table.
 DROP FUNCTION IF EXISTS public.author_business_evidence_reserve(uuid,text,text,bigint,text);
 DROP TABLE IF EXISTS public.business_rightsholder_moderation_audit;
+DROP TABLE IF EXISTS public.business_rightsholder_verification_attempts;
 DROP TABLE IF EXISTS public.business_onboarding_suspensions;
 DROP TABLE IF EXISTS public.business_product_optins;
 DROP TABLE IF EXISTS public.business_legal_consents;

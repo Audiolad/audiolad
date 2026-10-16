@@ -2033,9 +2033,12 @@ owner-account verification, private evidence, versioned program documents,
 append-only legal consents/moderation, product opt-in snapshots and scoped suspensions.
 Owner identity uses `author_members.role = 'owner'`; moderators bind the rightsholder.
 An unconditional UNIQUE on verification `owner_user_id` permits exactly one initial
-check record per account ever, including rejected records. Only a non-self moderator
-can `reopen` rejected → needs_info with a required reason and audit entry; corrections
-and resubmission retain that record. Product validation locks the parent FOR UPDATE
+case per account. Authors can edit rejected/needs_info → draft and resubmit without
+limit; rejected never permanently blocks the account. Each submission appends an immutable
+`business_rightsholder_verification_attempts` snapshot (fields, evidence, tracks, versioned
+consent IDs); moderation audit links decisions/reasons to that attempt. Owner RLS exposes
+their reason and history only. Account locks serialize submissions; verified remains
+moderator-only and shared across spaces, restricted/revoked cannot be self-reopened. Product validation locks the parent FOR UPDATE
 before checking/aggregating tracks, blocking concurrent audio_items FK inserts/moves.
 No legal versions are seeded: submit/opt-in fail with
 `business_program_documents_not_published` until both approved documents are published.

@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.business_rightsholder_verifications (
   CHECK (service_track_url ~ '^https://[^[:space:]@]+$'),
   CHECK (ai_service <> 'suno' OR service_track_url ~ '^https://suno[.]com/(s|song)/[A-Za-z0-9_-]+/?$')
 );
--- Exactly one initial verification per account, including rejected applications.
+-- One case per account: unlimited correction/submission cycles, never parallel cases.
 CREATE UNIQUE INDEX IF NOT EXISTS business_rightsholder_verifications_owner_uidx
   ON public.business_rightsholder_verifications(owner_user_id);
 
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS public.business_verification_evidence (
   verification_id uuid NOT NULL REFERENCES public.business_rightsholder_verifications(id) ON DELETE RESTRICT,
   kind text NOT NULL CHECK (kind IN ('generation', 'paid_period')),
   object_path text NOT NULL UNIQUE,
-  mime_type text NOT NULL CHECK (mime_type IN ('image/jpeg','image/png','application/pdf')),
+  mime_type text NOT NULL CHECK (mime_type IN ('image/jpeg','image/png','image/webp','application/pdf')),
   size_bytes bigint NOT NULL CHECK (size_bytes BETWEEN 1 AND 10485760),
   sha256 text NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp()
@@ -98,9 +98,22 @@ CREATE TABLE IF NOT EXISTS public.business_onboarding_suspensions (
   reason text NOT NULL CHECK (length(btrim(reason)) > 0),
   created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+-- Submission snapshots are append-only; decisions live in the linked append-only audit.
+CREATE TABLE IF NOT EXISTS public.business_rightsholder_verification_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  verification_id uuid NOT NULL REFERENCES public.business_rightsholder_verifications(id) ON DELETE RESTRICT,
+  attempt_no integer NOT NULL CHECK (attempt_no > 0),
+  snapshot jsonb NOT NULL CHECK (jsonb_typeof(snapshot) = 'object'),
+  submitted_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (verification_id, attempt_no),
+  UNIQUE (verification_id, id)
+);
 CREATE TABLE IF NOT EXISTS public.business_rightsholder_moderation_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   verification_id uuid NOT NULL REFERENCES public.business_rightsholder_verifications(id) ON DELETE RESTRICT,
+  attempt_id uuid NOT NULL,
+  FOREIGN KEY (verification_id, attempt_id)
+    REFERENCES public.business_rightsholder_verification_attempts(verification_id, id) ON DELETE RESTRICT,
   actor_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
   action text NOT NULL,
   reason text NOT NULL CHECK (length(btrim(reason)) > 0),
@@ -173,7 +186,7 @@ CREATE OR REPLACE FUNCTION public.author_business_verification_draft(
   p_ai_service_other text, p_service_track_title text, p_service_track_url text
 )
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v_id uuid;
+DECLARE v_id uuid; v_status text;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501'; END IF;
   INSERT INTO public.business_rightsholder_accounts(owner_user_id) VALUES (auth.uid()) ON CONFLICT DO NOTHING;
@@ -190,8 +203,18 @@ BEGIN
     OR (p_ai_service = 'suno' AND p_service_track_url !~ '^https://suno[.]com/(s|song)/[A-Za-z0-9_-]+/?$') THEN
     RAISE EXCEPTION 'business_service_link_invalid';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.business_rightsholder_verifications WHERE owner_user_id = auth.uid()) THEN
-    RAISE EXCEPTION 'business_verification_already_active';
+  SELECT id, status INTO v_id, v_status FROM public.business_rightsholder_verifications
+    WHERE owner_user_id = auth.uid() FOR UPDATE;
+  IF FOUND THEN
+    IF v_status NOT IN ('rejected','needs_info') THEN
+      RAISE EXCEPTION 'business_verification_already_active';
+    END IF;
+    UPDATE public.business_rightsholder_verifications SET product_id = p_product_id,
+      audio_item_id = p_audio_item_id, ai_service = p_ai_service, ai_service_other = p_ai_service_other,
+      service_track_title = p_service_track_title, service_track_url = p_service_track_url,
+      status = 'draft', updated_at = clock_timestamp() WHERE id = v_id;
+    -- Keep the latest moderator reason readable; previous submissions remain untouched.
+    RETURN v_id;
   END IF;
   INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,
     ai_service_other,service_track_title,service_track_url)
@@ -259,7 +282,7 @@ CREATE OR REPLACE FUNCTION public.author_business_verification_submit(
   p_terms_version text, p_rights_version text, p_ip_address inet DEFAULT NULL, p_user_agent text DEFAULT NULL
 )
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v public.business_rightsholder_verifications%ROWTYPE; v_tracks jsonb; v_evidence jsonb;
+DECLARE v public.business_rightsholder_verifications%ROWTYPE; v_tracks jsonb; v_evidence jsonb; v_consents uuid[];
 BEGIN
   -- Account lock serializes submission, moderator actions and opt-in.
   PERFORM 1 FROM public.business_rightsholder_accounts WHERE owner_user_id = auth.uid() FOR UPDATE;
@@ -281,8 +304,13 @@ BEGIN
     (SELECT count(DISTINCT e.kind) FROM public.business_verification_evidence e WHERE e.id = ANY(p_evidence_ids) AND e.verification_id = v.id) <> 2 THEN
     RAISE EXCEPTION 'business_two_evidence_files_required';
   END IF;
-  PERFORM public.business_onboarding_consents(v.id,v.product_id,'verification',v_tracks,v_evidence,
+  v_consents := public.business_onboarding_consents(v.id,v.product_id,'verification',v_tracks,v_evidence,
     p_accept_terms,p_confirm_rights,p_terms_version,p_rights_version,p_ip_address,p_user_agent);
+  INSERT INTO public.business_rightsholder_verification_attempts(verification_id,attempt_no,snapshot)
+    SELECT v.id,coalesce(max(attempt_no),0) + 1,
+      jsonb_build_object('fields',to_jsonb(v) - ARRAY['status','reason','submitted_at','updated_at'],
+        'tracks',v_tracks,'evidence',v_evidence,'consent_ids',to_jsonb(v_consents))
+    FROM public.business_rightsholder_verification_attempts WHERE verification_id = v.id;
   UPDATE public.business_rightsholder_verifications SET status = 'submitted', submitted_at = clock_timestamp(),
     updated_at = clock_timestamp() WHERE id = v.id;
 END;
@@ -327,8 +355,10 @@ BEGIN
   END IF;
   UPDATE public.business_rightsholder_verifications SET status = v_next, reason = p_reason,
     updated_at = clock_timestamp() WHERE id = v.id;
-  INSERT INTO public.business_rightsholder_moderation_audit(verification_id,actor_user_id,action,reason,previous_status,next_status,rightsholder_id)
-    VALUES(v.id,auth.uid(),p_action,p_reason,v.status,v_next,v_rightsholder);
+  INSERT INTO public.business_rightsholder_moderation_audit(verification_id,attempt_id,actor_user_id,action,reason,previous_status,next_status,rightsholder_id)
+    VALUES(v.id,(SELECT id FROM public.business_rightsholder_verification_attempts
+      WHERE verification_id = v.id ORDER BY attempt_no DESC LIMIT 1),
+      auth.uid(),p_action,p_reason,v.status,v_next,v_rightsholder);
 END;
 $$;
 
@@ -398,11 +428,11 @@ END;
 $$;
 
 INSERT INTO storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
-  VALUES('business-rightsholder-evidence','business-rightsholder-evidence',false,10485760,ARRAY['image/jpeg','image/png','application/pdf'])
+  VALUES('business-rightsholder-evidence','business-rightsholder-evidence',false,10485760,ARRAY['image/jpeg','image/png','image/webp','application/pdf'])
   ON CONFLICT (id) DO NOTHING;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'business-rightsholder-evidence' AND NOT public
-    AND file_size_limit = 10485760 AND allowed_mime_types = ARRAY['image/jpeg','image/png','application/pdf']) THEN
+    AND file_size_limit = 10485760 AND allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp','application/pdf']) THEN
     RAISE EXCEPTION 'business_evidence_bucket_configuration_mismatch';
   END IF;
 END $$;
@@ -432,7 +462,7 @@ DO $$
 DECLARE t text; f record;
 BEGIN
   FOREACH t IN ARRAY ARRAY['business_program_document_versions','business_rightsholder_accounts',
-    'business_rightsholder_verifications','business_verification_evidence','business_legal_consents',
+    'business_rightsholder_verifications','business_rightsholder_verification_attempts','business_verification_evidence','business_legal_consents',
     'business_product_optins','business_onboarding_suspensions','business_rightsholder_moderation_audit'] LOOP
     EXECUTE format('COMMENT ON TABLE public.%I IS %L', t, 'audiolad:business-onboarding; account onboarding, never a rights grant or eligibility decision');
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
@@ -443,12 +473,12 @@ BEGIN
       EXECUTE format('CREATE POLICY business_onboarding_read ON public.%I FOR SELECT TO authenticated USING (published_at <= now())',t);
     ELSIF t IN ('business_rightsholder_accounts','business_rightsholder_verifications','business_legal_consents','business_product_optins') THEN
       EXECUTE format('CREATE POLICY business_onboarding_read ON public.%I FOR SELECT TO authenticated USING (owner_user_id = auth.uid() OR public.business_onboarding_is_moderator())',t);
-    ELSIF t IN ('business_verification_evidence','business_rightsholder_moderation_audit') THEN
+    ELSIF t IN ('business_rightsholder_verification_attempts','business_verification_evidence','business_rightsholder_moderation_audit') THEN
       EXECUTE format('CREATE POLICY business_onboarding_read ON public.%I FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM public.business_rightsholder_verifications v WHERE v.id = verification_id AND (v.owner_user_id = auth.uid() OR public.business_onboarding_is_moderator())))',t);
     ELSE
       EXECUTE format('CREATE POLICY business_onboarding_read ON public.%I FOR SELECT TO authenticated USING (public.business_onboarding_is_moderator())',t);
     END IF;
-    IF t IN ('business_legal_consents','business_rightsholder_moderation_audit','business_verification_evidence','business_product_optins','business_onboarding_suspensions') THEN
+    IF t IN ('business_rightsholder_verification_attempts','business_legal_consents','business_rightsholder_moderation_audit','business_verification_evidence','business_product_optins','business_onboarding_suspensions') THEN
       EXECUTE format('DROP TRIGGER IF EXISTS business_onboarding_immutable ON public.%I',t);
       EXECUTE format('CREATE TRIGGER business_onboarding_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.business_onboarding_append_only()',t);
     END IF;

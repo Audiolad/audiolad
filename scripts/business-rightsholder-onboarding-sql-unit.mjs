@@ -2,7 +2,7 @@
 // Contract checks + real PostgreSQL scenarios in an EXPLICIT disposable test container only.
 // No discovery of supabase-db, no production URL, no install or network in this runner.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -14,7 +14,7 @@ assert.doesNotMatch(clean, /(?:INSERT INTO|UPDATE|ALTER TABLE|DELETE FROM)\s+pub
 assert.doesNotMatch(clean, /CREATE.*FUNCTION public\.resolve_business_track_eligibility/i);
 assert.doesNotMatch(clean, /INSERT INTO public\.business_program_document_versions/i);
 for (const name of ['business_program_document_versions', 'business_rightsholder_accounts',
-  'business_rightsholder_verifications', 'business_verification_evidence', 'business_legal_consents',
+  'business_rightsholder_verifications', 'business_rightsholder_verification_attempts', 'business_verification_evidence', 'business_legal_consents',
   'business_product_optins', 'business_onboarding_suspensions', 'business_rightsholder_moderation_audit']) {
   assert.ok(sql.includes(`CREATE TABLE IF NOT EXISTS public.${name}`), name);
 }
@@ -199,6 +199,8 @@ BEGIN
   PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'','' '')',v),'business_moderation_reason_required');
   PERFORM public.moderator_business_verification_action(v,'request_info','Provide clearer evidence');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+  EXECUTE replace(draft_call,'Example','Clarified') INTO c;
+  PERFORM onboarding_test.check_true(c = v,'needs_info edit retains case');
   e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('e',64));
   INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":200}');
   submit_call := format('SELECT public.author_business_verification_submit(%L,ARRAY[%L,%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id,e2.id);
@@ -241,6 +243,7 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   PERFORM public.moderator_business_verification_action(v,'restrict','Investigating');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
   PERFORM onboarding_test.expect_error(optin_call,'business_account_not_verified');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   PERFORM public.moderator_business_verification_action(v,'revoke','Revoked');
@@ -255,46 +258,58 @@ BEGIN
   SET LOCAL ROLE authenticated;
   EXECUTE replace(replace(draft_call,'''suno''','''musicgpt'''),'https://suno.com/s/example','https://musicgpt.com/track/example') INTO v;
   RESET ROLE;
-  -- Rejected applicants cannot start a second initial check, even with another service.
-  UPDATE public.business_rightsholder_verifications SET status = 'submitted' WHERE id = v;
-  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   SET LOCAL ROLE authenticated;
-  PERFORM public.moderator_business_verification_action(v,'reject','Insufficient evidence');
-  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
-  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
-  PERFORM onboarding_test.expect_error(replace(replace(draft_call,'''suno'',NULL','''other'',''Synthetic service'''),'https://suno.com/s/example','https://example.test/track/1'),'business_verification_already_active');
-  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'',''Correct evidence'')',v),'business_moderator_required');
-  PERFORM onboarding_test.expect_error(format('SELECT public.author_business_evidence_reserve(%L,''generation'',''image/png'',100,%L)',v,repeat('a',64)),'business_evidence_upload_forbidden');
-  RESET ROLE;
-  -- The unconditional index also protects against direct privileged duplicate inserts.
-  PERFORM onboarding_test.expect_error(format('INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url) SELECT owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url FROM public.business_rightsholder_verifications WHERE id = %L',v),'duplicate key value violates unique constraint');
-  INSERT INTO public.platform_user_roles VALUES('00000000-0000-0000-0000-000000000002','admin');
-  SET LOCAL ROLE authenticated;
-  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'',''Correct evidence'')',v),'business_self_moderation_forbidden');
-  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
-  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'','' '')',v),'business_moderation_reason_required');
-  PERFORM public.moderator_business_verification_action(v,'reopen','Correct evidence');
-  PERFORM onboarding_test.check_true((SELECT status = 'needs_info' FROM public.business_rightsholder_verifications WHERE id = v),'reopen keeps the same verification');
-  PERFORM onboarding_test.check_true((SELECT count(*) = 1 FROM public.business_rightsholder_moderation_audit
-    WHERE verification_id = v AND action = 'reopen' AND previous_status = 'rejected' AND next_status = 'needs_info'
-      AND actor_user_id = '00000000-0000-0000-0000-000000000003' AND reason = 'Correct evidence'),'reopen audited');
-  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'',''Again'')',v),'business_verification_transition_forbidden');
-  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
-  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
   e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
   e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('b',64));
   INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
     ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"image/png","size":100}'),
     ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":200}');
-  PERFORM public.author_business_verification_submit(v,ARRAY[e1.id,e2.id],true,true,'test-v1','test-v1');
-  PERFORM onboarding_test.check_true((SELECT count(*) = 1 AND bool_and(id = v AND status = 'submitted')
-    FROM public.business_rightsholder_verifications WHERE owner_user_id = '00000000-0000-0000-0000-000000000002'),'corrections resubmit the single initial check');
+  submit_call := format('SELECT public.author_business_verification_submit(%L,ARRAY[%L,%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id,e2.id);
+  EXECUTE submit_call;
+  -- Each rejection permits corrections on the SAME case, without moderator reopen.
+  FOR n IN 1..2 LOOP
+    PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+    PERFORM public.moderator_business_verification_action(v,'reject','Insufficient evidence');
+    PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
+    PERFORM onboarding_test.check_true((SELECT reason = 'Insufficient evidence' FROM public.business_rightsholder_verifications WHERE id = v),'author reads rejection reason');
+    EXECUTE replace(draft_call,'Example','Corrected ' || n) INTO c;
+    PERFORM onboarding_test.check_true(c = v,'edit retains case ID');
+    PERFORM onboarding_test.check_true((SELECT reason = 'Insufficient evidence' FROM public.business_rightsholder_verifications WHERE id = v),'reason survives editing');
+    EXECUTE submit_call;
+  END LOOP;
+  PERFORM onboarding_test.check_true((SELECT count(*) = 3 AND max(attempt_no) = 3 FROM public.business_rightsholder_verification_attempts WHERE verification_id = v),'three preserved submissions');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 2 FROM public.business_rightsholder_moderation_audit WHERE verification_id = v AND attempt_id IS NOT NULL AND action = 'reject'),'rejections linked to attempts');
+  PERFORM onboarding_test.check_true((SELECT snapshot->'fields'->>'service_track_title' = 'Example' FROM public.business_rightsholder_verification_attempts WHERE verification_id = v AND attempt_no = 1),'original fields preserved');
+  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
+  PERFORM onboarding_test.expect_error(submit_call,'business_verification_submit_forbidden');
+  PERFORM onboarding_test.expect_error('UPDATE public.business_rightsholder_verification_attempts SET snapshot = ''{}''','permission denied');
+  PERFORM onboarding_test.expect_error('UPDATE public.business_rightsholder_verifications SET status = ''verified''','permission denied');
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+  RESET ROLE;
+  DELETE FROM public.platform_user_roles WHERE user_id = '00000000-0000-0000-0000-000000000001';
+  SET LOCAL ROLE authenticated;
+  PERFORM onboarding_test.check_true((SELECT count(*) = 0 FROM public.business_rightsholder_verification_attempts WHERE verification_id = v),'foreign attempts unreadable');
+  RESET ROLE;
+  PERFORM onboarding_test.expect_error('UPDATE public.business_rightsholder_verification_attempts SET snapshot = ''{}''','business_onboarding_history_immutable');
+  PERFORM onboarding_test.expect_error('DELETE FROM public.business_rightsholder_verification_attempts','business_onboarding_history_immutable');
+  PERFORM onboarding_test.expect_error('TRUNCATE public.business_rightsholder_verification_attempts','business_onboarding_history_immutable');
+  PERFORM onboarding_test.expect_error('UPDATE public.business_verification_evidence SET sha256 = repeat(''f'',64)','business_onboarding_history_immutable');
+  -- Unconditional owner uniqueness also blocks privileged duplicate active cases.
+  PERFORM onboarding_test.expect_error(format('INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url) SELECT owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url FROM public.business_rightsholder_verifications WHERE id = %L',v),'duplicate key value violates unique constraint');
   RESET ROLE;
 END $test$;
 DROP FUNCTION onboarding_test.expect_error(text,text);
 DROP FUNCTION onboarding_test.check_true(boolean,text);
 DROP SCHEMA onboarding_test;
 `;
+
+const onboardingTables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS public\.(business_\w+)/g)].map((m) => m[1]);
+const captureRows = `CREATE TABLE onboarding_before(table_name text, rows jsonb);\n` + onboardingTables.map((t) =>
+  `INSERT INTO onboarding_before SELECT '${t}', coalesce(jsonb_agg(row_data ORDER BY row_data::text), '[]'::jsonb) FROM (SELECT to_jsonb(t) row_data FROM public.${t} t) rows;`).join('\n');
+const assertRowsUnchanged = onboardingTables.map((t) =>
+  `DO $$ BEGIN IF (SELECT rows FROM onboarding_before WHERE table_name = '${t}') IS DISTINCT FROM (SELECT coalesce(jsonb_agg(row_data ORDER BY row_data::text), '[]'::jsonb) FROM (SELECT to_jsonb(t) row_data FROM public.${t} t) rows) THEN RAISE EXCEPTION 'migration changed ${t}'; END IF; END $$;`).join('\n');
+const unrelatedCheck = "SELECT 1 / CASE WHEN count(*) = 1 AND min(value) = 'keep me' THEN 1 ELSE 0 END FROM public.unrelated_existing;";
+const rollback = read('docs/business/rightsholder-onboarding-8d9cd0af-rollback.sql');
 
 const container = process.env.AUDIOLAD_ONBOARDING_TEST_CONTAINER;
 if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
@@ -307,11 +322,62 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
   psql('postgres', `CREATE DATABASE ${db};`);
   try {
     psql(db, [stub, read('supabase/migrations/20261205120000_music_rights_foundation.sql'),
-      read('supabase/migrations/20261206120200_business_rights_eligibility.sql'), sql, sql,
+      read('supabase/migrations/20261206120200_business_rights_eligibility.sql'),
+      "CREATE TABLE public.unrelated_existing(value text); INSERT INTO public.unrelated_existing VALUES ('keep me');",
+      sql, sql,
       "SELECT 1 / CASE WHEN count(*) = 0 THEN 1 ELSE 0 END FROM public.business_program_document_versions;",
-      read('docs/business/rightsholder-onboarding-8d9cd0af-rollback.sql'),
-      "SELECT 1 / CASE WHEN to_regclass('public.business_rightsholder_accounts') IS NULL AND to_regclass('public.music_rights_grants') IS NOT NULL THEN 1 ELSE 0 END;",
-      sql, smoke].join('\n'));
+      smoke].join('\n'));
+    // Two independent PG sessions race to submit the same needs_info case.
+    psql(db, `SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+      SET ROLE authenticated;
+      SELECT public.moderator_business_verification_action(id,'request_info','Concurrent submission test')
+      FROM public.business_rightsholder_verifications WHERE owner_user_id = '00000000-0000-0000-0000-000000000002';`);
+    const concurrentSubmit = `BEGIN;
+      SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
+      SET LOCAL ROLE authenticated;
+      SELECT public.author_business_verification_submit(v.id,
+        ARRAY(SELECT e.id FROM public.business_verification_evidence e WHERE e.verification_id = v.id),
+        true,true,'test-v1','test-v1') FROM public.business_rightsholder_verifications v
+        WHERE owner_user_id = '00000000-0000-0000-0000-000000000002';
+      SELECT pg_sleep(0.5); COMMIT;`;
+    const runConcurrent = () => new Promise((resolve, reject) => {
+      const child = spawn('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1']);
+      let stderr = '';
+      child.stdout.resume();
+      child.stderr.on('data', (data) => { stderr += data; });
+      child.on('error', reject);
+      child.on('close', (code) => resolve({code, stderr}));
+      child.stdin.end(concurrentSubmit);
+    });
+    const races = await Promise.all([runConcurrent(), runConcurrent()]);
+    assert.equal(races.filter((r) => r.code === 0).length, 1, 'exactly one concurrent submission succeeds');
+    assert.match(races.find((r) => r.code !== 0).stderr, /business_verification_submit_forbidden/);
+    psql(db, `SELECT 1 / CASE WHEN count(*) = 4 THEN 1 ELSE 0 END
+      FROM public.business_rightsholder_verification_attempts a JOIN public.business_rightsholder_verifications v ON v.id = a.verification_id
+      WHERE v.owner_user_id = '00000000-0000-0000-0000-000000000002';`);
+    // Re-run twice WITH history and compare complete rows, including row counts.
+    psql(db, [captureRows, sql, sql, assertRowsUnchanged, unrelatedCheck].join('\n'));
+    assert.throws(() => execFileSync('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1'],
+      {input: rollback, stdio:['pipe','pipe','pipe']}), (err) => {
+      assert.match(err.stderr.toString(), /business_onboarding_rollback_refuses_data_loss/);
+      return true;
+    });
+    // The failed transaction must preserve all onboarding history and unrelated rows.
+    psql(db, [assertRowsUnchanged, unrelatedCheck].join('\n'));
+
+    // Separate DB: only unrelated data, empty onboarding. Rollback and re-apply must succeed.
+    const emptyDb = `${db}_empty`;
+    psql('postgres', `CREATE DATABASE ${emptyDb};`);
+    try {
+      psql(emptyDb, [stub, read('supabase/migrations/20261205120000_music_rights_foundation.sql'),
+        read('supabase/migrations/20261206120200_business_rights_eligibility.sql'),
+        "CREATE TABLE public.unrelated_existing(value text); INSERT INTO public.unrelated_existing VALUES ('keep me');",
+        sql, rollback, unrelatedCheck,
+        "SELECT 1 / CASE WHEN to_regclass('public.business_rightsholder_accounts') IS NULL AND to_regclass('public.business_rightsholder_verification_attempts') IS NULL AND to_regclass('public.music_rights_grants') IS NOT NULL THEN 1 ELSE 0 END;",
+        sql, unrelatedCheck].join('\n'));
+    } finally {
+      psql('postgres', `DROP DATABASE ${emptyDb};`);
+    }
     console.log('business-rightsholder-onboarding-sql-unit: contract + isolated PostgreSQL scenarios OK (migration applied twice)');
   } finally {
     psql('postgres', `DROP DATABASE ${db};`);
