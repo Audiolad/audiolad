@@ -36,6 +36,12 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/more": `${BUSINESS_SITE_PATH}/more`,
   "/announcements": `${BUSINESS_SITE_PATH}/announcements`,
   "/documents": `${BUSINESS_SITE_PATH}/documents`,
+  // Readable full texts of client documents (tasks 8d9cd0af/8dcba9d1); keep in sync with CLIENT_DOCUMENTS ids.
+  "/documents/venue-license": `${BUSINESS_SITE_PATH}/documents/venue-license`,
+  "/documents/b2b-terms": `${BUSINESS_SITE_PATH}/documents/b2b-terms`,
+  "/documents/claims-procedure": `${BUSINESS_SITE_PATH}/documents/claims-procedure`,
+  "/documents/claim-reply-kit": `${BUSINESS_SITE_PATH}/documents/claim-reply-kit`,
+  "/documents/rightsholder-link": `${BUSINESS_SITE_PATH}/documents/rightsholder-link`,
   "/team": `${BUSINESS_SITE_PATH}/team`,
   "/preferences": `${BUSINESS_SITE_PATH}/settings`,
   "/help": `${BUSINESS_SITE_PATH}/help`,

@@ -5,63 +5,73 @@
  * a migration, see docs/business/rights-8dcba9d1/15_PLAYBACK_REPORT_DESIGN.md).
  */
 
-export const CLIENT_DOCUMENT_DRAFT_LABEL =
-  "Черновик, требует проверки юриста";
+export const CLIENT_DOCUMENT_EDITION_LABEL = "Редакция от 16.10.2026";
+export const CLIENT_DOCUMENT_REQUISITES =
+  "ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237";
 
 export type ClientDocumentEntry = {
   id: string;
   title: string;
   version: string;
   versionDate: string;
-  status: "draft_pending_legal_review";
+  status: "approved";
   summary: string;
 };
 
 export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
-    title: "Лицензия на публичное исполнение в заведении (документ точки)",
-    version: "0.1-draft",
+    title: "Лицензия на публичное исполнение музыки в заведении",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary:
-      "Проект документа о лицензии на музыку AudioLad в вашей точке (только через плеер AudioLad). Будет выдан после проверки юристом.",
+      "Документ точки: лицензия на музыку АудиоЛад в вашем заведении (только через плеер АудиоЛад).",
   },
   {
     id: "b2b-terms",
-    title: "Условия AudioLad Business",
-    version: "r3-draft",
-    versionDate: "2026-10-14",
-    status: "draft_pending_legal_review",
-    summary: "Условия лицензирования музыки для бизнеса.",
+    title: "Условия лицензирования музыки для бизнеса",
+    version: "r4-2026-10-16",
+    versionDate: "2026-10-16",
+    status: "approved",
+    summary: "Раздел оферты «АудиоЛад Бизнес»: что разрешено, сроки, учёт, РАО и ВОИС.",
   },
   {
     id: "claims-procedure",
-    title: "Порядок защиты при претензиях РАО/ВОИС и других лиц",
-    version: "0.1-draft",
+    title: "Порядок защиты клиента при претензиях РАО, ВОИС и иных лиц",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary:
       "Что делать, если пришла претензия или проверка: сроки, документы, помощь и условия возмещения.",
   },
   {
     id: "claim-reply-kit",
-    title: "Шаблон ответа на претензию и перечень документов",
-    version: "0.1-draft",
+    title: "Образец ответа на претензию и перечень документов",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
-    summary: "Не отправляйте ответ без согласования с AudioLad.",
+    status: "approved",
+    summary: "Не отправляйте ответ без согласования с АудиоЛад.",
   },
   {
     id: "rightsholder-link",
     title: "Правообладатель каталогов «Аурафон» и «Джаз Релакс»",
-    version: "0.1-draft",
+    version: "r4-2026-10-16",
     versionDate: "2026-10-16",
-    status: "draft_pending_legal_review",
+    status: "approved",
     summary:
       "«Аурафон» и «Джаз Релакс» — творческие псевдонимы. Правообладатель: ИП Петров Сергей Сергеевич.",
   },
 ] as const;
+
+/** Browser-visible href of the full document text on business.audiolad.ru. */
+export function clientDocumentHref(id: string): string {
+  return `/documents/${id}`;
+}
+
+export function findClientDocument(id: string): ClientDocumentEntry | undefined {
+  return CLIENT_DOCUMENTS.find((d) => d.id === id);
+}
 
 export const PLAYBACK_REPORT_MAX_WINDOW_MINUTES = 180;
 export const PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES = 30;
