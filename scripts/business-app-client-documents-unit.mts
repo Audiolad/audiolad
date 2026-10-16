@@ -7,6 +7,7 @@ import {
   CLIENT_DOCUMENT_REQUISITES,
   buildPlaybackReport,
   clampWindowMinutes,
+  formatVenueZoneRu,
   venueLocalToUtc,
 } from "../src/lib/business-app/client-documents";
 import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query";
@@ -15,7 +16,7 @@ import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query
 assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r4-2026-10-16");
+  assert.equal(d.version, "r5-2026-10-16");
   assert.doesNotMatch(d.version, /draft/);
 }
 assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 16.10.2026");
@@ -38,6 +39,9 @@ assert.equal(venueLocalToUtc("bad", "Europe/Moscow"), null);
 assert.equal(venueLocalToUtc("2026-13-01T00:00", "Europe/Moscow"), null);
 assert.equal(clampWindowMinutes("999"), 180);
 assert.equal(clampWindowMinutes("x"), 30);
+assert.equal(formatVenueZoneRu("2026-10-16T12:00:00.500Z", "Europe/Moscow"), "часовой пояс точки, всемирное время +03:00");
+assert.equal(formatVenueZoneRu("2026-10-16T12:00:00Z", "Asia/Kolkata"), "часовой пояс точки, всемирное время +05:30");
+assert.equal(formatVenueZoneRu("2026-10-16T12:00:00Z", "America/New_York"), "часовой пояс точки, всемирное время −04:00");
 
 // Report grouping.
 const at = new Date("2026-10-16T12:00:00Z");

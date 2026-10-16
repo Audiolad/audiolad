@@ -175,7 +175,7 @@ assert.doesNotMatch(copy, /Audiolad Business/i);
 assert.doesNotMatch(copy, /без РАО|без ВОИС/);
 assert.doesNotMatch(copy, /\d[\d\s]*₽|\d[\d\s]*руб/);
 assert.equal(
-  copy.includes("Без надоедливых повторов и лишних забот. Работает даже без интернета."),
+  copy.includes("Без надоедливых повторов и лишних забот. Стабильный онлайн-плеер."),
   true,
 );
 assert.match(copy, /7 дней бесплатно/);

@@ -23,7 +23,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
     title: "Лицензия на публичное исполнение музыки в заведении",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary:
@@ -32,7 +32,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "b2b-terms",
     title: "Условия лицензирования музыки для бизнеса",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary: "Раздел оферты «АудиоЛад Бизнес»: что разрешено, сроки, учёт, РАО и ВОИС.",
@@ -40,7 +40,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "claims-procedure",
     title: "Порядок защиты клиента при претензиях РАО, ВОИС и иных лиц",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary:
@@ -49,10 +49,10 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "claim-reply-kit",
     title: "Образец ответа на претензию и перечень документов",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
-    summary: "Не отправляйте ответ без согласования с АудиоЛад.",
+    summary: "Образец ответа и документы; отправляйте ответ по согласованию с АудиоЛад, кроме случаев п. 2.2 порядка защиты.",
   },
 ] as const;
 
@@ -155,6 +155,23 @@ export function venueLocalToUtc(local: unknown, timeZone: string): Date | null {
   let guess = naive - tzOffsetMs(naive, tz);
   guess = naive - tzOffsetMs(guess, tz);
   return new Date(guess);
+}
+
+/** Russian-only label of the venue time zone: «часовой пояс точки, всемирное время +03:00» (no Latin IANA id in the UI). */
+export function formatVenueZoneRu(iso: string, timeZone: string): string {
+  const tz = isValidTimeZone(timeZone) ? timeZone : "Europe/Moscow";
+  const at = new Date(iso);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(at);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
+  const offMin = Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 60000);
+  const sign = offMin < 0 ? "−" : "+";
+  const abs = Math.abs(offMin);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `часовой пояс точки, всемирное время ${sign}${hh}:${mm}`;
 }
 
 export function formatVenueTime(iso: string, timeZone: string): string {

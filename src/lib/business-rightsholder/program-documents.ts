@@ -1,5 +1,5 @@
 // Public read-only program documents for the rights-holder onboarding consent checkboxes (task 8d9cd0af).
-// Редакция r4 от 16.10.2026 approved by the owner (Sergey, 16.10.2026); no lawyer gate.
+// Редакция r5 от 16.10.2026 approved by the owner (Sergey, 16.10.2026); no lawyer gate.
 import {
   PROGRAM_TERMS_MD,
   PROGRAM_TERMS_MD_SHA256,
@@ -33,7 +33,7 @@ export const PUBLIC_PROGRAM_DOCUMENTS: Record<ProgramDocumentKey, PublicProgramD
     key: "business_program_terms",
     path: "/business-documents/program-terms",
     title: "Условия программы АудиоЛад Бизнес",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     date: "2026-10-16",
     status: "approved",
     markdown: PROGRAM_TERMS_MD,
@@ -43,7 +43,7 @@ export const PUBLIC_PROGRAM_DOCUMENTS: Record<ProgramDocumentKey, PublicProgramD
     key: "business_music_rights_declaration",
     path: "/business-documents/music-rights-declaration",
     title: "Заявление о правах на музыку",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     date: "2026-10-16",
     status: "approved",
     markdown: RIGHTS_DECLARATION_MD,
