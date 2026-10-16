@@ -4,10 +4,13 @@ export type RightsholderExample = {
   kind: RightsholderEvidenceKind;
   label: string;
   title: string;
-  src: string;
-  width: number;
-  height: number;
-  alt: string;
+  /** Real redacted screenshot (Suno only). Text examples have no image — never invent screenshots. */
+  src?: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+  /** Text example lines, shown instead of a screenshot (MusicGPT / other service). */
+  textExample?: string[];
   hint: string;
 };
 

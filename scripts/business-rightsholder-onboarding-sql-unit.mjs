@@ -7,6 +7,25 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const sql = read('supabase/migrations/20270101120000_business_rightsholder_onboarding.sql');
+// 20270102120000: provider choice (Suno / MusicGPT / other). Additive; applied after the base migration.
+const providers = read('supabase/migrations/20270102120000_business_rightsholder_providers.sql');
+const providersRollback = read('docs/business/rightsholder-providers-8d9cd0af-rollback.sql');
+const providersClean = providers.replace(/--[^\n]*/g, '');
+assert.match(providersClean, /^\s*BEGIN;/);
+assert.match(providersClean, /COMMIT;\s*$/);
+assert.doesNotMatch(providersClean, /DROP\s+(TABLE|COLUMN|CONSTRAINT|FUNCTION|POLICY|TRIGGER)/i, 'providers migration is additive');
+assert.doesNotMatch(providersClean, /CREATE OR REPLACE FUNCTION public\.(author_business_verification_draft|author_business_verification_submit|business_onboarding_consents|moderator_\w+)\(/, 'existing RPCs are not rewritten');
+assert.doesNotMatch(providersClean, /music_rights_grants|resolve_business_track_eligibility/);
+assert.doesNotMatch(providersClean, /status = 'verified'|'verified'/, 'no auto verification');
+const providerTables = [...providersClean.matchAll(/ALTER TABLE\s+(public\.\w+)/g)].map((m) => m[1]);
+assert.ok(providerTables.length > 0 && providerTables.every((t) => t === 'public.business_rightsholder_verifications'));
+for (const body of providersClean.matchAll(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/g)) {
+  assert.match(body[0], /SET search_path = public, pg_temp/);
+}
+assert.match(providers, /GRANT EXECUTE ON FUNCTION public\.author_business_verification_draft_v2\([^)]*\) TO authenticated/);
+assert.match(providers, /GRANT EXECUTE ON FUNCTION public\.author_business_verification_submit_v2\([^)]*\) TO authenticated/);
+assert.doesNotMatch(providers, /GRANT EXECUTE ON FUNCTION public\.business_onboarding_provider_error/);
+assert.match(providersRollback, /business_providers_rollback_refuses_data_loss/);
 const clean = sql.replace(/--[^\n]*/g, '');
 assert.match(clean, /^\s*BEGIN;/);
 assert.match(clean, /COMMIT;\s*$/);
@@ -305,6 +324,144 @@ DROP FUNCTION onboarding_test.check_true(boolean,text);
 DROP SCHEMA onboarding_test;
 `;
 
+const providersSmoke = String.raw`
+CREATE SCHEMA providers_test;
+CREATE FUNCTION providers_test.expect_error(command text, expected text) RETURNS void LANGUAGE plpgsql AS $f$
+BEGIN
+  BEGIN EXECUTE command;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%' || expected || '%' THEN RAISE EXCEPTION 'expected %, got %: %',expected,SQLERRM,command; END IF;
+    RETURN;
+  END;
+  RAISE EXCEPTION 'expected error %, succeeded: %', expected, command;
+END $f$;
+CREATE FUNCTION providers_test.check_true(ok boolean, message text) RETURNS void LANGUAGE plpgsql AS $f$
+BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'assertion failed: %', message; END IF; END $f$;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA providers_test FROM PUBLIC;
+GRANT USAGE ON SCHEMA providers_test TO authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA providers_test TO authenticated;
+INSERT INTO auth.users(id) VALUES ('00000000-0000-0000-0000-000000000004'),('00000000-0000-0000-0000-000000000005'),('00000000-0000-0000-0000-000000000006');
+INSERT INTO public.profiles VALUES ('00000000-0000-0000-0000-000000000004','listener'),('00000000-0000-0000-0000-000000000005','listener'),('00000000-0000-0000-0000-000000000006','listener');
+INSERT INTO public.authors(id,slug) VALUES ('10000000-0000-0000-0000-000000000004','prov-suno'),('10000000-0000-0000-0000-000000000005','prov-musicgpt'),('10000000-0000-0000-0000-000000000006','prov-other');
+INSERT INTO public.author_members(author_id,user_id,role) VALUES
+ ('10000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000004','owner'),
+ ('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000005','owner'),
+ ('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000006','owner');
+INSERT INTO public.practices(id,author_id,slug,status) VALUES
+ ('20000000-0000-0000-0000-000000000014','10000000-0000-0000-0000-000000000004','prov-suno','published'),
+ ('20000000-0000-0000-0000-000000000015','10000000-0000-0000-0000-000000000005','prov-musicgpt','published'),
+ ('20000000-0000-0000-0000-000000000016','10000000-0000-0000-0000-000000000006','prov-other','published');
+INSERT INTO public.audio_items(id,practice_id,title) VALUES
+ ('30000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000014','Suno track'),
+ ('30000000-0000-0000-0000-000000000015','20000000-0000-0000-0000-000000000015','MusicGPT track'),
+ ('30000000-0000-0000-0000-000000000016','20000000-0000-0000-0000-000000000016','Studio track');
+
+DO $test$
+DECLARE v uuid; e1 public.business_verification_evidence; e2 public.business_verification_evidence;
+  d text; s text; n bigint; snap jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claim.role','authenticated',false);
+  -- Existing rows keep working: legacy rows get '{}' and keep their NOT NULL links.
+  PERFORM providers_test.check_true((SELECT bool_and(provider_details = '{}'::jsonb AND service_track_url IS NOT NULL) FROM public.business_rightsholder_verifications),'legacy rows untouched');
+
+  -- SUNO: link + generation refs required; two files (generation + paid_period).
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000004',false);
+  SET LOCAL ROLE authenticated;
+  d := 'SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-000000000014'',''30000000-0000-0000-0000-000000000014'',''suno'',NULL,''Spa jazz'',''https://suno.com/s/abc'',''{"generation_refs":"https://suno.com/s/abc\nhttps://suno.com/s/def","paid_plan":"Pro"}''::jsonb)';
+  PERFORM providers_test.expect_error(replace(d,'https://suno.com/s/abc''','https://evil.example/s/abc'''),'business_service_link_invalid');
+  PERFORM providers_test.expect_error(replace(d,',''https://suno.com/s/abc''',',NULL'),'business_service_link_invalid');
+  PERFORM providers_test.expect_error(replace(d,'"generation_refs":"https://suno.com/s/abc\nhttps://suno.com/s/def",',''),'business_suno_generation_refs_required');
+  PERFORM providers_test.expect_error(replace(d,'"paid_plan"','"plan_name"'),'business_provider_details_invalid');
+  PERFORM providers_test.expect_error(replace(d,'"Pro"','5'),'business_provider_details_invalid');
+  PERFORM providers_test.expect_error(regexp_replace(d,'''\{.*\}''::jsonb','''["x"]''::jsonb'),'business_provider_details_invalid');
+  EXECUTE d INTO v;
+  PERFORM providers_test.check_true((SELECT provider_details->>'paid_plan' = 'Pro' AND ai_service_other IS NULL FROM public.business_rightsholder_verifications WHERE id = v),'suno details stored');
+  e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
+  e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('b',64));
+  INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
+    ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"image/png","size":100}'),
+    ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":200}');
+  s := format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id);
+  PERFORM providers_test.expect_error(s,'business_evidence_files_required');
+  PERFORM providers_test.expect_error(replace(s,'true,true','true,false'),'business_evidence_files_required');
+  s := format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L,%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id,e2.id);
+  PERFORM providers_test.expect_error(replace(s,'true,true','true,false'),'business_program_consents_required');
+  EXECUTE s;
+  PERFORM providers_test.check_true((SELECT status = 'submitted' FROM public.business_rightsholder_verifications WHERE id = v),'suno submitted, not verified');
+  SELECT snapshot INTO snap FROM public.business_rightsholder_verification_attempts WHERE verification_id = v;
+  PERFORM providers_test.check_true(snap->'fields'->'provider_details'->>'generation_refs' LIKE '%suno.com/s/def%','attempt snapshot keeps provider details');
+  PERFORM providers_test.check_true(snap->'fields'->>'ai_service' = 'suno','attempt snapshot keeps provider');
+  PERFORM providers_test.expect_error(d,'business_verification_already_active');
+  -- Unlimited resubmission after reject; provider may change.
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+  PERFORM public.moderator_business_verification_action(v,'reject','Paid period does not cover creation date');
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000004',false);
+  EXECUTE replace(d,'Spa jazz','Spa jazz v2') INTO v;
+  EXECUTE s;
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+  PERFORM public.moderator_business_verification_action(v,'reject','Again');
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000004',false);
+  EXECUTE replace(d,'Spa jazz','Spa jazz v3') INTO v;
+  EXECUTE s;
+  PERFORM providers_test.check_true((SELECT count(*) = 3 FROM public.business_rightsholder_verification_attempts WHERE verification_id = v),'three attempts kept');
+  PERFORM providers_test.expect_error('UPDATE public.business_rightsholder_verifications SET provider_details = ''{}''','permission denied');
+
+  -- MUSICGPT: plan required; link optional; two files (license/passport + plan details).
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000005',false);
+  d := 'SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-000000000015'',''30000000-0000-0000-0000-000000000015'',''musicgpt'',''ignored'',''Calm piano'',NULL,''{"plan_name":"Pro","license_refs":"LIC-123"}''::jsonb)';
+  PERFORM providers_test.expect_error(replace(d,'"plan_name":"Pro",',''),'business_musicgpt_plan_required');
+  PERFORM providers_test.expect_error(replace(d,'"plan_name":"Pro"','"plan_name":"  "'),'business_musicgpt_plan_required');
+  PERFORM providers_test.expect_error(replace(d,'"license_refs"','"generation_refs"'),'business_provider_details_invalid');
+  PERFORM providers_test.expect_error(replace(d,',NULL,',',''http://musicgpt.com/x'','),'business_service_link_invalid');
+  EXECUTE d INTO v;
+  PERFORM providers_test.check_true((SELECT service_track_url IS NULL AND ai_service_other IS NULL FROM public.business_rightsholder_verifications WHERE id = v),'musicgpt link optional, other name dropped');
+  e1 := public.author_business_evidence_reserve(v,'generation','application/pdf',300,repeat('c',64));
+  e2 := public.author_business_evidence_reserve(v,'paid_period','image/webp',400,repeat('d',64));
+  INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
+    ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"application/pdf","size":300}'),
+    ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"image/webp","size":400}');
+  PERFORM providers_test.expect_error(format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e2.id),'business_evidence_files_required');
+  EXECUTE format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L,%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id,e2.id);
+  PERFORM providers_test.check_true((SELECT status = 'submitted' FROM public.business_rightsholder_verifications WHERE id = v),'musicgpt submitted');
+
+  -- OTHER / own studio: name or description required, no link required, 1..2 files, each slot once.
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000006',false);
+  d := 'SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-000000000016'',''30000000-0000-0000-0000-000000000016'',''other'',''Своя студия: Ableton Live 12'',''Studio track'',NULL,''{"method_description":"Записано дома"}''::jsonb)';
+  PERFORM providers_test.expect_error(replace(d,'''Своя студия: Ableton Live 12''','''  '''),'business_ai_service_invalid');
+  PERFORM providers_test.expect_error(replace(d,'''Своя студия: Ableton Live 12''','NULL'),'business_ai_service_invalid');
+  PERFORM providers_test.expect_error(replace(d,'''Studio track''','''  '''),'business_service_track_title_invalid');
+  PERFORM providers_test.expect_error(replace(d,'"method_description"','"paid_plan"'),'business_provider_details_invalid');
+  EXECUTE d INTO v;
+  e1 := public.author_business_evidence_reserve(v,'generation','application/pdf',500,repeat('e',64));
+  e2 := public.author_business_evidence_reserve(v,'generation','application/pdf',600,repeat('f',64));
+  INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
+    ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"application/pdf","size":500}'),
+    ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":600}');
+  PERFORM providers_test.expect_error(format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[]::uuid[],true,true,''test-v1'',''test-v1'')',v),'business_evidence_files_required');
+  PERFORM providers_test.expect_error(format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L,%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id,e2.id),'business_evidence_files_required');
+  -- Legacy submit keeps its stricter two-kind rule.
+  PERFORM providers_test.expect_error(format('SELECT public.author_business_verification_submit(%L,ARRAY[%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id),'business_two_evidence_files_required');
+  EXECUTE format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id);
+  PERFORM providers_test.check_true((SELECT status = 'submitted' AND ai_service_other = 'Своя студия: Ableton Live 12' FROM public.business_rightsholder_verifications WHERE id = v),'other submitted');
+  -- Foreign owner cannot read or submit.
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000005',false);
+  PERFORM providers_test.check_true((SELECT count(*) = 0 FROM public.business_rightsholder_verifications WHERE id = v),'foreign case unreadable');
+  PERFORM providers_test.expect_error(format('SELECT public.author_business_verification_submit_v2(%L,ARRAY[%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id),'business_verification_submit_forbidden');
+  PERFORM providers_test.expect_error('SELECT public.business_onboarding_provider_error(''suno'',NULL,NULL,''{}'')','permission denied');
+  RESET ROLE;
+  -- Never auto-verified, and onboarding never creates rights grants.
+  PERFORM providers_test.check_true((SELECT count(*) = 0 FROM public.business_rightsholder_verifications WHERE owner_user_id IN
+    ('00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006') AND status = 'verified'),'no auto verified');
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000004',false);
+  SET LOCAL ROLE authenticated;
+  PERFORM providers_test.expect_error('SELECT public.author_business_product_optin(ARRAY[''20000000-0000-0000-0000-000000000014'']::uuid[],true,true,''test-v1'',''test-v1'')','business_account_not_verified');
+  RESET ROLE;
+END $test$;
+DROP FUNCTION providers_test.expect_error(text,text);
+DROP FUNCTION providers_test.check_true(boolean,text);
+DROP SCHEMA providers_test;
+`;
+
 const onboardingTables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS public\.(business_\w+)/g)].map((m) => m[1]);
 const captureRows = `CREATE TABLE onboarding_before(table_name text, rows jsonb);\n` + onboardingTables.map((t) =>
   `INSERT INTO onboarding_before SELECT '${t}', coalesce(jsonb_agg(row_data ORDER BY row_data::text), '[]'::jsonb) FROM (SELECT to_jsonb(t) row_data FROM public.${t} t) rows;`).join('\n');
@@ -326,7 +483,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     psql(db, [stub, read('supabase/migrations/20261205120000_music_rights_foundation.sql'),
       read('supabase/migrations/20261206120200_business_rights_eligibility.sql'),
       "CREATE TABLE public.unrelated_existing(value text); INSERT INTO public.unrelated_existing VALUES ('keep me');",
-      sql, sql,
+      sql, sql, providers, providers,
       "SELECT 1 / CASE WHEN count(*) = 0 THEN 1 ELSE 0 END FROM public.business_program_document_versions;",
       smoke].join('\n'));
     // Two independent PG sessions race to submit the same needs_info case.
@@ -357,8 +514,16 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     psql(db, `SELECT 1 / CASE WHEN count(*) = 4 THEN 1 ELSE 0 END
       FROM public.business_rightsholder_verification_attempts a JOIN public.business_rightsholder_verifications v ON v.id = a.verification_id
       WHERE v.owner_user_id = '00000000-0000-0000-0000-000000000002';`);
+    psql(db, providersSmoke);
     // Re-run twice WITH history and compare complete rows, including row counts.
-    psql(db, [captureRows, sql, sql, assertRowsUnchanged, unrelatedCheck].join('\n'));
+    psql(db, [captureRows, sql, sql, providers, providers, assertRowsUnchanged, unrelatedCheck].join('\n'));
+    // Providers rollback refuses to drop provider data and leaves every row intact.
+    assert.throws(() => execFileSync('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1'],
+      {input: providersRollback, stdio:['pipe','pipe','pipe']}), (err) => {
+      assert.match(err.stderr.toString(), /business_providers_rollback_refuses_data_loss/);
+      return true;
+    });
+    psql(db, [assertRowsUnchanged, unrelatedCheck].join('\n'));
     assert.throws(() => execFileSync('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1'],
       {input: rollback, stdio:['pipe','pipe','pipe']}), (err) => {
       assert.match(err.stderr.toString(), /business_onboarding_rollback_refuses_data_loss/);
@@ -374,9 +539,11 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       psql(emptyDb, [stub, read('supabase/migrations/20261205120000_music_rights_foundation.sql'),
         read('supabase/migrations/20261206120200_business_rights_eligibility.sql'),
         "CREATE TABLE public.unrelated_existing(value text); INSERT INTO public.unrelated_existing VALUES ('keep me');",
-        sql, rollback, unrelatedCheck,
+        sql, providers, providersRollback,
+        "SELECT 1 / CASE WHEN NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'business_rightsholder_verifications' AND column_name = 'provider_details') AND to_regprocedure('public.author_business_verification_submit_v2(uuid,uuid[],boolean,boolean,text,text,inet,text)') IS NULL THEN 1 ELSE 0 END;",
+        providers, rollback, unrelatedCheck,
         "SELECT 1 / CASE WHEN to_regclass('public.business_rightsholder_accounts') IS NULL AND to_regclass('public.business_rightsholder_verification_attempts') IS NULL AND to_regclass('public.music_rights_grants') IS NOT NULL THEN 1 ELSE 0 END;",
-        sql, unrelatedCheck].join('\n'));
+        sql, providers, unrelatedCheck].join('\n'));
     } finally {
       psql('postgres', `DROP DATABASE ${emptyDb};`);
     }
