@@ -144,11 +144,15 @@ export default function PracticeEmbedCard(props: Props) {
     // The frame itself is the visual card on the partner page: no shadow and a transparent
     // document (the platform body is lilac #f7f2fc, which showed as a purple band under the
     // card whenever the card was shorter than the frame). 100vh fallback for WebViews without dvh.
+    // NO overscroll-behavior here: `overflow-hidden` makes <main> a scroll container, and
+    // `overscroll-behavior: none` on it stops scroll chaining, so on Android Chrome a vertical
+    // swipe over the card was swallowed inside the iframe and the partner page did not scroll.
+    // With the default `auto`, the (non-scrollable) card chains the gesture to the parent page.
     <main
       data-practice-embed-root="true"
-      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-hidden overscroll-none bg-transparent p-0"
+      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-hidden bg-transparent p-0"
     >
-      <style>{"html,body{background:transparent!important}"}</style>
+      <style>{"html,body{background:transparent!important;overscroll-behavior:auto!important}"}</style>
       <article
         data-practice-embed="true"
         data-practice-embed-mode={props.mode}
