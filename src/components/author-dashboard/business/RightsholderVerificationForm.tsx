@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import SunoLinkHowTo from "@/components/author-dashboard/business/SunoLinkHowTo";
 import ExampleLightbox from "@/components/author-dashboard/business/ExampleLightbox";
 import {
   RIGHTSHOLDER_EXAMPLES,
@@ -195,12 +196,15 @@ export default function RightsholderVerificationForm({ products, documents, exis
                 onChange={(e) => setTrackTitle(e.target.value)} placeholder="Spa relaxation jazz background" />
               {errors.trackTitle ? <span className="mt-1 block text-red-600">{errors.trackTitle}</span> : null}
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-neutral-800">Ссылка на трек в Suno</span>
-              <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackUrl} inputMode="url"
-                onChange={(e) => setTrackUrl(e.target.value)} placeholder="https://suno.com/s/…" />
-              {errors.trackUrl ? <span className="mt-1 block text-red-600">{errors.trackUrl}</span> : null}
-            </label>
+            <div className="text-sm">
+              <label className="block">
+                <span className="font-medium text-neutral-800">Ссылка на трек в Suno</span>
+                <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackUrl} inputMode="url"
+                  onChange={(e) => setTrackUrl(e.target.value)} placeholder="https://suno.com/s/…" />
+                {errors.trackUrl ? <span className="mt-1 block text-red-600">{errors.trackUrl}</span> : null}
+              </label>
+              <SunoLinkHowTo />
+            </div>
           </div>
 
           {(["generation", "paid_period"] as const).map((kind) => {
