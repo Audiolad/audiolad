@@ -394,6 +394,7 @@
     "test:business-rightsholder-onboarding": "node scripts/business-rightsholder-onboarding-sql-unit.mjs",
     "test:business-rightsholder-examples-ui": "node scripts/business-rightsholder-examples-ui-unit.mjs",
     "test:business-suno-link-howto-ui": "node scripts/business-suno-link-howto-ui-unit.mjs",
+    "test:business-consent-document-links": "npx tsx scripts/business-consent-document-links-unit.mts",
     "test:business-rights-eligibility": "node scripts/business-rights-eligibility-sql-unit.mjs",
     "test:scheduled-publication": "npx tsx scripts/scheduled-publication-unit.mts && node scripts/scheduled-publication-sql-unit.mjs",
     "test:live-public-content-sync": "npx tsx scripts/live-public-content-sync-unit.mts && node scripts/public-content-revision-sql-unit.mjs",
@@ -402,7 +403,8 @@
     "test:product-video-export": "npx tsx scripts/product-video-export-unit.mts",
     "test:author-product-publish-preview-flow": "npx tsx scripts/author-product-publish-preview-flow-unit.mts",
     "run:seo-reservation-5d-reminder": "npx tsx scripts/process-seo-reservation-5d-reminders.ts",
-    "test:seo-reservation-5d-reminder": "npx tsx scripts/seo-reservation-5d-reminder-unit.mts && bash scripts/seo-reservation-5d-reminder-timer-unit.sh"
+    "test:seo-reservation-5d-reminder": "npx tsx scripts/seo-reservation-5d-reminder-unit.mts && bash scripts/seo-reservation-5d-reminder-timer-unit.sh",
+    "test:business-app-client-documents": "npx tsx scripts/business-app-client-documents-unit.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

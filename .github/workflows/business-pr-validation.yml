@@ -48,6 +48,7 @@ jobs:
           npm run test:business-app-eligibility
           npm run test:business-app-owner-home-signals
           npm run test:business-app-support-diagnostics
+          npm run test:business-app-client-documents
           npm run test:business-app-onboarding-wizard
           npm run test:business-domain-core
           npm run test:business-player-foundation
@@ -56,6 +57,7 @@ jobs:
           npm run test:business-rights-eligibility
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-rightsholder-onboarding
           npm run test:business-rightsholder-examples-ui
+          npm run test:business-consent-document-links
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger
