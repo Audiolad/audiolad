@@ -11,7 +11,7 @@ DECLARE
   u1 uuid := gen_random_uuid(); u2 uuid := gen_random_uuid(); u3 uuid := gen_random_uuid();
   a1 uuid := gen_random_uuid(); a2 uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid();
   p1 uuid := gen_random_uuid(); p2 uuid := gen_random_uuid(); pb uuid := gen_random_uuid();
-  pc uuid := gen_random_uuid(); pd uuid := gen_random_uuid();
+  pc uuid := gen_random_uuid(); pd uuid := gen_random_uuid(); p1b uuid := gen_random_uuid();
   base public.ecompany_catalog_stats_snapshots; r record; snap public.ecompany_catalog_stats_snapshots; n bigint;
   t_now timestamptz := now();
 BEGIN
@@ -81,16 +81,31 @@ BEGIN
          public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '10 days']) b2;
   IF r.d < 1 THEN RAISE EXCEPTION 't1 (uploaded 15d ago) counts from P1 go-live 10d ago'; END IF;
 
-  -- Withdrawing the EARLIEST product of a space must not make the space/author "new" again.
+  -- Re-publication with a moderation event: P2's track t4 (uploaded 2d ago) counts from the event (12h ago).
+  INSERT INTO public.practice_moderation_events(practice_id, author_id, action, from_status, to_status, actor_type, created_at)
+    VALUES (p2, a2, 'republished', 'unpublished', 'published', 'admin', t_now - interval '12 hours');
+  SELECT a.published_tracks - b2.published_tracks AS d INTO r
+    FROM public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '11 hours']) a,
+         public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '13 hours']) b2;
+  IF r.d < 1 THEN RAISE EXCEPTION 're-published product tracks count from the re-publication event'; END IF;
+
+  -- Same space: withdrawing the EARLIEST product must not make the space/author "new" again.
   SELECT spaces_with_published AS s0, authors_with_published AS a0 INTO r
     FROM public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '7 days']);
-  UPDATE public.practices SET status = 'unpublished' WHERE id = p1;
   INSERT INTO public.practices(id, author_id, title, slug, status, is_free, price, product_kind, catalog_visibility, published_at)
-    VALUES (gen_random_uuid(), a1, 'Продукт новый', 'stats-c353-p1b', 'published', true, 0, 'practice', 'listed', t_now - interval '1 day');
-  SELECT b2.spaces_with_published - r.s0 AS ds, b2.authors_with_published - r.a0 AS da INTO r
+    VALUES (p1b, a1, 'Продукт новый', 'stats-c353-p1b', 'published', true, 0, 'practice', 'listed', t_now - interval '1 day');
+  UPDATE public.practices SET status = 'unpublished' WHERE id = p1;
+  SELECT b2.spaces_with_published - r.s0 AS ds, b2.authors_with_published - r.a0 AS da, r.s0, r.a0 INTO r
     FROM public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '7 days']) b2;
   IF r.ds <> 0 OR r.da <> 0 THEN RAISE EXCEPTION 'space a1 keeps its first-publication date (ds %, da %)', r.ds, r.da; END IF;
-  -- p1 stays withdrawn (re-publishing needs moderation); remaining public: p2, p1b.
+
+  -- Across spaces: u1's earliest space a1 fully withdrawn; u1 still published via a2 and keeps the
+  -- 10-days-ago first-publication date (no re-count), while space a1 itself drops out.
+  UPDATE public.practices SET status = 'unpublished' WHERE id = p1b;
+  SELECT b2.spaces_with_published - r.s0 AS ds, b2.authors_with_published - r.a0 AS da INTO r
+    FROM public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '7 days']) b2;
+  IF r.ds <> -1 OR r.da <> 0 THEN RAISE EXCEPTION 'cross-space: ds -1 / da 0 expected (ds %, da %)', r.ds, r.da; END IF;
+  -- Remaining public fixtures: p2 only.
 
   -- Snapshot upsert: twice in a day = one row (throttled); withdrawal shows as decrease after refresh.
   DELETE FROM public.ecompany_catalog_stats_snapshots;
@@ -101,12 +116,12 @@ BEGIN
   IF snap.snapshot_date <> (now() AT TIME ZONE 'Europe/Moscow')::date THEN RAISE EXCEPTION 'Moscow date'; END IF;
   UPDATE public.practices SET status = 'unpublished' WHERE id = p2;
   snap := public.ecompany_catalog_stats_capture();
-  IF snap.published_products - base.published_products <> 2 THEN RAISE EXCEPTION 'capture within an hour is throttled (got %)', snap.published_products - base.published_products; END IF;
+  IF snap.published_products - base.published_products <> 1 THEN RAISE EXCEPTION 'capture within an hour is throttled (got %)', snap.published_products - base.published_products; END IF;
   UPDATE public.ecompany_catalog_stats_snapshots SET captured_at = now() - interval '2 hours';
   snap := public.ecompany_catalog_stats_capture();
-  IF snap.published_products - base.published_products <> 1 THEN RAISE EXCEPTION 'withdrawal decreases products'; END IF;
-  IF snap.spaces_with_published - base.spaces_with_published <> 1 THEN RAISE EXCEPTION 'withdrawal decreases spaces'; END IF;
-  IF snap.authors_with_published - base.authors_with_published <> 1 THEN RAISE EXCEPTION 'author keeps other space'; END IF;
+  IF snap.published_products - base.published_products <> 0 THEN RAISE EXCEPTION 'withdrawal decreases products'; END IF;
+  IF snap.spaces_with_published - base.spaces_with_published <> 0 THEN RAISE EXCEPTION 'withdrawal decreases spaces'; END IF;
+  IF snap.authors_with_published - base.authors_with_published <> 0 THEN RAISE EXCEPTION 'no published space left'; END IF;
   IF snap.published_tracks - base.published_tracks <> 0 THEN RAISE EXCEPTION 'withdrawn product tracks excluded'; END IF;
   SELECT count(*) INTO n FROM public.ecompany_catalog_stats_history(10);
   IF n <> 1 THEN RAISE EXCEPTION 'history'; END IF;

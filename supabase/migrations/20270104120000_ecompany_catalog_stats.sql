@@ -78,18 +78,28 @@ AS $$
     WHERE m.user_id IS NOT NULL
     GROUP BY m.user_id
   ),
-  spaces AS (
+  -- First-ever publication of each space (withdrawn/deleted products keep published_at).
+  spaces_first AS (
     SELECT p.author_id, min(coalesce(p.published_at, p.scheduled_publish_at, p.created_at)) AS since
     FROM public.practices p
-    WHERE p.author_id IN (SELECT pp.author_id FROM pp)
-      AND (p.published_at IS NOT NULL OR p.id IN (SELECT pp.id FROM pp))
+    WHERE p.published_at IS NOT NULL OR p.id IN (SELECT pp.id FROM pp)
     GROUP BY p.author_id
   ),
+  -- Counted now only if the space currently has a published product.
+  spaces AS (
+    SELECT f.author_id, f.since FROM spaces_first f
+    WHERE f.author_id IN (SELECT pp.author_id FROM pp)
+  ),
+  -- A person counts if ANY of their spaces is currently published; their date is their first-ever
+  -- publication across ALL their spaces (withdrawing an earlier space does not make them "new").
   people_pub AS (
-    SELECT m.user_id, min(greatest(s.since, m.created_at)) AS since
+    SELECT m.user_id, min(greatest(f.since, m.created_at)) AS since
     FROM public.author_members m
-    JOIN spaces s ON s.author_id = m.author_id
+    JOIN spaces_first f ON f.author_id = m.author_id
     WHERE m.user_id IS NOT NULL
+      AND m.user_id IN (
+        SELECT m2.user_id FROM public.author_members m2 JOIN spaces s2 ON s2.author_id = m2.author_id
+      )
     GROUP BY m.user_id
   ),
   tracks AS (

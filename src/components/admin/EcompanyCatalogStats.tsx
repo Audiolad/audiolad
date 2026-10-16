@@ -75,6 +75,10 @@ export function EcompanyCatalogStats({ model, error }: { model: CatalogStatsMode
               <p className="mt-2 text-[#796ba0]" data-history-started>
                 Накопление снимков начато {model.historyStartedLabel}. Более ранних снимков нет — значения не досчитаны задним числом.
               </p>
+            ) : model.historyStartUnknown ? (
+              <p className="mt-2 text-[#9f1239]" data-history-started-unknown>
+                Дату начала накопления сейчас не удалось прочитать; ниже — последние снимки.
+              </p>
             ) : (
               <p className="mt-2 text-[#796ba0]">Снимков пока нет: накопление начнётся с первого открытия табло.</p>
             )}

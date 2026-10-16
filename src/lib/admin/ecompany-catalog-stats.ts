@@ -116,6 +116,8 @@ export type CatalogStatsModel = {
   periods: Array<CatalogPeriod & { growth: CatalogCounts; snapshotChange: CatalogCounts | null }>;
   history: Array<CatalogSnapshot & { change: CatalogCounts | null }>;
   historyStartedLabel: string | null;
+  /** Snapshots exist but the true first capture could not be read: do not guess it from a limited list. */
+  historyStartUnknown: boolean;
 };
 
 function toInt(value: unknown): number | null {
@@ -202,11 +204,8 @@ export function composeCatalogStats(
     totals,
     periods,
     history,
-    historyStartedLabel: historyStartedAt
-      ? `${formatMsk(new Date(historyStartedAt))} МСК`
-      : first
-        ? `${formatMsk(new Date(first.firstCapturedAt))} МСК`
-        : null,
+    historyStartedLabel: historyStartedAt ? `${formatMsk(new Date(historyStartedAt))} МСК` : null,
+    historyStartUnknown: !historyStartedAt && first !== undefined,
   };
 }
 

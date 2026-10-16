@@ -62,7 +62,10 @@ assert.equal(composeCatalogStats(now, new Map(), []), null, "missing data is not
 // 4. Snapshot history: newest first, change only between consecutive days, start label from first row.
 const snap = (date: string, n: number) =>
   parseSnapshot({ snapshot_date: date, captured_at: `${date}T20:00:00+00:00`, first_captured_at: `${date}T15:24:00+00:00`, ...c(n) })!;
-const withHistory = composeCatalogStats(now, countsAt, [snap("2026-10-15", 95), snap("2026-10-13", 88), snap("2026-10-14", 91)])!;
+const withHistory = composeCatalogStats(now, countsAt, [snap("2026-10-15", 95), snap("2026-10-13", 88), snap("2026-10-14", 91)], "2026-10-13T15:24:00+00:00")!;
+const noStart = composeCatalogStats(now, countsAt, [snap("2026-10-15", 95)], null)!;
+assert.equal(noStart.historyStartedLabel, null, "start is not guessed from the limited list");
+assert.equal(noStart.historyStartUnknown, true);
 assert.deepEqual(withHistory.history.map((h) => h.snapshotDate), ["2026-10-15", "2026-10-14", "2026-10-13"]);
 assert.equal(withHistory.history[0].change?.published_products, 4);
 assert.equal(withHistory.history[2].change, null, "first day has no previous snapshot");
