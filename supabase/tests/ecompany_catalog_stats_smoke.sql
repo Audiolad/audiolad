@@ -90,7 +90,7 @@ BEGIN
   SELECT b2.spaces_with_published - r.s0 AS ds, b2.authors_with_published - r.a0 AS da INTO r
     FROM public.ecompany_catalog_stats_counts(ARRAY[t_now - interval '7 days']) b2;
   IF r.ds <> 0 OR r.da <> 0 THEN RAISE EXCEPTION 'space a1 keeps its first-publication date (ds %, da %)', r.ds, r.da; END IF;
-  UPDATE public.practices SET status = 'published' WHERE id = p1;
+  -- p1 stays withdrawn (re-publishing needs moderation); remaining public: p2, p1b.
 
   -- Snapshot upsert: twice in a day = one row (throttled); withdrawal shows as decrease after refresh.
   DELETE FROM public.ecompany_catalog_stats_snapshots;
@@ -101,13 +101,13 @@ BEGIN
   IF snap.snapshot_date <> (now() AT TIME ZONE 'Europe/Moscow')::date THEN RAISE EXCEPTION 'Moscow date'; END IF;
   UPDATE public.practices SET status = 'unpublished' WHERE id = p2;
   snap := public.ecompany_catalog_stats_capture();
-  IF snap.published_products - base.published_products <> 3 THEN RAISE EXCEPTION 'capture within an hour is throttled (got %)', snap.published_products - base.published_products; END IF;
+  IF snap.published_products - base.published_products <> 2 THEN RAISE EXCEPTION 'capture within an hour is throttled (got %)', snap.published_products - base.published_products; END IF;
   UPDATE public.ecompany_catalog_stats_snapshots SET captured_at = now() - interval '2 hours';
   snap := public.ecompany_catalog_stats_capture();
-  IF snap.published_products - base.published_products <> 2 THEN RAISE EXCEPTION 'withdrawal decreases products'; END IF;
+  IF snap.published_products - base.published_products <> 1 THEN RAISE EXCEPTION 'withdrawal decreases products'; END IF;
   IF snap.spaces_with_published - base.spaces_with_published <> 1 THEN RAISE EXCEPTION 'withdrawal decreases spaces'; END IF;
   IF snap.authors_with_published - base.authors_with_published <> 1 THEN RAISE EXCEPTION 'author keeps other space'; END IF;
-  IF snap.published_tracks - base.published_tracks <> 2 THEN RAISE EXCEPTION 'withdrawn product tracks excluded'; END IF;
+  IF snap.published_tracks - base.published_tracks <> 0 THEN RAISE EXCEPTION 'withdrawn product tracks excluded'; END IF;
   SELECT count(*) INTO n FROM public.ecompany_catalog_stats_history(10);
   IF n <> 1 THEN RAISE EXCEPTION 'history'; END IF;
   IF public.ecompany_catalog_stats_history_started() IS NULL THEN RAISE EXCEPTION 'history start'; END IF;
