@@ -292,7 +292,9 @@ BEGIN
   RESET ROLE;
   PERFORM onboarding_test.expect_error('UPDATE public.business_rightsholder_verification_attempts SET snapshot = ''{}''','business_onboarding_history_immutable');
   PERFORM onboarding_test.expect_error('DELETE FROM public.business_rightsholder_verification_attempts','business_onboarding_history_immutable');
-  PERFORM onboarding_test.expect_error('TRUNCATE public.business_rightsholder_verification_attempts','business_onboarding_history_immutable');
+  -- Plain TRUNCATE is stopped by the audit FK; CASCADE reaches the append-only triggers.
+  PERFORM onboarding_test.expect_error('TRUNCATE public.business_rightsholder_verification_attempts','cannot truncate a table referenced in a foreign key');
+  PERFORM onboarding_test.expect_error('TRUNCATE public.business_rightsholder_verification_attempts CASCADE','business_onboarding_history_immutable');
   PERFORM onboarding_test.expect_error('UPDATE public.business_verification_evidence SET sha256 = repeat(''f'',64)','business_onboarding_history_immutable');
   -- Unconditional owner uniqueness also blocks privileged duplicate active cases.
   PERFORM onboarding_test.expect_error(format('INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url) SELECT owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url FROM public.business_rightsholder_verifications WHERE id = %L',v),'duplicate key value violates unique constraint');
