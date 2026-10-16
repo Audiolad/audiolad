@@ -52,7 +52,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
     version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
-    summary: "Не отправляйте ответ без согласования с АудиоЛад.",
+    summary: "Образец ответа и документы; отправляйте ответ по согласованию с АудиоЛад, кроме случаев п. 2.2 порядка защиты.",
   },
 ] as const;
 

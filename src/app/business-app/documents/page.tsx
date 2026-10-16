@@ -58,9 +58,10 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           ))}
         </ul>
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
-          Получили претензию или пришла проверка? Ничего не подписывайте и не
-          платите на месте. Сообщите нам в течение 3 рабочих дней через раздел
-          «Помощь».
+          Получили претензию или пришла проверка? Ничего не подписывайте по
+          существу и не платите на месте. Сообщите нам через раздел «Помощь»
+          как можно раньше, не позднее 3 рабочих дней. Обязательные по закону
+          действия выполняйте в срок — см. п. 2.2 «Порядка защиты клиента».
         </p>
       </section>
 
@@ -116,8 +117,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                 <p className="text-sm text-[var(--biz-text-muted)]">
                   {result.locationName} · {result.report.timezone} · интервал{" "}
                   {formatVenueTime(result.report.fromUtc, result.report.timezone)} —{" "}
-                  {formatVenueTime(result.report.toUtc, result.report.timezone)} (UTC{" "}
-                  {result.report.fromUtc} — {result.report.toUtc})
+                  {formatVenueTime(result.report.toUtc, result.report.timezone)} (по времени точки)
                 </p>
                 {result.report.tracks.length === 0 ? (
                   <p className="mt-3 text-sm">
