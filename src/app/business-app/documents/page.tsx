@@ -139,7 +139,13 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                           <td>{formatVenueTime(t.firstAt, result.report.timezone)}</td>
                           <td>{formatVenueTime(t.lastAt, result.report.timezone)}</td>
                           <td>{t.coversT ? "да" : ""}</td>
-                          <td>{t.rightsholders.length > 0 ? t.rightsholders.join(", ") : "нет записи в реестре"}</td>
+                          <td>
+                            {result.report.registryUnavailable
+                              ? "сведения реестра временно недоступны"
+                              : t.rightsholders.length > 0
+                                ? t.rightsholders.join(", ")
+                                : "нет записи в реестре"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

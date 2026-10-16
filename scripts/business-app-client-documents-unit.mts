@@ -197,25 +197,33 @@ console.log("business-app-client-documents-unit OK");
   assert.match(CLIENT_DOCUMENT_SOURCES["venue-license"].markdown, /реестра прав/);
   assert.match(CLIENT_DOCUMENT_SOURCES["claim-reply-kit"].markdown, /реестра прав/);
   const at = new Date("2026-10-16T12:00:00Z");
+  // Review r1 B2: holder matched to the playback time of each fact, not to the search instant.
   const map = rightsholdersFromRegistry(
     [
-      { audio_item_id: "a", rightsholder_id: "h1", status: "verified", valid_from: "2026-01-01T00:00:00Z", valid_until: null },
-      { audio_item_id: "a", rightsholder_id: "h2", status: "verified", valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-02-01T00:00:00Z" },
+      { audio_item_id: "a", rightsholder_id: "h1", status: "verified", valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-10-16T12:10:00Z" },
+      { audio_item_id: "a", rightsholder_id: "h2", status: "verified", valid_from: "2026-10-16T12:10:00Z", valid_until: null },
       { audio_item_id: "b", rightsholder_id: "h2", status: "draft", valid_from: "2026-01-01T00:00:00Z", valid_until: null },
     ],
     [{ id: "h1", display_name: "Правообладатель А" }, { id: "h2", display_name: "Правообладатель Б" }],
-    at,
   );
-  assert.deepEqual(map.get("a"), ["Правообладатель А"]);
   assert.equal(map.get("b"), undefined);
-  const rep = buildPlaybackReport({
-    at, windowMinutes: 30, timezone: "Europe/Moscow",
-    facts: [{ occurred_at: "2026-10-16T12:00:00Z", audio_item_id: "a", location_id: null, player_id: null, listened_ms: 1000 }],
-    titles: new Map(), rightsholders: map,
-  });
-  assert.deepEqual(rep.tracks[0].rightsholders, ["Правообладатель А"]);
+  const fact = (iso: string) => ({ occurred_at: iso, audio_item_id: "a", location_id: null, player_id: null, listened_ms: 1000 });
+  const late = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: map });
+  assert.deepEqual(late.tracks[0].rightsholders, ["Правообладатель Б"]);
+  const early = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z")], titles: new Map(), rightsholders: map });
+  assert.deepEqual(early.tracks[0].rightsholders, ["Правообладатель А"]);
+  const both = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: map });
+  assert.deepEqual(both.tracks[0].rightsholders, ["Правообладатель А", "Правообладатель Б"]);
+  assert.equal(both.registryUnavailable, false);
+  // Review r1 B1: a failed registry read is "unavailable", never "no record".
+  const down = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T12:00:00Z")], titles: new Map(), registryUnavailable: true });
+  assert.equal(down.registryUnavailable, true);
+  const pageSrc2 = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
+  assert.match(pageSrc2, /registryUnavailable[\s\S]{0,80}сведения реестра временно недоступны/);
   const loader = readFileSync("src/lib/business-app/load-playback-report.ts", "utf8");
   assert.match(loader, /from\("music_rights_grants"\)/);
   assert.match(loader, /from\("music_rightsholders"\)/);
+  assert.match(loader, /grantsError/);
+  assert.match(loader, /holdersError/);
   console.log("business-app-client-documents-unit: universal documents OK");
 }

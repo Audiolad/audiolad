@@ -96,6 +96,7 @@ export type PlaybackReport = {
   timezone: string;
   tracks: PlaybackReportTrack[];
   factCount: number;
+  registryUnavailable: boolean;
 };
 
 function toNum(v: unknown): number {
@@ -179,7 +180,9 @@ export function buildPlaybackReport(input: {
   timezone: string;
   facts: readonly PlaybackFactRow[];
   titles: ReadonlyMap<string, string>;
-  rightsholders?: ReadonlyMap<string, readonly string[]>;
+  rightsholders?: ReadonlyMap<string, readonly RegistryHolderPeriod[]>;
+  /** True when the registry could not be read: holders are unknown, not absent. */
+  registryUnavailable?: boolean;
 }): PlaybackReport {
   const w = clampWindowMinutes(input.windowMinutes) * 60_000;
   const atMs = input.at.getTime();
@@ -187,7 +190,7 @@ export function buildPlaybackReport(input: {
   const to = atMs + w;
   const groups = new Map<
     string,
-    { id: string | null; startMs: number; lastMs: number; listened: number }
+    { id: string | null; startMs: number; lastMs: number; listened: number; holders: string[] }
   >();
   let count = 0;
   const sorted = [...input.facts]
@@ -202,17 +205,21 @@ export function buildPlaybackReport(input: {
     const listened = toNum(f.listened_ms);
     const key = f.audio_item_id ?? "__unknown__";
     const g = groups.get(key);
+    // Holder is matched to the time of this playback fact, not to the search instant.
+    const factHolders = f.audio_item_id ? holdersAt(input.rightsholders?.get(f.audio_item_id), t) : [];
     if (!g) {
       groups.set(key, {
         id: f.audio_item_id ?? null,
         startMs: t - listened,
         lastMs: t,
         listened,
+        holders: [...factHolders],
       });
     } else {
       g.startMs = Math.min(g.startMs, t - listened);
       g.lastMs = Math.max(g.lastMs, t);
       g.listened += listened;
+      for (const h of factHolders) if (!g.holders.includes(h)) g.holders.push(h);
     }
   }
   const tracks: PlaybackReportTrack[] = [...groups.values()]
@@ -224,7 +231,7 @@ export function buildPlaybackReport(input: {
       lastAt: new Date(g.lastMs).toISOString(),
       listenedMs: g.listened,
       coversT: g.startMs <= atMs && atMs <= g.lastMs,
-      rightsholders: g.id ? [...(input.rightsholders?.get(g.id) ?? [])] : [],
+      rightsholders: g.holders,
     }));
   return {
     atUtc: input.at.toISOString(),
@@ -233,12 +240,16 @@ export function buildPlaybackReport(input: {
     timezone: isValidTimeZone(input.timezone) ? input.timezone : "Europe/Moscow",
     tracks,
     factCount: count,
+    registryUnavailable: input.registryUnavailable === true,
   };
 }
 
+export type RegistryHolderPeriod = { name: string; fromMs: number; untilMs: number | null };
+
 /**
- * Rights holders per track from registry rows (music_rights_grants joined to
- * music_rightsholders): verified, business background playback, valid at T.
+ * Rights holder periods per track from registry rows (music_rights_grants
+ * joined to music_rightsholders): verified, business background playback.
+ * Matching to playback time happens per fact in buildPlaybackReport.
  */
 export function rightsholdersFromRegistry(
   grants: readonly {
@@ -249,21 +260,28 @@ export function rightsholdersFromRegistry(
     valid_until?: string | null;
   }[],
   holders: readonly { id: string; display_name: string | null }[],
-  at: Date,
-): Map<string, string[]> {
+): Map<string, RegistryHolderPeriod[]> {
   const names = new Map(holders.map((h) => [h.id, (h.display_name ?? "").trim()]));
-  const t = at.getTime();
-  const out = new Map<string, string[]>();
+  const out = new Map<string, RegistryHolderPeriod[]>();
   for (const g of grants) {
     if (!g.audio_item_id || !g.rightsholder_id) continue;
     if (g.status && g.status !== "verified") continue;
-    if (g.valid_from && Date.parse(g.valid_from) > t) continue;
-    if (g.valid_until && Date.parse(g.valid_until) <= t) continue;
     const name = names.get(g.rightsholder_id);
     if (!name) continue;
+    const fromMs = g.valid_from ? Date.parse(g.valid_from) : Number.NEGATIVE_INFINITY;
+    const untilMs = g.valid_until ? Date.parse(g.valid_until) : null;
     const list = out.get(g.audio_item_id) ?? [];
-    if (!list.includes(name)) list.push(name);
+    list.push({ name, fromMs: Number.isNaN(fromMs) ? Number.NEGATIVE_INFINITY : fromMs, untilMs: untilMs !== null && Number.isNaN(untilMs) ? null : untilMs });
     out.set(g.audio_item_id, list);
   }
   return out;
+}
+
+/** Holders whose registry period covers the instant tMs. */
+export function holdersAt(periods: readonly RegistryHolderPeriod[] | undefined, tMs: number): string[] {
+  const res: string[] = [];
+  for (const p of periods ?? []) {
+    if (p.fromMs <= tMs && (p.untilMs === null || tMs < p.untilMs) && !res.includes(p.name)) res.push(p.name);
+  }
+  return res;
 }
