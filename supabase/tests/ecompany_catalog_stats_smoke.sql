@@ -5,6 +5,7 @@
 -- withdrawal as a decrease; no anon/authenticated access.
 \set ON_ERROR_STOP on
 BEGIN;
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
 DO $$
 DECLARE
   u1 uuid := gen_random_uuid(); u2 uuid := gen_random_uuid(); u3 uuid := gen_random_uuid();
@@ -96,5 +97,6 @@ BEGIN
   IF NOT has_function_privilege('service_role', 'public.ecompany_catalog_stats_capture()', 'EXECUTE') THEN
     RAISE EXCEPTION 'service_role capture';
   END IF;
+  RAISE NOTICE 'ecompany_catalog_stats_smoke: ok';
 END $$;
 ROLLBACK;
