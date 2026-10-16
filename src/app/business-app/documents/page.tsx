@@ -36,7 +36,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           {CLIENT_DOCUMENTS.map((doc) => (
             <li
               key={doc.id}
-              className="rounded-lg border border-[var(--biz-border,#e5e7eb)] p-3"
+              className="rounded-lg border border-[var(--biz-border)] p-3"
               data-doc-id={doc.id}
             >
               <div className="font-semibold text-[var(--biz-text)]">{doc.title}</div>
@@ -91,7 +91,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   className="w-24 rounded border px-2 py-1"
                 />
               </label>
-              <button type="submit" className="business-app-button rounded px-3 py-1">
+              <button type="submit" className="rounded bg-[var(--biz-accent)] px-3 py-1 font-semibold text-white">
                 Показать
               </button>
             </form>

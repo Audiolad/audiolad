@@ -25,12 +25,12 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
     versionDate: "2026-10-16",
     status: "draft_pending_legal_review",
     summary:
-      "Подтверждает, что музыка AudioLad играет в вашей точке по лицензии. Только через плеер AudioLad.",
+      "Проект документа о лицензии на музыку AudioLad в вашей точке (только через плеер AudioLad). Будет выдан после проверки юристом.",
   },
   {
     id: "b2b-terms",
     title: "Условия AudioLad Business",
-    version: "0.3-draft",
+    version: "r3-draft",
     versionDate: "2026-10-14",
     status: "draft_pending_legal_review",
     summary: "Условия лицензирования музыки для бизнеса.",
