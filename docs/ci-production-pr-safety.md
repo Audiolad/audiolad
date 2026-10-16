@@ -22,6 +22,8 @@ production credentials.
   `BLOCK MERGE` / stale;
 - ancestry: PROD → MAIN, PROD → PR, MAIN → PR, and PR → MAIN;
 - ahead/behind counts and merge base;
+- one post-merge race, described under blocking conditions, where the head
+  is exactly the merge commit behind main;
 - migrations changed from PROD to MAIN and from MAIN to PR;
 - duplicate migration version prefixes from the fetched PR Git tree.
 
@@ -81,10 +83,22 @@ The trusted status blocks when:
 - production SHA is unavailable or invalid;
 - production commit is unavailable in fetched repository history;
 - production is not an ancestor of main or the PR;
-- the PR is behind or diverged from current main;
+- the PR is behind or diverged from current main, except the post-merge head lag below;
 - main changes while the guard runs;
 - duplicate migration versions are found;
 - trusted lineage/migration analysis has an internal failure.
+
+Post-merge head lag is the one behind-main result that does not block by
+itself. A run can start with `origin/main` at the pre-merge base, then finish
+after GitHub has merged the PR. Current main is then the merge commit: its
+first parent is that start base, another parent is the PR head, the head is an
+ancestor of main, and the counts are exactly 0 ahead and 1 behind. That one
+commit is the merge. The guard still reports the lineage, and it still fails
+the run when any other check fails: health, a missing production commit,
+ancestry of production, divergence, main moving during the check, duplicate
+migration versions, or an internal failure. A branch that is behind for any
+other reason still fails, including a branch that is one ordinary commit
+behind and a branch whose head was not just merged.
 
 `PR Repository Validation` failures are reported by that separate ordinary CI
 workflow and never become a reason for the trusted status to fail. The trusted
