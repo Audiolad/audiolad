@@ -1,6 +1,7 @@
 import {
   CLIENT_DOCUMENT_EDITION_LABEL,
   CLIENT_DOCUMENT_REQUISITES,
+  clientDocumentHref,
   CLIENT_DOCUMENTS,
   PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES,
   formatVenueTime,
@@ -35,17 +36,22 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         </p>
         <ul className="mt-4 flex flex-col gap-3">
           {CLIENT_DOCUMENTS.map((doc) => (
-            <li
-              key={doc.id}
-              className="rounded-lg border border-[var(--biz-border)] p-3"
-              data-doc-id={doc.id}
-            >
-              <div className="font-semibold text-[var(--biz-text)]">{doc.title}</div>
-              <div className="mt-1 text-xs text-[var(--biz-text-muted)]">
-                Версия {doc.version} от {doc.versionDate} ·{" "}
-                <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
-              </div>
-              <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
+            <li key={doc.id} data-doc-id={doc.id}>
+              <a
+                href={clientDocumentHref(doc.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-lg border border-[var(--biz-border)] p-3 hover:border-[var(--biz-accent)]"
+                data-doc-link={doc.id}
+              >
+                <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">{doc.title}</div>
+                <div className="mt-1 text-xs text-[var(--biz-text-muted)]">
+                  Версия {doc.version} от {doc.versionDate} ·{" "}
+                  <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
+                </div>
+                <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
+                <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Открыть полный текст →</span>
+              </a>
             </li>
           ))}
         </ul>

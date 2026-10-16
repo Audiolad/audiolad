@@ -64,6 +64,15 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   },
 ] as const;
 
+/** Browser-visible href of the full document text on business.audiolad.ru. */
+export function clientDocumentHref(id: string): string {
+  return `/documents/${id}`;
+}
+
+export function findClientDocument(id: string): ClientDocumentEntry | undefined {
+  return CLIENT_DOCUMENTS.find((d) => d.id === id);
+}
+
 export const PLAYBACK_REPORT_MAX_WINDOW_MINUTES = 180;
 export const PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES = 30;
 
