@@ -285,6 +285,12 @@ export default function AuthorDashboardNav({
       active: pathname.startsWith("/author-dashboard/status"),
     },
     {
+      href: `/author-dashboard/business${authorQuery}`,
+      label: "АудиоЛад Бизнес",
+      icon: StatusIcon,
+      active: pathname.startsWith("/author-dashboard/business"),
+    },
+    {
       href: `/author-dashboard/legal${authorQuery}`,
       label: "Документы",
       icon: DocumentsIcon,
