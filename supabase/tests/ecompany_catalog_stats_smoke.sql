@@ -23,8 +23,8 @@ BEGIN
 
   INSERT INTO auth.users(id, email) VALUES (u1, 'stats-u1@test.invalid'), (u2, 'stats-u2@test.invalid'), (u3, 'stats-u3@test.invalid');
   INSERT INTO public.authors(id, name, slug) VALUES
-    (a1, 'Стат A1', 'stats-c353-a1'), (a2, 'Стат A2', 'stats-c353-a2'),
-    (b, 'Стат B', 'stats-c353-b'), (c, 'Стат C', 'stats-c353-c');
+    (a1, 'Стат Первый', 'stats-c353-a1'), (a2, 'Стат Второй', 'stats-c353-a2'),
+    (b, 'Стат Третий', 'stats-c353-b'), (c, 'Стат Четвёртый', 'stats-c353-c');
   -- u1 owns two spaces; u2 one space with only a draft; u3 one space whose product was withdrawn.
   INSERT INTO public.author_members(author_id, user_id, role, created_at) VALUES
     (a1, u1, 'owner', t_now - interval '40 days'), (a2, u1, 'owner', t_now - interval '3 days'),
@@ -32,11 +32,11 @@ BEGIN
 
   PERFORM set_config('audiolad.allow_practice_publish', 'on', true);
   INSERT INTO public.practices(id, author_id, title, slug, status, is_free, price, product_kind, catalog_visibility, published_at) VALUES
-    (p1, a1, 'P1', 'stats-c353-p1', 'published', true, 0, 'practice', 'listed', t_now - interval '10 days'),
-    (p2, a2, 'P2', 'stats-c353-p2', 'published', true, 0, 'practice', 'unlisted', t_now - interval '2 days'),
-    (pb, b, 'PB', 'stats-c353-pb', 'draft', true, 0, 'practice', 'listed', NULL),
-    (pc, c, 'PC', 'stats-c353-pc', 'unpublished', true, 0, 'practice', 'listed', t_now - interval '30 days'),
-    (pd, a1, 'PD', 'stats-c353-pd', 'published', true, 0, 'practice', 'listed', t_now - interval '5 days');
+    (p1, a1, 'Продукт один', 'stats-c353-p1', 'published', true, 0, 'practice', 'listed', t_now - interval '10 days'),
+    (p2, a2, 'Продукт два', 'stats-c353-p2', 'published', true, 0, 'practice', 'unlisted', t_now - interval '2 days'),
+    (pb, b, 'Черновик', 'stats-c353-pb', 'draft', true, 0, 'practice', 'listed', NULL),
+    (pc, c, 'Снятый', 'stats-c353-pc', 'unpublished', true, 0, 'practice', 'listed', t_now - interval '30 days'),
+    (pd, a1, 'Удалённый', 'stats-c353-pd', 'published', true, 0, 'practice', 'listed', t_now - interval '5 days');
   UPDATE public.practices SET deleted_at = t_now WHERE id = pd;
 
   INSERT INTO public.audio_items(practice_id, title, position, status, created_at) VALUES
