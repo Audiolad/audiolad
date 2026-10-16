@@ -32,12 +32,19 @@ REVOKE ALL ON TABLE public.ecompany_catalog_stats_snapshots FROM PUBLIC;
 REVOKE ALL ON TABLE public.ecompany_catalog_stats_snapshots FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.ecompany_catalog_stats_snapshots TO service_role;
 
--- Totals "as of" each point, reconstructed from the CURRENT composition and real timestamps:
--- an object counts from the moment it first met the criterion (author: first membership;
--- product: published_at; space/author-with-product: earliest go-live of a currently published
--- product; track: later of product go-live and track creation). Objects withdrawn from
--- publication are not counted at any point (they do not meet the criterion now); their
--- withdrawal shows up only in the dated snapshots.
+-- Totals "as of" each point (half-open: an object counts at point T if it qualified strictly
+-- before T, so a period [from, to) gets exactly the objects that qualified inside it), reconstructed
+-- from the CURRENT composition and real timestamps:
+--   person author            : first author_members.created_at
+--   product                  : published_at (first go-live; kept by the platform across withdrawals)
+--   space / author with pub. : first go-live of ANY product of that space that was ever published
+--                              (withdrawing the earliest product does not make the space "new" again);
+--                              counted only while it still has a currently published product
+--   track                    : later of track upload and the product's latest go-live (published_at or
+--                              the latest moderation publish event), so tracks of a re-published
+--                              product are attributed to the re-publication
+-- Objects withdrawn from publication are not counted at any point; their withdrawal is visible
+-- only in the dated snapshots as a decrease.
 CREATE OR REPLACE FUNCTION public.ecompany_catalog_stats_counts(p_points timestamptz[])
 RETURNS TABLE (
   point timestamptz,
@@ -58,6 +65,13 @@ AS $$
     WHERE public.practice_affects_public_surface(
       p.status, p.scheduled_publish_at, p.published_at, p.deleted_at, p.catalog_visibility, now())
   ),
+  pp_latest AS (
+    SELECT pp.id, greatest(pp.live_at, coalesce(max(e.created_at), pp.live_at)) AS latest_live_at
+    FROM pp
+    LEFT JOIN public.practice_moderation_events e
+      ON e.practice_id = pp.id AND e.to_status = 'published'
+    GROUP BY pp.id, pp.live_at
+  ),
   people AS (
     SELECT m.user_id, min(m.created_at) AS since
     FROM public.author_members m
@@ -65,7 +79,11 @@ AS $$
     GROUP BY m.user_id
   ),
   spaces AS (
-    SELECT pp.author_id, min(pp.live_at) AS since FROM pp GROUP BY pp.author_id
+    SELECT p.author_id, min(coalesce(p.published_at, p.scheduled_publish_at, p.created_at)) AS since
+    FROM public.practices p
+    WHERE p.author_id IN (SELECT pp.author_id FROM pp)
+      AND (p.published_at IS NOT NULL OR p.id IN (SELECT pp.id FROM pp))
+    GROUP BY p.author_id
   ),
   people_pub AS (
     SELECT m.user_id, min(greatest(s.since, m.created_at)) AS since
@@ -75,22 +93,23 @@ AS $$
     GROUP BY m.user_id
   ),
   tracks AS (
-    SELECT ai.id, min(greatest(pp.live_at, ai.created_at)) AS since
+    SELECT ai.id, min(greatest(l.latest_live_at, ai.created_at)) AS since
     FROM public.audio_items ai
-    JOIN pp ON pp.id = ai.practice_id
+    JOIN pp_latest l ON l.id = ai.practice_id
     WHERE ai.status = 'published'
     GROUP BY ai.id
   )
   SELECT pt,
-    (SELECT count(*) FROM people WHERE since <= pt)::integer,
-    (SELECT count(*) FROM people_pub WHERE since <= pt)::integer,
-    (SELECT count(*) FROM spaces WHERE since <= pt)::integer,
-    (SELECT count(*) FROM pp WHERE live_at <= pt)::integer,
-    (SELECT count(*) FROM tracks WHERE since <= pt)::integer
+    (SELECT count(*) FROM people WHERE since < pt)::integer,
+    (SELECT count(*) FROM people_pub WHERE since < pt)::integer,
+    (SELECT count(*) FROM spaces WHERE since < pt)::integer,
+    (SELECT count(*) FROM pp WHERE live_at < pt)::integer,
+    (SELECT count(*) FROM tracks WHERE since < pt)::integer
   FROM unnest(p_points) AS pt;
 $$;
 
--- Upsert today's (Moscow) snapshot with the exact current totals. Idempotent; one row per day.
+-- Upsert today's (Moscow) snapshot with the exact current totals. Idempotent; one row per day;
+-- refreshed at most once per hour, so frequent board refreshes do not re-aggregate or contend.
 CREATE OR REPLACE FUNCTION public.ecompany_catalog_stats_capture()
 RETURNS public.ecompany_catalog_stats_snapshots
 LANGUAGE plpgsql
@@ -102,7 +121,12 @@ DECLARE
   c record;
   r public.ecompany_catalog_stats_snapshots;
 BEGIN
-  SELECT * INTO c FROM public.ecompany_catalog_stats_counts(ARRAY[now()]);
+  SELECT * INTO r FROM public.ecompany_catalog_stats_snapshots
+  WHERE snapshot_date = (now() AT TIME ZONE 'Europe/Moscow')::date;
+  IF FOUND AND r.captured_at > now() - interval '1 hour' THEN
+    RETURN r;
+  END IF;
+  SELECT * INTO c FROM public.ecompany_catalog_stats_counts(ARRAY['infinity'::timestamptz]);
   INSERT INTO public.ecompany_catalog_stats_snapshots AS s (
     snapshot_date, captured_at, first_captured_at, authors_total, authors_with_published,
     spaces_with_published, published_products, published_tracks)
@@ -132,6 +156,18 @@ AS $$
   LIMIT greatest(1, least(coalesce(p_limit, 400), 2000));
 $$;
 
+CREATE OR REPLACE FUNCTION public.ecompany_catalog_stats_history_started()
+RETURNS timestamptz
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT min(first_captured_at) FROM public.ecompany_catalog_stats_snapshots;
+$$;
+
+REVOKE ALL ON FUNCTION public.ecompany_catalog_stats_history_started() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ecompany_catalog_stats_history_started() TO service_role;
 REVOKE ALL ON FUNCTION public.ecompany_catalog_stats_counts(timestamptz[]) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.ecompany_catalog_stats_capture() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.ecompany_catalog_stats_history(integer) FROM PUBLIC, anon, authenticated;

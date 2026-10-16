@@ -1,3 +1,4 @@
+import { loadCatalogStats } from "@/lib/admin/ecompany-catalog-stats-queries";
 import {
   CATALOG_METRICS,
   CATALOG_STATS_TIME_ZONE,
@@ -59,10 +60,11 @@ export function EcompanyCatalogStats({ model, error }: { model: CatalogStatsMode
                 <b>Всё время:</b> текущий итог на {model.generatedLabel}.
               </li>
               <li>
-                Прирост — сколько объектов из текущего состава впервые выполнили условие в периоде: автор — по дате
-                появления в пространстве, продукт — по дате публикации, автор/пространство с публикацией — по первой
-                публикации их ныне опубликованного продукта, трек — по более поздней из дат публикации продукта и
-                загрузки трека. Снятые с публикации продукты не учитываются ни в итоге, ни в приросте; их снятие видно
+                Прирост — сколько объектов из текущего состава впервые выполнили условие в периоде (начало
+                включено, конец нет): автор — по дате появления в пространстве; продукт — по первой дате публикации;
+                пространство и автор с публикацией — по первой публикации любого их продукта (снятие более раннего
+                продукта не делает их «новыми»); трек — по более поздней из дат загрузки трека и последней публикации
+                продукта. Это реконструкция по датам: снятые с публикации объекты в ней не участвуют, их снятие видно
                 только в истории снимков как уменьшение.
               </li>
             </ul>
@@ -109,6 +111,21 @@ export function EcompanyCatalogStats({ model, error }: { model: CatalogStatsMode
           </details>
         </>
       )}
+    </section>
+  );
+}
+
+/** Async server section: rendered inside <Suspense> so a slow DB never blocks the board. */
+export async function EcompanyCatalogStatsSection() {
+  const { model, error } = await loadCatalogStats();
+  return <EcompanyCatalogStats model={model} error={error} />;
+}
+
+export function EcompanyCatalogStatsFallback() {
+  return (
+    <section aria-labelledby="ai-company-catalog-stats" data-section="catalog-stats" className="rounded-2xl border border-[#eadff8] bg-white p-3 sm:p-4">
+      <h3 id="ai-company-catalog-stats" className="text-xl font-semibold">Статистика АудиоЛада</h3>
+      <p className="mt-2 text-sm text-[#796ba0]" role="status">Загружаем статистику…</p>
     </section>
   );
 }

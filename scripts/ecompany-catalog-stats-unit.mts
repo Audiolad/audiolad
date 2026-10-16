@@ -68,6 +68,8 @@ assert.equal(withHistory.history[0].change?.published_products, 4);
 assert.equal(withHistory.history[2].change, null, "first day has no previous snapshot");
 assert.equal(withHistory.historyStartedLabel, "13.10.2026 18:24 МСК");
 assert.equal(withHistory.periods[0].snapshotChange?.published_products, 4, "yesterday net change from snapshots 14→15.10");
+const limited = composeCatalogStats(now, countsAt, [snap("2026-10-15", 95)], "2025-01-01T09:00:00+00:00")!;
+assert.equal(limited.historyStartedLabel, "01.01.2025 12:00 МСК", "start comes from the true first snapshot, not the limited list");
 const gap = composeCatalogStats(now, countsAt, [snap("2026-10-15", 95), snap("2026-10-12", 80)])!;
 assert.equal(gap.history[0].change, null, "a gap is not bridged with invented daily change");
 // Withdrawal: snapshot decreases are shown with a minus sign.

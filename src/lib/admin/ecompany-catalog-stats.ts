@@ -167,6 +167,8 @@ export function composeCatalogStats(
   now: Date,
   countsAt: Map<number, CatalogCounts>,
   snapshots: CatalogSnapshot[],
+  /** min(first_captured_at) over ALL snapshots (history list itself is limited). */
+  historyStartedAt: string | null = null,
 ): CatalogStatsModel | null {
   const totals = countsAt.get(now.getTime());
   if (!totals) return null;
@@ -200,7 +202,11 @@ export function composeCatalogStats(
     totals,
     periods,
     history,
-    historyStartedLabel: first ? `${formatMsk(new Date(first.firstCapturedAt))} МСК` : null,
+    historyStartedLabel: historyStartedAt
+      ? `${formatMsk(new Date(historyStartedAt))} МСК`
+      : first
+        ? `${formatMsk(new Date(first.firstCapturedAt))} МСК`
+        : null,
   };
 }
 
