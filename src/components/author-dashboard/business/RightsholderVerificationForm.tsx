@@ -2,17 +2,24 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import SunoLinkHowTo from "@/components/author-dashboard/business/SunoLinkHowTo";
 import ExampleLightbox from "@/components/author-dashboard/business/ExampleLightbox";
 import ConsentDocumentLink from "@/components/author-dashboard/business/ConsentDocumentLink";
 import {
-  RIGHTSHOLDER_EXAMPLES,
-  SUNO_LINK_RE,
   VERIFICATION_STATUS_TEXT,
   validateEvidenceFile,
   type RightsholderEvidenceKind,
   type RightsholderExample,
 } from "@/lib/business-rightsholder/examples";
 import { createClient } from "@/lib/supabase/client";
+import {
+  PROVIDERS,
+  PROVIDER_ORDER,
+  buildDraftDetails,
+  evidenceKindsToUpload,
+  validateProviderValues,
+  type RightsholderProvider,
+} from "@/lib/business-rightsholder/providers";
 
 export type OwnProduct = {
   id: string;
@@ -32,7 +39,10 @@ export type ExistingVerification = {
   productId: string;
   audioItemId: string;
   trackTitle: string;
-  trackUrl: string;
+  trackUrl: string | null;
+  aiService: RightsholderProvider;
+  aiServiceOther: string | null;
+  providerDetails: Record<string, string>;
   attempts: number;
 } | null;
 
@@ -55,6 +65,11 @@ export default function RightsholderVerificationForm({ products, documents, exis
   const [audioItemId, setAudioItemId] = useState(existing?.audioItemId ?? products[0]?.tracks[0]?.id ?? "");
   const [trackTitle, setTrackTitle] = useState(existing?.trackTitle ?? "");
   const [trackUrl, setTrackUrl] = useState(existing?.trackUrl ?? "");
+  const [provider, setProvider] = useState<RightsholderProvider>(existing?.aiService ?? "suno");
+  const [fields, setFields] = useState<Record<string, string>>(() => ({
+    ...(existing?.providerDetails ?? {}),
+    ...(existing?.aiServiceOther ? { ai_service_other: existing.aiServiceOther } : {}),
+  }));
   const [files, setFiles] = useState<Record<RightsholderEvidenceKind, File | null>>({ generation: null, paid_period: null });
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [confirmRights, setConfirmRights] = useState(false);
@@ -68,16 +83,13 @@ export default function RightsholderVerificationForm({ products, documents, exis
   const terms = documents.find((d) => d.key === "business_program_terms");
   const rights = documents.find((d) => d.key === "business_music_rights_declaration");
   const editable = status === null || EDITABLE.has(status);
+  const cfg = PROVIDERS[provider];
+  const values = { provider, trackTitle, trackUrl, fields, files };
 
   function validate() {
     const next: Record<string, string> = {};
     if (!productId || !audioItemId) next.track = "Выберите свой опубликованный трек";
-    if (!trackTitle.trim()) next.trackTitle = "Укажите название трека в Suno";
-    if (!SUNO_LINK_RE.test(trackUrl.trim())) next.trackUrl = "Нужна ссылка вида https://suno.com/s/…";
-    for (const kind of ["generation", "paid_period"] as const) {
-      const message = validateEvidenceFile(files[kind]);
-      if (message) next[kind] = message;
-    }
+    Object.assign(next, validateProviderValues(values, validateEvidenceFile));
     if (!acceptTerms) next.acceptTerms = "Отметьте согласие с условиями";
     if (!confirmRights) next.confirmRights = "Подтвердите права на музыку";
     if (!terms || !rights) next.form = "Документы программы ещё не опубликованы — отправка временно недоступна";
@@ -91,18 +103,20 @@ export default function RightsholderVerificationForm({ products, documents, exis
     setBusy(true);
     try {
       const supabase = createClient();
-      const draft = await supabase.rpc("author_business_verification_draft", {
+      const details = buildDraftDetails(values);
+      const draft = await supabase.rpc("author_business_verification_draft_v2", {
         p_product_id: productId,
         p_audio_item_id: audioItemId,
-        p_ai_service: "suno",
-        p_ai_service_other: null,
+        p_ai_service: provider,
+        p_ai_service_other: details.aiServiceOther,
         p_service_track_title: trackTitle.trim(),
-        p_service_track_url: trackUrl.trim(),
+        p_service_track_url: details.serviceTrackUrl,
+        p_provider_details: details.providerDetails,
       });
       if (draft.error) throw draft.error;
       const verificationId = draft.data as string;
       const evidenceIds: string[] = [];
-      for (const kind of ["generation", "paid_period"] as const) {
+      for (const kind of evidenceKindsToUpload(values)) {
         const file = files[kind]!;
         const reserved = await supabase.rpc("author_business_evidence_reserve", {
           p_verification_id: verificationId,
@@ -117,7 +131,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
         if (upload.error) throw upload.error;
         evidenceIds.push(row.id);
       }
-      const submitted = await supabase.rpc("author_business_verification_submit", {
+      const submitted = await supabase.rpc("author_business_verification_submit_v2", {
         p_verification_id: verificationId,
         p_evidence_ids: evidenceIds,
         p_accept_terms: acceptTerms,
@@ -141,7 +155,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
     <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-neutral-900">Подтверждение правообладателя</h2>
       <p className="mt-1 text-sm text-neutral-600">
-        Один пример на весь аккаунт: покажите, что вы создали один свой трек в Suno по платной подписке. Это не подтверждает права на весь каталог — каждый трек проверяется отдельно.
+        Один пример на весь аккаунт: выберите один свой опубликованный продукт и трек и покажите, как он создан. Это не подтверждает права на весь каталог — каждый трек проверяется отдельно.
       </p>
 
       {status ? (
@@ -189,28 +203,70 @@ export default function RightsholderVerificationForm({ products, documents, exis
             </label>
           </div>
 
+          <fieldset className="space-y-2" data-provider-choice>
+            <legend className="text-sm font-medium text-neutral-800">Где сделана музыка</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {PROVIDER_ORDER.map((id) => (
+                <label key={id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${provider === id ? "border-neutral-900 bg-neutral-50" : "border-neutral-300"}`}>
+                  <input type="radio" name="rightsholder-provider" value={id} checked={provider === id}
+                    onChange={() => { setProvider(id); setFiles({ generation: null, paid_period: null }); setErrors({}); }} />
+                  <span>{PROVIDERS[id].label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-sm text-neutral-600" data-provider-intro={provider}>{cfg.intro}</p>
+          </fieldset>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="font-medium text-neutral-800">Название трека в Suno</span>
+              <span className="font-medium text-neutral-800">{cfg.titleLabel}</span>
               <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackTitle}
-                onChange={(e) => setTrackTitle(e.target.value)} placeholder="Spa relaxation jazz background" />
+                onChange={(e) => setTrackTitle(e.target.value)} placeholder={cfg.titlePlaceholder} />
               {errors.trackTitle ? <span className="mt-1 block text-red-600">{errors.trackTitle}</span> : null}
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-neutral-800">Ссылка на трек в Suno</span>
-              <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackUrl} inputMode="url"
-                onChange={(e) => setTrackUrl(e.target.value)} placeholder="https://suno.com/s/…" />
-              {errors.trackUrl ? <span className="mt-1 block text-red-600">{errors.trackUrl}</span> : null}
-            </label>
+            <div className="text-sm">
+              <label className="block">
+                <span className="font-medium text-neutral-800">{cfg.link.label}</span>
+                <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackUrl ?? ""} inputMode="url"
+                  onChange={(e) => setTrackUrl(e.target.value)} placeholder={cfg.link.placeholder} />
+                <span className="mt-1 block text-xs text-neutral-500">{cfg.link.hint}</span>
+                {errors.trackUrl ? <span className="mt-1 block text-red-600">{errors.trackUrl}</span> : null}
+              </label>
+              {provider === "suno" ? <SunoLinkHowTo /> : null}
+            </div>
           </div>
 
-          {(["generation", "paid_period"] as const).map((kind) => {
-            const ex = RIGHTSHOLDER_EXAMPLES[kind];
+          {cfg.fields.map((f) => {
+            const id = `rightsholder-field-${f.key}`;
+            const common = {
+              id,
+              className: "mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2",
+              value: fields[f.key] ?? "",
+              placeholder: f.placeholder,
+              "aria-required": f.required,
+            };
+            return (
+              <div key={`${provider}-${f.key}`} className="text-sm" data-provider-field={f.key}>
+                <label htmlFor={id} className="font-medium text-neutral-800">
+                  {f.label}{f.required ? " *" : ""}
+                </label>
+                {f.multiline ? (
+                  <textarea {...common} rows={3} onChange={(e) => setFields((prev) => ({ ...prev, [f.key]: e.target.value }))} />
+                ) : (
+                  <input {...common} onChange={(e) => setFields((prev) => ({ ...prev, [f.key]: e.target.value }))} />
+                )}
+                <span className="mt-1 block text-xs text-neutral-500">{f.hint}</span>
+                {errors[`field:${f.key}`] ? <span className="mt-1 block text-red-600">{errors[`field:${f.key}`]}</span> : null}
+              </div>
+            );
+          })}
+
+          {cfg.evidence.map(({ kind, required, example: ex }) => {
             const inputId = `rightsholder-evidence-${kind}`;
             return (
-              <div key={kind} className="rounded-xl border border-dashed border-neutral-300 p-4" data-evidence-field={kind}>
+              <div key={`${provider}-${kind}`} className="rounded-xl border border-dashed border-neutral-300 p-4" data-evidence-field={kind}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label htmlFor={inputId} className="text-sm font-medium text-neutral-800">{ex.label}</label>
+                  <label htmlFor={inputId} className="text-sm font-medium text-neutral-800">{ex.label}{required ? " *" : " (необязательно)"}</label>
                   <button type="button" onClick={() => setExample(ex)}
                     className="min-h-11 rounded-lg px-2 text-sm font-medium text-indigo-700 underline underline-offset-4 hover:text-indigo-900"
                     aria-haspopup="dialog">
