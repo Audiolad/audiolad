@@ -26,6 +26,10 @@ DROP POLICY IF EXISTS business_onboarding_evidence_delete_fence ON storage.objec
 
 -- Tables first drop their own policies and triggers (no CASCADE to existing objects).
 -- The reserve RPC returns the evidence row type, so must be removed before that table.
+-- Provider RPCs (20270102120000) if the providers rollback was not run first.
+DROP FUNCTION IF EXISTS public.author_business_verification_submit_v2(uuid,uuid[],boolean,boolean,text,text,inet,text);
+DROP FUNCTION IF EXISTS public.author_business_verification_draft_v2(uuid,uuid,text,text,text,text,jsonb);
+DROP FUNCTION IF EXISTS public.business_onboarding_provider_error(text,text,text,jsonb);
 DROP FUNCTION IF EXISTS public.author_business_evidence_reserve(uuid,text,text,bigint,text);
 DROP TABLE IF EXISTS public.business_rightsholder_moderation_audit;
 DROP TABLE IF EXISTS public.business_rightsholder_verification_attempts;

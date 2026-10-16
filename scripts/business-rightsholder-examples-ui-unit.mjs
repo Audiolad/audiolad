@@ -1,5 +1,6 @@
 // Contract test for «Посмотреть пример» (task 8d9cd0af): links, assets, accessible lightbox.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 
 const read = (p) => readFileSync(p, "utf8");
@@ -19,8 +20,24 @@ for (const f of ["suno-generation.webp", "suno-pro-receipt.webp"]) {
 // Originals never land in the public repo.
 assert.ok(!existsSync("public/business/rightsholder-examples/suno-pro-receipt.png"));
 
-// One example link per upload field (both kinds rendered via the map).
-assert.match(form, /\(\["generation", "paid_period"\] as const\)\.map/);
+// One example link per upload field of the chosen provider (rendered via the map).
+const providers = read("src/lib/business-rightsholder/providers.ts");
+assert.match(form, /cfg\.evidence\.map\(/);
+assert.match(form, /PROVIDER_ORDER\.map/);
+assert.match(form, /type="radio"/);
+assert.match(form, /author_business_verification_draft_v2/);
+assert.match(form, /author_business_verification_submit_v2/);
+assert.match(providers, /"Другой сервис \/ своя студия"/);
+assert.match(providers, /label: "MusicGPT"/);
+assert.match(providers, /label: "Suno"/);
+// Suno keeps the real redacted screenshots; MusicGPT / other use text examples only (no invented screenshots).
+assert.match(providers, /example: RIGHTSHOLDER_EXAMPLES\.generation/);
+assert.match(providers, /example: RIGHTSHOLDER_EXAMPLES\.paid_period/);
+assert.doesNotMatch(providers, /src:\s*"/, "no new screenshot assets for MusicGPT / other");
+assert.match(box, /example\.src \?/);
+assert.match(box, /data-text-example/);
+assert.match(box, /Текстовый пример — скриншота нет/);
+execFileSync("npx", ["tsx", "scripts/business-rightsholder-providers-unit.mts"], { stdio: "inherit" });
 assert.match(form, /Посмотреть пример/);
 assert.match(form, /aria-haspopup="dialog"/);
 assert.match(examples, /Styles/);

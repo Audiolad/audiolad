@@ -45,7 +45,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       .eq("is_current", true),
     supabase
       .from("business_rightsholder_verifications")
-      .select("id, status, reason, product_id, audio_item_id, service_track_title, service_track_url, business_rightsholder_verification_attempts(count)")
+      .select("id, status, reason, product_id, audio_item_id, service_track_title, service_track_url, ai_service, ai_service_other, provider_details, business_rightsholder_verification_attempts(count)")
       .eq("owner_user_id", user.id)
       .maybeSingle(),
   ]);
@@ -73,7 +73,10 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
         productId: verification.product_id as string,
         audioItemId: verification.audio_item_id as string,
         trackTitle: verification.service_track_title as string,
-        trackUrl: verification.service_track_url as string,
+        trackUrl: (verification.service_track_url as string | null) ?? null,
+        aiService: verification.ai_service as "suno" | "musicgpt" | "other",
+        aiServiceOther: (verification.ai_service_other as string | null) ?? null,
+        providerDetails: (verification.provider_details as Record<string, string> | null) ?? {},
         attempts: attemptsAgg?.[0]?.count ?? 0,
       }
     : null;
