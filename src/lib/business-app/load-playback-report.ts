@@ -6,6 +6,7 @@ import {
   type PlaybackFactRow,
   type PlaybackReport,
 } from "@/lib/business-app/client-documents";
+import { queryPlaybackFacts } from "@/lib/business-app/playback-facts-query";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -69,16 +70,13 @@ export async function loadPlaybackReport(params: {
 
   try {
     const service = createServiceRoleClient();
-    const { data: facts, error } = await service
-      .from("playback_usage_facts")
-      .select("occurred_at, audio_item_id, location_id, player_id, listened_ms")
-      .eq("usage_kind", "business")
-      .eq("organization_id", organizationId)
-      .eq("location_id", location.id)
-      .gte("occurred_at", from)
-      .lte("occurred_at", to)
-      .order("occurred_at", { ascending: true })
-      .limit(MAX_FACTS);
+    const { data: facts, error } = await queryPlaybackFacts(service, {
+      organizationId,
+      locationId: location.id as string,
+      from,
+      to,
+      limit: MAX_FACTS,
+    });
     if (error) return { kind: "error", locationName, timezone };
 
     const rows = (facts ?? []) as PlaybackFactRow[];
