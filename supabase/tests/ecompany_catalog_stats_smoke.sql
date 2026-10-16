@@ -37,6 +37,7 @@ BEGIN
     (pb, b, 'Черновик', 'stats-c353-pb', 'draft', true, 0, 'practice', 'listed', NULL),
     (pc, c, 'Снятый', 'stats-c353-pc', 'unpublished', true, 0, 'practice', 'listed', t_now - interval '30 days'),
     (pd, a1, 'Удалённый', 'stats-c353-pd', 'published', true, 0, 'practice', 'listed', t_now - interval '5 days');
+  PERFORM set_config('audiolad.allow_practice_soft_delete', 'on', true);
   UPDATE public.practices SET deleted_at = t_now WHERE id = pd;
 
   INSERT INTO public.audio_items(practice_id, title, position, status, created_at) VALUES
