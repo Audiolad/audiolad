@@ -19,7 +19,8 @@ type Props = {
 export default function ConsentDocumentLink({ documentKey, children, dbVersion, dbUrl }: Props) {
   const doc = PUBLIC_PROGRAM_DOCUMENTS[documentKey];
   const href = dbUrl ?? doc.path;
-  const edition = dbVersion ? `редакция ${dbVersion}` : documentEditionLabel(doc);
+  // Internal version ids (DB or code) are never shown to users: Russian edition label only.
+  const edition = dbVersion ? "действующая редакция" : documentEditionLabel(doc);
   return (
     <>
       <a

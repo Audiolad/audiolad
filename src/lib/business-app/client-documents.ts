@@ -21,24 +21,24 @@ export type ClientDocumentEntry = {
 export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
-    title: "Лицензия на публичное исполнение в заведении (документ точки)",
+    title: "Лицензия на публичное исполнение музыки в заведении",
     version: "r4-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary:
-      "Документ о лицензии на музыку AudioLad в вашей точке (только через плеер AudioLad).",
+      "Документ точки: лицензия на музыку АудиоЛад в вашем заведении (только через плеер АудиоЛад).",
   },
   {
     id: "b2b-terms",
-    title: "Условия AudioLad Business",
+    title: "Условия лицензирования музыки для бизнеса",
     version: "r4-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
-    summary: "Условия лицензирования музыки для бизнеса.",
+    summary: "Раздел оферты «АудиоЛад Бизнес»: что разрешено, сроки, учёт, РАО и ВОИС.",
   },
   {
     id: "claims-procedure",
-    title: "Порядок защиты при претензиях РАО/ВОИС и других лиц",
+    title: "Порядок защиты клиента при претензиях РАО, ВОИС и иных лиц",
     version: "r4-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
@@ -47,11 +47,11 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   },
   {
     id: "claim-reply-kit",
-    title: "Шаблон ответа на претензию и перечень документов",
+    title: "Образец ответа на претензию и перечень документов",
     version: "r4-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
-    summary: "Не отправляйте ответ без согласования с AudioLad.",
+    summary: "Не отправляйте ответ без согласования с АудиоЛад.",
   },
   {
     id: "rightsholder-link",

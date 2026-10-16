@@ -133,9 +133,10 @@ console.log("business-app-client-documents-unit OK");
     assert.ok(src.markdown.length > 500);
     const html = renderToStaticMarkup(createElement(SimpleMarkdown, { source: src.markdown }));
     assert.match(html, /<h1/);
-    assert.match(src.markdown, /Редакция от 16\.10\.2026 · версия r4-2026-10-16/);
+    assert.match(src.markdown, /Редакция от 16\.10\.2026/);
     assert.doesNotMatch(src.markdown, /Черновик, требует проверки юриста|паспорт\s*\[|ОГРНИП \[ \]|355045|Ставрополь/);
-    assert.match(src.markdown, /ИНН 507305817690, ОГРНИП 316505300063237/);
+    assert.match(src.markdown, /ИНН 507305817690/);
+    assert.match(src.markdown, /ОГРНИП 316505300063237/);
     assert.doesNotMatch(src.markdown, /без\s+(РАО|ВОИС)/i);
   }
   console.log("business-app-client-documents-unit: card links OK");

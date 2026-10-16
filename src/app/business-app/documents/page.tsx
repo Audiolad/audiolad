@@ -31,7 +31,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Документы
         </h1>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Действующие документы AudioLad Business. Правообладатель и оператор:{" "}
+          Действующие документы «АудиоЛад Бизнес». Правообладатель и оператор:{" "}
           <span data-testid="client-documents-requisites">{CLIENT_DOCUMENT_REQUISITES}</span>.
         </p>
         <ul className="mt-4 flex flex-col gap-3">
@@ -46,7 +46,6 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               >
                 <div className="font-semibold text-[var(--biz-text)] underline-offset-2 hover:underline">{doc.title}</div>
                 <div className="mt-1 text-xs text-[var(--biz-text-muted)]">
-                  Версия {doc.version} от {doc.versionDate} ·{" "}
                   <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
                 </div>
                 <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
@@ -67,8 +66,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Что играло в заведении в нужное время
         </h2>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Отчёт по данным сервера AudioLad. Время — по часовому поясу точки.
-          
+          Отчёт по данным сервера АудиоЛад. Время — по часовому поясу точки.
         </p>
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm">Войдите, чтобы построить отчёт.</p>
@@ -127,7 +125,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                         <th>Трек</th>
                         <th>С</th>
                         <th>По</th>
-                        <th>Во время T</th>
+                        <th>В указанное время</th>
                       </tr>
                     </thead>
                     <tbody>

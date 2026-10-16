@@ -40,19 +40,20 @@ for (const d of [terms, rights]) {
   // Rights rules preserved.
   assert.doesNotMatch(d.markdown, /без\s+(РАО|ВОИС)/i);
 }
-assert.match(rights.markdown, /один Трек не подтверждает каталог, статус VERIFIED автоматически не присваивается/);
-assert.match(terms.markdown, /Запрещено\*\* обещать клиенту «никаких платежей РАО\/ВОИС»/);
+assert.match(rights.markdown, /Подтверждение одного трека никогда не подтверждает каталог; статус подтверждения автоматически не присваивается/);
+assert.match(terms.markdown, /Сервис не обещает клиенту отсутствия платежей РАО и ВОИС/);
 assert.equal(PROGRAM_DOCUMENT_REQUISITES.inn, "507305817690");
 assert.equal(PROGRAM_DOCUMENT_REQUISITES.ogrnip, "316505300063237");
 // Page shell needs the Next router, so assert on the component source.
 const pageSrc = readFileSync("src/components/business-documents/ProgramDocumentPage.tsx", "utf8");
 assert.match(pageSrc, /PROGRAM_DOCUMENT_REQUISITES\.inn/);
 assert.match(pageSrc, /PROGRAM_DOCUMENT_REQUISITES\.ogrnip/);
-assert.match(pageSrc, /documentEditionLabel\(doc\)\} · версия \{doc\.version\}/);
+assert.match(pageSrc, /\{documentEditionLabel\(doc\)\}/);
+assert.doesNotMatch(pageSrc, /Это черновик|версия \{doc\.version\}|SHA-256 текста/);
 assert.doesNotMatch(JSON.stringify(PROGRAM_DOCUMENT_REQUISITES), /паспорт|адрес|355045|Ставрополь/i);
 assert.equal(documentEditionLabel({ date: "2026-11-01", status: "approved" }), "Редакция от 01.11.2026");
-assert.match(terms.markdown, /УСЛОВИЯ ЛИЦЕНЗИРОВАНИЯ МУЗЫКИ ДЛЯ БИЗНЕСА/);
-assert.match(rights.markdown, /ДЕКЛАРАЦИЯ ПРАВООБЛАДАТЕЛЯ/);
+assert.match(terms.markdown, /^# Условия лицензирования музыки для бизнеса/);
+assert.match(rights.markdown, /^# Заявление правообладателя о правах на музыку/);
 
 function anchors(html: string) {
   return [...html.matchAll(/<a\b[^>]*>/g)].map((m) => m[0]);
@@ -73,7 +74,8 @@ assert.doesNotMatch(link, /черновик/);
 const dbLink = renderToStaticMarkup(createElement(ConsentDocumentLink, { documentKey: "business_music_rights_declaration", dbVersion: "v1", dbUrl: "https://audiolad.ru/x" }, "заявление"));
 assertNewTab(anchors(dbLink)[0]);
 assert.match(dbLink, /href="https:\/\/audiolad\.ru\/x"/);
-assert.match(dbLink, /редакция v1/);
+assert.match(dbLink, /действующая редакция/);
+assert.doesNotMatch(dbLink, /v1/);
 
 // Full form: both checkbox texts link out, and no <a> sits inside a <label> (clicking it cannot toggle).
 const html = renderToStaticMarkup(createElement(RightsholderVerificationForm, {
