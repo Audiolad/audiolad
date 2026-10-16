@@ -224,9 +224,24 @@ console.log("business-app-client-documents-unit OK");
   );
   const gap = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: onlyB });
   assert.deepEqual(gap.tracks.map((t) => t.rightsholders), [[], ["Правообладатель Б"]]);
-  // Fact interval overlapping the change shows both holders.
+  // Review r3: a fact spanning the change is split into segments (sequential, not simultaneous).
   const edge = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [{ ...fact("2026-10-16T12:10:01Z"), listened_ms: 2000 }], titles: new Map(), rightsholders: map });
-  assert.deepEqual(edge.tracks[0].rightsholders, ["Правообладатель А", "Правообладатель Б"]);
+  assert.deepEqual(edge.tracks.map((t) => t.rightsholders), [["Правообладатель А"], ["Правообладатель Б"]]);
+  assert.equal(edge.tracks[0].lastAt, "2026-10-16T12:10:00.000Z");
+  const edgeGap = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [{ ...fact("2026-10-16T12:10:01Z"), listened_ms: 2000 }], titles: new Map(), rightsholders: onlyB });
+  assert.deepEqual(edgeGap.tracks.map((t) => t.rightsholders), [[], ["Правообладатель Б"]]);
+  // A → Б → A: the second A period is a new row; at 12:05 only Б covers T.
+  const aba = rightsholdersFromRegistry(
+    [
+      { audio_item_id: "a", rightsholder_id: "h1", status: "verified", valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-10-16T12:00:00Z" },
+      { audio_item_id: "a", rightsholder_id: "h2", status: "verified", valid_from: "2026-10-16T12:00:00Z", valid_until: "2026-10-16T12:10:00Z" },
+      { audio_item_id: "a", rightsholder_id: "h1", status: "verified", valid_from: "2026-10-16T12:10:00Z", valid_until: null },
+    ],
+    [{ id: "h1", display_name: "Правообладатель А" }, { id: "h2", display_name: "Правообладатель Б" }],
+  );
+  const r3 = buildPlaybackReport({ at: new Date("2026-10-16T12:05:00Z"), windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T11:50:00Z"), fact("2026-10-16T12:05:00Z"), fact("2026-10-16T12:20:00Z")], titles: new Map(), rightsholders: aba });
+  assert.deepEqual(r3.tracks.map((t) => t.rightsholders), [["Правообладатель А"], ["Правообладатель Б"], ["Правообладатель А"]]);
+  assert.deepEqual(r3.tracks.map((t) => t.coversT), [false, true, false]);
   assert.equal(both.registryUnavailable, false);
   // Review r1 B1: a failed registry read is "unavailable", never "no record".
   const down = buildPlaybackReport({ at, windowMinutes: 30, timezone: "Europe/Moscow", facts: [fact("2026-10-16T12:00:00Z")], titles: new Map(), registryUnavailable: true });
