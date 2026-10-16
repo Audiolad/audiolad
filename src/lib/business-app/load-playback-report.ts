@@ -2,6 +2,7 @@ import {
   buildPlaybackReport,
   clampWindowMinutes,
   isValidTimeZone,
+  rightsholdersFromRegistry,
   venueLocalToUtc,
   type PlaybackFactRow,
   type PlaybackReport,
@@ -95,10 +96,30 @@ export async function loadPlaybackReport(params: {
         }
       }
     }
+    // Rights holders come from the rights registry, never from hardcoded names.
+    let rightsholders = new Map<string, string[]>();
+    if (ids.length > 0) {
+      const { data: grants } = await service
+        .from("music_rights_grants")
+        .select("audio_item_id, rightsholder_id, status, valid_from, valid_until")
+        .in("audio_item_id", ids)
+        .eq("status", "verified")
+        .eq("use_type", "business_background_playback");
+      const holderIds = [
+        ...new Set((grants ?? []).map((g) => g.rightsholder_id).filter((x): x is string => typeof x === "string")),
+      ];
+      if (holderIds.length > 0) {
+        const { data: holders } = await service
+          .from("music_rightsholders")
+          .select("id, display_name")
+          .in("id", holderIds);
+        rightsholders = rightsholdersFromRegistry(grants ?? [], holders ?? [], at);
+      }
+    }
     return {
       kind: "ok",
       locationName,
-      report: buildPlaybackReport({ at, windowMinutes, timezone, facts: rows, titles }),
+      report: buildPlaybackReport({ at, windowMinutes, timezone, facts: rows, titles, rightsholders }),
     };
   } catch {
     return { kind: "error", locationName, timezone };

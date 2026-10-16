@@ -6,6 +6,7 @@
  */
 
 export const CLIENT_DOCUMENT_EDITION_LABEL = "Редакция от 16.10.2026";
+/** Requisites of the service operator (not a declaration of ownership of third-party music). */
 export const CLIENT_DOCUMENT_REQUISITES =
   "ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237";
 
@@ -53,15 +54,6 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
     status: "approved",
     summary: "Не отправляйте ответ без согласования с АудиоЛад.",
   },
-  {
-    id: "rightsholder-link",
-    title: "Правообладатель каталогов «Аурафон» и «Джаз Релакс»",
-    version: "r4-2026-10-16",
-    versionDate: "2026-10-16",
-    status: "approved",
-    summary:
-      "«Аурафон» и «Джаз Релакс» — творческие псевдонимы. Правообладатель: ИП Петров Сергей Сергеевич.",
-  },
 ] as const;
 
 /** Browser-visible href of the full document text on business.audiolad.ru. */
@@ -93,6 +85,8 @@ export type PlaybackReportTrack = {
   listenedMs: number;
   /** True if the requested instant T is inside [first segment start, last fact]. */
   coversT: boolean;
+  /** Rights holders from the rights registry (verified grants), never hardcoded. */
+  rightsholders: string[];
 };
 
 export type PlaybackReport = {
@@ -185,6 +179,7 @@ export function buildPlaybackReport(input: {
   timezone: string;
   facts: readonly PlaybackFactRow[];
   titles: ReadonlyMap<string, string>;
+  rightsholders?: ReadonlyMap<string, readonly string[]>;
 }): PlaybackReport {
   const w = clampWindowMinutes(input.windowMinutes) * 60_000;
   const atMs = input.at.getTime();
@@ -229,6 +224,7 @@ export function buildPlaybackReport(input: {
       lastAt: new Date(g.lastMs).toISOString(),
       listenedMs: g.listened,
       coversT: g.startMs <= atMs && atMs <= g.lastMs,
+      rightsholders: g.id ? [...(input.rightsholders?.get(g.id) ?? [])] : [],
     }));
   return {
     atUtc: input.at.toISOString(),
@@ -238,4 +234,36 @@ export function buildPlaybackReport(input: {
     tracks,
     factCount: count,
   };
+}
+
+/**
+ * Rights holders per track from registry rows (music_rights_grants joined to
+ * music_rightsholders): verified, business background playback, valid at T.
+ */
+export function rightsholdersFromRegistry(
+  grants: readonly {
+    audio_item_id: string | null;
+    rightsholder_id: string | null;
+    status?: string | null;
+    valid_from?: string | null;
+    valid_until?: string | null;
+  }[],
+  holders: readonly { id: string; display_name: string | null }[],
+  at: Date,
+): Map<string, string[]> {
+  const names = new Map(holders.map((h) => [h.id, (h.display_name ?? "").trim()]));
+  const t = at.getTime();
+  const out = new Map<string, string[]>();
+  for (const g of grants) {
+    if (!g.audio_item_id || !g.rightsholder_id) continue;
+    if (g.status && g.status !== "verified") continue;
+    if (g.valid_from && Date.parse(g.valid_from) > t) continue;
+    if (g.valid_until && Date.parse(g.valid_until) <= t) continue;
+    const name = names.get(g.rightsholder_id);
+    if (!name) continue;
+    const list = out.get(g.audio_item_id) ?? [];
+    if (!list.includes(name)) list.push(name);
+    out.set(g.audio_item_id, list);
+  }
+  return out;
 }

@@ -171,3 +171,51 @@ console.log("business-app-client-documents-unit OK");
   }
   console.log("business-app-client-documents-unit: claim reply sample paragraphs OK");
 }
+
+// 8dcba9d1 (Sergey 16.10.2026 17:12): general documents are universal — no hardcoded artists/holders;
+// the pseudonym statement lives in the artists' dossier; holders come from the rights registry;
+// ИП Петров is the service operator, never the owner of all music.
+{
+  const { CLIENT_DOCUMENT_SOURCES } = await import("../src/lib/business-app/client-document-content");
+  const { PUBLIC_PROGRAM_DOCUMENTS } = await import("../src/lib/business-rightsholder/program-documents");
+  const { rightsholdersFromRegistry, buildPlaybackReport } = await import("../src/lib/business-app/client-documents");
+  const { resolveBusinessInternalPath } = await import("../src/lib/business-app/host");
+  assert.ok(!CLIENT_DOCUMENTS.some((d) => d.id === "rightsholder-link"), "pseudonym statement not in general list");
+  assert.ok(!CLIENT_DOCUMENT_SOURCES["rightsholder-link"]);
+  assert.equal(resolveBusinessInternalPath("/documents/rightsholder-link"), null);
+  const general = [
+    ...CLIENT_DOCUMENTS.map((d) => `${d.title} ${d.summary}`),
+    ...Object.values(CLIENT_DOCUMENT_SOURCES).map((s) => s.markdown),
+    ...Object.values(PUBLIC_PROGRAM_DOCUMENTS).map((d) => d.markdown),
+    readFileSync("src/app/business-app/documents/page.tsx", "utf8"),
+  ];
+  for (const t of general) {
+    assert.doesNotMatch(t, /Аурафон|Джаз Релакс|Aurafon|Jazz Relax/i, "no hardcoded artists in general docs");
+    assert.doesNotMatch(t, /Правообладател(ь|ем)[^.\n|]{0,40}(Петров|ИП)/, "operator not declared rights holder");
+    assert.doesNotMatch(t, /тот же субъект/);
+  }
+  assert.match(CLIENT_DOCUMENT_SOURCES["venue-license"].markdown, /реестра прав/);
+  assert.match(CLIENT_DOCUMENT_SOURCES["claim-reply-kit"].markdown, /реестра прав/);
+  const at = new Date("2026-10-16T12:00:00Z");
+  const map = rightsholdersFromRegistry(
+    [
+      { audio_item_id: "a", rightsholder_id: "h1", status: "verified", valid_from: "2026-01-01T00:00:00Z", valid_until: null },
+      { audio_item_id: "a", rightsholder_id: "h2", status: "verified", valid_from: "2026-01-01T00:00:00Z", valid_until: "2026-02-01T00:00:00Z" },
+      { audio_item_id: "b", rightsholder_id: "h2", status: "draft", valid_from: "2026-01-01T00:00:00Z", valid_until: null },
+    ],
+    [{ id: "h1", display_name: "Правообладатель А" }, { id: "h2", display_name: "Правообладатель Б" }],
+    at,
+  );
+  assert.deepEqual(map.get("a"), ["Правообладатель А"]);
+  assert.equal(map.get("b"), undefined);
+  const rep = buildPlaybackReport({
+    at, windowMinutes: 30, timezone: "Europe/Moscow",
+    facts: [{ occurred_at: "2026-10-16T12:00:00Z", audio_item_id: "a", location_id: null, player_id: null, listened_ms: 1000 }],
+    titles: new Map(), rightsholders: map,
+  });
+  assert.deepEqual(rep.tracks[0].rightsholders, ["Правообладатель А"]);
+  const loader = readFileSync("src/lib/business-app/load-playback-report.ts", "utf8");
+  assert.match(loader, /from\("music_rights_grants"\)/);
+  assert.match(loader, /from\("music_rightsholders"\)/);
+  console.log("business-app-client-documents-unit: universal documents OK");
+}
