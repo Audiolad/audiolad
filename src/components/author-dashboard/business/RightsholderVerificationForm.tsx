@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import ExampleLightbox from "@/components/author-dashboard/business/ExampleLightbox";
+import ConsentDocumentLink from "@/components/author-dashboard/business/ConsentDocumentLink";
 import {
   RIGHTSHOLDER_EXAMPLES,
   SUNO_LINK_RE,
@@ -227,24 +228,22 @@ export default function RightsholderVerificationForm({ products, documents, exis
           })}
 
           <div className="space-y-3 text-sm">
-            <label className="flex items-start gap-3">
-              <input type="checkbox" className="mt-1 h-5 w-5" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
+            <div className="flex items-start gap-3">
+              <input id="rightsholder-accept-terms" type="checkbox" className="mt-1 h-5 w-5" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
               <span>
-                Я принимаю{" "}
-                {terms?.url ? <a className="underline" href={terms.url} target="_blank" rel="noreferrer">условия программы АудиоЛад Бизнес</a> : "условия программы АудиоЛад Бизнес"}
-                {terms ? ` (редакция ${terms.version})` : ""}
+                <label htmlFor="rightsholder-accept-terms">Я принимаю</label>{" "}
+                <ConsentDocumentLink documentKey="business_program_terms" dbVersion={terms?.version} dbUrl={terms?.url}>условия программы АудиоЛад Бизнес</ConsentDocumentLink>
                 {errors.acceptTerms ? <span className="block text-red-600">{errors.acceptTerms}</span> : null}
               </span>
-            </label>
-            <label className="flex items-start gap-3">
-              <input type="checkbox" className="mt-1 h-5 w-5" checked={confirmRights} onChange={(e) => setConfirmRights(e.target.checked)} />
+            </div>
+            <div className="flex items-start gap-3">
+              <input id="rightsholder-confirm-rights" type="checkbox" className="mt-1 h-5 w-5" checked={confirmRights} onChange={(e) => setConfirmRights(e.target.checked)} />
               <span>
-                Я подтверждаю{" "}
-                {rights?.url ? <a className="underline" href={rights.url} target="_blank" rel="noreferrer">заявление о правах на музыку</a> : "заявление о правах на музыку"}
-                {rights ? ` (редакция ${rights.version})` : ""}
+                <label htmlFor="rightsholder-confirm-rights">Я подтверждаю</label>{" "}
+                <ConsentDocumentLink documentKey="business_music_rights_declaration" dbVersion={rights?.version} dbUrl={rights?.url}>заявление о правах на музыку</ConsentDocumentLink>
                 {errors.confirmRights ? <span className="block text-red-600">{errors.confirmRights}</span> : null}
               </span>
-            </label>
+            </div>
           </div>
 
           {errors.form ? <p className="text-sm text-red-600" role="alert">{errors.form}</p> : null}
