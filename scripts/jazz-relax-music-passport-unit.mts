@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { MUSIC_MASTERS_BUCKET } from "../src/lib/author-products/music-master-upload-contract";
 import { PRACTICE_AUDIO_BUCKET } from "../src/lib/author-products/product-audio-upload-contract";
+import * as jazzRelaxPanelModule from "../src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import {
   JazzRelaxPassportActivityNotice,
   JazzRelaxPassportBody,
@@ -1065,6 +1066,44 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   ));
   assert.match(preparingMarkup, /Подготавливаем запуск…/);
   assert.doesNotMatch(preparingMarkup, /Можно закрыть|data-passport-close/);
+
+  // The wizard owns its live notice; standalone surfaces retain theirs by default.
+  // Count visible headlines separately: progressbar aria attributes repeat the label.
+  function assertPreparingNotice(markup: string, count: number) {
+    assert.equal((markup.match(/>Подготавливаем запуск…<\/p>/g) ?? []).length, count);
+    assert.equal((markup.match(/data-passport-activity="enqueueing"/g) ?? []).length, count);
+    assert.equal((markup.match(/role="progressbar"/g) ?? []).length, count);
+    if (count === 0) assert.doesNotMatch(markup, /Подготавливаем запуск/);
+  }
+  for (const showActivityNotice of [undefined, false]) {
+    const bodyMarkup = renderToStaticMarkup(createElement(JazzRelaxPassportBody, {
+      status: preparingStatus,
+      pending: true,
+      showActivityNotice,
+      onRetry: () => undefined,
+      onReanalyzeTrack: () => undefined,
+      onReanalyzeAll: () => undefined,
+    }));
+    assertPreparingNotice(bodyMarkup, showActivityNotice === false ? 0 : 1);
+
+    // Before the first status response the panel renders its own pending notice.
+    // tsx exposes the TSX default export through a CJS namespace in this .mts script.
+    const panelExport = jazzRelaxPanelModule.default as unknown as { default?: unknown };
+    const JazzRelaxMusicPassportPanel = (panelExport.default ?? panelExport) as typeof jazzRelaxPanelModule.default;
+    const panelMarkup = renderToStaticMarkup(createElement(JazzRelaxMusicPassportPanel, {
+      practiceId: "aaaaaaaa-aaaa-4aaa-8aaa-000000000001",
+      command: { nonce: 1, action: "start" },
+      showActivityNotice,
+      onStatus: () => undefined,
+    }));
+    assertPreparingNotice(panelMarkup, showActivityNotice === false ? 0 : 1);
+  }
+
+  // Album re-analysis must reach the wizard's single notice while the panel notice is hidden.
+  assert.match(
+    read("src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel.tsx"),
+    /onReanalyzeAll=\{\(\) => \{\s*setPending\(true\);[\s\S]*?onEnqueueActive\?\.\(true\);[\s\S]*?onEnqueueActive\?\.\(false\);/,
+  );
 
   const durableQueued = {
     ...viewFor(Array.from({ length: 10 }, () => "queued" as const)),
