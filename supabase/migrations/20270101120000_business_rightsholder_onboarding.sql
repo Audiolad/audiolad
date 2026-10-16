@@ -236,7 +236,7 @@ BEGIN
   END IF;
   SELECT rightsholder_id INTO v_rightsholder FROM public.business_rightsholder_accounts WHERE owner_user_id = auth.uid();
   FOR d IN SELECT * FROM public.business_program_document_versions WHERE is_current ORDER BY document_key LOOP
-    IF d.version IS DISTINCT FROM CASE d.document_key WHEN 'business_program_terms' THEN p_terms_version ELSE p_rights_version END THEN
+    IF d.version IS DISTINCT FROM (CASE d.document_key WHEN 'business_program_terms' THEN p_terms_version ELSE p_rights_version END) THEN
       RAISE EXCEPTION 'business_program_document_version_changed';
     END IF;
     INSERT INTO public.business_legal_consents(user_id,owner_user_id,rightsholder_id,document_key,version,content_hash,
