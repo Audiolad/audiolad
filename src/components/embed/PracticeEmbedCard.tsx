@@ -141,14 +141,18 @@ export default function PracticeEmbedCard(props: Props) {
     // The card always fills the frame exactly (h-dvh + overflow-hidden): on narrow frames the
     // cover flexes to the space left by the text, so the document never overflows the iframe.
     // An overflowing frame became a nested scroller and the card "jittered" under touch scroll.
+    // The frame itself is the visual card on the partner page: no shadow and a transparent
+    // document (the platform body is lilac #f7f2fc, which showed as a purple band under the
+    // card whenever the card was shorter than the frame). 100vh fallback for WebViews without dvh.
     <main
       data-practice-embed-root="true"
-      className="flex h-dvh items-stretch justify-center overflow-hidden overscroll-none bg-transparent p-0"
+      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-hidden overscroll-none bg-transparent p-0"
     >
+      <style>{"html,body{background:transparent!important}"}</style>
       <article
         data-practice-embed="true"
         data-practice-embed-mode={props.mode}
-        className="flex h-full w-full max-w-[420px] flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(36,19,63,0.12)] min-[560px]:grid min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7] min-[560px]:shadow-none"
+        className="flex h-full w-full max-w-[420px] flex-col overflow-hidden rounded-[28px] bg-white shadow-none min-[560px]:grid min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7]"
       >
         <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-[#efe7fb] min-[560px]:aspect-square min-[560px]:h-full min-[560px]:w-auto min-[560px]:flex-none">
           {props.coverUrl ? (

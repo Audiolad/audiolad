@@ -70,15 +70,17 @@ console.log("practice-embed-unit: ok");
 // Wide frames (partner desktop) use the horizontal practice-hero layout; narrow ones stay vertical.
 {
   const card = await readFile(new URL("../src/components/embed/PracticeEmbedCard.tsx", import.meta.url), "utf8");
-  assert.match(card, /max-w-\[420px\][^"]*shadow-\[0_10px_30px/, "mobile card keeps 420px + shadow");
+  assert.match(card, /max-w-\[420px\][^"]*shadow-none/, "mobile card keeps 420px, no (purple) shadow");
+  assert.ok(!/shadow-\[/.test(card), "no tinted shadow anywhere in the embed card");
+  assert.match(card, /html,body\{background:transparent!important\}/, "embed document is transparent (no lilac band)");
   assert.match(card, /min-\[560px\]:grid-cols-\[auto_minmax\(0,1fr\)\]/, "desktop card is horizontal");
-  assert.match(card, /min-\[560px\]:shadow-none/, "desktop card has no clipped shadow");
+  
 }
 
 // Partner mobile: card fills the iframe exactly (no nested scroll / jitter), «Аудиолад» sits in the button row.
 {
   const card = await readFile(new URL("../src/components/embed/PracticeEmbedCard.tsx", import.meta.url), "utf8");
-  assert.match(card, /className="flex h-dvh [^"]*overflow-hidden/, "embed root is exactly frame-high and never scrolls");
+  assert.match(card, /className="flex h-screen supports-\[height:100dvh\]:h-dvh [^"]*overflow-hidden/, "embed root is exactly frame-high and never scrolls");
   assert.ok(!/min-h-dvh/.test(card), "no min-h-dvh: content must not outgrow the frame");
   assert.match(card, /min-h-0 w-full flex-1[^"]*min-\[560px\]:aspect-square/, "narrow cover flexes, wide cover stays square");
   const actions = card.slice(card.indexOf('data-practice-embed-actions'), card.indexOf('data-practice-embed-progress'));
