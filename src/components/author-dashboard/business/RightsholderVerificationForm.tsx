@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import SunoLinkHowTo from "@/components/author-dashboard/business/SunoLinkHowTo";
 import ExampleLightbox from "@/components/author-dashboard/business/ExampleLightbox";
 import {
   VERIFICATION_STATUS_TEXT,
@@ -222,13 +223,16 @@ export default function RightsholderVerificationForm({ products, documents, exis
                 onChange={(e) => setTrackTitle(e.target.value)} placeholder={cfg.titlePlaceholder} />
               {errors.trackTitle ? <span className="mt-1 block text-red-600">{errors.trackTitle}</span> : null}
             </label>
-            <label className="block text-sm">
-              <span className="font-medium text-neutral-800">{cfg.link.label}</span>
-              <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackUrl ?? ""} inputMode="url"
-                onChange={(e) => setTrackUrl(e.target.value)} placeholder={cfg.link.placeholder} />
-              <span className="mt-1 block text-xs text-neutral-500">{cfg.link.hint}</span>
-              {errors.trackUrl ? <span className="mt-1 block text-red-600">{errors.trackUrl}</span> : null}
-            </label>
+            <div className="text-sm">
+              <label className="block">
+                <span className="font-medium text-neutral-800">{cfg.link.label}</span>
+                <input className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2" value={trackUrl ?? ""} inputMode="url"
+                  onChange={(e) => setTrackUrl(e.target.value)} placeholder={cfg.link.placeholder} />
+                <span className="mt-1 block text-xs text-neutral-500">{cfg.link.hint}</span>
+                {errors.trackUrl ? <span className="mt-1 block text-red-600">{errors.trackUrl}</span> : null}
+              </label>
+              {provider === "suno" ? <SunoLinkHowTo /> : null}
+            </div>
           </div>
 
           {cfg.fields.map((f) => {
