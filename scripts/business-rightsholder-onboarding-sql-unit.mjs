@@ -377,8 +377,11 @@ BEGIN
   PERFORM providers_test.expect_error(replace(d,'https://suno.com/s/abc''','https://evil.example/s/abc'''),'business_service_link_invalid');
   PERFORM providers_test.expect_error(replace(d,',''https://suno.com/s/abc''',',NULL'),'business_service_link_invalid');
   -- 20270103120000: generation_refs no longer required for Suno (one track link is enough).
+  -- helper is not granted to authenticated (by design); check it as the owner.
+  RESET ROLE;
   PERFORM providers_test.check_true(public.business_onboarding_provider_error('suno',NULL,'https://suno.com/s/abc','{"paid_plan":"Pro"}'::jsonb) IS NULL,'suno without generation_refs is valid');
   PERFORM providers_test.check_true(public.business_onboarding_provider_error('suno',NULL,'https://suno.com/s/abc','{}'::jsonb) IS NULL,'suno with empty details is valid');
+  SET LOCAL ROLE authenticated;
   PERFORM providers_test.expect_error(replace(d,'"paid_plan"','"plan_name"'),'business_provider_details_invalid');
   PERFORM providers_test.expect_error(replace(d,'"Pro"','5'),'business_provider_details_invalid');
   PERFORM providers_test.expect_error(regexp_replace(d,'''\{.*\}''::jsonb','''["x"]''::jsonb'),'business_provider_details_invalid');
