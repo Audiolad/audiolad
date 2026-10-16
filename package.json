@@ -393,6 +393,7 @@
     "test:business-spa-manifest": "node scripts/business-spa-manifest-sql-unit.mjs && npx tsx scripts/business-spa-manifest-client-unit.mts",
     "test:business-rightsholder-onboarding": "node scripts/business-rightsholder-onboarding-sql-unit.mjs",
     "test:business-rightsholder-examples-ui": "node scripts/business-rightsholder-examples-ui-unit.mjs",
+    "test:business-consent-document-links": "npx tsx scripts/business-consent-document-links-unit.mts",
     "test:business-rights-eligibility": "node scripts/business-rights-eligibility-sql-unit.mjs",
     "test:scheduled-publication": "npx tsx scripts/scheduled-publication-unit.mts && node scripts/scheduled-publication-sql-unit.mjs",
     "test:live-public-content-sync": "npx tsx scripts/live-public-content-sync-unit.mts && node scripts/public-content-revision-sql-unit.mjs",
