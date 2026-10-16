@@ -199,6 +199,13 @@ applyFile(
   "post-apply business player live state smoke",
   resolve(root, "supabase/tests/business_player_live_state_smoke.sql"),
 );
+if (!pending.has("20270104120000")) {
+  throw new Error("ИИ-компания catalog stats migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply ИИ-компания catalog stats smoke",
+  resolve(root, "supabase/tests/ecompany_catalog_stats_smoke.sql"),
+);
 if (!pending.has("20261101120000")) {
   throw new Error("Wordstat music query seed migration was not included in the disposable replay");
 }

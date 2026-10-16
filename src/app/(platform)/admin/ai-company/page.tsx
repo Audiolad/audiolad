@@ -1,5 +1,7 @@
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
+import { EcompanyCatalogStats } from "@/components/admin/EcompanyCatalogStats";
+import { loadCatalogStats } from "@/lib/admin/ecompany-catalog-stats-queries";
 import { isAiCompanyOwner, requireAiCompanyView } from "@/lib/admin/guard";
 import {
   companyStatusRequestPath,
@@ -61,7 +63,11 @@ export default async function AiCompanyPage({
     history_offset: params.history_offset,
     history_before: params.history_before,
   });
-  const [current, archive] = await Promise.all([loadStatus(filters, "current"), loadStatus(filters, "archive")]);
+  const [current, archive, catalogStats] = await Promise.all([
+    loadStatus(filters, "current"),
+    loadStatus(filters, "archive"),
+    loadCatalogStats(),
+  ]);
   const { model, acceptanceAvailable, sourceError } = composeAiCompanyBoard(current, archive, filters);
   // Core records decisions as actor `sergey`: only the platform owner session gets live buttons.
   const canAccept = isAiCompanyOwner(session.access);
@@ -77,6 +83,9 @@ export default async function AiCompanyPage({
         canAccept={canAccept}
         initialTab={parseBoardTabParam(params.tab)}
       />
+      <div className="mt-5">
+        <EcompanyCatalogStats model={catalogStats.model} error={catalogStats.error} />
+      </div>
     </>
   );
 }
