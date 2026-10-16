@@ -40,9 +40,9 @@ CREATE TABLE IF NOT EXISTS public.business_rightsholder_verifications (
   CHECK (service_track_url ~ '^https://[^[:space:]@]+$'),
   CHECK (ai_service <> 'suno' OR service_track_url ~ '^https://suno[.]com/(s|song)/[A-Za-z0-9_-]+/?$')
 );
--- Revocation/restriction cannot be bypassed by creating another application.
-CREATE UNIQUE INDEX IF NOT EXISTS business_rightsholder_verifications_active_uidx
-  ON public.business_rightsholder_verifications(owner_user_id) WHERE status <> 'rejected';
+-- Exactly one initial verification per account, including rejected applications.
+CREATE UNIQUE INDEX IF NOT EXISTS business_rightsholder_verifications_owner_uidx
+  ON public.business_rightsholder_verifications(owner_user_id);
 
 CREATE TABLE IF NOT EXISTS public.business_verification_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -145,7 +145,9 @@ CREATE OR REPLACE FUNCTION public.business_onboarding_product(p_product_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_product public.practices%ROWTYPE; v_tracks jsonb;
 BEGIN
-  SELECT * INTO v_product FROM public.practices WHERE id = p_product_id FOR SHARE;
+  -- FOR UPDATE conflicts with the FK KEY SHARE lock from audio_items inserts/reparenting,
+  -- keeping new tracks out between publication validation and snapshot aggregation until commit.
+  SELECT * INTO v_product FROM public.practices WHERE id = p_product_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'business_product_not_owned'; END IF;
   PERFORM 1 FROM public.author_members WHERE author_id = v_product.author_id
     AND user_id = auth.uid() AND role = 'owner' FOR SHARE;
@@ -188,7 +190,7 @@ BEGIN
     OR (p_ai_service = 'suno' AND p_service_track_url !~ '^https://suno[.]com/(s|song)/[A-Za-z0-9_-]+/?$') THEN
     RAISE EXCEPTION 'business_service_link_invalid';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.business_rightsholder_verifications WHERE owner_user_id = auth.uid() AND status <> 'rejected') THEN
+  IF EXISTS (SELECT 1 FROM public.business_rightsholder_verifications WHERE owner_user_id = auth.uid()) THEN
     RAISE EXCEPTION 'business_verification_already_active';
   END IF;
   INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,
@@ -304,6 +306,7 @@ BEGIN
     WHEN p_action = 'approve' AND v.status = 'submitted' THEN 'verified'
     WHEN p_action = 'request_info' AND v.status = 'submitted' THEN 'needs_info'
     WHEN p_action = 'reject' AND v.status IN ('submitted','needs_info') THEN 'rejected'
+    WHEN p_action = 'reopen' AND v.status = 'rejected' THEN 'needs_info'
     WHEN p_action = 'restrict' AND v.status = 'verified' THEN 'restricted'
     WHEN p_action = 'revoke' AND v.status IN ('verified','restricted') THEN 'revoked'
     ELSE NULL END;

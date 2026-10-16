@@ -2032,6 +2032,11 @@ Forward-only migration `20270101120000_business_rightsholder_onboarding.sql` add
 owner-account verification, private evidence, versioned program documents,
 append-only legal consents/moderation, product opt-in snapshots and scoped suspensions.
 Owner identity uses `author_members.role = 'owner'`; moderators bind the rightsholder.
+An unconditional UNIQUE on verification `owner_user_id` permits exactly one initial
+check record per account ever, including rejected records. Only a non-self moderator
+can `reopen` rejected → needs_info with a required reason and audit entry; corrections
+and resubmission retain that record. Product validation locks the parent FOR UPDATE
+before checking/aggregating tracks, blocking concurrent audio_items FK inserts/moves.
 No legal versions are seeded: submit/opt-in fail with
 `business_program_documents_not_published` until both approved documents are published.
 Verification and opt-in do not create Rights Grants or change track eligibility.

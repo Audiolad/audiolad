@@ -22,6 +22,12 @@ for (const body of clean.matchAll(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/g)) {
   if (/SECURITY DEFINER/.test(body[0])) assert.match(body[0], /SET search_path = public, pg_temp/);
 }
 assert.match(sql, /role = 'owner' FOR SHARE/);
+assert.match(clean, /CREATE UNIQUE INDEX IF NOT EXISTS business_rightsholder_verifications_owner_uidx\s+ON public\.business_rightsholder_verifications\(owner_user_id\);/);
+assert.doesNotMatch(clean, /status <> 'rejected'/);
+const productHelper = clean.match(/CREATE OR REPLACE FUNCTION public\.business_onboarding_product\([\s\S]*?\$\$;/)?.[0];
+assert.ok(productHelper, 'product helper exists');
+assert.match(productHelper, /FROM public\.practices WHERE id = p_product_id FOR UPDATE;/);
+assert.match(clean, /WHEN p_action = 'reopen' AND v\.status = 'rejected' THEN 'needs_info'/);
 assert.doesNotMatch(clean, /author_members_can_mutate/);
 assert.match(sql, /BEFORE UPDATE OR DELETE OR TRUNCATE/);
 assert.match(sql, /AS RESTRICTIVE FOR UPDATE/);
@@ -50,7 +56,8 @@ CREATE POLICY old_broad_policy ON storage.objects FOR ALL TO authenticated USING
 `;
 
 const smoke = String.raw`
-CREATE FUNCTION pg_temp.expect_error(command text, expected text) RETURNS void LANGUAGE plpgsql AS $f$
+CREATE SCHEMA onboarding_test;
+CREATE FUNCTION onboarding_test.expect_error(command text, expected text) RETURNS void LANGUAGE plpgsql AS $f$
 BEGIN
   BEGIN
     EXECUTE command;
@@ -60,9 +67,11 @@ BEGIN
   END;
   RAISE EXCEPTION 'expected error %, succeeded: %', expected, command;
 END $f$;
-CREATE FUNCTION pg_temp.check_true(ok boolean, message text) RETURNS void LANGUAGE plpgsql AS $f$
+CREATE FUNCTION onboarding_test.check_true(ok boolean, message text) RETURNS void LANGUAGE plpgsql AS $f$
 BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'assertion failed: %', message; END IF; END $f$;
-GRANT USAGE ON SCHEMA pg_temp TO authenticated;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA onboarding_test FROM PUBLIC;
+GRANT USAGE ON SCHEMA onboarding_test TO authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA onboarding_test TO authenticated;
 
 INSERT INTO auth.users(id) VALUES
  ('00000000-0000-0000-0000-000000000001'),('00000000-0000-0000-0000-000000000002'),('00000000-0000-0000-0000-000000000003');
@@ -125,69 +134,69 @@ BEGIN
   optin_call := format('SELECT public.author_business_product_optin(ARRAY[%L]::uuid[],true,true,''test-v1'',''test-v1'')',p);
   before_eligibility := public.resolve_business_track_eligibility(a,location);
   before_deny := public.resolve_business_track_eligibility(a,'50000000-0000-0000-0000-000000000002');
-  PERFORM pg_temp.check_true(before_eligibility->>'decision' = 'UNKNOWN','out-of-territory stays UNKNOWN');
-  PERFORM pg_temp.check_true(before_deny->>'decision' = 'INELIGIBLE','unsupported country denies');
+  PERFORM onboarding_test.check_true(before_eligibility->>'decision' = 'UNKNOWN','out-of-territory stays UNKNOWN');
+  PERFORM onboarding_test.check_true(before_deny->>'decision' = 'INELIGIBLE','unsupported country denies');
   engine := pg_get_functiondef('public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)'::regprocedure);
   SELECT count(*) INTO grants FROM public.music_rights_grants;
   UPDATE public.audio_items SET status = 'draft' WHERE id = a;
   SET LOCAL ROLE authenticated;
-  PERFORM pg_temp.expect_error(draft_call,'business_track_not_published');
+  PERFORM onboarding_test.expect_error(draft_call,'business_track_not_published');
   RESET ROLE;
   UPDATE public.audio_items SET status = 'published' WHERE id = a;
   SET LOCAL ROLE authenticated;
   -- Foreign product (even editor) and unpublished product.
-  PERFORM pg_temp.expect_error(replace(replace(draft_call,p::text,'20000000-0000-0000-0000-000000000002'),a::text,'30000000-0000-0000-0000-000000000002'),'business_product_not_owned');
-  PERFORM pg_temp.expect_error(replace(replace(draft_call,p::text,'20000000-0000-0000-0000-000000000003'),a::text,'30000000-0000-0000-0000-000000000003'),'business_product_not_published');
-  PERFORM pg_temp.expect_error(replace(draft_call,a::text,'30000000-0000-0000-0000-000000000002'),'business_track_not_in_product');
-  PERFORM pg_temp.expect_error(replace(draft_call,'https://suno.com/s/example','https://suno.com.evil/s/example'),'business_service_link_invalid');
-  PERFORM pg_temp.expect_error(replace(draft_call,'''suno''','''unknown'''),'business_ai_service_invalid');
-  PERFORM pg_temp.expect_error(replace(draft_call,'''suno''','''other'''),'business_ai_service_invalid');
-  PERFORM pg_temp.expect_error(optin_call,'business_account_not_verified');
+  PERFORM onboarding_test.expect_error(replace(replace(draft_call,p::text,'20000000-0000-0000-0000-000000000002'),a::text,'30000000-0000-0000-0000-000000000002'),'business_product_not_owned');
+  PERFORM onboarding_test.expect_error(replace(replace(draft_call,p::text,'20000000-0000-0000-0000-000000000003'),a::text,'30000000-0000-0000-0000-000000000003'),'business_product_not_published');
+  PERFORM onboarding_test.expect_error(replace(draft_call,a::text,'30000000-0000-0000-0000-000000000002'),'business_track_not_in_product');
+  PERFORM onboarding_test.expect_error(replace(draft_call,'https://suno.com/s/example','https://suno.com.evil/s/example'),'business_service_link_invalid');
+  PERFORM onboarding_test.expect_error(replace(draft_call,'''suno''','''unknown'''),'business_ai_service_invalid');
+  PERFORM onboarding_test.expect_error(replace(draft_call,'''suno''','''other'''),'business_ai_service_invalid');
+  PERFORM onboarding_test.expect_error(optin_call,'business_account_not_verified');
   EXECUTE draft_call INTO v;
-  PERFORM pg_temp.expect_error(draft_call,'business_verification_already_active');
-  PERFORM pg_temp.expect_error('UPDATE public.business_rightsholder_verifications SET status = ''verified''','permission denied');
-  PERFORM pg_temp.expect_error('INSERT INTO public.business_program_document_versions VALUES (''business_program_terms'',''evil'',''' || repeat('a',64) || ''',''unapproved'',NULL,now(),true)','permission denied');
+  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
+  PERFORM onboarding_test.expect_error('UPDATE public.business_rightsholder_verifications SET status = ''verified''','permission denied');
+  PERFORM onboarding_test.expect_error('INSERT INTO public.business_program_document_versions VALUES (''business_program_terms'',''evil'',''' || repeat('a',64) || ''',''unapproved'',NULL,now(),true)','permission denied');
   e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
   e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('b',64));
-  PERFORM pg_temp.expect_error(format('SELECT public.author_business_evidence_reserve(%L,''generation'',''image/png'',10485761,%L)',v,repeat('a',64)),'check constraint');
-  PERFORM pg_temp.expect_error(format('SELECT public.author_business_evidence_reserve(%L,''generation'',''text/plain'',10,%L)',v,repeat('a',64)),'check constraint');
+  PERFORM onboarding_test.expect_error(format('SELECT public.author_business_evidence_reserve(%L,''generation'',''image/png'',10485761,%L)',v,repeat('a',64)),'check constraint');
+  PERFORM onboarding_test.expect_error(format('SELECT public.author_business_evidence_reserve(%L,''generation'',''text/plain'',10,%L)',v,repeat('a',64)),'check constraint');
   INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
     ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"image/png","size":100}'),
     ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":200}');
   submit_call := format('SELECT public.author_business_verification_submit(%L,ARRAY[%L,%L]::uuid[],true,true,''test-v1'',''test-v1'')',v,e1.id,e2.id);
-  PERFORM pg_temp.expect_error(submit_call,'business_program_documents_not_published');
+  PERFORM onboarding_test.expect_error(submit_call,'business_program_documents_not_published');
   RESET ROLE;
   -- Test-only legal fixtures; migration itself MUST leave this table empty.
   INSERT INTO public.business_program_document_versions(document_key,version,content_hash,content_text,published_at,is_current)
     VALUES('business_program_terms','test-v1',repeat('c',64),'NOT A LEGAL DOCUMENT',now(),true),
     ('business_music_rights_declaration','test-v1',repeat('d',64),'NOT A LEGAL DOCUMENT',now(),true);
   SET LOCAL ROLE authenticated;
-  PERFORM pg_temp.expect_error(replace(submit_call,'true,true','false,true'),'business_program_consents_required');
-  PERFORM pg_temp.expect_error(replace(submit_call,'true,true','true,false'),'business_program_consents_required');
-  PERFORM pg_temp.expect_error(replace(submit_call,'true,true','NULL,true'),'business_program_consents_required');
-  PERFORM pg_temp.expect_error(replace(submit_call,'test-v1','stale'),'business_program_document_version_changed');
+  PERFORM onboarding_test.expect_error(replace(submit_call,'true,true','false,true'),'business_program_consents_required');
+  PERFORM onboarding_test.expect_error(replace(submit_call,'true,true','true,false'),'business_program_consents_required');
+  PERFORM onboarding_test.expect_error(replace(submit_call,'true,true','NULL,true'),'business_program_consents_required');
+  PERFORM onboarding_test.expect_error(replace(submit_call,'test-v1','stale'),'business_program_document_version_changed');
   EXECUTE submit_call;
-  PERFORM pg_temp.check_true((SELECT count(*) = 2 FROM public.business_legal_consents),'two independent consents');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 2 FROM public.business_legal_consents),'two independent consents');
   -- Object overwrite/delete remain blocked despite old broad storage policy.
   UPDATE storage.objects SET metadata = '{}' WHERE name = e1.object_path;
   GET DIAGNOSTICS n = ROW_COUNT;
-  PERFORM pg_temp.check_true(n = 0,'storage immutable');
+  PERFORM onboarding_test.check_true(n = 0,'storage immutable');
   DELETE FROM storage.objects WHERE name = e1.object_path;
   GET DIAGNOSTICS n = ROW_COUNT;
-  PERFORM pg_temp.check_true(n = 0,'storage delete blocked');
+  PERFORM onboarding_test.check_true(n = 0,'storage delete blocked');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
-  PERFORM pg_temp.check_true((SELECT count(*) = 0 FROM storage.objects),'foreign evidence unreadable');
-  PERFORM pg_temp.check_true((SELECT count(*) = 0 FROM public.business_rightsholder_verifications),'foreign verification unreadable');
-  PERFORM pg_temp.expect_error(format('INSERT INTO storage.objects(bucket_id,name) VALUES (''business-rightsholder-evidence'',%L)',e1.object_path || '/foreign'),'row-level security');
-  PERFORM pg_temp.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''test'')',v),'business_moderator_required');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 0 FROM storage.objects),'foreign evidence unreadable');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 0 FROM public.business_rightsholder_verifications),'foreign verification unreadable');
+  PERFORM onboarding_test.expect_error(format('INSERT INTO storage.objects(bucket_id,name) VALUES (''business-rightsholder-evidence'',%L)',e1.object_path || '/foreign'),'row-level security');
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''test'')',v),'business_moderator_required');
   RESET ROLE;
   INSERT INTO public.platform_user_roles VALUES('00000000-0000-0000-0000-000000000001','admin');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
   SET LOCAL ROLE authenticated;
-  PERFORM pg_temp.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''test'')',v),'business_self_moderation_forbidden');
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''test'')',v),'business_self_moderation_forbidden');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
-  PERFORM pg_temp.check_true((SELECT count(*) = 2 FROM storage.objects),'moderator evidence readable');
-  PERFORM pg_temp.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'','' '')',v),'business_moderation_reason_required');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 2 FROM storage.objects),'moderator evidence readable');
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'','' '')',v),'business_moderation_reason_required');
   PERFORM public.moderator_business_verification_action(v,'request_info','Provide clearer evidence');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
   e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('e',64));
@@ -201,60 +210,90 @@ BEGIN
   RESET ROLE;
   UPDATE public.business_program_document_versions SET is_current = false;
   SET LOCAL ROLE authenticated;
-  PERFORM pg_temp.expect_error(optin_call,'business_program_documents_not_published');
+  PERFORM onboarding_test.expect_error(optin_call,'business_program_documents_not_published');
   RESET ROLE;
   UPDATE public.business_program_document_versions SET is_current = true;
   SET LOCAL ROLE authenticated;
-  PERFORM pg_temp.expect_error(replace(optin_call,'true,true','false,true'),'business_program_consents_required');
-  PERFORM pg_temp.expect_error(replace(optin_call,p::text,'20000000-0000-0000-0000-000000000002'),'business_product_not_owned');
-  PERFORM pg_temp.expect_error(replace(optin_call,p::text,'20000000-0000-0000-0000-000000000003'),'business_product_not_published');
+  PERFORM onboarding_test.expect_error(replace(optin_call,'true,true','false,true'),'business_program_consents_required');
+  PERFORM onboarding_test.expect_error(replace(optin_call,p::text,'20000000-0000-0000-0000-000000000002'),'business_product_not_owned');
+  PERFORM onboarding_test.expect_error(replace(optin_call,p::text,'20000000-0000-0000-0000-000000000003'),'business_product_not_published');
   EXECUTE optin_call INTO optins;
   EXECUTE replace(optin_call,p::text,'20000000-0000-0000-0000-000000000004') INTO optins;
-  PERFORM pg_temp.check_true((SELECT count(*) = 2 FROM public.business_product_optins),'one verification covers two owner spaces');
-  PERFORM pg_temp.check_true((SELECT count(*) = 4 FROM public.business_legal_consents WHERE context = 'product_optin'),'each product has independent consents');
-  PERFORM pg_temp.expect_error('DELETE FROM public.business_legal_consents','permission denied');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 2 FROM public.business_product_optins),'one verification covers two owner spaces');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 4 FROM public.business_legal_consents WHERE context = 'product_optin'),'each product has independent consents');
+  PERFORM onboarding_test.expect_error('DELETE FROM public.business_legal_consents','permission denied');
   RESET ROLE;
-  PERFORM pg_temp.check_true((SELECT count(*) = grants FROM public.music_rights_grants),'opt-in never creates grants');
-  PERFORM pg_temp.check_true(public.resolve_business_track_eligibility(a,location) = before_eligibility,'out-of-territory eligibility unchanged');
-  PERFORM pg_temp.check_true(public.resolve_business_track_eligibility(a,'50000000-0000-0000-0000-000000000002') = before_deny,'country deny unchanged');
-  PERFORM pg_temp.check_true(public.resolve_business_track_eligibility('30000000-0000-0000-0000-000000000004',location)->>'decision' = 'UNKNOWN','opted product with no grants stays UNKNOWN');
-  PERFORM pg_temp.check_true(pg_get_functiondef('public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)'::regprocedure) = engine,'engine definition unchanged');
-  PERFORM pg_temp.expect_error('UPDATE public.business_legal_consents SET user_agent = ''tamper''','business_onboarding_history_immutable');
-  PERFORM pg_temp.expect_error('DELETE FROM public.business_legal_consents','business_onboarding_history_immutable');
-  PERFORM pg_temp.expect_error('TRUNCATE public.business_rightsholder_moderation_audit','business_onboarding_history_immutable');
-  PERFORM pg_temp.expect_error('UPDATE public.business_program_document_versions SET content_text = ''tamper''','business_program_document_immutable');
+  PERFORM onboarding_test.check_true((SELECT count(*) = grants FROM public.music_rights_grants),'opt-in never creates grants');
+  PERFORM onboarding_test.check_true(public.resolve_business_track_eligibility(a,location) = before_eligibility,'out-of-territory eligibility unchanged');
+  PERFORM onboarding_test.check_true(public.resolve_business_track_eligibility(a,'50000000-0000-0000-0000-000000000002') = before_deny,'country deny unchanged');
+  PERFORM onboarding_test.check_true(public.resolve_business_track_eligibility('30000000-0000-0000-0000-000000000004',location)->>'decision' = 'UNKNOWN','opted product with no grants stays UNKNOWN');
+  PERFORM onboarding_test.check_true(pg_get_functiondef('public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)'::regprocedure) = engine,'engine definition unchanged');
+  PERFORM onboarding_test.expect_error('UPDATE public.business_legal_consents SET user_agent = ''tamper''','business_onboarding_history_immutable');
+  PERFORM onboarding_test.expect_error('DELETE FROM public.business_legal_consents','business_onboarding_history_immutable');
+  PERFORM onboarding_test.expect_error('TRUNCATE public.business_rightsholder_moderation_audit','business_onboarding_history_immutable');
+  PERFORM onboarding_test.expect_error('UPDATE public.business_program_document_versions SET content_text = ''tamper''','business_program_document_immutable');
   SET LOCAL ROLE authenticated;
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   PERFORM public.moderator_business_suspend_product(p,a,'Disputed track');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
-  PERFORM pg_temp.expect_error(optin_call,'business_product_or_track_suspended');
+  PERFORM onboarding_test.expect_error(optin_call,'business_product_or_track_suspended');
   EXECUTE replace(optin_call,p::text,'20000000-0000-0000-0000-000000000004');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   PERFORM public.moderator_business_verification_action(v,'restrict','Investigating');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
-  PERFORM pg_temp.expect_error(optin_call,'business_account_not_verified');
+  PERFORM onboarding_test.expect_error(optin_call,'business_account_not_verified');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   PERFORM public.moderator_business_verification_action(v,'revoke','Revoked');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
-  PERFORM pg_temp.expect_error(optin_call,'business_account_not_verified');
-  PERFORM pg_temp.expect_error(draft_call,'business_verification_already_active');
+  PERFORM onboarding_test.expect_error(optin_call,'business_account_not_verified');
+  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
   RESET ROLE;
-  PERFORM pg_temp.check_true((SELECT count(*) = 4 FROM public.business_rightsholder_moderation_audit),'moderation audit append-only');
-  -- Other allowed services, including explicit Other details (another owner, no duplicate active application).
+  PERFORM onboarding_test.check_true((SELECT count(*) = 4 FROM public.business_rightsholder_moderation_audit),'moderation audit append-only');
+  -- Another allowed service on a different owner account.
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
   draft_call := replace(replace(draft_call,p::text,'20000000-0000-0000-0000-000000000002'),a::text,'30000000-0000-0000-0000-000000000002');
   SET LOCAL ROLE authenticated;
   EXECUTE replace(replace(draft_call,'''suno''','''musicgpt'''),'https://suno.com/s/example','https://musicgpt.com/track/example') INTO v;
   RESET ROLE;
-  -- Rejected applications can be replaced; request/reject transitions are audited too.
+  -- Rejected applicants cannot start a second initial check, even with another service.
   UPDATE public.business_rightsholder_verifications SET status = 'submitted' WHERE id = v;
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
   SET LOCAL ROLE authenticated;
   PERFORM public.moderator_business_verification_action(v,'reject','Insufficient evidence');
   PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
-  EXECUTE replace(replace(draft_call,'''suno'',NULL','''other'',''Synthetic service'''),'https://suno.com/s/example','https://example.test/track/1');
+  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
+  PERFORM onboarding_test.expect_error(replace(replace(draft_call,'''suno'',NULL','''other'',''Synthetic service'''),'https://suno.com/s/example','https://example.test/track/1'),'business_verification_already_active');
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'',''Correct evidence'')',v),'business_moderator_required');
+  PERFORM onboarding_test.expect_error(format('SELECT public.author_business_evidence_reserve(%L,''generation'',''image/png'',100,%L)',v,repeat('a',64)),'business_evidence_upload_forbidden');
+  RESET ROLE;
+  -- The unconditional index also protects against direct privileged duplicate inserts.
+  PERFORM onboarding_test.expect_error(format('INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url) SELECT owner_user_id,product_id,audio_item_id,ai_service,service_track_title,service_track_url FROM public.business_rightsholder_verifications WHERE id = %L',v),'duplicate key value violates unique constraint');
+  INSERT INTO public.platform_user_roles VALUES('00000000-0000-0000-0000-000000000002','admin');
+  SET LOCAL ROLE authenticated;
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'',''Correct evidence'')',v),'business_self_moderation_forbidden');
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'','' '')',v),'business_moderation_reason_required');
+  PERFORM public.moderator_business_verification_action(v,'reopen','Correct evidence');
+  PERFORM onboarding_test.check_true((SELECT status = 'needs_info' FROM public.business_rightsholder_verifications WHERE id = v),'reopen keeps the same verification');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 1 FROM public.business_rightsholder_moderation_audit
+    WHERE verification_id = v AND action = 'reopen' AND previous_status = 'rejected' AND next_status = 'needs_info'
+      AND actor_user_id = '00000000-0000-0000-0000-000000000003' AND reason = 'Correct evidence'),'reopen audited');
+  PERFORM onboarding_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''reopen'',''Again'')',v),'business_verification_transition_forbidden');
+  PERFORM set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
+  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
+  e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
+  e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('b',64));
+  INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
+    ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"image/png","size":100}'),
+    ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":200}');
+  PERFORM public.author_business_verification_submit(v,ARRAY[e1.id,e2.id],true,true,'test-v1','test-v1');
+  PERFORM onboarding_test.check_true((SELECT count(*) = 1 AND bool_and(id = v AND status = 'submitted')
+    FROM public.business_rightsholder_verifications WHERE owner_user_id = '00000000-0000-0000-0000-000000000002'),'corrections resubmit the single initial check');
   RESET ROLE;
 END $test$;
+DROP FUNCTION onboarding_test.expect_error(text,text);
+DROP FUNCTION onboarding_test.check_true(boolean,text);
+DROP SCHEMA onboarding_test;
 `;
 
 const container = process.env.AUDIOLAD_ONBOARDING_TEST_CONTAINER;

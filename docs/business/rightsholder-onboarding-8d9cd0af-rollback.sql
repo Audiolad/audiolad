@@ -32,12 +32,14 @@ DROP TABLE IF EXISTS public.business_onboarding_suspensions;
 DROP TABLE IF EXISTS public.business_product_optins;
 DROP TABLE IF EXISTS public.business_legal_consents;
 DROP TABLE IF EXISTS public.business_verification_evidence;
+-- Dropping this empty table also removes its unconditional owner_user_id unique index.
 DROP TABLE IF EXISTS public.business_rightsholder_verifications;
 DROP TABLE IF EXISTS public.business_rightsholder_accounts;
 DROP TABLE IF EXISTS public.business_program_document_versions;
 DROP FUNCTION IF EXISTS public.author_business_verification_draft(uuid,uuid,text,text,text,text);
 DROP FUNCTION IF EXISTS public.author_business_verification_submit(uuid,uuid[],boolean,boolean,text,text,inet,text);
 DROP FUNCTION IF EXISTS public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text);
+-- Includes the audited rejected -> needs_info reopen action; no separate RPC to drop.
 DROP FUNCTION IF EXISTS public.moderator_business_verification_action(uuid,text,text,uuid,text,text);
 DROP FUNCTION IF EXISTS public.moderator_business_suspend_product(uuid,uuid,text);
 DROP FUNCTION IF EXISTS public.business_onboarding_storage_access(text,boolean);
