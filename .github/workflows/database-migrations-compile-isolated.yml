@@ -21,6 +21,7 @@ on:
       - "supabase/tests/business_royalty_ledger_smoke.sql"
       - "supabase/tests/business_spa_manifest_smoke.sql"
       - "supabase/tests/business_player_live_state_smoke.sql"
+      - "supabase/tests/ecompany_catalog_stats_smoke.sql"
       - "supabase/tests/seo_wordstat_music_queries_seed_smoke.sql"
       - "supabase/tests/seo_wordstat_jazz_queries_seed_smoke.sql"
       - "deploy/scripts/lib/database-migrations-plan.mjs"
