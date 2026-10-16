@@ -862,6 +862,7 @@ export default function AuthorProductForm({
     useState<ProductWizardStep>(initialWizardStep);
   const [promoError, setPromoError] = useState<string | null>(null);
   const lastSaveFailureReasonRef = useRef<string | null>(null);
+  const wizardContinueInFlightRef = useRef(false);
   const [passportCommand, setPassportCommand] = useState<{
     nonce: number;
     action: "start" | "retry" | "reanalyze";
@@ -3849,6 +3850,7 @@ export default function AuthorProductForm({
   });
 
   async function saveWizardStepAndContinue() {
+    if (wizardContinueInFlightRef.current) return;
     setError(null);
     setMessage(null);
     const creatingPassport = jazzRelaxMusicPassport
@@ -3859,6 +3861,7 @@ export default function AuthorProductForm({
       if (passportActivity.buttonDisabled) return;
       setPassportSaving(true);
     }
+    wizardContinueInFlightRef.current = true;
     try {
       const saved = await saveProduct();
       if (!saved) {
@@ -3906,6 +3909,7 @@ export default function AuthorProductForm({
         goToWizardStep(next);
       }
     } finally {
+      wizardContinueInFlightRef.current = false;
       if (creatingPassport) setPassportSaving(false);
     }
   }
@@ -6092,6 +6096,7 @@ export default function AuthorProductForm({
             practiceId={practiceId}
             command={passportCommand}
             saving={passportSaving}
+            showActivityNotice={false}
             onStatus={onJazzRelaxPassportStatus}
             onEnqueueActive={onPassportEnqueueActive}
             onPollFailed={onPassportPollFailed}

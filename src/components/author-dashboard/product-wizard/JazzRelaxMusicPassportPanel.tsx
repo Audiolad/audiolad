@@ -22,6 +22,7 @@ type JazzRelaxMusicPassportPanelProps = {
   practiceId: string;
   command: PassportCommand | null;
   saving?: boolean;
+  showActivityNotice?: boolean;
   onStatus: (status: JazzRelaxPassportView) => void;
   onEnqueueActive?: (active: boolean) => void;
   onPollFailed?: (failed: boolean) => void;
@@ -110,7 +111,7 @@ export function JazzRelaxPassportActivityNotice({
   live = false,
 }: {
   activity: JazzRelaxPassportActivity;
-  /** One live region announces the stage. The duplicate near the other surface stays silent. */
+  /** Enable announcements on the surface that owns the activity notice. */
   live?: boolean;
 }) {
   if (!activity.headline || activity.kind === "completed") return null;
@@ -182,6 +183,7 @@ export function JazzRelaxPassportBody({
   pending,
   saving = false,
   pollFailed = false,
+  showActivityNotice = true,
   onRetry,
   onReanalyzeTrack,
   onReanalyzeAll,
@@ -190,6 +192,7 @@ export function JazzRelaxPassportBody({
   pending: boolean;
   saving?: boolean;
   pollFailed?: boolean;
+  showActivityNotice?: boolean;
   onRetry: (audioItemId: string) => void;
   onReanalyzeTrack: (audioItemId: string) => void;
   onReanalyzeAll: () => void;
@@ -202,7 +205,7 @@ export function JazzRelaxPassportBody({
   });
   const album = status.phase === "completed" || status.phase === "partial" ? status.album : null;
   const showTracks = status.phase === "completed" || status.phase === "partial" || status.phase === "failed";
-  const showNotice = activity.headline.length > 0 && activity.kind !== "completed";
+  const showNotice = showActivityNotice && activity.headline.length > 0 && activity.kind !== "completed";
   if (!showNotice && !album && !showTracks && status.readyCount === 0 && status.summary.length === 0) {
     return null;
   }
@@ -296,6 +299,7 @@ export default function JazzRelaxMusicPassportPanel({
   practiceId,
   command,
   saving = false,
+  showActivityNotice = true,
   onStatus,
   onEnqueueActive,
   onPollFailed,
@@ -418,7 +422,7 @@ export default function JazzRelaxMusicPassportPanel({
 
   return (
     <div className="space-y-3">
-      {!status && (saving || pending || pollFailed) ? (
+      {showActivityNotice && !status && (saving || pending || pollFailed) ? (
         <JazzRelaxPassportActivityNotice activity={savingActivity} />
       ) : null}
       {status ? (
@@ -427,6 +431,7 @@ export default function JazzRelaxMusicPassportPanel({
           pending={pending}
           saving={saving}
           pollFailed={pollFailed}
+          showActivityNotice={showActivityNotice}
           onRetry={(audioItemId) => {
             void postAction("retry", audioItemId).catch(() => setError("Не удалось повторить анализ."));
           }}
