@@ -1,0 +1,231 @@
+/**
+ * Client documents (task 8dcba9d1): document list + pure helpers for the
+ * «что играло в заведении во время T» report built from server-accepted
+ * playback_usage_facts. No DB writes; no rights-status snapshot (that needs
+ * a migration, see docs/business/rights-8dcba9d1/15_PLAYBACK_REPORT_DESIGN.md).
+ */
+
+export const CLIENT_DOCUMENT_DRAFT_LABEL =
+  "Черновик, требует проверки юриста";
+
+export type ClientDocumentEntry = {
+  id: string;
+  title: string;
+  version: string;
+  versionDate: string;
+  status: "draft_pending_legal_review";
+  summary: string;
+};
+
+export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
+  {
+    id: "venue-license",
+    title: "Лицензия на публичное исполнение в заведении (документ точки)",
+    version: "0.1-draft",
+    versionDate: "2026-10-16",
+    status: "draft_pending_legal_review",
+    summary:
+      "Подтверждает, что музыка AudioLad играет в вашей точке по лицензии. Только через плеер AudioLad.",
+  },
+  {
+    id: "b2b-terms",
+    title: "Условия AudioLad Business",
+    version: "0.3-draft",
+    versionDate: "2026-10-14",
+    status: "draft_pending_legal_review",
+    summary: "Условия лицензирования музыки для бизнеса.",
+  },
+  {
+    id: "claims-procedure",
+    title: "Порядок защиты при претензиях РАО/ВОИС и других лиц",
+    version: "0.1-draft",
+    versionDate: "2026-10-16",
+    status: "draft_pending_legal_review",
+    summary:
+      "Что делать, если пришла претензия или проверка: сроки, документы, помощь и условия возмещения.",
+  },
+  {
+    id: "claim-reply-kit",
+    title: "Шаблон ответа на претензию и перечень документов",
+    version: "0.1-draft",
+    versionDate: "2026-10-16",
+    status: "draft_pending_legal_review",
+    summary: "Не отправляйте ответ без согласования с AudioLad.",
+  },
+  {
+    id: "rightsholder-link",
+    title: "Правообладатель каталогов «Аурафон» и «Джаз Релакс»",
+    version: "0.1-draft",
+    versionDate: "2026-10-16",
+    status: "draft_pending_legal_review",
+    summary:
+      "«Аурафон» и «Джаз Релакс» — творческие псевдонимы. Правообладатель: ИП Петров Сергей Сергеевич.",
+  },
+] as const;
+
+export const PLAYBACK_REPORT_MAX_WINDOW_MINUTES = 180;
+export const PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES = 30;
+
+export type PlaybackFactRow = {
+  occurred_at: string;
+  audio_item_id: string | null;
+  location_id: string | null;
+  player_id: string | null;
+  listened_ms: number | string | null;
+  position_ms?: number | string | null;
+};
+
+export type PlaybackReportTrack = {
+  audioItemId: string | null;
+  title: string;
+  firstAt: string;
+  lastAt: string;
+  listenedMs: number;
+  /** True if the requested instant T is inside [first segment start, last fact]. */
+  coversT: boolean;
+};
+
+export type PlaybackReport = {
+  atUtc: string;
+  fromUtc: string;
+  toUtc: string;
+  timezone: string;
+  tracks: PlaybackReportTrack[];
+  factCount: number;
+};
+
+function toNum(v: unknown): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+export function clampWindowMinutes(raw: unknown): number {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n <= 0) return PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES;
+  return Math.min(n, PLAYBACK_REPORT_MAX_WINDOW_MINUTES);
+}
+
+/** Offset (ms) of `timeZone` at the given UTC instant. */
+function tzOffsetMs(utcMs: number, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p: Record<string, number> = {};
+  for (const part of dtf.formatToParts(new Date(utcMs))) {
+    if (part.type !== "literal") p[part.type] = Number(part.value);
+  }
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - Math.floor(utcMs / 1000) * 1000;
+}
+
+export function isValidTimeZone(tz: unknown): tz is string {
+  if (typeof tz !== "string" || !tz) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse "YYYY-MM-DDTHH:mm" (venue-local wall clock) into a UTC Date.
+ * Returns null on bad input.
+ */
+export function venueLocalToUtc(local: unknown, timeZone: string): Date | null {
+  if (typeof local !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local.trim());
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m.map(Number);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59) return null;
+  const naive = Date.UTC(y, mo - 1, d, h, mi);
+  const tz = isValidTimeZone(timeZone) ? timeZone : "Europe/Moscow";
+  let guess = naive - tzOffsetMs(naive, tz);
+  guess = naive - tzOffsetMs(guess, tz);
+  return new Date(guess);
+}
+
+export function formatVenueTime(iso: string, timeZone: string): string {
+  const tz = isValidTimeZone(timeZone) ? timeZone : "Europe/Moscow";
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(iso));
+}
+
+/**
+ * Group facts by track in chronological order of first appearance.
+ * A fact at occurred_at covers roughly [occurred_at - listened_ms, occurred_at].
+ */
+export function buildPlaybackReport(input: {
+  at: Date;
+  windowMinutes: number;
+  timezone: string;
+  facts: readonly PlaybackFactRow[];
+  titles: ReadonlyMap<string, string>;
+}): PlaybackReport {
+  const w = clampWindowMinutes(input.windowMinutes) * 60_000;
+  const atMs = input.at.getTime();
+  const from = atMs - w;
+  const to = atMs + w;
+  const groups = new Map<
+    string,
+    { id: string | null; startMs: number; lastMs: number; listened: number }
+  >();
+  let count = 0;
+  const sorted = [...input.facts]
+    .filter((f) => {
+      const t = Date.parse(f.occurred_at);
+      return Number.isFinite(t) && t >= from && t <= to;
+    })
+    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
+  for (const f of sorted) {
+    count += 1;
+    const t = Date.parse(f.occurred_at);
+    const listened = toNum(f.listened_ms);
+    const key = f.audio_item_id ?? "__unknown__";
+    const g = groups.get(key);
+    if (!g) {
+      groups.set(key, {
+        id: f.audio_item_id ?? null,
+        startMs: t - listened,
+        lastMs: t,
+        listened,
+      });
+    } else {
+      g.startMs = Math.min(g.startMs, t - listened);
+      g.lastMs = Math.max(g.lastMs, t);
+      g.listened += listened;
+    }
+  }
+  const tracks: PlaybackReportTrack[] = [...groups.values()]
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((g) => ({
+      audioItemId: g.id,
+      title: (g.id && input.titles.get(g.id)) || "Трек без названия",
+      firstAt: new Date(g.startMs).toISOString(),
+      lastAt: new Date(g.lastMs).toISOString(),
+      listenedMs: g.listened,
+      coversT: g.startMs <= atMs && atMs <= g.lastMs,
+    }));
+  return {
+    atUtc: input.at.toISOString(),
+    fromUtc: new Date(from).toISOString(),
+    toUtc: new Date(to).toISOString(),
+    timezone: isValidTimeZone(input.timezone) ? input.timezone : "Europe/Moscow",
+    tracks,
+    factCount: count,
+  };
+}
