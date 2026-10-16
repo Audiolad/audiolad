@@ -138,13 +138,19 @@ export default function PracticeEmbedCard(props: Props) {
     // Narrow frames (<560px, partner mobile) keep the vertical card. Wide frames
     // (partner desktop) switch to the AudioLad desktop practice-hero layout:
     // square cover left, info + «Слушать» right, filling the frame height.
-    <main className="flex min-h-dvh items-start justify-center bg-transparent p-0 min-[560px]:h-dvh">
+    // The card always fills the frame exactly (h-dvh + overflow-hidden): on narrow frames the
+    // cover flexes to the space left by the text, so the document never overflows the iframe.
+    // An overflowing frame became a nested scroller and the card "jittered" under touch scroll.
+    <main
+      data-practice-embed-root="true"
+      className="flex h-dvh items-stretch justify-center overflow-hidden overscroll-none bg-transparent p-0"
+    >
       <article
         data-practice-embed="true"
         data-practice-embed-mode={props.mode}
-        className="w-full max-w-[420px] overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(36,19,63,0.12)] min-[560px]:grid min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7] min-[560px]:shadow-none"
+        className="flex h-full w-full max-w-[420px] flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(36,19,63,0.12)] min-[560px]:grid min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7] min-[560px]:shadow-none"
       >
-        <div className="relative aspect-square w-full overflow-hidden bg-[#efe7fb] min-[560px]:h-full min-[560px]:w-auto">
+        <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-[#efe7fb] min-[560px]:aspect-square min-[560px]:h-full min-[560px]:w-auto min-[560px]:flex-none">
           {props.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -156,13 +162,13 @@ export default function PracticeEmbedCard(props: Props) {
             />
           ) : null}
         </div>
-        <div className="px-5 pb-5 pt-5 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
+        <div className="shrink-0 px-5 pb-4 pt-4 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
           {props.typeLabel ? (
             <span className="inline-flex w-fit rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
               {props.typeLabel}
             </span>
           ) : null}
-          <h2 className="mt-3 text-[22px] font-semibold leading-tight text-[#25135c]">
+          <h2 className="mt-2 text-[22px] font-semibold leading-tight text-[#25135c]">
             {props.title}
           </h2>
           {props.subtitle ? (
@@ -171,7 +177,7 @@ export default function PracticeEmbedCard(props: Props) {
           {props.metaLine ? (
             <p className="mt-2 text-sm text-[#7d70a2]">{props.metaLine}</p>
           ) : null}
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-3 flex items-center gap-3 min-[560px]:flex-wrap" data-practice-embed-actions="true">
             {canPlayInline ? (
               <button
                 type="button"
@@ -197,9 +203,18 @@ export default function PracticeEmbedCard(props: Props) {
                 Слушать
               </a>
             )}
+            <a
+              href={props.practiceUrl}
+              target="_blank"
+              rel="noopener"
+              data-practice-embed-brand="true"
+              className="ml-auto text-xs text-[#9a8fb8] underline-offset-2 hover:underline min-[560px]:ml-0 min-[560px]:w-full"
+            >
+              Аудиолад
+            </a>
           </div>
           {canPlayInline && state !== "idle" ? (
-            <div className="mt-4" data-practice-embed-progress="true">
+            <div className="mt-3" data-practice-embed-progress="true">
               <input
                 type="range"
                 min={0}
@@ -220,11 +235,6 @@ export default function PracticeEmbedCard(props: Props) {
               </div>
             </div>
           ) : null}
-          <p className="mt-4 text-xs text-[#9a8fb8]">
-            <a href={props.practiceUrl} target="_blank" rel="noopener" className="text-inherit underline-offset-2 hover:underline">
-              Аудиолад
-            </a>
-          </p>
         </div>
         {canPlayInline ? (
           <audio

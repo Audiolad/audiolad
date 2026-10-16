@@ -74,3 +74,14 @@ console.log("practice-embed-unit: ok");
   assert.match(card, /min-\[560px\]:grid-cols-\[auto_minmax\(0,1fr\)\]/, "desktop card is horizontal");
   assert.match(card, /min-\[560px\]:shadow-none/, "desktop card has no clipped shadow");
 }
+
+// Partner mobile: card fills the iframe exactly (no nested scroll / jitter), «Аудиолад» sits in the button row.
+{
+  const card = await readFile(new URL("../src/components/embed/PracticeEmbedCard.tsx", import.meta.url), "utf8");
+  assert.match(card, /className="flex h-dvh [^"]*overflow-hidden/, "embed root is exactly frame-high and never scrolls");
+  assert.ok(!/min-h-dvh/.test(card), "no min-h-dvh: content must not outgrow the frame");
+  assert.match(card, /min-h-0 w-full flex-1[^"]*min-\[560px\]:aspect-square/, "narrow cover flexes, wide cover stays square");
+  const actions = card.slice(card.indexOf('data-practice-embed-actions'), card.indexOf('data-practice-embed-progress'));
+  assert.match(actions, /data-practice-embed-brand="true"[\s\S]*Аудиолад/, "brand label is in the «Слушать» row");
+  assert.match(actions, /ml-auto/, "brand label is right-aligned");
+}
