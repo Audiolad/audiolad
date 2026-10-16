@@ -2,9 +2,11 @@ import {
   buildPlaybackReport,
   clampWindowMinutes,
   isValidTimeZone,
+  rightsholdersFromRegistry,
   venueLocalToUtc,
   type PlaybackFactRow,
   type PlaybackReport,
+  type RegistryHolderPeriod,
 } from "@/lib/business-app/client-documents";
 import { queryPlaybackFacts } from "@/lib/business-app/playback-facts-query";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +21,8 @@ export type PlaybackReportResult =
   | { kind: "ok"; locationName: string; report: PlaybackReport };
 
 const MAX_FACTS = 2000;
+/** Above this many grant rows the answer may be truncated: treat as unavailable. */
+const MAX_REGISTRY_ROWS = 1000;
 
 /**
  * Read-only. Membership is checked with the user's session (RLS); facts are
@@ -95,10 +99,38 @@ export async function loadPlaybackReport(params: {
         }
       }
     }
+    // Rights holders come from the rights registry, never from hardcoded names.
+    // A failed registry read is reported as "unavailable", not as "no record".
+    let rightsholders = new Map<string, RegistryHolderPeriod[]>();
+    let registryUnavailable = false;
+    if (ids.length > 0) {
+      const { data: grants, error: grantsError } = await service
+        .from("music_rights_grants")
+        .select("audio_item_id, rightsholder_id, status, valid_from, valid_until")
+        .in("audio_item_id", ids)
+        .eq("status", "verified")
+        .eq("use_type", "business_background_playback")
+        .limit(MAX_REGISTRY_ROWS);
+      if (grantsError || (grants ?? []).length >= MAX_REGISTRY_ROWS) {
+        registryUnavailable = true;
+      } else {
+        const holderIds = [
+          ...new Set((grants ?? []).map((g) => g.rightsholder_id).filter((x): x is string => typeof x === "string")),
+        ];
+        if (holderIds.length > 0) {
+          const { data: holders, error: holdersError } = await service
+            .from("music_rightsholders")
+            .select("id, display_name")
+            .in("id", holderIds);
+          if (holdersError) registryUnavailable = true;
+          else rightsholders = rightsholdersFromRegistry(grants ?? [], holders ?? []);
+        }
+      }
+    }
     return {
       kind: "ok",
       locationName,
-      report: buildPlaybackReport({ at, windowMinutes, timezone, facts: rows, titles }),
+      report: buildPlaybackReport({ at, windowMinutes, timezone, facts: rows, titles, rightsholders, registryUnavailable }),
     };
   } catch {
     return { kind: "error", locationName, timezone };

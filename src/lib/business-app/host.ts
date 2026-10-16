@@ -41,7 +41,6 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/documents/b2b-terms": `${BUSINESS_SITE_PATH}/documents/b2b-terms`,
   "/documents/claims-procedure": `${BUSINESS_SITE_PATH}/documents/claims-procedure`,
   "/documents/claim-reply-kit": `${BUSINESS_SITE_PATH}/documents/claim-reply-kit`,
-  "/documents/rightsholder-link": `${BUSINESS_SITE_PATH}/documents/rightsholder-link`,
   "/team": `${BUSINESS_SITE_PATH}/team`,
   "/preferences": `${BUSINESS_SITE_PATH}/settings`,
   "/help": `${BUSINESS_SITE_PATH}/help`,

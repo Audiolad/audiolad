@@ -31,8 +31,11 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Документы
         </h1>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Действующие документы «АудиоЛад Бизнес». Правообладатель и оператор:{" "}
+          Действующие документы «АудиоЛад Бизнес». Оператор сервиса:{" "}
           <span data-testid="client-documents-requisites">{CLIENT_DOCUMENT_REQUISITES}</span>.
+        </p>
+        <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
+          Правообладатели треков указываются по данным реестра прав сервиса в отчёте «Что играло в заведении».
         </p>
         <ul className="mt-4 flex flex-col gap-3">
           {CLIENT_DOCUMENTS.map((doc) => (
@@ -126,15 +129,23 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                         <th>С</th>
                         <th>По</th>
                         <th>В указанное время</th>
+                        <th>Правообладатель по реестру прав</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {result.report.tracks.map((t) => (
-                        <tr key={`${t.audioItemId}-${t.firstAt}`}>
+                      {result.report.tracks.map((t, i) => (
+                        <tr key={`${t.audioItemId}-${t.firstAt}-${i}`}>
                           <td>{t.title}</td>
                           <td>{formatVenueTime(t.firstAt, result.report.timezone)}</td>
                           <td>{formatVenueTime(t.lastAt, result.report.timezone)}</td>
                           <td>{t.coversT ? "да" : ""}</td>
+                          <td>
+                            {result.report.registryUnavailable
+                              ? "сведения реестра временно недоступны"
+                              : t.rightsholders.length > 0
+                                ? t.rightsholders.join(", ")
+                                : "нет записи в реестре"}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

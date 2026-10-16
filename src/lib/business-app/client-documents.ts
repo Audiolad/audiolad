@@ -6,6 +6,7 @@
  */
 
 export const CLIENT_DOCUMENT_EDITION_LABEL = "Редакция от 16.10.2026";
+/** Requisites of the service operator (not a declaration of ownership of third-party music). */
 export const CLIENT_DOCUMENT_REQUISITES =
   "ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237";
 
@@ -53,15 +54,6 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
     status: "approved",
     summary: "Не отправляйте ответ без согласования с АудиоЛад.",
   },
-  {
-    id: "rightsholder-link",
-    title: "Правообладатель каталогов «Аурафон» и «Джаз Релакс»",
-    version: "r4-2026-10-16",
-    versionDate: "2026-10-16",
-    status: "approved",
-    summary:
-      "«Аурафон» и «Джаз Релакс» — творческие псевдонимы. Правообладатель: ИП Петров Сергей Сергеевич.",
-  },
 ] as const;
 
 /** Browser-visible href of the full document text on business.audiolad.ru. */
@@ -93,6 +85,8 @@ export type PlaybackReportTrack = {
   listenedMs: number;
   /** True if the requested instant T is inside [first segment start, last fact]. */
   coversT: boolean;
+  /** Rights holders from the rights registry (verified grants), never hardcoded. */
+  rightsholders: string[];
 };
 
 export type PlaybackReport = {
@@ -102,6 +96,7 @@ export type PlaybackReport = {
   timezone: string;
   tracks: PlaybackReportTrack[];
   factCount: number;
+  registryUnavailable: boolean;
 };
 
 function toNum(v: unknown): number {
@@ -185,42 +180,35 @@ export function buildPlaybackReport(input: {
   timezone: string;
   facts: readonly PlaybackFactRow[];
   titles: ReadonlyMap<string, string>;
+  rightsholders?: ReadonlyMap<string, readonly RegistryHolderPeriod[]>;
+  /** True when the registry could not be read: holders are unknown, not absent. */
+  registryUnavailable?: boolean;
 }): PlaybackReport {
   const w = clampWindowMinutes(input.windowMinutes) * 60_000;
   const atMs = input.at.getTime();
   const from = atMs - w;
   const to = atMs + w;
-  const groups = new Map<
-    string,
-    { id: string | null; startMs: number; lastMs: number; listened: number }
-  >();
   let count = 0;
-  const sorted = [...input.facts]
-    .filter((f) => {
-      const t = Date.parse(f.occurred_at);
-      return Number.isFinite(t) && t >= from && t <= to;
-    })
-    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
-  for (const f of sorted) {
-    count += 1;
+  const byTrack = new Map<string, { id: string | null; spans: { s: number; e: number }[] }>();
+  for (const f of input.facts) {
     const t = Date.parse(f.occurred_at);
-    const listened = toNum(f.listened_ms);
+    if (!Number.isFinite(t) || t < from || t > to) continue;
+    count += 1;
     const key = f.audio_item_id ?? "__unknown__";
-    const g = groups.get(key);
-    if (!g) {
-      groups.set(key, {
-        id: f.audio_item_id ?? null,
-        startMs: t - listened,
-        lastMs: t,
-        listened,
-      });
-    } else {
-      g.startMs = Math.min(g.startMs, t - listened);
-      g.lastMs = Math.max(g.lastMs, t);
-      g.listened += listened;
-    }
+    const entry = byTrack.get(key) ?? { id: f.audio_item_id ?? null, spans: [] };
+    entry.spans.push({ s: t - toNum(f.listened_ms), e: t });
+    byTrack.set(key, entry);
   }
-  const tracks: PlaybackReportTrack[] = [...groups.values()]
+  // Holder is matched to the playback time, not to the search instant: per track,
+  // time is swept over elementary segments cut at fact edges and registry period
+  // boundaries, so a change of holder or a gap without a registry record (even
+  // between facts) always starts a separate row. Overlapping facts (several players)
+  // are aggregated, never duplicated.
+  const runs: Run[] = [];
+  for (const { id, spans } of byTrack.values()) {
+    runs.push(...sweepTrack(id, spans, id ? input.rightsholders?.get(id) : undefined));
+  }
+  const tracks: PlaybackReportTrack[] = [...runs]
     .sort((a, b) => a.startMs - b.startMs)
     .map((g) => ({
       audioItemId: g.id,
@@ -228,7 +216,11 @@ export function buildPlaybackReport(input: {
       firstAt: new Date(g.startMs).toISOString(),
       lastAt: new Date(g.lastMs).toISOString(),
       listenedMs: g.listened,
-      coversT: g.startMs <= atMs && atMs <= g.lastMs,
+      coversT:
+        g.startMs <= atMs &&
+        (atMs < g.lastMs ||
+          (atMs === g.lastMs && !runs.some((o) => o !== g && o.id === g.id && o.startMs === atMs))),
+      rightsholders: g.holders,
     }));
   return {
     atUtc: input.at.toISOString(),
@@ -237,5 +229,102 @@ export function buildPlaybackReport(input: {
     timezone: isValidTimeZone(input.timezone) ? input.timezone : "Europe/Moscow",
     tracks,
     factCount: count,
+    registryUnavailable: input.registryUnavailable === true,
   };
+}
+
+type Run = { id: string | null; startMs: number; lastMs: number; listened: number; holders: string[]; sig: string };
+
+function sweepTrack(
+  id: string | null,
+  spans: readonly { s: number; e: number }[],
+  periods: readonly RegistryHolderPeriod[] | undefined,
+): Run[] {
+  if (spans.length === 0) return [];
+  const lo = Math.min(...spans.map((x) => x.s));
+  const hi = Math.max(...spans.map((x) => x.e));
+  const cuts = new Set<number>();
+  for (const x of spans) {
+    cuts.add(x.s);
+    cuts.add(x.e);
+  }
+  for (const p of periods ?? []) {
+    if (p.fromMs > lo && p.fromMs < hi) cuts.add(p.fromMs);
+    if (p.untilMs !== null && p.untilMs > lo && p.untilMs < hi) cuts.add(p.untilMs);
+  }
+  const pts = [...cuts].sort((x, y) => x - y);
+  const out: Run[] = [];
+  let cur: Run | null = null;
+  const visit = (from: number, to: number, holders: string[], covered: number) => {
+    const sig = holders.join("\u0001");
+    if (cur && cur.sig === sig) {
+      if (covered > 0 || to === from) cur.lastMs = Math.max(cur.lastMs, to);
+      cur.listened += covered * (to - from);
+      return;
+    }
+    if (covered === 0) {
+      cur = null; // gap with a different holder set: the next covered time starts a new row
+      return;
+    }
+    cur = { id, startMs: from, lastMs: to, listened: covered * (to - from), holders, sig };
+    out.push(cur);
+  };
+  for (let i = 0; i < pts.length; i += 1) {
+    const p = pts[i];
+    // Zero-length facts (no listened_ms) are points.
+    if (spans.some((x) => x.s === p && x.e === p)) visit(p, p, holdersAt(periods, p), 1);
+    if (i + 1 < pts.length) {
+      const q = pts[i + 1];
+      const covered = spans.filter((x) => x.s <= p && x.e >= q && x.e > x.s).length;
+      visit(p, q, holdersAt(periods, (p + q) / 2), covered);
+    }
+  }
+  // A row ends at its last covered instant.
+  return out;
+}
+
+export type RegistryHolderPeriod = { name: string; fromMs: number; untilMs: number | null };
+
+/**
+ * Rights holder periods per track from registry rows (music_rights_grants
+ * joined to music_rightsholders): verified, business background playback.
+ * Matching to playback time happens per fact in buildPlaybackReport.
+ */
+export function rightsholdersFromRegistry(
+  grants: readonly {
+    audio_item_id: string | null;
+    rightsholder_id: string | null;
+    status?: string | null;
+    valid_from?: string | null;
+    valid_until?: string | null;
+  }[],
+  holders: readonly { id: string; display_name: string | null }[],
+): Map<string, RegistryHolderPeriod[]> {
+  const names = new Map(holders.map((h) => [h.id, (h.display_name ?? "").trim()]));
+  const out = new Map<string, RegistryHolderPeriod[]>();
+  for (const g of grants) {
+    if (!g.audio_item_id || !g.rightsholder_id) continue;
+    if (g.status && g.status !== "verified") continue;
+    const name = names.get(g.rightsholder_id);
+    if (!name) continue;
+    const fromMs = g.valid_from ? Date.parse(g.valid_from) : Number.NEGATIVE_INFINITY;
+    const untilMs = g.valid_until ? Date.parse(g.valid_until) : null;
+    const list = out.get(g.audio_item_id) ?? [];
+    list.push({ name, fromMs: Number.isNaN(fromMs) ? Number.NEGATIVE_INFINITY : fromMs, untilMs: untilMs !== null && Number.isNaN(untilMs) ? null : untilMs });
+    out.set(g.audio_item_id, list);
+  }
+  return out;
+}
+
+/** Holders whose registry period overlaps the playback interval [fromMs, toMs]. */
+export function holdersAt(
+  periods: readonly RegistryHolderPeriod[] | undefined,
+  toMs: number,
+  fromMs: number = toMs,
+): string[] {
+  const res: string[] = [];
+  for (const p of periods ?? []) {
+    if (p.fromMs <= toMs && (p.untilMs === null || fromMs < p.untilMs) && !res.includes(p.name)) res.push(p.name);
+  }
+  return res.sort((a, b) => a.localeCompare(b, "ru"));
 }
