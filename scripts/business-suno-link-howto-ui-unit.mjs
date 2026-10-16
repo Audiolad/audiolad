@@ -19,3 +19,12 @@ assert.equal(alts.length, 2);
 for (const alt of alts) assert.match(alt, /[А-Яа-яЁё]/, "alt must be Russian");
 assert.match(form, /provider === "suno" \? <SunoLinkHowTo \/>/);
 console.log("business-suno-link-howto-ui-unit: ok");
+
+// 8d9cd0af (Sergey 16:27): intro copy — catalogue disclaimer wording.
+{
+  const { readFileSync } = await import('node:fs');
+  const form = readFileSync(new URL('../src/components/author-dashboard/business/RightsholderVerificationForm.tsx', import.meta.url), 'utf8');
+  if (!form.includes('Это не подтверждает права на весь каталог. При необходимости любой конкретный трек может быть проверен отдельно.')) throw new Error('new intro copy missing');
+  if (form.includes('каждый трек проверяется отдельно')) throw new Error('old intro copy still present');
+  console.log('business-suno-link-howto-ui-unit: intro copy ok');
+}

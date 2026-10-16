@@ -155,7 +155,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
     <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold text-neutral-900">Подтверждение правообладателя</h2>
       <p className="mt-1 text-sm text-neutral-600">
-        Один пример на весь аккаунт: выберите один свой опубликованный продукт и трек и покажите, как он создан. Это не подтверждает права на весь каталог — каждый трек проверяется отдельно.
+        Один пример на весь аккаунт: выберите один свой опубликованный продукт и трек и покажите, как он создан. Это не подтверждает права на весь каталог. При необходимости любой конкретный трек может быть проверен отдельно.
       </p>
 
       {status ? (
