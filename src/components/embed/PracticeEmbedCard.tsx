@@ -132,10 +132,49 @@ export default function PracticeEmbedCard(props: Props) {
     void audio.play().catch(() => setState("paused"));
   }, [loadSignedUrl]);
 
+  // Report the card's natural height to the partner page so it can size the iframe to fit the
+  // full square cover + text without clipping (and without an inner scroller). `wide` tells the
+  // partner the frame is in the >=560px horizontal layout, which fills the frame height: there the
+  // partner must drop any measured height and use its own. The partner may ask for the current
+  // value at any time (`audiolad:embed-height-request`), so a message sent before its listener
+  // was ready is not lost. Partners that ignore the message keep their fixed frame height.
+  const articleRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = articleRef.current;
+    if (!el || window.parent === window) return;
+    let last = "";
+    const post = (force = false) => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
+      const wide = window.innerWidth >= 560;
+      const key = `${height}:${wide}`;
+      if (height <= 0 || (!force && key === last)) return;
+      last = key;
+      window.parent.postMessage({ type: "audiolad:embed-height", height, wide }, "*");
+    };
+    const onResize = () => post();
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent) return;
+      const data = event.data as { type?: unknown } | null;
+      if (data && data.type === "audiolad:embed-height-request") post(true);
+    };
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
+    observer?.observe(el);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("message", onMessage);
+    post(true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("message", onMessage);
+    };
+  }, []);
+
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
   return (
-    // Narrow frames (<560px, partner mobile) keep the vertical card. Wide frames
+    // Narrow frames (<560px, partner mobile) keep the vertical card with a SQUARE cover shown in
+    // full (never cropped, as on the audiolad.ru product card); the card has its natural height
+    // and reports it to the parent (audiolad:embed-height) so the partner frame fits it. Wide frames
     // (partner desktop) switch to the AudioLad desktop practice-hero layout:
     // square cover left, info + «Слушать» right, filling the frame height.
     // The card always fills the frame exactly (h-dvh + overflow-hidden): on narrow frames the
@@ -156,9 +195,11 @@ export default function PracticeEmbedCard(props: Props) {
       <article
         data-practice-embed="true"
         data-practice-embed-mode={props.mode}
-        className="flex h-full w-full max-w-[420px] flex-col overflow-hidden rounded-[28px] bg-white shadow-none min-[560px]:grid min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7]"
+        ref={articleRef}
+        className="flex h-auto w-full max-w-[420px] flex-col self-start overflow-hidden rounded-[28px] bg-white shadow-none min-[560px]:grid min-[560px]:self-stretch min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7]"
       >
-        <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-[#efe7fb] min-[560px]:aspect-square min-[560px]:h-full min-[560px]:w-auto min-[560px]:flex-none">
+        <div data-practice-embed-cover="true"
+          className="relative aspect-square w-full shrink-0 overflow-hidden bg-[#efe7fb] min-[560px]:aspect-square min-[560px]:h-full min-[560px]:w-auto min-[560px]:flex-none">
           {props.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
