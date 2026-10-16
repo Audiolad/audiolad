@@ -23,7 +23,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
     title: "Лицензия на публичное исполнение музыки в заведении",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary:
@@ -32,7 +32,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "b2b-terms",
     title: "Условия лицензирования музыки для бизнеса",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary: "Раздел оферты «АудиоЛад Бизнес»: что разрешено, сроки, учёт, РАО и ВОИС.",
@@ -40,7 +40,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "claims-procedure",
     title: "Порядок защиты клиента при претензиях РАО, ВОИС и иных лиц",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary:
@@ -49,7 +49,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "claim-reply-kit",
     title: "Образец ответа на претензию и перечень документов",
-    version: "r4-2026-10-16",
+    version: "r5-2026-10-16",
     versionDate: "2026-10-16",
     status: "approved",
     summary: "Не отправляйте ответ без согласования с АудиоЛад.",

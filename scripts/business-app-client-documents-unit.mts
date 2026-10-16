@@ -15,7 +15,7 @@ import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query
 assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r4-2026-10-16");
+  assert.equal(d.version, "r5-2026-10-16");
   assert.doesNotMatch(d.version, /draft/);
 }
 assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 16.10.2026");

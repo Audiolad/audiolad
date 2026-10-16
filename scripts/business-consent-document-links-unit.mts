@@ -29,7 +29,7 @@ assert.equal(documentEditionLabel(rights), "Редакция от 16.10.2026");
 assert.equal(documentEditionLabel({ date: "2026-10-14", status: "draft" }), "Редакция от 14.10.2026, черновик");
 for (const d of [terms, rights]) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r4-2026-10-16");
+  assert.equal(d.version, "r5-2026-10-16");
   // Final edition: no draft / waiting-for-lawyer marks.
   assert.doesNotMatch(d.markdown, /Черновик, требует проверки юриста|До него текст|проект r2|проект v3|не подписан\)/);
   // Requisites filled from published /requisites; passport and address never published.
