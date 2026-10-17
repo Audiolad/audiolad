@@ -96,4 +96,14 @@ assert.match(sql, /AT TIME ZONE 'Europe\/Moscow'/);
 assert.doesNotMatch(sql, /\b(DROP|ALTER\s+TABLE\s+public\.(practices|authors|audio_items|author_members)|DELETE|TRUNCATE)\b/i, "additive only");
 assert.doesNotMatch(sql, /GRANT[^;]*TO\s+(anon|authenticated)/i);
 
+// Placement: the block lives in the admin statistics section (/admin «Обзор»), never on the ИИ-компания board.
+const overviewPage = readFileSync("src/app/(platform)/admin/page.tsx", "utf8");
+const aiCompanyPage = readFileSync("src/app/(platform)/admin/ai-company/page.tsx", "utf8");
+assert.match(overviewPage, /<Suspense fallback=\{<EcompanyCatalogStatsFallback \/>\}>\s*<EcompanyCatalogStatsSection \/>/, "stats render on /admin inside Suspense");
+assert.doesNotMatch(aiCompanyPage, /EcompanyCatalogStats/, "stats are not rendered on the ИИ-компания board");
+const pagesUsingStats = ["src/app/(platform)/admin/page.tsx", "src/app/(platform)/admin/ai-company/page.tsx"].filter((f) =>
+  /<EcompanyCatalogStatsSection/.test(readFileSync(f, "utf8")),
+);
+assert.deepEqual(pagesUsingStats, ["src/app/(platform)/admin/page.tsx"], "rendered exactly once, no duplication");
+
 console.log("ecompany catalog stats unit: OK");

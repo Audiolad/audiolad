@@ -6,6 +6,10 @@ import AdminSectionError from "@/components/admin/AdminSectionError";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
 import AuthorApplicationsAttentionCard from "@/components/admin/AuthorApplicationsAttentionCard";
 import CommercialApplicationsAttentionCard from "@/components/admin/CommercialApplicationsAttentionCard";
+import {
+  EcompanyCatalogStatsFallback,
+  EcompanyCatalogStatsSection,
+} from "@/components/admin/EcompanyCatalogStats";
 import { getAdminAnalyticsSummaryBundle } from "@/lib/admin/analytics-queries";
 import { getCachedAdminAuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention-cache";
 import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
@@ -134,6 +138,11 @@ export default async function AdminOverviewPage({
           />
         )}
       </section>
+
+      {/* c353a4b5: статистика каталога АудиоЛада живёт в разделе статистики, не на табло ИИ-компании. */}
+      <Suspense fallback={<EcompanyCatalogStatsFallback />}>
+        <EcompanyCatalogStatsSection />
+      </Suspense>
     </div>
   );
 }
