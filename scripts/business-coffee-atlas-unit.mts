@@ -18,6 +18,7 @@ import {
   COFFEE_ATLAS_PDF_PATH,
 } from "../src/lib/business/coffee-atlas/constants";
 import {
+  buildCoffeeAtlasMusic,
   COFFEE_ATLAS_MAX_TRACKS_PER_SHOP,
   COFFEE_ATLAS_MUSIC,
   getCoffeeAtlasTrackRefs,
@@ -122,6 +123,49 @@ assert.match(listen, /скоро появится/, "honest empty state");
 assert.doesNotMatch(listen, /ariaLabel=/, "keeps the player's dynamic «Слушать» / «Пауза» label");
 const loader = read("src/lib/business/coffee-atlas/load-music.ts");
 assert.match(loader, /getPublishedCatalogProducts/, "resolves against the published catalogue");
+assert.match(loader, /loadCatalogPlaySession/, "checks playability with the /api/catalog/play loader");
+assert.doesNotMatch(loader, /\.(insert|update|upsert|delete|rpc)\(/, "loader is read-only");
+
+// --- loader: only playable examples, failures hide examples ---
+const allPublished = Object.values(COFFEE_ATLAS_MUSIC)
+  .flat()
+  .map((ref) => ({
+    id: `${ref.authorSlug}/${ref.productSlug}`,
+    title: ref.productSlug,
+    authorName: "Jazz Relax",
+    authorSlug: ref.authorSlug,
+    slug: ref.productSlug,
+    href: `/practice/${ref.authorSlug}/${ref.productSlug}`,
+    coverUrl: null,
+    coverImage: null,
+    updatedAt: null,
+    format: "music",
+    audioCount: 1,
+  }));
+const checked: string[] = [];
+const playableBuilt = await buildCoffeeAtlasMusic({
+  loadPublishedProducts: async () => allPublished,
+  isPlayable: async (track) => {
+    checked.push(track.id);
+    if (track.slug === "dzhaz-dlya-raboty") throw new Error("storage down");
+    return track.slug !== "italyanskiy-dzhaz";
+  },
+});
+assert.deepEqual(playableBuilt["caffe-florian"], [], "published but unplayable track is hidden");
+assert.deepEqual(playableBuilt["starbucks-reserve-shanghai"], [], "play-check failure hides the example");
+assert.equal(playableBuilt["fuglen-tokyo"]?.length, 2, "playable examples stay");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.slug, "dzhaz-launzh");
+assert.equal(new Set(checked).size, checked.length, "each track is checked once");
+assert.deepEqual(
+  await buildCoffeeAtlasMusic({
+    loadPublishedProducts: async () => {
+      throw new Error("catalogue down");
+    },
+    isPlayable: async () => true,
+  }),
+  {},
+  "catalogue failure → no examples",
+);
 
 // --- CTA: existing guest path only ---
 assert.equal(COFFEE_ATLAS_CTA_LABEL, "Подобрать звучание моей кофейни");

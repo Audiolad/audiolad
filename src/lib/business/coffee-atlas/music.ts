@@ -115,3 +115,57 @@ export function resolveCoffeeAtlasTracks(
 
   return resolved;
 }
+
+export type CoffeeAtlasMusicDeps = {
+  /** Published music catalogue as the guest sees it. */
+  loadPublishedProducts: () => Promise<readonly CoffeeAtlasCatalogProduct[]>;
+  /**
+   * Same check the guest «Слушать» button triggers (`/api/catalog/play`):
+   * true only when the existing player can actually start this track.
+   */
+  isPlayable: (track: CoffeeAtlasTrack) => Promise<boolean>;
+};
+
+/**
+ * Build shop → playable examples. A track is shown only when it is published AND the
+ * existing player can start it; any failure (catalogue, storage, play session) hides the
+ * example instead of rendering a button that would not play.
+ */
+export async function buildCoffeeAtlasMusic(
+  deps: CoffeeAtlasMusicDeps,
+): Promise<Record<string, CoffeeAtlasTrack[]>> {
+  let products: readonly CoffeeAtlasCatalogProduct[];
+  try {
+    products = await deps.loadPublishedProducts();
+  } catch {
+    return {};
+  }
+
+  const resolvedByShop = Object.keys(COFFEE_ATLAS_MUSIC).map(
+    (shopSlug) =>
+      [shopSlug, resolveCoffeeAtlasTracks(getCoffeeAtlasTrackRefs(shopSlug), products)] as const,
+  );
+
+  const playableById = new Map<string, Promise<boolean>>();
+  const checkPlayable = (track: CoffeeAtlasTrack) => {
+    let pending = playableById.get(track.id);
+    if (!pending) {
+      pending = deps.isPlayable(track).then(
+        (ok) => ok === true,
+        () => false,
+      );
+      playableById.set(track.id, pending);
+    }
+    return pending;
+  };
+
+  const result: Record<string, CoffeeAtlasTrack[]> = {};
+  await Promise.all(
+    resolvedByShop.map(async ([shopSlug, tracks]) => {
+      const flags = await Promise.all(tracks.map(checkPlayable));
+      result[shopSlug] = tracks.filter((_, index) => flags[index]);
+    }),
+  );
+
+  return result;
+}
