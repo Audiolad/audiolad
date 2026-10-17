@@ -181,13 +181,51 @@ const shopView = read("src/components/business/coffee-atlas/CoffeeAtlasShopView.
 for (const [name, source] of [["overview", overview], ["shop", shopView]] as const) {
   assert.match(source, /<CoffeeAtlasOffer /, `${name}: offer at the bottom`);
   assert.match(source, /<CoffeeAtlasHeader/, `${name}: shop switcher`);
-  assert.match(source, /CoffeeAtlasPdfActions|COFFEE_ATLAS_PDF_PATH/, `${name}: PDF access`);
   assert.doesNotMatch(source, /гостев\w* панел/i, `${name}: no invented guest panel step`);
 }
 assert.match(shopView, /previous\.slug[\s\S]*next\.slug/, "back / next navigation");
 const chrome = read("src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx");
-assert.match(chrome, /business_atlas_pdf_downloaded[\s\S]*download=/, "PDF download link");
-assert.match(chrome, /newTab/, "PDF opens in a new tab");
+
+// --- PDF: exactly ONE control, in the header; page bodies have no PDF buttons ---
+assert.equal(COFFEE_ATLAS_PDF_PATH, "/business/atlas-kofeen/atlas-10-kofeen-mira.pdf");
+const headerStart = chrome.indexOf("export function CoffeeAtlasHeader");
+assert.ok(headerStart >= 0, "header component exists");
+const headerEnd = chrome.indexOf("\nexport function ", headerStart + 1);
+const headerSource = chrome.slice(headerStart, headerEnd);
+const restOfChrome = chrome.slice(0, headerStart) + chrome.slice(headerEnd);
+assert.equal(headerSource.match(/COFFEE_ATLAS_PDF_PATH/g)?.length ?? 0, 1, "header: exactly one PDF link");
+assert.equal(headerSource.match(/Скачать PDF-атлас/g)?.length ?? 0, 1, "header: one «Скачать PDF-атлас» pill");
+assert.match(
+  headerSource,
+  /href=\{COFFEE_ATLAS_PDF_PATH\}[\s\S]{0,120}goal="business_atlas_pdf_downloaded"[\s\S]{0,120}download=\{COFFEE_ATLAS_PDF_DOWNLOAD_NAME\}[\s\S]{0,80}className="atlas-header__pdf"/,
+  "header pill downloads the PDF",
+);
+assert.ok(
+  headerSource.indexOf("Скачать PDF-атлас") < headerSource.indexOf("atlas-header__back"),
+  "header pill sits next to the «АудиоЛад Бизнес» link",
+);
+assert.doesNotMatch(chrome, /CoffeeAtlasPdfActions/, "no shared PDF button group left");
+const PDF_BUTTON = /COFFEE_ATLAS_PDF_PATH|\.pdf\b|business_atlas_pdf_|Открыть PDF|Скачать PDF|PDF-атласе|Подарок:/;
+for (const [name, source] of [
+  ["overview", overview],
+  ["shop", shopView],
+  ["listen", read("src/components/business/coffee-atlas/CoffeeAtlasListen.tsx")],
+  ["chrome outside header (switcher/offer/footer)", restOfChrome.replace(/^import[\s\S]*?;\n/gm, "")],
+] as const) {
+  assert.doesNotMatch(source, PDF_BUTTON, `${name}: no PDF buttons in the page body`);
+}
+assert.match(overview, /Начать путешествие/, "overview hero keeps «Начать путешествие»");
+assert.match(shopView, /href="#listen"[\s\S]{0,80}Послушать атмосферу/, "shop hero keeps «Послушать атмосферу»");
+assert.match(shopView, /id="listen"/, "listen anchor exists");
+assert.match(shopView, /Из PDF-атласа/, "PDF page images block stays");
+assert.match(shopView, /\$\{shop\.slug\}-\$\{index \+ 1\}\.webp/, "PDF page images (WebP) stay");
+const css = read("src/components/business/coffee-atlas/coffee-atlas.css");
+assert.match(css, /#listen[^{]*\{[^}]*scroll-margin-top/, "#listen is not hidden under the sticky header");
+assert.match(
+  read("src/components/business/coffee-atlas/CoffeeAtlasSwitcherFocus.tsx"),
+  /ResizeObserver[\s\S]*--atlas-sticky-offset|--atlas-sticky-offset[\s\S]*ResizeObserver/,
+  "sticky header height is measured for the #listen offset",
+);
 
 // --- SEO + analytics ---
 assert.equal(COFFEE_ATLAS_PATH, "/b/atlas-kofeen");

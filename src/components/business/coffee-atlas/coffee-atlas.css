@@ -246,19 +246,6 @@
   color: #1b130b;
 }
 
-.atlas-btn--ghost {
-  border: 1.5px solid currentColor;
-  color: inherit;
-  background: transparent;
-}
-
-.atlas-btn--glass {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(6px);
-}
-
 .atlas-btn--wide {
   width: 100%;
 }
@@ -282,6 +269,7 @@
 }
 
 .atlas-header__brand {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -327,10 +315,60 @@
   text-decoration: none;
 }
 
-.atlas-header__pdf {
-  padding: 8px 14px;
+/* The only PDF control of the atlas: large pill «Скачать PDF-атлас». */
+.atlas-header__actions .atlas-header__pdf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 9px 16px;
   border-radius: 999px;
-  border: 1px solid var(--atlas-line);
+  background: var(--atlas-accent);
+  color: var(--atlas-accent-ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.atlas-header__actions .atlas-header__pdf:hover {
+  transform: translateY(-1px);
+}
+
+.atlas-header__pdf:focus-visible {
+  outline: 3px solid var(--atlas-gold);
+  outline-offset: 3px;
+}
+
+/* Phones (390px): brand + pill fit on one bar without horizontal overflow. */
+@media (max-width: 639px) {
+  .atlas-header__bar {
+    gap: 10px;
+  }
+  .atlas-header__brand {
+    gap: 8px;
+    font-size: 1rem;
+  }
+  .atlas-header__mark {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+  }
+  .atlas-header__actions .atlas-header__pdf {
+    padding: 9px 14px;
+    font-size: 0.86rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .atlas-header__actions .atlas-header__pdf {
+    min-height: 46px;
+    padding: 11px 24px;
+    font-size: 1rem;
+  }
 }
 
 .atlas-header__back {
@@ -467,26 +505,6 @@
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 26px;
-}
-
-.atlas-pdf-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.atlas-pdf-actions--dark .atlas-btn--ghost {
-  color: #f6ead7;
-}
-
-.atlas-section--slides .atlas-pdf-actions {
-  margin-top: 26px;
-}
-
-.atlas-cover__gift {
-  margin: 18px 0 0;
-  font-size: 0.98rem;
-  color: rgba(246, 234, 215, 0.75);
 }
 
 .atlas-cover__visual {
@@ -876,6 +894,21 @@
 }
 
 /* ---------- sound ---------- */
+/* In-page anchors (#listen from «Послушать атмосферу», #content) land below the
+   sticky header (bar + coffee-shop switcher) instead of under it. */
+.coffee-atlas #listen,
+.coffee-atlas #content {
+  scroll-margin-top: var(--atlas-sticky-offset, 126px);
+}
+
+/* Static fallback until the client measures the header (see CoffeeAtlasSwitcherFocus). */
+@media (min-width: 1100px) {
+  .coffee-atlas #listen,
+  .coffee-atlas #content {
+    scroll-margin-top: var(--atlas-sticky-offset, 176px);
+  }
+}
+
 .atlas-section--sound {
   background: var(--atlas-deep);
   color: var(--atlas-deep-ink);

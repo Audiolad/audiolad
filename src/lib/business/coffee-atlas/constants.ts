@@ -20,10 +20,9 @@ export function coffeeAtlasAsset(file: string): string {
   return `${COFFEE_ATLAS_ASSET_DIR}/${file}`;
 }
 
-/** The full PDF atlas — a gift for guests (open in a new tab or download). */
+/** The full PDF atlas — downloaded only from the header pill «Скачать PDF-атлас». */
 export const COFFEE_ATLAS_PDF_PATH = coffeeAtlasAsset("atlas-10-kofeen-mira.pdf");
 export const COFFEE_ATLAS_PDF_DOWNLOAD_NAME = "Атлас-10-кофеен-мира-АудиоЛад.pdf";
-export const COFFEE_ATLAS_PDF_PAGES = 33;
 
 /**
  * «Подобрать звучание моей кофейни» leads ONLY into the existing guest path of
