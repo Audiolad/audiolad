@@ -108,6 +108,27 @@ export default async function AdminBusinessVerificationPage({
       : Promise.resolve({ data: [] as never[] }),
     service.from("music_rightsholders").select("id, display_name, entity_type").eq("status", "active").order("display_name").limit(200),
   ]);
+  const [{ data: catalog }, { data: recentSuspensions }] = await Promise.all([
+    service
+      .from("practices")
+      .select("id, title, authors(name)")
+      .eq("status", "published")
+      .eq("product_kind", "music")
+      .order("title")
+      .limit(1000),
+    supabase
+      .from("business_onboarding_suspensions")
+      .select("id, product_id, audio_item_id, actor_user_id, reason, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+  const catalogOptions = ((catalog ?? []) as { id: string; title: string | null; authors: { name: string | null } | { name: string | null }[] | null }[])
+    .map((p) => {
+      const author = Array.isArray(p.authors) ? p.authors[0] : p.authors;
+      return { id: p.id, label: `${author?.name ?? "—"} — ${p.title ?? "Без названия"}` };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  const catalogLabel = new Map(catalogOptions.map((o) => [o.id, o.label]));
 
   const productById = new Map(
     ((products ?? []) as { id: string; title: string | null; authors: { name: string | null; slug: string | null } | { name: string | null; slug: string | null }[] | null }[]).map((p) => {
@@ -291,6 +312,45 @@ export default async function AdminBusinessVerificationPage({
           })}
         </ul>
       )}
+
+      <section aria-labelledby="admin-business-suspend-heading" className="mt-8 rounded-[22px] border border-[#e4d7f4] bg-white p-5">
+        <h3 id="admin-business-suspend-heading" className="text-[17px] font-semibold">Приостановить продукт в АудиоЛад Бизнес</h3>
+        <p className="mt-1 text-sm text-[#796ba0]">
+          Приостановка запрещает подключать продукт (или один трек) к Бизнесу. Запись необратима и хранится в журнале.
+          Свои продукты может приостановить только владелец платформы.
+        </p>
+        <form action={suspendBusinessProductAction} className="mt-3 grid gap-2 sm:grid-cols-2">
+          <input type="hidden" name="filter" value={filter} />
+          <label className="text-sm sm:col-span-2">
+            <span className="block font-semibold">Продукт</span>
+            <select name="productId" required className="mt-1 w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" defaultValue="">
+              <option value="" disabled>Выберите продукт</option>
+              {catalogOptions.map((o) => (<option key={o.id} value={o.id}>{o.label}</option>))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="block font-semibold">ID трека (необязательно)</span>
+            <input name="audioItemId" pattern="[0-9a-fA-F-]{36}" placeholder="Пусто — весь продукт" className="mt-1 w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" />
+          </label>
+          <label className="text-sm">
+            <span className="block font-semibold">Причина (обязательно)</span>
+            <input name="reason" required maxLength={2000} className="mt-1 w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" />
+          </label>
+          <div className="sm:col-span-2">
+            <button type="submit" className="rounded-full border border-[#b34f63] px-4 py-2 text-sm font-semibold text-[#b34f63]">Приостановить</button>
+          </div>
+        </form>
+        {(recentSuspensions ?? []).length ? (
+          <ul data-testid="business-recent-suspensions" className="mt-4 space-y-1 text-xs text-[#796ba0]">
+            {((recentSuspensions ?? []) as { id: string; product_id: string; audio_item_id: string | null; actor_user_id: string; reason: string; created_at: string }[]).map((s) => (
+              <li key={s.id}>
+                {formatMsk(s.created_at)} — {catalogLabel.get(s.product_id) ?? productById.get(s.product_id)?.title ?? s.product_id}
+                {s.audio_item_id ? " (один трек)" : ""}{s.actor_user_id === session.userId ? " — вы" : ""}: {s.reason}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
     </section>
   );
 }
