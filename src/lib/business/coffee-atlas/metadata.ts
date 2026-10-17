@@ -49,7 +49,7 @@ export function buildCoffeeAtlasShopTitle(shop: CoffeeAtlasShop): string {
 }
 
 export function buildCoffeeAtlasShopDescription(shop: CoffeeAtlasShop): string {
-  return `${shop.name} (${shop.city}, ${shop.country}) — ${shop.storyTitle.toLowerCase()}. ${shop.soundIdea}`.slice(
+  return `${shop.name} (${shop.city}, ${shop.country}) – ${shop.storyTitle.toLowerCase()}. ${shop.soundIdea}`.slice(
     0,
     300,
   );
