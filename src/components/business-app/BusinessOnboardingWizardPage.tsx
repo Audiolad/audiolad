@@ -221,7 +221,7 @@ export default function BusinessOnboardingWizardPage({
               Что у вас?
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Выберите тип бизнеса — это станет категорией точки в A1 domain.
+              Выберите тип бизнеса – это станет категорией точки в A1 domain.
             </p>
             <ul className="space-y-2" role="listbox" aria-label="Тип бизнеса">
               {BUSINESS_ONBOARDING_TYPES.map((option) => {
@@ -259,7 +259,7 @@ export default function BusinessOnboardingWizardPage({
               Как должно ощущаться?
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Выбор атмосферы пока только для онбординга. Sonic DNA / dayparts —
+              Выбор атмосферы пока только для онбординга. Sonic DNA / dayparts –
               отдельный этап (P1-02), после Passport trust.
             </p>
             <ul className="space-y-2" role="listbox" aria-label="Атмосфера">
@@ -388,7 +388,7 @@ export default function BusinessOnboardingWizardPage({
             </h2>
             <p className="text-[var(--biz-text)]">
               Дальше: откройте Venue Player и проверьте статус музыки. Каталог
-              ELIGIBLE пока пуст — eligibility остаётся UNKNOWN-safe.
+              ELIGIBLE пока пуст – eligibility остаётся UNKNOWN-safe.
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">

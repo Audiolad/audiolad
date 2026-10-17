@@ -168,7 +168,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
     domain.status === "anonymous"
       ? "Войдите, чтобы управлять точкой."
       : domain.status === "authenticated" && !domain.location
-        ? "Создайте организацию и первую точку — это займёт минуту."
+        ? "Создайте организацию и первую точку – это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
   const playback = deriveOwnerPlaybackSignal(
@@ -279,7 +279,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
               </div>
             ) : (
               <p className="mt-3 text-[var(--biz-text-muted)]">
-                Что звучит сейчас — появится, когда плеер точки начнёт присылать подтверждения
+                Что звучит сейчас – появится, когда плеер точки начнёт присылать подтверждения
               </p>
             )}
             {lastPlayAge && (
@@ -291,8 +291,8 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         </div>
         <div className="business-app-home-stack">
           <ComingSoon title="Атмосфера">
-            <p className="mt-3 text-[var(--biz-text-muted)]">Спокойнее — Энергичнее</p>
-            <input type="range" min="0" max="100" disabled aria-disabled="true" aria-label="Атмосфера — скоро" className="mt-2 w-full min-h-12" />
+            <p className="mt-3 text-[var(--biz-text-muted)]">Спокойнее – Энергичнее</p>
+            <input type="range" min="0" max="100" disabled aria-disabled="true" aria-label="Атмосфера – скоро" className="mt-2 w-full min-h-12" />
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Больше такого · скоро</button>
               <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Меньше такого · скоро</button>

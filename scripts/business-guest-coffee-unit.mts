@@ -374,6 +374,11 @@ for (const file of [
   "src/app/business-app/music/page.tsx",
   "src/app/business-app/guest/coffee/page.tsx",
   "src/lib/business-app/guest-coffee/catalog.ts",
+  // Sergey 17.10: en dashes everywhere visible – the Home page and the onboarding wizard of this flow too.
+  "src/components/business-app/BusinessHomePage.tsx",
+  "src/components/business-app/BusinessOnboardingWizardPage.tsx",
+  "src/lib/business-app/onboarding-wizard.ts",
+  "src/lib/business-app/owner-home-signals.ts",
 ]) {
   const code = read(file).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.split(" // ")[0]).join("\n");
   assert.doesNotMatch(code, /—/, `${file}: no em dash in visible text`);
