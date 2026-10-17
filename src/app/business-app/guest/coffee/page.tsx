@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * a8240527 — permanent guest entry https://business.audiolad.ru/guest/coffee (printed in the
+ * a8240527 – permanent guest entry https://business.audiolad.ru/guest/coffee (printed in the
  * PDF atlas, linked from every atlas CTA). No account required. It is the cabinet's own Music
  * section inside the shared BusinessAppShell (sidebar / bottom nav), not a separate guest app.
  */

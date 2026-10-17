@@ -31,7 +31,7 @@ import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 
 /**
- * a8240527 — Music section of the AudioLad Business cabinet: sound settings, collections and
+ * a8240527 – Music section of the AudioLad Business cabinet: sound settings, collections and
  * the Business player. Rendered inside the shared BusinessAppShell for the guest
  * (https://business.audiolad.ru/guest/coffee) and for the owner (/music) alike.
  *

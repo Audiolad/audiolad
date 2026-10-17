@@ -8,7 +8,7 @@ import { GUEST_COFFEE_COPY } from "@/lib/business-app/guest-coffee/copy";
 import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 
 /**
- * a8240527 — the Music section of the AudioLad Business cabinet. The SAME section is the
+ * a8240527 – the Music section of the AudioLad Business cabinet. The SAME section is the
  * owner's /music and the guest's permanent entry https://business.audiolad.ru/guest/coffee;
  * both render inside the shared BusinessAppShell. memberTools are shown to organization
  * members only (their data is also gated on the server).

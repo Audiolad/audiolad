@@ -8,7 +8,7 @@ import {
 } from "@/lib/business-app/guest-coffee/catalog";
 
 /**
- * a8240527 — sound settings of a point in the AudioLad Business cabinet: venue character,
+ * a8240527 – sound settings of a point in the AudioLad Business cabinet: venue character,
  * music direction and time of day. One component for the guest and for the venue owner
  * (Music section). The parameters pick the collections the player plays right away.
  */
