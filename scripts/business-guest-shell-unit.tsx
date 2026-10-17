@@ -139,7 +139,7 @@ const playlists: GuestCoffeePlaylist[] = [{
 for (const [name, domain] of [["guest", anonymous], ["member", member]] as const) {
   const html = wrap(domain, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="ok" />);
   has(html, /data-testid="biz-sound-settings"/, `${name}: settings`);
-  for (const legend of ["Характер заведения", "Музыкальное направление", "Время суток"]) has(html, new RegExp(legend));
+  for (const legend of ["Характер заведения", "Тип звучания", "Время суток"]) has(html, new RegExp(legend));
   has(html, /data-testid="biz-player"/, `${name}: Business player`);
   // Sergey 17.10 23:21: nothing plays or changes before the explicit «Собрать атмосферу» step.
   has(html, /data-testid="biz-atmosphere-assemble"[^>]*>Собрать атмосферу</, `${name}: explicit assemble button`);
@@ -164,8 +164,11 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   assert.equal(wrap(anonymous, "/music", <BusinessMemberOnly guest="Без регистрации." />), "Без регистрации.", "guest-only lead");
   assert.equal(wrap(member, "/music", <BusinessMemberOnly guest="Без регистрации." />), "", "no «без регистрации» for a member");
 }
-assert.deepEqual(parseBusinessSoundProfile(serializeBusinessSoundProfile({ character: "evening", direction: "sax", daypart: "evening" })), { character: "evening", direction: "sax", daypart: "evening" });
-assert.deepEqual(parseBusinessSoundProfile('{"character":"x","direction":"bossa"}'), { character: "cozy", direction: "bossa", daypart: "allday" });
+assert.deepEqual(parseBusinessSoundProfile(serializeBusinessSoundProfile({ character: "evening", direction: "melodic", daypart: "evening" })), { character: "evening", direction: "melodic", daypart: "evening" });
+// Settings saved before the passport stage (old genre directions) keep working.
+assert.deepEqual(parseBusinessSoundProfile('{"character":"x","direction":"bossa"}'), { character: "cozy", direction: "rhythm", daypart: "allday" });
+assert.deepEqual(parseBusinessSoundProfile('{"character":"city","direction":"sax","daypart":"day"}'), { character: "city", direction: "jazz", daypart: "day" });
+assert.deepEqual(parseBusinessSoundProfile('{"direction":"nope"}'), { character: "cozy", direction: "jazz", daypart: "allday" });
 assert.deepEqual(parseBusinessSoundProfile("not json"), { character: "cozy", direction: "jazz", daypart: "allday" });
 assert.equal(BUSINESS_SOUND_PROFILE_STORAGE_KEY, "audiolad-business-sound-profile");
 

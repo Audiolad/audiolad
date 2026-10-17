@@ -4,16 +4,20 @@
  * the curated shelf of real free catalogue albums. Pure / browser-safe, deterministic.
  *
  * How the assembly works:
- * 1. Albums are ranked with the same score as the shelf (direction → time of day → venue
- *    character). Only albums of the chosen direction are used when there are any; otherwise
- *    the closest albums are used and this is said openly (directionFallback).
- * 2. Up to GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES best albums are taken and their tracks are
- *    interleaved (one track from each album in turn), so the playlist is varied.
+ * 1. Albums come ranked by the recommendation module (guest-coffee/recommend.ts): on the
+ *    server by the sound of the tracks (music passports, hidden) with the editorial tags as
+ *    the reserve, delivered as a client-safe plan; without a plan – by the editorial tags.
+ *    Albums that fit the chosen sound type are used first; closer albums are added only when
+ *    the fitting ones do not give enough tracks. No sound type is ever an empty shelf; when
+ *    nothing fits, the closest albums are used and this is said openly (directionFallback).
+ * 2. Up to GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES albums are taken and their tracks (best
+ *    fitting first) are interleaved (one track from each album in turn), so the playlist is
+ *    varied.
  * 3. Collection stops at ~GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS or
  *    GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS tracks. Long-form single tracks (one 30-minute piece)
  *    are used only when nothing shorter exists – one of them would take the whole guest limit.
- * 4. The match is reported per setting honestly: the catalogue knows the setting of an ALBUM
- *    (shelf tags), not of every single track.
+ * 4. The match is reported per setting honestly, per album (yes / no from the plan); no
+ *    technical passport details are shown.
  *
  * Every track is a real track of a shelf album, so the existing guest stream-URL route
  * (/api/business/guest/coffee/track-url, shelf membership + 30-minute server limit) plays it
@@ -23,13 +27,11 @@ import {
   GUEST_COFFEE_CHARACTERS,
   GUEST_COFFEE_DAYPARTS,
   GUEST_COFFEE_DIRECTIONS,
-  scoreGuestCoffeePlaylist,
-  type GuestCoffeeDaypart,
   type GuestCoffeePlaylist,
   type GuestCoffeeProfile,
-  type GuestCoffeeShelfRef,
   type GuestCoffeeTrack,
 } from "./catalog";
+import { guestCoffeeProfileKey, guestCoffeeRecommendation, type GuestCoffeeRecommendationPlan } from "./recommend";
 
 export const GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES = 4;
 export const GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS = 12;
@@ -85,7 +87,7 @@ function labelOf(options: readonly { id: string; label: string }[], id: string):
 }
 
 export function guestCoffeeAtmosphereKey(profile: GuestCoffeeProfile): string {
-  return `${profile.character}|${profile.direction}|${profile.daypart}`;
+  return guestCoffeeProfileKey(profile);
 }
 
 /** «Уютная кофейня · Джаз · Вечер» */
@@ -97,12 +99,6 @@ export function guestCoffeeAtmosphereName(profile: GuestCoffeeProfile): string {
   ].join(" · ");
 }
 
-function fitsDaypart(dayparts: GuestCoffeeShelfRef["dayparts"], daypart: GuestCoffeeDaypart): boolean {
-  if (dayparts === "allday") return true;
-  if (daypart === "allday") return false;
-  return dayparts.includes(daypart);
-}
-
 function axis(matched: number, of: number, label: string): GuestCoffeeAxisMatch {
   return { state: of > 0 && matched === of ? "all" : matched > 0 ? "some" : "none", matched, of, label };
 }
@@ -110,45 +106,57 @@ function axis(matched: number, of: number, label: string): GuestCoffeeAxisMatch 
 export function assembleGuestCoffeeAtmosphere(
   available: readonly GuestCoffeePlaylist[],
   profile: GuestCoffeeProfile,
+  plan?: GuestCoffeeRecommendationPlan | null,
 ): GuestCoffeeAtmosphere | null {
-  const order = new Map(available.map((p, i) => [p.id, i]));
-  const ranked = available
-    .filter((p) => p.tracks.length > 0)
-    .map((playlist) => ({ playlist, score: scoreGuestCoffeePlaylist(playlist, profile) }))
-    .sort((a, b) => b.score - a.score || (order.get(a.playlist.id) ?? 0) - (order.get(b.playlist.id) ?? 0))
-    .map((r) => r.playlist);
-  if (ranked.length === 0) return null;
-  const sameDirection = ranked.filter((p) => p.direction === profile.direction);
-  const directionFallback = sameDirection.length === 0;
-  const pool = directionFallback ? ranked : sameDirection;
+  const { albums, soundFallback } = guestCoffeeRecommendation(available, profile, plan);
+  if (albums.length === 0) return null;
+  const directionFallback = soundFallback;
 
   const isLong = (t: GuestCoffeeTrack) => typeof t.durationSeconds === "number" && t.durationSeconds >= GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS;
-  const hasShort = pool.some((p) => p.tracks.some((t) => !isLong(t)));
+  const hasShort = albums.some((a) => a.tracks.some((t) => !isLong(t)));
   const usable = (t: GuestCoffeeTrack) => !hasShort || !isLong(t);
-  const sources = pool.filter((p) => p.tracks.some(usable)).slice(0, GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES);
+  // Sound-fitting albums first; closer ones only while the playlist still lacks tracks.
+  const candidates = albums.filter((a) => a.tracks.some(usable));
+  const chosen: typeof candidates = [];
+  let usableTracks = 0;
+  for (const a of candidates) {
+    if (chosen.length >= GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES) break;
+    if (!directionFallback && !a.fits.sound && chosen.length > 0 && usableTracks >= GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS) break;
+    chosen.push(a);
+    usableTracks += a.tracks.filter(usable).length;
+  }
+  const sources = chosen.map((a) => a.playlist);
+  const fitsById = new Map(chosen.map((a) => [a.playlist.id, a.fits]));
 
-  const queues = sources.map((p) => p.tracks.filter(usable));
+  const queues = chosen.map((a) => a.tracks.filter(usable));
   const seen = new Set<string>();
   const tracks: GuestCoffeeAtmosphereTrack[] = [];
   const used = new Map<string, number>();
   let planned = 0;
   let total = 0;
-  for (let round = 0; tracks.length < GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS && planned < GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS; round++) {
-    let took = false;
-    for (let s = 0; s < sources.length; s++) {
-      if (tracks.length >= GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS || planned >= GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS) break;
-      const track = queues[s][round];
-      if (!track || seen.has(track.audioItemId)) continue;
-      seen.add(track.audioItemId);
-      const source = sources[s];
-      tracks.push({ ...track, playlistId: source.id, albumTitle: source.title, authorName: source.authorName });
-      used.set(source.id, (used.get(source.id) ?? 0) + 1);
-      const known = typeof track.durationSeconds === "number" && track.durationSeconds > 0 ? track.durationSeconds : 0;
-      total += known;
-      planned += known || UNKNOWN_TRACK_SECONDS;
-      took = true;
+  // Phase 1 interleaves the sound-fitting albums; phase 2 (closer albums) only tops up.
+  const phases = directionFallback
+    ? [chosen.map((_, i) => i)]
+    : [chosen.flatMap((a, i) => (a.fits.sound ? [i] : [])), chosen.flatMap((a, i) => (a.fits.sound ? [] : [i]))];
+  const full = () => tracks.length >= GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS || planned >= GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS;
+  for (const phase of phases) {
+    for (let round = 0; !full(); round++) {
+      let took = false;
+      for (const s of phase) {
+        if (full()) break;
+        const track = queues[s][round];
+        if (!track || seen.has(track.audioItemId)) continue;
+        seen.add(track.audioItemId);
+        const source = sources[s];
+        tracks.push({ ...track, playlistId: source.id, albumTitle: source.title, authorName: source.authorName });
+        used.set(source.id, (used.get(source.id) ?? 0) + 1);
+        const known = typeof track.durationSeconds === "number" && track.durationSeconds > 0 ? track.durationSeconds : 0;
+        total += known;
+        planned += known || UNKNOWN_TRACK_SECONDS;
+        took = true;
+      }
+      if (!took && phase.every((s) => queues[s].length <= round)) break;
     }
-    if (!took && queues.every((q) => q.length <= round)) break;
   }
   if (tracks.length === 0) return null;
 
@@ -165,9 +173,9 @@ export function assembleGuestCoffeeAtmosphere(
     durationKnown: tracks.every((t) => typeof t.durationSeconds === "number" && t.durationSeconds > 0),
     directionFallback,
     match: {
-      direction: axis(contributing.filter((p) => p.direction === profile.direction).length, n, labelOf(GUEST_COFFEE_DIRECTIONS, profile.direction)),
-      daypart: axis(contributing.filter((p) => fitsDaypart(p.dayparts, profile.daypart)).length, n, labelOf(GUEST_COFFEE_DAYPARTS, profile.daypart)),
-      character: axis(contributing.filter((p) => p.characters.includes(profile.character)).length, n, labelOf(GUEST_COFFEE_CHARACTERS, profile.character)),
+      direction: axis(contributing.filter((p) => fitsById.get(p.id)?.sound).length, n, labelOf(GUEST_COFFEE_DIRECTIONS, profile.direction)),
+      daypart: axis(contributing.filter((p) => fitsById.get(p.id)?.daypart).length, n, labelOf(GUEST_COFFEE_DAYPARTS, profile.daypart)),
+      character: axis(contributing.filter((p) => fitsById.get(p.id)?.character).length, n, labelOf(GUEST_COFFEE_CHARACTERS, profile.character)),
     },
   };
 }
@@ -210,7 +218,7 @@ export function guestCoffeeAtmosphereMatchLines(a: Pick<GuestCoffeeAtmosphere, "
   const { direction, daypart, character } = a.match;
   const part = (m: GuestCoffeeAxisMatch, what: string, rest: string) =>
     m.state === "all"
-      ? `${what} «${m.label}» – подходит по описанию всех альбомов подборки.`
+      ? `${what} «${m.label}» – подходит по звучанию всех альбомов подборки.`
       : m.state === "some"
         ? `${what} «${m.label}» – ${m.matched % 10 === 1 && m.matched % 100 !== 11 ? "подходит" : "подходят"} ${m.matched} из ${m.of} альбомов, остальные – ${rest}.`
         : `${what} «${m.label}» – отдельных альбомов пока нет, взяли ${rest}.`;
@@ -219,10 +227,10 @@ export function guestCoffeeAtmosphereMatchLines(a: Pick<GuestCoffeeAtmosphere, "
       id: "direction",
       state: a.directionFallback ? "none" : direction.state,
       text: a.directionFallback
-        ? `Направление «${direction.label}» – альбомов пока нет, собрали самое близкое по времени суток и характеру.`
-        : part(direction, "Направление", "близкие по звучанию"),
+        ? `Тип звучания «${direction.label}» – подходящих альбомов пока нет, собрали самое близкое по звучанию.`
+        : part(direction, "Тип звучания", "близкие по звучанию"),
     },
-    { id: "daypart", state: daypart.state, text: part(daypart, "Время суток", "ближайшие по направлению") },
-    { id: "character", state: character.state, text: part(character, "Характер заведения", "ближайшие по направлению и времени суток") },
+    { id: "daypart", state: daypart.state, text: part(daypart, "Время суток", "ближайшие по звучанию") },
+    { id: "character", state: character.state, text: part(character, "Характер заведения", "ближайшие по звучанию и времени суток") },
   ];
 }

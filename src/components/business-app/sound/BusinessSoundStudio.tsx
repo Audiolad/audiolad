@@ -33,6 +33,7 @@ import {
   GuestCoffeePlaybackMeter,
   type GuestCoffeeLimitState,
 } from "@/lib/business-app/guest-coffee/limit";
+import type { GuestCoffeeRecommendationPlan } from "@/lib/business-app/guest-coffee/recommend";
 import {
   BUSINESS_SOUND_PROFILE_STORAGE_KEY,
   parseBusinessSoundProfile,
@@ -59,6 +60,8 @@ import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business
  */
 type Props = {
   playlists: GuestCoffeePlaylist[];
+  /** Server ranking for all 64 settings (ids, track positions, yes / no matches only). */
+  plan?: GuestCoffeeRecommendationPlan | null;
   initialLimit: GuestCoffeeLimitState;
 };
 
@@ -107,13 +110,13 @@ function prefersReducedMotion(): boolean {
 function assemblingSteps(profile: GuestCoffeeProfile): string[] {
   const direction = GUEST_COFFEE_DIRECTIONS.find((d) => d.id === profile.direction)?.label ?? "";
   return [
-    `Подбираем альбомы направления «${direction}»…`,
+    `Подбираем треки по звучанию «${direction}»…`,
     "Сверяем время суток и характер заведения…",
     "Сводим треки в одну подборку…",
   ];
 }
 
-export default function BusinessSoundStudio({ playlists, initialLimit }: Props) {
+export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
   const access = resolveBusinessAccess(useBusinessDomain());
   const guest = access.level === "guest";
   const { setLimit: reportLimitToShell } = useBusinessGuestStatus();
@@ -272,7 +275,7 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
   const assemble = () => {
     if (!canAssemble) return;
     // Computed right away (pure); revealed after the short assembling moment.
-    const next = assembleGuestCoffeeAtmosphere(playlists, profile);
+    const next = assembleGuestCoffeeAtmosphere(playlists, profile, plan);
     const steps = assemblingSteps(profile);
     const reduced = prefersReducedMotion();
     setAssembling({ step: 0, steps });

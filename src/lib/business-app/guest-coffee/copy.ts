@@ -1,5 +1,5 @@
 /**
- * a8240527 — honest copy of the guest coffee cabinet. Terms come from the same source as
+ * a8240527 – honest copy of the guest coffee cabinet. Terms come from the same source as
  * the atlas offer (799 ₽/month, first 7 days free) so they can never drift apart.
  */
 import { COFFEE_ATLAS_CANONICAL, COFFEE_ATLAS_OFFER } from "@/lib/business/coffee-atlas/constants";
@@ -16,7 +16,7 @@ export const GUEST_COFFEE_TERMS = `Первые 7 дней – в подарок
 
 export const GUEST_COFFEE_COPY = {
   title: "Настройте звучание вашей кофейни",
-  lead: "Выберите характер заведения, музыкальное направление и время суток, нажмите «Собрать атмосферу» – и слушайте готовую подборку прямо в кабинете АудиоЛад Бизнес.",
+  lead: "Выберите характер заведения, тип звучания и время суток, нажмите «Собрать атмосферу» – и слушайте готовую подборку прямо в кабинете АудиоЛад Бизнес.",
   /** Guest-only addition to the lead (members are already signed in). */
   leadGuest: "Без регистрации.",
   limitNote: "В гостевом режиме доступно 30 минут прослушивания.",
@@ -31,7 +31,7 @@ export const GUEST_COFFEE_COPY = {
     "30 минут знакомства с подборками на этом устройстве использованы. Музыка в эфир точки идёт через плеер программы – только треки с подтверждёнными правами.",
   unavailable: "Гостевое прослушивание временно недоступно. Попробуйте, пожалуйста, позже.",
   emptyShelf: "Подборки для кофеен сейчас не загрузились. Обновите страницу чуть позже – мы показываем только настоящие треки каталога.",
-  directionFallback: "Для этого направления пока нет подборок – показываем самые близкие.",
+  directionFallback: "Для этого типа звучания пока нет подходящих подборок – показываем самые близкие.",
   evaluationOnly:
     "Гостевой режим – для оценки звучания. Он не даёт права на публичное воспроизведение музыки в заведении.",
   shelfSource:
@@ -46,7 +46,7 @@ export const GUEST_COFFEE_COPY = {
 /**
  * a8240527 (Sergey 17.10.2026 23:21): the explicit «Собрать атмосферу» step. The result is
  * ONE playlist assembled from real tracks of the curated free albums; the match is stated
- * honestly (album-level tags, not per-track analysis).
+ * honestly per album, without technical passport details.
  */
 export const GUEST_COFFEE_ATMOSPHERE_COPY = {
   assemble: "Собрать атмосферу",
@@ -59,12 +59,12 @@ export const GUEST_COFFEE_ATMOSPHERE_COPY = {
   settingsHint: "Выберите настройки и нажмите «Собрать атмосферу» – мы соберём одну готовую подборку под ваш выбор.",
   emptyTitle: "Здесь появится ваша атмосфера",
   emptyText:
-    "Выберите характер заведения, направление и время суток и нажмите «Собрать атмосферу». Мы соберём одну подборку из настоящих треков каталога АудиоЛада.",
+    "Выберите характер заведения, тип звучания и время суток и нажмите «Собрать атмосферу». Мы соберём одну подборку из настоящих треков каталога АудиоЛада.",
   dirty: "Настройки изменились. Нажмите «Пересобрать атмосферу» – до этого подборка остаётся прежней.",
   stale: "Собрано для прежних настроек.",
   play: "Слушать атмосферу",
   matchTitle: "Что совпало с вашим выбором",
-  matchNote: "Подбор – по описанию альбомов каталога, а не каждого трека отдельно.",
+  matchNote: "Подбор учитывает звучание треков и описание альбомов каталога. Это подсказка – окончательно решает ваш слух.",
   sourcesTitle: "Собрано из альбомов",
   playerIdle: "Соберите атмосферу и нажмите «Слушать атмосферу» – музыка заиграет здесь.",
   playerReady: "Атмосфера собрана. Нажмите «Слушать атмосферу» или выберите трек.",

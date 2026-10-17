@@ -74,6 +74,7 @@ export async function buildGuestCoffeeShelf(
         updatedAt: product.updatedAt ?? null,
         format: product.format ?? null,
         direction: ref.direction,
+        ...(ref.sounds ? { sounds: ref.sounds } : {}),
         dayparts: ref.dayparts,
         characters: ref.characters,
         tracks,
