@@ -120,7 +120,20 @@ for (const { src, sizes, purpose } of bizPngs) {
 }
 const ico = readFileSync(pub("/business/brand/favicon.ico"));
 assert.equal(ico.readUInt16LE(2), 1);
-const icoSizes = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => ico[6 + i * 16] || 256).sort((a, b) => a - b);
+const icoSizes = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => {
+  const e = 6 + i * 16;
+  const w = ico[e] || 256, h = ico[e + 1] || 256, len = ico.readUInt32LE(e + 8), off = ico.readUInt32LE(e + 12);
+  assert.equal(w, h, `favicon.ico entry ${i} is not square`);
+  assert.ok(len > 0 && off >= 6 + ico.readUInt16LE(4) * 16 && off + len <= ico.length, `favicon.ico entry ${i} payload out of bounds`);
+  const img = ico.subarray(off, off + len);
+  if (img.toString("latin1", 1, 4) === "PNG") {
+    assert.deepEqual([img.readUInt32BE(16), img.readUInt32BE(20)], [w, h], `favicon.ico entry ${i} PNG size`);
+  } else {
+    assert.equal(img.readUInt32LE(0), 40, `favicon.ico entry ${i} is neither PNG nor BMP`);
+    assert.deepEqual([img.readInt32LE(4), img.readInt32LE(8) / 2], [w, h], `favicon.ico entry ${i} BMP size`);
+  }
+  return w;
+}).sort((a, b) => a - b);
 assert.deepEqual(icoSizes, [16, 32, 48]);
 for (const [b, c] of [
   ["/business/brand/favicon.ico", "/favicon.ico"],
