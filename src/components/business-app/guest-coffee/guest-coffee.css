@@ -1,28 +1,28 @@
 /* a8240527 — guest coffee cabinet, Jazz & Coffee look (warm browns, cream, gold).
  *
- * LOCAL THEME LAYER (temporary): the shared Jazz & Coffee tokens for AudioLad Business are
- * being built in parallel by task 21546de4 (branch ai-company/task-21546de4) and were not
- * published when this was written. ALL colours of this screen come from the --gc-* block
- * below and nowhere else — switching to the shared tokens = map these few variables to
- * them (e.g. --gc-espresso: var(--jc-espresso)) and delete the literals. No other CSS
- * duplicates the theme. Palette is aligned with the coffee atlas (coffee-atlas.css).
+ * THEME LAYER: the shared Jazz & Coffee tokens for AudioLad Business come from task
+ * 21546de4 (PR #901, business-theme.css, [data-biz-theme="jazz-coffee"] --biz-*), which is
+ * not merged into main yet. All palette colours of this screen come from the --gc-* block below and
+ * nowhere else. Each --gc-* reads the shared --biz-* token first and falls back to a local
+ * literal of the same family, so the screen looks right today and adopts the shared theme
+ * automatically once #901 lands. Final cleanup after #901: drop the fallback literals.
  */
 
 .guest-coffee {
-  --gc-espresso: #2b1a12;
-  --gc-roast: #4a2e1f;
-  --gc-brown: #6b4430;
-  --gc-cream: #f7efe3;
-  --gc-cream-2: #fffaf3;
-  --gc-sand: #eadcc6;
-  --gc-gold: #c9a35b;
-  --gc-gold-deep: #a9823b;
-  --gc-ink: #2b1d14;
-  --gc-muted: #6b5848;
+  --gc-espresso: var(--biz-espresso, #2b1a12);
+  --gc-roast: var(--biz-coffee-deep, #4a2e1f);
+  --gc-brown: var(--biz-coffee, #6b4430);
+  --gc-cream: var(--biz-bg, #f7efe3);
+  --gc-cream-2: var(--biz-surface, #fffaf3);
+  --gc-sand: var(--biz-sand-deep, #eadcc6);
+  --gc-gold: var(--biz-brass, #c9a35b);
+  --gc-gold-deep: var(--biz-brass-ink, #a9823b);
+  --gc-ink: var(--biz-text, #2b1d14);
+  --gc-muted: var(--biz-text-muted, #6b5848);
   --gc-line: rgba(84, 56, 32, 0.16);
   --gc-shadow: 0 10px 30px rgba(43, 26, 18, 0.10);
   --gc-radius: 20px;
-  --gc-display: Georgia, "Times New Roman", "Playfair Display", serif;
+  --gc-display: var(--biz-font-display, Georgia, "Times New Roman", "Playfair Display", serif);
   --gc-player-h: 76px;
 
   min-height: 100dvh;
@@ -109,7 +109,7 @@
 .gc-btn:active { transform: translateY(1px); }
 .gc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .gc-btn--gold { background: var(--gc-gold); color: var(--gc-espresso); }
-.gc-btn--gold:hover { background: #d6b06a; }
+.gc-btn--gold:hover { filter: brightness(1.06); }
 .gc-btn--dark { background: var(--gc-espresso); color: var(--gc-cream); }
 .gc-btn--play { background: var(--gc-roast); color: var(--gc-cream); min-width: 104px; }
 .gc-btn--play[aria-pressed="true"] { background: var(--gc-gold); color: var(--gc-espresso); }
@@ -178,7 +178,7 @@
   padding: 7px 12px;
   border: 1px solid var(--gc-line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--gc-cream-2);
   cursor: pointer;
   transition: border-color 0.12s ease, background-color 0.12s ease;
 }
