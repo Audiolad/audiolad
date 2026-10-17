@@ -114,6 +114,10 @@ async function main() {
     const [cta] = byTestId(nav.container, "business-commercial-required-cta");
     assert.equal(cta.getAttribute("href"), "/author-dashboard/commercial-application?author=slug-1");
     assert.equal(tab.getAttribute("aria-expanded"), "true");
+    assert.equal(notice[0].getAttribute("id"), tab.getAttribute("aria-controls"), "aria-controls targets the notice");
+    await act(async () => tab.click());
+    assert.equal(byTestId(nav.container, "business-commercial-required").length, 0, "second click closes the notice");
+    assert.equal(tab.getAttribute("aria-expanded"), "false");
     await nav.cleanup();
   }
 
@@ -129,8 +133,10 @@ async function main() {
   {
     const nav = await renderNav("free", "/author-dashboard/business");
     const [tab] = byTestId(nav.container, "author-nav-business-locked");
+    assert.equal(tab.getAttribute("aria-expanded"), "true", "page notice is always visible there");
     await act(async () => tab.click());
     assert.equal(byTestId(nav.container, "business-commercial-required").length, 0);
+    assert.equal(tab.getAttribute("aria-expanded"), "true");
     await nav.cleanup();
   }
 
@@ -163,6 +169,7 @@ async function main() {
   assert.ok(membership > 0 && guard > membership, "guard follows requireAuthorMembership");
   const guardBlock = page.slice(guard, page.indexOf("\n  }\n", guard));
   assert.ok(guardBlock.includes("<BusinessCommercialRequiredNotice"), "guard renders the notice");
+  assert.ok(guardBlock.includes("id={BUSINESS_LOCKED_NOTICE_ID}"), "page notice carries the id the nav tab controls");
   assert.ok(!/supabase|\.from\(|\.rpc\(/.test(guardBlock), "guard loads no data");
   for (const marker of ["await isConsentBlockedForRequest(", ".from(", ".rpc("]) {
     const at = page.indexOf(marker);

@@ -7,7 +7,7 @@ import { Suspense, useState } from "react";
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
 import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
-import { authorCanOpenBusiness } from "@/lib/author-dashboard/business-access";
+import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import { audioSprintHref } from "@/lib/seo-queries/audio-sprint";
@@ -209,7 +209,6 @@ type AuthorDashboardNavProps = {
   accessStatus?: AuthorAccessStatus | string | null;
 };
 
-const BUSINESS_LOCKED_NOTICE_ID = "author-nav-business-locked-notice";
 
 export default function AuthorDashboardNav({
   authorSlug,
@@ -220,6 +219,8 @@ export default function AuthorDashboardNav({
   const pathname = usePathname();
   const [businessNoticeOpen, setBusinessNoticeOpen] = useState(false);
   const businessLocked = accessStatus !== undefined && !authorCanOpenBusiness(accessStatus);
+  // On /author-dashboard/business the page itself renders the notice (same id), so it is always shown.
+  const onBusinessPage = pathname.startsWith("/author-dashboard/business");
   const supportMode = useAuthorSupportMode();
   const authorQuery = authorSlug
     ? `?author=${encodeURIComponent(authorSlug)}`
@@ -342,10 +343,12 @@ export default function AuthorDashboardNav({
                 key={item.href}
                 type="button"
                 data-testid="author-nav-business-locked"
-                aria-expanded={businessNoticeOpen}
+                aria-expanded={onBusinessPage || businessNoticeOpen}
                 aria-controls={BUSINESS_LOCKED_NOTICE_ID}
                 title="Доступно с коммерческим статусом автора"
-                onClick={() => setBusinessNoticeOpen((open) => !open)}
+                onClick={() => {
+                  if (!onBusinessPage) setBusinessNoticeOpen((open) => !open);
+                }}
                 className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-[#d9cdea] bg-[#f7f4fb] px-4 py-2 text-sm font-semibold text-[#8a7fa8] opacity-80"
               >
                 <Icon />
@@ -371,8 +374,7 @@ export default function AuthorDashboardNav({
           );
         })}
       </nav>
-      {/* On /author-dashboard/business the page itself already shows the same notice. */}
-      {businessLocked && businessNoticeOpen && !pathname.startsWith("/author-dashboard/business") ? (
+      {businessLocked && businessNoticeOpen && !onBusinessPage ? (
         <BusinessCommercialRequiredNotice id={BUSINESS_LOCKED_NOTICE_ID} authorSlug={authorSlug} />
       ) : null}
     </div>

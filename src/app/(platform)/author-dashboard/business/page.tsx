@@ -8,7 +8,7 @@ import RightsholderVerificationForm, {
   type OwnProduct,
   type ProgramDocument,
 } from "@/components/author-dashboard/business/RightsholderVerificationForm";
-import { authorCanOpenBusiness } from "@/lib/author-dashboard/business-access";
+import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
 import {
   listAuthorWorkspacesForUser,
   requireAuthenticatedUser,
@@ -42,7 +42,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
         <div className="mb-6">
           <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
         </div>
-        <BusinessCommercialRequiredNotice authorSlug={workspace.slug} />
+        <BusinessCommercialRequiredNotice id={BUSINESS_LOCKED_NOTICE_ID} authorSlug={workspace.slug} />
       </AuthorShell>
     );
   }

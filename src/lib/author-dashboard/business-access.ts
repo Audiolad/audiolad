@@ -11,6 +11,9 @@ export const BUSINESS_COMMERCIAL_REQUIRED_NOTICE =
 
 export const BUSINESS_COMMERCIAL_REQUIRED_CTA = "Оформить коммерческий статус";
 
+/** DOM id of the notice: the locked nav tab points aria-controls at it (nav notice or the page notice). */
+export const BUSINESS_LOCKED_NOTICE_ID = "author-nav-business-locked-notice";
+
 /** Same set as the rest of the cabinet's "approved commercial path": onboarding, active, suspended, legacy. */
 export function authorCanOpenBusiness(
   accessStatus: AuthorAccessStatus | string | null | undefined,
