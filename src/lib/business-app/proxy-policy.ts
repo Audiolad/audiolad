@@ -59,7 +59,7 @@ export function resolveBusinessProxyAction(
     return { action: "pass_through" };
   }
 
-  // Lavender brand assets (manifest/.ico are not excluded by the proxy matcher).
+  // Business brand assets (manifest/.ico are not excluded by the proxy matcher).
   if (isBusinessBrandAssetPath(pathname)) {
     return { action: "pass_through" };
   }

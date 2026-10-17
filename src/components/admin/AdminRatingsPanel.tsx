@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AdminRatingsListenersPanel } from "@/components/admin/AdminRatingsListenersPanel";
 import { buildCsv, downloadCsv } from "@/lib/admin/analytics-csv";
 import { getProductKindLabel } from "@/lib/author-products/product-kind";
 import {
@@ -429,13 +430,15 @@ export default function AdminRatingsPanel({
               Таблицы всегда показывают all-time + окна 7/30 дней по created_at.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={exportCurrent}
-            className="rounded-full border border-[#eadff8] px-4 py-2 text-sm font-medium text-[#7042c5]"
-          >
-            Export CSV
-          </button>
+          {tab !== "listeners" ? (
+            <button
+              type="button"
+              onClick={exportCurrent}
+              className="rounded-full border border-[#eadff8] px-4 py-2 text-sm font-medium text-[#7042c5]"
+            >
+              Export CSV
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -444,6 +447,7 @@ export default function AdminRatingsPanel({
               ["products", "Продукты"],
               ["authors", "Авторы"],
               ["journal", "Журнал"],
+              ["listeners", "Слушатели"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -461,7 +465,7 @@ export default function AdminRatingsPanel({
           ))}
         </div>
 
-        {tab !== "journal" ? (
+        {tab === "products" || tab === "authors" ? (
           <div className="mt-4">
             <input
               type="search"
@@ -474,7 +478,7 @@ export default function AdminRatingsPanel({
           </div>
         ) : null}
 
-        {loadingBreakdown && tab !== "journal" ? (
+        {loadingBreakdown && (tab === "products" || tab === "authors") ? (
           <p className="mt-6 text-sm text-[#796ba0]">Загружаем таблицы…</p>
         ) : null}
 
@@ -731,6 +735,8 @@ export default function AdminRatingsPanel({
             </div>
           )
         ) : null}
+
+        {tab === "listeners" ? <AdminRatingsListenersPanel /> : null}
 
         {tab === "journal" ? (
           <div className="mt-4 space-y-4">
