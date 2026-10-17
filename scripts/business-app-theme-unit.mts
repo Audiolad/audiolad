@@ -150,7 +150,9 @@ assert.equal(manifest.background_color, resolve("--biz-bg"));
 assert.equal(BUSINESS_THEMES["jazz-coffee"].themeColor, resolve("--biz-bg"));
 assert.match(themeCss, new RegExp(`html:has\\(\\.business-app-root\\[data-biz-theme="jazz-coffee"\\]\\)[^{]*\\{\\s*background: ${resolve("--biz-bg")};`));
 
-// 7. The token layer is Business-only: imported by the business-app layout and nowhere else.
+// 7. The token layer is Business-only: imported by the business-app layout and by the
+//    AudioLad Business tab of the author cabinet (evidence file fields opt in with
+//    data-biz-theme; colour tokens are attribute-scoped, so nothing else changes). Nowhere else.
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(join(root, dir))) {
     const p = `${dir}/${name}`;
@@ -160,7 +162,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 const importers = walk("src").filter((p) => /import\s+["']@\/components\/business-app\/theme\/business-theme\.css["']/.test(read(p)));
-assert.deepEqual(importers, ["src/app/business-app/layout.tsx"]);
+assert.deepEqual(importers, ["src/app/(platform)/author-dashboard/business/page.tsx", "src/app/business-app/layout.tsx"]);
 
 // 8. No colours outside the token layer: no hex/rgb in Business CSS, no hard-coded
 //    palette classes, inline colour styles or dark-on-light leftovers in Business TSX.

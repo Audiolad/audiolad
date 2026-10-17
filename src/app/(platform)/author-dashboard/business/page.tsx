@@ -17,6 +17,16 @@ import {
 import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
 import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard";
 import { createClient } from "@/lib/supabase/server";
+import {
+  EVIDENCE_SIGNED_URL_TTL_SECONDS,
+  parseAttemptEvidence,
+  parseAttemptProvider,
+  type StoredEvidenceFile,
+} from "@/lib/business-rightsholder/evidence-display";
+// Jazz & Coffee --biz-* tokens for the evidence file fields (scoped by data-biz-theme).
+import "@/components/business-app/theme/business-theme.css";
+
+const EVIDENCE_BUCKET = "business-rightsholder-evidence";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -36,7 +46,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
     return (
       <AuthorShell
         title="АудиоЛад Бизнес"
-        subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+        subtitle="Ваша музыка в спа, салонах и кафе – с честными выплатами"
         internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
       >
         <div className="mb-6">
@@ -53,7 +63,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
     return (
       <AuthorShell
         title="АудиоЛад Бизнес"
-        subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+        subtitle="Ваша музыка в спа, салонах и кафе – с честными выплатами"
         internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
       >
         <div className="mb-6">
@@ -108,6 +118,40 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   }));
 
   const attemptsAgg = verification?.business_rightsholder_verification_attempts as { count: number }[] | undefined;
+  // Files of the latest submitted attempt, so a reopened form shows what was sent.
+  // Owner RLS on attempts + storage; short-lived signed links with the user's own session
+  // (same pattern as /admin/business-verification). Nothing is written here.
+  let storedEvidence: StoredEvidenceFile[] = [];
+  if (verification) {
+    const { data: lastAttempt } = await supabase
+      .from("business_rightsholder_verification_attempts")
+      .select("snapshot")
+      .eq("verification_id", verification.id as string)
+      .order("attempt_no", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    // Only files submitted with the case's current service (the draft can switch services
+    // after a failed upload; old files would otherwise appear under the new labels).
+    const attemptProvider = parseAttemptProvider(lastAttempt?.snapshot);
+    const rows = attemptProvider === (verification.ai_service as string) ? parseAttemptEvidence(lastAttempt?.snapshot) : [];
+    if (rows.length) {
+      const { data: links } = await supabase.storage
+        .from(EVIDENCE_BUCKET)
+        .createSignedUrls(rows.map((r) => r.objectPath), EVIDENCE_SIGNED_URL_TTL_SECONDS);
+      const signed = new Map<string, string>();
+      for (const link of links ?? []) {
+        if (link.path && link.signedUrl && !link.error) signed.set(link.path, link.signedUrl);
+      }
+      storedEvidence = rows.map((r) => ({
+        kind: r.kind,
+        mimeType: r.mimeType,
+        sizeBytes: r.sizeBytes,
+        createdAt: r.createdAt,
+        url: signed.get(r.objectPath) ?? null,
+      }));
+    }
+  }
+
   const existing: ExistingVerification = verification
     ? {
         status: verification.status as string,
@@ -126,7 +170,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   return (
     <AuthorShell
       title="АудиоЛад Бизнес"
-      subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+      subtitle="Ваша музыка в спа, салонах и кафе – с честными выплатами"
       internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
     >
       <div className="mb-6">
@@ -134,10 +178,10 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       </div>
       {products.length === 0 ? (
         <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
-          Сначала опубликуйте хотя бы один свой музыкальный продукт — потом здесь можно будет подтвердить права.
+          Сначала опубликуйте хотя бы один свой музыкальный продукт – потом здесь можно будет подтвердить права.
         </p>
       ) : (
-        <RightsholderVerificationForm products={products} documents={documents} existing={existing} />
+        <RightsholderVerificationForm products={products} documents={documents} existing={existing} storedEvidence={storedEvidence} />
       )}
     </AuthorShell>
   );
