@@ -143,15 +143,18 @@ SELECT 'P' || lpad(row_number() OVER (ORDER BY count(*) DESC, practice_id)::text
        count(*) FILTER (WHERE NOT is_owner) AS n_wo_owner
 FROM r GROUP BY practice_id ORDER BY n DESC LIMIT 60;
 
--- S5. Catalogue-sort preview on real data (spec §4): products with ratings, Bayesian score (C=10, m=global mean).
+-- S5. Catalogue-sort preview on real data (spec §3–4). Recommended score: Bayesian with FIXED neutral
+-- prior m0 = 3.5, C = 10 (bayes_m0_35). Global-mean prior shown only for comparison (bayes_global_c10).
 WITH agg AS (
   SELECT practice_id, count(*) AS n, sum(stars) AS s FROM practice_ratings WHERE excluded_at IS NULL GROUP BY practice_id
 ), g AS (SELECT sum(s)::numeric / nullif(sum(n), 0) AS m FROM agg)
 SELECT 'P' || lpad(row_number() OVER (ORDER BY n DESC, practice_id)::text, 2, '0') AS product,
        n, round(s::numeric / n, 2) AS avg,
-       round((10 * g.m + s) / (10 + n), 3) AS bayes_c10,
+       round((10 * 3.5 + s) / (10 + n), 3) AS bayes_m0_35,
+       round((10 * g.m + s) / (10 + n), 3) AS bayes_global_c10,
        rank() OVER (ORDER BY s::numeric / n DESC) AS rank_by_avg,
-       rank() OVER (ORDER BY (10 * g.m + s) / (10 + n) DESC) AS rank_by_bayes
+       rank() OVER (ORDER BY (10 * 3.5 + s) / (10 + n) DESC) AS rank_by_bayes_m0_35,
+       (n >= 10 AND (10 * 3.5 + s) / (10 + n) >= 4.3) AS in_top_rated_filter
 FROM agg, g ORDER BY n DESC LIMIT 60;
 
 SELECT

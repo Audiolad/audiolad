@@ -42,6 +42,9 @@ function errorText(status: number): string {
   if (status === 403) {
     return "Недостаточно прав: для списка слушателей нужны analytics.view и users.view.";
   }
+  if (status === 503) {
+    return "Журнал доступа сейчас недоступен, поэтому данные слушателей не показаны.";
+  }
   return "Не удалось загрузить данные. Попробуйте позже.";
 }
 

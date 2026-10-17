@@ -279,23 +279,31 @@ BEGIN
 
   -- Neutral signal counts: number of OTHER accounts that share at least one
   -- vote IP-signal / device-signal with this listener. Values never returned.
+  -- Deduplicate this listener's signal values first so a common value
+  -- (e.g. a proxy address) is joined once, not once per own rating.
   SELECT count(DISTINCT o.user_id)::integer INTO v_shared_ip
-  FROM public.practice_ratings AS mine
+  FROM (
+    SELECT DISTINCT r.vote_ip_hmac AS h
+    FROM public.practice_ratings AS r
+    WHERE r.user_id = p_user_id
+      AND r.vote_ip_hmac IS NOT NULL
+      AND btrim(r.vote_ip_hmac) <> ''
+  ) AS mine
   JOIN public.practice_ratings AS o
-    ON o.vote_ip_hmac = mine.vote_ip_hmac
-   AND o.user_id <> mine.user_id
-  WHERE mine.user_id = p_user_id
-    AND mine.vote_ip_hmac IS NOT NULL
-    AND btrim(mine.vote_ip_hmac) <> '';
+    ON o.vote_ip_hmac = mine.h
+   AND o.user_id <> p_user_id;
 
   SELECT count(DISTINCT o.user_id)::integer INTO v_shared_device
-  FROM public.practice_ratings AS mine
+  FROM (
+    SELECT DISTINCT r.device_id_hmac AS h
+    FROM public.practice_ratings AS r
+    WHERE r.user_id = p_user_id
+      AND r.device_id_hmac IS NOT NULL
+      AND btrim(r.device_id_hmac) <> ''
+  ) AS mine
   JOIN public.practice_ratings AS o
-    ON o.device_id_hmac = mine.device_id_hmac
-   AND o.user_id <> mine.user_id
-  WHERE mine.user_id = p_user_id
-    AND mine.device_id_hmac IS NOT NULL
-    AND btrim(mine.device_id_hmac) <> '';
+    ON o.device_id_hmac = mine.h
+   AND o.user_id <> p_user_id;
 
   IF v_registered_at IS NOT NULL THEN
     SELECT count(*)::integer INTO v_fast_paths

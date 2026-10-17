@@ -64,7 +64,7 @@ export function hashListenerEmailForAudit(email: string | null): string {
 /**
  * Append-only access log (admin_operation_log). Search text is NOT stored
  * (it may itself be PII); only whether a search was used and row counts.
- * Logging failure is reported but does not leak details to the client.
+ * Returns false on any failure: callers MUST then withhold PII (fail closed).
  */
 export async function writeAdminRatingsListenersAccessLog(input: {
   actorUserId: string;
@@ -72,7 +72,7 @@ export async function writeAdminRatingsListenersAccessLog(input: {
   targetUserId?: string | null;
   targetEmail?: string | null;
   counts: Record<string, number | boolean>;
-}): Promise<void> {
+}): Promise<boolean> {
   try {
     const service = createServiceRoleClient();
     const { error } = await service.from("admin_operation_log").insert({
@@ -92,11 +92,14 @@ export async function writeAdminRatingsListenersAccessLog(input: {
     });
     if (error) {
       console.error("admin_ratings_listeners_audit_log_failed", error.message);
+      return false;
     }
+    return true;
   } catch (error) {
     console.error(
       "admin_ratings_listeners_audit_log_failed",
       error instanceof Error ? error.message : "unknown",
     );
+    return false;
   }
 }

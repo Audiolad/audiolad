@@ -33,6 +33,12 @@ import {
   resolvePermissionsForRoles,
 } from "../src/lib/auth/platform-permissions";
 import { parseAdminAnalyticsUrlState } from "../src/lib/admin/analytics-url-state";
+import {
+  AUDIT_UNAVAILABLE_BODY,
+  handleRatingsListenerDetail,
+  handleRatingsListenersList,
+  type RatingsListenersRouteDeps,
+} from "../src/lib/admin/analytics-ratings-listeners-route";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(root, rel), "utf8");
@@ -162,18 +168,131 @@ assert.equal(safeInternalHref("/practice/a/b"), "/practice/a/b");
 assert.equal(safeInternalHref("https://x"), null);
 assert.equal(safeInternalHref("/\\evil"), null);
 
+
+// --- route-level behaviour with mocked auth / queries / audit log ----------
+const PII_EMAIL = "secret.person@mail.ru";
+const U = "c0000000-0000-4000-8000-000000000001";
+function makeDeps(opts: {
+  guard: "allow" | 401 | 403;
+  logOk?: boolean;
+  found?: boolean;
+  throwOnQuery?: boolean;
+}) {
+  const calls = { list: 0, detail: 0, log: [] as unknown[] };
+  const deps: RatingsListenersRouteDeps = {
+    requireActor: async () =>
+      opts.guard === "allow"
+        ? { ok: true, actor: { userId: "admin-1" } }
+        : {
+            ok: false,
+            response: Response.json(
+              { error: opts.guard === 401 ? "unauthorized" : "forbidden" },
+              { status: opts.guard },
+            ),
+          },
+    getList: async () => {
+      calls.list += 1;
+      if (opts.throwOnQuery) throw new Error("db exploded: relation x");
+      return {
+        total: 1, limit: 50, offset: 0, sort: "last_activity", sortDir: "desc",
+        rows: [{
+          userId: U, fullName: "Секретное Имя", email: PII_EMAIL, registeredAt: null,
+          ratingCount: 1, activeCount: 1, excludedCount: 0, average: 5,
+          firstRatedAt: null, lastActivityAt: null, isTest: false,
+        }],
+      };
+    },
+    getDetail: async () => {
+      calls.detail += 1;
+      if (opts.found === false) return { found: false };
+      return {
+        found: true,
+        profile: { userId: U, fullName: null, email: PII_EMAIL, registeredAt: null, hasProfile: true, isTest: false },
+        ratingTotal: 0, eventTotal: 0, limit: 200, ratings: [], events: [],
+        signals: { sharedIpOtherAccounts: 0, sharedDeviceOtherAccounts: 0, fastRegistrationPaths: 0 },
+      };
+    },
+    writeAccessLog: async (input) => {
+      calls.log.push(input);
+      return opts.logOk !== false;
+    },
+  };
+  return { deps, calls };
+}
+const listReq = new Request("https://audiolad.ru/api/admin/analytics/ratings/listeners?q=secret&sort=rating_count&dir=asc&offset=50");
+
+for (const status of [401, 403] as const) {
+  const { deps, calls } = makeDeps({ guard: status });
+  const res = await handleRatingsListenersList(listReq, deps);
+  assert.equal(res.status, status, `list denied ${status}`);
+  const body = await res.text();
+  assert.ok(!body.includes(PII_EMAIL), "denied list returns no PII");
+  assert.equal(calls.list, 0, "denied list never queries data");
+  assert.equal(calls.log.length, 0);
+  const { deps: d2, calls: c2 } = makeDeps({ guard: status });
+  const res2 = await handleRatingsListenerDetail(U, d2);
+  assert.equal(res2.status, status, `detail denied ${status}`);
+  assert.ok(!(await res2.text()).includes(PII_EMAIL));
+  assert.equal(c2.detail, 0, "denied detail never queries data");
+}
+{
+  const { deps, calls } = makeDeps({ guard: "allow" });
+  const res = await handleRatingsListenersList(listReq, deps);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.ok((await res.text()).includes(PII_EMAIL));
+  assert.equal(calls.list, 1);
+  assert.equal(calls.log.length, 1, "list access logged");
+  assert.ok(!JSON.stringify(calls.log).includes("secret"), "search text not logged");
+}
+{
+  const { deps } = makeDeps({ guard: "allow", logOk: false });
+  const res = await handleRatingsListenersList(listReq, deps);
+  assert.equal(res.status, 503, "audit failure → 503");
+  const body = await res.text();
+  assert.deepEqual(JSON.parse(body), AUDIT_UNAVAILABLE_BODY);
+  assert.ok(!body.includes(PII_EMAIL), "fail closed: no PII without audit row");
+  const { deps: d2 } = makeDeps({ guard: "allow", logOk: false });
+  const res2 = await handleRatingsListenerDetail(U, d2);
+  assert.equal(res2.status, 503);
+  assert.ok(!(await res2.text()).includes(PII_EMAIL), "detail fail closed");
+}
+{
+  const { deps, calls } = makeDeps({ guard: "allow" });
+  const res = await handleRatingsListenerDetail(U, deps);
+  assert.equal(res.status, 200);
+  assert.equal(calls.log.length, 1, "detail access logged");
+  const logged = calls.log[0] as { kind: string; targetUserId: string };
+  assert.equal(logged.kind, "detail");
+  assert.equal(logged.targetUserId, U);
+  const { deps: d2, calls: c2 } = makeDeps({ guard: "allow" });
+  const bad = await handleRatingsListenerDetail("../../etc/passwd", d2);
+  assert.equal(bad.status, 400);
+  assert.equal(c2.detail, 0, "invalid id never queries");
+  const { deps: d3, calls: c3 } = makeDeps({ guard: "allow", found: false });
+  const nf = await handleRatingsListenerDetail(U, d3);
+  assert.equal(nf.status, 404);
+  assert.equal(c3.log.length, 0);
+  const { deps: d4 } = makeDeps({ guard: "allow", throwOnQuery: true });
+  const err = await handleRatingsListenersList(listReq, d4);
+  assert.equal(err.status, 500);
+  assert.ok(!(await err.text()).includes("relation"), "DB message never returned");
+}
+
 // --- source contracts ------------------------------------------------------
 const listRoute = read("src/app/api/admin/analytics/ratings/listeners/route.ts");
 const detailRoute = read("src/app/api/admin/analytics/ratings/listeners/[userId]/route.ts");
 for (const [name, src] of [["list", listRoute], ["detail", detailRoute]] as const) {
-  const guardAt = src.indexOf("await requireRatingsListenersViewActor()");
-  assert.ok(guardAt > 0, `${name} route calls the listeners guard`);
-  assert.ok(guardAt < src.indexOf("await getAdminRatingsListener"), `${name}: guard before data access`);
-  assert.match(src, /"Cache-Control": "no-store"/, `${name}: no-store`);
-  assert.match(src, /writeAdminRatingsListenersAccessLog/, `${name}: access is logged`);
-  assert.doesNotMatch(src, /error\.message\b[^)]*\)\s*}\s*,\s*{\s*status/, `${name}: DB message never returned`);
+  assert.match(src, /requireActor: requireRatingsListenersViewActor/, `${name} route wires the listeners guard`);
+  assert.match(src, /writeAccessLog: writeAdminRatingsListenersAccessLog/, `${name}: real audit writer wired`);
 }
-assert.match(detailRoute, /isAdminRatingsListenerUuid\(userId\)/, "detail validates uuid");
+const sqlRunner = read("scripts/admin-ratings-listeners-sql-unit.mjs");
+assert.doesNotMatch(sqlRunner, /execFileSync\(\s*"(docker|sudo)"/, "SQL smoke never targets an existing server");
+assert.match(sqlRunner, /initdb/, "SQL smoke uses a disposable cluster");
+const auditWriter = read("src/lib/admin/analytics-ratings-listeners-queries.ts");
+assert.match(auditWriter, /Promise<boolean>/, "audit writer reports success for fail-closed routes");
+assert.match(auditWriter, /target_email_hash:[\s\S]*hashListenerEmailForAudit\(/, "audit row stores sha256 of email");
+assert.doesNotMatch(auditWriter, /^\s*(target_)?email:/m, "audit row never stores raw email");
 const guard = read("src/lib/admin/analytics-ratings-route-guard.ts");
 assert.match(guard, /export async function requireRatingsListenersViewActor/);
 assert.match(guard, /evaluateRatingsListenersAccess/);
