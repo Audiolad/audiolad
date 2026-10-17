@@ -57,6 +57,7 @@ export default async function AuthorAudioSprintPage({
           authorSlug={workspace.slug}
           authorId={workspace.id}
           authorRole={role}
+          accessStatus={workspace.accessStatus}
         />
       </div>
       <AuthorAudioSprintClient

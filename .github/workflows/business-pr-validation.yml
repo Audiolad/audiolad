@@ -57,8 +57,11 @@ jobs:
           npm run test:business-rights-eligibility
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-rightsholder-onboarding
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:support-consent-block
+          AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-owner-self-moderation
+          npm run test:admin-business-verification
           npm run test:business-rightsholder-examples-ui
           npm run test:business-consent-document-links
+          npm run test:author-business-tab
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger

@@ -1,8 +1,5 @@
-import { Suspense } from "react";
-
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
-import { EcompanyCatalogStatsFallback, EcompanyCatalogStatsSection } from "@/components/admin/EcompanyCatalogStats";
 import { isAiCompanyOwner, requireAiCompanyView } from "@/lib/admin/guard";
 import {
   companyStatusRequestPath,
@@ -80,11 +77,6 @@ export default async function AiCompanyPage({
         canAccept={canAccept}
         initialTab={parseBoardTabParam(params.tab)}
       />
-      <div className="mt-5">
-        <Suspense fallback={<EcompanyCatalogStatsFallback />}>
-          <EcompanyCatalogStatsSection />
-        </Suspense>
-      </div>
     </>
   );
 }

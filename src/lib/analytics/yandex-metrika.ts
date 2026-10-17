@@ -2,6 +2,7 @@ import { isAnalyticsConsentGranted } from "@/lib/analytics/analytics-consent";
 import { shouldEnableYandexMetrika } from "@/lib/analytics/yandex-metrika-environment";
 import {
   isYandexMetrikaGoalName,
+  YANDEX_METRIKA_BUSINESS_ATLAS_GOALS,
   YANDEX_METRIKA_CORE_GOALS,
   YANDEX_METRIKA_PWA_GOALS,
   YANDEX_METRIKA_RETENTION_GOALS,
@@ -28,6 +29,7 @@ export const YANDEX_METRIKA_GOALS = new Set<YandexMetrikaGoalName>([
   ...YANDEX_METRIKA_CORE_GOALS,
   ...YANDEX_METRIKA_RETENTION_GOALS,
   ...YANDEX_METRIKA_PWA_GOALS,
+  ...YANDEX_METRIKA_BUSINESS_ATLAS_GOALS,
 ]);
 
 let initializedCounterId: number | null = null;
