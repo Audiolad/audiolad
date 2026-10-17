@@ -6,7 +6,7 @@
   color: var(--biz-text);
 }
 
-/* Display serif for page titles: the same voice as the public atlas, system fonts only. */
+/* Display serif for page titles: the same voice as the public atlas (Playfair Display via next/font). */
 .business-app-root h1 {
   font-family: var(--biz-font-display);
   letter-spacing: -0.01em;

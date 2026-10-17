@@ -112,7 +112,9 @@ assert.ok(
     layout.indexOf('import "@/components/business-app/business-app.css";'),
   "theme tokens load before component CSS",
 );
-assert.match(layout, /<div className="business-app-root" data-biz-theme=\{theme\}>/);
+assert.match(layout, /className=\{`business-app-root \$\{businessDisplaySerif\.variable\}`\}\s*data-biz-theme=\{theme\}/);
+assert.match(layout, /variable: "--font-biz-display"/);
+assert.match(themeCss, /--biz-font-display: var\(--font-biz-display\)/);
 assert.match(layout, /themeColor: BUSINESS_THEMES\[theme\]\.themeColor/);
 const manifest = JSON.parse(read("public/business/brand/manifest.webmanifest"));
 assert.equal(manifest.theme_color, BUSINESS_THEMES["jazz-coffee"].themeColor);

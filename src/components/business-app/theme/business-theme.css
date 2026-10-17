@@ -23,7 +23,7 @@
   --biz-bottom-nav-height: 68px;
   --biz-radius: 18px;
   --biz-radius-sm: 12px;
-  --biz-font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+  --biz-font-display: var(--font-biz-display), "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 [data-biz-theme="jazz-coffee"] {
