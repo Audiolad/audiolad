@@ -111,6 +111,28 @@ for (const f of ["src/lib/author-terms/editions.ts", "src/lib/author-terms/servi
   assert.doesNotMatch(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"), /reaccept_grace_until|graceUntil|inGrace/, `${f}: no grace`);
 }
 
+// ---- Cabinet notices: a 1.2 author after the switch sees an invitation, never a "must accept / blocked" warning.
+{
+  const { resolveAuthorTermsNotice } = await import("../src/lib/author-terms/terms-notice.ts");
+  const v = { id: "v20", version: "2.0" };
+  assert.equal(resolveAuthorTermsNotice({ currentVersion: v, acceptedCurrent: false, previousEditionActive: true, reacceptInvited: true }), "invite");
+  assert.equal(resolveAuthorTermsNotice({ currentVersion: v, acceptedCurrent: false, previousEditionActive: true, reacceptInvited: false }), "none");
+  assert.equal(resolveAuthorTermsNotice({ currentVersion: v, acceptedCurrent: true, previousEditionActive: false, reacceptInvited: false }), "none");
+  // 1.1-only author / new author / flag off: unchanged "required" warning.
+  assert.equal(resolveAuthorTermsNotice({ currentVersion: v, acceptedCurrent: false, previousEditionActive: false, reacceptInvited: true }), "required");
+  assert.equal(resolveAuthorTermsNotice({ currentVersion: v, acceptedCurrent: false }), "required");
+  assert.equal(resolveAuthorTermsNotice(null), "none");
+  // End-to-end status → notice for the main dashboard scenario (gate output wired as service.ts does).
+  const gate = evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: on12 });
+  assert.equal(resolveAuthorTermsNotice({ currentVersion: v, acceptedCurrent: gate.acceptedCurrent,
+    previousEditionActive: gate.previousEditionActive, reacceptInvited: gate.reacceptInvited }), "invite");
+  const banner = read("src/components/author-dashboard/AuthorTermsRequiredBanner.tsx");
+  assert.match(banner, /resolveAuthorTermsNotice\(status\)/);
+  assert.ok(banner.indexOf('notice === "invite"') < banner.indexOf("Нужно принять Авторские условия сотрудничества"), "invite branch before the warning");
+  assert.match(read("src/components/author-dashboard/AuthorLegalTermsCard.tsx"), /status\.previousEditionActive\s*\?\s*PREVIOUS_EDITION_ACTIVE_STATUS_LABEL/);
+  assert.match(read("src/app/(platform)/author-dashboard/commercial/terms/page.tsx"), /status\.previousEditionActive \? \(\s*<AuthorAgreementReacceptBanner/);
+}
+
 // ---- Two public statuses.
 assert.deepEqual(Object.values(AUTHOR_PRODUCT_STATUS_LABEL), ["Бесплатный", "Коммерческий"]);
 for (const [s, want] of [["free", "free"], ["commercial_pending", "free"], ["commercial_onboarding", "commercial"],

@@ -4,6 +4,7 @@ import AuthorTermsAcceptPanel, {
   type AuthorTermsCommercialShareSummary,
 } from "@/components/author-dashboard/AuthorTermsAcceptPanel";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
+import { PREVIOUS_EDITION_ACTIVE_STATUS_LABEL } from "@/lib/author-terms/terms-notice";
 
 type Props = {
   authorId: string;
@@ -94,7 +95,11 @@ export default function AuthorLegalTermsCard({
           <div>
             <dt className="font-medium text-[#7d70a2]">Статус</dt>
             <dd>
-              {status.acceptedCurrent ? "Принято" : "Требуется принятие"}
+              {status.acceptedCurrent
+                ? "Принято"
+                : status.previousEditionActive
+                  ? PREVIOUS_EDITION_ACTIVE_STATUS_LABEL
+                  : "Требуется принятие"}
             </dd>
           </div>
           {status.acceptedCurrent && status.acceptance ? (
