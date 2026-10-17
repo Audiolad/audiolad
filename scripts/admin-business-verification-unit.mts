@@ -69,5 +69,7 @@ assert.match(page, /requireAdminPermission\("author_products\.moderate"\)/);
 assert.match(page, /from\("business_rightsholder_verifications"\)/);
 assert.doesNotMatch(page, /service\.from\("business_/, "Business tables are read under RLS, not service role");
 assert.doesNotMatch(page, /service\.rpc\(/);
+assert.match(page, /supabase\.rpc\("is_platform_owner", \{ p_user_id: session\.userId \}\)/, "UI owner identity = DB is_platform_owner");
+assert.match(page, /const isPlatformOwner = ownerFlag === true;/, "fail-closed owner flag");
 
 console.log("admin-business-verification-unit: OK");

@@ -61,11 +61,12 @@ export default async function AdminBusinessVerificationPage({
   const params = await searchParams;
   const filter = resolveBusinessVerificationFilter(params.status);
   const statuses = statusesForBusinessVerificationFilter(filter);
-  // Same identity as the DB (public.is_platform_owner): RBAC owner or legacy platform_owner fallback.
-  const isPlatformOwner = session.access.roles.includes("owner");
-
   // Business tables are read with the moderator's own session (RLS: business_onboarding_is_moderator).
   const supabase = await createClient();
+  // Exactly the DB identity (public.is_platform_owner: RBAC owner OR legacy profiles.role platform_owner).
+  // Display-only: the moderation RPCs re-check it. Fail-closed: on error the own-case controls stay hidden.
+  const { data: ownerFlag } = await supabase.rpc("is_platform_owner", { p_user_id: session.userId });
+  const isPlatformOwner = ownerFlag === true;
   let query = supabase
     .from("business_rightsholder_verifications")
     .select("id, owner_user_id, product_id, audio_item_id, ai_service, ai_service_other, service_track_title, service_track_url, provider_details, status, reason, submitted_at, updated_at")
