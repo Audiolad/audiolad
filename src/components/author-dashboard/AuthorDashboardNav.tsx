@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
+import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
+import { authorCanOpenBusiness } from "@/lib/author-dashboard/business-access";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
+import type { AuthorAccessStatus } from "@/lib/authors/access";
 import { audioSprintHref } from "@/lib/seo-queries/audio-sprint";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
@@ -198,21 +201,38 @@ type AuthorDashboardNavProps = {
   authorId?: string;
   /** Owner/editor role of the current workspace; used to show the partner tab. */
   authorRole?: "owner" | "editor" | string | null;
+  /**
+   * access_status of the current workspace. Without a commercial status the «АудиоЛад Бизнес»
+   * tab is shown muted and opens a notice instead of the page (the page is also guarded server-side).
+   * Unknown (undefined) keeps the plain link: the server page then shows the same notice.
+   */
+  accessStatus?: AuthorAccessStatus | string | null;
 };
+
+const BUSINESS_LOCKED_NOTICE_ID = "author-nav-business-locked-notice";
 
 export default function AuthorDashboardNav({
   authorSlug,
   authorId,
   authorRole,
+  accessStatus,
 }: AuthorDashboardNavProps) {
   const pathname = usePathname();
+  const [businessNoticeOpen, setBusinessNoticeOpen] = useState(false);
+  const businessLocked = accessStatus !== undefined && !authorCanOpenBusiness(accessStatus);
   const supportMode = useAuthorSupportMode();
   const authorQuery = authorSlug
     ? `?author=${encodeURIComponent(authorSlug)}`
     : "";
   const discoveryEnabled = isAuthorSeoDiscoveryEnabled(authorId);
 
-  const items = [
+  const items: {
+    href: string;
+    label: string;
+    icon: typeof ProfileIcon;
+    active: boolean;
+    locked?: boolean;
+  }[] = [
     {
       href: `/author-dashboard${authorQuery}`,
       label: "Продукты",
@@ -289,6 +309,7 @@ export default function AuthorDashboardNav({
       label: "АудиоЛад Бизнес",
       icon: StatusIcon,
       active: pathname.startsWith("/author-dashboard/business"),
+      locked: businessLocked,
     },
     {
       href: `/author-dashboard/legal${authorQuery}`,
@@ -314,6 +335,25 @@ export default function AuthorDashboardNav({
           const Icon = item.icon;
           const autumn = item.label === AUTUMN_NAV_LABEL;
 
+          if (item.locked) {
+            // No commercial status: visible but muted; never navigates to Business.
+            return (
+              <button
+                key={item.href}
+                type="button"
+                data-testid="author-nav-business-locked"
+                aria-expanded={businessNoticeOpen}
+                aria-controls={BUSINESS_LOCKED_NOTICE_ID}
+                title="Доступно с коммерческим статусом автора"
+                onClick={() => setBusinessNoticeOpen((open) => !open)}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-[#d9cdea] bg-[#f7f4fb] px-4 py-2 text-sm font-semibold text-[#8a7fa8] opacity-80"
+              >
+                <Icon />
+                {item.label}
+              </button>
+            );
+          }
+
           return (
             <Link
               key={item.href}
@@ -331,6 +371,10 @@ export default function AuthorDashboardNav({
           );
         })}
       </nav>
+      {/* On /author-dashboard/business the page itself already shows the same notice. */}
+      {businessLocked && businessNoticeOpen && !pathname.startsWith("/author-dashboard/business") ? (
+        <BusinessCommercialRequiredNotice id={BUSINESS_LOCKED_NOTICE_ID} authorSlug={authorSlug} />
+      ) : null}
     </div>
   );
 }

@@ -2,11 +2,13 @@ import { redirect } from "next/navigation";
 
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
+import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import RightsholderVerificationForm, {
   type ExistingVerification,
   type OwnProduct,
   type ProgramDocument,
 } from "@/components/author-dashboard/business/RightsholderVerificationForm";
+import { authorCanOpenBusiness } from "@/lib/author-dashboard/business-access";
 import {
   listAuthorWorkspacesForUser,
   requireAuthenticatedUser,
@@ -28,7 +30,22 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   if (workspaces.length === 0) redirect("/become-author");
   const requestedSlug = params.author?.trim() ?? "";
   const workspace = workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
-  const { role } = await requireAuthorMembership(workspace.id);
+  const { role, accessStatus } = await requireAuthorMembership(workspace.id);
+  // No commercial status: same notice as the muted nav tab, and no Business data is loaded.
+  if (!authorCanOpenBusiness(accessStatus)) {
+    return (
+      <AuthorShell
+        title="АудиоЛад Бизнес"
+        subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+        internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
+      >
+        <div className="mb-6">
+          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
+        </div>
+        <BusinessCommercialRequiredNotice authorSlug={workspace.slug} />
+      </AuthorShell>
+    );
+  }
   // Business consents are the rightsholder's personal act: never in support mode.
   // The DB also refuses (business_onboarding_consents → support_mode_consent_forbidden).
   const supportMode = await isConsentBlockedForRequest(user.id);
@@ -40,7 +57,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
         internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
       >
         <div className="mb-6">
-          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
+          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
         </div>
         <p
           role="note"
@@ -113,7 +130,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
     >
       <div className="mb-6">
-        <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
+        <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
       </div>
       {products.length === 0 ? (
         <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">

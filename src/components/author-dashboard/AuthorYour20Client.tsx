@@ -226,6 +226,7 @@ export default function AuthorYour20Client({
         authorSlug={selectedAuthor.slug}
         authorId={selectedAuthor.id}
         authorRole={selectedAuthor.role}
+        accessStatus={selectedAuthor.accessStatus}
       />
 
       <section className="rounded-[24px] border border-[#eadff8] bg-white px-4 py-5 sm:px-5">
