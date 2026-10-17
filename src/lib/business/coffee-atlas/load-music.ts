@@ -1,7 +1,6 @@
 import "server-only";
 
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
-import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { createClient } from "@/lib/supabase/server";
 
 import {
@@ -15,7 +14,7 @@ export type { CoffeeAtlasTrack };
 
 /**
  * Resolve the shop → track mapping against the published music catalogue.
- * Same source as the /b listen rail (guest catalogue viewer). On any error the
+ * Same source as the /b listen rail (guest catalogue viewer), read-only. On any error the
  * atlas simply shows no examples — never a fake player.
  */
 export async function loadCoffeeAtlasMusic(): Promise<Record<string, CoffeeAtlasTrack[]>> {
@@ -23,7 +22,6 @@ export async function loadCoffeeAtlasMusic(): Promise<Record<string, CoffeeAtlas
 
   try {
     const supabase = await createClient();
-    await releaseDueScheduledPublications();
     const products = await getPublishedCatalogProducts(supabase, {
       productKind: "music",
     });
