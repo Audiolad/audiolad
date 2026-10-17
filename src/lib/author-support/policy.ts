@@ -1,3 +1,5 @@
+import { isAuthorSupportConsentPath } from "./consent-guard";
+
 export const AUTHOR_SUPPORT_COOKIE_NAME = "audiolad_author_support";
 export const AUTHOR_SUPPORT_TTL_SECONDS = 4 * 60 * 60;
 export const AUTHOR_SUPPORT_SESSION_ACTIONS = [
@@ -135,7 +137,9 @@ export function isAuthorSupportBlockedMutation(input: {
   // Platform-owner support mode is a full operational override. Route-level
   // authorization still binds every author/studio operation to actingAuthorId.
   // Password-reset flows remain outside impersonation/support semantics.
-  return isAuthorSupportSensitivePath(path);
+  // Legal acceptances/consents are a personal act of the author and are never
+  // available in support mode (8dcba9d1 PR 1).
+  return isAuthorSupportSensitivePath(path) || isAuthorSupportConsentPath(path);
 }
 
 export function evaluateAuthorSupportSqlAuthority(input: {

@@ -5,6 +5,8 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import { AuthorTermsError } from "@/lib/author-terms/errors";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { isConsentBlockedForExecution } from "@/lib/author-support/consent-guard";
 import { loadAuthorTermsStatus } from "@/lib/author-terms/service";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +23,12 @@ export async function GET(request: Request) {
     }
 
     const { role } = await requireAuthorMembership(authorId);
-    const status = await loadAuthorTermsStatus({ authorId, role });
+    const execution = await peekAuthorExecutionContext();
+    const status = await loadAuthorTermsStatus({
+      authorId,
+      role,
+      supportMode: isConsentBlockedForExecution(execution),
+    });
 
     return NextResponse.json(
       { status },

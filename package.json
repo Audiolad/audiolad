@@ -155,6 +155,7 @@
     "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs",
     "test:integration:private-catalog-race": "node scripts/private-to-catalog-player-race-smoke.mjs",
     "test:author-terms-acceptance": "npx tsx scripts/author-terms-acceptance-unit.mjs",
+    "test:support-consent-block": "npx tsx scripts/author-support-consent-block-unit.mjs && node scripts/business-consents-support-mode-sql-unit.mjs",
     "test:author-appreciation-prototype": "node scripts/author-appreciation-prototype-unit.mjs",
     "test:author-appreciation-eligibility": "npx tsx scripts/author-appreciation-eligibility-unit.mjs",
     "test:author-appreciation-getcourse": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-appreciation-getcourse-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-appreciation-getcourse-callback-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-appreciation-getcourse-reconcile-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-appreciation-auto-commercial-unit.mts && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-appreciation-admin-analytics-unit.mts && bash scripts/author-appreciation-reconcile-artifact-unit.sh && bash scripts/author-appreciation-reconcile-log-unit.sh && npm run test:run-from-target-sha-pin-reuse",

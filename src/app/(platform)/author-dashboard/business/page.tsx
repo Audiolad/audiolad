@@ -12,6 +12,11 @@ import {
   requireAuthenticatedUser,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import {
+  SUPPORT_MODE_CONSENT_NOTICE,
+  isConsentBlockedForExecution,
+} from "@/lib/author-support/consent-guard";
+import { peekAuthorExecutionContext } from "@/lib/author-support/context";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +32,29 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   const requestedSlug = params.author?.trim() ?? "";
   const workspace = workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
   const { role } = await requireAuthorMembership(workspace.id);
+  // Business consents are the rightsholder's personal act: never in support mode.
+  // The DB also refuses (business_onboarding_consents → support_mode_consent_forbidden).
+  const supportMode = isConsentBlockedForExecution(await peekAuthorExecutionContext());
+  if (supportMode) {
+    return (
+      <AuthorShell
+        title="АудиоЛад Бизнес"
+        subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+        internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
+      >
+        <div className="mb-6">
+          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
+        </div>
+        <p
+          role="note"
+          data-testid="support-mode-business-consent-blocked"
+          className="rounded-2xl border border-[#f1d9a6] bg-[#fff8e8] p-4 text-sm leading-6 text-[#6b4a00]"
+        >
+          {SUPPORT_MODE_CONSENT_NOTICE}
+        </p>
+      </AuthorShell>
+    );
+  }
   const supabase = await createClient();
 
   // Only own published music products with published tracks (the DB re-checks ownership on submit).
