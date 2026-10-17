@@ -73,14 +73,14 @@ export default function BusinessDomainBootstrapForm() {
       <input type="hidden" name="countryCode" value="RU" />
       <input type="hidden" name="timezone" value="Europe/Moscow" />
       {error ? (
-        <p className="text-sm font-medium text-[var(--biz-danger,#b42318)]" role="alert">
+        <p className="text-sm font-medium text-[var(--biz-danger)]" role="alert">
           Не удалось создать точку: {error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={pending}
-        className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)] disabled:opacity-60"
       >
         {pending ? "Создаём…" : "Создать организацию и точку"}
       </button>
