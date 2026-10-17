@@ -208,7 +208,7 @@ export function guestCoffeeAtmosphereMatchLines(a: Pick<GuestCoffeeAtmosphere, "
     m.state === "all"
       ? `${what} «${m.label}» – подходит по описанию всех альбомов подборки.`
       : m.state === "some"
-        ? `${what} «${m.label}» – подходят ${m.matched} из ${m.of} альбомов, остальные – ${rest}.`
+        ? `${what} «${m.label}» – ${m.matched % 10 === 1 && m.matched % 100 !== 11 ? "подходит" : "подходят"} ${m.matched} из ${m.of} альбомов, остальные – ${rest}.`
         : `${what} «${m.label}» – отдельных альбомов пока нет, взяли ${rest}.`;
   return [
     {

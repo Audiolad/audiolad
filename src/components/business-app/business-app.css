@@ -783,6 +783,20 @@
   to { opacity: 1; transform: none; }
 }
 
+.business-atmosphere__stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--biz-yellow-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-yellow-bg);
+  color: var(--biz-yellow);
+  font-weight: 600;
+}
+
 .business-atmosphere__name {
   font-family: var(--biz-font-display);
   font-size: 1.4rem;

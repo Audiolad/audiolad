@@ -262,6 +262,13 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
   const isAssembling = assembling !== null;
   const canAssemble = playlists.length > 0 && !isAssembling && (atmosphere === null || dirty);
 
+  const revealResult = (reduced: boolean) => {
+    const el = resultRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.top < 0 || r.top > window.innerHeight * 0.55) el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+  };
+
   const assemble = () => {
     if (!canAssemble) return;
     // Computed right away (pure); revealed after the short assembling moment.
@@ -269,6 +276,8 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
     const steps = assemblingSteps(profile);
     const reduced = prefersReducedMotion();
     setAssembling({ step: 0, steps });
+    // Mobile: the result sits below the settings – bring the assembling moment into view.
+    window.requestAnimationFrame(() => revealResult(reduced));
     const stepMs = reduced ? ATMOSPHERE_REDUCED_MOTION_MS : ATMOSPHERE_STEP_MS;
     const total = reduced ? ATMOSPHERE_REDUCED_MOTION_MS : ATMOSPHERE_STEP_MS * steps.length;
     if (!reduced) {
@@ -284,12 +293,7 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
         // (with the same track if it is in the new playlist, else from the new first track).
         const ctl = ctlRef.current;
         if (ctl && next) void ctl.applyManifest(toItems(next));
-        window.requestAnimationFrame(() => {
-          const el = resultRef.current;
-          if (!el) return;
-          const r = el.getBoundingClientRect();
-          if (r.top < 0 || r.top > window.innerHeight * 0.55) el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
-        });
+        window.requestAnimationFrame(() => revealResult(reduced));
       }, total),
     );
   };
@@ -427,7 +431,20 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
                 data-stale={dirty ? "true" : undefined}
                 aria-labelledby="business-atmosphere-name"
               >
-                <p className="business-app-eyebrow">{C.eyebrow}</p>
+                {dirty ? (
+                  <div className="business-atmosphere__stale" role="status" data-testid="biz-atmosphere-stale">
+                    <p>{C.stale}</p>
+                    <button
+                      type="button"
+                      className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+                      onClick={assemble}
+                      disabled={!canAssemble}
+                      data-testid="biz-atmosphere-reassemble"
+                    >
+                      {C.reassemble}
+                    </button>
+                  </div>
+                ) : null}
                 <h3 id="business-atmosphere-name" className="business-atmosphere__name" data-testid="biz-atmosphere-name">
                   {atmosphere.name}
                 </h3>

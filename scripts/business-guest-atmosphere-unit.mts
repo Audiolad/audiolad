@@ -136,6 +136,16 @@ for (const profile of all()) {
     },
   });
   assert.equal(none[1].text, "Время суток «Утро» – отдельных альбомов пока нет, взяли ближайшие по направлению.");
+  const one = guestCoffeeAtmosphereMatchLines({
+    directionFallback: false,
+    match: {
+      direction: { state: "all", matched: 4, of: 4, label: "Фортепиано и спокойный фон" },
+      daypart: { state: "some", matched: 1, of: 4, label: "Вечер" },
+      character: { state: "some", matched: 2, of: 4, label: "Уютная" },
+    },
+  });
+  assert.equal(one[1].text, "Время суток «Вечер» – подходит 1 из 4 альбомов, остальные – ближайшие по направлению.");
+  assert.match(one[2].text, /– подходят 2 из 4 альбомов/);
 
   assert.equal(assembleGuestCoffeeAtmosphere([], { character: "cozy", direction: "jazz", daypart: "day" }), null, "nothing to assemble");
   const empty = { ...shelf[0], tracks: [] };
@@ -178,6 +188,7 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.match(studio, /onClick=\{assemble\}/);
   assert.match(studio, /const dirty = atmosphere !== null && atmosphere\.key !== currentKey/);
   assert.match(studio, /data-testid="biz-atmosphere-dirty"/, "changed settings prompt re-assembling");
+  assert.match(studio, /data-testid="biz-atmosphere-stale"/, "the stale playlist says so itself");
   assert.match(studio, /data-testid="biz-atmosphere-assembling"/, "visible assembling moment");
   assert.match(studio, /prefers-reduced-motion/);
   assert.match(studio, /data-testid="biz-atmosphere-play"/);
