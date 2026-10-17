@@ -182,6 +182,14 @@ assert.match(businessPage, /valid_until/);
   assert.equal(clientDocumentSource("b2b-terms", false).markdown, r6);
   assert.equal(clientDocumentSource("venue-license", false), clientDocumentSource("venue-license", true));
 }
+// Unified form never uses the whole-album legacy draft.
+assert.match(read("src/components/author-dashboard/business/RightsholderVerificationForm.tsx"), /unified \? "author_business_verification_draft_v3" : "author_business_verification_draft_v2"/);
+{
+  const { clientDocumentSource } = await import("../src/lib/business-app/client-document-content.ts");
+  assert.equal(clientDocumentSource("b2b-terms", true).version, "r7-2026-10-17");
+  assert.equal(clientDocumentSource("b2b-terms", false).version, undefined);
+  assert.match(read("src/app/business-app/documents/[id]/page.tsx"), /data-document-version=\{source\.version \?\? doc\.version\}/);
+}
 // Venue documents are r6's: untouched here.
 const plan = read("docs/business/unified-agreement-8dcba9d1/ROLLOUT-PLAN-RU.md");
 for (const needle of ["Резервная копия", "Пробное восстановление", "20270106120000", "AUDIOLAD_UNIFIED_AGREEMENT_ENABLED", "01-insert-edition-2.0.sql", "02-switch-current.sql", "Откат"]) {

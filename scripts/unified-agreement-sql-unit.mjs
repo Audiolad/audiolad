@@ -3,7 +3,7 @@
 // Contract checks + real PostgreSQL scenarios in an EXPLICIT disposable test container only
 // (same harness contract as business-rightsholder-onboarding-sql-unit.mjs; never a production URL).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -38,9 +38,24 @@ for (const fn of ['author_business_verification_submit_v3', 'moderator_business_
   const body = clean.match(new RegExp(`FUNCTION public\\.${fn}\\([\\s\\S]*?\\$\\$;`))[0];
   assert.match(body, /business_unified_agreement_active\(\)/, `${fn} gated by activation`);
 }
+{
+  const review = clean.match(/FUNCTION public\.moderator_business_track_review\([\s\S]*?\$\$;/)[0];
+  assert.ok(review.indexOf('business_author_lock') > 0 && review.indexOf('business_author_lock') < review.indexOf('business_track_lock'), 'review: author lock before track lock');
+  const run = clean.match(/FUNCTION public\.business_catalog_sync_run\([\s\S]*?\$\$;/)[0];
+  assert.ok(run.indexOf('business_author_lock') > 0 && run.indexOf('business_author_lock') < run.indexOf('business_track_lock'), 'sync: author lock before track locks');
+  assert.match(run, /ORDER BY ai\.id/, 'tracks locked in ascending id');
+  const draft3 = clean.match(/FUNCTION public\.author_business_verification_draft_v3\([\s\S]*?\$\$;/)[0];
+  assert.match(draft3, /business_unified_agreement_active\(\)/);
+  assert.match(draft3, /business_consent_caller_in_support_mode/);
+  assert.doesNotMatch(draft3 + clean.match(/FUNCTION public\.author_business_verification_submit_v3[\s\S]*?\$\$;/)[0], /business_onboarding_product\(/, 'unified rights check never requires the whole album to be published');
+  assert.match(clean, /RENAME TO resolve_business_track_eligibility_v1/);
+  assert.match(clean, /FUNCTION public\.resolve_business_track_eligibility\([\s\S]*?resolve_business_track_eligibility_v1\(/);
+  assert.match(clean, /WHERE source_type = 'platform_agreement' AND status IN \('draft', 'verified'\) AND valid_until IS NULL;/);
+  assert.match(rollbackMigration, /RENAME TO resolve_business_track_eligibility;/);
+}
 assert.match(clean.match(/FUNCTION public\.moderator_business_track_review\([\s\S]*?\$\$;/)[0], /business_track_lock/);
 assert.match(clean.match(/FUNCTION public\.business_catalog_sync_run\([\s\S]*?\$\$;/)[0], /business_track_lock/);
-assert.match(clean, /CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_platform_agreement_live_uidx/);
+assert.match(clean, /CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_platform_agreement_open_uidx/);
 for (const t of ['author_terms_acceptances', 'business_rightsholder_verifications', 'practices', 'audio_items']) {
   assert.match(clean, new RegExp(`CREATE TRIGGER zz_business_unified_auto_sync_\\w+ AFTER (INSERT|UPDATE) ON public\\.${t}`), `auto inflow on ${t}`);
   assert.match(rollbackMigration, new RegExp(`DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_\\w+ ON public\\.${t}`), `rollback drops trigger on ${t}`);
@@ -194,9 +209,14 @@ BEGIN
     VALUES ('10000000-0000-0000-0000-00000000000a',v20,'${A}','2.0 text');
   PERFORM ua_test.ok(public.author_has_business_agreement('10000000-0000-0000-0000-00000000000a'), 'A has Business agreement');
 
+  -- Aurafon also has an unpublished track: the legacy draft refuses the whole album, the unified one does not.
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000a0','20000000-0000-0000-0000-00000000000a','Aurafon demo',9,'draft');
   PERFORM ua_test.as_user('${A}');
   SET LOCAL ROLE authenticated;
-  EXECUTE 'SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-00000000000a'',''30000000-0000-0000-0000-0000000000a1'',''suno'',NULL,''Spa'',''https://suno.com/s/abc'',''{"paid_plan":"Pro"}''::jsonb)' INTO v;
+  PERFORM ua_test.expect_error('SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-00000000000a'',''30000000-0000-0000-0000-0000000000a1'',''suno'',NULL,''Spa'',''https://suno.com/s/abc'',''{"paid_plan":"Pro"}''::jsonb)', 'business_track_not_published');
+  PERFORM ua_test.expect_error('SELECT public.author_business_verification_draft_v3(''20000000-0000-0000-0000-00000000000a'',''30000000-0000-0000-0000-0000000000a0'',''suno'',NULL,''Spa'',''https://suno.com/s/abc'',''{"paid_plan":"Pro"}''::jsonb)', 'business_track_not_in_product');
+  PERFORM ua_test.expect_error('SELECT public.author_business_verification_draft_v3(''20000000-0000-0000-0000-00000000000b'',''30000000-0000-0000-0000-0000000000b1'',''suno'',NULL,''Spa'',''https://suno.com/s/abc'',''{"paid_plan":"Pro"}''::jsonb)', 'business_product_not_owned');
+  EXECUTE 'SELECT public.author_business_verification_draft_v3(''20000000-0000-0000-0000-00000000000a'',''30000000-0000-0000-0000-0000000000a1'',''suno'',NULL,''Spa'',''https://suno.com/s/abc'',''{"paid_plan":"Pro"}''::jsonb)' INTO v;
   e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('c',64));
   e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('d',64));
   INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
@@ -323,10 +343,51 @@ BEGIN
   UPDATE public.audio_items SET title = 'Aurafon 1 (remaster)' WHERE id = '30000000-0000-0000-0000-0000000000a1';
   PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND rights_layer = 'recording' AND status = 'verified'), 'revoked grant not restored by a later event');
 
+  -- Expired agreement grants are history: after an explicit admission the track gets open-ended replacements.
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000a7','20000000-0000-0000-0000-0000000000a2','Jazz Relax 3',3,'draft');
+  INSERT INTO public.music_rights_grants(audio_item_id,rightsholder_id,rights_layer,use_type,territory_scope,valid_from,valid_until,source_type,source_reference,status,verified_at)
+    SELECT '30000000-0000-0000-0000-0000000000a7', rightsholder_id, l, 'business_background_playback', 'worldwide', '2026-01-01', '2026-06-01', 'platform_agreement', 'author-terms:2.0:legacy-test', 'verified', '2026-01-01'
+    FROM (SELECT rightsholder_id FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' LIMIT 1) h, unnest(ARRAY['recording','composition']) l;
+  UPDATE public.audio_items SET status = 'published' WHERE id = '30000000-0000-0000-0000-0000000000a7';
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a7'), 'expired agreement grants: no automatic replacement');
+  PERFORM ua_test.as_user('${M}');
+  SET LOCAL ROLE authenticated;
+  PERFORM public.moderator_business_track_review('30000000-0000-0000-0000-0000000000a7','admitted','ok',NULL);
+  RESET ROLE;
+  PERFORM ua_test.ok((SELECT count(*) FILTER (WHERE valid_until IS NULL AND status = 'verified') = 2 AND count(*) FILTER (WHERE valid_until IS NOT NULL) = 2
+     FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a7'), 'readmitted after expiry: 2 new open grants, expired history kept');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.business_catalog_sync_failures), 'no sync failures so far');
+
+  -- Playback enforces per-track admission: a blocked track is INELIGIBLE whatever grants exist.
+  INSERT INTO public.business_organizations(id,name) VALUES ('70000000-0000-0000-0000-000000000001','Spa Org');
+  INSERT INTO public.business_locations(id,organization_id,name,business_category,country_code) VALUES ('70000000-0000-0000-0000-000000000002','70000000-0000-0000-0000-000000000001','Spa','spa','RU');
+  PERFORM ua_test.as_user('${M}');
+  SET LOCAL ROLE authenticated;
+  PERFORM public.moderator_business_track_review(a5,'blocked','rights_revoked_or_disputed',NULL);
+  RESET ROLE;
+  r := public.resolve_business_track_eligibility(a5, '70000000-0000-0000-0000-000000000002');
+  PERFORM ua_test.ok(r->>'decision' = 'INELIGIBLE' AND r->'reason_codes' ? 'BUSINESS_TRACK_ADMISSION_BLOCKED', 'blocked track not playable: ' || r::text);
+  PERFORM ua_test.ok(public.resolve_business_track_eligibility('30000000-0000-0000-0000-0000000000a3', '70000000-0000-0000-0000-000000000002')
+     = public.resolve_business_track_eligibility_v1('30000000-0000-0000-0000-0000000000a3', '70000000-0000-0000-0000-000000000002', NULL, 'business_background_playback', now()), 'no review: identical to v1');
+  r := public.resolve_business_track_eligibility(a5, '70000000-0000-0000-0000-000000000002', NULL, 'business_background_playback', now() - interval '1 day');
+  PERFORM ua_test.ok(NOT (r->'reason_codes' ? 'BUSINESS_TRACK_ADMISSION_BLOCKED'), 'as_of before the decision: not blocked');
+  PERFORM ua_test.ok(NOT has_function_privilege('service_role','public.resolve_business_track_eligibility_v1(uuid,uuid,uuid,text,timestamptz)','EXECUTE')
+     AND has_function_privilege('service_role','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE')
+     AND NOT has_function_privilege('authenticated','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE'), 'resolver grants');
+
+  -- A failing automatic sync never breaks the triggering write and is recorded for retry.
+  CREATE FUNCTION ua_test.boom() RETURNS trigger LANGUAGE plpgsql AS $b$ BEGIN RAISE EXCEPTION 'injected_failure'; END $b$;
+  CREATE TRIGGER ua_boom BEFORE INSERT ON public.music_rights_grant_countries FOR EACH ROW EXECUTE FUNCTION ua_test.boom();
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000a8','20000000-0000-0000-0000-00000000000a','Aurafon 4',4,'published');
+  DROP TRIGGER ua_boom ON public.music_rights_grant_countries;
+  PERFORM ua_test.ok((SELECT status = 'published' FROM public.audio_items WHERE id = '30000000-0000-0000-0000-0000000000a8'), 'publish succeeded despite sync failure');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a8'), 'failed sync rolled back as a unit');
+  PERFORM ua_test.ok((SELECT count(*) = 1 AND bool_and(error LIKE '%injected_failure%') FROM public.business_catalog_sync_failures WHERE author_id = A_), 'failure recorded');
+
   -- Idempotency is enforced by the DB, not only by the sync loop.
   PERFORM ua_test.expect_error($q$INSERT INTO public.music_rights_grants(audio_item_id,rightsholder_id,rights_layer,use_type,territory_scope,valid_from,source_type,status)
     SELECT '30000000-0000-0000-0000-0000000000a1', rightsholder_id, 'composition','business_background_playback','worldwide',now(),'platform_agreement','draft'
-    FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' LIMIT 1$q$, 'music_rights_grants_platform_agreement_live_uidx');
+    FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' LIMIT 1$q$, 'music_rights_grants_platform_agreement_open_uidx');
   -- Internal runner and lock are not callable by clients.
   PERFORM ua_test.as_user('${A}');
   SET LOCAL ROLE authenticated;
@@ -367,15 +428,34 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     psql(db, switchCurrent, ['-v', `grace_until=${grace}`]);
     psql(db, scenario);
     psql(db, scenario2);
+    // Real concurrency (two sessions): sync vs sync on a track without grants, review vs sync.
+    const session = (sql) => new Promise((resolve, reject) => {
+      const p = spawn('docker', ['exec', '-i', container, 'psql', '-X', '-q', '-U', 'postgres', '-d', db, '-v', 'ON_ERROR_STOP=1'], { stdio: ['pipe', 'pipe', 'pipe'] });
+      let err = '';
+      p.stderr.on('data', (d) => { err += d; });
+      p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`session failed: ${err}`))));
+      p.stdin.end(sql);
+    });
+    const later = (ms, fn) => new Promise((r) => setTimeout(r, ms)).then(fn);
+    const svc = "SELECT set_config('request.jwt.claim.sub','',false), set_config('request.jwt.claim.role','service_role',false);";
+    const syncA = `${svc} BEGIN; SELECT public.business_catalog_sync('10000000-0000-0000-0000-00000000000a', false); SELECT pg_sleep(1.5); COMMIT;`;
+    await Promise.all([session(syncA), later(300, () => session(syncA))]);
+    const reviewA1 = `SELECT ua_test.as_user('${M}'); SET ROLE authenticated; BEGIN; SELECT public.moderator_business_track_review('30000000-0000-0000-0000-0000000000a1','admitted','ok','concurrent'); SELECT pg_sleep(1.5); COMMIT;`;
+    await Promise.all([session(reviewA1), later(300, () => session(syncA))]);
+    psql(db, String.raw`DO $t$ BEGIN
+      PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a8' AND status = 'verified'), 'concurrent syncs: exactly 2 grants (retry after failure)');
+      PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND rights_layer = 'recording' AND status = 'verified' AND valid_until IS NULL), 'review+sync concurrently: exactly 1 new recording grant');
+      PERFORM ua_test.ok((SELECT count(*) = 0 FROM (SELECT 1 FROM public.music_rights_grants WHERE source_type = 'platform_agreement' AND status IN ('draft','verified') AND valid_until IS NULL GROUP BY audio_item_id, rights_layer, use_type HAVING count(*) > 1) d), 'no duplicate open grants');
+    END $t$;`);
     // Rollback: migration rollback refuses while 2.0 is current; switch back first; history kept.
     let blocked = false;
     try { execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-q', '-U', 'postgres', '-d', db, '-v', 'ON_ERROR_STOP=1'], { input: rollbackMigration, stdio: ['pipe', 'pipe', 'pipe'] }); } catch { blocked = true; }
     assert.ok(blocked, 'migration rollback refuses while 2.0 is current');
     psql(db, [rollbackSwitch, rollbackMigration,
-      "SELECT 1 / CASE WHEN to_regprocedure('public.business_catalog_sync(uuid,boolean)') IS NULL AND to_regprocedure('public.author_business_verification_submit_v3(uuid,uuid[],inet,text)') IS NULL AND to_regprocedure('public.business_catalog_sync_run(uuid,boolean)') IS NULL AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname LIKE 'zz_business_unified_auto_sync_%') THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN to_regprocedure('public.business_catalog_sync(uuid,boolean)') IS NULL AND to_regprocedure('public.author_business_verification_submit_v3(uuid,uuid[],inet,text)') IS NULL AND to_regprocedure('public.business_catalog_sync_run(uuid,boolean)') IS NULL AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname LIKE 'zz_business_unified_auto_sync_%') AND to_regprocedure('public.resolve_business_track_eligibility_v1(uuid,uuid,uuid,text,timestamptz)') IS NULL AND has_function_privilege('service_role','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE') AND NOT has_function_privilege('authenticated','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN has_function_privilege('authenticated','public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text)','EXECUTE') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN (SELECT version FROM public.author_terms_versions WHERE is_current) = '1.2' THEN 1 ELSE 0 END;",
-      "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 3 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 3 THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 3 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 6 THEN 1 ELSE 0 END;",
       // Re-apply after rollback works.
       migration].join('\n'));
     console.log('unified-agreement-sql-unit: contract + isolated PostgreSQL scenarios OK');

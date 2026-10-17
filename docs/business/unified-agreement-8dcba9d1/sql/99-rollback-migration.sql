@@ -33,13 +33,30 @@ DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.audio_items;
 DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.audio_items;
 DROP FUNCTION IF EXISTS public.business_unified_auto_sync_trigger();
 DROP FUNCTION IF EXISTS public.business_unified_auto_sync_authors(uuid[]);
+-- Playback overlay: restore the original resolver under its public name (body untouched, grants as in 20261206120200).
+DO $$
+BEGIN
+  IF to_regprocedure('public.resolve_business_track_eligibility_v1(uuid,uuid,uuid,text,timestamptz)') IS NOT NULL THEN
+    DROP FUNCTION IF EXISTS public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz);
+    ALTER FUNCTION public.resolve_business_track_eligibility_v1(uuid, uuid, uuid, text, timestamptz)
+      RENAME TO resolve_business_track_eligibility;
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) TO postgres;
+DROP FUNCTION IF EXISTS public.author_business_verification_draft_v3(uuid, uuid, text, text, text, text, jsonb);
 DROP FUNCTION IF EXISTS public.business_catalog_sync(uuid, boolean);
 DROP FUNCTION IF EXISTS public.business_catalog_sync_run(uuid, boolean);
 DROP FUNCTION IF EXISTS public.business_track_lock(uuid);
+DROP FUNCTION IF EXISTS public.business_author_lock(uuid);
 DROP FUNCTION IF EXISTS public.business_unified_agreement_active();
 -- Индекс идемпотентности снимается; гранты остаются.
-DROP INDEX IF EXISTS public.music_rights_grants_platform_agreement_live_uidx;
+DROP INDEX IF EXISTS public.music_rights_grants_platform_agreement_open_uidx;
+-- business_catalog_sync_failures (журнал сбоев автопоступления) сохраняется как история.
 DROP FUNCTION IF EXISTS public.author_business_verification_submit_v3(uuid, uuid[], inet, text);
+DROP FUNCTION IF EXISTS public.business_unified_evidence_track(uuid, uuid);
 DROP FUNCTION IF EXISTS public.moderator_business_track_review(uuid, text, text, text);
 DROP FUNCTION IF EXISTS public.business_track_latest_review(uuid);
 DROP FUNCTION IF EXISTS public.author_commercial_agreement_state(uuid);

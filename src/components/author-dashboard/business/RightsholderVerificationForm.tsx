@@ -114,7 +114,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
     try {
       const supabase = createClient();
       const details = buildDraftDetails(values);
-      const draft = await supabase.rpc("author_business_verification_draft_v2", {
+      // Unified: draft_v3 checks only the chosen published track, not the whole album.
+      const draft = await supabase.rpc(unified ? "author_business_verification_draft_v3" : "author_business_verification_draft_v2", {
         p_product_id: productId,
         p_audio_item_id: audioItemId,
         p_ai_service: provider,

@@ -34,7 +34,11 @@ export const CLIENT_B2B_TERMS_R6_SOURCE: Readonly<{ file: string; markdown: stri
 export function clientDocumentSource(
   id: string,
   unifiedAgreementEnabled: boolean,
-): { file: string; markdown: string; sha256: string } | undefined {
-  if (id === "b2b-terms" && !unifiedAgreementEnabled) return CLIENT_B2B_TERMS_R6_SOURCE;
+): { file: string; markdown: string; sha256: string; version?: string } | undefined {
+  if (id === "b2b-terms") {
+    return unifiedAgreementEnabled
+      ? { ...CLIENT_DOCUMENT_SOURCES[id], version: "r7-2026-10-17" }
+      : CLIENT_B2B_TERMS_R6_SOURCE;
+  }
   return CLIENT_DOCUMENT_SOURCES[id];
 }

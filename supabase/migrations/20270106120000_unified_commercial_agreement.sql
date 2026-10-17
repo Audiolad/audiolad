@@ -202,7 +202,18 @@ AS $$
   );
 $$;
 
--- Serializes catalogue sync and per-track moderation decisions for one track.
+-- Lock order (everywhere): author lock FIRST, then track locks in ascending track id.
+-- Sync and moderation for one author therefore never interleave and never invert lock order.
+CREATE OR REPLACE FUNCTION public.business_author_lock(p_author_id uuid)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT pg_advisory_xact_lock(hashtextextended('audiolad:business_author:' || p_author_id::text, 0));
+$$;
+
+-- Serializes catalogue sync and per-track moderation decisions for one track (taken after the author lock).
 CREATE OR REPLACE FUNCTION public.business_track_lock(p_audio_item_id uuid)
 RETURNS void
 LANGUAGE sql
@@ -212,11 +223,59 @@ AS $$
   SELECT pg_advisory_xact_lock(hashtextextended('audiolad:business_track:' || p_audio_item_id::text, 0));
 $$;
 
--- At most one live agreement grant per track/layer/use (idempotency under concurrency).
--- Only platform_agreement rows are constrained; existing grants (source 'other' etc.) are unaffected.
-CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_platform_agreement_live_uidx
+-- At most one open-ended agreement grant per track/layer/use (idempotency under concurrency).
+-- The sync only ever creates open-ended rows (valid_until IS NULL); rows with an end date (expired
+-- history or a later end set by the rights team) are outside the key, so an explicitly re-admitted
+-- track can get a replacement. Only platform_agreement rows are constrained; other sources unaffected.
+CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_platform_agreement_open_uidx
   ON public.music_rights_grants (audio_item_id, rights_layer, use_type)
-  WHERE source_type = 'platform_agreement' AND status IN ('draft', 'verified');
+  WHERE source_type = 'platform_agreement' AND status IN ('draft', 'verified') AND valid_until IS NULL;
+
+-- Failed automatic inflow is recorded (append-only) so it is visible and retried; never silent.
+CREATE TABLE IF NOT EXISTS public.business_catalog_sync_failures (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_id uuid NOT NULL,
+  sqlstate text NOT NULL,
+  error text NOT NULL CHECK (length(error) <= 2000),
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS business_catalog_sync_failures_author_idx
+  ON public.business_catalog_sync_failures(author_id, created_at DESC);
+ALTER TABLE public.business_catalog_sync_failures ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.business_catalog_sync_failures FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.business_catalog_sync_failures TO service_role;
+DROP TRIGGER IF EXISTS business_catalog_sync_failures_immutable ON public.business_catalog_sync_failures;
+CREATE TRIGGER business_catalog_sync_failures_immutable
+  BEFORE UPDATE OR DELETE OR TRUNCATE ON public.business_catalog_sync_failures
+  FOR EACH STATEMENT EXECUTE FUNCTION public.business_onboarding_append_only();
+
+-- Evidence track for the rights check: ONE published track of a published music product owned by
+-- the caller. Unlike business_onboarding_product it does not require every track of the album to be
+-- published (unified model: proof on >= 1 published track).
+CREATE OR REPLACE FUNCTION public.business_unified_evidence_track(p_product_id uuid, p_audio_item_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_product public.practices%ROWTYPE; v_track jsonb;
+BEGIN
+  SELECT * INTO v_product FROM public.practices WHERE id = p_product_id FOR SHARE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'business_product_not_owned'; END IF;
+  PERFORM 1 FROM public.author_members WHERE author_id = v_product.author_id
+    AND user_id = auth.uid() AND role = 'owner' FOR SHARE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'business_product_not_owned' USING ERRCODE = '42501'; END IF;
+  IF v_product.status IS DISTINCT FROM 'published' OR v_product.product_kind IS DISTINCT FROM 'music' THEN
+    RAISE EXCEPTION 'business_product_not_published';
+  END IF;
+  SELECT jsonb_build_array(jsonb_build_object('audio_item_id', id, 'title', title,
+      'position', position, 'music_track_code', music_track_code))
+    INTO v_track FROM public.audio_items
+    WHERE id = p_audio_item_id AND practice_id = p_product_id AND status = 'published' FOR SHARE;
+  IF v_track IS NULL THEN RAISE EXCEPTION 'business_track_not_in_product'; END IF;
+  RETURN v_track;
+END;
+$$;
 
 -- Moderator per-track decision. blocked / proof_requested revoke this agreement's own
 -- platform_agreement Business grants for the track (verified → revoked keeps history).
@@ -249,6 +308,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'business_self_moderation_forbidden' USING ERRCODE = '42501';
   END IF;
+  PERFORM public.business_author_lock(v_author);
   PERFORM public.business_track_lock(p_audio_item_id);
   INSERT INTO public.business_track_eligibility_reviews(audio_item_id, product_id, author_id, decision, reason_code, comment, actor_user_id)
     VALUES (p_audio_item_id, v_product, v_author, p_decision, p_reason_code, nullif(btrim(p_comment), ''), auth.uid())
@@ -295,10 +355,7 @@ BEGIN
   END IF;
   v_err := public.business_onboarding_provider_error(v.ai_service, v.ai_service_other, v.service_track_url, v.provider_details);
   IF v_err IS NOT NULL THEN RAISE EXCEPTION '%', v_err; END IF;
-  v_tracks := public.business_onboarding_product(v.product_id);
-  IF NOT EXISTS (SELECT 1 FROM public.audio_items WHERE id = v.audio_item_id AND practice_id = v.product_id AND status = 'published') THEN
-    RAISE EXCEPTION 'business_track_not_in_product';
-  END IF;
+  v_tracks := public.business_unified_evidence_track(v.product_id, v.audio_item_id);
   SELECT author_id INTO v_author FROM public.practices WHERE id = v.product_id;
   SELECT * INTO v_agreement FROM public.author_business_agreement_acceptance(v_author);
   IF v_agreement.acceptance_id IS NULL THEN
@@ -327,6 +384,54 @@ BEGIN
     FROM public.business_rightsholder_verification_attempts WHERE verification_id = v.id;
   UPDATE public.business_rightsholder_verifications SET status = 'submitted', submitted_at = clock_timestamp(),
     updated_at = clock_timestamp() WHERE id = v.id;
+END;
+$$;
+
+-- 5b) draft_v3 = draft_v2 for the unified model: same fields, but the evidence track is checked
+--     alone (business_unified_evidence_track), never the whole album. Activation-gated, no support mode.
+CREATE OR REPLACE FUNCTION public.author_business_verification_draft_v3(
+  p_product_id uuid, p_audio_item_id uuid, p_ai_service text, p_ai_service_other text,
+  p_service_track_title text, p_service_track_url text, p_provider_details jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_id uuid; v_status text; v_err text;
+  v_url text := nullif(btrim(p_service_track_url),'');
+  v_other text := CASE WHEN p_ai_service = 'other' THEN nullif(btrim(p_ai_service_other),'') END;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501'; END IF;
+  IF public.business_consent_caller_in_support_mode() THEN
+    RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.business_unified_agreement_active() THEN
+    RAISE EXCEPTION 'business_unified_agreement_inactive' USING ERRCODE = '55000';
+  END IF;
+  INSERT INTO public.business_rightsholder_accounts(owner_user_id) VALUES (auth.uid()) ON CONFLICT DO NOTHING;
+  PERFORM 1 FROM public.business_rightsholder_accounts WHERE owner_user_id = auth.uid() FOR UPDATE;
+  PERFORM public.business_unified_evidence_track(p_product_id, p_audio_item_id);
+  v_err := public.business_onboarding_provider_error(p_ai_service, v_other, v_url, p_provider_details);
+  IF v_err IS NOT NULL THEN RAISE EXCEPTION '%', v_err; END IF;
+  IF p_service_track_title IS NULL OR length(btrim(p_service_track_title)) NOT BETWEEN 1 AND 500 THEN
+    RAISE EXCEPTION 'business_service_track_title_invalid';
+  END IF;
+  SELECT id, status INTO v_id, v_status FROM public.business_rightsholder_verifications
+    WHERE owner_user_id = auth.uid() FOR UPDATE;
+  IF FOUND THEN
+    IF v_status NOT IN ('rejected','needs_info') THEN RAISE EXCEPTION 'business_verification_already_active'; END IF;
+    UPDATE public.business_rightsholder_verifications SET product_id = p_product_id,
+      audio_item_id = p_audio_item_id, ai_service = p_ai_service, ai_service_other = v_other,
+      service_track_title = btrim(p_service_track_title), service_track_url = v_url,
+      provider_details = p_provider_details, status = 'draft', updated_at = clock_timestamp() WHERE id = v_id;
+    RETURN v_id;
+  END IF;
+  INSERT INTO public.business_rightsholder_verifications(owner_user_id,product_id,audio_item_id,ai_service,
+    ai_service_other,service_track_title,service_track_url,provider_details)
+    VALUES(auth.uid(),p_product_id,p_audio_item_id,p_ai_service,v_other,btrim(p_service_track_title),v_url,p_provider_details)
+    RETURNING id INTO v_id;
+  RETURN v_id;
 END;
 $$;
 
@@ -375,6 +480,9 @@ BEGIN
       'reasons', to_jsonb(v_reasons), 'created_grants', 0, 'ready', '[]'::jsonb, 'skipped', '[]'::jsonb);
   END IF;
 
+  IF NOT p_dry_run THEN
+    PERFORM public.business_author_lock(p_author_id);
+  END IF;
   FOR t IN
     SELECT ai.id AS audio_item_id, ai.practice_id AS product_id
     FROM public.audio_items ai JOIN public.practices p ON p.id = ai.practice_id
@@ -482,6 +590,10 @@ BEGIN
     BEGIN
       PERFORM public.business_catalog_sync_run(a, false);
     EXCEPTION WHEN OTHERS THEN
+      -- The failed sync is rolled back as a unit; the record below survives and the next event for
+      -- this author (or a manual business_catalog_sync) retries. See ROLLOUT-PLAN-RU.md monitoring.
+      INSERT INTO public.business_catalog_sync_failures(author_id, sqlstate, error)
+        VALUES (a, SQLSTATE, left(SQLERRM, 2000));
       RAISE WARNING 'business_unified_auto_sync_failed author=% err=%', a, SQLERRM;
     END;
   END LOOP;
@@ -536,6 +648,57 @@ DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.audio_items;
 CREATE TRIGGER zz_business_unified_auto_sync_upd AFTER UPDATE ON public.audio_items
   REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
 
+-- 7c) Per-track admission is enforced at PLAYBACK: the eligibility resolver (used by programmes,
+--     manifest and live player state) returns INELIGIBLE for a track whose latest admission
+--     decision as of p_as_of is 'blocked' or 'proof_requested', whatever grants exist (historical
+--     grants of any source are kept untouched). The original resolver is kept verbatim as
+--     resolve_business_track_eligibility_v1 (no client grant); the public name is a thin overlay.
+--     Without reviews (the case before activation) the result is byte-identical to v1.
+DO $$
+BEGIN
+  IF to_regprocedure('public.resolve_business_track_eligibility_v1(uuid,uuid,uuid,text,timestamptz)') IS NULL THEN
+    ALTER FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz)
+      RENAME TO resolve_business_track_eligibility_v1;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.resolve_business_track_eligibility(
+  p_audio_item_id uuid,
+  p_location_id uuid,
+  p_zone_id uuid DEFAULT NULL,
+  p_use_type text DEFAULT 'business_background_playback',
+  p_as_of timestamptz DEFAULT now()
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v jsonb; r record;
+BEGIN
+  v := public.resolve_business_track_eligibility_v1(p_audio_item_id, p_location_id, p_zone_id, p_use_type, p_as_of);
+  SELECT id, decision INTO r FROM public.business_track_eligibility_reviews
+    -- Current queries (as_of >= transaction time) see every decision, even one made later in this
+    -- transaction; historical queries see the decisions made up to as_of.
+    WHERE audio_item_id = p_audio_item_id
+      AND (coalesce(p_as_of, now()) >= now() OR created_at <= p_as_of)
+    ORDER BY created_at DESC, id DESC LIMIT 1;
+  IF FOUND AND r.decision IN ('blocked', 'proof_requested') THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || to_jsonb('BUSINESS_TRACK_ADMISSION_' || upper(r.decision)),
+      'business_track_review_id', r.id);
+  END IF;
+  RETURN v;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.resolve_business_track_eligibility_v1(uuid, uuid, uuid, text, timestamptz) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) TO service_role;
+COMMENT ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) IS
+  'audiolad:unified-agreement; rights_eligibility_v1 + per-track admission overlay (blocked/proof_requested => INELIGIBLE)';
+
 -- 8) Least privilege -----------------------------------------------------------------------
 REVOKE ALL ON FUNCTION public.business_unified_is_author_member(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.business_unified_is_author_member(uuid) TO authenticated;
@@ -545,6 +708,10 @@ REVOKE ALL ON FUNCTION public.author_commercial_agreement_state(uuid) FROM PUBLI
 REVOKE ALL ON FUNCTION public.business_track_latest_review(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.business_unified_agreement_active() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.business_track_lock(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_author_lock(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_unified_evidence_track(uuid,uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.author_business_verification_draft_v3(uuid,uuid,text,text,text,text,jsonb) FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.author_business_verification_draft_v3(uuid,uuid,text,text,text,text,jsonb) TO authenticated;
 REVOKE ALL ON FUNCTION public.business_catalog_sync_run(uuid,boolean) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.business_unified_auto_sync_authors(uuid[]) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.business_unified_auto_sync_trigger() FROM PUBLIC, anon, authenticated, service_role;
