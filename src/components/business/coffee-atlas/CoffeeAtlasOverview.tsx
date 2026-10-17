@@ -61,11 +61,11 @@ export default function CoffeeAtlasOverview() {
           <div className="atlas-wrap">
             <p className="atlas-kicker">Маршрут</p>
             <h2 id="atlas-route-title" className="atlas-display atlas-h2">
-              10 кофеен — 10 характеров звучания
+              10 кофеен – 10 характеров звучания
             </h2>
             <p className="atlas-lead">
               Путешествие от венецианских залов XVIII века до кофейного театра Шанхая. В каждой
-              кофейне — история, детали атмосферы, идеи, которые можно взять себе, и то, как она могла
+              кофейне – история, детали атмосферы, идеи, которые можно взять себе, и то, как она могла
               бы звучать.
             </p>
             <ul className="atlas-continents" aria-label="Города маршрута">

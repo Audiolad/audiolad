@@ -64,7 +64,7 @@ export default function CoffeeAtlasListen({ shopName, tracks }: CoffeeAtlasListe
           <span
             data-atlas-play="true"
             className="atlas-track__play-wrap"
-            title={`${track.title} — пример для ${shopName}`}
+            title={`${track.title} – пример для ${shopName}`}
           >
             <HomeProductPlayButton
               practiceId={track.id}
