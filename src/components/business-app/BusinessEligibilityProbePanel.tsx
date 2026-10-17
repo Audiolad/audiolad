@@ -68,7 +68,7 @@ export default function BusinessEligibilityProbePanel({
             ? "Пул эфира (eligibility)"
             : "Проверка eligibility",
           description:
-            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав — после HG-3/HG-4.",
+            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав – после HG-3/HG-4.",
         }
       : venueAirplayEmptyStateCopy({
           hasLocation: Boolean(domain.location),

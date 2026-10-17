@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const doc = findClientDocument(id);
   return {
-    title: doc ? `${doc.title} — ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ",
+    title: doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ",
     robots: { index: false, follow: false },
   };
 }

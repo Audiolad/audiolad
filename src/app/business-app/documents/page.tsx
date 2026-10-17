@@ -61,7 +61,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
           Получили претензию или пришла проверка? Ничего не подписывайте по
           существу и не платите на месте. Сообщите нам через раздел «Помощь»
-          в течение 3 рабочих дней, а лучше в тот же день — сроки и исключения
+          в течение 3 рабочих дней, а лучше в тот же день – сроки и исключения
           (обязательные по закону действия, поздно полученный иск, отсутствие
           нашего ответа) указаны в пп. 2.1–2.2 «Порядка защиты клиента».
         </p>
@@ -81,7 +81,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Отчёт строится по сообщениям плеера АудиоЛад о воспроизведении, которые принял
           сервер: сервер проверяет плеер и точку и фиксирует время получения, время начала
-          и длительность сообщает плеер. Время — по часовому поясу точки.
+          и длительность сообщает плеер. Время – по часовому поясу точки.
         </p>
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm">Войдите, чтобы построить отчёт.</p>
@@ -125,7 +125,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               <div className="mt-4">
                 <p className="text-sm text-[var(--biz-text-muted)]">
                   {result.locationName} · {formatVenueZoneRu(result.report.fromUtc, result.report.timezone)} · интервал{" "}
-                  {formatVenueTime(result.report.fromUtc, result.report.timezone)} —{" "}
+                  {formatVenueTime(result.report.fromUtc, result.report.timezone)} –{" "}
                   {formatVenueTime(result.report.toUtc, result.report.timezone)}
                 </p>
                 {result.report.tracks.length === 0 ? (

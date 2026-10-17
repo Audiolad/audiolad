@@ -310,7 +310,7 @@ export default function VenuePlayerPage() {
       <section className="business-app-span-full business-app-card">
         <h1 className="text-2xl font-bold text-[var(--biz-text)]">Venue Player</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          Сначала создайте организацию и точку на Главной — затем сюда вернётесь
+          Сначала создайте организацию и точку на Главной – затем сюда вернётесь
           для назначения Player на зону.
         </p>
       </section>
@@ -388,14 +388,14 @@ export default function VenuePlayerPage() {
           <div>
             <dt className="text-[var(--biz-text-muted)]">Heartbeat (A2)</dt>
             <dd className="font-semibold text-[var(--biz-text)]">
-              {heartbeatOk ? "ok" : "—"}
+              {heartbeatOk ? "ok" : "–"}
               {lastHeartbeatAt ? ` · ${lastHeartbeatAt}` : ""}
             </dd>
           </div>
           <div>
             <dt className="text-[var(--biz-text-muted)]">Proof of Play (A3)</dt>
             <dd className="font-semibold text-[var(--biz-text)]">
-              {popOk ? "ok" : "—"}
+              {popOk ? "ok" : "–"}
               {lastPopAcceptedMs != null
                 ? ` · accepted_ms=${lastPopAcceptedMs}`
                 : ""}

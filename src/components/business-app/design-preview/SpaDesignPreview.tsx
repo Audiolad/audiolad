@@ -129,7 +129,7 @@ export default function SpaDesignPreview() {
         {state === "playing" ? `Играет на плеере точки · ${PLAYER}` : state === "paused" ? `На паузе на плеере точки · ${PLAYER}` : `Плеер точки · ${PLAYER}`}
       </p>
       <button type="button" className={styles.primaryWide}>Управление музыкой ↗</button>
-      <p className={styles.note}>Откроется отдельный плеер точки — его использует персонал.</p>
+      <p className={styles.note}>Откроется отдельный плеер точки – его использует персонал.</p>
     </section>
   );
 
@@ -152,7 +152,7 @@ export default function SpaDesignPreview() {
       <p className={styles.mood}>{moodText(energy)}</p>
       <label className={styles.range}>
         <span className={styles.rangeLabels}><span>Спокойнее</span><span>Энергичнее</span></span>
-        <input type="range" min={0} max={100} step={5} value={energy} aria-label="Спокойнее — Энергичнее" aria-valuetext={moodText(energy)}
+        <input type="range" min={0} max={100} step={5} value={energy} aria-label="Спокойнее – Энергичнее" aria-valuetext={moodText(energy)}
           onChange={(e) => { setEnergy(Number(e.target.value)); setAuto(false); }} />
       </label>
       {!auto && (
@@ -189,7 +189,7 @@ export default function SpaDesignPreview() {
           </li>
         ))}
       </ol>
-      <p className={styles.note}>Аудиолад сам ведёт музыку через день. Поправите атмосферу — день подстроится.</p>
+      <p className={styles.note}>Аудиолад сам ведёт музыку через день. Поправите атмосферу – день подстроится.</p>
     </section>
   );
 
@@ -214,7 +214,7 @@ export default function SpaDesignPreview() {
       <p>Музыка точки лицензирована · пример</p>
       <dl className={styles.facts}>
         <div><dt>Точка</dt><dd>SPA «Тихий сад» · Тверская</dd></div>
-        <div><dt>Период</dt><dd>01.10.2026 — 30.09.2027</dd></div>
+        <div><dt>Период</dt><dd>01.10.2026 – 30.09.2027</dd></div>
         <div><dt>Покрывает</dt><dd>Фоновая музыка в зале и кабинетах</dd></div>
       </dl>
       <div className={styles.row}>
@@ -291,8 +291,8 @@ export default function SpaDesignPreview() {
         <h1>Пульт звуковой атмосферы</h1>
       </header>
       <div className={styles.banner}>
-        <strong>Макет — не реальные данные</strong>
-        <p>Точки, время и статусы вымышлены; треки и обложки — примеры из каталога Аудиолад. Кнопки меняют только макет. Звука и сохранения нет.</p>
+        <strong>Макет – не реальные данные</strong>
+        <p>Точки, время и статусы вымышлены; треки и обложки – примеры из каталога Аудиолад. Кнопки меняют только макет. Звука и сохранения нет.</p>
       </div>
       <div className={styles.controls}>
         <label>Экран
