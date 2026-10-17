@@ -38,7 +38,7 @@ for (const edition of APPROVED_AUTHOR_TERMS_EDITIONS) {
 const VERSION_COLUMNS =
   "id, version, title, published_at, effective_at, content_hash, document_key, is_current, created_at";
 /** Selected only when the unified-agreement flag is on (columns from migration 20270106120000). */
-const UNIFIED_VERSION_COLUMNS = `${VERSION_COLUMNS}, covers_business, reaccept_grace_until`;
+const UNIFIED_VERSION_COLUMNS = `${VERSION_COLUMNS}, covers_business, commercial_access_continues`;
 
 function adminClient(): SupabaseClient {
   return createServiceRoleClient();
@@ -68,14 +68,16 @@ export async function getCurrentAuthorTermsVersion(
   return (data as unknown as AuthorTermsVersionRow | null) ?? null;
 }
 
-/** All acceptances of an author with the edition's Business coverage (flag on only). */
+type EditionFlags = { covers_business: boolean | null; commercial_access_continues: boolean | null };
+
+/** All acceptances of an author with the edition flags (flag on only). */
 async function listAuthorTermsAcceptanceEditions(
   authorId: string,
   client: SupabaseClient,
-): Promise<{ termsVersionId: string; coversBusiness: boolean }[]> {
+): Promise<{ termsVersionId: string; coversBusiness: boolean; keepsCommercialAccess: boolean }[]> {
   const { data, error } = await client
     .from("author_terms_acceptances")
-    .select("terms_version_id, author_terms_versions!inner(covers_business, document_key)")
+    .select("terms_version_id, author_terms_versions!inner(covers_business, commercial_access_continues, document_key)")
     .eq("author_id", authorId)
     .eq("author_terms_versions.document_key", "author-terms");
   if (error) {
@@ -84,12 +86,16 @@ async function listAuthorTermsAcceptanceEditions(
   }
   return ((data ?? []) as unknown as {
     terms_version_id: string;
-    author_terms_versions: { covers_business: boolean | null } | { covers_business: boolean | null }[] | null;
+    author_terms_versions: EditionFlags | EditionFlags[] | null;
   }[]).map((row) => {
     const version = Array.isArray(row.author_terms_versions)
       ? row.author_terms_versions[0]
       : row.author_terms_versions;
-    return { termsVersionId: row.terms_version_id, coversBusiness: version?.covers_business === true };
+    return {
+      termsVersionId: row.terms_version_id,
+      coversBusiness: version?.covers_business === true,
+      keepsCommercialAccess: version?.commercial_access_continues === true,
+    };
   });
 }
 
@@ -119,7 +125,7 @@ export async function hasAcceptedCurrentAuthorTerms(
   authorId: string,
   client: SupabaseClient = adminClient(),
 ): Promise<{
-  /** Commercial gates: current edition accepted, or (flag on) within the re-acceptance grace. */
+  /** Commercial gates: current edition accepted, or (flag on) an earlier edition that keeps commercial access (no end date). */
   accepted: boolean;
   currentVersion: AuthorTermsVersionRow | null;
   acceptance: AuthorTermsAcceptanceRow | null;
@@ -133,7 +139,7 @@ export async function hasAcceptedCurrentAuthorTerms(
   const acceptances = unifiedEnabled && currentVersion
     ? await listAuthorTermsAcceptanceEditions(authorId, client)
     : acceptance
-      ? [{ termsVersionId: acceptance.terms_version_id, coversBusiness: false }]
+      ? [{ termsVersionId: acceptance.terms_version_id, coversBusiness: false, keepsCommercialAccess: false }]
       : [];
   const gate = evaluateTermsGate({
     unifiedEnabled,
@@ -142,7 +148,6 @@ export async function hasAcceptedCurrentAuthorTerms(
       ? {
           id: currentVersion.id,
           coversBusiness: currentVersion.covers_business === true,
-          reacceptGraceUntil: currentVersion.reaccept_grace_until ?? null,
         }
       : null,
     acceptances,
@@ -194,9 +199,8 @@ export async function loadAuthorTermsStatus(input: {
       !accepted,
     role: input.role,
     supportMode: input.supportMode,
-    reacceptRequired: gate.reacceptRequired,
-    inGrace: gate.inGrace,
-    graceUntil: gate.inGrace ? currentVersion?.reaccept_grace_until ?? null : null,
+    reacceptInvited: gate.reacceptInvited,
+    previousEditionActive: gate.previousEditionActive,
     coversBusiness: currentVersion?.covers_business === true,
     businessAgreement: gate.businessAgreement,
   };

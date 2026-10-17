@@ -9,7 +9,7 @@ BEGIN
   END IF;
   UPDATE public.author_terms_versions SET is_current = false
     WHERE document_key = 'author-terms' AND is_current AND id <> '9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902';
-  UPDATE public.author_terms_versions SET is_current = true
+  UPDATE public.author_terms_versions SET is_current = true, commercial_access_continues = false
     WHERE id = '9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902';
 END;
 $$;
@@ -17,5 +17,5 @@ $$;
 -- неактивны (business_unified_agreement_active() = false).
 GRANT EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) TO authenticated;
 SELECT public.business_unified_agreement_active() AS unified_active;
-SELECT version, is_current FROM public.author_terms_versions WHERE document_key = 'author-terms' ORDER BY published_at;
+SELECT version, is_current, commercial_access_continues FROM public.author_terms_versions WHERE document_key = 'author-terms' ORDER BY published_at;
 COMMIT;

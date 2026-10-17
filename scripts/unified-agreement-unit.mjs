@@ -76,32 +76,40 @@ assert.equal(findAcceptableEditionByHash("0".repeat(64), true), null);
 assert.equal(findEditionByVersion("1.2"), LEGACY_AUTHOR_TERMS_EDITION);
 assert.equal(findEditionByVersion("9.9"), null);
 
-// ---- Gate logic (grace, Business, never auto-accept).
+// ---- Gate logic (no cut-off date, Business only via personal 2.0, never auto-accept).
 const now = new Date("2026-11-01T00:00:00Z");
-const cur = (over = {}) => ({ id: "v20", coversBusiness: true, reacceptGraceUntil: "2027-01-31T20:59:59Z", ...over });
-const on12 = [{ termsVersionId: "v12", coversBusiness: false }];
-const on20 = [{ termsVersionId: "v12", coversBusiness: false }, { termsVersionId: "v20", coversBusiness: true }];
+const farFuture = new Date("2099-01-01T00:00:00Z");
+const cur = (over = {}) => ({ id: "v20", coversBusiness: true, ...over });
+const on12 = [{ termsVersionId: "v12", coversBusiness: false, keepsCommercialAccess: true }];
+const on11 = [{ termsVersionId: "v11", coversBusiness: false, keepsCommercialAccess: false }];
+const on20 = [{ termsVersionId: "v12", coversBusiness: false, keepsCommercialAccess: true }, { termsVersionId: "v20", coversBusiness: true, keepsCommercialAccess: false }];
+const NONE = { accepted: false, acceptedCurrent: false, previousEditionActive: false, reacceptInvited: false, businessAgreement: false };
 // Flag off: exactly the old rule.
-assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now, current: cur(), acceptances: on12 }),
-  { accepted: false, acceptedCurrent: false, inGrace: false, reacceptRequired: false, businessAgreement: false });
-assert.equal(evaluateTermsGate({ unifiedEnabled: false, now, current: { id: "v12", coversBusiness: false, reacceptGraceUntil: null }, acceptances: on12 }).accepted, true);
-// Flag on, 1.2 author during grace: commercial yes, Business no, banner yes.
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now, current: cur(), acceptances: on12 }), NONE);
+assert.equal(evaluateTermsGate({ unifiedEnabled: false, now, current: { id: "v12", coversBusiness: false }, acceptances: on12 }).accepted, true);
+// Flag on, 1.2 author: commercial yes (indefinitely), Business no, invitation notice yes.
 let g = evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: on12 });
-assert.deepEqual(g, { accepted: true, acceptedCurrent: false, inGrace: true, reacceptRequired: true, businessAgreement: false });
-// Grace over → not accepted until personal acceptance.
-g = evaluateTermsGate({ unifiedEnabled: true, now: new Date("2027-02-01T00:00:00Z"), current: cur(), acceptances: on12 });
-assert.equal(g.accepted, false); assert.equal(g.reacceptRequired, true); assert.equal(g.businessAgreement, false);
-// No grace configured → strict.
-assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: cur({ reacceptGraceUntil: null }), acceptances: on12 }).accepted, false);
-// Accepted 2.0 → everything, no banner.
+assert.deepEqual(g, { accepted: true, acceptedCurrent: false, previousEditionActive: true, reacceptInvited: true, businessAgreement: false });
+// No cut-off: same result at any moment in the future.
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: true, now: farFuture, current: cur(), acceptances: on12 }), g);
+// 1.1-only author (edition not flagged): unchanged strict rule, notice shown, no Business.
+g = evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: on11 });
+assert.equal(g.accepted, false); assert.equal(g.previousEditionActive, false); assert.equal(g.reacceptInvited, true); assert.equal(g.businessAgreement, false);
+// Accepted 2.0 → everything, no notice.
 assert.deepEqual(evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: on20 }),
-  { accepted: true, acceptedCurrent: true, inGrace: false, reacceptRequired: false, businessAgreement: true });
-// New author with no acceptances: nothing, no banner (first acceptance flow).
-assert.deepEqual(evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: [] }),
-  { accepted: false, acceptedCurrent: false, inGrace: false, reacceptRequired: false, businessAgreement: false });
-// Later edition 2.1 during its grace: an earlier covers_business acceptance keeps Business.
-assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: cur({ id: "v21" }), acceptances: on20 }).businessAgreement, true);
+  { accepted: true, acceptedCurrent: true, previousEditionActive: false, reacceptInvited: false, businessAgreement: true });
+// New author with no acceptances: nothing, no notice (first acceptance flow).
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: [] }), NONE);
+// Later edition 2.1: Business keeps only if 2.0 is explicitly flagged to continue; otherwise personal 2.1 needed.
+assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: cur({ id: "v21" }), acceptances: on20 }).businessAgreement, false);
+assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: cur({ id: "v21" }),
+  acceptances: [{ termsVersionId: "v20", coversBusiness: true, keepsCommercialAccess: true }] }).businessAgreement, true);
 assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: null, acceptances: on20 }).accepted, false);
+// Source contract: no grace/cut-off anywhere in the gate code, banner shows no end date.
+for (const f of ["src/lib/author-terms/editions.ts", "src/lib/author-terms/service.ts", "src/lib/studio-music/catalog.ts",
+  "src/components/author-dashboard/AuthorAgreementReacceptBanner.tsx", "src/lib/author-terms/types.ts"]) {
+  assert.doesNotMatch(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"), /reaccept_grace_until|graceUntil|inGrace/, `${f}: no grace`);
+}
 
 // ---- Two public statuses.
 assert.deepEqual(Object.values(AUTHOR_PRODUCT_STATUS_LABEL), ["Бесплатный", "Коммерческий"]);

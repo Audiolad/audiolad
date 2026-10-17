@@ -1407,28 +1407,18 @@ export function createSupabaseStudioMusicCatalogStore(
         .eq("author_terms_versions.document_key", "author-terms");
       if (error) throw new Error("studio_music_author_terms_lookup_failed");
       const accepted = new Set((data ?? []).map((row) => String(row.author_id)));
-      // Unified agreement 2.0 rollout: earlier editions stay valid during the
-      // re-acceptance grace (same rule as SQL author_has_accepted_current_terms).
+      // Unified agreement 2.0 rollout: an earlier edition flagged commercial_access_continues
+      // (1.2 at the switch) stays valid with no end date (same rule as SQL
+      // author_has_accepted_current_terms). Never Business.
       if (isUnifiedAgreementEnabled() && accepted.size < authorIds.length) {
-        const { data: current, error: currentError } = await supabase
-          .from("author_terms_versions")
-          .select("reaccept_grace_until")
-          .eq("is_current", true)
-          .eq("document_key", "author-terms")
-          .maybeSingle();
-        if (currentError) throw new Error("studio_music_author_terms_lookup_failed");
-        const graceUntil = current?.reaccept_grace_until
-          ? Date.parse(String(current.reaccept_grace_until))
-          : Number.NaN;
-        if (Number.isFinite(graceUntil) && Date.now() < graceUntil) {
-          const { data: earlier, error: earlierError } = await supabase
-            .from("author_terms_acceptances")
-            .select("author_id, author_terms_versions!inner(document_key)")
-            .in("author_id", authorIds.filter((id) => !accepted.has(id)))
-            .eq("author_terms_versions.document_key", "author-terms");
-          if (earlierError) throw new Error("studio_music_author_terms_lookup_failed");
-          for (const row of earlier ?? []) accepted.add(String(row.author_id));
-        }
+        const { data: earlier, error: earlierError } = await supabase
+          .from("author_terms_acceptances")
+          .select("author_id, author_terms_versions!inner(document_key, commercial_access_continues)")
+          .in("author_id", authorIds.filter((id) => !accepted.has(id)))
+          .eq("author_terms_versions.document_key", "author-terms")
+          .eq("author_terms_versions.commercial_access_continues", true);
+        if (earlierError) throw new Error("studio_music_author_terms_lookup_failed");
+        for (const row of earlier ?? []) accepted.add(String(row.author_id));
       }
       return accepted;
     },

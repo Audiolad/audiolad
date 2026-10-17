@@ -10,7 +10,7 @@ export type AuthorTermsVersionRow = {
   created_at: string;
   /** Unified agreement 2.0 columns (migration 20270106120000); present only when the flag is on. */
   covers_business?: boolean | null;
-  reaccept_grace_until?: string | null;
+  commercial_access_continues?: boolean | null;
 };
 
 export type AuthorTermsAcceptanceRow = {
@@ -43,10 +43,10 @@ export type AuthorTermsStatusView = {
   role: "owner" | "editor" | null;
   /** True in a platform-owner support session: acceptance is blocked. */
   supportMode?: boolean;
-  /** Unified agreement rollout (flag on): earlier edition accepted, current one not yet. */
-  reacceptRequired?: boolean;
-  inGrace?: boolean;
-  graceUntil?: string | null;
+  /** Unified agreement rollout (flag on): earlier edition accepted, current 2.0 not yet — notice only. */
+  reacceptInvited?: boolean;
+  /** The earlier edition (1.2) keeps its commercial channels indefinitely; Business needs 2.0. */
+  previousEditionActive?: boolean;
   coversBusiness?: boolean;
   businessAgreement?: boolean;
 };

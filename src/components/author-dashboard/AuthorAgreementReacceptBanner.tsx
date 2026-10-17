@@ -3,20 +3,10 @@ import Link from "next/link";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
 import { UNIFIED_AGREEMENT_TITLE } from "@/lib/author-terms/unified-agreement-texts";
 
-function formatDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Moscow",
-  }).format(date);
-}
-
 /**
- * Re-acceptance banner for authors on an earlier edition (1.0–1.2) once 2.0 is current.
+ * Invitation (notice, not a requirement) for authors on an earlier edition once 2.0 is current.
+ * Authors on 1.2 keep their 1.2 commercial features (sales, payouts, Studio) with no end date;
+ * only AudioLad Business needs a personal 2.0 acceptance plus a verified rights check.
  * Nothing is accepted automatically: the author opens the document and accepts it personally.
  */
 export default function AuthorAgreementReacceptBanner({
@@ -26,10 +16,9 @@ export default function AuthorAgreementReacceptBanner({
   status: AuthorTermsStatusView;
   authorSlug: string;
 }) {
-  if (!status.reacceptRequired || !status.coversBusiness || !status.currentVersion) {
+  if (!status.reacceptInvited || !status.coversBusiness || !status.currentVersion) {
     return null;
   }
-  const graceDate = status.inGrace ? formatDate(status.graceUntil) : null;
   return (
     <section
       role="status"
@@ -44,9 +33,9 @@ export default function AuthorAgreementReacceptBanner({
         по альбомам и трекам больше не нужны.
       </p>
       <p className="mt-2">
-        {graceDate
-          ? `Ваша прежняя редакция продолжает действовать до ${graceDate}. Чтобы музыка попала в «АудиоЛад Бизнес», примите новую редакцию — за вас её никто не примет.`
-          : "Чтобы продолжить коммерческое сотрудничество и подключить «АудиоЛад Бизнес», примите новую редакцию — за вас её никто не примет."}
+        {status.previousEditionActive
+          ? "Ваша редакция продолжает действовать без ограничения срока: продажи и другие возможности сохраняются. Чтобы подключить музыку к «АудиоЛад Бизнес», примите новую редакцию и пройдите проверку прав — за вас её никто не примет."
+          : "Чтобы подключить «АудиоЛад Бизнес», примите новую редакцию лично — за вас её никто не примет."}
       </p>
       <p className="mt-3 flex flex-wrap gap-4">
         <Link href="/author-terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#7042c5] underline-offset-2 hover:underline">

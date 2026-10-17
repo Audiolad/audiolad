@@ -96,20 +96,25 @@ export type TermsGateInput = {
   current: {
     id: string;
     coversBusiness: boolean;
-    /** Earlier editions stay valid for commercial gates until this moment (2.0 rollout only). */
-    reacceptGraceUntil: string | null;
   } | null;
-  /** All author_terms acceptances of this author (any edition). */
-  acceptances: ReadonlyArray<{ termsVersionId: string; coversBusiness: boolean }>;
+  /**
+   * All author_terms acceptances of this author (any edition), with the edition flags.
+   * keepsCommercialAccess = author_terms_versions.commercial_access_continues (1.2 after the 2.0 switch).
+   */
+  acceptances: ReadonlyArray<{ termsVersionId: string; coversBusiness: boolean; keepsCommercialAccess?: boolean }>;
 };
 
 export type TermsGateResult = {
-  /** Commercial gates (sales, payouts, Studio): accepted current OR within the re-acceptance grace. */
+  /**
+   * Commercial gates (sales, payouts, Studio): accepted current OR accepted an earlier edition that keeps
+   * its commercial access (1.2 after the 2.0 switch). No cut-off date: never closes on its own (Sergey 17.10.2026).
+   */
   accepted: boolean;
   acceptedCurrent: boolean;
-  inGrace: boolean;
-  /** Author has accepted an earlier edition but not the current one: show the re-acceptance banner. */
-  reacceptRequired: boolean;
+  /** Works under an earlier edition that keeps its commercial channels indefinitely (not Business). */
+  previousEditionActive: boolean;
+  /** Notice only: an earlier edition is accepted and the current one (covers Business) is not. Nothing is required. */
+  reacceptInvited: boolean;
   /** AudioLad Business: only an edition that covers Business, personally accepted. Never via 1.x. */
   businessAgreement: boolean;
 };
@@ -118,8 +123,8 @@ export function evaluateTermsGate(input: TermsGateInput): TermsGateResult {
   const none: TermsGateResult = {
     accepted: false,
     acceptedCurrent: false,
-    inGrace: false,
-    reacceptRequired: false,
+    previousEditionActive: false,
+    reacceptInvited: false,
     businessAgreement: false,
   };
   if (!input.current) return none;
@@ -128,18 +133,16 @@ export function evaluateTermsGate(input: TermsGateInput): TermsGateResult {
   if (!input.unifiedEnabled) {
     return { ...none, accepted: acceptedCurrent, acceptedCurrent };
   }
-  const hasEarlier = input.acceptances.some((a) => a.termsVersionId !== current.id);
-  const graceUntil = current.reacceptGraceUntil ? Date.parse(current.reacceptGraceUntil) : Number.NaN;
-  const inGrace =
-    !acceptedCurrent && hasEarlier && Number.isFinite(graceUntil) && input.now.getTime() < graceUntil;
+  const earlier = input.acceptances.filter((a) => a.termsVersionId !== current.id);
+  const continuing = earlier.filter((a) => a.keepsCommercialAccess === true);
+  const previousEditionActive = !acceptedCurrent && continuing.length > 0;
   const businessAgreement =
-    (acceptedCurrent && current.coversBusiness) ||
-    (inGrace && input.acceptances.some((a) => a.coversBusiness));
+    (acceptedCurrent && current.coversBusiness) || continuing.some((a) => a.coversBusiness);
   return {
-    accepted: acceptedCurrent || inGrace,
+    accepted: acceptedCurrent || previousEditionActive,
     acceptedCurrent,
-    inGrace,
-    reacceptRequired: !acceptedCurrent && hasEarlier,
+    previousEditionActive,
+    reacceptInvited: !acceptedCurrent && earlier.length > 0 && current.coversBusiness,
     businessAgreement,
   };
 }

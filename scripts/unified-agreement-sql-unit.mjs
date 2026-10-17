@@ -32,6 +32,11 @@ for (const body of clean.matchAll(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/g)) {
 // Flag-off behaviour is preserved: the opt-in revoke happens only at activation (02-switch), regrant on rollback.
 assert.doesNotMatch(clean, /author_business_product_optin/, 'migration leaves the legacy opt-in untouched');
 assert.match(switchCurrent, /REVOKE EXECUTE ON FUNCTION public\.author_business_product_optin\(uuid\[\],boolean,boolean,text,text,inet,text\) FROM authenticated;/);
+// Sergey 17.10.2026: no forced cut-off for 1.2 authors; clause 22.4 restriction is not used.
+assert.doesNotMatch(clean, /grace/i, 'migration has no grace / cut-off logic');
+assert.doesNotMatch(switchCurrent, /grace_until|:'/, 'switch script takes no cut-off date');
+assert.doesNotMatch(clean.match(/FUNCTION public\.author_has_accepted_current_terms[\s\S]*?\$\$;/)[0], /clock_timestamp|now\(\)|interval/i, 'commercial gate is not time-bound');
+assert.match(switchCurrent, /SET commercial_access_continues = true\s+WHERE id = '9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902';/, 'only 1.2 keeps commercial access');
 assert.match(rollbackSwitch, /GRANT EXECUTE ON FUNCTION public\.author_business_product_optin\(uuid\[\],boolean,boolean,text,text,inet,text\) TO authenticated;/);
 // Every new write path checks the DB activation gate; sync and review share the per-track lock.
 for (const fn of ['author_business_verification_submit_v3', 'moderator_business_track_review', 'business_catalog_sync_run']) {
@@ -101,6 +106,7 @@ const termsTables = read('supabase/migrations/20260728140000_author_terms_accept
 const A = '00000000-0000-0000-0000-00000000000a'; // owner of space A (e.g. Sergey's own music)
 const B = '00000000-0000-0000-0000-00000000000b'; // author on 1.2 only
 const M = '00000000-0000-0000-0000-00000000000c'; // moderator
+const C = '00000000-0000-0000-0000-00000000000d'; // author on 1.1 only (never accepted 1.2)
 const fixtures = String.raw`
 CREATE SCHEMA ua_test;
 CREATE FUNCTION ua_test.expect_error(command text, expected text) RETURNS void LANGUAGE plpgsql AS $f$
@@ -120,11 +126,12 @@ CREATE FUNCTION ua_test.as_user(p uuid) RETURNS void LANGUAGE sql AS $f$
   SELECT set_config('request.jwt.claim.sub', p::text, false), set_config('request.jwt.claim.role','authenticated',false);
 $f$;
 
-INSERT INTO auth.users(id) VALUES ('${A}'),('${B}'),('${M}');
-INSERT INTO public.profiles VALUES ('${A}','listener'),('${B}','listener'),('${M}','platform_admin');
-INSERT INTO public.authors(id,slug) VALUES ('10000000-0000-0000-0000-00000000000a','space-a'),('10000000-0000-0000-0000-00000000000b','space-b');
+INSERT INTO auth.users(id) VALUES ('${A}'),('${B}'),('${M}'),('${C}');
+INSERT INTO public.profiles VALUES ('${A}','listener'),('${B}','listener'),('${M}','platform_admin'),('${C}','listener');
+INSERT INTO public.authors(id,slug) VALUES ('10000000-0000-0000-0000-00000000000a','space-a'),('10000000-0000-0000-0000-00000000000b','space-b'),('10000000-0000-0000-0000-00000000000d','space-c');
 INSERT INTO public.author_members(author_id,user_id,role) VALUES
- ('10000000-0000-0000-0000-00000000000a','${A}','owner'),('10000000-0000-0000-0000-00000000000b','${B}','owner');
+ ('10000000-0000-0000-0000-00000000000a','${A}','owner'),('10000000-0000-0000-0000-00000000000b','${B}','owner'),
+ ('10000000-0000-0000-0000-00000000000d','${C}','owner');
 INSERT INTO public.practices(id,author_id,slug,status) VALUES
  ('20000000-0000-0000-0000-00000000000a','10000000-0000-0000-0000-00000000000a','aurafon','published'),
  ('20000000-0000-0000-0000-0000000000a2','10000000-0000-0000-0000-00000000000a','jazz-relax','published'),
@@ -136,10 +143,12 @@ INSERT INTO public.audio_items(id,practice_id,title,position) VALUES
  ('30000000-0000-0000-0000-0000000000b1','20000000-0000-0000-0000-00000000000b','Track B',1);
 -- Editions 1.2 (current) and acceptances of A and B on 1.2 (historical rows that must stay untouched).
 INSERT INTO public.author_terms_versions(id,version,title,published_at,effective_at,content_hash,document_key,is_current)
- VALUES ('9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902','1.2','v1.2','2026-09-13','2026-09-13',repeat('1',64),'author-terms',true);
+ VALUES ('9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902','1.2','v1.2','2026-09-13','2026-09-13',repeat('1',64),'author-terms',true),
+        ('8a3aaabe-8a12-4d58-8c4c-77bc2ba1a901','1.1','v1.1','2026-09-01','2026-09-01',repeat('2',64),'author-terms',false);
 INSERT INTO public.author_terms_acceptances(id,author_id,terms_version_id,accepted_by_user_id,acceptance_text) VALUES
  ('40000000-0000-0000-0000-00000000000a','10000000-0000-0000-0000-00000000000a','9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902','${A}','1.2'),
- ('40000000-0000-0000-0000-00000000000b','10000000-0000-0000-0000-00000000000b','9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902','${B}','1.2');
+ ('40000000-0000-0000-0000-00000000000b','10000000-0000-0000-0000-00000000000b','9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902','${B}','1.2'),
+ ('40000000-0000-0000-0000-00000000000d','10000000-0000-0000-0000-00000000000d','8a3aaabe-8a12-4d58-8c4c-77bc2ba1a901','${C}','1.1');
 -- A pre-existing grant from another source on Aurafon 1 (recording layer): must stay byte-identical.
 INSERT INTO public.music_rightsholders(id,display_name,entity_type) VALUES ('50000000-0000-0000-0000-0000000000ff','Legacy holder','person');
 INSERT INTO public.music_rights_grants(id,audio_item_id,rightsholder_id,rights_layer,use_type,territory_scope,valid_from,source_type,status,verified_at)
@@ -153,6 +162,9 @@ DO $t$ BEGIN
   PERFORM ua_test.ok(public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000b'), '1.2 still current: B commercial');
   PERFORM ua_test.ok(NOT public.author_has_business_agreement('10000000-0000-0000-0000-00000000000a'), '1.2 never covers Business');
   PERFORM ua_test.ok((SELECT NOT covers_business FROM public.author_terms_versions WHERE version = '1.2'), 'default covers_business=false');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.author_terms_versions WHERE commercial_access_continues), 'migration flags no edition (inert)');
+  PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000d'), '1.1-only author: strict today (unchanged)');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM information_schema.columns WHERE table_name = 'author_terms_versions' AND column_name = 'reaccept_grace_until'), 'no grace/cut-off column');
   PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.author_terms_versions WHERE version = '2.0' AND NOT is_current AND covers_business), '2.0 inserted, not current');
   PERFORM ua_test.ok((SELECT version = '1.2' FROM public.author_terms_versions WHERE is_current), 'insert does not switch');
   -- Inactive (flag off / 1.2 current): legacy flow unchanged, new paths refuse, auto inflow inert.
@@ -177,10 +189,13 @@ DO $t$
 DECLARE v uuid; e1 public.business_verification_evidence; e2 public.business_verification_evidence; s text; r jsonb; sess uuid;
   v20 uuid := (SELECT id FROM public.author_terms_versions WHERE version = '2.0');
 BEGIN
-  -- After switch with grace: earlier acceptances keep commercial gates, never Business. Nobody auto-accepted.
-  PERFORM ua_test.ok((SELECT version = '2.0' AND reaccept_grace_until > now() FROM public.author_terms_versions WHERE is_current), '2.0 current with grace');
-  PERFORM ua_test.ok(public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000b'), 'grace keeps B commercial');
-  PERFORM ua_test.ok(NOT public.author_has_business_agreement('10000000-0000-0000-0000-00000000000b'), 'grace never opens Business');
+  -- After switch: 1.2 keeps its commercial gates with NO end date, never Business. Nobody auto-accepted.
+  PERFORM ua_test.ok((SELECT version = '2.0' FROM public.author_terms_versions WHERE is_current), '2.0 current');
+  PERFORM ua_test.ok((SELECT commercial_access_continues FROM public.author_terms_versions WHERE version = '1.2'), '1.2 flagged commercial_access_continues');
+  PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.author_terms_versions WHERE commercial_access_continues), 'only 1.2 flagged');
+  PERFORM ua_test.ok(public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000b'), '1.2 keeps B commercial');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('10000000-0000-0000-0000-00000000000b'), '1.2 never opens Business');
+  PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000d'), '1.1-only author unchanged (strict, as before 2.0)');
   PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.author_terms_acceptances WHERE terms_version_id = v20), 'no auto-acceptance of 2.0');
   PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-0000000000ee'), 'unknown author false');
 
@@ -188,7 +203,7 @@ BEGIN
   PERFORM ua_test.as_user('${B}');
   SET LOCAL ROLE authenticated;
   r := public.author_commercial_agreement_state('10000000-0000-0000-0000-00000000000b');
-  PERFORM ua_test.ok((r->>'reaccept_required')::boolean AND (r->>'in_grace')::boolean AND NOT (r->>'business_agreement')::boolean, 'B state: reaccept banner, grace, no Business');
+  PERFORM ua_test.ok((r->>'reaccept_invited')::boolean AND (r->>'previous_edition_active')::boolean AND NOT (r->>'business_agreement')::boolean AND NOT (r ? 'grace_until') AND NOT (r ? 'in_grace'), 'B state: invitation notice, 1.2 active, no Business, no date');
   PERFORM ua_test.expect_error('SELECT public.author_commercial_agreement_state(''10000000-0000-0000-0000-00000000000a'')', 'author_membership_required');
   EXECUTE 'SELECT public.author_business_verification_draft_v2(''20000000-0000-0000-0000-00000000000b'',''30000000-0000-0000-0000-0000000000b1'',''suno'',NULL,''B'',''https://suno.com/s/bbb'',''{"paid_plan":"Pro"}''::jsonb)' INTO v;
   e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
@@ -292,13 +307,13 @@ BEGIN
 
   -- Historical rows untouched (pre-existing grant and acceptances byte-identical).
   PERFORM ua_test.ok((SELECT bool_and(s.row = to_jsonb(g)) FROM ua_test.snap s JOIN public.music_rights_grants g ON s.k = 'grant' AND g.id = (s.row->>'id')::uuid), 'pre-existing grant untouched');
-  PERFORM ua_test.ok((SELECT count(*) = 2 AND bool_and(s.row = to_jsonb(a)) FROM ua_test.snap s JOIN public.author_terms_acceptances a ON s.k = 'acc' AND a.id = (s.row->>'id')::uuid), 'acceptances untouched');
+  PERFORM ua_test.ok((SELECT count(*) = 3 AND bool_and(s.row = to_jsonb(a)) FROM ua_test.snap s JOIN public.author_terms_acceptances a ON s.k = 'acc' AND a.id = (s.row->>'id')::uuid), 'acceptances untouched');
 
-  -- Grace over: B loses commercial gate until personal acceptance.
-  UPDATE public.author_terms_versions SET reaccept_grace_until = now() - interval '1 second' WHERE id = v20;
-  PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000b'), 'grace expired');
+  -- No cut-off: B (1.2 only) keeps the commercial gate at any time; A accepted 2.0.
+  PERFORM ua_test.ok(public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000b'), 'B still commercial (no end date)');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('10000000-0000-0000-0000-00000000000b'), 'B still no Business without 2.0');
   PERFORM ua_test.ok(public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000a'), 'A accepted 2.0');
-  UPDATE public.author_terms_versions SET reaccept_grace_until = now() + interval '30 days' WHERE id = v20;
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.author_terms_acceptances WHERE author_id = '10000000-0000-0000-0000-00000000000b' AND terms_version_id = v20), 'B never auto-accepted 2.0');
 END $t$;
 `;
 
@@ -423,9 +438,8 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     assert.ok(refused, 'insert refuses without the migration');
     // Migration twice (idempotent), 2.0 insert twice (idempotent), switch twice (no-op second time).
     psql(db, [migration, migration, insert20, insert20, beforeSwitch].join('\n'));
-    const grace = new Date(Date.now() + 30 * 86400e3).toISOString();
-    psql(db, switchCurrent, ['-v', `grace_until=${grace}`]);
-    psql(db, switchCurrent, ['-v', `grace_until=${grace}`]);
+    psql(db, switchCurrent);
+    psql(db, switchCurrent);
     psql(db, scenario);
     psql(db, scenario2);
     // Real concurrency (two sessions): sync vs sync on a track without grants, review vs sync.
@@ -455,7 +469,8 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       "SELECT 1 / CASE WHEN to_regprocedure('public.business_catalog_sync(uuid,boolean)') IS NULL AND to_regprocedure('public.author_business_verification_submit_v3(uuid,uuid[],inet,text)') IS NULL AND to_regprocedure('public.business_catalog_sync_run(uuid,boolean)') IS NULL AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname LIKE 'zz_business_unified_auto_sync_%') AND to_regprocedure('public.resolve_business_track_eligibility_v1(uuid,uuid,uuid,text,timestamptz)') IS NULL AND has_function_privilege('service_role','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE') AND NOT has_function_privilege('authenticated','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN has_function_privilege('authenticated','public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text)','EXECUTE') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN (SELECT version FROM public.author_terms_versions WHERE is_current) = '1.2' THEN 1 ELSE 0 END;",
-      "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 3 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 6 THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN NOT EXISTS (SELECT 1 FROM public.author_terms_versions WHERE commercial_access_continues) THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 4 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 6 THEN 1 ELSE 0 END;",
       // Re-apply after rollback works.
       migration].join('\n'));
     console.log('unified-agreement-sql-unit: contract + isolated PostgreSQL scenarios OK');

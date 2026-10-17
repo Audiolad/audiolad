@@ -10,7 +10,7 @@ BEGIN;
 ALTER TABLE public.author_terms_versions
   ADD COLUMN IF NOT EXISTS covers_business boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS grants_scope jsonb NULL,
-  ADD COLUMN IF NOT EXISTS reaccept_grace_until timestamptz NULL;
+  ADD COLUMN IF NOT EXISTS commercial_access_continues boolean NOT NULL DEFAULT false;
 
 DO $$
 BEGIN
@@ -26,10 +26,12 @@ COMMENT ON COLUMN public.author_terms_versions.covers_business IS
   'audiolad:unified-agreement; true only for editions that license AudioLad Business + sublicensing to venues (2.0+).';
 COMMENT ON COLUMN public.author_terms_versions.grants_scope IS
   'audiolad:unified-agreement; informational list of licensed channels of this edition.';
-COMMENT ON COLUMN public.author_terms_versions.reaccept_grace_until IS
-  'audiolad:unified-agreement; on the CURRENT edition: acceptances of earlier editions keep commercial gates (not Business) open until this moment.';
+COMMENT ON COLUMN public.author_terms_versions.commercial_access_continues IS
+  'audiolad:unified-agreement; on an EARLIER edition (1.2 at the 2.0 switch): its acceptances keep the commercial gates of that edition (sales, payouts, Studio; NOT Business) with no end date after a newer edition becomes current. No cut-off date exists (Sergey 17.10.2026); clause 22.4 restriction is not used.';
 
--- 2) Grace-aware commercial gate (same signature; old behaviour when reaccept_grace_until IS NULL)
+-- 2) Commercial gate (same signature). Accepted the current edition, OR accepted an earlier edition
+--    flagged commercial_access_continues (1.2 at the 2.0 switch). No date: never closes on its own.
+--    Old behaviour when no edition carries the flag (the migration itself sets none).
 CREATE OR REPLACE FUNCTION public.author_has_accepted_current_terms(p_author_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -46,17 +48,15 @@ AS $$
     )
     OR EXISTS (
       SELECT 1
-      FROM public.author_terms_versions c
-      JOIN public.author_terms_acceptances a ON a.author_id = p_author_id
-      JOIN public.author_terms_versions v ON v.id = a.terms_version_id AND v.document_key = 'author-terms'
-      WHERE c.document_key = 'author-terms' AND c.is_current
-        AND c.reaccept_grace_until IS NOT NULL AND clock_timestamp() < c.reaccept_grace_until
+      FROM public.author_terms_acceptances a
+      JOIN public.author_terms_versions v ON v.id = a.terms_version_id
+      WHERE a.author_id = p_author_id AND v.document_key = 'author-terms' AND v.commercial_access_continues
     )
   );
 $$;
 
 -- 3) Business agreement: personal acceptance of a covers_business edition that is current
---    (or an earlier covers_business edition during the grace of a later one). Never 1.x.
+--    (or an earlier covers_business edition explicitly flagged commercial_access_continues). Never 1.x.
 CREATE OR REPLACE FUNCTION public.author_business_agreement_acceptance(p_author_id uuid)
 RETURNS TABLE(acceptance_id uuid, terms_version_id uuid, version text, content_hash text, accepted_at timestamptz)
 LANGUAGE sql
@@ -71,7 +71,7 @@ AS $$
   WHERE p_author_id IS NOT NULL
     AND c.document_key = 'author-terms' AND c.is_current
     AND v.document_key = 'author-terms' AND v.covers_business
-    AND (v.id = c.id OR (c.reaccept_grace_until IS NOT NULL AND clock_timestamp() < c.reaccept_grace_until))
+    AND (v.id = c.id OR v.commercial_access_continues)
   ORDER BY (v.id = c.id) DESC, a.accepted_at DESC, a.id
   LIMIT 1;
 $$;
@@ -94,7 +94,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE c public.author_terms_versions%ROWTYPE; v_accepted_current boolean; v_any boolean; v_biz record;
+DECLARE c public.author_terms_versions%ROWTYPE; v_accepted_current boolean; v_any boolean; v_continues boolean; v_biz record;
 BEGIN
   IF auth.uid() IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.author_members m WHERE m.author_id = p_author_id AND m.user_id = auth.uid()
@@ -103,21 +103,23 @@ BEGIN
   END IF;
   SELECT * INTO c FROM public.author_terms_versions WHERE document_key = 'author-terms' AND is_current;
   IF NOT FOUND THEN
-    RETURN jsonb_build_object('current_version', NULL, 'accepted_current', false, 'in_grace', false,
-      'reaccept_required', false, 'business_agreement', false);
+    RETURN jsonb_build_object('current_version', NULL, 'accepted_current', false, 'previous_edition_active', false,
+      'reaccept_invited', false, 'business_agreement', false);
   END IF;
   SELECT EXISTS (SELECT 1 FROM public.author_terms_acceptances WHERE author_id = p_author_id AND terms_version_id = c.id)
     INTO v_accepted_current;
   SELECT EXISTS (SELECT 1 FROM public.author_terms_acceptances a JOIN public.author_terms_versions v ON v.id = a.terms_version_id
     WHERE a.author_id = p_author_id AND v.document_key = 'author-terms' AND v.id <> c.id) INTO v_any;
+  SELECT EXISTS (SELECT 1 FROM public.author_terms_acceptances a JOIN public.author_terms_versions v ON v.id = a.terms_version_id
+    WHERE a.author_id = p_author_id AND v.document_key = 'author-terms' AND v.id <> c.id AND v.commercial_access_continues) INTO v_continues;
   SELECT * INTO v_biz FROM public.author_business_agreement_acceptance(p_author_id);
   RETURN jsonb_build_object(
     'current_version', c.version,
     'current_covers_business', c.covers_business,
     'accepted_current', v_accepted_current,
-    'in_grace', NOT v_accepted_current AND v_any AND c.reaccept_grace_until IS NOT NULL AND clock_timestamp() < c.reaccept_grace_until,
-    'grace_until', c.reaccept_grace_until,
-    'reaccept_required', NOT v_accepted_current AND v_any,
+    -- earlier edition keeps its commercial channels indefinitely (no date); notice only, nothing required
+    'previous_edition_active', NOT v_accepted_current AND v_continues,
+    'reaccept_invited', NOT v_accepted_current AND v_any AND c.covers_business,
     'business_agreement', v_biz.acceptance_id IS NOT NULL,
     'business_agreement_version', v_biz.version
   );
