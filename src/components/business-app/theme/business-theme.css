@@ -1,0 +1,98 @@
+/*
+ * AudioLad Business theme layer (task 21546de4).
+ *
+ * The ONLY place where business.audiolad.ru colours are defined. Components and
+ * business-app.css read semantic --biz-* tokens; they never hard-code colours.
+ *
+ * - Structural tokens (sizes, radii, fonts) live on .business-app-root.
+ * - Colour tokens live in a [data-biz-theme="<id>"] block. The layout sets the id from
+ *   src/lib/business-app/theme.ts (DEFAULT_BUSINESS_THEME).
+ * - A future theme (e.g. a separate SPA/wellness palette) is one more block with the same
+ *   token names plus one id in theme.ts. Not implemented now.
+ *
+ * Jazz & Coffee: espresso ink, warm coffee brown, cream/milk surfaces, sand, restrained
+ * brass. Same family as the public atlas (/b/atlas-kofeen: --atlas-bg #f7f1e8,
+ * --atlas-ink #2b1d14, --atlas-muted #6b5848, --atlas-gold) without copying its
+ * presentation layout. Text pairs meet WCAG AA (checked in
+ * scripts/business-app-theme-unit.mts). Suits cafes, bars, restaurants and hotels.
+ */
+
+.business-app-root {
+  --biz-sidebar-expanded: 232px;
+  --biz-sidebar-collapsed: 72px;
+  --biz-bottom-nav-height: 68px;
+  --biz-radius: 18px;
+  --biz-radius-sm: 12px;
+  --biz-font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+}
+
+[data-biz-theme="jazz-coffee"] {
+  /* Palette primitives: reference only inside this block. */
+  --biz-espresso: #2b1d14;
+  --biz-coffee: #6f4326;
+  --biz-coffee-deep: #573219;
+  --biz-cream: #f7f1e8;
+  --biz-milk: #fffaf3;
+  --biz-sand: #f2e8da;
+  --biz-sand-deep: #e5d6c1;
+  --biz-brass: #b8904f;
+  --biz-brass-ink: #7d5c24;
+
+  /* Surfaces and text. */
+  --biz-bg: var(--biz-cream);
+  --biz-surface: var(--biz-milk);
+  --biz-surface-soft: var(--biz-sand);
+  --biz-surface-glass: rgba(255, 250, 243, 0.96);
+  --biz-border: var(--biz-sand-deep);
+  --biz-border-strong: #cdb69a;
+  --biz-text: var(--biz-espresso);
+  --biz-text-muted: #6b5848;
+  --biz-eyebrow: var(--biz-brass-ink);
+
+  /* Actions. */
+  --biz-accent: var(--biz-coffee);
+  --biz-accent-hover: var(--biz-coffee-deep);
+  --biz-accent-soft: #f1e2cf;
+  --biz-accent-border: #dcc3a4;
+  --biz-on-accent: #fff8ef;
+  --biz-highlight: var(--biz-brass);
+  --biz-focus: var(--biz-coffee);
+  --biz-tooltip-bg: var(--biz-espresso);
+  --biz-tooltip-text: #fff8ef;
+
+  /* States: distinct hues, warm-tuned, readable. Red only for confirmed failures. */
+  --biz-green: #2f6b45;
+  --biz-green-bg: #e8f1e3;
+  --biz-green-border: #c5dbbd;
+  --biz-green-ink: #1f4d31;
+  --biz-yellow: #8a5a0b;
+  --biz-yellow-bg: #fbf0d8;
+  --biz-yellow-border: #ecd59f;
+  --biz-yellow-ink: #6b4508;
+  --biz-red: #a3372c;
+  --biz-red-bg: #fbe8e3;
+  --biz-red-border: #efc2b8;
+  --biz-red-ink: #7f2a21;
+  --biz-danger: var(--biz-red);
+  --biz-neutral: #6f6358;
+  --biz-neutral-bg: #efe9e1;
+  --biz-neutral-border: #ddd3c6;
+  --biz-neutral-ink: #5e5349;
+
+  /* Media and depth. */
+  --biz-progress-track: #eadcc8;
+  --biz-cover:
+    radial-gradient(circle at 30% 30%, rgba(184, 144, 79, 0.75), transparent 55%),
+    linear-gradient(145deg, var(--biz-coffee), var(--biz-espresso));
+  --biz-shadow: 0 10px 30px rgba(43, 29, 20, 0.07);
+  --biz-shadow-strong: 0 12px 40px rgba(43, 29, 20, 0.12);
+
+  color-scheme: light;
+}
+
+/* Overscroll / rubber-band area behind the cabinet matches the theme background
+   (the root layout paints html/body with the platform surface). */
+html:has(.business-app-root[data-biz-theme="jazz-coffee"]),
+html:has(.business-app-root[data-biz-theme="jazz-coffee"]) body {
+  background: #f7f1e8;
+}

@@ -296,9 +296,9 @@ export default function VenuePlayerPage() {
 
   if (domain.status === "anonymous") {
     return (
-      <section className="business-app-span-full rounded-2xl border border-white/10 bg-black/20 p-6">
-        <h1 className="text-2xl font-bold">Venue Player</h1>
-        <p className="mt-2 text-[1.05rem] opacity-90">
+      <section className="business-app-span-full business-app-card">
+        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Venue Player</h1>
+        <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
           Войдите как владелец точки, чтобы создать Player и запустить эфир.
         </p>
       </section>
@@ -307,9 +307,9 @@ export default function VenuePlayerPage() {
 
   if (!domain.location?.defaultZoneId) {
     return (
-      <section className="business-app-span-full rounded-2xl border border-white/10 bg-black/20 p-6">
-        <h1 className="text-2xl font-bold">Venue Player</h1>
-        <p className="mt-2 text-[1.05rem] opacity-90">
+      <section className="business-app-span-full business-app-card">
+        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Venue Player</h1>
+        <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
           Сначала создайте организацию и точку на Главной — затем сюда вернётесь
           для назначения Player на зону.
         </p>
@@ -319,12 +319,12 @@ export default function VenuePlayerPage() {
 
   return (
     <section className="business-app-span-full space-y-4">
-      <header className="rounded-2xl border border-white/10 bg-black/20 p-6">
-        <p className="text-sm font-semibold uppercase tracking-wide opacity-70">
+      <header className="business-app-card">
+        <p className="business-app-eyebrow">
           Venue Player · runtime v0 · PoP
         </p>
-        <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Эфир точки</h1>
-        <p className="mt-2 text-[1.05rem] opacity-90">
+        <h1 className="mt-1 text-2xl font-bold text-[var(--biz-text)] sm:text-3xl">Эфир точки</h1>
+        <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
           Точка: <strong>{domain.location.name}</strong>
           {playerCode ? (
             <>
@@ -333,25 +333,25 @@ export default function VenuePlayerPage() {
             </>
           ) : null}
         </p>
-        <p className="mt-2 text-sm opacity-70">{pilot.description}</p>
-        <p className="mt-1 text-xs opacity-50">
+        <p className="mt-2 text-sm text-[var(--biz-text-muted)]">{pilot.description}</p>
+        <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
           Proof of Play →{" "}
           <code>apply_business_playback_usage_heartbeat</code> (evidence;
           allowlist audio_item, не eligible-каталог).
         </p>
-        <p className="mt-1 text-xs opacity-50">
+        <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
           Eligibility gate (P0-05): в пул эфира только{" "}
           <code>ELIGIBLE</code>; UNKNOWN ≠ ELIGIBLE.
         </p>
       </header>
 
-      <div className="rounded-2xl border border-white/10 bg-black/20 p-6 space-y-4">
+      <div className="business-app-card space-y-4">
         <audio ref={audioRef} src={pilot.src} preload="auto" />
         <div className="flex flex-wrap gap-3">
           {!credential ? (
             <button
               type="button"
-              className="rounded-xl bg-emerald-500 px-5 py-3 text-base font-semibold text-black disabled:opacity-50"
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
               disabled={phase === "provisioning"}
               onClick={() => void onProvision()}
             >
@@ -363,7 +363,7 @@ export default function VenuePlayerPage() {
           {credential && phase !== "playing" ? (
             <button
               type="button"
-              className="rounded-xl bg-sky-400 px-5 py-3 text-base font-semibold text-black"
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
               onClick={() => void onStartPlayback()}
             >
               Старт эфира (пилот-тон + heartbeat + PoP)
@@ -372,7 +372,7 @@ export default function VenuePlayerPage() {
           {phase === "playing" ? (
             <button
               type="button"
-              className="rounded-xl bg-amber-300 px-5 py-3 text-base font-semibold text-black"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               onClick={onStopPlayback}
             >
               Стоп
@@ -382,19 +382,19 @@ export default function VenuePlayerPage() {
 
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="opacity-60">Фаза</dt>
-            <dd className="font-semibold">{phase}</dd>
+            <dt className="text-[var(--biz-text-muted)]">Фаза</dt>
+            <dd className="font-semibold text-[var(--biz-text)]">{phase}</dd>
           </div>
           <div>
-            <dt className="opacity-60">Heartbeat (A2)</dt>
-            <dd className="font-semibold">
+            <dt className="text-[var(--biz-text-muted)]">Heartbeat (A2)</dt>
+            <dd className="font-semibold text-[var(--biz-text)]">
               {heartbeatOk ? "ok" : "—"}
               {lastHeartbeatAt ? ` · ${lastHeartbeatAt}` : ""}
             </dd>
           </div>
           <div>
-            <dt className="opacity-60">Proof of Play (A3)</dt>
-            <dd className="font-semibold">
+            <dt className="text-[var(--biz-text-muted)]">Proof of Play (A3)</dt>
+            <dd className="font-semibold text-[var(--biz-text)]">
               {popOk ? "ok" : "—"}
               {lastPopAcceptedMs != null
                 ? ` · accepted_ms=${lastPopAcceptedMs}`
@@ -404,14 +404,14 @@ export default function VenuePlayerPage() {
             </dd>
           </div>
           <div>
-            <dt className="opacity-60">PoP audio_item (allowlist)</dt>
-            <dd className="font-semibold break-all text-xs">
+            <dt className="text-[var(--biz-text-muted)]">PoP audio_item (allowlist)</dt>
+            <dd className="font-semibold break-all text-xs text-[var(--biz-text)]">
               {VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="opacity-60">Трек (audio)</dt>
-            <dd className="font-semibold">
+            <dt className="text-[var(--biz-text-muted)]">Трек (audio)</dt>
+            <dd className="font-semibold text-[var(--biz-text)]">
               {pilot.title} · {pilot.program}
             </dd>
           </div>
@@ -419,7 +419,8 @@ export default function VenuePlayerPage() {
 
         {error ? (
           <p
-            className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-100"
+            className="business-app-alert"
+            data-tone="error"
             role="alert"
           >
             {error}
@@ -427,7 +428,7 @@ export default function VenuePlayerPage() {
         ) : null}
 
         {credential ? (
-          <p className="text-xs opacity-50 break-all">
+          <p className="text-xs text-[var(--biz-text-muted)] break-all">
             Credential хранится в sessionStorage этой вкладки (не логируется в UI
             целиком в проде-политике; для slice показан хвост):{" "}
             <code>…{credential.slice(-8)}</code>

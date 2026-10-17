@@ -195,7 +195,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
           </p>
           <a
             href="https://audiolad.ru/auth/sign-in"
-            className="mt-4 inline-flex rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="mt-4 business-app-btn business-app-btn-primary business-app-focus-ring"
           >
             Войти
           </a>
@@ -226,7 +226,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
           </p>
           <Link
             href="/onboarding"
-            className="mt-4 inline-flex rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+            className="mt-4 business-app-btn business-app-btn-primary business-app-focus-ring"
           >
             Начать подключение
           </Link>

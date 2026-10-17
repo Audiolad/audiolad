@@ -97,7 +97,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   name="at"
                   defaultValue={at ?? ""}
                   required
-                  className="rounded border px-2 py-1"
+                  className="business-app-input"
                 />
               </label>
               <label className="flex flex-col text-sm">
@@ -108,10 +108,10 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   min={1}
                   max={180}
                   defaultValue={windowMinutes ?? PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES}
-                  className="w-24 rounded border px-2 py-1"
+                  className="business-app-input w-24"
                 />
               </label>
-              <button type="submit" className="rounded bg-[var(--biz-accent)] px-3 py-1 font-semibold text-white">
+              <button type="submit" className="business-app-btn business-app-btn-primary business-app-focus-ring">
                 Показать
               </button>
             </form>

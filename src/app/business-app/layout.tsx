@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import BusinessAppShell from "@/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "@/components/business-app/BusinessDomainProvider";
+import "@/components/business-app/theme/business-theme.css";
 import "@/components/business-app/business-app.css";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import {
@@ -12,8 +13,16 @@ import {
   isBusinessHostname,
 } from "@/lib/business-app/host";
 import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
+import { BUSINESS_THEMES, resolveBusinessTheme } from "@/lib/business-app/theme";
 
 export const metadata: Metadata = buildBusinessAppMetadata();
+
+// One theme for every Business screen (21546de4); see src/lib/business-app/theme.ts.
+const theme = resolveBusinessTheme();
+
+export const viewport: Viewport = {
+  themeColor: BUSINESS_THEMES[theme].themeColor,
+};
 
 export default async function BusinessAppLayout({
   children,
@@ -30,7 +39,7 @@ export default async function BusinessAppLayout({
   const domain = await loadBusinessOwnerHomeContext();
 
   return (
-    <div className="business-app-root">
+    <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain}>
         <BusinessAppShell>{children}</BusinessAppShell>
       </BusinessDomainProvider>
