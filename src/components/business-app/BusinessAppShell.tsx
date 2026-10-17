@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
+
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
@@ -16,13 +18,16 @@ import { resolveBusinessAccess } from "@/lib/business-app/access";
  */
 export default function BusinessAppShell({
   children,
+  initialGuestLimit = null,
 }: {
   children: ReactNode;
+  /** Server listening-limit state for a guest (layout peek); null for members. */
+  initialGuestLimit?: GuestCoffeeLimitState | null;
 }) {
   const access = resolveBusinessAccess(useBusinessDomain());
 
   return (
-    <BusinessGuestStatusProvider>
+    <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
       <div className="business-app-shell" data-access={access.level}>
         <BusinessSidebar />
         <div className="business-app-main">

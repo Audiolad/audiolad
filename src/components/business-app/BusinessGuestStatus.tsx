@@ -24,8 +24,14 @@ type GuestStatus = {
 const noop = () => {};
 const GuestStatusContext = createContext<GuestStatus>({ limit: null, setLimit: noop, notice: null, showLocked: noop });
 
-export function BusinessGuestStatusProvider({ children }: { children: ReactNode }) {
-  const [limit, setLimitState] = useState<GuestCoffeeLimitState | null>(null);
+export function BusinessGuestStatusProvider({
+  children,
+  initialLimit = null,
+}: {
+  children: ReactNode;
+  initialLimit?: GuestCoffeeLimitState | null;
+}) {
+  const [limit, setLimitState] = useState<GuestCoffeeLimitState | null>(initialLimit);
   // The notice belongs to the screen where the locked item was tapped; it is dropped on navigation.
   const pathname = usePathname();
   const [lockedTap, setLockedTap] = useState<{ text: string; pathname: string | null } | null>(null);

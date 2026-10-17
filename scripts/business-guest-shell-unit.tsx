@@ -117,6 +117,19 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(m, /Анна/);
 }
 
+// ---------------------------------------------------------------- server limit on every guest screen
+{
+  const at = (limit: "ok" | "near_end" | "exhausted" | "unavailable", path: string) =>
+    wrap(anonymous, path, <BusinessAppShell initialGuestLimit={limit}><main>page</main></BusinessAppShell>);
+  has(at("exhausted", "/"), /data-limit="exhausted"[\s\S]*Гостевое прослушивание завершено/, "exhausted shown on Home");
+  has(at("exhausted", "/onboarding"), /data-limit="exhausted"/, "exhausted shown on onboarding");
+  has(at("near_end", "/"), /скоро подойдёт к концу/);
+  has(at("unavailable", "/"), /data-limit="unavailable"/);
+  const layout = read("src/app/business-app/layout.tsx");
+  has(layout, /resolveBusinessAccess\(domain\)\.level === "guest"\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests only");
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\}>/);
+}
+
 // ---------------------------------------------------------------- real player + settings (Music section)
 const playlists: GuestCoffeePlaylist[] = [{
   id: "p1", authorSlug: "a", productSlug: "jazz", title: "Джаз для кофеен", authorName: "Тёплый такт", href: "https://audiolad.ru/practice/a/jazz",
@@ -161,6 +174,8 @@ assert.equal(BUSINESS_SOUND_PROFILE_STORAGE_KEY, "audiolad-business-sound-profil
   has(anon, /пока не подключены – ничего не списывается/, "honest: no trial activation / payment yet");
   const noOrg = wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />);
   has(noOrg, /aria-selected="true"[^>]*>[\s\S]{0,400}Кафе \/ кофейня/, "coffee type preselected");
+  has(noOrg, /data-testid="onboarding-terms-note"[\s\S]{0,600}пока не подключены – ничего не списывается/, "signed-in wizard also discloses: no trial activation / payment yet");
+  has(noOrg, /data-testid="onboarding-terms-note"[^>]*>[^<]*799[\s\S]{0,300}пока не подключены – ничего не списывается/, "signed-in path also says: no trial activation / payment yet");
   const bogus = wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="<script>" />);
   hasNot(bogus, /aria-selected="true"/, "unknown type ignored");
   has(read("src/app/business-app/onboarding/page.tsx"), /initialTypeId=/);

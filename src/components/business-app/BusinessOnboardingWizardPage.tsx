@@ -197,6 +197,11 @@ export default function BusinessOnboardingWizardPage({
         title="Zero-to-Music"
         subtitle="Тип → атмосфера → preview → подтвердить → плеер"
       />
+      {step !== "done" ? (
+        <p className="mb-4 text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-terms-note">
+          {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
+        </p>
+      ) : null}
 
       <div
         className="mb-4 flex items-center gap-2 text-sm text-[var(--biz-text-muted)]"
