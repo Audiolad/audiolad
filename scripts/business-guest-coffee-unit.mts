@@ -296,7 +296,7 @@ assert.match(cabinet, /keepalive/, "pending seconds are flushed when the page is
 }
 
 // ---------------------------------------------------------------- migration contract
-const migration = read("supabase/migrations/20270106120000_business_guest_listening.sql");
+const migration = read("supabase/migrations/20270108120000_business_guest_listening.sql");
 const rollback = read("docs/business/guest-listening-a8240527-rollback.sql");
 {
   const clean = migration.replace(/--[^\n]*/g, "");

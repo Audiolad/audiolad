@@ -1,4 +1,4 @@
--- Rollback for 20270106120000_business_guest_listening.sql (a8240527).
+-- Rollback for 20270108120000_business_guest_listening.sql (a8240527).
 -- Drops only what that migration created. Guest meter data is disposable.
 BEGIN;
 DROP FUNCTION IF EXISTS public.business_guest_listening_peek(text, text);

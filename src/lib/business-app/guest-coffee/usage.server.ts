@@ -16,7 +16,7 @@ import {
 
 /**
  * a8240527 — server side of the guest listening meter (table business_guest_listening,
- * migration 20270106120000). Every function fails closed: on any DB error (e.g. the
+ * migration 20270108120000). Every function fails closed: on any DB error (e.g. the
  * migration is not applied yet) it returns null and the cabinet says honestly that guest
  * listening is temporarily unavailable — it never plays without counting.
  */
