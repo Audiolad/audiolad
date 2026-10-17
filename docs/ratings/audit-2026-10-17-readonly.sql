@@ -1,7 +1,6 @@
 -- AudioLad ratings audit pack (task 612f9c76). READ-ONLY. AGGREGATES ONLY.
 -- Run only with Sergey's explicit OK, by an operator with authorised prod access:
---   psql ... -v ON_ERROR_STOP=1 -v h_loop4="'<hmac of 127.0.0.1>'" -v h_loop6="'<hmac of ::ffff:127.0.0.1>'" -f this.sql
--- (h_loop* are computed in the app env with hmacRatingSignal("ip", ...); pass '' to skip S1b.)
+--   psql ... -v ON_ERROR_STOP=1 -f this.sql
 -- Output never contains emails, names, user ids or HMAC values. Groups are labelled G1.., products P01..
 -- Nothing here writes: the whole run is a READ ONLY transaction.
 
@@ -78,13 +77,17 @@ SELECT 'G' || row_number() OVER (ORDER BY accounts DESC) AS grp, accounts, pairs
        round(100.0 * pairs / (SELECT count(*) FROM practice_ratings WHERE excluded_at IS NULL), 1) AS pct_of_all_pairs
 FROM g ORDER BY accounts DESC;
 
--- S1b. Loopback hypothesis: does the dominant IP group equal HMAC(127.0.0.1)? Prints booleans only.
+-- S1b. Loopback check is NOT done in SQL (it would need the HMAC secret). Verified via nginx -T directives instead.
+
+-- S1c. Is the dominant IP group present over the whole period? (share of all pairs per month)
 WITH top AS (
   SELECT vote_ip_hmac AS h FROM practice_ratings WHERE excluded_at IS NULL AND vote_ip_hmac IS NOT NULL
   GROUP BY vote_ip_hmac ORDER BY count(DISTINCT user_id) DESC LIMIT 1
 )
-SELECT (SELECT h FROM top) = nullif(:h_loop4, '') AS top_group_is_ipv4_loopback,
-       (SELECT h FROM top) = nullif(:h_loop6, '') AS top_group_is_mapped_loopback;
+SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, count(*) AS pairs,
+       count(*) FILTER (WHERE vote_ip_hmac = (SELECT h FROM top)) AS pairs_in_top_ip_group,
+       count(DISTINCT user_id) AS raters
+FROM practice_ratings WHERE excluded_at IS NULL GROUP BY 1 ORDER BY 1;
 
 -- S2. Shared device-signal groups (>=3 accounts).
 WITH g AS (
@@ -119,7 +122,9 @@ SELECT count(*) AS pairs, count(DISTINCT user_id) AS accounts, count(DISTINCT pr
        min(created_at)::date AS first_day, max(created_at)::date AS last_day
 FROM f;
 
--- S4. Per-product impact simulation (NOTHING is excluded): count/avg as-is vs without each signal set.
+-- S4. Per-product impact simulation (NOTHING is excluded). For every product with ratings:
+-- count/avg as-is and count/avg without each signal set (IP group, device group, test accounts, author-owners).
+-- No LIMIT: all rated products. Segment from practices.product_kind (music → «Музыка и звуки»).
 WITH ipg AS (
   SELECT vote_ip_hmac AS h FROM practice_ratings WHERE excluded_at IS NULL AND vote_ip_hmac IS NOT NULL
   GROUP BY vote_ip_hmac HAVING count(DISTINCT user_id) >= 3
@@ -127,38 +132,103 @@ WITH ipg AS (
   SELECT device_id_hmac AS h FROM practice_ratings WHERE excluded_at IS NULL AND device_id_hmac IS NOT NULL
   GROUP BY device_id_hmac HAVING count(DISTINCT user_id) >= 3
 ), r AS (
-  SELECT r.*, p.author_id,
-         r.vote_ip_hmac IN (SELECT h FROM ipg) AS in_ip,
-         r.device_id_hmac IN (SELECT h FROM devg) AS in_dev,
+  SELECT r.practice_id, r.stars, p.product_kind,
+         coalesce(r.vote_ip_hmac IN (SELECT h FROM ipg), false) AS in_ip,
+         coalesce(r.device_id_hmac IN (SELECT h FROM devg), false) AS in_dev,
          EXISTS (SELECT 1 FROM analytics_test_accounts t WHERE t.user_id = r.user_id) AS is_test,
          EXISTS (SELECT 1 FROM author_members am WHERE am.author_id = p.author_id AND am.user_id = r.user_id) AS is_owner
   FROM practice_ratings r JOIN practices p ON p.id = r.practice_id
   WHERE r.excluded_at IS NULL
 )
-SELECT 'P' || lpad(row_number() OVER (ORDER BY count(*) DESC, practice_id)::text, 2, '0') AS product,
+SELECT 'P' || lpad(row_number() OVER (ORDER BY count(*) DESC, practice_id)::text, 3, '0') AS product,
+       min(product_kind) AS kind,
        count(*) AS n, round(avg(stars), 2) AS avg,
-       count(*) FILTER (WHERE NOT coalesce(in_ip, false)) AS n_wo_ip, round(avg(stars) FILTER (WHERE NOT coalesce(in_ip, false)), 2) AS avg_wo_ip,
-       count(*) FILTER (WHERE NOT coalesce(in_dev, false)) AS n_wo_dev,
-       count(*) FILTER (WHERE NOT is_test) AS n_wo_test,
-       count(*) FILTER (WHERE NOT is_owner) AS n_wo_owner
-FROM r GROUP BY practice_id ORDER BY n DESC LIMIT 60;
+       count(*) FILTER (WHERE NOT in_ip) AS n_wo_ip, round(avg(stars) FILTER (WHERE NOT in_ip), 2) AS avg_wo_ip,
+       count(*) FILTER (WHERE NOT in_dev) AS n_wo_dev, round(avg(stars) FILTER (WHERE NOT in_dev), 2) AS avg_wo_dev,
+       count(*) FILTER (WHERE NOT is_test) AS n_wo_test, round(avg(stars) FILTER (WHERE NOT is_test), 2) AS avg_wo_test,
+       count(*) FILTER (WHERE NOT is_owner) AS n_wo_owner, round(avg(stars) FILTER (WHERE NOT is_owner), 2) AS avg_wo_owner
+FROM r GROUP BY practice_id ORDER BY n DESC, practice_id;
 
--- S5. Catalogue-sort preview on real data (spec §3–4). Recommended score: Bayesian with FIXED neutral
--- prior m0 = 3.5, C = 10 (bayes_m0_35). Global-mean prior shown only for comparison (bayes_global_c10).
+-- S4b. Summary of S4: how many products change their average by any amount / by >= 0.25 under each simulation.
+WITH ipg AS (
+  SELECT vote_ip_hmac AS h FROM practice_ratings WHERE excluded_at IS NULL AND vote_ip_hmac IS NOT NULL
+  GROUP BY vote_ip_hmac HAVING count(DISTINCT user_id) >= 3
+), devg AS (
+  SELECT device_id_hmac AS h FROM practice_ratings WHERE excluded_at IS NULL AND device_id_hmac IS NOT NULL
+  GROUP BY device_id_hmac HAVING count(DISTINCT user_id) >= 3
+), r AS (
+  SELECT r.practice_id, r.stars,
+         coalesce(r.vote_ip_hmac IN (SELECT h FROM ipg), false) AS in_ip,
+         coalesce(r.device_id_hmac IN (SELECT h FROM devg), false) AS in_dev,
+         EXISTS (SELECT 1 FROM analytics_test_accounts t WHERE t.user_id = r.user_id) AS is_test,
+         EXISTS (SELECT 1 FROM author_members am JOIN practices p ON p.id = r.practice_id WHERE am.author_id = p.author_id AND am.user_id = r.user_id) AS is_owner
+  FROM practice_ratings r WHERE r.excluded_at IS NULL
+), pp AS (
+  SELECT practice_id, avg(stars) AS a,
+         avg(stars) FILTER (WHERE NOT in_ip) AS a_ip, avg(stars) FILTER (WHERE NOT in_dev) AS a_dev,
+         avg(stars) FILTER (WHERE NOT is_test) AS a_test, avg(stars) FILTER (WHERE NOT is_owner) AS a_owner
+  FROM r GROUP BY practice_id
+)
+SELECT count(*) AS rated_products,
+       count(*) FILTER (WHERE a_ip IS NULL) AS left_without_votes_wo_ip,
+       count(*) FILTER (WHERE a_ip IS NOT NULL AND a_ip <> a) AS avg_changes_wo_ip,
+       count(*) FILTER (WHERE abs(a_ip - a) >= 0.25) AS avg_changes_ge_025_wo_ip,
+       count(*) FILTER (WHERE a_dev IS NULL) AS left_without_votes_wo_dev,
+       count(*) FILTER (WHERE a_dev IS NOT NULL AND a_dev <> a) AS avg_changes_wo_dev,
+       count(*) FILTER (WHERE a_test IS NULL) AS left_without_votes_wo_test,
+       count(*) FILTER (WHERE a_test IS NOT NULL AND a_test <> a) AS avg_changes_wo_test,
+       count(*) FILTER (WHERE abs(a_test - a) >= 0.25) AS avg_changes_ge_025_wo_test,
+       count(*) FILTER (WHERE a_owner IS NULL) AS left_without_votes_wo_owner,
+       count(*) FILTER (WHERE a_owner IS NOT NULL AND a_owner <> a) AS avg_changes_wo_owner
+FROM pp;
+
+-- S5. Catalogue-sort preview on real data, per Sergey's decision 17.10: plain arithmetic mean of all valid
+-- votes (equal weight, a single vote counts), count shown next to it, NO prior, NO minimum. n = 0 → "Пока нет оценок",
+-- placed after rated products. Separate segments: music → «Музыка и звуки», practice → «Аудиопрактики и медитации».
+-- Compared with unique listeners (>= 30 s real listening) per product.
 WITH agg AS (
   SELECT practice_id, count(*) AS n, sum(stars) AS s FROM practice_ratings WHERE excluded_at IS NULL GROUP BY practice_id
-), g AS (SELECT sum(s)::numeric / nullif(sum(n), 0) AS m FROM agg)
-SELECT 'P' || lpad(row_number() OVER (ORDER BY n DESC, practice_id)::text, 2, '0') AS product,
-       n, round(s::numeric / n, 2) AS avg,
-       round((10 * 3.5 + s) / (10 + n), 3) AS bayes_m0_35,
-       round((10 * g.m + s) / (10 + n), 3) AS bayes_global_c10,
-       rank() OVER (ORDER BY s::numeric / n DESC) AS rank_by_avg,
-       rank() OVER (ORDER BY (10 * 3.5 + s) / (10 + n) DESC) AS rank_by_bayes_m0_35,
-       (n >= 10 AND (10 * 3.5 + s) / (10 + n) >= 4.3) AS in_top_rated_filter
-FROM agg, g ORDER BY n DESC LIMIT 60;
+), lis AS (
+  SELECT practice_id, count(*) FILTER (WHERE real_listened_ms >= 30000) AS listeners_30s
+  FROM practice_listen_stats GROUP BY practice_id
+), base AS (
+  SELECT p.id, p.product_kind,
+         CASE p.product_kind WHEN 'music' THEN 'Музыка и звуки' WHEN 'practice' THEN 'Аудиопрактики и медитации' ELSE 'Аудиопосты/прочее' END AS segment,
+         coalesce(a.n, 0) AS n, CASE WHEN a.n > 0 THEN round(a.s::numeric / a.n, 2) END AS avg,
+         coalesce(l.listeners_30s, 0) AS listeners_30s
+  FROM practices p LEFT JOIN agg a ON a.practice_id = p.id LEFT JOIN lis l ON l.practice_id = p.id
+  WHERE p.status = 'published'
+)
+SELECT segment,
+       count(*) AS published_products,
+       count(*) FILTER (WHERE n > 0) AS rated_products,
+       count(*) FILTER (WHERE n = 0) AS no_ratings_yet,
+       max(n) AS max_votes_per_product,
+       percentile_disc(0.5) WITHIN GROUP (ORDER BY n) FILTER (WHERE n > 0) AS median_votes_rated,
+       count(*) FILTER (WHERE n = 1) AS products_with_1_vote,
+       count(*) FILTER (WHERE avg = 5) AS products_avg_5,
+       count(*) FILTER (WHERE avg < 4.5) AS products_avg_below_4_5,
+       sum(listeners_30s) AS listener_pairs_30s,
+       max(listeners_30s) AS max_listeners_30s_per_product
+FROM base GROUP BY segment ORDER BY segment;
 
-SELECT
-  (SELECT count(*) FROM practices WHERE status = 'published') AS published_products,
-  (SELECT count(DISTINCT practice_id) FROM practice_ratings WHERE excluded_at IS NULL) AS products_with_ratings;
+-- S5b. Top-15 per segment by plain average (ties: more votes, then more listeners), with listener rank for comparison.
+WITH agg AS (
+  SELECT practice_id, count(*) AS n, sum(stars) AS s FROM practice_ratings WHERE excluded_at IS NULL GROUP BY practice_id
+), lis AS (
+  SELECT practice_id, count(*) FILTER (WHERE real_listened_ms >= 30000) AS listeners_30s FROM practice_listen_stats GROUP BY practice_id
+), base AS (
+  SELECT p.id, CASE p.product_kind WHEN 'music' THEN 'Музыка и звуки' WHEN 'practice' THEN 'Аудиопрактики и медитации' ELSE 'Аудиопосты/прочее' END AS segment,
+         coalesce(a.n, 0) AS n, CASE WHEN a.n > 0 THEN a.s::numeric / a.n END AS avg, coalesce(l.listeners_30s, 0) AS listeners_30s
+  FROM practices p LEFT JOIN agg a ON a.practice_id = p.id LEFT JOIN lis l ON l.practice_id = p.id
+  WHERE p.status = 'published'
+), ranked AS (
+  SELECT segment, n, round(avg, 2) AS avg, listeners_30s,
+         row_number() OVER (PARTITION BY segment ORDER BY avg DESC NULLS LAST, n DESC, listeners_30s DESC, id) AS rank_by_avg,
+         rank() OVER (PARTITION BY segment ORDER BY listeners_30s DESC) AS rank_by_listeners
+  FROM base
+)
+SELECT segment, rank_by_avg, n AS votes, avg, listeners_30s, rank_by_listeners
+FROM ranked WHERE rank_by_avg <= 15 ORDER BY segment, rank_by_avg;
 
 ROLLBACK;

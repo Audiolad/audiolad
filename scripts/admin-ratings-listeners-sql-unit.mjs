@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
 
-const migration = read("supabase/migrations/20270106120000_admin_ratings_listeners.sql");
+const migration = read("supabase/migrations/20270106190000_admin_ratings_listeners.sql");
 const ratings = read("supabase/migrations/20260921120000_practice_ratings.sql");
 
 // Static guarantees (cheap, always run).

@@ -7,13 +7,14 @@
  * scripts/admin-ratings-listeners-sql-unit.mjs
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 import {
   ADMIN_RATINGS_LISTENER_NO_NAME,
+  describeAdminRatingsListenerEventsTruncation,
   describeAdminRatingsListenerSignals,
   evaluateRatingsListenersAccess,
   formatAdminRatingsListenedMs,
@@ -323,5 +324,26 @@ assert.deepEqual(
 );
 const publicRatingFiles = grep("email", ["src/lib/ratings", "src/app/api/listen", "src/app/api/max/rating"]);
 assert.deepEqual(publicRatingFiles, [], "public rating APIs never touch email");
+
+// Event history truncation notice (review r3 MINOR).
+assert.equal(describeAdminRatingsListenerEventsTruncation({ eventTotal: 2, events: [1, 2] }), null);
+assert.equal(describeAdminRatingsListenerEventsTruncation({ eventTotal: 0, events: [] }), null);
+{
+  const note = describeAdminRatingsListenerEventsTruncation({ eventTotal: 250, events: new Array(200).fill(0) });
+  assert.ok(note && note.includes("200") && note.includes("250") && /неполная/.test(note));
+  assert.doesNotMatch(note!, /фрод|накрут|наруш/i);
+}
+assert.match(panel, /describeAdminRatingsListenerEventsTruncation\(detail\)/, "panel shows truncated-history notice");
+
+// Migration version must be unique across the repo (collision with PR #890's 20270106120000 fixed).
+{
+  const files = readdirSync(join(root, "supabase/migrations")).filter((f) => f.endsWith(".sql"));
+  const versions = files.map((f) => f.split("_")[0]);
+  const dupes = versions.filter((v, i) => versions.indexOf(v) !== i);
+  assert.deepEqual(dupes, [], "no duplicate Supabase migration versions");
+  const mine = files.filter((f) => f.endsWith("_admin_ratings_listeners.sql"));
+  assert.deepEqual(mine, ["20270106190000_admin_ratings_listeners.sql"]);
+  assert.notEqual(mine[0].split("_")[0], "20270106120000", "must not reuse PR #890 version");
+}
 
 console.log("admin-ratings-listeners-unit: ok");

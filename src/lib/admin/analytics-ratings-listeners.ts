@@ -333,6 +333,22 @@ export function safeInternalHref(href: string | null): string | null {
  * Neutral, non-accusatory wording for per-listener signals. Signals are
  * context for a human, never a verdict, and never trigger exclusion.
  */
+/**
+ * Neutral notice when the change history returned by the RPC is truncated
+ * (events are capped at `limit`, newest first). Returns null when complete.
+ */
+export function describeAdminRatingsListenerEventsTruncation(detail: {
+  eventTotal: number;
+  events: readonly unknown[];
+}): string | null {
+  const shown = detail.events.length;
+  const total = Number.isFinite(detail.eventTotal) ? detail.eventTotal : 0;
+  if (total <= shown) {
+    return null;
+  }
+  return `История неполная: показаны последние ${shown} из ${total} событий; более ранние изменения оценок здесь не отображаются.`;
+}
+
 export function describeAdminRatingsListenerSignals(
   signals: AdminRatingsListenerSignals,
 ): string[] {

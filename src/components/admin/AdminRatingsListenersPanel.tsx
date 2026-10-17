@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   ADMIN_RATINGS_LISTENER_NO_EMAIL,
+  describeAdminRatingsListenerEventsTruncation,
   describeAdminRatingsListenerSignals,
   formatAdminRatingsListenedMs,
   formatAdminRatingsListenerName,
@@ -407,9 +408,15 @@ export function AdminRatingsListenersPanel() {
                 ) : null}
               </div>
 
-              {detail.events.some((event) => event.eventKind === "changed") ? (
+              {detail.events.some((event) => event.eventKind === "changed") ||
+              describeAdminRatingsListenerEventsTruncation(detail) ? (
                 <div>
                   <p className="font-medium text-[#2b1d4a]">Изменения оценок</p>
+                  {describeAdminRatingsListenerEventsTruncation(detail) ? (
+                    <p className="mt-1 text-xs text-[#9485b4]" role="note">
+                      {describeAdminRatingsListenerEventsTruncation(detail)}
+                    </p>
+                  ) : null}
                   <ul className="mt-1 space-y-1 text-[#5b4d80]">
                     {detail.events
                       .filter((event) => event.eventKind === "changed")
