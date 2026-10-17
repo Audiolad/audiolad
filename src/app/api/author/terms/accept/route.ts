@@ -18,7 +18,14 @@ export const dynamic = "force-dynamic";
 type Body = {
   author_id?: unknown;
   acknowledged?: unknown;
+  /** Edition shown to the author (binds the acceptance to what was read). */
+  terms_version_id?: unknown;
+  content_hash?: unknown;
 };
+
+function optionalString(value: unknown, max: number): string | null {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+}
 
 function clientIp(headerStore: Headers): string | null {
   const forwarded = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -70,6 +77,8 @@ export async function POST(request: Request) {
       userAgent: headerStore.get("user-agent"),
       hadPriorAcceptance,
       supportMode: false,
+      expectedTermsVersionId: optionalString(body.terms_version_id, 64),
+      expectedContentHash: optionalString(body.content_hash, 64),
     });
 
     return NextResponse.json(

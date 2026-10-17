@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 
+import AuthorAgreementReacceptBanner from "@/components/author-dashboard/AuthorAgreementReacceptBanner";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
+import AuthorProductStatusBadge from "@/components/author-dashboard/AuthorProductStatusBadge";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
+import BusinessAgreementStatusScreen, {
+  type BusinessTrackAdmission,
+} from "@/components/author-dashboard/business/BusinessAgreementStatusScreen";
 import RightsholderVerificationForm, {
   type ExistingVerification,
   type OwnProduct,
@@ -14,7 +19,11 @@ import {
 } from "@/lib/author-products/auth";
 import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
 import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard";
+import { loadAuthorTermsStatus } from "@/lib/author-terms/service";
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { tracksLiveInBusiness, type BusinessGrantLayerRow } from "@/lib/business-rightsholder/track-in-business";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -59,7 +68,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   const [{ data: practices }, { data: docs }, { data: verification }] = await Promise.all([
     supabase
       .from("practices")
-      .select("id, title, audio_items(id, title, status, position)")
+      .select("id, title, author_id, audio_items(id, title, status, position)")
       .in("author_id", ownerWorkspaceIds)
       .eq("status", "published")
       .eq("product_kind", "music")
@@ -90,6 +99,62 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
     url: (d.content_url as string | null) ?? null,
   }));
 
+  const unified = isUnifiedAgreementEnabled();
+  let unifiedView: {
+    status: Awaited<ReturnType<typeof loadAuthorTermsStatus>>;
+    tracks: BusinessTrackAdmission[];
+  } | null = null;
+  if (unified) {
+    const status = await loadAuthorTermsStatus({ authorId: workspace.id, role, supportMode: false });
+    // Per-track admission for THIS workspace's own published music (read-only).
+    const ownTracks = (practices ?? []).filter((p) => p.author_id === workspace.id).flatMap((p) =>
+      ((p.audio_items as { id: string; title: string | null; status: string }[]) ?? [])
+        .filter((t) => t.status === "published")
+        .map((t) => ({ id: t.id, title: t.title ?? "Трек", productTitle: (p.title as string) ?? "Без названия" })),
+    );
+    const trackIds = ownTracks.map((t) => t.id);
+    const admin = createServiceRoleClient();
+    const [{ data: reviews }, { data: grants }] = trackIds.length
+      ? await Promise.all([
+          admin
+            .from("business_track_eligibility_reviews")
+            .select("audio_item_id, decision, reason_code, comment, created_at, id")
+            .eq("author_id", workspace.id)
+            .in("audio_item_id", trackIds)
+            .order("created_at", { ascending: false }),
+          admin
+            .from("music_rights_grants")
+            .select("audio_item_id, rights_layer, valid_from, valid_until")
+            .in("audio_item_id", trackIds)
+            .eq("use_type", "business_background_playback")
+            .eq("status", "verified")
+            .is("ceased_at", null),
+        ])
+      : [{ data: [] }, { data: [] }];
+    const latest = new Map<string, { decision: string; reason_code: string | null; comment: string | null }>();
+    for (const r of reviews ?? []) {
+      const id = String(r.audio_item_id);
+      if (!latest.has(id)) latest.set(id, r as { decision: string; reason_code: string | null; comment: string | null });
+    }
+    // "В Бизнесе" only when BOTH layers (recording + composition) have a live, currently valid grant.
+    const granted = tracksLiveInBusiness((grants ?? []) as BusinessGrantLayerRow[]);
+    unifiedView = {
+      status,
+      tracks: ownTracks.map((t) => {
+        const review = latest.get(t.id);
+        return {
+          audioItemId: t.id,
+          title: t.title,
+          productTitle: t.productTitle,
+          decision: (review?.decision as BusinessTrackAdmission["decision"]) ?? null,
+          reasonCode: review?.reason_code ?? null,
+          comment: review?.comment ?? null,
+          inBusiness: granted.has(t.id),
+        };
+      }),
+    };
+  }
+
   const attemptsAgg = verification?.business_rightsholder_verification_attempts as { count: number }[] | undefined;
   const existing: ExistingVerification = verification
     ? {
@@ -115,12 +180,32 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       <div className="mb-6">
         <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
       </div>
-      {products.length === 0 ? (
+      {unifiedView ? (
+        <>
+          <AuthorProductStatusBadge accessStatus={workspace.accessStatus} />
+          <AuthorAgreementReacceptBanner status={unifiedView.status} authorSlug={workspace.slug} />
+          <BusinessAgreementStatusScreen
+            authorSlug={workspace.slug}
+            agreement={{
+              accepted: unifiedView.status.businessAgreement === true,
+              version: unifiedView.status.businessAgreement ? unifiedView.status.currentVersion?.version ?? null : null,
+            }}
+            verificationStatus={(verification?.status as string | undefined) ?? null}
+            tracks={unifiedView.tracks}
+          />
+        </>
+      ) : null}
+      {unifiedView && unifiedView.status.businessAgreement !== true ? null : products.length === 0 ? (
         <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
           Сначала опубликуйте хотя бы один свой музыкальный продукт — потом здесь можно будет подтвердить права.
         </p>
       ) : (
-        <RightsholderVerificationForm products={products} documents={documents} existing={existing} />
+        <RightsholderVerificationForm
+          products={products}
+          documents={documents}
+          existing={existing}
+          mode={unifiedView ? "unified" : "legacy"}
+        />
       )}
     </AuthorShell>
   );

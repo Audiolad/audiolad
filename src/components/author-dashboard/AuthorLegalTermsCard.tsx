@@ -4,6 +4,7 @@ import AuthorTermsAcceptPanel, {
   type AuthorTermsCommercialShareSummary,
 } from "@/components/author-dashboard/AuthorTermsAcceptPanel";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
+import { PREVIOUS_EDITION_ACTIVE_STATUS_LABEL } from "@/lib/author-terms/terms-notice";
 
 type Props = {
   authorId: string;
@@ -66,7 +67,9 @@ export default function AuthorLegalTermsCard({
   return (
     <section className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-6">
       <h2 className="text-[20px] font-semibold text-[#25135c]">
-        Авторские условия сотрудничества платформы «АудиоЛад»
+        {status.coversBusiness
+          ? "Единое коммерческое соглашение с правообладателем"
+          : "Авторские условия сотрудничества платформы «АудиоЛад»"}
       </h2>
       <p className="mt-2 text-[15px] leading-6 text-[#4c3d78]">
         Условия регулируют размещение продуктов, предоставление доступа
@@ -92,7 +95,11 @@ export default function AuthorLegalTermsCard({
           <div>
             <dt className="font-medium text-[#7d70a2]">Статус</dt>
             <dd>
-              {status.acceptedCurrent ? "Принято" : "Требуется принятие"}
+              {status.acceptedCurrent
+                ? "Принято"
+                : status.previousEditionActive
+                  ? PREVIOUS_EDITION_ACTIVE_STATUS_LABEL
+                  : "Требуется принятие"}
             </dd>
           </div>
           {status.acceptedCurrent && status.acceptance ? (

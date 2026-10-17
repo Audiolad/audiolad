@@ -12,6 +12,9 @@ import {
 } from "@/lib/author-dashboard/free-author-first-step";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
+import { resolveAuthorTermsNotice } from "@/lib/author-terms/terms-notice";
+
+import AuthorAgreementReacceptBanner from "./AuthorAgreementReacceptBanner";
 
 type Props = {
   authorId: string;
@@ -95,8 +98,16 @@ export default function AuthorTermsRequiredBanner({
     );
   }
 
-  if (!mayNeedTerms || !status?.currentVersion || status.acceptedCurrent) {
+  if (!mayNeedTerms) {
     return null;
+  }
+  const notice = resolveAuthorTermsNotice(status);
+  if (notice === "none" || !status) {
+    return null;
+  }
+  if (notice === "invite") {
+    // 1.2 author after the 2.0 switch: access continues indefinitely, invitation only (no warning).
+    return <AuthorAgreementReacceptBanner status={status} authorSlug={authorSlug} />;
   }
 
   return (

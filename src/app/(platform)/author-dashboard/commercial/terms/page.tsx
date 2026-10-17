@@ -1,3 +1,4 @@
+import AuthorAgreementReacceptBanner from "@/components/author-dashboard/AuthorAgreementReacceptBanner";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import AuthorTermsAcceptPanel from "@/components/author-dashboard/AuthorTermsAcceptPanel";
 import { requireCommercialOnboardingAuthor } from "@/lib/author-dashboard/commercial-onboarding-routes";
@@ -73,6 +74,10 @@ export default async function AuthorCommercialTermsPage({
           </a>
         </section>
       ) : (
+        <>
+        {status.previousEditionActive ? (
+          <AuthorAgreementReacceptBanner status={status} authorSlug={author.slug} />
+        ) : null}
         <AuthorTermsAcceptPanel
           authorId={author.id}
           authorSlug={author.slug}
@@ -80,6 +85,7 @@ export default async function AuthorCommercialTermsPage({
           mode={hadPrior ? "updated" : "first"}
           commercialShare={commercialShare}
         />
+        </>
       )}
     </AuthorShell>
   );

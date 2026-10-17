@@ -4,6 +4,8 @@
 import {
   PROGRAM_TERMS_MD,
   PROGRAM_TERMS_MD_SHA256,
+  PROGRAM_TERMS_R6_MD,
+  PROGRAM_TERMS_R6_MD_SHA256,
   RIGHTS_DECLARATION_MD,
   RIGHTS_DECLARATION_MD_SHA256,
 } from "./legal-drafts/content";
@@ -37,8 +39,9 @@ export const PUBLIC_PROGRAM_DOCUMENTS: Record<ProgramDocumentKey, PublicProgramD
     version: "r6-2026-10-17",
     date: "2026-10-17",
     status: "approved",
-    markdown: PROGRAM_TERMS_MD,
-    sha256: PROGRAM_TERMS_MD_SHA256,
+    // Legacy flow (flag OFF) keeps r6 byte-identical: its п. 1 names the rights statement.
+    markdown: PROGRAM_TERMS_R6_MD,
+    sha256: PROGRAM_TERMS_R6_MD_SHA256,
   },
   business_music_rights_declaration: {
     key: "business_music_rights_declaration",
@@ -51,6 +54,30 @@ export const PUBLIC_PROGRAM_DOCUMENTS: Record<ProgramDocumentKey, PublicProgramD
     sha256: RIGHTS_DECLARATION_MD_SHA256,
   },
 };
+
+/**
+ * Unified agreement 2.0 (flag on): the separate rights statement is archived — its text stays
+ * readable unchanged (hash-pinned) for authors who signed it, but it is no longer a consent step.
+ */
+export const ARCHIVED_WITH_UNIFIED_AGREEMENT: readonly ProgramDocumentKey[] = ["business_music_rights_declaration"];
+
+export const PROGRAM_DOCUMENT_ARCHIVE_NOTICE =
+  "Документ в архиве. С редакции 2.0 Авторских условий права на музыку для «АудиоЛад Бизнес» подтверждаются Единым коммерческим соглашением с правообладателем; отдельное заявление больше не подписывается. Текст сохранён без изменений для авторов, которые его подписали.";
+
+/**
+ * Program terms r7 (flag ON): п. 1 names the unified commercial agreement 2.0 as the basis for
+ * sublicensing to venues instead of the archived rights statement. Same path and date as r6.
+ */
+export const UNIFIED_PROGRAM_TERMS_DOCUMENT: PublicProgramDocument = {
+  ...PUBLIC_PROGRAM_DOCUMENTS.business_program_terms,
+  version: "r7-2026-10-17",
+  markdown: PROGRAM_TERMS_MD,
+  sha256: PROGRAM_TERMS_MD_SHA256,
+};
+
+export function programTermsDocument(unifiedAgreementEnabled: boolean): PublicProgramDocument {
+  return unifiedAgreementEnabled ? UNIFIED_PROGRAM_TERMS_DOCUMENT : PUBLIC_PROGRAM_DOCUMENTS.business_program_terms;
+}
 
 export function formatDocumentDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-");
