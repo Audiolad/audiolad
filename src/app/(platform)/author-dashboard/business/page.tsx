@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   EVIDENCE_SIGNED_URL_TTL_SECONDS,
   parseAttemptEvidence,
+  parseAttemptProvider,
   type StoredEvidenceFile,
 } from "@/lib/business-rightsholder/evidence-display";
 // Jazz & Coffee --biz-* tokens for the evidence file fields (scoped by data-biz-theme).
@@ -129,7 +130,10 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       .order("attempt_no", { ascending: false })
       .limit(1)
       .maybeSingle();
-    const rows = parseAttemptEvidence(lastAttempt?.snapshot);
+    // Only files submitted with the case's current service (the draft can switch services
+    // after a failed upload; old files would otherwise appear under the new labels).
+    const attemptProvider = parseAttemptProvider(lastAttempt?.snapshot);
+    const rows = attemptProvider === (verification.ai_service as string) ? parseAttemptEvidence(lastAttempt?.snapshot) : [];
     if (rows.length) {
       const { data: links } = await supabase.storage
         .from(EVIDENCE_BUCKET)

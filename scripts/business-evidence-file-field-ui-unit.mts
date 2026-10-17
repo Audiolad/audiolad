@@ -10,10 +10,12 @@ import * as formModule from "../src/components/author-dashboard/business/Rightsh
 import {
   EVIDENCE_COPY,
   EVIDENCE_SIGNED_URL_TTL_SECONDS,
+  createEvidencePreviewStore,
   evidenceDoneText,
   formatEvidenceDate,
   formatEvidenceSize,
   parseAttemptEvidence,
+  parseAttemptProvider,
 } from "../src/lib/business-rightsholder/evidence-display";
 import { validateEvidenceFile } from "../src/lib/business-rightsholder/examples";
 
@@ -56,6 +58,37 @@ assert.deepEqual(parsed.map((e) => [e.kind, e.objectPath, e.mimeType, e.sizeByte
   ["paid_period", "u/v/pdf", "application/pdf", 30],
 ]);
 assert.deepEqual(parseAttemptEvidence(null), []);
+assert.equal(parseAttemptProvider({ fields: { ai_service: "suno" } }), "suno");
+assert.equal(parseAttemptProvider({ fields: {} }), null);
+assert.equal(parseAttemptProvider(null), null);
+
+// 2b. Object URL lifecycle: one URL per slot, revoked on replace / remove / reset / unmount.
+{
+  const created: string[] = [];
+  const revoked: string[] = [];
+  let n = 0;
+  const store = createEvidencePreviewStore({ create: () => { const u = `blob:${++n}`; created.push(u); return u; }, revoke: (u) => revoked.push(u) });
+  const img1 = new File([new Uint8Array(10)], "a.png", { type: "image/png" });
+  const img2 = new File([new Uint8Array(10)], "b.webp", { type: "image/webp" });
+  const doc = new File([new Uint8Array(10)], "c.pdf", { type: "application/pdf" });
+  const huge = new File([new Uint8Array(11 * 1024 * 1024)], "d.png", { type: "image/png" });
+  assert.deepEqual(store.set("generation", img1), { generation: "blob:1" });
+  assert.deepEqual(store.set("generation", img2), { generation: "blob:2" }, "replace");
+  assert.deepEqual(revoked, ["blob:1"]);
+  assert.deepEqual(store.set("paid_period", doc), { generation: "blob:2", paid_period: undefined }, "PDF gets no object URL");
+  assert.deepEqual(store.set("paid_period", huge), { generation: "blob:2", paid_period: undefined }, "invalid image gets no object URL");
+  assert.deepEqual(store.set("generation", null), { generation: undefined, paid_period: undefined }, "remove");
+  assert.deepEqual(revoked, ["blob:1", "blob:2"]);
+  store.set("generation", img1);
+  store.set("paid_period", img2);
+  assert.deepEqual(store.clear(), {}, "provider change resets");
+  assert.deepEqual(revoked, ["blob:1", "blob:2", "blob:3", "blob:4"]);
+  store.set("generation", img1);
+  store.dispose();
+  store.dispose();
+  assert.deepEqual(revoked, ["blob:1", "blob:2", "blob:3", "blob:4", "blob:5"], "unmount revokes once");
+  assert.equal(created.length, 5);
+}
 assert.deepEqual(parseAttemptEvidence({ evidence: "x" }), []);
 
 // 3. Field states (server render = first paint).
@@ -152,9 +185,10 @@ const fieldSrc = read("src/components/author-dashboard/business/EvidenceFileFiel
 const formSrc = read("src/components/author-dashboard/business/RightsholderVerificationForm.tsx");
 const pageSrc = read("src/app/(platform)/author-dashboard/business/page.tsx");
 const helperSrc = read("src/lib/business-rightsholder/evidence-display.ts");
-assert.match(fieldSrc, /URL\.createObjectURL\(file\)/);
-assert.match(fieldSrc, /URL\.revokeObjectURL\(previous\)/);
-assert.match(fieldSrc, /useEffect\(\(\) => \(\) => \{/, "object URLs revoked on unmount");
+assert.match(fieldSrc, /useState\(\(\) => createEvidencePreviewStore\(\)\)/);
+assert.match(fieldSrc, /useEffect\(\(\) => \(\) => store\.dispose\(\), \[store\]\)/, "object URLs revoked on unmount");
+assert.match(formSrc, /clearPreviews\(\)/, "provider change resets previews");
+assert.match(pageSrc, /attemptProvider === \(verification\.ai_service as string\)/, "stored files only for the case's current service");
 assert.doesNotMatch(formSrc, /type="file"/, "the form uses the shared field only");
 assert.match(formSrc, /<EvidenceFileField/);
 // Upload flow unchanged: reserve RPC + storage upload + submit_v2.

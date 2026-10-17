@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   EVIDENCE_COPY,
+  createEvidencePreviewStore,
   evidenceDoneText,
   formatEvidenceDate,
   formatEvidenceSize,
   isImageMime,
   isPdfMime,
+  type EvidencePreviews,
   type EvidenceUploadState,
   type StoredEvidenceFile,
 } from "@/lib/business-rightsholder/evidence-display";
@@ -23,31 +25,20 @@ export const EVIDENCE_FORMAT_HINT = "PNG, JPG, WEBP или PDF, до 10 МБ";
 
 /**
  * Local previews for chosen files. Object URLs are created in the change handler (not in
- * render or an effect), revoked when a slot is replaced, removed or reset, and on unmount.
- * Only valid image files get a URL; PDFs show an icon.
+ * render or an effect), revoked when a slot is replaced, removed or reset, and on unmount
+ * (see createEvidencePreviewStore). Only valid image files get a URL; PDFs show an icon.
  */
 export function useEvidencePreviews() {
-  const [previews, setPreviews] = useState<Partial<Record<RightsholderEvidenceKind, string>>>({});
-  const live = useRef<Partial<Record<RightsholderEvidenceKind, string>>>({});
+  const [store] = useState(() => createEvidencePreviewStore());
+  const [previews, setPreviews] = useState<EvidencePreviews>({});
 
   const setPreview = useCallback((kind: RightsholderEvidenceKind, file: File | null) => {
-    const previous = live.current[kind];
-    if (previous) URL.revokeObjectURL(previous);
-    const next = file && isImageMime(file.type) && !validateEvidenceFile(file) ? URL.createObjectURL(file) : undefined;
-    live.current = { ...live.current, [kind]: next };
-    setPreviews((prev) => ({ ...prev, [kind]: next }));
-  }, []);
+    setPreviews(store.set(kind, file));
+  }, [store]);
 
-  const clearPreviews = useCallback(() => {
-    for (const url of Object.values(live.current)) if (url) URL.revokeObjectURL(url);
-    live.current = {};
-    setPreviews({});
-  }, []);
+  const clearPreviews = useCallback(() => setPreviews(store.clear()), [store]);
 
-  useEffect(() => () => {
-    for (const url of Object.values(live.current)) if (url) URL.revokeObjectURL(url);
-    live.current = {};
-  }, []);
+  useEffect(() => () => store.dispose(), [store]);
 
   return { previews, setPreview, clearPreviews };
 }

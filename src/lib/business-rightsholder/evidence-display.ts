@@ -1,6 +1,6 @@
 // Display helpers for the rightsholder evidence file fields (screenshot / receipt).
 // UI only: upload and storage rules live in the form submit flow and the DB RPCs.
-import type { RightsholderEvidenceKind } from "@/lib/business-rightsholder/examples";
+import { validateEvidenceFile, type RightsholderEvidenceKind } from "@/lib/business-rightsholder/examples";
 
 /** A file that is already stored with the latest submitted attempt (read via a short-lived signed URL). */
 export type StoredEvidenceFile = {
@@ -88,4 +88,43 @@ export function parseAttemptEvidence(snapshot: unknown): SnapshotEvidence[] {
     if (!prev || (item.createdAt ?? "") > (prev.createdAt ?? "")) byKind.set(item.kind, item);
   }
   return [...byKind.values()];
+}
+
+/** AI service the attempt was submitted with (`snapshot.fields.ai_service`), or null. */
+export function parseAttemptProvider(snapshot: unknown): string | null {
+  const value = (snapshot as { fields?: { ai_service?: unknown } } | null)?.fields?.ai_service;
+  return typeof value === "string" && value ? value : null;
+}
+
+export type EvidencePreviews = Partial<Record<RightsholderEvidenceKind, string>>;
+type ObjectUrlApi = { create: (file: Blob) => string; revoke: (url: string) => void };
+
+/**
+ * Bookkeeping for local preview object URLs: one URL per slot, only for valid image files.
+ * The previous URL of a slot is revoked on replace / remove; clear() and dispose() revoke all.
+ */
+export function createEvidencePreviewStore(
+  api: ObjectUrlApi = { create: (file) => URL.createObjectURL(file), revoke: (url) => URL.revokeObjectURL(url) },
+) {
+  let live: EvidencePreviews = {};
+  const revokeAll = () => {
+    for (const url of Object.values(live)) if (url) api.revoke(url);
+    live = {};
+  };
+  return {
+    set(kind: RightsholderEvidenceKind, file: File | null): EvidencePreviews {
+      const previous = live[kind];
+      if (previous) api.revoke(previous);
+      const next = file && isImageMime(file.type) && !validateEvidenceFile(file) ? api.create(file) : undefined;
+      live = { ...live, [kind]: next };
+      return { ...live };
+    },
+    clear(): EvidencePreviews {
+      revokeAll();
+      return {};
+    },
+    dispose() {
+      revokeAll();
+    },
+  };
 }
