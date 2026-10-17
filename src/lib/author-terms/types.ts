@@ -8,6 +8,9 @@ export type AuthorTermsVersionRow = {
   document_key: string;
   is_current: boolean;
   created_at: string;
+  /** Unified agreement 2.0 columns (migration 20270106120000); present only when the flag is on. */
+  covers_business?: boolean | null;
+  reaccept_grace_until?: string | null;
 };
 
 export type AuthorTermsAcceptanceRow = {
@@ -40,6 +43,12 @@ export type AuthorTermsStatusView = {
   role: "owner" | "editor" | null;
   /** True in a platform-owner support session: acceptance is blocked. */
   supportMode?: boolean;
+  /** Unified agreement rollout (flag on): earlier edition accepted, current one not yet. */
+  reacceptRequired?: boolean;
+  inGrace?: boolean;
+  graceUntil?: string | null;
+  coversBusiness?: boolean;
+  businessAgreement?: boolean;
 };
 
 export const AUTHOR_TERMS_ACCEPTANCE_REQUIRED = "AUTHOR_TERMS_ACCEPTANCE_REQUIRED" as const;

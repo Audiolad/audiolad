@@ -66,7 +66,9 @@ export default function AuthorLegalTermsCard({
   return (
     <section className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-6">
       <h2 className="text-[20px] font-semibold text-[#25135c]">
-        Авторские условия сотрудничества платформы «АудиоЛад»
+        {status.coversBusiness
+          ? "Единое коммерческое соглашение с правообладателем"
+          : "Авторские условия сотрудничества платформы «АудиоЛад»"}
       </h2>
       <p className="mt-2 text-[15px] leading-6 text-[#4c3d78]">
         Условия регулируют размещение продуктов, предоставление доступа

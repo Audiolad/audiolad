@@ -1,3 +1,4 @@
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -1405,7 +1406,31 @@ export function createSupabaseStudioMusicCatalogStore(
         .eq("author_terms_versions.is_current", true)
         .eq("author_terms_versions.document_key", "author-terms");
       if (error) throw new Error("studio_music_author_terms_lookup_failed");
-      return new Set((data ?? []).map((row) => String(row.author_id)));
+      const accepted = new Set((data ?? []).map((row) => String(row.author_id)));
+      // Unified agreement 2.0 rollout: earlier editions stay valid during the
+      // re-acceptance grace (same rule as SQL author_has_accepted_current_terms).
+      if (isUnifiedAgreementEnabled() && accepted.size < authorIds.length) {
+        const { data: current, error: currentError } = await supabase
+          .from("author_terms_versions")
+          .select("reaccept_grace_until")
+          .eq("is_current", true)
+          .eq("document_key", "author-terms")
+          .maybeSingle();
+        if (currentError) throw new Error("studio_music_author_terms_lookup_failed");
+        const graceUntil = current?.reaccept_grace_until
+          ? Date.parse(String(current.reaccept_grace_until))
+          : Number.NaN;
+        if (Number.isFinite(graceUntil) && Date.now() < graceUntil) {
+          const { data: earlier, error: earlierError } = await supabase
+            .from("author_terms_acceptances")
+            .select("author_id, author_terms_versions!inner(document_key)")
+            .in("author_id", authorIds.filter((id) => !accepted.has(id)))
+            .eq("author_terms_versions.document_key", "author-terms");
+          if (earlierError) throw new Error("studio_music_author_terms_lookup_failed");
+          for (const row of earlier ?? []) accepted.add(String(row.author_id));
+        }
+      }
+      return accepted;
     },
   };
 }

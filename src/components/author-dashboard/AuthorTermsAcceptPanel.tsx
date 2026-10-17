@@ -13,6 +13,11 @@ import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT,
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED,
 } from "@/lib/author-terms/types";
+import {
+  UNIFIED_AGREEMENT_ACCEPTANCE_TEXT,
+  UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED,
+  UNIFIED_AGREEMENT_TITLE,
+} from "@/lib/author-terms/unified-agreement-texts";
 
 export type AuthorTermsCommercialShareSummary = {
   authorLine: string;
@@ -66,23 +71,32 @@ export default function AuthorTermsAcceptPanel({
 
   const version = status.currentVersion;
   const embedded = variant === "embedded";
-  const checkboxLabel =
-    mode === "updated"
+  // Unified agreement 2.0 (flag on and current edition covers Business): one document, one checkbox.
+  const unified = status.coversBusiness === true;
+  const checkboxLabel = unified
+    ? mode === "updated"
+      ? UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED
+      : UNIFIED_AGREEMENT_ACCEPTANCE_TEXT
+    : mode === "updated"
       ? AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED
       : AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT;
-  const title =
-    mode === "updated"
+  const title = unified
+    ? UNIFIED_AGREEMENT_TITLE
+    : mode === "updated"
       ? "Авторские условия обновлены"
       : "Авторские условия сотрудничества";
-  const lead =
-    mode === "updated"
+  const lead = unified
+    ? "Одно соглашение на все способы монетизации на Платформе, включая «АудиоЛад Бизнес» и сублицензирование заведениям. Отдельные заявления и согласия по альбомам и трекам не нужны. Принять соглашение может только сам автор."
+    : mode === "updated"
       ? "Для продолжения коммерческой деятельности необходимо ознакомиться с новой редакцией и принять её."
       : "Для публикации продуктов и получения авторского вознаграждения необходимо ознакомиться с Авторскими условиями сотрудничества платформы «АудиоЛад» и принять их.";
   const openLabel = embedded
     ? "Открыть документ"
-    : mode === "updated"
-      ? "Посмотреть новую редакцию"
-      : "Открыть Авторские условия";
+    : unified
+      ? "Открыть соглашение"
+      : mode === "updated"
+        ? "Посмотреть новую редакцию"
+        : "Открыть Авторские условия";
   const submitLabel = embedded
     ? "Принять и продолжить"
     : mode === "updated"

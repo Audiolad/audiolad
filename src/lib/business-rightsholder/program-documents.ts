@@ -51,6 +51,15 @@ export const PUBLIC_PROGRAM_DOCUMENTS: Record<ProgramDocumentKey, PublicProgramD
   },
 };
 
+/**
+ * Unified agreement 2.0 (flag on): the separate rights statement is archived — its text stays
+ * readable unchanged (hash-pinned) for authors who signed it, but it is no longer a consent step.
+ */
+export const ARCHIVED_WITH_UNIFIED_AGREEMENT: readonly ProgramDocumentKey[] = ["business_music_rights_declaration"];
+
+export const PROGRAM_DOCUMENT_ARCHIVE_NOTICE =
+  "Документ в архиве. С редакции 2.0 Авторских условий права на музыку для «АудиоЛад Бизнес» подтверждаются Единым коммерческим соглашением с правообладателем; отдельное заявление больше не подписывается. Текст сохранён без изменений для авторов, которые его подписали.";
+
 export function formatDocumentDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-");
   return `${d}.${m}.${y}`;

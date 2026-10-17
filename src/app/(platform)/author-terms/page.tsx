@@ -1,13 +1,35 @@
 import type { Metadata } from "next";
 
 import LegalPageShell from "@/components/legal/LegalPageShell";
+import { buildAuthorTermsDocumentBlocks } from "@/lib/author-terms/document-view";
 import {
-  buildAuthorTermsDocumentBlocks,
-  getAuthorTermsPublicMeta,
-} from "@/lib/author-terms/document-view";
+  LEGACY_AUTHOR_TERMS_EDITION,
+  findAcceptableEditionByHash,
+  findEditionByVersion,
+  type ApprovedAuthorTermsEdition,
+} from "@/lib/author-terms/editions";
+import { getCurrentAuthorTermsVersion } from "@/lib/author-terms/service";
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
-const meta = getAuthorTermsPublicMeta();
+// The displayed edition follows the DB current edition when the unified-agreement flag is on.
+export const dynamic = "force-dynamic";
+
+type PageProps = { searchParams?: Promise<{ edition?: string }> };
+
+async function resolveDisplayedEdition(
+  requestedVersion: string | undefined,
+): Promise<{ edition: ApprovedAuthorTermsEdition; isCurrent: boolean; current: ApprovedAuthorTermsEdition }> {
+  if (!isUnifiedAgreementEnabled()) {
+    return { edition: LEGACY_AUTHOR_TERMS_EDITION, isCurrent: true, current: LEGACY_AUTHOR_TERMS_EDITION };
+  }
+  const row = await getCurrentAuthorTermsVersion();
+  const current = findAcceptableEditionByHash(row?.content_hash, true) ?? LEGACY_AUTHOR_TERMS_EDITION;
+  const requested = findEditionByVersion(requestedVersion);
+  const edition = requested ?? current;
+  return { edition, isCurrent: edition.versionId === current.versionId, current };
+}
+
 const canonical = `${PRODUCTION_APP_ORIGIN}/author-terms`;
 
 export const metadata: Metadata = {
@@ -43,27 +65,63 @@ function formatPublishedDate(iso: string): string {
   }).format(date);
 }
 
-export default function AuthorTermsPage() {
-  const blocks = buildAuthorTermsDocumentBlocks();
+export default async function AuthorTermsPage({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
+  const { edition, isCurrent, current } = await resolveDisplayedEdition(params.edition?.trim());
+  const meta = edition;
+  const blocks = buildAuthorTermsDocumentBlocks(edition.text, edition.frontMatterMarker);
+  const otherEditions = isUnifiedAgreementEnabled()
+    ? [current, LEGACY_AUTHOR_TERMS_EDITION].filter(
+        (item, index, list) => item.versionId !== edition.versionId && list.findIndex((x) => x.versionId === item.versionId) === index,
+      )
+    : [];
 
   return (
     <LegalPageShell>
       <h1 className="mt-6 text-[28px] font-semibold leading-tight text-[#25135c] lg:text-[32px]">
-        Авторские условия сотрудничества платформы «АудиоЛад»
+        {edition.coversBusiness
+          ? "Единое коммерческое соглашение с правообладателем"
+          : "Авторские условия сотрудничества платформы «АудиоЛад»"}
       </h1>
 
       <p className="mt-3 text-[17px] leading-6 text-[#4c3d78] lg:text-[18px]">
-        Условия регулируют размещение продуктов, предоставление доступа
-        слушателям и выплату авторского вознаграждения.
+        {edition.coversBusiness
+          ? "Одно соглашение на все способы монетизации на Платформе, включая «АудиоЛад Бизнес». Отдельные заявления и согласия по альбомам и трекам не нужны."
+          : "Условия регулируют размещение продуктов, предоставление доступа слушателям и выплату авторского вознаграждения."}
       </p>
 
-      <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
+      {!isCurrent ? (
+        <p
+          role="note"
+          data-testid="author-terms-archived-edition"
+          className="mt-4 rounded-2xl border border-[#f1d9a6] bg-[#fff8e8] p-4 text-sm leading-6 text-[#6b4a00]"
+        >
+          Это прежняя редакция {meta.version}. Она продолжает действовать для авторов, которые приняли её и ещё не
+          приняли текущую редакцию {current.version}.
+        </p>
+      ) : null}
+
+      <p className="mt-3 text-sm leading-6 text-[#8c7dab]" data-testid="author-terms-edition">
         Версия: {meta.version}
         <br />
         Дата публикации: {formatPublishedDate(meta.publishedAt)}
         <br />
         Дата вступления в силу: {formatPublishedDate(meta.effectiveAt)}
       </p>
+
+      {otherEditions.length > 0 ? (
+        <p className="mt-3 text-sm leading-6 text-[#6f61a3]">
+          {otherEditions.map((item) => (
+            <a
+              key={item.versionId}
+              href={item.versionId === current.versionId ? "/author-terms" : `/author-terms?edition=${encodeURIComponent(item.version)}`}
+              className="mr-4 text-[#7042c5] underline-offset-2 hover:underline"
+            >
+              {item.versionId === current.versionId ? `Текущая редакция ${item.version}` : `Редакция ${item.version}`}
+            </a>
+          ))}
+        </p>
+      ) : null}
 
       <nav
         className="mt-8 rounded-[22px] border border-[#eadff8] bg-[#faf6ff] p-5"

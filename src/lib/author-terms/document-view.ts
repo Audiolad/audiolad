@@ -23,9 +23,11 @@ function sectionIdForHeading(text: string): string | undefined {
  * brand line, document title, and the plain-text «Содержание» list.
  * Legal wording of the body is left unchanged.
  */
-export function stripAuthorTermsFrontMatter(text: string): string {
+export function stripAuthorTermsFrontMatter(
+  text: string,
+  marker: string = "Настоящие Авторские условия сотрудничества",
+): string {
   const normalized = text.replace(/\r\n/g, "\n");
-  const marker = "Настоящие Авторские условия сотрудничества";
   const index = normalized.indexOf(marker);
   if (index < 0) {
     return normalized;
@@ -37,8 +39,9 @@ export function stripAuthorTermsFrontMatter(text: string): string {
 /** Split approved plain text into render blocks without altering wording. */
 export function buildAuthorTermsDocumentBlocks(
   text: string = AUTHOR_TERMS_APPROVED_TEXT,
+  frontMatterMarker?: string,
 ): AuthorTermsDocumentBlock[] {
-  const lines = stripAuthorTermsFrontMatter(text).split("\n");
+  const lines = stripAuthorTermsFrontMatter(text, frontMatterMarker).split("\n");
   const blocks: AuthorTermsDocumentBlock[] = [];
   let listItems: string[] = [];
 
