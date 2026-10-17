@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs><radialGradient id="bg" gradientUnits="userSpaceOnUse" cx="256" cy="195" r="384"><stop offset="0" stop-color="#6f4326"/><stop offset="1" stop-color="#2b1d14"/></radialGradient></defs>
+<rect width="512" height="512" rx="96" fill="url(#bg)"/><g transform="translate(256 262) scale(1.14) translate(-256 -230)"><g fill="none" stroke="#f7f1e8" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+<path d="M256 96 C292 130 318 178 316 232 C314 268 296 296 276 312 M236 312 C216 296 198 268 196 232 C194 178 220 130 256 96"/>
+<path d="M222 330 C168 334 110 312 74 252 C122 238 170 248 206 282"/>
+<path d="M222 330 C168 334 110 312 74 252 C122 238 170 248 206 282" transform="translate(512 0) scale(-1 1)"/>
+<path d="M246 352 C206 334 158 330 104 338 C150 356 196 368 238 364"/>
+<path d="M246 352 C206 334 158 330 104 338 C150 356 196 368 238 364" transform="translate(512 0) scale(-1 1)"/>
+</g>
+<path d="M240 350 C238 368 268 370 270 348 C272 312 250 248 249 194 C248 158 274 144 281 166 C290 194 256 216 230 246 C204 276 214 326 260 326 C302 326 312 276 282 258 C258 244 228 260 240 290" fill="none" stroke="url(#bg)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M240 350 C238 368 268 370 270 348 C272 312 250 248 249 194 C248 158 274 144 281 166 C290 194 256 216 230 246 C204 276 214 326 260 326 C302 326 312 276 282 258 C258 244 228 260 240 290" fill="none" stroke="#b8904f" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>
