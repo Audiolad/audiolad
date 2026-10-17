@@ -106,6 +106,8 @@ export async function hasAcceptedCurrentAuthorTerms(
 export async function loadAuthorTermsStatus(input: {
   authorId: string;
   role: "owner" | "editor";
+  /** Platform-owner support session: acceptance is never offered (8dcba9d1). */
+  supportMode: boolean;
 }): Promise<AuthorTermsStatusView> {
   const { accepted, currentVersion, acceptance } =
     await hasAcceptedCurrentAuthorTerms(input.authorId);
@@ -131,8 +133,13 @@ export async function loadAuthorTermsStatus(input: {
             version: currentVersion.version,
           }
         : null,
-    canAccept: input.role === "owner" && Boolean(currentVersion) && !accepted,
+    canAccept:
+      !input.supportMode &&
+      input.role === "owner" &&
+      Boolean(currentVersion) &&
+      !accepted,
     role: input.role,
+    supportMode: input.supportMode,
   };
 }
 
@@ -143,11 +150,16 @@ export async function acceptCurrentAuthorTerms(input: {
   ipAddress: string | null;
   userAgent: string | null;
   hadPriorAcceptance: boolean;
+  /** Must be false: support mode never records an acceptance (8dcba9d1). */
+  supportMode: boolean;
 }): Promise<{
   acceptance: AuthorTermsAcceptanceRow;
   created: boolean;
   currentVersion: AuthorTermsVersionRow;
 }> {
+  if (input.supportMode !== false) {
+    throw new AuthorTermsError("support_mode_acceptance_forbidden", 403);
+  }
   if (input.role !== "owner") {
     throw new AuthorTermsError("forbidden", 403);
   }

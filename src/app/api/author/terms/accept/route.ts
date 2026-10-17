@@ -6,8 +6,8 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import { AuthorTermsError } from "@/lib/author-terms/errors";
-import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
+import { SUPPORT_MODE_ACCEPTANCE_FORBIDDEN } from "@/lib/author-support/consent-guard";
 import {
   acceptCurrentAuthorTerms,
   authorHasAnyTermsAcceptance,
@@ -48,9 +48,17 @@ export async function POST(request: Request) {
     }
 
     const { user, role } = await requireAuthorMembership(authorId);
-    const execution = await peekAuthorExecutionContext();
-    const acceptanceUserId =
-      execution?.isSupportMode ? execution.actingUserId : user.id;
+    // Support mode: staff must never accept on the author's behalf.
+    // Fail-closed: with a support cookie, an unresolvable context or a
+    // different real user also blocks. Bearer-only owners are not affected.
+    if (await isConsentBlockedForRequest(user.id)) {
+      return NextResponse.json(
+        { error: SUPPORT_MODE_ACCEPTANCE_FORBIDDEN },
+        { status: 403, headers: { "Cache-Control": "private, no-store" } },
+      );
+    }
+    // Always the real, signed-in user: never the accompanied author.
+    const acceptanceUserId = user.id;
     const headerStore = await headers();
     const hadPriorAcceptance = await authorHasAnyTermsAcceptance(authorId);
 
@@ -61,13 +69,7 @@ export async function POST(request: Request) {
       ipAddress: clientIp(headerStore),
       userAgent: headerStore.get("user-agent"),
       hadPriorAcceptance,
-    });
-
-    await recordAuthorSupportAudit({
-      action: "author_terms_accepted",
-      resourceType: "author_terms",
-      resourceId: authorId,
-      metadata: { created: result.created },
+      supportMode: false,
     });
 
     return NextResponse.json(

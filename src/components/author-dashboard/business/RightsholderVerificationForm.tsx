@@ -11,6 +11,7 @@ import {
   type RightsholderEvidenceKind,
   type RightsholderExample,
 } from "@/lib/business-rightsholder/examples";
+import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard";
 import { createClient } from "@/lib/supabase/client";
 import {
   PROVIDERS,
@@ -145,7 +146,11 @@ export default function RightsholderVerificationForm({ products, documents, exis
       setErrors({});
     } catch (error) {
       const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error);
-      setErrors({ form: `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.` });
+      setErrors({
+        form: message.includes("support_mode_consent_forbidden")
+          ? SUPPORT_MODE_CONSENT_NOTICE
+          : `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.`,
+      });
     } finally {
       setBusy(false);
     }

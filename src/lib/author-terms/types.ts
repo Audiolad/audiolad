@@ -38,6 +38,8 @@ export type AuthorTermsStatusView = {
   } | null;
   canAccept: boolean;
   role: "owner" | "editor" | null;
+  /** True in a platform-owner support session: acceptance is blocked. */
+  supportMode?: boolean;
 };
 
 export const AUTHOR_TERMS_ACCEPTANCE_REQUIRED = "AUTHOR_TERMS_ACCEPTANCE_REQUIRED" as const;

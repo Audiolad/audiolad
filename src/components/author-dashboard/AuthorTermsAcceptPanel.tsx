@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import {
+  SUPPORT_MODE_ACCEPTANCE_FORBIDDEN,
+  SUPPORT_MODE_CONSENT_NOTICE,
+} from "@/lib/author-support/consent-guard";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
 import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT,
@@ -86,7 +90,7 @@ export default function AuthorTermsAcceptPanel({
       : "Принять и продолжить";
 
   async function onSubmit() {
-    if (!checked || pending || !status.canAccept) {
+    if (!checked || pending || !status.canAccept || status.supportMode) {
       return;
     }
 
@@ -109,9 +113,12 @@ export default function AuthorTermsAcceptPanel({
 
       if (!response.ok) {
         setError(
-          data.error === "forbidden"
-            ? "Принять условия может только владелец кабинета автора."
-            : "Не удалось сохранить принятие. Попробуйте ещё раз.",
+          data.error === SUPPORT_MODE_ACCEPTANCE_FORBIDDEN ||
+            data.error === "support_mutation_blocked"
+            ? SUPPORT_MODE_CONSENT_NOTICE
+            : data.error === "forbidden"
+              ? "Принять условия может только владелец кабинета автора."
+              : "Не удалось сохранить принятие. Попробуйте ещё раз.",
         );
         return;
       }
@@ -154,7 +161,15 @@ export default function AuthorTermsAcceptPanel({
         </div>
       ) : null}
 
-      {status.role === "editor" ? (
+      {status.supportMode ? (
+        <p
+          role="note"
+          data-testid="support-mode-acceptance-blocked"
+          className="mt-5 rounded-[18px] border border-[#f1d9a6] bg-[#fff8e8] px-4 py-3 text-sm leading-6 text-[#6b4a00]"
+        >
+          {SUPPORT_MODE_CONSENT_NOTICE}
+        </p>
+      ) : status.role === "editor" ? (
         <p className="mt-5 text-sm leading-6 text-[#8c7dab]">
           Принять условия может только владелец кабинета автора. Вы можете
           ознакомиться с документом по ссылке выше.

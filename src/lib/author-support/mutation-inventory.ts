@@ -386,10 +386,11 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
+      // Legal acceptance is the author's personal act: blocked in support mode
+      // (proxy 403 + route 403 + UI disabled). 8dcba9d1 PR 1.
       key: "author_terms",
-      group: "cabinet",
-      disposition: "allowed_audited",
-      action: "author_terms_accepted",
+      group: "blocked",
+      disposition: "blocked",
       routePatterns: ["src/app/api/author/terms/accept/route.ts"],
     },
     {

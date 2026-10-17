@@ -7,6 +7,7 @@ import {
   loadAuthorTermsStatus,
 } from "@/lib/author-terms/service";
 import { requireAuthorMembership } from "@/lib/author-products/auth";
+import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,9 +25,10 @@ export default async function AuthorCommercialTermsPage({
     authorSlug: params.author,
   });
 
-  const { role } = await requireAuthorMembership(author.id);
+  const { user, role } = await requireAuthorMembership(author.id);
+  const supportMode = await isConsentBlockedForRequest(user.id);
   const [status, hadPrior, commercialShare] = await Promise.all([
-    loadAuthorTermsStatus({ authorId: author.id, role }),
+    loadAuthorTermsStatus({ authorId: author.id, role, supportMode }),
     authorHasAnyTermsAcceptance(author.id),
     loadAuthorCommercialShareSummary(author.id),
   ]);
