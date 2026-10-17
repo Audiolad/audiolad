@@ -63,7 +63,7 @@ export default function BusinessOnboardingWizardPage() {
           </p>
           <a
             href="https://audiolad.ru/auth/sign-in"
-            className="mt-4 inline-flex rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)]"
+            className="mt-4 business-app-btn business-app-btn-primary business-app-focus-ring"
           >
             Войти
           </a>
@@ -86,19 +86,19 @@ export default function BusinessOnboardingWizardPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/"
-              className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)]"
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
             >
               На главную
             </Link>
             <Link
               href="/player"
-              className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
               Открыть плеер
             </Link>
             <Link
               href="/music"
-              className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
               Музыка / eligibility
             </Link>
@@ -365,19 +365,19 @@ export default function BusinessOnboardingWizardPage() {
             <div className="flex flex-wrap gap-2 pt-1">
               <Link
                 href="/player"
-                className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)]"
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
                 Открыть плеер
               </Link>
               <Link
                 href="/music"
-                className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 Музыка / eligibility
               </Link>
               <Link
                 href="/"
-                className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 На главную
               </Link>
@@ -401,7 +401,7 @@ export default function BusinessOnboardingWizardPage() {
                 type="button"
                 onClick={goBack}
                 disabled={pending}
-                className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)] disabled:opacity-60"
+                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 Назад
               </button>
@@ -411,7 +411,7 @@ export default function BusinessOnboardingWizardPage() {
                 type="button"
                 onClick={onConfirm}
                 disabled={pending}
-                className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)] disabled:opacity-60"
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
                 {pending ? "Создаём…" : "Подтвердить и создать точку"}
               </button>
@@ -420,7 +420,7 @@ export default function BusinessOnboardingWizardPage() {
                 type="button"
                 onClick={goNext}
                 disabled={pending}
-                className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)] disabled:opacity-60"
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
                 Далее
               </button>

@@ -55,6 +55,31 @@ const REQUIRED = [
 ];
 for (const t of REQUIRED) resolve(t);
 
+// Every var(--biz-*) referenced by Business code is defined by the theme layer
+// (only runtime-set layout variables are exempt).
+const RUNTIME_VARS = new Set(["--biz-sidebar-width"]);
+const structural = tokenBlock(themeCss, ".business-app-root");
+const usedIn = [
+  "src/components/business-app/business-app.css",
+  "src/components/business-app/design-preview/design-preview.module.css",
+  ...[...walkUsed("src/app/business-app"), ...walkUsed("src/components/business-app")].filter((p) => p.endsWith(".tsx")),
+];
+function walkUsed(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(join(root, dir))) {
+    const p = `${dir}/${name}`;
+    if (statSync(join(root, p)).isDirectory()) walkUsed(p, out);
+    else out.push(p);
+  }
+  return out;
+}
+for (const f of usedIn) {
+  for (const m of read(f).matchAll(/var\((--biz-[a-z0-9-]+)/g)) {
+    const name = m[1];
+    if (RUNTIME_VARS.has(name)) continue;
+    assert.ok(tokens.has(name) || structural.has(name), `${f}: ${name} is not defined in business-theme.css`);
+  }
+}
+
 // 3. Readable contrasts (WCAG AA 4.5:1 for text pairs).
 function lum(hex: string): number {
   const h = hex.replace("#", "");

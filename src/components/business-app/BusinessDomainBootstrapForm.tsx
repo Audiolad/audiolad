@@ -80,7 +80,7 @@ export default function BusinessDomainBootstrapForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-on-accent)] disabled:opacity-60"
+        className="business-app-btn business-app-btn-primary business-app-focus-ring"
       >
         {pending ? "Создаём…" : "Создать организацию и точку"}
       </button>
