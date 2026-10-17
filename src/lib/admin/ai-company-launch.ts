@@ -67,10 +67,38 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+// Wait reasons of Company Core admission (src/capacity.mjs CAPACITY_LABELS). Core also sends its own
+// `waiting_label`; that label wins, this table is only for answers without one. An unknown code is shown
+// as is: «нет свободной мощности» is said only when Core says so.
 const WAIT_TEXT: Record<string, string> = {
   wip_active_full: "Все слоты исполнения заняты (лимит активных задач).",
   wip_heavy_full: "Тяжёлая задача уже в работе (лимит тяжёлых).",
+  resources_cpu: "сервер загружен (CPU).",
+  resources_memory: "мало свободной памяти.",
+  resources_disk: "мало места на диске.",
+  resources_unknown: "не удалось измерить ресурсы сервера.",
+  executor_unavailable: "исполнитель не настроен или недоступен.",
+  provider_limited: "лимит провайдера исполнителя.",
+  repo_conflict: "в этой ветке уже идёт работа.",
+  unknown_repo_capacity: "у задачи не указан репозиторий, а все места для таких задач заняты.",
+  deploy_in_progress: "идёт деплой этого репозитория.",
+  admission_throttled: "допуск по очереди (не больше N за интервал).",
+  safety_ceiling: "достигнут аварийный предел одновременных задач.",
+  reserved_for_head: "мощность придержана для более приоритетной задачи.",
 };
+
+/** «Ожидает: …» text for a wait reason: Core's own label first, then the known code, then the raw code. */
+export function waitingText(reason: string, coreLabel?: string | null): string {
+  const label = typeof coreLabel === "string" ? coreLabel.replace(/\s+/g, " ").trim() : "";
+  if (label) {
+    const body = label.replace(/^Ожидает:\s*/i, "").trim();
+    if (body) return `Ожидает: ${/[.!?…]$/.test(body) ? body : `${body}.`}`;
+  }
+  const known = WAIT_TEXT[reason];
+  if (known) return `Ожидает: ${known}`;
+  const code = reason.replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 80);
+  return code ? `Ожидает: причина «${code}».` : "Ожидает допуска.";
+}
 
 export function interpretLaunchResponse(status: number, body: unknown, expectedTaskId?: string): LaunchOutcome {
   const record = asRecord(body);
@@ -93,6 +121,7 @@ export function interpretLaunchResponse(status: number, body: unknown, expectedT
     const admitted = record?.admitted === true;
     const idempotent = record?.idempotent === true;
     const waitingReason = typeof record?.waiting_reason === "string" ? record.waiting_reason : null;
+    const waitingLabel = typeof record?.waiting_label === "string" ? record.waiting_label : null;
     const delivery = asRecord(record?.delivery);
     const deliveryFailed = delivery != null && delivery.delivered === false;
     let message: string;
@@ -100,7 +129,7 @@ export function interpretLaunchResponse(status: number, body: unknown, expectedT
       const label = typeof delivery?.label === "string" && delivery.label ? delivery.label : "причина не передана";
       message = `Допущена, но не отправлена Грогу: ${label}. Строка остаётся на месте. Нажмите ещё раз — это безопасный повтор.`;
     } else if (waitingReason) {
-      message = `Ожидает: ${WAIT_TEXT[waitingReason] ?? "нет свободной мощности"} Запуск начнётся сам, по порядку.`;
+      message = `${waitingText(waitingReason, waitingLabel)} Запуск начнётся сам, по порядку.`;
     } else if (state === "sent" || admitted) {
       message = "Передана в мост Грога. Подтверждения исполнителя пока нет: это ещё не «выполнено».";
     } else if (idempotent) {

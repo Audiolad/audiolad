@@ -22,6 +22,7 @@ import {
   interpretLaunchResponse,
   launchCommandPath,
   validateLaunchCommand,
+  waitingText,
 } from "../src/lib/admin/ai-company-launch";
 
 const raw = JSON.parse(readFileSync("scripts/fixtures/ai-company/core29-launch.json", "utf8")) as {
@@ -212,6 +213,22 @@ assert.equal(calls.length, 1, "no Core call for a non-owner");
 const waitingResult = interpretLaunchResponse(200, { task_id: TASK, state: "waiting", admitted: false, waiting_reason: "wip_active_full" }, TASK);
 assert.equal(waitingResult.ok && waitingResult.waitingReason, "wip_active_full");
 assert.match(waitingResult.ok ? waitingResult.message : "", /Ожидает/);
+// Core 21546de4: the board never invents «нет свободной мощности» for a reason it does not know.
+const NO_POWER = /нет свободной мощности/;
+const repoConflict = interpretLaunchResponse(200, { task_id: TASK, state: "waiting", admitted: false, waiting_reason: "repo_conflict", waiting_label: "Ожидает: в этой ветке уже идёт работа" }, TASK);
+assert.equal(repoConflict.ok && repoConflict.message, "Ожидает: в этой ветке уже идёт работа. Запуск начнётся сам, по порядку.");
+const unknownRepo = interpretLaunchResponse(200, { task_id: TASK, state: "waiting", admitted: false, waiting_reason: "unknown_repo_capacity" }, TASK);
+assert.match(unknownRepo.ok ? unknownRepo.message : "", /не указан репозиторий/);
+assert.doesNotMatch(unknownRepo.ok ? unknownRepo.message : "", NO_POWER);
+const coreLabelWins = interpretLaunchResponse(200, { task_id: TASK, state: "waiting", admitted: false, waiting_reason: "some_future_code", waiting_label: "Ожидает: новая причина Core" }, TASK);
+assert.equal(coreLabelWins.ok && coreLabelWins.message, "Ожидает: новая причина Core. Запуск начнётся сам, по порядку.");
+const rawCode = interpretLaunchResponse(200, { task_id: TASK, state: "waiting", admitted: false, waiting_reason: "some_future_code" }, TASK);
+assert.match(rawCode.ok ? rawCode.message : "", /some_future_code/);
+assert.doesNotMatch(rawCode.ok ? rawCode.message : "", NO_POWER);
+assert.equal(waitingText("deploy_in_progress"), "Ожидает: идёт деплой этого репозитория.");
+assert.equal(waitingText("x", "   "), "Ожидает: причина «x».");
+assert.equal(waitingText("<b>", null), "Ожидает: причина «b».");
+assert.equal(waitingText("", null), "Ожидает допуска.");
 const deliveryFailed = interpretLaunchResponse(200, { task_id: TASK, state: "failed", admitted: true, delivery: { delivered: false, label: "Нет связи с мостом Грога" } }, TASK);
 assert.equal(deliveryFailed.ok && deliveryFailed.deliveryFailed, true);
 assert.match(deliveryFailed.ok ? deliveryFailed.message : "", /безопасный повтор/);
