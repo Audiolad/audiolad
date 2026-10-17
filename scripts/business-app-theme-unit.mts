@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   BUSINESS_THEME_IDS,
@@ -12,7 +13,7 @@ import {
   resolveBusinessTheme,
 } from "../src/lib/business-app/theme";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 // 1. Registry: one theme today, safe fallback, broad hospitality segments.
