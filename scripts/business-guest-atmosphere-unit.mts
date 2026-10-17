@@ -79,6 +79,7 @@ for (const profile of all()) {
   assert.ok(a.tracks.every((t) => (t.durationSeconds ?? 0) < GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS), "no 30-minute single piece when shorter tracks exist");
   const total = a.tracks.reduce((s, t) => s + (t.durationSeconds ?? 0), 0);
   assert.equal(a.totalSeconds, total);
+  assert.equal(a.durationKnown, true);
   assert.ok(total < GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS + 15 * 60, "about the target length");
   assert.deepEqual(a.sources.map((s) => s.tracksUsed).reduce((x, y) => x + y, 0), a.tracks.length);
   assert.deepEqual(assembleGuestCoffeeAtmosphere(shelf, profile), a, "deterministic");
@@ -163,12 +164,18 @@ for (const profile of all()) {
   assert.equal(d.tracks.length, 10, "unknown length counts as 4 min → 40-minute target");
   assert.equal(d.totalSeconds, 0);
   assert.equal(guestCoffeeAtmosphereMeta(d), "10 треков · из 1 альбома");
+  // Mixed known / unknown durations: no misleading partial total.
+  const mixed = { ...shelf[0], tracks: [{ audioItemId: "k0", title: "k0", durationSeconds: 180 }, ...unknown.tracks.slice(0, 9)] };
+  const e = assembleGuestCoffeeAtmosphere([mixed], { character: "cozy", direction: "jazz", daypart: "allday" })!;
+  assert.equal(e.durationKnown, false);
+  assert.equal(e.totalSeconds, 180);
+  assert.equal(guestCoffeeAtmosphereMeta(e), "10 треков · из 1 альбома");
 }
 
 // ---------------------------------------------------------------- formatting
 assert.equal(guestCoffeeAtmosphereName({ character: "evening", direction: "sax", daypart: "allday" }), "Вечерняя кофейня · Саксофон и лаунж · Весь день");
 assert.deepEqual([1, 2, 5, 11, 21, 22, 112].map(guestCoffeeTracksWord), ["трек", "трека", "треков", "треков", "трек", "трека", "треков"]);
-assert.equal(guestCoffeeAtmosphereMeta({ tracks: new Array(21).fill(null), totalSeconds: 3600, sources: new Array(21).fill(null) }), "21 трек · 60 мин · из 21 альбома");
+assert.equal(guestCoffeeAtmosphereMeta({ tracks: new Array(21).fill(null), totalSeconds: 3600, durationKnown: true, sources: new Array(21).fill(null) }), "21 трек · 60 мин · из 21 альбома");
 assert.equal(guestCoffeeTrackClock(185), "3:05");
 assert.equal(guestCoffeeTrackClock(null), null);
 assert.equal(guestCoffeeTrackClock(0), null);
@@ -192,6 +199,8 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.match(studio, /data-testid="biz-atmosphere-assembling"/, "visible assembling moment");
   assert.match(studio, /prefers-reduced-motion/);
   assert.match(studio, /data-testid="biz-atmosphere-play"/);
+  // Blocked starts are disabled; only pausing the playing track stays possible (review asm1).
+  assert.match(studio, /disabled=\{!\(current && isPlaying\) && !canStart\}/);
   assert.match(studio, /data-testid="biz-atmosphere-tracks"/);
   assert.match(studio, /data-testid="biz-atmosphere-match"/);
   // Existing guest listening API and 30-minute meter only – no new endpoint, no payment.

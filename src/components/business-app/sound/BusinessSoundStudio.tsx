@@ -312,7 +312,8 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
       await ctl.playIndex(0);
       return;
     }
-    if (fromIndex === ctl.index && isPlaying) {
+    if (fromIndex === ctl.index && (isPlaying || (ctl.status === "paused" && canStart))) {
+      // The current track: pause it, or resume it where it stopped.
       await ctl.toggle();
       return;
     }
@@ -481,7 +482,7 @@ export default function BusinessSoundStudio({ playlists, initialLimit }: Props) 
                           data-current={current ? "true" : undefined}
                           aria-current={current ? "true" : undefined}
                           onClick={() => void playAtmosphere(i)}
-                          disabled={!current && !canStart}
+                          disabled={!(current && isPlaying) && !canStart}
                           data-testid="biz-atmosphere-track"
                         >
                           <span className="business-atmosphere-track__no" aria-hidden="true">

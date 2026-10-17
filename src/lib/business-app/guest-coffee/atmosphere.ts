@@ -69,6 +69,8 @@ export type GuestCoffeeAtmosphere = {
   sources: GuestCoffeeAtmosphereSource[];
   /** Sum of known track durations, seconds. */
   totalSeconds: number;
+  /** Every track's duration is known – only then the total length is shown. */
+  durationKnown: boolean;
   /** true when no album of the chosen direction exists – the closest ones were used. */
   directionFallback: boolean;
   match: {
@@ -160,6 +162,7 @@ export function assembleGuestCoffeeAtmosphere(
     tracks,
     sources: contributing.map((p) => ({ id: p.id, title: p.title, authorName: p.authorName, tracksUsed: used.get(p.id) ?? 0 })),
     totalSeconds: total,
+    durationKnown: tracks.every((t) => typeof t.durationSeconds === "number" && t.durationSeconds > 0),
     directionFallback,
     match: {
       direction: axis(contributing.filter((p) => p.direction === profile.direction).length, n, labelOf(GUEST_COFFEE_DIRECTIONS, profile.direction)),
@@ -183,9 +186,10 @@ function albumsGenitive(n: number): string {
 }
 
 /** «12 треков · 38 мин · из 3 альбомов» */
-export function guestCoffeeAtmosphereMeta(a: Pick<GuestCoffeeAtmosphere, "tracks" | "totalSeconds" | "sources">): string {
+export function guestCoffeeAtmosphereMeta(a: Pick<GuestCoffeeAtmosphere, "tracks" | "totalSeconds" | "durationKnown" | "sources">): string {
   const parts = [`${a.tracks.length} ${guestCoffeeTracksWord(a.tracks.length)}`];
-  if (a.totalSeconds > 0) parts.push(`${Math.max(1, Math.round(a.totalSeconds / 60))} мин`);
+  // A partial sum would understate the length: show minutes only when every duration is known.
+  if (a.durationKnown && a.totalSeconds > 0) parts.push(`${Math.max(1, Math.round(a.totalSeconds / 60))} мин`);
   parts.push(`из ${a.sources.length} ${albumsGenitive(a.sources.length)}`);
   return parts.join(" · ");
 }
