@@ -303,7 +303,9 @@ console.log("business-app-client-documents-unit OK");
     assert.doesNotMatch(text, /без\s+(РАО|ВОИС)|не будет привлеч/i, `${label}: no «no payments to societies» promise`);
   }
   assert.match(claims, /только часть\*\* взысканного, вызванная нарушением со стороны АудиоЛад/);
-  assert.match(claims, /основанием возмещения не являются/);
+  assert.match(claims, /основанием возмещения не являются\.\n/, "no side path to reimbursement of settlements");
+  assert.doesNotMatch(claims + venue + terms, /отдельно письменно не принял|не указанных в документе точки/);
+  assert.doesNotMatch(claims + venue + terms + pageSrc, /вступившему в законную силу\s+решению суда/, "one term: судебный акт");
   assert.match(claims, /третьего лица, не заявляющего самостоятельных требований/);
   assert.match(claims, /административные штрафы, неустойки и иные санкции/);
   assert.match(claims, /ст\. 1326 ГК РФ/);
@@ -314,6 +316,7 @@ console.log("business-app-client-documents-unit OK");
     const lines = text.split("\n");
     lines.forEach((l, j) => {
       if (j > 0 && /^(\s*\d+\.(\d+\.)?\s|\s*- )/.test(l)) assert.equal(lines[j - 1].trim(), "", `${label}: blank line before «${l.slice(0, 30)}»`);
+      if (j > 0 && /^> \S/.test(l) && lines[j - 1].startsWith(">")) assert.equal(lines[j - 1].trim(), ">", `${label}: blank quote line before «${l.slice(0, 30)}»`);
     });
   }
   console.log("business-app-client-documents-unit: r6 liability OK");
