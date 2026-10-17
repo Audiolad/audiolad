@@ -171,34 +171,34 @@ export default function SpaPilotPlayer({ programId, programName, initialManifest
   const cachedCount = items.filter((i) => cachedAt.has(i.audioItemId)).length;
 
   return (
-    <section className="spa-pilot" data-testid="spa-pilot" style={{ maxWidth: 720, margin: "0 auto", padding: 16 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 600 }}>{programName}</h1>
-      <p style={{ fontSize: 13, opacity: 0.7 }}>Пилот: страница видна только участникам пилота.</p>
-      <p data-testid="spa-network" style={{ margin: "12px 0", fontWeight: online ? 400 : 600 }}>
+    <section className="spa-pilot business-app-card mx-auto max-w-[720px]" data-testid="spa-pilot">
+      <h1 className="text-2xl font-semibold text-[var(--biz-text)]">{programName}</h1>
+      <p className="mt-1 text-[0.82rem] business-app-muted">Пилот: страница видна только участникам пилота.</p>
+      <p data-testid="spa-network" className={`business-app-alert mt-3 ${online ? "" : "font-semibold"}`} data-tone={online ? "ok" : "warn"}>
         {online ? "Онлайн" : formatOfflineLabel(until)}
         {online && until ? ` · сохранено ${cachedCount}/${items.length}, ${formatOfflineLabel(until)}` : null}
       </p>
       {status === "no_access" ? (
-        <p data-testid="spa-no-access">Доступ к пилоту закрыт.</p>
+        <p className="mt-3" data-testid="spa-no-access">Доступ к пилоту закрыт.</p>
       ) : items.length === 0 ? (
-        <p data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
+        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "12px 0" }}>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               data-testid="spa-play"
               onClick={() => void engineRef.current?.toggle()}
-              style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid currentColor" }}
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
             >
               {status === "playing" ? "Пауза" : status === "needs_gesture" ? "Продолжить" : "Играть"}
             </button>
-            <span data-testid="spa-now">{current ? current.title : ""}</span>
+            <span className="business-app-muted" data-testid="spa-now">{current ? current.title : ""}</span>
           </div>
-          {message ? <p role="alert">{message}</p> : null}
-          <ol data-testid="spa-tracks">
+          {message ? <p className="business-app-alert mt-3" data-tone="warn" role="alert">{message}</p> : null}
+          <ol className="business-app-tracklist" data-testid="spa-tracks">
             {items.map((i) => (
-              <li key={i.audioItemId} style={{ fontWeight: current?.audioItemId === i.audioItemId ? 600 : 400 }}>
+              <li key={i.audioItemId} className={`px-3 py-2 ${current?.audioItemId === i.audioItemId ? "font-semibold" : ""}`}>
                 {i.title} {cachedAt.has(i.audioItemId) ? "· сохранён" : ""}
               </li>
             ))}

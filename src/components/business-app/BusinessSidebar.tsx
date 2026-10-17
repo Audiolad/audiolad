@@ -77,7 +77,7 @@ function NavLink({
         <span
           id={labelId}
           role="tooltip"
-          className="pointer-events-none absolute left-[calc(100%+0.55rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-[var(--biz-text)] px-2.5 py-1.5 text-xs font-medium text-white shadow-lg group-hover:block group-focus-visible:block"
+          className="pointer-events-none absolute left-[calc(100%+0.55rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-[var(--biz-tooltip-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--biz-tooltip-text)] shadow-lg group-hover:block group-focus-visible:block"
         >
           {item.title}
         </span>
@@ -192,7 +192,7 @@ export default function BusinessSidebar() {
       >
         {collapsed ? (
           <span
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-[var(--biz-on-accent)]"
             title={`${ownerFirstName} · ${locationName}`}
             aria-label={`${ownerFirstName}, ${locationName}`}
           >
@@ -200,7 +200,7 @@ export default function BusinessSidebar() {
           </span>
         ) : (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-white">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-[var(--biz-on-accent)]">
               {ownerInitial}
             </span>
             <div className="min-w-0">
