@@ -1008,6 +1008,15 @@
 
 .atlas-track__play[data-home-product-play-active="true"] {
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--atlas-gold) 35%, transparent);
+  background:
+    linear-gradient(currentColor, currentColor) calc(50% - 5px) 50% / 5px 18px no-repeat,
+    linear-gradient(currentColor, currentColor) calc(50% + 5px) 50% / 5px 18px no-repeat,
+    var(--atlas-gold);
+}
+
+/* Playing: show pause bars instead of the play triangle. */
+.atlas-track__play[data-home-product-play-active="true"] svg {
+  visibility: hidden;
 }
 
 .atlas-track__play[aria-busy="true"] {

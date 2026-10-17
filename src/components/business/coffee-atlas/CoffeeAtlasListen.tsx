@@ -7,7 +7,6 @@ import { PlayIcon } from "@/components/home/HomeIcons";
 import ProductCoverThumbnail from "@/components/products/ProductCoverThumbnail";
 import { sendYandexGoal } from "@/lib/analytics/yandex-metrika";
 import type { CoffeeAtlasTrack } from "@/lib/business/coffee-atlas/music";
-import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 type CoffeeAtlasListenProps = {
   shopName: string;
@@ -61,12 +60,16 @@ export default function CoffeeAtlasListen({ shopName, tracks }: CoffeeAtlasListe
               <span className="atlas-track__author">{track.authorName}</span>
             ) : null}
           </div>
-          <span data-atlas-play="true" className="atlas-track__play-wrap">
+          {/* The button keeps the player's own dynamic label («Слушать» / «Пауза»). */}
+          <span
+            data-atlas-play="true"
+            className="atlas-track__play-wrap"
+            title={`${track.title} — пример для ${shopName}`}
+          >
             <HomeProductPlayButton
               practiceId={track.id}
               authorSlug={track.authorSlug}
               productSlug={track.slug}
-              ariaLabel={`${PLAY_ACTION_LABEL}: ${track.title} — пример для ${shopName}`}
               className="atlas-track__play"
             >
               <PlayIcon />

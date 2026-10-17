@@ -100,12 +100,26 @@ assert.equal(resolved.length, 1, "unpublished, duplicate and silent refs are ski
 assert.equal(resolved[0].id, "a", "author slug must match too");
 assert.equal(resolved[0].label, "Днём");
 assert.deepEqual(resolveCoffeeAtlasTracks(getCoffeeAtlasTrackRefs("caffe-florian"), []), []);
+assert.deepEqual(
+  resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "silent" }], published),
+  [],
+  "published product without audio is never shown",
+);
+assert.equal(
+  resolveCoffeeAtlasTracks(
+    [1, 2, 3, 4].map(() => ({ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" })),
+    published,
+  ).length,
+  1,
+  "duplicates collapse",
+);
 
 // --- player: existing catalogue player only, honest empty state ---
 const listen = read("src/components/business/coffee-atlas/CoffeeAtlasListen.tsx");
 assert.match(listen, /HomeProductPlayButton/, "plays through the existing global player");
 assert.doesNotMatch(listen, /<audio|new Audio\(|\.mp3/, "no own audio element or hardcoded files");
 assert.match(listen, /скоро появится/, "honest empty state");
+assert.doesNotMatch(listen, /ariaLabel=/, "keeps the player's dynamic «Слушать» / «Пауза» label");
 const loader = read("src/lib/business/coffee-atlas/load-music.ts");
 assert.match(loader, /getPublishedCatalogProducts/, "resolves against the published catalogue");
 
