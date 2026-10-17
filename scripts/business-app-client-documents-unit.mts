@@ -12,14 +12,14 @@ import {
 } from "../src/lib/business-app/client-documents";
 import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query";
 
-// Редакция r4 от 16.10.2026 (owner decision): approved, no draft/lawyer marks, requisites present.
+// Редакция r6 от 17.10.2026 (owner decision): approved, no draft/lawyer marks, requisites present.
 assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r5-2026-10-16");
+  assert.equal(d.version, "r6-2026-10-17");
   assert.doesNotMatch(d.version, /draft/);
 }
-assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 16.10.2026");
+assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 17.10.2026");
 assert.match(CLIENT_DOCUMENT_REQUISITES, /Петров Сергей Сергеевич/);
 assert.match(CLIENT_DOCUMENT_REQUISITES, /ИНН 507305817690/);
 assert.match(CLIENT_DOCUMENT_REQUISITES, /ОГРНИП 316505300063237/);
@@ -137,7 +137,7 @@ console.log("business-app-client-documents-unit OK");
     assert.ok(src.markdown.length > 500);
     const html = renderToStaticMarkup(createElement(SimpleMarkdown, { source: src.markdown }));
     assert.match(html, /<h1/);
-    assert.match(src.markdown, /Редакция от 16\.10\.2026/);
+    assert.match(src.markdown, /Редакция от 17\.10\.2026/);
     assert.doesNotMatch(src.markdown, /Черновик, требует проверки юриста|паспорт\s*\[|ОГРНИП \[ \]|355045|Ставрополь/);
     assert.match(src.markdown, /ИНН 507305817690/);
     assert.match(src.markdown, /ОГРНИП 316505300063237/);
@@ -274,4 +274,50 @@ console.log("business-app-client-documents-unit OK");
   assert.match(loader, /grantsError/);
   assert.match(loader, /holdersError/);
   console.log("business-app-client-documents-unit: universal documents OK");
+}
+
+// 8dcba9d1 (Sergey 17.10.2026 08:55, r6): liability on the Bubuka 5.2–5.7 model — no fixed amounts,
+// no unconditional indemnity; legal assistance is the primary obligation; reimbursement only by a court act
+// in force and only in the part caused by AudioLad; deadlines agree across the documents.
+{
+  const { CLIENT_DOCUMENT_SOURCES } = await import("../src/lib/business-app/client-document-content");
+  const { PROGRAM_TERMS_MD } = await import("../src/lib/business-rightsholder/legal-drafts/content");
+  const venue = CLIENT_DOCUMENT_SOURCES["venue-license"].markdown;
+  const terms = CLIENT_DOCUMENT_SOURCES["b2b-terms"].markdown;
+  const claims = CLIENT_DOCUMENT_SOURCES["claims-procedure"].markdown;
+  const kit = CLIENT_DOCUMENT_SOURCES["claim-reply-kit"].markdown;
+  assert.equal(terms, PROGRAM_TERMS_MD, "both site copies of the terms are identical");
+  const pageSrc = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
+  const listCopy = JSON.stringify(CLIENT_DOCUMENTS);
+  for (const [label, text] of [["venue", venue], ["terms", terms], ["claims", claims], ["kit", kit], ["page", pageSrc], ["list", listCopy]] as const) {
+    assert.doesNotMatch(text, /Предел возмещения|100\s?000|сто тысяч/i, `${label}: no cap`);
+    assert.doesNotMatch(text, /\d[\d\s]*(руб|₽)/, `${label}: no fixed amount`);
+    assert.doesNotMatch(text, /в пределах суммы/, `${label}: no reference to a sum`);
+  }
+  for (const [label, text] of [["venue", venue], ["terms", terms], ["claims", claims]] as const) {
+    assert.match(text, /Безусловной обязанности возмещать/, `${label}: no unconditional indemnity`);
+    assert.match(text, /юридическ[а-яё]+ помощ/, `${label}: legal assistance`);
+    assert.match(text, /вступивш[а-яё]+ в законную силу/, `${label}: court act in force`);
+    assert.match(text, /3 рабочих дн/, `${label}: notice deadline`);
+    assert.match(text, /5 рабочих дней/, `${label}: lawsuit deadline`);
+    assert.doesNotMatch(text, /без\s+(РАО|ВОИС)|не будет привлеч/i, `${label}: no «no payments to societies» promise`);
+  }
+  assert.match(claims, /только часть\*\* взысканного, вызванная нарушением со стороны АудиоЛад/);
+  assert.match(claims, /основанием возмещения не являются\.\n/, "no side path to reimbursement of settlements");
+  assert.doesNotMatch(claims + venue + terms, /отдельно письменно не принял|не указанных в документе точки/);
+  assert.doesNotMatch(claims + venue + terms + pageSrc, /вступившему в законную силу\s+решению суда/, "one term: судебный акт");
+  assert.match(claims, /третьего лица, не заявляющего самостоятельных требований/);
+  assert.match(claims, /административные штрафы, неустойки и иные санкции/);
+  assert.match(claims, /ст\. 1326 ГК РФ/);
+  assert.match(terms, /9\. \*\*РАО и ВОИС\.\*\*[\s\S]*3 рабочих дней[\s\S]*5 рабочих дней[\s\S]*1 рабочего дня/);
+  assert.doesNotMatch(claims, /мировым соглашением либо выплатой, \*\*заранее письменно согласованными/);
+  // Each clause / item is its own paragraph with a blank line between items.
+  for (const [label, text] of [["venue", venue], ["terms", terms], ["claims", claims], ["kit", kit]] as const) {
+    const lines = text.split("\n");
+    lines.forEach((l, j) => {
+      if (j > 0 && /^(\s*\d+\.(\d+\.)?\s|\s*- )/.test(l)) assert.equal(lines[j - 1].trim(), "", `${label}: blank line before «${l.slice(0, 30)}»`);
+      if (j > 0 && /^> \S/.test(l) && lines[j - 1].startsWith(">")) assert.equal(lines[j - 1].trim(), ">", `${label}: blank quote line before «${l.slice(0, 30)}»`);
+    });
+  }
+  console.log("business-app-client-documents-unit: r6 liability OK");
 }
