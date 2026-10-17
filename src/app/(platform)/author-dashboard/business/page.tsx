@@ -23,8 +23,6 @@ import {
   parseAttemptProvider,
   type StoredEvidenceFile,
 } from "@/lib/business-rightsholder/evidence-display";
-// Jazz & Coffee --biz-* tokens for the evidence file fields (scoped by data-biz-theme).
-import "@/components/business-app/theme/business-theme.css";
 
 const EVIDENCE_BUCKET = "business-rightsholder-evidence";
 

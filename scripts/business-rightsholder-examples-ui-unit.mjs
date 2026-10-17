@@ -38,7 +38,7 @@ assert.match(providers, /example: RIGHTSHOLDER_EXAMPLES\.paid_period/);
 assert.doesNotMatch(providers, /src:\s*"/, "no new screenshot assets for MusicGPT / other");
 assert.match(box, /example\.src \?/);
 assert.match(box, /data-text-example/);
-assert.match(box, /Текстовый пример — скриншота нет/);
+assert.match(box, /Текстовый пример – скриншота нет/);
 execFileSync("npx", ["tsx", "scripts/business-rightsholder-providers-unit.mts"], { stdio: "inherit" });
 assert.match(field, /Посмотреть пример/);
 assert.match(field, /aria-haspopup="dialog"/);
