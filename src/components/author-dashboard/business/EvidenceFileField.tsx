@@ -152,7 +152,11 @@ export default function EvidenceFileField({
     !file && stored?.createdAt ? `от ${formatEvidenceDate(stored.createdAt)}` : "",
   ].filter(Boolean).join(" · ");
   const statusId = `${inputId}-status`;
+  const errorId = `${inputId}-error`;
+  const formatId = `${inputId}-format`;
   const fieldError = !localError && !(upload?.phase === "error") && error ? error : null;
+  // Keyboard users reach the picker buttons, so they carry the status, error and format hint.
+  const describedBy = [tone ? statusId : "", fieldError ? errorId : "", formatId].filter(Boolean).join(" ");
 
   function openPicker() {
     if (!disabled) inputRef.current?.click();
@@ -190,7 +194,7 @@ export default function EvidenceFileField({
           className="sr-only"
           tabIndex={-1}
           disabled={disabled}
-          aria-describedby={hasContent ? statusId : undefined}
+          aria-describedby={describedBy}
           onChange={(e) => {
             const next = e.target.files?.[0] ?? null;
             // Reset so choosing the same file again still fires onChange.
@@ -245,12 +249,14 @@ export default function EvidenceFileField({
             <div className="flex w-full gap-2 sm:w-auto sm:flex-col">
               <button type="button" onClick={openPicker} disabled={disabled}
                 aria-label={`${EVIDENCE_COPY.replace}: ${label}`}
+                aria-describedby={describedBy}
                 className="min-h-11 flex-1 rounded-lg border border-[var(--biz-accent-border)] bg-[var(--biz-accent-soft)] px-3 text-sm font-semibold text-[var(--biz-accent)] hover:border-[var(--biz-accent)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60 sm:flex-none">
                 {EVIDENCE_COPY.replace}
               </button>
               {file ? (
                 <button type="button" onClick={() => onSelect?.(null)} disabled={disabled}
                   aria-label={`${EVIDENCE_COPY.remove}: ${label}`}
+                  aria-describedby={describedBy}
                   className="min-h-11 flex-1 rounded-lg border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 text-sm font-semibold text-[var(--biz-red)] hover:border-[var(--biz-red-border)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60 sm:flex-none">
                   {EVIDENCE_COPY.remove}
                 </button>
@@ -262,14 +268,15 @@ export default function EvidenceFileField({
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="button" onClick={openPicker} disabled={disabled}
             aria-label={`${EVIDENCE_COPY.choose}: ${label}`}
+            aria-describedby={describedBy}
             className="min-h-11 rounded-lg border border-[var(--biz-accent-border)] bg-[var(--biz-accent-soft)] px-4 text-sm font-semibold text-[var(--biz-accent)] hover:border-[var(--biz-accent)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60">
             {EVIDENCE_COPY.choose}
           </button>
-          <span className="text-xs text-[var(--biz-text-muted)]">{EVIDENCE_FORMAT_HINT}</span>
+          <span id={formatId} className="text-xs text-[var(--biz-text-muted)]">{EVIDENCE_FORMAT_HINT}</span>
         </div>
       )}
-      {hasContent && !readOnly ? <p className="mt-2 text-xs text-[var(--biz-text-muted)]">{EVIDENCE_FORMAT_HINT}</p> : null}
-      {fieldError ? <p className="mt-2 text-sm text-[var(--biz-red)]" role="alert">{fieldError}</p> : null}
+      {hasContent && !readOnly ? <p id={formatId} className="mt-2 text-xs text-[var(--biz-text-muted)]">{EVIDENCE_FORMAT_HINT}</p> : null}
+      {fieldError ? <p id={errorId} className="mt-2 text-sm text-[var(--biz-red)]" role="alert">{fieldError}</p> : null}
     </div>
   );
 }

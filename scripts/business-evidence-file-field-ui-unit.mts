@@ -104,6 +104,7 @@ assert.match(empty, />Выбрать файл</);
 assert.match(empty, /PNG, JPG, WEBP или PDF, до 10 МБ/);
 assert.match(empty, /id="f" type="file" accept="image\/png,image\/jpeg,image\/webp,application\/pdf"/);
 assert.doesNotMatch(empty, /Удалить|Заменить/);
+assert.match(empty, /aria-label="Выбрать файл: Скриншот генерации" aria-describedby="f-format"/);
 assert.match(empty, /<label for="f"[^>]*>Скриншот генерации \*<\/label>/);
 
 // Image: thumbnail from the object URL, «Загружается…» until the image decodes.
@@ -131,6 +132,8 @@ assert.match(big, /Файл больше 10 МБ – сожмите его/);
 assert.match(big, /role="alert"/);
 const failed = render({ file: pdf, upload: { phase: "error", message: EVIDENCE_COPY.uploadFailed } });
 assert.match(failed, /Не удалось загрузить файл – проверьте интернет/);
+assert.match(failed, /aria-label="Заменить: Скриншот генерации" aria-describedby="f-status f-format"/);
+assert.match(render({ error: "Добавьте файл" }), /aria-describedby="f-error f-format"/);
 const uploading = render({ file: pdf, upload: { phase: "uploading" } });
 assert.match(uploading, /Загружается…/);
 assert.match(uploading, /animate-spin/);
