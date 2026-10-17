@@ -3,8 +3,11 @@
  * Takes the Supabase client as a parameter so it can be unit-tested with a fake; the real
  * service-role client is created only in passport.server.ts (server-only).
  *
- * Read-only SELECTs, two tables, chunked `.in(...)` filters: ⌈tracks / 50⌉ + ⌈passports / 50⌉
- * requests in total – never one request per album or per track.
+ * Read-only SELECTs, two tables, chunked `.in(...)` filters: ⌈tracks / 50⌉ version requests
+ * (at most one active version per track) and ⌈passports / 25⌉ attribute requests, each paged
+ * by a stable order so no row is lost under the PostgREST row ceiling (1000 here; a passport
+ * has at most 32 attributes, so a chunk is ≤ 800 rows and normally one page) – never one
+ * request per album or per track.
  */
 import { chunkIds } from "@/lib/supabase/chunk";
 
@@ -16,7 +19,11 @@ import {
 } from "./passport-features";
 
 export const GUEST_COFFEE_PASSPORT_VERSION_COLUMNS = "id, audio_item_id, status, sealed_at, ceased_at, structured_fields";
-export const GUEST_COFFEE_PASSPORT_ATTRIBUTE_COLUMNS = "passport_id, attribute_key, origin, value_numeric, value_text, confidence";
+export const GUEST_COFFEE_PASSPORT_ATTRIBUTE_COLUMNS = "id, passport_id, attribute_key, origin, value_numeric, value_text, confidence";
+/** Passports per attribute request. */
+export const GUEST_COFFEE_ATTRIBUTE_CHUNK = 25;
+/** Rows per attribute page (below the PostgREST max-rows ceiling). */
+export const GUEST_COFFEE_ATTRIBUTE_PAGE = 500;
 
 type QueryResult = PromiseLike<{ data: unknown; error: unknown }>;
 /** The minimal PostgREST surface used here (a subset of the Supabase client). */
@@ -24,6 +31,9 @@ export type GuestCoffeePassportClient = {
   from: (table: string) => {
     select: (columns: string) => {
       in: (column: string, values: readonly string[]) => QueryResult & {
+        order: (column: string, options: { ascending: boolean }) => {
+          range: (from: number, to: number) => QueryResult;
+        };
         eq: (column: string, value: string) => {
           is: (column: string, value: null) => {
             not: (column: string, operator: string, value: null) => QueryResult;
@@ -55,10 +65,21 @@ export async function queryGuestCoffeePassportFeatures(
   const wanted = new Set(ids);
   const versions = versionChunks.flat().filter((v) => wanted.has(v.audio_item_id));
   const attributeChunks = await Promise.all(
-    chunkIds(versions.map((v) => v.id)).map(async (chunk) => {
-      const { data, error } = await client.from("music_passport_attributes").select(GUEST_COFFEE_PASSPORT_ATTRIBUTE_COLUMNS).in("passport_id", chunk);
-      if (error || !Array.isArray(data)) throw new Error("guest_coffee_passport_attributes_unavailable");
-      return data as GuestCoffeePassportAttributeRow[];
+    chunkIds(versions.map((v) => v.id), GUEST_COFFEE_ATTRIBUTE_CHUNK).map(async (chunk) => {
+      const rows: GuestCoffeePassportAttributeRow[] = [];
+      for (let from = 0; ; ) {
+        const { data, error } = await client
+          .from("music_passport_attributes")
+          .select(GUEST_COFFEE_PASSPORT_ATTRIBUTE_COLUMNS)
+          .in("passport_id", chunk)
+          .order("id", { ascending: true })
+          .range(from, from + GUEST_COFFEE_ATTRIBUTE_PAGE - 1);
+        if (error || !Array.isArray(data)) throw new Error("guest_coffee_passport_attributes_unavailable");
+        rows.push(...(data as GuestCoffeePassportAttributeRow[]));
+        if (data.length < GUEST_COFFEE_ATTRIBUTE_PAGE) break;
+        from += data.length;
+      }
+      return rows;
     }),
   );
   const attributesByPassport = new Map<string, GuestCoffeePassportAttributeRow[]>();

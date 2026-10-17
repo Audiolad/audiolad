@@ -52,6 +52,7 @@ export type GuestCoffeePassportVersionRow = {
 
 /** A row of music_passport_attributes as read by the server adapter. */
 export type GuestCoffeePassportAttributeRow = {
+  id?: string;
   passport_id: string;
   attribute_key: string;
   origin: string;

@@ -98,7 +98,8 @@ export function guestCoffeeEditorialAffinity(p: EditorialInput): GuestCoffeeAffi
   for (const part of PARTS) {
     daypart[part] = p.dayparts === "allday" ? 0.85 : Math.max(0.15, ...p.dayparts.map((d) => PART_NEIGHBOUR[d][part]));
   }
-  daypart.allday = p.dayparts === "allday" ? 1 : Math.min(0.9, 0.3 + 0.2 * p.dayparts.length);
+  // One listed part of the day is closeness, not an all-day match (below the fit threshold).
+  daypart.allday = p.dayparts === "allday" ? 1 : Math.min(0.9, 0.3 + 0.15 * p.dayparts.length);
   const character = {} as Record<GuestCoffeeCharacter, number>;
   for (const c of GUEST_COFFEE_CHARACTERS) {
     character[c.id] = Math.max(0.1, ...p.characters.map((own) => CHARACTER_NEIGHBOUR[own][c.id]));
@@ -391,40 +392,75 @@ export function allGuestCoffeeProfiles(): GuestCoffeeProfile[] {
   );
 }
 
-/** One plan entry: album ids in rank order, «sdc» fit flags ("1"/"0"), optional track orders. */
+/**
+ * One plan entry: EVERY album of the plan in rank order (indices into `plan.albums`), «sdc» fit
+ * flags ("1" / "0", three per ranked album, concatenated) and the preferred track order of
+ * each ranked album: positions into its track list, one base-36 digit per track ("" = album
+ * order, e.g. no covered tracks or more than 36 tracks).
+ */
 export type GuestCoffeePlanEntry = {
-  ids: string[];
-  fits: string[];
-  order: (number[] | null)[];
+  rank: number[];
+  fits: string;
+  order: string[];
 };
 
 /**
  * The client-safe result of the server ranking for all 64 settings. Contains ONLY album ids,
- * track positions and yes / no matches – no passport labels, scores or coverage.
+ * a fingerprint of each album's ordered track ids (to reject stale entries), positions and
+ * yes / no matches – no passport labels, scores or coverage.
  */
 export type GuestCoffeeRecommendationPlan = {
-  version: 1;
+  version: 2;
+  albums: string[];
+  tracks: string[];
   entries: Record<string, GuestCoffeePlanEntry>;
 };
 
-export const GUEST_COFFEE_PLAN_DEPTH = GUEST_COFFEE_MAX_RESULTS;
+const ORDER_RADIX = 36;
+
+function encodeOrder(order: number[] | null): string {
+  return order && order.length <= ORDER_RADIX ? order.map((i) => i.toString(ORDER_RADIX)).join("") : "";
+}
+
+function decodeOrder(order: unknown, n: number): number[] | null {
+  if (typeof order !== "string" || order.length !== n || n === 0) return null;
+  const out = [...order].map((c) => parseInt(c, ORDER_RADIX));
+  return new Set(out).size === n && out.every((i) => Number.isInteger(i) && i >= 0 && i < n) ? out : null;
+}
+
+/** Short stable fingerprint of an album's ordered track ids (FNV-1a, 32 bit). */
+export function guestCoffeeTrackFingerprint(p: Pick<GuestCoffeePlaylist, "tracks">): string {
+  let h = 0x811c9dc5;
+  const text = p.tracks.map((t) => t.audioItemId).join("\n");
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${p.tracks.length}.${h.toString(36)}`;
+}
 
 export function buildGuestCoffeeRecommendationPlan(
   playlists: readonly GuestCoffeePlaylist[],
   features: ReadonlyMap<string, GuestCoffeeSoundFeatures> = new Map(),
-  depth = GUEST_COFFEE_PLAN_DEPTH,
 ): GuestCoffeeRecommendationPlan {
   const rankings = buildGuestCoffeeAlbumRankings(playlists, features);
+  const albums = playlists.map((p) => p.id);
+  const index = new Map(albums.map((id, i) => [id, i]));
   const entries: Record<string, GuestCoffeePlanEntry> = {};
   for (const profile of allGuestCoffeeProfiles()) {
-    const ranked = rankGuestCoffeeAlbums(playlists, rankings, profile).slice(0, depth);
+    const ranked = rankGuestCoffeeAlbums(playlists, rankings, profile);
     entries[guestCoffeeProfileKey(profile)] = {
-      ids: ranked.map((r) => r.id),
-      fits: ranked.map((r) => `${Number(r.fits.sound)}${Number(r.fits.daypart)}${Number(r.fits.character)}`),
-      order: ranked.map((r) => r.order),
+      rank: ranked.map((r) => index.get(r.id)!),
+      fits: ranked.map((r) => `${Number(r.fits.sound)}${Number(r.fits.daypart)}${Number(r.fits.character)}`).join(""),
+      order: ranked.map((r) => encodeOrder(r.order)),
     };
   }
-  return { version: 1, entries };
+  return { version: 2, albums, tracks: playlists.map(guestCoffeeTrackFingerprint), entries };
+}
+
+/** Album ids of one plan entry in rank order (tests and server diagnostics). */
+export function guestCoffeePlanAlbumIds(plan: GuestCoffeeRecommendationPlan, key: string): string[] {
+  return (plan.entries[key]?.rank ?? []).map((i) => plan.albums[i]);
 }
 
 export type GuestCoffeeRecommendedAlbum = {
@@ -434,14 +470,11 @@ export type GuestCoffeeRecommendedAlbum = {
   tracks: GuestCoffeePlaylist["tracks"];
 };
 
-function validOrder(order: number[] | null | undefined, n: number): order is number[] {
-  return Array.isArray(order) && order.length === n && new Set(order).size === n && order.every((i) => Number.isInteger(i) && i >= 0 && i < n);
-}
-
 /**
- * The ranked albums for one profile. Uses the server plan when it has an entry; any album the
- * plan does not list (or a missing / stale plan) is ranked by the editorial reserve basis, so
- * every available album with tracks is returned and nothing outside `available` ever is.
+ * The ranked albums for one profile. Uses the server plan when it is valid; an album the plan
+ * does not know, or whose track list changed since the plan was built (fingerprint), and a
+ * missing / invalid plan are ranked by the editorial reserve basis. Every available album with
+ * tracks is returned and nothing outside `available` ever is.
  */
 export function guestCoffeeRecommendation(
   available: readonly GuestCoffeePlaylist[],
@@ -452,33 +485,34 @@ export function guestCoffeeRecommendation(
   const byId = new Map(withTracks.map((p) => [p.id, p]));
   const out: GuestCoffeeRecommendedAlbum[] = [];
   const used = new Set<string>();
-  const entry = plan && plan.version === 1 ? plan.entries[guestCoffeeProfileKey(profile)] : undefined;
-  if (entry && Array.isArray(entry.ids)) {
-    entry.ids.forEach((id, i) => {
-      const p = byId.get(id);
-      if (!p || used.has(id)) return;
-      const f = typeof entry.fits?.[i] === "string" ? entry.fits[i] : "000";
-      const order = entry.order?.[i];
-      used.add(id);
+  const valid =
+    !!plan && plan.version === 2 && Array.isArray(plan.albums) && Array.isArray(plan.tracks) && plan.albums.length === plan.tracks.length;
+  const entry = valid ? plan.entries?.[guestCoffeeProfileKey(profile)] : undefined;
+  const usable = !!entry && Array.isArray(entry.rank) && typeof entry.fits === "string" && entry.fits.length === entry.rank.length * 3;
+  if (usable) {
+    entry.rank.forEach((albumIndex, pos) => {
+      const id = Number.isInteger(albumIndex) ? plan!.albums[albumIndex] : undefined;
+      const p = id === undefined ? undefined : byId.get(id);
+      if (!p || used.has(p.id) || plan!.tracks[albumIndex] !== guestCoffeeTrackFingerprint(p)) return;
+      const f = entry.fits.slice(pos * 3, pos * 3 + 3);
+      const order = decodeOrder(Array.isArray(entry.order) ? entry.order[pos] : null, p.tracks.length);
+      used.add(p.id);
       out.push({
         playlist: p,
         fits: { sound: f[0] === "1", daypart: f[1] === "1", character: f[2] === "1" },
-        tracks: validOrder(order, p.tracks.length) ? order.map((k) => p.tracks[k]) : p.tracks,
+        tracks: order ? order.map((k) => p.tracks[k]) : p.tracks,
       });
     });
   }
   const rest = withTracks.filter((p) => !used.has(p.id));
   if (rest.length > 0) {
     const ranked = rankGuestCoffeeAlbums(rest, buildGuestCoffeeAlbumRankings(rest), profile);
-    // Plan-listed albums keep their places; editorial-ranked ones follow, sound fits first.
+    // Plan albums keep their places; new or changed albums follow, sound fits first overall.
     for (const r of ranked) {
       const p = byId.get(r.id)!;
       out.push({ playlist: p, fits: r.fits, tracks: p.tracks });
     }
-    if (entry) {
-      // Keep sound-fitting albums ahead of non-fitting ones across both parts.
-      out.sort((a, b) => Number(b.fits.sound) - Number(a.fits.sound));
-    }
+    if (out.length > ranked.length) out.sort((a, b) => Number(b.fits.sound) - Number(a.fits.sound));
   }
   return { albums: out, soundFallback: out.length > 0 && !out.some((a) => a.fits.sound) };
 }
