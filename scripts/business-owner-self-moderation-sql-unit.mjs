@@ -119,8 +119,8 @@ BEGIN
   PERFORM public.author_business_verification_submit_v2(v,ARRAY[e1.id,e2.id],true,true,'test-v1','test-v1');
   RETURN v;
 END $f$;
-GRANT USAGE ON SCHEMA osm_test TO authenticated;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA osm_test TO authenticated;
+GRANT USAGE ON SCHEMA osm_test TO authenticated, anon, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA osm_test TO authenticated, anon, service_role;
 
 INSERT INTO auth.users(id) VALUES ${people.map((c) => `('${U(c)}')`).join(',')};
 INSERT INTO public.profiles VALUES ('${U(O)}','platform_owner'),('${U(L)}','platform_owner'),('${U(A)}','listener'),
@@ -145,7 +145,22 @@ BEGIN
   PERFORM osm_test.as_user('${U(A)}'); SET LOCAL ROLE authenticated; va := osm_test.submit('${P(A)}','${T(A)}'); RESET ROLE;
   PERFORM osm_test.as_user('${U(B)}'); SET LOCAL ROLE authenticated; vb := osm_test.submit('${P(B)}','${T(B)}'); RESET ROLE;
 
-  -- 0) The helper is internal: not callable by clients.
+  -- 0) The helper is internal: not callable by any client role; RPCs not callable by anon/service_role;
+  --    no JWT subject (auth.uid() IS NULL) is never a moderator.
+  SET LOCAL ROLE anon;
+  PERFORM osm_test.expect_error('SELECT public.business_moderation_owner_self_allowed()','permission denied');
+  PERFORM osm_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''x'',NULL,''O'',''person'')',vo),'permission denied');
+  PERFORM osm_test.expect_error('SELECT public.moderator_business_suspend_product(''${P(O)}'',NULL,''x'')','permission denied');
+  RESET ROLE;
+  SET LOCAL ROLE service_role;
+  PERFORM osm_test.expect_error('SELECT public.business_moderation_owner_self_allowed()','permission denied');
+  PERFORM osm_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''x'',NULL,''O'',''person'')',vo),'permission denied');
+  PERFORM osm_test.expect_error('SELECT public.moderator_business_suspend_product(''${P(O)}'',NULL,''x'')','permission denied');
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claim.sub','',false); SET LOCAL ROLE authenticated;
+  PERFORM osm_test.expect_error(format('SELECT public.moderator_business_verification_action(%L,''approve'',''x'',NULL,''O'',''person'')',vo),'business_moderator_required');
+  PERFORM osm_test.expect_error('SELECT public.moderator_business_suspend_product(''${P(O)}'',NULL,''x'')','business_moderator_required');
+  RESET ROLE;
   PERFORM osm_test.as_user('${U(O)}'); SET LOCAL ROLE authenticated;
   PERFORM osm_test.expect_error('SELECT public.business_moderation_owner_self_allowed()','permission denied');
 
