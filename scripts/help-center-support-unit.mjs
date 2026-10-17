@@ -250,12 +250,12 @@ const {
 } = await import("../src/lib/help/metadata.ts");
 assert.equal(
   helpArticleDocumentTitle(installOnPhone),
-  "АудиоЛад скачать на Виндовс, Андроид и Айфон — как установить",
+  "АудиоЛад скачать на Виндовс, Андроид и Айфон – как установить",
 );
 const installMetadata = buildHelpArticleMetadata(installOnPhone);
 assert.equal(
   installMetadata.title,
-  "АудиоЛад скачать на Виндовс, Андроид и Айфон — как установить",
+  "АудиоЛад скачать на Виндовс, Андроид и Айфон – как установить",
 );
 assert.equal(installMetadata.robots?.index, true);
 assert.equal(installMetadata.robots?.follow, true);

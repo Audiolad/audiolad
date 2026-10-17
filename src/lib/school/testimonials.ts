@@ -46,7 +46,7 @@ export const SCHOOL_TESTIMONIALS: readonly SchoolTestimonial[] = [
     embedUrl:
       "https://vkvideo.ru/video_ext.php?oid=-142616091&id=456240066&hash=ad36af329e9d5aff&hd=3",
     posterSrc: "/school/testimonials/galina-chikhacheva.webp",
-    posterAlt: "Галина Чихачёва — видеоистория участницы программы",
+    posterAlt: "Галина Чихачёва – видеоистория участницы программы",
   },
   {
     id: "irina-popova",
@@ -65,7 +65,7 @@ export const SCHOOL_TESTIMONIALS: readonly SchoolTestimonial[] = [
     embedUrl:
       "https://vkvideo.ru/video_ext.php?oid=-142616091&id=456240070&hash=44a0afecbb81f072&hd=3",
     posterSrc: "/school/testimonials/irina-popova.webp",
-    posterAlt: "Ирина Попова — видеоистория участницы программы",
+    posterAlt: "Ирина Попова – видеоистория участницы программы",
   },
   {
     id: "zhanna-bakurova",
@@ -83,7 +83,7 @@ export const SCHOOL_TESTIMONIALS: readonly SchoolTestimonial[] = [
     embedUrl:
       "https://vkvideo.ru/video_ext.php?oid=-142616091&id=456240069&hash=0384e4bf3e891e2f&hd=3",
     posterSrc: "/school/testimonials/zhanna-bakurova.webp",
-    posterAlt: "Жанна Бакурова — видеоистория участницы программы",
+    posterAlt: "Жанна Бакурова – видеоистория участницы программы",
   },
   {
     id: "irina-kuchma",
@@ -102,7 +102,7 @@ export const SCHOOL_TESTIMONIALS: readonly SchoolTestimonial[] = [
     embedUrl:
       "https://vkvideo.ru/video_ext.php?oid=-142616091&id=456240071&hash=9fbf98b706e4f5be&hd=3",
     posterSrc: "/school/testimonials/irina-kuchma.webp",
-    posterAlt: "Ирина Кучма — видеоистория участницы программы",
+    posterAlt: "Ирина Кучма – видеоистория участницы программы",
   },
   {
     id: "nina-pyanova",
@@ -118,7 +118,7 @@ export const SCHOOL_TESTIMONIALS: readonly SchoolTestimonial[] = [
     embedUrl:
       "https://vkvideo.ru/video_ext.php?oid=-142616091&id=456240067&hash=5e68b61f05e9b643&hd=3",
     posterSrc: "/school/testimonials/nina-pyanova.webp",
-    posterAlt: "Нина Пьянова — видеоистория участницы программы",
+    posterAlt: "Нина Пьянова – видеоистория участницы программы",
   },
 ] as const;
 
