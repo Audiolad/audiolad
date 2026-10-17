@@ -7,7 +7,10 @@ import BusinessAppShell from "@/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "@/components/business-app/BusinessDomainProvider";
 import "@/components/business-app/theme/business-theme.css";
 import "@/components/business-app/business-app.css";
+import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
+import { guestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
+import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 import {
   getHostnameFromHeaders,
   isBusinessHostname,
@@ -37,11 +40,16 @@ export default async function BusinessAppLayout({
   }
 
   const domain = await loadBusinessOwnerHomeContext();
+  // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).
+  const initialGuestLimit =
+    resolveBusinessAccess(domain).level === "guest"
+      ? guestCoffeeLimitState(await peekGuestCoffeeUsage())
+      : null;
 
   return (
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain}>
-        <BusinessAppShell>{children}</BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

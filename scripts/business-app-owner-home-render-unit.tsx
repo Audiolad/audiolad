@@ -31,7 +31,7 @@ for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, {
   assert.match(html, /Последний сигнал от плеера/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /Воспроизведение не подтверждено/);
-  assert.match(html, /Что звучит сейчас — появится, когда плеер точки начнёт присылать подтверждения/);
+  assert.match(html, /Что звучит сейчас – появится, когда плеер точки начнёт присылать подтверждения/);
   assert.match(html, /Лицензия: нет подтверждённых данных/);
   assert.match(html, /href="\/player"/);
   assert.match(html, /href="\/help"[^>]*>Проверить работу музыки<\/a>/);
@@ -78,7 +78,7 @@ assert.doesNotMatch(render({ ...live, playbackState: "error", lastSeenSeconds: 9
 assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 0 }), /Последний сигнал от плеера: только что/);
 assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 29 }), /Последний сигнал от плеера: только что/);
 assert.match(render(context.signals), /Последний сигнал от плеера: меньше минуты назад/);
-assert.match(render(context.signals, { playbackConfirmation: confirmed }), /data-testid="owner-home-overall-status">Музыка играет — воспроизведение подтверждено/);
+assert.match(render(context.signals, { playbackConfirmation: confirmed }), /data-testid="owner-home-overall-status">Музыка играет – воспроизведение подтверждено/);
 assert.match(render(context.signals, { playbackConfirmation: { nowMs, errorConfirmed: true } }), /data-testid="owner-home-overall-status">Сбой воспроизведения подтверждён/);
 const css = readFileSync(new URL("../src/components/business-app/business-app.css", import.meta.url), "utf8");
 assert.match(css, /\.business-app-owner-desktop-signals\s*\{\s*display: none;/);

@@ -248,7 +248,7 @@ for (const connectivity of [copy(null), copy({}), copy({ secondsSinceHeartbeat: 
     const overall = deriveOwnerOverallStatus(connectivity, sound);
     assert.equal(overall.tone === "error", sound.tone === "error");
     assert.equal(overall.title.includes("Музыка играет"), sound.kind === "confirmed");
-    assert.equal(overall.title, sound.tone === "error" ? sound.title : sound.kind === "confirmed" ? "Музыка играет — воспроизведение подтверждено" : connectivity.title);
+    assert.equal(overall.title, sound.tone === "error" ? sound.title : sound.kind === "confirmed" ? "Музыка играет – воспроизведение подтверждено" : connectivity.title);
     assert.deepEqual(deriveOwnerOverallStatus(connectivity, sound), overall);
   }
 }

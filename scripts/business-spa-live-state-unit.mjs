@@ -243,6 +243,8 @@ try {
       useEffect: (effect) => { cleanup = effect(); },
     },
     "react/jsx-runtime": require("react/jsx-runtime"),
+    // a8240527: shared transport controls (presentational) of the Business player.
+    "@/components/business-app/BusinessPlayerControls": { default: () => null },
     // c02fe282 stable-report: the player uses build-independent route handlers, not server actions.
     "@/lib/business-app/spa-player-client": {
       fetchSpaTrackUrl: async () => ({ ok: true, data: { url: "https://example.test/track" } }),

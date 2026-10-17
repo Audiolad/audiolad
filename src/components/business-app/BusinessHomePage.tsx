@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from "react";
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
+import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   buildBusinessGreeting,
@@ -167,7 +168,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
     domain.status === "anonymous"
       ? "Войдите, чтобы управлять точкой."
       : domain.status === "authenticated" && !domain.location
-        ? "Создайте организацию и первую точку — это займёт минуту."
+        ? "Создайте организацию и первую точку – это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
   const playback = deriveOwnerPlaybackSignal(
@@ -190,15 +191,23 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         </header>
         <section className="business-app-card max-w-xl">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
-            Кабинет больше не использует демонстрационные данные «Марина / Beauty Line».
-            Нужна сессия владельца.
+            Здесь появится статус вашей точки: плеер, что звучит сейчас, документы. Пока вы в
+            гостевом режиме – настройте звучание и послушайте подборки в разделе «Музыка».
           </p>
-          <a
-            href="https://audiolad.ru/auth/sign-in"
-            className="mt-4 business-app-btn business-app-btn-primary business-app-focus-ring"
-          >
-            Войти
-          </a>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href={BUSINESS_GUEST_COFFEE_PUBLIC_PATH}
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            >
+              Настроить звучание
+            </Link>
+            <a
+              href="https://audiolad.ru/auth/sign-in"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+            >
+              Войти
+            </a>
+          </div>
         </section>
       </div>
     );
@@ -270,7 +279,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
               </div>
             ) : (
               <p className="mt-3 text-[var(--biz-text-muted)]">
-                Что звучит сейчас — появится, когда плеер точки начнёт присылать подтверждения
+                Что звучит сейчас – появится, когда плеер точки начнёт присылать подтверждения
               </p>
             )}
             {lastPlayAge && (
@@ -282,8 +291,8 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         </div>
         <div className="business-app-home-stack">
           <ComingSoon title="Атмосфера">
-            <p className="mt-3 text-[var(--biz-text-muted)]">Спокойнее — Энергичнее</p>
-            <input type="range" min="0" max="100" disabled aria-disabled="true" aria-label="Атмосфера — скоро" className="mt-2 w-full min-h-12" />
+            <p className="mt-3 text-[var(--biz-text-muted)]">Спокойнее – Энергичнее</p>
+            <input type="range" min="0" max="100" disabled aria-disabled="true" aria-label="Атмосфера – скоро" className="mt-2 w-full min-h-12" />
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Больше такого · скоро</button>
               <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Меньше такого · скоро</button>

@@ -298,7 +298,7 @@ export function deriveOwnerOverallStatus(
 ): { title: string; tone: OwnerSignalTone } {
   if (playback.tone === "error") return { title: playback.title, tone: "error" };
   if (playback.kind === "confirmed") {
-    return { title: "Музыка играет — воспроизведение подтверждено", tone: "ok" };
+    return { title: "Музыка играет – воспроизведение подтверждено", tone: "ok" };
   }
   return { title: connectivity.title, tone: connectivity.tone === "ok" ? "ok" : "neutral" };
 }
