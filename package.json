@@ -14,6 +14,7 @@
     "test:supabase-cookie-domain": "npx tsx scripts/supabase-cookie-domain-unit.mts",
     "test:practice-embed": "npx tsx scripts/practice-embed-unit.mts",
     "test:business-coffee-atlas": "npx tsx scripts/business-coffee-atlas-unit.mts",
+    "test:business-guest-coffee": "npx tsx scripts/business-guest-coffee-unit.mts",
     "test:health-build": "npx tsx scripts/health-build-route-unit.mts",
     "test:password-recovery-hardening": "npx tsx scripts/password-recovery-hardening-unit.mts",
     "test:password-recovery": "npx tsx scripts/password-recovery-navigation-unit.ts && npx tsx scripts/password-recovery-hardening-unit.mts && npx tsx scripts/email-template-unit.ts && node scripts/email-policy-unit.mjs",
