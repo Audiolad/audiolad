@@ -94,7 +94,7 @@ export function waitingText(reason: string, coreLabel?: string | null): string {
     const body = label.replace(/^Ожидает:\s*/i, "").trim();
     if (body) return `Ожидает: ${/[.!?…]$/.test(body) ? body : `${body}.`}`;
   }
-  const known = WAIT_TEXT[reason];
+  const known = Object.prototype.hasOwnProperty.call(WAIT_TEXT, reason) ? WAIT_TEXT[reason] : undefined;
   if (known) return `Ожидает: ${known}`;
   const code = reason.replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 80);
   return code ? `Ожидает: причина «${code}».` : "Ожидает допуска.";

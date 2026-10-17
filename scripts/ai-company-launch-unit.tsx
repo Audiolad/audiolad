@@ -229,6 +229,32 @@ assert.equal(waitingText("deploy_in_progress"), "Ожидает: идёт деп
 assert.equal(waitingText("x", "   "), "Ожидает: причина «x».");
 assert.equal(waitingText("<b>", null), "Ожидает: причина «b».");
 assert.equal(waitingText("", null), "Ожидает допуска.");
+// Core's label wins over the board's own table; punctuation and whitespace are normalised; no prototype keys.
+assert.equal(waitingText("repo_conflict", "Ожидает: у задачи не указан репозиторий"), "Ожидает: у задачи не указан репозиторий.");
+assert.equal(waitingText("repo_conflict", "  Ожидает:   идёт   деплой!  "), "Ожидает: идёт деплой!");
+assert.equal(waitingText("x", "Ожидает: "), "Ожидает: причина «x».");
+for (const proto of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+  assert.equal(waitingText(proto), `Ожидает: причина «${proto}».`);
+}
+const CORE_LABELS: Record<string, string> = {
+  resources_cpu: "Ожидает: сервер загружен (CPU)",
+  resources_memory: "Ожидает: мало свободной памяти",
+  resources_disk: "Ожидает: мало места на диске",
+  executor_unavailable: "Ожидает: исполнитель не настроен или недоступен",
+  provider_limited: "Ожидает: лимит провайдера исполнителя",
+  repo_conflict: "Ожидает: в этой ветке уже идёт работа",
+  unknown_repo_capacity: "Ожидает: у задачи не указан репозиторий, а все места для таких задач заняты",
+  deploy_in_progress: "Ожидает: идёт деплой этого репозитория",
+  resources_unknown: "Ожидает: не удалось измерить ресурсы сервера",
+  admission_throttled: "Ожидает: допуск по очереди (не больше N за интервал)",
+  safety_ceiling: "Ожидает: достигнут аварийный предел одновременных задач",
+  reserved_for_head: "Ожидает: мощность придержана для более приоритетной задачи",
+};
+for (const [code, label] of Object.entries(CORE_LABELS)) {
+  // Without a Core label the board's fallback says the same as Core; with it, Core's text is used verbatim.
+  assert.equal(waitingText(code), `${label}.`, code);
+  assert.equal(waitingText(code, label), `${label}.`, code);
+}
 const deliveryFailed = interpretLaunchResponse(200, { task_id: TASK, state: "failed", admitted: true, delivery: { delivered: false, label: "Нет связи с мостом Грога" } }, TASK);
 assert.equal(deliveryFailed.ok && deliveryFailed.deliveryFailed, true);
 assert.match(deliveryFailed.ok ? deliveryFailed.message : "", /безопасный повтор/);
