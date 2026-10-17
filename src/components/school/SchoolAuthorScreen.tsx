@@ -46,7 +46,7 @@ const WISH = [
 ] as const;
 
 const PHOTO_ALT =
-  "Сергей Петров — автор и преподаватель Школы Аудиопрактик";
+  "Сергей Петров – автор и преподаватель Школы Аудиопрактик";
 
 function BookIcon({ className }: { className?: string }) {
   return (

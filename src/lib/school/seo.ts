@@ -3,7 +3,7 @@ import type { Metadata, MetadataRoute } from "next";
 import { SCHOOL_ORIGIN } from "@/lib/school/host";
 
 export const SCHOOL_SEO_TITLE =
-  "Школа Аудиопрактик — обучение созданию авторских медитаций и аудиопродуктов";
+  "Школа Аудиопрактик – обучение созданию авторских медитаций и аудиопродуктов";
 
 export const SCHOOL_SEO_DESCRIPTION =
   "Научитесь создавать авторские медитации, аудиопрактики, аудиокурсы и программы своим голосом. Онлайн-интенсив и практическое сопровождение Сергея Петрова.";
@@ -27,7 +27,7 @@ export function buildSchoolLandingMetadata(): Metadata {
           url: `${SCHOOL_ORIGIN}/school/hero-school-mobile.webp`,
           width: 946,
           height: 816,
-          alt: "Женщина записывает голос на телефон дома — Школа Аудиопрактик",
+          alt: "Женщина записывает голос на телефон дома – Школа Аудиопрактик",
         },
       ],
     },
