@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { loadGuestCoffeeShelf } from "@/lib/business-app/guest-coffee/load.server";
+import { isGuestCoffeePlaylistStillFree, loadGuestCoffeeShelf } from "@/lib/business-app/guest-coffee/load.server";
 import { handleGuestCoffeeTrackUrl } from "@/lib/business-app/guest-coffee/routes";
-import { applyGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
+import { issueGuestCoffeeLease } from "@/lib/business-app/guest-coffee/usage.server";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { signEntitledListenAudio } from "@/lib/listen/sign-entitled-audio";
 
@@ -23,8 +23,10 @@ export async function POST(request: Request) {
   }
   const result = await handleGuestCoffeeTrackUrl(body, {
     loadShelf: loadGuestCoffeeShelf,
-    readUsage: () => applyGuestCoffeeUsage(request, 0),
+    isStillFree: isGuestCoffeePlaylistStillFree,
+    issueLease: (trackSeconds) => issueGuestCoffeeLease(request, trackSeconds),
     sign: async ({ authorSlug, productSlug, audioId }) => {
+
 
       const signed = await signEntitledListenAudio({ userId: null, authorSlug, productSlug, audioId });
       return signed.ok ? { ok: true, url: signed.url } : { ok: false, reason: signed.reason };

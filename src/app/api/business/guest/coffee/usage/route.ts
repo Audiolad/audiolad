@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/routes";
-import { applyGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
+import { reportGuestCoffeePlayback } from "@/lib/business-app/guest-coffee/usage.server";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, reason: "invalid_request" }, { status: 400, headers: NO_STORE });
   }
-  const result = await handleGuestCoffeeUsage(body, (seconds) => applyGuestCoffeeUsage(request, seconds));
+  const result = await handleGuestCoffeeUsage(body, (seconds) => reportGuestCoffeePlayback(request, seconds));
   const status = !result.ok && result.reason === "invalid_request" ? 400 : 200;
   return NextResponse.json(result, { status, headers: NO_STORE });
 }

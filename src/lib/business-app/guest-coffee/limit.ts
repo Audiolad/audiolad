@@ -1,17 +1,29 @@
 /**
  * a8240527 — guest listening limit (Sergey 17.10.2026 15:32 MSK). Pure / browser-safe.
  *
- * - 30 minutes of ACTUAL playback (not a visit timer): only seconds the <audio> element
- *   really advanced while playing are reported.
- * - Counted and kept on the SERVER (table business_guest_listening), so it survives
- *   reloads and return visits. Primary key: an httpOnly device cookie; fallback when the
- *   cookie was cleared: a keyed hash of IP + User-Agent.
+ * - 30 minutes of playback, counted and kept on the SERVER (migration 20270108120000),
+ *   so it survives reloads and return visits.
+ * - Counting does not depend on the client: every stream URL opens a server-side playback
+ *   lease (track length known to the server); the next URL settles it at
+ *   min(track length, wall-clock since issue), at least min(track length, 15 s).
+ *   Client reports of actual <audio> progress only add to the open lease (cumulative,
+ *   bounded by that same wall clock) — they keep the meter current mid-track and charge
+ *   the last track of a session; suppressing or replaying them gains nothing.
+ * - Identity: httpOnly device cookie (primary) + a separate shared counter per client
+ *   network (keyed hash of the IP; IPv6 per /64). Effective used =
+ *   max(device, network - (NETWORK_LIMIT - LIMIT)): one device gets 30 min; cookie juggling
+ *   on one network gets at most NETWORK_LIMIT per rolling 30 days.
  * - Enforced where it matters: the server refuses new stream URLs once the limit is used.
  *   The track that is already playing is allowed to finish (gentle, no hard cut).
  * - The UI never shows a countdown — only a soft note near the end.
+ * Constants are mirrored in the SQL (checked by scripts/business-guest-coffee-unit.mts).
  */
 
 export const GUEST_COFFEE_LIMIT_SECONDS = 30 * 60;
+/** Shared per-network allowance per rolling 30 days (2 full guest sessions). */
+export const GUEST_COFFEE_NETWORK_LIMIT_SECONDS = 2 * GUEST_COFFEE_LIMIT_SECONDS;
+/** Minimum the server charges for every issued stream URL (skip-through / URL harvesting). */
+export const GUEST_COFFEE_MIN_LEASE_CHARGE_SECONDS = 15;
 /** Soft "near the end" note from 25 minutes of actual playback. */
 export const GUEST_COFFEE_WARN_AFTER_SECONDS = 25 * 60;
 /** Client reports actual playback at most this often while playing. */

@@ -17,9 +17,38 @@ function createGuestClient() {
   });
 }
 
+type FreshPracticeRow = { id: string; is_free: boolean | null; status: string | null; catalog_visibility: string | null };
+
+/** Ids (of the given ones) that are RIGHT NOW published, listed and free — raw columns, no cache. */
+async function loadStillFreeIds(supabase: ReturnType<typeof createGuestClient>, ids: readonly string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("practices")
+    .select("id, is_free, status, catalog_visibility")
+    .in("id", [...ids]);
+  if (error || !Array.isArray(data)) throw new Error("guest_coffee_free_check_unavailable");
+  return new Set(
+    (data as FreshPracticeRow[])
+      .filter((row) => row.is_free === true && row.status === "published" && row.catalog_visibility === "listed")
+      .map((row) => row.id),
+  );
+}
+
+/**
+ * Called by the stream-URL route immediately before signing (uncached): fails closed.
+ */
+export async function isGuestCoffeePlaylistStillFree(playlist: GuestCoffeePlaylist): Promise<boolean> {
+
+  try {
+    return (await loadStillFreeIds(createGuestClient(), [playlist.id])).has(playlist.id);
+  } catch {
+    return false;
+  }
+}
+
 async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
   const supabase = createGuestClient();
-  return buildGuestCoffeeShelf({
+  const shelf = await buildGuestCoffeeShelf({
     loadPublishedProducts: () => getPublishedCatalogProducts(supabase, { productKind: "music" }),
     loadFullTracks: async ({ authorSlug, productSlug }) => {
       // Same loader as /api/catalog/play, as an anonymous guest (userId null).
@@ -33,6 +62,10 @@ async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
       }));
     },
   });
+  // The catalogue's isFree may include temporary promo pricing; the guest shelf keeps only
+  // albums that are free by their own is_free flag (same rule as the per-request re-check).
+  const free = await loadStillFreeIds(supabase, shelf.map((p) => p.id));
+  return shelf.filter((p) => free.has(p.id));
 }
 
 /**
@@ -41,6 +74,7 @@ async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
  * result is not cached so a transient failure heals on the next request.
  */
 export async function loadGuestCoffeeShelf(): Promise<GuestCoffeePlaylist[]> {
+
 
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) return cache.value;

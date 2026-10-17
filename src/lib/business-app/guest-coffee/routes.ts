@@ -11,12 +11,27 @@ export type GuestCoffeeTrackUrlResult =
 
 export type GuestCoffeeTrackUrlDeps = {
   loadShelf: () => Promise<GuestCoffeePlaylist[]>;
-  /** Credit 0 = read the server total (ensures the device cookie). null = unavailable. */
-  readUsage: () => Promise<number | null>;
+  /**
+   * Fresh (uncached) check right before signing: the album is still published, listed
+   * and FREE. The shelf is cached for minutes; the canonical signer alone would also allow
+   * paid products with guest access, so this re-check is what keeps paid audio out.
+   */
+  isStillFree: (playlist: GuestCoffeePlaylist) => Promise<boolean>;
+  /**
+   * Server meter: settle the previous playback lease and open one for this track
+   * (unless the limit is used up). Returns effective used seconds; null = unavailable.
+   */
+  issueLease: (trackSeconds: number) => Promise<number | null>;
   sign: (input: { authorSlug: string; productSlug: string; audioId: string }) => Promise<
     { ok: true; url: string } | { ok: false; reason: string }
   >;
 };
+
+/** Lease length the server may charge for one issued track (unknown length → 5 min). */
+export function guestCoffeeLeaseSeconds(durationSeconds: number | null | undefined): number {
+  if (typeof durationSeconds !== "number" || !Number.isFinite(durationSeconds) || durationSeconds <= 0) return 300;
+  return Math.min(900, Math.max(1, Math.ceil(durationSeconds)));
+}
 
 export function parseGuestCoffeeAudioItemId(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
@@ -37,7 +52,9 @@ export async function handleGuestCoffeeTrackUrl(
   const found = findGuestCoffeeTrack(await deps.loadShelf(), audioItemId);
   if (!found) return { ok: false, reason: "not_in_manifest" };
 
-  const used = await deps.readUsage();
+  if (!(await deps.isStillFree(found.playlist))) return { ok: false, reason: "not_in_manifest" };
+
+  const used = await deps.issueLease(guestCoffeeLeaseSeconds(found.track.durationSeconds));
   const limit = guestCoffeeLimitState(used);
   if (limit === "unavailable") return { ok: false, reason: "guest_unavailable", limit };
   // The server refuses new stream URLs once 30 minutes of actual playback are used.

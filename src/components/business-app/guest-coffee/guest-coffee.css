@@ -247,26 +247,21 @@
 .gc-player__msg { flex-basis: 100%; margin: 0; font-size: 0.85rem; color: var(--gc-gold); }
 
 /* ---------- connect dialog ---------- */
-.gc-dialog__backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: end center;
-  background: rgba(20, 12, 6, 0.55);
-  padding: 12px;
-}
 .gc-dialog {
-  width: 100%;
+  width: calc(100% - 24px);
   max-width: 460px;
   max-height: calc(100dvh - 24px);
-  overflow: auto;
-  padding: 22px;
+  margin: auto auto 12px;
+  padding: 0;
+  border: 0;
   border-radius: 22px;
+  overflow: auto;
   background: var(--gc-cream-2);
   color: var(--gc-ink);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
+.gc-dialog::backdrop { background: rgba(20, 12, 6, 0.55); }
+.gc-dialog__body { padding: 22px; }
 .gc-dialog p { margin: 0 0 10px; line-height: 1.5; }
 .gc-dialog__title { margin: 0; font-family: var(--gc-display); font-size: 1.4rem; color: var(--gc-espresso); }
 .gc-dialog__price { margin: 12px 0 0; font-family: var(--gc-display); font-size: 2rem; color: var(--gc-espresso); }
@@ -277,7 +272,7 @@
 @media (min-width: 640px) {
   .gc-header__pill { display: inline-block; }
   .gc-header__back-long { display: inline; }
-  .gc-dialog__backdrop { place-items: center; }
+  .gc-dialog { margin: auto; }
   .gc-item { grid-template-columns: 76px 1fr auto; }
   .gc-item__cover { width: 76px; }
 }

@@ -114,6 +114,9 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
   const meterRef = useRef(new GuestCoffeePlaybackMeter());
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const connectRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  /** The control that opened the dialog: focus returns there on every dismissal. */
+  const openerRef = useRef<HTMLElement | null>(null);
   const [profile, setProfile] = useState<GuestCoffeeProfile>(GUEST_COFFEE_DEFAULT_PROFILE);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<View>({ status: "idle", current: null, message: null });
@@ -231,20 +234,42 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
     if (view.status === "paused" || view.status === "idle" || view.status === "no_access") void flush();
   }, [view.status, flush]);
 
-  // Connect dialog: focus, Escape, return focus.
+  // Connect dialog: native modal <dialog> — the browser traps focus, makes the page behind
+  // inert and closes on Escape; every dismissal goes through the "close" event, which
+  // returns focus to the control that opened it.
+  const openConnect = (event: { currentTarget: HTMLElement }) => {
+    openerRef.current = event.currentTarget;
+    setConnectOpen(true);
+  };
+
   useEffect(() => {
-    if (!connectOpen) return;
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setConnectOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (connectOpen && !dialog.open) {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+      closeRef.current?.focus();
+    } else if (!connectOpen && dialog.open) {
+      dialog.close();
+    }
   }, [connectOpen]);
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const onClose = () => {
+      setConnectOpen(false);
+      const opener = openerRef.current ?? connectRef.current;
+      opener?.focus();
+    };
+    dialog.addEventListener("close", onClose);
+    return () => dialog.removeEventListener("close", onClose);
+  }, []);
+
   const closeConnect = () => {
-    setConnectOpen(false);
-    connectRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (dialog?.open) dialog.close();
+    else setConnectOpen(false);
   };
 
   const exhausted = limit === "exhausted";
@@ -293,7 +318,7 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
             ref={connectRef}
             type="button"
             className="gc-btn gc-btn--gold gc-header__connect"
-            onClick={() => setConnectOpen(true)}
+            onClick={openConnect}
             data-testid="gc-connect"
           >
             Подключить
@@ -350,7 +375,7 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
               <div className="gc-card gc-limit" role="status" data-testid="gc-limit-exhausted">
                 <h3 className="gc-limit__title">{GUEST_COFFEE_COPY.exhaustedTitle}</h3>
                 <p>{GUEST_COFFEE_COPY.exhaustedText}</p>
-                <button type="button" className="gc-btn gc-btn--gold" onClick={() => setConnectOpen(true)}>
+                <button type="button" className="gc-btn gc-btn--gold" onClick={openConnect}>
                   Подключить
                 </button>
               </div>
@@ -470,38 +495,56 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
         </div>
       </div>
 
-      {connectOpen ? (
-        <div className="gc-dialog__backdrop" onClick={closeConnect}>
-          <div
-            className="gc-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="gc-connect-title"
-            data-testid="gc-connect-dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="gc-connect-title" className="gc-dialog__title">
-              {GUEST_COFFEE_COPY.connectTitle}
-            </h2>
-            <p className="gc-dialog__price">
-              {GUEST_COFFEE_PRICE}
-              <span> / месяц</span>
-            </p>
-            <p className="gc-dialog__terms">{GUEST_COFFEE_TERMS}.</p>
-            <p>{GUEST_COFFEE_COPY.connectStage}</p>
-            <p>
-              {GUEST_COFFEE_COPY.connectContact}{" "}
-              <a href={`mailto:${GUEST_COFFEE_INQUIRY_EMAIL}`}>{GUEST_COFFEE_INQUIRY_EMAIL}</a>
-            </p>
-            <p className="gc-muted">
-              <a href={GUEST_COFFEE_RIGHTS_URL}>Как устроены права на музыку</a>
-            </p>
-            <button ref={closeRef} type="button" className="gc-btn gc-btn--dark" onClick={closeConnect}>
-              Понятно
-            </button>
-          </div>
+      <dialog
+        ref={dialogRef}
+        className="gc-dialog"
+        aria-labelledby="gc-connect-title"
+        data-testid="gc-connect-dialog"
+        onClick={(event) => {
+          // A click on the ::backdrop lands on the <dialog> element itself.
+          if (event.target === event.currentTarget) closeConnect();
+        }}
+        onKeyDown={(event) => {
+          // Keep Tab / Shift+Tab cycling inside the dialog (the page behind is inert anyway).
+          if (event.key !== "Tab") return;
+          const focusables = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
+          );
+          if (focusables.length === 0) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          const current = document.activeElement;
+          if (event.shiftKey && (current === first || !event.currentTarget.contains(current))) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && (current === last || !event.currentTarget.contains(current))) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
+      >
+        <div className="gc-dialog__body">
+          <h2 id="gc-connect-title" className="gc-dialog__title">
+            {GUEST_COFFEE_COPY.connectTitle}
+          </h2>
+          <p className="gc-dialog__price">
+            {GUEST_COFFEE_PRICE}
+            <span> / месяц</span>
+          </p>
+          <p className="gc-dialog__terms">{GUEST_COFFEE_TERMS}.</p>
+          <p>{GUEST_COFFEE_COPY.connectStage}</p>
+          <p>
+            {GUEST_COFFEE_COPY.connectContact}{" "}
+            <a href={`mailto:${GUEST_COFFEE_INQUIRY_EMAIL}`}>{GUEST_COFFEE_INQUIRY_EMAIL}</a>
+          </p>
+          <p className="gc-muted">
+            <a href={GUEST_COFFEE_RIGHTS_URL}>Как устроены права на музыку</a>
+          </p>
+          <button ref={closeRef} type="button" className="gc-btn gc-btn--dark" onClick={closeConnect}>
+            Понятно
+          </button>
         </div>
-      ) : null}
+      </dialog>
 
       <audio ref={audioRef} preload="none" playsInline />
     </div>
