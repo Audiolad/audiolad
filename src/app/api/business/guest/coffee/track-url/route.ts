@@ -27,8 +27,6 @@ export async function POST(request: Request) {
     peekUsage: peekGuestCoffeeUsage,
     issueLease: (trackSeconds) => issueGuestCoffeeLease(request, trackSeconds),
     sign: async ({ authorSlug, productSlug, audioId }) => {
-
-
       const signed = await signEntitledListenAudio({ userId: null, authorSlug, productSlug, audioId });
       return signed.ok ? { ok: true, url: signed.url } : { ok: false, reason: signed.reason };
     },

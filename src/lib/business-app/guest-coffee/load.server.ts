@@ -38,7 +38,6 @@ async function loadStillFreeIds(supabase: ReturnType<typeof createGuestClient>, 
  * Called by the stream-URL route immediately before signing (uncached): fails closed.
  */
 export async function isGuestCoffeePlaylistStillFree(playlist: GuestCoffeePlaylist): Promise<boolean> {
-
   try {
     return (await loadStillFreeIds(createGuestClient(), [playlist.id])).has(playlist.id);
   } catch {
@@ -74,8 +73,6 @@ async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
  * result is not cached so a transient failure heals on the next request.
  */
 export async function loadGuestCoffeeShelf(): Promise<GuestCoffeePlaylist[]> {
-
-
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) return cache.value;
   const value = loadUncached().catch((error) => {

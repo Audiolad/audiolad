@@ -360,6 +360,18 @@ assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
   assert.doesNotMatch(cabinet, /checkout|payment|\/api\/payments|tochka|prodamus/i, "no payment wiring in this stage");
 }
 
+// ---------------------------------------------------------------- shared Jazz & Coffee theme (21546de4)
+{
+  const css = read("src/components/business-app/guest-coffee/guest-coffee.css");
+  const theme = read("src/components/business-app/theme/business-theme.css");
+  const used = new Set([...css.matchAll(/var\((--biz-[\w-]+)/g)].map((m) => m[1]));
+  assert.ok(used.size >= 10, "the cabinet reads the shared --biz-* tokens");
+  for (const name of used) assert.ok(theme.includes(`${name}:`), `${name} exists in business-theme.css`);
+  const literals = css.replace(/\/\*[\s\S]*?\*\//g, "").match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
+  assert.deepEqual(literals, ["rgba("], "no colour literals except the documented ::backdrop fallback");
+  assert.match(read("src/app/business-app/layout.tsx"), /data-biz-theme=\{theme\}/, "guest page renders inside the themed root");
+}
+
 // ---------------------------------------------------------------- fresh free check wiring
 {
   const loader = read("src/lib/business-app/guest-coffee/load.server.ts");

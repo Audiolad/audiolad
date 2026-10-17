@@ -34,8 +34,6 @@ function networkFrom(request: Request | null, h: Headers): string | null {
 
 /** First render: read-only, never creates a row or a cookie. */
 export async function peekGuestCoffeeUsage(): Promise<number | null> {
-
-
   try {
     const store = await cookies();
     const h = await headers();
@@ -69,7 +67,6 @@ async function callMeter(
   request: Request,
   extra: Record<string, number>,
 ): Promise<number | null> {
-
   try {
     const token = await deviceToken();
     const db = createServiceRoleClient();
