@@ -112,9 +112,11 @@ assert.ok(
     layout.indexOf('import "@/components/business-app/business-app.css";'),
   "theme tokens load before component CSS",
 );
-assert.match(layout, /className=\{`business-app-root \$\{businessDisplaySerif\.variable\}`\}\s*data-biz-theme=\{theme\}/);
-assert.match(layout, /variable: "--font-biz-display"/);
-assert.match(themeCss, /--biz-font-display: var\(--font-biz-display\)/);
+const rootTag = /<div\b[^>]*business-app-root[^>]*>/.exec(layout)?.[0] ?? "";
+assert.ok(rootTag, "layout renders .business-app-root");
+assert.match(rootTag, /data-biz-theme=\{theme\}/, "root carries the theme id");
+assert.doesNotMatch(layout, /next\/font\/google/, "no extra next/font/google instance (Turbopack resolve flake)");
+assert.match(themeCss, /--biz-font-display: "Playfair Display", Georgia/);
 assert.match(layout, /themeColor: BUSINESS_THEMES\[theme\]\.themeColor/);
 const manifest = JSON.parse(read("public/business/brand/manifest.webmanifest"));
 assert.equal(manifest.theme_color, BUSINESS_THEMES["jazz-coffee"].themeColor);
@@ -165,6 +167,21 @@ for (const cls of [
   assert.equal((appCss.match(new RegExp(`^\\.${cls} \\{`, "gm")) || []).length, 1, `.${cls} defined exactly once`);
 }
 // Mobile bottom nav fits every item on one row (6 items incl. «Ещё»).
-assert.match(appCss, /\.business-app-bottom-nav \{[^}]*grid-auto-flow: column;[^}]*grid-auto-columns: minmax\(0, 1fr\);/);
+const bottomNav = /\.business-app-bottom-nav \{([^}]*)\}/.exec(appCss)?.[1] ?? "";
+assert.match(bottomNav, /grid-auto-flow:\s*column/);
+assert.match(bottomNav, /grid-auto-columns:\s*minmax\(0,\s*1fr\)/);
+assert.doesNotMatch(bottomNav, /grid-template-columns/);
+
+// 10. Shared components with their own colours (SimpleMarkdown, used by public pages too)
+//     are re-coloured inside Business through a scoped wrapper.
+const docPage = read("src/app/business-app/documents/[id]/page.tsx");
+assert.match(docPage, /<div className="business-app-prose">\s*<SimpleMarkdown /);
+for (const sel of [/\.business-app-prose > div \{[^}]*color:\s*var\(--biz-text\)/, /\.business-app-prose blockquote \{[^}]*background:\s*var\(--biz-/, /\.business-app-prose th,\s*\.business-app-prose td \{[^}]*border-color:\s*var\(--biz-border\)/]) {
+  assert.match(appCss, sel);
+}
+// Every Business TSX that renders a shared colourful component must use a scoped wrapper.
+for (const f of tsx) {
+  if (/<SimpleMarkdown\b/.test(read(f))) assert.match(read(f), /business-app-prose/, `${f}: wrap SimpleMarkdown in .business-app-prose`);
+}
 
 console.log("business-app-theme-unit: ok");

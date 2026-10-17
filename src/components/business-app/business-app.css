@@ -6,7 +6,9 @@
   color: var(--biz-text);
 }
 
-/* Display serif for page titles: the same voice as the public atlas (Playfair Display via next/font). */
+/* Display serif for page titles, same family as the public atlas. Deliberately no
+   next/font here: a second Playfair next/font/google instance hit the known Turbopack
+   "queries have exactly one entry" build error; system serif fallback is used instead. */
 .business-app-root h1 {
   font-family: var(--biz-font-display);
   letter-spacing: -0.01em;
@@ -328,6 +330,26 @@
   border-radius: 999px;
   background: var(--biz-highlight);
   flex-shrink: 0;
+}
+
+/* Long-form documents (/documents/[id]). SimpleMarkdown is shared with public AudioLad
+   pages and keeps its own colours there; inside Business the theme tokens win. */
+.business-app-prose > div {
+  color: var(--biz-text);
+}
+
+.business-app-prose blockquote {
+  border-color: var(--biz-highlight);
+  background: var(--biz-surface-soft);
+}
+
+.business-app-prose th,
+.business-app-prose td {
+  border-color: var(--biz-border);
+}
+
+.business-app-prose th {
+  background: var(--biz-surface-soft);
 }
 
 @media (min-width: 900px) {
