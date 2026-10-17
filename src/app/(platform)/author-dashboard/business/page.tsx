@@ -23,6 +23,7 @@ import { loadAuthorTermsStatus } from "@/lib/author-terms/service";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { tracksLiveInBusiness, type BusinessGrantLayerRow } from "@/lib/business-rightsholder/track-in-business";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -136,18 +137,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       if (!latest.has(id)) latest.set(id, r as { decision: string; reason_code: string | null; comment: string | null });
     }
     // "В Бизнесе" only when BOTH layers (recording + composition) have a live, currently valid grant.
-    const nowMs = Date.now();
-    const liveLayers = new Map<string, Set<string>>();
-    for (const g of (grants ?? []) as { audio_item_id: string; rights_layer: string; valid_from: string | null; valid_until: string | null }[]) {
-      if (g.valid_from && Date.parse(g.valid_from) > nowMs) continue;
-      if (g.valid_until && Date.parse(g.valid_until) <= nowMs) continue;
-      const id = String(g.audio_item_id);
-      if (!liveLayers.has(id)) liveLayers.set(id, new Set());
-      liveLayers.get(id)!.add(g.rights_layer);
-    }
-    const granted = new Set(
-      [...liveLayers.entries()].filter(([, layers]) => layers.has("recording") && layers.has("composition")).map(([id]) => id),
-    );
+    const granted = tracksLiveInBusiness((grants ?? []) as BusinessGrantLayerRow[]);
     unifiedView = {
       status,
       tracks: ownTracks.map((t) => {

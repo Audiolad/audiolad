@@ -145,8 +145,43 @@ assert.match(acceptPanel, /terms_version_id: version\?\.id/);
 assert.match(acceptPanel, /content_hash: version\?\.contentHash/);
 assert.match(acceptPanel, /terms_version_changed/);
 // "В Бизнесе" requires both layers live and currently valid.
-assert.match(businessPage, /layers\.has\("recording"\) && layers\.has\("composition"\)/);
+assert.match(businessPage, /tracksLiveInBusiness\(/);
 assert.match(businessPage, /valid_until/);
+{
+  const { tracksLiveInBusiness } = await import("../src/lib/business-rightsholder/track-in-business.ts");
+  const now = new Date("2026-10-17T00:00:00Z");
+  const rows = [
+    { audio_item_id: "t1", rights_layer: "recording", valid_from: "2026-10-01", valid_until: null },
+    { audio_item_id: "t1", rights_layer: "composition", valid_from: "2026-10-01", valid_until: null },
+    { audio_item_id: "t2", rights_layer: "recording", valid_from: "2026-10-01", valid_until: null },
+    { audio_item_id: "t3", rights_layer: "recording", valid_from: "2026-10-01", valid_until: null },
+    { audio_item_id: "t3", rights_layer: "composition", valid_from: "2026-10-01", valid_until: "2026-10-10" },
+    { audio_item_id: "t4", rights_layer: "recording", valid_from: "2026-11-01", valid_until: null },
+    { audio_item_id: "t4", rights_layer: "composition", valid_from: "2026-10-01", valid_until: null },
+  ];
+  assert.deepEqual([...tracksLiveInBusiness(rows, now)], ["t1"], "only both live, currently valid layers count");
+}
+// Program terms п. 1 (r7): sublicensing basis = unified agreement 2.0, not the rights statement; r6 frozen for flag OFF.
+{
+  const r7 = read("docs/business/public/program-terms.md");
+  const r6 = read("docs/business/public/archive/program-terms-r6-2026-10-17.md");
+  const item1 = (t) => t.split("\n").find((l) => l.startsWith("1. "));
+  assert.equal(sha(r6), "493c0dd893b2646115b98997727e47ae7df1c3aa94c8d576605a96bf940c7dff", "r6 archive byte-identical to merged #888");
+  assert.doesNotMatch(item1(r7), /Заявлени/, "r7 п. 1 no longer names the rights statement");
+  assert.match(item1(r7), /Единое коммерческое соглашение с правообладателем/);
+  assert.match(item1(r7), /редакция 2\.0, разделы 7 и 8/);
+  assert.match(item1(r6), /Заявление правообладателя о правах на музыку/);
+  assert.equal(r7.split("\n").filter((l, i) => l !== r6.split("\n")[i]).length, 1, "only п. 1 changed");
+  const { programTermsDocument } = await import("../src/lib/business-rightsholder/program-documents.ts");
+  const { clientDocumentSource } = await import("../src/lib/business-app/client-document-content.ts");
+  assert.equal(programTermsDocument(true).markdown, r7);
+  assert.equal(programTermsDocument(true).sha256, sha(r7));
+  assert.equal(programTermsDocument(false).markdown, r6, "flag off: legacy consent flow keeps r6");
+  assert.equal(programTermsDocument(false).version, "r6-2026-10-17");
+  assert.equal(clientDocumentSource("b2b-terms", true).markdown, r7);
+  assert.equal(clientDocumentSource("b2b-terms", false).markdown, r6);
+  assert.equal(clientDocumentSource("venue-license", false), clientDocumentSource("venue-license", true));
+}
 // Venue documents are r6's: untouched here.
 const plan = read("docs/business/unified-agreement-8dcba9d1/ROLLOUT-PLAN-RU.md");
 for (const needle of ["Резервная копия", "Пробное восстановление", "20270106120000", "AUDIOLAD_UNIFIED_AGREEMENT_ENABLED", "01-insert-edition-2.0.sql", "02-switch-current.sql", "Откат"]) {
