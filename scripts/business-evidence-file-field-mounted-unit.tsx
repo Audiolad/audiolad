@@ -70,9 +70,16 @@ async function main() {
   assert.match(text(gen()), /Выбрать файл/);
   assert.equal(gen().getAttribute("data-evidence-state"), "empty");
 
-  // Select an image: thumbnail + «Загружается…» until decoded, then «✓ Скриншот загружен».
+  // Select an image through the real file input: thumbnail + «Загружается…» until decoded,
+  // then «✓ Скриншот загружен»; focus moves from «Выбрать файл» to «Заменить».
   const png = new File([new Uint8Array(100)], "shot.png", { type: "image/png" });
-  await act(async () => api.select!("generation", png));
+  const chooseBtn = buttons(gen()).find((b) => text(b) === "Выбрать файл")!;
+  (chooseBtn as HTMLElement).focus();
+  const input = all(gen()).find((x) => x.tagName === "INPUT" && x.getAttribute("type") === "file")! as HTMLInputElement;
+  Object.defineProperty(input, "files", { value: [png], configurable: true });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  const afterSelect = document.activeElement as Element | null;
+  assert.ok(afterSelect && text(afterSelect) === "Заменить" && all(gen()).includes(afterSelect), "focus moves to «Заменить» after the first selection");
   let img = imgOf(gen());
   assert.ok(img, "thumbnail rendered");
   assert.equal(img!.getAttribute("src"), "blob:test-1");

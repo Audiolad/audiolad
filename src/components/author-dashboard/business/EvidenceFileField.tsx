@@ -203,7 +203,10 @@ export default function EvidenceFileField({
             const next = e.target.files?.[0] ?? null;
             // Reset so choosing the same file again still fires onChange.
             e.target.value = "";
-            if (next) onSelect?.(next);
+            if (!next) return;
+            // The focused «Выбрать файл» button is replaced by «Заменить»; keep keyboard focus there.
+            flushSync(() => onSelect?.(next));
+            replaceRef.current?.focus();
           }}
         />
       )}
