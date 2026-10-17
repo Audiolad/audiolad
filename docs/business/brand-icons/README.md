@@ -15,4 +15,4 @@ Palette = Business theme tokens (`src/components/business-app/theme/business-the
 | `icon-small.svg` (simplified mark, heavier strokes) | `favicon-16x16.png`, `favicon-32x32.png`, `favicon-48x48.png`, `favicon.ico` (16/32/48) |
 
 PNGs were rasterised from these SVGs with headless Chrome at the exact pixel size
-(no downscaling); `favicon.ico` embeds the three favicon PNGs as-is.
+(no downscaling); `favicon.ico` embeds pixel-identical PNG versions of the three favicons.
