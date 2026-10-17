@@ -189,7 +189,7 @@ export default function EvidenceFileField({
           </button>
         ) : null}
       </div>
-      {readOnly ? null : <p className="mt-1 text-sm text-[#7d70a2]">{hint}</p>}
+      {readOnly ? null : <p className="mt-1 text-sm text-[#5f5484]">{hint}</p>}
 
       {readOnly ? null : (
         <input
@@ -230,12 +230,12 @@ export default function EvidenceFileField({
             ) : isPdfMime(mime) ? (
               <PdfIcon />
             ) : (
-              <span aria-hidden="true" className="text-2xl text-[#7d70a2]">🖼</span>
+              <span aria-hidden="true" className="text-2xl text-[#5f5484]">🖼</span>
             )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium" title={name} data-evidence-name>{name}</p>
-            {meta ? <p className="mt-0.5 text-xs text-[#7d70a2]">{meta}</p> : null}
+            {meta ? <p className="mt-0.5 text-xs text-[#5f5484]">{meta}</p> : null}
             {tone ? (
               <p id={statusId} role={tone === "error" ? "alert" : "status"} aria-live="polite"
                 className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${TONE_CLASS[tone]}`}
@@ -246,7 +246,7 @@ export default function EvidenceFileField({
                 {statusText}
               </p>
             ) : null}
-            {note ? <p className="mt-1 text-xs text-[#7d70a2]">{note}</p> : null}
+            {note ? <p className="mt-1 text-xs text-[#5f5484]">{note}</p> : null}
             {!file && stored?.url ? (
               <a href={stored.url} target="_blank" rel="noopener noreferrer"
                 className="mt-1 inline-block text-xs font-medium text-[#7042c5] underline underline-offset-4 hover:text-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]">
@@ -286,10 +286,10 @@ export default function EvidenceFileField({
             className="min-h-11 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white transition hover:bg-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60">
             {EVIDENCE_COPY.choose}
           </button>
-          <span id={formatId} className="text-xs text-[#7d70a2]">{EVIDENCE_FORMAT_HINT}</span>
+          <span id={formatId} className="text-xs text-[#5f5484]">{EVIDENCE_FORMAT_HINT}</span>
         </div>
       )}
-      {hasContent && !readOnly ? <p id={formatId} className="mt-2 text-xs text-[#7d70a2]">{EVIDENCE_FORMAT_HINT}</p> : null}
+      {hasContent && !readOnly ? <p id={formatId} className="mt-2 text-xs text-[#5f5484]">{EVIDENCE_FORMAT_HINT}</p> : null}
       {fieldError ? <p id={errorId} className="mt-2 text-sm text-[#9b3d3d]" role="alert">{fieldError}</p> : null}
     </div>
   );

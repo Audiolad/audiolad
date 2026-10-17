@@ -214,10 +214,20 @@ for (const [name, src] of [["field", fieldSrc], ["form", formSrc], ["helpers", h
 }
 // The field lives in the audiolad.ru author cabinet: lavender cabinet palette only.
 assert.doesNotMatch(fieldSrc, /--biz-|data-biz-theme/, "no Business Jazz & Coffee tokens in the author cabinet");
-const CABINET = new Set(["#7042c5", "#5e32ad", "#25135c", "#7d70a2", "#4c3d78", "#c6afe6", "#d7c4f5", "#e4d7f4", "#faf6ff", "#f3ecfd", "#f3fbf6", "#2f7a55", "#fff5f5", "#f2c7c7", "#9b3d3d", "#ffffff"]);
+const CABINET = new Set(["#7042c5", "#5e32ad", "#25135c", "#5f5484", "#4c3d78", "#c6afe6", "#d7c4f5", "#e4d7f4", "#faf6ff", "#f3ecfd", "#f3fbf6", "#2f7a55", "#fff5f5", "#f2c7c7", "#9b3d3d", "#ffffff"]);
 const hexes = new Set([...fieldSrc.matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0].toLowerCase()));
 assert.ok(hexes.has("#7042c5") && hexes.has("#faf6ff"));
 for (const h of hexes) assert.ok(CABINET.has(h), `${h} is not an author-cabinet colour`);
+// WCAG AA (4.5:1) for every text/background pair the field renders.
+const lum = (hex: string) => {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n); return (y + 0.05) / (x + 0.05); };
+assert.doesNotMatch(fieldSrc, /text-\[#7d70a2\]/, "#7d70a2 is below 4.5:1 on the lavender card");
+for (const [fg, bg] of [["#5f5484", "#faf6ff"], ["#5f5484", "#ffffff"], ["#25135c", "#faf6ff"], ["#7042c5", "#faf6ff"], ["#7042c5", "#ffffff"], ["#ffffff", "#7042c5"], ["#ffffff", "#5e32ad"], ["#4c3d78", "#f3ecfd"], ["#2f7a55", "#f3fbf6"], ["#9b3d3d", "#fff5f5"], ["#9b3d3d", "#ffffff"]]) {
+  assert.ok(ratio(fg, bg) >= 4.5, `${fg} on ${bg}: ${ratio(fg, bg).toFixed(2)}:1 < 4.5:1`);
+}
 // Warm Jazz & Coffee hex values must not appear in the field.
 for (const warm of ["#6f4326", "#f1e2cf", "#dcc3a4", "#cdb69a", "#fffaf3", "#f2e8da", "#e5d6c1", "#b8904f"]) assert.ok(!hexes.has(warm), warm);
 
