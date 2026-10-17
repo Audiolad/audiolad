@@ -211,6 +211,13 @@ export async function acceptCurrentAuthorTerms(input: {
   hadPriorAcceptance: boolean;
   /** Must be false: support mode never records an acceptance (8dcba9d1). */
   supportMode: boolean;
+  /**
+   * Edition the author actually saw (id + content hash from the status view).
+   * Required when the unified-agreement flag is on: a form opened under 1.2 can
+   * never record an acceptance of 2.0. Validated whenever provided.
+   */
+  expectedTermsVersionId?: string | null;
+  expectedContentHash?: string | null;
 }): Promise<{
   acceptance: AuthorTermsAcceptanceRow;
   created: boolean;
@@ -228,11 +235,22 @@ export async function acceptCurrentAuthorTerms(input: {
     throw new AuthorTermsError("terms_not_published", 503);
   }
 
+  const unifiedEnabled = isUnifiedAgreementEnabled();
+  const bindingProvided = Boolean(input.expectedTermsVersionId || input.expectedContentHash);
+  if (
+    (unifiedEnabled && !bindingProvided) ||
+    (bindingProvided &&
+      (input.expectedTermsVersionId !== currentVersion.id ||
+        input.expectedContentHash !== currentVersion.content_hash))
+  ) {
+    throw new AuthorTermsError("terms_version_changed", 409);
+  }
+
   // Client cannot choose a non-current edition. The DB current hash must be an
   // approved edition in code (flag off: only 1.2, exactly as before).
   const edition = findAcceptableEditionByHash(
     currentVersion.content_hash,
-    isUnifiedAgreementEnabled(),
+    unifiedEnabled,
   );
   if (!edition || edition.version !== currentVersion.version) {
     console.error("author_terms_hash_drift", {

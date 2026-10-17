@@ -118,6 +118,9 @@ export default function AuthorTermsAcceptPanel({
         body: JSON.stringify({
           author_id: authorId,
           acknowledged: true,
+          // Bind the acceptance to the edition shown here (server rejects a stale form).
+          terms_version_id: version?.id ?? null,
+          content_hash: version?.contentHash ?? null,
         }),
       });
       const data = (await response.json()) as {
@@ -130,7 +133,9 @@ export default function AuthorTermsAcceptPanel({
           data.error === SUPPORT_MODE_ACCEPTANCE_FORBIDDEN ||
             data.error === "support_mutation_blocked"
             ? SUPPORT_MODE_CONSENT_NOTICE
-            : data.error === "forbidden"
+            : data.error === "terms_version_changed"
+              ? "Редакция документа изменилась, пока страница была открыта. Обновите страницу, прочитайте актуальную редакцию и примите её."
+              : data.error === "forbidden"
               ? "Принять условия может только владелец кабинета автора."
               : "Не удалось сохранить принятие. Попробуйте ещё раз.",
         );

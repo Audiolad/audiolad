@@ -123,7 +123,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
             .order("created_at", { ascending: false }),
           admin
             .from("music_rights_grants")
-            .select("audio_item_id")
+            .select("audio_item_id, rights_layer, valid_from, valid_until")
             .in("audio_item_id", trackIds)
             .eq("use_type", "business_background_playback")
             .eq("status", "verified")
@@ -135,7 +135,19 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       const id = String(r.audio_item_id);
       if (!latest.has(id)) latest.set(id, r as { decision: string; reason_code: string | null; comment: string | null });
     }
-    const granted = new Set((grants ?? []).map((g) => String(g.audio_item_id)));
+    // "В Бизнесе" only when BOTH layers (recording + composition) have a live, currently valid grant.
+    const nowMs = Date.now();
+    const liveLayers = new Map<string, Set<string>>();
+    for (const g of (grants ?? []) as { audio_item_id: string; rights_layer: string; valid_from: string | null; valid_until: string | null }[]) {
+      if (g.valid_from && Date.parse(g.valid_from) > nowMs) continue;
+      if (g.valid_until && Date.parse(g.valid_until) <= nowMs) continue;
+      const id = String(g.audio_item_id);
+      if (!liveLayers.has(id)) liveLayers.set(id, new Set());
+      liveLayers.get(id)!.add(g.rights_layer);
+    }
+    const granted = new Set(
+      [...liveLayers.entries()].filter(([, layers]) => layers.has("recording") && layers.has("composition")).map(([id]) => id),
+    );
     unifiedView = {
       status,
       tracks: ownTracks.map((t) => {

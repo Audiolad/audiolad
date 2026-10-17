@@ -27,6 +27,10 @@ BEGIN
     WHERE id = '5d0c2b7e-3f4a-4c61-9a8e-2b0f6d1e7a20';
 END;
 $$;
+-- Активация единой модели: попродуктовый opt-in больше не вызывается клиентами
+-- (поступление треков в Бизнес — автоматическое, триггеры миграции 20270106120000).
+REVOKE EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) FROM authenticated;
+SELECT public.business_unified_agreement_active() AS unified_active;
 SELECT version, is_current, covers_business, reaccept_grace_until
 FROM public.author_terms_versions WHERE document_key = 'author-terms' ORDER BY published_at;
 COMMIT;

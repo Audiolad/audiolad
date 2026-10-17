@@ -13,5 +13,9 @@ BEGIN
     WHERE id = '9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902';
 END;
 $$;
+-- Возврат прежнего поведения Бизнеса: opt-in снова доступен, новые RPC и автопоступление
+-- неактивны (business_unified_agreement_active() = false).
+GRANT EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) TO authenticated;
+SELECT public.business_unified_agreement_active() AS unified_active;
 SELECT version, is_current FROM public.author_terms_versions WHERE document_key = 'author-terms' ORDER BY published_at;
 COMMIT;

@@ -186,6 +186,38 @@ AS $$
   WHERE audio_item_id = p_audio_item_id ORDER BY created_at DESC, id DESC LIMIT 1;
 $$;
 
+-- DB activation gate: the unified model is ACTIVE only once an edition that covers Business is the
+-- current author-terms edition (rollout step 02-switch-current, done only with the app flag on).
+-- Until then every new write path below refuses and the legacy Business flow is unchanged.
+CREATE OR REPLACE FUNCTION public.business_unified_agreement_active()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.author_terms_versions
+    WHERE document_key = 'author-terms' AND is_current AND covers_business
+  );
+$$;
+
+-- Serializes catalogue sync and per-track moderation decisions for one track.
+CREATE OR REPLACE FUNCTION public.business_track_lock(p_audio_item_id uuid)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT pg_advisory_xact_lock(hashtextextended('audiolad:business_track:' || p_audio_item_id::text, 0));
+$$;
+
+-- At most one live agreement grant per track/layer/use (idempotency under concurrency).
+-- Only platform_agreement rows are constrained; existing grants (source 'other' etc.) are unaffected.
+CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_platform_agreement_live_uidx
+  ON public.music_rights_grants (audio_item_id, rights_layer, use_type)
+  WHERE source_type = 'platform_agreement' AND status IN ('draft', 'verified');
+
 -- Moderator per-track decision. blocked / proof_requested revoke this agreement's own
 -- platform_agreement Business grants for the track (verified → revoked keeps history).
 CREATE OR REPLACE FUNCTION public.moderator_business_track_review(
@@ -204,6 +236,9 @@ BEGIN
   IF public.business_consent_caller_in_support_mode() THEN
     RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501';
   END IF;
+  IF NOT public.business_unified_agreement_active() THEN
+    RAISE EXCEPTION 'business_unified_agreement_inactive' USING ERRCODE = '55000';
+  END IF;
   SELECT ai.practice_id, p.author_id INTO v_product, v_author
   FROM public.audio_items ai JOIN public.practices p ON p.id = ai.practice_id
   WHERE ai.id = p_audio_item_id AND p.product_kind = 'music';
@@ -214,6 +249,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'business_self_moderation_forbidden' USING ERRCODE = '42501';
   END IF;
+  PERFORM public.business_track_lock(p_audio_item_id);
   INSERT INTO public.business_track_eligibility_reviews(audio_item_id, product_id, author_id, decision, reason_code, comment, actor_user_id)
     VALUES (p_audio_item_id, v_product, v_author, p_decision, p_reason_code, nullif(btrim(p_comment), ''), auth.uid())
     RETURNING id INTO v_id;
@@ -225,6 +261,9 @@ BEGIN
         AND source_type = 'platform_agreement'
         AND source_reference LIKE 'author-terms:%'
         AND status = 'verified';
+  ELSE
+    -- Explicit admission lets the track flow in at once (same exception-safe inflow as the triggers).
+    PERFORM public.business_unified_auto_sync_authors(ARRAY[v_author]);
   END IF;
   RETURN v_id;
 END;
@@ -245,6 +284,9 @@ BEGIN
   -- Rights check is the rightsholder's personal act (PR 1 guard): never in support mode.
   IF public.business_consent_caller_in_support_mode() THEN
     RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501';
+  END IF;
+  IF NOT public.business_unified_agreement_active() THEN
+    RAISE EXCEPTION 'business_unified_agreement_inactive' USING ERRCODE = '55000';
   END IF;
   PERFORM 1 FROM public.business_rightsholder_accounts WHERE owner_user_id = auth.uid() FOR UPDATE;
   SELECT * INTO v FROM public.business_rightsholder_verifications WHERE id = p_verification_id FOR UPDATE;
@@ -288,13 +330,16 @@ BEGIN
 END;
 $$;
 
--- 6) Per-product opt-in is replaced by automatic inflow: no client may call it any more.
-REVOKE EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) FROM authenticated;
+-- 6) Per-product opt-in: NOT revoked here (flag-off behaviour must stay identical). It is revoked
+--    at activation by docs/business/unified-agreement-8dcba9d1/sql/02-switch-current.sql and
+--    re-granted by 03-rollback-switch.sql.
 
 -- 7) Catalogue sync: creates NEW platform_agreement Business grants for suitable tracks only.
---    Default dry run. Existing grants (any source) are never modified; tracks that already have a
---    live grant for the layer are skipped. Territory: RU (agreement 2.0 п. 5.3).
-CREATE OR REPLACE FUNCTION public.business_catalog_sync(p_author_id uuid, p_dry_run boolean DEFAULT true)
+--    Existing grants (any source) are never modified. A track is skipped when it has a live grant
+--    of another rightsholder, a historical restriction (revoked / expired Business grant) not
+--    followed by an explicit 'admitted' review, a blocking review, or a suspension. Territory: RU
+--    (agreement 2.0 п. 5.3). Internal runner (no client grant) + authorised wrapper.
+CREATE OR REPLACE FUNCTION public.business_catalog_sync_run(p_author_id uuid, p_dry_run boolean)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -302,16 +347,13 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE v_agreement record; v_rightsholder uuid; v_owner uuid; t record; layer text; v_grant uuid;
   v_ready jsonb := '[]'::jsonb; v_skipped jsonb := '[]'::jsonb; v_created int := 0; v_reasons text[] := ARRAY[]::text[];
-  v_latest text; v_now timestamptz := clock_timestamp();
+  v_latest text; v_admitted_at timestamptz; v_now timestamptz := clock_timestamp();
 BEGIN
-  IF auth.uid() IS NOT NULL AND NOT public.business_onboarding_is_moderator() THEN
-    RAISE EXCEPTION 'business_moderator_required' USING ERRCODE = '42501';
-  END IF;
-  IF auth.uid() IS NULL AND coalesce(auth.role(), '') <> 'service_role' AND session_user NOT IN ('postgres', 'supabase_admin') THEN
-    RAISE EXCEPTION 'business_catalog_sync_forbidden' USING ERRCODE = '42501';
-  END IF;
-  IF p_dry_run IS DISTINCT FROM false AND p_dry_run IS DISTINCT FROM true THEN
+  IF p_dry_run IS NULL THEN
     RAISE EXCEPTION 'business_catalog_sync_dry_run_required';
+  END IF;
+  IF NOT public.business_unified_agreement_active() THEN
+    v_reasons := array_append(v_reasons, 'unified_agreement_inactive');
   END IF;
   SELECT * INTO v_agreement FROM public.author_business_agreement_acceptance(p_author_id);
   IF v_agreement.acceptance_id IS NULL THEN
@@ -337,9 +379,14 @@ BEGIN
     SELECT ai.id AS audio_item_id, ai.practice_id AS product_id
     FROM public.audio_items ai JOIN public.practices p ON p.id = ai.practice_id
     WHERE p.author_id = p_author_id AND p.status = 'published' AND p.product_kind = 'music' AND ai.status = 'published'
-    ORDER BY p.id, ai.position NULLS LAST, ai.id
+    ORDER BY ai.id
   LOOP
-    v_latest := public.business_track_latest_review(t.audio_item_id);
+    IF NOT p_dry_run THEN
+      -- Same lock as moderator_business_track_review: decisions and inflow never interleave.
+      PERFORM public.business_track_lock(t.audio_item_id);
+    END IF;
+    SELECT decision INTO v_latest FROM public.business_track_eligibility_reviews
+      WHERE audio_item_id = t.audio_item_id ORDER BY created_at DESC, id DESC LIMIT 1;
     IF v_latest IN ('blocked', 'proof_requested') THEN
       v_skipped := v_skipped || jsonb_build_object('audio_item_id', t.audio_item_id, 'reason', 'review_' || v_latest);
       CONTINUE;
@@ -347,6 +394,15 @@ BEGIN
     IF EXISTS (SELECT 1 FROM public.business_onboarding_suspensions s
                WHERE s.product_id = t.product_id AND (s.audio_item_id IS NULL OR s.audio_item_id = t.audio_item_id)) THEN
       v_skipped := v_skipped || jsonb_build_object('audio_item_id', t.audio_item_id, 'reason', 'suspended');
+      CONTINUE;
+    END IF;
+    SELECT max(created_at) INTO v_admitted_at FROM public.business_track_eligibility_reviews
+      WHERE audio_item_id = t.audio_item_id AND decision = 'admitted';
+    IF EXISTS (SELECT 1 FROM public.music_rights_grants g
+               WHERE g.audio_item_id = t.audio_item_id AND g.use_type = 'business_background_playback'
+                 AND (g.status = 'revoked' OR (g.status = 'verified' AND g.valid_until IS NOT NULL AND g.valid_until <= v_now))
+                 AND coalesce(g.ceased_at, g.valid_until, g.updated_at) > coalesce(v_admitted_at, '-infinity'::timestamptz)) THEN
+      v_skipped := v_skipped || jsonb_build_object('audio_item_id', t.audio_item_id, 'reason', 'historical_rights_restriction');
       CONTINUE;
     END IF;
     IF EXISTS (SELECT 1 FROM public.music_rights_grants g
@@ -388,6 +444,98 @@ BEGIN
 END;
 $$;
 
+-- Authorised entry point: moderator (JWT) or service_role / DB owner. Dry run by default.
+CREATE OR REPLACE FUNCTION public.business_catalog_sync(p_author_id uuid, p_dry_run boolean DEFAULT true)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.business_onboarding_is_moderator() THEN
+    RAISE EXCEPTION 'business_moderator_required' USING ERRCODE = '42501';
+  END IF;
+  IF auth.uid() IS NULL AND coalesce(auth.role(), '') <> 'service_role' AND session_user NOT IN ('postgres', 'supabase_admin') THEN
+    RAISE EXCEPTION 'business_catalog_sync_forbidden' USING ERRCODE = '42501';
+  END IF;
+  IF public.business_consent_caller_in_support_mode() THEN
+    RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501';
+  END IF;
+  RETURN public.business_catalog_sync_run(p_author_id, p_dry_run);
+END;
+$$;
+
+-- 7b) Automatic inflow (no manual step): after a personal acceptance of a Business-covering edition,
+--     after the rights check is verified, and after a music product/track is published.
+--     Inert unless the unified model is active. Never breaks the triggering write: failures are
+--     reported as WARNING and the sync is retried by the next event or a manual/dry-run call.
+CREATE OR REPLACE FUNCTION public.business_unified_auto_sync_authors(p_author_ids uuid[])
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE a uuid;
+BEGIN
+  IF p_author_ids IS NULL OR NOT public.business_unified_agreement_active() THEN RETURN; END IF;
+  FOR a IN SELECT DISTINCT x FROM unnest(p_author_ids) x WHERE x IS NOT NULL ORDER BY x LOOP
+    BEGIN
+      PERFORM public.business_catalog_sync_run(a, false);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'business_unified_auto_sync_failed author=% err=%', a, SQLERRM;
+    END;
+  END LOOP;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.business_unified_auto_sync_trigger()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_authors uuid[];
+BEGIN
+  IF NOT public.business_unified_agreement_active() THEN RETURN NULL; END IF;
+  IF TG_TABLE_NAME = 'author_terms_acceptances' THEN
+    SELECT array_agg(DISTINCT n.author_id) INTO v_authors
+      FROM new_rows n JOIN public.author_terms_versions v ON v.id = n.terms_version_id AND v.covers_business;
+  ELSIF TG_TABLE_NAME = 'business_rightsholder_verifications' THEN
+    SELECT array_agg(DISTINCT m.author_id) INTO v_authors
+      FROM new_rows n JOIN public.author_members m ON m.user_id = n.owner_user_id AND m.role = 'owner'
+      WHERE n.status = 'verified';
+  ELSIF TG_TABLE_NAME = 'practices' THEN
+    SELECT array_agg(DISTINCT n.author_id) INTO v_authors
+      FROM new_rows n WHERE n.status = 'published' AND n.product_kind = 'music';
+  ELSIF TG_TABLE_NAME = 'audio_items' THEN
+    SELECT array_agg(DISTINCT p.author_id) INTO v_authors
+      FROM new_rows n JOIN public.practices p ON p.id = n.practice_id
+      WHERE n.status = 'published' AND p.status = 'published' AND p.product_kind = 'music';
+  END IF;
+  PERFORM public.business_unified_auto_sync_authors(v_authors);
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.author_terms_acceptances;
+CREATE TRIGGER zz_business_unified_auto_sync_ins AFTER INSERT ON public.author_terms_acceptances
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.business_rightsholder_verifications;
+CREATE TRIGGER zz_business_unified_auto_sync_upd AFTER UPDATE ON public.business_rightsholder_verifications
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.practices;
+CREATE TRIGGER zz_business_unified_auto_sync_ins AFTER INSERT ON public.practices
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.practices;
+CREATE TRIGGER zz_business_unified_auto_sync_upd AFTER UPDATE ON public.practices
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.audio_items;
+CREATE TRIGGER zz_business_unified_auto_sync_ins AFTER INSERT ON public.audio_items
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.audio_items;
+CREATE TRIGGER zz_business_unified_auto_sync_upd AFTER UPDATE ON public.audio_items
+  REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION public.business_unified_auto_sync_trigger();
+
 -- 8) Least privilege -----------------------------------------------------------------------
 REVOKE ALL ON FUNCTION public.business_unified_is_author_member(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.business_unified_is_author_member(uuid) TO authenticated;
@@ -395,9 +543,15 @@ REVOKE ALL ON FUNCTION public.author_business_agreement_acceptance(uuid) FROM PU
 REVOKE ALL ON FUNCTION public.author_has_business_agreement(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.author_commercial_agreement_state(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.business_track_latest_review(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_unified_agreement_active() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.business_track_lock(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_catalog_sync_run(uuid,boolean) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_unified_auto_sync_authors(uuid[]) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_unified_auto_sync_trigger() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.moderator_business_track_review(uuid,text,text,text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.author_business_verification_submit_v3(uuid,uuid[],inet,text) FROM PUBLIC, anon, service_role;
 REVOKE ALL ON FUNCTION public.business_catalog_sync(uuid,boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.business_unified_agreement_active() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.author_has_business_agreement(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.author_commercial_agreement_state(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.moderator_business_track_review(uuid,text,text,text) TO authenticated;

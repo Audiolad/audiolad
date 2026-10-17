@@ -1,4 +1,4 @@
--- Откат миграции 20270106120000 (только функции и права; данные сохраняются).
+-- Откат миграции 20270106120000 (функции, триггеры автопоступления, индекс, права; данные сохраняются).
 -- Предусловие: текущая редакция НЕ 2.0 (сначала 03-rollback-switch.sql) и флаг выключен.
 -- Таблица business_track_eligibility_reviews и колонки author_terms_versions НЕ удаляются:
 -- это юридическая история (решения по трекам, отметка covers_business у строки 2.0).
@@ -25,7 +25,20 @@ AS $$
     WHERE a.author_id = p_author_id AND v.document_key = 'author-terms' AND v.is_current
   );
 $$;
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.author_terms_acceptances;
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.business_rightsholder_verifications;
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.practices;
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.practices;
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.audio_items;
+DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.audio_items;
+DROP FUNCTION IF EXISTS public.business_unified_auto_sync_trigger();
+DROP FUNCTION IF EXISTS public.business_unified_auto_sync_authors(uuid[]);
 DROP FUNCTION IF EXISTS public.business_catalog_sync(uuid, boolean);
+DROP FUNCTION IF EXISTS public.business_catalog_sync_run(uuid, boolean);
+DROP FUNCTION IF EXISTS public.business_track_lock(uuid);
+DROP FUNCTION IF EXISTS public.business_unified_agreement_active();
+-- Индекс идемпотентности снимается; гранты остаются.
+DROP INDEX IF EXISTS public.music_rights_grants_platform_agreement_live_uidx;
 DROP FUNCTION IF EXISTS public.author_business_verification_submit_v3(uuid, uuid[], inet, text);
 DROP FUNCTION IF EXISTS public.moderator_business_track_review(uuid, text, text, text);
 DROP FUNCTION IF EXISTS public.business_track_latest_review(uuid);

@@ -113,7 +113,8 @@ for (const [s, want] of [["free", "free"], ["commercial_pending", "free"], ["com
 // ---- Wiring (source-level).
 const service = read("src/lib/author-terms/service.ts");
 assert.match(service, /\.select\(isUnifiedAgreementEnabled\(\) \? UNIFIED_VERSION_COLUMNS : VERSION_COLUMNS\)/, "new columns only with flag on");
-assert.match(service, /findAcceptableEditionByHash\(\s*currentVersion\.content_hash,\s*isUnifiedAgreementEnabled\(\),\s*\)/);
+assert.match(service, /const unifiedEnabled = isUnifiedAgreementEnabled\(\);/);
+assert.match(service, /findAcceptableEditionByHash\(\s*currentVersion\.content_hash,\s*unifiedEnabled,\s*\)/);
 assert.match(service, /if \(input\.supportMode !== false\)/, "PR 1 guard kept");
 const form = read("src/components/author-dashboard/business/RightsholderVerificationForm.tsx");
 assert.match(form, /useState\(false\);\n  const \[confirmRights, setConfirmRights\] = useState\(false\)/, "legacy boxes not pre-ticked");
@@ -130,6 +131,22 @@ assert.doesNotMatch(read("src/components/author-dashboard/business/BusinessAgree
 assert.doesNotMatch(read("src/app/(platform)/author-dashboard/business/page.tsx"), /author_business_product_optin/);
 assert.match(read("src/app/(platform)/business-documents/music-rights-declaration/page.tsx"), /archived=\{archived\}/);
 assert.match(read("src/lib/business-rightsholder/program-documents.ts"), /ARCHIVED_WITH_UNIFIED_AGREEMENT: readonly ProgramDocumentKey\[\] = \["business_music_rights_declaration"\]/);
+// Acceptance is bound to the edition the author saw (Codex PR2 r1 B1).
+const svc = read("src/lib/author-terms/service.ts");
+assert.match(svc, /expectedTermsVersionId !== currentVersion\.id/);
+assert.match(svc, /expectedContentHash !== currentVersion\.content_hash/);
+assert.match(svc, /unifiedEnabled && !bindingProvided/, "flag on: binding mandatory");
+assert.match(svc, /AuthorTermsError\("terms_version_changed", 409\)/);
+const acceptRoute = read("src/app/api/author/terms/accept/route.ts");
+assert.match(acceptRoute, /expectedTermsVersionId: optionalString\(body\.terms_version_id, 64\)/);
+assert.match(acceptRoute, /expectedContentHash: optionalString\(body\.content_hash, 64\)/);
+const acceptPanel = panel;
+assert.match(acceptPanel, /terms_version_id: version\?\.id/);
+assert.match(acceptPanel, /content_hash: version\?\.contentHash/);
+assert.match(acceptPanel, /terms_version_changed/);
+// "В Бизнесе" requires both layers live and currently valid.
+assert.match(businessPage, /layers\.has\("recording"\) && layers\.has\("composition"\)/);
+assert.match(businessPage, /valid_until/);
 // Venue documents are r6's: untouched here.
 const plan = read("docs/business/unified-agreement-8dcba9d1/ROLLOUT-PLAN-RU.md");
 for (const needle of ["Резервная копия", "Пробное восстановление", "20270106120000", "AUDIOLAD_UNIFIED_AGREEMENT_ENABLED", "01-insert-edition-2.0.sql", "02-switch-current.sql", "Откат"]) {

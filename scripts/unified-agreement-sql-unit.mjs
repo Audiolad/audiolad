@@ -29,7 +29,22 @@ for (const body of clean.matchAll(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/g)) {
   assert.match(body[0], /SECURITY DEFINER/);
   assert.match(body[0], /SET search_path = public, pg_temp/);
 }
-assert.match(clean, /REVOKE EXECUTE ON FUNCTION public\.author_business_product_optin\(uuid\[\],boolean,boolean,text,text,inet,text\) FROM authenticated;/);
+// Flag-off behaviour is preserved: the opt-in revoke happens only at activation (02-switch), regrant on rollback.
+assert.doesNotMatch(clean, /author_business_product_optin/, 'migration leaves the legacy opt-in untouched');
+assert.match(switchCurrent, /REVOKE EXECUTE ON FUNCTION public\.author_business_product_optin\(uuid\[\],boolean,boolean,text,text,inet,text\) FROM authenticated;/);
+assert.match(rollbackSwitch, /GRANT EXECUTE ON FUNCTION public\.author_business_product_optin\(uuid\[\],boolean,boolean,text,text,inet,text\) TO authenticated;/);
+// Every new write path checks the DB activation gate; sync and review share the per-track lock.
+for (const fn of ['author_business_verification_submit_v3', 'moderator_business_track_review', 'business_catalog_sync_run']) {
+  const body = clean.match(new RegExp(`FUNCTION public\\.${fn}\\([\\s\\S]*?\\$\\$;`))[0];
+  assert.match(body, /business_unified_agreement_active\(\)/, `${fn} gated by activation`);
+}
+assert.match(clean.match(/FUNCTION public\.moderator_business_track_review\([\s\S]*?\$\$;/)[0], /business_track_lock/);
+assert.match(clean.match(/FUNCTION public\.business_catalog_sync_run\([\s\S]*?\$\$;/)[0], /business_track_lock/);
+assert.match(clean, /CREATE UNIQUE INDEX IF NOT EXISTS music_rights_grants_platform_agreement_live_uidx/);
+for (const t of ['author_terms_acceptances', 'business_rightsholder_verifications', 'practices', 'audio_items']) {
+  assert.match(clean, new RegExp(`CREATE TRIGGER zz_business_unified_auto_sync_\\w+ AFTER (INSERT|UPDATE) ON public\\.${t}`), `auto inflow on ${t}`);
+  assert.match(rollbackMigration, new RegExp(`DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_\\w+ ON public\\.${t}`), `rollback drops trigger on ${t}`);
+}
 assert.match(clean, /business_catalog_sync\(p_author_id uuid, p_dry_run boolean DEFAULT true\)/, 'dry run is the default');
 const submitV3 = clean.match(/FUNCTION public\.author_business_verification_submit_v3[\s\S]*?\$\$;/)[0];
 assert.ok(submitV3.indexOf('business_consent_caller_in_support_mode') < submitV3.indexOf('FOR UPDATE'), 'support guard first');
@@ -125,6 +140,20 @@ DO $t$ BEGIN
   PERFORM ua_test.ok((SELECT NOT covers_business FROM public.author_terms_versions WHERE version = '1.2'), 'default covers_business=false');
   PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.author_terms_versions WHERE version = '2.0' AND NOT is_current AND covers_business), '2.0 inserted, not current');
   PERFORM ua_test.ok((SELECT version = '1.2' FROM public.author_terms_versions WHERE is_current), 'insert does not switch');
+  -- Inactive (flag off / 1.2 current): legacy flow unchanged, new paths refuse, auto inflow inert.
+  PERFORM ua_test.ok(NOT public.business_unified_agreement_active(), 'unified model inactive before switch');
+  PERFORM ua_test.ok(has_function_privilege('authenticated','public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text)','EXECUTE'), 'legacy opt-in still callable');
+  PERFORM ua_test.as_user('${B}');
+  SET LOCAL ROLE authenticated;
+  PERFORM ua_test.expect_error('SELECT public.author_business_verification_submit_v3(gen_random_uuid(),ARRAY[]::uuid[])', 'business_unified_agreement_inactive');
+  RESET ROLE;
+  PERFORM ua_test.as_user('${M}');
+  SET LOCAL ROLE authenticated;
+  PERFORM ua_test.expect_error('SELECT public.moderator_business_track_review(''30000000-0000-0000-0000-0000000000b1'',''admitted'',''ok'')', 'business_unified_agreement_inactive');
+  PERFORM ua_test.ok((SELECT public.business_catalog_sync('10000000-0000-0000-0000-00000000000a', false)->'reasons' ? 'unified_agreement_inactive'), 'sync refuses while inactive');
+  RESET ROLE;
+  UPDATE public.audio_items SET status = 'published' WHERE id = '30000000-0000-0000-0000-0000000000a1';
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE source_type = 'platform_agreement'), 'auto inflow inert while inactive');
 END $t$;
 `;
 
@@ -197,11 +226,11 @@ BEGIN
   PERFORM ua_test.as_user('${M}');
   SET LOCAL ROLE authenticated;
   PERFORM public.moderator_business_verification_action(v,'approve','ok',NULL,'Synthetic A','person');
-  -- Dry run (default): reports, writes nothing.
+  -- Automatic inflow: the verification approval alone brought A's suitable tracks into Business.
   r := public.business_catalog_sync('10000000-0000-0000-0000-00000000000a');
   RESET ROLE;
-  PERFORM ua_test.ok(r->>'status' = 'ok' AND (r->>'dry_run')::boolean AND (r->>'created_grants')::int = 0 AND jsonb_array_length(r->'ready') = 2 AND jsonb_array_length(r->'skipped') = 1, 'dry run: 2 ready, 1 skipped (foreign holder), 0 created: ' || r::text);
-  PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.music_rights_grants), 'dry run wrote nothing');
+  PERFORM ua_test.ok((SELECT count(*) = 4 FROM public.music_rights_grants WHERE source_type = 'platform_agreement' AND status = 'verified'), 'auto inflow after rights check: 2 tracks x 2 layers');
+  PERFORM ua_test.ok(r->>'status' = 'ok' AND (r->>'dry_run')::boolean AND (r->>'created_grants')::int = 0 AND jsonb_array_length(r->'ready') = 0 AND jsonb_array_length(r->'skipped') = 3, 'dry run after inflow: nothing left, 3 skipped: ' || r::text);
   -- B (1.2 only) is not ready: no personal 2.0 acceptance.
   PERFORM ua_test.as_user('${M}');
   r := public.business_catalog_sync('10000000-0000-0000-0000-00000000000b', false);
@@ -210,8 +239,8 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub','',false);
   PERFORM set_config('request.jwt.claim.role','service_role',false);
   r := public.business_catalog_sync('10000000-0000-0000-0000-00000000000a', false);
-  -- Jazz Relax 1 has a foreign-holder grant → skipped, untouched; 2 tracks × 2 layers created.
-  PERFORM ua_test.ok((r->>'created_grants')::int = 4, 'created 4 grants: ' || r::text);
+  -- Jazz Relax 1 has a foreign-holder grant → skipped, untouched; the 4 grants already exist (no duplicates).
+  PERFORM ua_test.ok((r->>'created_grants')::int = 0 AND r->'skipped' @> '[{"audio_item_id":"30000000-0000-0000-0000-0000000000a1","reason":"already_granted"}]', 'manual run idempotent after auto inflow: ' || r::text);
   PERFORM ua_test.ok(r->'skipped' @> '[{"audio_item_id":"30000000-0000-0000-0000-0000000000a3","reason":"other_rightsholder_grant"}]', 'foreign grant track skipped');
   PERFORM ua_test.ok((SELECT count(*) = 4 FROM public.music_rights_grants WHERE source_type = 'platform_agreement' AND status = 'verified'
      AND territory_scope = 'countries' AND source_reference LIKE 'author-terms:2.0:acceptance:%'), 'grants: verified, RU, sourced to the 2.0 acceptance');
@@ -253,6 +282,61 @@ BEGIN
 END $t$;
 `;
 
+const scenario2 = String.raw`
+DO $t$
+DECLARE r jsonb;
+  A_ uuid := '10000000-0000-0000-0000-00000000000a';
+  a4 uuid := '30000000-0000-0000-0000-0000000000a4'; a5 uuid := '30000000-0000-0000-0000-0000000000a5';
+BEGIN
+  -- Auto inflow on publish: a draft track gets nothing; publishing it brings both layers in.
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES (a5,'20000000-0000-0000-0000-00000000000a','Aurafon 3',3,'draft');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = a5), 'draft track: no grants');
+  UPDATE public.audio_items SET status = 'published' WHERE id = a5;
+  PERFORM ua_test.ok((SELECT count(*) = 2 AND bool_and(status = 'verified' AND source_type = 'platform_agreement') FROM public.music_rights_grants WHERE audio_item_id = a5), 'published track flowed in automatically');
+
+  -- Historical restriction: an expired Business grant (another holder) blocks automatic inflow.
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES (a4,'20000000-0000-0000-0000-0000000000a2','Jazz Relax 2',2,'draft');
+  INSERT INTO public.music_rights_grants(id,audio_item_id,rightsholder_id,rights_layer,use_type,territory_scope,valid_from,valid_until,source_type,status,verified_at)
+    VALUES ('60000000-0000-0000-0000-0000000000fe',a4,'50000000-0000-0000-0000-0000000000ff','recording','business_background_playback','worldwide','2026-01-01','2026-06-01','other','verified','2026-01-01');
+  UPDATE public.audio_items SET status = 'published' WHERE id = a4;
+  PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.music_rights_grants WHERE audio_item_id = a4), 'expired restriction: no automatic grants');
+  r := public.business_catalog_sync(A_, true);
+  PERFORM ua_test.ok(r->'skipped' @> jsonb_build_array(jsonb_build_object('audio_item_id', a4, 'reason', 'historical_rights_restriction')), 'restriction reported: ' || r::text);
+  -- Explicit admission by a moderator lifts it and the track flows in.
+  PERFORM ua_test.as_user('${M}');
+  SET LOCAL ROLE authenticated;
+  PERFORM public.moderator_business_track_review(a4,'admitted','ok','rights confirmed');
+  -- Blocked Aurafon 2 is re-admitted: new grants, the revoked rows stay as history.
+  PERFORM public.moderator_business_track_review('30000000-0000-0000-0000-0000000000a2','admitted','ok','dispute resolved');
+  RESET ROLE;
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = a4 AND source_type = 'platform_agreement' AND status = 'verified'), 'admitted after restriction: inflow');
+  PERFORM ua_test.ok((SELECT count(*) FILTER (WHERE status = 'revoked') = 2 AND count(*) FILTER (WHERE status = 'verified') = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a2'), 're-admitted: new grants, revoked history kept');
+  -- A rights revocation made outside the review flow (e.g. a grant revoked by the rights team) is a
+  -- restriction too: no sync or later event restores the track without an explicit admission.
+  UPDATE public.music_rights_grants SET status = 'revoked', updated_at = clock_timestamp()
+    WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND rights_layer = 'recording' AND source_type = 'platform_agreement';
+  PERFORM set_config('request.jwt.claim.sub','',false);
+  PERFORM set_config('request.jwt.claim.role','service_role',false);
+  r := public.business_catalog_sync(A_, false);
+  PERFORM ua_test.ok(r->'skipped' @> '[{"audio_item_id":"30000000-0000-0000-0000-0000000000a1","reason":"historical_rights_restriction"}]'
+     AND (SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND rights_layer = 'recording' AND status = 'verified'), 'revoked grant never restored by sync: ' || r::text);
+  UPDATE public.audio_items SET title = 'Aurafon 1 (remaster)' WHERE id = '30000000-0000-0000-0000-0000000000a1';
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND rights_layer = 'recording' AND status = 'verified'), 'revoked grant not restored by a later event');
+
+  -- Idempotency is enforced by the DB, not only by the sync loop.
+  PERFORM ua_test.expect_error($q$INSERT INTO public.music_rights_grants(audio_item_id,rightsholder_id,rights_layer,use_type,territory_scope,valid_from,source_type,status)
+    SELECT '30000000-0000-0000-0000-0000000000a1', rightsholder_id, 'composition','business_background_playback','worldwide',now(),'platform_agreement','draft'
+    FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' LIMIT 1$q$, 'music_rights_grants_platform_agreement_live_uidx');
+  -- Internal runner and lock are not callable by clients.
+  PERFORM ua_test.as_user('${A}');
+  SET LOCAL ROLE authenticated;
+  PERFORM ua_test.expect_error('SELECT public.business_catalog_sync_run(''10000000-0000-0000-0000-00000000000a'', false)', 'permission denied');
+  PERFORM ua_test.expect_error('SELECT public.business_track_lock(''30000000-0000-0000-0000-0000000000a1'')', 'permission denied');
+  PERFORM ua_test.expect_error('SELECT public.business_unified_auto_sync_authors(ARRAY[''10000000-0000-0000-0000-00000000000a'']::uuid[])', 'permission denied');
+  RESET ROLE;
+END $t$;
+`;
+
 const container = process.env.AUDIOLAD_ONBOARDING_TEST_CONTAINER;
 if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
   assert.notEqual(process.env.AUDIOLAD_REQUIRE_ONBOARDING_SQL, '1', 'isolated SQL required; provide disposable test container');
@@ -282,15 +366,16 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     psql(db, switchCurrent, ['-v', `grace_until=${grace}`]);
     psql(db, switchCurrent, ['-v', `grace_until=${grace}`]);
     psql(db, scenario);
+    psql(db, scenario2);
     // Rollback: migration rollback refuses while 2.0 is current; switch back first; history kept.
     let blocked = false;
     try { execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-q', '-U', 'postgres', '-d', db, '-v', 'ON_ERROR_STOP=1'], { input: rollbackMigration, stdio: ['pipe', 'pipe', 'pipe'] }); } catch { blocked = true; }
     assert.ok(blocked, 'migration rollback refuses while 2.0 is current');
     psql(db, [rollbackSwitch, rollbackMigration,
-      "SELECT 1 / CASE WHEN to_regprocedure('public.business_catalog_sync(uuid,boolean)') IS NULL AND to_regprocedure('public.author_business_verification_submit_v3(uuid,uuid[],inet,text)') IS NULL THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN to_regprocedure('public.business_catalog_sync(uuid,boolean)') IS NULL AND to_regprocedure('public.author_business_verification_submit_v3(uuid,uuid[],inet,text)') IS NULL AND to_regprocedure('public.business_catalog_sync_run(uuid,boolean)') IS NULL AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname LIKE 'zz_business_unified_auto_sync_%') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN has_function_privilege('authenticated','public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text)','EXECUTE') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN (SELECT version FROM public.author_terms_versions WHERE is_current) = '1.2' THEN 1 ELSE 0 END;",
-      "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 3 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 1 THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 3 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 3 THEN 1 ELSE 0 END;",
       // Re-apply after rollback works.
       migration].join('\n'));
     console.log('unified-agreement-sql-unit: contract + isolated PostgreSQL scenarios OK');
