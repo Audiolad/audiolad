@@ -7,15 +7,15 @@ import {
   type CatalogStatsModel,
 } from "@/lib/admin/ecompany-catalog-stats";
 
-/** c353a4b5: статистика каталога АудиоЛада на табло ИИ-компании. Server-rendered, no client JS. */
+/** c353a4b5: статистика каталога АудиоЛада в разделе статистики админки (/admin). Server-rendered, no client JS. */
 export function EcompanyCatalogStats({ model, error }: { model: CatalogStatsModel | null; error: string | null }) {
   return (
     <section
-      aria-labelledby="ai-company-catalog-stats"
+      aria-labelledby="admin-catalog-stats"
       data-section="catalog-stats"
       className="rounded-2xl border border-[#eadff8] bg-white p-3 sm:p-4"
     >
-      <h3 id="ai-company-catalog-stats" className="text-xl font-semibold">
+      <h3 id="admin-catalog-stats" className="text-xl font-semibold">
         Статистика АудиоЛада
       </h3>
       {!model ? (
@@ -80,7 +80,7 @@ export function EcompanyCatalogStats({ model, error }: { model: CatalogStatsMode
                 Дату начала накопления сейчас не удалось прочитать; ниже — последние снимки.
               </p>
             ) : (
-              <p className="mt-2 text-[#796ba0]">Снимков пока нет: накопление начнётся с первого открытия табло.</p>
+              <p className="mt-2 text-[#796ba0]">Снимков пока нет: накопление начнётся с первого открытия страницы статистики.</p>
             )}
             {model.history.length > 0 ? (
               <div className="mt-2 max-w-full overflow-x-auto">
@@ -119,7 +119,7 @@ export function EcompanyCatalogStats({ model, error }: { model: CatalogStatsMode
   );
 }
 
-/** Async server section: rendered inside <Suspense> so a slow DB never blocks the board. */
+/** Async server section: rendered inside <Suspense> so a slow DB never blocks the admin overview. */
 export async function EcompanyCatalogStatsSection() {
   const { model, error } = await loadCatalogStats();
   return <EcompanyCatalogStats model={model} error={error} />;
@@ -127,8 +127,8 @@ export async function EcompanyCatalogStatsSection() {
 
 export function EcompanyCatalogStatsFallback() {
   return (
-    <section aria-labelledby="ai-company-catalog-stats" data-section="catalog-stats" className="rounded-2xl border border-[#eadff8] bg-white p-3 sm:p-4">
-      <h3 id="ai-company-catalog-stats" className="text-xl font-semibold">Статистика АудиоЛада</h3>
+    <section aria-labelledby="admin-catalog-stats" data-section="catalog-stats" className="rounded-2xl border border-[#eadff8] bg-white p-3 sm:p-4">
+      <h3 id="admin-catalog-stats" className="text-xl font-semibold">Статистика АудиоЛада</h3>
       <p className="mt-2 text-sm text-[#796ba0]" role="status">Загружаем статистику…</p>
     </section>
   );
