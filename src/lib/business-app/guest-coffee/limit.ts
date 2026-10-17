@@ -1,0 +1,78 @@
+/**
+ * a8240527 — guest listening limit (Sergey 17.10.2026 15:32 MSK). Pure / browser-safe.
+ *
+ * - 30 minutes of ACTUAL playback (not a visit timer): only seconds the <audio> element
+ *   really advanced while playing are reported.
+ * - Counted and kept on the SERVER (table business_guest_listening), so it survives
+ *   reloads and return visits. Primary key: an httpOnly device cookie; fallback when the
+ *   cookie was cleared: a keyed hash of IP + User-Agent.
+ * - Enforced where it matters: the server refuses new stream URLs once the limit is used.
+ *   The track that is already playing is allowed to finish (gentle, no hard cut).
+ * - The UI never shows a countdown — only a soft note near the end.
+ */
+
+export const GUEST_COFFEE_LIMIT_SECONDS = 30 * 60;
+/** Soft "near the end" note from 25 minutes of actual playback. */
+export const GUEST_COFFEE_WARN_AFTER_SECONDS = 25 * 60;
+/** Client reports actual playback at most this often while playing. */
+export const GUEST_COFFEE_REPORT_INTERVAL_MS = 15_000;
+/** Upper bound of one report (server clamps too). */
+export const GUEST_COFFEE_MAX_CREDIT_SECONDS = 60;
+
+export type GuestCoffeeLimitState = "ok" | "near_end" | "exhausted" | "unavailable";
+
+export function guestCoffeeLimitState(usedSeconds: number | null | undefined): GuestCoffeeLimitState {
+  if (typeof usedSeconds !== "number" || !Number.isFinite(usedSeconds)) return "unavailable";
+  if (usedSeconds >= GUEST_COFFEE_LIMIT_SECONDS) return "exhausted";
+  if (usedSeconds >= GUEST_COFFEE_WARN_AFTER_SECONDS) return "near_end";
+  return "ok";
+}
+
+/** Normalise a client-claimed credit: integer seconds in [0, MAX_CREDIT]. */
+export function clampGuestCoffeeCredit(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number.NaN;
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(GUEST_COFFEE_MAX_CREDIT_SECONDS, Math.floor(n));
+}
+
+/**
+ * Browser-side meter of actual playback: feed it audio.currentTime on every timeupdate.
+ * Only forward progress of a playing element counts; seeks/jumps (>2.5 s) and pauses do not.
+ */
+export class GuestCoffeePlaybackMeter {
+  private last: number | null = null;
+  private pending = 0;
+
+  sample(currentTime: number, playing: boolean): void {
+    if (!playing || !Number.isFinite(currentTime)) {
+      this.last = null;
+      return;
+    }
+    if (this.last !== null) {
+      const delta = currentTime - this.last;
+      if (delta > 0 && delta <= 2.5) this.pending += delta;
+    }
+    this.last = currentTime;
+  }
+
+  /** Reset the position anchor (new track / seek / pause) without losing pending seconds. */
+  reanchor(): void {
+    this.last = null;
+  }
+
+  /** Whole seconds ready to report; the fraction stays pending. */
+  take(max = GUEST_COFFEE_MAX_CREDIT_SECONDS): number {
+    const whole = Math.min(max, Math.floor(this.pending));
+    this.pending -= whole;
+    return whole;
+  }
+
+  /** Give back seconds whose report failed (network) so they are retried. */
+  restore(seconds: number): void {
+    if (seconds > 0) this.pending += seconds;
+  }
+
+  get pendingSeconds(): number {
+    return this.pending;
+  }
+}

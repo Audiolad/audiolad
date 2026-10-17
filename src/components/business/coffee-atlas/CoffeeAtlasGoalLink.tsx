@@ -33,7 +33,9 @@ export default function CoffeeAtlasGoalLink({
 }: CoffeeAtlasGoalLinkProps) {
   const onClick = () => sendYandexGoal(goal);
 
-  if (newTab || download) {
+  // Absolute URLs (e.g. the guest cabinet on business.audiolad.ru) are a full navigation
+  // to another host: plain anchor, no client-side routing / prefetch.
+  if (newTab || download || /^https?:\/\//i.test(href)) {
     return (
       <a
         href={href}

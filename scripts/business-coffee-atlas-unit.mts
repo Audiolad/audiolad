@@ -167,10 +167,23 @@ assert.deepEqual(
   "catalogue failure → no examples",
 );
 
-// --- CTA: existing guest path only ---
+// --- CTA: permanent guest coffee cabinet (a8240527, Sergey 17.10 15:34 MSK; URL printed in the PDF) ---
 assert.equal(COFFEE_ATLAS_CTA_LABEL, "Подобрать звучание моей кофейни");
-assert.equal(COFFEE_ATLAS_CTA_HREF, "/b#venues");
-assert.match(read("src/components/business/BusinessLandingView.tsx"), /id="venues"/, "CTA target exists on /b");
+assert.equal(COFFEE_ATLAS_CTA_HREF, "https://business.audiolad.ru/guest/coffee");
+{
+  const ctaSources = [
+    read("src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx"),
+    read("src/components/business/coffee-atlas/CoffeeAtlasOverview.tsx"),
+    read("src/components/business/coffee-atlas/CoffeeAtlasShopView.tsx"),
+  ].join("\n");
+  // Every CTA goes through the one constant; no hard-coded old target is left anywhere.
+  assert.doesNotMatch(ctaSources, /#venues/, "no CTA points to /b#venues any more");
+  const labelUses = ctaSources.match(/COFFEE_ATLAS_CTA_LABEL/g)?.length ?? 0;
+  assert.ok(labelUses >= 1, "CTA label rendered from the constant");
+  assert.doesNotMatch(ctaSources, /Подобрать звучание моей кофейни/, "CTA label is never hard-coded (always the constant)");
+  const goalLink = read("src/components/business/coffee-atlas/CoffeeAtlasGoalLink.tsx");
+  assert.match(goalLink, /\^https\?:/, "absolute CTA → plain <a> (full navigation to business.audiolad.ru)");
+}
 
 // --- offer on every page ---
 assert.equal(COFFEE_ATLAS_OFFER.price, "799 ₽");
