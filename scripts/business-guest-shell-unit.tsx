@@ -141,8 +141,12 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   has(html, /data-testid="biz-sound-settings"/, `${name}: settings`);
   for (const legend of ["Характер заведения", "Музыкальное направление", "Время суток"]) has(html, new RegExp(legend));
   has(html, /data-testid="biz-player"/, `${name}: Business player`);
-  has(html, /Джаз для кофеен/);
-  has(html, /data-testid="biz-sound-listen"/);
+  // Sergey 17.10 23:21: nothing plays or changes before the explicit «Собрать атмосферу» step.
+  has(html, /data-testid="biz-atmosphere-assemble"[^>]*>Собрать атмосферу</, `${name}: explicit assemble button`);
+  has(html, /data-testid="biz-atmosphere-empty"/, `${name}: placeholder before assembling`);
+  has(html, /Здесь появится ваша атмосфера/);
+  hasNot(html, /data-testid="biz-atmosphere"[ >]/, "no playlist before the button is pressed");
+  hasNot(html, /data-testid="biz-sound-listen"/, "no per-album live list any more");
   has(html, /Это не каталог эфира/, "free albums are not presented as the B2B catalogue");
   hasNot(html, /<dialog/);
   has(html, new RegExp(`data-access="${name === "guest" ? "guest" : "member"}"`));
