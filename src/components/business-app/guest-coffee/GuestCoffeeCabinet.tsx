@@ -364,7 +364,7 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
               value={profile.daypart}
               onChange={(id) => setAxis("daypart", id)}
             />
-            <p className="gc-setup__hint">Меняйте настройки в любой момент — подборки обновляются сразу, музыка не прерывается.</p>
+            <p className="gc-setup__hint">Меняйте настройки в любой момент – подборки обновляются сразу, музыка не прерывается.</p>
           </section>
 
           <section className="gc-results" aria-labelledby="gc-results-title" data-testid="gc-results">
@@ -485,7 +485,7 @@ export default function GuestCoffeeCabinet({ playlists, initialLimit }: Props) {
               </div>
             </>
           ) : (
-            <p className="gc-player__idle">Выберите подборку и нажмите «Слушать» — музыка заиграет здесь.</p>
+            <p className="gc-player__idle">Выберите подборку и нажмите «Слушать» – музыка заиграет здесь.</p>
           )}
           {playerMessage ? (
             <p className="gc-player__msg" role="alert">

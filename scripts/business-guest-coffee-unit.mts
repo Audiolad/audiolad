@@ -355,7 +355,12 @@ assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
   assert.match(constants, /COFFEE_ATLAS_CTA_HREF = BUSINESS_GUEST_COFFEE_URL;/);
   assert.match(cabinet, /GUEST_COFFEE_ATLAS_URL/, "way back to the atlas");
   assert.match(copy, /COFFEE_ATLAS_OFFER\.price/, "terms share the atlas offer source");
-  assert.match(copy, /7 дней — в подарок/);
+  assert.match(copy, /7 дней – в подарок/);
+// Typography (as in the atlas, #900): visible texts use the en dash, never the em dash.
+for (const file of ["src/lib/business-app/guest-coffee/copy.ts", "src/components/business-app/guest-coffee/GuestCoffeeCabinet.tsx", "src/app/business-app/guest/coffee/page.tsx", "src/lib/business-app/guest-coffee/catalog.ts"]) {
+  const code = read(file).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.split(" // ")[0]).join("\n");
+  assert.doesNotMatch(code, /—/, `${file}: no em dash in visible text`);
+}
   assert.match(copy, /нельзя зарегистрироваться, начать пробный период или оплатить/, "info-only connect window");
   assert.doesNotMatch(cabinet, /checkout|payment|\/api\/payments|tochka|prodamus/i, "no payment wiring in this stage");
 }

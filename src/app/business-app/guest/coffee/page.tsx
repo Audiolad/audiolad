@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   ...buildBusinessAppMetadata(),
-  title: "Гостевой кабинет кофейни — АудиоЛад Бизнес",
+  title: "Гостевой кабинет кофейни – АудиоЛад Бизнес",
   description: "Настройте звучание кофейни и послушайте настоящие подборки без регистрации.",
   alternates: { canonical: BUSINESS_GUEST_COFFEE_URL },
 };
