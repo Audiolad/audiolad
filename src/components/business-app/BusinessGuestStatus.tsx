@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import { BUSINESS_CONNECT_HREF, businessLockedNotice } from "@/lib/business-app/access";
@@ -25,9 +26,15 @@ const GuestStatusContext = createContext<GuestStatus>({ limit: null, setLimit: n
 
 export function BusinessGuestStatusProvider({ children }: { children: ReactNode }) {
   const [limit, setLimitState] = useState<GuestCoffeeLimitState | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // The notice belongs to the screen where the locked item was tapped; it is dropped on navigation.
+  const pathname = usePathname();
+  const [lockedTap, setLockedTap] = useState<{ text: string; pathname: string | null } | null>(null);
+  const notice = lockedTap && lockedTap.pathname === pathname ? lockedTap.text : null;
   const setLimit = useCallback((value: GuestCoffeeLimitState) => setLimitState(value), []);
-  const showLocked = useCallback((title: string) => setNotice(businessLockedNotice(title)), []);
+  const showLocked = useCallback(
+    (title: string) => setLockedTap({ text: businessLockedNotice(title), pathname }),
+    [pathname],
+  );
   const value = useMemo(() => ({ limit, setLimit, notice, showLocked }), [limit, setLimit, notice, showLocked]);
   return <GuestStatusContext.Provider value={value}>{children}</GuestStatusContext.Provider>;
 }
@@ -55,10 +62,10 @@ export function BusinessGuestStatusBar() {
     >
       <div className="business-app-guest-bar__text">
         <p>
-          <span className="business-app-chip is-active">Гостевой режим</span>{" "}
+          <span className="business-app-guest-bar__badge">Гостевой режим</span>{" "}
           <span data-testid="biz-guest-limit">{guestLimitLine(limit)}</span>
         </p>
-        <p className="business-app-muted">{GUEST_COFFEE_TERMS}.</p>
+        <p className="business-app-muted business-app-guest-bar__terms">{GUEST_COFFEE_TERMS}.</p>
         {/* Always in the tree so screen readers announce the notice when a locked section is tapped. */}
         <p className="business-app-guest-bar__notice" role="status" data-testid="biz-locked-notice">
           {notice ?? ""}

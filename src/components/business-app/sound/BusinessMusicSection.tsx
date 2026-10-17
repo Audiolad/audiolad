@@ -20,7 +20,7 @@ export default async function BusinessMusicSection({ memberTools }: { memberTool
       <header>
         <p className="business-app-eyebrow">Музыка</p>
         <h1 className="mt-1 text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">{GUEST_COFFEE_COPY.title}</h1>
-        <p className="mt-1.5 max-w-3xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">{GUEST_COFFEE_COPY.lead}</p>
+        <p className="mt-1.5 max-w-3xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">{GUEST_COFFEE_COPY.lead}<BusinessMemberOnly guest={` ${GUEST_COFFEE_COPY.leadGuest}`} /></p>
       </header>
       <BusinessSoundStudio playlists={playlists} initialLimit={guestCoffeeLimitState(used)} />
       {memberTools ? <BusinessMemberOnly>{memberTools}</BusinessMemberOnly> : null}

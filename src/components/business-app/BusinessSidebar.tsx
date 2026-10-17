@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState, type ComponentType } from "react";
+import { useEffect, useId, useRef, useState, type ComponentType } from "react";
 
 import {
   BizAnnouncementsIcon,
@@ -86,7 +86,6 @@ function NavLink({
     return (
       <button
         type="button"
-        aria-disabled="true"
         data-locked="true"
         data-nav-id={item.id}
         onClick={() => showLocked(item.title)}
@@ -146,7 +145,15 @@ function readInitialCollapsed(): boolean {
 }
 
 export default function BusinessSidebar() {
-  const [collapsed, setCollapsed] = useState(readInitialCollapsed);
+  // SSR always renders the expanded sidebar; the device preference (localStorage / ≤1200px) is
+  // applied after hydration, otherwise narrow screens hit a React hydration mismatch (a8240527).
+  const [collapsed, setCollapsed] = useState(false);
+  const restored = useRef(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the device preference after hydration
+    setCollapsed(readInitialCollapsed());
+  }, []);
 
   useEffect(() => {
     const width = collapsed
@@ -156,6 +163,10 @@ export default function BusinessSidebar() {
       "--biz-sidebar-width",
       `${width}px`,
     );
+    if (!restored.current) {
+      restored.current = true;
+      return;
+    }
     try {
       window.localStorage.setItem(
         BUSINESS_SIDEBAR_STORAGE_KEY,

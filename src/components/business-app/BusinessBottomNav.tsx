@@ -54,7 +54,6 @@ export default function BusinessBottomNav() {
             <button
               key={item.id}
               type="button"
-              aria-disabled="true"
               data-locked="true"
               data-nav-id={item.id}
               aria-label={`${item.title} – ${BUSINESS_LOCKED_LABEL}`}

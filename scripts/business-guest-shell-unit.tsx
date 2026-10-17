@@ -84,9 +84,10 @@ assert.ok(isBusinessNavItemCurrent("/guest/coffee", music) && isBusinessNavItemC
 assert.equal(BUSINESS_CONNECT_HREF.startsWith("/onboarding"), true, "Подключить stays in this cabinet");
 
 // ---------------------------------------------------------------- same shell for guest and subscriber
+const domains: ReadonlyArray<readonly [string, BusinessOwnerHomeContext]> = [["guest", anonymous], ["signed-in", signedInNoOrg], ["member", member]];
 for (const path of ["/guest/coffee", "/music", "/"]) {
-  for (const [name, domain] of [["guest", anonymous], ["signed-in", signedInNoOrg], ["member", member]] as const) {
-    const html = shell(domain, path);
+  for (const [name, domain] of domains) {
+    const html: string = shell(domain, path);
     has(html, /class="business-app-shell"/, `${name} ${path}: shared shell`);
     has(html, /<aside class="business-app-sidebar[^"]*"[^>]*aria-label="Навигация кабинета"/, `${name} ${path}: desktop sidebar`);
     has(html, /<nav class="business-app-bottom-nav" aria-label="Мобильная навигация"/, `${name} ${path}: mobile bottom nav`);
@@ -143,6 +144,8 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   has(m, /плеер программы/);
   assert.equal(wrap(anonymous, "/music", <BusinessMemberOnly><p>probe</p></BusinessMemberOnly>), "", "member tools hidden for a guest");
   has(wrap(member, "/music", <BusinessMemberOnly><p>probe</p></BusinessMemberOnly>), /probe/);
+  assert.equal(wrap(anonymous, "/music", <BusinessMemberOnly guest="Без регистрации." />), "Без регистрации.", "guest-only lead");
+  assert.equal(wrap(member, "/music", <BusinessMemberOnly guest="Без регистрации." />), "", "no «без регистрации» for a member");
 }
 assert.deepEqual(parseBusinessSoundProfile(serializeBusinessSoundProfile({ character: "evening", direction: "sax", daypart: "evening" })), { character: "evening", direction: "sax", daypart: "evening" });
 assert.deepEqual(parseBusinessSoundProfile('{"character":"x","direction":"bossa"}'), { character: "cozy", direction: "bossa", daypart: "allday" });
