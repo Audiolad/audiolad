@@ -56,6 +56,10 @@ async function fire(el: Element, type: string) {
   });
 }
 
+// The test DOM's focus() is a no-op; record it so focus restoration can be asserted.
+const elementProto = Object.getPrototypeOf(document.createElement("button"));
+elementProto.focus = function focus(this: Element) { (document as { activeElement: Element | null }).activeElement = this; };
+
 async function main() {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -94,6 +98,9 @@ async function main() {
   await act(async () => { (remove as HTMLElement).click(); });
   assert.match(text(gen()), /Выбрать файл/);
   assert.deepEqual(revoked, ["blob:test-1", "blob:test-2"]);
+  const focused = document.activeElement as Element | null;
+  assert.ok(focused && focused.tagName === "BUTTON" && text(focused) === "Выбрать файл", "focus returns to «Выбрать файл» after removal");
+  assert.ok(all(gen()).includes(focused!), "focus stays inside the same field");
 
   // PDF: icon, no object URL, done at once.
   const pdf = new File([new Uint8Array(100)], "receipt.pdf", { type: "application/pdf" });

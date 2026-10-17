@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import {
   EVIDENCE_COPY,
@@ -103,6 +104,9 @@ export default function EvidenceFileField({
   onSelect,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const chooseRef = useRef<HTMLButtonElement>(null);
+  // After removing a new file over a stored one, «Заменить» stays; focus goes there.
+  const replaceRef = useRef<HTMLButtonElement>(null);
   // Image decode result, keyed by the src it belongs to (stale results are ignored).
   const [decoded, setDecoded] = useState<{ src: string; ok: boolean } | null>(null);
 
@@ -247,14 +251,19 @@ export default function EvidenceFileField({
           </div>
           {readOnly ? null : (
             <div className="flex w-full gap-2 sm:w-auto sm:flex-col">
-              <button type="button" onClick={openPicker} disabled={disabled}
+              <button ref={replaceRef} type="button" onClick={openPicker} disabled={disabled}
                 aria-label={`${EVIDENCE_COPY.replace}: ${label}`}
                 aria-describedby={describedBy}
                 className="min-h-11 flex-1 rounded-lg border border-[var(--biz-accent-border)] bg-[var(--biz-accent-soft)] px-3 text-sm font-semibold text-[var(--biz-accent)] hover:border-[var(--biz-accent)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60 sm:flex-none">
                 {EVIDENCE_COPY.replace}
               </button>
               {file ? (
-                <button type="button" onClick={() => onSelect?.(null)} disabled={disabled}
+                <button type="button" disabled={disabled}
+                  onClick={() => {
+                    // The focused «Удалить» button unmounts; keep keyboard focus in the field.
+                    flushSync(() => onSelect?.(null));
+                    (chooseRef.current ?? replaceRef.current)?.focus();
+                  }}
                   aria-label={`${EVIDENCE_COPY.remove}: ${label}`}
                   aria-describedby={describedBy}
                   className="min-h-11 flex-1 rounded-lg border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 text-sm font-semibold text-[var(--biz-red)] hover:border-[var(--biz-red-border)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60 sm:flex-none">
@@ -266,7 +275,7 @@ export default function EvidenceFileField({
         </div>
       ) : readOnly ? null : (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={openPicker} disabled={disabled}
+          <button ref={chooseRef} type="button" onClick={openPicker} disabled={disabled}
             aria-label={`${EVIDENCE_COPY.choose}: ${label}`}
             aria-describedby={describedBy}
             className="min-h-11 rounded-lg border border-[var(--biz-accent-border)] bg-[var(--biz-accent-soft)] px-4 text-sm font-semibold text-[var(--biz-accent)] hover:border-[var(--biz-accent)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60">
