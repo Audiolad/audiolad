@@ -74,21 +74,21 @@ export default function BusinessSupportDiagnosticPage({
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field
             label="Организация"
-            value={diagnostics.organizationName ?? "—"}
+            value={diagnostics.organizationName ?? "–"}
           />
           <Field
             label="Идентификатор организации"
-            value={diagnostics.organizationId ?? "—"}
+            value={diagnostics.organizationId ?? "–"}
             mono
           />
-          <Field label="Точка" value={location?.name ?? "—"} />
-          <Field label="Идентификатор точки" value={location?.id ?? "—"} mono />
-          <Field label="Страна" value={location?.countryCode ?? "—"} />
-          <Field label="Часовой пояс" value={location?.timezone ?? "—"} />
+          <Field label="Точка" value={location?.name ?? "–"} />
+          <Field label="Идентификатор точки" value={location?.id ?? "–"} mono />
+          <Field label="Страна" value={location?.countryCode ?? "–"} />
+          <Field label="Часовой пояс" value={location?.timezone ?? "–"} />
           <Field label="Статус точки" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
           <Field
             label="Основная зона"
-            value={location?.defaultZoneId ?? "—"}
+            value={location?.defaultZoneId ?? "–"}
             mono
           />
         </dl>
@@ -174,17 +174,17 @@ export default function BusinessSupportDiagnosticPage({
               value={
                 diagnostics.lastPlay.minutesAgo != null
                   ? formatBusinessAge(diagnostics.lastPlay.minutesAgo) ?? "нет данных"
-                  : "—"
+                  : "–"
               }
             />
             <Field
               label="Идентификатор аудио"
-              value={diagnostics.lastPlay.audioItemId ?? "—"}
+              value={diagnostics.lastPlay.audioItemId ?? "–"}
               mono
             />
             <Field
               label="Идентификатор плеера"
-              value={diagnostics.lastPlay.playerId ?? "—"}
+              value={diagnostics.lastPlay.playerId ?? "–"}
               mono
             />
           </dl>

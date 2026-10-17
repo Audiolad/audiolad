@@ -117,7 +117,7 @@ export function venueAirplayEmptyStateCopy(input: {
     return {
       title: "Каталог для эфира пуст",
       description:
-        "Нет треков со статусом ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Технический пилот-тон Player остаётся отдельно и не является eligible-каталогом. Реальные сиды прав / freeze-list — после решений HG-3/HG-4 (P0-06).",
+        "Нет треков со статусом ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Технический пилот-тон Player остаётся отдельно и не является eligible-каталогом. Реальные сиды прав / freeze-list – после решений HG-3/HG-4 (P0-06).",
     };
   }
   return {
