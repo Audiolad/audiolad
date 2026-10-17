@@ -374,6 +374,7 @@ for (const file of [
   "src/app/business-app/music/page.tsx",
   "src/app/business-app/guest/coffee/page.tsx",
   "src/lib/business-app/guest-coffee/catalog.ts",
+  "src/lib/business-app/guest-coffee/atmosphere.ts",
   // Sergey 17.10: en dashes everywhere visible – the Home page and the onboarding wizard of this flow too.
   "src/components/business-app/BusinessHomePage.tsx",
   "src/components/business-app/BusinessOnboardingWizardPage.tsx",
