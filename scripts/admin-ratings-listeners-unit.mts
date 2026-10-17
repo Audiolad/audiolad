@@ -342,8 +342,10 @@ assert.match(panel, /describeAdminRatingsListenerEventsTruncation\(detail\)/, "p
   const dupes = versions.filter((v, i) => versions.indexOf(v) !== i);
   assert.deepEqual(dupes, [], "no duplicate Supabase migration versions");
   const mine = files.filter((f) => f.endsWith("_admin_ratings_listeners.sql"));
-  assert.deepEqual(mine, ["20270106190000_admin_ratings_listeners.sql"]);
+  assert.deepEqual(mine, ["20270107190000_admin_ratings_listeners.sql"]);
   assert.notEqual(mine[0].split("_")[0], "20270106120000", "must not reuse PR #890 version");
+  // Must sort after #899's 20270107120000 (already applied on prod), otherwise the deploy planner aborts with history drift.
+  assert.ok(mine[0].split("_")[0] > "20270107120000", "must be newer than the latest applied production migration");
 }
 
 console.log("admin-ratings-listeners-unit: ok");
