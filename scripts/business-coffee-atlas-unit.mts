@@ -16,23 +16,23 @@ import {
   COFFEE_ATLAS_OFFER,
   COFFEE_ATLAS_PATH,
   COFFEE_ATLAS_PDF_PATH,
-} from "../src/lib/business/coffee-atlas/constants.ts";
+} from "../src/lib/business/coffee-atlas/constants";
 import {
   COFFEE_ATLAS_MAX_TRACKS_PER_SHOP,
   COFFEE_ATLAS_MUSIC,
   getCoffeeAtlasTrackRefs,
   resolveCoffeeAtlasTracks,
-} from "../src/lib/business/coffee-atlas/music.ts";
+} from "../src/lib/business/coffee-atlas/music";
 import {
   COFFEE_ATLAS_SHOPS,
   getCoffeeAtlasNeighbours,
   getCoffeeAtlasShop,
-} from "../src/lib/business/coffee-atlas/shops.ts";
-import { COFFEE_ATLAS_SITEMAP_PATHS } from "../src/lib/business/coffee-atlas/sitemap.ts";
+} from "../src/lib/business/coffee-atlas/shops";
+import { COFFEE_ATLAS_SITEMAP_PATHS } from "../src/lib/business/coffee-atlas/sitemap";
 import {
   isYandexMetrikaGoalName,
   YANDEX_METRIKA_BUSINESS_ATLAS_GOALS,
-} from "../src/lib/analytics/yandex-metrika-goals.ts";
+} from "../src/lib/analytics/yandex-metrika-goals";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");

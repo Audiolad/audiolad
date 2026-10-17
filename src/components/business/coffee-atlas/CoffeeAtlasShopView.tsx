@@ -48,30 +48,45 @@ export default function CoffeeAtlasShopView({ shop, previous, next, tracks }: Co
             />
           </div>
           <div className="atlas-wrap atlas-hero__content">
-            <p className="atlas-hero__stop">
-              <span className="atlas-hero__badge">{shop.number}</span>
-              Остановка {shop.number} из {total}
-            </p>
-            <h1 id="atlas-shop-title" className="atlas-display atlas-hero__title">
-              {shop.name}
-            </h1>
-            <p className="atlas-hero__place">
-              {shop.city}, {shop.country}
-            </p>
-            <p className="atlas-hero__tagline">{shop.tagline}</p>
-            <div className="atlas-hero__actions">
-              <a href="#listen" className="atlas-btn atlas-btn--primary">
-                Послушать атмосферу
-              </a>
-              <CoffeeAtlasGoalLink
-                href={`${COFFEE_ATLAS_PDF_PATH}#page=${shop.pdfPage}`}
-                goal="business_atlas_pdf_opened"
-                newTab
-                className="atlas-btn atlas-btn--glass"
-              >
-                Страницы в PDF-атласе
-              </CoffeeAtlasGoalLink>
+            <div className="atlas-hero__copy">
+              <p className="atlas-hero__stop">
+                <span className="atlas-hero__badge">{shop.number}</span>
+                Остановка {shop.number} из {total}
+              </p>
+              <h1 id="atlas-shop-title" className="atlas-display atlas-hero__title">
+                {shop.name}
+              </h1>
+              <p className="atlas-hero__place">
+                {shop.city}, {shop.country}
+              </p>
+              <p className="atlas-hero__tagline">{shop.tagline}</p>
+              <div className="atlas-hero__actions">
+                <a href="#listen" className="atlas-btn atlas-btn--primary">
+                  Послушать атмосферу
+                </a>
+                <CoffeeAtlasGoalLink
+                  href={`${COFFEE_ATLAS_PDF_PATH}#page=${shop.pdfPage}`}
+                  goal="business_atlas_pdf_opened"
+                  newTab
+                  className="atlas-btn atlas-btn--glass"
+                >
+                  Страницы в PDF-атласе
+                </CoffeeAtlasGoalLink>
+              </div>
             </div>
+            <figure className="atlas-hero__postcard" aria-hidden="true">
+              <Image
+                src={coffeeAtlasAsset(`${shop.slug}-hero.webp`)}
+                alt=""
+                width={756}
+                height={807}
+                sizes="420px"
+                priority
+              />
+              <figcaption>
+                {shop.city} · {shop.number}/{total}
+              </figcaption>
+            </figure>
           </div>
         </section>
 

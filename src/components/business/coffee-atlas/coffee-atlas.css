@@ -50,6 +50,8 @@
   --atlas-deep: #1b2a22;
 }
 [data-atlas-theme="coffee-collective"] {
+  --atlas-hero-cta-bg: #ffffff;
+  --atlas-hero-cta-ink: #141414;
   --atlas-bg: #f6f5f2;
   --atlas-surface: #ffffff;
   --atlas-ink: #22201d;
@@ -110,6 +112,8 @@
   --atlas-radius: 6px;
 }
 [data-atlas-theme="single-o-surry-hills"] {
+  --atlas-hero-cta-bg: #ffffff;
+  --atlas-hero-cta-ink: #141414;
   --atlas-bg: #f4f3ef;
   --atlas-surface: #ffffff;
   --atlas-ink: #141414;
@@ -120,6 +124,8 @@
   --atlas-radius: 14px;
 }
 [data-atlas-theme="la-colombe"] {
+  --atlas-hero-cta-bg: #ffffff;
+  --atlas-hero-cta-ink: #141414;
   --atlas-bg: #f1ece4;
   --atlas-surface: #fbf8f3;
   --atlas-ink: #1b1f26;
@@ -347,6 +353,13 @@
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
+}
+
+@media (min-width: 1100px) {
+  .atlas-switcher__list {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
 }
 
 .atlas-switcher__list::-webkit-scrollbar {
@@ -679,6 +692,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
+  overflow: hidden;
 }
 
 .atlas-hero__media::after {
@@ -730,7 +744,7 @@
 }
 
 .atlas-hero__place {
-  margin: 14px 0 0;
+  margin: 18px 0 0;
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.22em;
@@ -746,11 +760,64 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
+.atlas-hero .atlas-btn--primary {
+  background: var(--atlas-hero-cta-bg, var(--atlas-accent));
+  color: var(--atlas-hero-cta-ink, var(--atlas-accent-ink));
+}
+
 .atlas-hero__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 24px;
+}
+
+.atlas-hero__postcard {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .atlas-hero {
+    align-items: center;
+    min-height: 640px;
+    padding: 64px 0;
+  }
+  /* The PDF photo is 756px wide: blur the full-bleed copy, show it crisp as a postcard. */
+  .atlas-hero__image {
+    filter: blur(22px) saturate(1.1) brightness(0.62);
+    transform: scale(1.12);
+  }
+  .atlas-hero__content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 56px;
+    align-items: center;
+  }
+  .atlas-hero__postcard {
+    display: block;
+    justify-self: end;
+    width: min(420px, 100%);
+    margin: 0;
+    padding: 12px 12px 0;
+    border-radius: 6px;
+    background: #fbf6ec;
+    color: #3a2a1c;
+    box-shadow: 0 34px 70px rgba(0, 0, 0, 0.5);
+    transform: rotate(2deg);
+  }
+  .atlas-hero__postcard img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 3px;
+  }
+  .atlas-hero__postcard figcaption {
+    padding: 12px 4px 14px;
+    font-family: var(--atlas-display-font);
+    font-style: italic;
+    font-size: 1.05rem;
+    text-align: center;
+  }
 }
 
 /* ---------- story features ---------- */
@@ -1086,6 +1153,7 @@
     radial-gradient(600px 240px at 90% 0%, rgba(201, 163, 91, 0.28), transparent 70%),
     #1c1611;
   color: #f6ead7;
+  border: 1px solid rgba(216, 180, 111, 0.35);
   width: min(1180px, calc(100% - 40px));
 }
 

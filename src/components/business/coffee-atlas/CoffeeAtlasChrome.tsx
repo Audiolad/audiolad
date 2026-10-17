@@ -15,6 +15,7 @@ import { COFFEE_ATLAS_SHOPS } from "@/lib/business/coffee-atlas/shops";
 import { BUSINESS_INQUIRY_EMAIL, BUSINESS_LANDING_PATH } from "@/lib/business/landing";
 
 import CoffeeAtlasGoalLink from "./CoffeeAtlasGoalLink";
+import CoffeeAtlasSwitcherFocus from "./CoffeeAtlasSwitcherFocus";
 
 export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
   return (
@@ -44,6 +45,7 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
         </div>
       </div>
       <nav className="atlas-switcher" aria-label="Кофейни атласа">
+        <CoffeeAtlasSwitcherFocus currentSlug={currentSlug} />
         <ol className="atlas-wrap atlas-switcher__list">
           <li>
             <Link
