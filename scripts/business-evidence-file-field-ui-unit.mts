@@ -98,7 +98,11 @@ const png = new File([new Uint8Array(2048)], "Снимок экрана.png", { 
 const pdf = new File([new Uint8Array(4096)], "receipt.pdf", { type: "application/pdf" });
 
 const empty = render({});
-assert.match(empty, /data-biz-theme="jazz-coffee"/);
+// Author cabinet (audiolad.ru) lavender style, never the Business Jazz & Coffee theme.
+assert.doesNotMatch(empty, /data-biz-theme|--biz-/);
+assert.match(empty, /border-dashed border-\[#c6afe6\] bg-\[#faf6ff\]/, "lavender dashed card");
+assert.match(empty, /bg-\[#7042c5\][^"]*text-white[^"]*"[^>]*>Выбрать файл</, "purple «Выбрать файл» like «Найти»");
+assert.match(empty, /text-\[#7042c5\][^"]*"[^>]*>\s*Посмотреть пример/, "violet example link");
 assert.match(empty, /data-evidence-state="empty"/);
 assert.match(empty, />Выбрать файл</);
 assert.match(empty, /PNG, JPG, WEBP или PDF, до 10 МБ/);
@@ -170,7 +174,7 @@ const existing = { status: "needs_info", reason: null, productId: "p1", audioIte
 const storedEvidence = [stored, { ...stored, kind: "paid_period", mimeType: "application/pdf" }];
 const formHtml = renderToStaticMarkup(createElement(Form, { products, documents: [], existing, storedEvidence }));
 assert.equal((formHtml.match(/data-evidence-field="/g) ?? []).length, 2);
-assert.equal((formHtml.match(/data-biz-theme="jazz-coffee"/g) ?? []).length, 2);
+assert.doesNotMatch(formHtml, /data-biz-theme|--biz-/, "no Business theme inside the author cabinet form");
 assert.match(formHtml, /✓ Скриншот загружен ранее/);
 assert.match(formHtml, /✓ PDF загружен ранее/);
 const otherProvider = renderToStaticMarkup(createElement(Form, { products, documents: [], existing: { ...existing, aiService: "musicgpt" }, storedEvidence }));
@@ -200,17 +204,22 @@ assert.match(formSrc, /storage\.from\(EVIDENCE_BUCKET\)\.upload\(row\.object_pat
 assert.match(pageSrc, /createSignedUrls\(rows\.map\(\(r\) => r\.objectPath\), EVIDENCE_SIGNED_URL_TTL_SECONDS\)/);
 assert.match(pageSrc, /business_rightsholder_verification_attempts/);
 assert.doesNotMatch(pageSrc, /createServiceRoleClient/, "owner reads with their own session");
-assert.match(pageSrc, /import "@\/components\/business-app\/theme\/business-theme\.css";/);
+assert.doesNotMatch(pageSrc, /business-theme\.css|data-biz-theme/, "author cabinet page must not load the Business theme");
 assert.equal(EVIDENCE_SIGNED_URL_TTL_SECONDS, 600);
-for (const [name, src] of [["field", fieldSrc], ["form", formSrc], ["helpers", helperSrc], ["page", pageSrc]] as const) {
+const providersSrc = read("src/lib/business-rightsholder/providers.ts");
+const lightboxSrc = read("src/components/author-dashboard/business/ExampleLightbox.tsx");
+const howtoSrc = read("src/components/author-dashboard/business/SunoLinkHowTo.tsx");
+for (const [name, src] of [["field", fieldSrc], ["form", formSrc], ["helpers", helperSrc], ["page", pageSrc], ["providers", providersSrc], ["lightbox", lightboxSrc], ["howto", howtoSrc]] as const) {
   assert.doesNotMatch(src, /—/, `${name}: use en dashes (–), never em dashes`);
 }
-// Every --biz-* token used by the field is defined by the Jazz & Coffee theme block.
-const themeCss = read("src/components/business-app/theme/business-theme.css");
-const block = themeCss.slice(themeCss.indexOf('[data-biz-theme="jazz-coffee"] {'), themeCss.indexOf("\n}", themeCss.indexOf('[data-biz-theme="jazz-coffee"] {')));
-const used = new Set([...fieldSrc.matchAll(/var\((--biz-[a-z0-9-]+)\)/g)].map((m) => m[1]));
-assert.ok(used.size >= 10);
-for (const t of used) assert.match(block, new RegExp(`\\s${t}:`), `${t} not defined in the jazz-coffee block`);
-assert.doesNotMatch(fieldSrc, /#[0-9a-f]{6}\b/i, "no hard-coded colours");
+// The field lives in the audiolad.ru author cabinet: lavender cabinet palette only.
+assert.doesNotMatch(fieldSrc, /--biz-|data-biz-theme/, "no Business Jazz & Coffee tokens in the author cabinet");
+const CABINET = new Set(["#7042c5", "#5e32ad", "#25135c", "#7d70a2", "#4c3d78", "#c6afe6", "#d7c4f5", "#e4d7f4", "#faf6ff", "#f3ecfd", "#f3fbf6", "#2f7a55", "#fff5f5", "#f2c7c7", "#9b3d3d", "#ffffff"]);
+const hexes = new Set([...fieldSrc.matchAll(/#[0-9a-f]{6}\b/gi)].map((m) => m[0].toLowerCase()));
+assert.ok(hexes.has("#7042c5") && hexes.has("#faf6ff"));
+for (const h of hexes) assert.ok(CABINET.has(h), `${h} is not an author-cabinet colour`);
+// Warm Jazz & Coffee hex values must not appear in the field.
+for (const warm of ["#6f4326", "#f1e2cf", "#dcc3a4", "#cdb69a", "#fffaf3", "#f2e8da", "#e5d6c1", "#b8904f"]) assert.ok(!hexes.has(warm), warm);
+
 
 console.log("business-evidence-file-field-ui-unit: ok");

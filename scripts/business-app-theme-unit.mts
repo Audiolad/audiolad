@@ -81,6 +81,16 @@ for (const f of usedIn) {
   }
 }
 
+// Scope guard: the Jazz & Coffee theme belongs to business.audiolad.ru only. The audiolad.ru
+// author cabinet (lavender) must not import the theme or opt into it via data-biz-theme.
+for (const dir of ["src/app/(platform)", "src/components/author-dashboard"]) {
+  for (const f of walkUsed(dir).filter((p) => /\.(tsx?|css)$/.test(p))) {
+    const src = read(f);
+    assert.doesNotMatch(src, /business-app\/theme\/business-theme\.css/, `${f}: Business theme imported in the author cabinet`);
+    assert.doesNotMatch(src, /data-biz-theme|var\(--biz-/, `${f}: Business theme tokens used in the author cabinet`);
+  }
+}
+
 // 3. Readable contrasts (WCAG AA 4.5:1 for text pairs).
 function lum(hex: string): number {
   const h = hex.replace("#", "");
@@ -162,7 +172,8 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 const importers = walk("src").filter((p) => /import\s+["']@\/components\/business-app\/theme\/business-theme\.css["']/.test(read(p)));
-assert.deepEqual(importers, ["src/app/(platform)/author-dashboard/business/page.tsx", "src/app/business-app/layout.tsx"]);
+// Business layout only: the audiolad.ru author cabinet keeps its own lavender palette.
+assert.deepEqual(importers, ["src/app/business-app/layout.tsx"]);
 
 // 8. No colours outside the token layer: no hex/rgb in Business CSS, no hard-coded
 //    palette classes, inline colour styles or dark-on-light leftovers in Business TSX.

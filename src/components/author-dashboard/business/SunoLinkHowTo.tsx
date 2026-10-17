@@ -31,12 +31,12 @@ export default function SunoLinkHowTo() {
           <figure>
             <Image
               src="/images/help/suno-copy-link.webp"
-              alt="Окно Suno «Share to…»: первая кнопка слева — Copy Link"
+              alt="Окно Suno «Share to…»: первая кнопка слева – Copy Link"
               width={1166}
               height={474}
               className="h-auto w-full rounded-lg border border-neutral-200"
             />
-            <figcaption className="mt-1">Шаг 3: Copy Link — ссылка скопирована, вставьте её в поле выше</figcaption>
+            <figcaption className="mt-1">Шаг 3: Copy Link – ссылка скопирована, вставьте её в поле выше</figcaption>
           </figure>
         </div>
       </details>
