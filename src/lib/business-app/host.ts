@@ -11,6 +11,14 @@ export const BUSINESS_ORIGIN = `https://${BUSINESS_HOSTNAME}`;
 /** Internal App Router path served for the Business App root. Must not collide with public `/b`. */
 export const BUSINESS_SITE_PATH = "/business-app";
 
+/**
+ * a8240527: permanent guest coffee-shop cabinet. This exact URL is printed in the
+ * distributed PDF atlas (pages 32–33) and linked from every atlas CTA — NEVER change it.
+ */
+export const BUSINESS_GUEST_COFFEE_PUBLIC_PATH = "/guest/coffee";
+export const BUSINESS_GUEST_COFFEE_URL = `${BUSINESS_ORIGIN}${BUSINESS_GUEST_COFFEE_PUBLIC_PATH}`;
+export const BUSINESS_GUEST_COFFEE_INTERNAL_PATH = `${BUSINESS_SITE_PATH}/guest/coffee`;
+
 export { normalizeHostname, getHostnameFromHeaders };
 
 export function isBusinessHostname(hostname: string): boolean {
@@ -47,7 +55,15 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/onboarding": `${BUSINESS_SITE_PATH}/onboarding`,
   "/player": `${BUSINESS_SITE_PATH}/player`,
   "/spa": `${BUSINESS_SITE_PATH}/spa`,
+  // a8240527: permanent URL from the PDF atlas — keep forever.
+  [BUSINESS_GUEST_COFFEE_PUBLIC_PATH]: BUSINESS_GUEST_COFFEE_INTERNAL_PATH,
 };
+
+/** Guest paths render without the owner sidebar/bottom nav (no account needed). */
+export function isBusinessGuestPathname(pathname: string): boolean {
+  const normalized = normalizeBusinessAppPathname(pathname);
+  return normalized === "/guest" || normalized.startsWith("/guest/");
+}
 
 export function resolveBusinessInternalPath(
   publicPathname: string,
