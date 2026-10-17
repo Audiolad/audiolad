@@ -102,7 +102,7 @@ export default function ClassicaPublicWorkView({ work, related }: ClassicaPublic
                   className="text-[#7042c5]"
                   href={classicaWorkPath(item.composerSlug, item.workSlug)}
                 >
-                  {item.composerName} — {item.title}
+                  {item.composerName} – {item.title}
                 </Link>
               </li>
             ))}

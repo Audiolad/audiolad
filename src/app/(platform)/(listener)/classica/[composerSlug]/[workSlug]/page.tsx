@@ -21,12 +21,12 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { composerSlug, workSlug } = await params;
   if (!isClassicaSlug(composerSlug) || !isClassicaSlug(workSlug)) {
-    return { title: "Classica — АудиоЛад", robots: { index: false, follow: false } };
+    return { title: "Classica – АудиоЛад", robots: { index: false, follow: false } };
   }
   const supabase = await createClient();
   const loaded = await getPublishedClassicaWork(supabase, composerSlug, workSlug);
   if (!loaded) {
-    return { title: "Classica — АудиоЛад", robots: { index: false, follow: false } };
+    return { title: "Classica – АудиоЛад", robots: { index: false, follow: false } };
   }
   return buildClassicaWorkMetadata(loaded.work);
 }

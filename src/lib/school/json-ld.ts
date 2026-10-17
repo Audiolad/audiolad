@@ -46,7 +46,7 @@ export function buildSchoolLandingJsonLd(): JsonLdNode {
   const offers = SCHOOL_OFFERS.map((tariff) => ({
     "@type": "Offer",
     "@id": `${SCHOOL_URL}#offer-${tariff.id}`,
-    name: `Школа Аудиопрактик — ${tariff.name}`,
+    name: `Школа Аудиопрактик – ${tariff.name}`,
     description: tariff.description,
     url: `${SCHOOL_URL}#tariffs`,
     price: tariff.price,

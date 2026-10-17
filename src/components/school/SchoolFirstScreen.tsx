@@ -15,7 +15,7 @@ export default function SchoolFirstScreen() {
         <div className="school-first-screen__hero">
           <Image
             src="/school/hero-school-mobile.webp"
-            alt="Женщина записывает голос на телефон дома — для создания аудиопродукта достаточно телефона"
+            alt="Женщина записывает голос на телефон дома – для создания аудиопродукта достаточно телефона"
             fill
             className="school-first-screen__hero-image"
             sizes="(max-width: 430px) 100vw, (max-width: 900px) 90vw, (max-width: 1023px) 860px, 640px"
