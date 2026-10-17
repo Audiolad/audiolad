@@ -8,7 +8,7 @@ DROP FUNCTION IF EXISTS public.business_guest_listening_settle_(text);
 DROP FUNCTION IF EXISTS public.business_guest_listening_effective_(integer, integer);
 DROP FUNCTION IF EXISTS public.business_guest_listening_network_used_(text, text);
 DROP FUNCTION IF EXISTS public.business_guest_listening_lease_owed_(public.business_guest_listening);
-DROP FUNCTION IF EXISTS public.business_guest_listening_charge_(text, text, integer);
+DROP FUNCTION IF EXISTS public.business_guest_listening_charge_(text, text, integer, date);
 DROP FUNCTION IF EXISTS public.business_guest_listening_lock_(text, text);
 DROP TABLE IF EXISTS public.business_guest_listening_ip_day;
 DROP TABLE IF EXISTS public.business_guest_listening;

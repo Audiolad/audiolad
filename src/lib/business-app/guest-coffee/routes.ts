@@ -17,9 +17,12 @@ export type GuestCoffeeTrackUrlDeps = {
    * paid products with guest access, so this re-check is what keeps paid audio out.
    */
   isStillFree: (playlist: GuestCoffeePlaylist) => Promise<boolean>;
+  /** Read-only server total (no lease, no charge) — skip signing when already exhausted. */
+  peekUsage: () => Promise<number | null>;
   /**
-   * Server meter: settle the previous playback lease and open one for this track
-   * (unless the limit is used up). Returns effective used seconds; null = unavailable.
+   * Server meter, called only AFTER signing succeeded: settle the previous playback lease
+   * and open (and charge) one for this track unless the limit is used up.
+   * Returns effective used seconds; null = unavailable.
    */
   issueLease: (trackSeconds: number) => Promise<number | null>;
   sign: (input: { authorSlug: string; productSlug: string; audioId: string }) => Promise<
@@ -54,12 +57,12 @@ export async function handleGuestCoffeeTrackUrl(
 
   if (!(await deps.isStillFree(found.playlist))) return { ok: false, reason: "not_in_manifest" };
 
-  const used = await deps.issueLease(guestCoffeeLeaseSeconds(found.track.durationSeconds));
-  const limit = guestCoffeeLimitState(used);
-  if (limit === "unavailable") return { ok: false, reason: "guest_unavailable", limit };
-  // The server refuses new stream URLs once 30 minutes of actual playback are used.
-  if (limit === "exhausted") return { ok: false, reason: "no_access", limit };
+  // 1. Cheap read-only gate: no signing for a guest whose limit is already used up.
+  const before = guestCoffeeLimitState(await deps.peekUsage());
+  if (before === "unavailable") return { ok: false, reason: "guest_unavailable", limit: before };
+  if (before === "exhausted") return { ok: false, reason: "no_access", limit: before };
 
+  // 2. Sign first: a failed signing never opens or charges a lease.
   const signed = await deps.sign({
     authorSlug: found.playlist.authorSlug,
     productSlug: found.playlist.productSlug,
@@ -67,8 +70,15 @@ export async function handleGuestCoffeeTrackUrl(
   });
   if (!signed.ok) {
     const skip = signed.reason === "not_found" || signed.reason === "forbidden" || signed.reason === "access_required" || signed.reason === "audio_missing";
-    return { ok: false, reason: skip ? "not_in_manifest" : "sign_failed", limit };
+    return { ok: false, reason: skip ? "not_in_manifest" : "sign_failed", limit: before };
   }
+
+  // 3. Authoritative, atomic authorisation + charge. The URL is returned only if it passes;
+  //    otherwise the freshly signed URL is simply discarded.
+  const limit = guestCoffeeLimitState(await deps.issueLease(guestCoffeeLeaseSeconds(found.track.durationSeconds)));
+  if (limit === "unavailable") return { ok: false, reason: "guest_unavailable", limit };
+  // The server refuses new stream URLs once 30 minutes of playback are used.
+  if (limit === "exhausted") return { ok: false, reason: "no_access", limit };
   return { ok: true, data: { url: signed.url }, limit };
 }
 

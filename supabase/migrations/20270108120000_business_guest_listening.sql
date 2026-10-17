@@ -19,7 +19,9 @@ BEGIN;
 --    slack, replays are idempotent.
 --  * Identity: device_hash = sha256 of a random httpOnly cookie token (primary);
 --    ip_hash = HMAC(server secret, client IP; IPv6 per /64), independent of the cookie
---    and of client headers. Network usage = sum of daily buckets over a ROLLING 30 days.
+--    and of client headers. Network usage = sum of daily buckets over a ROLLING 30 days;
+--    a charge is booked on the day its lease started (when the playback happened), and
+--    debt of leases older than the window is not counted for the network.
 --    effective used = greatest(device used, network used - (3600 - 1800)): one device
 --    gets 30 min; cookie juggling on one network gets at most 2 x 30 min per rolling
 --    30 days. Constants mirror src/lib/business-app/guest-coffee/limit.ts.
@@ -59,12 +61,17 @@ CREATE INDEX IF NOT EXISTS business_guest_listening_open_lease_idx
   ON public.business_guest_listening (lease_ip_hash)
   WHERE lease_started_at IS NOT NULL AND lease_ip_hash IS NOT NULL;
 
--- Per-network usage in daily buckets (rolling 30-day sum).
+-- Per-network usage in daily buckets (rolling 30-day sum), one row per device: a bucket
+-- row is only ever written while holding that device's row lock, so bucket writes never
+-- wait on each other across devices/networks (no lock cycles).
 CREATE TABLE IF NOT EXISTS public.business_guest_listening_ip_day (
   ip_hash text NOT NULL,
   day date NOT NULL,
+  device_hash text NOT NULL,
   used_seconds integer NOT NULL DEFAULT 0,
-  PRIMARY KEY (ip_hash, day),
+  PRIMARY KEY (ip_hash, day, device_hash),
+  CONSTRAINT business_guest_listening_ip_day_device_check
+    CHECK (device_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT business_guest_listening_ip_day_hash_check
     CHECK (ip_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT business_guest_listening_ip_day_used_check
@@ -78,6 +85,10 @@ REVOKE ALL ON public.business_guest_listening_ip_day FROM PUBLIC, anon, authenti
 
 -- Internal: validate input, serialise per network (transaction advisory lock), create
 -- and lock the device row. Not granted to anyone.
+-- Lock discipline (deadlock-free): a transaction takes at most ONE advisory lock (the
+-- current network) and then at most ONE blocking row lock (its own device); other
+-- devices' rows are only taken with SKIP LOCKED, and bucket rows only under the lock of
+-- the device they belong to.
 CREATE OR REPLACE FUNCTION public.business_guest_listening_lock_(
   p_device_hash text,
   p_ip_hash text
@@ -103,11 +114,13 @@ BEGIN
 END;
 $$;
 
--- Internal: add seconds to a device and (when known) to today's bucket of a network.
+-- Internal: add seconds to a device and (when known and still inside the rolling window)
+-- to the network bucket of the day the playback happened. Caller holds the device lock.
 CREATE OR REPLACE FUNCTION public.business_guest_listening_charge_(
   p_device_hash text,
   p_ip_hash text,
-  p_seconds integer
+  p_seconds integer,
+  p_day date
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -121,10 +134,10 @@ BEGIN
   UPDATE public.business_guest_listening
   SET used_seconds = least(used_seconds + p_seconds, 86400), updated_at = now()
   WHERE device_hash = p_device_hash;
-  IF p_ip_hash IS NOT NULL THEN
-    INSERT INTO public.business_guest_listening_ip_day AS b (ip_hash, day, used_seconds)
-    VALUES (p_ip_hash, current_date, least(p_seconds, 864000))
-    ON CONFLICT (ip_hash, day) DO UPDATE
+  IF p_ip_hash IS NOT NULL AND p_day IS NOT NULL AND p_day > current_date - 30 THEN
+    INSERT INTO public.business_guest_listening_ip_day AS b (ip_hash, day, device_hash, used_seconds)
+    VALUES (p_ip_hash, least(p_day, current_date), p_device_hash, least(p_seconds, 864000))
+    ON CONFLICT (ip_hash, day, device_hash) DO UPDATE
       SET used_seconds = least(b.used_seconds + excluded.used_seconds, 864000);
   END IF;
 END;
@@ -174,6 +187,7 @@ AS $$
       FROM public.business_guest_listening d
       WHERE d.lease_ip_hash = p_ip_hash
         AND d.lease_started_at IS NOT NULL
+        AND d.lease_started_at::date > current_date - 30
         AND d.device_hash IS DISTINCT FROM p_except_device
     ), 0)
   )::integer END;
@@ -210,7 +224,8 @@ BEGIN
     RETURN;
   END IF;
   PERFORM public.business_guest_listening_charge_(
-    p_device_hash, v_device.lease_ip_hash, public.business_guest_listening_lease_owed_(v_device));
+    p_device_hash, v_device.lease_ip_hash, public.business_guest_listening_lease_owed_(v_device),
+    v_device.lease_started_at::date);
   UPDATE public.business_guest_listening
   SET lease_started_at = NULL, lease_cap_seconds = NULL, lease_charged_seconds = 0,
       lease_ip_hash = NULL, updated_at = now()
@@ -251,6 +266,8 @@ BEGIN
     LOOP
       PERFORM public.business_guest_listening_settle_(v_other);
     END LOOP;
+    -- Buckets older than the window are never written again (see charge_), so pruning
+    -- them cannot contend with concurrent charges.
     DELETE FROM public.business_guest_listening_ip_day
     WHERE ip_hash = p_ip_hash AND day <= current_date - 31;
   END IF;
@@ -268,7 +285,7 @@ BEGIN
         lease_ip_hash = p_ip_hash,
         updated_at = now()
     WHERE device_hash = p_device_hash;
-    PERFORM public.business_guest_listening_charge_(p_device_hash, p_ip_hash, least(v_cap, 15));
+    PERFORM public.business_guest_listening_charge_(p_device_hash, p_ip_hash, least(v_cap, 15), current_date);
   END IF;
   RETURN v_effective;
 END;
@@ -302,7 +319,8 @@ BEGIN
     );
     v_delta := greatest(0, v_new - v_device.lease_charged_seconds);
     IF v_delta > 0 THEN
-      PERFORM public.business_guest_listening_charge_(p_device_hash, v_device.lease_ip_hash, v_delta);
+      PERFORM public.business_guest_listening_charge_(
+        p_device_hash, v_device.lease_ip_hash, v_delta, v_device.lease_started_at::date);
       UPDATE public.business_guest_listening
       SET lease_charged_seconds = lease_charged_seconds + v_delta
       WHERE device_hash = p_device_hash;
@@ -339,7 +357,7 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.business_guest_listening_lock_(text, text) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.business_guest_listening_charge_(text, text, integer) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.business_guest_listening_charge_(text, text, integer, date) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.business_guest_listening_lease_owed_(public.business_guest_listening) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.business_guest_listening_network_used_(text, text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.business_guest_listening_effective_(integer, integer) FROM PUBLIC, anon, authenticated, service_role;

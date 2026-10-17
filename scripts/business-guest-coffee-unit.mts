@@ -5,7 +5,7 @@
  * migration contract, and (with an explicit disposable database only) real PostgreSQL scenarios.
  */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 import {
@@ -224,14 +224,21 @@ assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
   let signed = 0;
   let leases: number[] = [];
   let stillFree = true;
-  const deps = (used: number | null) => ({
+  let calls: string[] = [];
+  const deps = (used: number | null, issued: number | null = used) => ({
     loadShelf: async () => shelf,
     isStillFree: async () => stillFree,
-    issueLease: async (trackSeconds: number) => {
-      leases.push(trackSeconds);
+    peekUsage: async () => {
+      calls.push("peek");
       return used;
     },
+    issueLease: async (trackSeconds: number) => {
+      calls.push("issue");
+      leases.push(trackSeconds);
+      return issued;
+    },
     sign: async () => {
+      calls.push("sign");
       signed++;
       return { ok: true as const, url: "https://audiolad.ru/storage/v1/object/sign/x" };
     },
@@ -260,6 +267,23 @@ assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
   assert.equal(signed, signedBefore, "paid-now album is never signed");
   assert.deepEqual(leases, [], "and never charged");
   stillFree = true;
+  // Order: read-only peek → sign → atomic issue (charge). Exhausted at peek → nothing signed or charged.
+  calls = [];
+  await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(100));
+  assert.deepEqual(calls, ["peek", "sign", "issue"]);
+  calls = [];
+  await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(1800));
+  assert.deepEqual(calls, ["peek"], "exhausted: neither signed nor charged");
+  // Race: peek still ok, authoritative issue says exhausted → the signed URL is discarded.
+  assert.deepEqual(await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(1790, 1800)), { ok: false, reason: "no_access", limit: "exhausted" });
+  // Signing failure → no lease is opened or charged.
+  for (const reason of ["storage_unavailable", "audio_missing"]) {
+    calls = [];
+    leases = [];
+    await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t1" }, { ...deps(10), sign: async () => { calls.push("sign"); return { ok: false as const, reason }; } });
+    assert.deepEqual(calls, ["peek", "sign"], `sign failed (${reason}) → issue never called`);
+    assert.deepEqual(leases, []);
+  }
   const fail = await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t1" }, {
     ...deps(10), sign: async () => ({ ok: false as const, reason: "audio_missing" }),
   });
@@ -344,6 +368,7 @@ assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
   assert.match(loader, /is_free === true && row\.status === "published" && row\.catalog_visibility === "listed"/);
   assert.match(route, /isStillFree: isGuestCoffeePlaylistStillFree/, "uncached re-check right before signing");
   assert.match(route, /issueLease: \(trackSeconds\) => issueGuestCoffeeLease\(request, trackSeconds\)/);
+  assert.match(route, /peekUsage: peekGuestCoffeeUsage/);
 }
 
 // ---------------------------------------------------------------- migration contract
@@ -377,7 +402,7 @@ const rollback = read("docs/business/guest-listening-a8240527-rollback.sql");
   assert.match(clean, new RegExp(`v_effective < ${GUEST_COFFEE_LIMIT_SECONDS}`));
   assert.match(clean, new RegExp(`least\\(p_device\\.lease_cap_seconds, ${GUEST_COFFEE_MIN_LEASE_CHARGE_SECONDS}\\)`));
   assert.doesNotMatch(clean, /\+ 10\b/, "no renewable per-request slack");
-  for (const fn of ["peek(text, text)", "report(text, text, integer)", "issue(text, text, integer)", "settle_(text)", "effective_(integer, integer)", "network_used_(text, text)", "lease_owed_(public.business_guest_listening)", "charge_(text, text, integer)", "lock_(text, text)"]) {
+  for (const fn of ["peek(text, text)", "report(text, text, integer)", "issue(text, text, integer)", "settle_(text)", "effective_(integer, integer)", "network_used_(text, text)", "lease_owed_(public.business_guest_listening)", "charge_(text, text, integer, date)", "lock_(text, text)"]) {
     assert.ok(rollback.includes(`DROP FUNCTION IF EXISTS public.business_guest_listening_${fn};`), `rollback drops ${fn}`);
   }
   assert.match(rollback, /DROP TABLE IF EXISTS public\.business_guest_listening_ip_day;/);
@@ -412,6 +437,7 @@ END $$;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;`;
     const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64), F = "f".repeat(64), H = "e".repeat(64);
     const G1 = "1".repeat(64), G2 = "2".repeat(64), R = "3".repeat(64), Z = "0".repeat(64);
+    const OLD = "4".repeat(64), N1 = "5".repeat(64);
     const out = psql(db, [setup, migration, migration /* idempotent re-run */, `
 SET ROLE service_role;
 SELECT 'i1=' || public.business_guest_listening_issue('${A}', '${F}', 200);
@@ -464,6 +490,16 @@ BEGIN
 END
 $do$;
 SELECT k || '=' || v FROM gc_res;
+-- abandoned leases older than the window: device still pays, the network does not
+INSERT INTO public.business_guest_listening (device_hash, lease_started_at, lease_cap_seconds, lease_charged_seconds, lease_ip_hash)
+SELECT lpad(to_hex(9000 + g), 64, 'c'), now() - interval '40 days', 900, 15, '${OLD}' FROM generate_series(1, 4) g;
+SET ROLE service_role;
+SELECT 'old_peek=' || public.business_guest_listening_peek('${Z}', '${OLD}');
+SELECT 'old_issue=' || public.business_guest_listening_issue('${N1}', '${OLD}', 200);
+RESET ROLE;
+SELECT 'old_net=' || coalesce(sum(used_seconds), 0) FROM public.business_guest_listening_ip_day WHERE ip_hash = '${OLD}';
+SELECT 'old_dev=' || used_seconds FROM public.business_guest_listening WHERE device_hash = lpad(to_hex(9001), 64, 'c');
+SELECT 'old_open=' || count(*) FROM public.business_guest_listening WHERE lease_ip_hash = '${OLD}' AND device_hash <> '${N1}';
 -- two cookies created BEFORE listening on one network H
 SET ROLE service_role;
 SELECT 'jb=' || public.business_guest_listening_issue('${B}', '${H}', 200);
@@ -471,7 +507,8 @@ SELECT 'jc=' || public.business_guest_listening_issue('${C}', '${H}', 200);
 RESET ROLE;
 UPDATE public.business_guest_listening SET used_seconds = 1800, lease_started_at = NULL, lease_cap_seconds = NULL, lease_ip_hash = NULL, lease_charged_seconds = 0 WHERE device_hash IN ('${B}', '${C}');
 UPDATE public.business_guest_listening SET used_seconds = 15 WHERE device_hash = '${C}';
-UPDATE public.business_guest_listening_ip_day SET used_seconds = 1800 WHERE ip_hash = '${H}';
+DELETE FROM public.business_guest_listening_ip_day WHERE ip_hash = '${H}';
+INSERT INTO public.business_guest_listening_ip_day VALUES ('${H}', current_date, '${B}', 1800);
 SET ROLE service_role;
 SELECT 'xb=' || public.business_guest_listening_issue('${B}', '${H}', 200);
 RESET ROLE;
@@ -480,7 +517,7 @@ SET ROLE service_role;
 SELECT 'xc=' || public.business_guest_listening_issue('${C}', '${H}', 200);
 RESET ROLE;
 UPDATE public.business_guest_listening SET lease_started_at = NULL, lease_cap_seconds = NULL, lease_ip_hash = NULL, lease_charged_seconds = 0 WHERE device_hash = '${C}';
-UPDATE public.business_guest_listening_ip_day SET used_seconds = 3600 WHERE ip_hash = '${H}';
+UPDATE public.business_guest_listening_ip_day SET used_seconds = 3600 WHERE ip_hash = '${H}' AND device_hash = '${B}';
 SET ROLE service_role;
 SELECT 'yc=' || public.business_guest_listening_issue('${C}', '${H}', 200);
 SELECT 'yd=' || public.business_guest_listening_peek('${D}', '${H}');
@@ -490,7 +527,7 @@ SELECT 'z=' || public.business_guest_listening_peek('${Z}', NULL);
 SELECT 'neg=' || public.business_guest_listening_report('${Z}', NULL, -5);
 RESET ROLE;
 -- ROLLING 30 days: usage from day -29 still counts, day -30 no longer does
-INSERT INTO public.business_guest_listening_ip_day VALUES ('${R}', current_date - 29, 3600);
+INSERT INTO public.business_guest_listening_ip_day VALUES ('${R}', current_date - 29, '${Z}', 3600);
 SET ROLE service_role;
 SELECT 'w29=' || public.business_guest_listening_peek('${Z}', '${R}');
 RESET ROLE;
@@ -513,25 +550,64 @@ RESET ROLE;
     assert.equal(val("i5"), 515, "…and again for every following track");
     assert.equal(val("played_granted"), 18, "fresh cookie per track + no reports: denied after 2 × 30 min of network playback");
     assert.equal(val("harvest_granted"), 240, "instant URL harvesting with fresh cookies: denied after 3600 / 15 URLs");
+    assert.equal(val("old_peek"), 0, "debt of leases older than the window is not counted for the network");
+    assert.equal(val("old_issue"), 0);
+    assert.equal(val("old_net"), 15, "settling 40-day-old leases books nothing for the network (only the new URL's 15 s)");
+    assert.equal(val("old_dev"), 885, "…but the device still pays the rest of the track (900 − 15 charged up front)");
+    assert.equal(val("old_open"), 0, "expired leases of the network were settled");
     assert.equal(val("jb"), 0);
     assert.equal(val("jc"), 0);
     assert.ok(val("xb") >= 1800, "exhausted device refused");
     assert.match(out, /^xblease=true$/m, "no lease is opened for a refused URL");
     assert.equal(val("xc"), 15, "pre-created second cookie on the same network: one more session at most");
-    assert.equal(val("yc"), 1800, "network allowance (2 × 30 min) used → second cookie refused too");
-    assert.equal(val("yd"), 1800, "brand-new cookie on that network: refused (peek)");
+    assert.equal(val("yc"), 1815, "network allowance (2 × 30 min) used (+ C’s own 15 s) → second cookie refused too");
+    assert.equal(val("yd"), 1815, "brand-new cookie on that network: refused (peek)");
     assert.ok(val("yd2") >= 1800, "brand-new cookie on that network: refused (issue)");
     assert.equal(val("ye"), 0, "another network: own meter");
     assert.equal(val("z"), 0);
     assert.equal(val("neg"), 0, "report without a lease / negative credit ignored");
     assert.equal(val("w29"), 1800, "rolling window: usage from 29 days ago still counts");
     assert.equal(val("w30"), 0, "rolling window: usage from 30 days ago no longer counts");
+    // Reciprocal network change (X: lease on net A, now on B; Y: lease on B, now on A),
+    // both with debt, issued concurrently in two sessions, many rounds: never a deadlock.
+    {
+      const NA = "6".repeat(64), NB = "7".repeat(64), X = "8".repeat(64), Y = "9".repeat(64);
+      const psqlArgs = (database: string) =>
+        container
+          ? ["docker", ["exec", "-i", container, "psql", "-X", "-q", "-At", "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1"]] as const
+          : ["psql", ["-X", "-q", "-At", "-v", "ON_ERROR_STOP=1", "-d", `${dsn} dbname=${database}`]] as const;
+      const runAsync = (input: string) =>
+        new Promise<{ code: number | null; err: string }>((resolve) => {
+          const [cmd, args] = psqlArgs(db);
+          const child = spawn(cmd, [...args], { stdio: ["pipe", "ignore", "pipe"] });
+          let err = "";
+          child.stderr.on("data", (d) => (err += String(d)));
+          child.on("close", (code) => resolve({ code, err }));
+          child.stdin.end(input);
+        });
+      for (let round = 0; round < 25; round++) {
+        psql(db, `
+DELETE FROM public.business_guest_listening WHERE device_hash IN ('${X}', '${Y}');
+INSERT INTO public.business_guest_listening (device_hash, lease_started_at, lease_cap_seconds, lease_charged_seconds, lease_ip_hash) VALUES
+  ('${X}', now() - interval '100 seconds', 200, 15, '${NA}'),
+  ('${Y}', now() - interval '100 seconds', 200, 15, '${NB}');`);
+        const [rx, ry] = await Promise.all([
+          runAsync(`SET ROLE service_role; SELECT public.business_guest_listening_issue('${X}', '${NB}', 200); SELECT pg_sleep(0.01); SELECT public.business_guest_listening_report('${X}', '${NB}', 5);`),
+          runAsync(`SET ROLE service_role; SELECT public.business_guest_listening_issue('${Y}', '${NA}', 200); SELECT pg_sleep(0.01); SELECT public.business_guest_listening_report('${Y}', '${NA}', 5);`),
+        ]);
+        assert.equal(rx.code, 0, `round ${round} X: ${rx.err}`);
+        assert.equal(ry.code, 0, `round ${round} Y: ${ry.err}`);
+        assert.doesNotMatch(rx.err + ry.err, /deadlock/i);
+      }
+      const books = psql(db, `SELECT ip_hash = '${NA}', sum(used_seconds) FROM public.business_guest_listening_ip_day WHERE ip_hash IN ('${NA}', '${NB}') AND device_hash IN ('${X}', '${Y}') GROUP BY 1 ORDER BY 1;`).trim().split("\n");
+      assert.equal(books.length, 2, "each lease was booked on the network it was issued to");
+    }
     for (const role of ["anon", "authenticated"]) {
       for (const call of [
         `SELECT public.business_guest_listening_issue('${A}', NULL, 1);`,
         `SELECT public.business_guest_listening_report('${A}', NULL, 1);`,
         `SELECT public.business_guest_listening_peek('${A}', NULL);`,
-        `SELECT public.business_guest_listening_charge_('${A}', NULL, 100);`,
+        `SELECT public.business_guest_listening_charge_('${A}', NULL, 100, current_date);`,
         `SELECT public.business_guest_listening_lock_('${A}', NULL);`,
         `SELECT public.business_guest_listening_settle_('${A}');`,
         "SELECT * FROM public.business_guest_listening;",
@@ -540,7 +616,7 @@ RESET ROLE;
         assert.throws(() => psql(db, `SET ROLE ${role}; ${call}`), /permission denied/, `${role}: ${call}`);
       }
     }
-    for (const call of [`business_guest_listening_charge_('${A}', NULL, 100)`, `business_guest_listening_settle_('${A}')`, `business_guest_listening_lock_('${A}', NULL)`]) {
+    for (const call of [`business_guest_listening_charge_('${A}', NULL, 100, current_date)`, `business_guest_listening_settle_('${A}')`, `business_guest_listening_lock_('${A}', NULL)`]) {
       assert.throws(() => psql(db, `SET ROLE service_role; SELECT public.${call};`), /permission denied/, `internal helper not callable even by service_role: ${call}`);
     }
     assert.throws(() => psql(db, `SET ROLE service_role; SELECT public.business_guest_listening_issue('bad', NULL, 1);`), /invalid_device_hash/);
