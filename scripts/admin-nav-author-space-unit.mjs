@@ -140,7 +140,7 @@ for (const relPath of [
   );
 }
 
-assert.match(read("src/components/admin/AdminNav.tsx"), /isAdminNavPathActive/);
+assert.match(read("src/components/admin/AdminNavTabs.tsx"), /isAdminNavPathActive/);
 assert.match(
   read("src/app/(platform)/admin/layout.tsx"),
   /matchPrefixes: item\.activePrefixes/,

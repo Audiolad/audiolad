@@ -178,7 +178,7 @@ function testSourceGuards() {
   assert.match(layout, /commercial-applications/);
   assert.match(layout, /getCachedAdminCommercialApplicationAttentionSummary/);
 
-  const nav = read("src/components/admin/AdminNav.tsx");
+  const nav = read("src/components/admin/AdminNavTabs.tsx");
   assert.match(nav, /badgeCount/);
 
   const route = read("src/app/api/author/commercial-application/route.ts");
