@@ -212,7 +212,7 @@ function parseView(value: string | null): AdminAnalyticsView {
 }
 
 function parseRatingsTab(value: string | null): AdminRatingsTab {
-  if (value === "authors" || value === "journal") {
+  if (value === "authors" || value === "journal" || value === "listeners") {
     return value;
   }
   return "products";
