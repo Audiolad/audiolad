@@ -17,7 +17,19 @@ export type BusinessNavItem = {
   icon: BusinessNavIconKey;
   /** Only home is interactive in PR1; others are empty stubs. */
   available: boolean;
+  /**
+   * a8240527: who may open the section. "everyone" sections work for a guest too (limited by
+   * server rights); "member" sections stay visible in the same navigation but are locked
+   * («доступно после подключения») until the visitor belongs to a Business organization.
+   */
+  requires: BusinessNavRequirement;
+  /** Where a guest goes instead of href (same section, guest entry URL). */
+  guestHref?: string;
+  /** Other paths that belong to this section (highlighted as current). */
+  aliases?: readonly string[];
 };
+
+export type BusinessNavRequirement = "everyone" | "member";
 
 export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
   {
@@ -26,6 +38,7 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/",
     icon: "home",
     available: true,
+    requires: "everyone",
   },
   {
     id: "player",
@@ -33,6 +46,7 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/player",
     icon: "music",
     available: true,
+    requires: "member",
   },
   {
     id: "locations",
@@ -40,6 +54,7 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/locations",
     icon: "locations",
     available: false,
+    requires: "member",
   },
   {
     id: "music",
@@ -47,6 +62,10 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/music",
     icon: "music",
     available: true,
+    requires: "everyone",
+    // a8240527: the permanent atlas URL (PDF) is the guest entry to this same section.
+    guestHref: "/guest/coffee",
+    aliases: ["/guest/coffee"],
   },
   {
     id: "stats",
@@ -54,6 +73,7 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/stats",
     icon: "stats",
     available: false,
+    requires: "member",
   },
 ] as const;
 
@@ -64,6 +84,7 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/announcements",
     icon: "announcements",
     available: false,
+    requires: "member",
   },
   {
     id: "documents",
@@ -71,6 +92,7 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/documents",
     icon: "documents",
     available: false,
+    requires: "member",
   },
   {
     id: "team",
@@ -78,6 +100,7 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/team",
     icon: "team",
     available: false,
+    requires: "member",
   },
   {
     id: "settings",
@@ -85,6 +108,7 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/preferences",
     icon: "settings",
     available: false,
+    requires: "member",
   },
   {
     id: "help",
@@ -92,6 +116,7 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/help",
     icon: "help",
     available: true,
+    requires: "everyone",
   },
 ] as const;
 
@@ -103,12 +128,22 @@ export const BUSINESS_MOBILE_NAV_ITEMS: readonly BusinessNavItem[] = [
     href: "/more",
     icon: "more",
     available: false,
+    requires: "everyone",
   },
 ] as const;
 
 export const BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX = 232;
 export const BUSINESS_SIDEBAR_COLLAPSED_WIDTH_PX = 72;
 export const BUSINESS_SIDEBAR_STORAGE_KEY = "audiolad-business-sidebar";
+
+/** a8240527: the item is the current section (its href or one of its aliases). */
+export function isBusinessNavItemCurrent(
+  pathname: string,
+  item: Pick<BusinessNavItem, "href" | "aliases" | "guestHref">,
+): boolean {
+  const paths = [item.href, ...(item.guestHref ? [item.guestHref] : []), ...(item.aliases ?? [])];
+  return paths.some((href) => isBusinessNavItemActive(pathname, href));
+}
 
 export function isBusinessNavItemActive(
   pathname: string,

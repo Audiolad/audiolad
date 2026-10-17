@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from "react";
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
+import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   buildBusinessGreeting,
@@ -190,15 +191,23 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         </header>
         <section className="business-app-card max-w-xl">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
-            Кабинет больше не использует демонстрационные данные «Марина / Beauty Line».
-            Нужна сессия владельца.
+            Здесь появится статус вашей точки: плеер, что звучит сейчас, документы. Пока вы в
+            гостевом режиме – настройте звучание и послушайте подборки в разделе «Музыка».
           </p>
-          <a
-            href="https://audiolad.ru/auth/sign-in"
-            className="mt-4 business-app-btn business-app-btn-primary business-app-focus-ring"
-          >
-            Войти
-          </a>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href={BUSINESS_GUEST_COFFEE_PUBLIC_PATH}
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            >
+              Настроить звучание
+            </Link>
+            <a
+              href="https://audiolad.ru/auth/sign-in"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+            >
+              Войти
+            </a>
+          </div>
         </section>
       </div>
     );

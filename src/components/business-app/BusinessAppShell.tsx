@@ -1,30 +1,36 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { usePathname } from "next/navigation";
 
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
+import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
 import BusinessSidebar from "@/components/business-app/BusinessSidebar";
-import { isBusinessGuestPathname } from "@/lib/business-app/host";
+import { resolveBusinessAccess } from "@/lib/business-app/access";
 
+/**
+ * One AudioLad Business cabinet for everyone (a8240527, Sergey 17.10.2026): the guest from the
+ * atlas (/guest/coffee) and the venue owner get the same sidebar (desktop), bottom nav
+ * (mobile), sections and player. Only the access level differs: protected sections stay
+ * visible but locked, and a guest sees the guest status strip.
+ */
 export default function BusinessAppShell({
   children,
 }: {
   children: ReactNode;
 }) {
-  const pathname = usePathname() ?? "/";
-
-  // a8240527: the guest coffee cabinet has its own chrome (no owner sidebar / bottom nav,
-  // no account). Same Business app, layout and host — only the owner navigation is hidden.
-  if (isBusinessGuestPathname(pathname)) {
-    return <div className="business-app-guest">{children}</div>;
-  }
+  const access = resolveBusinessAccess(useBusinessDomain());
 
   return (
-    <div className="business-app-shell">
-      <BusinessSidebar />
-      <div className="business-app-main">{children}</div>
-      <BusinessBottomNav />
-    </div>
+    <BusinessGuestStatusProvider>
+      <div className="business-app-shell" data-access={access.level}>
+        <BusinessSidebar />
+        <div className="business-app-main">
+          {access.level === "guest" ? <BusinessGuestStatusBar /> : null}
+          {children}
+        </div>
+        <BusinessBottomNav />
+      </div>
+    </BusinessGuestStatusProvider>
   );
 }

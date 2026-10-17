@@ -468,3 +468,195 @@
     display: grid;
   }
 }
+
+/* ---------------------------------------------------------------------------------------
+   a8240527 – one cabinet for guest and owner: guest status strip, locked navigation items,
+   Music section (sound settings + collections + Business player). Tokens only.
+   --------------------------------------------------------------------------------------- */
+.business-app-guest-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin: 0 auto 1rem;
+  max-width: 72rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--biz-accent-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-accent-soft);
+  color: var(--biz-text);
+}
+
+.business-app-guest-bar__text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+  font-size: 0.92rem;
+}
+
+.business-app-guest-bar__notice {
+  font-weight: 600;
+  color: var(--biz-text);
+}
+
+.business-app-guest-bar__notice:empty {
+  display: block;
+  height: 0;
+  overflow: hidden;
+}
+
+.business-app-nav-locked {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+.business-sound-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.business-sound-settings {
+  display: grid;
+  gap: 1rem;
+  align-self: start;
+}
+
+.business-sound-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.business-sound-group__legend {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  color: var(--biz-text);
+}
+
+.business-sound-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.business-sound-chips--compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.business-sound-chip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--biz-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-surface);
+  cursor: pointer;
+}
+
+.business-sound-chips--compact .business-sound-chip {
+  align-items: center;
+  padding: 0.45rem 0.25rem;
+  text-align: center;
+}
+
+.business-sound-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.business-sound-chip:hover {
+  border-color: var(--biz-accent-border);
+}
+
+.business-sound-chip:focus-within {
+  outline: 2px solid var(--biz-focus);
+  outline-offset: 2px;
+}
+
+.business-sound-chip[data-checked="true"] {
+  border-color: var(--biz-accent);
+  background: var(--biz-accent);
+  color: var(--biz-on-accent);
+}
+
+.business-sound-chip__label {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.business-sound-chip__hint {
+  font-size: 0.74rem;
+  line-height: 1.25;
+  opacity: 0.85;
+}
+
+.business-sound-results {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.business-sound-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.business-sound-item {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
+}
+
+.business-sound-item[data-active="true"] {
+  border-color: var(--biz-accent);
+}
+
+.business-sound-item__cover {
+  width: 64px;
+}
+
+.business-sound-item__title {
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--biz-text);
+}
+
+.business-sound-limit {
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+}
+
+/* Business player: stays reachable while scrolling the collections, above the mobile nav. */
+.business-sound-player {
+  position: sticky;
+  bottom: calc(var(--biz-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  z-index: 20;
+  margin-top: 1rem;
+  box-shadow: var(--biz-shadow-strong);
+}
+
+.business-sound-player .business-app-player-controls {
+  margin-top: 0.35rem;
+}
+
+@media (min-width: 900px) {
+  .business-sound-layout {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.3fr);
+    align-items: start;
+  }
+
+  .business-sound-player {
+    bottom: 1rem;
+  }
+}
