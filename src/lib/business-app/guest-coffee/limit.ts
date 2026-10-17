@@ -4,15 +4,16 @@
  * - 30 minutes of playback, counted and kept on the SERVER (migration 20270108120000),
  *   so it survives reloads and return visits.
  * - Counting does not depend on the client: every stream URL opens a server-side playback
- *   lease (track length known to the server); the next URL settles it at
- *   min(track length, wall-clock since issue), at least min(track length, 15 s).
- *   Client reports of actual <audio> progress only add to the open lease (cumulative,
- *   bounded by that same wall clock) — they keep the meter current mid-track and charge
- *   the last track of a session; suppressing or replaying them gains nothing.
+ *   lease (track length known to the server, network remembered) and is charged
+ *   min(track length, 15 s) up front; in total a lease costs min(track length, wall-clock
+ *   since issue). Before authorising a URL the network total also includes what every
+ *   still-open lease of that network would cost now, so fresh cookies with suppressed
+ *   reports leave nothing unaccounted. Client reports of actual <audio> progress only add
+ *   to the open lease (cumulative, bounded by that same wall clock).
  * - Identity: httpOnly device cookie (primary) + a separate shared counter per client
- *   network (keyed hash of the IP; IPv6 per /64). Effective used =
- *   max(device, network - (NETWORK_LIMIT - LIMIT)): one device gets 30 min; cookie juggling
- *   on one network gets at most NETWORK_LIMIT per rolling 30 days.
+ *   network (keyed hash of the IP; IPv6 per /64; daily buckets, rolling 30 days).
+ *   Effective used = max(device, network - (NETWORK_LIMIT - LIMIT)): one device gets
+ *   30 min; cookie juggling on one network gets at most NETWORK_LIMIT per rolling 30 days.
  * - Enforced where it matters: the server refuses new stream URLs once the limit is used.
  *   The track that is already playing is allowed to finish (gentle, no hard cut).
  * - The UI never shows a countdown — only a soft note near the end.
@@ -22,7 +23,7 @@
 export const GUEST_COFFEE_LIMIT_SECONDS = 30 * 60;
 /** Shared per-network allowance per rolling 30 days (2 full guest sessions). */
 export const GUEST_COFFEE_NETWORK_LIMIT_SECONDS = 2 * GUEST_COFFEE_LIMIT_SECONDS;
-/** Minimum the server charges for every issued stream URL (skip-through / URL harvesting). */
+/** Charged up front for every issued stream URL (skip-through / URL harvesting). */
 export const GUEST_COFFEE_MIN_LEASE_CHARGE_SECONDS = 15;
 /** Soft "near the end" note from 25 minutes of actual playback. */
 export const GUEST_COFFEE_WARN_AFTER_SECONDS = 25 * 60;

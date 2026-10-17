@@ -356,16 +356,19 @@ const rollback = read("docs/business/guest-listening-a8240527-rollback.sql");
   assert.match(clean, /CREATE TABLE IF NOT EXISTS public\.business_guest_listening/);
   assert.match(clean, /ENABLE ROW LEVEL SECURITY/);
   assert.doesNotMatch(clean, /CREATE POLICY/, "no policies: service_role only");
-  assert.match(clean, /CREATE TABLE IF NOT EXISTS public\.business_guest_listening_ip/);
+  assert.match(clean, /CREATE TABLE IF NOT EXISTS public\.business_guest_listening_ip_day/);
   assert.match(clean, /REVOKE ALL ON public\.business_guest_listening FROM PUBLIC, anon, authenticated;/);
-  assert.match(clean, /REVOKE ALL ON public\.business_guest_listening_ip FROM PUBLIC, anon, authenticated;/);
+  assert.match(clean, /REVOKE ALL ON public\.business_guest_listening_ip_day FROM PUBLIC, anon, authenticated;/);
+  assert.match(clean, /b\.day > current_date - 30/, "rolling 30-day network window");
+  assert.match(clean, new RegExp(`lease_charged_seconds = least\\(v_cap, ${GUEST_COFFEE_MIN_LEASE_CHARGE_SECONDS}\\)`), "minimum charged up front at issuance");
   const granted = [...clean.matchAll(/GRANT EXECUTE ON FUNCTION public\.(\w+)\([^)]*\) TO service_role;/g)].map((m) => m[1]).sort();
   assert.deepEqual(granted, ["business_guest_listening_issue", "business_guest_listening_peek", "business_guest_listening_report"]);
   assert.doesNotMatch(clean, /GRANT[^;]*TO (anon|authenticated|PUBLIC)/);
-  assert.doesNotMatch(clean, /\b(ALTER TABLE public\.(?!business_guest_listening)|DROP |UPDATE public\.(?!business_guest_listening)|DELETE FROM)/i, "additive only");
+  assert.doesNotMatch(clean, /\b(ALTER TABLE public\.(?!business_guest_listening)|DROP |UPDATE public\.(?!business_guest_listening)|DELETE FROM (?!public\.business_guest_listening_ip_day))/i, "additive only (old buckets of its own table are pruned)");
   for (const body of clean.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)[\s\S]*?\$\$;/g)) {
     assert.match(body[0], /SET search_path = public, pg_temp/, `${body[1]}: fixed search_path`);
     const pure = body[1] === "business_guest_listening_lease_owed_" || body[1] === "business_guest_listening_effective_";
+    if (body[1].endsWith("_")) assert.match(clean, new RegExp(`REVOKE ALL ON FUNCTION public\\.${body[1]}\\([^)]*\\) FROM PUBLIC, anon, authenticated, service_role;`), `${body[1]}: internal`);
     if (!pure) assert.match(body[0], /SECURITY DEFINER/, `${body[1]}: SECURITY DEFINER`);
     assert.match(clean, new RegExp(`REVOKE ALL ON FUNCTION public\\.${body[1]}\\(`), `${body[1]}: revoked from PUBLIC`);
   }
@@ -374,10 +377,10 @@ const rollback = read("docs/business/guest-listening-a8240527-rollback.sql");
   assert.match(clean, new RegExp(`v_effective < ${GUEST_COFFEE_LIMIT_SECONDS}`));
   assert.match(clean, new RegExp(`least\\(p_device\\.lease_cap_seconds, ${GUEST_COFFEE_MIN_LEASE_CHARGE_SECONDS}\\)`));
   assert.doesNotMatch(clean, /\+ 10\b/, "no renewable per-request slack");
-  for (const fn of ["peek(text, text)", "report(text, text, integer)", "issue(text, text, integer)", "effective_(integer, integer)", "lease_owed_(public.business_guest_listening)", "charge_(text, text, integer)", "lock_(text, text)"]) {
+  for (const fn of ["peek(text, text)", "report(text, text, integer)", "issue(text, text, integer)", "settle_(text)", "effective_(integer, integer)", "network_used_(text, text)", "lease_owed_(public.business_guest_listening)", "charge_(text, text, integer)", "lock_(text, text)"]) {
     assert.ok(rollback.includes(`DROP FUNCTION IF EXISTS public.business_guest_listening_${fn};`), `rollback drops ${fn}`);
   }
-  assert.match(rollback, /DROP TABLE IF EXISTS public\.business_guest_listening_ip;/);
+  assert.match(rollback, /DROP TABLE IF EXISTS public\.business_guest_listening_ip_day;/);
   assert.match(rollback, /DROP TABLE IF EXISTS public\.business_guest_listening;/);
 }
 const pkg = JSON.parse(read("package.json"));
@@ -407,12 +410,12 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS; END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;`;
-    const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64), F = "f".repeat(64), G = "e".repeat(64);
-    const Z = "0".repeat(64);
+    const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64), F = "f".repeat(64), H = "e".repeat(64);
+    const G1 = "1".repeat(64), G2 = "2".repeat(64), R = "3".repeat(64), Z = "0".repeat(64);
     const out = psql(db, [setup, migration, migration /* idempotent re-run */, `
 SET ROLE service_role;
 SELECT 'i1=' || public.business_guest_listening_issue('${A}', '${F}', 200);
--- burst / replayed reports right after issue: nothing (bounded by wall clock since the lease opened, no slack)
+-- burst / replayed reports right after issue: nothing beyond the 15 s charged up front
 SELECT 'r1=' || public.business_guest_listening_report('${A}', '${F}', 60);
 SELECT 'r2=' || public.business_guest_listening_report('${A}', '${F}', 60);
 RESET ROLE;
@@ -434,41 +437,73 @@ RESET ROLE;
 UPDATE public.business_guest_listening SET lease_started_at = now() - interval '1 hour' WHERE device_hash = '${A}';
 SET ROLE service_role;
 SELECT 'i5=' || public.business_guest_listening_issue('${A}', '${F}', 200);
--- cookie juggling on one network G: B and C created BEFORE listening
-SELECT 'jb=' || public.business_guest_listening_issue('${B}', '${G}', 200);
-SELECT 'jc=' || public.business_guest_listening_issue('${C}', '${G}', 200);
 RESET ROLE;
-UPDATE public.business_guest_listening SET used_seconds = 1800, lease_started_at = NULL, lease_cap_seconds = NULL WHERE device_hash IN ('${B}');
-UPDATE public.business_guest_listening SET lease_started_at = NULL, lease_cap_seconds = NULL WHERE device_hash IN ('${C}');
-UPDATE public.business_guest_listening_ip SET used_seconds = 1800 WHERE ip_hash = '${G}';
+-- fresh cookie for EVERY track, no reports, tracks actually played (time passes):
+-- abandoned leases still count for the network → denial after 2 × 30 min.
+CREATE TEMP TABLE gc_res (k text, v integer);
+GRANT ALL ON gc_res TO service_role;
+DO $do$
+DECLARE i integer; v integer; granted integer := 0;
+BEGIN
+  FOR i IN 1..100 LOOP
+    v := public.business_guest_listening_issue(lpad(to_hex(1000 + i), 64, 'a'), '${G1}', 200);
+    EXIT WHEN v >= 1800;
+    granted := granted + 1;
+    UPDATE public.business_guest_listening SET lease_started_at = lease_started_at - interval '200 seconds'
+    WHERE lease_ip_hash = '${G1}' AND lease_started_at IS NOT NULL;
+  END LOOP;
+  INSERT INTO gc_res VALUES ('played_granted', granted);
+  granted := 0;
+  -- instant URL harvesting with fresh cookies (no time passes): 15 s each up front
+  FOR i IN 1..400 LOOP
+    v := public.business_guest_listening_issue(lpad(to_hex(5000 + i), 64, 'b'), '${G2}', 200);
+    EXIT WHEN v >= 1800;
+    granted := granted + 1;
+  END LOOP;
+  INSERT INTO gc_res VALUES ('harvest_granted', granted);
+END
+$do$;
+SELECT k || '=' || v FROM gc_res;
+-- two cookies created BEFORE listening on one network H
 SET ROLE service_role;
-SELECT 'xb=' || public.business_guest_listening_issue('${B}', '${G}', 200);
+SELECT 'jb=' || public.business_guest_listening_issue('${B}', '${H}', 200);
+SELECT 'jc=' || public.business_guest_listening_issue('${C}', '${H}', 200);
+RESET ROLE;
+UPDATE public.business_guest_listening SET used_seconds = 1800, lease_started_at = NULL, lease_cap_seconds = NULL, lease_ip_hash = NULL, lease_charged_seconds = 0 WHERE device_hash IN ('${B}', '${C}');
+UPDATE public.business_guest_listening SET used_seconds = 15 WHERE device_hash = '${C}';
+UPDATE public.business_guest_listening_ip_day SET used_seconds = 1800 WHERE ip_hash = '${H}';
+SET ROLE service_role;
+SELECT 'xb=' || public.business_guest_listening_issue('${B}', '${H}', 200);
 RESET ROLE;
 SELECT 'xblease=' || (lease_started_at IS NULL)::text FROM public.business_guest_listening WHERE device_hash = '${B}';
 SET ROLE service_role;
-SELECT 'xc=' || public.business_guest_listening_issue('${C}', '${G}', 200);
+SELECT 'xc=' || public.business_guest_listening_issue('${C}', '${H}', 200);
 RESET ROLE;
-UPDATE public.business_guest_listening SET lease_started_at = NULL, lease_cap_seconds = NULL WHERE device_hash = '${C}';
-UPDATE public.business_guest_listening_ip SET used_seconds = 3600 WHERE ip_hash = '${G}';
+UPDATE public.business_guest_listening SET lease_started_at = NULL, lease_cap_seconds = NULL, lease_ip_hash = NULL, lease_charged_seconds = 0 WHERE device_hash = '${C}';
+UPDATE public.business_guest_listening_ip_day SET used_seconds = 3600 WHERE ip_hash = '${H}';
 SET ROLE service_role;
-SELECT 'yc=' || public.business_guest_listening_issue('${C}', '${G}', 200);
-SELECT 'yd=' || public.business_guest_listening_peek('${D}', '${G}');
-SELECT 'yd2=' || public.business_guest_listening_issue('${D}', '${G}', 200);
+SELECT 'yc=' || public.business_guest_listening_issue('${C}', '${H}', 200);
+SELECT 'yd=' || public.business_guest_listening_peek('${D}', '${H}');
+SELECT 'yd2=' || public.business_guest_listening_issue('${D}', '${H}', 200);
 SELECT 'ye=' || public.business_guest_listening_peek('${D}', NULL);
 SELECT 'z=' || public.business_guest_listening_peek('${Z}', NULL);
 SELECT 'neg=' || public.business_guest_listening_report('${Z}', NULL, -5);
 RESET ROLE;
--- an IP window older than 30 days starts over
-UPDATE public.business_guest_listening_ip SET window_started_at = now() - interval '31 days' WHERE ip_hash = '${G}';
+-- ROLLING 30 days: usage from day -29 still counts, day -30 no longer does
+INSERT INTO public.business_guest_listening_ip_day VALUES ('${R}', current_date - 29, 3600);
 SET ROLE service_role;
-SELECT 'w=' || public.business_guest_listening_peek('${Z}', '${G}');
+SELECT 'w29=' || public.business_guest_listening_peek('${Z}', '${R}');
+RESET ROLE;
+UPDATE public.business_guest_listening_ip_day SET day = current_date - 30 WHERE ip_hash = '${R}';
+SET ROLE service_role;
+SELECT 'w30=' || public.business_guest_listening_peek('${Z}', '${R}');
 RESET ROLE;
 `].join("\n"));
     const val = (k: string) => Number(out.match(new RegExp(`^${k}=(\\d+)$`, "m"))?.[1]);
-    assert.equal(val("i1"), 0, "new guest starts at 0");
-    assert.equal(val("r1"), 0, "report right after issue: nothing to credit yet");
-    assert.equal(val("r2"), 0, "replayed reports add nothing");
-    assert.equal(val("r3"), 60, "real report credited (≤ 60 s per report)");
+    assert.equal(val("i1"), 0, "new guest starts at 0 (value before the up-front charge)");
+    assert.equal(val("r1"), 15, "issue charged 15 s up front; an immediate report adds nothing");
+    assert.equal(val("r2"), 15, "replayed reports add nothing");
+    assert.equal(val("r3"), 75, "real report credited (≤ 60 s per report)");
     assert.equal(val("r4"), 100, "cumulative credit bounded by wall clock since the lease opened");
     assert.equal(val("r5"), 100, "no renewable slack on repeated reports");
     assert.equal(val("i2"), 100, "settling an already reported lease adds nothing");
@@ -476,18 +511,21 @@ RESET ROLE;
     assert.equal(val("p1"), 315, "peek includes what the open lease would cost now");
     assert.equal(val("i4"), 315, "no reports at all: lease settled by the server at the track length");
     assert.equal(val("i5"), 515, "…and again for every following track");
+    assert.equal(val("played_granted"), 18, "fresh cookie per track + no reports: denied after 2 × 30 min of network playback");
+    assert.equal(val("harvest_granted"), 240, "instant URL harvesting with fresh cookies: denied after 3600 / 15 URLs");
     assert.equal(val("jb"), 0);
     assert.equal(val("jc"), 0);
     assert.ok(val("xb") >= 1800, "exhausted device refused");
     assert.match(out, /^xblease=true$/m, "no lease is opened for a refused URL");
-    assert.equal(val("xc"), 0, "pre-created second cookie on the same network: one more session at most");
+    assert.equal(val("xc"), 15, "pre-created second cookie on the same network: one more session at most");
     assert.equal(val("yc"), 1800, "network allowance (2 × 30 min) used → second cookie refused too");
     assert.equal(val("yd"), 1800, "brand-new cookie on that network: refused (peek)");
     assert.ok(val("yd2") >= 1800, "brand-new cookie on that network: refused (issue)");
     assert.equal(val("ye"), 0, "another network: own meter");
     assert.equal(val("z"), 0);
     assert.equal(val("neg"), 0, "report without a lease / negative credit ignored");
-    assert.equal(val("w"), 0, "IP window older than 30 days starts over");
+    assert.equal(val("w29"), 1800, "rolling window: usage from 29 days ago still counts");
+    assert.equal(val("w30"), 0, "rolling window: usage from 30 days ago no longer counts");
     for (const role of ["anon", "authenticated"]) {
       for (const call of [
         `SELECT public.business_guest_listening_issue('${A}', NULL, 1);`,
@@ -495,17 +533,20 @@ RESET ROLE;
         `SELECT public.business_guest_listening_peek('${A}', NULL);`,
         `SELECT public.business_guest_listening_charge_('${A}', NULL, 100);`,
         `SELECT public.business_guest_listening_lock_('${A}', NULL);`,
+        `SELECT public.business_guest_listening_settle_('${A}');`,
         "SELECT * FROM public.business_guest_listening;",
-        "SELECT * FROM public.business_guest_listening_ip;",
+        "SELECT * FROM public.business_guest_listening_ip_day;",
       ]) {
         assert.throws(() => psql(db, `SET ROLE ${role}; ${call}`), /permission denied/, `${role}: ${call}`);
       }
     }
-    assert.throws(() => psql(db, `SET ROLE service_role; SELECT public.business_guest_listening_charge_('${A}', NULL, 100);`), /permission denied/, "internal helpers are not callable even by service_role");
+    for (const call of [`business_guest_listening_charge_('${A}', NULL, 100)`, `business_guest_listening_settle_('${A}')`, `business_guest_listening_lock_('${A}', NULL)`]) {
+      assert.throws(() => psql(db, `SET ROLE service_role; SELECT public.${call};`), /permission denied/, `internal helper not callable even by service_role: ${call}`);
+    }
     assert.throws(() => psql(db, `SET ROLE service_role; SELECT public.business_guest_listening_issue('bad', NULL, 1);`), /invalid_device_hash/);
     assert.throws(() => psql(db, `SET ROLE service_role; SELECT public.business_guest_listening_issue('${A}', 'bad', 1);`), /invalid_ip_hash/);
     psql(db, rollback);
-    assert.equal(psql(db, "SELECT to_regclass('public.business_guest_listening') IS NULL AND to_regclass('public.business_guest_listening_ip') IS NULL;").trim(), "t", "rollback drops both tables");
+    assert.equal(psql(db, "SELECT to_regclass('public.business_guest_listening') IS NULL AND to_regclass('public.business_guest_listening_ip_day') IS NULL;").trim(), "t", "rollback drops both tables");
     assert.equal(psql(db, "SELECT count(*) FROM pg_proc WHERE proname LIKE 'business_guest_listening%';").trim(), "0", "rollback drops every function");
     console.log("business-guest-coffee-unit: ok (incl. real PostgreSQL scenarios)");
   } finally {
