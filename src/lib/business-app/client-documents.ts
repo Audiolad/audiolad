@@ -5,7 +5,7 @@
  * a migration, see docs/business/rights-8dcba9d1/15_PLAYBACK_REPORT_DESIGN.md).
  */
 
-export const CLIENT_DOCUMENT_EDITION_LABEL = "Редакция от 16.10.2026";
+export const CLIENT_DOCUMENT_EDITION_LABEL = "Редакция от 17.10.2026";
 /** Requisites of the service operator (not a declaration of ownership of third-party music). */
 export const CLIENT_DOCUMENT_REQUISITES =
   "ИП Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237";
@@ -23,8 +23,8 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "venue-license",
     title: "Лицензия на публичное исполнение музыки в заведении",
-    version: "r5-2026-10-16",
-    versionDate: "2026-10-16",
+    version: "r6-2026-10-17",
+    versionDate: "2026-10-17",
     status: "approved",
     summary:
       "Документ точки: лицензия на музыку АудиоЛад в вашем заведении (только через плеер АудиоЛад).",
@@ -32,25 +32,25 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
   {
     id: "b2b-terms",
     title: "Условия лицензирования музыки для бизнеса",
-    version: "r5-2026-10-16",
-    versionDate: "2026-10-16",
+    version: "r6-2026-10-17",
+    versionDate: "2026-10-17",
     status: "approved",
     summary: "Раздел оферты «АудиоЛад Бизнес»: что разрешено, сроки, учёт, РАО и ВОИС.",
   },
   {
     id: "claims-procedure",
     title: "Порядок защиты клиента при претензиях РАО, ВОИС и иных лиц",
-    version: "r5-2026-10-16",
-    versionDate: "2026-10-16",
+    version: "r6-2026-10-17",
+    versionDate: "2026-10-17",
     status: "approved",
     summary:
-      "Что делать, если пришла претензия или проверка: сроки, документы, помощь и условия возмещения.",
+      "Что делать, если пришла претензия или проверка: сроки, юридическая помощь АудиоЛад и условия, при которых возможно возмещение.",
   },
   {
     id: "claim-reply-kit",
     title: "Образец ответа на претензию и перечень документов",
-    version: "r5-2026-10-16",
-    versionDate: "2026-10-16",
+    version: "r6-2026-10-17",
+    versionDate: "2026-10-17",
     status: "approved",
     summary: "Образец ответа и документы; отправляйте ответ по согласованию с АудиоЛад, кроме случаев п. 2.2 порядка защиты.",
   },

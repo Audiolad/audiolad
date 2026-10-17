@@ -15,7 +15,7 @@
 | 07 | [07_CHECKLIST_SERGEY.md](07_CHECKLIST_SERGEY.md) | Чек-лист документов и сведений, которые должен дать Сергей |
 | 08 | [08_LAWYER_BRIEF.md](08_LAWYER_BRIEF.md) | ТЗ и вопросы юристу: РАО/ВОИС, ст. 1244/1326, публичное исполнение в точке |
 | 09 | [09_STOP_FACTORS.md](09_STOP_FACTORS.md) | Юридические стоп-факторы до подписания и коммерческого использования |
-| 10 | [10_CLAIMS_PROTECTION_PROCEDURE.md](10_CLAIMS_PROTECTION_PROCEDURE.md) | Порядок защиты клиента при претензиях РАО/ВОИС: сроки, третье лицо, условия и лимит возмещения |
+| 10 | [10_CLAIMS_PROTECTION_PROCEDURE.md](10_CLAIMS_PROTECTION_PROCEDURE.md) | Порядок защиты клиента при претензиях РАО/ВОИС: сроки, третье лицо, условия возмещения (история; действующий текст — `docs/business/public/claims-procedure.md`, r6) |
 | 11 | [11_CLAIM_REPLY_KIT.md](11_CLAIM_REPLY_KIT.md) | Шаблон ответа на претензию, перечень документов, памятка «пришёл проверяющий» |
 | 12 | [12_VENUE_LICENSE_K12.md](12_VENUE_LICENSE_K12.md) | Документ точки (лицензия на заведение, K12) |
 | 13 | [13_PSEUDONYM_RIGHTSHOLDER_LINK.md](13_PSEUDONYM_RIGHTSHOLDER_LINK.md) | Связка псевдонимов «Аурафон»/«Джаз Релакс» с ИП Петров С.С. |

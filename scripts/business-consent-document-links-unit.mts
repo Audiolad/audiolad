@@ -24,12 +24,12 @@ const terms = PUBLIC_PROGRAM_DOCUMENTS.business_program_terms;
 const rights = PUBLIC_PROGRAM_DOCUMENTS.business_music_rights_declaration;
 assert.equal(terms.path, "/business-documents/program-terms");
 assert.equal(rights.path, "/business-documents/music-rights-declaration");
-assert.equal(documentEditionLabel(terms), "Редакция от 16.10.2026");
+assert.equal(documentEditionLabel(terms), "Редакция от 17.10.2026");
 assert.equal(documentEditionLabel(rights), "Редакция от 16.10.2026");
 assert.equal(documentEditionLabel({ date: "2026-10-14", status: "draft" }), "Редакция от 14.10.2026, черновик");
 for (const d of [terms, rights]) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r5-2026-10-16");
+  assert.equal(d.version, d === terms ? "r6-2026-10-17" : "r5-2026-10-16");
   // Final edition: no draft / waiting-for-lawyer marks.
   assert.doesNotMatch(d.markdown, /Черновик, требует проверки юриста|До него текст|проект r2|проект v3|не подписан\)/);
   // Requisites filled from published /requisites; passport and address never published.
@@ -68,7 +68,7 @@ function assertNewTab(tag: string) {
 const link = renderToStaticMarkup(createElement(ConsentDocumentLink, { documentKey: "business_program_terms" }, "условия"));
 assertNewTab(anchors(link)[0]);
 assert.match(link, /href="\/business-documents\/program-terms"/);
-assert.match(link, /Редакция от 16\.10\.2026/);
+assert.match(link, /Редакция от 17\.10\.2026/);
 assert.doesNotMatch(link, /черновик/);
 // DB-published version: shows the version that the consent row will record.
 const dbLink = renderToStaticMarkup(createElement(ConsentDocumentLink, { documentKey: "business_music_rights_declaration", dbVersion: "v1", dbUrl: "https://audiolad.ru/x" }, "заявление"));
