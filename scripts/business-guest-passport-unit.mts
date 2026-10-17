@@ -215,7 +215,7 @@ for (const [name, plan] of plans) {
       e.order.forEach((o, i) => {
         if (o === "") return;
         const n = shelf.find((p) => p.id === planned[i])!.tracks.length;
-        assert.deepEqual([...o].map((c) => parseInt(c, 36)).sort((x, y) => x - y), Array.from({ length: n }, (_, k) => k), "order is a permutation");
+        assert.deepEqual((n <= 36 ? [...o] : o.split(".")).map((c) => parseInt(c, 36)).sort((x, y) => x - y), Array.from({ length: n }, (_, k) => k), "order is a permutation");
       });
       // The client applies the server ranking as is – no album is re-ranked editorially.
       assert.deepEqual(rec.albums.map((a) => a.playlist.id), planned, `${name} ${key}: client order = server order`);
@@ -253,6 +253,8 @@ for (const [name, plan] of plans) {
   assert.deepEqual(assembleGuestCoffeeAtmosphere(shelf, profile, { version: 1, entries: {} } as unknown as GuestCoffeeRecommendationPlan), base, "old / unknown plan version → editorial");
   const broken = { ...editorialPlan, entries: { [key]: { ...editorialPlan.entries[key], fits: "1" } } };
   assert.deepEqual(assembleGuestCoffeeAtmosphere(shelf, profile, broken), base, "malformed entry → editorial");
+  const notBinary = { ...editorialPlan, entries: { [key]: { ...editorialPlan.entries[key], fits: "x".repeat(editorialPlan.entries[key].fits.length) } } };
+  assert.deepEqual(assembleGuestCoffeeAtmosphere(shelf, profile, notBinary), base, "non-binary fit flags → editorial, no false fallback notice");
   // An album that became unavailable after the plan was built (paid, unpublished) never comes back.
   const passportPlan = plans[0][1]!;
   const gone = ids(passportPlan, key)[0];
@@ -281,6 +283,22 @@ for (const [name, plan] of plans) {
   const rec3 = guestCoffeeRecommendation(shelf3, profile, plan);
   assert.equal(rec3.albums.length, shelf.length);
   assert.ok(rec3.albums.find((a) => a.playlist.id === it.id)!.tracks === replaced.tracks, "stale album → editorial basis, own track order");
+}
+
+// ---------------------------------------------------------------- long albums (> 36 tracks) keep their passport track order
+{
+  const long: GuestCoffeePlaylist = {
+    ...shelf[0], id: "p-long", productSlug: "long",
+    tracks: Array.from({ length: 40 }, (_, i) => ({ audioItemId: `long-t${i}`, title: `long ${i}`, durationSeconds: 120 })),
+  };
+  const f = new Map<string, GuestCoffeeSoundFeatures>([["long-t39", rome], ["long-t38", rome]]);
+  const plan = buildGuestCoffeeRecommendationPlan([long], f);
+  const profile: GuestCoffeeProfile = { character: "cozy", direction: "melodic", daypart: "evening" };
+  const enc = plan.entries[guestCoffeeProfileKey(profile)].order[0];
+  assert.ok(enc.includes("."), "dot-separated base-36 positions for long albums");
+  const got = guestCoffeeRecommendation([long], profile, plan).albums[0].tracks.map((t) => t.audioItemId);
+  assert.deepEqual(got.slice(0, 2).sort(), ["long-t38", "long-t39"], "the covered tracks lead a 40-track album");
+  assert.equal(new Set(got).size, 40);
 }
 
 // ---------------------------------------------------------------- the server decides for EVERY album (no truncated plan)

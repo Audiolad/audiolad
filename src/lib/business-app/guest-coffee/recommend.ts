@@ -395,8 +395,8 @@ export function allGuestCoffeeProfiles(): GuestCoffeeProfile[] {
 /**
  * One plan entry: EVERY album of the plan in rank order (indices into `plan.albums`), «sdc» fit
  * flags ("1" / "0", three per ranked album, concatenated) and the preferred track order of
- * each ranked album: positions into its track list, one base-36 digit per track ("" = album
- * order, e.g. no covered tracks or more than 36 tracks).
+ * each ranked album: positions into its track list in base 36 – one digit per track for up to
+ * 36 tracks, dot-separated for longer albums ("" = album order, e.g. no covered tracks).
  */
 export type GuestCoffeePlanEntry = {
   rank: number[];
@@ -419,12 +419,15 @@ export type GuestCoffeeRecommendationPlan = {
 const ORDER_RADIX = 36;
 
 function encodeOrder(order: number[] | null): string {
-  return order && order.length <= ORDER_RADIX ? order.map((i) => i.toString(ORDER_RADIX)).join("") : "";
+  if (!order) return "";
+  return order.map((i) => i.toString(ORDER_RADIX)).join(order.length <= ORDER_RADIX ? "" : ".");
 }
 
 function decodeOrder(order: unknown, n: number): number[] | null {
-  if (typeof order !== "string" || order.length !== n || n === 0) return null;
-  const out = [...order].map((c) => parseInt(c, ORDER_RADIX));
+  if (typeof order !== "string" || n === 0) return null;
+  const parts = n <= ORDER_RADIX ? [...order] : order.split(".");
+  if (parts.length !== n || !parts.every((c) => /^[0-9a-z]+$/.test(c))) return null;
+  const out = parts.map((c) => parseInt(c, ORDER_RADIX));
   return new Set(out).size === n && out.every((i) => Number.isInteger(i) && i >= 0 && i < n) ? out : null;
 }
 
@@ -488,7 +491,7 @@ export function guestCoffeeRecommendation(
   const valid =
     !!plan && plan.version === 2 && Array.isArray(plan.albums) && Array.isArray(plan.tracks) && plan.albums.length === plan.tracks.length;
   const entry = valid ? plan.entries?.[guestCoffeeProfileKey(profile)] : undefined;
-  const usable = !!entry && Array.isArray(entry.rank) && typeof entry.fits === "string" && entry.fits.length === entry.rank.length * 3;
+  const usable = !!entry && Array.isArray(entry.rank) && typeof entry.fits === "string" && entry.fits.length === entry.rank.length * 3 && /^[01]*$/.test(entry.fits);
   if (usable) {
     entry.rank.forEach((albumIndex, pos) => {
       const id = Number.isInteger(albumIndex) ? plan!.albums[albumIndex] : undefined;
