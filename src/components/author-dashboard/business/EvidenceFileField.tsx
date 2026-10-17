@@ -46,19 +46,22 @@ export function useEvidencePreviews() {
 
 type Tone = "progress" | "ok" | "error";
 
+// Author-cabinet (audiolad.ru) lavender palette: the same values as the rest of
+// /author-dashboard (primary #7042c5, lavender borders/surfaces, cabinet green/red notices).
+// Never the Business Jazz & Coffee theme tokens: they are scoped to business.audiolad.ru.
 const TONE_CLASS: Record<Tone, string> = {
-  progress: "bg-[var(--biz-neutral-bg)] text-[var(--biz-neutral-ink)]",
-  ok: "bg-[var(--biz-green-bg)] text-[var(--biz-green-ink)]",
-  error: "bg-[var(--biz-red-bg)] text-[var(--biz-red-ink)]",
+  progress: "bg-[#f3ecfd] text-[#4c3d78]",
+  ok: "bg-[#f3fbf6] text-[#2f7a55]",
+  error: "bg-[#fff5f5] text-[#9b3d3d]",
 };
 
 function PdfIcon() {
   return (
     <svg viewBox="0 0 40 48" className="h-11 w-9" aria-hidden="true" focusable="false">
-      <path d="M4 2h22l10 10v32a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="var(--biz-surface)" stroke="var(--biz-border-strong)" strokeWidth="2" />
-      <path d="M26 2v10h10" fill="none" stroke="var(--biz-border-strong)" strokeWidth="2" />
-      <rect x="5" y="26" width="30" height="13" rx="3" fill="var(--biz-red)" />
-      <text x="20" y="36" textAnchor="middle" fontSize="10" fontWeight="700" fill="var(--biz-on-accent)" fontFamily="system-ui, sans-serif">PDF</text>
+      <path d="M4 2h22l10 10v32a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" fill="#ffffff" stroke="#c6afe6" strokeWidth="2" />
+      <path d="M26 2v10h10" fill="none" stroke="#c6afe6" strokeWidth="2" />
+      <rect x="5" y="26" width="30" height="13" rx="3" fill="#9b3d3d" />
+      <text x="20" y="36" textAnchor="middle" fontSize="10" fontWeight="700" fill="#ffffff" fontFamily="system-ui, sans-serif">PDF</text>
     </svg>
   );
 }
@@ -168,10 +171,9 @@ export default function EvidenceFileField({
 
   return (
     <div
-      data-biz-theme="jazz-coffee"
       data-evidence-field={kind}
       data-evidence-state={tone ?? "empty"}
-      className={`rounded-xl border p-4 text-[var(--biz-text)] ${hasContent ? "border-solid border-[var(--biz-border)] bg-[var(--biz-surface)]" : "border-dashed border-[var(--biz-border-strong)] bg-[var(--biz-surface)]"}`}
+      className={`rounded-[18px] border p-4 text-[#25135c] ${hasContent ? "border-solid border-[#e4d7f4] bg-white" : "border-dashed border-[#c6afe6] bg-[#faf6ff]"}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         {readOnly ? (
@@ -181,13 +183,13 @@ export default function EvidenceFileField({
         )}
         {onShowExample && !readOnly ? (
           <button type="button" onClick={onShowExample}
-            className="min-h-11 rounded-lg px-2 text-sm font-medium text-[var(--biz-accent)] underline underline-offset-4 hover:text-[var(--biz-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)]"
+            className="min-h-11 rounded-lg px-2 text-sm font-medium text-[#7042c5] underline underline-offset-4 hover:text-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             aria-haspopup="dialog">
             Посмотреть пример
           </button>
         ) : null}
       </div>
-      {readOnly ? null : <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{hint}</p>}
+      {readOnly ? null : <p className="mt-1 text-sm text-[#5f5484]">{hint}</p>}
 
       {readOnly ? null : (
         <input
@@ -213,7 +215,7 @@ export default function EvidenceFileField({
 
       {hasContent ? (
         <div className="mt-3 flex flex-wrap items-start gap-3 sm:flex-nowrap" data-evidence-preview>
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--biz-border)] bg-[var(--biz-surface-soft)]">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e4d7f4] bg-[#faf6ff]">
             {showImage && imageSrc ? (
               // eslint-disable-next-line @next/next/no-img-element -- local object URL / short-lived signed URL
               <img
@@ -228,12 +230,12 @@ export default function EvidenceFileField({
             ) : isPdfMime(mime) ? (
               <PdfIcon />
             ) : (
-              <span aria-hidden="true" className="text-2xl text-[var(--biz-text-muted)]">🖼</span>
+              <span aria-hidden="true" className="text-2xl text-[#5f5484]">🖼</span>
             )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium" title={name} data-evidence-name>{name}</p>
-            {meta ? <p className="mt-0.5 text-xs text-[var(--biz-text-muted)]">{meta}</p> : null}
+            {meta ? <p className="mt-0.5 text-xs text-[#5f5484]">{meta}</p> : null}
             {tone ? (
               <p id={statusId} role={tone === "error" ? "alert" : "status"} aria-live="polite"
                 className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${TONE_CLASS[tone]}`}
@@ -244,10 +246,10 @@ export default function EvidenceFileField({
                 {statusText}
               </p>
             ) : null}
-            {note ? <p className="mt-1 text-xs text-[var(--biz-text-muted)]">{note}</p> : null}
+            {note ? <p className="mt-1 text-xs text-[#5f5484]">{note}</p> : null}
             {!file && stored?.url ? (
               <a href={stored.url} target="_blank" rel="noopener noreferrer"
-                className="mt-1 inline-block text-xs font-medium text-[var(--biz-accent)] underline underline-offset-4">
+                className="mt-1 inline-block text-xs font-medium text-[#7042c5] underline underline-offset-4 hover:text-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]">
                 {EVIDENCE_COPY.open}
               </a>
             ) : null}
@@ -257,7 +259,7 @@ export default function EvidenceFileField({
               <button ref={replaceRef} type="button" onClick={openPicker} disabled={disabled}
                 aria-label={`${EVIDENCE_COPY.replace}: ${label}`}
                 aria-describedby={describedBy}
-                className="min-h-11 flex-1 rounded-lg border border-[var(--biz-accent-border)] bg-[var(--biz-accent-soft)] px-3 text-sm font-semibold text-[var(--biz-accent)] hover:border-[var(--biz-accent)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60 sm:flex-none">
+                className="min-h-11 flex-1 rounded-full border border-[#d7c4f5] bg-white px-4 text-sm font-semibold text-[#7042c5] transition hover:border-[#c6afe6] hover:bg-[#faf6ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 sm:flex-none">
                 {EVIDENCE_COPY.replace}
               </button>
               {file ? (
@@ -269,7 +271,7 @@ export default function EvidenceFileField({
                   }}
                   aria-label={`${EVIDENCE_COPY.remove}: ${label}`}
                   aria-describedby={describedBy}
-                  className="min-h-11 flex-1 rounded-lg border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 text-sm font-semibold text-[var(--biz-red)] hover:border-[var(--biz-red-border)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60 sm:flex-none">
+                  className="min-h-11 flex-1 rounded-full border border-[#e4d7f4] bg-white px-4 text-sm font-semibold text-[#9b3d3d] transition hover:border-[#f2c7c7] hover:bg-[#fff5f5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 sm:flex-none">
                   {EVIDENCE_COPY.remove}
                 </button>
               ) : null}
@@ -281,14 +283,14 @@ export default function EvidenceFileField({
           <button ref={chooseRef} type="button" onClick={openPicker} disabled={disabled}
             aria-label={`${EVIDENCE_COPY.choose}: ${label}`}
             aria-describedby={describedBy}
-            className="min-h-11 rounded-lg border border-[var(--biz-accent-border)] bg-[var(--biz-accent-soft)] px-4 text-sm font-semibold text-[var(--biz-accent)] hover:border-[var(--biz-accent)] focus-visible:outline-2 focus-visible:outline-[var(--biz-focus)] disabled:opacity-60">
+            className="min-h-11 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white transition hover:bg-[#5e32ad] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60">
             {EVIDENCE_COPY.choose}
           </button>
-          <span id={formatId} className="text-xs text-[var(--biz-text-muted)]">{EVIDENCE_FORMAT_HINT}</span>
+          <span id={formatId} className="text-xs text-[#5f5484]">{EVIDENCE_FORMAT_HINT}</span>
         </div>
       )}
-      {hasContent && !readOnly ? <p id={formatId} className="mt-2 text-xs text-[var(--biz-text-muted)]">{EVIDENCE_FORMAT_HINT}</p> : null}
-      {fieldError ? <p id={errorId} className="mt-2 text-sm text-[var(--biz-red)]" role="alert">{fieldError}</p> : null}
+      {hasContent && !readOnly ? <p id={formatId} className="mt-2 text-xs text-[#5f5484]">{EVIDENCE_FORMAT_HINT}</p> : null}
+      {fieldError ? <p id={errorId} className="mt-2 text-sm text-[#9b3d3d]" role="alert">{fieldError}</p> : null}
     </div>
   );
 }
