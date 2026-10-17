@@ -13,8 +13,7 @@ import {
   authorHasAnyTermsAcceptance,
   loadAuthorTermsStatus,
 } from "@/lib/author-terms/service";
-import { isConsentBlockedForExecution } from "@/lib/author-support/consent-guard";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -39,9 +38,7 @@ export default async function AuthorLegalDocumentsPage({
     workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
 
   const { role } = await requireAuthorMembership(workspace.id);
-  const supportMode = isConsentBlockedForExecution(
-    await peekAuthorExecutionContext(),
-  );
+  const supportMode = await isConsentBlockedForRequest(user.id);
   const [status, hadPrior, commercialShare] = await Promise.all([
     loadAuthorTermsStatus({
       authorId: workspace.id,

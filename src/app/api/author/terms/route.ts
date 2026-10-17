@@ -5,8 +5,7 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import { AuthorTermsError } from "@/lib/author-terms/errors";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
-import { isConsentBlockedForExecution } from "@/lib/author-support/consent-guard";
+import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
 import { loadAuthorTermsStatus } from "@/lib/author-terms/service";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +21,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 
-    const { role } = await requireAuthorMembership(authorId);
-    const execution = await peekAuthorExecutionContext();
+    const { user, role } = await requireAuthorMembership(authorId);
     const status = await loadAuthorTermsStatus({
       authorId,
       role,
-      supportMode: isConsentBlockedForExecution(execution),
+      supportMode: await isConsentBlockedForRequest(user.id),
     });
 
     return NextResponse.json(

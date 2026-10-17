@@ -12,11 +12,8 @@ import {
   requireAuthenticatedUser,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
-import {
-  SUPPORT_MODE_CONSENT_NOTICE,
-  isConsentBlockedForExecution,
-} from "@/lib/author-support/consent-guard";
-import { peekAuthorExecutionContext } from "@/lib/author-support/context";
+import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
+import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +31,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   const { role } = await requireAuthorMembership(workspace.id);
   // Business consents are the rightsholder's personal act: never in support mode.
   // The DB also refuses (business_onboarding_consents → support_mode_consent_forbidden).
-  const supportMode = isConsentBlockedForExecution(await peekAuthorExecutionContext());
+  const supportMode = await isConsentBlockedForRequest(user.id);
   if (supportMode) {
     return (
       <AuthorShell

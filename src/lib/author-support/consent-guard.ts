@@ -49,3 +49,30 @@ export function isConsentBlockedForExecution(
   }
   return context.realUserId !== context.actingUserId;
 }
+
+/**
+ * Decision used by every server path that records an acceptance/consent.
+ *
+ * Support mode exists only through the support cookie (see
+ * getAuthorExecutionContext), so:
+ *   - no support cookie → not support mode (works for cookie AND Bearer auth);
+ *   - support cookie present → the cookie-authenticated execution context must
+ *     resolve, must not be support mode and must be the same real user as the
+ *     caller authenticated by the route; anything else blocks (fail-closed).
+ */
+export function evaluateConsentBlock(input: {
+  hasSupportCookie: boolean;
+  context: ConsentExecutionContext;
+  authenticatedUserId: string | null;
+}): boolean {
+  if (!input.authenticatedUserId) {
+    return true;
+  }
+  if (!input.hasSupportCookie) {
+    return false;
+  }
+  if (isConsentBlockedForExecution(input.context)) {
+    return true;
+  }
+  return input.context?.realUserId !== input.authenticatedUserId;
+}

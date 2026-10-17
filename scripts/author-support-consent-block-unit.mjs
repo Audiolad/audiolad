@@ -10,6 +10,7 @@ import {
   AUTHOR_SUPPORT_CONSENT_PATH_PREFIXES,
   SUPPORT_MODE_ACCEPTANCE_FORBIDDEN,
   SUPPORT_MODE_CONSENT_NOTICE,
+  evaluateConsentBlock,
   isAuthorSupportConsentPath,
   isConsentBlockedForExecution,
 } from "../src/lib/author-support/consent-guard.ts";
@@ -31,6 +32,20 @@ assert.equal(SUPPORT_MODE_ACCEPTANCE_FORBIDDEN, "support_mode_acceptance_forbidd
 assert.match(SUPPORT_MODE_CONSENT_NOTICE, /только сам автор/);
 assert.deepEqual([...AUTHOR_SUPPORT_CONSENT_PATH_PREFIXES], ["/api/author/terms/accept"]);
 
+// 1b) Request-level decision (route/pages): Bearer-only owners are NOT blocked; support cookie fails closed.
+const self = { isSupportMode: false, realUserId: A, actingUserId: A };
+assert.equal(evaluateConsentBlock({ hasSupportCookie: false, context: null, authenticatedUserId: A }), false, "Bearer-only owner (no cookies at all) may accept");
+assert.equal(evaluateConsentBlock({ hasSupportCookie: false, context: self, authenticatedUserId: A }), false, "cookie owner may accept");
+assert.equal(evaluateConsentBlock({ hasSupportCookie: false, context: null, authenticatedUserId: null }), true, "unauthenticated blocks");
+assert.equal(evaluateConsentBlock({ hasSupportCookie: true, context: { isSupportMode: true, realUserId: A, actingUserId: B }, authenticatedUserId: A }), true, "support mode blocks");
+assert.equal(evaluateConsentBlock({ hasSupportCookie: true, context: null, authenticatedUserId: A }), true, "support cookie + unresolvable context blocks");
+assert.equal(evaluateConsentBlock({ hasSupportCookie: true, context: self, authenticatedUserId: A }), false, "stale support cookie of a normal session does not block");
+assert.equal(evaluateConsentBlock({ hasSupportCookie: true, context: { isSupportMode: false, realUserId: B, actingUserId: B }, authenticatedUserId: A }), true, "cookie user differs from Bearer user blocks");
+const consentContext = read("src/lib/author-support/consent-context.ts");
+assert.match(consentContext, /const hasSupportCookie = Boolean\(await readAuthorSupportCookie\(\)\);/);
+assert.match(consentContext, /hasSupportCookie \? await peekAuthorExecutionContext\(\) : null/);
+assert.match(consentContext, /evaluateConsentBlock\(\{ hasSupportCookie, context, authenticatedUserId \}\)/);
+
 // 2) Proxy policy: with a support cookie the acceptance API is blocked (403 support_mutation_blocked).
 for (const p of ["/api/author/terms/accept", "/api/author/terms/accept/", "/api/author/terms/accept?x=1"]) {
   assert.equal(isAuthorSupportConsentPath(p), true, p);
@@ -51,8 +66,8 @@ assert.deepEqual(terms.routePatterns, ["src/app/api/author/terms/accept/route.ts
 // 4) Route: never records under actingUserId; 403 in support mode before any write.
 const route = read("src/app/api/author/terms/accept/route.ts");
 assert.doesNotMatch(route, /actingUserId/, "route must not use the acting (author) user id");
-assert.match(route, /isConsentBlockedForExecution\(execution\)/);
-assert.match(route, /execution\?\.realUserId !== user\.id/);
+assert.match(route, /if \(await isConsentBlockedForRequest\(user\.id\)\) \{/);
+assert.doesNotMatch(route, /peekAuthorExecutionContext/, "route must not authenticate via the cookie-only context");
 assert.match(route, /\{ error: SUPPORT_MODE_ACCEPTANCE_FORBIDDEN \},\s*\{ status: 403/);
 assert.match(route, /const acceptanceUserId = user\.id;/);
 assert.ok(
@@ -80,7 +95,7 @@ for (const rel of [
   "src/app/api/author/terms/route.ts",
 ]) {
   const src = read(rel);
-  assert.match(src, /isConsentBlockedForExecution\(/, rel);
+  assert.match(src, /isConsentBlockedForRequest\(user\.id\)/, rel);
   assert.match(src, /supportMode/, rel);
 }
 
