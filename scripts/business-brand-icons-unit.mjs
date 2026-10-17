@@ -71,8 +71,9 @@ for (const f of ["favicon.ico", "icon.svg", "icon.png", "icon.ico", "apple-icon.
 assert.ok(existsSync(pub("/favicon.ico")));
 assert.equal(classic.icons.icon[0].url, "/favicon.ico?favicon.2vob68tjqpejf.ico");
 
-// Jazz & Coffee icon set: real PNG sizes, opaque home-screen icons, coffee palette,
-// and never the same bytes as the audiolad.ru icons.
+// Espresso-on-cream icon set (original AudioLad mark, recoloured only): real PNG sizes,
+// opaque RGB, strictly two colours (every pixel is a blend of espresso and cream),
+// maskable mark inside the safe zone, and never the same bytes as the audiolad.ru icons.
 function readPng(path) {
   const b = readFileSync(path);
   assert.equal(b.toString("latin1", 1, 4), "PNG", path);
@@ -85,13 +86,12 @@ function readPng(path) {
   }
   return { w, h, depth, colorType, interlace, data: inflateSync(Buffer.concat(idat)) };
 }
-function pixel({ w, depth, colorType, interlace, data }, x, y) {
-  assert.equal(depth, 8); assert.equal(interlace, 0);
-  const bpp = { 2: 3, 6: 4 }[colorType];
-  assert.ok(bpp, `unsupported PNG color type ${colorType}`);
-  const stride = w * bpp, rows = [];
+function decodeRgb({ w, h, depth, colorType, interlace, data }, path) {
+  assert.equal(depth, 8, path); assert.equal(interlace, 0, path);
+  assert.equal(colorType, 2, `${path} must be opaque RGB (no alpha, no palette)`);
+  const bpp = 3, stride = w * bpp, rows = [];
   let prev = Buffer.alloc(stride);
-  for (let r = 0; r <= y; r++) {
+  for (let r = 0; r < h; r++) {
     const f = data[r * (stride + 1)], line = Buffer.from(data.subarray(r * (stride + 1) + 1, (r + 1) * (stride + 1)));
     for (let i = 0; i < stride; i++) {
       const a = i >= bpp ? line[i - bpp] : 0, up = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
@@ -101,22 +101,46 @@ function pixel({ w, depth, colorType, interlace, data }, x, y) {
     }
     rows.push(line); prev = line;
   }
-  return [...rows[y].subarray(x * bpp, x * bpp + bpp)];
+  return (x, y) => [...rows[y].subarray(x * bpp, x * bpp + bpp)];
 }
-const isCoffee = ([r, g, b]) => r > g && g > b && r < 140 && r - b > 20;
+const ESPRESSO = [0x2b, 0x1d, 0x14], CREAM = [0xf7, 0xf1, 0xe8];
+const D = CREAM.map((c, i) => c - ESPRESSO[i]), DD = D.reduce((s, d) => s + d * d, 0);
+/** Position on the cream(0)→espresso(1) line and distance from that line. */
+function onPalette(px) {
+  const t = px.reduce((s, v, i) => s + (CREAM[i] - v) * D[i], 0) / DD;
+  const off = Math.max(...px.map((v, i) => Math.abs(v - (CREAM[i] - t * D[i]))));
+  return { t, off };
+}
 const bizPngs = [
   ...bm.icons.map((i) => ({ src: i.src, sizes: i.sizes, purpose: i.purpose })),
   ...biz.icons.icon.filter((i) => i.sizes).map((i) => ({ src: i.url, sizes: i.sizes })),
 ];
+assert.deepEqual(
+  [...new Set(bizPngs.map((i) => i.src))].sort(),
+  [
+    "/business/brand/apple-touch-icon.png", "/business/brand/favicon-16x16.png", "/business/brand/favicon-32x32.png",
+    "/business/brand/favicon-48x48.png", "/business/brand/icon-192.png", "/business/brand/icon-512.png",
+    "/business/brand/icon-maskable-512.png",
+  ],
+);
 for (const { src, sizes, purpose } of bizPngs) {
   const png = readPng(pub(src));
   assert.equal(`${png.w}x${png.h}`, sizes, `${src} declared ${sizes}`);
-  const opaque = purpose === "maskable" || src.endsWith("apple-touch-icon.png");
-  if (opaque) {
-    assert.equal(png.colorType, 2, `${src} must be opaque (no alpha)`);
-    assert.ok(isCoffee(pixel(png, 2, 2)), `${src} corner is not espresso/coffee`);
+  const px = decodeRgb(png, src), N = png.w;
+  for (const [x, y] of [[0, 0], [N - 1, 0], [0, N - 1], [N - 1, N - 1]]) {
+    assert.deepEqual(px(x, y), CREAM, `${src} corner (${x},${y}) must be cream #f7f1e8`);
   }
-  assert.ok(isCoffee(pixel(png, Math.floor(png.w / 2), Math.floor(png.h * 0.9))), `${src} lower body is not coffee`);
+  let maxT = 0, exactMark = 0, maxR = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const p = px(x, y), { t, off } = onPalette(p);
+    assert.ok(off <= 2 && t >= -0.01 && t <= 1.01, `${src} (${x},${y}) ${p} is not an espresso/cream blend`);
+    maxT = Math.max(maxT, t);
+    if (p.every((v, i) => v === ESPRESSO[i])) exactMark++;
+    if (t > 0.01) maxR = Math.max(maxR, Math.hypot(x + 0.5 - N / 2, y + 0.5 - N / 2) / N);
+  }
+  assert.ok(maxT > (N >= 32 ? 0.9 : 0.5), `${src} has no espresso mark (max blend ${maxT.toFixed(2)})`);
+  if (N >= 180) assert.ok(exactMark > 0, `${src} has no solid espresso #2b1d14 pixels`);
+  if (purpose === "maskable") assert.ok(maxR <= 0.4, `${src} mark leaves the maskable safe zone (r=${maxR.toFixed(3)}N)`);
 }
 const ico = readFileSync(pub("/business/brand/favicon.ico"));
 assert.equal(ico.readUInt16LE(2), 1);
@@ -126,12 +150,9 @@ const icoSizes = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => {
   assert.equal(w, h, `favicon.ico entry ${i} is not square`);
   assert.ok(len > 0 && off >= 6 + ico.readUInt16LE(4) * 16 && off + len <= ico.length, `favicon.ico entry ${i} payload out of bounds`);
   const img = ico.subarray(off, off + len);
-  if (img.toString("latin1", 1, 4) === "PNG") {
-    assert.deepEqual([img.readUInt32BE(16), img.readUInt32BE(20)], [w, h], `favicon.ico entry ${i} PNG size`);
-  } else {
-    assert.equal(img.readUInt32LE(0), 40, `favicon.ico entry ${i} is neither PNG nor BMP`);
-    assert.deepEqual([img.readInt32LE(4), img.readInt32LE(8) / 2], [w, h], `favicon.ico entry ${i} BMP size`);
-  }
+  assert.equal(img.toString("latin1", 1, 4), "PNG", `favicon.ico entry ${i} is not PNG`);
+  assert.deepEqual([img.readUInt32BE(16), img.readUInt32BE(20)], [w, h], `favicon.ico entry ${i} PNG size`);
+  assert.ok(img.equals(readFileSync(pub(`/business/brand/favicon-${w}x${w}.png`))), `favicon.ico ${w}px != favicon-${w}x${w}.png`);
   return w;
 }).sort((a, b) => a - b);
 assert.deepEqual(icoSizes, [16, 32, 48]);
@@ -147,8 +168,11 @@ for (const [b, c] of [
   assert.ok(!readFileSync(pub(b)).equals(readFileSync(pub(c))), `${b} must differ from audiolad.ru ${c}`);
 }
 for (const f of ["icon.svg", "icon-fullbleed.svg", "icon-maskable.svg", "icon-small.svg"]) {
-  const svg = readFileSync(join(root, "docs/business/brand-icons", f), "utf8");
-  for (const c of ["#6f4326", "#2b1d14", "#f7f1e8", "#b8904f"]) assert.ok(svg.includes(c), `${f} lacks ${c}`);
+  assert.ok(!existsSync(join(root, "docs/business/brand-icons", f)), `redrawn SVG ${f} must not come back`);
 }
+const readme = readFileSync(join(root, "docs/business/brand-icons/README.md"), "utf8");
+assert.match(readme, /master-logo-icon\.png/);
+assert.match(readme, /render_icons\.py/);
+assert.ok(existsSync(join(root, "docs/business/brand-icons/render_icons.py")));
 
 console.log("business-brand-icons-unit: ok");
