@@ -21,9 +21,9 @@ import {
   GUEST_COFFEE_SHELF,
   findGuestCoffeeTrack,
   guestCoffeePlaylistMinutes,
-  selectGuestCoffeePlaylists,
   type GuestCoffeePlaylist,
 } from "../src/lib/business-app/guest-coffee/catalog";
+import { selectGuestCoffeePlaylists } from "../src/lib/business-app/guest-coffee/recommend";
 import { buildGuestCoffeeShelf } from "../src/lib/business-app/guest-coffee/shelf";
 import {
   GUEST_COFFEE_LIMIT_SECONDS,
@@ -81,16 +81,16 @@ assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessMusicSection
 const keys = GUEST_COFFEE_SHELF.map((r) => `${r.authorSlug}/${r.productSlug}`);
 assert.equal(new Set(keys).size, keys.length, "no duplicate shelf entries");
 const directionIds = new Set(GUEST_COFFEE_DIRECTIONS.map((d) => d.id));
+const editorialStyles = new Set(["jazz", "bossa", "sax", "calm"]);
 const characterIds = new Set(GUEST_COFFEE_CHARACTERS.map((c) => c.id));
 for (const ref of GUEST_COFFEE_SHELF) {
   assert.match(ref.authorSlug, /^[a-z0-9-]+$/);
   assert.match(ref.productSlug, /^[a-z0-9-]+$/);
-  assert.ok(directionIds.has(ref.direction));
+  assert.ok(editorialStyles.has(ref.direction), "editorial style (reserve basis)");
+  assert.ok((ref.sounds ?? []).every((s) => directionIds.has(s)), "editorial sound types are real sound types");
   assert.ok(ref.characters.length > 0 && ref.characters.every((c) => characterIds.has(c)));
 }
-for (const d of GUEST_COFFEE_DIRECTIONS) {
-  assert.ok(GUEST_COFFEE_SHELF.some((r) => r.direction === d.id), `direction ${d.id} has at least one album`);
-}
+assert.deepEqual(GUEST_COFFEE_DIRECTIONS.map((d) => d.id), ["jazz", "calm", "rhythm", "melodic"], "4 sound types");
 assert.deepEqual(GUEST_COFFEE_DAYPARTS.map((d) => d.id), ["morning", "day", "evening", "allday"]);
 
 const pl = (id: string, direction: GuestCoffeePlaylist["direction"], dayparts: GuestCoffeePlaylist["dayparts"], characters: GuestCoffeePlaylist["characters"], tracks = 3): GuestCoffeePlaylist => ({
@@ -106,14 +106,16 @@ const sample = [
 ];
 let sel = selectGuestCoffeePlaylists(sample, { character: "evening", direction: "jazz", daypart: "evening" });
 assert.equal(sel.playlists[0].id, "j-evening", "daypart + character win");
-assert.ok(sel.playlists.every((p) => p.direction === "jazz"), "only the chosen direction when it exists");
+assert.deepEqual(sel.playlists.slice(0, 3).map((p) => p.direction), ["jazz", "jazz", "jazz"], "sound-fitting albums first");
+assert.equal(sel.playlists.length, sample.length, "no hard filter: the closest albums follow");
 assert.equal(sel.directionFallback, false);
 sel = selectGuestCoffeePlaylists(sample, { character: "city", direction: "jazz", daypart: "morning" });
 assert.equal(sel.playlists[0].id, "j-morning");
 sel = selectGuestCoffeePlaylists(sample, { character: "cozy", direction: "jazz", daypart: "allday" });
 assert.equal(sel.playlists[0].id, "j-all");
-sel = selectGuestCoffeePlaylists(sample.filter((p) => p.direction !== "sax"), { character: "cozy", direction: "sax", daypart: "day" });
-assert.equal(sel.directionFallback, true, "honest fallback when a direction has no albums");
+sel = selectGuestCoffeePlaylists(sample.filter((p) => p.direction !== "bossa"), { character: "cozy", direction: "rhythm", daypart: "day" });
+assert.equal(sel.directionFallback, true, "honest fallback when no album fits the sound type");
+assert.equal(sel.playlists.length, 3, "…and still never an empty shelf");
 assert.equal(selectGuestCoffeePlaylists([], { character: "cozy", direction: "jazz", daypart: "day" }).playlists.length, 0);
 assert.equal(guestCoffeePlaylistMinutes(sample[0]), 6);
 assert.equal(findGuestCoffeeTrack(sample, "b-all-t1")?.playlist.id, "b-all");

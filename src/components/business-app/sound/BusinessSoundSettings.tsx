@@ -12,7 +12,7 @@ import {
 
 /**
  * a8240527 – sound settings of a point in the AudioLad Business cabinet: venue character,
- * music direction and time of day. One component for the guest and for the venue owner
+ * sound type and time of day (4 × 4 × 4, no sliders). One component for the guest and for the venue owner
  * (Music section). The settings do not change the music by themselves: the visitor presses
  * «Собрать атмосферу» (the `action` slot) to assemble one playlist for them.
  */
@@ -64,7 +64,7 @@ export default function BusinessSoundSettings({
         Настройки звучания
       </h2>
       <ChipGroup legend="Характер заведения" name="biz-sound-character" options={GUEST_COFFEE_CHARACTERS} value={profile.character} onChange={(id) => onChange("character", id)} />
-      <ChipGroup legend="Музыкальное направление" name="biz-sound-direction" options={GUEST_COFFEE_DIRECTIONS} value={profile.direction} onChange={(id) => onChange("direction", id)} />
+      <ChipGroup legend="Тип звучания" name="biz-sound-direction" options={GUEST_COFFEE_DIRECTIONS} value={profile.direction} onChange={(id) => onChange("direction", id)} />
       <ChipGroup legend="Время суток" name="biz-sound-daypart" options={GUEST_COFFEE_DAYPARTS} value={profile.daypart} onChange={(id) => onChange("daypart", id)} />
       <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{GUEST_COFFEE_ATMOSPHERE_COPY.settingsHint}</p>
       {action}

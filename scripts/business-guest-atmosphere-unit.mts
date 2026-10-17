@@ -48,6 +48,7 @@ const shelf: GuestCoffeePlaylist[] = GUEST_COFFEE_SHELF.map((ref, n) => ({
   updatedAt: null,
   format: null,
   direction: ref.direction,
+  ...(ref.sounds ? { sounds: ref.sounds } : {}),
   dayparts: ref.dayparts,
   characters: ref.characters,
   tracks: LONG_FORM.has(ref.productSlug)
@@ -73,9 +74,8 @@ for (const profile of all()) {
     assert.equal(found.playlist.id, t.playlistId);
     assert.equal(found.playlist.title, t.albumTitle);
   }
-  assert.equal(a.directionFallback, false, "every direction has albums on the real shelf");
-  assert.ok(a.tracks.every((t) => shelf.find((p) => p.id === t.playlistId)!.direction === profile.direction), "only the chosen direction");
-  assert.equal(a.match.direction.state, "all");
+  assert.equal(a.directionFallback, false, "every sound type has fitting albums on the real shelf");
+  assert.equal(a.match.direction.state, "all", "only sound-fitting albums when they give enough tracks");
   assert.ok(a.tracks.every((t) => (t.durationSeconds ?? 0) < GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS), "no 30-minute single piece when shorter tracks exist");
   const total = a.tracks.reduce((s, t) => s + (t.durationSeconds ?? 0), 0);
   assert.equal(a.totalSeconds, total);
@@ -89,20 +89,20 @@ for (const profile of all()) {
 // ---------------------------------------------------------------- piano + morning + cozy (Sergey's example)
 {
   const a = assembleGuestCoffeeAtmosphere(shelf, { character: "cozy", direction: "calm", daypart: "morning" })!;
-  assert.equal(a.name, "Уютная кофейня · Фортепиано и спокойный фон · Утро");
+  assert.equal(a.name, "Уютная кофейня · Спокойный фон · Утро");
   assert.deepEqual(
     a.sources.map((s) => s.id),
-    ["p-muzyka-dlya-relaksa-pianino", "p-spokoynaya-muzyka-dlya-kofeyni", "p-spokoynaya-uyutnaya-muzyka", "p-muzyka-dlya-uyutnogo-vechera"],
-    "best fitting albums first, long-form single tracks skipped",
+    ["p-muzyka-dlya-relaksa-pianino", "p-spokoynaya-muzyka-dlya-kofeyni", "p-spokoynaya-uyutnaya-muzyka", "p-myagkiy-dzhaz"],
+    "best fitting albums first (no hard genre filter: «Мягкий джаз» is a calm morning album too), long-form single tracks skipped",
   );
   // Interleaved: one track from each album in turn.
   assert.deepEqual(a.tracks.slice(0, 4).map((t) => t.playlistId), a.sources.map((s) => s.id));
-  // Honest: 3 of 4 albums are for the morning, all 4 are cozy.
-  assert.deepEqual([a.match.daypart.state, a.match.daypart.matched, a.match.daypart.of], ["some", 3, 4]);
+  // Honest: all 4 albums are morning + cozy albums.
+  assert.deepEqual([a.match.daypart.state, a.match.daypart.matched, a.match.daypart.of], ["all", 4, 4]);
   assert.equal(a.match.character.state, "all");
   const lines = guestCoffeeAtmosphereMatchLines(a);
-  assert.equal(lines[1].text, "Время суток «Утро» – подходят 3 из 4 альбомов, остальные – ближайшие по направлению.");
-  assert.equal(lines[2].text, "Характер заведения «Уютная» – подходит по описанию всех альбомов подборки.");
+  assert.equal(lines[1].text, "Время суток «Утро» – подходит по звучанию всех альбомов подборки.");
+  assert.equal(lines[2].text, "Характер заведения «Уютная» – подходит по звучанию всех альбомов подборки.");
   assert.match(guestCoffeeAtmosphereMeta(a), /^12 треков · \d+ мин · из 4 альбомов$/);
 }
 
@@ -115,13 +115,13 @@ for (const profile of all()) {
 
 // ---------------------------------------------------------------- honest fallbacks
 {
-  const noBossa = shelf.filter((p) => p.direction !== "bossa");
-  const a = assembleGuestCoffeeAtmosphere(noBossa, { character: "cozy", direction: "bossa", daypart: "day" })!;
+  const noRhythm = shelf.filter((p) => p.direction === "calm" && !(p.sounds ?? []).includes("rhythm"));
+  const a = assembleGuestCoffeeAtmosphere(noRhythm, { character: "cozy", direction: "rhythm", daypart: "day" })!;
   assert.equal(a.directionFallback, true);
   assert.equal(a.match.direction.state, "none");
   const line = guestCoffeeAtmosphereMatchLines(a)[0];
   assert.equal(line.state, "none");
-  assert.equal(line.text, "Направление «Босса-нова» – альбомов пока нет, собрали самое близкое по времени суток и характеру.");
+  assert.equal(line.text, "Тип звучания «Лёгкий ритм» – подходящих альбомов пока нет, собрали самое близкое по звучанию.");
 
   const onlyLong = shelf.filter((p) => LONG_FORM.has(p.productSlug));
   const b = assembleGuestCoffeeAtmosphere(onlyLong, { character: "city", direction: "calm", daypart: "morning" })!;
@@ -136,16 +136,16 @@ for (const profile of all()) {
       character: { state: "none", matched: 0, of: 1, label: "Вечерняя" },
     },
   });
-  assert.equal(none[1].text, "Время суток «Утро» – отдельных альбомов пока нет, взяли ближайшие по направлению.");
+  assert.equal(none[1].text, "Время суток «Утро» – отдельных альбомов пока нет, взяли ближайшие по звучанию.");
   const one = guestCoffeeAtmosphereMatchLines({
     directionFallback: false,
     match: {
-      direction: { state: "all", matched: 4, of: 4, label: "Фортепиано и спокойный фон" },
+      direction: { state: "all", matched: 4, of: 4, label: "Спокойный фон" },
       daypart: { state: "some", matched: 1, of: 4, label: "Вечер" },
       character: { state: "some", matched: 2, of: 4, label: "Уютная" },
     },
   });
-  assert.equal(one[1].text, "Время суток «Вечер» – подходит 1 из 4 альбомов, остальные – ближайшие по направлению.");
+  assert.equal(one[1].text, "Время суток «Вечер» – подходит 1 из 4 альбомов, остальные – ближайшие по звучанию.");
   assert.match(one[2].text, /– подходят 2 из 4 альбомов/);
 
   assert.equal(assembleGuestCoffeeAtmosphere([], { character: "cozy", direction: "jazz", daypart: "day" }), null, "nothing to assemble");
@@ -173,7 +173,7 @@ for (const profile of all()) {
 }
 
 // ---------------------------------------------------------------- formatting
-assert.equal(guestCoffeeAtmosphereName({ character: "evening", direction: "sax", daypart: "allday" }), "Вечерняя кофейня · Саксофон и лаунж · Весь день");
+assert.equal(guestCoffeeAtmosphereName({ character: "evening", direction: "melodic", daypart: "allday" }), "Вечерняя кофейня · Мелодичная музыка · Весь день");
 assert.deepEqual([1, 2, 5, 11, 21, 22, 112].map(guestCoffeeTracksWord), ["трек", "трека", "треков", "треков", "трек", "трека", "треков"]);
 assert.equal(guestCoffeeAtmosphereMeta({ tracks: new Array(21).fill(null), totalSeconds: 3600, durationKnown: true, sources: new Array(21).fill(null) }), "21 трек · 60 мин · из 21 альбома");
 assert.equal(guestCoffeeTrackClock(185), "3:05");
@@ -190,7 +190,7 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.equal(GUEST_COFFEE_ATMOSPHERE_COPY.resultsTitle, "Ваша атмосфера");
   // The playlist is assembled only inside the button handler – never derived from the live settings.
   assert.equal((studio.match(/assembleGuestCoffeeAtmosphere\(/g) ?? []).length, 1);
-  assert.match(studio, /const assemble = \(\) => \{[\s\S]*?assembleGuestCoffeeAtmosphere\(playlists, profile\)/);
+  assert.match(studio, /const assemble = \(\) => \{[\s\S]*?assembleGuestCoffeeAtmosphere\(playlists, profile, plan\)/);
   assert.doesNotMatch(studio, /selectGuestCoffeePlaylists|useMemo/, "no live re-filtering on settings change");
   assert.match(studio, /onClick=\{assemble\}/);
   assert.match(studio, /const dirty = atmosphere !== null && atmosphere\.key !== currentKey/);
