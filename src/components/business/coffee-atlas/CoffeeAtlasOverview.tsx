@@ -3,7 +3,6 @@ import Image from "next/image";
 import {
   buildCoffeeAtlasShopPath,
   coffeeAtlasAsset,
-  COFFEE_ATLAS_PDF_PAGES,
   COFFEE_ATLAS_SUBTITLE,
   COFFEE_ATLAS_TITLE,
 } from "@/lib/business/coffee-atlas/constants";
@@ -14,7 +13,6 @@ import {
   CoffeeAtlasFooter,
   CoffeeAtlasHeader,
   CoffeeAtlasOffer,
-  CoffeeAtlasPdfActions,
 } from "./CoffeeAtlasChrome";
 import CoffeeAtlasGoalLink from "./CoffeeAtlasGoalLink";
 
@@ -43,12 +41,7 @@ export default function CoffeeAtlasOverview() {
                 >
                   Начать путешествие
                 </CoffeeAtlasGoalLink>
-                <CoffeeAtlasPdfActions variant="dark" />
               </div>
-              <p className="atlas-cover__gift">
-                <span aria-hidden="true">🎁</span> Подарок: полный PDF-атлас, {COFFEE_ATLAS_PDF_PAGES} страницы —
-                откройте или сохраните себе.
-              </p>
             </div>
             <figure className="atlas-cover__visual">
               <Image

@@ -6,7 +6,6 @@ import {
   coffeeAtlasAsset,
   COFFEE_ATLAS_MUSIC_NOTE,
   COFFEE_ATLAS_PATH,
-  COFFEE_ATLAS_PDF_PATH,
 } from "@/lib/business/coffee-atlas/constants";
 import type { CoffeeAtlasTrack } from "@/lib/business/coffee-atlas/music";
 import { COFFEE_ATLAS_SHOPS, type CoffeeAtlasShop } from "@/lib/business/coffee-atlas/shops";
@@ -16,7 +15,6 @@ import {
   CoffeeAtlasFooter,
   CoffeeAtlasHeader,
   CoffeeAtlasOffer,
-  CoffeeAtlasPdfActions,
 } from "./CoffeeAtlasChrome";
 import CoffeeAtlasGoalLink from "./CoffeeAtlasGoalLink";
 import CoffeeAtlasListen from "./CoffeeAtlasListen";
@@ -64,14 +62,6 @@ export default function CoffeeAtlasShopView({ shop, previous, next, tracks }: Co
                 <a href="#listen" className="atlas-btn atlas-btn--primary">
                   Послушать атмосферу
                 </a>
-                <CoffeeAtlasGoalLink
-                  href={`${COFFEE_ATLAS_PDF_PATH}#page=${shop.pdfPage}`}
-                  goal="business_atlas_pdf_opened"
-                  newTab
-                  className="atlas-btn atlas-btn--glass"
-                >
-                  Страницы в PDF-атласе
-                </CoffeeAtlasGoalLink>
               </div>
             </div>
             <figure className="atlas-hero__postcard" aria-hidden="true">
@@ -182,7 +172,6 @@ export default function CoffeeAtlasShopView({ shop, previous, next, tracks }: Co
                 </li>
               ))}
             </ul>
-            <CoffeeAtlasPdfActions />
           </div>
         </section>
 

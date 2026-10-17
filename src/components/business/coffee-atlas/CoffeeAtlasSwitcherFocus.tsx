@@ -4,7 +4,9 @@ import { useEffect, useRef } from "react";
 
 /**
  * Keeps the current coffee shop chip visible in the horizontally scrolling
- * switcher on phones (horizontal scroll only — never moves the page).
+ * switcher on phones (horizontal scroll only — never moves the page), and
+ * publishes the real sticky header height as `--atlas-sticky-offset` so in-page
+ * anchors (#listen) land below the header (CSS has a static fallback).
  */
 export default function CoffeeAtlasSwitcherFocus({ currentSlug }: { currentSlug?: string }) {
   const markerRef = useRef<HTMLSpanElement>(null);
@@ -21,6 +23,21 @@ export default function CoffeeAtlasSwitcherFocus({ currentSlug }: { currentSlug?
       list.scrollLeft + (activeRect.left - listRect.left) - (listRect.width - activeRect.width) / 2;
     list.scrollLeft = Math.max(0, target);
   }, [currentSlug]);
+
+  useEffect(() => {
+    const header = markerRef.current?.closest("header");
+    const root = header?.closest<HTMLElement>(".coffee-atlas");
+    if (!header || !root || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const update = () => {
+      root.style.setProperty("--atlas-sticky-offset", `${Math.ceil(header.getBoundingClientRect().height) + 12}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   return <span ref={markerRef} hidden />;
 }

@@ -31,13 +31,15 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
           </span>
         </Link>
         <div className="atlas-header__actions">
+          {/* The ONLY PDF control of the atlas (header). Page bodies have no PDF buttons:
+              guests read and listen on the web; the PDF also arrives in the MAX mailing. */}
           <CoffeeAtlasGoalLink
             href={COFFEE_ATLAS_PDF_PATH}
-            goal="business_atlas_pdf_opened"
-            newTab
+            goal="business_atlas_pdf_downloaded"
+            download={COFFEE_ATLAS_PDF_DOWNLOAD_NAME}
             className="atlas-header__pdf"
           >
-            PDF-атлас
+            Скачать PDF-атлас
           </CoffeeAtlasGoalLink>
           <Link href={BUSINESS_LANDING_PATH} className="atlas-header__back">
             АудиоЛад Бизнес
@@ -72,29 +74,6 @@ export function CoffeeAtlasHeader({ currentSlug }: { currentSlug?: string }) {
         </ol>
       </nav>
     </header>
-  );
-}
-
-export function CoffeeAtlasPdfActions({ variant = "light" }: { variant?: "light" | "dark" }) {
-  return (
-    <div className={`atlas-pdf-actions atlas-pdf-actions--${variant}`}>
-      <CoffeeAtlasGoalLink
-        href={COFFEE_ATLAS_PDF_PATH}
-        goal="business_atlas_pdf_opened"
-        newTab
-        className="atlas-btn atlas-btn--ghost"
-      >
-        Открыть PDF-атлас
-      </CoffeeAtlasGoalLink>
-      <CoffeeAtlasGoalLink
-        href={COFFEE_ATLAS_PDF_PATH}
-        goal="business_atlas_pdf_downloaded"
-        download={COFFEE_ATLAS_PDF_DOWNLOAD_NAME}
-        className="atlas-btn atlas-btn--ghost"
-      >
-        Скачать PDF
-      </CoffeeAtlasGoalLink>
-    </div>
   );
 }
 
