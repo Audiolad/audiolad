@@ -16,6 +16,7 @@ type Props = {
   authorId: string;
   authorSlug: string;
   authorRole?: string | null;
+  accessStatus?: string | null;
   view: AuthorStatusViewModel;
 };
 
@@ -177,7 +178,7 @@ function CtaButton({ cta, primary }: { cta: AuthorStatusCta; primary?: boolean }
   );
 }
 
-export default function AuthorStatusClient({ authorId, authorSlug, authorRole, view }: Props) {
+export default function AuthorStatusClient({ authorId, authorSlug, authorRole, accessStatus, view }: Props) {
   const showStarterAsCurrent =
     view.kind === "starter" ||
     view.kind === "commercial_pending" ||
@@ -186,7 +187,7 @@ export default function AuthorStatusClient({ authorId, authorSlug, authorRole, v
 
   return (
     <div className="space-y-6">
-      <AuthorDashboardNav authorSlug={authorSlug} authorId={authorId} authorRole={authorRole} />
+      <AuthorDashboardNav authorSlug={authorSlug} authorId={authorId} authorRole={authorRole} accessStatus={accessStatus} />
 
       {showStarterAsCurrent ? (
         <StatusCard title={AUTHOR_STATUS_COPY.starterTitle} tone="accent">

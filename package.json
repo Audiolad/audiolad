@@ -118,6 +118,7 @@
     "test:admin-sales": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/admin-sales-visibility-unit.mts",
     "test:admin-mailings": "NODE_OPTIONS='--require ./scripts/admin-mailings-authz-test-require.cjs' npx tsx scripts/admin-mailings-authz-unit.mts && npx tsx scripts/admin-mailings-unit.mts && NODE_OPTIONS='--require ./scripts/admin-mailing-editor-test-require.cjs --import ./scripts/admin-mailing-editor-test-register.mjs' npx tsx scripts/admin-mailing-editor-test-recipient-unit.tsx",
     "test:admin-nav-author-space": "npx tsx scripts/admin-nav-author-space-unit.mjs",
+    "test:author-business-tab": "NODE_OPTIONS='--require ./scripts/author-business-tab-test-require.cjs --import ./scripts/author-business-tab-test-register.mjs' npx tsx scripts/author-business-tab-access-unit.tsx",
     "test:application-email-outbox-timer": "bash scripts/application-email-outbox-timer-unit.sh",
     "test:price-promotions": "npx tsx scripts/price-promotions-unit.mjs && npx tsx scripts/catalog-personal-countdown-unit.mts && npx tsx scripts/personal-timer-copy-unit.mts && npx tsx scripts/author-promo-preview-unit.mts && node scripts/price-promotions-sql-unit.mjs",
     "test:payments-p30": "npx tsx scripts/payments-p30-client-unit.mjs && node scripts/payments-p30-sql-unit.mjs",

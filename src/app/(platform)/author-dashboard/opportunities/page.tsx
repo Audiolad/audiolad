@@ -47,7 +47,7 @@ export default async function AuthorOpportunitiesPage({
       subtitle="Как продвигать продукты и развивать аудиторию"
       internalBackHref={backHref}
     >
-      <AuthorOpportunitiesClient view={view} authorRole={role} />
+      <AuthorOpportunitiesClient view={view} authorRole={role} accessStatus={accessStatus} />
     </AuthorShell>
   );
 }
