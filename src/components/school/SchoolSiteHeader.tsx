@@ -42,7 +42,7 @@ export default function SchoolSiteHeader({ shellData }: SchoolSiteHeaderProps) {
           className={
             isGuest ? guestLogoLinkClassName : "school-site-header__logo-link"
           }
-          aria-label="АудиоЛад — на главную"
+          aria-label="АудиоЛад – на главную"
         >
           <Image
             src="/brand/audiolad-logo-horizontal.png"
