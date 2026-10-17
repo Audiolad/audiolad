@@ -12,7 +12,6 @@ import {
   BUSINESS_GUEST_COFFEE_INTERNAL_PATH,
   BUSINESS_GUEST_COFFEE_PUBLIC_PATH,
   BUSINESS_GUEST_COFFEE_URL,
-  isBusinessGuestPathname,
 } from "../src/lib/business-app/host";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import {
@@ -64,15 +63,19 @@ for (const api of ["/api/business/guest/coffee/track-url", "/api/business/guest/
   assert.equal(resolveBusinessProxyAction("business.audiolad.ru", api).action, "pass_through", `${api} reachable on business host`);
 }
 assert.equal(resolveBusinessProxyAction("business.audiolad.ru", "/api/catalog/play").action, "not_found", "no new platform API exposed");
-assert.equal(isBusinessGuestPathname("/guest/coffee"), true);
-assert.equal(isBusinessGuestPathname("/business-app/guest/coffee"), true);
-assert.equal(isBusinessGuestPathname("/"), false);
-assert.equal(isBusinessGuestPathname("/player"), false);
+// a8240527 rework (Sergey 17.10.2026): ONE cabinet – the guest entry renders inside the shared
+// BusinessAppShell (sidebar / bottom nav), no separate guest branch or guest chrome.
 const shell = read("src/components/business-app/BusinessAppShell.tsx");
-assert.match(shell, /isBusinessGuestPathname\(pathname\)/, "guest path renders without owner sidebar/bottom nav");
+assert.doesNotMatch(shell, /isBusinessGuestPathname|business-app-guest"|usePathname/, "no guest-only shell branch");
+assert.match(shell, /<BusinessSidebar \/>[\s\S]*<BusinessBottomNav \/>/, "sidebar + bottom nav for everyone");
+assert.doesNotMatch(read("src/lib/business-app/host.ts"), /isBusinessGuestPathname/);
 const page = read("src/app/business-app/guest/coffee/page.tsx");
-assert.match(page, /loadGuestCoffeeShelf/);
+assert.match(page, /export default BusinessAppMusicPage;/, "guest entry IS the cabinet's Music section");
 assert.doesNotMatch(page, /notFound\(/, "no login / allowlist gate: guests land straight in the cabinet");
+const musicSection = read("src/components/business-app/sound/BusinessMusicSection.tsx");
+assert.match(musicSection, /loadGuestCoffeeShelf/);
+assert.match(musicSection, /peekGuestCoffeeUsage/);
+assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessMusicSection/, "owner /music renders the same section");
 
 // ---------------------------------------------------------------- curated shelf
 const keys = GUEST_COFFEE_SHELF.map((r) => `${r.authorSlug}/${r.productSlug}`);
@@ -177,17 +180,17 @@ assert.equal(clampGuestCoffeeCredit("15"), null);
   m.sample(100, true);
   assert.equal(Math.round(m.pendingSeconds * 10) / 10, 1.5);
 }
-const cabinet = read("src/components/business-app/guest-coffee/GuestCoffeeCabinet.tsx");
+const cabinet = read("src/components/business-app/sound/BusinessSoundStudio.tsx");
 const copy = read("src/lib/business-app/guest-coffee/copy.ts");
 assert.doesNotMatch(cabinet + copy, /осталось\s+\d|осталось\s*\{|remaining/i, "no countdown in the UI");
 assert.match(cabinet, /GUEST_COFFEE_REPORT_INTERVAL_MS/);
 assert.match(cabinet, /keepalive/, "pending seconds are flushed when the page is hidden");
-// Accessible connect dialog: native modal <dialog> (focus trap, inert page, Escape) and focus returns to the opener.
-assert.match(cabinet, /<dialog/);
-assert.match(cabinet, /showModal\(\)/);
-assert.match(cabinet, /addEventListener\("close"/);
-assert.match(cabinet, /event.key !== "Tab"/, "Tab / Shift+Tab stay inside the dialog");
-assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
+// No fake connect modal (Sergey 17.10.2026): «Подключить» is a link into the real point-creation path.
+assert.doesNotMatch(cabinet, /<dialog|showModal/);
+assert.match(cabinet, /href=\{BUSINESS_CONNECT_HREF\}/);
+assert.match(read("src/lib/business-app/access.ts"), /BUSINESS_CONNECT_HREF = "\/onboarding\?type=cafe"/);
+assert.match(cabinet, /BusinessPlayerControls/, "shared Business player controls");
+assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
 
 // ---------------------------------------------------------------- identity
 {
@@ -357,23 +360,44 @@ assert.match(cabinet, /openerRef\.current = event\.currentTarget/);
   assert.match(copy, /COFFEE_ATLAS_OFFER\.price/, "terms share the atlas offer source");
   assert.match(copy, /7 дней – в подарок/);
 // Typography (as in the atlas, #900): visible texts use the en dash, never the em dash.
-for (const file of ["src/lib/business-app/guest-coffee/copy.ts", "src/components/business-app/guest-coffee/GuestCoffeeCabinet.tsx", "src/app/business-app/guest/coffee/page.tsx", "src/lib/business-app/guest-coffee/catalog.ts"]) {
+for (const file of [
+  "src/lib/business-app/guest-coffee/copy.ts",
+  "src/components/business-app/sound/BusinessSoundStudio.tsx",
+  "src/components/business-app/sound/BusinessSoundSettings.tsx",
+  "src/components/business-app/sound/BusinessMusicSection.tsx",
+  "src/components/business-app/BusinessGuestStatus.tsx",
+  "src/components/business-app/BusinessAppShell.tsx",
+  "src/components/business-app/BusinessSidebar.tsx",
+  "src/components/business-app/BusinessBottomNav.tsx",
+  "src/components/business-app/BusinessPlayerControls.tsx",
+  "src/lib/business-app/access.ts",
+  "src/app/business-app/music/page.tsx",
+  "src/app/business-app/guest/coffee/page.tsx",
+  "src/lib/business-app/guest-coffee/catalog.ts",
+]) {
   const code = read(file).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.split(" // ")[0]).join("\n");
   assert.doesNotMatch(code, /—/, `${file}: no em dash in visible text`);
 }
-  assert.match(copy, /нельзя зарегистрироваться, начать пробный период или оплатить/, "info-only connect window");
-  assert.doesNotMatch(cabinet, /checkout|payment|\/api\/payments|tochka|prodamus/i, "no payment wiring in this stage");
+  // Honest conversion state: no online trial activation / payment exists yet.
+  assert.match(copy, /Онлайн-активация 7 дней в подарок и оплата пока не подключены – ничего не списывается/);
+  assert.doesNotMatch(cabinet + read("src/components/business-app/BusinessGuestStatus.tsx"), /checkout|payment|\/api\/payments|tochka|prodamus/i, "no payment wiring in this stage");
+  // Free public albums are evaluation listening, not the licensed airplay catalogue.
+  assert.match(copy, /Это не каталог эфира/);
 }
 
 // ---------------------------------------------------------------- shared Jazz & Coffee theme (21546de4)
 {
-  const css = read("src/components/business-app/guest-coffee/guest-coffee.css");
+  // The standalone guest stylesheet is gone; the Music section uses the cabinet's own CSS.
+  assert.throws(() => read("src/components/business-app/guest-coffee/guest-coffee.css"));
+  assert.throws(() => read("src/components/business-app/guest-coffee/GuestCoffeeCabinet.tsx"));
+  const appCss = read("src/components/business-app/business-app.css");
+  const block = appCss.slice(appCss.indexOf("a8240527 – one cabinet"));
   const theme = read("src/components/business-app/theme/business-theme.css");
-  const used = new Set([...css.matchAll(/var\((--biz-[\w-]+)/g)].map((m) => m[1]));
-  assert.ok(used.size >= 10, "the cabinet reads the shared --biz-* tokens");
+  const used = new Set([...block.matchAll(/var\((--biz-[\w-]+)/g)].map((m) => m[1]));
+  assert.ok(used.size >= 10, "the Music section reads the shared --biz-* tokens");
   for (const name of used) assert.ok(theme.includes(`${name}:`), `${name} exists in business-theme.css`);
-  const literals = css.replace(/\/\*[\s\S]*?\*\//g, "").match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
-  assert.deepEqual(literals, ["rgba("], "no colour literals except the documented ::backdrop fallback");
+  const literals = block.replace(/\/\*[\s\S]*?\*\//g, "").match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? [];
+  assert.deepEqual(literals, [], "no colour literals");
   assert.match(read("src/app/business-app/layout.tsx"), /data-biz-theme=\{theme\}/, "guest page renders inside the themed root");
 }
 

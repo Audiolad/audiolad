@@ -59,12 +59,6 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   [BUSINESS_GUEST_COFFEE_PUBLIC_PATH]: BUSINESS_GUEST_COFFEE_INTERNAL_PATH,
 };
 
-/** Guest paths render without the owner sidebar/bottom nav (no account needed). */
-export function isBusinessGuestPathname(pathname: string): boolean {
-  const normalized = normalizeBusinessAppPathname(pathname);
-  return normalized === "/guest" || normalized.startsWith("/guest/");
-}
-
 export function resolveBusinessInternalPath(
   publicPathname: string,
 ): string | null {

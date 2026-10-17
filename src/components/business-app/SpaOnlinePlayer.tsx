@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { fetchSpaManifest, fetchSpaTrackUrl, postSpaReport, watchSpaBuild } from "@/lib/business-app/spa-player-client";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
@@ -144,25 +145,14 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
       ) : (
         <>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              data-testid="spa-play"
-              onClick={() => void ctl()?.toggle()}
-              className="business-app-btn business-app-btn-primary business-app-focus-ring"
-            >
-              {status === "playing" || status === "loading" ? "Пауза" : "Играть"}
-            </button>
-            <button
-              type="button"
-              data-testid="spa-next"
-              onClick={() => void ctl()?.next()}
-              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-            >
-              Следующий
-            </button>
-            <span className="business-app-muted" data-testid="spa-now">{status === "loading" ? "Загрузка…" : current ? current.title : ""}</span>
-          </div>
+          <BusinessPlayerControls
+            testIdPrefix="spa"
+            playing={status === "playing"}
+            loading={status === "loading"}
+            nowTitle={current ? current.title : null}
+            onToggle={() => void ctl()?.toggle()}
+            onNext={() => void ctl()?.next()}
+          />
           {message ? <p className="business-app-alert mt-3" data-tone="warn" role="alert">{message}</p> : null}
           <ol className="business-app-tracklist" data-testid="spa-tracks">
             {items.map((i, idx) => (
