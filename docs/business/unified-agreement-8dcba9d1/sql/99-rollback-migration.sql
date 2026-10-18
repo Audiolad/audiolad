@@ -25,6 +25,126 @@ AS $$
     WHERE a.author_id = p_author_id AND v.document_key = 'author-terms' AND v.is_current
   );
 $$;
+-- Одобрение коммерческой заявки: исходное тело из 20261026120100 (проверка только текущей редакции).
+CREATE OR REPLACE FUNCTION public.approve_author_commercial_application(
+  p_application_id uuid,
+  p_staff_comment text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_row public.author_commercial_applications%ROWTYPE;
+  v_transition jsonb;
+  v_access text;
+  v_terms_accepted boolean := false;
+BEGIN
+  IF v_actor IS NULL OR NOT public.is_platform_staff(v_actor) THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_row
+  FROM public.author_commercial_applications
+  WHERE id = p_application_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'application_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_row.status = 'approved' THEN
+    SELECT a.access_status
+    INTO v_access
+    FROM public.authors AS a
+    WHERE a.id = v_row.author_id;
+
+    -- Idempotent re-approve: still finalize if terms already accepted.
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.author_terms_acceptances AS ata
+      INNER JOIN public.author_terms_versions AS atv
+        ON atv.id = ata.terms_version_id
+       AND atv.is_current = true
+      WHERE ata.author_id = v_row.author_id
+    )
+    INTO v_terms_accepted;
+
+    IF v_terms_accepted
+       AND coalesce(v_access, '') = 'commercial_onboarding' THEN
+      v_access := public.set_author_access_status_for_commercial_application(
+        v_row.author_id,
+        'commercial_active',
+        v_actor,
+        'author_terms_already_accepted_on_approve',
+        p_application_id
+      );
+    END IF;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'idempotent', true,
+      'application_id', p_application_id,
+      'author_id', v_row.author_id,
+      'status', 'approved',
+      'access_status', v_access
+    );
+  END IF;
+
+  IF v_row.status NOT IN ('submitted', 'in_review', 'needs_changes') THEN
+    RAISE EXCEPTION 'application_transition_not_allowed' USING ERRCODE = '22023';
+  END IF;
+
+  v_transition := public.transition_author_commercial_application_status(
+    p_application_id,
+    'approved',
+    p_staff_comment,
+    NULL
+  );
+
+  v_access := public.set_author_access_status_for_commercial_application(
+    v_row.author_id,
+    'commercial_onboarding',
+    v_actor,
+    'commercial_application_approved',
+    p_application_id
+  );
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.author_terms_acceptances AS ata
+    INNER JOIN public.author_terms_versions AS atv
+      ON atv.id = ata.terms_version_id
+     AND atv.is_current = true
+    WHERE ata.author_id = v_row.author_id
+  )
+  INTO v_terms_accepted;
+
+  IF v_terms_accepted THEN
+    v_access := public.set_author_access_status_for_commercial_application(
+      v_row.author_id,
+      'commercial_active',
+      v_actor,
+      'author_terms_already_accepted_on_approve',
+      p_application_id
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'idempotent', coalesce((v_transition ->> 'idempotent')::boolean, false),
+    'application_id', p_application_id,
+    'author_id', v_row.author_id,
+    'status', 'approved',
+    'access_status', v_access
+  );
+END;
+$$;
+REVOKE ALL ON FUNCTION public.approve_author_commercial_application(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.approve_author_commercial_application(uuid, text)
+  TO authenticated, service_role;
 DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.author_terms_acceptances;
 DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_upd ON public.business_rightsholder_verifications;
 DROP TRIGGER IF EXISTS zz_business_unified_auto_sync_ins ON public.practices;
@@ -66,6 +186,7 @@ DROP FUNCTION IF EXISTS public.author_business_agreement_acceptance(uuid);
 DROP POLICY IF EXISTS business_track_eligibility_reviews_read ON public.business_track_eligibility_reviews;
 CREATE POLICY business_track_eligibility_reviews_read ON public.business_track_eligibility_reviews
   FOR SELECT TO authenticated USING (public.business_onboarding_is_moderator());
+DROP FUNCTION IF EXISTS public.author_business_track_grant_layers(uuid, uuid[]);
 DROP FUNCTION IF EXISTS public.business_unified_is_author_member(uuid);
 GRANT EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) TO authenticated;
 COMMIT;

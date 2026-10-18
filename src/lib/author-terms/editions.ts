@@ -131,7 +131,13 @@ export function evaluateTermsGate(input: TermsGateInput): TermsGateResult {
   const current = input.current;
   const acceptedCurrent = input.acceptances.some((a) => a.termsVersionId === current.id);
   if (!input.unifiedEnabled) {
-    return { ...none, accepted: acceptedCurrent, acceptedCurrent };
+    // Flag off: legacy UI (no invite, no Business). But an earlier edition flagged
+    // commercial_access_continues still keeps its commercial gates — turning the flag off must
+    // never cut 1.2 authors off (Sergey 17.10.2026: no forced cut-off, clause 22.4 not used).
+    const continuingOff =
+      !acceptedCurrent &&
+      input.acceptances.some((a) => a.termsVersionId !== current.id && a.keepsCommercialAccess === true);
+    return { ...none, accepted: acceptedCurrent || continuingOff, acceptedCurrent, previousEditionActive: continuingOff };
   }
   const earlier = input.acceptances.filter((a) => a.termsVersionId !== current.id);
   const continuing = earlier.filter((a) => a.keepsCommercialAccess === true);

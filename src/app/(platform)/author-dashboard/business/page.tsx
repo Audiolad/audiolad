@@ -24,7 +24,6 @@ import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard"
 import { loadAuthorTermsStatus } from "@/lib/author-terms/service";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { tracksLiveInBusiness, type BusinessGrantLayerRow } from "@/lib/business-rightsholder/track-in-business";
 import {
   EVIDENCE_SIGNED_URL_TTL_SECONDS,
@@ -138,22 +137,20 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
         .map((t) => ({ id: t.id, title: t.title ?? "Трек", productTitle: (p.title as string) ?? "Без названия" })),
     );
     const trackIds = ownTracks.map((t) => t.id);
-    const admin = createServiceRoleClient();
+    // Owner's own session only: reviews via RLS (member read), grant layers via a membership-checked RPC.
     const [{ data: reviews }, { data: grants }] = trackIds.length
       ? await Promise.all([
-          admin
+          supabase
             .from("business_track_eligibility_reviews")
             .select("audio_item_id, decision, reason_code, comment, created_at, id")
             .eq("author_id", workspace.id)
             .in("audio_item_id", trackIds)
-            .order("created_at", { ascending: false }),
-          admin
-            .from("music_rights_grants")
-            .select("audio_item_id, rights_layer, valid_from, valid_until")
-            .in("audio_item_id", trackIds)
-            .eq("use_type", "business_background_playback")
-            .eq("status", "verified")
-            .is("ceased_at", null),
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false }),
+          supabase.rpc("author_business_track_grant_layers", {
+            p_author_id: workspace.id,
+            p_audio_item_ids: trackIds,
+          }),
         ])
       : [{ data: [] }, { data: [] }];
     const latest = new Map<string, { decision: string; reason_code: string | null; comment: string | null }>();

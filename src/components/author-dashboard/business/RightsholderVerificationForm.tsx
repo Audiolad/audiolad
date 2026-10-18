@@ -59,7 +59,7 @@ type Props = {
   existing: ExistingVerification;
   /**
    * legacy: two consent checkboxes + submit_v2 (flag off).
-   * unified: the accepted unified agreement 2.0 already covers Business — rights check only,
+   * unified: the accepted unified agreement 2.0 already covers Business – rights check only,
    * no checkboxes, submit_v3 (server re-checks the agreement and support mode).
    */
   mode?: "legacy" | "unified";
@@ -366,7 +366,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
           {unified ? (
             <p className="text-sm text-neutral-600" data-testid="unified-agreement-covers-business">
               Использование музыки в «АудиоЛад Бизнес» уже предусмотрено принятым Единым коммерческим соглашением.
-              Здесь — только проверка прав, без дополнительных согласий.
+              Здесь – только проверка прав, без дополнительных согласий.
             </p>
           ) : (
           <div className="space-y-3 text-sm">

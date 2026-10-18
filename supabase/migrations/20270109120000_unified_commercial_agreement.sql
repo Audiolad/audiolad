@@ -55,6 +55,117 @@ AS $$
   );
 $$;
 
+-- 2b) Commercial application approval honours the same gate (no forced cut-off for 1.2 authors).
+--     Body identical to 20261026120100 except the terms check, which now calls
+--     author_has_accepted_current_terms (current edition OR an edition flagged
+--     commercial_access_continues). Until 02-switch-current.sql flags 1.2 this is exactly the old check.
+CREATE OR REPLACE FUNCTION public.approve_author_commercial_application(
+  p_application_id uuid,
+  p_staff_comment text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_row public.author_commercial_applications%ROWTYPE;
+  v_transition jsonb;
+  v_access text;
+  v_terms_accepted boolean := false;
+BEGIN
+  IF v_actor IS NULL OR NOT public.is_platform_staff(v_actor) THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_row
+  FROM public.author_commercial_applications
+  WHERE id = p_application_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'application_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_row.status = 'approved' THEN
+    SELECT a.access_status
+    INTO v_access
+    FROM public.authors AS a
+    WHERE a.id = v_row.author_id;
+
+    -- Idempotent re-approve: still finalize if terms already accepted.
+    SELECT public.author_has_accepted_current_terms(v_row.author_id)
+    INTO v_terms_accepted;
+
+    IF v_terms_accepted
+       AND coalesce(v_access, '') = 'commercial_onboarding' THEN
+      v_access := public.set_author_access_status_for_commercial_application(
+        v_row.author_id,
+        'commercial_active',
+        v_actor,
+        'author_terms_already_accepted_on_approve',
+        p_application_id
+      );
+    END IF;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'idempotent', true,
+      'application_id', p_application_id,
+      'author_id', v_row.author_id,
+      'status', 'approved',
+      'access_status', v_access
+    );
+  END IF;
+
+  IF v_row.status NOT IN ('submitted', 'in_review', 'needs_changes') THEN
+    RAISE EXCEPTION 'application_transition_not_allowed' USING ERRCODE = '22023';
+  END IF;
+
+  v_transition := public.transition_author_commercial_application_status(
+    p_application_id,
+    'approved',
+    p_staff_comment,
+    NULL
+  );
+
+  v_access := public.set_author_access_status_for_commercial_application(
+    v_row.author_id,
+    'commercial_onboarding',
+    v_actor,
+    'commercial_application_approved',
+    p_application_id
+  );
+
+  SELECT public.author_has_accepted_current_terms(v_row.author_id)
+  INTO v_terms_accepted;
+
+  IF v_terms_accepted THEN
+    v_access := public.set_author_access_status_for_commercial_application(
+      v_row.author_id,
+      'commercial_active',
+      v_actor,
+      'author_terms_already_accepted_on_approve',
+      p_application_id
+    );
+  END IF;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'idempotent', coalesce((v_transition ->> 'idempotent')::boolean, false),
+    'application_id', p_application_id,
+    'author_id', v_row.author_id,
+    'status', 'approved',
+    'access_status', v_access
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.approve_author_commercial_application(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.approve_author_commercial_application(uuid, text)
+  TO authenticated, service_role;
+
 -- 3) Business agreement: personal acceptance of a covers_business edition that is current
 --    (or an earlier covers_business edition explicitly flagged commercial_access_continues). Never 1.x.
 CREATE OR REPLACE FUNCTION public.author_business_agreement_acceptance(p_author_id uuid)
@@ -701,9 +812,39 @@ GRANT EXECUTE ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, 
 COMMENT ON FUNCTION public.resolve_business_track_eligibility(uuid, uuid, uuid, text, timestamptz) IS
   'audiolad:unified-agreement; rights_eligibility_v1 + per-track admission overlay (blocked/proof_requested => INELIGIBLE)';
 
+-- 7b) Owner read of Business grant layers for the cabinet status screen (owner's own session; no
+--     service role in the page). Only verified, not ceased business_background_playback grants of
+--     the caller's own tracks; no rightsholder ids are returned.
+CREATE OR REPLACE FUNCTION public.author_business_track_grant_layers(p_author_id uuid, p_audio_item_ids uuid[])
+RETURNS TABLE(audio_item_id uuid, rights_layer text, valid_from timestamptz, valid_until timestamptz)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+#variable_conflict use_column
+BEGIN
+  IF p_author_id IS NULL OR NOT (public.business_unified_is_author_member(p_author_id) OR public.business_onboarding_is_moderator()) THEN
+    RAISE EXCEPTION 'author_membership_required' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+    SELECT g.audio_item_id, g.rights_layer, g.valid_from, g.valid_until
+    FROM public.music_rights_grants g
+    JOIN public.audio_items ai ON ai.id = g.audio_item_id
+    JOIN public.practices p ON p.id = ai.practice_id
+    WHERE p.author_id = p_author_id
+      AND g.audio_item_id = ANY (coalesce(p_audio_item_ids, ARRAY[]::uuid[]))
+      AND g.use_type = 'business_background_playback'
+      AND g.status = 'verified'
+      AND g.ceased_at IS NULL;
+END;
+$$;
+
 -- 8) Least privilege -----------------------------------------------------------------------
 REVOKE ALL ON FUNCTION public.business_unified_is_author_member(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.business_unified_is_author_member(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.author_business_track_grant_layers(uuid, uuid[]) FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.author_business_track_grant_layers(uuid, uuid[]) TO authenticated;
 REVOKE ALL ON FUNCTION public.author_business_agreement_acceptance(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.author_has_business_agreement(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.author_commercial_agreement_state(uuid) FROM PUBLIC, anon;

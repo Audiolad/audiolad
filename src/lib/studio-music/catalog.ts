@@ -1,4 +1,5 @@
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
+import { loadAuthorsOnContinuingEdition } from "@/lib/author-terms/continuing-editions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -1419,6 +1420,16 @@ export function createSupabaseStudioMusicCatalogStore(
           .eq("author_terms_versions.commercial_access_continues", true);
         if (earlierError) throw new Error("studio_music_author_terms_lookup_failed");
         for (const row of earlier ?? []) accepted.add(String(row.author_id));
+      } else if (accepted.size < authorIds.length) {
+        // Flag off while the DB is already switched to 2.0: 1.2 authors keep Studio (no cut-off).
+        // Before the switch no edition is flagged and nothing changes.
+        let continuing: Set<string>;
+        try {
+          continuing = await loadAuthorsOnContinuingEdition(supabase, authorIds.filter((id) => !accepted.has(id)));
+        } catch {
+          throw new Error("studio_music_author_terms_lookup_failed");
+        }
+        for (const id of continuing) accepted.add(id);
       }
       return accepted;
     },

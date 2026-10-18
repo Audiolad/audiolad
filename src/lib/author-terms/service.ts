@@ -14,6 +14,7 @@ import {
 } from "@/lib/author-terms/editions";
 import { AuthorTermsError } from "@/lib/author-terms/errors";
 import { assertAuthorTermsContentHash } from "@/lib/author-terms/hash";
+import { loadAuthorsOnContinuingEdition } from "@/lib/author-terms/continuing-editions";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import type {
   AuthorTermsAcceptanceRow,
@@ -37,7 +38,7 @@ for (const edition of APPROVED_AUTHOR_TERMS_EDITIONS) {
 
 const VERSION_COLUMNS =
   "id, version, title, published_at, effective_at, content_hash, document_key, is_current, created_at";
-/** Selected only when the unified-agreement flag is on (columns from migration 20270106120000). */
+/** Selected only when the unified-agreement flag is on (columns from migration 20270109120000). */
 const UNIFIED_VERSION_COLUMNS = `${VERSION_COLUMNS}, covers_business, commercial_access_continues`;
 
 function adminClient(): SupabaseClient {
@@ -136,11 +137,26 @@ export async function hasAcceptedCurrentAuthorTerms(
     ? await getAuthorTermsAcceptanceForVersion(authorId, currentVersion.id, client)
     : null;
   const unifiedEnabled = isUnifiedAgreementEnabled();
-  const acceptances = unifiedEnabled && currentVersion
-    ? await listAuthorTermsAcceptanceEditions(authorId, client)
-    : acceptance
-      ? [{ termsVersionId: acceptance.terms_version_id, coversBusiness: false, keepsCommercialAccess: false }]
-      : [];
+  let acceptances: { termsVersionId: string; coversBusiness: boolean; keepsCommercialAccess: boolean }[] =
+    unifiedEnabled && currentVersion
+      ? await listAuthorTermsAcceptanceEditions(authorId, client)
+      : acceptance
+        ? [{ termsVersionId: acceptance.terms_version_id, coversBusiness: false, keepsCommercialAccess: false }]
+        : [];
+  if (!unifiedEnabled && currentVersion && !acceptance) {
+    // Flag off but DB already switched (flag turned off / lost on redeploy): 1.2 authors must keep
+    // their commercial access — no forced cut-off. Commercial only; never Business, never an invite.
+    let continuing: Set<string>;
+    try {
+      continuing = await loadAuthorsOnContinuingEdition(client, [authorId]);
+    } catch (error) {
+      console.error("author_terms_continuing_lookup_error", error instanceof Error ? error.message : "unknown");
+      throw new AuthorTermsError("internal_error", 500);
+    }
+    if (continuing.has(authorId)) {
+      acceptances = [{ termsVersionId: "earlier-continuing-edition", coversBusiness: false, keepsCommercialAccess: true }];
+    }
+  }
   const gate = evaluateTermsGate({
     unifiedEnabled,
     now: new Date(),

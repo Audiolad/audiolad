@@ -37,6 +37,14 @@ assert.doesNotMatch(clean, /grace/i, 'migration has no grace / cut-off logic');
 assert.doesNotMatch(switchCurrent, /grace_until|:'/, 'switch script takes no cut-off date');
 assert.doesNotMatch(clean.match(/FUNCTION public\.author_has_accepted_current_terms[\s\S]*?\$\$;/)[0], /clock_timestamp|now\(\)|interval/i, 'commercial gate is not time-bound');
 assert.match(switchCurrent, /SET commercial_access_continues = true\s+WHERE id = '9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902';/, 'only 1.2 keeps commercial access');
+{
+  // Commercial application approval uses the same flag-independent gate (no hidden is_current-only check).
+  const approve = clean.match(/FUNCTION public\.approve_author_commercial_application\([\s\S]*?\$\$;/)[0];
+  assert.equal((approve.match(/public\.author_has_accepted_current_terms\(v_row\.author_id\)/g) ?? []).length, 2, 'approve: both terms checks via author_has_accepted_current_terms');
+  assert.doesNotMatch(approve, /is_current/, 'approve: no is_current-only terms join');
+  assert.doesNotMatch(approve, /clock_timestamp|now\(\)|interval/i, 'approve: no time-bound gate');
+  assert.match(rollbackMigration, /FUNCTION public\.approve_author_commercial_application\(/, 'rollback restores the original approve body');
+}
 assert.match(rollbackSwitch, /GRANT EXECUTE ON FUNCTION public\.author_business_product_optin\(uuid\[\],boolean,boolean,text,text,inet,text\) TO authenticated;/);
 // Every new write path checks the DB activation gate; sync and review share the per-track lock.
 for (const fn of ['author_business_verification_submit_v3', 'moderator_business_track_review', 'business_catalog_sync_run']) {
@@ -98,6 +106,16 @@ CREATE TABLE public.author_support_sessions(
   actor_user_id uuid NOT NULL, acting_user_id uuid NOT NULL, acting_author_id uuid NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL, revoked_at timestamptz NULL);
 REVOKE ALL ON public.author_support_sessions FROM PUBLIC, anon, authenticated;
+-- Commercial applications (only what approve_author_commercial_application needs; real bodies live in
+-- 20260725230000 / 20260727180000). Used to prove 1.2 authors keep commercial activation after 2.0.
+ALTER TABLE public.authors ADD COLUMN IF NOT EXISTS access_status text NOT NULL DEFAULT 'free';
+CREATE TABLE public.author_commercial_applications(id uuid PRIMARY KEY, author_id uuid NOT NULL REFERENCES public.authors(id), status text NOT NULL);
+CREATE FUNCTION public.is_platform_staff(p_user_id uuid DEFAULT auth.uid()) RETURNS boolean LANGUAGE sql STABLE AS
+  $f$ SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id AND role IN ('platform_admin','platform_owner')) $f$;
+CREATE FUNCTION public.transition_author_commercial_application_status(p_id uuid, p_status text, p_comment text, p_reason text)
+  RETURNS jsonb LANGUAGE sql AS $f$ UPDATE public.author_commercial_applications SET status = p_status WHERE id = p_id RETURNING jsonb_build_object('idempotent', false) $f$;
+CREATE FUNCTION public.set_author_access_status_for_commercial_application(p_author_id uuid, p_new_status text, p_changed_by uuid, p_reason text, p_application_id uuid)
+  RETURNS text LANGUAGE sql AS $f$ UPDATE public.authors SET access_status = p_new_status WHERE id = p_author_id RETURNING access_status $f$;
 `;
 // author_terms tables exactly as 20260728140000 (tables + indexes only).
 const termsTables = read('supabase/migrations/20260728140000_author_terms_acceptance.sql')
@@ -181,6 +199,16 @@ DO $t$ BEGIN
   RESET ROLE;
   UPDATE public.audio_items SET status = 'published' WHERE id = '30000000-0000-0000-0000-0000000000a1';
   PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE source_type = 'platform_agreement'), 'auto inflow inert while inactive');
+  -- Commercial approval before the switch: exactly the old rule (accepted current 1.2 → active; 1.1-only → onboarding).
+  INSERT INTO public.author_commercial_applications(id,author_id,status) VALUES
+    ('70000000-0000-0000-0000-0000000000b1','10000000-0000-0000-0000-00000000000b','submitted'),
+    ('70000000-0000-0000-0000-0000000000d1','10000000-0000-0000-0000-00000000000d','submitted');
+  PERFORM ua_test.as_user('${M}');
+  PERFORM public.approve_author_commercial_application('70000000-0000-0000-0000-0000000000b1');
+  PERFORM public.approve_author_commercial_application('70000000-0000-0000-0000-0000000000d1');
+  PERFORM ua_test.ok((SELECT access_status = 'commercial_active' FROM public.authors WHERE id = '10000000-0000-0000-0000-00000000000b'), 'before switch: 1.2 author activated on approve');
+  PERFORM ua_test.ok((SELECT access_status = 'commercial_onboarding' FROM public.authors WHERE id = '10000000-0000-0000-0000-00000000000d'), 'before switch: 1.1-only author stays onboarding');
+  UPDATE public.authors SET access_status = 'free' WHERE id IN ('10000000-0000-0000-0000-00000000000b','10000000-0000-0000-0000-00000000000d');
 END $t$;
 `;
 
@@ -198,6 +226,17 @@ BEGIN
   PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000d'), '1.1-only author unchanged (strict, as before 2.0)');
   PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.author_terms_acceptances WHERE terms_version_id = v20), 'no auto-acceptance of 2.0');
   PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-0000000000ee'), 'unknown author false');
+  -- No forced cut-off (Sergey 17.10, still binding 18.10): a 1.2 author approved AFTER the switch is still
+  -- activated commercially without accepting 2.0; a 1.1-only author is unchanged (onboarding). No date involved.
+  INSERT INTO public.author_commercial_applications(id,author_id,status) VALUES
+    ('70000000-0000-0000-0000-0000000000b2','10000000-0000-0000-0000-00000000000b','submitted'),
+    ('70000000-0000-0000-0000-0000000000d2','10000000-0000-0000-0000-00000000000d','submitted');
+  PERFORM ua_test.as_user('${M}');
+  r := public.approve_author_commercial_application('70000000-0000-0000-0000-0000000000b2');
+  PERFORM ua_test.ok(r->>'access_status' = 'commercial_active', 'after switch: 1.2 author activated on approve (no 2.0 needed): ' || r::text);
+  r := public.approve_author_commercial_application('70000000-0000-0000-0000-0000000000d2');
+  PERFORM ua_test.ok(r->>'access_status' = 'commercial_onboarding', 'after switch: 1.1-only author unchanged: ' || r::text);
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('10000000-0000-0000-0000-00000000000b'), 'commercial activation never opens Business');
 
   -- B: rights check without personal 2.0 acceptance → refused.
   PERFORM ua_test.as_user('${B}');
@@ -430,7 +469,10 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       read('supabase/migrations/20270101120000_business_rightsholder_onboarding.sql'),
       read('supabase/migrations/20270102120000_business_rightsholder_providers.sql'),
       read('supabase/migrations/20270103120000_business_rightsholder_suno_single_link.sql'),
-      read('supabase/migrations/20270105120000_business_consents_block_support_mode.sql')].join('\n');
+      read('supabase/migrations/20270105120000_business_consents_block_support_mode.sql'),
+      // Production approve body before this migration (function + grants only, no backfill).
+      read('supabase/migrations/20261026120100_commercial_activate_on_approve_if_terms.sql')
+        .match(/CREATE OR REPLACE FUNCTION public\.approve_author_commercial_application[\s\S]*?TO authenticated, service_role;/)[0]].join('\n');
     psql(db, [setup, fixtures].join('\n'));
     // Rollout must refuse before the migration exists.
     let refused = false;
@@ -461,15 +503,31 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND rights_layer = 'recording' AND status = 'verified' AND valid_until IS NULL), 'review+sync concurrently: exactly 1 new recording grant');
       PERFORM ua_test.ok((SELECT count(*) = 0 FROM (SELECT 1 FROM public.music_rights_grants WHERE source_type = 'platform_agreement' AND status IN ('draft','verified') AND valid_until IS NULL GROUP BY audio_item_id, rights_layer, use_type HAVING count(*) > 1) d), 'no duplicate open grants');
     END $t$;`);
+    // Cabinet status screen reads grant layers with the owner's own session (membership-checked RPC).
+    psql(db, String.raw`DO $t$ DECLARE n int; BEGIN
+      PERFORM ua_test.as_user('${A}');
+      SET LOCAL ROLE authenticated;
+      SELECT count(*) INTO n FROM public.author_business_track_grant_layers('10000000-0000-0000-0000-00000000000a',
+        ARRAY['30000000-0000-0000-0000-0000000000a1','30000000-0000-0000-0000-0000000000b1']::uuid[]);
+      PERFORM ua_test.ok(n >= 2, 'owner sees own track grant layers: ' || n);
+      SELECT count(*) INTO n FROM public.author_business_track_grant_layers('10000000-0000-0000-0000-00000000000a',
+        ARRAY['30000000-0000-0000-0000-0000000000b1']::uuid[]);
+      PERFORM ua_test.ok(n = 0, 'foreign track ids filtered out even if passed');
+      PERFORM ua_test.expect_error('SELECT * FROM public.author_business_track_grant_layers(''10000000-0000-0000-0000-00000000000b'', ARRAY[''30000000-0000-0000-0000-0000000000b1'']::uuid[])', 'author_membership_required');
+      RESET ROLE;
+      PERFORM ua_test.ok(NOT has_function_privilege('anon','public.author_business_track_grant_layers(uuid,uuid[])','EXECUTE'), 'anon cannot read grant layers');
+    END $t$;`);
     // Rollback: migration rollback refuses while 2.0 is current; switch back first; history kept.
     let blocked = false;
     try { execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-q', '-U', 'postgres', '-d', db, '-v', 'ON_ERROR_STOP=1'], { input: rollbackMigration, stdio: ['pipe', 'pipe', 'pipe'] }); } catch { blocked = true; }
     assert.ok(blocked, 'migration rollback refuses while 2.0 is current');
     psql(db, [rollbackSwitch, rollbackMigration,
       "SELECT 1 / CASE WHEN to_regprocedure('public.business_catalog_sync(uuid,boolean)') IS NULL AND to_regprocedure('public.author_business_verification_submit_v3(uuid,uuid[],inet,text)') IS NULL AND to_regprocedure('public.business_catalog_sync_run(uuid,boolean)') IS NULL AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname LIKE 'zz_business_unified_auto_sync_%') AND to_regprocedure('public.resolve_business_track_eligibility_v1(uuid,uuid,uuid,text,timestamptz)') IS NULL AND has_function_privilege('service_role','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE') AND NOT has_function_privilege('authenticated','public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)','EXECUTE') THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN to_regprocedure('public.author_business_track_grant_layers(uuid,uuid[])') IS NULL THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN has_function_privilege('authenticated','public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text)','EXECUTE') THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN (SELECT version FROM public.author_terms_versions WHERE is_current) = '1.2' THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN NOT EXISTS (SELECT 1 FROM public.author_terms_versions WHERE commercial_access_continues) THEN 1 ELSE 0 END;",
+      "SELECT 1 / CASE WHEN to_regprocedure('public.approve_author_commercial_application(uuid,text)') IS NOT NULL AND pg_get_functiondef('public.approve_author_commercial_application(uuid,text)'::regprocedure) LIKE '%atv.is_current = true%' THEN 1 ELSE 0 END;",
       "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 4 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 6 THEN 1 ELSE 0 END;",
       // Re-apply after rollback works.
       migration].join('\n'));

@@ -84,9 +84,18 @@ const on12 = [{ termsVersionId: "v12", coversBusiness: false, keepsCommercialAcc
 const on11 = [{ termsVersionId: "v11", coversBusiness: false, keepsCommercialAccess: false }];
 const on20 = [{ termsVersionId: "v12", coversBusiness: false, keepsCommercialAccess: true }, { termsVersionId: "v20", coversBusiness: true, keepsCommercialAccess: false }];
 const NONE = { accepted: false, acceptedCurrent: false, previousEditionActive: false, reacceptInvited: false, businessAgreement: false };
-// Flag off: exactly the old rule.
-assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now, current: cur(), acceptances: on12 }), NONE);
+// Flag off before the switch (no edition flagged): exactly the old rule.
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now, current: cur(), acceptances: on11 }), NONE);
 assert.equal(evaluateTermsGate({ unifiedEnabled: false, now, current: { id: "v12", coversBusiness: false }, acceptances: on12 }).accepted, true);
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now, current: { id: "v12", coversBusiness: false }, acceptances: [{ termsVersionId: "v12", coversBusiness: false, keepsCommercialAccess: false }] }),
+  { ...NONE, accepted: true, acceptedCurrent: true });
+// Flag OFF while the DB is already switched to 2.0 (flag turned off / lost on redeploy): 1.2 authors must NOT be cut off
+// (Sergey 17.10.2026, binding 18.10). Commercial continues, no Business, no invitation (legacy UI), at any date.
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now, current: cur(), acceptances: on12 }),
+  { ...NONE, accepted: true, previousEditionActive: true });
+assert.deepEqual(evaluateTermsGate({ unifiedEnabled: false, now: farFuture, current: cur(), acceptances: on12 }),
+  { ...NONE, accepted: true, previousEditionActive: true });
+assert.equal(evaluateTermsGate({ unifiedEnabled: false, now, current: cur(), acceptances: on20 }).businessAgreement, false, "flag off never opens Business");
 // Flag on, 1.2 author: commercial yes (indefinitely), Business no, invitation notice yes.
 let g = evaluateTermsGate({ unifiedEnabled: true, now, current: cur(), acceptances: on12 });
 assert.deepEqual(g, { accepted: true, acceptedCurrent: false, previousEditionActive: true, reacceptInvited: true, businessAgreement: false });
@@ -105,8 +114,56 @@ assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: cur({ id: "
 assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: cur({ id: "v21" }),
   acceptances: [{ termsVersionId: "v20", coversBusiness: true, keepsCommercialAccess: true }] }).businessAgreement, true);
 assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: null, acceptances: on20 }).accepted, false);
+// ---- Flag-independent continuation loader (select("*") works before and after the migration).
+{
+  const { listContinuingEditionIds, loadAuthorsOnContinuingEdition } = await import("../src/lib/author-terms/continuing-editions.ts");
+  const fake = (versions, acceptances, calls = []) => ({
+    from(table) {
+      const q = { table, filters: [] };
+      const api = {
+        select(cols) { q.cols = cols; return api; },
+        eq(col, val) { q.filters.push(["eq", col, val]); return api; },
+        in(col, vals) { q.filters.push(["in", col, vals]); return api; },
+        then(resolve) {
+          calls.push(q);
+          if (table === "author_terms_versions") return resolve({ data: versions, error: null });
+          const authorIds = q.filters.find((f) => f[1] === "author_id")[2];
+          const editionIds = q.filters.find((f) => f[1] === "terms_version_id")[2];
+          return resolve({ data: acceptances.filter((a) => authorIds.includes(a.author_id) && editionIds.includes(a.terms_version_id)), error: null });
+        },
+      };
+      return api;
+    },
+  });
+  // Before the migration: no column → nothing continues, and only ONE query (no acceptance lookup).
+  const pre = [{ id: "v11", is_current: false }, { id: "v12", is_current: true }];
+  const calls = [];
+  assert.deepEqual(await listContinuingEditionIds(fake(pre, [])), []);
+  assert.equal((await loadAuthorsOnContinuingEdition(fake(pre, [{ author_id: "b", terms_version_id: "v12" }], calls), ["b"])).size, 0);
+  assert.equal(calls.length, 1, "no acceptance query when no edition continues");
+  assert.equal(calls[0].cols, "*", "never names the new column (safe before the migration)");
+  // After the switch: 1.2 continues (not current), 2.0 current; 1.1 not flagged.
+  const post = [{ id: "v11", is_current: false, commercial_access_continues: false }, { id: "v12", is_current: false, commercial_access_continues: true }, { id: "v20", is_current: true, commercial_access_continues: false }];
+  assert.deepEqual(await listContinuingEditionIds(fake(post, [])), ["v12"]);
+  const acc = [{ author_id: "b", terms_version_id: "v12" }, { author_id: "c", terms_version_id: "v11" }];
+  assert.deepEqual([...(await loadAuthorsOnContinuingEdition(fake(post, acc), ["b", "c"]))], ["b"]);
+  assert.equal((await loadAuthorsOnContinuingEdition(fake(post, acc), [])).size, 0);
+  // A flag on the CURRENT edition is ignored (current acceptance is checked by the caller).
+  assert.deepEqual(await listContinuingEditionIds(fake([{ id: "v20", is_current: true, commercial_access_continues: true }], [])), []);
+  // Errors fail closed (thrown), never silently grant.
+  const broken = { from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: null, error: { message: "x" } }) }) }) };
+  await assert.rejects(() => listContinuingEditionIds(broken), /author_terms_continuing_editions_lookup_failed/);
+}
+// Wiring: both commercial gates use the loader when the flag is off.
+{
+  const service = read("src/lib/author-terms/service.ts");
+  assert.match(service, /if \(!unifiedEnabled && currentVersion && !acceptance\) \{[\s\S]{0,600}loadAuthorsOnContinuingEdition\(client, \[authorId\]\)/, "service: flag-off continuation");
+  const catalog = read("src/lib/studio-music/catalog.ts");
+  assert.match(catalog, /\} else if \(accepted\.size < authorIds\.length\) \{[\s\S]{0,500}loadAuthorsOnContinuingEdition\(supabase,/, "studio catalog: flag-off continuation");
+}
+
 // Source contract: no grace/cut-off anywhere in the gate code, banner shows no end date.
-for (const f of ["src/lib/author-terms/editions.ts", "src/lib/author-terms/service.ts", "src/lib/studio-music/catalog.ts",
+for (const f of ["src/lib/author-terms/editions.ts", "src/lib/author-terms/service.ts", "src/lib/studio-music/catalog.ts", "src/lib/author-terms/continuing-editions.ts",
   "src/components/author-dashboard/AuthorAgreementReacceptBanner.tsx", "src/lib/author-terms/types.ts"]) {
   assert.doesNotMatch(readFileSync(new URL(`../${f}`, import.meta.url), "utf8"), /reaccept_grace_until|graceUntil|inGrace/, `${f}: no grace`);
 }
@@ -176,7 +233,11 @@ assert.match(acceptPanel, /content_hash: version\?\.contentHash/);
 assert.match(acceptPanel, /terms_version_changed/);
 // "В Бизнесе" requires both layers live and currently valid.
 assert.match(businessPage, /tracksLiveInBusiness\(/);
-assert.match(businessPage, /valid_until/);
+// Grant layers are read with the owner's own session (membership-checked RPC), never via service role.
+assert.match(businessPage, /supabase\.rpc\("author_business_track_grant_layers"/);
+assert.doesNotMatch(businessPage, /createServiceRoleClient/);
+assert.match(read("supabase/migrations/20270109120000_unified_commercial_agreement.sql"),
+  /FUNCTION public\.author_business_track_grant_layers\([\s\S]*?valid_until[\s\S]*?author_membership_required[\s\S]*?g\.ceased_at IS NULL/);
 {
   const { tracksLiveInBusiness } = await import("../src/lib/business-rightsholder/track-in-business.ts");
   const now = new Date("2026-10-17T00:00:00Z");
