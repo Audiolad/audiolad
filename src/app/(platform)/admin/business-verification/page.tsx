@@ -254,6 +254,7 @@ export default async function AdminBusinessVerificationPage({
                         <input type="hidden" name="verificationId" value={c.id} />
                         <input type="hidden" name="filter" value={filter} />
                         <BusinessDecisionFields
+                          key={`${c.id}:${actions.join(",")}`}
                           caseId={c.id}
                           actions={actions.map((a) => ({ value: a, label: BUSINESS_MODERATION_ACTION_LABEL[a] }))}
                         >

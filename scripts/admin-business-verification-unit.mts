@@ -97,6 +97,7 @@ assert.match(actions.slice(actions.indexOf("suspendBusinessProductAction")), /co
 const fields = read("src/app/(platform)/admin/business-verification/BusinessDecisionFields.tsx");
 assert.match(fields, /^"use client";/);
 assert.match(fields, /required=\{!optional\}/);
+assert.match(page, /key=\{`\$\{c\.id\}:\$\{actions\.join\(","\)\}`\}/, "decision fields remount when the allowed actions change");
 assert.match(fields, /placeholder=\{businessModerationReasonPlaceholder\(action\)\}/);
 assert.doesNotMatch(page, /placeholder="Причина решения \(обязательно\)"/, "decision reason is no longer statically required");
 
