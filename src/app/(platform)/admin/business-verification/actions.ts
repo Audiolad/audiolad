@@ -9,6 +9,7 @@ import {
   UUID_RE,
   businessModerationErrorText,
   isBusinessModerationAction,
+  resolveBusinessModerationReason,
 } from "@/lib/admin/business-verification";
 import { createClient } from "@/lib/supabase/server";
 
@@ -29,13 +30,14 @@ export async function moderateBusinessVerificationAction(formData: FormData): Pr
   const session = await requireAdminPermission("author_products.moderate");
   const verificationId = text(formData, "verificationId", 64);
   const action = text(formData, "action", 32);
-  const reason = text(formData, "reason", 2000);
   const filter = text(formData, "filter", 32) || "open";
   const anchor = UUID_RE.test(verificationId) ? `case-${verificationId}` : undefined;
 
   if (!UUID_RE.test(verificationId) || !isBusinessModerationAction(action)) {
     back({ status: filter, error: "Некорректный запрос." }, anchor);
   }
+  // Optional only for «Подтвердить» (stored as a neutral default); required for every other decision.
+  const reason = resolveBusinessModerationReason(action, text(formData, "reason", 2000));
   if (!reason) {
     back({ status: filter, error: businessModerationErrorText("business_moderation_reason_required") }, anchor);
   }
