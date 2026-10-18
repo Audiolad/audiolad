@@ -57,3 +57,19 @@ export function pickCoveringAcceptance(
     return a.acceptedAt < b.acceptedAt ? -1 : a.acceptedAt > b.acceptedAt ? 1 : a.acceptanceId.localeCompare(b.acceptanceId);
   })[0];
 }
+
+/**
+ * Which OTHER owned workspaces to promote after an acceptance: only those waiting in
+ * commercial_onboarding AND actually covered now (account-level rule re-checked per workspace).
+ * Never trust the click alone: e.g. after a workspace transfer, the old owner's row covers only that
+ * workspace, not the new owner's other workspaces (Codex review acct-r1).
+ */
+export function selectAccountWorkspacesToActivate(input: {
+  acceptingAuthorId: string;
+  waitingAuthorIds: readonly string[];
+  coveredAuthorIds: ReadonlySet<string>;
+}): string[] {
+  return [...new Set(input.waitingAuthorIds)].filter(
+    (id) => id !== input.acceptingAuthorId && input.coveredAuthorIds.has(id),
+  );
+}

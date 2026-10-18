@@ -27,7 +27,11 @@ import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED,
 } from "@/lib/author-terms/types";
 import { activateCommercialAccessAfterTermsAccepted } from "@/lib/authors/activate-commercial-after-terms";
-import { listCoveringAcceptances, pickCoveringAcceptance } from "@/lib/author-terms/covering-acceptances";
+import {
+  listCoveringAcceptances,
+  pickCoveringAcceptance,
+  selectAccountWorkspacesToActivate,
+} from "@/lib/author-terms/covering-acceptances";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 assertAuthorTermsContentHash(
@@ -262,7 +266,7 @@ export async function loadAuthorTermsStatus(input: {
 /**
  * Account level: an acceptance by the owner covers all workspaces that user owns, so every owned
  * workspace waiting in commercial_onboarding is promoted, not only the one where the owner clicked.
- * The accepting workspace goes first; others follow (no-op unless commercial_onboarding).
+ * The accepting workspace goes first; others only if waiting in commercial_onboarding AND covered now.
  */
 async function activateAccountWorkspacesAfterTermsAccepted(input: { authorId: string; actorUserId: string }) {
   await activateCommercialAccessAfterTermsAccepted({ authorId: input.authorId, actorUserId: input.actorUserId });
@@ -289,7 +293,22 @@ async function activateAccountWorkspacesAfterTermsAccepted(input: { authorId: st
     console.error("author_terms_account_workspaces_status_failed");
     return;
   }
-  for (const authorId of (waiting ?? []).map((row) => String((row as { id: unknown }).id))) {
+  const waitingIds = (waiting ?? []).map((row) => String((row as { id: unknown }).id));
+  // Re-check account-level coverage per workspace (an old acceptance of a transferred workspace
+  // must not promote the new owner's other workspaces).
+  const covered = new Set<string>();
+  for (const id of waitingIds) {
+    try {
+      if ((await hasAcceptedCurrentAuthorTerms(id)).accepted) covered.add(id);
+    } catch {
+      console.error("author_terms_account_workspaces_coverage_failed");
+    }
+  }
+  for (const authorId of selectAccountWorkspacesToActivate({
+    acceptingAuthorId: input.authorId,
+    waitingAuthorIds: waitingIds,
+    coveredAuthorIds: covered,
+  })) {
     await activateCommercialAccessAfterTermsAccepted({
       authorId,
       actorUserId: input.actorUserId,

@@ -551,6 +551,25 @@ BEGIN
   INSERT INTO public.author_commercial_applications(id,author_id,status) VALUES ('70000000-0000-0000-0000-0000000000c3','${A3}','submitted');
   r := public.approve_author_commercial_application('70000000-0000-0000-0000-0000000000c3');
   PERFORM ua_test.ok(r->>'access_status' = 'commercial_active', 'future workspace activated on approve: ' || r::text);
+  -- Acceptance trigger fans out: music of a sibling workspace that was NOT synced yet flows in when the
+  -- owner records an acceptance in ANOTHER workspace (publication triggers disabled to isolate it).
+  ALTER TABLE public.practices DISABLE TRIGGER zz_business_unified_auto_sync_ins;
+  ALTER TABLE public.audio_items DISABLE TRIGGER zz_business_unified_auto_sync_ins;
+  INSERT INTO public.authors(id,slug) VALUES ('10000000-0000-0000-0000-0000000000a4','space-a4');
+  INSERT INTO public.author_members(author_id,user_id,role) VALUES ('10000000-0000-0000-0000-0000000000a4','${A}','owner');
+  INSERT INTO public.practices(id,author_id,slug,status) VALUES ('20000000-0000-0000-0000-0000000000c4','10000000-0000-0000-0000-0000000000a4','quiet','published');
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000c4','20000000-0000-0000-0000-0000000000c4','Quiet 1',1,'published');
+  ALTER TABLE public.practices ENABLE TRIGGER zz_business_unified_auto_sync_ins;
+  ALTER TABLE public.audio_items ENABLE TRIGGER zz_business_unified_auto_sync_ins;
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000c4'), 'isolated: A4 not synced yet');
+  INSERT INTO public.author_terms_acceptances(author_id,terms_version_id,accepted_by_user_id,acceptance_text)
+    VALUES ('${A2}',v20,'${A}','2.0 text');
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000c4' AND status = 'verified'), 'acceptance in A2 brought A4 music in (fan-out)');
+  -- Workspace transfer: the old owner's acceptance stays with that workspace only.
+  UPDATE public.author_members SET user_id = '${T}' WHERE author_id = '${A2}' AND user_id = '${A}';
+  PERFORM ua_test.ok(public.author_has_business_agreement('${A2}'), 'transferred A2: its own rows still count');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('${WT}') AND NOT public.author_has_accepted_current_terms('${WT}'), 'new owner T: other workspace NOT covered by A''s acceptances');
+  PERFORM ua_test.ok(public.author_has_business_agreement('${A3}'), 'A keeps coverage of the workspaces A still owns');
   PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.business_catalog_sync_failures), 'no sync failures');
 END $t$;
 `;
@@ -656,9 +675,9 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
         psql(db2, [setup, fixtures, migration, insert20, switchCurrent, accountFixtures].join('\n'));
         psql(db2, [accountLevel, accountLevel, accountScenario].join('\n'));
         psql(db2, [accountRollback,
-          `SELECT 1 / CASE WHEN to_regprocedure('public.author_terms_covering_acceptances(uuid[])') IS NULL AND NOT public.author_has_accepted_current_terms('${A2}') AND public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000a') THEN 1 ELSE 0 END;`,
+          `SELECT 1 / CASE WHEN to_regprocedure('public.author_terms_covering_acceptances(uuid[])') IS NULL AND NOT public.author_has_accepted_current_terms('${A3}') AND public.author_has_accepted_current_terms('${A2}') AND public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000a') THEN 1 ELSE 0 END;`,
           accountLevel,
-          `SELECT 1 / CASE WHEN public.author_has_business_agreement('${A2}') THEN 1 ELSE 0 END;`].join('\n'));
+          `SELECT 1 / CASE WHEN public.author_has_business_agreement('${A3}') THEN 1 ELSE 0 END;`].join('\n'));
       } finally {
         psql('postgres', `DROP DATABASE ${db2};`);
       }

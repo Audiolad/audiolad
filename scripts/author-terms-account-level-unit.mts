@@ -6,7 +6,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { listCoveringAcceptances, pickCoveringAcceptance } from "../src/lib/author-terms/covering-acceptances";
+import {
+  listCoveringAcceptances,
+  pickCoveringAcceptance,
+  selectAccountWorkspacesToActivate,
+} from "../src/lib/author-terms/covering-acceptances";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
@@ -48,6 +52,17 @@ const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "u
   );
 }
 
+// Activation after an acceptance: only other owned workspaces that wait AND are covered now.
+{
+  const sel = (waiting: string[], covered: string[], accepting = "w1") =>
+    selectAccountWorkspacesToActivate({ acceptingAuthorId: accepting, waitingAuthorIds: waiting, coveredAuthorIds: new Set(covered) });
+  assert.deepEqual(sel(["w2", "w3", "w2"], ["w2", "w3"]), ["w2", "w3"], "owner's waiting covered workspaces promoted once");
+  assert.deepEqual(sel(["w1", "w2"], ["w1", "w2"]), ["w2"], "accepting workspace handled separately");
+  // Transfer: W1 (old owner A's acceptance) moved to B; B's W2 waits but B never accepted → not covered.
+  assert.deepEqual(sel(["w2"], []), [], "old owner's acceptance of a transferred workspace never promotes the new owner's others");
+  assert.deepEqual(sel([], ["w2"]), [], "nothing waiting, nothing promoted");
+}
+
 // Wiring: every reader of acceptances for gates goes through the account-level RPC.
 {
   const service = read("src/lib/author-terms/service.ts");
@@ -62,6 +77,7 @@ const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "u
   assert.equal((service.match(/await activateAccountWorkspacesAfterTermsAccepted\(\{/g) ?? []).length, 3);
   assert.match(service, /\.eq\("user_id", input\.actorUserId\)\s*\.eq\("role", "owner"\)/, "only workspaces the accepting user OWNS");
   assert.match(service, /\.eq\("access_status", "commercial_onboarding"\)/, "already-active workspaces untouched");
+  assert.match(service, /\(await hasAcceptedCurrentAuthorTerms\(id\)\)\.accepted\) covered\.add\(id\)[\s\S]{0,400}selectAccountWorkspacesToActivate\(/, "coverage re-checked per workspace before promotion");
   // Support mode and owner-only acceptance are unchanged.
   assert.match(service, /if \(input\.supportMode !== false\) \{\s*throw new AuthorTermsError\("support_mode_acceptance_forbidden", 403\);/);
   assert.match(service, /if \(input\.role !== "owner"\) \{\s*throw new AuthorTermsError\("forbidden", 403\);/);
