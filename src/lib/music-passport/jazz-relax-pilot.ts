@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { isAudioPrepareInFlight, mapProductNormalizeJobToPrepareStatus } from "@/lib/author-products/audio-prepare-status";
 import { MUSIC_MASTERS_BUCKET } from "@/lib/author-products/music-master-upload-contract";
 import { PRACTICE_AUDIO_BUCKET } from "@/lib/author-products/product-audio-upload-contract";
-import { isJazzRelaxAuthor } from "@/lib/authors/jazz-relax";
 import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
 import {
   MUSIC_ANALYZER_MAX_UPLOAD_BYTES,
@@ -40,6 +39,7 @@ import {
   type JazzRelaxPassportTrackView,
   type JazzRelaxPassportView,
 } from "@/lib/music-passport/jazz-relax-status";
+import { isMusicPassportPilotAuthor } from "@/lib/music-passport/pilot-authors";
 
 export class JazzRelaxPassportError extends Error {
   constructor(
@@ -55,7 +55,7 @@ export function assertJazzRelaxMusicPassport(input: {
   authorId: string | null | undefined;
   productKind: string | null | undefined;
 }): void {
-  if (!isJazzRelaxAuthor(input.authorId) || input.productKind?.trim() !== "music") {
+  if (!isMusicPassportPilotAuthor(input.authorId) || input.productKind?.trim() !== "music") {
     throw new JazzRelaxPassportError("jazz_relax_passport_forbidden", 403);
   }
 }
@@ -1080,7 +1080,7 @@ export async function jazzRelaxAlbumFactsForDescription(input: {
   facts: string | null;
   alreadyBound: boolean;
 }> {
-  if (!isJazzRelaxAuthor(input.authorId) || input.productKind?.trim() !== "music") {
+  if (!isMusicPassportPilotAuthor(input.authorId) || input.productKind?.trim() !== "music") {
     return { albumPassportVersionId: null, facts: null, alreadyBound: false };
   }
   const { data: practice, error } = await service()
