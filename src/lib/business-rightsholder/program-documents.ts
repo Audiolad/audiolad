@@ -66,13 +66,13 @@ export const PROGRAM_DOCUMENT_ARCHIVE_NOTICE =
   "Документ в архиве. С редакции 2.0 Авторских условий права на музыку для «АудиоЛад Бизнес» подтверждаются Единым коммерческим соглашением с правообладателем; отдельное заявление больше не подписывается. Текст сохранён без изменений для авторов, которые его подписали.";
 
 /**
- * Program terms r7 (flag ON): п. 1 names the unified commercial agreement 2.0 as the basis for
+ * Program terms r8 (flag ON; r7 + п. 5 «треки с подтверждёнными правами», edition 2.1, task 8d9cd0af): п. 1 names the unified commercial agreement 2.0 as the basis for
  * sublicensing to venues instead of the archived rights statement. Same path and date as r6.1
  * (r6.1 = r6 with en dashes, #912); only п. 1 differs.
  */
 export const UNIFIED_PROGRAM_TERMS_DOCUMENT: PublicProgramDocument = {
   ...PUBLIC_PROGRAM_DOCUMENTS.business_program_terms,
-  version: "r7-2026-10-18",
+  version: "r8-2026-10-18",
   markdown: PROGRAM_TERMS_MD,
   sha256: PROGRAM_TERMS_MD_SHA256,
 };
