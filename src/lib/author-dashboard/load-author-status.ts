@@ -9,6 +9,7 @@ import {
 } from "@/lib/author-dashboard/author-status";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
+import { payoutProfileStatusSourceFromRow } from "@/lib/author-payout-profiles/display-status";
 import { hasAcceptedCurrentAuthorTerms } from "@/lib/author-terms/service";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { loadAuthorAppreciationSettings } from "@/lib/author-appreciation/settings";
@@ -18,6 +19,7 @@ import { ensureAutoCommercialAppreciationLifecycle } from "@/lib/authors/ensure-
 async function loadPayoutProfileSummary(authorId: string): Promise<{
   status: AuthorPayoutProfileStatus | null;
   reviewComment: string | null;
+  loadFailed: boolean;
 }> {
   try {
     const service = createServiceRoleClient();
@@ -27,16 +29,20 @@ async function loadPayoutProfileSummary(authorId: string): Promise<{
       .eq("author_id", authorId)
       .maybeSingle();
 
-    if (error || !data) {
-      return { status: null, reviewComment: null };
+    // A failed lookup is "unknown", never "no profile" (would read as
+    // «не заполнены» while the form shows saved data).
+    const source = payoutProfileStatusSourceFromRow({ error, row: data });
+    if (source.kind !== "loaded") {
+      return { status: null, reviewComment: null, loadFailed: true };
     }
 
     return {
-      status: (data.status as AuthorPayoutProfileStatus) ?? null,
-      reviewComment: (data.review_comment as string | null) ?? null,
+      status: source.status,
+      reviewComment: (data?.review_comment as string | null) ?? null,
+      loadFailed: false,
     };
   } catch {
-    return { status: null, reviewComment: null };
+    return { status: null, reviewComment: null, loadFailed: true };
   }
 }
 
@@ -105,6 +111,7 @@ export async function loadAuthorStatusView(input: {
     termsAccepted: termsAcceptance.accepted,
     publishedTermsAvailable: Boolean(termsAcceptance.currentVersion),
     payoutProfileStatus: payout.status,
+    payoutProfileLoadFailed: payout.loadFailed,
     payoutReviewComment: payout.reviewComment,
     individualShare: individualShare
       ? {

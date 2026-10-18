@@ -7,6 +7,7 @@ import {
 } from "@/lib/author-commercial/economics";
 import { STARTER_FREE_PRODUCT_BEFORE_COMMERCIAL_HINT } from "@/lib/author-dashboard/free-author-first-step";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
+import { resolvePayoutProfileDisplayState } from "@/lib/author-payout-profiles/display-status";
 import {
   isAuthorCommercialActiveAccess,
   type AuthorAccessStatus,
@@ -36,6 +37,8 @@ export type AuthorStatusCta = {
 export type AuthorStatusOptionalPayoutSection = {
   title: string;
   description: string;
+  /** Real payout profile state (shared resolver), e.g. draft vs missing. */
+  statusLabel: string | null;
   cta: AuthorStatusCta;
 };
 
@@ -80,6 +83,11 @@ export type ResolveAuthorStatusViewInput = {
   termsAccepted: boolean;
   publishedTermsAvailable: boolean;
   payoutProfileStatus: AuthorPayoutProfileStatus | null;
+  /**
+   * True when the payout profile could not be loaded. The status is then
+   * unknown and must not be rendered as "not filled".
+   */
+  payoutProfileLoadFailed?: boolean;
   payoutReviewComment?: string | null;
   individualShare?: {
     authorShareBps: number;
@@ -213,6 +221,30 @@ export function resolveAuthorStatusView(
   };
 
   function buildOptionalPayoutSection(): AuthorStatusOptionalPayoutSection {
+    const display = resolvePayoutProfileDisplayState(
+      input.payoutProfileLoadFailed
+        ? { kind: "error" }
+        : { kind: "loaded", status: input.payoutProfileStatus },
+    );
+
+    if (display.kind === "unavailable") {
+      const canOpen =
+        capabilities.can_edit_payout_profile && input.role !== "editor";
+      return {
+        title: "Данные для выплат",
+        description:
+          display.description ??
+          "Не удалось загрузить статус реквизитов. Обновите страницу.",
+        statusLabel: display.statusLabel,
+        cta: {
+          label: display.ctaLabel ?? "Открыть данные для выплат",
+          href: canOpen ? payoutHref : null,
+          disabled: !canOpen,
+          hint: null,
+        },
+      };
+    }
+
     const hasProfile = input.payoutProfileStatus != null;
     const pending =
       input.payoutProfileStatus === "submitted" ||
@@ -226,6 +258,7 @@ export function resolveAuthorStatusView(
       title: "Данные для выплат",
       description:
         "Заполните реквизиты, когда захотите получить первое авторское вознаграждение.",
+      statusLabel: display.statusLabel,
       cta: {
         label: verified
           ? "Реквизиты заполнены"

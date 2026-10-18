@@ -251,6 +251,14 @@ export default function AuthorStatusClient({ authorId, authorSlug, authorRole, a
 
       {view.optionalPayout ? (
         <StatusCard title={view.optionalPayout.title} tone="muted">
+          {view.optionalPayout.statusLabel ? (
+            <p
+              data-payout-profile-status-label="true"
+              className="mt-3 inline-flex rounded-full bg-[#f3edfb] px-3 py-1 text-sm font-medium text-[#7042c5]"
+            >
+              {view.optionalPayout.statusLabel}
+            </p>
+          ) : null}
           <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">
             {view.optionalPayout.description}
           </p>
