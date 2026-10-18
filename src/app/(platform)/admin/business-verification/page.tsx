@@ -4,6 +4,7 @@ import {
   moderateBusinessVerificationAction,
   suspendBusinessProductAction,
 } from "@/app/(platform)/admin/business-verification/actions";
+import { BusinessDecisionFields } from "@/app/(platform)/admin/business-verification/BusinessDecisionFields";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
   BUSINESS_MODERATION_ACTION_LABEL,
@@ -44,7 +45,7 @@ type CaseRow = {
 };
 
 function formatMsk(value: string | null): string {
-  if (!value) return "—";
+  if (!value) return "–";
   return new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Europe/Moscow",
     dateStyle: "short",
@@ -126,7 +127,7 @@ export default async function AdminBusinessVerificationPage({
   const catalogOptions = ((catalog ?? []) as { id: string; title: string | null; authors: { name: string | null } | { name: string | null }[] | null }[])
     .map((p) => {
       const author = Array.isArray(p.authors) ? p.authors[0] : p.authors;
-      return { id: p.id, label: `${author?.name ?? "—"} — ${p.title ?? "Без названия"}` };
+      return { id: p.id, label: `${author?.name ?? "–"} – ${p.title ?? "Без названия"}` };
     })
     .sort((a, b) => a.label.localeCompare(b.label, "ru"));
   const catalogLabel = new Map(catalogOptions.map((o) => [o.id, o.label]));
@@ -134,7 +135,7 @@ export default async function AdminBusinessVerificationPage({
   const productById = new Map(
     ((products ?? []) as { id: string; title: string | null; authors: { name: string | null; slug: string | null } | { name: string | null; slug: string | null }[] | null }[]).map((p) => {
       const author = Array.isArray(p.authors) ? p.authors[0] : p.authors;
-      return [p.id, { title: p.title ?? "Без названия", authorName: author?.name ?? "—" }];
+      return [p.id, { title: p.title ?? "Без названия", authorName: author?.name ?? "–" }];
     }),
   );
   const trackById = new Map(((tracks ?? []) as { id: string; title: string | null }[]).map((t) => [t.id, t.title ?? "Трек"]));
@@ -155,8 +156,9 @@ export default async function AdminBusinessVerificationPage({
         Бизнес: проверка правообладателей
       </h2>
       <p className="mt-2 text-sm text-[#796ba0]">
-        Проверка одного примера на аккаунт правообладателя для АудиоЛад Бизнес. Это не подтверждение прав на весь каталог.
-        Каждое решение требует причины и сохраняется в журнале.
+        Проверка одного примера на аккаунт. После подтверждения все треки аккаунта и всех его авторских пространств
+        попадают в «АудиоЛад Бизнес» автоматически, отдельной проверки треков нет. Комментарий к подтверждению
+        необязателен; отказ, запрос уточнения и приостановка требуют причины. Все решения сохраняются в журнале.
       </p>
 
       {params.error ? (
@@ -209,7 +211,7 @@ export default async function AdminBusinessVerificationPage({
                   <span className="text-xs text-[#796ba0]">Отправлено: {formatMsk(c.submitted_at)}</span>
                 </div>
                 <dl className="mt-3 grid gap-1 text-sm sm:grid-cols-[180px_1fr]">
-                  <dt className="text-[#796ba0]">Пространство</dt><dd>{product?.authorName ?? "—"}</dd>
+                  <dt className="text-[#796ba0]">Пространство</dt><dd>{product?.authorName ?? "–"}</dd>
                   <dt className="text-[#796ba0]">Продукт</dt><dd>{product?.title ?? c.product_id}</dd>
                   <dt className="text-[#796ba0]">Трек</dt><dd>{trackById.get(c.audio_item_id) ?? c.audio_item_id}</dd>
                   <dt className="text-[#796ba0]">Сервис</dt><dd>{c.ai_service === "other" ? c.ai_service_other ?? "Другой" : c.ai_service}</dd>
@@ -251,27 +253,28 @@ export default async function AdminBusinessVerificationPage({
                       <form action={moderateBusinessVerificationAction} className="space-y-2 rounded-2xl border border-[#efe6fa] p-3">
                         <input type="hidden" name="verificationId" value={c.id} />
                         <input type="hidden" name="filter" value={filter} />
-                        <label className="block text-sm font-semibold" htmlFor={`action-${c.id}`}>Решение</label>
-                        <select id={`action-${c.id}`} name="action" className="w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" defaultValue={actions[0]}>
-                          {actions.map((a) => (<option key={a} value={a}>{BUSINESS_MODERATION_ACTION_LABEL[a]}</option>))}
-                        </select>
-                        {actions.includes("approve") ? (
-                          <fieldset className="space-y-2 text-sm">
-                            <legend className="text-[#796ba0]">Правообладатель (только для «Подтвердить»)</legend>
-                            <select name="rightsholder" className="w-full rounded-xl border border-[#e4d7f4] p-2" defaultValue="new">
-                              <option value="new">Создать нового</option>
-                              {((rightsholders ?? []) as { id: string; display_name: string; entity_type: string }[]).map((r) => (
-                                <option key={r.id} value={r.id}>{r.display_name} ({r.entity_type === "organization" ? "организация" : "физлицо"})</option>
-                              ))}
-                            </select>
-                            <input name="newDisplayName" maxLength={200} placeholder="Имя нового правообладателя" className="w-full rounded-xl border border-[#e4d7f4] p-2" />
-                            <select name="newEntityType" className="w-full rounded-xl border border-[#e4d7f4] p-2" defaultValue="person">
-                              <option value="person">Физлицо</option>
-                              <option value="organization">Организация</option>
-                            </select>
-                          </fieldset>
-                        ) : null}
-                        <textarea name="reason" required maxLength={2000} rows={3} placeholder="Причина решения (обязательно)" className="w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" />
+                        <BusinessDecisionFields
+                          key={`${c.id}:${actions.join(",")}`}
+                          caseId={c.id}
+                          actions={actions.map((a) => ({ value: a, label: BUSINESS_MODERATION_ACTION_LABEL[a] }))}
+                        >
+                          {actions.includes("approve") ? (
+                            <fieldset className="space-y-2 text-sm">
+                              <legend className="text-[#796ba0]">Правообладатель (только для «Подтвердить»)</legend>
+                              <select name="rightsholder" className="w-full rounded-xl border border-[#e4d7f4] p-2" defaultValue="new">
+                                <option value="new">Создать нового</option>
+                                {((rightsholders ?? []) as { id: string; display_name: string; entity_type: string }[]).map((r) => (
+                                  <option key={r.id} value={r.id}>{r.display_name} ({r.entity_type === "organization" ? "организация" : "физлицо"})</option>
+                                ))}
+                              </select>
+                              <input name="newDisplayName" maxLength={200} placeholder="Имя нового правообладателя" className="w-full rounded-xl border border-[#e4d7f4] p-2" />
+                              <select name="newEntityType" className="w-full rounded-xl border border-[#e4d7f4] p-2" defaultValue="person">
+                                <option value="person">Физлицо</option>
+                                <option value="organization">Организация</option>
+                              </select>
+                            </fieldset>
+                          ) : null}
+                        </BusinessDecisionFields>
                         <button type="submit" className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">Сохранить решение</button>
                       </form>
                     ) : null}
@@ -301,7 +304,7 @@ export default async function AdminBusinessVerificationPage({
                     <ul className="mt-2 space-y-1">
                       {caseAudit.map((a) => (
                         <li key={a.id}>
-                          {formatMsk(a.created_at)} — {BUSINESS_MODERATION_ACTION_LABEL[a.action as keyof typeof BUSINESS_MODERATION_ACTION_LABEL] ?? a.action}
+                          {formatMsk(a.created_at)} – {BUSINESS_MODERATION_ACTION_LABEL[a.action as keyof typeof BUSINESS_MODERATION_ACTION_LABEL] ?? a.action}
                           {a.actor_user_id === c.owner_user_id ? " (сам владелец аккаунта)" : ""}: {a.reason}
                         </li>
                       ))}
@@ -331,7 +334,7 @@ export default async function AdminBusinessVerificationPage({
           </label>
           <label className="text-sm">
             <span className="block font-semibold">ID трека (необязательно)</span>
-            <input name="audioItemId" pattern="[0-9a-fA-F-]{36}" placeholder="Пусто — весь продукт" className="mt-1 w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" />
+            <input name="audioItemId" pattern="[0-9a-fA-F-]{36}" placeholder="Пусто – весь продукт" className="mt-1 w-full rounded-xl border border-[#e4d7f4] p-2 text-sm" />
           </label>
           <label className="text-sm">
             <span className="block font-semibold">Причина (обязательно)</span>
@@ -345,8 +348,8 @@ export default async function AdminBusinessVerificationPage({
           <ul data-testid="business-recent-suspensions" className="mt-4 space-y-1 text-xs text-[#796ba0]">
             {((recentSuspensions ?? []) as { id: string; product_id: string; audio_item_id: string | null; actor_user_id: string; reason: string; created_at: string }[]).map((s) => (
               <li key={s.id}>
-                {formatMsk(s.created_at)} — {catalogLabel.get(s.product_id) ?? productById.get(s.product_id)?.title ?? s.product_id}
-                {s.audio_item_id ? " (один трек)" : ""}{s.actor_user_id === session.userId ? " — вы" : ""}: {s.reason}
+                {formatMsk(s.created_at)} – {catalogLabel.get(s.product_id) ?? productById.get(s.product_id)?.title ?? s.product_id}
+                {s.audio_item_id ? " (один трек)" : ""}{s.actor_user_id === session.userId ? " – вы" : ""}: {s.reason}
               </li>
             ))}
           </ul>

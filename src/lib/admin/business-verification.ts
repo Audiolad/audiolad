@@ -67,6 +67,31 @@ export function allowedBusinessModerationActions(status: string): BusinessModera
 
 export type BusinessVerificationFilterKey = "open" | "all" | BusinessVerificationStatus;
 
+/**
+ * Sergey 18.10 20:16 MSK: the decision comment is optional for «Подтвердить» only.
+ * Reject / request_info / reopen / restrict / revoke and suspensions still need a reason.
+ */
+export function isBusinessModerationReasonOptional(action: string): boolean {
+  return action === "approve";
+}
+
+/**
+ * Stored when «Подтвердить» is saved without a comment. The DB RPC keeps its non-empty reason
+ * check (audit rows always carry text), so the app sends this neutral default instead of "".
+ */
+export const BUSINESS_APPROVE_DEFAULT_REASON = "Подтверждено без комментария";
+
+export function businessModerationReasonPlaceholder(action: string): string {
+  return isBusinessModerationReasonOptional(action) ? "Комментарий (необязательно)" : "Причина решения (обязательно)";
+}
+
+/** Reason to send to the RPC, or null when a required reason is missing. */
+export function resolveBusinessModerationReason(action: string, reason: string): string | null {
+  const trimmed = reason.trim();
+  if (trimmed) return trimmed;
+  return isBusinessModerationReasonOptional(action) ? BUSINESS_APPROVE_DEFAULT_REASON : null;
+}
+
 export const BUSINESS_VERIFICATION_FILTERS: { key: BusinessVerificationFilterKey; label: string }[] = [
   { key: "open", label: "Ждут решения" },
   { key: "verified", label: "Подтверждены" },
@@ -98,7 +123,7 @@ export function canActOnOwnBusinessCase(input: { isOwnCase: boolean; isPlatformO
 
 const ERROR_TEXT: Record<string, string> = {
   business_moderator_required: "Нет прав модератора АудиоЛад Бизнес.",
-  business_moderation_reason_required: "Укажите причину решения — она сохраняется в журнале.",
+  business_moderation_reason_required: "Укажите причину решения – она сохраняется в журнале.",
   business_verification_not_found: "Заявка не найдена.",
   business_self_moderation_forbidden:
     "Модерировать собственную заявку может только владелец платформы и только вне режима сопровождения автора.",
