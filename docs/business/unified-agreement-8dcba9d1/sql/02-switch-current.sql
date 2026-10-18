@@ -2,6 +2,8 @@
 -- на сервере уже включён флаг AUDIOLAD_UNIFIED_AGREEMENT_ENABLED=1 (иначе приложение откажет в
 -- принятии: в коде без флага допустима только 1.2).
 -- Использование: psql -f 02-switch-current.sql   (параметров нет; никакой даты отсечения нет)
+-- Дата публикации и вступления в силу 2.0 = момент переключения (решение Сергея 18.10.2026 15:02):
+-- ставится здесь, now() этой же транзакции. Повторный запуск (2.0 уже текущая) даты не меняет.
 -- Решение Сергея 17.10.2026: авторы, принявшие 1.2, сохраняют коммерческие возможности 1.2
 -- (продажи, выплаты, Студия) БЕССРОЧНО — редакция 1.2 помечается commercial_access_continues.
 -- Правом ограничения из п. 22.4 Платформа не пользуется. «АудиоЛад Бизнес» открывается только
@@ -32,7 +34,7 @@ BEGIN
     WHERE id = '9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902';
   UPDATE public.author_terms_versions SET is_current = false
     WHERE document_key = 'author-terms' AND is_current;
-  UPDATE public.author_terms_versions SET is_current = true
+  UPDATE public.author_terms_versions SET is_current = true, published_at = now(), effective_at = now()
     WHERE id = '5d0c2b7e-3f4a-4c61-9a8e-2b0f6d1e7a20';
 END;
 $$;
@@ -40,6 +42,6 @@ $$;
 -- (поступление треков в Бизнес — автоматическое, триггеры миграции 20270109120000).
 REVOKE EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) FROM authenticated;
 SELECT public.business_unified_agreement_active() AS unified_active;
-SELECT version, is_current, covers_business, commercial_access_continues
+SELECT version, is_current, covers_business, commercial_access_continues, published_at, effective_at
 FROM public.author_terms_versions WHERE document_key = 'author-terms' ORDER BY published_at;
 COMMIT;

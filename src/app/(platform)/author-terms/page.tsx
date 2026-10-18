@@ -8,7 +8,8 @@ import {
   findEditionByVersion,
   type ApprovedAuthorTermsEdition,
 } from "@/lib/author-terms/editions";
-import { getCurrentAuthorTermsVersion } from "@/lib/author-terms/service";
+import { resolveEditionDisplayDates, type EditionDisplayDates } from "@/lib/author-terms/edition-dates";
+import { getCurrentAuthorTermsVersion, listAuthorTermsVersionDates } from "@/lib/author-terms/service";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
@@ -19,15 +20,39 @@ type PageProps = { searchParams?: Promise<{ edition?: string }> };
 
 async function resolveDisplayedEdition(
   requestedVersion: string | undefined,
-): Promise<{ edition: ApprovedAuthorTermsEdition; isCurrent: boolean; current: ApprovedAuthorTermsEdition }> {
+): Promise<{
+  edition: ApprovedAuthorTermsEdition;
+  isCurrent: boolean;
+  current: ApprovedAuthorTermsEdition;
+  dates: EditionDisplayDates;
+}> {
   if (!isUnifiedAgreementEnabled()) {
-    return { edition: LEGACY_AUTHOR_TERMS_EDITION, isCurrent: true, current: LEGACY_AUTHOR_TERMS_EDITION };
+    // Flag off: 1.2 only, code dates (equal to its DB row), no DB read – unchanged behaviour.
+    const legacy = LEGACY_AUTHOR_TERMS_EDITION;
+    return {
+      edition: legacy,
+      isCurrent: true,
+      current: legacy,
+      dates: resolveEditionDisplayDates({
+        contentHash: legacy.contentHash,
+        codePublishedAt: legacy.publishedAt,
+        codeEffectiveAt: legacy.effectiveAt,
+        rows: [],
+      }),
+    };
   }
-  const row = await getCurrentAuthorTermsVersion();
+  const [row, rows] = await Promise.all([getCurrentAuthorTermsVersion(), listAuthorTermsVersionDates()]);
   const current = findAcceptableEditionByHash(row?.content_hash, true) ?? LEGACY_AUTHOR_TERMS_EDITION;
   const requested = findEditionByVersion(requestedVersion);
   const edition = requested ?? current;
-  return { edition, isCurrent: edition.versionId === current.versionId, current };
+  // Dates always from the DB row (2.0: set at the switch); never a hardcoded 2.0 date.
+  const dates = resolveEditionDisplayDates({
+    contentHash: edition.contentHash,
+    codePublishedAt: edition.publishedAt,
+    codeEffectiveAt: edition.effectiveAt,
+    rows,
+  });
+  return { edition, isCurrent: edition.versionId === current.versionId, current, dates };
 }
 
 const canonical = `${PRODUCTION_APP_ORIGIN}/author-terms`;
@@ -67,7 +92,7 @@ function formatPublishedDate(iso: string): string {
 
 export default async function AuthorTermsPage({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
-  const { edition, isCurrent, current } = await resolveDisplayedEdition(params.edition?.trim());
+  const { edition, isCurrent, current, dates } = await resolveDisplayedEdition(params.edition?.trim());
   const meta = edition;
   const blocks = buildAuthorTermsDocumentBlocks(edition.text, edition.frontMatterMarker);
   const otherEditions = isUnifiedAgreementEnabled()
@@ -90,7 +115,18 @@ export default async function AuthorTermsPage({ searchParams }: PageProps) {
           : "Условия регулируют размещение продуктов, предоставление доступа слушателям и выплату авторского вознаграждения."}
       </p>
 
-      {!isCurrent ? (
+      {!isCurrent && dates.kind === "pending" ? (
+        <p
+          role="note"
+          data-testid="author-terms-pending-edition"
+          className="mt-4 rounded-2xl border border-[#d9cff1] bg-[#f6f2ff] p-4 text-sm leading-6 text-[#4c3d78]"
+        >
+          Это новая редакция {meta.version}. Она ещё не вступила в силу: даты публикации и вступления в силу
+          будут указаны в день, когда она станет текущей. Сейчас действует редакция {current.version}.
+        </p>
+      ) : null}
+
+      {!isCurrent && dates.kind !== "pending" ? (
         <p
           role="note"
           data-testid="author-terms-archived-edition"
@@ -103,10 +139,19 @@ export default async function AuthorTermsPage({ searchParams }: PageProps) {
 
       <p className="mt-3 text-sm leading-6 text-[#8c7dab]" data-testid="author-terms-edition">
         Версия: {meta.version}
-        <br />
-        Дата публикации: {formatPublishedDate(meta.publishedAt)}
-        <br />
-        Дата вступления в силу: {formatPublishedDate(meta.effectiveAt)}
+        {dates.kind === "dated" ? (
+          <>
+            <br />
+            Дата публикации: {formatPublishedDate(dates.publishedAt)}
+            <br />
+            Дата вступления в силу: {formatPublishedDate(dates.effectiveAt)}
+          </>
+        ) : (
+          <>
+            <br />
+            Ещё не вступила в силу
+          </>
+        )}
       </p>
 
       {otherEditions.length > 0 ? (

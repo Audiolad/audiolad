@@ -3,6 +3,8 @@
  * (task 8dcba9d1 / 8d9cd0af, owner decision 17.10.2026). Source: docs/legal/author-agreement/edition-2.0.txt.
  * Do not edit ad hoc: the text is hashed and the DB row in public.author_terms_versions must carry the same hash.
  * Used only when the unified-agreement feature flag is on AND the DB current edition has this hash.
+ * No publication / effective date here (Sergey 18.10.2026 15:02): both come from the DB row and are set
+ * by sql/02-switch-current.sql to the moment 2.0 becomes current (step e). The text hash is unchanged.
  */
 
 import { AUTHOR_TERMS_DOCUMENT_KEY } from "@/lib/author-terms/approved-content";
@@ -12,8 +14,6 @@ export const AUTHOR_TERMS_V2_META = {
   documentKey: AUTHOR_TERMS_DOCUMENT_KEY,
   version: "2.0",
   title: "Единое коммерческое соглашение с правообладателем (Авторские условия сотрудничества платформы «АудиоЛад», редакция 2.0)",
-  publishedAt: "2026-10-17T00:00:00+03:00",
-  effectiveAt: "2026-10-17T00:00:00+03:00",
   contentHash: "41770211b4b40c6c675316ace4796708179a9c08860101fdb4b23bcdf9443d97",
   publicPath: "/author-terms",
   coversBusiness: true,

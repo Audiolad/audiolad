@@ -289,4 +289,46 @@ for (const needle of ["Резервная копия", "Пробное восс�
   assert.ok(plan.includes(needle), `rollout plan mentions ${needle}`);
 }
 assert.ok(read("docs/business/unified-agreement-8dcba9d1/TEST-PLAN-RU.md").includes("Aurafon"));
+// ---- Edition 2.0 dates come from the DB row, set when 2.0 becomes current (Sergey 18.10.2026 15:02).
+{
+  const { resolveEditionDisplayDates } = await import("../src/lib/author-terms/edition-dates.ts");
+  assert.ok(!("publishedAt" in AUTHOR_TERMS_V2_META) && !("effectiveAt" in AUTHOR_TERMS_V2_META), "no hardcoded 2.0 dates in code meta");
+  assert.equal(UNIFIED_AUTHOR_TERMS_EDITION.publishedAt, null);
+  assert.equal(UNIFIED_AUTHOR_TERMS_EDITION.effectiveAt, null);
+  assert.equal(LEGACY_AUTHOR_TERMS_EDITION.publishedAt, "2026-09-13T00:00:00+03:00", "1.2 code dates unchanged");
+  assert.equal(sha(AUTHOR_TERMS_V2_TEXT), "41770211b4b40c6c675316ace4796708179a9c08860101fdb4b23bcdf9443d97", "2.0 text hash unchanged");
+  const h12 = LEGACY_AUTHOR_TERMS_EDITION.contentHash;
+  const h20 = UNIFIED_AUTHOR_TERMS_EDITION.contentHash;
+  const r12 = (cur) => ({ content_hash: h12, published_at: "2026-09-12T21:00:00+00:00", effective_at: "2026-09-12T21:00:00+00:00", is_current: cur });
+  const r20 = (cur, at) => ({ content_hash: h20, published_at: at, effective_at: at, is_current: cur });
+  const forEd = (ed, rows) => resolveEditionDisplayDates({ contentHash: ed.contentHash, codePublishedAt: ed.publishedAt, codeEffectiveAt: ed.effectiveAt, rows });
+  // Before (c): no 2.0 row -> 2.0 not in force; 1.2 from its DB row.
+  assert.deepEqual(forEd(UNIFIED_AUTHOR_TERMS_EDITION, [r12(true)]), { kind: "pending" });
+  assert.deepEqual(forEd(LEGACY_AUTHOR_TERMS_EDITION, [r12(true)]), { kind: "dated", publishedAt: "2026-09-12T21:00:00+00:00", effectiveAt: "2026-09-12T21:00:00+00:00" });
+  // After (c), before (e): placeholder insert time is never shown.
+  const placeholder = "2026-10-18T12:00:00+00:00";
+  assert.deepEqual(forEd(UNIFIED_AUTHOR_TERMS_EDITION, [r12(true), r20(false, placeholder)]), { kind: "pending" });
+  // After (e): 2.0 current with the switch moment; 1.2 shown with its own dates as previous edition.
+  const switched = "2026-10-25T09:30:00+00:00";
+  assert.deepEqual(forEd(UNIFIED_AUTHOR_TERMS_EDITION, [r12(false), r20(true, switched)]), { kind: "dated", publishedAt: switched, effectiveAt: switched });
+  assert.deepEqual(forEd(LEGACY_AUTHOR_TERMS_EDITION, [r12(false), r20(true, switched)]).kind, "dated");
+  // After rollback of the switch (03): 2.0 not current again -> not in force (no stale date shown).
+  assert.deepEqual(forEd(UNIFIED_AUTHOR_TERMS_EDITION, [r12(true), r20(false, switched)]), { kind: "pending" });
+  // Flag off path: 1.2 code dates without DB rows.
+  assert.equal(forEd(LEGACY_AUTHOR_TERMS_EDITION, []).kind, "dated");
+  // Wiring: page renders only resolved dates; SQL: insert placeholder, switch sets now() in the same transaction.
+  const page = read("src/app/(platform)/author-terms/page.tsx");
+  assert.ok(!/meta\.(publishedAt|effectiveAt)/.test(page), "page never renders edition code dates directly");
+  assert.match(page, /listAuthorTermsVersionDates\(\)/);
+  assert.match(page, /resolveEditionDisplayDates\(/);
+  assert.match(page, /data-testid="author-terms-pending-edition"/);
+  const ins = read("docs/business/unified-agreement-8dcba9d1/sql/01-insert-edition-2.0.sql");
+  const sw = read("docs/business/unified-agreement-8dcba9d1/sql/02-switch-current.sql");
+  for (const [name, text] of [["01", ins], ["02", sw], ["meta", read("src/lib/author-terms/approved-content-v2.ts")]]) {
+    assert.ok(!text.includes("2026-10-17T"), `${name}: no 17.10 edition date`);
+  }
+  assert.match(ins, /now\(\),\s+-- временно[^\n]*\n\s+now\(\),/);
+  assert.match(sw, /SET is_current = true, published_at = now\(\), effective_at = now\(\)\s+WHERE id = '5d0c2b7e-3f4a-4c61-9a8e-2b0f6d1e7a20';/);
+  assert.ok(sw.indexOf("published_at = now()") > sw.indexOf("RETURN;"), "dates set only on the real switch, not on the no-op re-run");
+}
 console.log("unified-agreement-unit: ok");

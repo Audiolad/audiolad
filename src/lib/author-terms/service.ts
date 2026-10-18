@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { EditionDateRow } from "@/lib/author-terms/edition-dates";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -67,6 +68,24 @@ export async function getCurrentAuthorTermsVersion(
   }
 
   return (data as unknown as AuthorTermsVersionRow | null) ?? null;
+}
+
+/**
+ * Publication / effective dates of all Author Terms editions from the DB (the only source of the
+ * 2.0 dates: set when 2.0 becomes current). Read-only, no PII.
+ */
+export async function listAuthorTermsVersionDates(
+  client: SupabaseClient = adminClient(),
+): Promise<EditionDateRow[]> {
+  const { data, error } = await client
+    .from("author_terms_versions")
+    .select("content_hash, published_at, effective_at, is_current")
+    .eq("document_key", "author-terms");
+  if (error) {
+    console.error("author_terms_version_dates_error", error.message);
+    throw new AuthorTermsError("internal_error", 500);
+  }
+  return (data ?? []) as EditionDateRow[];
 }
 
 type EditionFlags = { covers_business: boolean | null; commercial_access_continues: boolean | null };
