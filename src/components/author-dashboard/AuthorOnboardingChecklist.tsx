@@ -302,6 +302,14 @@ function CommercialStepCard({ step }: { step: CommercialOnboardingStepState }) {
             {step.hint ? (
               <p className="mt-2 break-words text-sm leading-6 text-[#7d7596]">
                 {step.hint}
+              {step.hintHref ? (
+                <>
+                  {" "}
+                  <Link href={step.hintHref} className="font-semibold underline underline-offset-2">
+                    {step.hintLinkLabel ?? "Перейти"}
+                  </Link>
+                </>
+              ) : null}
               </p>
             ) : null}
           </div>
@@ -335,6 +343,14 @@ function CommercialStepCard({ step }: { step: CommercialOnboardingStepState }) {
           {step.hint ? (
             <p className="mt-2 break-words rounded-[14px] border border-[#f0e2b8] bg-[#fff9ea] px-3 py-2 text-sm text-[#8a6a1d]">
               {step.hint}
+              {step.hintHref ? (
+                <>
+                  {" "}
+                  <Link href={step.hintHref} className="font-semibold underline underline-offset-2">
+                    {step.hintLinkLabel ?? "Перейти"}
+                  </Link>
+                </>
+              ) : null}
             </p>
           ) : null}
 

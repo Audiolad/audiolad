@@ -26,7 +26,7 @@ export default function AuthorAgreementReacceptBanner({
       className="mb-6 rounded-[20px] border border-[#d9c8f5] bg-[#faf6ff] px-5 py-4 text-[15px] leading-6 text-[#2f2548]"
     >
       <p className="font-semibold text-[#25135c]">
-        Вышла редакция {status.currentVersion.version} — {UNIFIED_AGREEMENT_TITLE}
+        Вышла редакция {status.currentVersion.version} – {UNIFIED_AGREEMENT_TITLE}
       </p>
       <p className="mt-2">
         Одно соглашение на все способы монетизации, включая «АудиоЛад Бизнес». Отдельные заявления и согласия
@@ -34,8 +34,8 @@ export default function AuthorAgreementReacceptBanner({
       </p>
       <p className="mt-2">
         {status.previousEditionActive
-          ? "Ваша редакция продолжает действовать без ограничения срока: продажи и другие возможности сохраняются. Чтобы подключить музыку к «АудиоЛад Бизнес», примите новую редакцию и пройдите проверку прав — за вас её никто не примет."
-          : "Чтобы подключить «АудиоЛад Бизнес», примите новую редакцию лично — за вас её никто не примет."}
+          ? "Ваша редакция продолжает действовать без ограничения срока: продажи и другие возможности сохраняются. Чтобы подключить музыку к «АудиоЛад Бизнес», примите новую редакцию и пройдите проверку прав – за вас её никто не примет."
+          : "Чтобы подключить «АудиоЛад Бизнес», примите новую редакцию лично – за вас её никто не примет."}
       </p>
       <p className="mt-3 flex flex-wrap gap-4">
         <Link href="/author-terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#7042c5] underline-offset-2 hover:underline">

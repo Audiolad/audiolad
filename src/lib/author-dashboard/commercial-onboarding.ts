@@ -90,6 +90,9 @@ export type CommercialOnboardingStepState = {
   href?: string;
   ctaExternal?: boolean;
   hint?: string | null;
+  /** Direct link for a hint that asks to do something on another page (Sergey 18.10.2026 UX rule). */
+  hintHref?: string | null;
+  hintLinkLabel?: string | null;
   readiness?: {
     completedCount: number;
     totalCount: number;
@@ -526,6 +529,7 @@ export function evaluateCommercialOnboardingChecklist(input: {
       hint: applicationApproved
         ? "Сначала примите Авторские условия сотрудничества."
         : "Сначала нужна одобренная коммерческая заявка.",
+      ...(applicationApproved && termsHref ? { hintHref: termsHref, hintLinkLabel: "Перейти и принять" } : {}),
     });
   } else if (!paidProductComplete) {
     paidProductStep = {

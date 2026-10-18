@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AuthorAgreementReacceptBanner from "@/components/author-dashboard/AuthorAgreementReacceptBanner";
@@ -21,7 +22,8 @@ import {
 } from "@/lib/author-products/auth";
 import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
 import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard";
-import { loadAuthorTermsStatus } from "@/lib/author-terms/service";
+import { hasAcceptedCurrentAuthorTerms, loadAuthorTermsStatus } from "@/lib/author-terms/service";
+import { orderProductsForVerification } from "@/lib/business-rightsholder/agreement-links";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { createClient } from "@/lib/supabase/server";
 import { tracksLiveInBusiness, type BusinessGrantLayerRow } from "@/lib/business-rightsholder/track-in-business";
@@ -108,14 +110,41 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       .maybeSingle(),
   ]);
 
-  const products: OwnProduct[] = (practices ?? []).map((p) => ({
-    id: p.id as string,
-    title: (p.title as string) ?? "Без названия",
-    tracks: ((p.audio_items as { id: string; title: string | null; status: string; position: number | null }[]) ?? [])
-      .filter((t) => t.status === "published")
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-      .map((t) => ({ id: t.id, title: t.title ?? "Трек" })),
-  })).filter((p) => p.tracks.length > 0);
+  const unifiedMode = isUnifiedAgreementEnabled();
+  // The unified agreement is accepted per workspace; one application per account may use a product
+  // of any own workspace (pseudonyms). Each product carries its workspace and that workspace's 2.0 status.
+  const productWorkspaceIds = [...new Set((practices ?? []).map((p) => p.author_id as string))];
+  const agreementByWorkspace = new Map<string, boolean>(
+    unifiedMode
+      ? await Promise.all(
+          productWorkspaceIds.map(
+            async (id) => [id, (await hasAcceptedCurrentAuthorTerms(id)).gate.businessAgreement === true] as const,
+          ),
+        )
+      : [],
+  );
+  const workspaceById = new Map(workspaces.map((w) => [w.id, w]));
+  const products: OwnProduct[] = orderProductsForVerification(
+    (practices ?? []).map((p) => {
+      const ws = workspaceById.get(p.author_id as string);
+      return {
+        id: p.id as string,
+        title: (p.title as string) ?? "Без названия",
+        tracks: ((p.audio_items as { id: string; title: string | null; status: string; position: number | null }[]) ?? [])
+          .filter((t) => t.status === "published")
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+          .map((t) => ({ id: t.id, title: t.title ?? "Трек" })),
+        workspace: ws
+          ? {
+              slug: ws.slug,
+              name: ws.name,
+              agreementAccepted: unifiedMode ? agreementByWorkspace.get(ws.id) === true : null,
+            }
+          : null,
+      };
+    }).filter((p) => p.tracks.length > 0),
+    workspace.slug,
+  );
 
   const documents: ProgramDocument[] = (docs ?? []).map((d) => ({
     key: d.document_key as ProgramDocument["key"],
@@ -253,7 +282,13 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       ) : null}
       {unifiedView && unifiedView.status.businessAgreement !== true ? null : products.length === 0 ? (
         <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
-          Сначала опубликуйте хотя бы один свой музыкальный продукт – потом здесь можно будет подтвердить права.
+          Сначала опубликуйте хотя бы один свой музыкальный продукт – потом здесь можно будет подтвердить права.{" "}
+          <Link
+            href={`/author-dashboard/music?author=${encodeURIComponent(workspace.slug)}`}
+            className="font-semibold text-[#7042c5] underline underline-offset-2"
+          >
+            Перейти к музыке
+          </Link>
         </p>
       ) : (
         <RightsholderVerificationForm

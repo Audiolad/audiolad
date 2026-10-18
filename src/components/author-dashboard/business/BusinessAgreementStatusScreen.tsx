@@ -46,7 +46,7 @@ export default function BusinessAgreementStatusScreen({ authorSlug, agreement, v
           <p className="font-medium text-neutral-900">1. Соглашение</p>
           <p className="mt-1 text-neutral-700">
             {agreement.accepted
-              ? `Принято Единое коммерческое соглашение, редакция ${agreement.version ?? ""}. Оно покрывает «АудиоЛад Бизнес» — отдельные согласия не нужны.`
+              ? `Принято Единое коммерческое соглашение, редакция ${agreement.version ?? ""}. Оно покрывает «АудиоЛад Бизнес» – отдельные согласия не нужны.`
               : "Нужно лично принять Единое коммерческое соглашение (редакция 2.0)."}
           </p>
           {!agreement.accepted ? (
@@ -73,7 +73,7 @@ export default function BusinessAgreementStatusScreen({ authorSlug, agreement, v
           <p className="font-medium text-neutral-900">3. Треки</p>
           <p className="mt-1 text-neutral-700">
             {verified
-              ? "Пригодные треки попадают в «АудиоЛад Бизнес» автоматически — включать альбомы вручную не нужно."
+              ? "Пригодные треки попадают в «АудиоЛад Бизнес» автоматически – включать альбомы вручную не нужно."
               : "После проверки прав пригодные треки попадут в «АудиоЛад Бизнес» автоматически."}
           </p>
           {tracks.length > 0 ? (
@@ -86,7 +86,7 @@ export default function BusinessAgreementStatusScreen({ authorSlug, agreement, v
                   </span>
                   <span className="text-right text-neutral-700">
                     {t.decision
-                      ? `${DECISION_TEXT[t.decision]}${t.reasonCode && REASON_TEXT[t.reasonCode] ? ` — ${REASON_TEXT[t.reasonCode]}` : ""}`
+                      ? `${DECISION_TEXT[t.decision]}${t.reasonCode && REASON_TEXT[t.reasonCode] ? ` – ${REASON_TEXT[t.reasonCode]}` : ""}`
                       : t.inBusiness
                         ? "В «АудиоЛад Бизнес»"
                         : verified && agreement.accepted
