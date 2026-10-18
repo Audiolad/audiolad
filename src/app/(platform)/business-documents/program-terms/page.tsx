@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export function generateMetadata(): Metadata {
   const doc = programTermsDocument(isUnifiedAgreementEnabled());
   return {
-    title: `${doc.title} — ${documentEditionLabel(doc)}`,
+    title: `${doc.title} – ${documentEditionLabel(doc)}`,
     robots: { index: false, follow: false },
     alternates: { canonical: doc.path },
   };
