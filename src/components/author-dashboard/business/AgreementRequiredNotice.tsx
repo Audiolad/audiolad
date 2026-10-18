@@ -22,8 +22,8 @@ export default function AgreementRequiredNotice({
     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert" data-agreement-required={workspace.slug}>
       <p>
         {variant === "choice"
-          ? `Этот продукт – из кабинета, где ещё не принято Единое коммерческое соглашение (редакция 2.0)${where ? `: «${workspace.name}»` : ""}. `
-          : `Сначала примите Единое коммерческое соглашение (редакция 2.0)${where} в разделе `}
+          ? `Этот продукт – из кабинета, где ещё не принято Единое коммерческое соглашение${where ? `: «${workspace.name}»` : ""}. `
+          : `Сначала примите Единое коммерческое соглашение${where} в разделе `}
         {variant === "submit" ? (
           <>
             <Link href={href} className="font-semibold underline underline-offset-2">«Юридические документы»</Link>.{" "}

@@ -292,7 +292,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
                     {multiWorkspace && p.workspace ? `${p.title} – ${p.workspace.name}` : p.title}
-                    {unified && p.workspace?.agreementAccepted === false ? " (нужно принять соглашение 2.0)" : ""}
+                    {unified && p.workspace?.agreementAccepted === false ? " (нужно принять соглашение)" : ""}
                   </option>
                 ))}
               </select>

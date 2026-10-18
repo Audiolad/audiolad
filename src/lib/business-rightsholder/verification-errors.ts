@@ -52,7 +52,7 @@ const BY_CODE: Record<string, VerificationFormError> = {
     text: "Проверка прав для «АудиоЛад Бизнес» пока недоступна – попробуйте позже.",
   },
   business_unified_agreement_required: {
-    text: "Сначала примите Единое коммерческое соглашение (редакция 2.0) в разделе «Юридические документы».",
+    text: "Сначала примите Единое коммерческое соглашение в разделе «Юридические документы».",
     link: { href: LEGAL_DOCUMENTS_HREF, label: "Перейти и принять" },
   },
   support_mode_consent_forbidden: { text: SUPPORT_MODE_CONSENT_NOTICE },

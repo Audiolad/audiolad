@@ -4,11 +4,12 @@ import LegalPageShell from "@/components/legal/LegalPageShell";
 import { buildAuthorTermsDocumentBlocks } from "@/lib/author-terms/document-view";
 import {
   LEGACY_AUTHOR_TERMS_EDITION,
+  APPROVED_AUTHOR_TERMS_EDITIONS,
   findAcceptableEditionByHash,
-  findEditionByVersion,
+  findPublishedEditionByVersion,
   type ApprovedAuthorTermsEdition,
 } from "@/lib/author-terms/editions";
-import { resolveEditionDisplayDates, type EditionDisplayDates } from "@/lib/author-terms/edition-dates";
+import { resolveEditionDisplayDates, type EditionDateRow, type EditionDisplayDates } from "@/lib/author-terms/edition-dates";
 import { getCurrentAuthorTermsVersion, listAuthorTermsVersionDates } from "@/lib/author-terms/service";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
@@ -25,6 +26,8 @@ async function resolveDisplayedEdition(
   isCurrent: boolean;
   current: ApprovedAuthorTermsEdition;
   dates: EditionDisplayDates;
+  dbHashes: readonly string[];
+  dbRows: readonly EditionDateRow[];
 }> {
   if (!isUnifiedAgreementEnabled()) {
     // Flag off: 1.2 only, code dates (equal to its DB row), no DB read – unchanged behaviour.
@@ -39,11 +42,15 @@ async function resolveDisplayedEdition(
         codeEffectiveAt: legacy.effectiveAt,
         rows: [],
       }),
+      dbHashes: [],
+      dbRows: [],
     };
   }
   const [row, rows] = await Promise.all([getCurrentAuthorTermsVersion(), listAuthorTermsVersionDates()]);
   const current = findAcceptableEditionByHash(row?.content_hash, true) ?? LEGACY_AUTHOR_TERMS_EDITION;
-  const requested = findEditionByVersion(requestedVersion);
+  const dbHashes = rows.map((item) => item.content_hash);
+  // Only editions present in the DB can be opened (2.1 stays invisible until sql/04 inserts it).
+  const requested = findPublishedEditionByVersion(requestedVersion, dbHashes);
   const edition = requested ?? current;
   // Dates always from the DB row (2.0: set at the switch); never a hardcoded 2.0 date.
   const dates = resolveEditionDisplayDates({
@@ -52,7 +59,7 @@ async function resolveDisplayedEdition(
     codeEffectiveAt: edition.effectiveAt,
     rows,
   });
-  return { edition, isCurrent: edition.versionId === current.versionId, current, dates };
+  return { edition, isCurrent: edition.versionId === current.versionId, current, dates, dbHashes, dbRows: rows };
 }
 
 const canonical = `${PRODUCTION_APP_ORIGIN}/author-terms`;
@@ -92,11 +99,22 @@ function formatPublishedDate(iso: string): string {
 
 export default async function AuthorTermsPage({ searchParams }: PageProps) {
   const params = (await searchParams) ?? {};
-  const { edition, isCurrent, current, dates } = await resolveDisplayedEdition(params.edition?.trim());
+  const { edition, isCurrent, current, dates, dbHashes, dbRows } = await resolveDisplayedEdition(params.edition?.trim());
   const meta = edition;
   const blocks = buildAuthorTermsDocumentBlocks(edition.text, edition.frontMatterMarker);
   const otherEditions = isUnifiedAgreementEnabled()
-    ? [current, LEGACY_AUTHOR_TERMS_EDITION].filter(
+    ? [
+        current,
+        // Earlier unified editions in the DB (2.0 after the 2.1 switch), then 1.2.
+        ...APPROVED_AUTHOR_TERMS_EDITIONS.filter(
+          (item) =>
+            item.coversBusiness &&
+            dbHashes.includes(item.contentHash) &&
+            // never list a not-yet-current newer edition (pending): it is only reachable once current
+            resolveEditionDisplayDates({ contentHash: item.contentHash, codePublishedAt: null, codeEffectiveAt: null, rows: dbRows }).kind === "dated",
+        ).reverse(),
+        LEGACY_AUTHOR_TERMS_EDITION,
+      ].filter(
         (item, index, list) => item.versionId !== edition.versionId && list.findIndex((x) => x.versionId === item.versionId) === index,
       )
     : [];
