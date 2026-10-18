@@ -161,7 +161,7 @@ function checklist(overrides = {}) {
   const financeClient = read(
     "src/components/author-dashboard/AuthorFinanceClient.tsx",
   );
-  assert.match(financeClient, /shouldShowFinancePayoutProfileBanner/);
+  assert.match(financeClient, /resolveFinancePayoutProfileBanner/);
   assert.doesNotMatch(financeClient, /pointer-events-none|opacity-40.*summary/i);
 }
 

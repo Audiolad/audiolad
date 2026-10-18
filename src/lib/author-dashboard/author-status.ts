@@ -7,6 +7,7 @@ import {
 } from "@/lib/author-commercial/economics";
 import { STARTER_FREE_PRODUCT_BEFORE_COMMERCIAL_HINT } from "@/lib/author-dashboard/free-author-first-step";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
+import { resolvePayoutProfileDisplayState } from "@/lib/author-payout-profiles/display-status";
 import {
   isAuthorCommercialActiveAccess,
   type AuthorAccessStatus,
@@ -36,6 +37,8 @@ export type AuthorStatusCta = {
 export type AuthorStatusOptionalPayoutSection = {
   title: string;
   description: string;
+  /** Real payout profile state (shared resolver), e.g. draft vs missing. */
+  statusLabel: string | null;
   cta: AuthorStatusCta;
 };
 
@@ -47,6 +50,8 @@ export type AuthorStatusViewModel = {
   applicationStatus: AuthorCommercialApplicationStatus | "none";
   termsAccepted: boolean;
   payoutProfileStatus: AuthorPayoutProfileStatus | null;
+  /** Server render could not load the payout profile (status unknown). */
+  payoutProfileLoadFailed: boolean;
   role: "owner" | "editor";
   share: CommercialShareBps & { isIndividual: boolean };
   shareLines: {
@@ -63,6 +68,11 @@ export type AuthorStatusViewModel = {
   cta: AuthorStatusCta;
   secondaryCtas: AuthorStatusCta[];
   optionalPayout: AuthorStatusOptionalPayoutSection | null;
+  /**
+   * Same card for an unknown payout status. The client switches to it when a
+   * fresh status read fails, so a stale SSR «не заполнены» is never kept.
+   */
+  optionalPayoutUnavailable: AuthorStatusOptionalPayoutSection | null;
   starterCapabilities: string[];
   commercialCapabilities: string[];
   premiumCapabilities: string[];
@@ -80,6 +90,11 @@ export type ResolveAuthorStatusViewInput = {
   termsAccepted: boolean;
   publishedTermsAvailable: boolean;
   payoutProfileStatus: AuthorPayoutProfileStatus | null;
+  /**
+   * True when the payout profile could not be loaded. The status is then
+   * unknown and must not be rendered as "not filled".
+   */
+  payoutProfileLoadFailed?: boolean;
   payoutReviewComment?: string | null;
   individualShare?: {
     authorShareBps: number;
@@ -158,6 +173,7 @@ export function resolveAuthorStatusView(
     applicationStatus,
     termsAccepted: input.termsAccepted,
     payoutProfileStatus: input.payoutProfileStatus,
+    payoutProfileLoadFailed: input.payoutProfileLoadFailed === true,
     role: input.role,
     share,
     shareLines,
@@ -167,6 +183,7 @@ export function resolveAuthorStatusView(
     payoutReviewComment: input.payoutReviewComment ?? null,
     secondaryCtas: [] as AuthorStatusCta[],
     optionalPayout: null as AuthorStatusOptionalPayoutSection | null,
+    optionalPayoutUnavailable: null as AuthorStatusOptionalPayoutSection | null,
     starterCapabilities: [...STARTER_CAPABILITIES],
     commercialCapabilities: [...COMMERCIAL_CAPABILITIES],
     premiumCapabilities: [...PREMIUM_CAPABILITIES],
@@ -212,7 +229,33 @@ export function resolveAuthorStatusView(
     hint: null,
   };
 
-  function buildOptionalPayoutSection(): AuthorStatusOptionalPayoutSection {
+  function buildOptionalPayoutSection(
+    forceUnavailable = false,
+  ): AuthorStatusOptionalPayoutSection {
+    const display = resolvePayoutProfileDisplayState(
+      forceUnavailable || input.payoutProfileLoadFailed
+        ? { kind: "error" }
+        : { kind: "loaded", status: input.payoutProfileStatus },
+    );
+
+    if (display.kind === "unavailable") {
+      const canOpen =
+        capabilities.can_edit_payout_profile && input.role !== "editor";
+      return {
+        title: "Данные для выплат",
+        description:
+          display.description ??
+          "Не удалось загрузить статус реквизитов. Обновите страницу.",
+        statusLabel: display.statusLabel,
+        cta: {
+          label: display.ctaLabel ?? "Открыть данные для выплат",
+          href: canOpen ? payoutHref : null,
+          disabled: !canOpen,
+          hint: null,
+        },
+      };
+    }
+
     const hasProfile = input.payoutProfileStatus != null;
     const pending =
       input.payoutProfileStatus === "submitted" ||
@@ -226,6 +269,7 @@ export function resolveAuthorStatusView(
       title: "Данные для выплат",
       description:
         "Заполните реквизиты, когда захотите получить первое авторское вознаграждение.",
+      statusLabel: display.statusLabel,
       cta: {
         label: verified
           ? "Реквизиты заполнены"
@@ -317,6 +361,7 @@ export function resolveAuthorStatusView(
         },
       ],
       optionalPayout: buildOptionalPayoutSection(),
+      optionalPayoutUnavailable: buildOptionalPayoutSection(true),
     };
   }
 
@@ -362,6 +407,7 @@ export function resolveAuthorStatusView(
           "Условия приняты. Обновите страницу через несколько секунд — коммерческий доступ откроется автоматически.",
       },
       optionalPayout: buildOptionalPayoutSection(),
+      optionalPayoutUnavailable: buildOptionalPayoutSection(true),
     };
   }
 

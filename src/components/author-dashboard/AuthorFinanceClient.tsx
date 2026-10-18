@@ -28,10 +28,15 @@ import {
   getAuthorFinanceTypeLabel,
 } from "@/lib/author-finance/labels";
 import {
-  AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY,
   buildPayoutDetailsHref,
-  shouldShowFinancePayoutProfileBanner,
+  resolveFinancePayoutProfileBanner,
 } from "@/lib/author-finance/payout-profile-banner";
+import {
+  fetchPayoutProfileStatusSource,
+  selectPayoutProfileSourceForWorkspace,
+  subscribeToPageReturn,
+  type PayoutProfileStatusSource,
+} from "@/lib/author-payout-profiles/display-status";
 import {
   AUTHOR_FINANCE_PERIODS,
   AUTHOR_FINANCE_TYPE_KEYS,
@@ -50,11 +55,15 @@ import {
   DEFAULT_COMMERCIAL_SHARE,
   formatShareBpsAsPercent,
 } from "@/lib/author-commercial/economics";
-import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 
 type AuthorFinanceClientProps = {
   authors: AuthorWorkspace[];
+  /**
+   * Changes on every server render of the finance page (navigation,
+   * router.refresh()). Used to invalidate the client-held payout status.
+   */
+  renderRevision?: string;
 };
 
 function formatDate(value: string | null): string {
@@ -129,6 +138,7 @@ function StateBadge({ label }: { label: string }) {
 
 export default function AuthorFinanceClient({
   authors,
+  renderRevision = "",
 }: AuthorFinanceClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -155,11 +165,12 @@ export default function AuthorFinanceClient({
   const [payouts, setPayouts] = useState<AuthorFinancePayoutRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [payoutProfileStatus, setPayoutProfileStatus] = useState<
-    AuthorPayoutProfileStatus | null
-  >(null);
-  const [payoutProfilesFeatureEnabled, setPayoutProfilesFeatureEnabled] =
-    useState(false);
+  // Payout profile status is loaded per author workspace and kept separate
+  // from finance data: a stale / failed load must never read as «не заполнены».
+  const [payoutProfileState, setPayoutProfileState] = useState<{
+    authorId: string | null;
+    source: PayoutProfileStatusSource;
+  }>({ authorId: null, source: { kind: "loading" } });
 
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
   const [entryDetail, setEntryDetail] =
@@ -203,7 +214,6 @@ export default function AuthorFinanceClient({
           termsResponse,
           ledgerResponse,
           payoutsResponse,
-          payoutProfileResponse,
         ] = await Promise.all([
           fetch(`/api/author/finance/summary?${authorParam}`, {
             cache: "no-store",
@@ -219,9 +229,6 @@ export default function AuthorFinanceClient({
             `/api/author/finance/payouts?${authorParam}&${activityQuery}&limit=100`,
             { cache: "no-store" },
           ),
-          fetch(`/api/author/payout-profile?${authorParam}`, {
-            cache: "no-store",
-          }),
         ]);
 
         if (cancelled) return;
@@ -247,12 +254,6 @@ export default function AuthorFinanceClient({
         const payoutsPayload = payoutsResponse.ok
           ? ((await payoutsResponse.json()) as { rows: AuthorFinancePayoutRow[] })
           : { rows: [] };
-        const payoutProfilePayload = payoutProfileResponse.ok
-          ? ((await payoutProfileResponse.json()) as {
-              featureEnabled?: boolean;
-              profile?: { status?: AuthorPayoutProfileStatus | null } | null;
-            })
-          : { featureEnabled: false, profile: null };
 
         if (cancelled) return;
 
@@ -262,10 +263,6 @@ export default function AuthorFinanceClient({
         setLedger(ledgerPayload.rows ?? []);
         setLedgerTotal(ledgerPayload.total ?? 0);
         setPayouts(payoutsPayload.rows ?? []);
-        setPayoutProfilesFeatureEnabled(
-          payoutProfilePayload.featureEnabled === true,
-        );
-        setPayoutProfileStatus(payoutProfilePayload.profile?.status ?? null);
       } catch {
         if (!cancelled) setError("Не удалось загрузить финансовые данные.");
       } finally {
@@ -279,6 +276,52 @@ export default function AuthorFinanceClient({
       cancelled = true;
     };
   }, [selectedAuthor, activityQuery]);
+
+  const selectedAuthorId = selectedAuthor?.id ?? null;
+
+  // Re-read the payout profile status on: workspace switch, every server
+  // render of the page (renderRevision changes on navigation back from the
+  // form and on router.refresh()), tab return and back/forward cache restore.
+  useEffect(() => {
+    if (!selectedAuthorId) return;
+
+    let cancelled = false;
+    let inFlight: AbortController | null = null;
+    const authorId = selectedAuthorId;
+
+    // A status stored for the previous workspace is ignored at render time
+    // (selectPayoutProfileSourceForWorkspace) until this author's load lands.
+
+    async function loadPayoutProfileStatus() {
+      inFlight?.abort();
+      const controller = new AbortController();
+      inFlight = controller;
+      let source: PayoutProfileStatusSource;
+      try {
+        source = await fetchPayoutProfileStatusSource(
+          authorId,
+          controller.signal,
+        );
+      } catch {
+        return; // aborted
+      }
+      if (cancelled || controller.signal.aborted) return;
+      setPayoutProfileState({ authorId, source });
+    }
+
+    void loadPayoutProfileStatus();
+
+    const unsubscribe = subscribeToPageReturn(
+      { document, window },
+      () => void loadPayoutProfileStatus(),
+    );
+
+    return () => {
+      cancelled = true;
+      inFlight?.abort();
+      unsubscribe();
+    };
+  }, [selectedAuthorId, renderRevision]);
 
   const toggleEntry = useCallback(
     async (entryId: string) => {
@@ -357,10 +400,9 @@ export default function AuthorFinanceClient({
     summary?.activeTermsSummary?.authorShareBps ??
     DEFAULT_COMMERCIAL_SHARE.authorShareBps;
   const displayHoldDays = activeTerms?.holdDays ?? null;
-  const showPayoutProfileBanner = shouldShowFinancePayoutProfileBanner({
-    featureEnabled: payoutProfilesFeatureEnabled,
-    payoutProfileStatus,
-  });
+  const payoutProfileBanner = resolveFinancePayoutProfileBanner(
+    selectPayoutProfileSourceForWorkspace(payoutProfileState, selectedAuthor.id),
+  );
   const termsHref = `/author-dashboard/commercial/terms?author=${encodeURIComponent(selectedAuthor.slug)}`;
 
   return (
@@ -385,20 +427,37 @@ export default function AuthorFinanceClient({
             </p>
           ) : null}
 
-          {showPayoutProfileBanner ? (
-            <div className="mt-5 rounded-[20px] border border-[#eadff8] bg-[#fcfbfe] px-4 py-3">
+          {payoutProfileBanner.showFinanceBanner ? (
+            <div
+              data-payout-profile-status={payoutProfileBanner.kind}
+              className={`mt-5 rounded-[20px] border px-4 py-3 ${
+                payoutProfileBanner.tone === "warning"
+                  ? "border-[#f0dfab] bg-[#fffaf0]"
+                  : "border-[#eadff8] bg-[#fcfbfe]"
+              }`}
+            >
               <p className="text-sm font-semibold text-[#25135c]">
-                {AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY.title}
+                {payoutProfileBanner.title}
               </p>
-              <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
-                {AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY.description}
-              </p>
-              <Link
-                href={buildPayoutDetailsHref(selectedAuthor.slug)}
-                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-semibold text-[#7042c5]"
-              >
-                {AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY.ctaLabel}
-              </Link>
+              {payoutProfileBanner.statusLabel &&
+              payoutProfileBanner.kind !== "missing" ? (
+                <p className="mt-1 text-sm font-medium text-[#7042c5]">
+                  {payoutProfileBanner.statusLabel}
+                </p>
+              ) : null}
+              {payoutProfileBanner.description ? (
+                <p className="mt-1 text-sm leading-6 text-[#4c3d78]">
+                  {payoutProfileBanner.description}
+                </p>
+              ) : null}
+              {payoutProfileBanner.ctaLabel ? (
+                <Link
+                  href={buildPayoutDetailsHref(selectedAuthor.slug)}
+                  className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-[#bda6e1] px-5 text-sm font-semibold text-[#7042c5]"
+                >
+                  {payoutProfileBanner.ctaLabel}
+                </Link>
+              ) : null}
             </div>
           ) : null}
 
