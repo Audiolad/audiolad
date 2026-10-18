@@ -57,6 +57,12 @@ type Props = {
   products: OwnProduct[];
   documents: ProgramDocument[];
   existing: ExistingVerification;
+  /**
+   * legacy: two consent checkboxes + submit_v2 (flag off).
+   * unified: the accepted unified agreement 2.0 already covers Business – rights check only,
+   * no checkboxes, submit_v3 (server re-checks the agreement and support mode).
+   */
+  mode?: "legacy" | "unified";
   /** Files of the latest submitted attempt (signed URLs), shown when the form is reopened. */
   storedEvidence?: StoredEvidenceFile[];
 };
@@ -72,7 +78,8 @@ async function sha256Hex(file: File) {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export default function RightsholderVerificationForm({ products, documents, existing, storedEvidence = [] }: Props) {
+export default function RightsholderVerificationForm({ products, documents, existing, mode = "legacy", storedEvidence = [] }: Props) {
+  const unified = mode === "unified";
   const [productId, setProductId] = useState(existing?.productId ?? products[0]?.id ?? "");
   const [audioItemId, setAudioItemId] = useState(existing?.audioItemId ?? products[0]?.tracks[0]?.id ?? "");
   const [trackTitle, setTrackTitle] = useState(existing?.trackTitle ?? "");
@@ -122,23 +129,26 @@ export default function RightsholderVerificationForm({ products, documents, exis
     const next: Record<string, string> = {};
     if (!productId || !audioItemId) next.track = "Выберите свой опубликованный трек";
     Object.assign(next, validateProviderValues(values, validateEvidenceFile));
-    if (!acceptTerms) next.acceptTerms = "Отметьте согласие с условиями";
-    if (!confirmRights) next.confirmRights = "Подтвердите права на музыку";
-    if (!terms || !rights) next.form = "Документы программы ещё не опубликованы – отправка временно недоступна";
+    if (!unified) {
+      if (!acceptTerms) next.acceptTerms = "Отметьте согласие с условиями";
+      if (!confirmRights) next.confirmRights = "Подтвердите права на музыку";
+      if (!terms || !rights) next.form = "Документы программы ещё не опубликованы – отправка временно недоступна";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!validate() || !terms || !rights) return;
+    if (!validate() || (!unified && (!terms || !rights))) return;
     setBusy(true);
     setUploads(NO_UPLOADS);
     let uploadingKind: RightsholderEvidenceKind | null = null;
     try {
       const supabase = createClient();
       const details = buildDraftDetails(values);
-      const draft = await supabase.rpc("author_business_verification_draft_v2", {
+      // Unified: draft_v3 checks only the chosen published track, not the whole album.
+      const draft = await supabase.rpc(unified ? "author_business_verification_draft_v3" : "author_business_verification_draft_v2", {
         p_product_id: productId,
         p_audio_item_id: audioItemId,
         p_ai_service: provider,
@@ -169,15 +179,21 @@ export default function RightsholderVerificationForm({ products, documents, exis
         setUploads((prev) => ({ ...prev, [kind]: { phase: "uploaded" } }));
         uploadingKind = null;
       }
-      const submitted = await supabase.rpc("author_business_verification_submit_v2", {
-        p_verification_id: verificationId,
-        p_evidence_ids: evidenceIds,
-        p_accept_terms: acceptTerms,
-        p_confirm_rights: confirmRights,
-        p_terms_version: terms.version,
-        p_rights_version: rights.version,
-        p_user_agent: navigator.userAgent.slice(0, 500),
-      });
+      const submitted = unified
+        ? await supabase.rpc("author_business_verification_submit_v3", {
+            p_verification_id: verificationId,
+            p_evidence_ids: evidenceIds,
+            p_user_agent: navigator.userAgent.slice(0, 500),
+          })
+        : await supabase.rpc("author_business_verification_submit_v2", {
+            p_verification_id: verificationId,
+            p_evidence_ids: evidenceIds,
+            p_accept_terms: acceptTerms,
+            p_confirm_rights: confirmRights,
+            p_terms_version: terms!.version,
+            p_rights_version: rights!.version,
+            p_user_agent: navigator.userAgent.slice(0, 500),
+          });
       if (submitted.error) throw submitted.error;
       setStatus("submitted");
       setErrors({});
@@ -188,7 +204,9 @@ export default function RightsholderVerificationForm({ products, documents, exis
       setErrors({
         form: message.includes("support_mode_consent_forbidden")
           ? SUPPORT_MODE_CONSENT_NOTICE
-          : `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.`,
+          : message.includes("business_unified_agreement_required")
+            ? "Сначала примите Единое коммерческое соглашение (редакция 2.0) в разделе «Юридические документы»."
+            : `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.`,
       });
     } finally {
       setBusy(false);
@@ -345,6 +363,12 @@ export default function RightsholderVerificationForm({ products, documents, exis
             />
           ))}
 
+          {unified ? (
+            <p className="text-sm text-neutral-600" data-testid="unified-agreement-covers-business">
+              Использование музыки в «АудиоЛад Бизнес» уже предусмотрено принятым Единым коммерческим соглашением.
+              Здесь – только проверка прав, без дополнительных согласий.
+            </p>
+          ) : (
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
               <input id="rightsholder-accept-terms" type="checkbox" className="mt-1 h-5 w-5" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
@@ -363,6 +387,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
               </span>
             </div>
           </div>
+          )}
 
           {errors.form ? <p className="text-sm text-red-600" role="alert">{errors.form}</p> : null}
           <button type="submit" disabled={busy}

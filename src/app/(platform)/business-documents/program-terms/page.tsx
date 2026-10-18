@@ -1,16 +1,21 @@
 import type { Metadata } from "next";
 
 import ProgramDocumentPage from "@/components/business-documents/ProgramDocumentPage";
-import { documentEditionLabel, PUBLIC_PROGRAM_DOCUMENTS } from "@/lib/business-rightsholder/program-documents";
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
+import { documentEditionLabel, programTermsDocument } from "@/lib/business-rightsholder/program-documents";
 
-const doc = PUBLIC_PROGRAM_DOCUMENTS.business_program_terms;
+// Edition follows the server flag at request time: r7 (unified agreement 2.0) when on, r6 when off.
+export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: `${doc.title} — ${documentEditionLabel(doc)}`,
-  robots: { index: false, follow: false },
-  alternates: { canonical: doc.path },
-};
+export function generateMetadata(): Metadata {
+  const doc = programTermsDocument(isUnifiedAgreementEnabled());
+  return {
+    title: `${doc.title} – ${documentEditionLabel(doc)}`,
+    robots: { index: false, follow: false },
+    alternates: { canonical: doc.path },
+  };
+}
 
 export default function Page() {
-  return <ProgramDocumentPage doc={doc} />;
+  return <ProgramDocumentPage doc={programTermsDocument(isUnifiedAgreementEnabled())} />;
 }

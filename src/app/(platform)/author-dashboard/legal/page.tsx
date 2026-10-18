@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 
+import AuthorAgreementReacceptBanner from "@/components/author-dashboard/AuthorAgreementReacceptBanner";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import AuthorLegalTermsCard from "@/components/author-dashboard/AuthorLegalTermsCard";
+import AuthorProductStatusBadge from "@/components/author-dashboard/AuthorProductStatusBadge";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { loadAuthorCommercialShareSummary } from "@/lib/author-commercial/share-summary";
 import {
@@ -14,6 +16,7 @@ import {
   loadAuthorTermsStatus,
 } from "@/lib/author-terms/service";
 import { isConsentBlockedForRequest } from "@/lib/author-support/consent-context";
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -59,6 +62,12 @@ export default async function AuthorLegalDocumentsPage({
       <div className="mb-6">
         <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={workspace.accessStatus} />
       </div>
+      {isUnifiedAgreementEnabled() ? (
+        <>
+          <AuthorProductStatusBadge accessStatus={workspace.accessStatus} />
+          <AuthorAgreementReacceptBanner status={status} authorSlug={workspace.slug} />
+        </>
+      ) : null}
       <AuthorLegalTermsCard
         authorId={workspace.id}
         authorSlug={workspace.slug}

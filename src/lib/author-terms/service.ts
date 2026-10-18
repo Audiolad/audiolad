@@ -6,8 +6,16 @@ import {
   AUTHOR_TERMS_APPROVED_META,
   AUTHOR_TERMS_APPROVED_TEXT,
 } from "@/lib/author-terms/approved-content";
+import {
+  APPROVED_AUTHOR_TERMS_EDITIONS,
+  evaluateTermsGate,
+  findAcceptableEditionByHash,
+  type TermsGateResult,
+} from "@/lib/author-terms/editions";
 import { AuthorTermsError } from "@/lib/author-terms/errors";
 import { assertAuthorTermsContentHash } from "@/lib/author-terms/hash";
+import { loadAuthorsOnContinuingEdition } from "@/lib/author-terms/continuing-editions";
+import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
 import type {
   AuthorTermsAcceptanceRow,
   AuthorTermsStatusView,
@@ -24,6 +32,14 @@ assertAuthorTermsContentHash(
   AUTHOR_TERMS_APPROVED_TEXT,
   AUTHOR_TERMS_APPROVED_META.contentHash,
 );
+for (const edition of APPROVED_AUTHOR_TERMS_EDITIONS) {
+  assertAuthorTermsContentHash(edition.text, edition.contentHash);
+}
+
+const VERSION_COLUMNS =
+  "id, version, title, published_at, effective_at, content_hash, document_key, is_current, created_at";
+/** Selected only when the unified-agreement flag is on (columns from migration 20270109120000). */
+const UNIFIED_VERSION_COLUMNS = `${VERSION_COLUMNS}, covers_business, commercial_access_continues`;
 
 function adminClient(): SupabaseClient {
   return createServiceRoleClient();
@@ -41,9 +57,7 @@ export async function getCurrentAuthorTermsVersion(
 ): Promise<AuthorTermsVersionRow | null> {
   const { data, error } = await client
     .from("author_terms_versions")
-    .select(
-      "id, version, title, published_at, effective_at, content_hash, document_key, is_current, created_at",
-    )
+    .select(isUnifiedAgreementEnabled() ? UNIFIED_VERSION_COLUMNS : VERSION_COLUMNS)
     .eq("is_current", true)
     .maybeSingle();
 
@@ -52,7 +66,38 @@ export async function getCurrentAuthorTermsVersion(
     throw new AuthorTermsError("internal_error", 500);
   }
 
-  return (data as AuthorTermsVersionRow | null) ?? null;
+  return (data as unknown as AuthorTermsVersionRow | null) ?? null;
+}
+
+type EditionFlags = { covers_business: boolean | null; commercial_access_continues: boolean | null };
+
+/** All acceptances of an author with the edition flags (flag on only). */
+async function listAuthorTermsAcceptanceEditions(
+  authorId: string,
+  client: SupabaseClient,
+): Promise<{ termsVersionId: string; coversBusiness: boolean; keepsCommercialAccess: boolean }[]> {
+  const { data, error } = await client
+    .from("author_terms_acceptances")
+    .select("terms_version_id, author_terms_versions!inner(covers_business, commercial_access_continues, document_key)")
+    .eq("author_id", authorId)
+    .eq("author_terms_versions.document_key", "author-terms");
+  if (error) {
+    console.error("author_terms_acceptance_editions_error", error.message);
+    throw new AuthorTermsError("internal_error", 500);
+  }
+  return ((data ?? []) as unknown as {
+    terms_version_id: string;
+    author_terms_versions: EditionFlags | EditionFlags[] | null;
+  }[]).map((row) => {
+    const version = Array.isArray(row.author_terms_versions)
+      ? row.author_terms_versions[0]
+      : row.author_terms_versions;
+    return {
+      termsVersionId: row.terms_version_id,
+      coversBusiness: version?.covers_business === true,
+      keepsCommercialAccess: version?.commercial_access_continues === true,
+    };
+  });
 }
 
 export async function getAuthorTermsAcceptanceForVersion(
@@ -81,25 +126,54 @@ export async function hasAcceptedCurrentAuthorTerms(
   authorId: string,
   client: SupabaseClient = adminClient(),
 ): Promise<{
+  /** Commercial gates: current edition accepted, or (flag on) an earlier edition that keeps commercial access (no end date). */
   accepted: boolean;
   currentVersion: AuthorTermsVersionRow | null;
   acceptance: AuthorTermsAcceptanceRow | null;
+  gate: TermsGateResult;
 }> {
   const currentVersion = await getCurrentAuthorTermsVersion(client);
-  if (!currentVersion) {
-    return { accepted: false, currentVersion: null, acceptance: null };
+  const acceptance = currentVersion
+    ? await getAuthorTermsAcceptanceForVersion(authorId, currentVersion.id, client)
+    : null;
+  const unifiedEnabled = isUnifiedAgreementEnabled();
+  let acceptances: { termsVersionId: string; coversBusiness: boolean; keepsCommercialAccess: boolean }[] =
+    unifiedEnabled && currentVersion
+      ? await listAuthorTermsAcceptanceEditions(authorId, client)
+      : acceptance
+        ? [{ termsVersionId: acceptance.terms_version_id, coversBusiness: false, keepsCommercialAccess: false }]
+        : [];
+  if (!unifiedEnabled && currentVersion && !acceptance) {
+    // Flag off but DB already switched (flag turned off / lost on redeploy): 1.2 authors must keep
+    // their commercial access — no forced cut-off. Commercial only; never Business, never an invite.
+    let continuing: Set<string>;
+    try {
+      continuing = await loadAuthorsOnContinuingEdition(client, [authorId]);
+    } catch (error) {
+      console.error("author_terms_continuing_lookup_error", error instanceof Error ? error.message : "unknown");
+      throw new AuthorTermsError("internal_error", 500);
+    }
+    if (continuing.has(authorId)) {
+      acceptances = [{ termsVersionId: "earlier-continuing-edition", coversBusiness: false, keepsCommercialAccess: true }];
+    }
   }
-
-  const acceptance = await getAuthorTermsAcceptanceForVersion(
-    authorId,
-    currentVersion.id,
-    client,
-  );
+  const gate = evaluateTermsGate({
+    unifiedEnabled,
+    now: new Date(),
+    current: currentVersion
+      ? {
+          id: currentVersion.id,
+          coversBusiness: currentVersion.covers_business === true,
+        }
+      : null,
+    acceptances,
+  });
 
   return {
-    accepted: Boolean(acceptance),
+    accepted: gate.accepted,
     currentVersion,
     acceptance,
+    gate,
   };
 }
 
@@ -109,8 +183,9 @@ export async function loadAuthorTermsStatus(input: {
   /** Platform-owner support session: acceptance is never offered (8dcba9d1). */
   supportMode: boolean;
 }): Promise<AuthorTermsStatusView> {
-  const { accepted, currentVersion, acceptance } =
+  const { currentVersion, acceptance, gate } =
     await hasAcceptedCurrentAuthorTerms(input.authorId);
+  const accepted = gate.acceptedCurrent;
 
   return {
     currentVersion: currentVersion
@@ -140,6 +215,10 @@ export async function loadAuthorTermsStatus(input: {
       !accepted,
     role: input.role,
     supportMode: input.supportMode,
+    reacceptInvited: gate.reacceptInvited,
+    previousEditionActive: gate.previousEditionActive,
+    coversBusiness: currentVersion?.covers_business === true,
+    businessAgreement: gate.businessAgreement,
   };
 }
 
@@ -152,6 +231,13 @@ export async function acceptCurrentAuthorTerms(input: {
   hadPriorAcceptance: boolean;
   /** Must be false: support mode never records an acceptance (8dcba9d1). */
   supportMode: boolean;
+  /**
+   * Edition the author actually saw (id + content hash from the status view).
+   * Required when the unified-agreement flag is on: a form opened under 1.2 can
+   * never record an acceptance of 2.0. Validated whenever provided.
+   */
+  expectedTermsVersionId?: string | null;
+  expectedContentHash?: string | null;
 }): Promise<{
   acceptance: AuthorTermsAcceptanceRow;
   created: boolean;
@@ -169,8 +255,24 @@ export async function acceptCurrentAuthorTerms(input: {
     throw new AuthorTermsError("terms_not_published", 503);
   }
 
-  // Client cannot choose a non-current edition.
-  if (currentVersion.content_hash !== AUTHOR_TERMS_APPROVED_META.contentHash) {
+  const unifiedEnabled = isUnifiedAgreementEnabled();
+  const bindingProvided = Boolean(input.expectedTermsVersionId || input.expectedContentHash);
+  if (
+    (unifiedEnabled && !bindingProvided) ||
+    (bindingProvided &&
+      (input.expectedTermsVersionId !== currentVersion.id ||
+        input.expectedContentHash !== currentVersion.content_hash))
+  ) {
+    throw new AuthorTermsError("terms_version_changed", 409);
+  }
+
+  // Client cannot choose a non-current edition. The DB current hash must be an
+  // approved edition in code (flag off: only 1.2, exactly as before).
+  const edition = findAcceptableEditionByHash(
+    currentVersion.content_hash,
+    unifiedEnabled,
+  );
+  if (!edition || edition.version !== currentVersion.version) {
     console.error("author_terms_hash_drift", {
       db: currentVersion.content_hash,
       code: AUTHOR_TERMS_APPROVED_META.contentHash,
@@ -178,9 +280,14 @@ export async function acceptCurrentAuthorTerms(input: {
     throw new AuthorTermsError("terms_hash_mismatch", 500);
   }
 
-  const acceptanceText = input.hadPriorAcceptance
-    ? AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED
-    : AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT;
+  const acceptanceText =
+    edition.contentHash === AUTHOR_TERMS_APPROVED_META.contentHash
+      ? input.hadPriorAcceptance
+        ? AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED
+        : AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT
+      : input.hadPriorAcceptance
+        ? edition.acceptanceTextUpdated
+        : edition.acceptanceText;
 
   const existing = await getAuthorTermsAcceptanceForVersion(
     input.authorId,
