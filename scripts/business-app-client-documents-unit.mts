@@ -17,7 +17,8 @@ import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query
 assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r6.1-2026-10-18");
+  // venue-license r7 (18.10.2026, п. 7 offline player, task 8d9cd0af); the rest r6.1.
+  assert.equal(d.version, d.id === "venue-license" ? "r7-2026-10-18" : "r6.1-2026-10-18");
   assert.equal(d.versionDate, "2026-10-18");
   assert.doesNotMatch(d.version, /draft/);
 }
