@@ -68,6 +68,11 @@ export type AuthorStatusViewModel = {
   cta: AuthorStatusCta;
   secondaryCtas: AuthorStatusCta[];
   optionalPayout: AuthorStatusOptionalPayoutSection | null;
+  /**
+   * Same card for an unknown payout status. The client switches to it when a
+   * fresh status read fails, so a stale SSR «не заполнены» is never kept.
+   */
+  optionalPayoutUnavailable: AuthorStatusOptionalPayoutSection | null;
   starterCapabilities: string[];
   commercialCapabilities: string[];
   premiumCapabilities: string[];
@@ -178,6 +183,7 @@ export function resolveAuthorStatusView(
     payoutReviewComment: input.payoutReviewComment ?? null,
     secondaryCtas: [] as AuthorStatusCta[],
     optionalPayout: null as AuthorStatusOptionalPayoutSection | null,
+    optionalPayoutUnavailable: null as AuthorStatusOptionalPayoutSection | null,
     starterCapabilities: [...STARTER_CAPABILITIES],
     commercialCapabilities: [...COMMERCIAL_CAPABILITIES],
     premiumCapabilities: [...PREMIUM_CAPABILITIES],
@@ -223,9 +229,11 @@ export function resolveAuthorStatusView(
     hint: null,
   };
 
-  function buildOptionalPayoutSection(): AuthorStatusOptionalPayoutSection {
+  function buildOptionalPayoutSection(
+    forceUnavailable = false,
+  ): AuthorStatusOptionalPayoutSection {
     const display = resolvePayoutProfileDisplayState(
-      input.payoutProfileLoadFailed
+      forceUnavailable || input.payoutProfileLoadFailed
         ? { kind: "error" }
         : { kind: "loaded", status: input.payoutProfileStatus },
     );
@@ -353,6 +361,7 @@ export function resolveAuthorStatusView(
         },
       ],
       optionalPayout: buildOptionalPayoutSection(),
+      optionalPayoutUnavailable: buildOptionalPayoutSection(true),
     };
   }
 
@@ -398,6 +407,7 @@ export function resolveAuthorStatusView(
           "Условия приняты. Обновите страницу через несколько секунд — коммерческий доступ откроется автоматически.",
       },
       optionalPayout: buildOptionalPayoutSection(),
+      optionalPayoutUnavailable: buildOptionalPayoutSection(true),
     };
   }
 

@@ -312,3 +312,69 @@ export function subscribeToPageReturn(
     targets.window.removeEventListener("pageshow", onPageShow);
   };
 }
+
+export type ServerRenderedPayoutStatusDecision = "refresh" | "unavailable" | "keep";
+
+/**
+ * What the server-rendered status card should do after a fresh read:
+ * - refresh: the real status differs (or SSR failed) – re-render on server;
+ * - unavailable: the fresh read failed – show "status unknown" instead of a
+ *   possibly stale SSR label (never keep a stale «не заполнены»);
+ * - keep: the SSR card matches the real status.
+ */
+export function decideServerRenderedPayoutStatus(
+  rendered: { status: AuthorPayoutProfileStatus | null; loadFailed: boolean },
+  fresh: PayoutProfileStatusSource,
+): ServerRenderedPayoutStatusDecision {
+  if (fresh.kind === "error") return "unavailable";
+  if (shouldRefreshServerRenderedPayoutStatus(rendered, fresh)) return "refresh";
+  return "keep";
+}
+
+/**
+ * Framework-free revalidation lifecycle for a server-rendered status card
+ * (used by AuthorStatusClient; unit-tested without a DOM). Reads the status
+ * once on start and on every page return; aborts the previous read; never
+ * reports after dispose.
+ */
+export function startServerRenderedPayoutStatusRevalidation(input: {
+  authorId: string;
+  rendered: { status: AuthorPayoutProfileStatus | null; loadFailed: boolean };
+  fetchSource: (
+    authorId: string,
+    signal: AbortSignal,
+  ) => Promise<PayoutProfileStatusSource>;
+  targets: PageReturnTargets;
+  onRefresh: () => void;
+  onUnavailableChange: (unavailable: boolean) => void;
+}): () => void {
+  let disposed = false;
+  let inFlight: AbortController | null = null;
+
+  async function revalidate() {
+    inFlight?.abort();
+    const controller = new AbortController();
+    inFlight = controller;
+    let fresh: PayoutProfileStatusSource;
+    try {
+      fresh = await input.fetchSource(input.authorId, controller.signal);
+    } catch {
+      return; // aborted
+    }
+    if (disposed || controller.signal.aborted) return;
+    const decision = decideServerRenderedPayoutStatus(input.rendered, fresh);
+    input.onUnavailableChange(decision === "unavailable");
+    if (decision === "refresh") input.onRefresh();
+  }
+
+  void revalidate();
+  const unsubscribe = subscribeToPageReturn(input.targets, () => {
+    void revalidate();
+  });
+
+  return () => {
+    disposed = true;
+    inFlight?.abort();
+    unsubscribe();
+  };
+}

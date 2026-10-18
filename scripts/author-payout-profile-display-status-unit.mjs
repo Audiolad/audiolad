@@ -125,6 +125,8 @@ const {
   fetchPayoutProfileStatusSource,
   shouldRefreshServerRenderedPayoutStatus,
   subscribeToPageReturn,
+  decideServerRenderedPayoutStatus,
+  startServerRenderedPayoutStatusRevalidation,
   PAYOUT_PROFILE_DRAFT_STATUS_LABEL,
 } = await import("../src/lib/author-payout-profiles/display-status.ts");
 const {
@@ -456,11 +458,131 @@ assert.equal(shouldShowFinancePayoutProfileBanner({ featureEnabled: true, payout
   assert.match(financePage, /dynamic = "force-dynamic"/);
   const statusClient = readFileSync("src/components/author-dashboard/AuthorStatusClient.tsx", "utf8");
   assert.match(statusClient, /usePayoutStatusRevalidation\(/);
-  assert.match(statusClient, /shouldRefreshServerRenderedPayoutStatus/);
-  assert.match(statusClient, /router\.refresh\(\)/);
-  assert.match(statusClient, /unsubscribe\(\);/);
+  assert.match(statusClient, /return startServerRenderedPayoutStatusRevalidation\(/);
+  assert.match(statusClient, /onRefresh: \(\) => router\.refresh\(\)/);
+  assert.match(statusClient, /view\.optionalPayoutUnavailable/);
   const statusPage = readFileSync("src/app/(platform)/author-dashboard/status/page.tsx", "utf8");
   assert.match(statusPage, /dynamic = "force-dynamic"/);
+}
+
+// 16. Status page revalidation lifecycle (framework-free controller used by
+// AuthorStatusClient): SSR «нет профиля» -> draft saved elsewhere -> return
+// with a failing read must show "unknown", recover on success, refresh when
+// the real status differs, ignore superseded reads and stop after dispose.
+{
+  function fakeTarget() {
+    const listeners = new Map();
+    return {
+      visibilityState: "visible",
+      addEventListener(type, fn) {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type).add(fn);
+      },
+      removeEventListener(type, fn) { listeners.get(type)?.delete(fn); },
+      emit(type, event = {}) { for (const fn of listeners.get(type) ?? []) fn(event); },
+      count(type) { return listeners.get(type)?.size ?? 0; },
+    };
+  }
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(decideServerRenderedPayoutStatus({ status: null, loadFailed: false }, { kind: "error" }), "unavailable");
+  assert.equal(decideServerRenderedPayoutStatus({ status: null, loadFailed: false }, { kind: "loaded", status: "draft" }), "refresh");
+  assert.equal(decideServerRenderedPayoutStatus({ status: "draft", loadFailed: false }, { kind: "loaded", status: "draft" }), "keep");
+  assert.equal(decideServerRenderedPayoutStatus({ status: "draft", loadFailed: false }, { kind: "feature_disabled" }), "keep");
+
+  const doc = fakeTarget();
+  const win = fakeTarget();
+  const queue = [{ kind: "loaded", status: null }];
+  const signals = [];
+  let refreshes = 0;
+  const unavailable = [];
+  const dispose = startServerRenderedPayoutStatusRevalidation({
+    authorId: AUTHOR_C,
+    rendered: { status: null, loadFailed: false },
+    fetchSource: (authorId, signal) => {
+      assert.equal(authorId, AUTHOR_C);
+      signals.push(signal);
+      const next = queue.shift();
+      return typeof next === "function" ? next(signal) : Promise.resolve(next);
+    },
+    targets: { document: doc, window: win },
+    onRefresh: () => { refreshes += 1; },
+    onUnavailableChange: (value) => unavailable.push(value),
+  });
+  // Initial read on mount -> still "no profile": keep.
+  await tick();
+  assert.equal(signals.length, 1);
+  assert.deepEqual(unavailable, [false]);
+  assert.equal(refreshes, 0);
+
+  // Return with a failing read -> unknown, not a stale «не заполнены».
+  queue.push({ kind: "error" });
+  doc.emit("visibilitychange");
+  await tick();
+  assert.equal(unavailable.at(-1), true);
+  assert.equal(refreshes, 0);
+
+  // Return with a successful read of the same status -> recover.
+  queue.push({ kind: "loaded", status: null });
+  win.emit("pageshow", { persisted: true });
+  await tick();
+  assert.equal(unavailable.at(-1), false);
+  assert.equal(refreshes, 0);
+
+  // Draft saved in another tab -> server re-render requested.
+  queue.push({ kind: "loaded", status: "draft" });
+  doc.emit("visibilitychange");
+  await tick();
+  assert.equal(unavailable.at(-1), false);
+  assert.equal(refreshes, 1);
+
+  // Superseded read: the older request is aborted and never applied.
+  let releaseSlow;
+  queue.push((signal) => new Promise((resolve, reject) => {
+    releaseSlow = () => (signal.aborted ? reject(new Error("aborted")) : resolve({ kind: "error" }));
+  }));
+  doc.emit("visibilitychange");
+  queue.push({ kind: "loaded", status: null });
+  doc.emit("visibilitychange");
+  await tick();
+  releaseSlow();
+  await tick();
+  assert.equal(signals.at(-2).aborted, true);
+  assert.equal(unavailable.at(-1), false);
+  assert.equal(refreshes, 1);
+
+  // Dispose: listeners removed, in-flight read aborted, no more callbacks.
+  const before = unavailable.length;
+  queue.push(() => new Promise(() => {}));
+  doc.emit("visibilitychange");
+  dispose();
+  assert.equal(signals.at(-1).aborted, true);
+  assert.equal(doc.count("visibilitychange"), 0);
+  assert.equal(win.count("pageshow"), 0);
+  doc.emit("visibilitychange");
+  await tick();
+  assert.equal(unavailable.length, before);
+  assert.equal(refreshes, 1);
+
+  // The unknown-status card the client switches to never says «не заполнены».
+  const view = resolveAuthorStatusView({
+    accessStatus: "commercial_active",
+    applicationStatus: "approved",
+    termsAccepted: true,
+    publishedTermsAvailable: true,
+    role: "owner",
+    authorSlug: "synthetic-author",
+    hasPublishedFreeProduct: true,
+    payoutProfileStatus: null,
+  });
+  assert.ok(view.optionalPayoutUnavailable);
+  assert.equal(view.optionalPayout?.cta.label, "Заполнить реквизиты");
+  assert.equal(view.optionalPayoutUnavailable.cta.label, "Открыть данные для выплат");
+  assert.doesNotMatch(
+    [view.optionalPayoutUnavailable.statusLabel, view.optionalPayoutUnavailable.description, view.optionalPayoutUnavailable.cta.label].join(" "),
+    NOT_FILLED,
+  );
+  assert.equal(view.payoutProfileLoadFailed, false);
 }
 
 // No requisites or raw DB error details logged.

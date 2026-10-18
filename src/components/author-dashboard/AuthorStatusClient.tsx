@@ -7,9 +7,7 @@ import { useEffect, useState } from "react";
 
 import {
   fetchPayoutProfileStatusSource,
-  shouldRefreshServerRenderedPayoutStatus,
-  subscribeToPageReturn,
-  type PayoutProfileStatusSource,
+  startServerRenderedPayoutStatusRevalidation,
 } from "@/lib/author-payout-profiles/display-status";
 import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
@@ -189,66 +187,47 @@ function CtaButton({ cta, primary }: { cta: AuthorStatusCta; primary?: boolean }
 /**
  * The status card is server-rendered. When the author returns to the page
  * (tab visible / back-forward cache) or the client router reuses an older
- * render, re-read the real payout profile status for this workspace and
- * re-render on the server if it differs. A failed read never loops.
+ * render, re-read the real payout profile status for this workspace:
+ * re-render on the server if it differs, show "status unknown" if the read
+ * fails (never a stale «не заполнены»). Returns true while unknown.
  */
 function usePayoutStatusRevalidation(input: {
   authorId: string;
   enabled: boolean;
   renderedStatus: AuthorPayoutProfileStatus | null;
   renderedLoadFailed: boolean;
-}) {
+}): boolean {
   const router = useRouter();
   const { authorId, enabled, renderedStatus, renderedLoadFailed } = input;
+  const [unavailableFor, setUnavailableFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
-
-    let cancelled = false;
-    let inFlight: AbortController | null = null;
-
-    async function revalidate() {
-      inFlight?.abort();
-      const controller = new AbortController();
-      inFlight = controller;
-      let fresh: PayoutProfileStatusSource;
-      try {
-        fresh = await fetchPayoutProfileStatusSource(authorId, controller.signal);
-      } catch {
-        return; // aborted
-      }
-      if (cancelled || controller.signal.aborted) return;
-      if (
-        shouldRefreshServerRenderedPayoutStatus(
-          { status: renderedStatus, loadFailed: renderedLoadFailed },
-          fresh,
-        )
-      ) {
-        router.refresh();
-      }
-    }
-
-    void revalidate();
-    const unsubscribe = subscribeToPageReturn(
-      { document, window },
-      () => void revalidate(),
-    );
-
-    return () => {
-      cancelled = true;
-      inFlight?.abort();
-      unsubscribe();
-    };
+    return startServerRenderedPayoutStatusRevalidation({
+      authorId,
+      rendered: { status: renderedStatus, loadFailed: renderedLoadFailed },
+      fetchSource: fetchPayoutProfileStatusSource,
+      targets: { document, window },
+      onRefresh: () => router.refresh(),
+      onUnavailableChange: (unavailable) =>
+        setUnavailableFor(unavailable ? authorId : null),
+    });
   }, [authorId, enabled, renderedStatus, renderedLoadFailed, router]);
+
+  return enabled && unavailableFor === authorId;
 }
 
 export default function AuthorStatusClient({ authorId, authorSlug, authorRole, accessStatus, view }: Props) {
-  usePayoutStatusRevalidation({
+  const payoutStatusUnavailable = usePayoutStatusRevalidation({
     authorId,
     enabled: view.optionalPayout != null,
     renderedStatus: view.payoutProfileStatus,
     renderedLoadFailed: view.payoutProfileLoadFailed,
   });
+  const optionalPayout =
+    payoutStatusUnavailable && view.optionalPayoutUnavailable
+      ? view.optionalPayoutUnavailable
+      : view.optionalPayout;
   const showStarterAsCurrent =
     view.kind === "starter" ||
     view.kind === "commercial_pending" ||
@@ -319,23 +298,23 @@ export default function AuthorStatusClient({ authorId, authorSlug, authorRole, a
         ) : null}
       </StatusCard>
 
-      {view.optionalPayout ? (
-        <StatusCard title={view.optionalPayout.title} tone="muted">
-          {view.optionalPayout.statusLabel ? (
+      {optionalPayout ? (
+        <StatusCard title={optionalPayout.title} tone="muted">
+          {optionalPayout.statusLabel ? (
             <p
               data-payout-profile-status-label="true"
               className="mt-3 inline-flex rounded-full bg-[#f3edfb] px-3 py-1 text-sm font-medium text-[#7042c5]"
             >
-              {view.optionalPayout.statusLabel}
+              {optionalPayout.statusLabel}
             </p>
           ) : null}
           <p className="mt-3 text-[15px] leading-6 text-[#4c3d78]">
-            {view.optionalPayout.description}
+            {optionalPayout.description}
           </p>
-          <CtaButton cta={view.optionalPayout.cta} />
-          {view.optionalPayout.cta.hint ? (
+          <CtaButton cta={optionalPayout.cta} />
+          {optionalPayout.cta.hint ? (
             <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-              {view.optionalPayout.cta.hint}
+              {optionalPayout.cta.hint}
             </p>
           ) : null}
         </StatusCard>
