@@ -122,6 +122,9 @@ const {
   payoutProfileStatusSourceFromRow,
   resolvePayoutProfileDisplayState,
   selectPayoutProfileSourceForWorkspace,
+  fetchPayoutProfileStatusSource,
+  shouldRefreshServerRenderedPayoutStatus,
+  subscribeToPageReturn,
   PAYOUT_PROFILE_DRAFT_STATUS_LABEL,
 } = await import("../src/lib/author-payout-profiles/display-status.ts");
 const {
@@ -347,16 +350,117 @@ assert.equal(shouldShowFinancePayoutProfileBanner({ featureEnabled: true, payout
 
   const client = readFileSync("src/components/author-dashboard/AuthorFinanceClient.tsx", "utf8");
   assert.match(client, /resolveFinancePayoutProfileBanner/);
-  assert.match(client, /payoutProfileStatusSourceFromApi/);
+  assert.match(client, /fetchPayoutProfileStatusSource\(/);
   assert.match(client, /selectPayoutProfileSourceForWorkspace\(payoutProfileState, selectedAuthor\.id\)/);
-  assert.match(client, /\/api\/author\/payout-profile\?author_id=/);
-  assert.match(client, /cache: "no-store"/);
-  assert.match(client, /visibilitychange/);
-  assert.match(client, /pageshow/);
+  const helper = readFileSync("src/lib/author-payout-profiles/display-status.ts", "utf8");
+  assert.match(helper, /\/api\/author\/payout-profile\?author_id=/);
+  assert.match(helper, /cache: "no-store"/);
+  assert.match(helper, /visibilitychange/);
+  assert.match(helper, /pageshow/);
   assert.doesNotMatch(client, /AUTHOR_FINANCE_PAYOUT_PROFILE_MISSING_COPY/);
 
   const loader = readFileSync("src/lib/author-dashboard/load-author-status.ts", "utf8");
   assert.match(loader, /payoutProfileLoadFailed: payout\.loadFailed/);
+}
+
+// 13. Refresh after save in the same workspace (no stale client status):
+// the client fetch helper goes through the real route; a save that turns
+// "no profile" into a draft is picked up on the next read.
+{
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    assert.equal(init?.cache, "no-store");
+    return route.GET(new Request(new URL(url, "http://localhost")));
+  };
+  try {
+    const before = await fetchPayoutProfileStatusSource(AUTHOR_C);
+    assert.equal(resolvePayoutProfileDisplayState(before).kind, "missing");
+    rowsByAuthor.set(AUTHOR_C, row(AUTHOR_C, "draft", { account_last4: "0000" }));
+    const afterSave = await fetchPayoutProfileStatusSource(AUTHOR_C);
+    assert.equal(resolvePayoutProfileDisplayState(afterSave).statusLabel, PAYOUT_PROFILE_DRAFT_STATUS_LABEL);
+    rowsByAuthor.set(AUTHOR_C, row(AUTHOR_C, "submitted", { account_last4: "0000" }));
+    const afterSubmit = await fetchPayoutProfileStatusSource(AUTHOR_C);
+    assert.equal(resolvePayoutProfileDisplayState(afterSubmit).kind, "submitted");
+    rowsByAuthor.delete(AUTHOR_C);
+
+    // Server-rendered status page: refresh only when the real status differs
+    // or the server render failed; a failed fresh read never loops.
+    assert.equal(shouldRefreshServerRenderedPayoutStatus({ status: null, loadFailed: false }, afterSave), true);
+    assert.equal(shouldRefreshServerRenderedPayoutStatus({ status: "draft", loadFailed: false }, afterSave), false);
+    assert.equal(shouldRefreshServerRenderedPayoutStatus({ status: null, loadFailed: true }, { kind: "loaded", status: null }), true);
+    assert.equal(shouldRefreshServerRenderedPayoutStatus({ status: null, loadFailed: false }, { kind: "error" }), false);
+    assert.equal(shouldRefreshServerRenderedPayoutStatus({ status: null, loadFailed: true }, { kind: "error" }), false);
+    assert.equal(shouldRefreshServerRenderedPayoutStatus({ status: "draft", loadFailed: false }, { kind: "feature_disabled" }), false);
+
+    // Network failure -> error (not «не заполнены»); abort -> rethrown.
+    globalThis.fetch = async () => { throw new TypeError("network"); };
+    assert.deepEqual(await fetchPayoutProfileStatusSource(AUTHOR_A), { kind: "error" });
+    globalThis.fetch = async () => new Response("<html>502</html>", { status: 502 });
+    assert.deepEqual(await fetchPayoutProfileStatusSource(AUTHOR_A), { kind: "error" });
+    const controller = new AbortController();
+    globalThis.fetch = async () => { controller.abort(); throw new DOMException("aborted", "AbortError"); };
+    await assert.rejects(fetchPayoutProfileStatusSource(AUTHOR_A, controller.signal));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+// 14. Page return lifecycle: tab visible again / bfcache restore trigger a
+// re-read; hidden tab and normal pageshow do not; cleanup removes listeners.
+{
+  function fakeTarget() {
+    const listeners = new Map();
+    return {
+      visibilityState: "hidden",
+      addEventListener(type, fn) {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type).add(fn);
+      },
+      removeEventListener(type, fn) { listeners.get(type)?.delete(fn); },
+      emit(type, event = {}) { for (const fn of listeners.get(type) ?? []) fn(event); },
+      count(type) { return listeners.get(type)?.size ?? 0; },
+    };
+  }
+  const doc = fakeTarget();
+  const win = fakeTarget();
+  let calls = 0;
+  const unsubscribe = subscribeToPageReturn({ document: doc, window: win }, () => { calls += 1; });
+  assert.equal(doc.count("visibilitychange"), 1);
+  assert.equal(win.count("pageshow"), 1);
+  doc.emit("visibilitychange");
+  assert.equal(calls, 0, "hidden tab does not refetch");
+  doc.visibilityState = "visible";
+  doc.emit("visibilitychange");
+  assert.equal(calls, 1);
+  win.emit("pageshow", { persisted: false });
+  assert.equal(calls, 1, "normal load pageshow ignored");
+  win.emit("pageshow", { persisted: true });
+  assert.equal(calls, 2, "bfcache restore refetches");
+  unsubscribe();
+  assert.equal(doc.count("visibilitychange"), 0);
+  assert.equal(win.count("pageshow"), 0);
+  doc.emit("visibilitychange");
+  win.emit("pageshow", { persisted: true });
+  assert.equal(calls, 2);
+}
+
+// 15. Wiring: finance refetches per server render (router.refresh / back from
+// the form), status page revalidates its SSR card on return.
+{
+  const client = readFileSync("src/components/author-dashboard/AuthorFinanceClient.tsx", "utf8");
+  assert.match(client, /\}, \[selectedAuthorId, renderRevision\]\);/);
+  assert.match(client, /subscribeToPageReturn\(/);
+  assert.match(client, /inFlight\?\.abort\(\);[\s\S]*unsubscribe\(\);/);
+  const financePage = readFileSync("src/app/(platform)/author-dashboard/finance/page.tsx", "utf8");
+  assert.match(financePage, /renderRevision=\{createRenderRevision\(\)\}/);
+  assert.match(financePage, /dynamic = "force-dynamic"/);
+  const statusClient = readFileSync("src/components/author-dashboard/AuthorStatusClient.tsx", "utf8");
+  assert.match(statusClient, /usePayoutStatusRevalidation\(/);
+  assert.match(statusClient, /shouldRefreshServerRenderedPayoutStatus/);
+  assert.match(statusClient, /router\.refresh\(\)/);
+  assert.match(statusClient, /unsubscribe\(\);/);
+  const statusPage = readFileSync("src/app/(platform)/author-dashboard/status/page.tsx", "utf8");
+  assert.match(statusPage, /dynamic = "force-dynamic"/);
 }
 
 // No requisites or raw DB error details logged.

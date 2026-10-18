@@ -34,6 +34,11 @@ function NoAuthorAccess() {
   );
 }
 
+/** New value per server render; invalidates client-held payout status. */
+function createRenderRevision(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export default async function AuthorFinancePage() {
   const supabase = await createClient();
 
@@ -58,7 +63,10 @@ export default async function AuthorFinancePage() {
       internalBackHref="/author-dashboard"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>
-        <AuthorFinanceClient authors={authors} />
+        <AuthorFinanceClient
+          authors={authors}
+          renderRevision={createRenderRevision()}
+        />
       </Suspense>
     </AuthorShell>
   );

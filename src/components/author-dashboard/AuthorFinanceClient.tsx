@@ -32,8 +32,9 @@ import {
   resolveFinancePayoutProfileBanner,
 } from "@/lib/author-finance/payout-profile-banner";
 import {
-  payoutProfileStatusSourceFromApi,
+  fetchPayoutProfileStatusSource,
   selectPayoutProfileSourceForWorkspace,
+  subscribeToPageReturn,
   type PayoutProfileStatusSource,
 } from "@/lib/author-payout-profiles/display-status";
 import {
@@ -58,6 +59,11 @@ import type { AuthorWorkspace } from "@/lib/author-products/types";
 
 type AuthorFinanceClientProps = {
   authors: AuthorWorkspace[];
+  /**
+   * Changes on every server render of the finance page (navigation,
+   * router.refresh()). Used to invalidate the client-held payout status.
+   */
+  renderRevision?: string;
 };
 
 function formatDate(value: string | null): string {
@@ -132,6 +138,7 @@ function StateBadge({ label }: { label: string }) {
 
 export default function AuthorFinanceClient({
   authors,
+  renderRevision = "",
 }: AuthorFinanceClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -272,6 +279,9 @@ export default function AuthorFinanceClient({
 
   const selectedAuthorId = selectedAuthor?.id ?? null;
 
+  // Re-read the payout profile status on: workspace switch, every server
+  // render of the page (renderRevision changes on navigation back from the
+  // form and on router.refresh()), tab return and back/forward cache restore.
   useEffect(() => {
     if (!selectedAuthorId) return;
 
@@ -288,23 +298,12 @@ export default function AuthorFinanceClient({
       inFlight = controller;
       let source: PayoutProfileStatusSource;
       try {
-        const response = await fetch(
-          `/api/author/payout-profile?author_id=${encodeURIComponent(authorId)}`,
-          { cache: "no-store", signal: controller.signal },
+        source = await fetchPayoutProfileStatusSource(
+          authorId,
+          controller.signal,
         );
-        let payload: unknown = null;
-        try {
-          payload = await response.json();
-        } catch {
-          payload = null;
-        }
-        source = payoutProfileStatusSourceFromApi({
-          ok: response.ok,
-          payload,
-        });
       } catch {
-        if (controller.signal.aborted) return;
-        source = { kind: "error" };
+        return; // aborted
       }
       if (cancelled || controller.signal.aborted) return;
       setPayoutProfileState({ authorId, source });
@@ -312,26 +311,17 @@ export default function AuthorFinanceClient({
 
     void loadPayoutProfileStatus();
 
-    // Returning from the payout form (back / bfcache / other tab) must not
-    // keep a stale status: re-read it whenever the page becomes visible.
-    function refreshWhenVisible() {
-      if (document.visibilityState === "visible") {
-        void loadPayoutProfileStatus();
-      }
-    }
-    function refreshOnPageShow(event: PageTransitionEvent) {
-      if (event.persisted) void loadPayoutProfileStatus();
-    }
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("pageshow", refreshOnPageShow);
+    const unsubscribe = subscribeToPageReturn(
+      { document, window },
+      () => void loadPayoutProfileStatus(),
+    );
 
     return () => {
       cancelled = true;
       inFlight?.abort();
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("pageshow", refreshOnPageShow);
+      unsubscribe();
     };
-  }, [selectedAuthorId]);
+  }, [selectedAuthorId, renderRevision]);
 
   const toggleEntry = useCallback(
     async (entryId: string) => {

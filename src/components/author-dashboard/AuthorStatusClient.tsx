@@ -2,8 +2,16 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
+import {
+  fetchPayoutProfileStatusSource,
+  shouldRefreshServerRenderedPayoutStatus,
+  subscribeToPageReturn,
+  type PayoutProfileStatusSource,
+} from "@/lib/author-payout-profiles/display-status";
+import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
 import AuthorDashboardNav from "@/components/author-dashboard/AuthorDashboardNav";
 import { getAuthorRewardCabinetCopy } from "@/lib/author-commercial/economics";
 import {
@@ -178,7 +186,69 @@ function CtaButton({ cta, primary }: { cta: AuthorStatusCta; primary?: boolean }
   );
 }
 
+/**
+ * The status card is server-rendered. When the author returns to the page
+ * (tab visible / back-forward cache) or the client router reuses an older
+ * render, re-read the real payout profile status for this workspace and
+ * re-render on the server if it differs. A failed read never loops.
+ */
+function usePayoutStatusRevalidation(input: {
+  authorId: string;
+  enabled: boolean;
+  renderedStatus: AuthorPayoutProfileStatus | null;
+  renderedLoadFailed: boolean;
+}) {
+  const router = useRouter();
+  const { authorId, enabled, renderedStatus, renderedLoadFailed } = input;
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let cancelled = false;
+    let inFlight: AbortController | null = null;
+
+    async function revalidate() {
+      inFlight?.abort();
+      const controller = new AbortController();
+      inFlight = controller;
+      let fresh: PayoutProfileStatusSource;
+      try {
+        fresh = await fetchPayoutProfileStatusSource(authorId, controller.signal);
+      } catch {
+        return; // aborted
+      }
+      if (cancelled || controller.signal.aborted) return;
+      if (
+        shouldRefreshServerRenderedPayoutStatus(
+          { status: renderedStatus, loadFailed: renderedLoadFailed },
+          fresh,
+        )
+      ) {
+        router.refresh();
+      }
+    }
+
+    void revalidate();
+    const unsubscribe = subscribeToPageReturn(
+      { document, window },
+      () => void revalidate(),
+    );
+
+    return () => {
+      cancelled = true;
+      inFlight?.abort();
+      unsubscribe();
+    };
+  }, [authorId, enabled, renderedStatus, renderedLoadFailed, router]);
+}
+
 export default function AuthorStatusClient({ authorId, authorSlug, authorRole, accessStatus, view }: Props) {
+  usePayoutStatusRevalidation({
+    authorId,
+    enabled: view.optionalPayout != null,
+    renderedStatus: view.payoutProfileStatus,
+    renderedLoadFailed: view.payoutProfileLoadFailed,
+  });
   const showStarterAsCurrent =
     view.kind === "starter" ||
     view.kind === "commercial_pending" ||

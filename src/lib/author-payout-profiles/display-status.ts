@@ -235,3 +235,80 @@ export function selectPayoutProfileSourceForWorkspace(
   }
   return state.source;
 }
+
+/** Client fetch of the current workspace's payout profile status (no-store). */
+export async function fetchPayoutProfileStatusSource(
+  authorId: string,
+  signal?: AbortSignal,
+): Promise<PayoutProfileStatusSource> {
+  try {
+    const response = await fetch(
+      `/api/author/payout-profile?author_id=${encodeURIComponent(authorId)}`,
+      { cache: "no-store", signal },
+    );
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+    return payoutProfileStatusSourceFromApi({ ok: response.ok, payload });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return { kind: "error" };
+  }
+}
+
+/**
+ * A server-rendered status card must be re-rendered when a fresh read shows
+ * a different real status (or the server render could not load it). A failed
+ * fresh read never triggers a refresh loop.
+ */
+export function shouldRefreshServerRenderedPayoutStatus(
+  rendered: { status: AuthorPayoutProfileStatus | null; loadFailed: boolean },
+  fresh: PayoutProfileStatusSource,
+): boolean {
+  if (fresh.kind !== "loaded") return false;
+  if (rendered.loadFailed) return true;
+  return fresh.status !== rendered.status;
+}
+
+type PageReturnTargets = {
+  document: {
+    visibilityState: string;
+    addEventListener(type: "visibilitychange", listener: () => void): void;
+    removeEventListener(type: "visibilitychange", listener: () => void): void;
+  };
+  window: {
+    addEventListener(
+      type: "pageshow",
+      listener: (event: { persisted?: boolean }) => void,
+    ): void;
+    removeEventListener(
+      type: "pageshow",
+      listener: (event: { persisted?: boolean }) => void,
+    ): void;
+  };
+};
+
+/**
+ * Calls onReturn when the author comes back to the page (tab visible again,
+ * or restored from the back/forward cache). Returns the cleanup function.
+ */
+export function subscribeToPageReturn(
+  targets: PageReturnTargets,
+  onReturn: () => void,
+): () => void {
+  const onVisibility = () => {
+    if (targets.document.visibilityState === "visible") onReturn();
+  };
+  const onPageShow = (event: { persisted?: boolean }) => {
+    if (event.persisted) onReturn();
+  };
+  targets.document.addEventListener("visibilitychange", onVisibility);
+  targets.window.addEventListener("pageshow", onPageShow);
+  return () => {
+    targets.document.removeEventListener("visibilitychange", onVisibility);
+    targets.window.removeEventListener("pageshow", onPageShow);
+  };
+}

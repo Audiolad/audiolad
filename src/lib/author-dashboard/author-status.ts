@@ -50,6 +50,8 @@ export type AuthorStatusViewModel = {
   applicationStatus: AuthorCommercialApplicationStatus | "none";
   termsAccepted: boolean;
   payoutProfileStatus: AuthorPayoutProfileStatus | null;
+  /** Server render could not load the payout profile (status unknown). */
+  payoutProfileLoadFailed: boolean;
   role: "owner" | "editor";
   share: CommercialShareBps & { isIndividual: boolean };
   shareLines: {
@@ -166,6 +168,7 @@ export function resolveAuthorStatusView(
     applicationStatus,
     termsAccepted: input.termsAccepted,
     payoutProfileStatus: input.payoutProfileStatus,
+    payoutProfileLoadFailed: input.payoutProfileLoadFailed === true,
     role: input.role,
     share,
     shareLines,
