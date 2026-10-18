@@ -43,7 +43,7 @@ export function assertCleanRussian(label: string, text: string) {
 
 // audiolad.ru/business-documents/* (and consent links).
 for (const doc of Object.values(PUBLIC_PROGRAM_DOCUMENTS)) {
-  assert.equal(documentEditionLabel(doc), doc.key === "business_program_terms" ? "Редакция от 17.10.2026" : "Редакция от 16.10.2026");
+  assert.equal(documentEditionLabel(doc), doc.key === "business_program_terms" ? "Редакция от 18.10.2026" : "Редакция от 16.10.2026");
   const html = renderToStaticMarkup(createElement("article", null,
     createElement("h1", null, doc.title),
     createElement("p", null, documentEditionLabel(doc)),
@@ -67,7 +67,9 @@ for (const d of CLIENT_DOCUMENTS) {
   const el = await ClientDocumentPage({ params: Promise.resolve({ id: d.id }) });
   const text = visibleText(renderToStaticMarkup(el));
   assertCleanRussian(`/documents/${d.id}`, text);
-  assert.match(text, /Редакция от 17\.10\.2026/);
+  assert.match(text, /Редакция от 18\.10\.2026/);
+  // r6.1 (Sergey 18.10.2026 13:17): the rendered page has no em dash anywhere (title, label, document text).
+  assert.doesNotMatch(text, /\u2014/, `/documents/${d.id}: no em dash in visible text`);
   assert.match(text, /ИНН 507305817690/);
   assert.match(text, /ОГРНИП 316505300063237/);
   assert.ok(text.length > 800, `${d.id}: full text`);
