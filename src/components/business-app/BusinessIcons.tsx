@@ -155,3 +155,13 @@ export function BizExpandIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** a8240527: a section that is visible but opens after connecting the venue. */
+export function BizLockIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 shrink-0 ${className ?? ""}`} aria-hidden focusable="false">
+      <rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}

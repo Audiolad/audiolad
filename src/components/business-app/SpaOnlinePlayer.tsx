@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import { deriveSpaPlaybackState, getSpaDeviceSecret, SpaLiveEvidence, sendSpaLiveReport, type SpaLiveReport, type SpaPlaybackState } from "@/lib/business-app/spa-live-report";
 import { fetchSpaManifest, fetchSpaTrackUrl, postSpaReport, watchSpaBuild } from "@/lib/business-app/spa-player-client";
 import { parseSpaManifest, type SpaManifestItem } from "@/lib/business-app/spa-manifest";
@@ -135,42 +136,32 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
   const ctl = () => ctlRef.current;
 
   return (
-    <section className="spa-pilot" data-testid="spa-pilot" style={{ maxWidth: 720, margin: "0 auto", padding: 16 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 600 }}>{programName}</h1>
-      <p style={{ fontSize: 13, opacity: 0.7 }}>Пилот: страница видна только участникам пилота. Воспроизведение через интернет.</p>
+    <section className="spa-pilot business-app-card mx-auto max-w-[720px]" data-testid="spa-pilot">
+      <h1 className="text-2xl font-semibold text-[var(--biz-text)]">{programName}</h1>
+      <p className="mt-1 text-[0.82rem] business-app-muted">Пилот: страница видна только участникам пилота. Воспроизведение через интернет.</p>
       {status === "no_access" ? (
-        <p data-testid="spa-no-access">Доступ к пилоту закрыт.</p>
+        <p className="mt-3" data-testid="spa-no-access">Доступ к пилоту закрыт.</p>
       ) : items.length === 0 ? (
-        <p data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
+        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "12px 0", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              data-testid="spa-play"
-              onClick={() => void ctl()?.toggle()}
-              style={{ padding: "10px 24px", borderRadius: 8, border: "1px solid currentColor", fontSize: 16 }}
-            >
-              {status === "playing" || status === "loading" ? "Пауза" : "Играть"}
-            </button>
-            <button
-              type="button"
-              data-testid="spa-next"
-              onClick={() => void ctl()?.next()}
-              style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid currentColor", fontSize: 16 }}
-            >
-              Следующий
-            </button>
-            <span data-testid="spa-now">{status === "loading" ? "Загрузка…" : current ? current.title : ""}</span>
-          </div>
-          {message ? <p role="alert">{message}</p> : null}
-          <ol data-testid="spa-tracks" style={{ paddingLeft: 20 }}>
+          <BusinessPlayerControls
+            testIdPrefix="spa"
+            playing={status === "playing"}
+            loading={status === "loading"}
+            nowTitle={current ? current.title : null}
+            onToggle={() => void ctl()?.toggle()}
+            onNext={() => void ctl()?.next()}
+          />
+          {message ? <p className="business-app-alert mt-3" data-tone="warn" role="alert">{message}</p> : null}
+          <ol className="business-app-tracklist" data-testid="spa-tracks">
             {items.map((i, idx) => (
-              <li key={i.audioItemId} style={{ padding: "6px 0" }}>
+              <li key={i.audioItemId}>
                 <button
                   type="button"
                   onClick={() => void ctl()?.playIndex(idx)}
-                  style={{ background: "none", border: 0, padding: 0, textAlign: "left", cursor: "pointer", fontSize: 16, fontWeight: current?.audioItemId === i.audioItemId ? 600 : 400 }}
+                  className="business-app-focus-ring"
+                  aria-current={current?.audioItemId === i.audioItemId ? "true" : undefined}
                 >
                   {i.title || "Без названия"}
                 </button>
@@ -180,7 +171,7 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
         </>
       )}
       {newBuild ? (
-        <p data-testid="spa-new-build" style={{ fontSize: 13, opacity: 0.7 }}>
+        <p className="mt-4 text-[0.82rem] business-app-muted" data-testid="spa-new-build">
           Доступна новая версия страницы. Музыка продолжит играть; обновите страницу, когда будет удобно.
         </p>
       ) : null}

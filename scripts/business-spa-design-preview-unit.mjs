@@ -15,7 +15,7 @@ assert.ok(route.indexOf("if (!ctx) notFound();") < route.indexOf("return <SpaDes
 assert.match(route, /export const dynamic = ["']force-dynamic["']/);
 assert.match(route, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/);
 assert.match(route, /googleBot:\s*\{\s*index:\s*false,\s*follow:\s*false/);
-assert.match(client, /<strong>Макет — не реальные данные<\/strong>/);
+assert.match(client, /<strong>Макет – не реальные данные<\/strong>/);
 for (const id of ["home", "music", "locations", "more", "license", "alerts", "company", "support"]) {
   assert.ok(client.includes(`["${id}",`), `missing screen ${id}`);
 }
@@ -60,7 +60,7 @@ for (const label of ["Лицензия и документы", "Уведомле
 assert.match(client, /closed: \{[^\n]*checked: "Последняя связь/);
 // Atmosphere: single range slider, auto badge + reset, reactions tied to current track.
 assert.match(client, /type="range"/);
-assert.match(client, /aria-label="Спокойнее — Энергичнее"/);
+assert.match(client, /aria-label="Спокойнее – Энергичнее"/);
 assert.match(client, /Автоматически/);
 assert.match(client, /Вернуть автоматический режим/);
 assert.match(client, /К треку «\{track\.title\}»/);

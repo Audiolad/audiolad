@@ -23,6 +23,9 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/player/report",
   "/api/business/player/track-url",
   "/api/business/player/manifest",
+  // a8240527: guest coffee cabinet (no account; server-side 30-minute listening limit).
+  "/api/business/guest/coffee/track-url",
+  "/api/business/guest/coffee/usage",
 ] as const;
 
 /**
@@ -59,7 +62,7 @@ export function resolveBusinessProxyAction(
     return { action: "pass_through" };
   }
 
-  // Lavender brand assets (manifest/.ico are not excluded by the proxy matcher).
+  // Business brand assets (manifest/.ico are not excluded by the proxy matcher).
   if (isBusinessBrandAssetPath(pathname)) {
     return { action: "pass_through" };
   }

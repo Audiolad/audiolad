@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const doc = findClientDocument(id);
   return {
-    title: doc ? `${doc.title} — ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ",
+    title: doc ? `${doc.title} – ${CLIENT_DOCUMENT_EDITION_LABEL}` : "Документ",
     robots: { index: false, follow: false },
   };
 }
@@ -46,7 +46,10 @@ export default async function ClientDocumentPage({ params }: Props) {
         <p className="mt-1 text-sm text-[var(--biz-text-muted)]" data-testid="document-requisites">
           {CLIENT_DOCUMENT_REQUISITES}
         </p>
-        <SimpleMarkdown source={source.markdown} />
+        {/* SimpleMarkdown is shared with public pages; Business colours come from .business-app-prose. */}
+        <div className="business-app-prose">
+          <SimpleMarkdown source={source.markdown} />
+        </div>
       </article>
     </div>
   );

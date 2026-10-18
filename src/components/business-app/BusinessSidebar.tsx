@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState, type ComponentType } from "react";
+import { useEffect, useId, useRef, useState, type ComponentType } from "react";
 
 import {
   BizAnnouncementsIcon,
@@ -12,6 +12,7 @@ import {
   BizHelpIcon,
   BizHomeIcon,
   BizLocationsIcon,
+  BizLockIcon,
   BizMusicIcon,
   BizSettingsIcon,
   BizStatsIcon,
@@ -23,11 +24,20 @@ import {
   BUSINESS_SIDEBAR_COLLAPSED_WIDTH_PX,
   BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX,
   BUSINESS_SIDEBAR_STORAGE_KEY,
-  isBusinessNavItemActive,
+  isBusinessNavItemCurrent,
   type BusinessNavIconKey,
   type BusinessNavItem,
 } from "@/lib/business-app/nav";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
+import {
+  BUSINESS_CONNECT_HREF,
+  BUSINESS_LOCKED_LABEL,
+  businessNavHref,
+  isBusinessNavItemLocked,
+  resolveBusinessAccess,
+  type BusinessAccess,
+} from "@/lib/business-app/access";
 import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
 type IconComp = ComponentType<{ active?: boolean; className?: string }>;
@@ -48,18 +58,62 @@ const ICONS: Record<BusinessNavIconKey, IconComp> = {
 function NavLink({
   item,
   collapsed,
+  access,
 }: {
   item: BusinessNavItem;
   collapsed: boolean;
+  access: BusinessAccess;
 }) {
   const pathname = normalizeBusinessAppPathname(usePathname() || "/");
-  const active = isBusinessNavItemActive(pathname, item.href);
+  const active = isBusinessNavItemCurrent(pathname, item);
   const Icon = ICONS[item.icon];
   const labelId = useId();
+  const { showLocked } = useBusinessGuestStatus();
+  const locked = isBusinessNavItemLocked(item, access);
+
+  const tooltip = collapsed ? (
+    <span
+      id={labelId}
+      role="tooltip"
+      className="pointer-events-none absolute left-[calc(100%+0.55rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-[var(--biz-tooltip-bg)] px-2.5 py-1.5 text-xs font-medium text-[var(--biz-tooltip-text)] shadow-lg group-hover:block group-focus-visible:block"
+    >
+      {locked ? `${item.title} – ${BUSINESS_LOCKED_LABEL}` : item.title}
+    </span>
+  ) : null;
+
+  if (locked) {
+    // a8240527: protected section, visible in the same navigation, opens after connecting.
+    return (
+      <button
+        type="button"
+        data-locked="true"
+        data-nav-id={item.id}
+        onClick={() => showLocked(item.title)}
+        className={`business-app-focus-ring business-app-nav-locked group relative flex w-full items-center gap-3 rounded-xl px-3 text-left text-[0.95rem] text-[var(--biz-text-muted)] hover:bg-[var(--biz-surface-soft)] ${
+          collapsed ? "justify-center py-3" : "py-2.5"
+        }`}
+        aria-label={`${item.title} – ${BUSINESS_LOCKED_LABEL}`}
+        title={collapsed ? undefined : BUSINESS_LOCKED_LABEL}
+      >
+        <Icon />
+        {!collapsed ? (
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex items-center gap-1.5">
+              {item.title}
+              <BizLockIcon className="opacity-70" />
+            </span>
+            <span className="text-[0.72rem] leading-tight">{BUSINESS_LOCKED_LABEL}</span>
+          </span>
+        ) : null}
+        {tooltip}
+      </button>
+    );
+  }
 
   return (
     <Link
-      href={item.href}
+      href={businessNavHref(item, access)}
+      data-nav-id={item.id}
       className={`business-app-focus-ring group relative flex items-center gap-3 rounded-xl px-3 text-[0.95rem] transition-colors ${
         collapsed ? "justify-center py-3" : "py-2.5"
       } ${
@@ -73,15 +127,7 @@ function NavLink({
     >
       <Icon active={active} />
       {!collapsed ? <span>{item.title}</span> : null}
-      {collapsed ? (
-        <span
-          id={labelId}
-          role="tooltip"
-          className="pointer-events-none absolute left-[calc(100%+0.55rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-[var(--biz-text)] px-2.5 py-1.5 text-xs font-medium text-white shadow-lg group-hover:block group-focus-visible:block"
-        >
-          {item.title}
-        </span>
-      ) : null}
+      {tooltip}
     </Link>
   );
 }
@@ -99,7 +145,15 @@ function readInitialCollapsed(): boolean {
 }
 
 export default function BusinessSidebar() {
-  const [collapsed, setCollapsed] = useState(readInitialCollapsed);
+  // SSR always renders the expanded sidebar; the device preference (localStorage / ≤1200px) is
+  // applied after hydration, otherwise narrow screens hit a React hydration mismatch (a8240527).
+  const [collapsed, setCollapsed] = useState(false);
+  const restored = useRef(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the device preference after hydration
+    setCollapsed(readInitialCollapsed());
+  }, []);
 
   useEffect(() => {
     const width = collapsed
@@ -109,6 +163,10 @@ export default function BusinessSidebar() {
       "--biz-sidebar-width",
       `${width}px`,
     );
+    if (!restored.current) {
+      restored.current = true;
+      return;
+    }
     try {
       window.localStorage.setItem(
         BUSINESS_SIDEBAR_STORAGE_KEY,
@@ -120,6 +178,7 @@ export default function BusinessSidebar() {
   }, [collapsed]);
 
   const domain = useBusinessDomain();
+  const access = resolveBusinessAccess(domain);
   const ownerFirstName =
     domain.status === "authenticated" ? domain.owner.firstName : "Гость";
   const locationName =
@@ -127,7 +186,7 @@ export default function BusinessSidebar() {
       ? domain.location.name
       : domain.status === "authenticated"
         ? "Точка ещё не создана"
-        : "Войдите в аккаунт";
+        : "Гостевой режим";
   const ownerInitial = ownerFirstName.slice(0, 1).toUpperCase() || "А";
 
   return (
@@ -173,7 +232,7 @@ export default function BusinessSidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3" aria-label="Основное">
         {BUSINESS_PRIMARY_NAV_ITEMS.map((item) => (
-          <NavLink key={item.id} item={item} collapsed={collapsed} />
+          <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
         <div
           className="my-2 border-t border-[var(--biz-border)]"
@@ -181,7 +240,7 @@ export default function BusinessSidebar() {
           aria-hidden
         />
         {BUSINESS_SECONDARY_NAV_ITEMS.map((item) => (
-          <NavLink key={item.id} item={item} collapsed={collapsed} />
+          <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
       </nav>
 
@@ -192,7 +251,7 @@ export default function BusinessSidebar() {
       >
         {collapsed ? (
           <span
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-[var(--biz-on-accent)]"
             title={`${ownerFirstName} · ${locationName}`}
             aria-label={`${ownerFirstName}, ${locationName}`}
           >
@@ -200,7 +259,7 @@ export default function BusinessSidebar() {
           </span>
         ) : (
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-white">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--biz-accent)] text-sm font-semibold text-[var(--biz-on-accent)]">
               {ownerInitial}
             </span>
             <div className="min-w-0">
@@ -213,6 +272,15 @@ export default function BusinessSidebar() {
             </div>
           </div>
         )}
+        {access.level === "guest" && !collapsed ? (
+          <Link
+            href={BUSINESS_CONNECT_HREF}
+            className="mt-3 business-app-btn business-app-btn-primary business-app-focus-ring w-full"
+            data-testid="biz-sidebar-connect"
+          >
+            Подключить
+          </Link>
+        ) : null}
       </div>
     </aside>
   );

@@ -47,7 +47,7 @@ export function validateEvidenceFile(file: File | null): string | null {
   if (!(RIGHTSHOLDER_EVIDENCE_MIME as readonly string[]).includes(file.type)) {
     return "Подойдёт PNG, JPG, WEBP или PDF";
   }
-  if (file.size > RIGHTSHOLDER_EVIDENCE_MAX_BYTES) return "Файл больше 10 МБ — сожмите его или сделайте скриншот";
+  if (file.size > RIGHTSHOLDER_EVIDENCE_MAX_BYTES) return "Файл больше 10 МБ – сожмите его или сделайте скриншот";
   if (file.size === 0) return "Файл пустой";
   return null;
 }
@@ -56,7 +56,7 @@ export const VERIFICATION_STATUS_TEXT: Record<string, string> = {
   draft: "Черновик",
   submitted: "Заявка на проверке у модератора",
   needs_info: "Модератор просит уточнить",
-  rejected: "Заявка отклонена — исправьте и отправьте снова",
+  rejected: "Заявка отклонена – исправьте и отправьте снова",
   verified: "Пример проверен модератором",
   restricted: "Участие ограничено модератором",
   revoked: "Подтверждение отозвано модератором",

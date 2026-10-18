@@ -48,7 +48,7 @@ export function buildClassicaWorkCanonical(work: Pick<ClassicaPublicWork, "compo
 
 export function buildClassicaWorkMetadata(work: ClassicaPublicWork): Metadata {
   const canonical = buildClassicaWorkCanonical(work);
-  const title = work.seoTitle.trim() || `${work.title} — ${work.composerName}`;
+  const title = work.seoTitle.trim() || `${work.title} – ${work.composerName}`;
   const description = work.seoDescription.trim();
 
   return {
@@ -78,7 +78,7 @@ export function buildClassicaWorkMetadata(work: ClassicaPublicWork): Metadata {
 
 export function buildClassicaIndexMetadata(): Metadata {
   const canonical = `${getAppOrigin()}${classicaIndexPath()}`;
-  const title = "Classica — АудиоЛад";
+  const title = "Classica – АудиоЛад";
   const description =
     "Произведения классической музыки на АудиоЛад: слушать, читать о сочинении и композиторе.";
   return {

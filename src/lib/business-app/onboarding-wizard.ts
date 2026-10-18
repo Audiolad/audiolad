@@ -83,7 +83,7 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
     {
       id: "calm_premium",
       label: "Спокойный · премиальный",
-      vibe: "Тихо, ровно, без резких пиков — гости остаются в комфорте.",
+      vibe: "Тихо, ровно, без резких пиков – гости остаются в комфорте.",
       energyHint: "calm",
     },
     {
@@ -95,16 +95,16 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
     {
       id: "warm_lively",
       label: "Тёплый · живой",
-      vibe: "Чуть больше энергии, всё ещё фон — не концерт.",
+      vibe: "Чуть больше энергии, всё ещё фон – не концерт.",
       energyHint: "lively",
     },
   ] as const;
 
 export const BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER =
-  "Каталог эфира пока без подтверждённых ELIGIBLE-треков. Статус прав — UNKNOWN, пока нет evidence и freeze-list. Мы не утверждаем, что музыка «лицензирована».";
+  "Каталог эфира пока без подтверждённых ELIGIBLE-треков. Статус прав – UNKNOWN, пока нет evidence и freeze-list. Мы не утверждаем, что музыка «лицензирована».";
 
 export const BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE =
-  "Preview в этом шаге описательный: без воспроизведения треков Case A и без выдачи в эфир. Подключение плеера — после подтверждения точки.";
+  "Preview в этом шаге описательный: без воспроизведения треков Case A и без выдачи в эфир. Подключение плеера – после подтверждения точки.";
 
 export function isBusinessOnboardingStep(
   value: string,

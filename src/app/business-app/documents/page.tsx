@@ -61,7 +61,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
           Получили претензию или пришла проверка? Ничего не подписывайте по
           существу и не платите на месте. Сообщите нам через раздел «Помощь»
-          в течение 3 рабочих дней, а лучше в тот же день — сроки и исключения
+          в течение 3 рабочих дней, а лучше в тот же день – сроки и исключения
           (обязательные по закону действия, поздно полученный иск, отсутствие
           нашего ответа) указаны в пп. 2.1–2.2 «Порядка защиты клиента».
         </p>
@@ -81,7 +81,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Отчёт строится по сообщениям плеера АудиоЛад о воспроизведении, которые принял
           сервер: сервер проверяет плеер и точку и фиксирует время получения, время начала
-          и длительность сообщает плеер. Время — по часовому поясу точки.
+          и длительность сообщает плеер. Время – по часовому поясу точки.
         </p>
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm">Войдите, чтобы построить отчёт.</p>
@@ -97,7 +97,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   name="at"
                   defaultValue={at ?? ""}
                   required
-                  className="rounded border px-2 py-1"
+                  className="business-app-input"
                 />
               </label>
               <label className="flex flex-col text-sm">
@@ -108,10 +108,10 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   min={1}
                   max={180}
                   defaultValue={windowMinutes ?? PLAYBACK_REPORT_DEFAULT_WINDOW_MINUTES}
-                  className="w-24 rounded border px-2 py-1"
+                  className="business-app-input w-24"
                 />
               </label>
-              <button type="submit" className="rounded bg-[var(--biz-accent)] px-3 py-1 font-semibold text-white">
+              <button type="submit" className="business-app-btn business-app-btn-primary business-app-focus-ring">
                 Показать
               </button>
             </form>
@@ -125,7 +125,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
               <div className="mt-4">
                 <p className="text-sm text-[var(--biz-text-muted)]">
                   {result.locationName} · {formatVenueZoneRu(result.report.fromUtc, result.report.timezone)} · интервал{" "}
-                  {formatVenueTime(result.report.fromUtc, result.report.timezone)} —{" "}
+                  {formatVenueTime(result.report.fromUtc, result.report.timezone)} –{" "}
                   {formatVenueTime(result.report.toUtc, result.report.timezone)}
                 </p>
                 {result.report.tracks.length === 0 ? (

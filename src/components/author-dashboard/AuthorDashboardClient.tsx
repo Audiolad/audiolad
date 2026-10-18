@@ -296,7 +296,7 @@ export default function AuthorDashboardClient({
 
   return (
     <div>
-      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} />
+      <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} accessStatus={selectedAuthor.accessStatus} />
 
       <Link
         href="/osen-zvuchit"

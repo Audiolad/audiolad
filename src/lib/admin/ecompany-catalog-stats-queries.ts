@@ -17,7 +17,7 @@ const RPC_TIMEOUT_MS = 4000;
 
 /**
  * c353a4b5: one aggregate RPC (a few hundred rows scanned), one idempotent daily snapshot upsert,
- * one history read. Errors degrade to "нет данных" and never break the ИИ-компания board.
+ * one history read. Errors degrade to "нет данных" and never break the admin overview page.
  */
 export async function loadCatalogStats(now: Date = new Date()): Promise<{ model: CatalogStatsModel | null; error: string | null }> {
   try {

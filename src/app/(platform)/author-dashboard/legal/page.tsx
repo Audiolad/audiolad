@@ -60,7 +60,7 @@ export default async function AuthorLegalDocumentsPage({
       internalBackHref={backHref}
     >
       <div className="mb-6">
-        <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
+        <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={workspace.accessStatus} />
       </div>
       {isUnifiedAgreementEnabled() ? (
         <>

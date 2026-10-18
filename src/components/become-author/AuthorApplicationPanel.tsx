@@ -920,7 +920,7 @@ export default function AuthorApplicationPanel({
         <p className={`mt-2 ${becomeAuthorBodyClass}`}>
           {updateContactsOnly
             ? "Обновите контакты для связи по вашей заявке."
-            : "Заполните короткую форму — мы рассмотрим её и свяжемся с вами при необходимости."}
+            : "Заполните короткую форму – мы рассмотрим её и свяжемся с вами при необходимости."}
         </p>
 
         {application?.review_comment && status === "needs_changes" ? (

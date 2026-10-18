@@ -5,6 +5,12 @@ import { useCallback, useMemo, useState } from "react";
 import SunoLinkHowTo from "@/components/author-dashboard/business/SunoLinkHowTo";
 import ExampleLightbox from "@/components/author-dashboard/business/ExampleLightbox";
 import ConsentDocumentLink from "@/components/author-dashboard/business/ConsentDocumentLink";
+import EvidenceFileField, { useEvidencePreviews } from "@/components/author-dashboard/business/EvidenceFileField";
+import {
+  EVIDENCE_COPY,
+  type EvidenceUploadState,
+  type StoredEvidenceFile,
+} from "@/lib/business-rightsholder/evidence-display";
 import {
   VERIFICATION_STATUS_TEXT,
   validateEvidenceFile,
@@ -57,7 +63,12 @@ type Props = {
    * no checkboxes, submit_v3 (server re-checks the agreement and support mode).
    */
   mode?: "legacy" | "unified";
+  /** Files of the latest submitted attempt (signed URLs), shown when the form is reopened. */
+  storedEvidence?: StoredEvidenceFile[];
 };
+
+type Kinds<T> = Record<RightsholderEvidenceKind, T>;
+const NO_UPLOADS: Kinds<EvidenceUploadState> = { generation: null, paid_period: null };
 
 const EDITABLE = new Set(["draft", "needs_info", "rejected"]);
 const EVIDENCE_BUCKET = "business-rightsholder-evidence";
@@ -67,7 +78,7 @@ async function sha256Hex(file: File) {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export default function RightsholderVerificationForm({ products, documents, existing, mode = "legacy" }: Props) {
+export default function RightsholderVerificationForm({ products, documents, existing, mode = "legacy", storedEvidence = [] }: Props) {
   const unified = mode === "unified";
   const [productId, setProductId] = useState(existing?.productId ?? products[0]?.id ?? "");
   const [audioItemId, setAudioItemId] = useState(existing?.audioItemId ?? products[0]?.tracks[0]?.id ?? "");
@@ -78,7 +89,9 @@ export default function RightsholderVerificationForm({ products, documents, exis
     ...(existing?.providerDetails ?? {}),
     ...(existing?.aiServiceOther ? { ai_service_other: existing.aiServiceOther } : {}),
   }));
-  const [files, setFiles] = useState<Record<RightsholderEvidenceKind, File | null>>({ generation: null, paid_period: null });
+  const [files, setFiles] = useState<Kinds<File | null>>({ generation: null, paid_period: null });
+  const [uploads, setUploads] = useState<Kinds<EvidenceUploadState>>(NO_UPLOADS);
+  const { previews, setPreview, clearPreviews } = useEvidencePreviews();
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [confirmRights, setConfirmRights] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -93,6 +106,24 @@ export default function RightsholderVerificationForm({ products, documents, exis
   const editable = status === null || EDITABLE.has(status);
   const cfg = PROVIDERS[provider];
   const values = { provider, trackTitle, trackUrl, fields, files };
+  // Stored files belong to the provider they were submitted with.
+  const storedFor = (kind: RightsholderEvidenceKind) =>
+    existing && existing.aiService === provider ? storedEvidence.find((e) => e.kind === kind) ?? null : null;
+
+  function selectFile(kind: RightsholderEvidenceKind, file: File | null) {
+    setPreview(kind, file);
+    setFiles((prev) => ({ ...prev, [kind]: file }));
+    setUploads((prev) => ({ ...prev, [kind]: null }));
+    setErrors((prev) => {
+      if (!prev[kind]) return prev;
+      const next = { ...prev };
+      delete next[kind];
+      return next;
+    });
+  }
+
+  // After a successful submit (or for a closed case) the chosen / stored files stay visible read-only.
+  const submittedSlots = cfg.evidence.filter((slot) => files[slot.kind] || storedFor(slot.kind));
 
   function validate() {
     const next: Record<string, string> = {};
@@ -101,7 +132,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
     if (!unified) {
       if (!acceptTerms) next.acceptTerms = "Отметьте согласие с условиями";
       if (!confirmRights) next.confirmRights = "Подтвердите права на музыку";
-      if (!terms || !rights) next.form = "Документы программы ещё не опубликованы — отправка временно недоступна";
+      if (!terms || !rights) next.form = "Документы программы ещё не опубликованы – отправка временно недоступна";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -111,6 +142,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
     event.preventDefault();
     if (!validate() || (!unified && (!terms || !rights))) return;
     setBusy(true);
+    setUploads(NO_UPLOADS);
+    let uploadingKind: RightsholderEvidenceKind | null = null;
     try {
       const supabase = createClient();
       const details = buildDraftDetails(values);
@@ -129,6 +162,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
       const evidenceIds: string[] = [];
       for (const kind of evidenceKindsToUpload(values)) {
         const file = files[kind]!;
+        uploadingKind = kind;
+        setUploads((prev) => ({ ...prev, [kind]: { phase: "uploading" } }));
         const reserved = await supabase.rpc("author_business_evidence_reserve", {
           p_verification_id: verificationId,
           p_kind: kind,
@@ -141,6 +176,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
         const upload = await supabase.storage.from(EVIDENCE_BUCKET).upload(row.object_path, file, { contentType: file.type });
         if (upload.error) throw upload.error;
         evidenceIds.push(row.id);
+        setUploads((prev) => ({ ...prev, [kind]: { phase: "uploaded" } }));
+        uploadingKind = null;
       }
       const submitted = unified
         ? await supabase.rpc("author_business_verification_submit_v3", {
@@ -161,6 +198,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
       setStatus("submitted");
       setErrors({});
     } catch (error) {
+      const failedKind = uploadingKind;
+      if (failedKind) setUploads((prev) => ({ ...prev, [failedKind]: { phase: "error", message: EVIDENCE_COPY.uploadFailed } }));
       const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error);
       setErrors({
         form: message.includes("support_mode_consent_forbidden")
@@ -190,6 +229,27 @@ export default function RightsholderVerificationForm({ products, documents, exis
           {existing && existing.attempts > 0 ? (
             <p className="mt-1 text-neutral-500">Отправок: {existing.attempts}</p>
           ) : null}
+        </div>
+      ) : null}
+
+      {!editable && submittedSlots.length > 0 ? (
+        <div className="mt-4 space-y-3" data-evidence-readonly>
+          <p className="text-sm font-medium text-neutral-800">Файлы заявки</p>
+          {submittedSlots.map(({ kind, example: ex }) => (
+            <EvidenceFileField
+              key={`readonly-${kind}`}
+              kind={kind}
+              inputId={`rightsholder-evidence-readonly-${kind}`}
+              label={ex.label}
+              required={false}
+              hint={ex.hint}
+              file={files[kind]}
+              previewUrl={previews[kind] ?? null}
+              stored={files[kind] ? null : storedFor(kind)}
+              upload={files[kind] ? { phase: "uploaded" } : null}
+              readOnly
+            />
+          ))}
         </div>
       ) : null}
 
@@ -232,7 +292,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
               {PROVIDER_ORDER.map((id) => (
                 <label key={id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${provider === id ? "border-neutral-900 bg-neutral-50" : "border-neutral-300"}`}>
                   <input type="radio" name="rightsholder-provider" value={id} checked={provider === id}
-                    onChange={() => { setProvider(id); setFiles({ generation: null, paid_period: null }); setErrors({}); }} />
+                    onChange={() => { setProvider(id); setFiles({ generation: null, paid_period: null }); clearPreviews(); setUploads(NO_UPLOADS); setErrors({}); }} />
                   <span>{PROVIDERS[id].label}</span>
                 </label>
               ))}
@@ -284,27 +344,24 @@ export default function RightsholderVerificationForm({ products, documents, exis
             );
           })}
 
-          {cfg.evidence.map(({ kind, required, example: ex }) => {
-            const inputId = `rightsholder-evidence-${kind}`;
-            return (
-              <div key={`${provider}-${kind}`} className="rounded-xl border border-dashed border-neutral-300 p-4" data-evidence-field={kind}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label htmlFor={inputId} className="text-sm font-medium text-neutral-800">{ex.label}{required ? " *" : " (необязательно)"}</label>
-                  <button type="button" onClick={() => setExample(ex)}
-                    className="min-h-11 rounded-lg px-2 text-sm font-medium text-indigo-700 underline underline-offset-4 hover:text-indigo-900"
-                    aria-haspopup="dialog">
-                    Посмотреть пример
-                  </button>
-                </div>
-                <p className="mt-1 text-sm text-neutral-600">{ex.hint}</p>
-                <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp,application/pdf"
-                  className="mt-3 block w-full text-sm"
-                  onChange={(e) => setFiles((prev) => ({ ...prev, [kind]: e.target.files?.[0] ?? null }))} />
-                <p className="mt-1 text-xs text-neutral-500">PNG, JPG, WEBP или PDF, до 10 МБ</p>
-                {errors[kind] ? <p className="mt-1 text-sm text-red-600">{errors[kind]}</p> : null}
-              </div>
-            );
-          })}
+          {cfg.evidence.map(({ kind, required, example: ex }) => (
+            <EvidenceFileField
+              key={`${provider}-${kind}`}
+              kind={kind}
+              inputId={`rightsholder-evidence-${kind}`}
+              label={ex.label}
+              required={required}
+              hint={ex.hint}
+              onShowExample={() => setExample(ex)}
+              file={files[kind]}
+              previewUrl={previews[kind] ?? null}
+              stored={storedFor(kind)}
+              upload={uploads[kind]}
+              error={errors[kind]}
+              disabled={busy}
+              onSelect={(file) => selectFile(kind, file)}
+            />
+          ))}
 
           {unified ? (
             <p className="text-sm text-neutral-600" data-testid="unified-agreement-covers-business">

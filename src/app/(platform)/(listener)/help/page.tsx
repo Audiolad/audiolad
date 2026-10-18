@@ -138,7 +138,7 @@ export default function HelpHubPage() {
         <h2 className="text-lg font-semibold text-[#25135c]">Не нашли ответ?</h2>
         <p className="mt-2 text-sm leading-6 text-[#5f5484]">
           Если инструкции не хватило, задайте вопрос поддержке. Ответ придёт на
-          электронную почту — без обещания мгновенного ответа.
+          электронную почту – без обещания мгновенного ответа.
         </p>
         <Link
           href={helpSupportHref({ source: "/help" })}

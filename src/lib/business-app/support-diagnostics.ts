@@ -161,7 +161,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "NO_ORGANIZATION",
       severity: "error",
-      messageRu: "Организация ещё не создана — сначала пройдите bootstrap.",
+      messageRu: "Организация ещё не создана – сначала пройдите bootstrap.",
     });
     return issues;
   }
@@ -205,7 +205,7 @@ export function deriveSupportIssues(input: {
         issues.push({
           code: "PLAYER_OFFLINE",
           severity: "error",
-          messageRu: `Плеер ${player.playerCode} offline — heartbeat давно не обновлялся.`,
+          messageRu: `Плеер ${player.playerCode} offline – heartbeat давно не обновлялся.`,
         });
       } else if (player.healthStatus === "stale") {
         issues.push({

@@ -1,0 +1,48 @@
+{
+  "_note": "a8240527 passport stage. sunnyMorningRome = the live track passport Sergey showed on 17.10.2026 (Core clarification 5ff3ce84), transcribed label by label: «Солнечное утро в Риме», album jazz-relax/italyanskiy-dzhaz, 2:08. BPM 85.2 is a LOW-confidence candidate (raw 170.5 failed the gate) – there is no published BPM. Scores are not on the screenshot (null). No secrets, no personal data. synthetic* fixtures are clearly invented test passports, NOT production data.",
+  "sunnyMorningRome": {
+    "audioItemId": "ad9306f4-98a2-479d-a77d-2b91b6c2e3a3",
+    "version": {
+      "id": "fixture-passport-sunny-morning-rome",
+      "audio_item_id": "ad9306f4-98a2-479d-a77d-2b91b6c2e3a3",
+      "status": "active",
+      "sealed_at": "2026-10-17T00:00:00Z",
+      "ceased_at": null,
+      "structured_fields": {
+        "bpm": { "published": null, "candidate": 85.2, "raw": 170.5 },
+        "key": { "published": null, "published_mode": null, "candidate": "F#", "candidate_mode": "minor" },
+        "genres": [{ "label": "Jazz", "score": null }, { "label": "Blues", "score": null }, { "label": "New Age", "score": null }],
+        "styles": [{ "label": "Lounge", "score": null }, { "label": "Contemporary", "score": null }, { "label": "Smooth Jazz", "score": null }],
+        "moods": [{ "label": "warm", "score": null }, { "label": "happy", "score": null }, { "label": "romantic", "score": null }, { "label": "calm", "score": null }, { "label": "dreamy", "score": null }],
+        "instruments": [{ "label": "electric piano", "score": null }, { "label": "piano", "score": null }, { "label": "harp", "score": null }, { "label": "grand piano", "score": null }, { "label": "strings", "score": null }],
+        "sound_character": { "label": "rich", "score": null },
+        "loudness_lufs": -9,
+        "energy": null
+      }
+    },
+    "attributes": []
+  },
+  "synthetic": {
+    "calmPiano": {
+      "genres": [{ "label": "New Age", "score": 0.34 }, { "label": "Ambient", "score": 0.28 }, { "label": "Classical", "score": 0.22 }],
+      "styles": [{ "label": "Relaxation Music", "score": 0.41 }, { "label": "Lounge", "score": 0.25 }],
+      "moods": [{ "label": "calm", "score": 0.33 }, { "label": "peaceful", "score": 0.3 }, { "label": "tender", "score": 0.27 }, { "label": "warm", "score": 0.24 }, { "label": "dreamy", "score": 0.21 }],
+      "instruments": [{ "label": "piano", "score": 0.19 }, { "label": "strings", "score": 0.14 }, { "label": "harp", "score": 0.12 }],
+      "sound_character": { "label": "soft", "score": 0.31 }
+    },
+    "upbeatBossa": {
+      "genres": [{ "label": "Latin", "score": 0.38 }, { "label": "Jazz", "score": 0.33 }],
+      "styles": [{ "label": "Bossa Nova", "score": 0.45 }, { "label": "Latin Jazz", "score": 0.37 }, { "label": "Lounge Jazz", "score": 0.3 }],
+      "moods": [{ "label": "happy", "score": 0.35 }, { "label": "playful", "score": 0.31 }, { "label": "upbeat", "score": 0.28 }, { "label": "warm", "score": 0.22 }],
+      "instruments": [{ "label": "acoustic guitar", "score": 0.18 }, { "label": "percussion", "score": 0.15 }, { "label": "double bass", "score": 0.12 }],
+      "sound_character": { "label": "bright", "score": 0.3 }
+    },
+    "eveningSax": {
+      "genres": [{ "label": "Jazz", "score": 0.44 }, { "label": "Blues", "score": 0.33 }],
+      "styles": [{ "label": "Smooth Jazz", "score": 0.48 }, { "label": "Lounge Jazz", "score": 0.42 }, { "label": "Cool Jazz", "score": 0.36 }],
+      "moods": [{ "label": "romantic", "score": 0.32 }, { "label": "dreamy", "score": 0.3 }, { "label": "sensual", "score": 0.27 }, { "label": "mellow", "score": 0.24 }],
+      "instruments": [{ "label": "saxophone", "score": 0.2 }, { "label": "electric piano", "score": 0.15 }, { "label": "double bass", "score": 0.13 }],
+      "sound_character": { "label": "warm", "score": 0.29 }
+    }
+  }
+}

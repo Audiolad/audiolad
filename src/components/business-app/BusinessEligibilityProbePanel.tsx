@@ -51,9 +51,9 @@ export default function BusinessEligibilityProbePanel({
 
   if (domain.status === "anonymous") {
     return (
-      <section className="rounded-2xl border border-white/10 bg-black/20 p-5">
-        <h2 className="text-lg font-bold">Eligibility (A5)</h2>
-        <p className="mt-2 text-sm opacity-80">
+      <section className="business-app-card">
+        <h2 className="text-lg font-bold text-[var(--biz-text)]">Eligibility (A5)</h2>
+        <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Войдите как владелец, чтобы увидеть read-only статус прав для кандидатов
           эфира. Без Location вызов RPC недоступен.
         </p>
@@ -68,7 +68,7 @@ export default function BusinessEligibilityProbePanel({
             ? "Пул эфира (eligibility)"
             : "Проверка eligibility",
           description:
-            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав — после HG-3/HG-4.",
+            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав – после HG-3/HG-4.",
         }
       : venueAirplayEmptyStateCopy({
           hasLocation: Boolean(domain.location),
@@ -77,24 +77,24 @@ export default function BusinessEligibilityProbePanel({
         });
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-black/20 p-5 space-y-3">
+    <section className="business-app-card space-y-3">
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide opacity-60">
+          <p className="business-app-eyebrow">
             Rights Eligibility · read-only
           </p>
-          <h2 className="text-lg font-bold">
+          <h2 className="text-lg font-bold text-[var(--biz-text)]">
             {compact && probe.status !== "idle" ? "Пул эфира (eligibility)" : empty.title}
           </h2>
-          <p className="mt-1 text-sm opacity-80">{empty.description}</p>
-          <p className="mt-1 text-xs opacity-50">
+          <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{empty.description}</p>
+          <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
             RPC <code>resolve_business_track_eligibility</code> · UNKNOWN ≠
             ELIGIBLE · без claims «лицензировано»
           </p>
         </div>
         <button
           type="button"
-          className="rounded-lg border border-white/20 px-3 py-2 text-sm font-medium hover:bg-white/5 disabled:opacity-50"
+          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
           disabled={probe.status === "loading" || !domain.location}
           onClick={() => void runProbe()}
         >
@@ -108,7 +108,8 @@ export default function BusinessEligibilityProbePanel({
 
       {probe.status === "error" ? (
         <p
-          className="rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-100"
+          className="business-app-alert"
+          data-tone="error"
           role="alert"
         >
           {probe.message}
@@ -120,23 +121,24 @@ export default function BusinessEligibilityProbePanel({
           {probe.rows.map((row) => (
             <li
               key={row.audioItemId}
-              className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-sm"
+              className="business-app-list-row text-sm"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-semibold">{row.label}</span>
+                <span className="font-semibold text-[var(--biz-text)]">{row.label}</span>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                  className="business-app-badge"
+                  data-tone={
                     row.decision === "ELIGIBLE"
-                      ? "bg-emerald-500/30 text-emerald-100"
+                      ? "ok"
                       : row.decision === "INELIGIBLE"
-                        ? "bg-red-500/30 text-red-100"
-                        : "bg-amber-400/20 text-amber-100"
-                  }`}
+                        ? "error"
+                        : "warn"
+                  }
                 >
                   {formatEligibilityDecisionLabel(row.decision)}
                 </span>
               </div>
-              <p className="mt-1 break-all text-xs opacity-60">
+              <p className="mt-1 break-all text-xs text-[var(--biz-text-muted)]">
                 audio_item: <code>{row.audioItemId}</code>
                 {row.trackCode ? (
                   <>
@@ -146,12 +148,12 @@ export default function BusinessEligibilityProbePanel({
                 ) : null}
               </p>
               {row.reasonCodes.length > 0 ? (
-                <p className="mt-1 text-xs opacity-70">
+                <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
                   reasons: {row.reasonCodes.join(", ")}
                 </p>
               ) : null}
               {row.error ? (
-                <p className="mt-1 text-xs text-red-200">error: {row.error}</p>
+                <p className="mt-1 text-xs text-[var(--biz-red-ink)]">error: {row.error}</p>
               ) : null}
             </li>
           ))}
@@ -159,7 +161,7 @@ export default function BusinessEligibilityProbePanel({
       ) : null}
 
       {probe.status === "loading" ? (
-        <p className="text-sm opacity-70">Вызов A5 eligibility…</p>
+        <p className="text-sm text-[var(--biz-text-muted)]">Вызов A5 eligibility…</p>
       ) : null}
     </section>
   );

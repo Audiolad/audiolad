@@ -25,6 +25,18 @@ export const YANDEX_METRIKA_CORE_GOALS = [
   "author_application_submitted",
 ] as const satisfies readonly PlatformAnalyticsEventName[];
 
+/** Guest «Атлас звучания кофеен мира» (/b/atlas-kofeen): PDF, CTA, switching, listening. */
+export const YANDEX_METRIKA_BUSINESS_ATLAS_GOALS = [
+  "business_atlas_pdf_opened",
+  "business_atlas_pdf_downloaded",
+  "business_atlas_cta_clicked",
+  "business_atlas_shop_opened",
+  "business_atlas_listen_clicked",
+] as const;
+
+export type YandexMetrikaBusinessAtlasGoalName =
+  (typeof YANDEX_METRIKA_BUSINESS_ATLAS_GOALS)[number];
+
 export type YandexMetrikaRetentionGoalName =
   (typeof YANDEX_METRIKA_RETENTION_GOALS)[number];
 
@@ -35,12 +47,14 @@ export type YandexMetrikaCoreGoalName = (typeof YANDEX_METRIKA_CORE_GOALS)[numbe
 export type YandexMetrikaGoalName =
   | YandexMetrikaCoreGoalName
   | YandexMetrikaRetentionGoalName
-  | YandexMetrikaPwaGoalName;
+  | YandexMetrikaPwaGoalName
+  | YandexMetrikaBusinessAtlasGoalName;
 
 const GOAL_NAME_SET = new Set<string>([
   ...YANDEX_METRIKA_CORE_GOALS,
   ...YANDEX_METRIKA_RETENTION_GOALS,
   ...YANDEX_METRIKA_PWA_GOALS,
+  ...YANDEX_METRIKA_BUSINESS_ATLAS_GOALS,
 ]);
 
 export function isYandexMetrikaGoalName(

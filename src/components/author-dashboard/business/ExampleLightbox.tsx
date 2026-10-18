@@ -94,7 +94,7 @@ export default function ExampleLightbox({ example, onClose }: Props) {
             />
           ) : (
             <div className="mx-auto max-w-prose rounded-xl bg-white p-4 text-sm text-neutral-800" data-text-example>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">Текстовый пример — скриншота нет</p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">Текстовый пример – скриншота нет</p>
               <ul className="list-disc space-y-1 pl-5">
                 {(example.textExample ?? []).map((line) => (
                   <li key={line}>{line}</li>

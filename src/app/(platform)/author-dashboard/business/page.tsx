@@ -7,11 +7,13 @@ import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import BusinessAgreementStatusScreen, {
   type BusinessTrackAdmission,
 } from "@/components/author-dashboard/business/BusinessAgreementStatusScreen";
+import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import RightsholderVerificationForm, {
   type ExistingVerification,
   type OwnProduct,
   type ProgramDocument,
 } from "@/components/author-dashboard/business/RightsholderVerificationForm";
+import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
 import {
   listAuthorWorkspacesForUser,
   requireAuthenticatedUser,
@@ -24,6 +26,14 @@ import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { tracksLiveInBusiness, type BusinessGrantLayerRow } from "@/lib/business-rightsholder/track-in-business";
+import {
+  EVIDENCE_SIGNED_URL_TTL_SECONDS,
+  parseAttemptEvidence,
+  parseAttemptProvider,
+  type StoredEvidenceFile,
+} from "@/lib/business-rightsholder/evidence-display";
+
+const EVIDENCE_BUCKET = "business-rightsholder-evidence";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,7 +47,22 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   if (workspaces.length === 0) redirect("/become-author");
   const requestedSlug = params.author?.trim() ?? "";
   const workspace = workspaces.find((item) => item.slug === requestedSlug) ?? workspaces[0];
-  const { role } = await requireAuthorMembership(workspace.id);
+  const { role, accessStatus } = await requireAuthorMembership(workspace.id);
+  // No commercial status: same notice as the muted nav tab, and no Business data is loaded.
+  if (!authorCanOpenBusiness(accessStatus)) {
+    return (
+      <AuthorShell
+        title="АудиоЛад Бизнес"
+        subtitle="Ваша музыка в спа, салонах и кафе – с честными выплатами"
+        internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
+      >
+        <div className="mb-6">
+          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
+        </div>
+        <BusinessCommercialRequiredNotice id={BUSINESS_LOCKED_NOTICE_ID} authorSlug={workspace.slug} />
+      </AuthorShell>
+    );
+  }
   // Business consents are the rightsholder's personal act: never in support mode.
   // The DB also refuses (business_onboarding_consents → support_mode_consent_forbidden).
   const supportMode = await isConsentBlockedForRequest(user.id);
@@ -45,11 +70,11 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
     return (
       <AuthorShell
         title="АудиоЛад Бизнес"
-        subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+        subtitle="Ваша музыка в спа, салонах и кафе – с честными выплатами"
         internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
       >
         <div className="mb-6">
-          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
+          <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
         </div>
         <p
           role="note"
@@ -156,6 +181,40 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   }
 
   const attemptsAgg = verification?.business_rightsholder_verification_attempts as { count: number }[] | undefined;
+  // Files of the latest submitted attempt, so a reopened form shows what was sent.
+  // Owner RLS on attempts + storage; short-lived signed links with the user's own session
+  // (same pattern as /admin/business-verification). Nothing is written here.
+  let storedEvidence: StoredEvidenceFile[] = [];
+  if (verification) {
+    const { data: lastAttempt } = await supabase
+      .from("business_rightsholder_verification_attempts")
+      .select("snapshot")
+      .eq("verification_id", verification.id as string)
+      .order("attempt_no", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    // Only files submitted with the case's current service (the draft can switch services
+    // after a failed upload; old files would otherwise appear under the new labels).
+    const attemptProvider = parseAttemptProvider(lastAttempt?.snapshot);
+    const rows = attemptProvider === (verification.ai_service as string) ? parseAttemptEvidence(lastAttempt?.snapshot) : [];
+    if (rows.length) {
+      const { data: links } = await supabase.storage
+        .from(EVIDENCE_BUCKET)
+        .createSignedUrls(rows.map((r) => r.objectPath), EVIDENCE_SIGNED_URL_TTL_SECONDS);
+      const signed = new Map<string, string>();
+      for (const link of links ?? []) {
+        if (link.path && link.signedUrl && !link.error) signed.set(link.path, link.signedUrl);
+      }
+      storedEvidence = rows.map((r) => ({
+        kind: r.kind,
+        mimeType: r.mimeType,
+        sizeBytes: r.sizeBytes,
+        createdAt: r.createdAt,
+        url: signed.get(r.objectPath) ?? null,
+      }));
+    }
+  }
+
   const existing: ExistingVerification = verification
     ? {
         status: verification.status as string,
@@ -174,11 +233,11 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
   return (
     <AuthorShell
       title="АудиоЛад Бизнес"
-      subtitle="Ваша музыка в спа, салонах и кафе — с честными выплатами"
+      subtitle="Ваша музыка в спа, салонах и кафе – с честными выплатами"
       internalBackHref={`/author-dashboard?author=${encodeURIComponent(workspace.slug)}`}
     >
       <div className="mb-6">
-        <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} />
+        <AuthorDashboardNav authorSlug={workspace.slug} authorId={workspace.id} authorRole={role} accessStatus={accessStatus} />
       </div>
       {unifiedView ? (
         <>
@@ -197,7 +256,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       ) : null}
       {unifiedView && unifiedView.status.businessAgreement !== true ? null : products.length === 0 ? (
         <p className="rounded-2xl border border-neutral-200 bg-white p-4 text-sm text-neutral-700">
-          Сначала опубликуйте хотя бы один свой музыкальный продукт — потом здесь можно будет подтвердить права.
+          Сначала опубликуйте хотя бы один свой музыкальный продукт – потом здесь можно будет подтвердить права.
         </p>
       ) : (
         <RightsholderVerificationForm
@@ -205,6 +264,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
           documents={documents}
           existing={existing}
           mode={unifiedView ? "unified" : "legacy"}
+          storedEvidence={storedEvidence}
         />
       )}
     </AuthorShell>

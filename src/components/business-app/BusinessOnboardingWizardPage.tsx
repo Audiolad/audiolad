@@ -7,6 +7,11 @@ import { useMemo, useState, useTransition } from "react";
 import { bootstrapBusinessOrganizationWithLocation } from "@/app/business-app/actions";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
+  GUEST_COFFEE_COPY,
+  GUEST_COFFEE_INQUIRY_EMAIL,
+  GUEST_COFFEE_TERMS,
+} from "@/lib/business-app/guest-coffee/copy";
+import {
   BUSINESS_ONBOARDING_ATMOSPHERES,
   BUSINESS_ONBOARDING_STEPS,
   BUSINESS_ONBOARDING_TYPES,
@@ -21,11 +26,18 @@ import {
   type BusinessOnboardingStep,
 } from "@/lib/business-app/onboarding-wizard";
 
-export default function BusinessOnboardingWizardPage() {
+export default function BusinessOnboardingWizardPage({
+  initialTypeId = null,
+}: {
+  /** a8240527: venue type preselected by the entry link (e.g. «Подключить» from the coffee guest entry). */
+  initialTypeId?: string | null;
+} = {}) {
   const domain = useBusinessDomain();
   const router = useRouter();
   const [step, setStep] = useState<BusinessOnboardingStep>("type");
-  const [typeId, setTypeId] = useState<string | null>(null);
+  const [typeId, setTypeId] = useState<string | null>(
+    () => getBusinessOnboardingType(initialTypeId)?.id ?? null,
+  );
   const [atmosphereId, setAtmosphereId] = useState<string | null>(null);
   const suggested = useMemo(
     () => suggestBusinessOnboardingNames(typeId),
@@ -55,18 +67,36 @@ export default function BusinessOnboardingWizardPage() {
       <div className="mx-auto max-w-2xl">
         <WizardHeader
           title="Подключение точки"
-          subtitle="Войдите, чтобы пройти Zero-to-Music: тип → атмосфера → preview → подтверждение."
+          subtitle="Войдите или зарегистрируйтесь в АудиоЛаде – и создайте точку в этом же кабинете."
         />
-        <section className="business-app-card">
+        <section className="business-app-card space-y-3" data-testid="onboarding-sign-in">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
-            Нужна сессия владельца. Демо-данные кабинета не используются.
+            Аккаунт АудиоЛада общий для audiolad.ru и business.audiolad.ru: после входа кабинет узнает вас автоматически.
           </p>
-          <a
-            href="https://audiolad.ru/auth/sign-in"
-            className="mt-4 inline-flex rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            Войти
-          </a>
+          <p className="text-sm text-[var(--biz-text-muted)]">
+            После входа откройте business.audiolad.ru/onboarding – автоматического возврата в кабинет пока нет.
+          </p>
+          <p className="text-sm text-[var(--biz-text-muted)]">
+            {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="https://audiolad.ru/auth/sign-in"
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            >
+              Войти
+            </a>
+            <a
+              href="https://audiolad.ru/auth/sign-up"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+            >
+              Зарегистрироваться
+            </a>
+          </div>
+          <p className="text-sm text-[var(--biz-text-muted)]">
+            {GUEST_COFFEE_COPY.connectContact}{" "}
+            <a className="underline" href={`mailto:${GUEST_COFFEE_INQUIRY_EMAIL}`}>{GUEST_COFFEE_INQUIRY_EMAIL}</a>
+          </p>
         </section>
       </div>
     );
@@ -86,19 +116,19 @@ export default function BusinessOnboardingWizardPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/"
-              className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+              className="business-app-btn business-app-btn-primary business-app-focus-ring"
             >
               На главную
             </Link>
             <Link
               href="/player"
-              className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
               Открыть плеер
             </Link>
             <Link
               href="/music"
-              className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
               Музыка / eligibility
             </Link>
@@ -167,6 +197,11 @@ export default function BusinessOnboardingWizardPage() {
         title="Zero-to-Music"
         subtitle="Тип → атмосфера → preview → подтвердить → плеер"
       />
+      {step !== "done" ? (
+        <p className="mb-4 text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-terms-note">
+          {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
+        </p>
+      ) : null}
 
       <div
         className="mb-4 flex items-center gap-2 text-sm text-[var(--biz-text-muted)]"
@@ -186,7 +221,7 @@ export default function BusinessOnboardingWizardPage() {
               Что у вас?
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Выберите тип бизнеса — это станет категорией точки в A1 domain.
+              Выберите тип бизнеса – это станет категорией точки в A1 domain.
             </p>
             <ul className="space-y-2" role="listbox" aria-label="Тип бизнеса">
               {BUSINESS_ONBOARDING_TYPES.map((option) => {
@@ -224,7 +259,7 @@ export default function BusinessOnboardingWizardPage() {
               Как должно ощущаться?
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Выбор атмосферы пока только для онбординга. Sonic DNA / dayparts —
+              Выбор атмосферы пока только для онбординга. Sonic DNA / dayparts –
               отдельный этап (P1-02), после Passport trust.
             </p>
             <ul className="space-y-2" role="listbox" aria-label="Атмосфера">
@@ -274,7 +309,7 @@ export default function BusinessOnboardingWizardPage() {
                 <p className="mt-2 text-[var(--biz-text-muted)]">{preview.vibe}</p>
               ) : null}
             </div>
-            <p className="rounded-xl border border-[#f0e0a8] bg-[var(--biz-yellow-bg)] px-3 py-2 text-sm text-[var(--biz-text)]">
+            <p className="rounded-xl border border-[var(--biz-yellow-border)] bg-[var(--biz-yellow-bg)] px-3 py-2 text-sm text-[var(--biz-text)]">
               {preview.noAudioNote}
             </p>
             <p className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-2 text-sm text-[var(--biz-text-muted)]">
@@ -353,7 +388,7 @@ export default function BusinessOnboardingWizardPage() {
             </h2>
             <p className="text-[var(--biz-text)]">
               Дальше: откройте Venue Player и проверьте статус музыки. Каталог
-              ELIGIBLE пока пуст — eligibility остаётся UNKNOWN-safe.
+              ELIGIBLE пока пуст – eligibility остаётся UNKNOWN-safe.
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
@@ -365,19 +400,19 @@ export default function BusinessOnboardingWizardPage() {
             <div className="flex flex-wrap gap-2 pt-1">
               <Link
                 href="/player"
-                className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white"
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
                 Открыть плеер
               </Link>
               <Link
                 href="/music"
-                className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 Музыка / eligibility
               </Link>
               <Link
                 href="/"
-                className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)]"
+                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 На главную
               </Link>
@@ -389,7 +424,7 @@ export default function BusinessOnboardingWizardPage() {
         ) : null}
 
         {error ? (
-          <p className="text-sm font-medium text-[var(--biz-danger,#b42318)]" role="alert">
+          <p className="text-sm font-medium text-[var(--biz-danger)]" role="alert">
             {error}
           </p>
         ) : null}
@@ -401,7 +436,7 @@ export default function BusinessOnboardingWizardPage() {
                 type="button"
                 onClick={goBack}
                 disabled={pending}
-                className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-4 py-2.5 text-sm font-semibold text-[var(--biz-text)] disabled:opacity-60"
+                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
                 Назад
               </button>
@@ -411,7 +446,7 @@ export default function BusinessOnboardingWizardPage() {
                 type="button"
                 onClick={onConfirm}
                 disabled={pending}
-                className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
                 {pending ? "Создаём…" : "Подтвердить и создать точку"}
               </button>
@@ -420,7 +455,7 @@ export default function BusinessOnboardingWizardPage() {
                 type="button"
                 onClick={goNext}
                 disabled={pending}
-                className="rounded-xl bg-[var(--biz-accent)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
               >
                 Далее
               </button>

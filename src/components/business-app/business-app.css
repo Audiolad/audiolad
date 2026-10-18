@@ -1,26 +1,28 @@
+/* Layout + shared components of AudioLad Business. Colours come only from the
+   --biz-* tokens in ./theme/business-theme.css (task 21546de4). */
 .business-app-root {
-  --biz-bg: #f7f4fb;
-  --biz-surface: #ffffff;
-  --biz-surface-soft: #f3eef9;
-  --biz-border: #e8e0f2;
-  --biz-text: #2a1a4a;
-  --biz-text-muted: #6b5f82;
-  --biz-accent: #7042c5;
-  --biz-accent-soft: #efe7fb;
-  --biz-green: #1f8a4c;
-  --biz-green-bg: #e8f7ee;
-  --biz-yellow: #a67b0e;
-  --biz-yellow-bg: #fff6df;
-  --biz-red: #c43c3c;
-  --biz-red-bg: #fdeeee;
-  --biz-sidebar-expanded: 232px;
-  --biz-sidebar-collapsed: 72px;
-  --biz-bottom-nav-height: 68px;
-  --biz-radius: 18px;
-  --biz-shadow: 0 10px 30px rgba(42, 26, 74, 0.06);
-
   min-height: 100dvh;
   background: var(--biz-bg);
+  color: var(--biz-text);
+}
+
+/* Display serif for page titles, same family as the public atlas. Deliberately no
+   next/font here: a second Playfair next/font/google instance hit the known Turbopack
+   "queries have exactly one entry" build error; system serif fallback is used instead. */
+.business-app-root h1 {
+  font-family: var(--biz-font-display);
+  letter-spacing: -0.01em;
+}
+
+.business-app-root code {
+  border-radius: 6px;
+  background: var(--biz-surface-soft);
+  padding: 0.05em 0.35em;
+  font-size: 0.9em;
+}
+
+.business-app-root ::selection {
+  background: var(--biz-accent-soft);
   color: var(--biz-text);
 }
 
@@ -60,11 +62,12 @@
   bottom: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 0.15rem;
   min-height: calc(var(--biz-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
   padding: 0.35rem 0.4rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--biz-surface-glass);
   border-top: 1px solid var(--biz-border);
   backdrop-filter: blur(10px);
 }
@@ -85,20 +88,20 @@
 
 .business-app-status-banner.is-healthy {
   background: var(--biz-green-bg);
-  border-color: #c9ebd6;
-  color: #145c34;
+  border-color: var(--biz-green-border);
+  color: var(--biz-green-ink);
 }
 
 .business-app-status-banner.is-autonomous {
   background: var(--biz-yellow-bg);
-  border-color: #f0e0a8;
-  color: #7a5a08;
+  border-color: var(--biz-yellow-border);
+  color: var(--biz-yellow-ink);
 }
 
 .business-app-status-banner.is-stopped {
   background: var(--biz-red-bg);
-  border-color: #f3c4c4;
-  color: #8f2a2a;
+  border-color: var(--biz-red-border);
+  color: var(--biz-red-ink);
 }
 
 .business-app-home-grid {
@@ -107,7 +110,7 @@
 }
 
 .business-app-focus-ring:focus-visible {
-  outline: 2px solid var(--biz-accent);
+  outline: 2px solid var(--biz-focus);
   outline-offset: 2px;
 }
 
@@ -115,16 +118,14 @@
   width: 72px;
   height: 72px;
   border-radius: 14px;
-  background:
-    radial-gradient(circle at 30% 30%, #cbb6f2, transparent 55%),
-    linear-gradient(145deg, #7042c5, #3d1f7a);
+  background: var(--biz-cover);
   flex-shrink: 0;
 }
 
 .business-app-progress {
   height: 6px;
   border-radius: 999px;
-  background: #ece4f6;
+  background: var(--biz-progress-track);
   overflow: hidden;
 }
 
@@ -149,7 +150,7 @@
 }
 
 .business-app-chip.is-active {
-  border-color: #c9b3ef;
+  border-color: var(--biz-accent-border);
   background: var(--biz-accent-soft);
   color: var(--biz-accent);
 }
@@ -169,7 +170,11 @@
 
 .business-app-btn-primary {
   background: var(--biz-accent);
-  color: #fff;
+  color: var(--biz-on-accent);
+}
+
+.business-app-btn-primary:hover:not(:disabled) {
+  background: var(--biz-accent-hover);
 }
 
 .business-app-btn-secondary {
@@ -178,10 +183,173 @@
   color: var(--biz-text);
 }
 
+.business-app-btn-secondary:hover:not(:disabled) {
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+}
+
+.business-app-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .business-app-slider {
   width: 100%;
   accent-color: var(--biz-accent);
   height: 1.5rem;
+}
+
+/* Shared building blocks (21546de4): one look for every Business screen. */
+.business-app-eyebrow {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--biz-eyebrow);
+}
+
+.business-app-muted {
+  color: var(--biz-text-muted);
+}
+
+.business-app-input {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--biz-border-strong);
+  background: var(--biz-surface);
+  color: var(--biz-text);
+  padding: 0 0.75rem;
+}
+
+.business-app-input:focus-visible {
+  outline: 2px solid var(--biz-focus);
+  outline-offset: 1px;
+}
+
+.business-app-alert {
+  border-radius: var(--biz-radius-sm);
+  border: 1px solid var(--biz-neutral-border);
+  background: var(--biz-neutral-bg);
+  color: var(--biz-neutral-ink);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.business-app-alert[data-tone="error"] {
+  border-color: var(--biz-red-border);
+  background: var(--biz-red-bg);
+  color: var(--biz-red-ink);
+}
+
+.business-app-alert[data-tone="warn"] {
+  border-color: var(--biz-yellow-border);
+  background: var(--biz-yellow-bg);
+  color: var(--biz-yellow-ink);
+}
+
+.business-app-alert[data-tone="ok"] {
+  border-color: var(--biz-green-border);
+  background: var(--biz-green-bg);
+  color: var(--biz-green-ink);
+}
+
+.business-app-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--biz-neutral-border);
+  background: var(--biz-neutral-bg);
+  color: var(--biz-neutral-ink);
+  padding: 0.1rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.business-app-badge[data-tone="ok"] {
+  border-color: var(--biz-green-border);
+  background: var(--biz-green-bg);
+  color: var(--biz-green-ink);
+}
+
+.business-app-badge[data-tone="warn"] {
+  border-color: var(--biz-yellow-border);
+  background: var(--biz-yellow-bg);
+  color: var(--biz-yellow-ink);
+}
+
+.business-app-badge[data-tone="error"] {
+  border-color: var(--biz-red-border);
+  background: var(--biz-red-bg);
+  color: var(--biz-red-ink);
+}
+
+.business-app-list-row {
+  border-radius: var(--biz-radius-sm);
+  border: 1px solid var(--biz-border);
+  background: var(--biz-surface-soft);
+  padding: 0.75rem;
+}
+
+.business-app-tracklist {
+  display: grid;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.business-app-tracklist button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: var(--biz-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0 0.75rem;
+  color: var(--biz-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.business-app-tracklist button:hover {
+  background: var(--biz-surface-soft);
+}
+
+.business-app-tracklist button[aria-current="true"] {
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+  font-weight: 600;
+}
+
+.business-app-tracklist button[aria-current="true"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--biz-highlight);
+  flex-shrink: 0;
+}
+
+/* Long-form documents (/documents/[id]). SimpleMarkdown is shared with public AudioLad
+   pages and keeps its own colours there; inside Business the theme tokens win. */
+.business-app-prose > div {
+  color: var(--biz-text);
+}
+
+.business-app-prose blockquote {
+  border-color: var(--biz-highlight);
+  background: var(--biz-surface-soft);
+}
+
+.business-app-prose th,
+.business-app-prose td {
+  border-color: var(--biz-border);
+}
+
+.business-app-prose th {
+  background: var(--biz-surface-soft);
 }
 
 @media (min-width: 900px) {
@@ -244,7 +412,7 @@
 
 .business-app-owner-signals li[data-tone="error"] {
   background: var(--biz-red-bg);
-  color: #8f2a2a;
+  color: var(--biz-red-ink);
 }
 
 .business-app-owner-signals p {
@@ -276,7 +444,7 @@
 
 .business-app-owner-compact-status[data-tone="error"] {
   background: var(--biz-red-bg);
-  color: #8f2a2a;
+  color: var(--biz-red-ink);
 }
 
 .business-app-owner-signal-details summary {
@@ -298,5 +466,455 @@
 
   .business-app-owner-desktop-signals {
     display: grid;
+  }
+}
+
+/* ---------------------------------------------------------------------------------------
+   a8240527 – one cabinet for guest and owner: guest status strip, locked navigation items,
+   Music section (sound settings + collections + Business player). Tokens only.
+   --------------------------------------------------------------------------------------- */
+.business-app-guest-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin: 0 auto 1rem;
+  max-width: 72rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--biz-accent-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-accent-soft);
+  color: var(--biz-text);
+}
+
+.business-app-guest-bar__text {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+  font-size: 0.92rem;
+}
+
+.business-app-guest-bar__badge {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--biz-accent);
+  color: var(--biz-on-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.5;
+  vertical-align: 0.08em;
+}
+
+.business-app-guest-bar__terms {
+  font-size: 0.85rem;
+}
+
+@media (max-width: 639px) {
+  .business-app-guest-bar {
+    gap: 0.5rem 0.75rem;
+    padding: 0.6rem 0.75rem;
+  }
+}
+
+.business-app-guest-bar__notice {
+  font-weight: 600;
+  color: var(--biz-text);
+}
+
+.business-app-guest-bar__notice:empty {
+  display: block;
+  height: 0;
+  overflow: hidden;
+}
+
+.business-app-nav-locked {
+  cursor: not-allowed;
+  opacity: 0.78;
+}
+
+.business-sound-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.business-sound-settings {
+  display: grid;
+  gap: 1rem;
+  align-self: start;
+}
+
+.business-sound-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.business-sound-group__legend {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  color: var(--biz-text);
+}
+
+.business-sound-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.business-sound-chips--compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.business-sound-chip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--biz-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-surface);
+  cursor: pointer;
+}
+
+.business-sound-chips--compact .business-sound-chip {
+  align-items: center;
+  padding: 0.45rem 0.25rem;
+  text-align: center;
+}
+
+.business-sound-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.business-sound-chip:hover {
+  border-color: var(--biz-accent-border);
+}
+
+.business-sound-chip:focus-within {
+  outline: 2px solid var(--biz-focus);
+  outline-offset: 2px;
+}
+
+.business-sound-chip[data-checked="true"] {
+  border-color: var(--biz-accent);
+  background: var(--biz-accent);
+  color: var(--biz-on-accent);
+}
+
+.business-sound-chip__label {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.business-sound-chip__hint {
+  font-size: 0.74rem;
+  line-height: 1.25;
+  opacity: 0.85;
+}
+
+.business-sound-results {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.business-sound-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.business-sound-item {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
+}
+
+.business-sound-item[data-active="true"] {
+  border-color: var(--biz-accent);
+}
+
+.business-sound-item__cover {
+  width: 64px;
+}
+
+.business-sound-item__title {
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--biz-text);
+}
+
+.business-sound-limit {
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+}
+
+/* Business player: stays reachable while scrolling the collections, above the mobile nav. */
+.business-sound-player {
+  position: sticky;
+  bottom: calc(var(--biz-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  z-index: 20;
+  margin-top: 1rem;
+  box-shadow: var(--biz-shadow-strong);
+}
+
+/* Nothing playing yet: the hint stays in the flow instead of covering the collections. */
+.business-sound-player[data-status="idle"] {
+  position: static;
+  box-shadow: none;
+}
+
+.business-sound-player .business-app-player-controls {
+  margin-top: 0.35rem;
+}
+
+/* a8240527 – «Собрать атмосферу»: explicit assemble step and the assembled playlist. */
+.business-atmosphere-action {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.business-atmosphere-assemble {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.05rem;
+}
+
+.business-atmosphere-assemble[data-state="assembled"]:disabled {
+  opacity: 1;
+  border-color: var(--biz-green-border);
+  background: var(--biz-green-bg);
+  color: var(--biz-green-ink);
+}
+
+.business-atmosphere-anchor {
+  scroll-margin-top: 5.5rem;
+}
+
+.business-atmosphere-empty {
+  border-style: dashed;
+  background: var(--biz-surface-soft);
+}
+
+.business-atmosphere-empty__title,
+.business-atmosphere-assembling__title {
+  font-family: var(--biz-font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--biz-text);
+}
+
+.business-atmosphere-assembling {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+}
+
+.business-atmosphere-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 28px;
+}
+
+.business-atmosphere-bars span {
+  width: 6px;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--biz-accent);
+  transform-origin: bottom;
+  animation: business-atmosphere-bar 0.9s ease-in-out infinite;
+}
+
+.business-atmosphere-bars span:nth-child(2) { animation-delay: -0.15s; background: var(--biz-highlight); }
+.business-atmosphere-bars span:nth-child(3) { animation-delay: -0.3s; }
+.business-atmosphere-bars span:nth-child(4) { animation-delay: -0.45s; background: var(--biz-highlight); }
+.business-atmosphere-bars span:nth-child(5) { animation-delay: -0.6s; }
+
+@keyframes business-atmosphere-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+.business-atmosphere-steps {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.business-atmosphere-steps li {
+  color: var(--biz-text-muted);
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.business-atmosphere-steps li[data-state="next"] { opacity: 0.45; }
+.business-atmosphere-steps li[data-state="active"] { color: var(--biz-text); font-weight: 600; }
+.business-atmosphere-steps li[data-state="done"]::before { content: "✓ "; color: var(--biz-green); }
+
+.business-atmosphere {
+  display: grid;
+  gap: 0.6rem;
+  border-color: var(--biz-accent);
+  animation: business-atmosphere-in 0.35s ease-out;
+}
+
+.business-atmosphere[data-stale="true"] {
+  border-color: var(--biz-border-strong);
+}
+
+@keyframes business-atmosphere-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.business-atmosphere__stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--biz-yellow-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-yellow-bg);
+  color: var(--biz-yellow);
+  font-weight: 600;
+}
+
+.business-atmosphere__name {
+  font-family: var(--biz-font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--biz-text);
+}
+
+.business-atmosphere__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.business-atmosphere-match {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-surface-soft);
+  list-style: none;
+  font-size: 0.92rem;
+  color: var(--biz-text);
+}
+
+.business-atmosphere-match li[data-state="all"] > span { color: var(--biz-green); font-weight: 700; }
+.business-atmosphere-match li:not([data-state="all"]) > span { color: var(--biz-brass-ink); font-weight: 700; }
+
+.business-atmosphere-tracks {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.business-atmosphere-track {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--biz-radius-sm);
+  background: transparent;
+  text-align: left;
+  color: var(--biz-text);
+  cursor: pointer;
+}
+
+.business-atmosphere-track:hover:not(:disabled) {
+  background: var(--biz-surface-soft);
+}
+
+.business-atmosphere-track:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.business-atmosphere-track[data-current="true"] {
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+}
+
+.business-atmosphere-track__no {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--biz-text-muted);
+}
+
+.business-atmosphere-track[data-current="true"] .business-atmosphere-track__no {
+  color: var(--biz-accent);
+  font-weight: 700;
+}
+
+.business-atmosphere-track__meta {
+  display: grid;
+  min-width: 0;
+}
+
+.business-atmosphere-track__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.business-atmosphere-track__album {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--biz-text-muted);
+}
+
+.business-atmosphere-track__time {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--biz-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .business-atmosphere,
+  .business-atmosphere-bars span {
+    animation: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .business-sound-layout {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.3fr);
+    align-items: start;
+  }
+
+  .business-sound-player {
+    bottom: 1rem;
   }
 }

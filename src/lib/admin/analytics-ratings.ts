@@ -41,7 +41,7 @@ export function simulateAdminRatingsRouteFromHelper(
 }
 
 export type AdminRatingsPeriod = "7d" | "30d" | "all";
-export type AdminRatingsTab = "products" | "authors" | "journal";
+export type AdminRatingsTab = "products" | "authors" | "journal" | "listeners";
 export type AdminRatingsEventKind = "first" | "changed";
 export type AdminRatingsExcludedFilter = "all" | "included" | "excluded";
 
