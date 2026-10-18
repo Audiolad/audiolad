@@ -222,7 +222,7 @@ assert.match(read("src/components/author-dashboard/business/RightsholderVerifica
 }
 // Venue documents are r6's: untouched here.
 const plan = read("docs/business/unified-agreement-8dcba9d1/ROLLOUT-PLAN-RU.md");
-for (const needle of ["Резервная копия", "Пробное восстановление", "20270106120000", "AUDIOLAD_UNIFIED_AGREEMENT_ENABLED", "01-insert-edition-2.0.sql", "02-switch-current.sql", "Откат"]) {
+for (const needle of ["Резервная копия", "Пробное восстановление", "20270109120000", "AUDIOLAD_UNIFIED_AGREEMENT_ENABLED", "01-insert-edition-2.0.sql", "02-switch-current.sql", "Откат"]) {
   assert.ok(plan.includes(needle), `rollout plan mentions ${needle}`);
 }
 assert.ok(read("docs/business/unified-agreement-8dcba9d1/TEST-PLAN-RU.md").includes("Aurafon"));

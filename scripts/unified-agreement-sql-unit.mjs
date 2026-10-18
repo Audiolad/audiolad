@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 8dcba9d1 / 8d9cd0af PR 2: unified commercial agreement 2.0 (migration 20270106120000 + rollout SQL).
+// 8dcba9d1 / 8d9cd0af PR 2: unified commercial agreement 2.0 (migration 20270109120000 + rollout SQL).
 // Contract checks + real PostgreSQL scenarios in an EXPLICIT disposable test container only
 // (same harness contract as business-rightsholder-onboarding-sql-unit.mjs; never a production URL).
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const migration = read('supabase/migrations/20270106120000_unified_commercial_agreement.sql');
+const migration = read('supabase/migrations/20270109120000_unified_commercial_agreement.sql');
 const dir = 'docs/business/unified-agreement-8dcba9d1/sql/';
 const insert20 = read(`${dir}01-insert-edition-2.0.sql`);
 const switchCurrent = read(`${dir}02-switch-current.sql`);

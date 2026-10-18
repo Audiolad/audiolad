@@ -1,5 +1,5 @@
 -- Шаг «вставка редакции 2.0» (идемпотентно). НЕ делает 2.0 текущей. Только с явного OK Сергея.
--- Требует применённой миграции 20270106120000 (колонки covers_business, grants_scope).
+-- Требует применённой миграции 20270109120000 (колонки covers_business, grants_scope).
 -- Хэш = sha256 текста src/lib/author-terms/approved-content-v2.ts (AUTHOR_TERMS_V2_TEXT).
 BEGIN;
 DO $$

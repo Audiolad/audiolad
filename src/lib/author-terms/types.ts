@@ -8,7 +8,7 @@ export type AuthorTermsVersionRow = {
   document_key: string;
   is_current: boolean;
   created_at: string;
-  /** Unified agreement 2.0 columns (migration 20270106120000); present only when the flag is on. */
+  /** Unified agreement 2.0 columns (migration 20270109120000); present only when the flag is on. */
   covers_business?: boolean | null;
   commercial_access_continues?: boolean | null;
 };

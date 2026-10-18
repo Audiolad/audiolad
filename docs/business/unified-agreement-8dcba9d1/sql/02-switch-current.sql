@@ -37,7 +37,7 @@ BEGIN
 END;
 $$;
 -- Активация единой модели: попродуктовый opt-in больше не вызывается клиентами
--- (поступление треков в Бизнес — автоматическое, триггеры миграции 20270106120000).
+-- (поступление треков в Бизнес — автоматическое, триггеры миграции 20270109120000).
 REVOKE EXECUTE ON FUNCTION public.author_business_product_optin(uuid[],boolean,boolean,text,text,inet,text) FROM authenticated;
 SELECT public.business_unified_agreement_active() AS unified_active;
 SELECT version, is_current, covers_business, commercial_access_continues
