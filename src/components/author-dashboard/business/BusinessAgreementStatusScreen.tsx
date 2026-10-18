@@ -13,20 +13,20 @@ export type BusinessTrackAdmission = {
   inBusiness: boolean;
 };
 
-const DECISION_TEXT: Record<NonNullable<BusinessTrackAdmission["decision"]>, string> = {
-  admitted: "Допущен",
-  proof_requested: "Нужны доказательства по этому треку",
-  blocked: "Не допущен",
-};
+/** One line instead of a per-track list (Sergey 18.10.2026 18:28: with 1000 tracks a list is endless). */
+export const BUSINESS_TRACKS_AUTO_LINE =
+  "После проверки прав все треки аккаунта и всех его авторских пространств попадут в «АудиоЛад Бизнес» автоматически.";
 
-const REASON_TEXT: Record<string, string> = {
-  rights_undefined_or_limited: "права не определены или ограничены",
-  other_rightsholder: "у трека другой правообладатель",
-  rights_revoked_or_disputed: "права отозваны или оспорены",
-  use_type_missing: "нет нужного способа использования",
-  proof_requested: "запрошены дополнительные доказательства",
-  suspended: "использование приостановлено",
-};
+/** Short counts for this workspace once tracks are in (no list). */
+export function businessTrackSummary(tracks: BusinessTrackAdmission[]): { inBusiness: number; restricted: number } {
+  let inBusiness = 0;
+  let restricted = 0;
+  for (const t of tracks) {
+    if (t.decision === "blocked" || t.decision === "proof_requested") restricted += 1;
+    else if (t.inBusiness) inBusiness += 1;
+  }
+  return { inBusiness, restricted };
+}
 
 type Props = {
   authorSlug: string;
@@ -35,9 +35,10 @@ type Props = {
   tracks: BusinessTrackAdmission[];
 };
 
-/** Business status screen (unified agreement): agreement → rights check → per-track admission. */
+/** Business status screen (unified agreement): agreement → rights check → automatic inflow (counts only, no track list). */
 export default function BusinessAgreementStatusScreen({ authorSlug, agreement, verificationStatus, tracks }: Props) {
   const verified = verificationStatus === "verified";
+  const summary = businessTrackSummary(tracks);
   return (
     <section className="mb-6 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:p-6" data-testid="business-status-screen">
       <h2 className="text-lg font-semibold text-neutral-900">Статус в «АудиоЛад Бизнес»</h2>
@@ -65,38 +66,14 @@ export default function BusinessAgreementStatusScreen({ authorSlug, agreement, v
               ? VERIFICATION_STATUS_TEXT[verificationStatus] ?? verificationStatus
               : "Подтвердите права минимум на один свой трек: ссылка на генерацию, скриншот с датой, платный тариф."}
           </p>
-          <p className="mt-1 text-neutral-500">
-            Проверка одного трека не подтверждает остальные: по любому треку могут запросить доказательства.
-          </p>
         </li>
         <li data-testid="business-step-tracks">
-          <p className="font-medium text-neutral-900">3. Треки</p>
-          <p className="mt-1 text-neutral-700">
-            {verified
-              ? "Пригодные треки попадают в «АудиоЛад Бизнес» автоматически – включать альбомы вручную не нужно."
-              : "После проверки прав пригодные треки попадут в «АудиоЛад Бизнес» автоматически."}
-          </p>
-          {tracks.length > 0 ? (
-            <ul className="mt-3 divide-y divide-neutral-100 rounded-xl border border-neutral-200" data-testid="business-track-admissions">
-              {tracks.map((t) => (
-                <li key={t.audioItemId} className="flex flex-wrap items-start justify-between gap-2 px-3 py-2" data-track-decision={t.decision ?? "auto"}>
-                  <span>
-                    <span className="font-medium text-neutral-900">{t.title}</span>
-                    <span className="text-neutral-500"> · {t.productTitle}</span>
-                  </span>
-                  <span className="text-right text-neutral-700">
-                    {t.decision
-                      ? `${DECISION_TEXT[t.decision]}${t.reasonCode && REASON_TEXT[t.reasonCode] ? ` – ${REASON_TEXT[t.reasonCode]}` : ""}`
-                      : t.inBusiness
-                        ? "В «АудиоЛад Бизнес»"
-                        : verified && agreement.accepted
-                          ? "Ожидает синхронизации каталога"
-                          : "Пока не в «АудиоЛад Бизнес»"}
-                    {t.comment ? <span className="block text-neutral-500">{t.comment}</span> : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          <p className="mt-1 text-neutral-700">{BUSINESS_TRACKS_AUTO_LINE}</p>
+          {verified && (summary.inBusiness > 0 || summary.restricted > 0) ? (
+            <p className="mt-1 text-neutral-500" data-testid="business-track-summary">
+              {`Уже в «АудиоЛад Бизнес» из этого авторского пространства: ${summary.inBusiness}.`}
+              {summary.restricted > 0 ? ` Не допущены или ждут доказательств: ${summary.restricted}.` : ""}
+            </p>
           ) : null}
         </li>
       </ol>

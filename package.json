@@ -125,6 +125,7 @@
     "test:admin-nav-author-space": "npx tsx scripts/admin-nav-author-space-unit.mjs",
     "test:admin-nav-moderation-badge": "npx tsx scripts/admin-nav-moderation-badge-unit.tsx",
     "test:business-agreement-workspace-link": "npx tsx scripts/business-agreement-workspace-link-unit.tsx",
+    "test:business-status-no-track-list": "npx tsx scripts/business-status-no-track-list-unit.tsx",
     "test:author-business-tab": "NODE_OPTIONS='--require ./scripts/author-business-tab-test-require.cjs --import ./scripts/author-business-tab-test-register.mjs' npx tsx scripts/author-business-tab-access-unit.tsx",
     "test:application-email-outbox-timer": "bash scripts/application-email-outbox-timer-unit.sh",
     "test:price-promotions": "npx tsx scripts/price-promotions-unit.mjs && npx tsx scripts/catalog-personal-countdown-unit.mts && npx tsx scripts/personal-timer-copy-unit.mts && npx tsx scripts/author-promo-preview-unit.mts && node scripts/price-promotions-sql-unit.mjs",
