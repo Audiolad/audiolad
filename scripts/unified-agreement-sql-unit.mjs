@@ -15,6 +15,9 @@ const switchCurrent = read(`${dir}02-switch-current.sql`);
 const rollbackSwitch = read(`${dir}03-rollback-switch.sql`);
 const rollbackMigration = read(`${dir}99-rollback-migration.sql`);
 const v2 = read('src/lib/author-terms/approved-content-v2.ts');
+// Account-level acceptance (owner decision 10.10.2026, Sergey 18.10.2026 18:26).
+const accountLevel = read('supabase/migrations/20270110120000_author_terms_account_level_acceptance.sql');
+const accountRollback = read(`${dir}98-rollback-account-level-acceptance.sql`);
 const clean = migration.replace(/--[^\n]*/g, '');
 
 // ---- Contract: additive only; nothing inserts/switches editions or touches historical rows.
@@ -88,6 +91,26 @@ for (const sql of [insert20, switchCurrent]) {
 assert.match(insert20, /ON CONFLICT \(id\) DO NOTHING/);
 assert.match(insert20, /edition_2_0_duplicate_hash/);
 assert.match(insert20, /\n  false,\n  true,\n/, 'inserted as NOT current, covers_business = true');
+
+// ---- Contract: account-level migration is read-side only (no tables, no DML), definer + search_path.
+{
+  const c = accountLevel.replace(/--[^\n]*/g, '');
+  assert.match(c, /^\s*BEGIN;/); assert.match(c, /COMMIT;\s*$/);
+  const out = c.replace(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/g, '');
+  assert.doesNotMatch(out, /\b(CREATE|ALTER|DROP)\s+(TABLE|COLUMN|INDEX|TRIGGER)\b|INSERT\s+INTO|UPDATE\s+public|DELETE\s+FROM|TRUNCATE/i, 'account level: no DDL on tables, no DML');
+  assert.doesNotMatch(c, /INSERT INTO public\.author_terms_acceptances|UPDATE public\.author_terms_(acceptances|versions)/, 'never writes acceptances or editions');
+  for (const body of c.matchAll(/CREATE OR REPLACE FUNCTION[\s\S]*?\$\$;/g)) {
+    assert.match(body[0], /SECURITY DEFINER/); assert.match(body[0], /SET search_path = public, pg_temp/);
+    assert.doesNotMatch(body[0], /clock_timestamp|now\(\)|interval/i, 'no time-bound gate');
+  }
+  assert.match(c, /m\.role = 'owner'/, 'only owners extend coverage');
+  assert.match(c, /GRANT EXECUTE ON FUNCTION public\.author_terms_covering_acceptances\(uuid\[\]\) TO service_role;/);
+  assert.match(c, /REVOKE ALL ON FUNCTION public\.author_terms_covering_acceptances\(uuid\[\]\) FROM PUBLIC, anon, authenticated;/);
+  const trig = c.match(/FUNCTION public\.business_unified_auto_sync_trigger\(\)[\s\S]*?\$\$;/)[0];
+  assert.match(trig, /m\.user_id = n\.accepted_by_user_id AND m\.role = 'owner'/, 'acceptance fans out to all owned workspaces');
+  assert.match(accountRollback, /DROP FUNCTION IF EXISTS public\.author_terms_covering_acceptances\(uuid\[\]\);/);
+  assert.doesNotMatch(accountRollback.replace(/--[^\n]*/g, ''), /author_terms_covering_acceptances\(ARRAY/, 'rollback restores per-workspace bodies');
+}
 const pkg = JSON.parse(read('package.json'));
 assert.ok(pkg.scripts['test:unified-agreement'].includes('unified-agreement-sql-unit.mjs'));
 assert.match(read('.github/workflows/business-pr-validation.yml'), /npm run test:unified-agreement/);
@@ -452,6 +475,105 @@ BEGIN
 END $t$;
 `;
 
+
+// ---- Account level (second disposable DB): one owner acceptance covers all current and future workspaces.
+const A2 = '10000000-0000-0000-0000-0000000000a2', A3 = '10000000-0000-0000-0000-0000000000a3', T = '00000000-0000-0000-0000-0000000000e1', WT = '10000000-0000-0000-0000-0000000000e1';
+const accountFixtures = String.raw`
+INSERT INTO auth.users(id) VALUES ('${T}');
+INSERT INTO public.profiles VALUES ('${T}','listener');
+INSERT INTO public.authors(id,slug) VALUES ('${A2}','space-a2'),('${WT}','space-t');
+-- A owns a second workspace (pseudonym) with music; B is only an EDITOR of T's workspace.
+INSERT INTO public.author_members(author_id,user_id,role) VALUES ('${A2}','${A}','owner'),('${WT}','${T}','owner'),('${WT}','${B}','editor');
+INSERT INTO public.practices(id,author_id,slug,status) VALUES ('20000000-0000-0000-0000-0000000000c1','${A2}','pseudo','published');
+INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000c1','20000000-0000-0000-0000-0000000000c1','Pseudo 1',1,'published');
+CREATE TABLE ua_test.before AS SELECT a.id, public.author_has_accepted_current_terms(a.id) AS ok FROM public.authors a;
+CREATE TABLE ua_test.acc_before AS SELECT count(*) AS n FROM public.author_terms_acceptances;
+`;
+const accountScenario = String.raw`
+DO $t$
+DECLARE v uuid; e1 public.business_verification_evidence; e2 public.business_verification_evidence; r jsonb;
+  v20 uuid := (SELECT id FROM public.author_terms_versions WHERE version = '2.0');
+BEGIN
+  -- Before: per workspace (the bug). A2 has no own row.
+  PERFORM ua_test.ok(NOT (SELECT ok FROM ua_test.before WHERE id = '${A2}'), 'before: A2 not covered');
+  -- 1.2 commercial at account level: A accepted 1.2 in space-a → A2 covered too.
+  PERFORM ua_test.ok(public.author_has_accepted_current_terms('${A2}'), 'A2 covered by owner A 1.2 acceptance');
+  -- Unchanged for single-workspace authors; an editor's acceptance never covers another workspace.
+  PERFORM ua_test.ok(public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000b'), 'B unchanged');
+  PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000d'), '1.1-only C unchanged');
+  PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('${WT}'), 'editor B does not extend to T workspace');
+  PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.authors a JOIN ua_test.before b USING (id)
+     WHERE public.author_has_accepted_current_terms(a.id) IS DISTINCT FROM b.ok), 'only A2 changed');
+  PERFORM ua_test.ok((SELECT count(*) FROM public.author_terms_acceptances) = (SELECT n FROM ua_test.acc_before), 'no acceptance rows written');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('${A2}'), '1.2 still never opens Business');
+  -- A accepts 2.0 ONCE, in space-a only.
+  INSERT INTO public.author_terms_acceptances(author_id,terms_version_id,accepted_by_user_id,acceptance_text)
+    VALUES ('10000000-0000-0000-0000-00000000000a',v20,'${A}','2.0 text');
+  PERFORM ua_test.ok(public.author_has_business_agreement('10000000-0000-0000-0000-00000000000a'), 'A space-a Business');
+  PERFORM ua_test.ok(public.author_has_business_agreement('${A2}'), 'A2 Business without a second acceptance');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('${WT}'), 'T workspace not covered');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('10000000-0000-0000-0000-00000000000b'), 'B not covered');
+  PERFORM ua_test.as_user('${A}');
+  SET LOCAL ROLE authenticated;
+  r := public.author_commercial_agreement_state('${A2}');
+  PERFORM ua_test.ok((r->>'accepted_current')::boolean AND NOT (r->>'reaccept_invited')::boolean AND (r->>'business_agreement')::boolean, 'A2 cabinet: accepted, no invite: ' || r::text);
+  PERFORM ua_test.expect_error('SELECT * FROM public.author_terms_covering_acceptances(ARRAY[''${A2}''::uuid])', 'permission denied');
+  -- The 17:30 bug: rights check with a product of ANOTHER own workspace now passes the agreement check.
+  EXECUTE 'SELECT public.author_business_verification_draft_v3(''20000000-0000-0000-0000-0000000000c1'',''30000000-0000-0000-0000-0000000000c1'',''suno'',NULL,''P'',''https://suno.com/s/ppp'',''{"paid_plan":"Pro"}''::jsonb)' INTO v;
+  e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('f',64));
+  e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('9',64));
+  RESET ROLE;
+  INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
+    ('business-rightsholder-evidence',e1.object_path,'{"mimetype":"image/png","size":100}'),
+    ('business-rightsholder-evidence',e2.object_path,'{"mimetype":"application/pdf","size":200}');
+  SET LOCAL ROLE authenticated;
+  PERFORM public.author_business_verification_submit_v3(v, ARRAY[e1.id,e2.id]);
+  RESET ROLE;
+  PERFORM ua_test.ok((SELECT snapshot->'agreement'->>'version' = '2.0' FROM public.business_rightsholder_verification_attempts WHERE verification_id = v), 'submitted with the account 2.0 acceptance');
+  -- Approval → automatic inflow for EVERY workspace of the owner (space-a and A2).
+  PERFORM ua_test.as_user('${M}');
+  SET LOCAL ROLE authenticated;
+  PERFORM public.moderator_business_verification_action(v,'approve','ok',NULL,'Synthetic A','person');
+  RESET ROLE;
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000c1' AND source_type = 'platform_agreement' AND status = 'verified'), 'A2 track in Business');
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000a1' AND source_type = 'platform_agreement' AND status = 'verified'), 'space-a track in Business');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants g JOIN public.audio_items ai ON ai.id = g.audio_item_id JOIN public.practices p ON p.id = ai.practice_id
+     WHERE g.source_type = 'platform_agreement' AND p.author_id IN ('10000000-0000-0000-0000-00000000000b','${WT}')), 'no grants for other accounts');
+  -- Future workspace of the same owner: covered at once, music flows in on publication.
+  INSERT INTO public.authors(id,slug) VALUES ('${A3}','space-a3');
+  INSERT INTO public.author_members(author_id,user_id,role) VALUES ('${A3}','${A}','owner');
+  PERFORM ua_test.ok(public.author_has_accepted_current_terms('${A3}') AND public.author_has_business_agreement('${A3}'), 'future workspace covered');
+  INSERT INTO public.practices(id,author_id,slug,status) VALUES ('20000000-0000-0000-0000-0000000000c3','${A3}','future','draft');
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000c3','20000000-0000-0000-0000-0000000000c3','Future 1',1,'published');
+  UPDATE public.practices SET status = 'published' WHERE id = '20000000-0000-0000-0000-0000000000c3';
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000c3' AND status = 'verified'), 'future workspace music flows in automatically');
+  -- Commercial approval of a new workspace of a covered owner activates without another acceptance.
+  INSERT INTO public.author_commercial_applications(id,author_id,status) VALUES ('70000000-0000-0000-0000-0000000000c3','${A3}','submitted');
+  r := public.approve_author_commercial_application('70000000-0000-0000-0000-0000000000c3');
+  PERFORM ua_test.ok(r->>'access_status' = 'commercial_active', 'future workspace activated on approve: ' || r::text);
+  -- Acceptance trigger fans out: music of a sibling workspace that was NOT synced yet flows in when the
+  -- owner records an acceptance in ANOTHER workspace (publication triggers disabled to isolate it).
+  ALTER TABLE public.practices DISABLE TRIGGER zz_business_unified_auto_sync_ins;
+  ALTER TABLE public.audio_items DISABLE TRIGGER zz_business_unified_auto_sync_ins;
+  INSERT INTO public.authors(id,slug) VALUES ('10000000-0000-0000-0000-0000000000a4','space-a4');
+  INSERT INTO public.author_members(author_id,user_id,role) VALUES ('10000000-0000-0000-0000-0000000000a4','${A}','owner');
+  INSERT INTO public.practices(id,author_id,slug,status) VALUES ('20000000-0000-0000-0000-0000000000c4','10000000-0000-0000-0000-0000000000a4','quiet','published');
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000c4','20000000-0000-0000-0000-0000000000c4','Quiet 1',1,'published');
+  ALTER TABLE public.practices ENABLE TRIGGER zz_business_unified_auto_sync_ins;
+  ALTER TABLE public.audio_items ENABLE TRIGGER zz_business_unified_auto_sync_ins;
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000c4'), 'isolated: A4 not synced yet');
+  INSERT INTO public.author_terms_acceptances(author_id,terms_version_id,accepted_by_user_id,acceptance_text)
+    VALUES ('${A2}',v20,'${A}','2.0 text');
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000c4' AND status = 'verified'), 'acceptance in A2 brought A4 music in (fan-out)');
+  -- Workspace transfer: the old owner's acceptance stays with that workspace only.
+  UPDATE public.author_members SET user_id = '${T}' WHERE author_id = '${A2}' AND user_id = '${A}';
+  PERFORM ua_test.ok(public.author_has_business_agreement('${A2}'), 'transferred A2: its own rows still count');
+  PERFORM ua_test.ok(NOT public.author_has_business_agreement('${WT}') AND NOT public.author_has_accepted_current_terms('${WT}'), 'new owner T: other workspace NOT covered by A''s acceptances');
+  PERFORM ua_test.ok(public.author_has_business_agreement('${A3}'), 'A keeps coverage of the workspaces A still owns');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.business_catalog_sync_failures), 'no sync failures');
+END $t$;
+`;
+
 const container = process.env.AUDIOLAD_ONBOARDING_TEST_CONTAINER;
 if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
   assert.notEqual(process.env.AUDIOLAD_REQUIRE_ONBOARDING_SQL, '1', 'isolated SQL required; provide disposable test container');
@@ -545,6 +667,21 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       "SELECT 1 / CASE WHEN (SELECT count(*) FROM public.author_terms_acceptances) = 4 AND (SELECT count(*) FROM public.business_track_eligibility_reviews) = 6 THEN 1 ELSE 0 END;",
       // Re-apply after rollback works.
       migration].join('\n'));
+    // Account level on a fresh disposable DB: setup → 2.0 switch → account-level migration (twice) → scenarios → rollback.
+    {
+      const db2 = `${db}_acct`;
+      psql('postgres', `CREATE DATABASE ${db2};`);
+      try {
+        psql(db2, [setup, fixtures, migration, insert20, switchCurrent, accountFixtures].join('\n'));
+        psql(db2, [accountLevel, accountLevel, accountScenario].join('\n'));
+        psql(db2, [accountRollback,
+          `SELECT 1 / CASE WHEN to_regprocedure('public.author_terms_covering_acceptances(uuid[])') IS NULL AND NOT public.author_has_accepted_current_terms('${A3}') AND public.author_has_accepted_current_terms('${A2}') AND public.author_has_accepted_current_terms('10000000-0000-0000-0000-00000000000a') THEN 1 ELSE 0 END;`,
+          accountLevel,
+          `SELECT 1 / CASE WHEN public.author_has_business_agreement('${A3}') THEN 1 ELSE 0 END;`].join('\n'));
+      } finally {
+        psql('postgres', `DROP DATABASE ${db2};`);
+      }
+    }
     console.log('unified-agreement-sql-unit: contract + isolated PostgreSQL scenarios OK');
   } finally {
     psql('postgres', `DROP DATABASE ${db};`);

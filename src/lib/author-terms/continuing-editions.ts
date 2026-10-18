@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { listCoveringAcceptances } from "@/lib/author-terms/covering-acceptances";
+
 /**
  * Commercial continuation of an earlier Author Terms edition (Sergey 17.10.2026, still binding 18.10):
  * once 2.0 is current, authors who accepted 1.2 keep every 1.2 commercial feature (sales, payouts,
@@ -22,7 +24,7 @@ export async function listContinuingEditionIds(client: SupabaseClient): Promise<
     .map((row) => String(row.id));
 }
 
-/** Authors (subset of `authorIds`) with an acceptance of an edition that keeps commercial access. */
+/** Authors (subset of `authorIds`) covered (account level) by an acceptance of an edition that keeps commercial access. */
 export async function loadAuthorsOnContinuingEdition(
   client: SupabaseClient,
   authorIds: readonly string[],
@@ -30,11 +32,12 @@ export async function loadAuthorsOnContinuingEdition(
   if (authorIds.length === 0) return new Set();
   const editionIds = await listContinuingEditionIds(client);
   if (editionIds.length === 0) return new Set();
-  const { data, error } = await client
-    .from("author_terms_acceptances")
-    .select("author_id")
-    .in("author_id", [...authorIds])
-    .in("terms_version_id", editionIds);
-  if (error) throw new Error("author_terms_continuing_acceptances_lookup_failed");
-  return new Set((data ?? []).map((row) => String((row as { author_id: unknown }).author_id)));
+  let covering;
+  try {
+    covering = await listCoveringAcceptances(client, authorIds);
+  } catch {
+    throw new Error("author_terms_continuing_acceptances_lookup_failed");
+  }
+  const editions = new Set(editionIds);
+  return new Set(covering.filter((row) => editions.has(row.termsVersionId)).map((row) => row.authorId));
 }

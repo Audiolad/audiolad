@@ -27,6 +27,11 @@ import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED,
 } from "@/lib/author-terms/types";
 import { activateCommercialAccessAfterTermsAccepted } from "@/lib/authors/activate-commercial-after-terms";
+import {
+  listCoveringAcceptances,
+  pickCoveringAcceptance,
+  selectAccountWorkspacesToActivate,
+} from "@/lib/author-terms/covering-acceptances";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 assertAuthorTermsContentHash(
@@ -90,47 +95,64 @@ export async function listAuthorTermsVersionDates(
 
 type EditionFlags = { covers_business: boolean | null; commercial_access_continues: boolean | null };
 
-/** All acceptances of an author with the edition flags (flag on only). */
+/** All acceptances covering an author workspace (account level) with the edition flags (flag on only). */
 async function listAuthorTermsAcceptanceEditions(
   authorId: string,
   client: SupabaseClient,
 ): Promise<{ termsVersionId: string; coversBusiness: boolean; keepsCommercialAccess: boolean }[]> {
+  let covering;
+  try {
+    covering = await listCoveringAcceptances(client, [authorId]);
+  } catch {
+    console.error("author_terms_acceptance_editions_error");
+    throw new AuthorTermsError("internal_error", 500);
+  }
+  const versionIds = [...new Set(covering.map((row) => row.termsVersionId))];
+  if (versionIds.length === 0) return [];
   const { data, error } = await client
-    .from("author_terms_acceptances")
-    .select("terms_version_id, author_terms_versions!inner(covers_business, commercial_access_continues, document_key)")
-    .eq("author_id", authorId)
-    .eq("author_terms_versions.document_key", "author-terms");
+    .from("author_terms_versions")
+    .select("id, covers_business, commercial_access_continues, document_key")
+    .in("id", versionIds)
+    .eq("document_key", "author-terms");
   if (error) {
     console.error("author_terms_acceptance_editions_error", error.message);
     throw new AuthorTermsError("internal_error", 500);
   }
-  return ((data ?? []) as unknown as {
-    terms_version_id: string;
-    author_terms_versions: EditionFlags | EditionFlags[] | null;
-  }[]).map((row) => {
-    const version = Array.isArray(row.author_terms_versions)
-      ? row.author_terms_versions[0]
-      : row.author_terms_versions;
-    return {
-      termsVersionId: row.terms_version_id,
-      coversBusiness: version?.covers_business === true,
-      keepsCommercialAccess: version?.commercial_access_continues === true,
-    };
-  });
+  const flags = new Map(
+    ((data ?? []) as unknown as ({ id: string } & EditionFlags)[]).map((row) => [String(row.id), row]),
+  );
+  return versionIds
+    .filter((id) => flags.has(id))
+    .map((id) => ({
+      termsVersionId: id,
+      coversBusiness: flags.get(id)?.covers_business === true,
+      keepsCommercialAccess: flags.get(id)?.commercial_access_continues === true,
+    }));
 }
 
+/**
+ * Acceptance of an edition that covers this workspace (account level): the workspace's own row, or an
+ * acceptance made personally by its current owner in another workspace of the same account.
+ */
 export async function getAuthorTermsAcceptanceForVersion(
   authorId: string,
   termsVersionId: string,
   client: SupabaseClient = adminClient(),
 ): Promise<AuthorTermsAcceptanceRow | null> {
+  let picked;
+  try {
+    picked = pickCoveringAcceptance(await listCoveringAcceptances(client, [authorId]), authorId, termsVersionId);
+  } catch {
+    console.error("author_terms_acceptance_lookup_error");
+    throw new AuthorTermsError("internal_error", 500);
+  }
+  if (!picked) return null;
   const { data, error } = await client
     .from("author_terms_acceptances")
     .select(
       "id, author_id, terms_version_id, accepted_at, accepted_by_user_id, acceptance_text, created_at",
     )
-    .eq("author_id", authorId)
-    .eq("terms_version_id", termsVersionId)
+    .eq("id", picked.acceptanceId)
     .maybeSingle();
 
   if (error) {
@@ -241,6 +263,60 @@ export async function loadAuthorTermsStatus(input: {
   };
 }
 
+/**
+ * Account level: an acceptance by the owner covers all workspaces that user owns, so every owned
+ * workspace waiting in commercial_onboarding is promoted, not only the one where the owner clicked.
+ * The accepting workspace goes first; others only if waiting in commercial_onboarding AND covered now.
+ */
+async function activateAccountWorkspacesAfterTermsAccepted(input: { authorId: string; actorUserId: string }) {
+  await activateCommercialAccessAfterTermsAccepted({ authorId: input.authorId, actorUserId: input.actorUserId });
+  const { data, error } = await adminClient()
+    .from("author_members")
+    .select("author_id")
+    .eq("user_id", input.actorUserId)
+    .eq("role", "owner");
+  if (error) {
+    console.error("author_terms_account_workspaces_lookup_failed");
+    return;
+  }
+  const others = [...new Set((data ?? []).map((row) => String((row as { author_id: unknown }).author_id)))].filter(
+    (id) => id !== input.authorId,
+  );
+  if (others.length === 0) return;
+  // Only workspaces actually waiting for terms; already-active ones are left untouched.
+  const { data: waiting, error: waitingError } = await adminClient()
+    .from("authors")
+    .select("id")
+    .in("id", others)
+    .eq("access_status", "commercial_onboarding");
+  if (waitingError) {
+    console.error("author_terms_account_workspaces_status_failed");
+    return;
+  }
+  const waitingIds = (waiting ?? []).map((row) => String((row as { id: unknown }).id));
+  // Re-check account-level coverage per workspace (an old acceptance of a transferred workspace
+  // must not promote the new owner's other workspaces).
+  const covered = new Set<string>();
+  for (const id of waitingIds) {
+    try {
+      if ((await hasAcceptedCurrentAuthorTerms(id)).accepted) covered.add(id);
+    } catch {
+      console.error("author_terms_account_workspaces_coverage_failed");
+    }
+  }
+  for (const authorId of selectAccountWorkspacesToActivate({
+    acceptingAuthorId: input.authorId,
+    waitingAuthorIds: waitingIds,
+    coveredAuthorIds: covered,
+  })) {
+    await activateCommercialAccessAfterTermsAccepted({
+      authorId,
+      actorUserId: input.actorUserId,
+      reason: "author_terms_accepted_account_level",
+    });
+  }
+}
+
 export async function acceptCurrentAuthorTerms(input: {
   authorId: string;
   userId: string;
@@ -314,7 +390,7 @@ export async function acceptCurrentAuthorTerms(input: {
   );
   if (existing) {
     // Self-heal: previously accepted terms but still stuck in onboarding.
-    await activateCommercialAccessAfterTermsAccepted({
+    await activateAccountWorkspacesAfterTermsAccepted({
       authorId: input.authorId,
       actorUserId: input.userId,
     });
@@ -351,7 +427,7 @@ export async function acceptCurrentAuthorTerms(input: {
         currentVersion.id,
       );
       if (again) {
-        await activateCommercialAccessAfterTermsAccepted({
+        await activateAccountWorkspacesAfterTermsAccepted({
           authorId: input.authorId,
           actorUserId: input.userId,
         });
@@ -367,7 +443,7 @@ export async function acceptCurrentAuthorTerms(input: {
     throw new AuthorTermsError("internal_error", 500);
   }
 
-  await activateCommercialAccessAfterTermsAccepted({
+  await activateAccountWorkspacesAfterTermsAccepted({
     authorId: input.authorId,
     actorUserId: input.userId,
   });
@@ -383,17 +459,10 @@ export async function authorHasAnyTermsAcceptance(
   authorId: string,
   client: SupabaseClient = adminClient(),
 ): Promise<boolean> {
-  const { data, error } = await client
-    .from("author_terms_acceptances")
-    .select("id")
-    .eq("author_id", authorId)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("author_terms_any_acceptance_error", error.message);
+  try {
+    return (await listCoveringAcceptances(client, [authorId])).length > 0;
+  } catch {
+    console.error("author_terms_any_acceptance_error");
     throw new AuthorTermsError("internal_error", 500);
   }
-
-  return Boolean(data?.id);
 }
