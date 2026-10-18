@@ -2,7 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 
+import AgreementRequiredNotice from "@/components/author-dashboard/business/AgreementRequiredNotice";
 import SunoLinkHowTo from "@/components/author-dashboard/business/SunoLinkHowTo";
+import type { ProductWorkspace } from "@/lib/business-rightsholder/agreement-links";
 import ExampleLightbox from "@/components/author-dashboard/business/ExampleLightbox";
 import ConsentDocumentLink from "@/components/author-dashboard/business/ConsentDocumentLink";
 import EvidenceFileField, { useEvidencePreviews } from "@/components/author-dashboard/business/EvidenceFileField";
@@ -32,6 +34,8 @@ export type OwnProduct = {
   id: string;
   title: string;
   tracks: { id: string; title: string }[];
+  /** Author workspace of the product (the unified agreement is accepted per workspace). */
+  workspace?: ProductWorkspace | null;
 };
 
 export type ProgramDocument = {
@@ -101,6 +105,16 @@ export default function RightsholderVerificationForm({ products, documents, exis
   const closeExample = useCallback(() => setExample(null), []);
 
   const product = useMemo(() => products.find((p) => p.id === productId), [products, productId]);
+  // The agreement is per workspace; the account's one application may pick a product of any own workspace.
+  const multiWorkspace = useMemo(
+    () => new Set(products.map((p) => p.workspace?.slug ?? "")).size > 1,
+    [products],
+  );
+  const [agreementRefusedSlug, setAgreementRefusedSlug] = useState<string | null>(null);
+  const productWorkspace = product?.workspace ?? null;
+  const productNeedsAgreement = unified && productWorkspace?.agreementAccepted === false;
+  const refusedWorkspace =
+    agreementRefusedSlug && productWorkspace?.slug === agreementRefusedSlug ? productWorkspace : null;
   const terms = documents.find((d) => d.key === "business_program_terms");
   const rights = documents.find((d) => d.key === "business_music_rights_declaration");
   const editable = status === null || EDITABLE.has(status);
@@ -141,6 +155,9 @@ export default function RightsholderVerificationForm({ products, documents, exis
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!validate() || (!unified && (!terms || !rights))) return;
+    // Do not upload files for a product whose workspace has not accepted 2.0: the server would refuse.
+    if (productNeedsAgreement) return;
+    setAgreementRefusedSlug(null);
     setBusy(true);
     setUploads(NO_UPLOADS);
     let uploadingKind: RightsholderEvidenceKind | null = null;
@@ -201,13 +218,19 @@ export default function RightsholderVerificationForm({ products, documents, exis
       const failedKind = uploadingKind;
       if (failedKind) setUploads((prev) => ({ ...prev, [failedKind]: { phase: "error", message: EVIDENCE_COPY.uploadFailed } }));
       const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error);
-      setErrors({
-        form: message.includes("support_mode_consent_forbidden")
-          ? SUPPORT_MODE_CONSENT_NOTICE
-          : message.includes("business_unified_agreement_required")
-            ? "Сначала примите Единое коммерческое соглашение (редакция 2.0) в разделе «Юридические документы»."
-            : `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.`,
-      });
+      if (message.includes("business_unified_agreement_required") && productWorkspace) {
+        // Rendered with direct links to the acceptance page of the product's workspace.
+        setAgreementRefusedSlug(productWorkspace.slug);
+        setErrors({});
+      } else {
+        setErrors({
+          form: message.includes("support_mode_consent_forbidden")
+            ? SUPPORT_MODE_CONSENT_NOTICE
+            : message.includes("business_unified_agreement_required")
+              ? "Сначала примите Единое коммерческое соглашение (редакция 2.0) в разделе «Юридические документы» кабинета этого продукта."
+              : `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.`,
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -267,7 +290,10 @@ export default function RightsholderVerificationForm({ products, documents, exis
                 }}
               >
                 {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.title}</option>
+                  <option key={p.id} value={p.id}>
+                    {multiWorkspace && p.workspace ? `${p.title} – ${p.workspace.name}` : p.title}
+                    {unified && p.workspace?.agreementAccepted === false ? " (нужно принять соглашение 2.0)" : ""}
+                  </option>
                 ))}
               </select>
             </label>
@@ -285,6 +311,10 @@ export default function RightsholderVerificationForm({ products, documents, exis
               {errors.track ? <span className="mt-1 block text-red-600">{errors.track}</span> : null}
             </label>
           </div>
+
+          {productNeedsAgreement && productWorkspace ? (
+            <AgreementRequiredNotice workspace={productWorkspace} showWorkspaceName={multiWorkspace} variant="choice" />
+          ) : null}
 
           <fieldset className="space-y-2" data-provider-choice>
             <legend className="text-sm font-medium text-neutral-800">Где сделана музыка</legend>
@@ -390,7 +420,10 @@ export default function RightsholderVerificationForm({ products, documents, exis
           )}
 
           {errors.form ? <p className="text-sm text-red-600" role="alert">{errors.form}</p> : null}
-          <button type="submit" disabled={busy}
+          {refusedWorkspace && !productNeedsAgreement ? (
+            <AgreementRequiredNotice workspace={refusedWorkspace} showWorkspaceName={multiWorkspace} variant="submit" />
+          ) : null}
+          <button type="submit" disabled={busy || productNeedsAgreement}
             className="min-h-11 w-full rounded-xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto">
             {busy ? "Отправляем…" : status === "rejected" || status === "needs_info" ? "Исправить и отправить снова" : "Отправить на проверку"}
           </button>

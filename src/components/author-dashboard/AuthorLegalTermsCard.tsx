@@ -4,6 +4,7 @@ import AuthorTermsAcceptPanel, {
   type AuthorTermsCommercialShareSummary,
 } from "@/components/author-dashboard/AuthorTermsAcceptPanel";
 import type { AuthorTermsStatusView } from "@/lib/author-terms/types";
+import { AGREEMENT_ACCEPT_ANCHOR } from "@/lib/business-rightsholder/agreement-links";
 import { PREVIOUS_EDITION_ACTIVE_STATUS_LABEL } from "@/lib/author-terms/terms-notice";
 
 type Props = {
@@ -65,7 +66,7 @@ export default function AuthorLegalTermsCard({
   );
 
   return (
-    <section className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-6">
+    <section id={AGREEMENT_ACCEPT_ANCHOR} className="scroll-mt-24 rounded-[24px] border border-[#eadff8] bg-white px-5 py-6">
       <h2 className="text-[20px] font-semibold text-[#25135c]">
         {status.coversBusiness
           ? "Единое коммерческое соглашение с правообладателем"
