@@ -382,6 +382,16 @@ for (const file of [
   "src/components/business-app/BusinessOnboardingWizardPage.tsx",
   "src/lib/business-app/onboarding-wizard.ts",
   "src/lib/business-app/owner-home-signals.ts",
+  // Sergey 18.10.2026 13:17: the legal documents at business.audiolad.ru/documents/<id> (edition r6.1) too,
+  // both the source .md files and their verbatim site copies.
+  "src/lib/business-app/client-document-content.ts",
+  "src/lib/business-app/client-documents.ts",
+  "src/app/business-app/documents/page.tsx",
+  "src/app/business-app/documents/[id]/page.tsx",
+  "docs/business/public/venue-license.md",
+  "docs/business/public/program-terms.md",
+  "docs/business/public/claims-procedure.md",
+  "docs/business/public/claim-reply-kit.md",
 ]) {
   const code = read(file).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.split(" // ")[0]).join("\n");
   assert.doesNotMatch(code, /—/, `${file}: no em dash in visible text`);

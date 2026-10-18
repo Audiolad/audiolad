@@ -12,14 +12,16 @@ import {
 } from "../src/lib/business-app/client-documents";
 import { queryPlaybackFacts } from "../src/lib/business-app/playback-facts-query";
 
-// Редакция r6 от 17.10.2026 (owner decision): approved, no draft/lawyer marks, requisites present.
+// Редакция r6 от 17.10.2026 (owner decision); r6.1 от 18.10.2026 = the same text with en dashes (Sergey 18.10 13:17).
+// Approved, no draft/lawyer marks, requisites present.
 assert.ok(CLIENT_DOCUMENTS.length >= 4);
 for (const d of CLIENT_DOCUMENTS) {
   assert.equal(d.status, "approved");
-  assert.equal(d.version, "r6-2026-10-17");
+  assert.equal(d.version, "r6.1-2026-10-18");
+  assert.equal(d.versionDate, "2026-10-18");
   assert.doesNotMatch(d.version, /draft/);
 }
-assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 17.10.2026");
+assert.equal(CLIENT_DOCUMENT_EDITION_LABEL, "Редакция от 18.10.2026");
 assert.match(CLIENT_DOCUMENT_REQUISITES, /Петров Сергей Сергеевич/);
 assert.match(CLIENT_DOCUMENT_REQUISITES, /ИНН 507305817690/);
 assert.match(CLIENT_DOCUMENT_REQUISITES, /ОГРНИП 316505300063237/);
@@ -137,7 +139,10 @@ console.log("business-app-client-documents-unit OK");
     assert.ok(src.markdown.length > 500);
     const html = renderToStaticMarkup(createElement(SimpleMarkdown, { source: src.markdown }));
     assert.match(html, /<h1/);
-    assert.match(src.markdown, /Редакция от 17\.10\.2026/);
+    assert.match(src.markdown, /Редакция от 18\.10\.2026/);
+    // r6.1 (Sergey 18.10.2026 13:17): en dashes only, never the em dash, in the full document text.
+    assert.doesNotMatch(src.markdown, /\u2014/, `${d.id}: no em dash`);
+    assert.match(src.markdown, /\u2013/, `${d.id}: en dashes present`);
     assert.doesNotMatch(src.markdown, /Черновик, требует проверки юриста|паспорт\s*\[|ОГРНИП \[ \]|355045|Ставрополь/);
     assert.match(src.markdown, /ИНН 507305817690/);
     assert.match(src.markdown, /ОГРНИП 316505300063237/);
