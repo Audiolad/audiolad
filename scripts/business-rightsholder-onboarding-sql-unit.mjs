@@ -12,6 +12,8 @@ const providers = read('supabase/migrations/20270102120000_business_rightsholder
 // 20270103120000: Suno single link — function-only relax of the generation_refs rule.
 const sunoSingleLink = read('supabase/migrations/20270103120000_business_rightsholder_suno_single_link.sql');
 const sunoSingleLinkRollback = read('docs/business/rightsholder-suno-single-link-8d9cd0af-rollback.sql');
+// 20270111120000: the owner's own unsubmitted 'draft' case can be edited again (functions only).
+const draftReuse = read('supabase/migrations/20270111120000_business_verification_draft_reuse.sql');
 assert.doesNotMatch(sunoSingleLink.replace(/--[^\n]*/g, ''), /ALTER\s+TABLE|DROP\s|INSERT|UPDATE|DELETE|GRANT|REVOKE/i, 'suno single-link migration is function-only');
 assert.doesNotMatch(sunoSingleLink.replace(/--[^\n]*/g, ''), /generation_refs_required/);
 assert.match(sunoSingleLinkRollback, /business_suno_generation_refs_required/);
@@ -178,7 +180,12 @@ BEGIN
   PERFORM onboarding_test.expect_error(replace(draft_call,'''suno''','''other'''),'business_ai_service_invalid');
   PERFORM onboarding_test.expect_error(optin_call,'business_account_not_verified');
   EXECUTE draft_call INTO v;
-  PERFORM onboarding_test.expect_error(draft_call,'business_verification_already_active');
+  -- 20270111120000: a 'draft' left by a failed submit is edited again (same case), never a dead end.
+  EXECUTE replace(draft_call,'Example','Example draft edit') INTO c;
+  PERFORM onboarding_test.check_true(c = v,'draft is editable again with the same case id');
+  PERFORM onboarding_test.check_true((SELECT status = 'draft' AND service_track_title = 'Example draft edit' FROM public.business_rightsholder_verifications WHERE id = v),'draft edit stored');
+  EXECUTE draft_call INTO c;
+  PERFORM onboarding_test.check_true(c = v AND (SELECT count(*) = 1 FROM public.business_rightsholder_verifications WHERE owner_user_id = '00000000-0000-0000-0000-000000000001'),'one case per account');
   PERFORM onboarding_test.expect_error('UPDATE public.business_rightsholder_verifications SET status = ''verified''','permission denied');
   PERFORM onboarding_test.expect_error('INSERT INTO public.business_program_document_versions VALUES (''business_program_terms'',''evil'',''' || repeat('a',64) || ''',''unapproved'',NULL,now(),true)','permission denied');
   e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
@@ -385,8 +392,11 @@ BEGIN
   PERFORM providers_test.expect_error(replace(d,'"paid_plan"','"plan_name"'),'business_provider_details_invalid');
   PERFORM providers_test.expect_error(replace(d,'"Pro"','5'),'business_provider_details_invalid');
   PERFORM providers_test.expect_error(regexp_replace(d,'''\{.*\}''::jsonb','''["x"]''::jsonb'),'business_provider_details_invalid');
-  EXECUTE d INTO v;
-  PERFORM providers_test.check_true((SELECT provider_details->>'paid_plan' = 'Pro' AND ai_service_other IS NULL FROM public.business_rightsholder_verifications WHERE id = v),'suno details stored');
+  EXECUTE replace(d,'Spa jazz','Spa jazz first draft') INTO v;
+  -- 20270111120000: the unsubmitted draft is edited again by draft_v2 (same case id).
+  PERFORM providers_test.check_true((SELECT count(*) = 1 FROM public.business_rightsholder_verifications WHERE id = v AND status = 'draft'),'first draft');
+  PERFORM providers_test.check_true((SELECT public.author_business_verification_draft_v2('20000000-0000-0000-0000-000000000014','30000000-0000-0000-0000-000000000014','suno',NULL,'Spa jazz','https://suno.com/s/abc','{"generation_refs":"https://suno.com/s/abc\nhttps://suno.com/s/def","paid_plan":"Pro"}'::jsonb)) = v,'draft_v2 reuses the draft');
+  PERFORM providers_test.check_true((SELECT provider_details->>'paid_plan' = 'Pro' AND ai_service_other IS NULL AND service_track_title = 'Spa jazz' FROM public.business_rightsholder_verifications WHERE id = v),'suno details stored');
   e1 := public.author_business_evidence_reserve(v,'generation','image/png',100,repeat('a',64));
   e2 := public.author_business_evidence_reserve(v,'paid_period','application/pdf',200,repeat('b',64));
   INSERT INTO storage.objects(bucket_id,name,metadata) VALUES
@@ -494,7 +504,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     psql(db, [stub, read('supabase/migrations/20261205120000_music_rights_foundation.sql'),
       read('supabase/migrations/20261206120200_business_rights_eligibility.sql'),
       "CREATE TABLE public.unrelated_existing(value text); INSERT INTO public.unrelated_existing VALUES ('keep me');",
-      sql, sql, providers, providers, sunoSingleLink, sunoSingleLinkRollback, sunoSingleLink,
+      sql, sql, providers, providers, sunoSingleLink, sunoSingleLinkRollback, sunoSingleLink, draftReuse, draftReuse,
       "SELECT 1 / CASE WHEN count(*) = 0 THEN 1 ELSE 0 END FROM public.business_program_document_versions;",
       smoke].join('\n'));
     // Two independent PG sessions race to submit the same needs_info case.
@@ -527,7 +537,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
       WHERE v.owner_user_id = '00000000-0000-0000-0000-000000000002';`);
     psql(db, providersSmoke);
     // Re-run twice WITH history and compare complete rows, including row counts.
-    psql(db, [captureRows, sql, sql, providers, providers, sunoSingleLink, sunoSingleLinkRollback, sunoSingleLink, assertRowsUnchanged, unrelatedCheck].join('\n'));
+    psql(db, [captureRows, sql, sql, providers, providers, sunoSingleLink, sunoSingleLinkRollback, sunoSingleLink, draftReuse, draftReuse, assertRowsUnchanged, unrelatedCheck].join('\n'));
     // Providers rollback refuses to drop provider data and leaves every row intact.
     assert.throws(() => execFileSync('docker', ['exec','-i',container,'psql','-X','-U','postgres','-d',db,'-v','ON_ERROR_STOP=1'],
       {input: providersRollback, stdio:['pipe','pipe','pipe']}), (err) => {

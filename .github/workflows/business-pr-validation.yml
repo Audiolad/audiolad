@@ -69,6 +69,7 @@ jobs:
           npm run test:business-evidence-file-field
           npm run test:author-business-tab
           npm run test:business-agreement-workspace-link
+          npm run test:business-verification-errors
           npm run test:business-status-no-track-list
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-programs
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-spa-composition

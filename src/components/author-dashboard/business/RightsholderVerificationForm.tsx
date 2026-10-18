@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
 import AgreementRequiredNotice from "@/components/author-dashboard/business/AgreementRequiredNotice";
@@ -19,7 +20,7 @@ import {
   type RightsholderEvidenceKind,
   type RightsholderExample,
 } from "@/lib/business-rightsholder/examples";
-import { SUPPORT_MODE_CONSENT_NOTICE } from "@/lib/author-support/consent-guard";
+import { verificationFormError, type VerificationFormError } from "@/lib/business-rightsholder/verification-errors";
 import { createClient } from "@/lib/supabase/client";
 import {
   PROVIDERS,
@@ -99,6 +100,8 @@ export default function RightsholderVerificationForm({ products, documents, exis
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [confirmRights, setConfirmRights] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Server refusal in plain Russian (never a raw code); links when it points to another page.
+  const [formError, setFormError] = useState<VerificationFormError | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(existing?.status ?? null);
   const [example, setExample] = useState<RightsholderExample | null>(null);
@@ -158,6 +161,7 @@ export default function RightsholderVerificationForm({ products, documents, exis
     // Do not upload files for a product whose workspace has not accepted 2.0: the server would refuse.
     if (productNeedsAgreement) return;
     setAgreementRefusedSlug(null);
+    setFormError(null);
     setBusy(true);
     setUploads(NO_UPLOADS);
     let uploadingKind: RightsholderEvidenceKind | null = null;
@@ -214,22 +218,18 @@ export default function RightsholderVerificationForm({ products, documents, exis
       if (submitted.error) throw submitted.error;
       setStatus("submitted");
       setErrors({});
+      setFormError(null);
     } catch (error) {
       const failedKind = uploadingKind;
       if (failedKind) setUploads((prev) => ({ ...prev, [failedKind]: { phase: "error", message: EVIDENCE_COPY.uploadFailed } }));
       const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error);
+      setErrors({});
       if (message.includes("business_unified_agreement_required") && productWorkspace) {
         // Rendered with direct links to the acceptance page of the product's workspace.
         setAgreementRefusedSlug(productWorkspace.slug);
-        setErrors({});
       } else {
-        setErrors({
-          form: message.includes("support_mode_consent_forbidden")
-            ? SUPPORT_MODE_CONSENT_NOTICE
-            : message.includes("business_unified_agreement_required")
-              ? "Сначала примите Единое коммерческое соглашение (редакция 2.0) в разделе «Юридические документы» кабинета этого продукта."
-              : `Не получилось отправить: ${message}. Проверьте данные и попробуйте ещё раз.`,
-        });
+        // support_mode_consent_forbidden, business_verification_already_active, … → plain Russian.
+        setFormError(verificationFormError(message));
       }
     } finally {
       setBusy(false);
@@ -420,6 +420,27 @@ export default function RightsholderVerificationForm({ products, documents, exis
           )}
 
           {errors.form ? <p className="text-sm text-red-600" role="alert">{errors.form}</p> : null}
+          {formError ? (
+            <p className="text-sm text-red-600" role="alert" data-verification-form-error>
+              {formError.text}
+              {formError.link ? (
+                <>
+                  {" "}
+                  <Link href={formError.link.href} className="font-semibold underline underline-offset-2">
+                    {formError.link.label}
+                  </Link>
+                </>
+              ) : null}
+              {formError.refresh ? (
+                <>
+                  {" "}
+                  <button type="button" className="font-semibold underline underline-offset-2" onClick={() => window.location.reload()}>
+                    Обновить страницу
+                  </button>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           {refusedWorkspace && !productNeedsAgreement ? (
             <AgreementRequiredNotice workspace={refusedWorkspace} showWorkspaceName={multiWorkspace} variant="submit" />
           ) : null}
