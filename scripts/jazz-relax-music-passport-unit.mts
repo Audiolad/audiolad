@@ -40,6 +40,12 @@ import {
   type JazzRelaxPassportTrackView,
 } from "../src/lib/music-passport/jazz-relax-status";
 import {
+  isMusicPassportPilotAuthor,
+  MUSIC_PASSPORT_PILOT_AUTHOR_IDS,
+} from "../src/lib/music-passport/pilot-authors";
+import {
+  assertJazzRelaxMusicPassport,
+  JazzRelaxPassportError,
   jazzRelaxAnalysisStorageTarget,
   jazzRelaxPassportTrackBlock,
   resolveJazzRelaxAnalysisAudio,
@@ -92,6 +98,44 @@ assert.match(
 );
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /if \(!versionId\) \{[\s\S]*?facts: null/);
 assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Продолжить без музыкального паспорта/);
+
+// --- Music passport pilot allowlist: Jazz Relax + Aurafon (18.10.2026) -----
+{
+  assert.deepEqual([...MUSIC_PASSPORT_PILOT_AUTHOR_IDS], [JAZZ_RELAX_AUTHOR_ID, AURAFON_AUTHOR_ID]);
+  assert.equal(isMusicPassportPilotAuthor(JAZZ_RELAX_AUTHOR_ID), true);
+  assert.equal(isMusicPassportPilotAuthor(AURAFON_AUTHOR_ID), true);
+  assert.equal(isMusicPassportPilotAuthor(`  ${AURAFON_AUTHOR_ID}  `), true);
+  for (const other of [
+    "11111111-1111-1111-1111-111111111111",
+    "aurafon",
+    "jazz-relax",
+    "Аурафон",
+    "",
+    "   ",
+    null,
+    undefined,
+  ]) {
+    assert.equal(isMusicPassportPilotAuthor(other), false);
+  }
+  assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId: JAZZ_RELAX_AUTHOR_ID, productKind: "music" }));
+  assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId: AURAFON_AUTHOR_ID, productKind: "music" }));
+  for (const input of [
+    { authorId: AURAFON_AUTHOR_ID, productKind: "practice" },
+    { authorId: AURAFON_AUTHOR_ID, productKind: null },
+    { authorId: "11111111-1111-1111-1111-111111111111", productKind: "music" },
+    { authorId: null, productKind: "music" },
+  ]) {
+    assert.throws(
+      () => assertJazzRelaxMusicPassport(input),
+      (error: unknown) => error instanceof JazzRelaxPassportError && error.status === 403,
+    );
+  }
+  assert.match(form, /musicProductWizard && isMusicPassportPilotAuthor\(form\.authorId\)/);
+  assert.doesNotMatch(form, /isJazzRelaxAuthor/);
+  const pilotGateSource = read("src/lib/music-passport/jazz-relax-pilot.ts");
+  assert.equal(pilotGateSource.match(/!isMusicPassportPilotAuthor\(input\.authorId\)/g)?.length, 2);
+  assert.doesNotMatch(pilotGateSource, /isJazzRelaxAuthor/);
+}
 
 const migration = read("supabase/migrations/20261218120000_jazz_relax_album_passport.sql");
 assert.match(migration, /generated_from_album_passport_version_id/);
@@ -1125,7 +1169,7 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
     JazzRelaxPassportActivityNotice,
     { activity: durableQueuedActivity, live: true },
   ));
-  assert.match(durableQueuedMarkup, /Можно закрыть страницу и вернуться позже — процесс продолжится/);
+  assert.match(durableQueuedMarkup, /Можно закрыть страницу и вернуться позже – процесс продолжится/);
   assert.doesNotMatch(durableQueuedMarkup, /Готово 0|%/);
 
   const durableOne = describeJazzRelaxPassportActivity({
@@ -1272,7 +1316,7 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.doesNotMatch(panelActivitySource, /reanalyze[\s\S]{0,80}useEffect/);
   assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Создаём музыкальный паспорт/);
   assert.doesNotMatch(panelActivitySource, /Можно закрыть страницу/);
-  assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Можно закрыть страницу и вернуться позже — процесс продолжится/);
+  assert.match(read("src/lib/music-passport/jazz-relax-status.ts"), /Можно закрыть страницу и вернуться позже – процесс продолжится/);
   assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /ensureJazzRelaxAlbumContinuation/);
   assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /albumContinuations/);
   assert.doesNotMatch(read("src/lib/music-passport/jazz-relax-pilot.ts"), /Можно закрыть страницу/);

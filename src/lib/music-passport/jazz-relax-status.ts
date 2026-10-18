@@ -140,7 +140,7 @@ export const JAZZ_RELAX_PASSPORT_CREATING_BUTTON_LABEL = "Создаём муз�
 export const JAZZ_RELAX_PASSPORT_START_BUTTON_LABEL = "Сохранить и создать музыкальный паспорт";
 export const JAZZ_RELAX_PASSPORT_NEXT_BUTTON_LABEL = "Перейти к оформлению";
 /** 1313c2b7: the passport is built on the server; the author is never blocked by it. */
-export const JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL = "Продолжить — паспорт создаётся в фоне";
+export const JAZZ_RELAX_PASSPORT_CONTINUE_IN_BACKGROUND_LABEL = "Продолжить – паспорт создаётся в фоне";
 
 export type JazzRelaxPassportActivityKind =
   | "saving"
@@ -440,7 +440,7 @@ export const JAZZ_RELAX_PASSPORT_PREPARING_LABEL = "Подготавливаем
 
 /** Shown only after every eligible track is already in the durable analyzer queue. */
 export const JAZZ_RELAX_PASSPORT_SERVER_CONTINUATION_HINT =
-  "Музыкальный паспорт формируется на сервере. Можно закрыть страницу и вернуться позже — процесс продолжится";
+  "Музыкальный паспорт формируется на сервере. Можно закрыть страницу и вернуться позже – процесс продолжится";
 
 export function resolveJazzRelaxAlbumLaunch(input: {
   tracks: readonly Pick<JazzRelaxPassportTrackView, "state" | "errorCode">[];
