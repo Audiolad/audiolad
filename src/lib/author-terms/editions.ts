@@ -14,9 +14,12 @@ import {
   AUTHOR_TERMS_V2_TOC,
 } from "@/lib/author-terms/approved-content-v2";
 import {
-  UNIFIED_AGREEMENT_ACCEPTANCE_TEXT,
-  UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED,
-} from "@/lib/author-terms/unified-agreement-texts";
+  AUTHOR_TERMS_V21_FRONT_MATTER_MARKER,
+  AUTHOR_TERMS_V21_META,
+  AUTHOR_TERMS_V21_TEXT,
+  AUTHOR_TERMS_V21_TOC,
+} from "@/lib/author-terms/approved-content-v21";
+import { UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS } from "@/lib/author-terms/unified-agreement-texts";
 
 export type ApprovedAuthorTermsEdition = {
   versionId: string;
@@ -65,13 +68,41 @@ export const APPROVED_AUTHOR_TERMS_EDITIONS: readonly ApprovedAuthorTermsEdition
     frontMatterMarker: AUTHOR_TERMS_V2_FRONT_MATTER_MARKER,
     toc: AUTHOR_TERMS_V2_TOC,
     text: AUTHOR_TERMS_V2_TEXT,
-    acceptanceText: UNIFIED_AGREEMENT_ACCEPTANCE_TEXT,
-    acceptanceTextUpdated: UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED,
+    acceptanceText: UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS["2.0"].first,
+    acceptanceTextUpdated: UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS["2.0"].updated,
+  },
+  {
+    // 2.1 (Sergey 18.10.2026 20:57): inert until the DB holds a row with this hash; dates from that row.
+    versionId: AUTHOR_TERMS_V21_META.versionId,
+    version: AUTHOR_TERMS_V21_META.version,
+    title: AUTHOR_TERMS_V21_META.title,
+    publishedAt: null,
+    effectiveAt: null,
+    contentHash: AUTHOR_TERMS_V21_META.contentHash,
+    coversBusiness: AUTHOR_TERMS_V21_META.coversBusiness,
+    frontMatterMarker: AUTHOR_TERMS_V21_FRONT_MATTER_MARKER,
+    toc: AUTHOR_TERMS_V21_TOC,
+    text: AUTHOR_TERMS_V21_TEXT,
+    acceptanceText: UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS["2.1"].first,
+    acceptanceTextUpdated: UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS["2.1"].updated,
   },
 ];
 
 export const LEGACY_AUTHOR_TERMS_EDITION = APPROVED_AUTHOR_TERMS_EDITIONS[0];
 export const UNIFIED_AUTHOR_TERMS_EDITION = APPROVED_AUTHOR_TERMS_EDITIONS[1];
+export const UNIFIED_AUTHOR_TERMS_EDITION_V21 = APPROVED_AUTHOR_TERMS_EDITIONS[2];
+
+/**
+ * Editions that may be shown via /author-terms?edition=…: only those with a DB row (inserted by SQL).
+ * A code-only edition (2.1 before sql/04) stays invisible – the code is inert until the DB step.
+ */
+export function findPublishedEditionByVersion(
+  version: string | null | undefined,
+  dbHashes: readonly string[],
+): ApprovedAuthorTermsEdition | null {
+  const edition = findEditionByVersion(version);
+  return edition && dbHashes.includes(edition.contentHash) ? edition : null;
+}
 
 /**
  * Editions the server may accept / display for a given DB content hash.

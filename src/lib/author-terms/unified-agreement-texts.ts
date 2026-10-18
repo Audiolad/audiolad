@@ -8,6 +8,27 @@ export const UNIFIED_AGREEMENT_ACCEPTANCE_TEXT =
 export const UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED =
   "Я ознакомился(ась) с новой редакцией 2.0 — Единым коммерческим соглашением с правообладателем — и принимаю её в полном объёме, включая использование моей музыки в «АудиоЛад Бизнес» и сублицензирование заведениям.";
 
+/**
+ * Checkbox texts per unified edition, recorded verbatim in author_terms_acceptances.acceptance_text.
+ * 2.0 strings are frozen (already recorded for 2.0 acceptances). 2.1 names the new use explicitly
+ * (offline cache of the venue player, 8.2) – it needs an explicit acceptance.
+ */
+export const UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS: Readonly<Record<string, { first: string; updated: string }>> = {
+  "2.0": { first: UNIFIED_AGREEMENT_ACCEPTANCE_TEXT, updated: UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED },
+  "2.1": {
+    first:
+      "Я ознакомился(ась) с Единым коммерческим соглашением с правообладателем (Авторские условия сотрудничества «АудиоЛад», редакция 2.1) и принимаю его в полном объёме, включая использование моей музыки в «АудиоЛад Бизнес», сублицензирование заведениям и работу плеера заведения без подключения к сети.",
+    updated:
+      "Я ознакомился(ась) с новой редакцией 2.1 Единого коммерческого соглашения с правообладателем и принимаю её в полном объёме, включая использование моей музыки в «АудиоЛад Бизнес», сублицензирование заведениям и работу плеера заведения без подключения к сети.",
+  },
+};
+
+/** Checkbox text for the unified edition shown (unknown version: the 2.0 text, the previous behaviour). */
+export function unifiedAgreementAcceptanceText(version: string | null | undefined, mode: "first" | "updated"): string {
+  const texts = (version && UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS[version]) || UNIFIED_AGREEMENT_ACCEPTANCE_TEXTS["2.0"];
+  return mode === "updated" ? texts.updated : texts.first;
+}
+
 export const UNIFIED_AGREEMENT_TITLE = "Единое коммерческое соглашение с правообладателем";
 
 /** Product statuses shown to authors: only two. Internal access_status values are unchanged. */

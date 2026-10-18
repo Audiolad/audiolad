@@ -14,9 +14,8 @@ import {
   AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED,
 } from "@/lib/author-terms/types";
 import {
-  UNIFIED_AGREEMENT_ACCEPTANCE_TEXT,
-  UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED,
   UNIFIED_AGREEMENT_TITLE,
+  unifiedAgreementAcceptanceText,
 } from "@/lib/author-terms/unified-agreement-texts";
 
 export type AuthorTermsCommercialShareSummary = {
@@ -73,10 +72,9 @@ export default function AuthorTermsAcceptPanel({
   const embedded = variant === "embedded";
   // Unified agreement 2.0 (flag on and current edition covers Business): one document, one checkbox.
   const unified = status.coversBusiness === true;
+  // Text of the edition shown (2.0 or 2.1); the server records edition.acceptanceText of the same edition.
   const checkboxLabel = unified
-    ? mode === "updated"
-      ? UNIFIED_AGREEMENT_ACCEPTANCE_TEXT_UPDATED
-      : UNIFIED_AGREEMENT_ACCEPTANCE_TEXT
+    ? unifiedAgreementAcceptanceText(version?.version, mode)
     : mode === "updated"
       ? AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT_UPDATED
       : AUTHOR_TERMS_ACCEPTANCE_CHECKBOX_TEXT;

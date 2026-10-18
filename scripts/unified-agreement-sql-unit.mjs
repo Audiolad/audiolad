@@ -14,6 +14,11 @@ const insert20 = read(`${dir}01-insert-edition-2.0.sql`);
 const switchCurrent = read(`${dir}02-switch-current.sql`);
 const rollbackSwitch = read(`${dir}03-rollback-switch.sql`);
 const rollbackMigration = read(`${dir}99-rollback-migration.sql`);
+// Edition 2.1 (Sergey 18.10.2026 20:57): new row, 2.0 kept and continues, explicit acceptance of 2.1.
+const insert21 = read(`${dir}04-insert-edition-2.1.sql`);
+const switch21 = read(`${dir}05-switch-current-2.1.sql`);
+const rollback21 = read(`${dir}06-rollback-switch-2.1.sql`);
+const v21 = read('src/lib/author-terms/approved-content-v21.ts');
 const v2 = read('src/lib/author-terms/approved-content-v2.ts');
 // Account-level acceptance (owner decision 10.10.2026, Sergey 18.10.2026 18:26).
 const accountLevel = read('supabase/migrations/20270110120000_author_terms_account_level_acceptance.sql');
@@ -93,6 +98,34 @@ for (const sql of [insert20, switchCurrent]) {
 assert.match(insert20, /ON CONFLICT \(id\) DO NOTHING/);
 assert.match(insert20, /edition_2_0_duplicate_hash/);
 assert.match(insert20, /\n  false,\n  true,\n/, 'inserted as NOT current, covers_business = true');
+
+// ---- Contract: 2.1 rollout SQL uses the code hash/id; 2.0 continues; dates only at the switch; no cut-off.
+{
+  const t21 = v21.match(/export const AUTHOR_TERMS_V21_TEXT = `([\s\S]*)`;\s*$/)[1];
+  const h21 = createHash('sha256').update(t21, 'utf8').digest('hex');
+  assert.match(v21, new RegExp(`contentHash: "${h21}"`), '2.1 meta hash = sha256(text)');
+  assert.equal(t21, read('docs/legal/author-agreement/edition-2.1.txt'), '2.1 TS text = docs text');
+  const id21 = v21.match(/versionId: "([0-9a-f-]{36})"/)[1];
+  assert.notEqual(id21, versionId, '2.1 is a new row');
+  assert.notEqual(h21, hash);
+  for (const sql of [insert21, switch21, rollback21]) {
+    assert.ok(sql.includes(id21), '2.1 SQL uses the code id');
+    assert.ok(sql.includes(versionId), '2.1 SQL references the 2.0 row');
+    assert.doesNotMatch(sql, /\u2014/, '2.1 SQL: en dash only');
+  }
+  for (const sql of [insert21, switch21]) assert.ok(sql.includes(h21) && sql.includes(hash), '2.1 SQL checks both hashes');
+  assert.match(insert21, /ON CONFLICT \(id\) DO NOTHING/);
+  assert.match(insert21, /edition_2_1_duplicate_hash/);
+  assert.match(insert21, /\n  false,\n  true,\n/, '2.1 inserted as NOT current, covers_business = true');
+  assert.match(insert21, /"business_offline_cache"/);
+  const sw = switch21.replace(/--[^\n]*/g, '');
+  assert.match(sw, new RegExp(`SET commercial_access_continues = true\\s+WHERE id = '${versionId}';`), '2.0 keeps access at the 2.1 switch');
+  assert.doesNotMatch(sw, /commercial_access_continues = false/, 'switch never cuts anyone off');
+  assert.doesNotMatch(sw, /grace|:'|author_business_product_optin|music_rights_grants|author_terms_acceptances/, 'switch: no cut-off date, no opt-in, no grants/acceptances');
+  assert.match(sw, /published_at = now\(\), effective_at = now\(\)\s+WHERE id = '[0-9a-f-]{36}';/);
+  const rb = rollback21.replace(/--[^\n]*/g, '');
+  assert.doesNotMatch(rb, /9b4bbabe-8a12-4d58-8c4c-77bc2ba1a902|DELETE|music_rights_grants|author_business_product_optin/, 'rollback 2.1: 1.2, grants, acceptances, opt-in untouched');
+}
 
 // ---- Contract: account-level migration is read-side only (no tables, no DML), definer + search_path.
 {
@@ -584,6 +617,72 @@ BEGIN
 END $t$;
 `;
 
+
+// ---- Edition 2.1 (third disposable DB, after 2.0 + account level + A verified with grants).
+const AA = '10000000-0000-0000-0000-00000000000a', BB = '10000000-0000-0000-0000-00000000000b', CC = '10000000-0000-0000-0000-00000000000d';
+const before21 = String.raw`
+CREATE TABLE ua_test.g21 AS SELECT to_jsonb(g) AS row FROM public.music_rights_grants g;
+CREATE TABLE ua_test.acc21 AS SELECT a.id, public.author_has_accepted_current_terms(a.id) AS ok,
+  public.author_has_business_agreement(a.id) AS biz FROM public.authors a;
+CREATE TABLE ua_test.d20 AS SELECT published_at, effective_at FROM public.author_terms_versions WHERE version = '2.0';
+CREATE TABLE ua_test.t21 AS SELECT clock_timestamp() AS t;
+DO $t$ BEGIN
+  PERFORM ua_test.ok((SELECT count(*) > 0 FROM public.music_rights_grants WHERE source_reference LIKE 'author-terms:2.0:acceptance:%' AND status = 'verified'), 'precondition: 2.0 grants exist');
+END $t$;
+`;
+const after21Checks = (label) => String.raw`
+DO $t$ DECLARE r jsonb; BEGIN
+  PERFORM ua_test.ok((SELECT version FROM public.author_terms_versions WHERE is_current) = '2.1', '${label}: 2.1 current');
+  PERFORM ua_test.ok(public.business_unified_agreement_active(), '${label}: unified stays active');
+  PERFORM ua_test.ok((SELECT bool_and(commercial_access_continues) FROM public.author_terms_versions WHERE version IN ('1.2','2.0')), '${label}: 1.2 and 2.0 continue');
+  PERFORM ua_test.ok((SELECT NOT commercial_access_continues FROM public.author_terms_versions WHERE version = '2.1'), '${label}: 2.1 itself not flagged');
+  PERFORM ua_test.ok((SELECT v.published_at = d.published_at AND v.effective_at = d.effective_at FROM public.author_terms_versions v, ua_test.d20 d WHERE v.version = '2.0'), '${label}: 2.0 dates untouched');
+  PERFORM ua_test.ok((SELECT published_at = effective_at AND published_at >= t.t FROM public.author_terms_versions, ua_test.t21 t WHERE version = '2.1'), '${label}: 2.1 dated at the switch');
+  -- Nobody loses anything: commercial gate and Business agreement identical for every workspace.
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.authors a JOIN ua_test.acc21 b USING (id)
+    WHERE public.author_has_accepted_current_terms(a.id) IS DISTINCT FROM b.ok OR public.author_has_business_agreement(a.id) IS DISTINCT FROM b.biz), '${label}: no access change');
+  PERFORM ua_test.ok(public.author_has_business_agreement('${AA}') AND (SELECT version FROM public.author_business_agreement_acceptance('${AA}')) = '2.0', '${label}: A keeps Business through 2.0');
+  PERFORM ua_test.ok(public.author_has_accepted_current_terms('${BB}') AND NOT public.author_has_business_agreement('${BB}'), '${label}: 1.2 author keeps commercial, no Business');
+  PERFORM ua_test.ok(NOT public.author_has_accepted_current_terms('${CC}'), '${label}: 1.1-only author unchanged');
+  -- All grants byte-identical (none revoked, none closed, none added by the switch).
+  PERFORM ua_test.ok((SELECT count(*) FROM public.music_rights_grants) = (SELECT count(*) FROM ua_test.g21)
+    AND NOT EXISTS (SELECT to_jsonb(g) FROM public.music_rights_grants g EXCEPT SELECT row FROM ua_test.g21), '${label}: grants unchanged');
+  PERFORM ua_test.as_user('${A}');
+  SET LOCAL ROLE authenticated;
+  r := public.author_commercial_agreement_state('${AA}');
+  RESET ROLE;
+  PERFORM ua_test.ok(r->>'current_version' = '2.1' AND NOT (r->>'accepted_current')::boolean AND (r->>'previous_edition_active')::boolean
+    AND (r->>'reaccept_invited')::boolean AND (r->>'business_agreement')::boolean AND r->>'business_agreement_version' = '2.0', '${label}: A cabinet = invitation only: ' || r::text);
+  PERFORM ua_test.as_user('${M}');
+  SET LOCAL ROLE authenticated;
+  r := public.business_catalog_sync('${AA}', true);
+  RESET ROLE;
+  PERFORM ua_test.ok(r->>'status' = 'ok' AND jsonb_array_length(r->'ready') = 0, '${label}: sync dry run ok, nothing missing: ' || r::text);
+END $t$;
+`;
+const scenario21 = String.raw`
+DO $t$ DECLARE r jsonb; n int; v21 uuid := (SELECT id FROM public.author_terms_versions WHERE version = '2.1'); BEGIN
+  -- New music after the switch (before A accepts 2.1) still flows in under the continuing 2.0 acceptance.
+  INSERT INTO public.practices(id,author_id,slug,status) VALUES ('20000000-0000-0000-0000-0000000000d1','${AA}','after-21','draft');
+  INSERT INTO public.audio_items(id,practice_id,title,position,status) VALUES ('30000000-0000-0000-0000-0000000000d1','20000000-0000-0000-0000-0000000000d1','After 2.1',1,'published');
+  UPDATE public.practices SET status = 'published' WHERE id = '20000000-0000-0000-0000-0000000000d1';
+  PERFORM ua_test.ok((SELECT count(*) = 2 FROM public.music_rights_grants WHERE audio_item_id = '30000000-0000-0000-0000-0000000000d1' AND status = 'verified' AND source_reference LIKE 'author-terms:2.0:acceptance:%'), 'new track after switch flows in under 2.0');
+  -- A accepts 2.1 explicitly (offline cache = new use): Business now through 2.1, no duplicate grants.
+  SELECT count(*) INTO n FROM public.music_rights_grants;
+  INSERT INTO public.author_terms_acceptances(author_id,terms_version_id,accepted_by_user_id,acceptance_text) VALUES ('${AA}',v21,'${A}','2.1 text');
+  PERFORM ua_test.ok((SELECT version FROM public.author_business_agreement_acceptance('${AA}')) = '2.1', 'after accepting 2.1: agreement 2.1');
+  PERFORM ua_test.ok((SELECT version FROM public.author_business_agreement_acceptance('${A3}')) = '2.1', 'account level: other own workspace covered by 2.1');
+  PERFORM ua_test.ok((SELECT count(*) FROM public.music_rights_grants) = n, 'accepting 2.1 creates no duplicate grants');
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM (SELECT 1 FROM public.music_rights_grants WHERE source_type = 'platform_agreement' AND status IN ('draft','verified') AND valid_until IS NULL GROUP BY audio_item_id, rights_layer, use_type HAVING count(*) > 1) d), 'no duplicate open grants');
+  PERFORM ua_test.as_user('${A}');
+  SET LOCAL ROLE authenticated;
+  r := public.author_commercial_agreement_state('${AA}');
+  RESET ROLE;
+  PERFORM ua_test.ok((r->>'accepted_current')::boolean AND NOT (r->>'reaccept_invited')::boolean AND r->>'business_agreement_version' = '2.1', 'A cabinet after 2.1: ' || r::text);
+  PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.business_catalog_sync_failures), 'no sync failures');
+END $t$;
+`;
+
 const container = process.env.AUDIOLAD_ONBOARDING_TEST_CONTAINER;
 if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
   assert.notEqual(process.env.AUDIOLAD_REQUIRE_ONBOARDING_SQL, '1', 'isolated SQL required; provide disposable test container');
@@ -690,6 +789,48 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
           `SELECT 1 / CASE WHEN public.author_has_business_agreement('${A3}') THEN 1 ELSE 0 END;`].join('\n'));
       } finally {
         psql('postgres', `DROP DATABASE ${db2};`);
+      }
+    }
+    // Edition 2.1 on a fresh disposable DB: 2.0 + account level + verified A → 04/05/06 scenarios.
+    {
+      const db3 = `${db}_e21`;
+      psql('postgres', `CREATE DATABASE ${db3};`);
+      try {
+        psql(db3, [setup, fixtures, migration, draftReuse, insert20, switchCurrent, accountFixtures].join('\n'));
+        psql(db3, [accountLevel, accountScenario].join('\n'));
+        // Switch refuses before 2.1 is inserted.
+        let refused21 = false;
+        try { execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-q', '-U', 'postgres', '-d', db3, '-v', 'ON_ERROR_STOP=1'], { input: switch21, stdio: ['pipe', 'pipe', 'pipe'] }); } catch { refused21 = true; }
+        assert.ok(refused21, '05 refuses before 04');
+        psql(db3, [before21, insert21, insert21, String.raw`DO $t$ BEGIN
+          PERFORM ua_test.ok((SELECT version FROM public.author_terms_versions WHERE is_current) = '2.0', 'insert 2.1 keeps 2.0 current');
+          PERFORM ua_test.ok((SELECT count(*) = 1 FROM public.author_terms_versions WHERE version = '2.1' AND NOT is_current AND covers_business), 'one 2.1 row');
+          PERFORM ua_test.ok((SELECT NOT commercial_access_continues FROM public.author_terms_versions WHERE version = '2.0'), 'insert does not flag 2.0');
+        END $t$;`].join('\n'));
+        // Switch, no-op re-switch keeps the dates.
+        psql(db3, switch21);
+        psql(db3, `CREATE TABLE ua_test.d21 AS SELECT published_at FROM public.author_terms_versions WHERE version = '2.1';`);
+        psql(db3, [switch21, after21Checks('switch'), String.raw`DO $t$ BEGIN
+          PERFORM ua_test.ok((SELECT v.published_at = d.published_at FROM public.author_terms_versions v, ua_test.d21 d WHERE v.version = '2.1'), 're-switch keeps the 2.1 dates');
+        END $t$;`].join('\n'));
+        // Rollback with no 2.1 acceptances: back to the pre-04/05 flags.
+        psql(db3, [rollback21, String.raw`DO $t$ BEGIN
+          PERFORM ua_test.ok((SELECT version FROM public.author_terms_versions WHERE is_current) = '2.0', 'rollback: 2.0 current');
+          PERFORM ua_test.ok((SELECT NOT commercial_access_continues FROM public.author_terms_versions WHERE version = '2.0'), 'rollback: 2.0 flag reset');
+          PERFORM ua_test.ok((SELECT NOT commercial_access_continues FROM public.author_terms_versions WHERE version = '2.1'), 'rollback: 2.1 not flagged without acceptances');
+          PERFORM ua_test.ok((SELECT commercial_access_continues FROM public.author_terms_versions WHERE version = '1.2'), 'rollback: 1.2 keeps access');
+          PERFORM ua_test.ok(public.business_unified_agreement_active(), 'rollback: unified stays active');
+          PERFORM ua_test.ok(NOT EXISTS (SELECT to_jsonb(g) FROM public.music_rights_grants g EXCEPT SELECT row FROM ua_test.g21), 'rollback: grants unchanged');
+        END $t$;`].join('\n'));
+        // Switch again (new dates), then A accepts 2.1, then rollback keeps A's 2.1 acceptance working.
+        psql(db3, `UPDATE ua_test.t21 SET t = clock_timestamp();`);
+        psql(db3, [switch21, after21Checks('re-switch'), scenario21, rollback21, String.raw`DO $t$ BEGIN
+          PERFORM ua_test.ok((SELECT commercial_access_continues FROM public.author_terms_versions WHERE version = '2.1'), 'rollback after acceptances: 2.1 continues');
+          PERFORM ua_test.ok(public.author_has_business_agreement('${AA}') AND public.author_has_accepted_current_terms('${BB}'), 'rollback after acceptances: nobody cut off');
+          PERFORM ua_test.ok((SELECT count(*) = 0 FROM public.business_catalog_sync_failures), 'no sync failures');
+        END $t$;`].join('\n'));
+      } finally {
+        psql('postgres', `DROP DATABASE ${db3};`);
       }
     }
     console.log('unified-agreement-sql-unit: contract + isolated PostgreSQL scenarios OK');
