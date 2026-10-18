@@ -18,6 +18,8 @@ const v2 = read('src/lib/author-terms/approved-content-v2.ts');
 // Account-level acceptance (owner decision 10.10.2026, Sergey 18.10.2026 18:26).
 const accountLevel = read('supabase/migrations/20270110120000_author_terms_account_level_acceptance.sql');
 const accountRollback = read(`${dir}98-rollback-account-level-acceptance.sql`);
+// 20270111120000 (Sergey 18.10.2026 19:37): a draft left by a failed submit is edited again.
+const draftReuse = read('supabase/migrations/20270111120000_business_verification_draft_reuse.sql');
 const clean = migration.replace(/--[^\n]*/g, '');
 
 // ---- Contract: additive only; nothing inserts/switches editions or touches historical rows.
@@ -308,8 +310,16 @@ BEGIN
   PERFORM ua_test.expect_error(s, 'support_mode_consent_forbidden');
   RESET ROLE;
   UPDATE public.author_support_sessions SET revoked_at = now() WHERE id = sess;
+  -- 20270111120000: the refused submit left the case in 'draft'; the form's retry starts with draft_v3
+  -- again and must reuse that case (production bug 18.10.2026: business_verification_already_active).
+  PERFORM ua_test.ok((SELECT status = 'draft' FROM public.business_rightsholder_verifications WHERE id = v), 'refused submit leaves a draft');
+  SET LOCAL ROLE authenticated;
+  PERFORM ua_test.ok(public.author_business_verification_draft_v3('20000000-0000-0000-0000-00000000000a','30000000-0000-0000-0000-0000000000a1','suno',NULL,'Spa retry','https://suno.com/s/abc','{"paid_plan":"Pro"}'::jsonb) = v, 'draft_v3 reuses the stuck draft');
+  RESET ROLE;
+  PERFORM ua_test.ok((SELECT status = 'draft' AND service_track_title = 'Spa retry' FROM public.business_rightsholder_verifications WHERE id = v), 'retry edits the same draft');
   SET LOCAL ROLE authenticated;
   EXECUTE s;
+  PERFORM ua_test.expect_error('SELECT public.author_business_verification_draft_v3(''20000000-0000-0000-0000-00000000000a'',''30000000-0000-0000-0000-0000000000a1'',''suno'',NULL,''Spa'',''https://suno.com/s/abc'',''{"paid_plan":"Pro"}''::jsonb)', 'business_verification_already_active');
   RESET ROLE;
   PERFORM ua_test.ok((SELECT status = 'submitted' FROM public.business_rightsholder_verifications WHERE id = v), 'submitted');
   PERFORM ua_test.ok((SELECT snapshot->'agreement'->>'version' = '2.0' AND snapshot->'agreement'->>'content_hash' = (SELECT content_hash FROM public.author_terms_versions WHERE id = v20)
@@ -602,7 +612,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     assert.ok(refused, 'insert refuses without the migration');
     // Migration twice (idempotent), 2.0 insert twice (idempotent), switch twice (no-op second time).
     psql(db, `CREATE TABLE ua_test.t0 AS SELECT clock_timestamp() AS t;`);
-    psql(db, [migration, migration, insert20].join('\n'));
+    psql(db, [migration, migration, draftReuse, draftReuse, insert20].join('\n'));
     // 2.0 dates (Sergey 18.10.2026 15:02): insert holds only a placeholder; re-insert keeps it.
     psql(db, `CREATE TABLE ua_test.d_ins AS SELECT published_at, effective_at FROM public.author_terms_versions WHERE version = '2.0';`);
     psql(db, [insert20, beforeSwitch, String.raw`DO $t$ BEGIN

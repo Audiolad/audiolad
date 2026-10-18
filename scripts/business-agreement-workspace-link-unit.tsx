@@ -70,7 +70,7 @@ assert.ok(!single.includes("кабинете «S»"), "single workspace: no work
 const form = read("src/components/author-dashboard/business/RightsholderVerificationForm.tsx");
 assert.match(form, /workspace\?: ProductWorkspace \| null;/);
 assert.match(form, /const productNeedsAgreement = unified && productWorkspace\?\.agreementAccepted === false;/);
-assert.match(form, /if \(productNeedsAgreement\) return;\n\s+setAgreementRefusedSlug\(null\);\n\s+setBusy\(true\);/, "blocked before any upload");
+assert.match(form, /if \(productNeedsAgreement\) return;\n\s+setAgreementRefusedSlug\(null\);\n\s+setFormError\(null\);\n\s+setBusy\(true\);/, "blocked before any upload");
 assert.match(form, /message\.includes\("business_unified_agreement_required"\) && productWorkspace\) \{\n\s+\/\/[^\n]*\n\s+setAgreementRefusedSlug\(productWorkspace\.slug\);/);
 assert.match(form, /<AgreementRequiredNotice workspace=\{productWorkspace\} showWorkspaceName=\{multiWorkspace\} variant="choice" \/>/);
 assert.match(form, /<AgreementRequiredNotice workspace=\{refusedWorkspace\} showWorkspaceName=\{multiWorkspace\} variant="submit" \/>/);
