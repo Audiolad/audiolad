@@ -118,6 +118,18 @@ assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: null, accep
 {
   const { listContinuingEditionIds, loadAuthorsOnContinuingEdition } = await import("../src/lib/author-terms/continuing-editions.ts");
   const fake = (versions, acceptances, calls = []) => ({
+    // Account level (20270110120000): acceptances come from the covering RPC (own rows here).
+    rpc(name, args) {
+      calls.push({ table: name, filters: [["rpc", "p_author_ids", args.p_author_ids]] });
+      assert.equal(name, "author_terms_covering_acceptances");
+      return Promise.resolve({
+        data: acceptances.filter((a) => args.p_author_ids.includes(a.author_id)).map((a, i) => ({
+          author_id: a.author_id, acceptance_id: `acc-${i}`, terms_version_id: a.terms_version_id,
+          accepted_at: "2026-10-01T00:00:00Z", accepted_by_user_id: null, source_author_id: a.author_id,
+        })),
+        error: null,
+      });
+    },
     from(table) {
       const q = { table, filters: [] };
       const api = {
@@ -159,7 +171,8 @@ assert.equal(evaluateTermsGate({ unifiedEnabled: true, now, current: null, accep
   const service = read("src/lib/author-terms/service.ts");
   assert.match(service, /if \(!unifiedEnabled && currentVersion && !acceptance\) \{[\s\S]{0,600}loadAuthorsOnContinuingEdition\(client, \[authorId\]\)/, "service: flag-off continuation");
   const catalog = read("src/lib/studio-music/catalog.ts");
-  assert.match(catalog, /\} else if \(accepted\.size < authorIds\.length\) \{[\s\S]{0,500}loadAuthorsOnContinuingEdition\(supabase,/, "studio catalog: flag-off continuation");
+  // Account level: one covering lookup; current OR commercial_access_continues, independent of the flag.
+  assert.match(catalog, /listCoveringAcceptances\(supabase, authorIds\)[\s\S]{0,1200}row\.is_current === true \|\| row\.commercial_access_continues === true/, "studio catalog: 1.2 continuation, flag on or off");
 }
 
 // Source contract: no grace/cut-off anywhere in the gate code, banner shows no end date.

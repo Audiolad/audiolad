@@ -1,5 +1,4 @@
-import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
-import { loadAuthorsOnContinuingEdition } from "@/lib/author-terms/continuing-editions";
+import { listCoveringAcceptances } from "@/lib/author-terms/covering-acceptances";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -1400,38 +1399,31 @@ export function createSupabaseStudioMusicCatalogStore(
     },
     async loadAuthorsWithCurrentTerms(authorIds) {
       if (authorIds.length === 0) return new Set();
-      const { data, error } = await supabase
-        .from("author_terms_acceptances")
-        .select("author_id, author_terms_versions!inner(is_current, document_key)")
-        .in("author_id", authorIds)
-        .eq("author_terms_versions.is_current", true)
-        .eq("author_terms_versions.document_key", "author-terms");
-      if (error) throw new Error("studio_music_author_terms_lookup_failed");
-      const accepted = new Set((data ?? []).map((row) => String(row.author_id)));
-      // Unified agreement 2.0 rollout: an earlier edition flagged commercial_access_continues
-      // (1.2 at the switch) stays valid with no end date (same rule as SQL
-      // author_has_accepted_current_terms). Never Business.
-      if (isUnifiedAgreementEnabled() && accepted.size < authorIds.length) {
-        const { data: earlier, error: earlierError } = await supabase
-          .from("author_terms_acceptances")
-          .select("author_id, author_terms_versions!inner(document_key, commercial_access_continues)")
-          .in("author_id", authorIds.filter((id) => !accepted.has(id)))
-          .eq("author_terms_versions.document_key", "author-terms")
-          .eq("author_terms_versions.commercial_access_continues", true);
-        if (earlierError) throw new Error("studio_music_author_terms_lookup_failed");
-        for (const row of earlier ?? []) accepted.add(String(row.author_id));
-      } else if (accepted.size < authorIds.length) {
-        // Flag off while the DB is already switched to 2.0: 1.2 authors keep Studio (no cut-off).
-        // Before the switch no edition is flagged and nothing changes.
-        let continuing: Set<string>;
-        try {
-          continuing = await loadAuthorsOnContinuingEdition(supabase, authorIds.filter((id) => !accepted.has(id)));
-        } catch {
-          throw new Error("studio_music_author_terms_lookup_failed");
-        }
-        for (const id of continuing) accepted.add(id);
+      // Account level (owner decision 10.10.2026): an acceptance by the workspace owner in any of
+      // their workspaces covers this one (same rule as SQL author_has_accepted_current_terms).
+      let covering;
+      try {
+        covering = await listCoveringAcceptances(supabase, authorIds);
+      } catch {
+        throw new Error("studio_music_author_terms_lookup_failed");
       }
-      return accepted;
+      const versionIds = [...new Set(covering.map((row) => row.termsVersionId))];
+      if (versionIds.length === 0) return new Set();
+      // select("*"): commercial_access_continues may be absent before migration 20270109120000.
+      const { data, error } = await supabase
+        .from("author_terms_versions")
+        .select("*")
+        .in("id", versionIds)
+        .eq("document_key", "author-terms");
+      if (error) throw new Error("studio_music_author_terms_lookup_failed");
+      // Current edition, or an earlier edition flagged commercial_access_continues (1.2 after the 2.0
+      // switch): no end date, flag on or off (no forced cut-off). Never Business.
+      const valid = new Set(
+        ((data ?? []) as Record<string, unknown>[])
+          .filter((row) => row.is_current === true || row.commercial_access_continues === true)
+          .map((row) => String(row.id)),
+      );
+      return new Set(covering.filter((row) => valid.has(row.termsVersionId)).map((row) => row.authorId));
     },
   };
 }
