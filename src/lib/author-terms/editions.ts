@@ -22,8 +22,9 @@ export type ApprovedAuthorTermsEdition = {
   versionId: string;
   version: string;
   title: string;
-  publishedAt: string;
-  effectiveAt: string;
+  /** Code fallback only (flag off, 1.2). Null for 2.0: its dates come from the DB row (set at switch). */
+  publishedAt: string | null;
+  effectiveAt: string | null;
   contentHash: string;
   coversBusiness: boolean;
   frontMatterMarker: string;
@@ -57,8 +58,8 @@ export const APPROVED_AUTHOR_TERMS_EDITIONS: readonly ApprovedAuthorTermsEdition
     versionId: AUTHOR_TERMS_V2_META.versionId,
     version: AUTHOR_TERMS_V2_META.version,
     title: AUTHOR_TERMS_V2_META.title,
-    publishedAt: AUTHOR_TERMS_V2_META.publishedAt,
-    effectiveAt: AUTHOR_TERMS_V2_META.effectiveAt,
+    publishedAt: null,
+    effectiveAt: null,
     contentHash: AUTHOR_TERMS_V2_META.contentHash,
     coversBusiness: AUTHOR_TERMS_V2_META.coversBusiness,
     frontMatterMarker: AUTHOR_TERMS_V2_FRONT_MATTER_MARKER,

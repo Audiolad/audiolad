@@ -1,6 +1,10 @@
 -- Шаг «вставка редакции 2.0» (идемпотентно). НЕ делает 2.0 текущей. Только с явного OK Сергея.
 -- Требует применённой миграции 20270109120000 (колонки covers_business, grants_scope).
 -- Хэш = sha256 текста src/lib/author-terms/approved-content-v2.ts (AUTHOR_TERMS_V2_TEXT).
+-- Даты (решение Сергея 18.10.2026 15:02): дата публикации и вступления в силу 2.0 = момент, когда
+-- 2.0 становится текущей. Здесь – только временная отметка момента вставки (now()); её нигде не
+-- показывают (не текущая редакция новее текущей = «ещё не вступила в силу»). Настоящие даты ставит
+-- 02-switch-current.sql в той же транзакции, что и переключение. Повтор вставки даты не меняет.
 BEGIN;
 DO $$
 BEGIN
@@ -29,8 +33,8 @@ INSERT INTO public.author_terms_versions (
   '5d0c2b7e-3f4a-4c61-9a8e-2b0f6d1e7a20',
   '2.0',
   'Единое коммерческое соглашение с правообладателем (Авторские условия сотрудничества платформы «АудиоЛад», редакция 2.0)',
-  '2026-10-17T00:00:00+03:00',
-  '2026-10-17T00:00:00+03:00',
+  now(),  -- временно; 02-switch-current.sql ставит дату переключения
+  now(),
   '41770211b4b40c6c675316ace4796708179a9c08860101fdb4b23bcdf9443d97',
   'author-terms',
   false,
@@ -40,6 +44,6 @@ INSERT INTO public.author_terms_versions (
 ON CONFLICT (id) DO NOTHING;
 
 -- Проверка результата (должна вернуть 1 строку с covers_business = true, is_current = false до шага 02).
-SELECT id, version, content_hash, is_current, covers_business
+SELECT id, version, content_hash, is_current, covers_business, published_at, effective_at
 FROM public.author_terms_versions WHERE id = '5d0c2b7e-3f4a-4c61-9a8e-2b0f6d1e7a20';
 COMMIT;

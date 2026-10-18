@@ -479,9 +479,23 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === '1' || !container) {
     try { execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-q', '-U', 'postgres', '-d', db, '-v', 'ON_ERROR_STOP=1'], { input: insert20, stdio: ['pipe', 'pipe', 'pipe'] }); } catch { refused = true; }
     assert.ok(refused, 'insert refuses without the migration');
     // Migration twice (idempotent), 2.0 insert twice (idempotent), switch twice (no-op second time).
-    psql(db, [migration, migration, insert20, insert20, beforeSwitch].join('\n'));
+    psql(db, `CREATE TABLE ua_test.t0 AS SELECT clock_timestamp() AS t;`);
+    psql(db, [migration, migration, insert20].join('\n'));
+    // 2.0 dates (Sergey 18.10.2026 15:02): insert holds only a placeholder; re-insert keeps it.
+    psql(db, `CREATE TABLE ua_test.d_ins AS SELECT published_at, effective_at FROM public.author_terms_versions WHERE version = '2.0';`);
+    psql(db, [insert20, beforeSwitch, String.raw`DO $t$ BEGIN
+      PERFORM ua_test.ok((SELECT v.published_at = d.published_at AND v.effective_at = d.effective_at FROM public.author_terms_versions v, ua_test.d_ins d WHERE v.version = '2.0'), 're-insert keeps placeholder dates');
+      PERFORM ua_test.ok((SELECT d.published_at >= t.t AND d.published_at <> '2026-10-17T00:00:00+03:00'::timestamptz FROM ua_test.d_ins d, ua_test.t0 t), 'placeholder = insert time, never 17.10');
+      PERFORM ua_test.ok((SELECT published_at = '2026-09-13'::timestamptz FROM public.author_terms_versions WHERE version = '1.2'), '1.2 dates untouched by insert');
+    END $t$;`].join('\n'));
     psql(db, switchCurrent);
+    psql(db, `CREATE TABLE ua_test.d_sw AS SELECT published_at, effective_at FROM public.author_terms_versions WHERE version = '2.0';`);
     psql(db, switchCurrent);
+    psql(db, String.raw`DO $t$ BEGIN
+      PERFORM ua_test.ok((SELECT s.published_at > d.published_at AND s.effective_at = s.published_at FROM ua_test.d_sw s, ua_test.d_ins d), 'switch sets 2.0 published_at = effective_at = switch moment');
+      PERFORM ua_test.ok((SELECT v.published_at = s.published_at AND v.effective_at = s.effective_at FROM public.author_terms_versions v, ua_test.d_sw s WHERE v.version = '2.0'), 'no-op re-switch keeps the switch dates');
+      PERFORM ua_test.ok((SELECT published_at = '2026-09-13'::timestamptz AND effective_at = '2026-09-13'::timestamptz FROM public.author_terms_versions WHERE version = '1.2'), '1.2 dates untouched by switch');
+    END $t$;`);
     psql(db, scenario);
     psql(db, scenario2);
     // Real concurrency (two sessions): sync vs sync on a track without grants, review vs sync.
