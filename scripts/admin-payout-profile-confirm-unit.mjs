@@ -271,4 +271,64 @@ const base = {
   assert.equal(changes.detail.status, "needs_changes");
 }
 
+// 6. Legitimate confirmations are not blocked: card (self-employed) and
+//    bank account (ИП), both INN-bearing recipient types.
+for (const body of [
+  {
+    ...base,
+    recipient_type: "self_employed",
+    payout_method: "card",
+    inn: "500100732259",
+    is_npd_declared: true,
+    card_number: "4111 1111 1111 1111",
+    bank_name: "Тест-Банк",
+  },
+  {
+    ...base,
+    recipient_type: "individual_entrepreneur",
+    payout_method: "bank_account",
+    inn: "500100732259",
+    legal_name: "ИП Тестов Т.",
+    bank_name: "АО «Тест Банк»",
+    bank_bik: "044525000",
+    bank_account: "40802810000000000001",
+  },
+  { ...base, bank_name: "Банк 2.0" },
+]) {
+  const db = createFakeSupabase();
+  const { profile } = await submitAuthorPayoutProfile({ supabase: db, authorId: author, actorUserId: author, body: { ...body, author_id: author } });
+  assert.equal(profile.status, "submitted", body.payout_method);
+  const detail = await getAdminPayoutProfileDetail(db, profile.id);
+  assert.deepEqual(detail.verify_blockers, [], body.payout_method);
+  // Full card/account never reach the browser-facing detail.
+  const serialized = JSON.stringify(detail);
+  assert.doesNotMatch(serialized, /4111111111111111|40802810000000000001/);
+  const result = await staffTransitionPayoutProfile({ supabase: db, profileId: profile.id, actorUserId: staff, toStatus: "verified" });
+  assert.equal(result.detail.status, "verified", body.payout_method);
+}
+
+// 7. Review form feedback follows the last submitted action; buttons follow
+//    the server transition rules (no «Подтвердить» for needs_changes).
+{
+  const { pickAdminPayoutProfileFeedback, ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE } = await import(
+    "../src/app/(platform)/admin/payout-profiles/action-state.ts"
+  );
+  const states = {
+    take: ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
+    verify: { ok: false, error: "Данные нельзя подтвердить: не указан банк. Запросите у автора изменения." },
+    changes: { ok: true, message: "Запрос изменений отправлен автору." },
+    reject: ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
+  };
+  assert.equal(pickAdminPayoutProfileFeedback("changes", states).message, "Запрос изменений отправлен автору.");
+  assert.match(pickAdminPayoutProfileFeedback("verify", states).error, /нельзя подтвердить/);
+  assert.equal(pickAdminPayoutProfileFeedback(null, states), ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE);
+  const form = read("src/components/admin/PayoutProfileReviewForm.tsx");
+  assert.match(form, /pickAdminPayoutProfileFeedback\(lastAction/);
+  for (const kind of ["take", "changes", "verify", "reject"]) {
+    assert.match(form, new RegExp(`setLastAction\\("${kind}"\\)`), kind);
+  }
+  assert.match(form, /canStaffTransitionPayoutProfileStatus\(profile\.status, "verified"\)/);
+  assert.doesNotMatch(form, /\["submitted", "in_review", "needs_changes"\]/);
+}
+
 console.log("admin-payout-profile-confirm-unit: ok");

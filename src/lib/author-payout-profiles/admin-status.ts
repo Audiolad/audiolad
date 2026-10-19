@@ -129,8 +129,11 @@ export function payoutBankNameLooksInvalid(
 
 /**
  * Reasons why staff cannot confirm a questionnaire (empty list = OK).
- * Mirrors the author submit rules for the selected payout method, plus the
- * bank-name sanity check. Messages name fields only, never values.
+ * Scope: presence/format of the requisites needed to actually pay out with
+ * the selected method (a subset of the author submit rules: name, INN for
+ * self-employed/ИП, bank, card/SBP phone/БИК+account), plus the bank-name
+ * sanity check. Contact email, consent checkboxes and optional fields are
+ * not re-checked here. Messages name fields only, never values.
  */
 export function findPayoutProfileVerifyBlockers(input: {
   recipientType: AuthorPayoutRecipientType;

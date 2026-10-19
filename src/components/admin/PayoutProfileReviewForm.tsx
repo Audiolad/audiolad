@@ -4,8 +4,11 @@ import { useActionState, useState } from "react";
 
 import {
   ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
+  pickAdminPayoutProfileFeedback,
+  type AdminPayoutProfileActionKind,
   type AdminPayoutProfileActionState,
 } from "@/app/(platform)/admin/payout-profiles/action-state";
+import { canStaffTransitionPayoutProfileStatus } from "@/lib/author-payout-profiles/status";
 import {
   rejectPayoutProfile,
   requestPayoutProfileChanges,
@@ -162,24 +165,26 @@ export default function PayoutProfileReviewForm({
     ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
   );
 
-  const feedbackState =
-    verifyState.ok || verifyState.error || verifyState.warning
-      ? verifyState
-      : rejectState.ok || rejectState.error || rejectState.warning
-        ? rejectState
-        : changesState.ok || changesState.error || changesState.warning
-          ? changesState
-          : takeState.ok || takeState.error || takeState.warning
-            ? takeState
-            : ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE;
-
-  const canTake = profile.status === "submitted";
-  const canRequestChanges =
-    profile.status === "in_review" || profile.status === "submitted";
-  const canVerify = ["submitted", "in_review", "needs_changes"].includes(
-    profile.status,
+  // Show feedback of the most recently submitted action only, so an old
+  // red error (e.g. a refused confirmation) never hides a later success.
+  const [lastAction, setLastAction] = useState<AdminPayoutProfileActionKind | null>(
+    null,
   );
-  const canReject = canVerify;
+  const feedbackState = pickAdminPayoutProfileFeedback(lastAction, {
+    take: takeState,
+    changes: changesState,
+    reject: rejectState,
+    verify: verifyState,
+  });
+
+  // Buttons follow the server-side staff transition rules exactly.
+  const canTake = canStaffTransitionPayoutProfileStatus(profile.status, "in_review");
+  const canRequestChanges = canStaffTransitionPayoutProfileStatus(
+    profile.status,
+    "needs_changes",
+  );
+  const canVerify = canStaffTransitionPayoutProfileStatus(profile.status, "verified");
+  const canReject = canStaffTransitionPayoutProfileStatus(profile.status, "rejected");
 
   const fields = profile.fields;
   const fullName = [fields.last_name, fields.first_name, fields.middle_name]
@@ -327,7 +332,11 @@ export default function PayoutProfileReviewForm({
 
           <div className="flex flex-col gap-3">
             {canTake ? (
-              <form action={takeAction} className="contents">
+              <form
+                action={takeAction}
+                onSubmit={() => setLastAction("take")}
+                className="contents"
+              >
                 <input type="hidden" name="profileId" value={profile.id} />
                 <input type="hidden" name="staffNote" value={staffNote} />
                 <button
@@ -341,7 +350,11 @@ export default function PayoutProfileReviewForm({
             ) : null}
 
             {canRequestChanges ? (
-              <form action={changesAction} className="contents">
+              <form
+                action={changesAction}
+                onSubmit={() => setLastAction("changes")}
+                className="contents"
+              >
                 <input type="hidden" name="profileId" value={profile.id} />
                 <input type="hidden" name="staffNote" value={staffNote} />
                 <input type="hidden" name="reviewComment" value={reviewComment} />
@@ -372,7 +385,10 @@ export default function PayoutProfileReviewForm({
                       выплат.
                     </p>
                     <div className="mt-4 flex flex-wrap gap-3">
-                      <form action={verifyAction}>
+                      <form
+                        action={verifyAction}
+                        onSubmit={() => setLastAction("verify")}
+                      >
                         <input type="hidden" name="profileId" value={profile.id} />
                         <input type="hidden" name="staffNote" value={staffNote} />
                         <button
@@ -397,7 +413,11 @@ export default function PayoutProfileReviewForm({
             ) : null}
 
             {canReject ? (
-              <form action={rejectAction} className="contents">
+              <form
+                action={rejectAction}
+                onSubmit={() => setLastAction("reject")}
+                className="contents"
+              >
                 <input type="hidden" name="profileId" value={profile.id} />
                 <input type="hidden" name="staffNote" value={staffNote} />
                 <input type="hidden" name="reviewComment" value={reviewComment} />
