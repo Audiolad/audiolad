@@ -162,7 +162,7 @@
     "test:commercial-onboarding-after-approve": "npx tsx scripts/commercial-onboarding-after-approve-unit.mjs",
     "test:author-payout-profiles-route": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-route-unit.mjs",
     "test:author-payout-profiles-save": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-save-unit.mjs",
-    "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profile-display-status-unit.mjs",
+    "test:author-payout-profiles": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profiles-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/author-payout-profile-display-status-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/admin-payout-profile-confirm-unit.mjs",
     "test:integration:private-catalog-race": "node scripts/private-to-catalog-player-race-smoke.mjs",
     "test:author-terms-acceptance": "npx tsx scripts/author-terms-acceptance-unit.mjs",
     "test:support-consent-block": "npx tsx scripts/author-support-consent-block-unit.mjs && node scripts/business-consents-support-mode-sql-unit.mjs",

@@ -4,8 +4,11 @@ import { useActionState, useState } from "react";
 
 import {
   ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
+  pickAdminPayoutProfileFeedback,
+  type AdminPayoutProfileActionKind,
   type AdminPayoutProfileActionState,
 } from "@/app/(platform)/admin/payout-profiles/action-state";
+import { canStaffTransitionPayoutProfileStatus } from "@/lib/author-payout-profiles/status";
 import {
   rejectPayoutProfile,
   requestPayoutProfileChanges,
@@ -14,9 +17,14 @@ import {
 } from "@/app/(platform)/admin/payout-profiles/actions";
 import type { AuthorPayoutProfileAdminDetail } from "@/lib/author-payout-profiles/types";
 import {
-  getAuthorPayoutProfileStatusLabel,
+  getAuthorPayoutMethodLabel,
   getAuthorPayoutRecipientTypeLabel,
 } from "@/lib/author-payout-profiles/types";
+import {
+  formatPayoutProfileVerifyBlockedMessage,
+  getAdminPayoutProfileStatusLabel,
+  payoutBankNameLooksInvalid,
+} from "@/lib/author-payout-profiles/admin-status";
 
 type PayoutProfileReviewFormProps = {
   profile: AuthorPayoutProfileAdminDetail;
@@ -33,7 +41,58 @@ function formatDateTime(value: string | null): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Moscow",
   }).format(new Date(value));
+}
+
+function DecisionSummary({
+  profile,
+}: {
+  profile: AuthorPayoutProfileAdminDetail;
+}) {
+  const who = profile.reviewed_by_name ?? "сотрудник платформы";
+
+  if (profile.status === "verified") {
+    return (
+      <div
+        data-payout-decision="verified"
+        className="rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-3 text-sm leading-6 text-[#2f7a52]"
+      >
+        <p className="font-semibold">Данные подтверждены</p>
+        <p className="mt-1">
+          {formatDateTime(profile.verified_at)} (МСК) · {who}
+        </p>
+      </div>
+    );
+  }
+
+  if (profile.status === "rejected") {
+    return (
+      <div
+        data-payout-decision="rejected"
+        className="rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm leading-6 text-[#b34f63]"
+      >
+        <p className="font-semibold">Анкета отклонена</p>
+        <p className="mt-1">
+          {formatDateTime(profile.rejected_at)} (МСК) · {who}
+        </p>
+      </div>
+    );
+  }
+
+  if (profile.status === "needs_changes") {
+    return (
+      <div
+        data-payout-decision="needs_changes"
+        className="rounded-[18px] border border-[#f0e2b8] bg-[#fff9e8] px-4 py-3 text-sm leading-6 text-[#8a6a1f]"
+      >
+        <p className="font-semibold">Автору отправлен запрос изменений</p>
+        <p className="mt-1">{who}</p>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -106,24 +165,26 @@ export default function PayoutProfileReviewForm({
     ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE,
   );
 
-  const feedbackState =
-    verifyState.ok || verifyState.error || verifyState.warning
-      ? verifyState
-      : rejectState.ok || rejectState.error || rejectState.warning
-        ? rejectState
-        : changesState.ok || changesState.error || changesState.warning
-          ? changesState
-          : takeState.ok || takeState.error || takeState.warning
-            ? takeState
-            : ADMIN_PAYOUT_PROFILE_ACTION_INITIAL_STATE;
-
-  const canTake = profile.status === "submitted";
-  const canRequestChanges =
-    profile.status === "in_review" || profile.status === "submitted";
-  const canVerify = ["submitted", "in_review", "needs_changes"].includes(
-    profile.status,
+  // Show feedback of the most recently submitted action only, so an old
+  // red error (e.g. a refused confirmation) never hides a later success.
+  const [lastAction, setLastAction] = useState<AdminPayoutProfileActionKind | null>(
+    null,
   );
-  const canReject = canVerify;
+  const feedbackState = pickAdminPayoutProfileFeedback(lastAction, {
+    take: takeState,
+    changes: changesState,
+    reject: rejectState,
+    verify: verifyState,
+  });
+
+  // Buttons follow the server-side staff transition rules exactly.
+  const canTake = canStaffTransitionPayoutProfileStatus(profile.status, "in_review");
+  const canRequestChanges = canStaffTransitionPayoutProfileStatus(
+    profile.status,
+    "needs_changes",
+  );
+  const canVerify = canStaffTransitionPayoutProfileStatus(profile.status, "verified");
+  const canReject = canStaffTransitionPayoutProfileStatus(profile.status, "rejected");
 
   const fields = profile.fields;
   const fullName = [fields.last_name, fields.first_name, fields.middle_name]
@@ -145,7 +206,7 @@ export default function PayoutProfileReviewForm({
             label="Правовой статус"
             value={getAuthorPayoutRecipientTypeLabel(profile.recipient_type)}
           />
-          <InfoRow label="Статус" value={getAuthorPayoutProfileStatusLabel(profile.status)} />
+          <InfoRow label="Статус" value={getAdminPayoutProfileStatusLabel(profile.status)} />
           <InfoRow label="Версия" value={String(profile.version)} />
           {profile.recipient_type === "individual_entrepreneur" && fields.legal_name ? (
             <InfoRow label="Наименование ИП" value={fields.legal_name} />
@@ -157,7 +218,23 @@ export default function PayoutProfileReviewForm({
           ) : null}
           <InfoRow label="Email" value={fields.email || "—"} />
           <InfoRow label="Телефон" value={fields.phone || "—"} />
+          <InfoRow
+            label="Способ выплаты"
+            value={
+              profile.payout_method
+                ? getAuthorPayoutMethodLabel(profile.payout_method)
+                : "–"
+            }
+          />
           <InfoRow label="Банк" value={fields.bank_name || "—"} />
+          {payoutBankNameLooksInvalid(fields.bank_name) ? (
+            <p
+              data-payout-bank-name-invalid="true"
+              className="-mt-2 text-xs leading-5 text-[#b34f63]"
+            >
+              В поле «Банк» нет названия банка – похоже, указан номер.
+            </p>
+          ) : null}
           <InfoRow label="БИК" value={fields.bank_bik || "—"} />
           <InfoRow label="Расчётный счёт" value={fields.bank_account || "—"} />
           {fields.bank_correspondent_account ? (
@@ -207,8 +284,19 @@ export default function PayoutProfileReviewForm({
         <div className="mt-4 space-y-4">
           <div className="rounded-[18px] border border-[#f0e2b8] bg-[#fff9e8] px-4 py-3 text-sm leading-6 text-[#8a6a1f]">
             Не вставляйте банковские реквизиты, ИНН, телефон или адрес в
-            комментарии — используйте общие формулировки.
+            комментарии – используйте общие формулировки.
           </div>
+
+          <DecisionSummary profile={profile} />
+
+          {canVerify && profile.verify_blockers.length > 0 ? (
+            <div
+              data-payout-verify-blockers="true"
+              className="rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm leading-6 text-[#b34f63]"
+            >
+              {formatPayoutProfileVerifyBlockedMessage(profile.verify_blockers)}
+            </div>
+          ) : null}
 
           <ActionFeedback state={feedbackState} />
 
@@ -244,7 +332,11 @@ export default function PayoutProfileReviewForm({
 
           <div className="flex flex-col gap-3">
             {canTake ? (
-              <form action={takeAction} className="contents">
+              <form
+                action={takeAction}
+                onSubmit={() => setLastAction("take")}
+                className="contents"
+              >
                 <input type="hidden" name="profileId" value={profile.id} />
                 <input type="hidden" name="staffNote" value={staffNote} />
                 <button
@@ -258,7 +350,11 @@ export default function PayoutProfileReviewForm({
             ) : null}
 
             {canRequestChanges ? (
-              <form action={changesAction} className="contents">
+              <form
+                action={changesAction}
+                onSubmit={() => setLastAction("changes")}
+                className="contents"
+              >
                 <input type="hidden" name="profileId" value={profile.id} />
                 <input type="hidden" name="staffNote" value={staffNote} />
                 <input type="hidden" name="reviewComment" value={reviewComment} />
@@ -289,7 +385,10 @@ export default function PayoutProfileReviewForm({
                       выплат.
                     </p>
                     <div className="mt-4 flex flex-wrap gap-3">
-                      <form action={verifyAction}>
+                      <form
+                        action={verifyAction}
+                        onSubmit={() => setLastAction("verify")}
+                      >
                         <input type="hidden" name="profileId" value={profile.id} />
                         <input type="hidden" name="staffNote" value={staffNote} />
                         <button
@@ -314,7 +413,11 @@ export default function PayoutProfileReviewForm({
             ) : null}
 
             {canReject ? (
-              <form action={rejectAction} className="contents">
+              <form
+                action={rejectAction}
+                onSubmit={() => setLastAction("reject")}
+                className="contents"
+              >
                 <input type="hidden" name="profileId" value={profile.id} />
                 <input type="hidden" name="staffNote" value={staffNote} />
                 <input type="hidden" name="reviewComment" value={reviewComment} />

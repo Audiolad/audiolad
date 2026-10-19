@@ -1,10 +1,13 @@
 import Link from "next/link";
 
 import type { AuthorPayoutProfileAdminListItem } from "@/lib/author-payout-profiles/types";
+import type { AuthorPayoutProfileStatus } from "@/lib/author-payout-profiles/types";
+import { getAuthorPayoutRecipientTypeLabel } from "@/lib/author-payout-profiles/types";
 import {
-  getAuthorPayoutProfileStatusLabel,
-  getAuthorPayoutRecipientTypeLabel,
-} from "@/lib/author-payout-profiles/types";
+  ADMIN_PAYOUT_PROFILE_STATUS_TONE_CLASSES,
+  getAdminPayoutProfileStatusLabel,
+  getAdminPayoutProfileStatusTone,
+} from "@/lib/author-payout-profiles/admin-status";
 import { maskBankAccount, maskInn } from "@/lib/author-payout-profiles/masking";
 
 type PayoutProfilesListProps = {
@@ -22,7 +25,20 @@ function formatDateTime(value: string | null): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Moscow",
   }).format(new Date(value));
+}
+
+function StatusBadge({ status }: { status: AuthorPayoutProfileStatus }) {
+  const tone = getAdminPayoutProfileStatusTone(status);
+  return (
+    <span
+      data-payout-status={status}
+      className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold ${ADMIN_PAYOUT_PROFILE_STATUS_TONE_CLASSES[tone]}`}
+    >
+      {getAdminPayoutProfileStatusLabel(status)}
+    </span>
+  );
 }
 
 function formatMask(
@@ -68,7 +84,9 @@ export default function PayoutProfilesList({ profiles }: PayoutProfilesListProps
               {profiles.map((profile) => (
                 <tr
                   key={profile.id}
-                  className="border-b border-[#f3edf9] last:border-b-0"
+                  className={`border-b border-[#f3edf9] last:border-b-0 ${
+                    profile.status === "verified" ? "bg-[#f3fbf6]" : ""
+                  }`}
                 >
                   <td className="px-4 py-4 font-medium text-[#25135c]">
                     <div>{profile.author_name}</div>
@@ -91,7 +109,7 @@ export default function PayoutProfilesList({ profiles }: PayoutProfilesListProps
                     {formatDateTime(profile.submitted_at ?? profile.updated_at)}
                   </td>
                   <td className="px-4 py-4 text-[#796ba0]">
-                    {getAuthorPayoutProfileStatusLabel(profile.status)}
+                    <StatusBadge status={profile.status} />
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Link
@@ -112,7 +130,11 @@ export default function PayoutProfilesList({ profiles }: PayoutProfilesListProps
         {profiles.map((profile) => (
           <article
             key={profile.id}
-            className="rounded-[22px] border border-[#eadff8] bg-white p-5"
+            className={`rounded-[22px] border p-5 ${
+              profile.status === "verified"
+                ? "border-[#cfe8d9] bg-[#f3fbf6]"
+                : "border-[#eadff8] bg-white"
+            }`}
           >
             <h2 className="text-base font-semibold text-[#25135c]">
               {profile.author_name}
@@ -138,8 +160,8 @@ export default function PayoutProfilesList({ profiles }: PayoutProfilesListProps
               </div>
               <div>
                 <dt className="text-[#9485b4]">Статус</dt>
-                <dd className="text-[#25135c]">
-                  {getAuthorPayoutProfileStatusLabel(profile.status)}
+                <dd className="mt-1">
+                  <StatusBadge status={profile.status} />
                 </dd>
               </div>
             </dl>

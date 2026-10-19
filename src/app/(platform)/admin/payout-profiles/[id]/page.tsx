@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import PayoutProfileReviewForm from "@/components/admin/PayoutProfileReviewForm";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { getAdminPayoutProfileDetail } from "@/lib/author-payout-profiles/service";
-import { getAuthorPayoutProfileStatusLabel } from "@/lib/author-payout-profiles/types";
+import { getAdminPayoutProfileStatusLabel } from "@/lib/author-payout-profiles/admin-status";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export default async function AdminPayoutProfileDetailPage({
             {profile.author_name}
           </h2>
           <p className="mt-1 text-sm text-[#796ba0]">
-            Статус: {getAuthorPayoutProfileStatusLabel(profile.status)}
+            Статус: {getAdminPayoutProfileStatusLabel(profile.status)}
           </p>
         </div>
       </div>

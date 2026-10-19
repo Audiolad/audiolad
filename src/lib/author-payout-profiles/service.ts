@@ -51,6 +51,7 @@ import {
   sanitizeStaffFacingComment,
   validateAuthorPayoutProfileFormValues,
 } from "./validation";
+import { findPayoutProfileVerifyBlockers } from "./admin-status";
 
 type ProfileRow = {
   id: string;
@@ -685,6 +686,26 @@ export async function listAdminPayoutProfiles(
   });
 }
 
+async function resolveStaffDisplayName(
+  supabase: SupabaseClient,
+  userId: string | null,
+): Promise<string | null> {
+  if (!userId) {
+    return null;
+  }
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", userId)
+      .maybeSingle();
+    const row = data as { full_name?: string | null; email?: string | null } | null;
+    return row?.full_name?.trim() || row?.email?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAdminPayoutProfileDetail(
   supabase: SupabaseClient,
   profileId: string,
@@ -723,13 +744,25 @@ export async function getAdminPayoutProfileDetail(
     row.payout_method && isAuthorPayoutMethod(row.payout_method)
       ? row.payout_method
       : fields.payout_method;
+  const recipientType = assertRecipientType(row.recipient_type);
+  // Computed from the full decrypted payload (before browser redaction) so
+  // card/account presence is checked for real. Only field names leave here.
+  const verifyBlockers = findPayoutProfileVerifyBlockers({
+    recipientType,
+    payoutMethod,
+    fields: decrypted,
+  });
+  const reviewedByName = await resolveStaffDisplayName(
+    supabase,
+    row.reviewed_by,
+  );
 
   return {
     id: row.id,
     author_id: row.author_id,
     author_name: author?.name ?? "Автор",
     author_slug: author?.slug ?? null,
-    recipient_type: assertRecipientType(row.recipient_type),
+    recipient_type: recipientType,
     payout_method: payoutMethod,
     bank_display_name: row.bank_display_name,
     status: assertStatus(row.status),
@@ -746,6 +779,8 @@ export async function getAdminPayoutProfileDetail(
     staff_note: row.staff_note,
     author_revision_comment: row.author_revision_comment,
     reviewed_by: row.reviewed_by,
+    reviewed_by_name: reviewedByName,
+    verify_blockers: verifyBlockers,
     review_started_at: row.review_started_at,
     verified_at: row.verified_at,
     rejected_at: row.rejected_at,
@@ -800,6 +835,29 @@ export async function staffTransitionPayoutProfile(input: {
     !reviewComment
   ) {
     throw new AuthorPayoutProfileError("review_comment_required", 400);
+  }
+
+  if (input.toStatus === "verified") {
+    // Never report a fake success: refuse to confirm incomplete requisites
+    // with an explicit reason (field names only, no values).
+    const payoutMethodRaw = row.payout_method;
+    const blockers = findPayoutProfileVerifyBlockers({
+      recipientType: assertRecipientType(row.recipient_type),
+      payoutMethod:
+        payoutMethodRaw && isAuthorPayoutMethod(payoutMethodRaw)
+          ? payoutMethodRaw
+          : null,
+      fields: decryptRowFields(row),
+    });
+    if (blockers.length > 0) {
+      throw new AuthorPayoutProfileError(
+        "verify_blocked",
+        422,
+        Object.fromEntries(
+          blockers.map((reason, index) => [`blocker_${index}`, reason]),
+        ),
+      );
+    }
   }
 
   const patch: Record<string, unknown> = {
