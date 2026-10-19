@@ -13,6 +13,7 @@ import {
 } from "@/lib/admin/mailings/campaign-status";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 import { formatHumanSenderLabel, getSenderIdentity } from "@/lib/email/sender-identities";
+import { paragraphsToText } from "@/lib/admin/mailings/paragraphs";
 import { renderManualCampaignEmail } from "@/lib/email/templates/manual-campaign";
 import { createSupabaseApplicationEmailRuntime } from "@/lib/email/supabase-application-email-runtime";
 import { getAppOrigin } from "@/lib/seo/app-origin";
@@ -88,7 +89,7 @@ export default async function AdminMailingDetailPage({
             subject: campaign.subject,
             preheader: campaign.preheader ?? "",
             heading: campaign.content.heading ?? "",
-            paragraphs: (campaign.content.paragraphs ?? []).join("\n"),
+            paragraphs: paragraphsToText(campaign.content.paragraphs ?? []),
             ctaLabel: campaign.content.cta?.label ?? "",
             ctaUrl: campaign.content.cta?.url ?? "",
             infoTitle: campaign.content.infoBlock?.title ?? "",

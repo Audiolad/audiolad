@@ -3,6 +3,18 @@ import {
   parseAbsoluteHttpUrl,
   sanitizeEmailSubject,
 } from "@/lib/email/templates/manual-campaign";
+import {
+  MAX_CAMPAIGN_LINES_PER_PARAGRAPH,
+  MAX_CAMPAIGN_PARAGRAPH_CHARS,
+  MAX_CAMPAIGN_PARAGRAPHS,
+  countNonEmptyLines,
+} from "./paragraphs";
+
+export {
+  MAX_CAMPAIGN_LINES_PER_PARAGRAPH,
+  MAX_CAMPAIGN_PARAGRAPH_CHARS,
+  MAX_CAMPAIGN_PARAGRAPHS,
+} from "./paragraphs";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -42,9 +54,6 @@ export type CampaignDraftInput = {
   content: ManualCampaignContentInput;
   filter: AuthorCampaignFilter;
 };
-
-/** Max non-empty lines in «Текст» (editor splits on every newline). */
-export const MAX_CAMPAIGN_PARAGRAPHS = 40;
 
 export type CampaignValidationError =
   | "subject_required"
@@ -194,9 +203,12 @@ export function validateCampaignDraft(
 
   const paragraphs: string[] = [];
   for (const paragraph of input.content.paragraphs) {
-    const cleaned = cleanText(paragraph, 4000);
+    const cleaned = cleanText(paragraph, MAX_CAMPAIGN_PARAGRAPH_CHARS);
     if (!cleaned) {
       return { ok: false, code: "paragraphs_required" };
+    }
+    if (countNonEmptyLines(cleaned) > MAX_CAMPAIGN_LINES_PER_PARAGRAPH) {
+      return { ok: false, code: "paragraphs_too_many" };
     }
     paragraphs.push(cleaned);
   }
