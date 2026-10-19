@@ -12,7 +12,7 @@ import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
 import {
   audioSprintHref,
-  isAudioSprintOsenZvuchitPromoActive,
+  isAudioSprintOsenZvuchitPromoVisible,
 } from "@/lib/seo-queries/audio-sprint";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
@@ -229,7 +229,7 @@ export default function AuthorDashboardNav({
     ? `?author=${encodeURIComponent(authorSlug)}`
     : "";
   const discoveryEnabled = isAuthorSeoDiscoveryEnabled(authorId);
-  const sprintPromoActive = isAudioSprintOsenZvuchitPromoActive();
+  const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible();
 
   const items: {
     href: string;
@@ -272,7 +272,7 @@ export default function AuthorDashboardNav({
       active: pathname.startsWith("/author-dashboard/seo-opportunities"),
     },
     // Promo tab only while the sprint runs; the sprint page itself stays reachable.
-    ...(sprintPromoActive
+    ...(sprintPromoVisible
       ? [
           {
             href: audioSprintHref(authorSlug),

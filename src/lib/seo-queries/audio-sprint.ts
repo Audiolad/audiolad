@@ -18,9 +18,9 @@ export const AUDIO_SPRINT_OSEN_ZVUCHIT_DESCRIPTION =
   "Выберите свободный запрос и создайте по нему бесплатный аудиопродукт в каталог. Музыка создаётся в разделе «Музыка», медитации, аффирмации и практики — через «Продукт» → «Аудиопрактика».";
 
 /**
- * Sprint window: 3–18 October 2026 inclusive (Moscow time), so the promo ends at
+ * Sprint window: 3–18 October 2026 inclusive (Moscow time), so the sprint ends at
  * 2026-10-19 00:00 MSK. Only the author-facing promo (the cabinet nav tab and the
- * dashboard banner) is gated by this. Sprint pages, routes, queries, reservations,
+ * dashboard banner) is gated. Sprint pages, routes, queries, reservations,
  * results and admin tooling stay available after the end.
  */
 export const AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENDS_AT = "2026-10-19T00:00:00+03:00";
@@ -29,13 +29,32 @@ const AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENDS_AT_MS = Date.parse(
   AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENDS_AT,
 );
 
-/** true while the sprint is running; the author UI stops advertising it afterwards. */
+/** true while the sprint window is open (pure, time injectable). */
 export function isAudioSprintOsenZvuchitPromoActive(
   now: Date | number = Date.now(),
 ): boolean {
   const at = typeof now === "number" ? now : now.getTime();
   if (!Number.isFinite(at)) return false;
   return at < AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENDS_AT_MS;
+}
+
+/**
+ * Build-time switch for the author-facing promo. Off since the sprint ended
+ * (owner, 19.10.2026): the promo renders identically on the server and in the
+ * browser and never depends on the visitor's clock.
+ */
+export const AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENABLED: boolean = false;
+
+/**
+ * Whether the author UI shows the sprint promo. With the switch off no clock is
+ * read, so SSR and hydration always agree. If the switch is ever turned on, the
+ * promo still hides itself after the sprint end date.
+ */
+export function isAudioSprintOsenZvuchitPromoVisible(
+  now?: Date | number,
+): boolean {
+  if (!AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENABLED) return false;
+  return isAudioSprintOsenZvuchitPromoActive(now ?? Date.now());
 }
 
 /** First release shows the initial pool only. Reserve stays hidden. */

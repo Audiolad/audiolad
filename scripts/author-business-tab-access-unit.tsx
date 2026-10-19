@@ -11,6 +11,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import AuthorDashboardClient from "../src/components/author-dashboard/AuthorDashboardClient";
 import AuthorDashboardNav from "../src/components/author-dashboard/AuthorDashboardNav";
 import BusinessCommercialRequiredNotice from "../src/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import {
@@ -129,8 +130,9 @@ async function main() {
     await nav.cleanup();
   }
 
-  // AudioSprint «Осень звучит» ended 18.10.2026: no promo tab in the cabinet nav (also on the
-  // sprint page, which stays reachable by URL); the neighbouring tabs are unchanged.
+  // AudioSprint «Осень звучит» ended 18.10.2026: the promo switch is off, so neither the nav tab
+  // (also not on the sprint page, which stays reachable by URL) nor the dashboard banner renders,
+  // whatever the clock says; the neighbouring tabs are unchanged.
   for (const pathname of ["/author-dashboard", "/author-dashboard/audio-sprints/osen-zvuchit-2026"]) {
     const nav = await renderNav("free", pathname);
     const text = nav.container.textContent ?? "";
@@ -140,6 +142,29 @@ async function main() {
     assert.equal(linksTo(nav.container, "/author-dashboard/seo-opportunities").length, 1);
     assert.equal(linksTo(nav.container, "/author-dashboard/stats").length, 1);
     await nav.cleanup();
+  }
+  {
+    const doc = document as { cookie?: string };
+    if (typeof doc.cookie !== "string") doc.cookie = "";
+    const dashboardHtml = renderToStaticMarkup(
+      createElement(AuthorDashboardClient, {
+        authors: [
+          {
+            id: "00000000-0000-0000-0000-000000000001",
+            slug: "slug-1",
+            name: "Проект",
+            role: "owner",
+            accessStatus: "free",
+            canBypassProductModeration: false,
+            defaultAudioProductAuthor: null,
+          },
+        ],
+      }),
+    );
+    assert.ok(dashboardHtml.includes("Продукты текущего проекта"), "dashboard rendered");
+    assert.ok(!dashboardHtml.includes("Осень звучит"), "no sprint banner or tab on the dashboard");
+    assert.ok(!dashboardHtml.includes("призовой фонд"), "no prize-fund promo on the dashboard");
+    assert.ok(!dashboardHtml.includes('href="/osen-zvuchit"'), "no link to the sprint landing");
   }
 
   // On the Business page itself the page already renders the notice: no duplicate from the nav.

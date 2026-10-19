@@ -37,7 +37,7 @@ import {
 } from "@/lib/author-products/moderation";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import { authorAccessAllowsContentMutations } from "@/lib/authors/access";
-import { isAudioSprintOsenZvuchitPromoActive } from "@/lib/seo-queries/audio-sprint";
+import { isAudioSprintOsenZvuchitPromoVisible } from "@/lib/seo-queries/audio-sprint";
 import {
   formatPriceLabel,
   formatUpdatedAt,
@@ -291,7 +291,7 @@ export default function AuthorDashboardClient({
   const musicHref = `/author-dashboard/music?author=${encodeURIComponent(selectedAuthor.slug)}`;
 
 
-  const sprintPromoActive = isAudioSprintOsenZvuchitPromoActive();
+  const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible();
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthor.accessStatus,
   );
@@ -301,7 +301,7 @@ export default function AuthorDashboardClient({
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} accessStatus={selectedAuthor.accessStatus} />
 
       {/* AudioSprint promo only while the sprint runs (ends 18.10.2026). */}
-      {sprintPromoActive ? (
+      {sprintPromoVisible ? (
         <Link
           href="/osen-zvuchit"
           className="group mt-4 block overflow-hidden rounded-[24px] border border-[#efc873] bg-gradient-to-r from-[#fff4d7] via-[#ffe9bd] to-[#f7d28a] px-5 py-4 text-[#4a2f17] shadow-[0_10px_26px_rgba(181,120,42,0.14)] transition hover:border-[#dfa94a] hover:shadow-[0_12px_30px_rgba(181,120,42,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b97828]"
