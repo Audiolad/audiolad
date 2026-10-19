@@ -165,6 +165,7 @@ export const MAILING_CODE_LABELS: Record<string, string> = {
   subject_invalid: "Некорректная тема письма",
   heading_required: "Укажите заголовок",
   paragraphs_required: "Добавьте текст письма",
+  paragraphs_too_many: "Слишком много абзацев: в поле «Текст» не больше 40 строк (каждая строка – отдельный абзац)",
   url_invalid: "Некорректная ссылка",
   cta_incomplete: "Кнопка заполнена не полностью",
   link_incomplete: "Ссылка заполнена не полностью",

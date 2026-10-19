@@ -251,7 +251,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
             required
             value={state.paragraphs}
             onChange={(event) => update("paragraphs", event.target.value)}
-            placeholder={"Каждая строка — отдельный абзац.\nМожно использовать {{first_name}}."}
+            placeholder={"Каждая строка – отдельный абзац (не больше 40).\nМожно использовать {{first_name}}."}
           />
         </label>
 
