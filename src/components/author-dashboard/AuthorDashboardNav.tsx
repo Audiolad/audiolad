@@ -10,7 +10,10 @@ import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportM
 import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
 import { canAccessAuthorPartnerYour20Ui } from "@/lib/author-partner/access";
 import type { AuthorAccessStatus } from "@/lib/authors/access";
-import { audioSprintHref } from "@/lib/seo-queries/audio-sprint";
+import {
+  audioSprintHref,
+  isAudioSprintOsenZvuchitPromoVisible,
+} from "@/lib/seo-queries/audio-sprint";
 import { isAuthorSeoDiscoveryEnabled } from "@/lib/seo-queries/discovery-beta";
 
 function ProfileIcon() {
@@ -226,6 +229,7 @@ export default function AuthorDashboardNav({
     ? `?author=${encodeURIComponent(authorSlug)}`
     : "";
   const discoveryEnabled = isAuthorSeoDiscoveryEnabled(authorId);
+  const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible();
 
   const items: {
     href: string;
@@ -267,12 +271,17 @@ export default function AuthorDashboardNav({
       icon: SeoIcon,
       active: pathname.startsWith("/author-dashboard/seo-opportunities"),
     },
-    {
-      href: audioSprintHref(authorSlug),
-      label: AUTUMN_NAV_LABEL,
-      icon: AudioSprintIcon,
-      active: pathname.startsWith("/author-dashboard/audio-sprints"),
-    },
+    // Promo tab only while the sprint runs; the sprint page itself stays reachable.
+    ...(sprintPromoVisible
+      ? [
+          {
+            href: audioSprintHref(authorSlug),
+            label: AUTUMN_NAV_LABEL,
+            icon: AudioSprintIcon,
+            active: pathname.startsWith("/author-dashboard/audio-sprints"),
+          },
+        ]
+      : []),
     {
       href: `/author-dashboard/stats${authorQuery}`,
       label: "Статистика",

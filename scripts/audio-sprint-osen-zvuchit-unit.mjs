@@ -20,6 +20,10 @@ import {
   AUDIO_SPRINT_GROUP_LABEL,
   AUDIO_SPRINT_OSEN_ZVUCHIT_SLUG,
   AUDIO_SPRINT_OSEN_ZVUCHIT_TITLE,
+  AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENDS_AT,
+  AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENABLED,
+  isAudioSprintOsenZvuchitPromoActive,
+  isAudioSprintOsenZvuchitPromoVisible,
   audioSprintEnabledPools,
   audioSprintHref,
   audioSprintHasCover,
@@ -514,6 +518,43 @@ const sprintAt = nav.indexOf("href: audioSprintHref");
 const statsAt = nav.indexOf("href: `/author-dashboard/stats");
 assert.ok(seoAt >= 0 && sprintAt > seoAt && statsAt > sprintAt);
 assert.match(nav, /Осень звучит/);
+
+// Promo hides automatically after the sprint (3–18.10.2026 MSK); nothing else is removed.
+assert.equal(AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENDS_AT, "2026-10-19T00:00:00+03:00");
+assert.equal(isAudioSprintOsenZvuchitPromoActive(new Date("2026-10-03T00:00:00+03:00")), true);
+assert.equal(isAudioSprintOsenZvuchitPromoActive(new Date("2026-10-18T23:59:59+03:00")), true);
+assert.equal(isAudioSprintOsenZvuchitPromoActive(new Date("2026-10-19T00:00:00+03:00")), false);
+assert.equal(isAudioSprintOsenZvuchitPromoActive(Date.parse("2026-10-19T08:21:00+03:00")), false);
+assert.equal(isAudioSprintOsenZvuchitPromoActive(new Date("invalid")), false);
+assert.equal(isAudioSprintOsenZvuchitPromoActive(Number.NaN), false);
+// The promo switch is off: no date (including a browser clock set back) shows it again.
+assert.equal(AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENABLED, false);
+for (const at of [
+  new Date("2026-10-03T00:00:00+03:00"),
+  new Date("2026-10-18T23:59:59+03:00"),
+  new Date("2026-10-19T00:00:00+03:00"),
+  Date.parse("2020-01-01T00:00:00Z"),
+  undefined,
+]) {
+  assert.equal(isAudioSprintOsenZvuchitPromoVisible(at), false);
+}
+const sprintLibSource = read("src/lib/seo-queries/audio-sprint.ts");
+assert.match(
+  sprintLibSource,
+  /if \(!AUDIO_SPRINT_OSEN_ZVUCHIT_PROMO_ENABLED\) return false;\s*return isAudioSprintOsenZvuchitPromoActive\(now \?\? Date\.now\(\)\);/,
+);
+assert.match(nav, /const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible\(\)/);
+assert.match(nav, /\.\.\.\(sprintPromoVisible\s*\?\s*\[\s*\{\s*href: audioSprintHref\(authorSlug\)/);
+const dashboardClient = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
+assert.match(dashboardClient, /const sprintPromoVisible = isAudioSprintOsenZvuchitPromoVisible\(\)/);
+assert.match(
+  dashboardClient,
+  /\{sprintPromoVisible \? \(\s*<Link\s+href="\/osen-zvuchit"[\s\S]*?Осень звучит · АудиоСпринт[\s\S]*?<\/Link>\s*\) : null\}/,
+);
+assert.equal((dashboardClient.match(/href="\/osen-zvuchit"/g) ?? []).length, 1);
+// Sprint page, public landing and routes stay in place.
+assert.ok(existsSync(path.join(root, "src/app/(platform)/author-dashboard/audio-sprints/[slug]/page.tsx")));
+assert.ok(existsSync(path.join(root, "src/app/(platform)/(listener)/osen-zvuchit/page.tsx")));
 assert.doesNotMatch(nav, /isAuthorSeoDiscoveryEnabled\(authorId\)[\s\S]{0,180}Осень звучит/);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
