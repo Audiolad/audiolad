@@ -129,6 +129,19 @@ async function main() {
     await nav.cleanup();
   }
 
+  // AudioSprint «Осень звучит» ended 18.10.2026: no promo tab in the cabinet nav (also on the
+  // sprint page, which stays reachable by URL); the neighbouring tabs are unchanged.
+  for (const pathname of ["/author-dashboard", "/author-dashboard/audio-sprints/osen-zvuchit-2026"]) {
+    const nav = await renderNav("free", pathname);
+    const text = nav.container.textContent ?? "";
+    assert.ok(!text.includes("Осень звучит"), `no sprint tab on ${pathname}`);
+    assert.ok(!text.includes("до 18 октября"), `no sprint deadline badge on ${pathname}`);
+    assert.equal(linksTo(nav.container, "/author-dashboard/audio-sprints").length, 0);
+    assert.equal(linksTo(nav.container, "/author-dashboard/seo-opportunities").length, 1);
+    assert.equal(linksTo(nav.container, "/author-dashboard/stats").length, 1);
+    await nav.cleanup();
+  }
+
   // On the Business page itself the page already renders the notice: no duplicate from the nav.
   {
     const nav = await renderNav("free", "/author-dashboard/business");

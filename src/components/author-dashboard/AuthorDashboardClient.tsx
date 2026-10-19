@@ -37,6 +37,7 @@ import {
 } from "@/lib/author-products/moderation";
 import type { AuthorProductListItem, AuthorWorkspace } from "@/lib/author-products/types";
 import { authorAccessAllowsContentMutations } from "@/lib/authors/access";
+import { isAudioSprintOsenZvuchitPromoActive } from "@/lib/seo-queries/audio-sprint";
 import {
   formatPriceLabel,
   formatUpdatedAt,
@@ -290,6 +291,7 @@ export default function AuthorDashboardClient({
   const musicHref = `/author-dashboard/music?author=${encodeURIComponent(selectedAuthor.slug)}`;
 
 
+  const sprintPromoActive = isAudioSprintOsenZvuchitPromoActive();
   const canMutateContent = authorAccessAllowsContentMutations(
     selectedAuthor.accessStatus,
   );
@@ -298,31 +300,34 @@ export default function AuthorDashboardClient({
     <div>
       <AuthorDashboardNav authorSlug={selectedAuthor.slug} authorId={selectedAuthor.id} authorRole={selectedAuthor.role} accessStatus={selectedAuthor.accessStatus} />
 
-      <Link
-        href="/osen-zvuchit"
-        className="group mt-4 block overflow-hidden rounded-[24px] border border-[#efc873] bg-gradient-to-r from-[#fff4d7] via-[#ffe9bd] to-[#f7d28a] px-5 py-4 text-[#4a2f17] shadow-[0_10px_26px_rgba(181,120,42,0.14)] transition hover:border-[#dfa94a] hover:shadow-[0_12px_30px_rgba(181,120,42,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b97828]"
-        aria-label="Подробнее об АудиоСпринте «Осень звучит»"
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/75 text-[#b66f22] shadow-sm">
-              <AutumnLeafIcon />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[17px] font-semibold text-[#6f3f16]">
-                Осень звучит · АудиоСпринт
-              </p>
-              <p className="mt-1 text-sm leading-5 text-[#80552e]">
-                3–18 октября · 100 поисковых запросов · призовой фонд 6 000 ₽
-              </p>
+      {/* AudioSprint promo only while the sprint runs (ends 18.10.2026). */}
+      {sprintPromoActive ? (
+        <Link
+          href="/osen-zvuchit"
+          className="group mt-4 block overflow-hidden rounded-[24px] border border-[#efc873] bg-gradient-to-r from-[#fff4d7] via-[#ffe9bd] to-[#f7d28a] px-5 py-4 text-[#4a2f17] shadow-[0_10px_26px_rgba(181,120,42,0.14)] transition hover:border-[#dfa94a] hover:shadow-[0_12px_30px_rgba(181,120,42,0.2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b97828]"
+          aria-label="Подробнее об АудиоСпринте «Осень звучит»"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/75 text-[#b66f22] shadow-sm">
+                <AutumnLeafIcon />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[17px] font-semibold text-[#6f3f16]">
+                  Осень звучит · АудиоСпринт
+                </p>
+                <p className="mt-1 text-sm leading-5 text-[#80552e]">
+                  3–18 октября · 100 поисковых запросов · призовой фонд 6 000 ₽
+                </p>
+              </div>
             </div>
+            <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-[#dfb45d] bg-white/75 px-4 py-2 text-sm font-semibold text-[#8f571d] transition group-hover:bg-white sm:self-auto">
+              Подробнее
+              <span aria-hidden="true">→</span>
+            </span>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-[#dfb45d] bg-white/75 px-4 py-2 text-sm font-semibold text-[#8f571d] transition group-hover:bg-white sm:self-auto">
-            Подробнее
-            <span aria-hidden="true">→</span>
-          </span>
-        </div>
-      </Link>
+        </Link>
+      ) : null}
 
       <AuthorAccessStatusBanner accessStatus={selectedAuthor.accessStatus} />
       <AuthorTermsRequiredBanner
