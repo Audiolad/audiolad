@@ -4,37 +4,12 @@ import PayoutProfilesList from "@/components/admin/PayoutProfilesList";
 import { listAdminPayoutProfiles } from "@/lib/author-payout-profiles/service";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
-  AUTHOR_PAYOUT_PROFILE_STATUSES,
-  getAuthorPayoutProfileStatusLabel,
-  type AuthorPayoutProfileStatus,
-} from "@/lib/author-payout-profiles/types";
+  ADMIN_PAYOUT_PROFILE_FILTERS,
+  resolveAdminPayoutProfileFilter,
+} from "@/lib/author-payout-profiles/admin-status";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
-
-const FILTER_STATUSES = [
-  "all",
-  ...AUTHOR_PAYOUT_PROFILE_STATUSES.filter(
-    (status) => status !== "draft",
-  ),
-] as const;
-
-function resolveFilterStatus(
-  value: string | undefined,
-): AuthorPayoutProfileStatus | "all" {
-  if (!value || value === "all") {
-    return "all";
-  }
-
-  if (
-    (AUTHOR_PAYOUT_PROFILE_STATUSES as readonly string[]).includes(value) &&
-    value !== "draft"
-  ) {
-    return value as AuthorPayoutProfileStatus;
-  }
-
-  return "all";
-}
 
 export default async function AdminPayoutProfilesPage({
   searchParams,
@@ -43,8 +18,8 @@ export default async function AdminPayoutProfilesPage({
 }) {
   await requireAdminPermission("authors.payout_profiles.review");
   const params = await searchParams;
-  const status = resolveFilterStatus(params.status);
-  const activeFilter = params.status ?? "all";
+  const status = resolveAdminPayoutProfileFilter(params.status);
+  const activeFilter = status;
 
   let profiles;
 
@@ -74,25 +49,22 @@ export default async function AdminPayoutProfilesPage({
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {FILTER_STATUSES.map((filterKey) => (
+        {ADMIN_PAYOUT_PROFILE_FILTERS.map((filter) => (
           <Link
-            key={filterKey}
+            key={filter.key}
             href={
-              filterKey === "all"
+              filter.key === "all"
                 ? "/admin/payout-profiles"
-                : `/admin/payout-profiles?status=${filterKey}`
+                : `/admin/payout-profiles?status=${filter.key}`
             }
+            aria-current={activeFilter === filter.key ? "page" : undefined}
             className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold ${
-              activeFilter === filterKey
+              activeFilter === filter.key
                 ? "bg-[#7042c5] text-white"
                 : "border border-[#e4d7f4] bg-white text-[#7042c5]"
             }`}
           >
-            {filterKey === "all"
-              ? "Все"
-              : getAuthorPayoutProfileStatusLabel(
-                  filterKey as AuthorPayoutProfileStatus,
-                )}
+            {filter.label}
           </Link>
         ))}
       </div>

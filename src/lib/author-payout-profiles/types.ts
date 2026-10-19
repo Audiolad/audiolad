@@ -157,6 +157,13 @@ export type AuthorPayoutProfileAdminDetail = AuthorPayoutProfileAdminListItem & 
   verified_at: string | null;
   rejected_at: string | null;
   created_at: string;
+  /** Display name (or email) of the staff member who made the last decision. */
+  reviewed_by_name: string | null;
+  /**
+   * Server-computed reasons why the questionnaire cannot be confirmed
+   * (field names only, never values). Empty when confirmation is allowed.
+   */
+  verify_blockers: string[];
   /** Browser-safe: payment PAN/account always redacted. */
   fields: AuthorPayoutProfileSensitivePayload;
   requisites: {

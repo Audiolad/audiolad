@@ -5,7 +5,14 @@ import { revalidatePath } from "next/cache";
 import type { AdminPayoutProfileActionState } from "@/app/(platform)/admin/payout-profiles/action-state";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { isPayoutProfilesEnabled } from "@/lib/author-payout-profiles/feature";
-import { staffTransitionPayoutProfile } from "@/lib/author-payout-profiles/service";
+import {
+  describeStaffPayoutTransitionError,
+  formatPayoutProfileVerifyBlockedMessage,
+} from "@/lib/author-payout-profiles/admin-status";
+import {
+  AuthorPayoutProfileError,
+  staffTransitionPayoutProfile,
+} from "@/lib/author-payout-profiles/service";
 import { sendPayoutProfileAuthorStatusEmail } from "@/lib/email/send-payout-profile-author-status-email";
 import { getAppOrigin } from "@/lib/seo/app-origin";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -124,7 +131,7 @@ async function runStaffTransition(
           }
         } else {
           warning =
-            "Статус обновлён, но email автора не найден — письмо не отправлено.";
+            "Статус обновлён, но email автора не найден – письмо не отправлено.";
         }
       } catch (error) {
         console.error(
@@ -145,8 +152,21 @@ async function runStaffTransition(
       warning,
     };
   } catch (error) {
-    console.error("admin_payout_profile_action_failed", error);
-    return { ok: false, error: "Не удалось обновить статус анкеты." };
+    if (error instanceof AuthorPayoutProfileError) {
+      // Code only – never log payload/requisite values.
+      console.error("admin_payout_profile_action_failed", error.code);
+      if (error.code === "verify_blocked") {
+        return {
+          ok: false,
+          error: formatPayoutProfileVerifyBlockedMessage(
+            Object.values(error.fieldErrors ?? {}),
+          ),
+        };
+      }
+      return { ok: false, error: describeStaffPayoutTransitionError(error.code) };
+    }
+    console.error("admin_payout_profile_action_failed");
+    return { ok: false, error: describeStaffPayoutTransitionError(null) };
   }
 }
 
