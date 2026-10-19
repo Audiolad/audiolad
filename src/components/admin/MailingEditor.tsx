@@ -18,6 +18,7 @@ import type { RecipientListingEntry } from "@/lib/admin/mailings/recipients";
 import type { AuthorCampaignFilter } from "@/lib/admin/mailings/validation";
 import { formatHumanSenderLabel, getSenderIdentity } from "@/lib/email/sender-identities";
 import { normalizeOptionalCampaignLink } from "@/lib/email/templates/manual-campaign";
+import { paragraphsFromText } from "@/lib/admin/mailings/paragraphs";
 
 export function RecipientsDialog(props: {
   entries: RecipientListingEntry[];
@@ -116,13 +117,6 @@ export const MAILING_TEST_RECIPIENT_PRESETS = [
 
 function isMailingTestPresetSelected(current: string, email: string): boolean {
   return current.trim().toLowerCase() === email.toLowerCase();
-}
-
-function paragraphsFromText(value: string): string[] {
-  return value
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
 }
 
 export default function MailingEditor({ campaignId, canSend, initial }: EditorProps) {
@@ -251,7 +245,7 @@ export default function MailingEditor({ campaignId, canSend, initial }: EditorPr
             required
             value={state.paragraphs}
             onChange={(event) => update("paragraphs", event.target.value)}
-            placeholder={"Каждая строка – отдельный абзац (не больше 40).\nМожно использовать {{first_name}}."}
+            placeholder={"Пустая строка – новый абзац; одна строка внутри абзаца – перенос (не больше 40 абзацев).\nМожно использовать {{first_name}}."}
           />
         </label>
 

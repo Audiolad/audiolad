@@ -10,7 +10,7 @@ import {
 import { escapeHtml } from "./escape-html";
 
 export const MANUAL_CAMPAIGN_TEMPLATE_KEY = "manual_campaign";
-export const MANUAL_CAMPAIGN_TEMPLATE_VERSION = "manual-campaign-v1-20261219";
+export const MANUAL_CAMPAIGN_TEMPLATE_VERSION = "manual-campaign-v2-20261019";
 
 const FIRST_NAME_TOKEN = "{{first_name}}";
 
@@ -116,16 +116,24 @@ export function applyFirstNamePlaceholder(
     return text.split(FIRST_NAME_TOKEN).join(name);
   }
 
+  // Keep newlines: \s would swallow line breaks needed for <br /> blocks.
   return text
-    .replace(/,\s*\{\{first_name\}\}/g, "")
-    .replace(/\{\{first_name\}\}\s*,?/g, "")
+    .replace(/,[ \t]*\{\{first_name\}\}/g, "")
+    .replace(/\{\{first_name\}\}[ \t]*,?/g, "")
     .replace(/[ \t]{2,}/g, " ")
-    .replace(/\s+([!?.])/g, "$1")
+    .replace(/[ \t]+([!?.])/g, "$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
     .trim();
 }
 
 function personalize(text: string, firstName: string | null | undefined): string {
   return applyFirstNamePlaceholder(text, firstName);
+}
+
+/** Escape plain text then turn single newlines into <br /> (paragraph blocks stay separate <p>). */
+export function formatCampaignParagraphHtml(text: string): string {
+  return escapeHtml(text).replace(/\n/g, "<br />");
 }
 
 export function renderManualCampaignEmail(
@@ -171,7 +179,7 @@ export function renderManualCampaignEmail(
     renderBrandEmailHeading(heading),
     ...paragraphs.map((paragraph, index) =>
       renderBrandEmailParagraph(
-        escapeHtml(paragraph),
+        formatCampaignParagraphHtml(paragraph),
         index === 0 ? "email-greeting" : "email-body",
         index === paragraphs.length - 1 ? "0 0 24px" : "0 0 10px",
       ),
@@ -234,32 +242,29 @@ export function renderManualCampaignEmail(
     versionComment: `AUDIOLAD_MANUAL_CAMPAIGN ${MANUAL_CAMPAIGN_TEMPLATE_VERSION}`,
   });
 
-  const text = [
-    subject,
-    "",
-    heading,
-    "",
-    ...paragraphs.flatMap((paragraph) => [paragraph, ""]),
-    cta && ctaUrl ? `${cta.label}: ${ctaUrl}` : "",
-    input.content.infoBlock?.text.trim()
-      ? [
-          input.content.infoBlock.title.trim(),
-          personalize(input.content.infoBlock.text, input.firstName).trim(),
-        ]
-          .filter(Boolean)
-          .join("\n")
-      : "",
-    secondaryLink && secondaryUrl ? `${secondaryLink.label}: ${secondaryUrl}` : "",
-    "",
-    "С заботой,",
-    "команда АудиоЛада",
-    "",
-    "© АудиоЛад, 2026. Все права защищены.",
-    "Вы получили это письмо как автор АудиоЛада.",
-    unsubscribeUrl ? `Отписаться от информационных писем: ${unsubscribeUrl}` : "",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
+  const textSections: string[] = [subject, heading, paragraphs.join("\n\n")];
+  if (cta && ctaUrl) {
+    textSections.push(`${cta.label}: ${ctaUrl}`);
+  }
+  if (input.content.infoBlock?.text.trim()) {
+    textSections.push(
+      [
+        input.content.infoBlock.title.trim(),
+        personalize(input.content.infoBlock.text, input.firstName).trim(),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+  if (secondaryLink && secondaryUrl) {
+    textSections.push(`${secondaryLink.label}: ${secondaryUrl}`);
+  }
+  textSections.push("С заботой,\nкоманда АудиоЛада");
+  textSections.push("© АудиоЛад, 2026. Все права защищены.\nВы получили это письмо как автор АудиоЛада.");
+  if (unsubscribeUrl) {
+    textSections.push(`Отписаться от информационных писем: ${unsubscribeUrl}`);
+  }
+  const text = textSections.filter((section) => section.trim().length > 0).join("\n\n");
 
   return { ok: true, subject, html, text };
 }

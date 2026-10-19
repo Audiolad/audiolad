@@ -31,6 +31,14 @@ import {
 } from "../src/lib/admin/mailings/test-send";
 import { MAX_CAMPAIGN_PARAGRAPHS, validateCampaignDraft } from "../src/lib/admin/mailings/validation";
 import {
+  paragraphsFromText,
+  paragraphsToText,
+} from "../src/lib/admin/mailings/paragraphs";
+import {
+  formatCampaignParagraphHtml,
+  MANUAL_CAMPAIGN_TEMPLATE_VERSION,
+} from "../src/lib/email/templates/manual-campaign";
+import {
   campaignOutboxDedupKey,
   createMemoryApplicationEmailRuntime,
   type EmailCampaignRecord,
@@ -236,34 +244,36 @@ assert.equal(validateCampaignDraft({
   filter: { version: 1, kind: "all_authors" },
 }).ok, false);
 
-// Regression: long «Текст» with emoji/keycaps and >12 lines used to fail as paragraphs_required
-// («Добавьте текст письма») because the editor splits every newline into a paragraph.
-function paragraphsFromTextLikeEditor(value: string): string[] {
-  return value
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
+// Paragraph blocks: blank line separates <p>; single newline → <br /> inside the block.
+assert.deepEqual(
+  paragraphsFromText("A\nB\n\nC\nD"),
+  ["A\nB", "C\nD"],
+);
+assert.equal(paragraphsToText(["A\nB", "C\nD"]), "A\nB\n\nC\nD");
+// Legacy one-line-per-element rows reopen as separate blocks when joined with \\n\\n.
+assert.deepEqual(
+  paragraphsFromText(paragraphsToText(["line1", "line2", "line3"])),
+  ["line1", "line2", "line3"],
+);
+assert.equal(formatCampaignParagraphHtml("1 <b>x</b>\n2"), "1 &lt;b&gt;x&lt;/b&gt;<br />2");
+
 const autumnSprintBody = [
   "Друзья, ✨ подводим итоги аудиоспринта «Осень звучит» 🍂🎧",
   "",
-  "Что было важно:",
+  "Сегодня на созвоне:",
   "1️⃣ Первый пункт про эфир и результаты.",
   "2️⃣ Второй пункт про материалы авторов.",
   "3️⃣ Третий пункт про следующие шаги.",
-  "4️⃣ Четвёртый пункт про чат.",
-  "5️⃣ Пятый пункт про ссылку на эфир.",
+  "",
+  "3 000 ₽",
+  "2 000 ₽",
+  "1 000 ₽",
   "",
   "Спасибо всем, кто участвовал.",
-  "До встречи на эфире.",
-  "Короткий абзац A.",
-  "Короткий абзац B.",
-  "Короткий абзац C.",
-  "Короткий абзац D.",
-  "Короткий абзац E.",
 ].join("\n");
-const autumnParagraphs = paragraphsFromTextLikeEditor(autumnSprintBody);
-assert.ok(autumnParagraphs.length > 12, "fixture must exceed the old 12-line cap");
+const autumnParagraphs = paragraphsFromText(autumnSprintBody);
+assert.equal(autumnParagraphs.length, 4);
+assert.ok(autumnParagraphs[1].includes("\n1️⃣"));
 assert.ok(autumnParagraphs.length <= MAX_CAMPAIGN_PARAGRAPHS);
 const autumnDraft = validateCampaignDraft({
   audienceType: "authors",
@@ -272,11 +282,11 @@ const autumnDraft = validateCampaignDraft({
   subject: "Эфир в 18:00 мск",
   preheader: "Итоги спринта",
   content: {
-    heading: "Подводим итоги",
+    heading: "Подводим итоги аудиоспринта «Осень звучит»",
     paragraphs: autumnParagraphs,
     cta: { label: "Ссылка на эфир", url: "https://example.com/zoom" },
     infoBlock: { title: "", text: "" },
-    secondaryLink: { label: "Telegram", url: "https://t.me/example" },
+    secondaryLink: { label: "Telegram-чат", url: "https://t.me/example" },
   },
   filter: { version: 1, kind: "all_authors" },
 });
@@ -285,6 +295,37 @@ if (autumnDraft.ok) {
   assert.equal(autumnDraft.value.content.infoBlock, null);
   assert.ok(autumnDraft.value.content.paragraphs.some((p) => p.includes("1️⃣")));
 }
+
+const formatted = renderManualCampaignEmail({
+  subject: "Эфир в 18:00 мск",
+  content: {
+    heading: "Подводим итоги аудиоспринта «Осень звучит»",
+    paragraphs: autumnParagraphs,
+    cta: { label: "Ссылка на эфир", url: "https://example.com/zoom" },
+    infoBlock: null,
+    secondaryLink: { label: "Telegram-чат", url: "https://t.me/example" },
+  },
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(formatted.ok, true);
+if (formatted.ok) {
+  assert.match(formatted.html, /Подводим итоги аудиоспринта/);
+  assert.doesNotMatch(formatted.html, />итоги аудиоспринта/);
+  assert.match(formatted.html, /Сегодня на созвоне:<br \/>1️⃣/);
+  assert.match(formatted.html, /3 000 ₽<br \/>2 000 ₽<br \/>1 000 ₽/);
+  assert.match(formatted.html, /href="https:\/\/t\.me\/example"/);
+  assert.match(formatted.html, />Telegram-чат</);
+  assert.match(formatted.html, /href="https:\/\/example\.com\/zoom"/);
+  // blank-line blocks → separate <p>, not one glued block
+  const bodyPs = formatted.html.match(/class="email-(?:greeting|body)"/g) ?? [];
+  assert.ok(bodyPs.length >= 6, `expected several body paragraphs, got ${bodyPs.length}`);
+  // plain text keeps blank lines between blocks and single newlines inside
+  assert.match(formatted.text, /Сегодня на созвоне:\n1️⃣/);
+  assert.match(formatted.text, /3 000 ₽\n2 000 ₽\n1 000 ₽/);
+  assert.match(formatted.text, /🎧\n\nСегодня на созвоне:/);
+  assert.match(formatted.text, /Telegram-чат: https:\/\/t\.me\/example/);
+}
+
 const emptyParagraphs = validateCampaignDraft({
   audienceType: "authors",
   messageType: "author_operational",
@@ -302,7 +343,7 @@ const tooMany = validateCampaignDraft({
   subject: "Тема",
   content: {
     heading: "Заголовок",
-    paragraphs: Array.from({ length: MAX_CAMPAIGN_PARAGRAPHS + 1 }, (_, i) => `Строка ${i + 1}`),
+    paragraphs: Array.from({ length: MAX_CAMPAIGN_PARAGRAPHS + 1 }, (_, i) => `Блок ${i + 1}`),
     cta: null,
     infoBlock: null,
     secondaryLink: null,
@@ -336,9 +377,35 @@ if (rendered.ok) {
   assert.ok(rendered.text.length > 20);
 }
 assert.equal(applyFirstNamePlaceholder("Здравствуйте, {{first_name}}!", "Анна"), "Здравствуйте, Анна!");
+assert.equal(
+  applyFirstNamePlaceholder("Здравствуйте {{first_name}}\nСледующая строка", null),
+  "Здравствуйте\nСледующая строка",
+);
+assert.equal(
+  applyFirstNamePlaceholder("Здравствуйте {{first_name}}\nСледующая строка", "Анна"),
+  "Здравствуйте Анна\nСледующая строка",
+);
+const missingNameBreak = renderManualCampaignEmail({
+  subject: "Тема",
+  content: {
+    heading: "Заголовок",
+    paragraphs: ["Здравствуйте {{first_name}}\nСледующая строка"],
+    cta: null,
+    infoBlock: null,
+    secondaryLink: null,
+  },
+  firstName: null,
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(missingNameBreak.ok, true);
+if (missingNameBreak.ok) {
+  assert.match(missingNameBreak.html, /Здравствуйте<br \/>Следующая строка/);
+  assert.match(missingNameBreak.text, /Здравствуйте\nСледующая строка/);
+}
+
 const viaRenderer = await brandEmailTemplateRenderer.render({
   templateKey: "manual_campaign",
-  templateVersion: "manual-campaign-v1-20261219",
+  templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,
   payload: {
     subject: "Тема",
     heading: "Здравствуйте!",
@@ -548,7 +615,7 @@ const queued = await enqueueApplicationEmail({
   messageType: "author_operational",
   toEmail: "anna@example.com",
   templateKey: "manual_campaign",
-  templateVersion: "manual-campaign-v1-20261219",
+  templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,
   deduplicationKey: "manual:test:1",
   payload: { subject: "Тема", heading: "Заголовок", paragraphs: ["Текст"], unsubscribeUrl: "https://audiolad.ru/email/unsubscribe?token=should-strip" },
   gate: { suppressions: [{ normalizedEmail: "anna@example.com", scope: "marketing" }], preference: null, latestAuthorMarketingConsent: null },
@@ -558,7 +625,7 @@ const again = await enqueueApplicationEmail({
   messageType: "author_operational",
   toEmail: "anna@example.com",
   templateKey: "manual_campaign",
-  templateVersion: "manual-campaign-v1-20261219",
+  templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,
   deduplicationKey: "manual:test:1",
   payload: { subject: "Тема", heading: "Заголовок", paragraphs: ["Текст"] },
 }, runtime, now);
@@ -598,7 +665,7 @@ await workerRuntime.insertOutbox({
   userId: null,
   toEmail: "one@example.com",
   templateKey: "manual_campaign",
-  templateVersion: "manual-campaign-v1-20261219",
+  templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,
   payload: { subject: "Тема", heading: "Заголовок", paragraphs: ["Текст"], senderIdentity: "authors" },
   status: "pending",
   priority: 100,
@@ -654,7 +721,7 @@ await retryRuntime.insertOutbox({
   userId: null,
   toEmail: "retry@example.com",
   templateKey: "manual_campaign",
-  templateVersion: "manual-campaign-v1-20261219",
+  templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,
   payload: { subject: "Тема", heading: "Заголовок", paragraphs: ["Текст"], senderIdentity: "authors" },
   status: "pending",
   priority: 100,
@@ -689,7 +756,7 @@ await supportRuntime.insertOutbox({
   userId: null,
   toEmail: "support-path@example.com",
   templateKey: "manual_campaign",
-  templateVersion: "manual-campaign-v1-20261219",
+  templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,
   payload: { subject: "Тема", heading: "Заголовок", paragraphs: ["Текст"], senderIdentity: "support" },
   status: "pending",
   priority: 100,
