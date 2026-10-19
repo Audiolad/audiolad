@@ -43,11 +43,15 @@ export type CampaignDraftInput = {
   filter: AuthorCampaignFilter;
 };
 
+/** Max non-empty lines in «Текст» (editor splits on every newline). */
+export const MAX_CAMPAIGN_PARAGRAPHS = 40;
+
 export type CampaignValidationError =
   | "subject_required"
   | "subject_invalid"
   | "heading_required"
   | "paragraphs_required"
+  | "paragraphs_too_many"
   | "url_invalid"
   | "cta_incomplete"
   | "link_incomplete"
@@ -181,8 +185,11 @@ export function validateCampaignDraft(
     return { ok: false, code: "heading_required" };
   }
 
-  if (input.content.paragraphs.length === 0 || input.content.paragraphs.length > 12) {
+  if (input.content.paragraphs.length === 0) {
     return { ok: false, code: "paragraphs_required" };
+  }
+  if (input.content.paragraphs.length > MAX_CAMPAIGN_PARAGRAPHS) {
+    return { ok: false, code: "paragraphs_too_many" };
   }
 
   const paragraphs: string[] = [];

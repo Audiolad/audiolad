@@ -29,7 +29,7 @@ import {
   TEST_SUBJECT_PREFIX,
   withTestSubjectPrefix,
 } from "../src/lib/admin/mailings/test-send";
-import { validateCampaignDraft } from "../src/lib/admin/mailings/validation";
+import { MAX_CAMPAIGN_PARAGRAPHS, validateCampaignDraft } from "../src/lib/admin/mailings/validation";
 import {
   campaignOutboxDedupKey,
   createMemoryApplicationEmailRuntime,
@@ -235,6 +235,83 @@ assert.equal(validateCampaignDraft({
   content: { heading: "Заголовок", paragraphs: ["Абзац"], cta: null, infoBlock: null, secondaryLink: null },
   filter: { version: 1, kind: "all_authors" },
 }).ok, false);
+
+// Regression: long «Текст» with emoji/keycaps and >12 lines used to fail as paragraphs_required
+// («Добавьте текст письма») because the editor splits every newline into a paragraph.
+function paragraphsFromTextLikeEditor(value: string): string[] {
+  return value
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+const autumnSprintBody = [
+  "Друзья, ✨ подводим итоги аудиоспринта «Осень звучит» 🍂🎧",
+  "",
+  "Что было важно:",
+  "1️⃣ Первый пункт про эфир и результаты.",
+  "2️⃣ Второй пункт про материалы авторов.",
+  "3️⃣ Третий пункт про следующие шаги.",
+  "4️⃣ Четвёртый пункт про чат.",
+  "5️⃣ Пятый пункт про ссылку на эфир.",
+  "",
+  "Спасибо всем, кто участвовал.",
+  "До встречи на эфире.",
+  "Короткий абзац A.",
+  "Короткий абзац B.",
+  "Короткий абзац C.",
+  "Короткий абзац D.",
+  "Короткий абзац E.",
+].join("\n");
+const autumnParagraphs = paragraphsFromTextLikeEditor(autumnSprintBody);
+assert.ok(autumnParagraphs.length > 12, "fixture must exceed the old 12-line cap");
+assert.ok(autumnParagraphs.length <= MAX_CAMPAIGN_PARAGRAPHS);
+const autumnDraft = validateCampaignDraft({
+  audienceType: "authors",
+  messageType: "author_operational",
+  senderIdentity: "authors",
+  subject: "Эфир в 18:00 мск",
+  preheader: "Итоги спринта",
+  content: {
+    heading: "Подводим итоги",
+    paragraphs: autumnParagraphs,
+    cta: { label: "Ссылка на эфир", url: "https://example.com/zoom" },
+    infoBlock: { title: "", text: "" },
+    secondaryLink: { label: "Telegram", url: "https://t.me/example" },
+  },
+  filter: { version: 1, kind: "all_authors" },
+});
+assert.equal(autumnDraft.ok, true);
+if (autumnDraft.ok) {
+  assert.equal(autumnDraft.value.content.infoBlock, null);
+  assert.ok(autumnDraft.value.content.paragraphs.some((p) => p.includes("1️⃣")));
+}
+const emptyParagraphs = validateCampaignDraft({
+  audienceType: "authors",
+  messageType: "author_operational",
+  senderIdentity: "authors",
+  subject: "Тема",
+  content: { heading: "Заголовок", paragraphs: [], cta: null, infoBlock: null, secondaryLink: null },
+  filter: { version: 1, kind: "all_authors" },
+});
+assert.equal(emptyParagraphs.ok, false);
+if (!emptyParagraphs.ok) assert.equal(emptyParagraphs.code, "paragraphs_required");
+const tooMany = validateCampaignDraft({
+  audienceType: "authors",
+  messageType: "author_operational",
+  senderIdentity: "authors",
+  subject: "Тема",
+  content: {
+    heading: "Заголовок",
+    paragraphs: Array.from({ length: MAX_CAMPAIGN_PARAGRAPHS + 1 }, (_, i) => `Строка ${i + 1}`),
+    cta: null,
+    infoBlock: null,
+    secondaryLink: null,
+  },
+  filter: { version: 1, kind: "all_authors" },
+});
+assert.equal(tooMany.ok, false);
+if (!tooMany.ok) assert.equal(tooMany.code, "paragraphs_too_many");
+assert.match(mailingCodeLabel("paragraphs_too_many"), /40/);
 
 const rendered = renderManualCampaignEmail({
   subject: "Тема",
