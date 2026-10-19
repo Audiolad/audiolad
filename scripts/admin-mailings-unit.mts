@@ -377,6 +377,32 @@ if (rendered.ok) {
   assert.ok(rendered.text.length > 20);
 }
 assert.equal(applyFirstNamePlaceholder("Здравствуйте, {{first_name}}!", "Анна"), "Здравствуйте, Анна!");
+assert.equal(
+  applyFirstNamePlaceholder("Здравствуйте {{first_name}}\nСледующая строка", null),
+  "Здравствуйте\nСледующая строка",
+);
+assert.equal(
+  applyFirstNamePlaceholder("Здравствуйте {{first_name}}\nСледующая строка", "Анна"),
+  "Здравствуйте Анна\nСледующая строка",
+);
+const missingNameBreak = renderManualCampaignEmail({
+  subject: "Тема",
+  content: {
+    heading: "Заголовок",
+    paragraphs: ["Здравствуйте {{first_name}}\nСледующая строка"],
+    cta: null,
+    infoBlock: null,
+    secondaryLink: null,
+  },
+  firstName: null,
+  siteOrigin: "https://audiolad.ru",
+});
+assert.equal(missingNameBreak.ok, true);
+if (missingNameBreak.ok) {
+  assert.match(missingNameBreak.html, /Здравствуйте<br \/>Следующая строка/);
+  assert.match(missingNameBreak.text, /Здравствуйте\nСледующая строка/);
+}
+
 const viaRenderer = await brandEmailTemplateRenderer.render({
   templateKey: "manual_campaign",
   templateVersion: MANUAL_CAMPAIGN_TEMPLATE_VERSION,

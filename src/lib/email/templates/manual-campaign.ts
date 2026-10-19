@@ -116,11 +116,14 @@ export function applyFirstNamePlaceholder(
     return text.split(FIRST_NAME_TOKEN).join(name);
   }
 
+  // Keep newlines: \s would swallow line breaks needed for <br /> blocks.
   return text
-    .replace(/,\s*\{\{first_name\}\}/g, "")
-    .replace(/\{\{first_name\}\}\s*,?/g, "")
+    .replace(/,[ \t]*\{\{first_name\}\}/g, "")
+    .replace(/\{\{first_name\}\}[ \t]*,?/g, "")
     .replace(/[ \t]{2,}/g, " ")
-    .replace(/\s+([!?.])/g, "$1")
+    .replace(/[ \t]+([!?.])/g, "$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
     .trim();
 }
 
