@@ -9,7 +9,18 @@ import {
   ARTICLES_DIRECTORY_SEO_TITLE,
 } from "./directory";
 
-export function buildArticlesDirectoryMetadata(): Metadata {
+export type ArticlesDirectoryMetadataOptions = {
+  /** True when the request carries a search query (?q=…). */
+  hasSearchQuery?: boolean;
+};
+
+/**
+ * Search result URLs (?q=…) keep the /articles canonical and are marked
+ * noindex, follow so filtered variants never compete with the full list.
+ */
+export function buildArticlesDirectoryMetadata(
+  options: ArticlesDirectoryMetadataOptions = {},
+): Metadata {
   const title = ARTICLES_DIRECTORY_SEO_TITLE;
   const description = ARTICLES_DIRECTORY_META_DESCRIPTION;
   const canonical = buildSiteCanonicalUrl(ARTICLES_DIRECTORY_PATH);
@@ -34,7 +45,7 @@ export function buildArticlesDirectoryMetadata(): Metadata {
       description,
     },
     robots: {
-      index: true,
+      index: !options.hasSearchQuery,
       follow: true,
     },
   };

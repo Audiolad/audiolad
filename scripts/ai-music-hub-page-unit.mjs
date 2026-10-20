@@ -146,7 +146,7 @@ function testCopyAndEconomics() {
 
   assert.equal(
     AI_MUSIC_HUB_SUBTITLE,
-    "Получайте деньги за свою нейромузыку: от слушателей, которые покупают её на АудиоЛаде, и от авторов медитаций, которые используют её в своих проектах.",
+    "Получайте деньги за свою нейромузыку тремя способами: от слушателей, которые покупают её на АудиоЛаде, от авторов медитаций, которые используют её в своих проектах, и от заведений, где она звучит через сервис «АудиоЛад Бизнес».",
   );
   assert.match(AI_MUSIC_HUB_INTRO, /ИИ-музыка, AI-музыка, нейромузыка/);
   assert.equal(
@@ -156,11 +156,11 @@ function testCopyAndEconomics() {
   assert.equal(AI_MUSIC_HUB_WHAT_IS_HEADING, "Что такое АудиоЛад");
   assert.equal(
     AI_MUSIC_HUB_DUAL_INCOME_HEADING,
-    "Один трек – два источника дохода",
+    "Один трек – три источника дохода",
   );
   assert.equal(
     AI_MUSIC_HUB_DUAL_INCOME_RECAP_HEADING,
-    "Один трек. Два источника дохода.",
+    "Один трек. Три источника дохода.",
   );
   assert.equal(AI_MUSIC_HUB_ECONOMICS_HEADING, "Простая экономика");
   assert.match(AI_MUSIC_HUB_ECONOMICS_INTRO, /500 ₽/);
@@ -200,10 +200,10 @@ function testCopyAndEconomics() {
 }
 
 function testScreenshots() {
-  assert.equal(AI_MUSIC_HUB_SCREENSHOTS.length, 4);
+  assert.equal(AI_MUSIC_HUB_SCREENSHOTS.length, 5);
   assert.deepEqual(
     AI_MUSIC_HUB_SCREENSHOTS.map((shot) => shot.id),
-    ["home", "product", "studio", "author"],
+    ["home", "product", "studio", "business", "author"],
   );
   assert.equal(
     AI_MUSIC_HUB_SCREENSHOTS[0].caption,
@@ -219,6 +219,10 @@ function testScreenshots() {
   );
   assert.equal(
     AI_MUSIC_HUB_SCREENSHOTS[3].caption,
+    "В «АудиоЛад Бизнес» музыка звучит фоном в заведениях – например, в спа-салонах и массажных кабинетах.",
+  );
+  assert.equal(
+    AI_MUSIC_HUB_SCREENSHOTS[4].caption,
     "Каждая новая работа становится ещё одним продуктом в вашем музыкальном каталоге.",
   );
 
@@ -268,6 +272,9 @@ function testPageWiring() {
   assert.match(view, /id="ai-music-economics"/);
   assert.match(view, /id="ai-music-rights"/);
   assert.match(view, /id="ai-music-repeat"/);
+  assert.match(view, /id="ai-music-business"/);
+  assert.match(view, /AI_MUSIC_HUB_BUSINESS_HEADING/);
+  assert.match(view, /href=\{AI_MUSIC_HUB_BUSINESS_LINK_HREF\}/);
   assert.doesNotMatch(view, /ArticleFaqList/);
   assert.doesNotMatch(view, /Регистрация бесплатная/);
   assert.doesNotMatch(view, /CreatorPathsCta/);
@@ -296,8 +303,59 @@ function testNavigationAndSitemap() {
   );
 }
 
+function testBusinessSection() {
+  const {
+    AI_MUSIC_HUB_BUSINESS_HEADING,
+    AI_MUSIC_HUB_BUSINESS_TEXT,
+    AI_MUSIC_HUB_BUSINESS_JOIN_TEXT,
+    AI_MUSIC_HUB_BUSINESS_CHECKS_TEXT,
+    AI_MUSIC_HUB_BUSINESS_PAYOUTS_TEXT,
+    AI_MUSIC_HUB_BUSINESS_LINK_HREF,
+    AI_MUSIC_HUB_DUAL_INCOME_LEAD,
+    AI_MUSIC_HUB_DUAL_INCOME_RECAP_TEXT,
+  } = hubContent;
+
+  assert.match(AI_MUSIC_HUB_BUSINESS_HEADING, /^3\. /);
+  assert.match(AI_MUSIC_HUB_BUSINESS_HEADING, /«АудиоЛад Бизнес»/);
+  assert.match(AI_MUSIC_HUB_DUAL_INCOME_LEAD, /тремя способами/);
+  assert.match(AI_MUSIC_HUB_SUBTITLE, /тремя способами/);
+  assert.match(AI_MUSIC_HUB_DUAL_INCOME_RECAP_TEXT.join(" "), /трёх направлениях/);
+
+  const business = [
+    ...AI_MUSIC_HUB_BUSINESS_TEXT,
+    ...AI_MUSIC_HUB_BUSINESS_JOIN_TEXT,
+    ...AI_MUSIC_HUB_BUSINESS_CHECKS_TEXT,
+    ...AI_MUSIC_HUB_BUSINESS_PAYOUTS_TEXT,
+  ].join(" ");
+
+  for (const venue of ["ресторан", "бар", "кофе", "спа-салон", "магазин"]) {
+    assert.match(business, new RegExp(venue), `venue ${venue}`);
+  }
+  // Account-level admission (agreement 2.1 п. 6.4, 8.7; cabinet copy).
+  assert.match(business, /один раз – на уровне аккаунта/);
+  assert.match(business, /все треки аккаунта и всех его авторских пространств/);
+  assert.match(business, /автоматически/);
+  assert.doesNotMatch(business, /каждый трек (проверя|провер)/i);
+  assert.doesNotMatch(business, /по одному треку проверя/i);
+  // Legal checks named in agreement 2.1 (п. 4.7, 5.3, 8.9).
+  assert.match(business, /РАО, ВОИС/);
+  assert.match(business, /территории России/);
+  // Payouts described qualitatively; no invented numbers or guarantees.
+  assert.doesNotMatch(business, /\d/);
+  assert.doesNotMatch(business, /%|₽/);
+  assert.match(business, /не гарантируются/);
+  // Agreement 2.1 п. 10.3–10.4 / program terms п. 4: accrual from paid venue receipts only.
+  assert.match(business, /Когда заведение платит за доступ/);
+  assert.match(business, /Бесплатные прослушивания/);
+  assert.match(business, /порядку распределения, который опубликован в кабинете автора/);
+  assert.doesNotMatch(business, /гарантированн/);
+  assert.equal(AI_MUSIC_HUB_BUSINESS_LINK_HREF, "/b");
+  assert.ok(STATIC_SITEMAP_PAGES.some((page) => page.path === "/b"), "/b is a live public page");
+}
+
 testMetadata();
 testJsonLd();
+testBusinessSection();
 testCopyAndEconomics();
 testPageWiring();
 testNavigationAndSitemap();

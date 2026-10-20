@@ -14,7 +14,14 @@ import {
   estimateReadingTimeMinutesFromChunks,
 } from "./reading-time";
 import { listArticleDefinitions } from "./registry";
+import {
+  listStandaloneArticleDefinitions,
+  listStandaloneArticleDirectoryCards,
+  type StandaloneArticleDefinition,
+} from "./standalone";
 import type { ArticleDefinition } from "./types";
+
+export { formatArticleReadingTimeLabel } from "./reading-time-label";
 
 export const ARTICLES_DIRECTORY_PATH = "/articles";
 
@@ -45,6 +52,8 @@ export type ArticleDirectoryCard = {
   topicHref: string | null;
   readingTimeMinutes: number;
   publishedAt?: string;
+  /** Extra search-only terms (meta title, breadcrumb title). Not rendered. */
+  searchKeywords?: readonly string[];
 };
 
 export type ArticleDirectoryTopicHubCard = {
@@ -186,6 +195,21 @@ export function compareArticlesByPublishedAtDesc(
   return left.slug.localeCompare(right.slug, "en");
 }
 
+function resolveArticleSearchKeywords(article: ArticleDefinition): string[] {
+  const title = article.title.trim();
+  const keywords: string[] = [];
+
+  for (const value of [article.metaTitle, article.breadcrumbTitle]) {
+    const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
+
+    if (normalized && normalized !== title && !keywords.includes(normalized)) {
+      keywords.push(normalized);
+    }
+  }
+
+  return keywords;
+}
+
 export function toArticleDirectoryCard(
   article: ArticleDefinition,
 ): ArticleDirectoryCard {
@@ -201,6 +225,7 @@ export function toArticleDirectoryCard(
     topicHref: topic.topicHref,
     readingTimeMinutes: estimateArticleReadingTimeMinutes(article),
     publishedAt: article.publishedAt.trim(),
+    searchKeywords: resolveArticleSearchKeywords(article),
   };
 }
 
@@ -293,6 +318,39 @@ export function listListenDirectoryCards(
     .map(toListenDirectoryCard);
 }
 
+function compareDirectoryCardsByPublishedAtDesc(
+  left: ArticleDirectoryCard,
+  right: ArticleDirectoryCard,
+): number {
+  const leftTime = Date.parse(left.publishedAt ?? "");
+  const rightTime = Date.parse(right.publishedAt ?? "");
+  const safeLeft = Number.isNaN(leftTime) ? -Infinity : leftTime;
+  const safeRight = Number.isNaN(rightTime) ? -Infinity : rightTime;
+
+  if (safeRight !== safeLeft) {
+    return safeRight > safeLeft ? 1 : -1;
+  }
+
+  return left.slug.localeCompare(right.slug, "en");
+}
+
+/**
+ * Registry articles and standalone editorial guides share one date-sorted
+ * sequence (newest first); listen pages follow, as before.
+ */
+export function mergeDatedDirectoryCards(
+  articleCards: readonly ArticleDirectoryCard[],
+  standaloneCards: readonly ArticleDirectoryCard[],
+): ArticleDirectoryCard[] {
+  if (standaloneCards.length === 0) {
+    return [...articleCards];
+  }
+
+  return [...articleCards, ...standaloneCards].sort(
+    compareDirectoryCardsByPublishedAtDesc,
+  );
+}
+
 function mergeDirectoryCardsByHref(
   articleCards: readonly ArticleDirectoryCard[],
   listenCards: readonly ArticleDirectoryCard[],
@@ -334,6 +392,7 @@ export function loadArticleDirectoryPageData(
   articles: readonly ArticleDirectoryEligibilityInput[] = listArticleDefinitions(),
   hubs: readonly TopicHubDefinition[] = listTopicHubDefinitions(),
   listens: readonly ListenPageDefinition[] = listIndexableListenPageDefinitions(),
+  standalone: readonly StandaloneArticleDefinition[] = listStandaloneArticleDefinitions(),
 ): ArticleDirectoryPageData {
   return {
     path: ARTICLES_DIRECTORY_PATH,
@@ -342,26 +401,11 @@ export function loadArticleDirectoryPageData(
     intro: ARTICLES_DIRECTORY_INTRO,
     hubs: listArticleDirectoryTopicHubs(hubs),
     articles: mergeDirectoryCardsByHref(
-      listArticleDirectoryCards(articles),
+      mergeDatedDirectoryCards(
+        listArticleDirectoryCards(articles),
+        listStandaloneArticleDirectoryCards(standalone),
+      ),
       listListenDirectoryCards(listens),
     ),
   };
-}
-
-export function formatArticleReadingTimeLabel(minutes: number): string {
-  const safeMinutes = Number.isFinite(minutes)
-    ? Math.max(1, Math.round(minutes))
-    : 1;
-  const mod10 = safeMinutes % 10;
-  const mod100 = safeMinutes % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${safeMinutes} минута чтения`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${safeMinutes} минуты чтения`;
-  }
-
-  return `${safeMinutes} минут чтения`;
 }

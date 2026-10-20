@@ -3072,7 +3072,7 @@ const articleCards = listArticleDirectoryCards();
 }
 
 function testEmptyState() {
-  const empty = loadArticleDirectoryPageData([], listTopicHubDefinitions(), []);
+  const empty = loadArticleDirectoryPageData([], listTopicHubDefinitions(), [], []);
   assert(empty.articles.length === 0, "empty articles");
   assert(empty.hubs.length > 0, "hubs still available when articles empty");
 
