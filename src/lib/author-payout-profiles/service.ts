@@ -129,7 +129,7 @@ function assertStatus(value: string): AuthorPayoutProfileStatus {
 }
 
 function decryptRowFields(
-  row: ProfileRow,
+  row: Pick<ProfileRow, "encrypted_payload">,
 ): AuthorPayoutProfileSensitivePayload | null {
   if (!row.encrypted_payload) {
     return null;
@@ -147,6 +147,17 @@ function decryptRowFields(
     console.error("author_payout_profile_decrypt_unavailable");
     throw new AuthorPayoutProfileError("encryption_unavailable", 503);
   }
+}
+
+/** Server-only projection: no other decrypted fields leave this function. */
+export function decryptPayoutProfilePersonName(
+  row: Pick<ProfileRow, "encrypted_payload" | "recipient_type">,
+): string | null {
+  if (!isAuthorPayoutRecipientType(row.recipient_type)) return null;
+  const fields = decryptRowFields(row);
+  if (!fields) return null;
+  return [fields.last_name, fields.first_name, fields.middle_name]
+    .map((part) => part?.trim()).filter(Boolean).join(" ") || null;
 }
 
 function encryptFields(fields: AuthorPayoutProfileSensitivePayload): string {

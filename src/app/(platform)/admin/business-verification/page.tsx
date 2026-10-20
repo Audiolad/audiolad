@@ -18,6 +18,7 @@ import {
   type BusinessVerificationStatus,
 } from "@/lib/admin/business-verification";
 import { loadBusinessVerificationApplicants } from "@/lib/admin/business-verification-applicant";
+import { rightsholderProposalKey } from "@/lib/admin/business-rightsholder-proposal";
 import type { ApplicantWorkspace } from "@/lib/admin/business-verification-applicant-model";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 import { getAuthorAccessStatusLabel, type AuthorAccessStatus } from "@/lib/authors/access";
@@ -112,7 +113,7 @@ export default async function AdminBusinessVerificationPage({
     trackIds.length
       ? service.from("audio_items").select("id, title").in("id", trackIds)
       : Promise.resolve({ data: [] as never[], error: null }),
-    service.from("music_rightsholders").select("id, display_name, entity_type").eq("status", "active").order("display_name").limit(200),
+    service.from("music_rightsholders").select("id, display_name, entity_type, status").eq("status", "active").order("display_name").limit(200),
   ]);
   const [catalogResult, { data: recentSuspensions }] = await Promise.all([
     service
@@ -290,7 +291,11 @@ export default async function AdminBusinessVerificationPage({
 
                 <section className="mt-4 min-w-0 space-y-2 text-sm">
                   <h3 className="font-semibold">Правообладатель, которому присваивается подтверждение</h3>
-                  <p>{applicant.rightsholder ? `${applicant.rightsholder.display_name} (${applicant.rightsholder.entity_type === "organization" ? "организация" : "физлицо"})` : "Правообладатель пока не привязан – выберите при подтверждении"}</p>
+                  {applicant.proposal.name ? <p>{applicant.proposal.name} ({applicant.proposal.entityType === "organization" ? "организация" : "физлицо"})</p> : null}
+                  <div className={applicant.proposal.needsCheck ? "rounded-xl bg-[#fff8e8] p-3 text-[#9a5a00]" : "text-[#796ba0]"}>
+                    <p>{applicant.proposal.sourceLabel}</p>
+                    {applicant.proposal.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+                  </div>
                   <p className="text-[#796ba0]">Правообладатель – отдельный юридический субъект, отличающийся от личности заявителя в аккаунте и от его псевдонимов или авторских проектов.</p>
                 </section>
                 <section className="mt-4 min-w-0 space-y-2 text-sm">
@@ -309,10 +314,11 @@ export default async function AdminBusinessVerificationPage({
                         <input type="hidden" name="verificationId" value={c.id} />
                         <input type="hidden" name="filter" value={filter} />
                         <BusinessDecisionFields
-                          key={`${c.id}:${actions.join(",")}`}
+                          key={`${c.id}:${actions.join(",")}:${rightsholderProposalKey(applicant.proposal)}`}
                           caseId={c.id}
                           actions={actions.map((a) => ({ value: a, label: BUSINESS_MODERATION_ACTION_LABEL[a] }))}
                           rightsholders={(rightsholders ?? []) as { id: string; display_name: string; entity_type: string }[]}
+                          proposal={{ name: applicant.proposal.name, entityType: applicant.proposal.entityType, selection: applicant.proposal.selection, sourceLabel: applicant.proposal.sourceLabel }}
                           applicantName={applicant.fullName}
                           workspaceNames={applicant.workspaces.map((w) => w.name)}
                         />
