@@ -139,6 +139,9 @@ export default function PracticeEmbedCard(props: Props) {
   // value at any time (`audiolad:embed-height-request`), so a message sent before its listener
   // was ready is not lost. Partners that ignore the message keep their fixed frame height.
   const articleRef = useRef<HTMLElement | null>(null);
+  const coverRef = useRef<HTMLDivElement | null>(null);
+  const infoRef = useRef<HTMLDivElement | null>(null);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = articleRef.current;
     if (!el || window.parent === window) return;
@@ -146,10 +149,29 @@ export default function PracticeEmbedCard(props: Props) {
     const post = (force = false) => {
       const height = Math.ceil(el.getBoundingClientRect().height);
       const wide = window.innerWidth >= 560;
-      const key = `${height}:${wide}`;
+      const cover = coverRef.current?.getBoundingClientRect();
+      const info = infoRef.current?.getBoundingClientRect();
+      const actions = actionsRef.current?.getBoundingClientRect();
+      const rects = [];
+      if (cover) rects.push(cover);
+      if (info && actions) {
+        rects.push({
+          left: info.left,
+          top: info.top,
+          width: info.width,
+          height: Math.max(0, actions.top - info.top),
+        });
+      }
+      const shield = rects.map((rect) => ({
+        x: Math.floor(rect.left),
+        y: Math.floor(rect.top),
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height),
+      })).filter((rect) => rect.width > 0 && rect.height > 0);
+      const key = JSON.stringify({ height, wide, shield });
       if (height <= 0 || (!force && key === last)) return;
       last = key;
-      window.parent.postMessage({ type: "audiolad:embed-height", height, wide }, "*");
+      window.parent.postMessage({ type: "audiolad:embed-height", height, wide, shield }, "*");
     };
     const onResize = () => post();
     const onMessage = (event: MessageEvent) => {
@@ -159,6 +181,8 @@ export default function PracticeEmbedCard(props: Props) {
     };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
     observer?.observe(el);
+    if (infoRef.current) observer?.observe(infoRef.current);
+    if (actionsRef.current) observer?.observe(actionsRef.current);
     window.addEventListener("resize", onResize);
     window.addEventListener("message", onMessage);
     post(true);
@@ -172,24 +196,16 @@ export default function PracticeEmbedCard(props: Props) {
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
   return (
-    // Narrow frames (<560px, partner mobile) keep the vertical card with a SQUARE cover shown in
-    // full (never cropped, as on the audiolad.ru product card); the card has its natural height
-    // and reports it to the parent (audiolad:embed-height) so the partner frame fits it. Wide frames
-    // (partner desktop) switch to the AudioLad desktop practice-hero layout:
-    // square cover left, info + «Слушать» right, filling the frame height.
-    // The card always fills the frame exactly (h-dvh + overflow-hidden): on narrow frames the
-    // cover flexes to the space left by the text, so the document never overflows the iframe.
-    // An overflowing frame became a nested scroller and the card "jittered" under touch scroll.
-    // The frame itself is the visual card on the partner page: no shadow and a transparent
-    // document (the platform body is lilac #f7f2fc, which showed as a purple band under the
-    // card whenever the card was shorter than the frame). 100vh fallback for WebViews without dvh.
-    // NO overscroll-behavior here: `overflow-hidden` makes <main> a scroll container, and
-    // `overscroll-behavior: none` on it stops scroll chaining, so on Android Chrome a vertical
-    // swipe over the card was swallowed inside the iframe and the partner page did not scroll.
-    // With the default `auto`, the (non-scrollable) card chains the gesture to the parent page.
+    // Narrow frames (<560px) keep the full square cover and the card's natural height;
+    // wide frames keep the horizontal cover + info layout filling the frame height.
+    // The transparent frame has no shadow; overflow-clip keeps the root from becoming
+    // a scroll container. 100vh is the fallback for WebViews without dvh.
+    // audiolad:embed-height includes shield rects in iframe viewport CSS pixels – cover
+    // and info above the actions. The partner overlays these with transparent page layers
+    // so Android swipes scroll its article. Buttons, brand link and progress stay exposed.
     <main
       data-practice-embed-root="true"
-      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-hidden bg-transparent p-0"
+      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-clip bg-transparent p-0"
     >
       <style>{"html,body{background:transparent!important;overscroll-behavior:auto!important}"}</style>
       <article
@@ -198,7 +214,7 @@ export default function PracticeEmbedCard(props: Props) {
         ref={articleRef}
         className="flex h-auto w-full max-w-[420px] flex-col self-start overflow-hidden rounded-[28px] bg-white shadow-none min-[560px]:grid min-[560px]:self-stretch min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7]"
       >
-        <div data-practice-embed-cover="true"
+        <div ref={coverRef} data-practice-embed-cover="true"
           className="relative aspect-square w-full shrink-0 overflow-hidden bg-[#efe7fb] min-[560px]:aspect-square min-[560px]:h-full min-[560px]:w-auto min-[560px]:flex-none">
           {props.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -211,7 +227,7 @@ export default function PracticeEmbedCard(props: Props) {
             />
           ) : null}
         </div>
-        <div className="shrink-0 px-5 pb-4 pt-4 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
+        <div ref={infoRef} className="shrink-0 px-5 pb-4 pt-4 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
           {props.typeLabel ? (
             <span className="inline-flex w-fit rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
               {props.typeLabel}
@@ -226,7 +242,7 @@ export default function PracticeEmbedCard(props: Props) {
           {props.metaLine ? (
             <p className="mt-2 text-sm text-[#7d70a2]">{props.metaLine}</p>
           ) : null}
-          <div className="mt-3 flex items-center gap-3 min-[560px]:flex-wrap" data-practice-embed-actions="true">
+          <div ref={actionsRef} className="mt-3 flex items-center gap-3 min-[560px]:flex-wrap" data-practice-embed-actions="true">
             {canPlayInline ? (
               <button
                 type="button"
