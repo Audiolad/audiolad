@@ -6,8 +6,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const root = "/var/www/audiolad";
-const dataTs = readFileSync(`${root}/src/lib/home/data.ts`, "utf8");
+// c881d3c0 introduced a production-root path; inspect the current worktree.
+const dataTs = readFileSync(new URL("../src/lib/home/data.ts", import.meta.url), "utf8");
 
 function selectNewHomeProducts(catalogProducts, limit = 8) {
   return catalogProducts.slice(0, limit);
@@ -111,7 +111,7 @@ function testLegacyBuggySelectionWouldDropNewest() {
   );
 }
 
-function testSourceContractUnchangedForOtherRails() {
+function testSourceContractForIndependentNewMaterials() {
   assert.match(
     dataTs,
     /const newProducts = allProducts\.slice\(0,\s*8\);/,
@@ -128,12 +128,15 @@ function testSourceContractUnchangedForOtherRails() {
     "guest newProducts stays independent catalog slice",
   );
 
+  // dc3a5000 replaced excludeProducts with daily recommendation selection.
+  assert.match(dataTs, /getDailyForYouProducts\(supabase, userId, allProducts\)/,
+    "forYou uses daily personalized selection");
   const forYouBlock = dataTs.slice(
-    dataTs.indexOf("const forYouProducts"),
+    dataTs.indexOf("for (const product of forYouProducts)"),
     dataTs.indexOf("const visibleRecentlyListened"),
   );
-  assert.match(forYouBlock, /excludeProducts/, "forYou still dedupes via excludeProducts");
-  assert.match(forYouBlock, /shownIds/, "forYou still uses shownIds");
+  assert.match(forYouBlock, /shownIds\.add\(product.id\)/,
+    "forYou ids still exclude duplicates from lower rails");
 
   const recentBlock = dataTs.slice(
     dataTs.indexOf("const visibleRecentlyListened"),
@@ -152,7 +155,7 @@ function run() {
   testNewestKeptEvenWhenInOtherRails();
   testOrderAndLimit();
   testLegacyBuggySelectionWouldDropNewest();
-  testSourceContractUnchangedForOtherRails();
+  testSourceContractForIndependentNewMaterials();
   console.log("personal-home-new-materials-unit: ok");
 }
 

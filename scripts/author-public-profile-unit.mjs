@@ -73,7 +73,12 @@ function testFeaturedProductsValidation() {
   const source = read("src/lib/authors/profile.ts");
 
   assert(source.includes('product.author_id !== authorId'), "foreign product guard");
-  assert(source.includes('product.status !== "published"'), "only published featured products");
+  // 18aea692 made featured eligibility respect scheduled publication as well.
+  assert(
+    /!isPracticePubliclyAvailable\(\{\s*status: product.status,\s*scheduledPublishAt: product.scheduled_publish_at,\s*publishedAt: product.published_at,\s*\}\)/.test(source),
+    "featured products must be publicly available under the publication schedule",
+  );
+  assert(source.includes("featured_product_not_published"), "unavailable featured products rejected");
 }
 
 function testMigrationExists() {

@@ -143,7 +143,10 @@ function testAccessAndErrors() {
   const auth = read("src/lib/personal-materials/server/auth.ts");
   const errors = read("src/lib/personal-materials/client/errors.ts");
 
-  assert(auth.includes("author_members"), "membership check");
+  // 49d04377 delegates material membership to the shared acting-author guard.
+  assert(auth.includes("await requireAuthorMembership(material.author_id)"), "membership delegation");
+  const sharedAuth = read("src/lib/author-products/auth.ts");
+  assert(sharedAuth.includes('.from("author_members")'), "shared membership check");
   assert(auth.includes("requireAuthenticatedUser"), "session required");
 
   assert(errors.includes("unauthorized"), "unauthorized message");

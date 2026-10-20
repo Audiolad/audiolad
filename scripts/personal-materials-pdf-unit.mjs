@@ -83,10 +83,12 @@ function testRoutes() {
     /requirePersonalMaterialReadAccess[\s\S]*assertAuthorContentMutationsAllowed/,
     "mutation access builds on read access plus mutation gate",
   );
+  // 49d04377 moved acting-author membership validation to the shared guard.
+  assert.match(auth, /await requireAuthorMembership\(material.author_id\)/);
   assert.match(
-    auth,
-    /membership\.role !== "owner"[\s\S]*membership\.role !== "editor"/,
-    "read access requires author owner or editor membership",
+    read("src/lib/author-products/auth.ts"),
+    /data\.role !== "owner" && data\.role !== "editor"/,
+    "shared guard requires author owner or editor membership",
   );
   assert.match(guestPdfOpen, /createGuestPdfSignedUrl/);
   assert.match(guestPdfOpen, /redirectToSignedPdfUrl/);

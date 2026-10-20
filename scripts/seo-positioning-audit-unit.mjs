@@ -157,7 +157,11 @@ function testHomeJsonLdValues() {
     serialized.includes(HOME_SEO_DESCRIPTION),
     "home JSON-LD includes canonical description",
   );
-  assert(!serialized.includes("Сергей Петров"), "home JSON-LD has no Sergey Petrov");
+  // bfc40d0b intentionally identifies the founder inside the Organization entity.
+  const organization = graph["@graph"].find((node) => node["@type"] === "Organization");
+  assert(organization?.founder?.name === "Сергей Петров", "organization identifies its founder");
+  const positioning = JSON.stringify(graph["@graph"].map((node) => ({ ...node, founder: undefined })));
+  assert(!positioning.includes("Сергей Петров"), "global positioning does not use the founder name");
   assert(
     !serialized.includes("энергетических программ"),
     "home JSON-LD removed old energetic programs wording",
@@ -176,7 +180,8 @@ function testLayoutAndManifestSources() {
   assert(
     guestHome.includes("GUEST_HOME_INTRO") &&
       readFileSync(join(ROOT, "src/lib/home/guest-slider.ts"), "utf8").includes(
-        "платформа авторского аудио: медитации, аудиопрактики, музыка, аудиокурсы.",
+        // 4c6c7853 intentionally changed the guest intro to music-first wording.
+        "платформа авторского аудио: музыка, аудиопрактики, медитации, обучение.",
       ),
     "guest home visible text includes platform positioning",
   );

@@ -113,15 +113,15 @@ function testSourceContracts() {
   assert(webhook.includes("recordTochkaWebhookEvent"), "webhook ledger");
   assert(webhook.includes("status: 400"), "invalid signature 400");
   assert(webhook.includes("status: 500"), "retryable 500");
+  // 9b0e3de3 moved aggregation into SQL; bad61f10 changed revenue to net of refunds.
+  const overviewSql = readFileSync(join(ROOT,
+    "supabase/migrations/20260904120000_admin_operational_overview_snapshot.sql"), "utf8");
+  assert(admin.includes('service.rpc("admin_operational_overview_snapshot"'), "admin uses aggregate RPC");
   assert(
-    admin.includes('.eq("status", "succeeded")') &&
-      admin.includes('.eq("is_test", false)'),
-    "admin revenue uses succeeded non-test payments",
+    overviewSql.includes("p.status = 'succeeded'") && overviewSql.includes("p.is_test = false"),
+    "admin revenue SQL uses succeeded non-test payments",
   );
-  assert(
-    admin.includes("Подтверждённая выручка (без test)"),
-    "admin revenue label excludes test",
-  );
+  assert(admin.includes("Выручка после возвратов"), "admin revenue label reflects refund deductions");
   assert(
     migration.includes("cancelled_order_late_approved"),
     "cancelled late APPROVED policy",

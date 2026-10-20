@@ -4,6 +4,9 @@
  */
 import { readFileSync } from "node:fs";
 
+// 800fae57 introduced production-root paths; inspect this checkout in any worktree.
+const read = (path, encoding) => readFileSync(new URL(`../${path}`, import.meta.url), encoding);
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -11,8 +14,8 @@ function assert(condition, message) {
 }
 
 function loadSanitizeModule() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/client-errors/sanitize.ts",
+  const source = read(
+    "src/lib/client-errors/sanitize.ts",
     "utf8",
   );
 
@@ -22,12 +25,12 @@ function loadSanitizeModule() {
 }
 
 function testReporterAvoidsSensitiveFields() {
-  const reporter = readFileSync(
-    "/var/www/audiolad/src/lib/client-errors/reporter.ts",
+  const reporter = read(
+    "src/lib/client-errors/reporter.ts",
     "utf8",
   );
-  const route = readFileSync(
-    "/var/www/audiolad/src/app/api/client-errors/route.ts",
+  const route = read(
+    "src/app/api/client-errors/route.ts",
     "utf8",
   );
 
@@ -37,8 +40,8 @@ function testReporterAvoidsSensitiveFields() {
 }
 
 function testClassificationPatterns() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/client-errors/sanitize.ts",
+  const source = read(
+    "src/lib/client-errors/sanitize.ts",
     "utf8",
   );
 

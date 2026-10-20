@@ -583,6 +583,13 @@ function testConversionDisplayContract() {
 }
 
 function main() {
+  // b6e30dac introduced this Docker-only test; honor the isolated-SQL opt-out
+  // established by e6f62aba without claiming a database regression pass.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    testConversionDisplayContract();
+    console.log("admin-analytics-dashboard-snapshot-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   setupSchema();
   testSmallPeriod();
   testExact1000();

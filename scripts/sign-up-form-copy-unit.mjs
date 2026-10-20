@@ -34,7 +34,8 @@ function testCentralizedCopy() {
 }
 
 function testSignUpPageUsesCentralizedCopy() {
-  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  // 0a25d36b moved auth pages into the platform route group.
+  const signUpPage = readRepoFile("src", "app", "(platform)", "auth", "sign-up", "page.tsx");
 
   assert.match(signUpPage, /SIGNUP_EMAIL_LABEL/);
   assert.match(signUpPage, /SIGNUP_PASSWORD_LABEL/);
@@ -47,7 +48,7 @@ function testSignUpPageUsesCentralizedCopy() {
 }
 
 function testSignInPageKeepsPasswordLabel() {
-  const signInPage = readRepoFile("src", "app", "auth", "sign-in", "page.tsx");
+  const signInPage = readRepoFile("src", "app", "(platform)", "auth", "sign-in", "page.tsx");
 
   assert.match(signInPage, /<span className="text-sm font-medium">Пароль<\/span>/);
   assert.doesNotMatch(signInPage, /Придумайте пароль/);
@@ -77,7 +78,8 @@ function testPasswordValidationLength() {
 }
 
 function testPasswordToggleMarkupStillPresentOnSignUpPage() {
-  const signUpPage = readRepoFile("src", "app", "auth", "sign-up", "page.tsx");
+  // 0a25d36b moved auth pages into the platform route group.
+  const signUpPage = readRepoFile("src", "app", "(platform)", "auth", "sign-up", "page.tsx");
 
   assert.match(signUpPage, /PasswordInput/);
   assert.match(signUpPage, /autoComplete="new-password"/);

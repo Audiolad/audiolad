@@ -657,7 +657,9 @@ assert.equal(
 );
 
 const sidebarNav = read("src/components/listener/DesktopSidebarNav.tsx");
-assert.match(sidebarNav, /item\.icon === "help"/);
+// ebb7981b replaces conditional icons with the shared sidebar icon map.
+assert.match(sidebarNav, /help: HelpNavIcon/);
+assert.match(sidebarNav, /const Icon = SIDEBAR_NAV_ICONS\[iconKey\]/);
 assert.match(sidebarNav, /isListenerPrimaryNavItemActive/);
 
 const homeLayout = read("src/app/(platform)/(listener)/(home)/layout.tsx");

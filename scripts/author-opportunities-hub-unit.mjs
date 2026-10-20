@@ -204,7 +204,9 @@ function primary(input) {
   );
 
   const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
-  assert.doesNotMatch(nav, /opportunities/);
+  // 167518d4 added a separate SEO-opportunities route; only the retired hub is forbidden.
+  assert.doesNotMatch(nav, /\/author-dashboard\/opportunities\b/);
+  assert.match(nav, /\/author-dashboard\/seo-opportunities/);
 
   const home = read("src/components/author-dashboard/AuthorDashboardClient.tsx");
   assert.doesNotMatch(home, /Посмотреть возможности/);

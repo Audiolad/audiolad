@@ -33,6 +33,8 @@ export const GUARDED_WRITE_SCRIPTS = [
 ];
 
 export const READ_ONLY_SQL_SCRIPTS = [
+  // ef1615ba: static SQL/parser checks, not database writes.
+  "scripts/playlists-stage21-validation-smoke.mjs",
   "scripts/platform-analytics-security.mjs",
   "scripts/platform-analytics-visitor-audit.mjs",
   "scripts/platform-analytics-sql-verify.mjs",
@@ -51,6 +53,11 @@ export const UNIT_MOCK_WRITE_SCRIPTS = [
   "scripts/test-user-reset-unit.mjs",
   "scripts/test-user-reset-guard-unit.mjs",
   "scripts/test-user-reset-service-mock-unit.mjs",
+];
+
+// 8af8e5a4: a localhost-only disposable SQL compile driver, audited separately.
+export const ISOLATED_SQL_WRITE_SCRIPTS = [
+  "scripts/database-migrations-compile-isolated.mjs",
 ];
 
 export const REQUIRED_GUARD_MARKERS = [

@@ -117,8 +117,9 @@ function testProfileTopicLimit() {
     "TopicSelector hint override keeps product default intact",
   );
   assert(
-    selector.includes("эту практику"),
-    "product default hint remains practice-oriented",
+    // 65902fa8 generalized the default hint to all audio product types.
+    selector.includes("этот аудиопродукт"),
+    "product default hint remains audio-product-oriented",
   );
 }
 

@@ -308,6 +308,11 @@ function fulfill({
 }
 
 function main() {
+  // 5048949d introduced this isolated SQL harness; honor e6f62aba opt-out.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    console.log("payments-p30-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   psql("postgres", `DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE);`);
   psql("postgres", `CREATE DATABASE ${TEST_DB};`);
   createStubSchema();

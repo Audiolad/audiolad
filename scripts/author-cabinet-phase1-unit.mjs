@@ -222,13 +222,12 @@ assert.match(createDraft, /product_kind: productKind/);
 
 const wizard = read("src/components/author-dashboard/AuthorCreateWizard.tsx");
 assert.match(wizard, /CABINET_BRANCH_LABELS/);
-assert.match(wizard, /AUTHOR_PUBLICATION_CLASS_LABELS/);
+assert.doesNotMatch(wizard, /AUTHOR_PUBLICATION_CLASS_LABELS|PRODUCT_OPTIONS/);
 assert.match(wizard, /CABINET_BRANCH\.PRODUCT/);
 assert.match(wizard, /CABINET_BRANCH\.MUSIC/);
 assert.match(wizard, /CABINET_BRANCH\.POST/);
 assert.match(wizard, /"practice"/);
-assert.match(wizard, /"course"/);
-assert.match(wizard, /"audiobook"/);
+assert.match(wizard, /option\.value === CABINET_BRANCH\.PRODUCT\s*\? "practice"/);
 
 const labels = read("src/lib/author-products/publication-class.ts");
 assert.match(labels, /product: "Продукт"/);
@@ -245,8 +244,14 @@ assert.match(newPage, /AuthorCreateWizard/);
 assert.match(newPage, /initialPublicationClass/);
 
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
+// 9e5fe81a (#704): select the product type once, inside the form.
+assert.match(form, /AUTHOR_PUBLICATION_CLASS_LABELS/);
+assert.match(form, /value: "practice"/);
+assert.match(form, /value: "course"/);
+assert.match(form, /value: "audiobook"/);
 assert.match(form, /publication_class: form.publicationClass/);
-assert.doesNotMatch(form, /Section|Lesson|Chapter|Gallery editor/);
+// 0eba9016 extracted form sections; their names are not course editor controls.
+assert.doesNotMatch(form, /\b(?:Section|Lesson|Chapter)\b|Gallery editor/);
 
 const listing = read("src/lib/catalog/listing.ts");
 assert.doesNotMatch(

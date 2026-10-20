@@ -34,6 +34,7 @@ function assert(condition, message) {
 function parseOverride(text) {
   const services = {};
   let current = null;
+  let currentKey = null;
   for (const rawLine of text.split("\n")) {
     const line = rawLine.replace(/\s+#.*$/, "");
     if (!line.trim() || line.trim().startsWith("#") || line.trim() === "services:") {
@@ -42,7 +43,8 @@ function parseOverride(text) {
     const service = line.match(/^  ([a-z0-9-]+):\s*$/);
     if (service) {
       current = service[1];
-      services[current] = { keys: [], logging: null };
+      services[current] = { keys: [], logging: null, environment: {} };
+      currentKey = null;
       continue;
     }
     if (!current) {
@@ -51,6 +53,13 @@ function parseOverride(text) {
     const topKey = line.match(/^    ([a-z0-9_-]+):/);
     if (topKey) {
       services[current].keys.push(topKey[1]);
+      currentKey = topKey[1];
+    }
+    if (currentKey === "environment" && !topKey) {
+      const entry = line.match(/^      ([A-Z0-9_]+): "([^"]+)"$/);
+      assert(entry, `${current} unexpected environment entry`);
+      assert(!(entry[1] in services[current].environment), `${current} duplicate environment entry`);
+      services[current].environment[entry[1]] = entry[2];
     }
     if (line.includes("max-size:")) {
       services[current].logging = {
@@ -77,7 +86,6 @@ function parseOverride(text) {
 const text = readFileSync(overridePath, "utf8");
 assert(!/^\s+volumes:/m.test(text), "override must not declare volumes");
 assert(!/^\s+ports:/m.test(text), "override must not declare ports");
-assert(!/environment:/m.test(text), "override must not declare environment");
 assert(!/restart:/m.test(text), "override must not declare restart");
 assert(!/depends_on:/m.test(text), "override must not declare depends_on");
 
@@ -89,7 +97,17 @@ assert(
 
 for (const name of EXPECTED_SERVICES) {
   const service = services[name];
-  assert(service.keys.join(",") === "logging", `${name} keys ${service.keys}`);
+  assert(
+    service.keys.join(",") === (name === "storage" ? "environment,logging" : "logging"),
+    `${name} keys ${service.keys}`,
+  );
+  // a56380db (#776) intentionally extends the override with the signed-upload TTL.
+  assert(
+    JSON.stringify(service.environment) === JSON.stringify(
+      name === "storage" ? { UPLOAD_SIGNED_URL_EXPIRATION_TIME: "7200" } : {},
+    ),
+    `${name} environment changed`,
+  );
   assert(service.logging?.driver === "json-file", `${name} driver`);
   assert(service.logging?.maxSize === "20m", `${name} max-size`);
   assert(service.logging?.maxFile === "5", `${name} max-file`);
@@ -140,6 +158,14 @@ for (const name of EXPECTED_SERVICES) {
   assert(service.image === `example/${name}:test`, `${name} image changed`);
   assert(service.restart === "unless-stopped", `${name} restart changed`);
   assert(service.environment?.EXAMPLE === "keep", `${name} env changed`);
+  assert(
+    JSON.stringify(service.environment) === JSON.stringify(
+      name === "storage"
+        ? { EXAMPLE: "keep", UPLOAD_SIGNED_URL_EXPIRATION_TIME: "7200" }
+        : { EXAMPLE: "keep" },
+    ),
+    `${name} merged environment changed`,
+  );
   assert(JSON.stringify(service.ports ?? "").includes("127.0.0.1"), `${name} ports changed`);
   assert(service.logging?.driver === "json-file", `${name} logging driver`);
   assert(service.logging?.options?.["max-size"] === "20m", `${name} max-size`);

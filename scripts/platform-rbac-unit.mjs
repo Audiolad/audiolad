@@ -291,7 +291,9 @@ assert.doesNotMatch(
 );
 
 const playlistApi = read("src/app/api/playlists/route.ts");
-assert.match(playlistApi, /playlists\.create_editorial/);
+// ef1615ba makes editorial creation direction-scoped rather than a global permission.
+assert.match(playlistApi, /await canUserCreateEditorialInDirection\(\s*supabase,\s*user.id,\s*parsed.directionId,/);
+assert.match(playlistApi, /if \(!canCreate\)[\s\S]*status: 403/);
 assert.doesNotMatch(playlistApi, /products\.moderate/);
 assert.ok(
   rolesGrantPermission(["admin"], "playlists.manage"),

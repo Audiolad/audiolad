@@ -4,18 +4,21 @@
  */
 import { readFileSync } from "node:fs";
 
+// 5494fb5d introduced production-root paths; inspect this checkout in any worktree.
+const read = (path, encoding) => readFileSync(new URL(`../${path}`, import.meta.url), encoding);
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-const sidebar = readFileSync(
-  "/var/www/audiolad/src/components/listener/NowPlayingPanel.tsx",
+const sidebar = read(
+  "src/components/listener/NowPlayingPanel.tsx",
   "utf8",
 );
-const bar = readFileSync(
-  "/var/www/audiolad/src/components/listener/DesktopPlayerBar.tsx",
+const bar = read(
+  "src/components/listener/DesktopPlayerBar.tsx",
   "utf8",
 );
 

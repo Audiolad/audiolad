@@ -66,7 +66,9 @@ function testDeleteApiRoute() {
   assert(itemRoute.includes("requirePersonalMaterialAccess"), "delete checks material access");
   assert(itemRoute.includes("softDeletePersonalMaterial"), "delete soft deletes material");
   assert(itemRoute.includes("removePersonalMaterialStorageFiles"), "delete removes storage files");
-  assert(auth.includes("author_members"), "ownership via author membership");
+  // 49d04377 delegates acting-author membership to the shared guard.
+  assert(auth.includes("await requireAuthorMembership(material.author_id)"), "ownership guard delegation");
+  assert(read("src/lib/author-products/auth.ts").includes('.from("author_members")'), "shared guard checks author membership");
 }
 
 function testDeleteDbScript() {
