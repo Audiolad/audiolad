@@ -1,3 +1,4 @@
+import * as aiMusicHub from "@/lib/seo/ai-music-hub/content";
 import * as distribyutorIiMuzyki from "@/lib/seo/distribyutor-ii-muzyki/content";
 import * as kakProdatMuzykuSozdannuyuIi from "@/lib/seo/kak-prodat-muzyku-sozdannuyu-ii/content";
 import * as kakSozdatFonovuyuMuzykuSPomoshchyuIi from "@/lib/seo/kak-sozdat-fonovuyu-muzyku-s-pomoshchyu-ii/content";
@@ -211,8 +212,16 @@ const STANDALONE_ARTICLE_DEFINITIONS: readonly StandaloneArticleDefinition[] = [
     },
     8,
   ),
-  // /kak-zarabatyvat-na-ii-muzyke-v-audiolad is intentionally not listed:
-  // it is a noindex production-test landing excluded from the sitemap.
+  neuromusicGuide(
+    {
+      path: aiMusicHub.AI_MUSIC_HUB_PATH,
+      title: aiMusicHub.AI_MUSIC_HUB_PAGE_H1,
+      description: aiMusicHub.AI_MUSIC_HUB_SEO_DESCRIPTION,
+      breadcrumbTitle: aiMusicHub.AI_MUSIC_HUB_BREADCRUMB_TITLE,
+      publishedAt: aiMusicHub.AI_MUSIC_HUB_DATE_PUBLISHED,
+    },
+    8,
+  ),
 ];
 
 export function listStandaloneArticleDefinitions(): readonly StandaloneArticleDefinition[] {

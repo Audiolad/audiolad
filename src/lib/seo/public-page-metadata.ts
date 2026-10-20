@@ -302,8 +302,7 @@ export function buildAiMusicHubMetadata(): Metadata {
       canonical,
     },
     robots: {
-      // Temporary production-test indexing. Restore index: true after visual QA.
-      index: false,
+      index: true,
       follow: true,
     },
     openGraph: {
