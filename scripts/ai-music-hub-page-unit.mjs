@@ -172,8 +172,10 @@ function testCopyAndEconomics() {
       "1 000 покупок – 500 000 ₽ продаж",
     ],
   );
-  assert.match(text, /Автор музыки получает 70% от продаж/);
-  assert.match(text, /30% – комиссия АудиоЛада/);
+  assert.match(text, /Автор музыки получает до 70% от продаж/);
+  assert.match(text, /Комиссия АудиоЛада – от 30%/);
+  assert.doesNotMatch(JSON.stringify(hubContent), /(?<!до )70%/);
+  assert.doesNotMatch(JSON.stringify(hubContent), /(?<!от )30%/);
   assert.equal(AI_MUSIC_HUB_RIGHTS_HEADING, "Права на музыку остаются у вас");
   assert.match(text, /Яндекс Музыке, Spotify, YouTube/);
   assert.equal(AI_MUSIC_HUB_STEPS_HEADING, "Что нужно сделать");
