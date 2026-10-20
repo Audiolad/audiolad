@@ -214,7 +214,7 @@ export default function SchoolTariffsScreen() {
         <p className="school-tariffs__subtitle">{SUBTITLE}</p>
         <div className="school-tariffs__schedule" role="group" aria-label="Расписание этапов">
           <p className="school-tariffs__schedule-stream">
-            {SCHOOL_STREAM_LABEL} · {SCHOOL_START_LABEL}
+            {SCHOOL_STREAM_LABEL} · <span className="school-nowrap">{SCHOOL_START_LABEL}</span>
           </p>
           <div className="school-tariffs__schedule-item">
             <span className="school-tariffs__schedule-icon" aria-hidden="true">

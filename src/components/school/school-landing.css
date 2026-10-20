@@ -59,6 +59,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.school-nowrap {
+  white-space: nowrap;
+}
+
 .school-number {
   font-family: var(--school-number-font);
   font-variant-numeric: tabular-nums lining-nums;
@@ -4303,19 +4307,20 @@
 
 @media (min-width: 1024px) {
   .school-tariffs__schedule {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: stretch;
-    gap: 0;
+    column-gap: 0;
+    row-gap: 0;
     padding: 0.95rem 1.05rem;
   }
 
   .school-tariffs__schedule-stream {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
   }
 
   .school-tariffs__schedule-item {
-    flex: 1 1 0;
+    min-width: 0;
   }
 
   .school-tariffs__schedule-divider {
