@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { computeEmbedShield } from "@/lib/embed/embed-shield";
 import type { PracticeEmbedMode } from "@/lib/embed/practice-embed";
 import {
   LISTEN_STATS_HEARTBEAT_MS,
@@ -139,6 +140,10 @@ export default function PracticeEmbedCard(props: Props) {
   // value at any time (`audiolad:embed-height-request`), so a message sent before its listener
   // was ready is not lost. Partners that ignore the message keep their fixed frame height.
   const articleRef = useRef<HTMLElement | null>(null);
+  const primaryRef = useRef<HTMLButtonElement | HTMLAnchorElement | null>(null);
+  const brandRef = useRef<HTMLAnchorElement | null>(null);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const postRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     const el = articleRef.current;
     if (!el || window.parent === window) return;
@@ -146,10 +151,19 @@ export default function PracticeEmbedCard(props: Props) {
     const post = (force = false) => {
       const height = Math.ceil(el.getBoundingClientRect().height);
       const wide = window.innerWidth >= 560;
-      const key = `${height}:${wide}`;
+      const controls = [primaryRef.current, brandRef.current, progressRef.current]
+        .flatMap((control) => {
+          if (!control) return [];
+          const rect = control.getBoundingClientRect();
+          return [{ x: rect.left, y: rect.top, width: rect.width, height: rect.height }];
+        });
+      const shield = computeEmbedShield(
+        { width: window.innerWidth, height: window.innerHeight }, controls,
+      );
+      const key = JSON.stringify({ height, wide, shield });
       if (height <= 0 || (!force && key === last)) return;
       last = key;
-      window.parent.postMessage({ type: "audiolad:embed-height", height, wide }, "*");
+      window.parent.postMessage({ type: "audiolad:embed-height", height, wide, shield }, "*");
     };
     const onResize = () => post();
     const onMessage = (event: MessageEvent) => {
@@ -159,37 +173,35 @@ export default function PracticeEmbedCard(props: Props) {
     };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
     observer?.observe(el);
+    postRef.current = post;
     window.addEventListener("resize", onResize);
     window.addEventListener("message", onMessage);
     post(true);
     return () => {
+      postRef.current = null;
       observer?.disconnect();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("message", onMessage);
     };
   }, []);
 
+  useEffect(() => {
+    postRef.current?.();
+  }, [state, canPlayInline]);
+
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
   return (
-    // Narrow frames (<560px, partner mobile) keep the vertical card with a SQUARE cover shown in
-    // full (never cropped, as on the audiolad.ru product card); the card has its natural height
-    // and reports it to the parent (audiolad:embed-height) so the partner frame fits it. Wide frames
-    // (partner desktop) switch to the AudioLad desktop practice-hero layout:
-    // square cover left, info + «Слушать» right, filling the frame height.
-    // The card always fills the frame exactly (h-dvh + overflow-hidden): on narrow frames the
-    // cover flexes to the space left by the text, so the document never overflows the iframe.
-    // An overflowing frame became a nested scroller and the card "jittered" under touch scroll.
-    // The frame itself is the visual card on the partner page: no shadow and a transparent
-    // document (the platform body is lilac #f7f2fc, which showed as a purple band under the
-    // card whenever the card was shorter than the frame). 100vh fallback for WebViews without dvh.
-    // NO overscroll-behavior here: `overflow-hidden` makes <main> a scroll container, and
-    // `overscroll-behavior: none` on it stops scroll chaining, so on Android Chrome a vertical
-    // swipe over the card was swallowed inside the iframe and the partner page did not scroll.
-    // With the default `auto`, the (non-scrollable) card chains the gesture to the parent page.
+    // Narrow frames (<560px) keep the full square cover and the card's natural height;
+    // wide frames keep the horizontal cover + info layout filling the frame height.
+    // The transparent frame has no shadow; overflow-clip keeps the root from becoming
+    // a scroll container. 100vh is the fallback for WebViews without dvh.
+    // audiolad:embed-height includes shield rects in iframe viewport CSS pixels – the
+    // partner shields the whole card except the controls with transparent page layers
+    // so Android swipes scroll its article. Buttons, brand link and progress stay exposed.
     <main
       data-practice-embed-root="true"
-      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-hidden bg-transparent p-0"
+      className="flex h-screen supports-[height:100dvh]:h-dvh items-stretch justify-center overflow-clip bg-transparent p-0"
     >
       <style>{"html,body{background:transparent!important;overscroll-behavior:auto!important}"}</style>
       <article
@@ -230,6 +242,7 @@ export default function PracticeEmbedCard(props: Props) {
             {canPlayInline ? (
               <button
                 type="button"
+                ref={(element) => { primaryRef.current = element; }}
                 data-practice-embed-play="true"
                 aria-pressed={state === "playing"}
                 aria-busy={state === "loading"}
@@ -245,6 +258,7 @@ export default function PracticeEmbedCard(props: Props) {
                 href={props.practiceUrl}
                 target="_blank"
                 rel="noopener"
+                ref={(element) => { primaryRef.current = element; }}
                 data-practice-embed-link="true"
                 className={BUTTON_CLASS}
               >
@@ -256,6 +270,7 @@ export default function PracticeEmbedCard(props: Props) {
               href={props.practiceUrl}
               target="_blank"
               rel="noopener"
+              ref={brandRef}
               data-practice-embed-brand="true"
               className="ml-auto text-xs text-[#9a8fb8] underline-offset-2 hover:underline min-[560px]:ml-0 min-[560px]:w-full"
             >
@@ -263,7 +278,7 @@ export default function PracticeEmbedCard(props: Props) {
             </a>
           </div>
           {canPlayInline && state !== "idle" ? (
-            <div className="mt-3" data-practice-embed-progress="true">
+            <div ref={progressRef} className="mt-3" data-practice-embed-progress="true">
               <input
                 type="range"
                 min={0}
