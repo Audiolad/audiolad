@@ -3,6 +3,7 @@ import {
   SCHOOL_START_DAY,
   SCHOOL_START_MONTH,
   SCHOOL_START_YEAR,
+  SCHOOL_STREAM_LABEL,
 } from "@/lib/school/start";
 
 const TITLE = "Школа Аудиопрактик";
@@ -70,7 +71,7 @@ export default function SchoolFinalScreen() {
         <p className="school-final__support">{SUPPORT}</p>
 
         <p className="school-final__start">
-          Старт – <span className="school-number">{SCHOOL_START_DAY}</span>{" "}
+          {SCHOOL_STREAM_LABEL} · Старт – <span className="school-number">{SCHOOL_START_DAY}</span>{" "}
           {SCHOOL_START_MONTH}{" "}
           <span className="school-number">{SCHOOL_START_YEAR}</span> года
         </p>

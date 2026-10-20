@@ -1,5 +1,5 @@
 import { SchoolTariffsAnchorLink } from "@/components/school/SchoolTariffsAnchorLink";
-import { SCHOOL_START_LABEL } from "@/lib/school/start";
+import { SCHOOL_START_LABEL, SCHOOL_STREAM_LABEL } from "@/lib/school/start";
 import Image from "next/image";
 
 /**
@@ -30,6 +30,8 @@ export default function SchoolFirstScreen() {
           Раскройте свои таланты и предназначение через создание собственных
           медитаций и аудиопрактик
         </p>
+
+        <p className="school-first-screen__stream">{SCHOOL_STREAM_LABEL}</p>
 
         <h1 className="school-first-screen__title">Школа Аудиопрактик</h1>
 

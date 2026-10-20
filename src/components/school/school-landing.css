@@ -177,6 +177,26 @@
   color: var(--school-body-color);
 }
 
+.school-first-screen__stream {
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 0 0 0.7rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--school-cta-end) 0%,
+    var(--school-cta-mid) 48%,
+    var(--school-cta-start) 100%
+  );
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .school-first-screen__start {
   display: inline-flex;
   align-self: flex-start;
@@ -4210,6 +4230,14 @@
   color: var(--school-ink);
 }
 
+.school-tariffs__schedule-stream {
+  margin: 0 0 0.75rem;
+  color: var(--school-ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .school-tariffs__schedule-item {
   display: flex;
   align-items: flex-start;
@@ -4276,9 +4304,14 @@
 @media (min-width: 1024px) {
   .school-tariffs__schedule {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: stretch;
     gap: 0;
     padding: 0.95rem 1.05rem;
+  }
+
+  .school-tariffs__schedule-stream {
+    flex-basis: 100%;
   }
 
   .school-tariffs__schedule-item {
