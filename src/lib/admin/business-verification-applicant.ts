@@ -69,7 +69,7 @@ export async function loadBusinessVerificationApplicants(cases: BusinessApplican
             if (!name) continue;
             for (const member of members) {
               const workspace = one(member.authors);
-              if (workspace?.id !== row.author_id) continue;
+              if (!workspace || workspace.id !== row.author_id) continue;
               const names = payoutNames.get(member.user_id) ?? [];
               names.push({ workspaceId: workspace.id, workspaceName: workspace.name, name });
               payoutNames.set(member.user_id, names);
