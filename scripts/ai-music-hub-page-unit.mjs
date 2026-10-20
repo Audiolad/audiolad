@@ -342,6 +342,11 @@ function testBusinessSection() {
     hubContent.AI_MUSIC_HUB_ECONOMICS_TEXT.join(" "),
     /в сервисе «АудиоЛад Бизнес» роялти рассчитываются по отдельной схеме – см\. ниже/,
   );
+  for (const item of hubContent.AI_MUSIC_HUB_ECONOMICS_TEXT) {
+    if (item.includes("70%")) {
+      assert.match(item, /АудиоЛад Бизнес/);
+    }
+  }
   assert.doesNotMatch(JSON.stringify(hubContent), /50\s*\/\s*50|50%/);
   assert.doesNotMatch(business, /\d/);
   assert.doesNotMatch(business, /%|₽/);
