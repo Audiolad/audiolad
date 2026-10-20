@@ -342,8 +342,9 @@ function testBusinessSection() {
   assert.match(AI_MUSIC_HUB_BUSINESS_PAYOUTS_TEXT.join(" "), /по отдельной схеме/);
   assert.match(
     hubContent.AI_MUSIC_HUB_ECONOMICS_TEXT.join(" "),
-    /в сервисе «АудиоЛад Бизнес» роялти рассчитываются по отдельной схеме – см\. ниже/,
+    /в сервисе «АудиоЛад Бизнес» роялти рассчитываются по отдельной схеме\)\./,
   );
+  assert.doesNotMatch(JSON.stringify(hubContent), /см\. ниже/);
   for (const item of hubContent.AI_MUSIC_HUB_ECONOMICS_TEXT) {
     if (item.includes("70%")) {
       assert.match(item, /АудиоЛад Бизнес/);
