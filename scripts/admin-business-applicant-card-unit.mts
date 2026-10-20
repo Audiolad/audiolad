@@ -26,9 +26,10 @@ assert.equal(buildBusinessVerificationApplicant({ ...input, workspaces: [] }).wo
 assert.equal(buildBusinessVerificationApplicant({ ...input, sourceWorkspace: { ...workspaces[0], id: "foreign" } }).sourceWarning, "пространство не принадлежит аккаунту заявителя – проверьте");
 assert.equal(buildBusinessVerificationApplicant({ ...input, sourceWorkspace: null }).sourceLabel, "Не определено");
 assert.equal(buildBusinessVerificationApplicant({ ...input, access: { ...access, roles: ["editor"], permissions: new Set() } }).profileHref, null);
+assert.equal(buildBusinessVerificationApplicant({ ...input, access: { ...access, roles: ["owner"], permissions: new Set() } }).profileHref, "/admin/users/applicant");
 for (const [n, text] of [[1, "1 авторский проект"], [2, "2 авторских проекта"], [5, "5 авторских проектов"], [11, "11 авторских проектов"], [14, "14 авторских проектов"], [21, "21 авторский проект"], [22, "22 авторских проекта"]] as const) assert.equal(formatApplicantWorkspaceTotal(n), text);
 const valid = { action: "approve", reason: "", rightsholder: "00000000-0000-0000-0000-000000000001", newDisplayName: "", newEntityType: "", confirmScope: "yes" };
-assert.equal(validateBusinessDecisionInput({ ...valid, action: "" }), "Выберите решение");
+assert.equal(validateBusinessDecisionInput({ ...valid, action: "" }), "Выберите решение.");
 assert.equal(validateBusinessDecisionInput({ ...valid, action: "invalid" }), "Некорректное решение.");
 assert.equal(validateBusinessDecisionInput({ ...valid, rightsholder: "" }), "Выберите правообладателя, которому присваивается подтверждение.");
 assert.equal(validateBusinessDecisionInput({ ...valid, rightsholder: "invalid" }), "Некорректный правообладатель.");

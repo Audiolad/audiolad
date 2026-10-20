@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ADMIN_NAV_ATTENTION_QUEUES, buildAdminNavAttention, resolveAdminNavBadge, shouldExcludeOwnBusinessCases } from "../src/lib/admin/nav-attention";
+import { ADMIN_NAV_ATTENTION_QUEUES, buildAdminNavAttention, canCountAdminQueue, resolveAdminNavBadge, shouldExcludeOwnBusinessCases } from "../src/lib/admin/nav-attention";
 import { formatAdminNavBadgeCount } from "../src/lib/admin/nav-badge";
-import { resolvePermissionsForRoles, type PlatformTeamRole } from "../src/lib/auth/platform-permissions";
+import { PLATFORM_TEAM_ROLES, resolvePermissionsForRoles, type PlatformTeamRole } from "../src/lib/auth/platform-permissions";
 import type { PlatformAccessSnapshot } from "../src/lib/auth/platform-access";
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const accessFor = (role: PlatformTeamRole): PlatformAccessSnapshot => ({ userId: "viewer", roles: [role], permissions: resolvePermissionsForRoles([role]), usedLegacyFallback: false });
@@ -12,11 +12,11 @@ const expected = [
   ["/admin/commercial-applications", "authors.manage", "author_commercial_applications", "status", ["submitted", "in_review"]],
   ["/admin/payout-profiles", "authors.payout_profiles.review", "author_payout_profiles", "status", ["submitted", "in_review"]],
   ["/admin/business-verification", "author_products.moderate", "business_rightsholder_verifications", "status", ["submitted"]],
-  ["/classica/production", "classica.production.access", "classica_production_jobs", "status", ["in_review"]],
+  ["/classica/production", "classica.production.moderate", "classica_production_jobs", "status", ["in_review"]],
 ];
 assert.deepEqual(ADMIN_NAV_ATTENTION_QUEUES.map((q) => [q.href, q.permission, q.table, q.column, [...q.statuses]]), expected);
 const counts = Object.fromEntries(ADMIN_NAV_ATTENTION_QUEUES.map((q) => [q.href, 150]));
-for (const role of ["owner", "admin", "editor", "support", "analyst", "finance"] as const) {
+for (const role of PLATFORM_TEAM_ROLES) {
   const access = accessFor(role);
   const result = buildAdminNavAttention(access, counts);
   for (const q of ADMIN_NAV_ATTENTION_QUEUES) {
@@ -29,6 +29,13 @@ for (const role of ["owner", "admin", "editor", "support", "analyst", "finance"]
   }
   assert.deepEqual(resolveAdminNavBadge(access, { "/admin": 999 }, "/admin"), {});
 }
+const operator = accessFor("classica_operator");
+assert.equal(operator.permissions.has("classica.production.access"), true);
+assert.equal(operator.permissions.has("classica.production.moderate"), false);
+assert.equal(canCountAdminQueue(operator, "classica.production.moderate"), false);
+assert.deepEqual(resolveAdminNavBadge(operator, counts, "/classica/production"), {});
+assert.equal(canCountAdminQueue(accessFor("classica_moderator"), "classica.production.moderate"), true);
+assert.equal(canCountAdminQueue({ ...accessFor("owner"), permissions: new Set() }, "future.permission"), true);
 assert.equal(formatAdminNavBadgeCount(99), "99");
 assert.equal(formatAdminNavBadgeCount(100), "99+");
 assert.equal(shouldExcludeOwnBusinessCases(false), true);

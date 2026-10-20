@@ -1,4 +1,4 @@
-import type { PlatformAccessSnapshot } from "@/lib/auth/platform-access";
+import { snapshotHasPermission, type PlatformAccessSnapshot } from "@/lib/auth/platform-access";
 
 export type ApplicantWorkspace = { id: string; name: string; slug: string | null; access_status: string | null };
 export type ApplicantRightsholder = { id: string; display_name: string; entity_type: string; status: string };
@@ -21,7 +21,7 @@ export function buildBusinessVerificationApplicant(input: {
   return {
     fullName,
     nameLabel: fullName ?? "Имя в профиле не заполнено – проверьте профиль",
-    profileHref: input.access.roles.includes("owner") || input.access.permissions.has("users.view") ? `/admin/users/${input.ownerUserId}` : null,
+    profileHref: snapshotHasPermission(input.access, "users.view") ? `/admin/users/${input.ownerUserId}` : null,
     workspaces,
     workspaceTotal: workspaces.length ? formatApplicantWorkspaceTotal(workspaces.length) : "У аккаунта нет авторских проектов",
     sourceWorkspace: input.sourceWorkspace,

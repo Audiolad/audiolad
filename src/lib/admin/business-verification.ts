@@ -155,7 +155,7 @@ export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 export function validateBusinessDecisionInput(input: {
   action: string; reason: string; rightsholder: string; newDisplayName: string; newEntityType: string; confirmScope: string;
 }): string | null {
-  if (!input.action) return "Выберите решение";
+  if (!input.action) return "Выберите решение.";
   if (!isBusinessModerationAction(input.action)) return "Некорректное решение.";
   if (input.action === "approve") {
     if (!input.rightsholder) return "Выберите правообладателя, которому присваивается подтверждение.";
