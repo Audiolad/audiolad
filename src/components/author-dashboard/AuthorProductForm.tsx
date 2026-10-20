@@ -4830,9 +4830,9 @@ export default function AuthorProductForm({
               </label>
             ) : null}
             <p className="text-sm leading-5 text-[#7d70a2]">
-              Минимальная цена лицензии для Студии — {MIN_STUDIO_MUSIC_PRICE_RUBLES}{' '}
+              Минимальная цена лицензии для Студии – {MIN_STUDIO_MUSIC_PRICE_RUBLES}{' '}
               ₽. Покупатель получает постоянное право использовать эту музыку в
-              Студии. Автор получает 70% с каждой продажи.
+              Студии. Автор получает до 70% с каждой продажи.
             </p>
           </fieldset>
         ) : null}

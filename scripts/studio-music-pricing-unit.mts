@@ -598,7 +598,8 @@ assert.match(form, /Использование в Студии АудиоЛад�
 assert.match(form, /Бесплатно — сохранено ранее/);
 assert.match(form, /Автоматическая цена/);
 assert.match(form, /Своя цена/);
-assert.match(form, /70%/);
+assert.match(form, /до 70%/);
+assert.ok(form.includes("Автор получает до 70% с каждой продажи."));
 assert.match(form, /studioMusicPricingModeAfterListenerFlip/);
 assert.doesNotMatch(card, /practice-audio\//);
 assert.doesNotMatch(overlay, /\/api\/catalog\/play/);
@@ -687,7 +688,7 @@ assert.match(
 );
 assert.match(
   read("src/components/author-dashboard/AuthorProductForm.tsx"),
-  /Минимальная цена лицензии для Студии/,
+  /Минимальная цена лицензии для Студии –/,
 );
 assert.match(
   read("src/components/author-dashboard/AuthorProductForm.tsx"),
