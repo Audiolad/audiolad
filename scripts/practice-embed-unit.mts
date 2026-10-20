@@ -11,6 +11,8 @@ import {
   withEmbedUtm,
 } from "../src/lib/embed/practice-embed";
 
+import { computeEmbedShield, type EmbedRect } from "../src/lib/embed/embed-shield";
+
 const base = { canListen: true, isCourse: false, hasPlayableAudio: true } as const;
 
 assert.equal(resolvePracticeEmbedMode({ ...base, accessReason: "free" }), "play");
@@ -97,24 +99,85 @@ console.log("practice-embed-unit: ok");
   assert.match(actions, /ml-auto/, "brand label is right-aligned");
 }
 
-// Parent-page touch shields cover only the cover and info above the actions in either layout.
+// Parent-page shields partition the viewport around padded controls.
+{
+  const viewport = { width: 380, height: 605 };
+  const controls = [
+    { x: 20, y: 525, width: 130, height: 44 },
+    { x: 320, y: 539, width: 50, height: 16 },
+  ];
+  const contains = (rect: EmbedRect, x: number, y: number) =>
+    x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
+  const intersects = (a: EmbedRect, b: EmbedRect) =>
+    a.x < b.x + b.width && a.x + a.width > b.x &&
+    a.y < b.y + b.height && a.y + a.height > b.y;
+  const verify = (items: EmbedRect[], pad = 4, step = 5) => {
+    const shield = computeEmbedShield(viewport, items, pad);
+    const inflated = items.map((rect) => {
+      const x = Math.floor(rect.x - pad);
+      const y = Math.floor(rect.y - pad);
+      return { x, y, width: Math.ceil(rect.x + rect.width + pad) - x,
+        height: Math.ceil(rect.y + rect.height + pad) - y };
+    });
+    for (const [index, rect] of shield.entries()) {
+      assert.ok(Object.values(rect).every(Number.isInteger), "integer geometry");
+      assert.ok(rect.width > 0 && rect.height > 0);
+      assert.ok(rect.x >= 0 && rect.y >= 0 &&
+        rect.x + rect.width <= viewport.width && rect.y + rect.height <= viewport.height);
+      assert.ok(inflated.every((hole) => !intersects(rect, hole)), "no shield overlaps controls");
+      assert.ok(shield.slice(index + 1).every((other) => !intersects(rect, other)), "shields do not overlap");
+    }
+    for (let y = 0; y < viewport.height; y += step) {
+      for (let x = 0; x < viewport.width; x += step) {
+        const count = shield.filter((rect) => contains(rect, x, y)).length;
+        assert.equal(count, inflated.some((rect) => contains(rect, x, y)) ? 0 : 1,
+          `exact partition at ${x},${y}`);
+      }
+    }
+    return shield;
+  };
+  const shield = verify(controls);
+  assert.deepEqual(shield.filter((rect) => rect.y < 380),
+    [{ x: 0, y: 0, width: 380, height: 521 }], "cover merges into one full-width shield");
+  verify([...controls, { x: 18.7, y: 580.2, width: 340.1, height: 20.4 }], 4, 1);
+  verify([
+    { x: -10.2, y: 20.7, width: 70.5, height: 30.1 },
+    { x: 40.1, y: 30.2, width: 80.8, height: 50.3 },
+    { x: 390, y: 10, width: 20, height: 20 },
+    { x: 360, y: 590, width: 50, height: 50 },
+  ], 4, 1);
+  verify(controls, 0);
+  assert.deepEqual(computeEmbedShield(viewport, []), [{ x: 0, y: 0, ...viewport }]);
+  assert.deepEqual(computeEmbedShield(viewport,
+    [{ x: -10, y: -10, width: 400, height: 630 }]), []);
+  for (const invalid of [NaN, Infinity, -Infinity, 0, -1]) {
+    assert.deepEqual(computeEmbedShield({ width: invalid, height: 605 }, controls), []);
+    assert.deepEqual(computeEmbedShield({ width: 380, height: invalid }, controls), []);
+  }
+  for (const key of ["x", "y", "width", "height"] as const) {
+    for (const invalid of [NaN, Infinity, -Infinity]) {
+      assert.deepEqual(computeEmbedShield(viewport, [{ ...controls[0], [key]: invalid }]),
+        computeEmbedShield(viewport, []), "ignore non-finite controls");
+    }
+  }
+  for (const key of ["width", "height"] as const) {
+    assert.deepEqual(computeEmbedShield(viewport, [{ ...controls[0], [key]: 0 }]),
+      computeEmbedShield(viewport, []), "ignore zero-size controls");
+  }
+  const stripes = Array.from({ length: 20 }, (_, i) =>
+    ({ x: 0, y: 10 + i * 20, width: 380, height: 2 }));
+  assert.deepEqual(computeEmbedShield(viewport, stripes, 0),
+    Array.from({ length: 16 }, (_, i) =>
+      ({ x: 0, y: i === 0 ? 0 : 12 + (i - 1) * 20, width: 380, height: i === 0 ? 10 : 18 })),
+    "cap keeps the first 16 shields in top-to-bottom order");
+}
+
 {
   const card = await readFile(new URL("../src/components/embed/PracticeEmbedCard.tsx", import.meta.url), "utf8");
-  assert.match(card, /ref=\{coverRef\}[^>]*data-practice-embed-cover="true"/);
-  assert.match(card, /ref=\{infoRef\}[^>]*className="shrink-0 px-5/);
-  assert.match(card, /ref=\{actionsRef\}[^>]*data-practice-embed-actions="true"/);
-  for (const ref of ["coverRef", "infoRef", "actionsRef"]) {
-    assert.ok(card.includes(`${ref}.current?.getBoundingClientRect()`), `${ref} supplies viewport geometry`);
-  }
-  assert.match(card, /left: info\.left,[\s\S]*?top: info\.top,[\s\S]*?width: info\.width,[\s\S]*?height: Math\.max\(0, actions\.top - info\.top\)/);
-  assert.match(card, /x: Math\.floor\(rect\.left\)/);
-  assert.match(card, /y: Math\.floor\(rect\.top\)/);
-  assert.match(card, /width: Math\.ceil\(rect\.width\)/);
-  assert.match(card, /height: Math\.ceil\(rect\.height\)/);
-  assert.match(card, /filter\(\(rect\) => rect\.width > 0 && rect\.height > 0\)/);
+  assert.match(card, /const shield = computeEmbedShield\(\s*\{ width: window\.innerWidth, height: window\.innerHeight \}, controls/);
   assert.match(card, /const key = JSON\.stringify\(\{ height, wide, shield \}\)/, "geometry changes bypass deduplication");
-  assert.match(card, /observer\?\.observe\(infoRef\.current\)/);
-  assert.match(card, /observer\?\.observe\(actionsRef\.current\)/);
+  assert.match(card, /observer\?\.observe\(el\)/);
+  assert.match(card, /\[state, canPlayInline\]/, "conditional progress changes repost geometry");
   assert.match(card, /window\.parent === window/, "standalone cards send no geometry");
   assert.match(card, /window\.parent\.postMessage\(\{ type: "audiolad:embed-height", height, wide, shield \}, "\*"\)/);
 }

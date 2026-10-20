@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { computeEmbedShield } from "@/lib/embed/embed-shield";
 import type { PracticeEmbedMode } from "@/lib/embed/practice-embed";
 import {
   LISTEN_STATS_HEARTBEAT_MS,
@@ -139,9 +140,10 @@ export default function PracticeEmbedCard(props: Props) {
   // value at any time (`audiolad:embed-height-request`), so a message sent before its listener
   // was ready is not lost. Partners that ignore the message keep their fixed frame height.
   const articleRef = useRef<HTMLElement | null>(null);
-  const coverRef = useRef<HTMLDivElement | null>(null);
-  const infoRef = useRef<HTMLDivElement | null>(null);
-  const actionsRef = useRef<HTMLDivElement | null>(null);
+  const primaryRef = useRef<HTMLButtonElement | HTMLAnchorElement | null>(null);
+  const brandRef = useRef<HTMLAnchorElement | null>(null);
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const postRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     const el = articleRef.current;
     if (!el || window.parent === window) return;
@@ -149,25 +151,15 @@ export default function PracticeEmbedCard(props: Props) {
     const post = (force = false) => {
       const height = Math.ceil(el.getBoundingClientRect().height);
       const wide = window.innerWidth >= 560;
-      const cover = coverRef.current?.getBoundingClientRect();
-      const info = infoRef.current?.getBoundingClientRect();
-      const actions = actionsRef.current?.getBoundingClientRect();
-      const rects = [];
-      if (cover) rects.push(cover);
-      if (info && actions) {
-        rects.push({
-          left: info.left,
-          top: info.top,
-          width: info.width,
-          height: Math.max(0, actions.top - info.top),
+      const controls = [primaryRef.current, brandRef.current, progressRef.current]
+        .flatMap((control) => {
+          if (!control) return [];
+          const rect = control.getBoundingClientRect();
+          return [{ x: rect.left, y: rect.top, width: rect.width, height: rect.height }];
         });
-      }
-      const shield = rects.map((rect) => ({
-        x: Math.floor(rect.left),
-        y: Math.floor(rect.top),
-        width: Math.ceil(rect.width),
-        height: Math.ceil(rect.height),
-      })).filter((rect) => rect.width > 0 && rect.height > 0);
+      const shield = computeEmbedShield(
+        { width: window.innerWidth, height: window.innerHeight }, controls,
+      );
       const key = JSON.stringify({ height, wide, shield });
       if (height <= 0 || (!force && key === last)) return;
       last = key;
@@ -181,17 +173,21 @@ export default function PracticeEmbedCard(props: Props) {
     };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
     observer?.observe(el);
-    if (infoRef.current) observer?.observe(infoRef.current);
-    if (actionsRef.current) observer?.observe(actionsRef.current);
+    postRef.current = post;
     window.addEventListener("resize", onResize);
     window.addEventListener("message", onMessage);
     post(true);
     return () => {
+      postRef.current = null;
       observer?.disconnect();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("message", onMessage);
     };
   }, []);
+
+  useEffect(() => {
+    postRef.current?.();
+  }, [state, canPlayInline]);
 
   const progress = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
@@ -200,8 +196,8 @@ export default function PracticeEmbedCard(props: Props) {
     // wide frames keep the horizontal cover + info layout filling the frame height.
     // The transparent frame has no shadow; overflow-clip keeps the root from becoming
     // a scroll container. 100vh is the fallback for WebViews without dvh.
-    // audiolad:embed-height includes shield rects in iframe viewport CSS pixels – cover
-    // and info above the actions. The partner overlays these with transparent page layers
+    // audiolad:embed-height includes shield rects in iframe viewport CSS pixels – the
+    // partner shields the whole card except the controls with transparent page layers
     // so Android swipes scroll its article. Buttons, brand link and progress stay exposed.
     <main
       data-practice-embed-root="true"
@@ -214,7 +210,7 @@ export default function PracticeEmbedCard(props: Props) {
         ref={articleRef}
         className="flex h-auto w-full max-w-[420px] flex-col self-start overflow-hidden rounded-[28px] bg-white shadow-none min-[560px]:grid min-[560px]:self-stretch min-[560px]:h-full min-[560px]:max-w-none min-[560px]:grid-cols-[auto_minmax(0,1fr)] min-[560px]:border min-[560px]:border-[#ece4f7]"
       >
-        <div ref={coverRef} data-practice-embed-cover="true"
+        <div data-practice-embed-cover="true"
           className="relative aspect-square w-full shrink-0 overflow-hidden bg-[#efe7fb] min-[560px]:aspect-square min-[560px]:h-full min-[560px]:w-auto min-[560px]:flex-none">
           {props.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -227,7 +223,7 @@ export default function PracticeEmbedCard(props: Props) {
             />
           ) : null}
         </div>
-        <div ref={infoRef} className="shrink-0 px-5 pb-4 pt-4 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
+        <div className="shrink-0 px-5 pb-4 pt-4 min-[560px]:flex min-[560px]:min-w-0 min-[560px]:flex-col min-[560px]:justify-center min-[560px]:overflow-hidden min-[560px]:px-6 min-[560px]:py-5">
           {props.typeLabel ? (
             <span className="inline-flex w-fit rounded-full bg-[#f4ecfb] px-3 py-1 text-xs font-medium text-[#7042c5]">
               {props.typeLabel}
@@ -242,10 +238,11 @@ export default function PracticeEmbedCard(props: Props) {
           {props.metaLine ? (
             <p className="mt-2 text-sm text-[#7d70a2]">{props.metaLine}</p>
           ) : null}
-          <div ref={actionsRef} className="mt-3 flex items-center gap-3 min-[560px]:flex-wrap" data-practice-embed-actions="true">
+          <div className="mt-3 flex items-center gap-3 min-[560px]:flex-wrap" data-practice-embed-actions="true">
             {canPlayInline ? (
               <button
                 type="button"
+                ref={(element) => { primaryRef.current = element; }}
                 data-practice-embed-play="true"
                 aria-pressed={state === "playing"}
                 aria-busy={state === "loading"}
@@ -261,6 +258,7 @@ export default function PracticeEmbedCard(props: Props) {
                 href={props.practiceUrl}
                 target="_blank"
                 rel="noopener"
+                ref={(element) => { primaryRef.current = element; }}
                 data-practice-embed-link="true"
                 className={BUTTON_CLASS}
               >
@@ -272,6 +270,7 @@ export default function PracticeEmbedCard(props: Props) {
               href={props.practiceUrl}
               target="_blank"
               rel="noopener"
+              ref={brandRef}
               data-practice-embed-brand="true"
               className="ml-auto text-xs text-[#9a8fb8] underline-offset-2 hover:underline min-[560px]:ml-0 min-[560px]:w-full"
             >
@@ -279,7 +278,7 @@ export default function PracticeEmbedCard(props: Props) {
             </a>
           </div>
           {canPlayInline && state !== "idle" ? (
-            <div className="mt-3" data-practice-embed-progress="true">
+            <div ref={progressRef} className="mt-3" data-practice-embed-progress="true">
               <input
                 type="range"
                 min={0}
