@@ -232,7 +232,7 @@ function testProfileMinimum() {
       full_bio: "Подробно о себе",
       avatar_url: AUTHOR_DEFAULT_AVATAR_PATH,
     }),
-    false,
+    true,
   );
   assert.equal(
     isAuthorProfileMinimumComplete({
@@ -248,7 +248,7 @@ function testProfileMinimum() {
       full_bio: "Подробно о себе",
       avatar_url: "https://cdn.example/avatar.jpg",
     }),
-    false,
+    true,
   );
 }
 
@@ -360,8 +360,10 @@ function testPartialAndFullProfile() {
       avatar_url: "https://cdn.example/avatar.jpg",
     },
   });
-  assert.equal(partial.steps[0].completed, false);
-  assert.equal(partial.steps[0].ctaLabel, "Продолжить оформление");
+  assert.equal(partial.steps[0].completed, true);
+  assert.equal(partial.steps[0].active, false);
+  assert.equal(partial.steps[0].ctaLabel, "Открыть страницу автора");
+  assert.equal(partial.steps[1].active, true);
 
   const full = evaluate({
     profile: {
@@ -372,6 +374,72 @@ function testPartialAndFullProfile() {
   });
   assert.equal(full.steps[0].completed, true);
   assert.equal(full.steps[1].active, true);
+}
+
+function testAnyMeaningfulProfileContent() {
+  const cases = [
+    ["empty profile", {}, false],
+    ["only real avatar", { avatar_url: "https://cdn.example/avatar.jpg" }, true],
+    ["only positioning", { short_positioning: "  Помогаю со сном  " }, true],
+    ["only bio", { full_bio: "  Подробно о себе  " }, true],
+    ...["", null].map((short_positioning) => [
+      `Kalinin with positioning ${JSON.stringify(short_positioning)}`,
+      {
+        avatar_url: "https://cdn.example/avatar.jpg",
+        full_bio: "Подробно о себе",
+        short_positioning,
+      },
+      true,
+    ]),
+    [
+      "brand default avatar with empty texts",
+      {
+        avatar_url: AUTHOR_DEFAULT_AVATAR_PATH,
+        short_positioning: "",
+        full_bio: "",
+      },
+      false,
+    ],
+    [
+      "fixture avatar with empty texts",
+      {
+        avatar_url: "https://cdn.example/avatar.jpg",
+        avatar_image: {
+          _audiolad_fixture: {
+            test_fixture: true,
+            namespace: "author-onboarding",
+            run_id: "profile-minimum",
+          },
+        },
+      },
+      false,
+    ],
+    [
+      "whitespace-only texts without avatar",
+      { short_positioning: " \t\n ", full_bio: " \n\t " },
+      false,
+    ],
+  ];
+
+  for (const [label, profile, completed] of cases) {
+    assert.equal(isAuthorProfileMinimumComplete(profile), completed, label);
+    const step = evaluate({ profile }).steps[0];
+    assert.equal(step.completed, completed, label);
+    assert.equal(step.active, !completed, label);
+    assert.equal(
+      step.ctaLabel,
+      completed ? "Открыть страницу автора" : "Оформить страницу",
+      label,
+    );
+    assert.equal(
+      step.ctaHref,
+      completed
+        ? "/authors/demo-author"
+        : "/author-dashboard/profile?author=demo-author",
+      label,
+    );
+    assert.equal(step.ctaExternal, completed, label);
+  }
 }
 
 function testFreeProductGate() {
@@ -1273,6 +1341,7 @@ function main() {
   testFocusProductSelection();
   testEmptyAuthor();
   testPartialAndFullProfile();
+  testAnyMeaningfulProfileContent();
   testFreeProductGate();
   testPreparePublishPromotionAndComplete();
   testUiPreferenceStorage();
