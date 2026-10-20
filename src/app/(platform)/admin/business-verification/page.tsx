@@ -18,6 +18,7 @@ import {
   type BusinessVerificationStatus,
 } from "@/lib/admin/business-verification";
 import { loadBusinessVerificationApplicants } from "@/lib/admin/business-verification-applicant";
+import { rightsholderProposalKey } from "@/lib/admin/business-rightsholder-proposal";
 import type { ApplicantWorkspace } from "@/lib/admin/business-verification-applicant-model";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 import { getAuthorAccessStatusLabel, type AuthorAccessStatus } from "@/lib/authors/access";
@@ -154,7 +155,7 @@ export default async function AdminBusinessVerificationPage({
   try {
     applicants = await loadBusinessVerificationApplicants(cases.map((c) => ({
       id: c.id, owner_user_id: c.owner_user_id, sourceWorkspace: productById.get(c.product_id)?.author ?? null,
-    })), (rightsholders ?? []) as { id: string; display_name: string; entity_type: string; status: string }[]);
+    })));
   } catch {
     return <p role="alert">Не удалось загрузить данные заявителей. <Link href={BUSINESS_VERIFICATION_ADMIN_PATH}>Повторить загрузку</Link></p>;
   }
@@ -313,7 +314,7 @@ export default async function AdminBusinessVerificationPage({
                         <input type="hidden" name="verificationId" value={c.id} />
                         <input type="hidden" name="filter" value={filter} />
                         <BusinessDecisionFields
-                          key={`${c.id}:${actions.join(",")}`}
+                          key={`${c.id}:${actions.join(",")}:${rightsholderProposalKey(applicant.proposal)}`}
                           caseId={c.id}
                           actions={actions.map((a) => ({ value: a, label: BUSINESS_MODERATION_ACTION_LABEL[a] }))}
                           rightsholders={(rightsholders ?? []) as { id: string; display_name: string; entity_type: string }[]}

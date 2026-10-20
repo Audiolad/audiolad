@@ -28,6 +28,16 @@ export function normalizeRightsholderName(s: string): string {
   return s.trim().replace(/\s+/g, " ").toLowerCase().replace(/ё/g, "е");
 }
 
+/** Reset decision fields and confirmation when the server proposal changes. */
+export function rightsholderProposalKey(proposal: RightsholderProposal): string {
+  const selection = proposal.selection;
+  switch (selection.kind) {
+    case "existing": return JSON.stringify([selection.kind, selection.id, proposal.name, proposal.entityType]);
+    case "new": return JSON.stringify([selection.kind, selection.displayName, selection.entityType]);
+    case "none": return JSON.stringify([selection.kind]);
+  }
+}
+
 export function buildRightsholderProposal(input: RightsholderProposalInput): RightsholderProposal {
   const warnings: string[] = [];
   function named(name: string, entityType: RightsholderEntityType, source: RightsholderProposalSource, sourceLabel: string, needsCheck: boolean): RightsholderProposal {
@@ -44,7 +54,7 @@ export function buildRightsholderProposal(input: RightsholderProposalInput): Rig
   }
   const bound = input.accountBinding;
   if (bound?.status === "active" && (bound.entity_type === "person" || bound.entity_type === "organization")) {
-    return { name: bound.display_name, entityType: bound.entity_type, source: "account_binding", sourceLabel: "Уже привязан к аккаунту", needsCheck: false, warnings, selection: { kind: "existing", id: bound.id } };
+    return { name: bound.display_name, entityType: bound.entity_type, source: "account_binding", sourceLabel: "Уже привязан к аккаунту – не указано автором, проверьте", needsCheck: true, warnings, selection: { kind: "existing", id: bound.id } };
   }
   const payouts = (input.verifiedPayoutNames ?? []).filter((p) => p.name.trim()).sort((a, b) => a.workspaceName.localeCompare(b.workspaceName, "ru") || a.workspaceId.localeCompare(b.workspaceId));
   if (payouts.length) {

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   buildRightsholderProposal as build,
   normalizeRightsholderName,
+  rightsholderProposalKey,
   type RightsholderProposalInput,
 } from "../src/lib/admin/business-rightsholder-proposal";
 
@@ -23,8 +24,8 @@ assert.equal(declared.sourceLabel, "Указано автором в заявк�
 assert.deepEqual(declared.selection, { kind: "new", displayName: "Заявлено автором", entityType: "organization" });
 assert.deepEqual(build(input).selection, { kind: "existing", id: holder.id });
 assert.equal(build(input).source, "account_binding");
-assert.equal(build(input).sourceLabel, "Уже привязан к аккаунту");
-assert.equal(build(input).needsCheck, false);
+assert.equal(build(input).sourceLabel, "Уже привязан к аккаунту – не указано автором, проверьте");
+assert.equal(build(input).needsCheck, true);
 const fromPayout = build({ ...input, accountBinding: null });
 assert.equal(fromPayout.source, "payout_profile");
 assert.equal(fromPayout.name, payout.name);
@@ -62,7 +63,36 @@ assert.equal(build({ verifiedPayoutNames: payouts, sourceWorkspaceId: "missing" 
 assert.deepEqual(build({ verifiedPayoutNames: [{ ...payout, name: "Семён Тестов" }, { ...payout, workspaceId: "other", name: " СЕМЕН  ТЕСТОВ " }] }).warnings, []);
 assert.deepEqual(payouts.map((p) => p.workspaceId), ["source", "other"], "input order is preserved");
 
+const newPerson = build({ profileName: holder.display_name });
+const existing = build(input);
+assert.notEqual(rightsholderProposalKey(newPerson), rightsholderProposalKey(existing));
+assert.notEqual(rightsholderProposalKey(newPerson), rightsholderProposalKey(build({ profileName: "Другое имя" })));
+assert.notEqual(rightsholderProposalKey(newPerson), rightsholderProposalKey(build({ declared: { name: holder.display_name, entityType: "organization" } })));
+assert.notEqual(rightsholderProposalKey(existing), rightsholderProposalKey(build({ accountBinding: { ...holder, id: "other" } })));
+assert.notEqual(rightsholderProposalKey(existing), rightsholderProposalKey(build({ accountBinding: { ...holder, display_name: "Другое имя" } })));
+assert.notEqual(rightsholderProposalKey(existing), rightsholderProposalKey(build({ accountBinding: { ...holder, entity_type: "organization" } })));
+assert.notEqual(rightsholderProposalKey(missing), rightsholderProposalKey(newPerson));
+assert.equal(rightsholderProposalKey(newPerson), rightsholderProposalKey(build({ profileName: holder.display_name })));
+
 const loader = read("src/lib/admin/business-verification-applicant.ts");
+const registry = loader.slice(loader.indexOf("async function loadAllActiveRightsholders("), loader.indexOf("async function loadAllOwnerMemberships("));
+assert.match(registry, /const pageSize = 1000/);
+assert.match(registry, /for \(let offset = 0; ; offset \+= pageSize\)/);
+assert.match(registry, /service\.from\("music_rightsholders"\)/);
+assert.match(registry, /\.select\("id, display_name, entity_type, status"\)/);
+assert.match(registry, /\.eq\("status", "active"\)\.order\("id"\)\.range\(offset, offset \+ pageSize - 1\)/);
+assert.match(registry, /if \(response\.error\) \{\s+console\.error\("admin_business_rightsholder_lookup_failed", \{ code: response\.error\.code \}\);\s+throw new Error\("admin_business_rightsholder_lookup_failed"\);/);
+assert.match(registry, /rightsholders\.push\(\.\.\.page\)/);
+assert.match(registry, /if \(page\.length < pageSize\) return rightsholders/);
+assert.doesNotMatch(registry, /\.limit\(|\.message|\.details|\.hint/);
+assert.match(loader, /const \[profiles, memberships, bindings, activeRightsholders\] = await Promise\.all\(/);
+assert.match(loader, /loadAllActiveRightsholders\(service\),/);
+assert.match(loader, /loadBusinessVerificationApplicants\(cases: BusinessApplicantCase\[\]\)/);
+const page = read("src/app/(platform)/admin/business-verification/page.tsx");
+assert.match(page, /import \{ rightsholderProposalKey \} from "@\/lib\/admin\/business-rightsholder-proposal"/);
+assert.ok(page.includes('key={`${c.id}:${actions.join(",")}:${rightsholderProposalKey(applicant.proposal)}`}'));
+assert.match(page, /sourceWorkspace: productById\.get\(c\.product_id\)\?\.author \?\? null,\s+\}\)\)\);/);
+assert.match(page, /catch \{\s+return <p role="alert">Не удалось загрузить данные заявителей/);
 const permissionCheck = loader.indexOf('if (snapshotHasPermission(session.access, "authors.payout_profiles.review"))');
 assert.ok(permissionCheck > 0);
 assert.ok(permissionCheck < loader.indexOf('service.from("author_payout_profiles")'));
@@ -92,6 +122,6 @@ assert.match(actions, /validateBusinessDecisionInput\(/);
 assert.match(actions, /p_new_display_name: newDisplayName/);
 assert.match(actions, /p_new_entity_type: newEntityType/);
 assert.match(actions, /revalidatePath\(BUSINESS_VERIFICATION_ADMIN_PATH\)/);
-for (const source of [loader, fields, projection, read("src/lib/admin/business-rightsholder-proposal.ts")]) assert.doesNotMatch(source, /\u2014/);
+for (const source of [loader, page, fields, projection, read("src/lib/admin/business-rightsholder-proposal.ts")]) assert.doesNotMatch(source, /\u2014/);
 for (const proposal of [declared, fromPayout, fromProfile, preferred, missing]) assert.doesNotMatch(JSON.stringify(proposal), /\u2014/);
 console.log("admin-business-rightsholder-proposal-unit: OK");

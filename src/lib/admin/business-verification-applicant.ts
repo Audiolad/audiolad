@@ -12,6 +12,23 @@ function one<T>(value: Joined<T>): T | null { return Array.isArray(value) ? valu
 
 type OwnerMembership = { user_id: string; authors: Joined<ApplicantWorkspace> };
 
+async function loadAllActiveRightsholders(service: ReturnType<typeof createServiceRoleClient>) {
+  const rightsholders: ProposalRightsholder[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const response = await service.from("music_rightsholders")
+      .select("id, display_name, entity_type, status")
+      .eq("status", "active").order("id").range(offset, offset + pageSize - 1);
+    if (response.error) {
+      console.error("admin_business_rightsholder_lookup_failed", { code: response.error.code });
+      throw new Error("admin_business_rightsholder_lookup_failed");
+    }
+    const page = (response.data ?? []) as ProposalRightsholder[];
+    rightsholders.push(...page);
+    if (page.length < pageSize) return rightsholders;
+  }
+}
+
 async function loadAllOwnerMemberships(service: ReturnType<typeof createServiceRoleClient>, ownerIds: string[]) {
   const members: OwnerMembership[] = [];
   const pageSize = 1000;
@@ -28,16 +45,17 @@ async function loadAllOwnerMemberships(service: ReturnType<typeof createServiceR
 }
 
 /** Batch account relations; permission is checked before the service client is created. */
-export async function loadBusinessVerificationApplicants(cases: BusinessApplicantCase[], activeRightsholders: ProposalRightsholder[] = []) {
+export async function loadBusinessVerificationApplicants(cases: BusinessApplicantCase[]) {
   const session = await requireAdminPermission("author_products.moderate");
   const result = new Map<string, ReturnType<typeof buildBusinessVerificationApplicant> & { proposal: RightsholderProposal }>();
   if (!cases.length) return result;
   const service = createServiceRoleClient();
   const ownerIds = [...new Set(cases.map((c) => c.owner_user_id))];
-  const [profiles, memberships, bindings] = await Promise.all([
+  const [profiles, memberships, bindings, activeRightsholders] = await Promise.all([
     service.from("profiles").select("id, full_name").in("id", ownerIds),
     loadAllOwnerMemberships(service, ownerIds),
     service.from("business_rightsholder_accounts").select("owner_user_id, rightsholder_id, music_rightsholders!business_rightsholder_accounts_rightsholder_id_fkey(id, display_name, entity_type, status)").in("owner_user_id", ownerIds),
+    loadAllActiveRightsholders(service),
   ]);
   for (const [lookup, response] of [["profiles", profiles], ["workspaces", memberships], ["bindings", bindings]] as const) {
     if (response.error) console.error("admin_business_applicant_lookup_failed", { lookup, code: response.error.code });
