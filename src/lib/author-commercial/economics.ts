@@ -125,8 +125,8 @@ export function getAuthorRewardCabinetCopy(
 
   return {
     title: AUTHOR_REWARD_CABINET_TITLE,
-    authorLine: `до ${authorPercentLabel} – получает автор`,
-    platformLine: `от ${platformPercentLabel} – комиссия АудиоЛада`,
+    authorLine: `До ${authorPercentLabel} – получает автор`,
+    platformLine: `От ${platformPercentLabel} – комиссия АудиоЛада`,
     caption: AUTHOR_REWARD_CABINET_CAPTION,
   };
 }

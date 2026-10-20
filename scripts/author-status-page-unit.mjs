@@ -44,11 +44,11 @@ assert.ok(PLATFORM_COMMISSION_SCOPE_TEXT.includes("технической инф
   assert.equal(defaultReward.title, "Вознаграждение автора");
   assert.equal(
     defaultReward.authorLine,
-    `до ${formatShareBpsAsPercent(AUTHOR_COMMERCIAL_SHARE_BPS)} – получает автор`,
+    `До ${formatShareBpsAsPercent(AUTHOR_COMMERCIAL_SHARE_BPS)} – получает автор`,
   );
   assert.equal(
     defaultReward.platformLine,
-    `от ${formatShareBpsAsPercent(PLATFORM_COMMERCIAL_SHARE_BPS)} – комиссия АудиоЛада`,
+    `От ${formatShareBpsAsPercent(PLATFORM_COMMERCIAL_SHARE_BPS)} – комиссия АудиоЛада`,
   );
   assert.equal(
     defaultReward.caption,
@@ -62,11 +62,11 @@ assert.ok(PLATFORM_COMMISSION_SCOPE_TEXT.includes("технической инф
   });
   assert.equal(
     individualReward.authorLine,
-    `до ${formatShareBpsAsPercent(8000)} – получает автор`,
+    `До ${formatShareBpsAsPercent(8000)} – получает автор`,
   );
   assert.equal(
     individualReward.platformLine,
-    `от ${formatShareBpsAsPercent(2000)} – комиссия АудиоЛада`,
+    `От ${formatShareBpsAsPercent(2000)} – комиссия АудиоЛада`,
   );
 }
 
@@ -222,8 +222,8 @@ function baseInput(overrides = {}) {
   assert.equal(view.share.isIndividual, true);
   assert.ok(view.shareLines.authorLine.includes("75%"));
   const reward = getAuthorRewardCabinetCopy(view.share);
-  assert.equal(reward.authorLine, `до ${formatShareBpsAsPercent(7500)} – получает автор`);
-  assert.equal(reward.platformLine, `от ${formatShareBpsAsPercent(2500)} – комиссия АудиоЛада`);
+  assert.equal(reward.authorLine, `До ${formatShareBpsAsPercent(7500)} – получает автор`);
+  assert.equal(reward.platformLine, `От ${formatShareBpsAsPercent(2500)} – комиссия АудиоЛада`);
   assert.equal(view.paidProductsLocked, false);
 }
 
