@@ -13,6 +13,7 @@ function revalidateApplicationPaths(applicationId: string) {
   revalidatePath("/admin/author-applications");
   revalidatePath(`/admin/author-applications/${applicationId}`);
   revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/become-author");
   revalidatePath("/profile");
   revalidatePath("/author-dashboard");
@@ -183,7 +184,7 @@ export async function approveAuthorApplication(
       }
     } else if (!recipientEmail) {
       warning =
-        "Доступ выдан, но контактный email в заявке не указан — письмо не отправлено.";
+        "Доступ выдан, но контактный email в заявке не указан – письмо не отправлено.";
     }
   }
 

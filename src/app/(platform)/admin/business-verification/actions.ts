@@ -9,6 +9,7 @@ import {
   UUID_RE,
   businessModerationErrorText,
   isBusinessModerationAction,
+  validateBusinessDecisionInput,
   resolveBusinessModerationReason,
 } from "@/lib/admin/business-verification";
 import { createClient } from "@/lib/supabase/server";
@@ -33,6 +34,16 @@ export async function moderateBusinessVerificationAction(formData: FormData): Pr
   const filter = text(formData, "filter", 32) || "open";
   const anchor = UUID_RE.test(verificationId) ? `case-${verificationId}` : undefined;
 
+  const validationError = validateBusinessDecisionInput({
+    action,
+    reason: text(formData, "reason", 2000),
+    rightsholder: text(formData, "rightsholder", 64),
+    // Do not truncate before validation: an overlong name must be refused.
+    newDisplayName: String(formData.get("newDisplayName") ?? ""),
+    newEntityType: text(formData, "newEntityType", 32),
+    confirmScope: text(formData, "confirmScope", 32),
+  });
+  if (validationError) back({ status: filter, error: validationError }, anchor);
   if (!UUID_RE.test(verificationId) || !isBusinessModerationAction(action)) {
     back({ status: filter, error: "Некорректный запрос." }, anchor);
   }
@@ -47,7 +58,7 @@ export async function moderateBusinessVerificationAction(formData: FormData): Pr
   let newEntityType: string | null = null;
   if (action === "approve") {
     const binding = text(formData, "rightsholder", 64);
-    if (binding && binding !== "new") {
+    if (binding !== "new") {
       if (!UUID_RE.test(binding)) back({ status: filter, error: "Некорректный правообладатель." }, anchor);
       rightsholderId = binding;
     } else {
@@ -77,6 +88,7 @@ export async function moderateBusinessVerificationAction(formData: FormData): Pr
     back({ status: filter, error: businessModerationErrorText(error.message) }, anchor);
   }
 
+  revalidatePath("/admin", "layout");
   revalidatePath(BUSINESS_VERIFICATION_ADMIN_PATH);
   revalidatePath("/author-dashboard/business");
   back({ status: filter, notice: "Решение сохранено и записано в журнал." }, anchor);
@@ -115,6 +127,7 @@ export async function suspendBusinessProductAction(formData: FormData): Promise<
     back({ status: filter, error: businessModerationErrorText(error.message) }, anchor);
   }
 
+  revalidatePath("/admin", "layout");
   revalidatePath(BUSINESS_VERIFICATION_ADMIN_PATH);
   back({ status: filter, notice: "Продукт приостановлен в АудиоЛад Бизнес; запись сохранена." }, anchor);
 }

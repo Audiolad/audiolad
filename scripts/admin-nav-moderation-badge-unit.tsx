@@ -91,10 +91,10 @@ const html = render(5, "/admin");
 const tracks = html.match(/<a[^>]*data-nav-href="\/admin\/tracks"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
 assert.doesNotMatch(tracks, /data-nav-badge|#f97316|#fff4e6/);
 
-// default-tone badges (commercial / author applications) keep purple style
+// The generic default-tone renderer remains available for non-queue nav items.
 const defaultHtml = renderToStaticMarkup(
   createElement(AdminNavTabs, {
-    items: [{ href: "/admin/commercial-applications", label: "Коммерческие заявки", badgeCount: 3 }],
+    items: [{ href: "/admin/example", label: "Пример", badgeCount: 3 }],
     pathname: "/admin",
   }),
 );
@@ -109,10 +109,12 @@ assert.match(moderationTab(render(2, "/admin")), /shrink-0/);
 
 // source guards: same source of truth, count only, permission gated
 const layout = read("src/app/(platform)/admin/layout.tsx");
-assert.match(layout, /snapshotHasPermission\(\s*session\.access,\s*"author_products\.moderate",?\s*\)/);
-assert.match(layout, /getCachedAdminProductModerationSubmittedCount/);
-assert.match(layout, /canModerateProducts\s*\?/);
-assert.match(layout, /badgeTone = "attention"/);
+assert.match(layout, /buildAdminNavAttention/);
+assert.match(layout, /getCachedAdminNavAttentionCounts/);
+const attentionCache = read("src/lib/admin/nav-attention-cache.ts");
+assert.match(attentionCache, /canCountAdminQueue/);
+assert.match(attentionCache, /getCachedAdminProductModerationSubmittedCount/);
+assert.match(read("src/lib/admin/nav-attention.ts"), /badgeTone: "attention"/);
 
 const cacheSrc = read("src/lib/admin/product-moderation-attention-cache.ts");
 assert.match(cacheSrc, /countAdminProductModerationSubmitted/);

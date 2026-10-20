@@ -174,9 +174,8 @@ function testSourceGuards() {
   assert.match(page, /getCachedAdminCommercialApplicationAttentionSummary/);
 
   const layout = read("src/app/(platform)/admin/layout.tsx");
-  assert.match(layout, /badgeCount/);
-  assert.match(layout, /commercial-applications/);
-  assert.match(layout, /getCachedAdminCommercialApplicationAttentionSummary/);
+  assert.match(layout, /buildAdminNavAttention/);
+  assert.match(read("src/lib/admin/nav-attention.ts"), /commercial-applications/);
 
   const nav = read("src/components/admin/AdminNavTabs.tsx");
   assert.match(nav, /badgeCount/);

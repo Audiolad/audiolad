@@ -41,6 +41,7 @@ async function userClient() {
 }
 
 function revalidateJob(jobId: string) {
+  revalidatePath("/admin", "layout");
   revalidatePath("/classica/production");
   revalidatePath(`/classica/production/${jobId}`);
   revalidatePath("/classica/production/stats");

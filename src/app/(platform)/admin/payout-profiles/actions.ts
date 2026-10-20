@@ -21,6 +21,7 @@ function revalidatePayoutProfilePaths(profileId: string) {
   revalidatePath("/admin/payout-profiles");
   revalidatePath(`/admin/payout-profiles/${profileId}`);
   revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/author-dashboard");
   revalidatePath("/author-dashboard/commercial/payout-details");
 }

@@ -16,6 +16,7 @@ function revalidateCommercialApplicationPaths(applicationId: string) {
   revalidatePath("/admin/commercial-applications");
   revalidatePath(`/admin/commercial-applications/${applicationId}`);
   revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/author-dashboard");
   revalidatePath("/author-dashboard/commercial-application");
   revalidatePath("/author-dashboard/commercial/payout-details");
@@ -217,7 +218,7 @@ export async function approveCommercialApplication(
         }
       } else {
         warning =
-          "Заявка одобрена, но email заявителя не найден — письмо не отправлено.";
+          "Заявка одобрена, но email заявителя не найден – письмо не отправлено.";
       }
     } catch (error) {
       console.error(

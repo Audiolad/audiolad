@@ -150,3 +150,22 @@ export function businessModerationErrorText(message: string | null | undefined):
 }
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Validate the explicit decision and approval scope before calling the session-bound RPC. */
+export function validateBusinessDecisionInput(input: {
+  action: string; reason: string; rightsholder: string; newDisplayName: string; newEntityType: string; confirmScope: string;
+}): string | null {
+  if (!input.action) return "Выберите решение.";
+  if (!isBusinessModerationAction(input.action)) return "Некорректное решение.";
+  if (input.action === "approve") {
+    if (!input.rightsholder) return "Выберите правообладателя, которому присваивается подтверждение.";
+    if (input.rightsholder === "new") {
+      const name = input.newDisplayName.trim();
+      if (!name || name.length > 200) return "Укажите имя нового правообладателя (до 200 символов).";
+      if (!["person", "organization"].includes(input.newEntityType)) return "Укажите тип правообладателя: физлицо или организация.";
+    } else if (!UUID_RE.test(input.rightsholder)) return "Некорректный правообладатель.";
+    if (input.confirmScope !== "yes") return "Подтвердите правообладателя и охват решения галочкой.";
+  }
+  if (!resolveBusinessModerationReason(input.action, input.reason)) return businessModerationErrorText("business_moderation_reason_required");
+  return null;
+}
