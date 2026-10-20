@@ -430,8 +430,8 @@ function testRouteFiles() {
     (page) => page.path === "/kak-zarabatyvat-na-ii-muzyke-v-audiolad",
   );
   assert(
-    !aiMusicHubEntry,
-    "temporary production-test: AI music hub excluded from sitemap",
+    aiMusicHubEntry,
+    "AI music hub included in sitemap",
   );
 }
 

@@ -31,7 +31,7 @@ import { listTopicHubDefinitions } from "../src/lib/seo/topic-hubs/index.ts";
 import { STATIC_SITEMAP_PAGES } from "../src/lib/seo/sitemap-data.ts";
 import * as suno from "../src/lib/seo/kak-sozdat-muzyku-v-suno/content.ts";
 import * as mozhnoLi from "../src/lib/seo/mozhno-li-zarabotat-na-ii-muzyke/content.ts";
-import { AI_MUSIC_HUB_PATH } from "../src/lib/seo/ai-music-hub/content.ts";
+import { AI_MUSIC_HUB_PAGE_H1, AI_MUSIC_HUB_PATH } from "../src/lib/seo/ai-music-hub/content.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relativePath) => readFileSync(join(root, relativePath), "utf8");
@@ -55,6 +55,7 @@ const EXPECTED_NEUROMUSIC_PATHS = [
   "/mozhno-li-zarabotat-na-ii-muzyke",
   "/kuda-vykladyvat-muzyku-iz-suno",
   "/kak-zarabotat-na-muzyke-iz-suno",
+  "/kak-zarabatyvat-na-ii-muzyke-v-audiolad",
 ];
 
 function testNeuromusicGuidesListed() {
@@ -104,12 +105,12 @@ function testTitlesComeFromPageContent() {
   );
 }
 
-function testNoindexHubNotListed() {
+function testIndexableHubListed() {
   const data = loadArticleDirectoryPageData();
-  assert(
-    !data.articles.some((card) => card.href === AI_MUSIC_HUB_PATH),
-    "noindex production-test hub stays out of /articles",
-  );
+  const hub = data.articles.find((card) => card.href === AI_MUSIC_HUB_PATH);
+  assert(hub, "indexable hub is listed in /articles");
+  assert(hub.topicTitle === NEUROMUSIC_TOPIC_TITLE, "hub topic Нейромузыка");
+  assert(hub.title === AI_MUSIC_HUB_PAGE_H1, "hub title = page H1");
   assert(
     !isStandaloneArticleDirectoryListed({
       ...listStandaloneArticleDefinitions()[0],
@@ -257,6 +258,12 @@ function testSearchFindsRealGuides() {
     sunoHits.some((card) => card.href === "/kak-zarabotat-na-muzyke-iz-suno"),
     "multi-word query finds suno monetisation guide",
   );
+  assert(
+    filterArticleDirectoryCards(data.articles, "зарабатывать ИИ-музыке").some(
+      (card) => card.href === AI_MUSIC_HUB_PATH,
+    ),
+    "multi-word query finds AI music hub",
+  );
   const all = filterArticleDirectoryCards(data.articles, "   ");
   assert(all.length === data.articles.length, "blank query keeps full list");
 }
@@ -372,7 +379,7 @@ async function testServerRenderedSearch() {
       action: "/articles",
     }),
   );
-  assert((filtered.match(/<li/g) ?? []).length === 12, "SSR with ?q= renders the filtered list");
+  assert((filtered.match(/<li/g) ?? []).length === 13, "SSR with ?q= renders the filtered list");
 
   const empty = renderToString(
     React.createElement(ArticleDirectorySearch, {
@@ -397,7 +404,7 @@ async function testServerRenderedSearch() {
 const tests = [
   ["neuromusic guides listed", testNeuromusicGuidesListed],
   ["titles from page content", testTitlesComeFromPageContent],
-  ["noindex hub not listed", testNoindexHubNotListed],
+  ["indexable hub listed", testIndexableHubListed],
   ["routes and sitemap", testRoutesAndSitemap],
   ["date sort with registry", testDateSortedWithRegistryArticles],
   ["empty standalone keeps old behaviour", testEmptyStandaloneKeepsOldBehaviour],

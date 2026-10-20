@@ -73,7 +73,7 @@ function testMetadata() {
     buildSiteCanonicalUrl(AI_MUSIC_HUB_PATH),
   );
   assert.equal(metadata.twitter?.card, "summary");
-  assert.equal(metadata.robots?.index, false);
+  assert.equal(metadata.robots?.index, true);
   assert.equal(metadata.robots?.follow, true);
   assert.equal(
     AI_MUSIC_HUB_PAGE_H1,
@@ -296,11 +296,7 @@ function testNavigationAndSitemap() {
   const sitemapEntry = STATIC_SITEMAP_PAGES.find(
     (page) => page.path === AI_MUSIC_HUB_PATH,
   );
-  assert.equal(
-    sitemapEntry,
-    undefined,
-    "AI music landing stays excluded from sitemap",
-  );
+  assert.ok(sitemapEntry, "AI music landing is in sitemap");
 }
 
 function testBusinessSection() {
@@ -341,6 +337,17 @@ function testBusinessSection() {
   assert.match(business, /РАО, ВОИС/);
   assert.match(business, /территории России/);
   // Payouts described qualitatively; no invented numbers or guarantees.
+  assert.match(AI_MUSIC_HUB_BUSINESS_PAYOUTS_TEXT.join(" "), /по отдельной схеме/);
+  assert.match(
+    hubContent.AI_MUSIC_HUB_ECONOMICS_TEXT.join(" "),
+    /в сервисе «АудиоЛад Бизнес» роялти рассчитываются по отдельной схеме – см\. ниже/,
+  );
+  for (const item of hubContent.AI_MUSIC_HUB_ECONOMICS_TEXT) {
+    if (item.includes("70%")) {
+      assert.match(item, /АудиоЛад Бизнес/);
+    }
+  }
+  assert.doesNotMatch(JSON.stringify(hubContent), /50\s*\/\s*50|50%/);
   assert.doesNotMatch(business, /\d/);
   assert.doesNotMatch(business, /%|₽/);
   assert.match(business, /не гарантируются/);
