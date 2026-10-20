@@ -7,21 +7,51 @@ ALTER TABLE public.business_rightsholder_verifications
   ADD COLUMN IF NOT EXISTS declared_rightsholder_type text,
   ADD COLUMN IF NOT EXISTS declared_rightsholder_is_self boolean;
 
-ALTER TABLE public.business_rightsholder_verifications
-  ADD CONSTRAINT business_declared_rightsholder_name_check CHECK (
-    declared_rightsholder_name IS NULL OR length(btrim(declared_rightsholder_name)) BETWEEN 1 AND 200
-  ),
-  ADD CONSTRAINT business_declared_rightsholder_type_check CHECK (
-    declared_rightsholder_type IS NULL OR declared_rightsholder_type IN ('person', 'organization')
-  ),
-  ADD CONSTRAINT business_declared_rightsholder_self_check CHECK (
-    declared_rightsholder_is_self IS DISTINCT FROM true OR declared_rightsholder_type = 'person'
-  ),
-  ADD CONSTRAINT business_declared_rightsholder_complete_check CHECK (
-    (declared_rightsholder_name IS NULL AND declared_rightsholder_type IS NULL AND declared_rightsholder_is_self IS NULL)
-    OR
-    (declared_rightsholder_name IS NOT NULL AND declared_rightsholder_type IS NOT NULL AND declared_rightsholder_is_self IS NOT NULL)
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'business_declared_rightsholder_name_check'
+      AND conrelid = 'public.business_rightsholder_verifications'::regclass) THEN
+    ALTER TABLE public.business_rightsholder_verifications
+      ADD CONSTRAINT business_declared_rightsholder_name_check CHECK (
+        declared_rightsholder_name IS NULL OR length(btrim(declared_rightsholder_name)) BETWEEN 1 AND 200
+      );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'business_declared_rightsholder_type_check'
+      AND conrelid = 'public.business_rightsholder_verifications'::regclass) THEN
+    ALTER TABLE public.business_rightsholder_verifications
+      ADD CONSTRAINT business_declared_rightsholder_type_check CHECK (
+        declared_rightsholder_type IS NULL OR declared_rightsholder_type IN ('person', 'organization')
+      );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'business_declared_rightsholder_self_check'
+      AND conrelid = 'public.business_rightsholder_verifications'::regclass) THEN
+    ALTER TABLE public.business_rightsholder_verifications
+      ADD CONSTRAINT business_declared_rightsholder_self_check CHECK (
+        declared_rightsholder_is_self IS DISTINCT FROM true OR declared_rightsholder_type = 'person'
+      );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'business_declared_rightsholder_complete_check'
+      AND conrelid = 'public.business_rightsholder_verifications'::regclass) THEN
+    ALTER TABLE public.business_rightsholder_verifications
+      ADD CONSTRAINT business_declared_rightsholder_complete_check CHECK (
+        (declared_rightsholder_name IS NULL AND declared_rightsholder_type IS NULL AND declared_rightsholder_is_self IS NULL)
+        OR
+        (declared_rightsholder_name IS NOT NULL AND declared_rightsholder_type IS NOT NULL AND declared_rightsholder_is_self IS NOT NULL)
+      );
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.author_business_verification_set_declared_rightsholder(
   p_verification_id uuid, p_is_self boolean, p_name text, p_type text
@@ -61,7 +91,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.author_business_verification_set_declared_rightsholder(uuid,boolean,text,text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.author_business_verification_set_declared_rightsholder(uuid,boolean,text,text) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.author_business_verification_set_declared_rightsholder(uuid,boolean,text,text) TO authenticated;
 
 COMMIT;

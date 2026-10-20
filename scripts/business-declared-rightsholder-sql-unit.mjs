@@ -18,6 +18,14 @@ assert.match(clean, /CONSTRAINT business_declared_rightsholder_name_check CHECK 
 assert.match(clean, /CONSTRAINT business_declared_rightsholder_type_check CHECK \(\s+declared_rightsholder_type IS NULL OR declared_rightsholder_type IN \('person', 'organization'\)/);
 assert.match(clean, /CONSTRAINT business_declared_rightsholder_self_check CHECK \(\s+declared_rightsholder_is_self IS DISTINCT FROM true OR declared_rightsholder_type = 'person'/);
 assert.match(clean, /CONSTRAINT business_declared_rightsholder_complete_check CHECK \(\s+\(declared_rightsholder_name IS NULL AND declared_rightsholder_type IS NULL AND declared_rightsholder_is_self IS NULL\)\s+OR\s+\(declared_rightsholder_name IS NOT NULL AND declared_rightsholder_type IS NOT NULL AND declared_rightsholder_is_self IS NOT NULL\)/);
+const constraintBlocks = [...clean.matchAll(/DO \$\$\s+BEGIN\s+IF NOT EXISTS \(SELECT 1 FROM pg_constraint WHERE conname = '(business_declared_rightsholder_\w+_check)'\s+AND conrelid = 'public\.business_rightsholder_verifications'::regclass\) THEN\s+ALTER TABLE public\.business_rightsholder_verifications\s+ADD CONSTRAINT \1 CHECK \([\s\S]*?;\s+END IF;\s+END \$\$;/g)];
+assert.deepEqual(constraintBlocks.map((block) => block[1]), [
+  "business_declared_rightsholder_name_check",
+  "business_declared_rightsholder_type_check",
+  "business_declared_rightsholder_self_check",
+  "business_declared_rightsholder_complete_check",
+]);
+assert.equal([...clean.matchAll(/\bADD CONSTRAINT\b/g)].length, constraintBlocks.length, "every constraint is guarded");
 const functions = [...clean.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\([\s\S]*?\$\$;/g)];
 assert.deepEqual(functions.map((f) => f[1]), ["author_business_verification_set_declared_rightsholder"]);
 const fn = functions[0][0];
@@ -33,7 +41,7 @@ assert.match(fn, /SET declared_rightsholder_name = btrim\(p_name\), declared_rig
 assert.ok(fn.indexOf("authentication_required") < fn.indexOf("FOR UPDATE"));
 assert.ok(fn.indexOf("support_mode_consent_forbidden") < fn.indexOf("FOR UPDATE"));
 const signature = "public.author_business_verification_set_declared_rightsholder(uuid,boolean,text,text)";
-assert.ok(clean.includes(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC, anon;`));
+assert.ok(clean.includes(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC, anon, service_role;`));
 assert.ok(clean.includes(`GRANT EXECUTE ON FUNCTION ${signature} TO authenticated;`));
 assert.doesNotMatch(clean.replace(fn, ""), /\b(UPDATE|INSERT|DELETE|DROP|TRUNCATE)\b/i, "no backfill or destructive changes");
 assert.doesNotMatch(clean, /provider_details|submit_v[23]|music_rightsholders/);
