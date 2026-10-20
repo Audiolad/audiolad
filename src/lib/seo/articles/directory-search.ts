@@ -131,3 +131,32 @@ export function buildArticleSearchHref(
 
   return search ? `${pathname}?${search}` : pathname;
 }
+
+/**
+ * Decide whether the search box must adopt the ?q= from the URL.
+ * Returns the query to adopt, or null to keep the current input.
+ * - Our own history.replaceState echoes back through useSearchParams: ignore it
+ *   (otherwise fast typing would be overwritten by an older URL value).
+ * - Any other change (link to /articles, Back/Forward, shared link) wins.
+ */
+export function resolveArticleSearchUrlSync({
+  urlQuery,
+  lastWrittenQuery,
+  currentQuery,
+}: {
+  urlQuery: string;
+  lastWrittenQuery: string | null;
+  currentQuery: string;
+}): string | null {
+  const fromUrl = sanitizeArticleSearchQuery(urlQuery);
+
+  if (lastWrittenQuery !== null && fromUrl === lastWrittenQuery) {
+    return null;
+  }
+
+  if (fromUrl === sanitizeArticleSearchQuery(currentQuery)) {
+    return null;
+  }
+
+  return fromUrl;
+}

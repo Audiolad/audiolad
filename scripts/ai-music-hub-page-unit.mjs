@@ -344,6 +344,10 @@ function testBusinessSection() {
   assert.doesNotMatch(business, /\d/);
   assert.doesNotMatch(business, /%|₽/);
   assert.match(business, /не гарантируются/);
+  // Agreement 2.1 п. 10.3–10.4 / program terms п. 4: accrual from paid venue receipts only.
+  assert.match(business, /Когда заведение платит за доступ/);
+  assert.match(business, /Бесплатные прослушивания/);
+  assert.match(business, /порядку распределения, который опубликован в кабинете автора/);
   assert.doesNotMatch(business, /гарантированн/);
   assert.equal(AI_MUSIC_HUB_BUSINESS_LINK_HREF, "/b");
   assert.ok(STATIC_SITEMAP_PAGES.some((page) => page.path === "/b"), "/b is a live public page");

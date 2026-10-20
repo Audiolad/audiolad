@@ -33,6 +33,7 @@ export {
   formatArticleSearchCountLabel,
   matchesArticleSearchTokens,
   normalizeArticleSearchText,
+  resolveArticleSearchUrlSync,
   sanitizeArticleSearchQuery,
   tokenizeArticleSearchQuery,
 } from "./directory-search";

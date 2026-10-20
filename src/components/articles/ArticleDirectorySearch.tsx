@@ -11,6 +11,8 @@ import {
   type MouseEvent,
 } from "react";
 
+import { useSearchParams } from "next/navigation";
+
 import ArticleDirectoryCardLink from "@/components/articles/ArticleDirectoryCardLink";
 import type { ArticleDirectoryCard } from "@/lib/seo/articles/directory";
 import {
@@ -20,6 +22,7 @@ import {
   buildArticleSearchHref,
   formatArticleSearchCountLabel,
   matchesArticleSearchTokens,
+  resolveArticleSearchUrlSync,
   sanitizeArticleSearchQuery,
   tokenizeArticleSearchQuery,
 } from "@/lib/seo/articles/directory-search";
@@ -48,6 +51,28 @@ export default function ArticleDirectorySearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState(() => sanitizeArticleSearchQuery(initialQuery));
   const deferredQuery = useDeferredValue(query);
+  const searchParams = useSearchParams();
+  const urlQuery = sanitizeArticleSearchQuery(
+    searchParams ? (searchParams.get(ARTICLE_SEARCH_PARAM) ?? "") : initialQuery,
+  );
+  /** Last ?q= value this component wrote itself (so our own replaceState is not echoed back). */
+  const lastWrittenQueryRef = useRef<string | null>(null);
+
+  // Navigation to /articles or /articles?q=… (links, Back/Forward) keeps this component
+  // mounted: adopt the URL query whenever it changed for a reason other than our own write.
+  useEffect(() => {
+    const next = resolveArticleSearchUrlSync({
+      urlQuery,
+      lastWrittenQuery: lastWrittenQueryRef.current,
+      currentQuery: query,
+    });
+
+    if (next !== null) {
+      lastWrittenQueryRef.current = null;
+      setQuery(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to URL changes only
+  }, [urlQuery]);
 
   const indexed = useMemo(
     () =>
@@ -86,7 +111,9 @@ export default function ArticleDirectorySearch({
     const current = `${window.location.pathname}${window.location.search}`;
 
     if (next !== current) {
-      window.history.replaceState(window.history.state, "", next);
+      lastWrittenQueryRef.current = sanitizeArticleSearchQuery(deferredQuery);
+      // null state: Next.js syncs useSearchParams with history.replaceState(null, …).
+      window.history.replaceState(null, "", next);
     }
   }, [deferredQuery]);
 

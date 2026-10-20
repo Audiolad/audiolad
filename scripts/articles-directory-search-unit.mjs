@@ -23,6 +23,7 @@ import {
   listStandaloneArticleDirectoryCards,
   loadArticleDirectoryPageData,
   normalizeArticleSearchText,
+  resolveArticleSearchUrlSync,
   sanitizeArticleSearchQuery,
   tokenizeArticleSearchQuery,
 } from "../src/lib/seo/articles/index.ts";
@@ -325,6 +326,74 @@ function testComponentsWiring() {
   }
 }
 
+function testUrlSync() {
+  // Own replaceState echo is ignored even if the user already typed further.
+  assert(
+    resolveArticleSearchUrlSync({ urlQuery: "суно", lastWrittenQuery: "суно", currentQuery: "суно пес" }) === null,
+    "own write ignored",
+  );
+  // Link to bare /articles while a query is typed → reset.
+  assert(
+    resolveArticleSearchUrlSync({ urlQuery: "", lastWrittenQuery: "суно", currentQuery: "суно" }) === "",
+    "navigation to /articles clears the query",
+  );
+  // Back/Forward or shared link with another ?q= → adopt it.
+  assert(
+    resolveArticleSearchUrlSync({ urlQuery: "деньги", lastWrittenQuery: null, currentQuery: "" }) === "деньги",
+    "external ?q= adopted",
+  );
+  // Same value (modulo whitespace) → keep input as typed.
+  assert(
+    resolveArticleSearchUrlSync({ urlQuery: "суно", lastWrittenQuery: null, currentQuery: "суно " }) === null,
+    "equal query keeps input",
+  );
+}
+
+async function testServerRenderedSearch() {
+  const React = await import("react");
+  const { renderToString } = await import("react-dom/server");
+  const { default: ArticleDirectorySearch } = await import(
+    "../src/components/articles/ArticleDirectorySearch.tsx"
+  );
+  const articles = loadArticleDirectoryPageData().articles;
+
+  const full = renderToString(
+    React.createElement(ArticleDirectorySearch, { articles, initialQuery: "", action: "/articles" }),
+  );
+  const fullItems = (full.match(/<li/g) ?? []).length;
+  assert(fullItems === articles.length, `SSR without q renders the full list (${fullItems})`);
+  assert(full.includes('href="/kak-sozdat-muzyku-v-suno"'), "SSR full list has neuromusic guide");
+  assert(full.includes('method="get"') && full.includes('name="q"'), "no-JS GET form");
+
+  const filtered = renderToString(
+    React.createElement(ArticleDirectorySearch, {
+      articles,
+      initialQuery: "НЕЙРОМУЗЫКА",
+      action: "/articles",
+    }),
+  );
+  assert((filtered.match(/<li/g) ?? []).length === 12, "SSR with ?q= renders the filtered list");
+
+  const empty = renderToString(
+    React.createElement(ArticleDirectorySearch, {
+      articles,
+      initialQuery: "zzzqqq",
+      action: "/articles",
+    }),
+  );
+  assert(empty.includes("Ничего не нашлось"), "SSR empty state");
+  assert(empty.includes('href="/articles"'), "no-JS reset link");
+
+  const xss = renderToString(
+    React.createElement(ArticleDirectorySearch, {
+      articles,
+      initialQuery: '"><script>alert(1)</script>',
+      action: "/articles",
+    }),
+  );
+  assert(!xss.includes("<script>alert(1)</script>"), "query is escaped");
+}
+
 const tests = [
   ["neuromusic guides listed", testNeuromusicGuidesListed],
   ["titles from page content", testTitlesComeFromPageContent],
@@ -339,13 +408,15 @@ const tests = [
   ["count label and href", testCountLabelAndHref],
   ["metadata for search urls", testMetadataForSearchUrls],
   ["components wiring", testComponentsWiring],
+  ["url sync", testUrlSync],
+  ["server-rendered search", testServerRenderedSearch],
 ];
 
 let failed = 0;
 
 for (const [name, fn] of tests) {
   try {
-    fn();
+    await fn();
     console.log(`ok - ${name}`);
   } catch (error) {
     failed += 1;
