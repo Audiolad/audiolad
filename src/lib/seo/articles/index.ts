@@ -12,6 +12,7 @@ export {
   listArticleDirectoryTopicHubs,
   listListenDirectoryCards,
   loadArticleDirectoryPageData,
+  mergeDatedDirectoryCards,
   resolveArticleDirectoryDescription,
   toArticleDirectoryCard,
   toListenDirectoryCard,
@@ -23,6 +24,27 @@ export type {
   ArticleDirectoryTopicHubCard,
 } from "./directory";
 export { buildArticlesDirectoryJsonLdGraph } from "./directory-json-ld";
+export {
+  ARTICLE_SEARCH_PARAM,
+  ARTICLE_SEARCH_QUERY_MAX_LENGTH,
+  buildArticleSearchHaystack,
+  buildArticleSearchHref,
+  filterArticleDirectoryCards,
+  formatArticleSearchCountLabel,
+  matchesArticleSearchTokens,
+  normalizeArticleSearchText,
+  sanitizeArticleSearchQuery,
+  tokenizeArticleSearchQuery,
+} from "./directory-search";
+export {
+  NEUROMUSIC_TOPIC_SLUG,
+  NEUROMUSIC_TOPIC_TITLE,
+  isStandaloneArticleDirectoryListed,
+  listStandaloneArticleDefinitions,
+  listStandaloneArticleDirectoryCards,
+  toStandaloneArticleDirectoryCard,
+} from "./standalone";
+export type { StandaloneArticleDefinition } from "./standalone";
 export { buildArticlesDirectoryMetadata } from "./directory-metadata";
 export { buildArticleJsonLd, buildArticleJsonLdGraph, buildArticleFaqJsonLd } from "./json-ld";
 export { loadArticlePageData } from "./load";

@@ -6,6 +6,16 @@ import {
   AI_MUSIC_HUB_AUTHORS_HEADING,
   AI_MUSIC_HUB_AUTHORS_TEXT,
   AI_MUSIC_HUB_BREADCRUMB_TITLE,
+  AI_MUSIC_HUB_BUSINESS_CHECKS_HEADING,
+  AI_MUSIC_HUB_BUSINESS_CHECKS_TEXT,
+  AI_MUSIC_HUB_BUSINESS_HEADING,
+  AI_MUSIC_HUB_BUSINESS_JOIN_HEADING,
+  AI_MUSIC_HUB_BUSINESS_JOIN_TEXT,
+  AI_MUSIC_HUB_BUSINESS_LINK_HREF,
+  AI_MUSIC_HUB_BUSINESS_LINK_LABEL,
+  AI_MUSIC_HUB_BUSINESS_PAYOUTS_HEADING,
+  AI_MUSIC_HUB_BUSINESS_PAYOUTS_TEXT,
+  AI_MUSIC_HUB_BUSINESS_TEXT,
   AI_MUSIC_HUB_CLOSING_HEADING,
   AI_MUSIC_HUB_CLOSING_NOTE,
   AI_MUSIC_HUB_CLOSING_TEXT,
@@ -165,6 +175,7 @@ export default function AiMusicHubPageView() {
   const homeShot = getScreenshot("home");
   const productShot = getScreenshot("product");
   const studioShot = getScreenshot("studio");
+  const businessShot = getScreenshot("business");
   const authorShot = getScreenshot("author");
 
   return (
@@ -236,6 +247,38 @@ export default function AiMusicHubPageView() {
           </h3>
           <Paragraphs items={AI_MUSIC_HUB_AUTHORS_TEXT} />
           <LandingScreenshot shot={studioShot} />
+        </div>
+
+        <div className="mt-12" id="ai-music-business">
+          <h3 className="text-xl font-semibold tracking-tight text-[#25135c] sm:text-2xl">
+            {AI_MUSIC_HUB_BUSINESS_HEADING}
+          </h3>
+          <Paragraphs items={AI_MUSIC_HUB_BUSINESS_TEXT} />
+          <LandingScreenshot shot={businessShot} />
+
+          <h4 className="mt-10 text-lg font-semibold tracking-tight text-[#25135c] sm:text-xl">
+            {AI_MUSIC_HUB_BUSINESS_JOIN_HEADING}
+          </h4>
+          <Paragraphs items={AI_MUSIC_HUB_BUSINESS_JOIN_TEXT} />
+
+          <h4 className="mt-10 text-lg font-semibold tracking-tight text-[#25135c] sm:text-xl">
+            {AI_MUSIC_HUB_BUSINESS_CHECKS_HEADING}
+          </h4>
+          <Paragraphs items={AI_MUSIC_HUB_BUSINESS_CHECKS_TEXT} />
+
+          <h4 className="mt-10 text-lg font-semibold tracking-tight text-[#25135c] sm:text-xl">
+            {AI_MUSIC_HUB_BUSINESS_PAYOUTS_HEADING}
+          </h4>
+          <Paragraphs items={AI_MUSIC_HUB_BUSINESS_PAYOUTS_TEXT} />
+
+          <p className={proseClassName}>
+            <Link
+              href={AI_MUSIC_HUB_BUSINESS_LINK_HREF}
+              className={`font-medium text-[#7042c5] underline decoration-[#c9b6ea] underline-offset-4 hover:text-[#56318f] ${linkFocusClass}`}
+            >
+              {AI_MUSIC_HUB_BUSINESS_LINK_LABEL}
+            </Link>
+          </p>
         </div>
       </Section>
 

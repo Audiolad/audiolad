@@ -70,6 +70,7 @@
     "test:seo-topic-hub": "npx tsx scripts/seo-topic-hub-unit.mjs && npx tsx scripts/seo-article-unit.mjs",
     "test:seo-article-runtime": "node scripts/seo-article-runtime.mjs",
     "test:articles-directory": "npx tsx scripts/articles-directory-unit.mjs",
+    "test:articles-directory-search": "npx tsx scripts/articles-directory-search-unit.mjs",
     "test:platform-rbac": "npx tsx scripts/platform-rbac-unit.mjs",
     "test:ai-company-viewer": "npx tsx scripts/ai-company-viewer-unit.tsx",
     "test:ecompany-catalog-stats": "npx tsx scripts/ecompany-catalog-stats-unit.mts",
