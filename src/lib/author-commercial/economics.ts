@@ -103,8 +103,8 @@ export function getCommercialShareDisplayLines(
   return {
     authorPercentLabel,
     platformPercentLabel,
-    authorLine: `Вознаграждение автора – ${authorPercentLabel} от стоимости продажи.`,
-    platformLine: `Вознаграждение Платформы – ${platformPercentLabel} от стоимости продажи.`,
+    authorLine: `Вознаграждение автора – до ${authorPercentLabel} от стоимости продажи.`,
+    platformLine: `Вознаграждение Платформы – от ${platformPercentLabel} от стоимости продажи.`,
   };
 }
 
@@ -125,8 +125,8 @@ export function getAuthorRewardCabinetCopy(
 
   return {
     title: AUTHOR_REWARD_CABINET_TITLE,
-    authorLine: `${authorPercentLabel} – получает автор`,
-    platformLine: `${platformPercentLabel} – комиссия АудиоЛада`,
+    authorLine: `До ${authorPercentLabel} – получает автор`,
+    platformLine: `От ${platformPercentLabel} – комиссия АудиоЛада`,
     caption: AUTHOR_REWARD_CABINET_CAPTION,
   };
 }

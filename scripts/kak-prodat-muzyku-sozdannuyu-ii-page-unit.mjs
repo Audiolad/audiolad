@@ -16,6 +16,8 @@ import { buildKakProdatMuzykuSozdannuyuIiMetadata, buildSiteCanonicalUrl } from 
 const view = readFileSync("src/components/kak-prodat-muzyku-sozdannuyu-ii/KakProdatMuzykuSozdannuyuIiPageView.tsx", "utf8");
 const page = readFileSync("src/app/(platform)/(listener)/kak-prodat-muzyku-sozdannuyu-ii/page.tsx", "utf8");
 const sitemap = readFileSync("src/lib/seo/sitemap-data.ts", "utf8");
+assert.match(view, /доля автора до 70% и доля платформы от 30%/);
+assert.doesNotMatch(view, /доля автора 70%/);
 const anchors = [...view.matchAll(/<a\b[^>]*>/g)].map((match) => match[0]);
 for (const anchor of anchors) {
   assert.match(anchor, /target="_blank"/);
