@@ -81,7 +81,7 @@ export default function SchoolFaqAccordion({ items }: SchoolFaqAccordionProps) {
             >
               {item.id === "start-date" ? (
                 <p className="school-faq__answer">
-                  Старт первого потока –{" "}
+                  Старт второго потока –{" "}
                   <span className="school-number">{SCHOOL_START_DAY}</span>{" "}
                   {SCHOOL_START_MONTH}{" "}
                   <span className="school-number">{SCHOOL_START_YEAR}</span>{" "}

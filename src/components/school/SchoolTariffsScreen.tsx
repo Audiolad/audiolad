@@ -11,6 +11,8 @@ import {
   SCHOOL_MENTORING_PERIOD,
   SCHOOL_MENTORING_SCOPE_NOTE,
   SCHOOL_MENTORING_TITLE,
+  SCHOOL_START_LABEL,
+  SCHOOL_STREAM_LABEL,
 } from "@/lib/school/start";
 
 type SchoolTariffId = SchoolGetCourseTariffId;
@@ -211,6 +213,9 @@ export default function SchoolTariffsScreen() {
         <h2 className="school-tariffs__title">{TITLE}</h2>
         <p className="school-tariffs__subtitle">{SUBTITLE}</p>
         <div className="school-tariffs__schedule" role="group" aria-label="Расписание этапов">
+          <p className="school-tariffs__schedule-stream">
+            {SCHOOL_STREAM_LABEL} · <span className="school-nowrap">{SCHOOL_START_LABEL}</span>
+          </p>
           <div className="school-tariffs__schedule-item">
             <span className="school-tariffs__schedule-icon" aria-hidden="true">
               <ScheduleIcon className="school-tariffs__schedule-icon-svg" />
