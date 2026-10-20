@@ -50,7 +50,9 @@ assert.match(page, /admin\/products\/\$\{c.product_id\}\/diagnostics/);
 assert.doesNotMatch(page, /product\?\.title \?\? c.product_id/);
 for (const heading of ["Заявитель / аккаунт", "Авторские проекты аккаунта", "Исходное пространство заявки", "Образец трека и доказательства", "Правообладатель, которому присваивается подтверждение", "Охват решения"]) assert.ok(page.includes(heading));
 const fields = read("src/app/(platform)/admin/business-verification/BusinessDecisionFields.tsx");
-assert.match(fields, /useState<string>\(""\)/);
+// Decision stays explicit; the rightsholder now starts from the server proposal.
+assert.match(fields, /const \[action, setAction\] = useState<string>\(""\)/);
+assert.match(fields, /const \[binding, setBinding\] = useState\(initialBinding\)/);
 assert.match(fields, /<option value="">Выберите решение<\/option>/);
 assert.match(fields, /<option value="">Выберите правообладателя<\/option>/);
 assert.match(fields, /<option value="">Выберите тип<\/option>/);

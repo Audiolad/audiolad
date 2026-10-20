@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { RightsholderProposal } from "@/lib/admin/business-rightsholder-proposal";
 import {
   businessModerationReasonPlaceholder,
   isBusinessModerationReasonOptional,
@@ -8,20 +9,30 @@ import {
 } from "@/lib/admin/business-verification";
 
 type RightsholderOption = { id: string; display_name: string; entity_type: string };
-export function BusinessDecisionFields({ caseId, actions, rightsholders, applicantName, workspaceNames }: {
+export function BusinessDecisionFields({ caseId, actions, rightsholders, proposal, applicantName, workspaceNames }: {
   caseId: string;
   actions: { value: BusinessModerationAction; label: string }[];
   rightsholders: RightsholderOption[];
+  proposal: Pick<RightsholderProposal, "name" | "entityType" | "selection" | "sourceLabel">;
   applicantName: string | null;
   workspaceNames: string[];
 }) {
   const [action, setAction] = useState<string>("");
-  const [binding, setBinding] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState("");
+  const initialBinding = proposal.selection.kind === "existing" ? proposal.selection.id : proposal.selection.kind === "new" ? "new" : "";
+  const initialName = proposal.selection.kind === "new" ? proposal.selection.displayName : "";
+  const initialType = proposal.selection.kind === "new" ? proposal.selection.entityType : "";
+  const [binding, setBinding] = useState(initialBinding);
+  const [newName, setNewName] = useState(initialName);
+  const [newType, setNewType] = useState<string>(initialType);
+  const manuallyChanged = binding !== initialBinding || (binding === "new" && (newName !== initialName || newType !== initialType));
+  const options = [...rightsholders];
+  const selection = proposal.selection;
+  if (selection.kind === "existing" && !options.some((r) => r.id === selection.id)) {
+    options.push({ id: selection.id, display_name: proposal.name ?? "Правообладатель", entity_type: proposal.entityType ?? "person" });
+  }
   const [confirmed, setConfirmed] = useState(false);
   const optional = isBusinessModerationReasonOptional(action);
-  const selected = rightsholders.find((r) => r.id === binding);
+  const selected = options.find((r) => r.id === binding);
   const name = binding === "new" ? newName.trim() : selected?.display_name;
   const type = binding === "new" ? newType : selected?.entity_type;
   const typeLabel = type === "person" ? "физлицо" : type === "organization" ? "организация" : "тип не выбран";
@@ -41,9 +52,11 @@ export function BusinessDecisionFields({ caseId, actions, rightsholders, applica
           <select id={`rightsholder-${caseId}`} name="rightsholder" required className={inputClass} value={binding}
             onChange={(event) => { setBinding(event.target.value); setConfirmed(false); }}>
             <option value="">Выберите правообладателя</option>
-            {rightsholders.map((r) => (<option key={r.id} value={r.id}>{r.display_name} ({r.entity_type === "organization" ? "организация" : "физлицо"})</option>))}
+            {options.map((r) => (<option key={r.id} value={r.id}>{r.display_name} ({r.entity_type === "organization" ? "организация" : "физлицо"})</option>))}
             <option value="new">Создать нового</option>
           </select>
+          <p className="text-xs text-[#796ba0]">Предзаполнено: {proposal.sourceLabel}</p>
+          {manuallyChanged ? <p role="status" className="text-xs text-[#9a5a00]">Изменено вручную</p> : null}
           {binding === "new" ? (
             <>
               <label className="block" htmlFor={`new-name-${caseId}`}>Имя нового правообладателя</label>
