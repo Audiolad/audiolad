@@ -25,6 +25,7 @@ function revalidateProductModerationPaths(practiceId: string) {
   revalidatePath("/admin/product-moderation");
   revalidatePath(`/admin/product-moderation/${practiceId}`);
   revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/author-dashboard");
   revalidatePath("/catalog");
   revalidatePath("/sitemap.xml");

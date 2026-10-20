@@ -17,6 +17,10 @@ import {
   statusesForBusinessVerificationFilter,
   type BusinessVerificationStatus,
 } from "@/lib/admin/business-verification";
+import { loadBusinessVerificationApplicants } from "@/lib/admin/business-verification-applicant";
+import type { ApplicantWorkspace } from "@/lib/admin/business-verification-applicant-model";
+import { snapshotHasPermission } from "@/lib/auth/platform-access";
+import { getAuthorAccessStatusLabel, type AuthorAccessStatus } from "@/lib/authors/access";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 
@@ -101,19 +105,19 @@ export default async function AdminBusinessVerificationPage({
 
   // Catalog titles and the rightsholder list are display-only lookups (gated by the permission above).
   const service = createServiceRoleClient();
-  const [{ data: products }, { data: tracks }, { data: rightsholders }] = await Promise.all([
+  const [productsResult, { data: tracks }, { data: rightsholders }] = await Promise.all([
     productIds.length
-      ? service.from("practices").select("id, title, author_id, authors(name, slug)").in("id", productIds)
-      : Promise.resolve({ data: [] as never[] }),
+      ? service.from("practices").select("id, title, author_id, authors!practices_author_id_fkey(id, name, slug, access_status)").in("id", productIds)
+      : Promise.resolve({ data: [] as never[], error: null }),
     trackIds.length
       ? service.from("audio_items").select("id, title").in("id", trackIds)
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve({ data: [] as never[], error: null }),
     service.from("music_rightsholders").select("id, display_name, entity_type").eq("status", "active").order("display_name").limit(200),
   ]);
-  const [{ data: catalog }, { data: recentSuspensions }] = await Promise.all([
+  const [catalogResult, { data: recentSuspensions }] = await Promise.all([
     service
       .from("practices")
-      .select("id, title, authors(name)")
+      .select("id, title, authors!practices_author_id_fkey(name)")
       .eq("status", "published")
       .eq("product_kind", "music")
       .order("title")
@@ -124,6 +128,14 @@ export default async function AdminBusinessVerificationPage({
       .order("created_at", { ascending: false })
       .limit(20),
   ]);
+  const { data: products } = productsResult;
+  const { data: catalog } = catalogResult;
+  for (const [lookup, result] of [["products", productsResult], ["catalog", catalogResult]] as const) {
+    if (result.error) console.error("admin_business_products_lookup_failed", { lookup, code: result.error.code });
+  }
+  if (productsResult.error) {
+    return <p role="alert">Не удалось загрузить исходные продукты. <Link href={BUSINESS_VERIFICATION_ADMIN_PATH}>Повторить загрузку</Link></p>;
+  }
   const catalogOptions = ((catalog ?? []) as { id: string; title: string | null; authors: { name: string | null } | { name: string | null }[] | null }[])
     .map((p) => {
       const author = Array.isArray(p.authors) ? p.authors[0] : p.authors;
@@ -133,11 +145,20 @@ export default async function AdminBusinessVerificationPage({
   const catalogLabel = new Map(catalogOptions.map((o) => [o.id, o.label]));
 
   const productById = new Map(
-    ((products ?? []) as { id: string; title: string | null; authors: { name: string | null; slug: string | null } | { name: string | null; slug: string | null }[] | null }[]).map((p) => {
-      const author = Array.isArray(p.authors) ? p.authors[0] : p.authors;
-      return [p.id, { title: p.title ?? "Без названия", authorName: author?.name ?? "–" }];
+    ((products ?? []) as unknown as { id: string; title: string | null; authors: ApplicantWorkspace | ApplicantWorkspace[] | null }[]).map((p) => {
+      const author = Array.isArray(p.authors) ? p.authors[0] ?? null : p.authors;
+      return [p.id, { title: p.title ?? "Без названия", author }];
     }),
   );
+  let applicants: Awaited<ReturnType<typeof loadBusinessVerificationApplicants>>;
+  try {
+    applicants = await loadBusinessVerificationApplicants(cases.map((c) => ({
+      id: c.id, owner_user_id: c.owner_user_id, sourceWorkspace: productById.get(c.product_id)?.author ?? null,
+    })));
+  } catch {
+    return <p role="alert">Не удалось загрузить данные заявителей. <Link href={BUSINESS_VERIFICATION_ADMIN_PATH}>Повторить загрузку</Link></p>;
+  }
+  const canViewProfiles = snapshotHasPermission(session.access, "users.view");
   const trackById = new Map(((tracks ?? []) as { id: string; title: string | null }[]).map((t) => [t.id, t.title ?? "Трек"]));
 
   // Short-lived signed links with the moderator's own session (storage policy: moderators may read).
@@ -190,6 +211,7 @@ export default async function AdminBusinessVerificationPage({
         <ul className="mt-5 space-y-4">
           {cases.map((c) => {
             const product = productById.get(c.product_id);
+            const applicant = applicants.get(c.id)!;
             const isOwnCase = c.owner_user_id === session.userId;
             const canAct = canActOnOwnBusinessCase({ isOwnCase, isPlatformOwner });
             const actions = allowedBusinessModerationActions(c.status);
@@ -198,7 +220,7 @@ export default async function AdminBusinessVerificationPage({
             const caseSuspensions = ((suspensions ?? []) as { id: string; product_id: string; audio_item_id: string | null; reason: string; created_at: string }[]).filter((s) => s.product_id === c.product_id);
             const status = c.status as BusinessVerificationStatus;
             return (
-              <li key={c.id} id={`case-${c.id}`} data-testid="business-verification-case" className="rounded-[22px] border border-[#e4d7f4] bg-white p-5">
+              <li key={c.id} id={`case-${c.id}`} data-testid="business-verification-case" className="min-w-0 break-words rounded-[22px] border border-[#e4d7f4] bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-[#f3edfb] px-3 py-1 text-xs font-semibold text-[#7042c5]">
                     {BUSINESS_VERIFICATION_STATUS_LABEL[status] ?? c.status}
@@ -208,11 +230,34 @@ export default async function AdminBusinessVerificationPage({
                       Ваш собственный аккаунт
                     </span>
                   ) : null}
-                  <span className="text-xs text-[#796ba0]">Отправлено: {formatMsk(c.submitted_at)}</span>
                 </div>
-                <dl className="mt-3 grid gap-1 text-sm sm:grid-cols-[180px_1fr]">
-                  <dt className="text-[#796ba0]">Пространство</dt><dd>{product?.authorName ?? "–"}</dd>
-                  <dt className="text-[#796ba0]">Продукт</dt><dd>{product?.title ?? c.product_id}</dd>
+                <section className="mt-4 min-w-0 space-y-2 text-sm">
+                  <h3 className="font-semibold">Заявитель / аккаунт</h3>
+                  <p>{applicant.nameLabel}</p>
+                  {canViewProfiles && applicant.profileHref ? <Link className="text-[#7042c5] underline" href={applicant.profileHref}>Открыть профиль</Link> : null}
+                  <p className="text-xs text-[#796ba0]">Отправлено: {formatMsk(c.submitted_at)}</p>
+                </section>
+                <section className="mt-4 min-w-0 space-y-2 text-sm">
+                  <h3 className="font-semibold">Авторские проекты аккаунта</h3>
+                  <p>{applicant.workspaceTotal}</p>
+                  {applicant.workspaces.length ? <ul className="space-y-1">
+                    {applicant.workspaces.map((w) => <li key={w.id}>
+                      {w.slug ? <Link className="text-[#7042c5] underline" href={`/authors/${w.slug}`}>{w.name}</Link> : w.name}
+                      {w.access_status ? <span className="text-[#796ba0]"> – {getAuthorAccessStatusLabel(w.access_status as AuthorAccessStatus)}</span> : null}
+                    </li>)}
+                  </ul> : null}
+                </section>
+                <section className="mt-4 min-w-0 space-y-2 text-sm">
+                  <h3 className="font-semibold">Исходное пространство заявки</h3>
+                  <p>{applicant.sourceLabel}</p>
+                  {applicant.sourceWarning ? <p className="rounded-xl bg-[#fff8e8] p-3 text-[#9a5a00]">{applicant.sourceWarning}</p> : null}
+                </section>
+                <h3 className="mt-4 font-semibold">Образец трека и доказательства</h3>
+                <dl className="mt-3 grid min-w-0 gap-1 text-sm sm:grid-cols-[180px_minmax(0,1fr)] [&>dd]:min-w-0">
+                  <dt className="text-[#796ba0]">Продукт</dt><dd>
+                    <Link href={`/admin/products/${c.product_id}/diagnostics`} className="text-[#7042c5] underline">{product?.title ?? "Название продукта недоступно"}</Link>
+                    <small className="block text-xs text-[#796ba0]">{c.product_id}</small>
+                  </dd>
                   <dt className="text-[#796ba0]">Трек</dt><dd>{trackById.get(c.audio_item_id) ?? c.audio_item_id}</dd>
                   <dt className="text-[#796ba0]">Сервис</dt><dd>{c.ai_service === "other" ? c.ai_service_other ?? "Другой" : c.ai_service}</dd>
                   <dt className="text-[#796ba0]">Название в сервисе</dt><dd>{c.service_track_title}</dd>
@@ -243,12 +288,22 @@ export default async function AdminBusinessVerificationPage({
                   </ul>
                 ) : null}
 
+                <section className="mt-4 min-w-0 space-y-2 text-sm">
+                  <h3 className="font-semibold">Правообладатель, которому присваивается подтверждение</h3>
+                  <p>{applicant.rightsholder ? `${applicant.rightsholder.display_name} (${applicant.rightsholder.entity_type === "organization" ? "организация" : "физлицо"})` : "Правообладатель пока не привязан – выберите при подтверждении"}</p>
+                  <p className="text-[#796ba0]">Правообладатель – отдельный юридический субъект, отличающийся от личности заявителя в аккаунте и от его псевдонимов или авторских проектов.</p>
+                </section>
+                <section className="mt-4 min-w-0 space-y-2 text-sm">
+                  <h3 className="font-semibold">Охват решения</h3>
+                  <p>Подтверждение этого образца допускает все треки аккаунта и всех его авторских проектов в АудиоЛад Бизнес. Доказательства относятся только к этому аккаунту.</p>
+                </section>
+
                 {!canAct ? (
                   <p data-testid="business-verification-self-blocked" className="mt-4 rounded-2xl border border-[#f1d9a6] bg-[#fff8e8] p-3 text-sm text-[#6b4a00]">
                     Это ваша собственная заявка. Решение по ней принимает другой модератор: модерировать свои продукты может только владелец платформы.
                   </p>
                 ) : (
-                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-2 [&>form]:min-w-0">
                     {actions.length ? (
                       <form action={moderateBusinessVerificationAction} className="space-y-2 rounded-2xl border border-[#efe6fa] p-3">
                         <input type="hidden" name="verificationId" value={c.id} />
@@ -257,24 +312,10 @@ export default async function AdminBusinessVerificationPage({
                           key={`${c.id}:${actions.join(",")}`}
                           caseId={c.id}
                           actions={actions.map((a) => ({ value: a, label: BUSINESS_MODERATION_ACTION_LABEL[a] }))}
-                        >
-                          {actions.includes("approve") ? (
-                            <fieldset className="space-y-2 text-sm">
-                              <legend className="text-[#796ba0]">Правообладатель (только для «Подтвердить»)</legend>
-                              <select name="rightsholder" className="w-full rounded-xl border border-[#e4d7f4] p-2" defaultValue="new">
-                                <option value="new">Создать нового</option>
-                                {((rightsholders ?? []) as { id: string; display_name: string; entity_type: string }[]).map((r) => (
-                                  <option key={r.id} value={r.id}>{r.display_name} ({r.entity_type === "organization" ? "организация" : "физлицо"})</option>
-                                ))}
-                              </select>
-                              <input name="newDisplayName" maxLength={200} placeholder="Имя нового правообладателя" className="w-full rounded-xl border border-[#e4d7f4] p-2" />
-                              <select name="newEntityType" className="w-full rounded-xl border border-[#e4d7f4] p-2" defaultValue="person">
-                                <option value="person">Физлицо</option>
-                                <option value="organization">Организация</option>
-                              </select>
-                            </fieldset>
-                          ) : null}
-                        </BusinessDecisionFields>
+                          rightsholders={(rightsholders ?? []) as { id: string; display_name: string; entity_type: string }[]}
+                          applicantName={applicant.fullName}
+                          workspaceNames={applicant.workspaces.map((w) => w.name)}
+                        />
                         <button type="submit" className="rounded-full bg-[#7042c5] px-4 py-2 text-sm font-semibold text-white">Сохранить решение</button>
                       </form>
                     ) : null}
@@ -348,7 +389,7 @@ export default async function AdminBusinessVerificationPage({
           <ul data-testid="business-recent-suspensions" className="mt-4 space-y-1 text-xs text-[#796ba0]">
             {((recentSuspensions ?? []) as { id: string; product_id: string; audio_item_id: string | null; actor_user_id: string; reason: string; created_at: string }[]).map((s) => (
               <li key={s.id}>
-                {formatMsk(s.created_at)} – {catalogLabel.get(s.product_id) ?? productById.get(s.product_id)?.title ?? s.product_id}
+                {formatMsk(s.created_at)} – {catalogLabel.get(s.product_id) ?? productById.get(s.product_id)?.title ?? "Название продукта недоступно"}
                 {s.audio_item_id ? " (один трек)" : ""}{s.actor_user_id === session.userId ? " – вы" : ""}: {s.reason}
               </li>
             ))}
