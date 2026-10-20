@@ -158,8 +158,16 @@ function testWiringAndFilters() {
   assert.match(attentionCard, /status=new/);
 
   const layout = read("src/app/(platform)/admin/layout.tsx");
-  assert.match(layout, /authorApplicationAttentionCount/);
-  assert.match(layout, /author-applications/);
+  assert.match(layout, /getCachedAdminNavAttentionCounts/);
+  assert.match(layout, /buildAdminNavAttention/);
+
+  const navAttention = read("src/lib/admin/nav-attention.ts");
+  const authorQueue = navAttention.match(
+    /\{[^{}]*href:\s*"\/admin\/author-applications"[^{}]*\}/,
+  )?.[0];
+  assert.ok(authorQueue, "author applications queue is configured");
+  assert.match(authorQueue, /permission:\s*"authors\.manage"/);
+  assert.match(authorQueue, /statuses:\s*\[\s*"submitted",\s*"in_review"\s*\]/);
 }
 
 async function main() {
