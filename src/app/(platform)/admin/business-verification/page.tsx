@@ -43,6 +43,9 @@ type CaseRow = {
   service_track_title: string;
   service_track_url: string;
   provider_details: Record<string, unknown> | null;
+  declared_rightsholder_name: string | null;
+  declared_rightsholder_type: "person" | "organization" | null;
+  declared_rightsholder_is_self: boolean | null;
   status: string;
   reason: string | null;
   submitted_at: string | null;
@@ -75,7 +78,7 @@ export default async function AdminBusinessVerificationPage({
   const isPlatformOwner = ownerFlag === true;
   let query = supabase
     .from("business_rightsholder_verifications")
-    .select("id, owner_user_id, product_id, audio_item_id, ai_service, ai_service_other, service_track_title, service_track_url, provider_details, status, reason, submitted_at, updated_at")
+    .select("id, owner_user_id, product_id, audio_item_id, ai_service, ai_service_other, service_track_title, service_track_url, provider_details, declared_rightsholder_name, declared_rightsholder_type, declared_rightsholder_is_self, status, reason, submitted_at, updated_at")
     .neq("status", "draft")
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .limit(100);
@@ -154,6 +157,9 @@ export default async function AdminBusinessVerificationPage({
   let applicants: Awaited<ReturnType<typeof loadBusinessVerificationApplicants>>;
   try {
     applicants = await loadBusinessVerificationApplicants(cases.map((c) => ({
+      declared: c.declared_rightsholder_name && c.declared_rightsholder_type && c.declared_rightsholder_is_self !== null
+        ? { name: c.declared_rightsholder_name, entityType: c.declared_rightsholder_type, isSelf: c.declared_rightsholder_is_self }
+        : null,
       id: c.id, owner_user_id: c.owner_user_id, sourceWorkspace: productById.get(c.product_id)?.author ?? null,
     })));
   } catch {

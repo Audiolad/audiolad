@@ -105,7 +105,7 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
       .eq("is_current", true),
     supabase
       .from("business_rightsholder_verifications")
-      .select("id, status, reason, product_id, audio_item_id, service_track_title, service_track_url, ai_service, ai_service_other, provider_details, business_rightsholder_verification_attempts(count)")
+      .select("id, status, reason, product_id, audio_item_id, service_track_title, service_track_url, ai_service, ai_service_other, provider_details, declared_rightsholder_name, declared_rightsholder_type, declared_rightsholder_is_self, business_rightsholder_verification_attempts(count)")
       .eq("owner_user_id", user.id)
       .maybeSingle(),
   ]);
@@ -252,6 +252,15 @@ export default async function AuthorBusinessPage({ searchParams }: PageProps) {
         aiService: verification.ai_service as "suno" | "musicgpt" | "other",
         aiServiceOther: (verification.ai_service_other as string | null) ?? null,
         providerDetails: (verification.provider_details as Record<string, string> | null) ?? {},
+        declaredRightsholder: verification.declared_rightsholder_name &&
+          (verification.declared_rightsholder_type === "person" || verification.declared_rightsholder_type === "organization") &&
+          typeof verification.declared_rightsholder_is_self === "boolean"
+          ? {
+              name: verification.declared_rightsholder_name as string,
+              type: verification.declared_rightsholder_type,
+              isSelf: verification.declared_rightsholder_is_self,
+            }
+          : null,
         attempts: attemptsAgg?.[0]?.count ?? 0,
       }
     : null;

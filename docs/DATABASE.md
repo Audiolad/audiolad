@@ -1,3 +1,29 @@
+## Business declared rightsholder (pending owner approval)
+
+Migration `20270112120000_business_declared_rightsholder.sql` is prepared but
+has not been applied by this task. It adds nullable `declared_rightsholder_name`,
+`declared_rightsholder_type` (`person` / `organization`) and
+`declared_rightsholder_is_self` to `business_rightsholder_verifications`.
+Named checks require either all NULL (legacy cases) or all populated, a trimmed
+name length of 1..200, and `person` when the rights holder is the author.
+No backfill is performed. Service-specific `provider_details` is unchanged.
+
+`author_business_verification_set_declared_rightsholder(uuid,boolean,text,text)`
+is an authenticated SECURITY DEFINER RPC with `search_path = public, pg_temp`.
+It refuses support mode, locks only the caller's own verification, requires
+`draft` status, validates and stores the trimmed name, type and self flag.
+The form calls it after draft_v2/v3 and before evidence uploads and submission.
+The admin proposal prioritizes this declaration over account binding, verified
+payout name and profile name. The existing moderation RPC creates the rights
+holder on approval if needed; account-level admission is unchanged.
+`submit_v3` is unchanged: its `to_jsonb(v)` snapshot includes the added fields.
+
+Validation: `scripts/business-declared-rightsholder-sql-unit.mjs`,
+`scripts/business-declared-rightsholder-form-unit.mts` and
+`scripts/admin-business-rightsholder-proposal-unit.mts`.
+Continuation: owner reviews the migration, applies it through the established
+deployment process, then checks self / other / legacy applications in the UI.
+
 ## Author Appreciation settings
 
 `author_appreciation_settings` is an optional 1:1 table keyed by `author_id`.

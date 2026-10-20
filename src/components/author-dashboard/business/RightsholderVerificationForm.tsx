@@ -55,6 +55,7 @@ export type ExistingVerification = {
   aiService: RightsholderProvider;
   aiServiceOther: string | null;
   providerDetails: Record<string, string>;
+  declaredRightsholder?: { name: string; type: "person" | "organization"; isSelf: boolean } | null;
   attempts: number;
 } | null;
 
@@ -89,6 +90,9 @@ export default function RightsholderVerificationForm({ products, documents, exis
   const [audioItemId, setAudioItemId] = useState(existing?.audioItemId ?? products[0]?.tracks[0]?.id ?? "");
   const [trackTitle, setTrackTitle] = useState(existing?.trackTitle ?? "");
   const [trackUrl, setTrackUrl] = useState(existing?.trackUrl ?? "");
+  const [rightsholderIsSelf, setRightsholderIsSelf] = useState(existing?.declaredRightsholder?.isSelf ?? true);
+  const [rightsholderName, setRightsholderName] = useState(existing?.declaredRightsholder?.name ?? "");
+  const [rightsholderType, setRightsholderType] = useState(existing?.declaredRightsholder?.type ?? "");
   const [provider, setProvider] = useState<RightsholderProvider>(existing?.aiService ?? "suno");
   const [fields, setFields] = useState<Record<string, string>>(() => ({
     ...(existing?.providerDetails ?? {}),
@@ -146,6 +150,12 @@ export default function RightsholderVerificationForm({ products, documents, exis
     const next: Record<string, string> = {};
     if (!productId || !audioItemId) next.track = "Выберите свой опубликованный трек";
     Object.assign(next, validateProviderValues(values, validateEvidenceFile));
+    if (!rightsholderName.trim() || Array.from(rightsholderName.trim()).length > 200) {
+      next.rightsholderName = "Укажите ФИО правообладателя (до 200 символов)";
+    }
+    if (!rightsholderIsSelf && rightsholderType !== "person" && rightsholderType !== "organization") {
+      next.rightsholderType = "Выберите тип правообладателя";
+    }
     if (!unified) {
       if (!acceptTerms) next.acceptTerms = "Отметьте согласие с условиями";
       if (!confirmRights) next.confirmRights = "Подтвердите права на музыку";
@@ -180,6 +190,13 @@ export default function RightsholderVerificationForm({ products, documents, exis
       });
       if (draft.error) throw draft.error;
       const verificationId = draft.data as string;
+      const declared = await supabase.rpc("author_business_verification_set_declared_rightsholder", {
+        p_verification_id: verificationId,
+        p_is_self: rightsholderIsSelf,
+        p_name: rightsholderName.trim(),
+        p_type: rightsholderIsSelf ? "person" : rightsholderType,
+      });
+      if (declared.error) throw declared.error;
       const evidenceIds: string[] = [];
       for (const kind of evidenceKindsToUpload(values)) {
         const file = files[kind]!;
@@ -373,6 +390,47 @@ export default function RightsholderVerificationForm({ products, documents, exis
               </div>
             );
           })}
+
+          <fieldset className="min-w-0 space-y-3" disabled={busy} data-declared-rightsholder>
+            <legend className="text-sm font-medium text-neutral-800">Правообладатель</legend>
+            <label className="flex items-start gap-2 text-sm">
+              <input className="mt-1 shrink-0" type="radio" name="declared-rightsholder" value="self"
+                checked={rightsholderIsSelf} onChange={() => setRightsholderIsSelf(true)} />
+              <span className="min-w-0">Правообладатель – я сам(а), физическое лицо</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input className="mt-1 shrink-0" type="radio" name="declared-rightsholder" value="other"
+                checked={!rightsholderIsSelf} onChange={() => setRightsholderIsSelf(false)} />
+              <span className="min-w-0">Права принадлежат другому лицу (лейбл, соавтор)</span>
+            </label>
+            <label className="block min-w-0 text-sm">
+              <span className="font-medium text-neutral-800">
+                {rightsholderIsSelf ? "Ваши фамилия, имя и отчество" : "Имя или название правообладателя"}
+              </span>
+              <input className="mt-1 w-full min-w-0 rounded-lg border border-neutral-300 px-3 py-2"
+                required maxLength={200} value={rightsholderName}
+                onChange={(e) => setRightsholderName(e.target.value)}
+                onBlur={() => setRightsholderName((name) => name.trim())} />
+              {rightsholderIsSelf ? (
+                <span className="mt-1 block text-xs text-neutral-500">
+                  Укажите настоящие ФИО, а не псевдоним или название проекта – на них оформляется подтверждение прав.
+                </span>
+              ) : null}
+              {errors.rightsholderName ? <span className="mt-1 block text-red-600">{errors.rightsholderName}</span> : null}
+            </label>
+            {!rightsholderIsSelf ? (
+              <label className="block min-w-0 text-sm">
+                <span className="font-medium text-neutral-800">Тип правообладателя</span>
+                <select className="mt-1 w-full min-w-0 rounded-lg border border-neutral-300 px-3 py-2"
+                  required value={rightsholderType} onChange={(e) => setRightsholderType(e.target.value)}>
+                  <option value="">Выберите тип</option>
+                  <option value="person">Физлицо</option>
+                  <option value="organization">Организация</option>
+                </select>
+                {errors.rightsholderType ? <span className="mt-1 block text-red-600">{errors.rightsholderType}</span> : null}
+              </label>
+            ) : null}
+          </fieldset>
 
           {cfg.evidence.map(({ kind, required, example: ex }) => (
             <EvidenceFileField
