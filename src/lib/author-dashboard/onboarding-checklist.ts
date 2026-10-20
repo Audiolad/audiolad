@@ -231,6 +231,7 @@ export function parseAuthorOnboardingShellCollapsedPreference(
   }
 }
 
+/** Owner rule: any real avatar or non-blank positioning/bio completes this step. */
 export function isAuthorProfileMinimumComplete(
   profile: AuthorOnboardingProfileInput,
 ): boolean {
@@ -242,8 +243,8 @@ export function isAuthorProfileMinimumComplete(
     typeof profile.full_bio === "string" ? profile.full_bio.trim() : "";
 
   return (
-    hasUserAuthorAvatar(profile) &&
-    shortPositioning.length > 0 &&
+    hasUserAuthorAvatar(profile) ||
+    shortPositioning.length > 0 ||
     fullBio.length > 0
   );
 }
@@ -448,11 +449,7 @@ export function evaluateAuthorOnboardingChecklist(input: {
       active: firstIncompleteIndex === 0,
       ctaLabel: profileComplete
         ? "Открыть страницу автора"
-        : profile.short_positioning?.trim() ||
-            profile.full_bio?.trim() ||
-            hasUserAuthorAvatar(profile)
-          ? "Продолжить оформление"
-          : "Оформить страницу",
+        : "Оформить страницу",
       ctaHref: profileComplete
         ? buildAuthorPublicPath(authorSlug)
         : profileHref,
@@ -470,7 +467,7 @@ export function evaluateAuthorOnboardingChecklist(input: {
         ? `/author-dashboard/products/${freeProducts[0].id}`
         : newProductHref,
       hint: paidOnlyNonArchived
-        ? "Для старта на АудиоЛаде создайте бесплатный продукт — так слушатели смогут познакомиться с вами без покупки."
+        ? "Для старта на АудиоЛаде создайте бесплатный продукт – так слушатели смогут познакомиться с вами без покупки."
         : null,
     },
     {
