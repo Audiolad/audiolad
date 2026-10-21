@@ -13,7 +13,11 @@ BEGIN
       AND conrelid = 'public.business_rightsholder_verifications'::regclass) THEN
     ALTER TABLE public.business_rightsholder_verifications
       ADD CONSTRAINT business_declared_rightsholder_name_check CHECK (
-        declared_rightsholder_name IS NULL OR length(btrim(declared_rightsholder_name)) BETWEEN 1 AND 200
+        declared_rightsholder_name IS NULL OR (
+          declared_rightsholder_name ~ '[^[:space:]]'
+          AND length(declared_rightsholder_name) BETWEEN 1 AND 200
+          AND declared_rightsholder_name = regexp_replace(declared_rightsholder_name, '^[[:space:]]+|[[:space:]]+$', '', 'g')
+        )
       );
   END IF;
 END $$;
@@ -61,7 +65,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE v_status text;
+DECLARE
+  v_status text;
+  v_name text;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'authentication_required' USING ERRCODE = '42501';
@@ -77,7 +83,8 @@ BEGIN
   IF v_status IS DISTINCT FROM 'draft' THEN
     RAISE EXCEPTION 'business_verification_transition_forbidden';
   END IF;
-  IF p_name IS NULL OR length(btrim(p_name)) NOT BETWEEN 1 AND 200 THEN
+  v_name := regexp_replace(p_name, '^[[:space:]]+|[[:space:]]+$', '', 'g');
+  IF p_name IS NULL OR v_name !~ '[^[:space:]]' OR length(v_name) > 200 THEN
     RAISE EXCEPTION 'business_declared_rightsholder_name_invalid';
   END IF;
   IF p_is_self IS NULL OR p_type IS NULL OR p_type NOT IN ('person', 'organization')
@@ -85,7 +92,7 @@ BEGIN
     RAISE EXCEPTION 'business_declared_rightsholder_type_invalid';
   END IF;
   UPDATE public.business_rightsholder_verifications
-    SET declared_rightsholder_name = btrim(p_name), declared_rightsholder_type = p_type,
+    SET declared_rightsholder_name = v_name, declared_rightsholder_type = p_type,
       declared_rightsholder_is_self = p_is_self, updated_at = clock_timestamp()
     WHERE id = p_verification_id;
 END;

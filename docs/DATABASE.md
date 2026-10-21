@@ -6,6 +6,9 @@ has not been applied by this task. It adds nullable `declared_rightsholder_name`
 `declared_rightsholder_is_self` to `business_rightsholder_verifications`.
 Named checks require either all NULL (legacy cases) or all populated, a trimmed
 name length of 1..200, and `person` when the rights holder is the author.
+The name must contain a non-whitespace character and have no leading or trailing
+POSIX `[[:space:]]` whitespace, including tabs and newlines. The RPC strips this
+whitespace before validating and storing the name.
 No backfill is performed. Service-specific `provider_details` is unchanged.
 
 `author_business_verification_set_declared_rightsholder(uuid,boolean,text,text)`

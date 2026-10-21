@@ -36,6 +36,10 @@ assert.equal(coauthor.sourceLabel, "Указано автором в заявк�
 assert.deepEqual(coauthor.selection, { kind: "new", displayName: "Соавтор", entityType: "person" });
 assert.equal(build({ ...input, declared: null }).source, "account_binding");
 assert.equal(build({ ...input, declared: { name: " ", entityType: "person", isSelf: true } }).source, "account_binding");
+const whitespaceDeclaration = { name: "\t\n ", entityType: "person" as const, isSelf: true };
+assert.deepEqual(build({ ...input, declared: whitespaceDeclaration }), build(input), "whitespace-only declaration falls back to account binding");
+assert.deepEqual(build({ declared: whitespaceDeclaration, profileName: input.profileName }), build({ profileName: input.profileName }), "whitespace-only declaration falls back to profile");
+assert.deepEqual(build({ declared: whitespaceDeclaration }), build({}), "whitespace-only declaration without fallback is missing");
 assert.deepEqual(build(input).selection, { kind: "existing", id: holder.id });
 assert.equal(build(input).source, "account_binding");
 assert.equal(build(input).sourceLabel, "Уже привязан к аккаунту – не указано автором – проверьте");

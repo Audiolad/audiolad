@@ -14,7 +14,8 @@ assert.match(clean, /COMMIT;\s*$/);
 for (const [column, type] of [["name", "text"], ["type", "text"], ["is_self", "boolean"]]) {
   assert.match(clean, new RegExp(`ADD COLUMN IF NOT EXISTS declared_rightsholder_${column} ${type}`));
 }
-assert.match(clean, /CONSTRAINT business_declared_rightsholder_name_check CHECK \(\s+declared_rightsholder_name IS NULL OR length\(btrim\(declared_rightsholder_name\)\) BETWEEN 1 AND 200/);
+assert.match(clean, /CONSTRAINT business_declared_rightsholder_name_check CHECK \(\s+declared_rightsholder_name IS NULL OR \(\s+declared_rightsholder_name ~ '\[\^\[:space:\]\]'\s+AND length\(declared_rightsholder_name\) BETWEEN 1 AND 200\s+AND declared_rightsholder_name = regexp_replace\(declared_rightsholder_name, '\^\[\[:space:\]\]\+\|\[\[:space:\]\]\+\$', '', 'g'\)\s+\)/);
+assert.doesNotMatch(clean, /\bbtrim\(\s*(?:p_name|declared_rightsholder_name)\s*\)/i, "ordinary-space-only trimming must not return");
 assert.match(clean, /CONSTRAINT business_declared_rightsholder_type_check CHECK \(\s+declared_rightsholder_type IS NULL OR declared_rightsholder_type IN \('person', 'organization'\)/);
 assert.match(clean, /CONSTRAINT business_declared_rightsholder_self_check CHECK \(\s+declared_rightsholder_is_self IS DISTINCT FROM true OR declared_rightsholder_type = 'person'/);
 assert.match(clean, /CONSTRAINT business_declared_rightsholder_complete_check CHECK \(\s+\(declared_rightsholder_name IS NULL AND declared_rightsholder_type IS NULL AND declared_rightsholder_is_self IS NULL\)\s+OR\s+\(declared_rightsholder_name IS NOT NULL AND declared_rightsholder_type IS NOT NULL AND declared_rightsholder_is_self IS NOT NULL\)/);
@@ -35,9 +36,10 @@ assert.match(fn, /IF auth.uid\(\) IS NULL THEN\s+RAISE EXCEPTION 'authentication
 assert.match(fn, /IF public.business_consent_caller_in_support_mode\(\) THEN\s+RAISE EXCEPTION 'support_mode_consent_forbidden' USING ERRCODE = '42501'/);
 assert.match(fn, /WHERE id = p_verification_id AND owner_user_id = auth.uid\(\) FOR UPDATE;\s+IF NOT FOUND THEN\s+RAISE EXCEPTION 'business_verification_not_found'/);
 assert.match(fn, /IF v_status IS DISTINCT FROM 'draft' THEN\s+RAISE EXCEPTION 'business_verification_transition_forbidden'/);
-assert.match(fn, /IF p_name IS NULL OR length\(btrim\(p_name\)\) NOT BETWEEN 1 AND 200 THEN\s+RAISE EXCEPTION 'business_declared_rightsholder_name_invalid'/);
+assert.match(fn, /DECLARE\s+v_status text;\s+v_name text;/);
+assert.match(fn, /v_name := regexp_replace\(p_name, '\^\[\[:space:\]\]\+\|\[\[:space:\]\]\+\$', '', 'g'\);\s+IF p_name IS NULL OR v_name !~ '\[\^\[:space:\]\]' OR length\(v_name\) > 200 THEN\s+RAISE EXCEPTION 'business_declared_rightsholder_name_invalid'/);
 assert.match(fn, /IF p_is_self IS NULL OR p_type IS NULL OR p_type NOT IN \('person', 'organization'\)\s+OR \(p_is_self AND p_type <> 'person'\) THEN\s+RAISE EXCEPTION 'business_declared_rightsholder_type_invalid'/);
-assert.match(fn, /SET declared_rightsholder_name = btrim\(p_name\), declared_rightsholder_type = p_type,\s+declared_rightsholder_is_self = p_is_self, updated_at = clock_timestamp\(\)\s+WHERE id = p_verification_id/);
+assert.match(fn, /SET declared_rightsholder_name = v_name, declared_rightsholder_type = p_type,\s+declared_rightsholder_is_self = p_is_self, updated_at = clock_timestamp\(\)\s+WHERE id = p_verification_id/);
 assert.ok(fn.indexOf("authentication_required") < fn.indexOf("FOR UPDATE"));
 assert.ok(fn.indexOf("support_mode_consent_forbidden") < fn.indexOf("FOR UPDATE"));
 const signature = "public.author_business_verification_set_declared_rightsholder(uuid,boolean,text,text)";
