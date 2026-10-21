@@ -2074,3 +2074,19 @@ No legal versions are seeded: submit/opt-in fail with
 Verification and opt-in do not create Rights Grants or change track eligibility.
 Full schema/RPC lifecycle, RLS, backup and manual rollback:
 [business/rightsholder-onboarding-8d9cd0af.md](business/rightsholder-onboarding-8d9cd0af.md).
+
+## Admin P2 timeseries grouping
+
+Migration `20270113120000_admin_p2_timeseries_grouped.sql` replaces only
+`admin_analytics_p2_timeseries`; its signature, grants, Moscow bucket policy,
+400-point cap and JSON fields are unchanged. Event counts are materialized by
+bucket, event, session, user, anonymous ID, practice and active identity before
+calling the test-session and visitor helpers. The active identity key preserves
+login/unlink boundaries inside a bucket. Sessions and registrations retain their
+existing predicates. No tables, indexes, RLS or stored data change. The migration
+is prepared locally; deployment and database smoke validation remain pending.
+
+This complements `20261226120000_admin_listening_timeseries_grouped.sql`
+(PR #819), which already groups playback usage for
+`admin_analytics_listening_time_timeseries`. That function and its helper
+`playback_usage_admin_listened_ms_by_bucket` are unchanged.

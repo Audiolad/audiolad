@@ -1127,4 +1127,101 @@ BEGIN
 END
 $$;
 
+-- P2 grouped timeseries (20270113120000): compare complete payloads against
+-- the previous canonical row-based included_events, with the same bucket policy.
+-- Reuse existing fixtures and add repeated events + identity boundaries.
+DO $smoke$
+DECLARE
+  v_def text;
+  v_reference text;
+  v_include boolean;
+  v_author uuid;
+  v_practice uuid;
+  v_utm text;
+  v_device text;
+  v_window record;
+  v_actual jsonb;
+  v_expected jsonb;
+  v_checked int := 0;
+BEGIN
+  v_def := pg_get_functiondef('public.admin_analytics_p2_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text)'::regprocedure);
+  IF position('event_groups AS MATERIALIZED' in v_def) = 0
+    OR position('included_events AS MATERIALIZED' in v_def) = 0
+    OR position('SECURITY DEFINER' in v_def) = 0
+    OR position('analytics_product_event_facts(' in v_def) > 0
+  THEN
+    RAISE EXCEPTION 'P2 timeseries is not grouped';
+  END IF;
+  IF has_function_privilege('anon', 'public.admin_analytics_p2_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.admin_analytics_p2_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+    OR NOT has_function_privilege('service_role', 'public.admin_analytics_p2_timeseries(timestamptz,timestamptz,boolean,uuid,uuid,text,text)', 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'P2 timeseries grants changed';
+  END IF;
+
+  -- Replace only the optimized CTEs/counts to construct a temporary oracle
+  -- using the original 20261006120000 canonical row-based event implementation.
+  v_reference := replace(v_def, 'public.admin_analytics_p2_timeseries(', 'pg_temp.admin_p2_timeseries_reference(');
+  v_reference := overlay(v_reference placing $cte$included_events AS (
+    SELECT date_trunc(v_granularity,occurred_at AT TIME ZONE v_tz) AS bucket_local,event_name,user_id,visitor_key
+    FROM public.analytics_product_event_facts(v_data_from,v_to,p_author_id,p_practice_id,v_include_test)
+    WHERE public.admin_analytics_p2_utm_matches(p_utm_source,utm_source) AND (v_device IS NULL OR device_type=v_device)
+  ),
+  $cte$ from position('event_groups AS MATERIALIZED' in v_reference)
+    for position('period_profiles AS (' in v_reference) - position('event_groups AS MATERIALIZED' in v_reference));
+  v_reference := replace(v_reference, 'sum(event_count) FILTER', 'count(*) FILTER');
+  EXECUTE v_reference;
+
+  INSERT INTO public.analytics_identity_links (anonymous_id, user_id, linked_at, unlinked_at)
+  VALUES ('p2-grouped-identity', 'db111111-1111-4111-8111-111111111101',
+    '2026-10-06 10:00+03', '2026-10-06 11:00+03');
+  INSERT INTO public.analytics_events
+    (event_name, practice_id, anonymous_session_id, occurred_at, is_staff, is_test, is_bot, traffic_class)
+  SELECT event_name, 'cb111111-1111-4111-8111-1111111111a1'::uuid,
+    anon, at_time, false, false, false, 'human'
+  FROM unnest(ARRAY['practice_view','audio_play_started','audio_completed','first_manual_library_save','audio_progress_25']) event_name
+  CROSS JOIN (VALUES ('p2-grouped-identity'::text), (NULL::text), ('test-p2-grouped')) ids(anon)
+  CROSS JOIN (VALUES
+    (timestamptz '2026-10-05 23:59:59+03'),
+    (timestamptz '2026-10-06 00:00:00+03'),
+    (timestamptz '2026-10-06 09:59:59+03'),
+    (timestamptz '2026-10-06 10:00:00+03'),
+    (timestamptz '2026-10-06 10:30:00+03'),
+    (timestamptz '2026-10-06 11:00:00+03')
+  ) times(at_time)
+  CROSS JOIN generate_series(1, 2); -- Counts must retain duplicate events.
+
+  FOR v_window IN SELECT * FROM (VALUES
+    (timestamptz '2026-10-06 00:00+03', timestamptz '2026-10-07 00:00+03'),
+    (timestamptz '2026-09-30 00:00+03', timestamptz '2026-10-07 00:00+03'),
+    (timestamptz '2026-09-07 00:00+03', timestamptz '2026-10-07 00:00+03'),
+    (timestamptz '2026-05-01 00:00+03', timestamptz '2026-10-07 00:00+03'),
+    (timestamptz '2000-01-01 00:00+03', timestamptz '2026-10-07 00:00+03'),
+    (NULL::timestamptz, timestamptz '2026-10-07 00:00+03'),
+    (timestamptz '2026-10-07 00:00+03', timestamptz '2026-10-06 00:00+03')
+  ) w(p_from,p_to) LOOP
+    FOREACH v_include IN ARRAY ARRAY[false,true] LOOP
+      FOREACH v_author IN ARRAY ARRAY[NULL::uuid,'ab111111-1111-4111-8111-1111111111a1'::uuid] LOOP
+        FOREACH v_practice IN ARRAY ARRAY[NULL::uuid,'cb111111-1111-4111-8111-1111111111a1'::uuid] LOOP
+          FOREACH v_utm IN ARRAY ARRAY[NULL::text,'telegram','direct'] LOOP
+            FOREACH v_device IN ARRAY ARRAY[NULL::text,'mobile'] LOOP
+              v_actual := public.admin_analytics_p2_timeseries(v_window.p_from,v_window.p_to,v_include,v_author,v_practice,v_utm,v_device);
+              v_expected := pg_temp.admin_p2_timeseries_reference(v_window.p_from,v_window.p_to,v_include,v_author,v_practice,v_utm,v_device);
+              IF v_actual IS DISTINCT FROM v_expected THEN
+                RAISE EXCEPTION 'P2 grouped payload differs from row oracle: from % to % include % author % practice % utm % device %: % <> %',
+                  v_window.p_from,v_window.p_to,v_include,v_author,v_practice,v_utm,v_device,v_actual,v_expected;
+              END IF;
+              v_checked := v_checked + 1;
+            END LOOP;
+          END LOOP;
+        END LOOP;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+  IF v_checked <> 7 * 2 * 2 * 2 * 3 * 2 THEN
+    RAISE EXCEPTION 'P2 equivalence matrix incomplete: %', v_checked;
+  END IF;
+END;
+$smoke$;
+
 ROLLBACK;
