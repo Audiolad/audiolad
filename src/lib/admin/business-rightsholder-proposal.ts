@@ -16,7 +16,7 @@ export type RightsholderProposal = {
 };
 export type VerifiedPayoutName = { workspaceId: string; workspaceName: string; name: string };
 export type RightsholderProposalInput = {
-  declared?: { name: string; entityType: RightsholderEntityType };
+  declared?: { name: string; entityType: RightsholderEntityType; isSelf?: boolean } | null;
   accountBinding?: ProposalRightsholder | null;
   verifiedPayoutNames?: VerifiedPayoutName[];
   sourceWorkspaceId?: string | null;
@@ -50,20 +50,25 @@ export function buildRightsholderProposal(input: RightsholderProposalInput): Rig
     };
   }
   if (input.declared?.name.trim()) {
-    return named(input.declared.name, input.declared.entityType, "declared", "Указано автором в заявке", false);
+    const label = input.declared.isSelf === true
+      ? "Указано автором в заявке – сам автор"
+      : input.declared.isSelf === false
+        ? "Указано автором в заявке – другое лицо (лейбл, соавтор)"
+        : "Указано автором в заявке";
+    return named(input.declared.name, input.declared.entityType, "declared", label, false);
   }
   const bound = input.accountBinding;
   if (bound?.status === "active" && (bound.entity_type === "person" || bound.entity_type === "organization")) {
-    return { name: bound.display_name, entityType: bound.entity_type, source: "account_binding", sourceLabel: "Уже привязан к аккаунту – не указано автором, проверьте", needsCheck: true, warnings, selection: { kind: "existing", id: bound.id } };
+    return { name: bound.display_name, entityType: bound.entity_type, source: "account_binding", sourceLabel: "Уже привязан к аккаунту – не указано автором – проверьте", needsCheck: true, warnings, selection: { kind: "existing", id: bound.id } };
   }
   const payouts = (input.verifiedPayoutNames ?? []).filter((p) => p.name.trim()).sort((a, b) => a.workspaceName.localeCompare(b.workspaceName, "ru") || a.workspaceId.localeCompare(b.workspaceId));
   if (payouts.length) {
     if (new Set(payouts.map((p) => normalizeRightsholderName(p.name))).size > 1) warnings.push("В анкетах выплат аккаунта разные имена – проверьте");
     const preferred = payouts.find((p) => p.workspaceId === input.sourceWorkspaceId) ?? payouts[0];
-    return named(preferred.name, "person", "payout_profile", "Из подтверждённых данных для выплат – не указано автором, проверьте", true);
+    return named(preferred.name, "person", "payout_profile", "Из подтверждённых данных для выплат – не указано автором – проверьте", true);
   }
   if (input.profileName?.trim()) {
-    return named(input.profileName, "person", "profile", "Из профиля аккаунта – не указано автором, проверьте", true);
+    return named(input.profileName, "person", "profile", "Из профиля аккаунта – не указано автором – проверьте", true);
   }
   return { name: null, entityType: null, source: null, sourceLabel: "Имя правообладателя не указано – выберите или введите вручную", needsCheck: true, warnings, selection: { kind: "none" } };
 }

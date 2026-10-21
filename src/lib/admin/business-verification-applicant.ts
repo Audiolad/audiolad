@@ -1,12 +1,12 @@
 import "server-only";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 import { decryptPayoutProfilePersonName } from "@/lib/author-payout-profiles/service";
-import { buildRightsholderProposal, type ProposalRightsholder, type RightsholderProposal, type VerifiedPayoutName } from "@/lib/admin/business-rightsholder-proposal";
+import { buildRightsholderProposal, type ProposalRightsholder, type RightsholderProposal, type RightsholderProposalInput, type VerifiedPayoutName } from "@/lib/admin/business-rightsholder-proposal";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { buildBusinessVerificationApplicant, type ApplicantWorkspace, type ApplicantRightsholder } from "@/lib/admin/business-verification-applicant-model";
 
-export type BusinessApplicantCase = { id: string; owner_user_id: string; sourceWorkspace: ApplicantWorkspace | null };
+export type BusinessApplicantCase = { id: string; owner_user_id: string; sourceWorkspace: ApplicantWorkspace | null; declared?: RightsholderProposalInput["declared"] };
 type Joined<T> = T | T[] | null;
 function one<T>(value: Joined<T>): T | null { return Array.isArray(value) ? value[0] ?? null : value; }
 
@@ -113,6 +113,7 @@ export async function loadBusinessVerificationApplicants(cases: BusinessApplican
       rightsholder,
       access: session.access,
     }), proposal: buildRightsholderProposal({
+      declared: c.declared,
       profileName: names.get(c.owner_user_id),
       accountBinding: rightsholder,
       verifiedPayoutNames: failedPayoutOwners.has(c.owner_user_id) ? undefined : payoutNames.get(c.owner_user_id),

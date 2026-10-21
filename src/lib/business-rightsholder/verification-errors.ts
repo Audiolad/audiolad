@@ -26,6 +26,10 @@ const PENDING_OR_CLOSED =
   "Заявку сейчас нельзя изменить: она уже на проверке или закрыта модератором.";
 
 const BY_CODE: Record<string, VerificationFormError> = {
+  business_declared_rightsholder_name_invalid: { text: "Укажите ФИО правообладателя (до 200 символов)" },
+  business_declared_rightsholder_type_invalid: { text: "Выберите тип правообладателя" },
+  business_verification_not_found: { text: "Заявка не найдена – обновите страницу и попробуйте снова.", refresh: true },
+  business_verification_transition_forbidden: { text: PENDING_OR_CLOSED, refresh: true },
   business_verification_already_active: {
     text: "Заявка уже отправлена – дождитесь решения модератора.",
     refresh: true,
