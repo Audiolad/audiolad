@@ -21,6 +21,26 @@ import {
   type StatsQueryHistory,
 } from "../src/lib/navigation/stats-query-navigation";
 
+import {
+  buildAdminAnalyticsSearchParams,
+  parseAdminAnalyticsUrlState,
+} from "../src/lib/admin/analytics-url-state";
+import { parseAdminAnalyticsPeriod } from "../src/lib/admin/analytics-period";
+
+// The client URL, server summary and breakdown endpoint must agree, including
+// the default page and the explicit 30-day period (never omitted by builder).
+for (const initial of ["", "period=7d", "period=all", "period=30d"]) {
+  let state = parseAdminAnalyticsUrlState(new URLSearchParams(initial));
+  assert.equal(state.period, parseAdminAnalyticsPeriod(new URLSearchParams(initial).get("period")));
+  for (const period of ["30d", "7d", "30d", "all", "today", "yesterday"] as const) {
+    const params = buildAdminAnalyticsSearchParams({ ...state, period, drill: null });
+    assert.equal(params.get("period"), period);
+    state = parseAdminAnalyticsUrlState(params);
+    assert.equal(state.period, period);
+    assert.equal(parseAdminAnalyticsPeriod(params.get("period")), period);
+  }
+}
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function read(path: string): string {
@@ -196,7 +216,7 @@ function testCallSites() {
   assert.match(workbench, /shouldReplaceStatsTableWithLoading\(/);
   assert.match(workbench, /adminSummaryNeedsRefresh\(/);
   assert.match(workbench, /router\.refresh\(\)/);
-  assert.doesNotMatch(workbench, /router\.(replace|push)\(/);
+  assert.match(workbench, /router\.replace\(href, \{ scroll: false \}\)/);
   assert.doesNotMatch(workbench, /scroll:\s*true/);
 
   assert.match(filters, /pushStatsQuery\(/);

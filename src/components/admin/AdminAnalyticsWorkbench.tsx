@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import AdminAnalyticsBreakdownPanel from "@/components/admin/AdminAnalyticsBreakdownPanel";
 import AdminAnalyticsDefinitions from "@/components/admin/AdminAnalyticsDefinitions";
@@ -92,6 +92,7 @@ export default function AdminAnalyticsWorkbench({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [periodPending, startPeriodTransition] = useTransition();
   const urlState = useMemo(
     () => parseAdminAnalyticsUrlState(searchParams),
     [searchParams],
@@ -114,9 +115,19 @@ export default function AdminAnalyticsWorkbench({
     (patch: Partial<typeof urlState>) => {
       const next = { ...urlState, ...patch };
       const params = buildAdminAnalyticsSearchParams(next);
-      replaceStatsQuery(statsQueryHref(pathname, params), window.history);
+      const href = statsQueryHref(pathname, params);
+      if (patch.period !== undefined) {
+        // A period changes server-owned summary + timeseries. Schedule the
+        // navigation on every click, including a return to the rendered period
+        // while a different period is still in flight.
+        startPeriodTransition(() => {
+          router.replace(href, { scroll: false });
+        });
+      } else {
+        replaceStatsQuery(href, window.history);
+      }
     },
-    [pathname, urlState],
+    [pathname, router, startPeriodTransition, urlState],
   );
 
   const renderedSummaryQuery = {
@@ -135,7 +146,7 @@ export default function AdminAnalyticsWorkbench({
     utmSource: urlState.utmSource,
     deviceType: urlState.deviceType,
   };
-  const summaryStale = adminSummaryNeedsRefresh(
+  const summaryStale = periodPending || adminSummaryNeedsRefresh(
     renderedSummaryQuery,
     urlSummaryQuery,
   );
