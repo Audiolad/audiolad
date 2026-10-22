@@ -53,6 +53,26 @@ const courseUpgradeLogdiagSudoersPath = join(
   repoRoot,
   "deploy/sudoers/audiolad-course-upgrade-logdiag",
 );
+const maintenanceOpsPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-maintenance-ops.sh",
+);
+const maintenanceDryRunPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-maintenance-dry-run.sh",
+);
+const maintenanceApplyPath = join(
+  repoRoot,
+  "deploy/scripts/audiolad-maintenance-apply.sh",
+);
+const maintenanceDryRunSudoersPath = join(
+  repoRoot,
+  "deploy/sudoers/audiolad-maintenance-dry-run",
+);
+const maintenanceApplySudoersPath = join(
+  repoRoot,
+  "deploy/sudoers/audiolad-maintenance-apply",
+);
 const SHA40 = "a".repeat(40);
 
 function parseYaml(text) {
@@ -176,6 +196,8 @@ function main() {
   assert.ok(jobs.disk_storage_cleanup, "job disk_storage_cleanup must exist");
   assert.ok(jobs.studio_duplicate_asset_diag, "job studio_duplicate_asset_diag must exist");
   assert.ok(jobs.course_upgrade_diag, "job course_upgrade_diag must exist");
+  assert.ok(jobs.maintenance_dry_run, "job maintenance_dry_run must exist");
+  assert.ok(jobs.maintenance_apply, "job maintenance_apply must exist");
   assert.equal(jobs.deploy.environment, "production");
   assert.equal(jobs.diagnose.environment, "production");
   assert.equal(jobs.studio_worker_recover.environment, "production");
@@ -183,6 +205,8 @@ function main() {
   assert.equal(jobs.disk_storage_cleanup.environment, "production");
   assert.equal(jobs.studio_duplicate_asset_diag.environment, "production");
   assert.equal(jobs.course_upgrade_diag.environment, "production");
+  assert.equal(jobs.maintenance_dry_run.environment, "production");
+  assert.equal(jobs.maintenance_apply.environment, "production");
   assert.equal(jobs.deploy["runs-on"], "ubuntu-latest");
   assert.equal(jobs.diagnose["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_worker_recover["runs-on"], "ubuntu-latest");
@@ -190,12 +214,16 @@ function main() {
   assert.equal(jobs.disk_storage_cleanup["runs-on"], "ubuntu-latest");
   assert.equal(jobs.studio_duplicate_asset_diag["runs-on"], "ubuntu-latest");
   assert.equal(jobs.course_upgrade_diag["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.maintenance_dry_run["runs-on"], "ubuntu-latest");
+  assert.equal(jobs.maintenance_apply["runs-on"], "ubuntu-latest");
   assert.match(workflowText, /if: inputs\.confirm == 'DO_NOT_DEPLOY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_WORKER_RECOVER'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_AUDIT'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_DISK_STORAGE_CLEANUP'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_STUDIO_DUPLICATE_ASSET_DIAG'/);
   assert.match(workflowText, /if: inputs\.confirm == 'OPS_COURSE_UPGRADE_DIAG'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_MAINTENANCE_DRY_RUN'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_MAINTENANCE_APPLY'/);
   assert.match(workflowText, /if: inputs\.confirm == 'DEPLOY'/);
   assert.match(workflowText, /audiolad_deploy=NOT_INVOKED/);
   assert.doesNotMatch(workflowText, /if: \$\{\{ inputs\.confirm \}\} != "DEPLOY"/);
@@ -267,6 +295,14 @@ function main() {
   assert.ok(
     confirm.options.includes("OPS_COURSE_UPGRADE_DIAG"),
     "confirm options must include OPS_COURSE_UPGRADE_DIAG",
+  );
+  assert.ok(
+    confirm.options.includes("OPS_MAINTENANCE_DRY_RUN"),
+    "confirm options must include OPS_MAINTENANCE_DRY_RUN",
+  );
+  assert.ok(
+    confirm.options.includes("OPS_MAINTENANCE_APPLY"),
+    "confirm options must include OPS_MAINTENANCE_APPLY",
   );
 
   const syntax = spawnSync("bash", ["-n", wrapperPath], { encoding: "utf8" });
@@ -410,6 +446,7 @@ function main() {
   assertCourseUpgradeDiag(workflowText, docsText, workflow);
   assertCourseUpgradeDiagHelper();
   assertCourseUpgradeHelperFetchTransport(workflow);
+  assertMaintenanceOps(workflowText, docsText, workflow);
 
   console.log("production-deploy-github-actions-unit: all tests passed");
 }
@@ -2953,6 +2990,74 @@ function runCourseUpgradeFetchScript(script, { sha, token, fakeBin, extraEnv = {
     env,
   });
   return { result, work, githubEnv };
+}
+
+function assertMaintenanceOps(workflowText, docsText, workflow) {
+  const helperText = readFileSync(maintenanceOpsPath, "utf8");
+  const dryRunText = readFileSync(maintenanceDryRunPath, "utf8");
+  const applyText = readFileSync(maintenanceApplyPath, "utf8");
+  const dryRunSudoers = readFileSync(maintenanceDryRunSudoersPath, "utf8");
+  const applySudoers = readFileSync(maintenanceApplySudoersPath, "utf8");
+  const maintenanceDoc = readFileSync(
+    join(repoRoot, "deploy/docs/MAINTENANCE.md"),
+    "utf8",
+  );
+
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_MAINTENANCE_DRY_RUN'/);
+  assert.match(workflowText, /if: inputs\.confirm == 'OPS_MAINTENANCE_APPLY'/);
+  assert.equal(workflow.jobs.maintenance_dry_run.environment, "production");
+  assert.equal(workflow.jobs.maintenance_apply.environment, "production");
+  assert.match(workflowText, /\/usr\/local\/sbin\/audiolad-maintenance-dry-run/);
+  assert.match(workflowText, /\/usr\/local\/sbin\/audiolad-maintenance-apply/);
+  assert.match(helperText, /sudo -n -- "\$\{WRAPPER\}"/);
+  assert.match(helperText, /WRAPPER="\/usr\/local\/sbin\/audiolad-maintenance-dry-run"/);
+  assert.match(helperText, /WRAPPER="\/usr\/local\/sbin\/audiolad-maintenance-apply"/);
+  assert.doesNotMatch(helperText, /\/usr\/local\/sbin\/audiolad-deploy/);
+  assert.doesNotMatch(helperText, /pm2 restart|systemctl start/);
+  assert.doesNotMatch(workflowText, /sudo -n \/usr\/local\/sbin\/audiolad-maintenance\.sh/);
+  assert.doesNotMatch(workflowText, /NOPASSWD:\s*ALL/);
+  assert.doesNotMatch(dryRunSudoers, /\*/);
+  assert.doesNotMatch(applySudoers, /\*/);
+  assert.match(
+    dryRunSudoers,
+    /deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-maintenance-dry-run ""/,
+  );
+  assert.match(
+    applySudoers,
+    /deploy ALL=\(root\) NOPASSWD: \/usr\/local\/sbin\/audiolad-maintenance-apply ""/,
+  );
+  assert.match(dryRunText, /exec \/usr\/local\/lib\/audiolad\/audiolad-maintenance\.sh --dry-run/);
+  assert.match(applyText, /exec \/usr\/local\/lib\/audiolad\/audiolad-maintenance\.sh --apply/);
+  assert.doesNotMatch(dryRunText, /"\$@"/);
+  assert.doesNotMatch(applyText, /"\$@"/);
+  assert.match(dryRunText, /if \[\[ \$# -ne 0 \]\]/);
+  assert.match(applyText, /if \[\[ \$# -ne 0 \]\]/);
+  assert.match(helperText, /NEED_INSTALL/);
+  assert.match(helperText, /CANONICAL_VERSION/);
+  assert.match(docsText, /OPS_MAINTENANCE_DRY_RUN/);
+  assert.match(docsText, /OPS_MAINTENANCE_APPLY/);
+  assert.match(docsText, /PRIVILEGED_MAINTENANCE=NEED_INSTALL/);
+  assert.match(maintenanceDoc, /OPS_MAINTENANCE_DRY_RUN/);
+  assert.match(helperText, /KEEP_EXTRA_RELEASES=1/);
+  assert.doesNotMatch(helperText, /KEEP_EXTRA_RELEASES=0/);
+
+  for (const path of [maintenanceDryRunPath, maintenanceApplyPath, maintenanceOpsPath]) {
+    const syntax = spawnSync("bash", ["-n", path], { encoding: "utf8" });
+    assert.equal(syntax.status, 0, `${path} bash -n failed: ${syntax.stderr}`);
+  }
+
+  chmodSync(maintenanceDryRunPath, 0o755);
+  chmodSync(maintenanceApplyPath, 0o755);
+  const dryRunReject = spawnSync("bash", [maintenanceDryRunPath, "--apply"], {
+    encoding: "utf8",
+  });
+  const applyReject = spawnSync("bash", [maintenanceApplyPath, "--dry-run"], {
+    encoding: "utf8",
+  });
+  assert.notEqual(dryRunReject.status, 0, "dry-run wrapper must reject extra args");
+  assert.notEqual(applyReject.status, 0, "apply wrapper must reject extra args");
+  assert.match(`${dryRunReject.stdout ?? ""}${dryRunReject.stderr ?? ""}`, /no arguments/);
+  assert.match(`${applyReject.stdout ?? ""}${applyReject.stderr ?? ""}`, /no arguments/);
 }
 
 function assertCourseUpgradeHelperFetchTransport(workflow) {
