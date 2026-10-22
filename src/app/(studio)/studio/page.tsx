@@ -44,48 +44,54 @@ export default async function StudioPage() {
               Создавайте аудиопрактики, аудиокниги и проводите аудиоэфиры
             </h2>
             <div className="mt-8 grid gap-5 lg:grid-cols-3">
-              <article className="rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
-                <h3 className="text-2xl font-semibold">Создать аудиопрактику</h3>
-                <p className="mt-4 max-w-lg leading-7 text-[#ddd2f5]">
-                  Записывайте голос, добавляйте музыку, редактируйте дорожки и
-                  создавайте готовые аудиопродукты.
-                </p>
+              <article className="flex min-h-80 flex-col rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
+                <div>
+                  <h3 className="text-2xl font-semibold">Студия аудиопрактик</h3>
+                  <p className="mt-4 max-w-lg leading-7 text-[#ddd2f5]">
+                    Записывайте голос, добавляйте музыку и создавайте готовые
+                    аудиопрактики без сложного монтажа.
+                  </p>
+                </div>
                 <Link
                   href="/studio/projects"
-                  className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
+                  className="mt-8 inline-flex min-h-11 w-fit items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530] sm:mt-auto"
                 >
-                  Открыть Студию
+                  Открыть студию
                 </Link>
               </article>
 
-              <article className="rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
-                <h3 className="text-2xl font-semibold">Студия аудиокниг</h3>
-                <p className="mt-4 max-w-lg leading-7 text-[#ddd2f5]">
-                  Записывайте аудиокниги своим голосом по главам и создавайте
-                  готовые аудиофайлы без сложного монтажа.
-                </p>
+              <article className="flex min-h-80 flex-col rounded-[28px] border border-[#9074c7] bg-[#271647] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:p-8">
+                <div>
+                  <h3 className="text-2xl font-semibold">Студия аудиокниг</h3>
+                  <p className="mt-4 max-w-lg leading-7 text-[#ddd2f5]">
+                    Записывайте аудиокниги по главам и создавайте готовые
+                    аудиофайлы без сложного монтажа.
+                  </p>
+                </div>
                 <Link
                   href="/studio/audiobooks"
-                  className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530]"
+                  className="mt-8 inline-flex min-h-11 w-fit items-center justify-center rounded-full bg-[#9bdab5] px-5 text-sm font-semibold text-[#1c1530] sm:mt-auto"
                 >
                   Создать аудиокнигу
                 </Link>
               </article>
 
-              <article className="rounded-[28px] border border-white/15 bg-[#21133d] p-6 sm:p-8">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h3 className="text-2xl font-semibold">Прямой аудиоэфир</h3>
-                  <span className="rounded-full bg-[#4c3a6f] px-3 py-1 text-xs font-semibold text-[#d9c9f7]">
-                    В разработке
-                  </span>
+              <article className="flex min-h-80 flex-col rounded-[28px] border border-white/15 bg-[#21133d] p-6 sm:p-8">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="text-2xl font-semibold">Студия аудиоэфиров</h3>
+                    <span className="rounded-full bg-[#4c3a6f] px-3 py-1 text-xs font-semibold text-[#d9c9f7]">
+                      В разработке
+                    </span>
+                  </div>
+                  <p className="mt-4 max-w-lg leading-7 text-[#cfc4e4]">
+                    Проводите аудиоэфиры, сохраняйте запись и продолжайте
+                    работу с ней в студии.
+                  </p>
                 </div>
-                <p className="mt-4 max-w-lg leading-7 text-[#cfc4e4]">
-                  Проводите живые аудиоэфиры, сохраняйте запись и продолжайте
-                  работу с ней в Студии.
-                </p>
                 <Link
                   href="/studio/live"
-                  className="mt-8 inline-flex min-h-11 items-center justify-center rounded-full border border-[#8065ad] px-5 text-sm font-semibold text-white"
+                  className="mt-8 inline-flex min-h-11 w-fit items-center justify-center rounded-full border border-[#8065ad] px-5 text-sm font-semibold text-white sm:mt-auto"
                 >
                   Подробнее
                 </Link>
