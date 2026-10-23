@@ -24,6 +24,19 @@ export const PROMISE_PATTERNS = [
   { name: "навсегда избавиться", re: /навсегда\s+избав[а-яё]*/giu },
 ];
 
+/**
+ * Wording that primes the reader for discomfort during a practice (owner rule 23.10):
+ * «при дискомфорте остановите запись» sets the listener up to expect discomfort. Practices are
+ * described only through the positive experience; a hard error anywhere in the text.
+ */
+export const DISCOMFORT_PATTERNS = [
+  { name: "дискомфорт", re: /дискомфорт|некомфортн/iu },
+  { name: "неприятные ощущения", re: /неприятн[а-яё]*\s+ощущени/iu },
+  { name: "остановить/прекратить запись", re: /(?:останов|прекра[тщ]|прерв|приостанов)[а-яё]*\s+(?:[а-яё]+\s+)?(?:запис|прослушивани|аудио|практик|медитаци|упражнени|сеанс)[а-яё]*/iu },
+  { name: "запись следует остановить", re: /(?:запис|прослушивани|аудио|практик|медитаци|упражнени)[а-яё]*\s+(?:можно|нужно|следует|лучше|стоит|надо|необходимо)\s+(?:[а-яё]+\s+)?(?:останов|прекрат|прерв)[а-яё]*/iu },
+  { name: "если станет плохо", re: /если\s+(?:вам\s+)?(?:станет|стало|становится)\s+(?:плохо|хуже|страшно|тревожно|не по себе)/iu },
+];
+
 const HYGIENE = [
   { name: "HTML-тег", re: /<\/?[a-z][^>]*>/i },
   { name: "Markdown-разметка", re: /\*\*|\]\(|^#{1,6}\s|`/m },
@@ -318,6 +331,14 @@ function checkText(article, brief, strings, errors, warnings, stats) {
   }
   for (const phrase of brief.forbiddenPhrases) {
     if (lower(all).includes(lower(phrase))) errors.push(`запрещённая брифом фраза: «${phrase}»`);
+  }
+
+  // Practices are described only through the positive experience (owner rule 23.10).
+  for (const item of strings) {
+    for (const rule of DISCOMFORT_PATTERNS) {
+      const match = item.text.match(rule.re);
+      if (match) errors.push(`${item.path}: настройка на дискомфорт (${rule.name}): «${match[0]}» – описывайте практику только через хорошее (поддержка, спокойствие, тепло)`);
+    }
   }
 
   // Addresses in plain text count as links to other websites too (owner rule 23.10).
