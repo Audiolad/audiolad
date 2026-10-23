@@ -2,12 +2,14 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 function read(path) {
   return readFileSync(path, "utf8");
 }
 
-const root = "/var/www/audiolad";
+// c1aa0492 introduced the production root; validate the current worktree.
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 assert.equal(existsSync(`${root}/src/app/api/listen/welcome-session/route.ts`), false);
 assert.equal(existsSync(`${root}/src/lib/listen/welcome-practice.ts`), false);

@@ -159,7 +159,8 @@ function testPolicyGuards() {
 }
 
 function testStaticWiring() {
-  const actions = readRepoFile("src", "app", "admin", "users", "actions.ts");
+  // 0a25d36b moved admin pages/actions into the platform route group.
+  const actions = readRepoFile("src", "app", "(platform)", "admin", "users", "actions.ts");
   const table = readRepoFile("src", "components", "admin", "AdminUsersTable.tsx");
   const deletion = readRepoFile("src", "lib", "admin", "user-deletion.ts");
 

@@ -428,9 +428,11 @@ function testChaptersAndLessonsAreSessionTracks() {
       !sessionLoader.includes("from(\"sections\")"),
     "session loader has no chapter/lesson/section tables",
   );
+  // 5c68358f added course lesson tables; their audio still references audio_items.
   assert(
-    database.includes("Section / Lesson / Chapter tables не создаются"),
-    "schema documents no chapter/lesson tables",
+    database.includes("`course_lesson_blocks`") &&
+      database.includes("audio → `audio_items.id` того же курса"),
+    "schema documents course audio blocks referencing session audio items",
   );
   assert(
     publication.includes('"course"') && publication.includes('"audiobook"'),

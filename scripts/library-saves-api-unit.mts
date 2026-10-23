@@ -206,7 +206,7 @@ function testRouteUsesExistingAuthAndSaveDomain() {
   assert.doesNotMatch(route, /favorites/);
   assert.doesNotMatch(listing, /claim_free_practice/);
   assert.doesNotMatch(listing, /user_practices/);
-  assert.match(listing, /isSaved/, "catalog listing attaches isSaved");
+  assert.match(listing, /is_saved: savedIds !== null && savedIds\.has\(item\.publication_id\)/, "catalog listing attaches viewer.is_saved (0de68154)");
 }
 
 testRequestParsing();

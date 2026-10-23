@@ -333,6 +333,11 @@ FROM generate_series(1,1200) g;
 }
 
 function main() {
+  // 56290109 introduced this isolated SQL harness; honor e6f62aba opt-out.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    console.log("platform-analytics-p1-identity-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   setup();
   testCrossTabResume();
   testTimeoutNewSession();

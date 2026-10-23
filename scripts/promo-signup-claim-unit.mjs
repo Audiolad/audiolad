@@ -4,6 +4,9 @@
  */
 import { readFileSync } from "node:fs";
 
+// 41cec3bd introduced production-root paths; inspect this checkout in any worktree.
+const read = (path, encoding) => readFileSync(new URL(`../${path}`, import.meta.url), encoding);
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -11,16 +14,16 @@ function assert(condition, message) {
 }
 
 function testPostSignupHandlerMounting() {
-  const listenClient = readFileSync(
-    "/var/www/audiolad/src/components/audio/ListenPageClient.tsx",
+  const listenClient = read(
+    "src/components/audio/ListenPageClient.tsx",
     "utf8",
   );
-  const practicePage = readFileSync(
-    "/var/www/audiolad/src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
+  const practicePage = read(
+    "src/app/(platform)/(listener)/practice/[...segments]/page.tsx",
     "utf8",
   );
-  const postSignup = readFileSync(
-    "/var/www/audiolad/src/lib/promo/post-signup.ts",
+  const postSignup = read(
+    "src/lib/promo/post-signup.ts",
     "utf8",
   );
 
@@ -41,8 +44,8 @@ function testPostSignupHandlerMounting() {
 }
 
 function testSignupContextFields() {
-  const context = readFileSync(
-    "/var/www/audiolad/src/lib/promo/signup-context.ts",
+  const context = read(
+    "src/lib/promo/signup-context.ts",
     "utf8",
   );
 
@@ -53,16 +56,16 @@ function testSignupContextFields() {
 }
 
 function testCompleteSignupApi() {
-  const api = readFileSync(
-    "/var/www/audiolad/src/lib/promo/complete-signup-api.ts",
+  const api = read(
+    "src/lib/promo/complete-signup-api.ts",
     "utf8",
   );
-  const route = readFileSync(
-    "/var/www/audiolad/src/app/api/promo/complete-signup/route.ts",
+  const route = read(
+    "src/app/api/promo/complete-signup/route.ts",
     "utf8",
   );
-  const handler = readFileSync(
-    "/var/www/audiolad/src/components/promo/PromoPostSignupHandler.tsx",
+  const handler = read(
+    "src/components/promo/PromoPostSignupHandler.tsx",
     "utf8",
   );
 
@@ -80,8 +83,8 @@ function testCompleteSignupApi() {
 }
 
 function testClaimRpcMigration() {
-  const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716191000_claim_promo_practice_by_id.sql",
+  const sql = read(
+    "supabase/migrations/20260716191000_claim_promo_practice_by_id.sql",
     "utf8",
   );
 
@@ -93,8 +96,8 @@ function testClaimRpcMigration() {
 }
 
 function testLibraryRefresh() {
-  const handler = readFileSync(
-    "/var/www/audiolad/src/components/promo/PromoPostSignupHandler.tsx",
+  const handler = read(
+    "src/components/promo/PromoPostSignupHandler.tsx",
     "utf8",
   );
 
@@ -102,8 +105,8 @@ function testLibraryRefresh() {
 }
 
 function testNoAutoClaimWithoutContext() {
-  const handler = readFileSync(
-    "/var/www/audiolad/src/components/promo/PromoPostSignupHandler.tsx",
+  const handler = read(
+    "src/components/promo/PromoPostSignupHandler.tsx",
     "utf8",
   );
 

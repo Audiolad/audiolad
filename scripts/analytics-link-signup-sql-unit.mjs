@@ -454,6 +454,13 @@ function main() {
   if (process.env.AUDIOLAD_ALLOW_PRODUCTION_SUPABASE === "1") {
     throw new Error("refusing to run: AUDIOLAD_ALLOW_PRODUCTION_SUPABASE is set");
   }
+  // b40609f7 introduced a mandatory local SQL harness; honor e6f62aba
+  // isolated-SQL opt-out while still running the source-only route contract.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    testFailSoftAppRoutes();
+    console.log("analytics-link-signup-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   if (!localPostgresAvailable()) {
     throw new Error(
       "isolated Postgres 16 is required. Tried: sudo -n -u postgres psql -c 'SELECT 1'. Docker is not used (production supabase-db must not be touched).",

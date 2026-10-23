@@ -42,7 +42,9 @@ function testStatusEndpointContract() {
   assert(route.includes("createServiceRoleClient"), "status route uses service role read");
   assert(route.includes("practiceSlug"), "status route returns practice slug");
   assert(!route.includes("user_id"), "status route does not expose user id");
-  assert(!route.includes("amount_minor"), "status route does not expose amount");
+  // 63645318 intentionally exposes order snapshot amount/currency for purchase analytics.
+  assert(route.includes("amountMinor:") && route.includes(").amount_minor"), "status maps snapshot amount");
+  assert(route.includes("currency:") && route.includes(").currency"), "status maps snapshot currency");
   assert(
     !route.includes("notifyPlatformOwnerOfConfirmedSale"),
     "checkout status does not send owner sale email",

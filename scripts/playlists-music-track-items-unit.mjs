@@ -463,6 +463,10 @@ assert(
   player.includes('entry.kind !== "product" && entry.kind !== "audio_item"'),
   "player activates reserved audio_item entries",
 );
-assert(player.includes("tracks: [track]"), "single track plays alone");
+// 8bf1bfa8 extracted full/preview queue resolution into the shared session helper.
+assert(player.includes("await resolvePlaylistQueueEntrySession(entry,"), "player delegates queue session selection");
+const queueSession = read("src/lib/playlists/queue-entry-session.ts");
+assert(queueSession.includes("tracks: [track]"), "single track plays alone");
+assert(queueSession.includes("session.tracks.find((item) => item.id === entry.audioItemId)"), "single-track selection uses the requested audio item");
 
 console.log("PLAYLISTS_MUSIC_TRACK_ITEMS_UNIT_PASS");

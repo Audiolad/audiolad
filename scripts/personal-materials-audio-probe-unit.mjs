@@ -4,12 +4,26 @@
  * does not commit binaries.
  */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { probePersonalMaterialAudioDuration } from "../src/lib/personal-materials/server/audio-probe.ts";
+
+// c2ae99e6 introduced fixture generation requiring local ffmpeg and ffprobe.
+// Match other audio integration tests: missing tools are an explicit skip.
+for (const tool of ["ffmpeg", "ffprobe"]) {
+  const result = spawnSync(tool, ["-version"], { stdio: "ignore" });
+  if (result.error?.code === "ENOENT") {
+    assert.equal(await probePersonalMaterialAudioDuration(Buffer.alloc(0), "mp3"), null);
+    assert.equal(await probePersonalMaterialAudioDuration(Buffer.alloc(0), "m4a"), null);
+    console.log(`personal-materials-audio-probe-unit: integration skipped (${tool} unavailable); empty-buffer checks passed`);
+    process.exit(0);
+  }
+  if (result.error) throw result.error;
+  assert.equal(result.status, 0, `${tool} must be functional when installed`);
+}
 
 const workdir = mkdtempSync(join(tmpdir(), "audiolad-pm-audio-probe-"));
 

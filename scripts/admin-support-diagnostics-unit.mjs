@@ -175,13 +175,14 @@ assert.equal(ready.tsReadiness.ok, true, "ready product passes TS readiness");
 assert.equal(ready.dbReadiness.ok, true, "ready product passes DB readiness");
 assert.equal(ready.fieldsReady, true, "ready product passes field readiness");
 
-// Optional metadata does not block readiness; audio still does.
+// 14e6c7aa requires a cover for SQL moderation readiness; audio remains required.
 const missingCover = readinessPair(
   basePractice({ cover_url: null }),
   [baseAudio()],
   { accessStatus: "free", activeTopicCount: 1 },
 );
-assert.equal(missingCover.fieldsReady, true);
+assert.equal(missingCover.fieldsReady, false);
+assert.equal(missingCover.dbReadiness.firstFailure?.code, "missing_cover");
 
 const missingAudio = readinessPair(basePractice(), [], {
   accessStatus: "free",
@@ -398,8 +399,8 @@ assert.equal(
     [baseAudio()],
     readyOptions,
   ).answer,
-  "ДА",
-  "missing cover is optional",
+  "НЕТ",
+  "missing cover blocks moderation submit (14e6c7aa)",
 );
 assert.equal(
   headlineFor(basePractice(), [], readyOptions).answer,

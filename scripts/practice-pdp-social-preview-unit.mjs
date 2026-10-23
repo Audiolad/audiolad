@@ -15,6 +15,8 @@ import {
 } from "../src/lib/promo-pages/social-preview.ts";
 import { PRODUCTION_APP_ORIGIN } from "../src/lib/seo/app-origin.ts";
 
+import { resolveProductMetaDescription } from "../src/lib/seo/product-metadata.ts";
+
 const ORIGIN = PRODUCTION_APP_ORIGIN;
 const PUBLIC_COVER =
   "https://audiolad.ru/storage/v1/object/public/practice-covers/anna/morning/lg.webp";
@@ -200,8 +202,12 @@ function testMetadataWiringPreservesSeoAndShare() {
   assert(page.includes("buildPracticeCanonicalUrl"), "canonical helper kept");
   assert(page.includes("twitter: social.twitter"), "twitter tags wired");
   assert(page.includes("openGraph: social.openGraph"), "openGraph tags wired");
+  // bf79accb moved description fallbacks into the shared SEO resolver.
+  assert(page.includes("resolveProductMetaDescription(seoInput)"), "shared description resolver wired");
+  assert(page.includes("productKind: practice.product_kind"), "resolver receives product kind");
   assert(
-    page.includes("Музыкальный продукт на платформе АудиоЛад."),
+    resolveProductMetaDescription({ title: "Альбом", productKind: PRODUCT_KIND.MUSIC }) ===
+      "Музыкальный продукт на платформе АудиоЛад.",
     "music description fallback kept",
   );
   assert(

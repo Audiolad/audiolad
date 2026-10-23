@@ -674,7 +674,14 @@ function testSourceGuards() {
     .map((relative) => readFileSync(join(repoRoot, relative), "utf8"))
     .join("\n");
   assert.doesNotMatch(hay, /NEXT_PUBLIC_MAX_BOT|NEXT_PUBLIC_MAX/);
-  assert.doesNotMatch(hay, /Domain=\.audiolad\.ru|domain:\s*["']\.audiolad\.ru/);
+  // f374604f (#848) shares Supabase sessions across first-party subdomains.
+  // MAX itself must still delegate cookie policy to the shared Supabase layer.
+  const maxSources = files.filter((file) => !file.startsWith("src/lib/supabase/"))
+    .map((file) => readFileSync(join(repoRoot, file), "utf8")).join("\n");
+  assert.doesNotMatch(maxSources, /Domain=\.audiolad\.ru|domain:\s*["']\.audiolad\.ru/);
+  for (const file of ["src/lib/supabase/client.ts", "src/lib/supabase/proxy.ts"]) {
+    assert.match(readFileSync(join(repoRoot, file), "utf8"), /getSupabaseCookieOptions\(/);
+  }
   assert.doesNotMatch(
     hay,
     /href=["']\/auth\/sign-up|buildAuthRouteHref\(\s*["']\/auth\/sign-up/,

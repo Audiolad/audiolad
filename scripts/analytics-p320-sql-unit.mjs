@@ -194,6 +194,11 @@ function orderRow(orderId) {
 }
 
 function main() {
+  // fc5bf69b introduced this isolated SQL harness; honor e6f62aba opt-out.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    console.log("analytics-p320-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   bootstrap();
   setAuth(USER_A);
 

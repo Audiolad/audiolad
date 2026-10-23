@@ -176,8 +176,11 @@ function testServerLayer() {
   assert(!rateLimit.includes("rawToken"), "rate limit no raw token");
   assert(rateLimit.includes("Retry-After"), "429 retry-after");
 
-  assert(auth.includes("author_members"), "membership check");
-  assert(auth.includes('membership.role !== "owner"'), "owner/editor roles");
+  // 49d04377 delegates acting-author membership to the shared author guard.
+  assert(auth.includes("await requireAuthorMembership(material.author_id)"), "material membership delegation");
+  const sharedAuth = read("src/lib/author-products/auth.ts");
+  assert(sharedAuth.includes('.from("author_members")'), "shared guard checks membership");
+  assert(sharedAuth.includes('data.role !== "owner" && data.role !== "editor"'), "shared guard enforces owner/editor roles");
 
   assert(clearMigration.includes("clear_personal_material_draft_audio"), "clear audio rpc");
   assert(clearMigration.includes("material_not_editable"), "draft-only guard");

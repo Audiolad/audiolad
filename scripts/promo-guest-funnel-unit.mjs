@@ -4,6 +4,9 @@
  */
 import { readFileSync } from "node:fs";
 
+// 9ce9ab40 introduced production-root paths; inspect this checkout in any worktree.
+const read = (path, encoding) => readFileSync(new URL(`../${path}`, import.meta.url), encoding);
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -11,8 +14,8 @@ function assert(condition, message) {
 }
 
 function testAccessModule() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/products/access.ts",
+  const source = read(
+    "src/lib/products/access.ts",
     "utf8",
   );
 
@@ -21,8 +24,8 @@ function testAccessModule() {
 }
 
 function testMigrationContract() {
-  const sql = readFileSync(
-    "/var/www/audiolad/supabase/migrations/20260716150000_practice_guest_promo_funnel.sql",
+  const sql = read(
+    "supabase/migrations/20260716150000_practice_guest_promo_funnel.sql",
     "utf8",
   );
 
@@ -35,8 +38,8 @@ function testMigrationContract() {
 }
 
 function testSafeNextPath() {
-  const routes = readFileSync(
-    "/var/www/audiolad/src/lib/auth/routes.ts",
+  const routes = read(
+    "src/lib/auth/routes.ts",
     "utf8",
   );
 
@@ -45,8 +48,8 @@ function testSafeNextPath() {
 }
 
 function testSignupContext() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/promo/signup-context.ts",
+  const source = read(
+    "src/lib/promo/signup-context.ts",
     "utf8",
   );
 
@@ -56,8 +59,8 @@ function testSignupContext() {
 }
 
 function testGuestProgress() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/promo/guest-progress.ts",
+  const source = read(
+    "src/lib/promo/guest-progress.ts",
     "utf8",
   );
 
@@ -66,8 +69,8 @@ function testGuestProgress() {
 }
 
 function testPracticeAccessUi() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/products/practice-access-ui.ts",
+  const source = read(
+    "src/lib/products/practice-access-ui.ts",
     "utf8",
   );
 
@@ -77,8 +80,8 @@ function testPracticeAccessUi() {
 }
 
 function testAnalyticsEvents() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/promo/analytics-events.ts",
+  const source = read(
+    "src/lib/promo/analytics-events.ts",
     "utf8",
   );
 
@@ -88,8 +91,8 @@ function testAnalyticsEvents() {
 }
 
 function testCompleteSignupApi() {
-  const source = readFileSync(
-    "/var/www/audiolad/src/lib/promo/complete-signup-api.ts",
+  const source = read(
+    "src/lib/promo/complete-signup-api.ts",
     "utf8",
   );
 
@@ -98,13 +101,13 @@ function testCompleteSignupApi() {
 }
 
 function testListenPageNoAutoplayDefault() {
-  const listenPage = readFileSync(
-    "/var/www/audiolad/src/app/(platform)/listen/[...segments]/page.tsx",
+  const listenPage = read(
+    "src/app/(platform)/listen/[...segments]/page.tsx",
     "utf8",
   );
 
   assert(
-    listenPage.includes("autoplay") || readFileSync("/var/www/audiolad/src/lib/listen/page-shared.tsx", "utf8").includes("autoplay={options?.autoplay === true}"),
+    listenPage.includes("autoplay") || read("src/lib/listen/page-shared.tsx", "utf8").includes("autoplay={options?.autoplay === true}"),
     "listen autoplay is opt-in",
   );
 }

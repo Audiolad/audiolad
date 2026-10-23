@@ -737,7 +737,11 @@ function testSourceContracts() {
   );
   assert.match(signedAudio, /isCourse && access.mode === "catalog_preview"/);
   assert.match(signedAudio, /isCourseStorefrontPreviewClipEligible/);
-  assert.match(signedAudio, /canPlayCourseAudioItem/);
+  // 63461114 shares entitled signing with native playback; course access stays enforced.
+  assert.match(signedAudio, /await signEntitledListenAudio\(/);
+  const entitledAudio = read("src/lib/listen/sign-entitled-audio.ts");
+  assert.match(entitledAudio, /const canPlayCourse = deps.canPlayCourse \?\? canPlayCourseAudioItem/);
+  assert.match(entitledAudio, /await canPlayCourse\(/);
   assert.match(clipResponse, /requireConfiguredWindow: isCourse/);
   assert.match(clip, /requireConfiguredWindow/);
   assert.match(builder, /data-author-course-storefront-preview/);

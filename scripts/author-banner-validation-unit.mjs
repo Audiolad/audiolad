@@ -4,6 +4,9 @@
  */
 import { readFileSync } from "node:fs";
 
+// 04595413 introduced production-root paths; inspect this checkout in any worktree.
+const read = (path, encoding) => readFileSync(new URL(`../${path}`, import.meta.url), encoding);
+
 import {
   AUTHOR_BANNER_ERROR_MESSAGES,
   AUTHOR_BANNER_IMAGE_CONFIG,
@@ -137,8 +140,8 @@ function testBannerHintAndMessages() {
 }
 
 function testBannerUploadUsesDedicatedValidation() {
-  const hookSource = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/useAuthorBannerUpload.ts",
+  const hookSource = read(
+    "src/components/author-dashboard/useAuthorBannerUpload.ts",
     "utf8",
   );
 
@@ -163,8 +166,8 @@ function testBannerUploadUsesDedicatedValidation() {
 }
 
 function testProductCoverValidationRelaxed() {
-  const coverValidation = readFileSync(
-    "/var/www/audiolad/src/lib/author-products/cover-validation-client.ts",
+  const coverValidation = read(
+    "src/lib/author-products/cover-validation-client.ts",
     "utf8",
   );
 
@@ -183,8 +186,8 @@ function testProductCoverValidationRelaxed() {
 }
 
 function testAuthorProfileBannerPreview() {
-  const authorBanner = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorBannerUploadBlock.tsx",
+  const authorBanner = read(
+    "src/components/author-dashboard/AuthorBannerUploadBlock.tsx",
     "utf8",
   );
 
@@ -203,8 +206,8 @@ function testAuthorProfileBannerPreview() {
 }
 
 function testApiRouteUsesSharedImagePipeline() {
-  const route = readFileSync(
-    "/var/www/audiolad/src/app/api/author/profile/[kind]/route.ts",
+  const route = read(
+    "src/app/api/author/profile/[kind]/route.ts",
     "utf8",
   );
 

@@ -171,7 +171,8 @@ function testProfileQueryPipelineDropsContinue() {
   );
   assert.match(
     loader,
-    /listAuthorWorkspacesForUser\(user\.id\)/,
+    // 9e435c0f reuses the profile client for linked MAX listener sessions.
+    /listAuthorWorkspacesForUser\(user\.id, supabase\)/,
     "getProfilePageData still loads author workspaces",
   );
   assert.match(

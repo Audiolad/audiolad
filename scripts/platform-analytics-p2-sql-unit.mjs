@@ -778,6 +778,11 @@ WHERE n.nspname = 'public' AND p.proname = '${name}';`);
 }
 
 function main() {
+  // e142b9a3 introduced this isolated SQL harness; honor e6f62aba opt-out.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    console.log("platform-analytics-p2-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   setup();
   testSummaryMatchesDirectSql();
   testEventCountsDifferFromUniquePeople();

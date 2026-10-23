@@ -174,6 +174,11 @@ INSERT INTO payments (
 }
 
 function main() {
+  // 319fe82f introduced this isolated SQL harness; honor e6f62aba opt-out.
+  if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1") {
+    console.log("payments-p31-sql-unit: isolated SQL skipped (AUDIOLAD_SKIP_ISOLATED_SQL=1)");
+    return;
+  }
   bootstrap();
 
   // Real succeeded

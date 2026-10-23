@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   ADMIN_INTERACTIVE_SCRIPTS,
   GUARDED_WRITE_SCRIPTS,
+  ISOLATED_SQL_WRITE_SCRIPTS,
   READ_ONLY_SQL_SCRIPTS,
   REQUIRED_ADMIN_MARKERS,
   REQUIRED_GUARD_MARKERS,
@@ -66,6 +67,27 @@ for (const relativePath of UNIT_MOCK_WRITE_SCRIPTS) {
   );
 }
 
+for (const relativePath of ISOLATED_SQL_WRITE_SCRIPTS) {
+  const source = readScript(relativePath);
+  assert(
+    /!\["127\.0\.0\.1", "localhost"\]\.includes\(url\.hostname\)/.test(source) &&
+      /throw new Error\("migration compile only permits a localhost PostgreSQL URL"\)/.test(source),
+    `${relativePath} must reject non-localhost database URLs`,
+  );
+  assert(
+    /const expectedDatabase = "audiolad_migration_compile_isolated"/.test(source) &&
+      /url\.pathname = `\/\$\{database\}`/.test(source) &&
+      /const databaseUrl = isolatedUrl\(adminUrl, expectedDatabase\)/.test(source),
+    `${relativePath} must target the disposable compile database`,
+  );
+  assert(
+    source.indexOf("const validatedAdminUrl = isolatedUrl(adminUrl") >= 0 &&
+      source.indexOf("runPsql(validatedAdminUrl") >
+        source.indexOf("const validatedAdminUrl = isolatedUrl(adminUrl"),
+    `${relativePath} must validate the admin URL before database creation`,
+  );
+}
+
 const writePattern =
   /createUser\(|auth\.admin\.createUser|INSERT INTO|docker exec supabase-db|\.from\([^)]+\)\.insert\(/;
 
@@ -89,6 +111,7 @@ function scanDirectory(dir, base = "scripts") {
       ...READ_ONLY_SQL_SCRIPTS,
       ...ADMIN_INTERACTIVE_SCRIPTS,
       ...UNIT_MOCK_WRITE_SCRIPTS,
+      ...ISOLATED_SQL_WRITE_SCRIPTS,
     ];
     if (inventory.includes(rel)) continue;
 

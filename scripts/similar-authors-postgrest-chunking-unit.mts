@@ -46,6 +46,12 @@ function createMockSupabase(options: {
       neq() {
         return builder;
       },
+      // 18aea692 adds the public availability filter to the candidate query.
+      or(filters: string) {
+        assert.match(filters, /^published_at\.lte\./);
+        assert.ok(filters.includes(",scheduled_publish_at.is.null,scheduled_publish_at.lte."));
+        return builder;
+      },
       then(
         onFulfilled?: (value: QueryResult) => unknown,
         onRejected?: (reason: unknown) => unknown,
