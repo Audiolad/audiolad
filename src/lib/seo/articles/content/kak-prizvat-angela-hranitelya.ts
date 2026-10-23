@@ -143,19 +143,8 @@ export const KAK_PRIZVAT_ANGELA_HRANITELYA_ARTICLE = {
       "paragraphs": [],
       "blocks": [
         {
-          "kind": "rich_paragraph",
-          "segments": [
-            {
-              "text": "Самый простой способ – краткая молитва Ангелу-Хранителю из Православного молитвослова (текст можно сверить на странице "
-            },
-            {
-              "href": "https://azbyka.ru/molitvoslov/molitva-angelu-xranitelyu.html",
-              "label": "«Молитвы Ангелу-Хранителю» на сайте Азбука веры"
-            },
-            {
-              "text": ")."
-            }
-          ]
+          "kind": "paragraph",
+          "text": "Самый простой способ – краткая молитва Ангелу-Хранителю из Православного молитвослова (текст можно сверить по разделу «Молитвы Ангелу-Хранителю» на сайте «Азбука веры»)."
         },
         {
           "kind": "paragraph",
