@@ -200,6 +200,35 @@ async function check(article) {
   }
 }
 
+// 4i. Owner rule 23.10: no discomfort priming in practice descriptions.
+{
+  const flagged = [
+    "При дискомфорте запись следует остановить.",
+    "Остановите запись при дискомфорте; не слушайте за рулём.",
+    "Если появятся неприятные ощущения, сделайте паузу.",
+    "Прекратите прослушивание, если устали.",
+    "Если станет плохо, откройте глаза.",
+    "Практику можно прервать в любой момент.",
+  ];
+  for (const text of flagged) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(text));
+    const result = await check(raw);
+    assert(result.errors.some((e) => e.includes("настройка на дискомфорт")), `${text}: ${result.errors.join("; ")}`);
+  }
+  const fine = [
+    "Слушайте медитацию в тихой, уютной обстановке – лучше не за рулём.",
+    "Образ света несёт ощущение поддержки, доверия и спокойствия.",
+    "Медитация помогает ненадолго остановиться и прислушаться к себе.",
+  ];
+  for (const text of fine) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(text));
+    const result = await check(raw);
+    assert(!result.errors.some((e) => e.includes("настройка на дискомфорт")), `${text}: ${result.errors.join("; ")}`);
+  }
+}
+
 // 5. Em dash survives only if inserted after normalization; HTML and table without support.
 {
   const { article } = normalizeArticle(fixture(), context);
