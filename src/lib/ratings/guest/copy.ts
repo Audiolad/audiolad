@@ -18,7 +18,19 @@ export function formatGuestRatingNotEligibleCopy(
   return `Послушайте минимум ${formatRussianSecondsAccusative(seconds)}, чтобы оставить свой отклик.`;
 }
 
-export const GUEST_RATING_NOT_ELIGIBLE_COPY = formatGuestRatingNotEligibleCopy();
+/**
+ * DISPLAYED number only; the server keeps RATING_ELIGIBILITY_LISTEN_MS (30 s).
+ * Owners/testers observed eligibility only after about 40 s: the first heartbeat
+ * is a +0 baseline, media time accrues in 5 s LISTEN_STATS_HEARTBEAT_MS steps,
+ * and eligibility is set only on the heartbeat crossing 30 s, plus audio start
+ * and buffering latency. Promise 40 s so guests are not told a shorter wait
+ * than reality. Owner decision 2026-10-23.
+ */
+export const GUEST_RATING_HINT_LISTEN_SECONDS = 40;
+
+export const GUEST_RATING_NOT_ELIGIBLE_COPY = formatGuestRatingNotEligibleCopy(
+  GUEST_RATING_HINT_LISTEN_SECONDS * 1000,
+);
 
 export const GUEST_RATING_CAPTCHA_UNAVAILABLE_COPY =
   "Не удалось проверить, попробуйте позже.";
