@@ -3627,7 +3627,7 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     const heartbeatAt = latestInstant([checkedAt, lastRunSignal]);
     const probeAt = cli && facts?.cliProbe ? facts.cliProbe.checkedAt : null;
     const signalSource = cli
-      ? (probeAt ? "проба Codex CLI (version, login status, отслеживаемые запуски)" : "нет сигналов в Company Core")
+      ? (probeAt ? "проба Codex CLI (version, login status, процессы codex exec и отслеживаемые запуски)" : "нет сигналов в Company Core")
       : checkedAt && checkedAt === heartbeatAt
       ? "проверка подключения в Company Core"
       : lastRunSignal
