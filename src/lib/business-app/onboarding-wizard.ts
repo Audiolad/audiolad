@@ -4,6 +4,8 @@
  * Path: тип → атмосфера → preview → confirm → (create org/location) → Player/Music.
  * Atmosphere is UX preference only until P1-02 Sonic DNA; no DNA persistence here.
  * Preview is descriptive + UNKNOWN-safe — no Case A audio without CONFIRM, no rights claims.
+ * Sergey 23.10.2026 21:21: no rights / "no tracks yet" box on the preview and done steps –
+ * eligibility is decided per location by the player, never asserted by the wizard.
  */
 
 export const BUSINESS_ONBOARDING_STEPS = [
@@ -99,9 +101,6 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
       energyHint: "lively",
     },
   ] as const;
-
-export const BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER =
-  "Для музыки в заведении нужны подтверждённые права на каждый трек. Пока таких треков в подборке нет.";
 
 export const BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE =
   "На этом шаге можно прочитать описание будущей атмосферы. Музыка здесь пока не играет. Плеер станет доступен после подтверждения точки.";
@@ -219,7 +218,6 @@ export function buildBusinessOnboardingPreviewSummary(input: {
   atmosphereLabel: string;
   vibe: string;
   category: string;
-  rightsSafeDisclaimer: string;
   noAudioNote: string;
 } {
   const type = getBusinessOnboardingType(input.typeId);
@@ -229,7 +227,6 @@ export function buildBusinessOnboardingPreviewSummary(input: {
     atmosphereLabel: atmosphere?.label ?? "Атмосфера не выбрана",
     vibe: atmosphere?.vibe ?? "",
     category: type?.category ?? "",
-    rightsSafeDisclaimer: BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER,
     noAudioNote: BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE,
   };
 }
