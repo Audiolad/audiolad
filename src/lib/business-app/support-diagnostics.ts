@@ -71,7 +71,7 @@ export function anonymousSupportDiagnostics(): BusinessSupportDiagnostics {
       {
         code: "ANONYMOUS",
         severity: "info",
-        messageRu: "Войдите как владелец, чтобы увидеть диагностику точки.",
+        messageRu: "Проверка работы музыки доступна владельцу точки.",
       },
     ],
     overall: "ok",
@@ -152,7 +152,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "ANONYMOUS",
       severity: "info",
-      messageRu: "Войдите как владелец, чтобы увидеть диагностику точки.",
+      messageRu: "Проверка работы музыки доступна владельцу точки.",
     });
     return issues;
   }
@@ -161,7 +161,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "NO_ORGANIZATION",
       severity: "error",
-      messageRu: "Организация ещё не создана – сначала пройдите bootstrap.",
+      messageRu: "Заведение ещё не подключено.",
     });
     return issues;
   }
@@ -170,7 +170,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "NO_LOCATION",
       severity: "error",
-      messageRu: "Активная точка (Location) не найдена.",
+      messageRu: "Активная точка не найдена.",
     });
   }
 
@@ -184,7 +184,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "NO_PLAYER",
       severity: "error",
-      messageRu: "Плеер не зарегистрирован на организацию / точку.",
+      messageRu: "Плеер ещё не подключён к заведению или точке.",
     });
   } else {
     for (const player of scoped) {
@@ -192,26 +192,26 @@ export function deriveSupportIssues(input: {
         issues.push({
           code: "PLAYER_UNASSIGNED",
           severity: "warn",
-          messageRu: `Плеер ${player.playerCode} не назначен на зону.`,
+          messageRu: `Плеер ${player.playerCode} не подключён к залу.`,
         });
       }
       if (player.healthStatus === "never_seen") {
         issues.push({
           code: "PLAYER_NEVER_SEEN",
           severity: "error",
-          messageRu: `Плеер ${player.playerCode} ещё не выходил на связь (heartbeat).`,
+          messageRu: `Плеер ${player.playerCode} ещё не выходил на связь.`,
         });
       } else if (player.healthStatus === "offline") {
         issues.push({
           code: "PLAYER_OFFLINE",
           severity: "error",
-          messageRu: `Плеер ${player.playerCode} offline – heartbeat давно не обновлялся.`,
+          messageRu: `Плеер ${player.playerCode} давно не выходит на связь.`,
         });
       } else if (player.healthStatus === "stale") {
         issues.push({
           code: "PLAYER_STALE",
           severity: "warn",
-          messageRu: `Плеер ${player.playerCode} отвечает с задержкой (stale heartbeat).`,
+          messageRu: `Плеер ${player.playerCode} отвечает с задержкой.`,
         });
       }
     }
@@ -224,7 +224,7 @@ export function deriveSupportIssues(input: {
         ? "warn"
         : "info",
       messageRu:
-        "Фактов business Proof of Play пока нет (или нет доступа к ledgers).",
+        "Данных о воспроизведении пока нет или они недоступны.",
     });
   } else if (
     input.lastPlay.minutesAgo != null &&
@@ -233,7 +233,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "STALE_BUSINESS_PLAY",
       severity: "warn",
-      messageRu: `Последний business play был ${input.lastPlay.minutesAgo} мин назад.`,
+      messageRu: `Последнее воспроизведение было ${input.lastPlay.minutesAgo} мин назад.`,
     });
   }
 
@@ -312,7 +312,7 @@ export function formatHeartbeatAgeRu(
 export function healthStatusLabelRu(status: string): string {
   if (status === "online") return "на связи";
   if (status === "stale") return "задержка";
-  if (status === "offline") return "offline";
+  if (status === "offline") return "нет связи";
   if (status === "never_seen") return "не выходил на связь";
-  return status;
+  return "нет данных";
 }

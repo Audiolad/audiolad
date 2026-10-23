@@ -91,7 +91,7 @@ export function offlineUntil(
 }
 
 export function formatOfflineLabel(until: Date | null): string {
-  if (!until) return "офлайн недоступен: треки ещё не сохранены";
+  if (!until) return "Без интернета пока недоступно: треки ещё не сохранены";
   const s = until.toLocaleString("ru-RU", {
     timeZone: "Europe/Moscow",
     day: "2-digit",
@@ -100,7 +100,7 @@ export function formatOfflineLabel(until: Date | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-  return `офлайн до ${s}`;
+  return `Без интернета до ${s}`;
 }
 
 /** Append with dedupe by client_event_id and a hard cap (oldest dropped). */

@@ -657,7 +657,7 @@ export class SpaPlayerEngine {
     if (pi < 0) {
       this.stopAll();
       this.setStatus(this.items.length === 0 ? "empty" : this.manifest && manifestNeedsRefresh(this.manifest, new Date(this.d.now())) ? "refresh_required" : "error",
-        this.d.online() ? "Нет доступных треков." : "Нет сохранённых треков для офлайна.");
+        this.d.online() ? "Нет доступных треков." : "Нет сохранённых треков для прослушивания без интернета.");
       // Offline with nothing cached: keep the play intent and retry on reconnect (A21).
       if (!this.d.online() && this.status === "error") this.stalledIntent = this.playOp;
       return;
@@ -1570,7 +1570,7 @@ export class SpaPlayerEngine {
     this.d.storage.remove(this.resumeKey);
     this.d.storage.remove(this.orderKey);
     // Synchronously (A22 #2): no_access holds and nothing sounds from here on.
-    this.setStatus("no_access", "Доступ к пилоту закрыт.");
+    this.setStatus("no_access", "Доступ к музыке закрыт.");
     const op = this.opEpoch, acc = this.accessEpoch, gen = this.generation;
     await this.writer.clear();
     // Something newer happened during the clear (access restored, refresh applied, resume,

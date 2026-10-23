@@ -31,7 +31,7 @@ for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, {
   assert.match(html, /Последний сигнал от плеера/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /Воспроизведение не подтверждено/);
-  assert.match(html, /Что звучит сейчас – появится, когда плеер точки начнёт присылать подтверждения/);
+  assert.match(html, /Название трека появится, когда плеер сообщит, что музыка играет./);
   assert.match(html, /Лицензия: нет подтверждённых данных/);
   assert.match(html, /href="\/player"/);
   assert.match(html, /href="\/help"[^>]*>Проверить работу музыки<\/a>/);
@@ -51,7 +51,7 @@ for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, {
 assert.match(render(null), /Нет данных о плеере/);
 assert.match(render(context.signals), /Плеер на связи/);
 assert.match(render({ ...context.signals!, secondsSinceHeartbeat: 301 }), /Нет связи с плеером/);
-assert.match(render({ ...context.signals!, lastPlayMinutesAgo: 2 }), /Последнее зарегистрированное событие воспроизведения: 2 мин назад/);
+assert.match(render({ ...context.signals!, lastPlayMinutesAgo: 2 }), /Последнее воспроизведение: 2 мин назад/);
 const nowMs = Date.parse("2026-10-14T12:00:00Z");
 const confirmed = { nowMs, playbackState: "playing" as const, playbackConfirmedAt: new Date(nowMs).toISOString() };
 assert.match(render(context.signals, { currentTrack: track, playbackConfirmation: confirmed }), /Реальный трек/);
@@ -86,7 +86,7 @@ assert.match(css, /@media \(min-width: 768px\)\s*\{\s*\.business-app-owner-compa
 for (const diagnostics of [anonymousSupportDiagnostics(), buildSupportDiagnostics({ hasUser: true, organizationId: "org", organizationName: "Организация", location: null, players: [{ playerId: "p", playerCode: "Плеер 1", displayName: null, playerStatus: "active", healthStatus: "online", secondsSinceHeartbeat: 12, lastHeartbeatAt: null, locationId: null, zoneId: null }], lastPlay: { occurredAt: "2026-10-14T12:00:00Z", minutesAgo: 0, audioItemId: null, playerId: "p", locationId: null } })]) {
   const html = renderToStaticMarkup(<BusinessSupportDiagnosticPage diagnostics={diagnostics} />);
   assert.match(html, /<h1[^>]*>Проверить работу музыки<\/h1>/);
-  for (const text of ["Воспроизведение не подтверждено", "Нет подтверждённых данных", "Количество плееров", "Последнее зарегистрированное событие воспроизведения"]) assert.ok(html.includes(text));
+  for (const text of ["Воспроизведение не подтверждено", "Нет подтверждённых данных", "Количество плееров", "Последнее воспроизведение"]) assert.ok(html.includes(text));
   assert.doesNotMatch(html, /is-stopped|is-healthy|biz-red-bg|Музыка играет/);
   if (diagnostics.players.length) {
     assert.match(html, /Плеер на связи/);
