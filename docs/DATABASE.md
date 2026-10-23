@@ -1888,6 +1888,7 @@ Tables: `business_location_rights_contexts`, `business_location_rights_context_u
 
 - Snapshots `country_code` + `business_category` from `business_locations`; profile country must match Location.
 - While an `active` Location Rights Context exists, `business_locations.country_code` / `business_category` cannot change (`active_location_rights_context_must_be_superseded`). V1 write order: supersede Context (server `ceased_at`) → UPDATE Location → create+activate new Context. No auto-supersede from Location.
+- Onboarding (`create_business_organization_with_location`) calls `business_ensure_location_rights_context(location_id)` in the same transaction (migration `20270122120000`): creates draft v1 and activates it only when the Location has no context history and its country has an active Country Profile whose `business_background_playback` rule is `supported` with `client_requirement = 'none'`; otherwise returns NULL and the venue stays fail-closed. Idempotent (row lock + existing active context returned), never supersedes, service_role only. The RPC returns `rights_context_id`.
 - Lifecycle/versioning mirrors Country Profile. One active context per Location. One linear context chain per Location: `UNIQUE(location_id, version)` plus the same root/predecessor/successor invariants.
 - `client_requirement_status`: not_required|confirmed|not_confirmed|unknown. Child rows immutable after parent leaves draft.
 

@@ -181,7 +181,7 @@ export default function SpaPilotPlayer({ programId, programName, initialManifest
       {status === "no_access" ? (
         <p className="mt-3" data-testid="spa-no-access">Доступ к музыке закрыт.</p>
       ) : items.length === 0 ? (
-        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков с подтверждёнными правами для заведений.</p>
+        <p className="mt-3 business-app-muted" data-testid="spa-empty">Подборка готовится – музыка появится здесь автоматически.</p>
       ) : (
         <>
           <div className="mt-4 flex flex-wrap items-center gap-3">

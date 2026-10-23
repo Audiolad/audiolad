@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { BUSINESS_VENUE_PROGRAM_KINDS } from "./venue-programs";
 import { summarizeSpaPlayback, type SpaPlaybackLogRow, type SpaTrackMinutes } from "./spa-admin-report";
 
 export type SpaAdminItem = {
@@ -58,7 +59,7 @@ export async function loadSpaAdminPrograms(): Promise<SpaAdminProgram[]> {
   const { data: programs, error } = await db
     .from("business_programs")
     .select("id, name, status, organization_id, business_organizations(name)")
-    .eq("kind", "spa")
+    .in("kind", [...BUSINESS_VENUE_PROGRAM_KINDS])
     .neq("status", "archived")
     .order("created_at", { ascending: true });
   if (error) throw new Error("business_spa_admin_load_failed");

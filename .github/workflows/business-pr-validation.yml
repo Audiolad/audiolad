@@ -61,6 +61,7 @@ jobs:
           npm run test:business-playback-attribution
           npm run test:business-rights-foundation
           npm run test:business-rights-eligibility
+          AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-onboarding-rights-context
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-rightsholder-onboarding
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:support-consent-block
           AUDIOLAD_REQUIRE_ONBOARDING_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-owner-self-moderation
@@ -79,6 +80,7 @@ jobs:
           AUDIOLAD_SKIP_ISOLATED_SQL=1 npm run test:business-royalty-ledger
           npm run test:business-spa-manifest
           npm run test:business-spa-admin
+          npm run test:business-venue-cafe-programs
           npm run test:business-spa-player-core
           npm run test:business-spa-player-engine
 

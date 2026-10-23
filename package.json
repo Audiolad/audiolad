@@ -432,6 +432,8 @@
     "test:business-consent-document-links": "npx tsx scripts/business-consent-document-links-unit.mts",
     "test:business-evidence-file-field": "npx tsx scripts/business-evidence-file-field-ui-unit.mts && NODE_OPTIONS='--import ./scripts/author-business-tab-test-register.mjs' npx tsx scripts/business-evidence-file-field-mounted-unit.tsx",
     "test:business-rights-eligibility": "node scripts/business-rights-eligibility-sql-unit.mjs",
+    "test:business-onboarding-rights-context": "node scripts/business-onboarding-rights-context-sql-unit.mjs",
+    "test:business-venue-cafe-programs": "npx tsx scripts/business-venue-cafe-programs-unit.mts",
     "test:scheduled-publication": "npx tsx scripts/scheduled-publication-unit.mts && node scripts/scheduled-publication-sql-unit.mjs",
     "test:live-public-content-sync": "npx tsx scripts/live-public-content-sync-unit.mts && node scripts/public-content-revision-sql-unit.mjs",
     "test:music-passport-basic": "node scripts/music-passport-basic-sql-unit.mjs && npx tsx scripts/music-passport-contract-unit.mts",
