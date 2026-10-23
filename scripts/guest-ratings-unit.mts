@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { RATING_ELIGIBILITY_LISTEN_MS } from "../src/lib/listen/listen-stats-constants";
 import { normalizeGuestListenerSearch } from "../src/lib/admin/analytics-ratings-listeners";
 import { evaluatePracticeRatingGate } from "../src/lib/ratings/eligibility";
 import {
@@ -25,6 +26,9 @@ import { claimGuestRatingsForUser } from "../src/lib/ratings/guest/claim-server"
 import {
   GUEST_RATING_ADMIN_NO_IP_SANCTION,
   formatGuestSessionAdminLabel,
+  formatGuestRatingNotEligibleCopy,
+  formatRussianSecondsAccusative,
+  GUEST_RATING_NOT_ELIGIBLE_COPY,
 } from "../src/lib/ratings/guest/copy";
 import {
   guestRatingsCaptchaProvider,
@@ -872,6 +876,21 @@ async function testClaimServerTouchesNoDbWhenOff() {
   assert.equal(calls[1].args.p_copy_to_account, true);
 }
 
+function testNotEligibleCopy() {
+  assert.equal(
+    GUEST_RATING_NOT_ELIGIBLE_COPY,
+    `Послушайте минимум ${formatRussianSecondsAccusative(RATING_ELIGIBILITY_LISTEN_MS / 1000)}, чтобы оставить свой отклик.`,
+  );
+  assert.equal(formatGuestRatingNotEligibleCopy(40_000), "Послушайте минимум 40 секунд, чтобы оставить свой отклик.");
+  assert.equal(formatGuestRatingNotEligibleCopy(30_000), "Послушайте минимум 30 секунд, чтобы оставить свой отклик.");
+  const cases: Array<[number, string]> = [
+    [1, "1 секунду"], [2, "2 секунды"], [4, "4 секунды"], [5, "5 секунд"],
+    [11, "11 секунд"], [12, "12 секунд"], [14, "14 секунд"], [21, "21 секунду"],
+    [22, "22 секунды"], [25, "25 секунд"], [101, "101 секунду"], [111, "111 секунд"],
+  ];
+  for (const [n, expected] of cases) assert.equal(formatRussianSecondsAccusative(n), expected);
+}
+
 async function main() {
   testFlagsDefaultOff();
   testSignedCookie();
@@ -883,6 +902,7 @@ async function main() {
   testClaimAggregateAndSegments();
   testSurfacesAndRegisteredRegression();
   testSourceContracts();
+  testNotEligibleCopy();
   await testClaimServerTouchesNoDbWhenOff();
   console.log("guest-ratings-unit: ok");
 }

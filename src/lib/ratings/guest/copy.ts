@@ -1,5 +1,24 @@
-export const GUEST_RATING_NOT_ELIGIBLE_COPY =
-  "Послушайте доступный фрагмент, чтобы оставить свой отклик.";
+import { RATING_ELIGIBILITY_LISTEN_MS } from "@/lib/listen/listen-stats-constants";
+
+/** Russian plural for «секунда» in the accusative: 1 секунду, 2 секунды, 5 секунд. */
+export function formatRussianSecondsAccusative(seconds: number): string {
+  const n = Math.abs(Math.trunc(seconds));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  let word = "секунд";
+  if (mod10 === 1 && mod100 !== 11) word = "секунду";
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "секунды";
+  return `${n} ${word}`;
+}
+
+export function formatGuestRatingNotEligibleCopy(
+  thresholdMs: number = RATING_ELIGIBILITY_LISTEN_MS,
+): string {
+  const seconds = Math.max(1, Math.ceil(thresholdMs / 1000));
+  return `Послушайте минимум ${formatRussianSecondsAccusative(seconds)}, чтобы оставить свой отклик.`;
+}
+
+export const GUEST_RATING_NOT_ELIGIBLE_COPY = formatGuestRatingNotEligibleCopy();
 
 export const GUEST_RATING_CAPTCHA_UNAVAILABLE_COPY =
   "Не удалось проверить, попробуйте позже.";
