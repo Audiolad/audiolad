@@ -104,8 +104,9 @@ const empty = venueAirplayEmptyStateCopy({
   probed: true,
   eligibleCount: 0,
 });
-assert.match(empty.title, /пуст/i);
-assert.match(empty.description, /нет треков с подтверждёнными правами/);
+assert.match(empty.title, /Подборка готовится/);
+// Owner rule: venues never see a claim that tracks lack confirmed rights.
+assert.doesNotMatch(`${empty.title} ${empty.description}`, /нет треков с подтверждёнными правами|пока пуста/);
 assert.match(empty.description, /Проверочный звук плеера.*не входит в музыкальную подборку/);
 assert.doesNotMatch(empty.description, /лицензирован/i);
 
