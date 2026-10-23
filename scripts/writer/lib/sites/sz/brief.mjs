@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 
+import { parseMaxRub } from "../../cost.mjs";
 import { readJson } from "../../util.mjs";
 import { SZ } from "./config.mjs";
 import { CONFLICTING_EXPERTS, defaultExpertPool, missingMix, rotationProblems } from "./experts.mjs";
@@ -34,6 +35,18 @@ export function normalizePack(raw, { baseDir = process.cwd(), pool = defaultExpe
   need(PACK_ID.test(pack), `pack: латиница/цифры/дефис, получено «${pack}»`, errors);
   const articles = list(raw?.articles);
   need(articles.length >= 1 && articles.length <= PACK_MAX, `articles: от 1 до ${PACK_MAX} статей, получено ${articles.length}`, errors);
+  // Pack limit tightens --max-rub; it must be a JSON number (not «3 ₽», not "3"), checked before any spend.
+  let maxRub = null;
+  if (raw?.maxRub !== undefined && raw?.maxRub !== null) {
+    if (typeof raw.maxRub !== "number") errors.push(`maxRub: нужно число рублей без кавычек и «₽» (например 3), получено «${raw.maxRub}»`);
+    else {
+      try {
+        maxRub = parseMaxRub(raw.maxRub, "maxRub");
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+  }
   if (raw?.publishedAt !== undefined) need(/^\d{4}-\d{2}-\d{2}$/.test(raw.publishedAt), "publishedAt: YYYY-MM-DD", errors);
   const out = articles.map((article, index) => normalizeArticleBrief(article, index, errors, baseDir, pool));
   const slugs = out.map((item) => item.slug);
@@ -45,7 +58,7 @@ export function normalizePack(raw, { baseDir = process.cwd(), pool = defaultExpe
   const bare = quotes.map((q) => q.slice(q.indexOf(":") + 1));
   for (const [i, q] of bare.entries()) need(bare.indexOf(q) === i, `цитата повторяется в пакете: «${q.slice(0, 50)}…»`, errors);
   if (errors.length) throw new Error(`Пакет-бриф не прошёл проверку:\n- ${errors.join("\n- ")}`);
-  return { pack, publishedAt: raw.publishedAt ?? null, maxRub: raw.maxRub ?? null, articles: out };
+  return { pack, publishedAt: raw.publishedAt ?? null, maxRub, articles: out };
 }
 
 function normalizeArticleBrief(raw, index, errors, baseDir, pool) {

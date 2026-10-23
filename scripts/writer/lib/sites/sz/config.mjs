@@ -9,7 +9,6 @@ export const SZ = {
   // Sergey's MAX rule: one MAX funnel per article – the site default link behind this label;
   // no ctaUrl, no max.ru / max-potok.ru in the text.
   maxLabel: "Выбрать ангела и получить послание в MAX",
-  maxUrl: "https://max.ru/id507305817690_bot?start=c1776857633467-ds",
   referenceGallerySlug: "kak-perestat-sebya-kritikovat",
   allAngelsImage: '<img src="/media/angels/four-angels-06-all-angels.webp" alt="Все четыре ангела вместе" width="1254" height="1254" loading="lazy">',
   // Same wording as angel-hranitel (stage 24); a brief may override it with `phones`.

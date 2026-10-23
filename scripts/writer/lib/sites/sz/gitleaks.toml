@@ -6,4 +6,4 @@ useDefault = true
 [allowlist]
 description = "sergey-zoya.ru checklist storage keys (slug-5-shagov) are not secrets"
 regexTarget = "line"
-regexes = ['''storageKey: [a-z0-9-]+-5-shagov\s*$''']
+regexes = ['''^\s*storageKey: [a-z0-9-]+-5-shagov\s*$''']

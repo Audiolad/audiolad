@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOpening, wireGate } from "./lib/sites/sz/apply.mjs";
 import { assembleSzArticle, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
+import { BudgetError, makeCaller } from "./lib/call.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ } from "./lib/sites/sz/config.mjs";
@@ -225,6 +226,28 @@ test("brief: expert outside the pool, unverified quote, wrong mix, Barrett + Ekm
     ];
   }, /спорят/);
   briefError((raw) => { raw.articles = Array.from({ length: 6 }, () => raw.articles[0]); }, /5|пакет/);
+});
+
+test("brief: maxRub must be a positive finite number ≤ ceiling – rejected before any spend", () => {
+  for (const bad of ["3 ₽", "3", "abc", Number.NaN, 0, -1, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1e9, true, {}, []]) {
+    briefError((raw) => { raw.maxRub = bad; }, /maxRub/);
+  }
+  const ok = clone();
+  ok.maxRub = 2.5;
+  assert.equal(normalizePack(ok, { baseDir: fixtures, pool }).maxRub, 2.5);
+  delete ok.maxRub;
+  assert.equal(normalizePack(ok, { baseDir: fixtures, pool }).maxRub, null);
+});
+
+test("budget: makeCaller refuses a non-finite or ≤ 0 limit, so the cap can never be switched off", () => {
+  let calls = 0;
+  const generate = () => { calls += 1; return { meta: {}, article: {} }; };
+  const base = { model: "x", maxTokens: 100, outDir: tmpdir(), runId: "t", state: { spentRub: 0, calls: [] }, schemaName: "s", generate };
+  for (const bad of [Number.NaN, 0, -1, Number.POSITIVE_INFINITY, "3", "3 ₽", undefined, null]) {
+    assert.throws(() => makeCaller({ ...base, maxRub: bad }), BudgetError);
+  }
+  assert.equal(calls, 0);
+  assert.equal(typeof makeCaller({ ...base, maxRub: 3 }), "function");
 });
 
 test("prompt: lessons, caution, siblings and tone sample reach the model", () => {

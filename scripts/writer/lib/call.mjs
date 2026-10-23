@@ -18,6 +18,9 @@ export class BudgetError extends Error {
 }
 
 export function makeCaller({ model, maxTokens, maxRub, outDir, runId, state, schemaName, generate = generateOnMoscow }) {
+  if (typeof maxRub !== "number" || !Number.isFinite(maxRub) || maxRub <= 0) {
+    throw new BudgetError(`бюджет: лимит должен быть положительным конечным числом рублей, получено «${maxRub}» – без лимита вызовы не делаются`);
+  }
   return function callWriter(callName, messages, schema) {
     const request = buildRequest(model, messages, schema, { maxTokens, schemaName });
     const worst = worstCaseRub(model, estimatePromptTokens(messages), maxTokens);
