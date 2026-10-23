@@ -25,6 +25,7 @@ export type ImageProcessErrorCode =
   | "invalid_file_type"
   | "corrupt_image"
   | "invalid_aspect_ratio"
+  | "not_square"
   | "image_too_large";
 
 export type ProcessedImageVariant = {

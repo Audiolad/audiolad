@@ -14,10 +14,15 @@ import {
   PRACTICE_COVERS_BUCKET,
   replaceAuthorGallerySlideImage,
 } from "@/lib/author-products/gallery";
+import {
+  cleanupCoverManifestWithinPrefix,
+  createPracticeImageWriteClient,
+  gallerySlidePrefix,
+  isGallerySlideId,
+} from "@/lib/author-products/cover-storage";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import {
-  cleanupImageManifest,
   primaryPublicUrl,
   uploadOptimizedImageSet,
 } from "@/lib/images/image-upload-service";
@@ -54,6 +59,16 @@ async function schedulePublishedGalleryIndexNow(
   );
 }
 
+function gallerySlideNotFoundResponse() {
+  return NextResponse.json(
+    {
+      error: "not_found",
+      message: getAuthorGalleryErrorMessage("not_found"),
+    },
+    { status: 404 },
+  );
+}
+
 function galleryNotSupportedResponse() {
   return NextResponse.json(
     {
@@ -67,6 +82,11 @@ function galleryNotSupportedResponse() {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { id, slideId } = await context.params;
+
+    if (!isGallerySlideId(slideId)) {
+      return gallerySlideNotFoundResponse();
+    }
+
     const { supabase, practice, user } = await requirePracticeMutationAccess(id);
     assertAuthorProductGalleryEligible(practice);
     await assertPracticePublicContentEditableForActor(
@@ -93,12 +113,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    // Gallery objects and slide image rows are server-only (1:1 is enforced
+    // here, migration 20270118120000). Access was checked above.
+    const writer = createPracticeImageWriteClient();
     const uploaded = await uploadOptimizedImageSet({
       profile: "product-gallery",
       bucket: PRACTICE_COVERS_BUCKET,
       buffer,
       declaredMime: file.type,
-      storage: supabase.storage,
+      storage: writer.storage,
       context: { practiceId: id, slideId },
     });
 
@@ -123,7 +146,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
 
     try {
-      const slide = await replaceAuthorGallerySlideImage(supabase, id, slideId, {
+      const slide = await replaceAuthorGallerySlideImage(writer, id, slideId, {
         imageUrl,
         imageManifest: uploaded.data.manifest,
       });
@@ -132,10 +155,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       return NextResponse.json({ slide, slides });
     } catch (error) {
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        writer,
         uploaded.data.manifest,
+        gallerySlidePrefix(id, slideId),
       );
 
       if (isGalleryNotFoundError(error)) {
@@ -162,6 +185,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id, slideId } = await context.params;
+
+    if (!isGallerySlideId(slideId)) {
+      return gallerySlideNotFoundResponse();
+    }
+
     const { supabase, practice, user } = await requirePracticeMutationAccess(id);
     assertAuthorProductGalleryEligible(practice);
     await assertPracticePublicContentEditableForActor(
@@ -171,7 +199,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
     );
 
     try {
-      const slides = await deleteAuthorGallerySlide(supabase, id, slideId);
+      const slides = await deleteAuthorGallerySlide(
+        createPracticeImageWriteClient(),
+        id,
+        slideId,
+      );
       await schedulePublishedGalleryIndexNow(supabase, practice);
       return NextResponse.json({ slides });
     } catch (error) {

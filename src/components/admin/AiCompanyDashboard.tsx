@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -16,7 +17,14 @@ import {
   validateRejectionComment,
   type AcceptanceDecision,
 } from "@/lib/admin/ai-company-acceptance";
-import { NO_DATA, historyHref, type LifecycleAction, type OwnerCommentView } from "@/lib/admin/ai-company-dashboard";
+import {
+  ARCHIVE_PAGE_SIZE,
+  NO_DATA,
+  historyHref,
+  type LifecycleAction,
+  type OwnerCommentView,
+} from "@/lib/admin/ai-company-dashboard";
+
 import {
   EVIDENCE_REFERENCE_HINT,
   EVIDENCE_TYPES,
@@ -45,6 +53,10 @@ import type {
   TodayRowModel,
   WorkEventModel,
 } from "@/lib/admin/ai-company-dashboard";
+
+function withArchiveTab(href: string): string {
+  return `${href}${href.includes("?") ? "&" : "?"}tab=archive`;
+}
 
 const CONNECTION_CLASS: Record<ExecutorCard["connection"], string> = {
   verified: "border-green-200 bg-green-50",
@@ -1240,8 +1252,14 @@ export function AiCompanyDashboardView({
     plan: model?.plan.length ?? 0,
     working: (model?.activeTasks.length ?? 0) + (model?.queue.length ?? 0) + (model?.decisions.length ?? 0),
     review: ownerReview.length,
-    archive: (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0) + (model?.cancelledArchive?.length ?? 0),
+    // Core counts archived tasks over the whole table; the loaded lists are only a window of them.
+    archive:
+      model?.boardCounts?.archive ??
+      (model?.acceptedArchive.length ?? 0) + (model?.closedCount ?? 0) + (model?.cancelledArchive?.length ?? 0),
   };
+  const archivePage = model?.archivePage ?? null;
+  const archiveMoreHref =
+    archivePage?.nextLimit != null ? withArchiveTab(historyHref(filters, { archiveLimit: archivePage.nextLimit, historyBefore: filters.historyBefore || undefined })) : null;
   function selectTab(next: BoardTab) {
     setTab(next);
     if (typeof window !== "undefined") {
@@ -1423,10 +1441,10 @@ export function AiCompanyDashboardView({
                   <h3 id="ai-company-executors" className="text-xl font-semibold">
                     Исполнители
                   </h3>
-                  <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке — подключение и занятость по фактам Company Core.</p>
+                  <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке – подключение и занятость по фактам Company Core.</p>
                   <HelpNote label="Справка об исполнителях">
                     <p>
-                      Подключение: проверено, недоступно, не удалось проверить, данные устарели или нет данных. Нет данных — это не «отключён». Занятость: выполняет задачу, ожидает, свободен или неизвестно. Запуск считается текущим, только если прогресс подтверждён за последние 60 минут. Grok — единственный оркестратор. Модель Grok внутри Cursor остаётся Cursor.
+                      Подключение: проверено, недоступно, не удалось проверить, данные устарели или нет данных. Нет данных – это не «отключён». Занятость: выполняет задачу, занят N из M, ожидает, свободен или неизвестно. Codex занят, пока на его сервере идёт хотя бы один процесс codex exec (проба раз в минуту); «свободен» – только когда процессов нет. Запуск считается текущим, только если прогресс подтверждён за последние 60 минут. Grok – единственный оркестратор. Модель Grok внутри Cursor остаётся Cursor.
                     </p>
                   </HelpNote>
                   <div className="mt-2 flex flex-col gap-1.5">
@@ -1461,6 +1479,19 @@ export function AiCompanyDashboardView({
                           </dl>
                           <div className="mt-3 text-sm" data-executor-runs={executor.id}>
                             <p className="font-semibold">{executor.activeRunsLabel}</p>
+                            {executor.sessions.length > 0 ? (
+                              <ul className="mt-1 space-y-2" data-executor-sessions={executor.id}>
+                                {executor.sessions.map((session) => (
+                                  <li key={session.key} className="rounded-lg border border-[#eadff8] bg-white p-2" data-session-task={session.taskId ?? ""}>
+                                    <p className="break-words font-medium">
+                                      {session.taskHref ? <a className="text-[#7042c5] underline" href={session.taskHref}>{session.task}</a> : session.task}
+                                    </p>
+                                    <p className="break-words text-[#796ba0]">{session.mode} · начата {session.started} · {session.elapsed}</p>
+                                    <p className="break-words text-[#796ba0]">{session.registration}</p>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
                             {executor.activeRuns.length > 0 ? (
                               <ul className="mt-1 space-y-2">
                                 {executor.activeRuns.map((run) => (
@@ -1602,6 +1633,13 @@ export function AiCompanyDashboardView({
           </div>
 
           <div role="tabpanel" id="ai-company-tab-archive" aria-labelledby="ai-company-tabbtn-archive" data-tab-panel="archive" hidden={tab !== "archive"} className="space-y-5">
+          {archivePage ? (
+            <p className="rounded-xl border border-[#eadff8] bg-white p-3 text-sm text-[#796ba0]" role="status" data-archive-window>
+              {archivePage.total != null
+                ? `Загружено из Company Core: ${Math.min(archivePage.loaded, archivePage.total)} из ${archivePage.total} архивных задач (новые сверху).`
+                : `Загружено из Company Core: ${archivePage.loaded} архивных задач (новые сверху).`}
+            </p>
+          ) : null}
           <section aria-labelledby="ai-company-accepted" data-section="accepted">
             <h3 id="ai-company-accepted" className="text-xl font-semibold">
               Архив / Принятые
@@ -1674,6 +1712,9 @@ export function AiCompanyDashboardView({
             <p className="mt-1 text-sm text-[#796ba0]">{model.historyBoundary}</p>
             <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap" method="get">
               <input type="hidden" name="tab" value="archive" />
+              {(filters.archiveLimit ?? ARCHIVE_PAGE_SIZE) > ARCHIVE_PAGE_SIZE ? (
+                <input type="hidden" name="archive_limit" value={String(filters.archiveLimit)} />
+              ) : null}
               <label className="flex min-w-0 flex-col gap-1 text-xs text-[#796ba0]">
                 Период
                 <select name="period" defaultValue={filters.period} className="rounded-lg border border-[#eadff8] bg-white p-2 text-sm text-[#25135c]">
@@ -1731,6 +1772,23 @@ export function AiCompanyDashboardView({
               <a className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={`${nextHistory}${nextHistory.includes("?") ? "&" : "?"}tab=archive`}>
                 Следующая страница истории
               </a>
+            ) : null}
+            {archiveMoreHref ? (
+              <div id="ai-company-archive-more" className="mt-3" data-archive-more>
+                <Link
+                  className="inline-flex min-h-11 items-center rounded-lg border border-[#d9c8f5] bg-white px-4 py-2 text-sm font-semibold text-[#7042c5]"
+                  href={archiveMoreHref}
+                  scroll={false}
+                  data-archive-more-link
+                >
+                  Показать ещё
+                </Link>
+                <p className="mt-1 text-xs text-[#796ba0]">
+                  {archivePage?.nextLimit === (filters.archiveLimit ?? ARCHIVE_PAGE_SIZE)
+                    ? "Часть архива не загрузилась – повторить загрузку с сохранением фильтров."
+                    : `Следующие ${ARCHIVE_PAGE_SIZE} архивных задач – с сохранением фильтров.`}
+                </p>
+              </div>
             ) : null}
             {model.archivedBlockers.length ? (
               <div className="mt-4" data-section="archived">
