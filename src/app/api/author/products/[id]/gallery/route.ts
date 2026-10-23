@@ -16,11 +16,15 @@ import {
   listAuthorGallerySlides,
   PRACTICE_COVERS_BUCKET,
 } from "@/lib/author-products/gallery";
+import {
+  cleanupCoverManifestWithinPrefix,
+  createPracticeImageWriteClient,
+  gallerySlidePrefix,
+} from "@/lib/author-products/cover-storage";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import { CATALOG_GALLERY_MAX_SLIDES } from "@/lib/catalog/gallery";
 import {
-  cleanupImageManifest,
   primaryPublicUrl,
   uploadOptimizedImageSet,
 } from "@/lib/images/image-upload-service";
@@ -133,13 +137,16 @@ export async function POST(request: Request, context: RouteContext) {
 
     const slideId = randomUUID();
     const buffer = Buffer.from(await file.arrayBuffer());
+    // Gallery objects and slide image rows are server-only (1:1 is enforced
+    // here, migration 20270118120000). Access was checked above.
+    const writer = createPracticeImageWriteClient();
 
     const uploaded = await uploadOptimizedImageSet({
       profile: "product-gallery",
       bucket: PRACTICE_COVERS_BUCKET,
       buffer,
       declaredMime: file.type,
-      storage: supabase.storage,
+      storage: writer.storage,
       context: { practiceId: id, slideId },
     });
 
@@ -164,7 +171,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
 
     try {
-      const slide = await insertAuthorGallerySlide(supabase, {
+      const slide = await insertAuthorGallerySlide(writer, {
         id: slideId,
         publicationId: id,
         imageUrl,
@@ -176,10 +183,10 @@ export async function POST(request: Request, context: RouteContext) {
 
       return NextResponse.json({ slide, slides });
     } catch (error) {
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        writer,
         uploaded.data.manifest,
+        gallerySlidePrefix(id, slideId),
       );
 
       if (isGalleryLimitError(error)) {

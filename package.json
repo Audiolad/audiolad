@@ -351,7 +351,7 @@
     "test:guest-resume-session-gate": "node scripts/guest-resume-session-gate-unit.mjs",
     "run:studio-guest-cleanup": "npx tsx scripts/run-studio-guest-cleanup.mts",
     "test:avatar-mobile-upload": "npx tsx scripts/avatar-mobile-upload-unit.mjs",
-    "test:product-cover-square": "npx tsx scripts/product-cover-square-unit.mjs && npx tsx scripts/practice-cover-storage-unit.mts && node scripts/practice-covers-storage-policy-sql-unit.mjs",
+    "test:product-cover-square": "npx tsx scripts/product-cover-square-unit.mjs && npx tsx scripts/practice-cover-storage-unit.mts && node scripts/practice-covers-storage-policy-sql-unit.mjs && npx tsx scripts/cover-columns-server-only-unit.mts && node scripts/cover-columns-server-only-sql-unit.mjs",
     "test:kak-prodat-muzyku-sozdannuyu-ii": "npx tsx scripts/kak-prodat-muzyku-sozdannuyu-ii-page-unit.mjs",
     "test:mozhno-li-zarabotat-na-ii-muzyke": "npx tsx scripts/mozhno-li-zarabotat-na-ii-muzyke-page-unit.mjs",
     "test:kuda-vykladyvat-muzyku-iz-suno": "npx tsx scripts/kuda-vykladyvat-muzyku-iz-suno-page-unit.mjs",

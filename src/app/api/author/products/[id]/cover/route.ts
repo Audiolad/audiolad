@@ -9,8 +9,9 @@ import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
 import {
   cleanupCoverManifestWithinPrefix,
-  createPracticeCoverStorageClient,
+  createPracticeImageWriteClient,
   PRACTICE_COVERS_BUCKET,
+  writePracticeCoverColumns,
   productCoverVariantPrefix,
 } from "@/lib/author-products/cover-storage";
 import { removePracticeCoverFiles } from "@/lib/author-products/utils";
@@ -68,29 +69,27 @@ export async function DELETE(_request: Request, context: RouteContext) {
       .eq("id", id)
       .maybeSingle();
 
-    // Cover objects are server-only in Storage (1:1 is enforced here).
-    const coverStorage = createPracticeCoverStorageClient();
-    await removePracticeCoverFiles(coverStorage, id);
+    // Cover objects and cover columns are server-only (1:1 is enforced
+    // here; migrations 20270117120000 and 20270118120000).
+    const coverWriter = createPracticeImageWriteClient();
+    await removePracticeCoverFiles(coverWriter, id);
 
     if (existing?.cover_image) {
       await cleanupCoverManifestWithinPrefix(
-        coverStorage,
+        coverWriter,
         parseImageManifest(existing.cover_image),
         productCoverVariantPrefix(id),
       );
     }
 
-    const { error: updateError } = await supabase
-      .from("practices")
-      .update({
-        cover_url: null,
-        cover_image: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+    const cleared = await writePracticeCoverColumns(coverWriter, id, {
+      cover_url: null,
+      cover_image: null,
+      updated_at: new Date().toISOString(),
+    });
 
-    if (updateError) {
-      console.error("author_cover_delete_error", updateError.message);
+    if (!cleared.ok) {
+      console.error("author_cover_delete_error", cleared.error);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
@@ -133,15 +132,16 @@ export async function POST(request: Request, context: RouteContext) {
       .maybeSingle();
 
     const previousManifest = parseImageManifest(previousRow?.cover_image);
-    // Cover objects are server-only in Storage (1:1 is enforced here).
-    const coverStorage = createPracticeCoverStorageClient();
+    // Cover objects and cover columns are server-only (1:1 is enforced
+    // here; migrations 20270117120000 and 20270118120000).
+    const coverWriter = createPracticeImageWriteClient();
 
     const uploaded = await uploadOptimizedImageSet({
       profile: "product-cover",
       bucket: PRACTICE_COVERS_BUCKET,
       buffer,
       declaredMime: file.type,
-      storage: coverStorage.storage,
+      storage: coverWriter.storage,
       context: { practiceId: id },
     });
 
@@ -165,19 +165,16 @@ export async function POST(request: Request, context: RouteContext) {
       now,
     );
 
-    const { error: updateError } = await supabase
-      .from("practices")
-      .update({
-        cover_url: coverUrl,
-        cover_image: uploaded.data.manifest,
-        updated_at: now,
-      })
-      .eq("id", id);
+    const written = await writePracticeCoverColumns(coverWriter, id, {
+      cover_url: coverUrl,
+      cover_image: uploaded.data.manifest,
+      updated_at: now,
+    });
 
-    if (updateError) {
-      console.error("author_cover_update_error", updateError.message);
+    if (!written.ok) {
+      console.error("author_cover_update_error", written.error);
       await cleanupCoverManifestWithinPrefix(
-        coverStorage,
+        coverWriter,
         uploaded.data.manifest,
         productCoverVariantPrefix(id),
       );
@@ -186,13 +183,13 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (previousManifest) {
       await cleanupCoverManifestWithinPrefix(
-        coverStorage,
+        coverWriter,
         previousManifest,
         productCoverVariantPrefix(id),
       );
     }
 
-    await removePracticeCoverFiles(coverStorage, id);
+    await removePracticeCoverFiles(coverWriter, id);
 
     const product = await getAuthorProductDetail(supabase, id);
     await schedulePublishedCoverIndexNow(supabase, practice);
