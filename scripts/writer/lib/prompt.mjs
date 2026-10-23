@@ -198,7 +198,7 @@ export function buildRequest(model, messages, schema, options = {}) {
     stream: false,
     response_format: {
       type: "json_schema",
-      json_schema: { name: "audiolad_practice_article", strict: true, schema },
+      json_schema: { name: options.schemaName ?? "audiolad_practice_article", strict: true, schema },
     },
   };
 }
