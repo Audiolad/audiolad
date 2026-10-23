@@ -50,9 +50,12 @@ Production deploy applies pending migrations automatically
 applies the policy change – this needs a separate approval.
 
 Deploy order: the app code and the migration ship together. The new code works
-with both the old and the new policies (service_role bypasses RLS), so the app
-can be deployed first; the migration must not be applied before the new app
-code is live, otherwise the old routes would fail to write covers.
+with both the old and the new policies (service_role bypasses RLS). The
+standard deploy (`deploy.sh`) applies pending migrations first and only then
+switches traffic to the new app code. So for a short window between the
+migration and the switch-over the old code is still live and its cover routes
+(user-scoped client) cannot upload product/track covers. The window ends when
+the new release is live; no extra step is needed.
 
 ## Verification after deploy (read-only)
 
