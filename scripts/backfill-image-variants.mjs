@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Safe idempotent backfill for **practice product cover** variant manifests only.
+ * Product covers must already be square (1:1). Rectangular legacy files are reported as failed.
  *
  * Supported --type: product-cover (default).
  * Follow-up work is required before track/avatar/banner/playlist backfill.

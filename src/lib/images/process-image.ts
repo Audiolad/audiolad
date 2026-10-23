@@ -20,6 +20,7 @@ import type {
 } from "@/lib/images/image-types";
 import {
   isAvatarImageProfile,
+  orientedDimensions,
   validateImageBufferForProfile,
   validateImageDimensions,
 } from "@/lib/images/validate-image";
@@ -106,14 +107,36 @@ export async function processImageForProfile(
 
     const width = meta.width ?? 0;
     const height = meta.height ?? 0;
-    const dimensionError = validateImageDimensions(width, height, profile);
+    const oriented = orientedDimensions(width, height, meta.orientation);
+    const dimensionError = validateImageDimensions(
+      oriented.width,
+      oriented.height,
+      profile,
+    );
 
     if (dimensionError) {
       return { ok: false, code: dimensionError };
     }
 
     const hasAlpha = meta.hasAlpha === true;
-    const rotated = buildSharpInput(working, profile).rotate();
+    let sourceWidth = width;
+    let sourceHeight = height;
+    let base = buildSharpInput(working, profile).rotate();
+
+    if (profile === "product-cover" || profile === "track-cover") {
+      const side = Math.min(oriented.width, oriented.height);
+      const left = Math.max(0, Math.floor((oriented.width - side) / 2));
+      const top = Math.max(0, Math.floor((oriented.height - side) / 2));
+      base = base.extract({
+        left,
+        top,
+        width: side,
+        height: side,
+      });
+      sourceWidth = side;
+      sourceHeight = side;
+    }
+
     const variants: ProcessedImageVariant[] = [];
 
     for (const spec of config.variants) {
@@ -124,9 +147,7 @@ export async function processImageForProfile(
       };
 
       const encoded = await encodeVariant(
-        rotated
-          .clone()
-          .resize(spec.width, spec.height, resizeOptions),
+        base.clone().resize(spec.width, spec.height, resizeOptions),
         spec.quality,
         hasAlpha,
       );
@@ -153,13 +174,11 @@ export async function processImageForProfile(
     if (config.includePlaceholder) {
       const placeholderSpec = getPlaceholderSpec();
       const placeholderEncoded = await encodeVariant(
-        buildSharpInput(working, profile)
-          .rotate()
-          .resize(placeholderSpec.width, placeholderSpec.height, {
-            fit: "cover",
-            position: "centre",
-            withoutEnlargement: true,
-          }),
+        base.clone().resize(placeholderSpec.width, placeholderSpec.height, {
+          fit: "cover",
+          position: "centre",
+          withoutEnlargement: true,
+        }),
         placeholderSpec.quality,
         hasAlpha,
       );
@@ -194,8 +213,8 @@ export async function processImageForProfile(
       data: {
         profile,
         versionId,
-        sourceWidth: width,
-        sourceHeight: height,
+        sourceWidth,
+        sourceHeight,
         originalBuffer: skipOriginal ? Buffer.alloc(0) : input,
         originalExtension: validated.data.originalExtension,
         variants,
@@ -242,6 +261,11 @@ export function imageProcessErrorMessage(
         return "Загрузите квадратное изображение 1:1 не меньше 400 × 400 пикселей.";
       }
       return "Минимальный размер изображения — 400 × 400 пикселей.";
+    case "not_square":
+      if (profile === "product-cover" || profile === "track-cover") {
+        return "Загрузите квадратную обложку (соотношение сторон 1:1)";
+      }
+      return "Загрузите квадратное изображение (соотношение сторон 1:1).";
     case "image_too_large":
       if (profile === "author-avatar" || profile === "user-avatar") {
         return AVATAR_ERROR_MESSAGES.resolutionTooLarge;

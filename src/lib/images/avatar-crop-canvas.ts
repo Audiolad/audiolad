@@ -37,14 +37,19 @@ function detectAlphaChannel(
   return false;
 }
 
-function buildOutputFileName(mimeType: AvatarCropOutput["mimeType"]): string {
+function buildOutputFileName(
+  mimeType: AvatarCropOutput["mimeType"],
+  fileBase = "avatar",
+): string {
+  const safeBase = fileBase.trim() || "avatar";
+
   switch (mimeType) {
     case "image/png":
-      return "avatar.png";
+      return `${safeBase}.png`;
     case "image/jpeg":
-      return "avatar.jpg";
+      return `${safeBase}.jpg`;
     default:
-      return "avatar.webp";
+      return `${safeBase}.webp`;
   }
 }
 
@@ -54,6 +59,7 @@ export async function cropAvatarToBlob(
   options?: {
     sourceMime?: string;
     maxOutputSize?: number;
+    fileBase?: string;
   },
 ): Promise<AvatarCropOutput> {
   const bitmap = await loadOrientedImageBitmap(source);
@@ -107,7 +113,10 @@ export async function cropAvatarToBlob(
 
     return {
       blob,
-      fileName: buildOutputFileName(blob.type as AvatarCropOutput["mimeType"]),
+      fileName: buildOutputFileName(
+        blob.type as AvatarCropOutput["mimeType"],
+        options?.fileBase,
+      ),
       mimeType: blob.type as AvatarCropOutput["mimeType"],
       width: outputSize,
       height: outputSize,
