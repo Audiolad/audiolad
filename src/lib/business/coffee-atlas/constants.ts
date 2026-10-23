@@ -1,4 +1,6 @@
+import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { BUSINESS_GUEST_COFFEE_URL } from "@/lib/business-app/host";
+import { BUSINESS_PLAN_PERIOD_LABEL, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { BUSINESS_LANDING_PATH } from "@/lib/business/landing";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
@@ -37,9 +39,9 @@ export const COFFEE_ATLAS_CTA_HREF = BUSINESS_GUEST_COFFEE_URL;
 /** AudioLad Business offer printed at the bottom of every atlas page. */
 export const COFFEE_ATLAS_OFFER = {
   title: "АудиоЛад Бизнес для вашей кофейни",
-  price: "799 ₽",
-  period: "в месяц",
-  trial: "Первые 7 дней – бесплатно",
+  price: formatBusinessMonthlyPrice(),
+  period: BUSINESS_PLAN_PERIOD_LABEL,
+  trial: BUSINESS_GIFT_TITLE,
   rights: "Лицензионная музыка с соблюдением прав авторов",
   rightsHref: `${BUSINESS_LANDING_PATH}/prava`,
 } as const;

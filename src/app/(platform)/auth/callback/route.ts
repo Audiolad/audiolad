@@ -1,4 +1,5 @@
-import { getSafeNextPath } from "@/lib/auth/routes";
+import { BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
+import { resolveValidatedNextPath } from "@/lib/auth/routes";
 import { bindPracticePricePromotionStarts } from "@/lib/pricing/rpc";
 import { readPriceVisitorId } from "@/lib/pricing/visitor";
 import { buildPublicRedirectUrl } from "@/lib/seo/app-origin";
@@ -8,7 +9,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = getSafeNextPath(url.searchParams.get("next"), "/profile");
+  const explicitNext = resolveValidatedNextPath(url.searchParams.get("next"));
 
   if (!code) {
     return NextResponse.redirect(
@@ -38,6 +39,11 @@ export async function GET(request: Request) {
       userId: user.id,
     });
   }
+
+  const metadataTrial =
+    user?.user_metadata &&
+    (user.user_metadata as { business_trial?: unknown }).business_trial === "1";
+  const next = explicitNext ?? (metadataTrial ? BUSINESS_TRIAL_RETURN_PATH : "/profile");
 
   return NextResponse.redirect(buildPublicRedirectUrl(next, request));
 }

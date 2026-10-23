@@ -187,7 +187,7 @@ assert.equal(COFFEE_ATLAS_CTA_HREF, "https://business.audiolad.ru/guest/coffee")
 
 // --- offer on every page ---
 assert.equal(COFFEE_ATLAS_OFFER.price, "799 ₽");
-assert.match(COFFEE_ATLAS_OFFER.trial, /7 дней – бесплатно/);
+assert.match(COFFEE_ATLAS_OFFER.trial, /30 дней в подарок/);
 assert.match(COFFEE_ATLAS_OFFER.rights, /Лицензионная музыка/);
 const overview = read("src/components/business/coffee-atlas/CoffeeAtlasOverview.tsx");
 const shopView = read("src/components/business/coffee-atlas/CoffeeAtlasShopView.tsx");

@@ -2,7 +2,11 @@
 
 import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { BUSINESS_REGISTERED_NOTE } from "@/lib/access-grants/copy";
+import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
+import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
+import { helpArticlePath } from "@/lib/help/paths";
 import { PASSWORD_RESET_SUCCESS_MESSAGE } from "@/lib/auth/recovery-messages";
 import {
   SIGN_IN_GENERIC_ERROR,
@@ -82,9 +86,20 @@ function SignInForm() {
 
         {isRegistered && (
           <div className="mt-8 rounded-[18px] border border-[#cfe8d9] bg-[#f3fbf6] px-4 py-4 text-sm leading-6 text-[#3d8d65]">
-            Регистрация прошла успешно.
-            <br />
-            Теперь войдите в аккаунт.
+            {isBusinessTrialNext(searchParams.get("next")) ? (
+              <>
+                {BUSINESS_REGISTERED_NOTE}{" "}
+                <Link href={helpArticlePath(emailNotReceivedArticle)} className="font-semibold underline">
+                  Письмо не пришло
+                </Link>
+              </>
+            ) : (
+              <>
+                Регистрация прошла успешно.
+                <br />
+                Теперь войдите в аккаунт.
+              </>
+            )}
           </div>
         )}
 

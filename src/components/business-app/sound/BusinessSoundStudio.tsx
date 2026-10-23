@@ -7,6 +7,8 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
+import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
+import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { BUSINESS_CONNECT_HREF, resolveBusinessAccess } from "@/lib/business-app/access";
 import {
   assembleGuestCoffeeAtmosphere,
@@ -387,9 +389,14 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               <h3 className="text-[1.05rem] font-bold text-[var(--biz-text)]">{GUEST_COFFEE_COPY.exhaustedTitle}</h3>
               <p className="mt-1 text-[var(--biz-text-muted)]">{guest ? GUEST_COFFEE_COPY.exhaustedText : GUEST_COFFEE_COPY.exhaustedMember}</p>
               {guest ? (
-                <Link href={BUSINESS_CONNECT_HREF} className="mt-3 business-app-btn business-app-btn-primary business-app-focus-ring">
-                  Подключить
-                </Link>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a href={BUSINESS_TRIAL_SIGN_UP_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-trial-cta">
+                    {BUSINESS_GIFT_CTA}
+                  </a>
+                  <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring">
+                    Подключить
+                  </Link>
+                </div>
               ) : null}
             </div>
           ) : null}

@@ -37,7 +37,8 @@ export const BUSINESS_LOCKED_LABEL = "доступно после подключ
 /**
  * «Подключить»: the real path inside this same cabinet – sign-in (shared .audiolad.ru
  * session) and point creation (/onboarding → create_business_organization_with_location).
- * The coffee-shop type is preselected. Online trial activation and payment do not exist yet.
+ * The coffee-shop type is preselected. The 30-day gift lives in src/lib/access-grants
+ * (tasks ba344b7f and 1e008ee8). This href only opens point connection.
  */
 export const BUSINESS_CONNECT_HREF = "/onboarding?type=cafe";
 

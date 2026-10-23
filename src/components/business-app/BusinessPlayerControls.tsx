@@ -16,6 +16,10 @@ type Props = {
   /** Starting playback is not allowed (pausing always is). */
   startDisabled?: boolean;
   nextDisabled?: boolean;
+  /** Label while audio is playing. The guest player keeps «Пауза». */
+  pauseLabel?: string;
+  volume?: number;
+  onVolume?: (value: number) => void;
 };
 
 export default function BusinessPlayerControls({
@@ -27,6 +31,9 @@ export default function BusinessPlayerControls({
   onNext,
   startDisabled = false,
   nextDisabled = false,
+  pauseLabel = "Пауза",
+  volume,
+  onVolume,
 }: Props) {
   const active = playing || loading;
   return (
@@ -38,7 +45,7 @@ export default function BusinessPlayerControls({
         disabled={!active && startDisabled}
         className="business-app-btn business-app-btn-primary business-app-focus-ring"
       >
-        {active ? "Пауза" : "Играть"}
+        {active ? pauseLabel : "Играть"}
       </button>
       <button
         type="button"
@@ -49,6 +56,23 @@ export default function BusinessPlayerControls({
       >
         Следующий
       </button>
+      {onVolume ? (
+        <label className="business-workspace-volume">
+          <span className="business-app-muted">Громкость</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={volume ?? 0.8}
+            onChange={(event) => onVolume(Number(event.target.value))}
+            data-testid={`${testIdPrefix}-volume`}
+            aria-valuemin={0}
+            aria-valuemax={1}
+            aria-valuenow={volume ?? 0.8}
+          />
+        </label>
+      ) : null}
       <span className="business-app-muted" data-testid={`${testIdPrefix}-now`}>
         {loading ? "Загрузка…" : nowTitle ?? ""}
       </span>

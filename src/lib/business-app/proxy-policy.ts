@@ -26,6 +26,9 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   // a8240527: guest coffee cabinet (no account; server-side 30-minute listening limit).
   "/api/business/guest/coffee/track-url",
   "/api/business/guest/coffee/usage",
+  // ba344b7f: workspace player. The gift gate and the rights filter run inside the handlers.
+  "/api/business/workspace/track-url",
+  "/api/business/workspace/state",
 ] as const;
 
 /**

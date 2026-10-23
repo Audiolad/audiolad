@@ -105,7 +105,8 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /aria-label="Точки – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
   has(g, /В гостевом режиме доступно 30 минут прослушивания/);
-  has(g, /Первые 7 дней – в подарок, затем 799\u00a0₽ в месяц/);
+  has(g, /30 дней в подарок, затем 799\u00a0₽ в месяц/);
+  has(g, /data-testid="biz-trial-cta"/, "gift CTA is on the guest bar before the limit");
   assert.ok(anchors(g, "/onboarding?type=cafe").some((t) => t.includes('data-testid="biz-connect"')), "Подключить → real onboarding");
   hasCurrentLink(g, "/guest/coffee", "Music is the current section");
   hasNot(g, /href="\/(locations|stats|documents|team|preferences|player|announcements)"/, "no link into protected sections");
@@ -155,6 +156,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   const g = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   has(g, /data-testid="biz-sound-exhausted"/);
   has(g, /Гостевое прослушивание завершено/);
+  has(g, /Получить 30 дней бесплатно/, "gift CTA stays after the 30-minute limit");
   has(g, /href="\/onboarding\?type=cafe"/, "exhausted → real connect path");
   const m = wrap(member, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   hasNot(m, /href="\/onboarding/);
