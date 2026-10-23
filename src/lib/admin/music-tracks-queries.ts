@@ -1,3 +1,4 @@
+import { practiceAffectsPublicSurface } from "@/lib/public-content/live-sync";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 type ServiceClient = ReturnType<typeof createServiceRoleClient>;
@@ -5,6 +6,7 @@ type ServiceClient = ReturnType<typeof createServiceRoleClient>;
 export type AdminMusicTrackRow = {
   id: string;
   trackCode: string;
+  isPublished: boolean;
   title: string;
   position: number;
   artistId: string;
@@ -18,6 +20,11 @@ type PracticeRow = {
   id: string;
   title: string;
   author_id: string;
+  status: string;
+  scheduled_publish_at: string | null;
+  published_at: string | null;
+  deleted_at: string | null;
+  catalog_visibility: string | null;
 };
 
 type AuthorRow = {
@@ -32,6 +39,7 @@ type AudioRow = {
   title: string;
   position: number;
   music_track_code: string | null;
+  status: string;
 };
 
 const PAGE_SIZE = 1000;
@@ -65,7 +73,9 @@ async function loadAllMusicPractices(
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await service
       .from("practices")
-      .select("id, title, author_id")
+      .select(
+        "id, title, author_id, status, scheduled_publish_at, published_at, deleted_at, catalog_visibility",
+      )
       .eq("product_kind", "music")
       .is("deleted_at", null)
       .order("id", { ascending: true })
@@ -118,7 +128,7 @@ async function loadAudioItems(
     for (let from = 0; ; from += PAGE_SIZE) {
       const { data, error } = await service
         .from("audio_items")
-        .select("id, practice_id, title, position, music_track_code")
+        .select("id, practice_id, title, position, music_track_code, status")
         .in("practice_id", ids)
         .order("practice_id", { ascending: true })
         .order("position", { ascending: true })
@@ -163,6 +173,8 @@ export async function listAdminMusicTracks(
     practices.map((practice) => practice.id),
   );
 
+  const atMs = Date.now();
+
   return audioItems
     .filter(
       (item): item is AudioRow & { music_track_code: string } =>
@@ -181,6 +193,15 @@ export async function listAdminMusicTracks(
       return {
         id: item.id,
         trackCode: item.music_track_code.trim(),
+        isPublished:
+          item.status === "published" &&
+          practiceAffectsPublicSurface({
+            status: practice.status,
+            scheduledPublishAt: practice.scheduled_publish_at,
+            publishedAt: practice.published_at,
+            deletedAt: practice.deleted_at,
+            catalogVisibility: practice.catalog_visibility,
+          }, atMs),
         title: item.title?.trim() || "Без названия",
         position: item.position,
         artistId: practice.author_id,
