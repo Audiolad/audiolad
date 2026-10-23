@@ -3,18 +3,14 @@ export type AdminOverviewSection<T> =
   | { status: "failed" }
   | { status: "skipped" };
 
-export type AdminOverviewSections<TStats, TAnalytics, TCommercial, TAuthors> = {
+export type AdminOverviewSections<TStats, TAnalytics> = {
   stats: AdminOverviewSection<TStats>;
   analytics: AdminOverviewSection<TAnalytics>;
-  commercial: AdminOverviewSection<TCommercial>;
-  authors: AdminOverviewSection<TAuthors>;
 };
 
 export const ADMIN_OVERVIEW_SECTION_ERRORS = {
   stats: "Не удалось загрузить операционные показатели.",
   analytics: "Не удалось загрузить аналитику.",
-  authors: "Не удалось загрузить заявки авторов.",
-  commercial: "Не удалось загрузить коммерческие заявки.",
 } as const;
 
 type OverviewRetryParams = {
@@ -76,36 +72,19 @@ async function loadSection<T>(
  * `rethrow` must rethrow framework control-flow (redirect, notFound, forbidden)
  * so those are never stored as a failed section.
  */
-export async function loadAdminOverviewSections<
-  TStats,
-  TAnalytics,
-  TCommercial,
-  TAuthors,
->(input: {
+export async function loadAdminOverviewSections<TStats, TAnalytics>(input: {
   stats: () => Promise<TStats>;
   analytics: (() => Promise<TAnalytics>) | null;
-  commercial: (() => Promise<TCommercial>) | null;
-  authors: (() => Promise<TAuthors>) | null;
   rethrow: (error: unknown) => void;
-}): Promise<AdminOverviewSections<TStats, TAnalytics, TCommercial, TAuthors>> {
-  const [stats, analytics, commercial, authors] = await Promise.all([
+}): Promise<AdminOverviewSections<TStats, TAnalytics>> {
+  const [stats, analytics] = await Promise.all([
     loadSection("admin_overview_stats_load_error", input.stats, input.rethrow),
     loadSection(
       "admin_overview_analytics_load_error",
       input.analytics,
       input.rethrow,
     ),
-    loadSection(
-      "admin_overview_commercial_attention_load_error",
-      input.commercial,
-      input.rethrow,
-    ),
-    loadSection(
-      "admin_overview_author_attention_load_error",
-      input.authors,
-      input.rethrow,
-    ),
   ]);
 
-  return { stats, analytics, commercial, authors };
+  return { stats, analytics };
 }
