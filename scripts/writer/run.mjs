@@ -19,7 +19,7 @@ import { loadBrief } from "./lib/brief.mjs";
 import { runChecks, runTests } from "./lib/checks.mjs";
 import { loadContext } from "./lib/context.mjs";
 import { applyToRepo } from "./lib/convert.mjs";
-import { DEFAULT_MODEL, SUPPORTED_MODELS, estimatePromptTokens, formatRub, worstCaseRub } from "./lib/cost.mjs";
+import { DEFAULT_MODEL, SUPPORTED_MODELS, chargedCost, estimatePromptTokens, formatRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
 import { generateOnMoscow } from "./lib/moscow.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
 import { articleSchema, buildExpandMessages, buildMessages, buildRepairMessages, buildRequest, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
@@ -63,8 +63,14 @@ if (!SUPPORTED_MODELS.includes(args.model)) {
 const model = args.model;
 const modelLabel = `Cloud.ru ${model.split("/").pop()}`;
 const authorLabel = `Райтер (${modelLabel})`;
-const maxRub = Number(args["max-rub"]);
-const maxTokens = Number(args["max-tokens"]);
+let limits;
+try {
+  limits = parseLimits(args["max-rub"], args["max-tokens"]);
+} catch (error) {
+  process.stderr.write(`${error.message}\n`);
+  process.exit(1);
+}
+const { maxRub, maxTokens } = limits;
 const brief = loadBrief(resolve(args.brief));
 const today = mskDate();
 const stamp = mskNow().slice(11, 16).replace(":", "");
@@ -103,7 +109,7 @@ function callWriter(callName, messages, schema) {
   writeJson(join(callDir, "request.json"), request);
   log(`${callName}: запрос к ${model} на Москве (худший случай ${formatRub(worst)})`);
   const { meta, article } = generateOnMoscow(runId, callName, join(callDir, "request.json"), callDir);
-  const cost = Number(meta.cost_rub ?? 0);
+  const { cost, estimated } = chargedCost(meta, worst);
   state.spentRub += cost;
   const call = {
     name: callName,
@@ -113,13 +119,14 @@ function callWriter(callName, messages, schema) {
     completionTokens: meta.completion_tokens ?? 0,
     reasoningTokens: meta.reasoning_tokens ?? null,
     costRub: cost,
+    costEstimated: estimated,
     finishReason: meta.finish_reason ?? null,
     responseFormatFallback: Boolean(meta.response_format_fallback),
     error: meta.ok ? null : meta.error ?? "ошибка",
   };
   state.calls.push(call);
   ledger({ call: callName, model, ...call });
-  log(`${callName}: http ${call.http}, ${call.promptTokens}+${call.completionTokens} токенов, ${formatRub(cost)}${call.error ? `, ошибка: ${call.error}` : ""}`);
+  log(`${callName}: http ${call.http}, ${call.promptTokens}+${call.completionTokens} токенов, ${formatRub(cost)}${estimated ? " (нет usage – засчитан худший случай)" : ""}${call.error ? `, ошибка: ${call.error}` : ""}`);
   return article;
 }
 

@@ -93,6 +93,15 @@ export function normalizeBrief(raw) {
     }
   }
 
+  // extraInstructions: a string or an array of strings; anything else is a brief error.
+  let extraInstructions = raw.extraInstructions ?? [];
+  if (typeof extraInstructions === "string") extraInstructions = [extraInstructions];
+  if (!Array.isArray(extraInstructions) || extraInstructions.some((item) => typeof item !== "string")) {
+    errors.push("extraInstructions: строка или массив строк");
+    extraInstructions = [];
+  }
+  extraInstructions = extraInstructions.map((item) => item.trim()).filter(Boolean);
+
   const tableMode = raw.table?.mode ?? "optional";
   if (!["required", "optional", "forbidden"].includes(tableMode)) {
     errors.push("table.mode: required | optional | forbidden");
@@ -127,7 +136,7 @@ export function normalizeBrief(raw) {
       rows: range(raw.table?.rows, { min: 3, max: 6 }, "table.rows", errors),
       note: raw.table?.note ?? "",
     },
-    extraInstructions: raw.extraInstructions ?? [],
+    extraInstructions,
     publishedAt: raw.publishedAt ?? null,
     pilot: raw.pilot === true,
   };

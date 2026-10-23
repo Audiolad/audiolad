@@ -2,7 +2,10 @@
 import { ALLOWED_EXTERNAL_HOSTS, EM_DASH, hostOf, isAllowedExternal } from "./util.mjs";
 
 const SECTION_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const NEGATION_RE = /(^|[^а-яё])(не|без|ни|нет|никаких|никакой|никто|вместо)([^а-яё]|$)/iu;
+// A promise is excused only by a direct negation right before it: the negation word, then at
+// most one word, then the promise («не исцелит», «не может гарантировать», «без гарантий»).
+// A negation elsewhere in the sentence («это не сложно, и молитва исцелит») does not count.
+const DIRECT_NEGATION_RE = /(?:^|[^а-яё])(?:не|ни|без|нет|никаких|никакой|никакого|никаким|вместо|невозможно|нельзя)\s+(?:[а-яё]+\s+)?$/iu;
 
 /** Promise patterns that are forbidden unless negated nearby or inside a verified quote. */
 export const PROMISE_PATTERNS = [
@@ -27,6 +30,40 @@ const HYGIENE = [
   { name: "латинский бренд AudioLad", re: /audiolad(?!\.ru)/i },
   { name: "U+2011/U+2010", re: /[\u2010\u2011]/ },
 ];
+
+const TEXT_ADDRESS_PATTERNS = [
+  { name: "e-mail", re: /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)*\.\p{L}{2,}/gu, always: true },
+  { name: "ссылка mailto:/tel:", re: /\b(?:mailto|tel|sms|tg|whatsapp|viber|skype):[^\s«»"]*/giu, always: true },
+  { name: "адрес сайта", re: /(?:https?:)?\/\/[^\s«»"()<>]+/giu },
+  { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:www\.)?(?:[a-z\d][a-z\d-]*\.)+(?:[a-z]{2,24}|рф)(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
+  { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:[а-яё\d][а-яё\d-]*\.)+рф(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
+];
+
+/**
+ * Addresses of other websites in plain text: bare domains (example.com/page, t.me/x),
+ * //host/x, http(s)://, mailto:/tel: and e-mails. Plain mentions of audiolad.ru and
+ * sergey-zoya.ru (the two allowed sites) are fine; e-mails and mailto: are never allowed.
+ */
+export function findTextAddresses(text) {
+  const problems = [];
+  const taken = [];
+  for (const pattern of TEXT_ADDRESS_PATTERNS) {
+    for (const match of text.matchAll(pattern.re)) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (taken.some(([a, b]) => start < b && end > a)) continue;
+      taken.push([start, end]);
+      const raw = match[0].replace(/[.,;:!?…]+$/u, "");
+      if (!pattern.always) {
+        const url = /^https?:/i.test(raw) ? raw : raw.startsWith("//") ? `https:${raw}` : `https://${raw}`;
+        const host = hostOf(url);
+        if (host && (host === "audiolad.ru" || ALLOWED_EXTERNAL_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`)))) continue;
+      }
+      problems.push(`${pattern.name} в тексте: ${raw.slice(0, 60)}`);
+    }
+  }
+  return problems;
+}
 
 function collectStrings(article) {
   const out = [];
@@ -283,13 +320,10 @@ function checkText(article, brief, strings, errors, warnings, stats) {
     if (lower(all).includes(lower(phrase))) errors.push(`запрещённая брифом фраза: «${phrase}»`);
   }
 
-  // Bare URLs in text count as links to other websites too.
+  // Addresses in plain text count as links to other websites too (owner rule 23.10).
   for (const item of strings) {
-    for (const match of item.text.matchAll(/(?:https?:\/\/|www\.)[^\s«»"()<>]+/giu)) {
-      const url = match[0].startsWith("www.") ? `https://${match[0]}` : match[0];
-      const host = hostOf(url.replace(/[.,;:!?]+$/u, ""));
-      if (host === "audiolad.ru" || isAllowedExternal(url)) continue;
-      errors.push(`${item.path}: адрес другого сайта в тексте (${host ?? match[0]}) – источник называйте без ссылки и адреса`);
+    for (const problem of findTextAddresses(item.text)) {
+      errors.push(`${item.path}: ${problem} – источник называйте без ссылки и адреса`);
     }
   }
 
@@ -329,8 +363,9 @@ function checkQuotes(brief, strings, errors, warnings, stats) {
   const verbatimTexts = [];
   stats.quotes = { verbatim: 0, short: 0 };
   for (const item of strings) {
-    for (const match of item.text.matchAll(/«([^«»]+)»/g)) {
-      const quote = match[1];
+    // «ёлочки», straight "…" and „…“ / “…” quotes all go through the same verbatim check.
+    for (const match of item.text.matchAll(/«([^«»]+)»|"([^"]+)"|„([^„“”]+)[“”]|“([^“”]+)”/g)) {
+      const quote = match[1] ?? match[2] ?? match[3] ?? match[4];
       const count = words(quote).length;
       if (count < 4) continue;
       if (isVerbatim(quote, sources)) {
@@ -373,7 +408,9 @@ function checkPromises(strings, verbatimQuotes, errors) {
     for (const pattern of PROMISE_PATTERNS) {
       for (const match of text.matchAll(pattern.re)) {
         const before = text.slice(Math.max(0, match.index - 40), match.index);
-        if (NEGATION_RE.test(before)) continue;
+        if (DIRECT_NEGATION_RE.test(before)) continue;
+        // A yes/no question about the promise («Гарантирует ли практика…?») is not a promise.
+        if (/^\s+ли(?![а-яё])/iu.test(text.slice(match.index + match[0].length))) continue;
         errors.push(`${item.path}: запрещённое обещание (${pattern.name}): «${text.slice(Math.max(0, match.index - 30), match.index + match[0].length + 20).trim()}»`);
       }
     }

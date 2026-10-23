@@ -9,10 +9,10 @@ import { fileURLToPath } from "node:url";
 import { normalizeBrief } from "./lib/brief.mjs";
 import { AUDIT_PATH, MASTER_PATH, loadContext } from "./lib/context.mjs";
 import { COUNT_TEST_FILES, bumpCountTests, constName, toDefinition, toTypeScript, updateOperational, masterEntry } from "./lib/convert.mjs";
-import { costRub } from "./lib/cost.mjs";
+import { chargedCost, costRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
 import { articleSchema, buildExpandMessages, buildMessages, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
-import { validateArticle } from "./lib/validate.mjs";
+import { findTextAddresses, validateArticle } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const context = await loadContext(root);
@@ -89,7 +89,7 @@ async function check(article) {
   const { article } = normalizeArticle(raw, context);
   const result = await validateArticle(article, local, context, { live: false });
   assert(!result.errors.some((e) => e.includes("sergey-zoya")), result.errors.join("\n"));
-  assert.equal(result.errors.filter((e) => e.includes("адрес другого сайта в тексте")).length, 2, result.errors.join("\n"));
+  assert.equal(result.errors.filter((e) => e.includes("в тексте:")).length, 2, result.errors.join("\n"));
   const linked = fixture();
   linked.sections[1].blocks[2].segments.push({ href: "https://example.org/proverb", label: "поговорка" });
   const linkedResult = await check(linked);
@@ -98,6 +98,106 @@ async function check(article) {
     () => normalizeBrief({ ...JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8")), externalLinks: ["https://example.org/x"] }),
     /ссылки на другие сайты запрещены/,
   );
+}
+
+// 4c. Review #1: any address of another site in plain text is a hard failure.
+{
+  const bad = [
+    "Подробнее: example.com/page.",
+    "Канал t.me/somechannel",
+    "Смотрите //evil.example/x",
+    "Пишите mailto:a@b.ru",
+    "Почта a@b.ru для вопросов",
+    "Сайт пример.рф",
+    "Сайт https://psychologies.ru",
+    "Адрес WWW.Example.org",
+    "Зеркало audiolad.ru.evil.com/x",
+    "Почта info@audiolad.ru",
+  ];
+  for (const text of bad) assert.equal(findTextAddresses(text).length, 1, `${text}: ${findTextAddresses(text).join("; ")}`);
+  const fine = [
+    "Практики есть на audiolad.ru и на sergey-zoya.ru.",
+    "Т.е. это и т.д., версия 1.2, 10.30 утра, «Сила настоящего» Экхарта Толле.",
+    "Полный адрес https://audiolad.ru/articles/x тоже допустим.",
+  ];
+  for (const text of fine) assert.deepEqual(findTextAddresses(text), [], text);
+  const raw = fixture();
+  raw.sections[0].blocks.push(para("Канал t.me/somechannel и почта a@b.ru."));
+  const result = await check(raw);
+  assert.equal(result.ok, false);
+  assert.equal(result.errors.filter((e) => e.includes("в тексте:")).length, 2, result.errors.join("\n"));
+}
+
+// 4d. Review #2: --max-rub / --max-tokens are parsed strictly.
+{
+  assert.deepEqual(parseLimits("3", "16000"), { maxRub: 3, maxTokens: 16000 });
+  assert.deepEqual(parseLimits("0,5", "800"), { maxRub: 0.5, maxTokens: 800 });
+  for (const [rub, tokens] of [["", "16000"], ["NaN", "16000"], ["3р", "16000"], ["0", "16000"], ["-1", "16000"], ["1e3", "16000"], ["Infinity", "16000"], ["31", "16000"], [undefined, "16000"], ["3", ""], ["3", "NaN"], ["3", "16k"], ["3", "1.5"], ["3", "0"], ["3", "999999"]]) {
+    assert.throws(() => parseLimits(rub, tokens), /--max-(rub|tokens)/, `${rub} / ${tokens}`);
+  }
+}
+
+// 4e. Review #6: a call without numeric usage is charged at the worst case, not 0.
+{
+  const worst = worstCaseRub("openai/gpt-oss-120b", 3000, 16000);
+  assert(worst > 0.9);
+  assert.deepEqual(chargedCost({ ok: true, cost_rub: 0.2 }, worst), { cost: 0.2, estimated: false });
+  assert.deepEqual(chargedCost({ ok: false, error: "generate.py: код 255" }, worst), { cost: worst, estimated: true });
+  assert.deepEqual(chargedCost(undefined, worst), { cost: worst, estimated: true });
+  assert.deepEqual(chargedCost({ cost_rub: "0.1" }, worst), { cost: worst, estimated: true });
+  assert.deepEqual(chargedCost({ cost_rub: Number.NaN }, worst), { cost: worst, estimated: true });
+}
+
+// 4f. Review #3: extraInstructions as a string or an array; other types are a brief error.
+{
+  const base = JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8"));
+  assert.deepEqual(normalizeBrief({ ...base, extraInstructions: "Одна строка." }).extraInstructions, ["Одна строка."]);
+  assert.deepEqual(normalizeBrief({ ...base, extraInstructions: ["А.", " ", "Б."] }).extraInstructions, ["А.", "Б."]);
+  assert.throws(() => normalizeBrief({ ...base, extraInstructions: 5 }), /extraInstructions/);
+  assert.throws(() => normalizeBrief({ ...base, extraInstructions: ["ok", 1] }), /extraInstructions/);
+  const pilot = normalizeBrief(JSON.parse(readFileSync(join(root, "scripts/writer/examples/pilot-brief.json"), "utf8")));
+  assert.equal(pilot.extraInstructions.length, 1);
+  const prompt = buildMessages(pilot, context).messages[1].content;
+  assert(prompt.includes(pilot.extraInstructions[0]), "pilot instruction is one prompt line");
+  assert(!/\n- .\n- .\n/.test(prompt), "no one-character prompt lines");
+}
+
+// 4g. Review #4: straight-quoted quotes get the same verbatim check as «ёлочки».
+{
+  const source = brief.sources[0].text;
+  const altered = source.replace("дальше", "быстрее");
+  for (const [open, close] of [['"', '"'], ["„", "“"], ["“", "”"]]) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(`Поговорка: ${open}${altered}${close}`));
+    const result = await check(raw);
+    assert(result.errors.some((e) => e.includes("похожа на источник, но не дословна")), `${open}: ${result.errors.join("; ")}`);
+    const long = fixture();
+    long.sections[0].blocks.push(para(`Молитва: ${open}Господи, даруй мне силу и терпение принять то, что я не могу изменить сегодня никак${close}`));
+    const longResult = await check(long);
+    assert(longResult.errors.some((e) => e.includes("длинная цитата без источника")), `${open}: ${longResult.errors.join("; ")}`);
+  }
+  const ok = fixture();
+  ok.sections[0].blocks.push(para(`Поговорка: "${source}"`));
+  const okResult = await check(ok);
+  assert(!okResult.errors.some((e) => e.includes("цитата")), okResult.errors.join("; "));
+}
+
+// 4h. Review #5: only a direct negation of the promise excuses it.
+{
+  const flagged = ["Это не сложно, и молитва исцелит вас.", "Без спешки практика гарантирует покой.", "Не торопитесь: медитация защитит от тревоги.", "Нельзя сказать иначе: практика исцелит."];
+  for (const text of flagged) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(text));
+    const result = await check(raw);
+    assert(result.errors.some((e) => e.includes("запрещённое обещание")), `${text}: ${result.errors.join("; ")}`);
+  }
+  const negated = ["Практика не исцелит болезнь.", "Медитация не может гарантировать результат.", "Это мягкая поддержка без гарантий.", "Здесь нет гарантий исхода.", "Невозможно гарантировать исход.", "Гарантирует ли практика покой?"];
+  for (const text of negated) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(text));
+    const result = await check(raw);
+    assert(!result.errors.some((e) => e.includes("запрещённое обещание")), `${text}: ${result.errors.join("; ")}`);
+  }
 }
 
 // 5. Em dash survives only if inserted after normalization; HTML and table without support.

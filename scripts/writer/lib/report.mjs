@@ -32,7 +32,7 @@ export function buildReport(state, brief, article, { forPr }) {
   lines.push("## Генерация и стоимость", "", "| Вызов | HTTP | Токены (вход/выход, из них reasoning) | Время | Стоимость |", "|---|---|---|---|---|");
   for (const call of state.calls) {
     lines.push(
-      `| ${call.name} | ${call.http ?? "–"} | ${call.promptTokens ?? 0} / ${call.completionTokens ?? 0}${call.reasoningTokens ? ` (${call.reasoningTokens})` : ""} | ${call.seconds ?? "–"} с | ${formatRub(call.costRub ?? 0)} |`,
+      `| ${call.name} | ${call.http ?? "–"} | ${call.promptTokens ?? 0} / ${call.completionTokens ?? 0}${call.reasoningTokens ? ` (${call.reasoningTokens})` : ""} | ${call.seconds ?? "–"} с | ${formatRub(call.costRub ?? 0)}${call.costEstimated ? " (худший случай: нет usage)" : ""} |`,
     );
   }
   lines.push("", `Итого: **${formatRub(state.spentRub)}** (тариф Cloud.ru с НДС, оценка по usage).`, "");
