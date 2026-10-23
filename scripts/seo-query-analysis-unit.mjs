@@ -75,7 +75,7 @@ const page = read("src/app/(platform)/admin/seo-queries/page.tsx");
 const ui = read("src/components/admin/AdminSeoQueriesClient.tsx");
 assert.match(page, /analysis_status/);
 assert.match(ui, /Анализировать выбранные/);
-assert.match(ui, /Не анализировались/);
+assert.match(ui, /Не проверены/);
 assert.match(ui, /Допустить авторам/);
 assert.match(ui, /Не подходит/);
 assert.match(ui, /SEO_QUERY_AUDIO_FIT_LABELS/);

@@ -80,12 +80,12 @@ function readReviewItem(value: unknown): ReviewItem | null {
   };
 }
 
-export default function AdminSeoQueriesClient({ initialRows, clusters: initialClusters }: { initialRows: Row[]; clusters: Cluster[] }) {
+export default function AdminSeoQueriesClient({ initialRows, clusters: initialClusters, initialAnalysisStatus = "" }: { initialRows: Row[]; clusters: Cluster[]; initialAnalysisStatus?: "" | Row["analysisStatus"] }) {
   const [rows, setRows] = useState(initialRows);
   const [clusterOptions, setClusterOptions] = useState(initialClusters);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [analysisStatus, setAnalysisStatus] = useState("");
+  const [analysisStatus, setAnalysisStatus] = useState<string>(initialAnalysisStatus);
   const [source, setSource] = useState("");
   const [cluster, setCluster] = useState("");
   const [newQuery, setNewQuery] = useState("");
@@ -460,7 +460,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     <div className="grid gap-2 sm:grid-cols-5">
       <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск" className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm" />
       <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все статусы</option>{["Свободен", "В работе", "На модерации", "Опубликован"].map((value) => <option key={value}>{value}</option>)}</select>
-      <select value={analysisStatus} onChange={(event) => setAnalysisStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все</option><option value="not_analyzed">Не анализировались</option><option value="analyzed">Готовы</option><option value="not_applicable">Не подходят</option></select>
+      <select value={analysisStatus} onChange={(event) => setAnalysisStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все</option><option value="not_analyzed">Не проверены</option><option value="analyzed">Готовы</option><option value="not_applicable">Не подходят</option></select>
       <select value={source} onChange={(event) => setSource(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все источники</option>{sources.map((value) => <option key={value}>{value}</option>)}</select>
       <select value={cluster} onChange={(event) => setCluster(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все кластеры</option>{clusters.map((value) => <option key={value}>{value}</option>)}</select>
     </div>

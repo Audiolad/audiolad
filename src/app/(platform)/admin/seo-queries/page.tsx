@@ -1,5 +1,6 @@
 import AdminSeoQueriesClient from "@/components/admin/AdminSeoQueriesClient";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { parseSeoAnalysisFilterParam } from "@/lib/seo-queries/admin-filter";
 import { isEffectiveSeoReservation } from "@/lib/seo-queries/reservation-effective";
 import { lifecycleLabel, type SeoQueryLifecycle } from "@/lib/seo-queries/types";
 import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
@@ -7,8 +8,13 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminSeoQueriesPage() {
+export default async function AdminSeoQueriesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ analysis?: string | string[] }>;
+}) {
   await requireAdminPermission("seo.manage");
+  const initialAnalysisStatus = parseSeoAnalysisFilterParam((await searchParams).analysis);
   const supabase = createServiceRoleClient();
   await supabase.rpc("expire_seo_query_reservation", {});
   const [
@@ -140,6 +146,7 @@ export default async function AdminSeoQueriesPage() {
       <div className="mt-5">
         <AdminSeoQueriesClient
           initialRows={rows}
+          initialAnalysisStatus={initialAnalysisStatus}
           clusters={(clusters ?? []).map((item) => ({
             id: item.id as string,
             name: item.name as string,
