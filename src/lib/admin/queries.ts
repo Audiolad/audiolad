@@ -8,11 +8,6 @@ import {
   AUTHOR_APPLICATION_COLUMNS,
   formatApplicationContactSummary,
 } from "@/lib/author-applications/queries";
-import {
-  AUTHOR_APPLICATION_ATTENTION_STATUSES,
-  summarizeAuthorApplicationAttention,
-  type AuthorApplicationAttentionSummary,
-} from "@/lib/admin/author-application-attention";
 import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
 import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -196,22 +191,6 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     cards,
     generatedAt: timeRange.snapshotNowIso,
   };
-}
-
-export async function getAdminAuthorApplicationAttentionSummary(): Promise<AuthorApplicationAttentionSummary> {
-  const service = createServiceRoleClient();
-  const { data, error } = await service
-    .from("author_applications")
-    .select("status")
-    .in("status", [...AUTHOR_APPLICATION_ATTENTION_STATUSES]);
-
-  if (error) {
-    throw new Error("admin_author_application_attention_load_failed");
-  }
-
-  return summarizeAuthorApplicationAttention(
-    (data ?? []).map((application) => application.status),
-  );
 }
 
 export async function listAdminAuthorApplications(input?: {
