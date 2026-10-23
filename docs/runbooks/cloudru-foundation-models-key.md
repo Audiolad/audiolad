@@ -18,12 +18,12 @@
 - В root-терминале выполнить:
 
 ```bash
-install -d -m 755 /etc/audiolad
-bash -c 'umask 077; IFS= read -rs -p "Key Secret: " k; echo; [ -n "$k" ] || exit 1; printf "CLOUDRU_FM_API_KEY=%s\n" "$k" > /etc/audiolad/cloudru-fm.env.tmp && chown root:root /etc/audiolad/cloudru-fm.env.tmp && chmod 600 /etc/audiolad/cloudru-fm.env.tmp && mv -f /etc/audiolad/cloudru-fm.env.tmp /etc/audiolad/cloudru-fm.env; unset k'
+install -d -m 755 -o root -g root /etc/audiolad
+bash -c 'set -euo pipefail; umask 077; ulimit -c 0; unset k; d=/etc/audiolad; t=$(mktemp "$d/.cloudru-fm.env.XXXXXX"); trap "rm -f -- \"$t\"" EXIT; IFS= read -rs -p "Key Secret: " k; echo; [ -n "$k" ] || { echo "Пустой ввод, файл не изменён" >&2; exit 1; }; printf "CLOUDRU_FM_API_KEY=%s\n" "$k" > "$t"; unset k; chown root:root "$t"; chmod 600 "$t"; mv -f -- "$t" "$d/cloudru-fm.env"'
 stat -c '%U:%G %a %s' /etc/audiolad/cloudru-fm.env
 ```
 
-- Вставить секрет в невидимое поле `Key Secret:` и нажать Enter. В `~/.bash_history` останется только команда без значения: ввод читает `read`, а не оболочка командной строки. Значение не передаётся через argv или env дочерних процессов. Ожидаем `root:root 600 <размер>`; содержимое файла не выводить.
+- Вставить секрет в невидимое поле `Key Secret:` и нажать Enter. В `~/.bash_history` останется только команда без значения: ввод читает `read`, а не оболочка командной строки. `unset k` до чтения снимает возможный export, `printf` — встроенная команда, поэтому значение не попадает в argv или env дочерних процессов. Временный файл создаётся уникальным через `mktemp` сразу с правами 0600 и удаляется при ошибке; core dump отключён. Пустой ввод оставляет прежний файл без изменений. Ожидаем `root:root 600 <размер>`; содержимое файла не выводить.
 - Скрипт не исполняет env-файл: допускаются только две указанные переменные `KEY=VALUE`, пустые строки и `#`-комментарии. Поддерживается одна пара внешних кавычек и CRLF. Пустые ключи, пробелы и управляющие символы запрещены.
 
 ## Где взять скрипт
