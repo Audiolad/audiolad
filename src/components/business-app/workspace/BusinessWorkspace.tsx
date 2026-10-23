@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import {
   BUSINESS_EMPTY_CATALOG_NOTE,
@@ -64,6 +65,16 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
   const lastPostRef = useRef(0);
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({ status: "idle", title: null, message: null, index: initialPlayback.index });
+  // ba344b7f: the gift may have been issued by this very page load (after the layout peek ran);
+  // tell the shared shell so «Получить 30 дней бесплатно» does not return on client navigation.
+  const reportChromeAccess = useReportBusinessChromeAccess();
+  const reportedStatus = model.status;
+  const reportedEndsAt = model.endsAt;
+  useEffect(() => {
+    if ((reportedStatus === "trial" || reportedStatus === "paid") && reportedEndsAt) {
+      reportChromeAccess({ mode: reportedStatus, endsAt: reportedEndsAt });
+    }
+  }, [reportChromeAccess, reportedStatus, reportedEndsAt]);
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const [offerNoted, setOfferNoted] = useState(false);
 

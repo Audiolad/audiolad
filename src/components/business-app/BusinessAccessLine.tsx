@@ -1,31 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
   BUSINESS_NO_ACCESS,
   businessAccessLine,
+  effectiveChromeAccess,
   hasLiveBusinessAccess,
   type BusinessChromeAccess,
 } from "@/lib/access-grants/access-line";
 import { BUSINESS_CONNECT_HREF } from "@/lib/business-app/access";
 
-const ChromeAccessContext = createContext<BusinessChromeAccess>(BUSINESS_NO_ACCESS);
+type ChromeAccessState = { access: BusinessChromeAccess; report: (access: BusinessChromeAccess) => void };
+
+const ChromeAccessContext = createContext<ChromeAccessState>({ access: BUSINESS_NO_ACCESS, report: () => {} });
 
 /** Live gift / paid state for every cabinet screen (hides repeated gift offers and prices). */
 export function BusinessChromeAccessProvider({ value, children }: { value: BusinessChromeAccess | null; children: ReactNode }) {
-  return <ChromeAccessContext.Provider value={value ?? BUSINESS_NO_ACCESS}>{children}</ChromeAccessContext.Provider>;
+  const [reported, setReported] = useState<BusinessChromeAccess | null>(null);
+  const report = useCallback((next: BusinessChromeAccess) => {
+    if (!hasLiveBusinessAccess(next)) return;
+    setReported((prev) => (prev && prev.mode === next.mode && prev.endsAt === next.endsAt ? prev : next));
+  }, []);
+  const access = effectiveChromeAccess(value, reported);
+  const state = useMemo(() => ({ access, report }), [access, report]);
+  return <ChromeAccessContext.Provider value={state}>{children}</ChromeAccessContext.Provider>;
 }
 
 export function useBusinessChromeAccess(): BusinessChromeAccess {
-  return useContext(ChromeAccessContext);
+  return useContext(ChromeAccessContext).access;
+}
+
+/**
+ * The workspace resolves (and on the first visit issues) the gift on the server; it reports the
+ * live period here so the shared shell drops the guest strip on the next client navigation
+ * without a reload (the layout peek of that same request may have run before the gift existed).
+ */
+export function useReportBusinessChromeAccess(): (access: BusinessChromeAccess) => void {
+  return useContext(ChromeAccessContext).report;
 }
 
 /** True while the 30-day gift or a paid period is live: do not offer the gift or show its price. */
 export function useHasLiveBusinessAccess(): boolean {
-  return hasLiveBusinessAccess(useContext(ChromeAccessContext));
+  return hasLiveBusinessAccess(useContext(ChromeAccessContext).access);
 }
 
 /**

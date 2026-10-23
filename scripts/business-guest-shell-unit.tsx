@@ -23,7 +23,7 @@ import {
   isBusinessNavItemLocked,
   resolveBusinessAccess,
 } from "../src/lib/business-app/access";
-import type { BusinessChromeAccess } from "../src/lib/access-grants/access-line";
+import { BUSINESS_NO_ACCESS, effectiveChromeAccess, type BusinessChromeAccess } from "../src/lib/access-grants/access-line";
 import { peekChromeAccessWith, type PeekReader } from "../src/lib/access-grants/peek-closure";
 import type { GrantRow } from "../src/lib/access-grants/policy";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
@@ -242,6 +242,26 @@ async function closedApis() {
   const studio = inTrial(signedInNoOrg, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   hasNot(studio, /biz-trial-cta|Получить 30 дней бесплатно|799/, "sound limit in trial: no gift CTA");
   has(studio, /data-testid="biz-connect-cta"/, "sound limit in trial: connect the venue instead");
+
+  // First visit: /workspace issues the gift while the (persisting) layout peek may already have
+  // answered "no access" – the workspace reports its live period so the strip does not return.
+  const none = BUSINESS_NO_ACCESS;
+  assert.deepEqual(effectiveChromeAccess(none, trial), trial, "stale guest peek + live workspace report → live");
+  assert.deepEqual(effectiveChromeAccess(null, trial), trial, "no peek + live report → live");
+  assert.deepEqual(effectiveChromeAccess(trial, null), trial, "live peek stays live");
+  assert.deepEqual(effectiveChromeAccess(paid0(), trial), paid0(), "a report never overrides a live server value");
+  assert.deepEqual(effectiveChromeAccess(none, { mode: "trial", endsAt: null }), none, "a report without an end date is ignored");
+  assert.deepEqual(effectiveChromeAccess(none, { mode: "offer" as never, endsAt: "2026-11-22T14:11:37Z" }), none, "a non-live report is ignored");
+  assert.deepEqual(effectiveChromeAccess(null, null), BUSINESS_NO_ACCESS);
+  const workspaceSource = readFileSync("src/components/business-app/workspace/BusinessWorkspace.tsx", "utf8");
+  assert.match(workspaceSource, /useReportBusinessChromeAccess\(\)/, "workspace reports its live period to the shell");
+  assert.match(workspaceSource, /reportChromeAccess\(\{ mode: reportedStatus, endsAt: reportedEndsAt \}\)/);
+  const shellSource = readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8");
+  assert.match(shellSource, /const chromeAccess = useBusinessChromeAccess\(\);/, "shell strip decision reads the (reportable) context");
+}
+
+function paid0(): BusinessChromeAccess {
+  return { mode: "paid", endsAt: "2026-12-31T10:00:00Z" };
 }
 
 // ---------------------------------------------------------------- permanent atlas URL

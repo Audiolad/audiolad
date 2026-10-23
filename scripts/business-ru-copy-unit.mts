@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import ts from "typescript";
 
-const roots = ["src/app/business-app", "src/components/business-app", "src/lib/business-app", "src/lib/business-workspace", "src/lib/access-grants/copy.ts", "src/lib/access-grants/access-line.ts"];
+const roots = ["src/app/business-app", "src/components/business-app", "src/lib/business-app", "src/lib/business-workspace", "src/lib/access-grants/copy.ts", "src/lib/access-grants/access-line.ts", "src/components/business/BusinessLandingView.tsx", "src/lib/business/landing.ts"];
 const properties = new Set("title label description text message messageRu hint body subtitle note error notice cta caption heading summary lead markdown detail eyebrow vibe placeholder".split(" "));
 // Calls whose string arguments are shown to the visitor.
 const visibleCalls = new Set(["setError", "setNotice", "setMessage", "setStatus", "showNotice", "notify", "toast", "alert"]);

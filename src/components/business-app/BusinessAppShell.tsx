@@ -7,7 +7,7 @@ import type { BusinessChromeAccess } from "@/lib/access-grants/access-line";
 import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 
-import BusinessAccessLine, { BusinessChromeAccessProvider } from "@/components/business-app/BusinessAccessLine";
+import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -37,26 +37,34 @@ export default function BusinessAppShell({
   /** Server listening-limit state for a guest (layout peek); null for members. */
   initialGuestLimit?: GuestCoffeeLimitState | null;
 }) {
-  const access = resolveBusinessAccess(useBusinessDomain());
-  const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
-  const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
-  const liveAccess = hasLiveBusinessAccess(customerAccess);
-  const showGuestBar = access.level === "guest" && !workspace && !liveAccess;
-  const showAccessLine = liveAccess && !workspace && customerAccess !== null;
-
   return (
     <BusinessChromeAccessProvider value={customerAccess}>
       <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
-        <div className="business-app-shell" data-access={access.level}>
-          <BusinessSidebar />
-          <div className="business-app-main">
-            {showGuestBar ? <BusinessGuestStatusBar /> : null}
-            {showAccessLine && customerAccess ? <BusinessAccessLine access={customerAccess} /> : null}
-            {children}
-          </div>
-          <BusinessBottomNav />
-        </div>
+        <BusinessShellFrame>{children}</BusinessShellFrame>
       </BusinessGuestStatusProvider>
     </BusinessChromeAccessProvider>
+  );
+}
+
+/** Reads the chrome access from context, so a live period reported by /workspace applies at once. */
+function BusinessShellFrame({ children }: { children: ReactNode }) {
+  const access = resolveBusinessAccess(useBusinessDomain());
+  const chromeAccess = useBusinessChromeAccess();
+  const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
+  const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
+  const liveAccess = hasLiveBusinessAccess(chromeAccess);
+  const showGuestBar = access.level === "guest" && !workspace && !liveAccess;
+  const showAccessLine = liveAccess && !workspace;
+
+  return (
+    <div className="business-app-shell" data-access={access.level}>
+      <BusinessSidebar />
+      <div className="business-app-main">
+        {showGuestBar ? <BusinessGuestStatusBar /> : null}
+        {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
+        {children}
+      </div>
+      <BusinessBottomNav />
+    </div>
   );
 }

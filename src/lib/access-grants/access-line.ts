@@ -33,6 +33,21 @@ export function formatMoscowDay(iso: string): string | null {
     .replace(/\s*г\.?$/u, "");
 }
 
+/**
+ * What the cabinet chrome shows: the layout's server peek, or – when that peek ran before the
+ * gift was issued (the /workspace page activates it in the same request, and the shared layout
+ * is not re-rendered on client navigation) – the live period the workspace itself reported.
+ * Only a live report can lift the guest strip; a report never hides a live server value.
+ */
+export function effectiveChromeAccess(
+  server: BusinessChromeAccess | null | undefined,
+  reported: BusinessChromeAccess | null | undefined,
+): BusinessChromeAccess {
+  if (hasLiveBusinessAccess(server)) return server as BusinessChromeAccess;
+  if (hasLiveBusinessAccess(reported)) return reported as BusinessChromeAccess;
+  return server ?? BUSINESS_NO_ACCESS;
+}
+
 export function businessAccessLine(access: BusinessChromeAccess | null | undefined): string | null {
   if (!access || !hasLiveBusinessAccess(access) || !access.endsAt) return null;
   const day = formatMoscowDay(access.endsAt);
