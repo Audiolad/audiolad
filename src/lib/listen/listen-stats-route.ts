@@ -14,6 +14,7 @@ import { applyPlaybackUsageHeartbeat } from "@/lib/listen/playback-usage-write";
 import type { PlaybackUsagePhase } from "@/lib/listen/playback-usage";
 import { canEntitledUserAccessPracticeStatus } from "@/lib/products/access";
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
+import { maybeHandleGuestListenPut } from "@/lib/ratings/guest/listen-server";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 const MAX_ANONYMOUS_ID_LENGTH = 128;
@@ -324,6 +325,28 @@ export async function handleListenStatsPut(
       return NextResponse.json(
         acceptedUsageMs == null ? ownState : { ...ownState, acceptedUsageMs },
       );
+    }
+
+    if (
+      access.mode === "catalog_preview" ||
+      access.mode === "entitled" ||
+      access.mode === "author_preview"
+    ) {
+      const guestResponse = await maybeHandleGuestListenPut({
+        request,
+        userId,
+        practiceId: practice.id,
+        productKind: practice.product_kind,
+        publicationClass: practice.publication_class,
+        accessMode: access.mode,
+        audioItemId,
+        positionMs,
+        clientMediaDeltaMs: derivedClientDelta,
+        acceptedUsageMs,
+      });
+      if (guestResponse) {
+        return guestResponse;
+      }
     }
 
     return NextResponse.json({

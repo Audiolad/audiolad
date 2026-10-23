@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { isCoursePublication } from "@/lib/course-content/validators";
+import { isGuestRatingsCollectEnabled } from "@/lib/ratings/guest/feature";
+import { handleGuestPracticeRatingGet, handleGuestPracticeRatingPut } from "@/lib/ratings/guest/rating-server";
 import { loadListenApiContext } from "@/lib/listen/api-context";
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
 import { readAnonymousIdFromRequest } from "@/lib/ratings/anonymous-id";
@@ -48,7 +50,30 @@ export async function handlePracticeRatingGet(
   }
 
   if (!user?.id) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (!isGuestRatingsCollectEnabled()) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const loaded = await loadListenApiContext(request, authorSlug, productSlug, {
+      purpose: "rating",
+    });
+    if (!loaded.ok) {
+      return loaded.response;
+    }
+
+    const { practice, access } = loaded.context;
+    try {
+      return await handleGuestPracticeRatingGet({
+        request,
+        practiceId: practice.id,
+        access,
+        isCourse: isCoursePublication(practice.publication_class, practice.product_kind),
+        productKind: practice.product_kind,
+      });
+    } catch (error) {
+      console.error("guest_rating_get_error", error);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
   }
 
   const { practice, error: practiceError } = await getPracticeByAuthorAndSlug(
@@ -94,7 +119,30 @@ export async function handlePracticeRatingPut(
   const { supabase, userId, practice, access } = loaded.context;
 
   if (!userId) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (!isGuestRatingsCollectEnabled()) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    let guestBody: unknown;
+    try {
+      guestBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+    }
+
+    try {
+      return await handleGuestPracticeRatingPut({
+        request,
+        practiceId: practice.id,
+        access,
+        isCourse: isCoursePublication(practice.publication_class, practice.product_kind),
+        productKind: practice.product_kind,
+        body: guestBody,
+      });
+    } catch (error) {
+      console.error("guest_rating_put_error", error);
+      return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    }
   }
 
   if (isPracticeRatingWriteRateLimited(userId)) {

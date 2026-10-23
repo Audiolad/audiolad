@@ -131,6 +131,9 @@ export default function MaxProductDetailView({
         <MiniAppGuestRating
           enabled={product.rating.enabled}
           aggregate={product.rating.aggregate}
+          guestCollect={product.rating.guestCollect === true}
+          authorSlug={authorSlug}
+          productSlug={productSlug}
           signInAction={{ message: MAX_RATING_GUEST_COPY, label: MAX_SHELL_LOGIN_CTA, onPress: requestLogin }}
           surface="max"
         />

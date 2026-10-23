@@ -184,6 +184,7 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
                   signInReturnPath={viewModel.practicePagePath}
                   isAuthenticated={viewModel.isAuthenticated}
                   initialAggregate={viewModel.ratingAggregate}
+                  guestCollectEnabled={viewModel.guestRatingsCollect}
                 />
               ) : null}
 
@@ -251,9 +252,10 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
               authorSlug={resolvedAuthorSlug}
               productSlug={practice.slug}
               signInReturnPath={viewModel.practicePagePath}
-              isAuthenticated={viewModel.isAuthenticated}
-              initialAggregate={viewModel.ratingAggregate}
-            />
+                  isAuthenticated={viewModel.isAuthenticated}
+                  initialAggregate={viewModel.ratingAggregate}
+                  guestCollectEnabled={viewModel.guestRatingsCollect}
+                />
           ) : null}
 
           <AudioPostTrailingSections viewModel={viewModel} />

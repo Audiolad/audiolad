@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useCallback, useRef, useState } from "react";
 
 import { signUpAction } from "@/app/(platform)/auth/sign-up/actions";
+import { claimGuestRatingsAction } from "@/app/(platform)/auth/claim-guest-ratings/actions";
 import AudioladHorizontalLogo from "@/components/brand/AudioladHorizontalLogo";
 import {
   MAX_WEB_APP_SCRIPT_SRC,
@@ -143,6 +144,7 @@ export default function MaxBridgeScript() {
             if (generation === actionGeneration.current) {
               applyEvent({ type: "LINK_START" });
             }
+            void claimGuestRatingsAction();
           },
         },
       );

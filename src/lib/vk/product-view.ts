@@ -91,6 +91,7 @@ function isNonNegativeInteger(value: unknown): value is number {
 function publicRating(
   value: {
     enabled?: boolean | null;
+    guestCollect?: boolean | null;
     aggregate?: { totalStars?: number | null; ratingCount?: number | null } | null;
   } | null | undefined,
 ): MaxProductRatingView {
@@ -103,13 +104,17 @@ function publicRating(
   ) {
     return DISABLED_RATING;
   }
-  return { enabled: true, aggregate: { totalStars, ratingCount } };
+  return {
+    enabled: true,
+    aggregate: { totalStars, ratingCount },
+    ...(value.guestCollect === true ? { guestCollect: true } : {}),
+  };
 }
 
 function readVkRating(value: unknown): MaxProductRatingView | null {
   if (value == null) return DISABLED_RATING;
   if (!isRecord(value)) return null;
-  if (Object.keys(value).some((key) => key !== "enabled" && key !== "aggregate")) return null;
+  if (Object.keys(value).some((key) => key !== "enabled" && key !== "aggregate" && key !== "guestCollect")) return null;
   const aggregate = value.aggregate;
   if (typeof value.enabled !== "boolean" || !isRecord(aggregate)) return null;
   if (
@@ -123,6 +128,7 @@ function readVkRating(value: unknown): MaxProductRatingView | null {
   return {
     enabled: value.enabled,
     aggregate: { totalStars: aggregate.totalStars, ratingCount: aggregate.ratingCount },
+    ...(value.guestCollect === true ? { guestCollect: true } : {}),
   };
 }
 
@@ -160,6 +166,7 @@ export function toVkProductView(product: {
   appreciation?: { authorName?: string | null } | null;
   rating?: {
     enabled?: boolean | null;
+    guestCollect?: boolean | null;
     aggregate?: { totalStars?: number | null; ratingCount?: number | null } | null;
   } | null;
   nextStep?: unknown;

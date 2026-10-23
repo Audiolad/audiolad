@@ -27,6 +27,7 @@ import {
 } from "@/lib/products/lookup";
 import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
 import { isRatingsUiEnabled } from "@/lib/ratings/feature";
+import { isGuestRatingsCollectEnabled } from "@/lib/ratings/guest/feature";
 import { getPracticeRatingAggregate } from "@/lib/ratings/read";
 import { MAX_AUTHOR_RECOMMENDATIONS } from "@/lib/seo/related-product-search";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -274,6 +275,9 @@ export async function getMaxPublishedProduct(
         rating: {
           enabled: ratingsEnabled,
           aggregate: ratingAggregate,
+          ...(ratingsEnabled && isGuestRatingsCollectEnabled()
+            ? { guestCollect: true }
+            : {}),
         },
         appreciation: appreciationVisible && authorName ? { authorName } : null,
         nextStep,
