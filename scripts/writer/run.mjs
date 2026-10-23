@@ -41,6 +41,14 @@ const { values: args } = parseArgs({
     out: { type: "string" },
     "keep-worktree": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
+    // --site sz: a pack of sergey-zoya.ru articles (see README «Режим sz»)
+    site: { type: "string", default: "audiolad" },
+    repo: { type: "string" },
+    briefs: { type: "string" },
+    experts: { type: "string" },
+    fixtures: { type: "string" },
+    "skip-build": { type: "boolean", default: false },
+    "experts-report": { type: "boolean", default: false },
   },
 });
 
@@ -51,8 +59,19 @@ class Stop extends Error {
   }
 }
 
-if (args.help || !args.brief) {
-  process.stdout.write("Использование: npx tsx scripts/writer/run.mjs --brief brief.json [--model M] [--dry-run] [--no-repair] [--offline] [--article a.json] [--max-rub 3]\nСм. scripts/writer/README.md\n");
+const szMode = args.site === "sz";
+if (!["audiolad", "sz"].includes(args.site)) {
+  process.stderr.write(`--site: audiolad или sz, получено ${args.site}\n`);
+  process.exit(1);
+}
+if (args.help || (!args.brief && !szMode) || (szMode && !args.briefs && !args.brief && !args["experts-report"])) {
+  process.stdout.write([
+    "Использование: npx tsx scripts/writer/run.mjs --brief brief.json [--model M] [--dry-run] [--no-repair] [--offline] [--article a.json] [--max-rub 3]",
+    "  sergey-zoya.ru: --site sz --repo <клон sergey-zoya-site> --briefs pack.json [--experts EXPERTS_RU.md] [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 3]",
+    "                  --site sz --repo <клон> --experts-report   (эксперты пула: кто реже использован, есть ли портрет)",
+    "См. scripts/writer/README.md",
+    "",
+  ].join("\n"));
   process.exit(args.help ? 0 : 1);
 }
 if (!SUPPORTED_MODELS.includes(args.model)) {
@@ -71,6 +90,17 @@ try {
   process.exit(1);
 }
 const { maxRub, maxTokens } = limits;
+if (szMode) {
+  const { runSzPipeline } = await import("./lib/sites/sz/pipeline.mjs");
+  let result;
+  try {
+    result = await runSzPipeline(args, { model, maxRub, maxTokens });
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exit(typeof error.code === "number" ? error.code : 1);
+  }
+  process.exit(result.code);
+}
 const brief = loadBrief(resolve(args.brief));
 const today = mskDate();
 const stamp = mskNow().slice(11, 16).replace(":", "");

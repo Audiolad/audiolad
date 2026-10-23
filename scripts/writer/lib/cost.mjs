@@ -37,16 +37,22 @@ export function formatRub(value) {
 export const MAX_RUB_CEILING = 30;
 export const MAX_TOKENS_CEILING = 32000;
 
-export function parseLimits(maxRubRaw, maxTokensRaw) {
-  const rubText = String(maxRubRaw ?? "").trim().replace(",", ".");
-  const tokensText = String(maxTokensRaw ?? "").trim();
-  if (!/^\d+(?:\.\d+)?$/.test(rubText)) throw new Error(`--max-rub: нужно положительное число рублей, получено «${maxRubRaw}»`);
-  if (!/^\d+$/.test(tokensText)) throw new Error(`--max-tokens: нужно целое положительное число, получено «${maxTokensRaw}»`);
-  const maxRub = Number(rubText);
-  const maxTokens = Number(tokensText);
+/** Rouble limit: a positive finite number ≤ MAX_RUB_CEILING (CLI string like «3» or «2,5», or a JSON number). */
+export function parseMaxRub(raw, label = "--max-rub") {
+  const text = typeof raw === "number" ? String(raw) : String(raw ?? "").trim().replace(",", ".");
+  if (!/^\d+(?:\.\d+)?$/.test(text)) throw new Error(`${label}: нужно положительное число рублей, получено «${raw}»`);
+  const maxRub = Number(text);
   if (!Number.isFinite(maxRub) || maxRub <= 0 || maxRub > MAX_RUB_CEILING) {
-    throw new Error(`--max-rub: допустимо больше 0 и не больше ${MAX_RUB_CEILING} ₽, получено «${maxRubRaw}»`);
+    throw new Error(`${label}: допустимо больше 0 и не больше ${MAX_RUB_CEILING} ₽, получено «${raw}»`);
   }
+  return maxRub;
+}
+
+export function parseLimits(maxRubRaw, maxTokensRaw) {
+  const maxRub = parseMaxRub(maxRubRaw);
+  const tokensText = String(maxTokensRaw ?? "").trim();
+  if (!/^\d+$/.test(tokensText)) throw new Error(`--max-tokens: нужно целое положительное число, получено «${maxTokensRaw}»`);
+  const maxTokens = Number(tokensText);
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 1 || maxTokens > MAX_TOKENS_CEILING) {
     throw new Error(`--max-tokens: допустимо от 1 до ${MAX_TOKENS_CEILING}, получено «${maxTokensRaw}»`);
   }
