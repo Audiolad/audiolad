@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { PathnameContext } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 
+import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessAppShell from "../src/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
@@ -22,6 +23,9 @@ import {
   isBusinessNavItemLocked,
   resolveBusinessAccess,
 } from "../src/lib/business-app/access";
+import { BUSINESS_NO_ACCESS, effectiveChromeAccess, type BusinessChromeAccess } from "../src/lib/access-grants/access-line";
+import { peekChromeAccessWith, type PeekReader } from "../src/lib/access-grants/peek-closure";
+import type { GrantRow } from "../src/lib/access-grants/policy";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import type { GuestCoffeePlaylist } from "../src/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_GUEST_COFFEE_URL } from "../src/lib/business-app/host";
@@ -127,8 +131,11 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(at("near_end", "/"), /скоро подойдёт к концу/);
   has(at("unavailable", "/"), /data-limit="unavailable"/);
   const layout = read("src/app/business-app/layout.tsx");
-  has(layout, /resolveBusinessAccess\(domain\)\.level === "guest"\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests only");
-  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\}>/);
+  has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
+  has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\}>/);
+  const peek = read("src/lib/access-grants/peek.server.ts") + read("src/lib/access-grants/peek-closure.ts");
+  hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }
 
 // ---------------------------------------------------------------- real player + settings (Music section)
@@ -206,6 +213,57 @@ async function closedApis() {
   }
 }
 
+// ---------------------------------------------------------------- live gift hides the guest strip (Sergey 23.10.2026)
+{
+  const trial: BusinessChromeAccess = { mode: "trial", endsAt: "2026-11-22T14:11:37.762Z" };
+  const withAccess = (domain: BusinessOwnerHomeContext, pathname: string, customerAccess: BusinessChromeAccess | null) =>
+    wrap(domain, pathname, <BusinessAppShell customerAccess={customerAccess}><main data-testid="page">page</main></BusinessAppShell>);
+  for (const path of ["/", "/music", "/onboarding", "/settings"]) {
+    const t = withAccess(signedInNoOrg, path, trial);
+    hasNot(t, /biz-guest-status|Гостевой режим|Получить 30 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
+    has(t, /data-testid="biz-access-line"[^>]*>[\s\S]*Бесплатный доступ до 22 ноября 2026/, `${path}: calm access line with the Moscow end date`);
+  }
+  const paid = withAccess(signedInNoOrg, "/", { mode: "paid" as const, endsAt: "2026-12-31T10:00:00Z" });
+  hasNot(paid, /biz-guest-status/, "paid: no guest strip");
+  has(paid, /Подписка действует до 31 декабря 2026/, "paid: quiet paid line");
+  const expired = withAccess(signedInNoOrg, "/", { mode: "offer" as never, endsAt: null } as never);
+  has(expired, /data-testid="biz-guest-status"/, "expired / no gift: guest strip and offer stay");
+  has(withAccess(anonymous, "/", null), /data-testid="biz-guest-status"/, "anonymous guest still sees the strip");
+  hasNot(withAccess(signedInNoOrg, "/workspace", trial), /biz-access-line|biz-guest-status/, "workspace shows its own period block");
+  hasNot(withAccess(member, "/", null), /biz-guest-status/, "member never sees the guest strip");
+
+  // Onboarding and the listening limit must not re-offer the gift or show its price either.
+  const inTrial = (domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode) =>
+    wrap(domain, pathname, <BusinessChromeAccessProvider value={trial}>{node}</BusinessChromeAccessProvider>);
+  const onb = inTrial(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />);
+  hasNot(onb, /onboarding-terms-note|30 дней в подарок|799/, "onboarding in trial: no gift terms / price");
+  has(onb, /data-testid="onboarding-access-line"[^>]*>Бесплатный доступ до 22 ноября 2026/, "onboarding in trial: end date line");
+  has(wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />), /onboarding-terms-note/, "onboarding without gift keeps the terms");
+  const studio = inTrial(signedInNoOrg, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
+  hasNot(studio, /biz-trial-cta|Получить 30 дней бесплатно|799/, "sound limit in trial: no gift CTA");
+  has(studio, /data-testid="biz-connect-cta"/, "sound limit in trial: connect the venue instead");
+
+  // First visit: /workspace issues the gift while the (persisting) layout peek may already have
+  // answered "no access" – the workspace reports its live period so the strip does not return.
+  const none = BUSINESS_NO_ACCESS;
+  assert.deepEqual(effectiveChromeAccess(none, trial), trial, "stale guest peek + live workspace report → live");
+  assert.deepEqual(effectiveChromeAccess(null, trial), BUSINESS_NO_ACCESS, "anonymous (no peek): a report is never applied");
+  assert.deepEqual(effectiveChromeAccess(trial, null), trial, "live peek stays live");
+  assert.deepEqual(effectiveChromeAccess(paid0(), trial), paid0(), "a report never overrides a live server value");
+  assert.deepEqual(effectiveChromeAccess(none, { mode: "trial", endsAt: null }), none, "a report without an end date is ignored");
+  assert.deepEqual(effectiveChromeAccess(none, { mode: "offer" as never, endsAt: "2026-11-22T14:11:37Z" }), none, "a non-live report is ignored");
+  assert.deepEqual(effectiveChromeAccess(null, null), BUSINESS_NO_ACCESS);
+  const workspaceSource = readFileSync("src/components/business-app/workspace/BusinessWorkspace.tsx", "utf8");
+  assert.match(workspaceSource, /useReportBusinessChromeAccess\(\)/, "workspace reports its live period to the shell");
+  assert.match(workspaceSource, /reportChromeAccess\(\{ mode: reportedStatus, endsAt: reportedEndsAt \}\)/);
+  const shellSource = readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8");
+  assert.match(shellSource, /const chromeAccess = useBusinessChromeAccess\(\);/, "shell strip decision reads the (reportable) context");
+}
+
+function paid0(): BusinessChromeAccess {
+  return { mode: "paid", endsAt: "2026-12-31T10:00:00Z" };
+}
+
 // ---------------------------------------------------------------- permanent atlas URL
 assert.equal(BUSINESS_GUEST_COFFEE_URL, "https://business.audiolad.ru/guest/coffee");
 assert.equal(COFFEE_ATLAS_CTA_HREF, "https://business.audiolad.ru/guest/coffee", "atlas CTA unchanged");
@@ -215,3 +273,34 @@ closedApis().then(
   () => console.log("business-guest-shell-unit: OK"),
   (e) => { console.error(e); process.exit(1); },
 );
+
+// ---------------------------------------------------------------- peek walks the identity graph like resolve_access_grant
+void (async () => {
+  // Gift issued to account A on address X; account B is bound to X and Y; account C signs in with Y.
+  const grants: GrantRow[] = [{ emailHash: "X", userId: "A", kind: "business_new_client", startsAt: "2026-10-23T14:11:37Z", endsAt: "2026-11-22T14:11:37Z" }];
+  const bindings = [{ emailHash: "X", userId: "A" }, { emailHash: "X", userId: "B" }, { emailHash: "Y", userId: "B" }, { emailHash: "Y", userId: "C" }];
+  const reads: string[] = [];
+  const reader = (paid: string[] = []): PeekReader => ({
+    async edges(users, hashes) {
+      reads.push("edges");
+      return [...bindings, ...grants].filter((e) => users.includes(e.userId) || hashes.includes(e.emailHash)).map(({ emailHash, userId }) => ({ emailHash, userId }));
+    },
+    async grants(users, hashes) { return grants.filter((g) => users.includes(g.userId) || hashes.includes(g.emailHash)); },
+    async paidStamps() { return paid; },
+  });
+  const now = new Date("2026-10-23T15:00:00Z");
+  const c = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, now);
+  assert.deepEqual(c, { mode: "trial", endsAt: "2026-11-22T14:11:37Z" }, "chain A–X–B–Y–C: C sees the live gift");
+  const stranger = await peekChromeAccessWith(reader(), { userId: "D", emailHash: "Z" }, now);
+  assert.notEqual(stranger.mode, "trial", "unrelated account: no gift");
+  assert.equal(stranger.endsAt, null);
+  const over = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-22T14:11:37Z"));
+  assert.ok(over.mode !== "trial" && over.endsAt === null, "gift over at its exact end instant");
+  const paid = await peekChromeAccessWith(reader(["2026-12-31T10:00:00Z"]), { userId: "C", emailHash: "Y" }, new Date("2026-12-01T00:00:00Z"));
+  assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z" }, "paid period after the gift");
+  assert.ok(reads.length > 0);
+  console.log("business-guest-shell-unit: peek closure OK");
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

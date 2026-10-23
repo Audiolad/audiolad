@@ -942,3 +942,11 @@
     flex: 1 1 100%;
   }
 }
+
+/* ba344b7f (23.10.2026): quiet access line for a visitor with a live gift / paid period. */
+.business-app-access-line {
+  margin: 0 auto 0.75rem;
+  max-width: 72rem;
+  padding: 0 0.25rem;
+  font-size: 0.9rem;
+}

@@ -176,7 +176,7 @@ export const BUSINESS_HOW_NOTE = "Без обязательных звонков
 export const BUSINESS_HOW_HELP = "Нужна помощь? Мы рядом.";
 
 export const BUSINESS_FORMATS = [
-  { id: "spa", name: "SPA" },
+  { id: "spa", name: "Спа" },
   { id: "massage", name: "Массаж" },
   { id: "beauty", name: "Салон красоты" },
   { id: "cafe", name: "Кафе" },

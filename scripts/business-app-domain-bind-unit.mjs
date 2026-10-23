@@ -28,7 +28,8 @@ const home = readFileSync(
 );
 assert.match(home, /useBusinessDomain/);
 assert.match(home, /BusinessDomainBootstrapForm/);
-assert.match(home, /create_business_organization_with_location/);
+assert.match(home, /Подключите своё заведение/);
+assert.match(readFileSync(join(repoRoot, "src/app/business-app/actions.ts"), "utf8"), /create_business_organization_with_location/);
 assert.doesNotMatch(
   home,
   /BUSINESS_HOME_MOCK\.owner/,

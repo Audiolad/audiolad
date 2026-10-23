@@ -29,6 +29,17 @@ function Field({
   );
 }
 
+/** Visitor-facing names instead of «RU» / «Europe/Moscow». */
+function countryLabelRu(code: string | null | undefined): string {
+  if (!code) return "–";
+  return code.toUpperCase() === "RU" ? "Россия" : "Другая страна";
+}
+
+function timezoneLabelRu(zone: string | null | undefined): string {
+  if (!zone) return "–";
+  return zone === "Europe/Moscow" ? "Московское время" : "Местное время точки";
+}
+
 export default function BusinessSupportDiagnosticPage({
   diagnostics,
 }: {
@@ -61,7 +72,7 @@ export default function BusinessSupportDiagnosticPage({
           <Field label="Лицензия" value="Нет подтверждённых данных" />
           <Field label="Количество плееров" value={String(diagnostics.players.length)} />
         </dl>
-        <p className="mt-3 text-sm text-[var(--biz-text-muted)]">{playback.detail}</p>
+        <p className="mt-3 text-sm text-[var(--biz-text-muted)]">{playback.detail} <Link href="/player" className="underline">Открыть плеер</Link></p>
       </section>
 
       <section className="business-app-card" aria-labelledby="support-org-loc">
@@ -69,25 +80,25 @@ export default function BusinessSupportDiagnosticPage({
           id="support-org-loc"
           className="text-[1.1rem] font-bold text-[var(--biz-text)]"
         >
-          Организация и точка
+          Заведение и точка
         </h2>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field
-            label="Организация"
+            label="Заведение"
             value={diagnostics.organizationName ?? "–"}
           />
           <Field
-            label="Идентификатор организации"
+            label="Код заведения"
             value={diagnostics.organizationId ?? "–"}
             mono
           />
           <Field label="Точка" value={location?.name ?? "–"} />
-          <Field label="Идентификатор точки" value={location?.id ?? "–"} mono />
-          <Field label="Страна" value={location?.countryCode ?? "–"} />
-          <Field label="Часовой пояс" value={location?.timezone ?? "–"} />
+          <Field label="Код точки" value={location?.id ?? "–"} mono />
+          <Field label="Страна" value={countryLabelRu(location?.countryCode)} />
+          <Field label="Часовой пояс" value={timezoneLabelRu(location?.timezone)} />
           <Field label="Статус точки" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
           <Field
-            label="Основная зона"
+            label="Основной зал"
             value={location?.defaultZoneId ?? "–"}
             mono
           />
@@ -134,7 +145,7 @@ export default function BusinessSupportDiagnosticPage({
                   <p className="mt-2 text-sm text-[var(--biz-text-muted)]">{connectivity.detail}</p>
                   <dl className="mt-2 grid gap-2 sm:grid-cols-2">
                     <Field label="Код плеера" value={player.playerCode} mono />
-                    <Field label="Идентификатор плеера" value={player.playerId} mono />
+                    <Field label="Код записи плеера" value={player.playerId} mono />
                     <Field label="Статус записи" value={player.playerStatus === "active" ? "Активна" : "Нет подтверждённых данных"} />
                     <Field
                       label="Связь"
@@ -147,7 +158,7 @@ export default function BusinessSupportDiagnosticPage({
                     />
                     <Field label="Время последнего сигнала" value={player.lastHeartbeatAt ?? "нет данных"} />
                     <Field
-                      label="Зона"
+                      label="Зал"
                       value={player.zoneId ?? "не назначен"}
                       mono
                     />
@@ -164,7 +175,7 @@ export default function BusinessSupportDiagnosticPage({
           id="support-last-play"
           className="text-[1.1rem] font-bold text-[var(--biz-text)]"
         >
-          Последнее зарегистрированное событие воспроизведения
+          Последнее воспроизведение
         </h2>
         {diagnostics.lastPlay ? (
           <dl className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -178,12 +189,12 @@ export default function BusinessSupportDiagnosticPage({
               }
             />
             <Field
-              label="Идентификатор аудио"
+              label="Код записи трека"
               value={diagnostics.lastPlay.audioItemId ?? "–"}
               mono
             />
             <Field
-              label="Идентификатор плеера"
+              label="Код записи плеера"
               value={diagnostics.lastPlay.playerId ?? "–"}
               mono
             />
@@ -196,16 +207,16 @@ export default function BusinessSupportDiagnosticPage({
       </section>
 
       <details className="business-app-card" aria-labelledby="support-issues">
-        <summary className="business-app-focus-ring cursor-pointer">Технические сведения для поддержки</summary>
+        <summary className="business-app-focus-ring cursor-pointer">Сведения для поддержки</summary>
         <h2
           id="support-issues"
           className="text-[1.1rem] font-bold text-[var(--biz-text)]"
         >
-          Коды проблем
+          Что требует внимания
         </h2>
         {diagnostics.issues.length === 0 ? (
           <p className="mt-3 text-[0.98rem] text-[var(--biz-green)]">
-            Критичных кодов нет.
+            Проблем не обнаружено.
           </p>
         ) : (
           <ul className="mt-3 flex flex-col gap-2">
@@ -215,7 +226,7 @@ export default function BusinessSupportDiagnosticPage({
                 className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface-soft)] px-3 py-2.5 text-[0.95rem]"
               >
                 <p className="font-mono text-xs font-semibold uppercase tracking-wide opacity-80">
-                  {issue.code} · {issue.severity}
+                  {{ error: "Ошибка", warn: "Требует внимания", info: "Сведения" }[issue.severity]}
                 </p>
                 <p className="mt-1 font-medium">{issue.messageRu}</p>
               </li>
@@ -223,11 +234,10 @@ export default function BusinessSupportDiagnosticPage({
           </ul>
         )}
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
-          Это не юридический статус и не каталог эфира. Для плеера:{" "}
+          Здесь показана работа плеера. Сведения о правах доступны в <Link href="/documents" className="underline">документах</Link>. {" "}
           <Link href="/player" className="font-semibold text-[var(--biz-accent)]">
-            /player
+            Открыть плеер
           </Link>
-          .
         </p>
       </details>
     </div>

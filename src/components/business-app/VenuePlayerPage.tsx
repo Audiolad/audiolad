@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { provisionVenuePlayer } from "@/app/business-app/actions";
@@ -89,7 +91,7 @@ export default function VenuePlayerPage() {
     );
     if (rpcError) {
       setHeartbeatOk(false);
-      setError(rpcError.message || "heartbeat_failed");
+      setError("Не удалось связаться с плеером. Попробуйте ещё раз.");
       return null;
     }
     const payload = data as {
@@ -99,7 +101,7 @@ export default function VenuePlayerPage() {
     } | null;
     if (!payload?.ok) {
       setHeartbeatOk(false);
-      setError("heartbeat_invalid_response");
+      setError("Плеер не подтвердил подключение. Попробуйте ещё раз.");
       return null;
     }
     setHeartbeatOk(true);
@@ -136,9 +138,9 @@ export default function VenuePlayerPage() {
           priorPositionMs: prior,
           phase: phaseName,
         });
-      } catch (err) {
+      } catch {
         setPopOk(false);
-        setError(err instanceof Error ? err.message : "pop_args_invalid");
+        setError("Не удалось подготовить сведения о воспроизведении.");
         return null;
       }
 
@@ -149,7 +151,7 @@ export default function VenuePlayerPage() {
       );
       if (rpcError) {
         setPopOk(false);
-        setError(rpcError.message || "pop_emit_failed");
+        setError("Не удалось отправить сведения о воспроизведении.");
         return null;
       }
       const payload = data as {
@@ -160,7 +162,7 @@ export default function VenuePlayerPage() {
       } | null;
       if (!payload?.ok) {
         setPopOk(false);
-        setError("pop_invalid_response");
+        setError("Не удалось подтвердить отправку сведений о воспроизведении.");
         return null;
       }
       lastPositionMsRef.current = positionMs;
@@ -230,7 +232,7 @@ export default function VenuePlayerPage() {
 
   async function onProvision() {
     if (domain.status !== "authenticated" || !domain.location?.defaultZoneId) {
-      setError("domain_incomplete");
+      setError("Данные точки пока недоступны. Попробуйте обновить страницу.");
       return;
     }
     setPhase("provisioning");
@@ -238,7 +240,7 @@ export default function VenuePlayerPage() {
     const result = await provisionVenuePlayer({
       organizationId: domain.location.organizationId,
       zoneId: domain.location.defaultZoneId,
-      displayName: `Player · ${domain.location.name}`,
+      displayName: `Плеер · ${domain.location.name}`,
     });
     if (!result.ok) {
       setPhase("error");
@@ -260,12 +262,12 @@ export default function VenuePlayerPage() {
 
   async function onStartPlayback() {
     if (!isVenuePlayerCredential(credential)) {
-      setError("missing_credential");
+      setError("Сначала подключите плеер к залу кнопкой выше.");
       return;
     }
     const audio = audioRef.current;
     if (!audio) {
-      setError("audio_element_missing");
+      setError("Плеер пока не готов. Обновите страницу и попробуйте ещё раз.");
       return;
     }
     try {
@@ -274,9 +276,9 @@ export default function VenuePlayerPage() {
       setPhase("playing");
       await startHeartbeatLoop(credential);
       await startPopLoop(credential);
-    } catch (err) {
+    } catch {
       setPhase("error");
-      setError(err instanceof Error ? err.message : "play_failed");
+      setError("Не удалось включить звук. Проверьте интернет и попробуйте ещё раз.");
     }
   }
 
@@ -297,10 +299,9 @@ export default function VenuePlayerPage() {
   if (domain.status === "anonymous") {
     return (
       <section className="business-app-span-full business-app-card">
-        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Venue Player</h1>
+        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер точки</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          Войдите как владелец точки, чтобы создать Player и запустить эфир.
-        </p>
+          <a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите как владелец точки</a>, чтобы подключить плеер и включить музыку.</p>
       </section>
     );
   }
@@ -308,11 +309,9 @@ export default function VenuePlayerPage() {
   if (!domain.location?.defaultZoneId) {
     return (
       <section className="business-app-span-full business-app-card">
-        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Venue Player</h1>
+        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер точки</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          Сначала создайте организацию и точку на Главной – затем сюда вернётесь
-          для назначения Player на зону.
-        </p>
+          <Link href="/" className="underline">Подключите заведение на главной</Link>, затем вернитесь сюда, чтобы настроить плеер зала.</p>
       </section>
     );
   }
@@ -321,7 +320,7 @@ export default function VenuePlayerPage() {
     <section className="business-app-span-full space-y-4">
       <header className="business-app-card">
         <p className="business-app-eyebrow">
-          Venue Player · runtime v0 · PoP
+          Плеер точки
         </p>
         <h1 className="mt-1 text-2xl font-bold text-[var(--biz-text)] sm:text-3xl">Эфир точки</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
@@ -329,20 +328,17 @@ export default function VenuePlayerPage() {
           {playerCode ? (
             <>
               {" "}
-              · Player <code className="text-sm">{playerCode}</code>
+               · Плеер <code className="text-sm">{playerCode}</code>
             </>
           ) : null}
         </p>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">{pilot.description}</p>
         <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
-          Proof of Play →{" "}
-          <code>apply_business_playback_usage_heartbeat</code> (evidence;
-          allowlist audio_item, не eligible-каталог).
-        </p>
+          Плеер отправляет{" "}
+          сведения о воспроизведении. Проверочный звук помогает проверить подключение и не входит в музыкальную подборку.</p>
         <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
-          Eligibility gate (P0-05): в пул эфира только{" "}
-          <code>ELIGIBLE</code>; UNKNOWN ≠ ELIGIBLE.
-        </p>
+          В заведении можно включать только треки с{" "}
+          подтверждёнными правами.</p>
       </header>
 
       <div className="business-app-card space-y-4">
@@ -356,8 +352,8 @@ export default function VenuePlayerPage() {
               onClick={() => void onProvision()}
             >
               {phase === "provisioning"
-                ? "Создаём Player…"
-                : "Создать Player и назначить на зону"}
+                ? "Подключаем плеер…"
+                : "Подключить плеер к залу"}
             </button>
           ) : null}
           {credential && phase !== "playing" ? (
@@ -366,8 +362,7 @@ export default function VenuePlayerPage() {
               className="business-app-btn business-app-btn-primary business-app-focus-ring"
               onClick={() => void onStartPlayback()}
             >
-              Старт эфира (пилот-тон + heartbeat + PoP)
-            </button>
+              Включить проверочный звук</button>
           ) : null}
           {phase === "playing" ? (
             <button
@@ -382,35 +377,35 @@ export default function VenuePlayerPage() {
 
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-[var(--biz-text-muted)]">Фаза</dt>
-            <dd className="font-semibold text-[var(--biz-text)]">{phase}</dd>
+            <dt className="text-[var(--biz-text-muted)]">Состояние</dt>
+            <dd className="font-semibold text-[var(--biz-text)]">{{ idle: "Ожидает подключения", provisioning: "Подключается", ready: "Готов", playing: "Играет", error: "Ошибка" }[phase]}</dd>
           </div>
           <div>
-            <dt className="text-[var(--biz-text-muted)]">Heartbeat (A2)</dt>
+            <dt className="text-[var(--biz-text-muted)]">Связь с плеером</dt>
             <dd className="font-semibold text-[var(--biz-text)]">
-              {heartbeatOk ? "ok" : "–"}
+              {heartbeatOk ? "Подтверждено" : "–"}
               {lastHeartbeatAt ? ` · ${lastHeartbeatAt}` : ""}
             </dd>
           </div>
           <div>
-            <dt className="text-[var(--biz-text-muted)]">Proof of Play (A3)</dt>
+            <dt className="text-[var(--biz-text-muted)]">Учёт воспроизведения</dt>
             <dd className="font-semibold text-[var(--biz-text)]">
-              {popOk ? "ok" : "–"}
+              {popOk ? "Подтверждено" : "–"}
               {lastPopAcceptedMs != null
-                ? ` · accepted_ms=${lastPopAcceptedMs}`
+                ? ` · учтено миллисекунд: ${lastPopAcceptedMs}`
                 : ""}
-              {popSampleSeq > 0 ? ` · seq=${popSampleSeq}` : ""}
+              {popSampleSeq > 0 ? ` · номер сообщения: ${popSampleSeq}` : ""}
               {lastPopAt ? ` · ${lastPopAt}` : ""}
             </dd>
           </div>
           <div>
-            <dt className="text-[var(--biz-text-muted)]">PoP audio_item (allowlist)</dt>
+            <dt className="text-[var(--biz-text-muted)]">Код проверочного звука</dt>
             <dd className="font-semibold break-all text-xs text-[var(--biz-text)]">
               {VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID}
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-[var(--biz-text-muted)]">Трек (audio)</dt>
+            <dt className="text-[var(--biz-text-muted)]">Трек</dt>
             <dd className="font-semibold text-[var(--biz-text)]">
               {pilot.title} · {pilot.program}
             </dd>
@@ -429,8 +424,7 @@ export default function VenuePlayerPage() {
 
         {credential ? (
           <p className="text-xs text-[var(--biz-text-muted)] break-all">
-            Credential хранится в sessionStorage этой вкладки (не логируется в UI
-            целиком в проде-политике; для slice показан хвост):{" "}
+            Ключ подключения сохранён для этой вкладки. Последние знаки: {" "}
             <code>…{credential.slice(-8)}</code>
           </p>
         ) : null}

@@ -32,7 +32,7 @@ export default function BusinessDomainBootstrapForm() {
     <form action={onSubmit} className="mt-5 space-y-3">
       <div>
         <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="organizationName">
-          Организация
+          Название заведения
         </label>
         <input
           id="organizationName"
@@ -58,7 +58,7 @@ export default function BusinessDomainBootstrapForm() {
       </div>
       <div>
         <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="businessCategory">
-          Тип бизнеса
+          Тип заведения
         </label>
         <input
           id="businessCategory"
@@ -82,7 +82,7 @@ export default function BusinessDomainBootstrapForm() {
         disabled={pending}
         className="business-app-btn business-app-btn-primary business-app-focus-ring"
       >
-        {pending ? "Создаём…" : "Создать организацию и точку"}
+        {pending ? "Создаём…" : "Подключить заведение"}
       </button>
     </form>
   );
