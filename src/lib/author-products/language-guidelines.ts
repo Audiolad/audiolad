@@ -18,7 +18,7 @@ export const PRODUCT_LANGUAGE_GUIDELINES = {
       "Основное название и другие смысловые надписи на обложке должны быть выполнены на русском языке кириллицей.",
   },
   coverTechnicalHint:
-    "Квадратная обложка от 1000 × 1000 px · JPG, PNG или WebP · до 3 МБ",
+    "Квадрат 1:1 · от 1000 × 1000 px · JPG, PNG или WebP · до 3 МБ. Если файл не квадратный, перед загрузкой откроется кадрирование",
   helpArticlePath: "/help/authors/language-and-formatting",
   helpArticleId: "help.authors.language-and-formatting",
 } as const;

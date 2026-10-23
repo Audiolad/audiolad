@@ -3,6 +3,10 @@
  * Author banner upload validation unit checks — safe without database access.
  */
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 import {
   AUTHOR_BANNER_ERROR_MESSAGES,
@@ -138,7 +142,7 @@ function testBannerHintAndMessages() {
 
 function testBannerUploadUsesDedicatedValidation() {
   const hookSource = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/useAuthorBannerUpload.ts",
+    resolve(ROOT, "src/components/author-dashboard/useAuthorBannerUpload.ts"),
     "utf8",
   );
 
@@ -162,9 +166,9 @@ function testBannerUploadUsesDedicatedValidation() {
   );
 }
 
-function testProductCoverValidationRelaxed() {
+function testProductCoverValidationSquareCrop() {
   const coverValidation = readFileSync(
-    "/var/www/audiolad/src/lib/author-products/cover-validation-client.ts",
+    resolve(ROOT, "src/lib/author-products/cover-validation-client.ts"),
     "utf8",
   );
 
@@ -173,18 +177,24 @@ function testProductCoverValidationRelaxed() {
     "product cover validation uses 400px minimum",
   );
   assert(
-    !coverValidation.includes("width !== height"),
-    "product cover validation no longer enforces strict 1:1 on client",
+    coverValidation.includes("decideCoverUploadAction"),
+    "product cover upload decides between direct upload and crop",
+  );
+  assert(
+    coverValidation.includes(
+      "Загрузите квадратную обложку (соотношение сторон 1:1)",
+    ),
+    "non-square cover without a cropper is rejected with the fallback copy",
   );
   assert(
     !coverValidation.includes("1000 × 1000"),
-    "product cover validation no longer requires 1000x1000 minimum",
+    "product cover validation does not require 1000x1000 minimum",
   );
 }
 
 function testAuthorProfileBannerPreview() {
   const authorBanner = readFileSync(
-    "/var/www/audiolad/src/components/author-dashboard/AuthorBannerUploadBlock.tsx",
+    resolve(ROOT, "src/components/author-dashboard/AuthorBannerUploadBlock.tsx"),
     "utf8",
   );
 
@@ -204,7 +214,7 @@ function testAuthorProfileBannerPreview() {
 
 function testApiRouteUsesSharedImagePipeline() {
   const route = readFileSync(
-    "/var/www/audiolad/src/app/api/author/profile/[kind]/route.ts",
+    resolve(ROOT, "src/app/api/author/profile/[kind]/route.ts"),
     "utf8",
   );
 
@@ -224,7 +234,7 @@ function run() {
   testBannerConfigContract();
   testBannerHintAndMessages();
   testBannerUploadUsesDedicatedValidation();
-  testProductCoverValidationRelaxed();
+  testProductCoverValidationSquareCrop();
   testAuthorProfileBannerPreview();
   testApiRouteUsesSharedImagePipeline();
   console.log("author-banner-validation-unit: ok");
