@@ -65,8 +65,10 @@ for (const api of ["/api/business/guest/coffee/track-url", "/api/business/guest/
 assert.equal(resolveBusinessProxyAction("business.audiolad.ru", "/api/catalog/play").action, "not_found", "no new platform API exposed");
 // a8240527 rework (Sergey 17.10.2026): ONE cabinet – the guest entry renders inside the shared
 // BusinessAppShell (sidebar / bottom nav), no separate guest branch or guest chrome.
+// data-biz-chrome only keeps /guest/coffee on the base tokens; the shell itself does not fork.
 const shell = read("src/components/business-app/BusinessAppShell.tsx");
-assert.doesNotMatch(shell, /isBusinessGuestPathname|business-app-guest"|usePathname/, "no guest-only shell branch");
+assert.doesNotMatch(shell, /isBusinessGuestPathname|business-app-guest"/, "no guest-only shell branch");
+assert.match(shell, /data-biz-chrome=\{guestPlayer \? "guest-player" : "cabinet"\}/, "guest player stays on the base theme");
 assert.match(shell, /<BusinessSidebar \/>[\s\S]*<BusinessBottomNav \/>/, "sidebar + bottom nav for everyone");
 assert.doesNotMatch(read("src/lib/business-app/host.ts"), /isBusinessGuestPathname/);
 const page = read("src/app/business-app/guest/coffee/page.tsx");
