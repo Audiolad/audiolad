@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationPath = join(
   repoRoot,
-  "supabase/migrations/20270113120000_business_player_live_claim_atomic.sql",
+  "supabase/migrations/20270114120000_business_player_live_claim_atomic.sql",
 );
 const migration = readFileSync(migrationPath, "utf8");
 
@@ -80,8 +80,8 @@ let cluster = null;
 
 function psqlArgs(sql, { tuples = true } = {}) {
   const args = cluster.mode === "initdb"
-    ? [cluster.psql, "-h", cluster.dir, "-p", cluster.port, "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"]
-    : ["docker", "exec", "-i", cluster.name, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"];
+    ? [cluster.psql, "-X", "-h", cluster.dir, "-p", cluster.port, "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"]
+    : ["docker", "exec", "-i", cluster.name, "psql", "-X", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"];
   if (tuples) args.push("-At");
   if (sql !== undefined) args.push("-c", sql);
   return args;
@@ -219,13 +219,16 @@ function startInitdb(bin) {
 function startDocker() {
   const port = String(20000 + Math.floor(Math.random() * 20000));
   const name = `al-live-claim-test-${port}`;
+  // Register the container before `docker run` so stopCluster() removes it even
+  // if `docker run` fails after the container was created (e.g. port bind error).
+  cluster = { mode: "docker", name, port, started: false };
   execFileSync("docker", [
     "run", "-d", "--name", name,
     "-e", "POSTGRES_HOST_AUTH_METHOD=trust",
     "-p", `127.0.0.1:${port}:5432`,
     "postgres:16",
   ], { stdio: "pipe" });
-  cluster = { mode: "docker", name, port, started: true };
+  cluster.started = true;
   const started = Date.now();
   while (Date.now() - started < 60000) {
     const probe = spawnSync("docker", ["exec", name, "pg_isready", "-U", "postgres"], { encoding: "utf8" });
@@ -408,6 +411,13 @@ async function main() {
   assertRow(later, SECRET_B, T_EXPIRY, T_AFTER);
 
   console.log("business-player-live-claim-concurrency: ok");
+}
+
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.once(signal, () => {
+    stopCluster();
+    process.exit(128 + (signal === "SIGINT" ? 2 : signal === "SIGTERM" ? 15 : 1));
+  });
 }
 
 try {

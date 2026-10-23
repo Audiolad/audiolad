@@ -207,7 +207,7 @@ assert.match(sql, /business_spa_track_visible/);
 assert.match(sql, /resolve_business_track_eligibility/);
 assert.doesNotMatch(activeSql, /audio_path|signedUrl|storage_path/);
 
-const atomic = readFileSync(new URL("../supabase/migrations/20270113120000_business_player_live_claim_atomic.sql", import.meta.url), "utf8");
+const atomic = readFileSync(new URL("../supabase/migrations/20270114120000_business_player_live_claim_atomic.sql", import.meta.url), "utf8");
 assert.match(atomic, /CREATE OR REPLACE FUNCTION public\.business_player_live_claim\(p_player_id uuid, p_device_secret text, p_now timestamptz\)/);
 assert.match(atomic, /RETURNS TABLE \(organization_id uuid, location_id uuid\)/);
 assert.match(atomic, /LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp/);
@@ -224,7 +224,7 @@ assert.match(atomic, /invalid_device_session/);
 assert.match(atomic, /no_access/);
 assert.doesNotMatch(atomic, /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.business_player_live_claim/i);
 assert.doesNotMatch(atomic, /\b(?:DELETE FROM|DROP |TRUNCATE|ALTER TABLE|CREATE TABLE)\b/i);
-assert.ok(readFileSync(new URL("../docs/DATABASE.md", import.meta.url), "utf8").includes("20270113120000_business_player_live_claim_atomic.sql"));
+assert.ok(readFileSync(new URL("../docs/DATABASE.md", import.meta.url), "utf8").includes("20270114120000_business_player_live_claim_atomic.sql"));
 console.log("business-spa-live-state-unit: all tests passed");
 
 // Mount the real component effect with a fake audio element and clock. No browser/DB.
