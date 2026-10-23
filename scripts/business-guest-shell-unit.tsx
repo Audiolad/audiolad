@@ -24,6 +24,8 @@ import {
   resolveBusinessAccess,
 } from "../src/lib/business-app/access";
 import type { BusinessChromeAccess } from "../src/lib/access-grants/access-line";
+import { peekChromeAccessWith, type PeekReader } from "../src/lib/access-grants/peek-closure";
+import type { GrantRow } from "../src/lib/access-grants/policy";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import type { GuestCoffeePlaylist } from "../src/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_GUEST_COFFEE_URL } from "../src/lib/business-app/host";
@@ -132,7 +134,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
   has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
   has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\}>/);
-  const peek = read("src/lib/access-grants/peek.server.ts");
+  const peek = read("src/lib/access-grants/peek.server.ts") + read("src/lib/access-grants/peek-closure.ts");
   hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }
 
@@ -251,3 +253,34 @@ closedApis().then(
   () => console.log("business-guest-shell-unit: OK"),
   (e) => { console.error(e); process.exit(1); },
 );
+
+// ---------------------------------------------------------------- peek walks the identity graph like resolve_access_grant
+void (async () => {
+  // Gift issued to account A on address X; account B is bound to X and Y; account C signs in with Y.
+  const grants: GrantRow[] = [{ emailHash: "X", userId: "A", kind: "business_new_client", startsAt: "2026-10-23T14:11:37Z", endsAt: "2026-11-22T14:11:37Z" }];
+  const bindings = [{ emailHash: "X", userId: "A" }, { emailHash: "X", userId: "B" }, { emailHash: "Y", userId: "B" }, { emailHash: "Y", userId: "C" }];
+  const reads: string[] = [];
+  const reader = (paid: string[] = []): PeekReader => ({
+    async edges(users, hashes) {
+      reads.push("edges");
+      return [...bindings, ...grants].filter((e) => users.includes(e.userId) || hashes.includes(e.emailHash)).map(({ emailHash, userId }) => ({ emailHash, userId }));
+    },
+    async grants(users, hashes) { return grants.filter((g) => users.includes(g.userId) || hashes.includes(g.emailHash)); },
+    async paidStamps() { return paid; },
+  });
+  const now = new Date("2026-10-23T15:00:00Z");
+  const c = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, now);
+  assert.deepEqual(c, { mode: "trial", endsAt: "2026-11-22T14:11:37Z" }, "chain A–X–B–Y–C: C sees the live gift");
+  const stranger = await peekChromeAccessWith(reader(), { userId: "D", emailHash: "Z" }, now);
+  assert.notEqual(stranger.mode, "trial", "unrelated account: no gift");
+  assert.equal(stranger.endsAt, null);
+  const over = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-22T14:11:37Z"));
+  assert.ok(over.mode !== "trial" && over.endsAt === null, "gift over at its exact end instant");
+  const paid = await peekChromeAccessWith(reader(["2026-12-31T10:00:00Z"]), { userId: "C", emailHash: "Y" }, new Date("2026-12-01T00:00:00Z"));
+  assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z" }, "paid period after the gift");
+  assert.ok(reads.length > 0);
+  console.log("business-guest-shell-unit: peek closure OK");
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

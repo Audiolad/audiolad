@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { createContext, useContext, type ReactNode } from "react";
 
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
@@ -9,6 +10,7 @@ import {
   hasLiveBusinessAccess,
   type BusinessChromeAccess,
 } from "@/lib/access-grants/access-line";
+import { BUSINESS_CONNECT_HREF } from "@/lib/business-app/access";
 
 const ChromeAccessContext = createContext<BusinessChromeAccess>(BUSINESS_NO_ACCESS);
 
@@ -40,6 +42,14 @@ export default function BusinessAccessLine({ access }: { access: BusinessChromeA
       <p className="business-app-muted">{line}</p>
       <p className="business-app-guest-bar__notice" role="status" data-testid="biz-locked-notice">
         {notice ?? ""}
+        {notice ? (
+          <>
+            {" "}
+            <Link href={BUSINESS_CONNECT_HREF} className="underline" data-testid="biz-locked-connect">
+              Подключить точку
+            </Link>
+          </>
+        ) : null}
       </p>
     </section>
   );

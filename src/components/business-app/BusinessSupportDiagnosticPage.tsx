@@ -29,6 +29,17 @@ function Field({
   );
 }
 
+/** Visitor-facing names instead of «RU» / «Europe/Moscow». */
+function countryLabelRu(code: string | null | undefined): string {
+  if (!code) return "–";
+  return code.toUpperCase() === "RU" ? "Россия" : "Другая страна";
+}
+
+function timezoneLabelRu(zone: string | null | undefined): string {
+  if (!zone) return "–";
+  return zone === "Europe/Moscow" ? "Московское время" : "Местное время точки";
+}
+
 export default function BusinessSupportDiagnosticPage({
   diagnostics,
 }: {
@@ -83,8 +94,8 @@ export default function BusinessSupportDiagnosticPage({
           />
           <Field label="Точка" value={location?.name ?? "–"} />
           <Field label="Код точки" value={location?.id ?? "–"} mono />
-          <Field label="Страна" value={location?.countryCode ?? "–"} />
-          <Field label="Часовой пояс" value={location?.timezone ?? "–"} />
+          <Field label="Страна" value={countryLabelRu(location?.countryCode)} />
+          <Field label="Часовой пояс" value={timezoneLabelRu(location?.timezone)} />
           <Field label="Статус точки" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
           <Field
             label="Основной зал"

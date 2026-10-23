@@ -5,33 +5,42 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { BUSINESS_NO_ACCESS, type BusinessChromeAccess } from "./access-line";
 import { hashAccessEmail } from "./email-hash";
-import { BUSINESS_NEW_CLIENT_GRANT_KIND, isEmailConfirmed, resolveCustomerAccess, type GrantRow } from "./policy";
+import { peekChromeAccessWith, type PeekEdge, type PeekReader } from "./peek-closure";
+import { BUSINESS_NEW_CLIENT_GRANT_KIND, isEmailConfirmed, type GrantRow } from "./policy";
 
 type Row = Record<string, unknown>;
 
-function earliest(rows: Row[]): GrantRow | null {
-  let best: GrantRow | null = null;
-  for (const row of rows) {
-    if (typeof row.email_hash !== "string" || typeof row.user_id !== "string") continue;
-    if (typeof row.starts_at !== "string" || typeof row.ends_at !== "string") continue;
-    const grant: GrantRow = {
-      emailHash: row.email_hash,
-      userId: row.user_id,
-      kind: typeof row.kind === "string" ? row.kind : BUSINESS_NEW_CLIENT_GRANT_KIND,
-      startsAt: row.starts_at,
-      endsAt: row.ends_at,
-    };
-    if (!best || Date.parse(grant.startsAt) < Date.parse(best.startsAt)) best = grant;
-  }
-  return best;
+class PeekReadError extends Error {}
+
+function rowsOf(result: { data: unknown; error: unknown }): Row[] {
+  if (result.error) throw new PeekReadError("read failed");
+  return (result.data ?? []) as Row[];
+}
+
+function edgeOf(row: Row): PeekEdge | null {
+  return typeof row.email_hash === "string" && typeof row.user_id === "string"
+    ? { emailHash: row.email_hash, userId: row.user_id }
+    : null;
+}
+
+function grantOf(row: Row): GrantRow | null {
+  if (typeof row.email_hash !== "string" || typeof row.user_id !== "string") return null;
+  if (typeof row.starts_at !== "string" || typeof row.ends_at !== "string") return null;
+  return {
+    emailHash: row.email_hash,
+    userId: row.user_id,
+    kind: typeof row.kind === "string" ? row.kind : BUSINESS_NEW_CLIENT_GRANT_KIND,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+  };
 }
 
 /**
  * READ-ONLY peek at the signed-in visitor's Business access for the cabinet chrome (guest strip
  * vs calm «Бесплатный доступ до …» line). Unlike activateBusinessTrial / resolve_access_grant it
- * never issues a gift and never writes identity bindings: plain SELECTs by user id and by the
- * address hashes already bound to this user. Any failure falls back to «no access» (the strip
- * then shows as before), so the layout never breaks on this read.
+ * never issues a gift and never writes identity bindings: plain SELECTs that walk the same
+ * identity graph as resolve_access_grant (see peek-closure.ts). Any failure falls back to
+ * «no access» (the strip then shows as before), so the layout never breaks on this read.
  */
 export async function peekBusinessChromeAccess(now: Date = new Date()): Promise<BusinessChromeAccess> {
   try {
@@ -42,45 +51,36 @@ export async function peekBusinessChromeAccess(now: Date = new Date()): Promise<
     if (!user || !isEmailConfirmed(user)) return BUSINESS_NO_ACCESS;
     const kind = BUSINESS_NEW_CLIENT_GRANT_KIND;
     const db = createServiceRoleClient();
+    const grantCols = "email_hash, user_id, kind, starts_at, ends_at";
 
-    const hashes = new Set<string>();
-    const own = hashAccessEmail(user.email);
-    if (own) hashes.add(own);
-    const bound = await db
-      .from("access_grant_identities")
-      .select("email_hash")
-      .eq("user_id", user.id)
-      .eq("kind", kind);
-    if (bound.error) return BUSINESS_NO_ACCESS;
-    for (const row of (bound.data ?? []) as Row[]) {
-      if (typeof row.email_hash === "string") hashes.add(row.email_hash);
-    }
+    const select = async (table: "access_grant_identities" | "access_grants", cols: string, userIds: string[], hashes: string[]) => {
+      const out: Row[] = [];
+      if (userIds.length) out.push(...rowsOf(await db.from(table).select(cols).in("user_id", userIds).eq("kind", kind)));
+      if (hashes.length) out.push(...rowsOf(await db.from(table).select(cols).in("email_hash", hashes).eq("kind", kind)));
+      return out;
+    };
 
-    const cols = "email_hash, user_id, kind, starts_at, ends_at";
-    const byUser = await db.from("access_grants").select(cols).eq("user_id", user.id).eq("kind", kind);
-    if (byUser.error) return BUSINESS_NO_ACCESS;
-    const rows: Row[] = [...((byUser.data ?? []) as Row[])];
-    const paidStamps: string[] = [];
-    const paidByUser = await db.from("access_paid_periods").select("paid_until").eq("user_id", user.id).eq("kind", kind);
-    if (paidByUser.error) return BUSINESS_NO_ACCESS;
-    for (const row of (paidByUser.data ?? []) as Row[]) if (typeof row.paid_until === "string") paidStamps.push(row.paid_until);
+    const reader: PeekReader = {
+      async edges(userIds, hashes) {
+        const rows = [
+          ...(await select("access_grant_identities", "email_hash, user_id", userIds, hashes)),
+          ...(await select("access_grants", "email_hash, user_id", userIds, hashes)),
+        ];
+        return rows.map(edgeOf).filter((edge): edge is PeekEdge => edge !== null);
+      },
+      async grants(userIds, hashes) {
+        return (await select("access_grants", grantCols, userIds, hashes))
+          .map(grantOf)
+          .filter((grant): grant is GrantRow => grant !== null);
+      },
+      async paidStamps(emailHash, userId) {
+        const rows = rowsOf(await db.from("access_paid_periods").select("paid_until").eq("user_id", userId).eq("kind", kind));
+        if (emailHash) rows.push(...rowsOf(await db.from("access_paid_periods").select("paid_until").eq("email_hash", emailHash).eq("kind", kind)));
+        return rows.map((row) => row.paid_until).filter((value): value is string => typeof value === "string");
+      },
+    };
 
-    if (hashes.size > 0) {
-      const list = [...hashes];
-      const byHash = await db.from("access_grants").select(cols).in("email_hash", list).eq("kind", kind);
-      if (byHash.error) return BUSINESS_NO_ACCESS;
-      rows.push(...((byHash.data ?? []) as Row[]));
-      const paidByHash = await db.from("access_paid_periods").select("paid_until").in("email_hash", list).eq("kind", kind);
-      if (paidByHash.error) return BUSINESS_NO_ACCESS;
-      for (const row of (paidByHash.data ?? []) as Row[]) if (typeof row.paid_until === "string") paidStamps.push(row.paid_until);
-    }
-
-    const paidUntil = paidStamps.length
-      ? paidStamps.reduce((max, value) => (Date.parse(value) > Date.parse(max) ? value : max))
-      : null;
-    const access = resolveCustomerAccess({ now, emailConfirmed: true, grant: earliest(rows), paidUntil });
-    if (access.mode !== "trial" && access.mode !== "paid") return { mode: access.mode, endsAt: null };
-    return { mode: access.mode, endsAt: access.endsAt };
+    return await peekChromeAccessWith(reader, { userId: user.id, emailHash: hashAccessEmail(user.email) ?? null }, now);
   } catch {
     return BUSINESS_NO_ACCESS;
   }
