@@ -320,9 +320,6 @@ export default function BusinessOnboardingWizardPage({
             <p className="rounded-xl border border-[var(--biz-yellow-border)] bg-[var(--biz-yellow-bg)] px-3 py-2 text-sm text-[var(--biz-text)]">
               {preview.noAudioNote}
             </p>
-            <p className="rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-2 text-sm text-[var(--biz-text-muted)]">
-              {preview.rightsSafeDisclaimer}
-            </p>
           </>
         ) : null}
 
@@ -394,7 +391,7 @@ export default function BusinessOnboardingWizardPage({
               Точка создана
             </h2>
             <p className="text-[var(--biz-text)]">
-              Точка готова. Откройте плеер и проверьте подключение. Музыка появится, когда права на треки будут подтверждены.
+              Точка готова. Откройте плеер и проверьте подключение.
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
@@ -423,9 +420,6 @@ export default function BusinessOnboardingWizardPage({
                 На главную
               </Link>
             </div>
-            <p className="text-sm text-[var(--biz-text-muted)]">
-              {preview.rightsSafeDisclaimer}
-            </p>
           </>
         ) : null}
 

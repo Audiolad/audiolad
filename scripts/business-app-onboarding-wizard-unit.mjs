@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import {
   BUSINESS_ONBOARDING_ATMOSPHERES,
   BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE,
-  BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER,
   BUSINESS_ONBOARDING_STEPS,
   BUSINESS_ONBOARDING_TYPES,
   buildBusinessOnboardingPreviewSummary,
@@ -89,10 +88,24 @@ const preview = buildBusinessOnboardingPreviewSummary({
 });
 assert.equal(preview.typeLabel, "Спа и отдых");
 assert.match(preview.atmosphereLabel, /Современный/);
-assert.equal(preview.rightsSafeDisclaimer, BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER);
+// Sergey 23.10.2026 21:21: the "no rights-confirmed tracks yet" box must not appear at all.
+assert.equal("rightsSafeDisclaimer" in preview, false);
 assert.equal(preview.noAudioNote, BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE);
-assert.match(preview.rightsSafeDisclaimer, /нужны подтверждённые права на каждый трек/);
-assert.match(preview.rightsSafeDisclaimer, /Пока таких треков в подборке нет/i);
+{
+  const wizardSrc = readFileSync(
+    join(repoRoot, "src/components/business-app/BusinessOnboardingWizardPage.tsx"),
+    "utf8",
+  );
+  const wizardLib = readFileSync(
+    join(repoRoot, "src/lib/business-app/onboarding-wizard.ts"),
+    "utf8",
+  );
+  for (const src of [wizardSrc, wizardLib]) {
+    assert.doesNotMatch(src, /Пока таких треков в подборке нет/);
+    assert.doesNotMatch(src, /подтверждённые права на каждый трек/);
+    assert.doesNotMatch(src, /Музыка появится, когда права на треки будут подтверждены/);
+  }
+}
 assert.match(preview.noAudioNote, /Музыка здесь пока не играет/);
 
 const ok = validateBusinessOnboardingConfirm({
@@ -143,7 +156,7 @@ const page = readFileSync(
 );
 assert.match(page, /bootstrapBusinessOrganizationWithLocation/);
 assert.match(page, /Музыка для заведения за минуту/);
-assert.match(page, /Музыка появится, когда права на треки будут подтверждены/);
+assert.match(page, /Точка готова\. Откройте плеер и проверьте подключение\.\n/);
 assert.doesNotMatch(page, /лицензирован[аоы]/i);
 assert.doesNotMatch(page, /ELIGIBLE\s*=\s*true/);
 
