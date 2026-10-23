@@ -61,6 +61,7 @@ assert.deepEqual(parseBoardCounts({ plan: 87, working: 7, review: 0, archive: 13
   review: 0,
   archive: 130,
   archiveByStatus: { accepted: 90, cancelled: 36, done: 4 },
+  source: "board_counts",
 });
 
 // 3. Live shape of the bug: Core returns a 100-row history page, 130 archived tasks in total.
@@ -109,12 +110,39 @@ function capped(name: string): RawStatus {
   assert.match(html, /name="archive_limit" value="200"/, "filter form keeps the archive window");
 }
 
-// 5. Older Core without board_counts: the counter keeps the previous formula (stnow = 68).
+// 5. Older Core without board_counts: history_included + omitted_history_count (Core's SQL count) is the total.
 {
   const { model } = composeAiCompanyBoard(load(raw("stnow-current")), load(raw("stnow-archive")), parseHistoryFilters({}));
   assert.ok(model);
-  assert.equal(model.boardCounts, null);
+  assert.equal(model.boardCounts?.source, "history_count");
   assert.equal(count(render(model, parseHistoryFilters({})), "archive"), 68);
+  const old = (name: string) => {
+    const value = raw(name);
+    value.tasks_page = { ...value.tasks_page, history_included: 100, history_complete: false, omitted_history_count: 30 };
+    return value;
+  };
+  const filters = parseHistoryFilters({});
+  const legacy = composeAiCompanyBoard(load(old("stnow-current")), load(old("stnow-archive")), filters).model;
+  assert.ok(legacy);
+  assert.equal(legacy.boardCounts?.archive, 130, "live bug shape on the current Core: 100 loaded + 30 omitted");
+  assert.deepEqual(legacy.archivePage, { loaded: 100, total: 130, nextLimit: 200 });
+  const html = render(legacy, filters);
+  assert.equal(count(html, "archive"), 130);
+  assert.match(html, />Показать ещё</);
+  // On an older history page the history count covers older tasks only: keep the previous formula.
+  const paged = parseHistoryFilters({ history_before: "2026-10-01T00:00:00.000Z" });
+  const pagedModel = composeAiCompanyBoard(load(old("stnow-current")), load(old("stnow-archive")), paged).model;
+  assert.equal(pagedModel?.boardCounts, null);
+  // No page facts at all: previous formula.
+  const bare = (name: string) => {
+    const value = raw(name);
+    value.tasks_page = { ...value.tasks_page, history_included: undefined, omitted_history_count: undefined };
+    return value;
+  };
+  const bareModel = composeAiCompanyBoard(load(bare("stnow-current")), load(bare("stnow-archive")), filters).model;
+  assert.ok(bareModel);
+  assert.equal(bareModel.boardCounts, null);
+  assert.equal(count(render(bareModel, filters), "archive"), 68);
 }
 
 // 6. Cursor chaining: a Core that clamps to 100 rows is paged with history_before until the window is full.

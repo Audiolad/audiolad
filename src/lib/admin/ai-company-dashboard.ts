@@ -416,6 +416,8 @@ export type BoardCounts = {
   review: number | null;
   archive: number | null;
   archiveByStatus: Record<string, number>;
+  /** "board_counts": Core board_counts. "history_count": older Core – tasks_page history count (server count) + active archived tasks. */
+  source: "board_counts" | "history_count";
 };
 
 export type ExecutiveRun = {
@@ -2006,6 +2008,7 @@ export function parseBoardCounts(raw: unknown): BoardCounts | null {
     review: countValue(record.review),
     archive: countValue(record.archive),
     archiveByStatus: byStatus,
+    source: "board_counts",
   };
   return counts.plan == null && counts.working == null && counts.review == null && counts.archive == null ? null : counts;
 }
@@ -3746,7 +3749,8 @@ export function composeAiCompanyBoard(
   const builtModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
   if (!builtModel || !current.data) return { model: null, acceptanceAvailable, sourceError: current.error };
   // Tab counts come from Core's server count over all tasks, never from the length of a loaded page.
-  const boardCounts = current.data.boardCounts ?? archive.data?.boardCounts ?? null;
+  const boardCounts =
+    current.data.boardCounts ?? archive.data?.boardCounts ?? legacyArchiveCount(current.data, archive.data, filters);
   const currentModel: DashboardModel = {
     ...builtModel,
     boardCounts,
@@ -3769,6 +3773,31 @@ export function composeAiCompanyBoard(
     acceptanceAvailable,
     sourceError: null,
   };
+}
+
+/**
+ * Older Core without `board_counts`: tasks_page.history_included + omitted_history_count is Core's own
+ * SQL count of terminal tasks (history count query), plus active tasks Core projects into «Архив».
+ * Only on the first history page – with history_before the count covers older tasks only.
+ */
+export function legacyArchiveCount(
+  current: CompanyStatus,
+  archive: CompanyStatus | null,
+  filters: HistoryFilters,
+): BoardCounts | null {
+  if (filters.historyBefore) return null;
+  const pages = [current, archive].filter((status): status is CompanyStatus => status != null);
+  const counted = pages.find(
+    (status) => status.completeness.historyIncluded != null && status.completeness.omittedHistoryCount != null,
+  );
+  if (!counted) return null;
+  const terminal = (counted.completeness.historyIncluded ?? 0) + (counted.completeness.omittedHistoryCount ?? 0);
+  const activeArchived = new Set(
+    pages.flatMap((status) =>
+      status.tasks.flatMap((task) => (task.active === true && task.boardTab === "archive" && task.id ? [task.id] : [])),
+    ),
+  );
+  return { plan: null, working: null, review: null, archive: terminal + activeArchived.size, archiveByStatus: {}, source: "history_count" };
 }
 
 /** «Архив» load-more state from the current snapshot's history window and Core's server count. */
