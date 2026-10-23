@@ -1,0 +1,9 @@
+# Райтер, режим sz: стандартные правила gitleaks плюс одно исключение.
+# Ключ чек-листа статьи (storageKey: <slug>-5-shagov) gitleaks принимает за generic-api-key.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "sergey-zoya.ru checklist storage keys (slug-5-shagov) are not secrets"
+regexTarget = "line"
+regexes = ['''storageKey: [a-z0-9-]+-5-shagov\s*$''']
