@@ -108,6 +108,20 @@ function capped(name: string): RawStatus {
   assert.match(html, /Загружено из Company Core: 130 из 130/);
   assert.doesNotMatch(html, /Показать ещё/);
   assert.match(html, /name="archive_limit" value="200"/, "filter form keeps the archive window");
+
+  // History complete plus one active task Core shows in «Архив»: 131 of 131, no endless «Показать ещё».
+  const withActive = (name: string) => {
+    const value = done(name);
+    const template = raw("stnow-current").tasks.find((task) => task.active === true);
+    assert.ok(template);
+    value.tasks = [...value.tasks, { ...template, id: "00000000-0000-4000-8000-0000000a0001", board_tab: "archive" }];
+    value.board_counts = { ...boardCounts, archive: 131 };
+    return value;
+  };
+  const activeModel = composeAiCompanyBoard(load(withActive("stnow-current")), load(withActive("stnow-archive")), filters).model;
+  assert.ok(activeModel);
+  assert.deepEqual(activeModel.archivePage, { loaded: 131, total: 131, nextLimit: null });
+  assert.doesNotMatch(render(activeModel, filters), /Показать ещё/);
 }
 
 // 5. Older Core without board_counts: history_included + omitted_history_count (Core's SQL count) is the total.
@@ -213,6 +227,38 @@ async function cursorChaining() {
   const a = parsed({ ...raw("stnow-current"), tasks: all.slice(0, 3), tasks_page: { history_included: 3, history_complete: false } });
   const b = parsed({ ...raw("stnow-current"), tasks: all.slice(2, 5), tasks_page: { history_included: 3, history_complete: true } });
   assert.equal(mergeStatusHistoryPage(a, b).tasks.length, 5);
+
+  // Merge keeps top-level events of the next page (not only events embedded in new tasks).
+  const lateEvent = { event_type: "executive_progress", agent_slug: "executive", task_id: all[2].id, payload: {}, created_at: "2026-10-01T00:00:00.000Z" };
+  const c = parsed({ ...raw("stnow-current"), recent_events: [], tasks: all.slice(0, 3), tasks_page: { history_included: 3, history_complete: false } });
+  const d = parsed({ ...raw("stnow-current"), recent_events: [lateEvent], tasks: all.slice(2, 5), tasks_page: { history_included: 3, history_complete: true } });
+  const merged = mergeStatusHistoryPage(c, d);
+  assert.ok(merged.events.some((event) => event.createdAt === lateEvent.created_at && event.taskId === all[2].id), "top-level event of the next page is kept");
+
+  // A Core that ignores history_before repeats the first page: stop, do not count it twice.
+  const repeatRequests: string[] = [];
+  const repeating = async (path: string) => {
+    repeatRequests.push(path);
+    const rows = all.slice(0, 100);
+    return load({
+      ...raw("stnow-current"),
+      tasks: rows,
+      tasks_page: {
+        active_complete: true,
+        history_included: rows.length,
+        history_limit: 100,
+        history_next_before: rows.at(-1)?.updated_at ?? null,
+        history_complete: false,
+        omitted_history_count: 150,
+        acceptance_view: "current",
+      },
+    });
+  };
+  const repeated = await loadCompanyStatusWindow(repeating, parseHistoryFilters({ archive_limit: "300" }), "current");
+  assert.equal(repeated.data?.tasks.length, 100);
+  assert.equal(repeated.data?.completeness.historyIncluded, 100, "a repeated page adds no history");
+  assert.equal(repeated.data?.completeness.omittedHistoryCount, 150);
+  assert.equal(repeatRequests.length, 2, "one retry of the cursor, then stop");
 }
 
 cursorChaining().then(

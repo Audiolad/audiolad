@@ -2023,7 +2023,8 @@ export function mergeStatusHistoryPage(base: CompanyStatus, next: CompanyStatus)
   return {
     ...base,
     tasks: [...base.tasks, ...added],
-    events: dedupeEvents([...base.events, ...added.flatMap((task) => task.taskEvents)]),
+    // next.events already holds the page's top-level and embedded task events.
+    events: dedupeEvents([...base.events, ...next.events, ...added.flatMap((task) => task.taskEvents)]),
     completeness: {
       ...base.completeness,
       historyComplete: next.completeness.historyComplete,
@@ -2035,6 +2036,13 @@ export function mergeStatusHistoryPage(base: CompanyStatus, next: CompanyStatus)
           : null,
     },
   };
+}
+
+function historyCursorAdvanced(requested: string, returned: string | null): boolean {
+  if (returned == null) return true;
+  const before = Date.parse(requested);
+  const after = Date.parse(returned);
+  return Number.isFinite(before) && Number.isFinite(after) && after < before;
 }
 
 function parseArchiveLimit(value: string | null | undefined): number {
@@ -2066,10 +2074,14 @@ export async function loadCompanyStatusWindow(
   if (!first.data) return first;
   let data = first.data;
   // Bounded: ARCHIVE_LIMIT_MAX / 100 pages even against an older Core that clamps to 100 rows.
+  const requested = new Set<string>();
   for (let page = 0; page < Math.ceil(ARCHIVE_LIMIT_MAX / ARCHIVE_PAGE_SIZE); page += 1) {
     const loaded = data.completeness.historyIncluded;
     const cursor = data.completeness.nextCursor;
     if (loaded == null || loaded >= want || data.completeness.historyComplete !== false || !cursor) break;
+    // A repeated cursor would re-read the same page: stop and keep the last valid page facts.
+    if (requested.has(cursor) || (filters.historyBefore != null && cursor === filters.historyBefore)) break;
+    requested.add(cursor);
     const next = await fetchPage(
       companyStatusRequestPath(
         { ...filters, historyBefore: cursor },
@@ -2078,6 +2090,9 @@ export async function loadCompanyStatusWindow(
       ),
     );
     if (!next.data || !next.data.completeness.historyIncluded) break;
+    // Core reads `updated_at < cursor`, so a real next page ends strictly older than the cursor.
+    // A repeated or non-advancing page (e.g. a Core that ignores history_before) is not merged.
+    if (!historyCursorAdvanced(cursor, next.data.completeness.nextCursor)) break;
     data = mergeStatusHistoryPage(data, next.data);
   }
   return { data, error: null };
@@ -3754,7 +3769,7 @@ export function composeAiCompanyBoard(
   const currentModel: DashboardModel = {
     ...builtModel,
     boardCounts,
-    archivePage: archivePageModel(current.data, filters, boardCounts),
+    archivePage: archivePageModel(current.data, filters, boardCounts, archive.data),
   };
   if (!acceptanceAvailable) {
     return { model: { ...currentModel, acceptedArchive: [], acceptedArchiveError: null }, acceptanceAvailable, sourceError: null };
@@ -3780,6 +3795,15 @@ export function composeAiCompanyBoard(
  * SQL count of terminal tasks (history count query), plus active tasks Core projects into «Архив».
  * Only on the first history page – with history_before the count covers older tasks only.
  */
+/** Active (non-terminal) tasks the board shows in «Архив», unique across the loaded snapshots. */
+function activeArchivedIds(pages: readonly (CompanyStatus | null | undefined)[]): Set<string> {
+  return new Set(
+    pages.flatMap((status) =>
+      (status?.tasks ?? []).flatMap((task) => (task.active === true && task.boardTab === "archive" && task.id ? [task.id] : [])),
+    ),
+  );
+}
+
 export function legacyArchiveCount(
   current: CompanyStatus,
   archive: CompanyStatus | null,
@@ -3792,11 +3816,7 @@ export function legacyArchiveCount(
   );
   if (!counted) return null;
   const terminal = (counted.completeness.historyIncluded ?? 0) + (counted.completeness.omittedHistoryCount ?? 0);
-  const activeArchived = new Set(
-    pages.flatMap((status) =>
-      status.tasks.flatMap((task) => (task.active === true && task.boardTab === "archive" && task.id ? [task.id] : [])),
-    ),
-  );
+  const activeArchived = activeArchivedIds(pages);
   return { plan: null, working: null, review: null, archive: terminal + activeArchived.size, archiveByStatus: {}, source: "history_count" };
 }
 
@@ -3805,12 +3825,16 @@ export function archivePageModel(
   status: CompanyStatus,
   filters: HistoryFilters,
   boardCounts: BoardCounts | null,
+  archive: CompanyStatus | null = null,
 ): ArchivePageModel | null {
-  const loaded = status.completeness.historyIncluded;
-  if (loaded == null) return null;
+  const history = status.completeness.historyIncluded;
+  if (history == null) return null;
+  // Same population as the counter: loaded terminal history plus active tasks shown in «Архив».
+  const loaded = history + activeArchivedIds([status, archive]).size;
   const total = boardCounts?.archive ?? null;
   const limit = filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
-  const more = status.completeness.historyComplete === false || (total != null && loaded < total);
-  const nextLimit = more && limit < ARCHIVE_LIMIT_MAX ? Math.min(Math.max(limit, loaded) + ARCHIVE_PAGE_SIZE, ARCHIVE_LIMIT_MAX) : null;
+  const complete = status.completeness.historyComplete;
+  const more = complete === false || (complete == null && total != null && loaded < total);
+  const nextLimit = more && limit < ARCHIVE_LIMIT_MAX ? Math.min(Math.max(limit, history) + ARCHIVE_PAGE_SIZE, ARCHIVE_LIMIT_MAX) : null;
   return { loaded, total, nextLimit };
 }
