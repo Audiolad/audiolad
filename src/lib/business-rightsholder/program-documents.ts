@@ -10,6 +10,7 @@ import {
   RIGHTS_DECLARATION_MD,
   RIGHTS_DECLARATION_MD_SHA256,
 } from "./legal-drafts/content";
+import { PROGRAM_TERMS_R6_2_DRAFT_MD, PROGRAM_TERMS_R6_2_DRAFT_MD_SHA256 } from "./legal-drafts/program-terms-r6-2-draft";
 
 export type ProgramDocumentKey = "business_program_terms" | "business_music_rights_declaration";
 
@@ -75,6 +76,22 @@ export const UNIFIED_PROGRAM_TERMS_DOCUMENT: PublicProgramDocument = {
   version: "r8-2026-10-18",
   markdown: PROGRAM_TERMS_MD,
   sha256: PROGRAM_TERMS_MD_SHA256,
+};
+
+/**
+ * Draft r6.2 of the legacy program terms (23.10.2026, task b01d3006). NOT published and not wired into
+ * programTermsDocument(): r6.1 remains the accepted edition and its consent records are untouched.
+ * Only two lines differ from r6.1: the edition date and п. «Лицензиар» (generic operator name, requisites
+ * referenced via /requisites). Publishing needs the owner's decision, a new business_program_document_versions
+ * row and a re-consent step; if the publication date changes, the date line and this checksum change too.
+ */
+export const PROGRAM_TERMS_R6_2_DRAFT_DOCUMENT: PublicProgramDocument = {
+  ...PUBLIC_PROGRAM_DOCUMENTS.business_program_terms,
+  version: "r6.2-2026-10-23",
+  date: "2026-10-23",
+  status: "draft",
+  markdown: PROGRAM_TERMS_R6_2_DRAFT_MD,
+  sha256: PROGRAM_TERMS_R6_2_DRAFT_MD_SHA256,
 };
 
 export function programTermsDocument(unifiedAgreementEnabled: boolean): PublicProgramDocument {
