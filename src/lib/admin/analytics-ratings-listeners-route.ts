@@ -24,7 +24,7 @@ export type RatingsListenersAccessLogInput = {
   kind: "list" | "detail";
   targetUserId?: string | null;
   targetEmail?: string | null;
-  counts: Record<string, number | boolean>;
+  counts: Record<string, number | boolean | string>;
 };
 
 export type RatingsListenersRouteDeps = {

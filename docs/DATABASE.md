@@ -13,6 +13,27 @@ Validation: `npm run test:business-workspace-trial`.
 Details and rollback: `docs/business/access-grants.md`.
 Continuation: the owner applies the migration through the established process.
 
+## Guest practice ratings (pending owner apply)
+
+Migration `20270121120000_guest_practice_ratings.sql` is additive and is not
+applied by the draft that adds it. It creates `guest_listen_stats`,
+`guest_listen_item_credit`, `guest_practice_ratings`,
+`guest_practice_rating_events`, `guest_captcha_tokens`,
+`guest_rating_activity` and `guest_rating_network_guests`. RLS is enabled and
+only `service_role` can use the tables and RPCs. No `auth.users` rows are
+inserted. `practice_ratings` and `set_practice_rating` are not altered.
+`claim_guest_practice_ratings` links a guest row to an account.
+`p_copy_to_account` defaults to false, so `practice_ratings` is not written.
+The application passes true only when `GUEST_RATINGS_CLAIM_COPY_ENABLED` is
+on, and only then calls the existing `set_practice_rating` once. An existing
+account vote wins and supersedes the guest row without a rewrite. Guest rows
+with `excluded_at` set are skipped by the claim, so a moderated-out vote never
+reaches `practice_ratings`. Once a row is linked (`claimed_by_user_id`) or
+superseded, `set_guest_practice_rating` refuses further guest edits. Rows are
+not deleted. `guest_rating_listen_threshold_ms` is revoked from `PUBLIC`,
+`anon` and `authenticated`. Apply and rollback steps are in
+`docs/ratings/GUEST_RATINGS_ENABLEMENT.md`.
+
 ## Business declared rightsholder (pending owner approval)
 
 Migration `20270112120000_business_declared_rightsholder.sql` is prepared but

@@ -25,6 +25,7 @@ export type MaxProductRatingView = {
     totalStars: number;
     ratingCount: number;
   };
+  guestCollect?: boolean;
 };
 
 export type MaxProductContentTrack = {
@@ -214,6 +215,7 @@ export function readMaxProductDetail(value: unknown): MaxProductDetailView | nul
         totalStars: aggregate.totalStars,
         ratingCount: aggregate.ratingCount,
       },
+      ...(value.rating.guestCollect === true ? { guestCollect: true } : {}),
     },
     appreciation,
     nextStep: readMiniAppNextStep(value.nextStep),
