@@ -334,7 +334,7 @@ const page = readFileSync("src/app/(platform)/admin/ai-company/page.tsx", "utf8"
 const dashboardSource = readFileSync("src/components/admin/AiCompanyDashboard.tsx", "utf8");
 assert.match(page, /requireAiCompanyView\(\)/);
 assert.match(page, /parseCompanyStatus/);
-assert.match(page, /companyStatusRequestPath/);
+assert.match(page, /loadCompanyStatusWindow/, "page loads Core through the archive window (companyStatusRequestPath + cursor)");
 assert.match(page, /<AiCompanyLiveRefresh/);
 assert.doesNotMatch(page, /updated_at/);
 assert.doesNotMatch(page, /httpEquiv|http-equiv/);
