@@ -221,6 +221,7 @@
     "test:seo-analytics-phase1": "npx tsx scripts/seo-analytics-phase1-unit.mts",
     "test:admin-seo-reservation-release": "npx tsx scripts/admin-seo-reservation-release-unit.mjs && node scripts/admin-seo-reservation-release-sql-unit.mjs",
     "test:seo-query-analysis": "npx tsx scripts/seo-query-analysis-unit.mjs",
+    "test:supabase-fetch-all-pages": "npx tsx scripts/supabase-fetch-all-pages-unit.mjs",
     "test:seo-wordstat-intake": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/seo-wordstat-intake-unit.mjs",
     "test:product-seo-autofill": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/product-seo-autofill-unit.mjs",
     "test:author-product-recommendations-title": "npx tsx scripts/author-product-recommendations-title-unit.mjs",

@@ -15,7 +15,7 @@ assert.match(shell, /\blg:px-8\b/);
 
 const client = read("src/components/admin/AdminSeoQueriesClient.tsx");
 assert.match(client, /Нужно проверить/);
-assert.match(client, /Одобрен — не закреплён/);
+assert.match(client, /Одобрен – не закреплён/);
 assert.match(client, /Закрепить автору/);
 assert.match(client, /seo-query-\$\{row\.id\}/);
 assert.match(client, /proposal_id/);

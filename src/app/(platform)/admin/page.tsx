@@ -4,15 +4,11 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import AdminAnalyticsWorkbench from "@/components/admin/AdminAnalyticsWorkbench";
 import AdminSectionError from "@/components/admin/AdminSectionError";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
-import AuthorApplicationsAttentionCard from "@/components/admin/AuthorApplicationsAttentionCard";
-import CommercialApplicationsAttentionCard from "@/components/admin/CommercialApplicationsAttentionCard";
 import {
   EcompanyCatalogStatsFallback,
   EcompanyCatalogStatsSection,
 } from "@/components/admin/EcompanyCatalogStats";
 import { getAdminAnalyticsSummaryBundle } from "@/lib/admin/analytics-queries";
-import { getCachedAdminAuthorApplicationAttentionSummary } from "@/lib/admin/author-application-attention-cache";
-import { getCachedAdminCommercialApplicationAttentionSummary } from "@/lib/admin/commercial-application-attention-cache";
 import {
   getFirstAllowedAdminPath,
   requireAdminPanelAccess,
@@ -55,7 +51,6 @@ export default async function AdminOverviewPage({
     "analytics.view",
   );
   const params = await searchParams;
-  const canViewAuthors = snapshotHasPermission(session.access, "authors.view");
   const retryHref = adminOverviewRetryHref(params);
 
   const loaded = await loadAdminOverviewSections({
@@ -71,37 +66,13 @@ export default async function AdminOverviewPage({
             deviceType: params.deviceType,
           })
       : null,
-    commercial: canViewAuthors
-      ? () => getCachedAdminCommercialApplicationAttentionSummary()
-      : null,
-    authors: canViewAuthors
-      ? () => getCachedAdminAuthorApplicationAttentionSummary()
-      : null,
     rethrow: unstable_rethrow,
   });
 
+  // Pending author/commercial applications are signalled by the admin tab
+  // highlight (buildAdminNavAttention in layout), so «Обзор» has no cards for them.
   return (
     <div className="space-y-8">
-      {loaded.authors.status === "ready" ? (
-        <AuthorApplicationsAttentionCard summary={loaded.authors.value} />
-      ) : null}
-      {loaded.authors.status === "failed" ? (
-        <AdminSectionError
-          message={ADMIN_OVERVIEW_SECTION_ERRORS.authors}
-          retryHref={retryHref}
-        />
-      ) : null}
-
-      {loaded.commercial.status === "ready" ? (
-        <CommercialApplicationsAttentionCard summary={loaded.commercial.value} />
-      ) : null}
-      {loaded.commercial.status === "failed" ? (
-        <AdminSectionError
-          message={ADMIN_OVERVIEW_SECTION_ERRORS.commercial}
-          retryHref={retryHref}
-        />
-      ) : null}
-
       {loaded.analytics.status === "ready" ? (
         <section aria-labelledby="admin-analytics-heading">
           <Suspense

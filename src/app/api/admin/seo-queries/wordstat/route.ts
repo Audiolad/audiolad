@@ -5,6 +5,7 @@ import {
   importWordstatIntakeItem,
   readWordstatIntakeItems,
   type WordstatIntakeRepository,
+  type WordstatStoredQuery,
 } from "@/lib/seo-queries/wordstat-intake";
 import { fetchWordstatSuggestions } from "@/lib/seo/wordstat/client";
 import { wordstatHttpStatus } from "@/lib/seo/wordstat/errors";
@@ -12,6 +13,18 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 function readPhrase(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+const queryColumns = "id, query_text, normalized_query, source, frequency, analysis_status, created_at";
+function mapQuery(data: {
+  id: string; query_text: string; normalized_query: string; source: string;
+  frequency: number; analysis_status: string; created_at: string;
+}): WordstatStoredQuery {
+  return {
+    id: data.id, queryText: data.query_text, normalizedQuery: data.normalized_query,
+    source: data.source, frequency: data.frequency,
+    analysisStatus: data.analysis_status as WordstatStoredQuery["analysisStatus"], createdAt: data.created_at,
+  };
 }
 
 function createWordstatIntakeRepository(): WordstatIntakeRepository {
@@ -26,20 +39,34 @@ function createWordstatIntakeRepository(): WordstatIntakeRepository {
     async findByNormalized(normalizedQuery) {
       const { data, error } = await supabase
         .from("seo_queries")
-        .select("id")
+        .select("id, analysis_status")
         .eq("normalized_query", normalizedQuery)
         .maybeSingle();
       if (error) return undefined;
-      return data ? { id: data.id } : null;
+      if (!data) return null;
+      const { data: proposal, error: proposalError } = await supabase
+        .from("seo_query_proposals").select("id").eq("query_id", data.id).limit(1);
+      if (proposalError) return undefined;
+      return { id: data.id, analysisStatus: data.analysis_status, hasProposal: Boolean(proposal?.length) };
     },
     async refresh(id, frequency, frequencyCheckedAt) {
       const { data, error } = await supabase
         .from("seo_queries")
         .update({ frequency, frequency_checked_at: frequencyCheckedAt })
         .eq("id", id)
-        .select("id, frequency")
+        .select(queryColumns)
         .single();
-      return error || !data ? null : { id: data.id, frequency: data.frequency };
+      return error || !data ? null : mapQuery(data);
+    },
+    async promote(id, frequency, frequencyCheckedAt) {
+      const { data, error } = await supabase
+        .from("seo_queries")
+        .update({ frequency, frequency_checked_at: frequencyCheckedAt, analysis_status: "analyzed" })
+        .eq("id", id)
+        .eq("analysis_status", "not_analyzed")
+        .select(queryColumns)
+        .maybeSingle();
+      return error ? undefined : data ? mapQuery(data) : null;
     },
     async create({ queryText, source, frequency, frequencyCheckedAt, analysisStatus }) {
       const { data, error } = await supabase
@@ -51,10 +78,10 @@ function createWordstatIntakeRepository(): WordstatIntakeRepository {
           frequency_checked_at: frequencyCheckedAt,
           analysis_status: analysisStatus,
         })
-        .select("id, frequency")
+        .select(queryColumns)
         .single();
       if (data && !error) {
-        return { status: "created" as const, query: { id: data.id, frequency: data.frequency } };
+        return { status: "created" as const, query: mapQuery(data) };
       }
       return error?.code === "23505"
         ? { status: "conflict" as const }
@@ -113,8 +140,11 @@ export async function PUT(request: Request) {
     parsed.items.map((item) => importWordstatIntakeItem(item, repository)),
   );
   const created = results.filter((item) => item.status === "created").length;
+  const promoted = results.filter((item) => item.status === "promoted").length;
+  const needsReview = results.filter((item) => item.status === "needs_review").length;
+  const notApplicable = results.filter((item) => item.status === "not_applicable").length;
   const refreshed = results.filter((item) => item.status === "refreshed").length;
   const errors = results.filter((item) => item.status === "error").length;
 
-  return NextResponse.json({ results, summary: { created, refreshed, errors } });
+  return NextResponse.json({ results, summary: { created, promoted, refreshed, needsReview, notApplicable, errors } });
 }
