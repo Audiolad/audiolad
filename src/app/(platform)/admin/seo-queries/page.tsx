@@ -2,6 +2,7 @@ import AdminSeoQueriesClient from "@/components/admin/AdminSeoQueriesClient";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { isEffectiveSeoReservation } from "@/lib/seo-queries/reservation-effective";
 import { lifecycleLabel, type SeoQueryLifecycle } from "@/lib/seo-queries/types";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
@@ -11,30 +12,30 @@ export default async function AdminSeoQueriesPage() {
   const supabase = createServiceRoleClient();
   await supabase.rpc("expire_seo_query_reservation", {});
   const [
-    { data: queries },
-    { data: reservations },
+    queries,
+    reservations,
     { data: clusters },
-    { data: proposals },
+    proposals,
   ] = await Promise.all([
-    supabase
+    fetchAllPages((from, to) => supabase
       .from("seo_queries")
       .select(
         "id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, analysis_status, created_at, seo_clusters(id, name)",
       )
-      .order("created_at", { ascending: false }),
-    supabase
+      .order("created_at", { ascending: false }).order("id").range(from, to)),
+    fetchAllPages((from, to) => supabase
       .from("seo_query_reservations")
       .select(
         "id, query_id, author_id, product_id, reserved_at, expires_at, status, authors(name), practices(title, status, moderation_status)",
       )
-      .in("status", ["active", "used"]),
+      .in("status", ["active", "used"]).order("reserved_at").order("id").range(from, to)),
     supabase.from("seo_clusters").select("id, name").order("name"),
-    supabase
+    fetchAllPages((from, to) => supabase
       .from("seo_query_proposals")
       .select(
         "id, query_id, author_id, submitted_by_user_id, created_at, authors(name, slug)",
       )
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false }).order("id").range(from, to)),
   ]);
 
   const reservationByQuery = new Map(

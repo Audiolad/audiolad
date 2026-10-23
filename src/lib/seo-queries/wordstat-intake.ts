@@ -7,19 +7,28 @@ export type WordstatIntakeItem = {
   count: number;
 };
 
-type StoredQuery = {
+export type WordstatStoredQuery = {
   id: string;
+  queryText: string;
+  normalizedQuery: string;
+  source: string;
   frequency: number;
+  analysisStatus: "not_analyzed" | "analyzed" | "not_applicable";
+  createdAt: string;
+};
+
+type ExistingQuery = {
+  id: string;
+  analysisStatus: WordstatStoredQuery["analysisStatus"];
+  hasProposal: boolean;
 };
 
 export type WordstatIntakeRepository = {
   normalize(phrase: string): Promise<string | null>;
-  findByNormalized(normalizedQuery: string): Promise<{ id: string } | null | undefined>;
-  refresh(
-    id: string,
-    frequency: number,
-    frequencyCheckedAt: string,
-  ): Promise<StoredQuery | null>;
+  findByNormalized(normalizedQuery: string): Promise<ExistingQuery | null | undefined>;
+  refresh(id: string, frequency: number, frequencyCheckedAt: string): Promise<WordstatStoredQuery | null>;
+  // undefined signals a read/write error; null means the guarded update lost a race.
+  promote(id: string, frequency: number, frequencyCheckedAt: string): Promise<WordstatStoredQuery | null | undefined>;
   create(input: {
     queryText: string;
     source: "wordstat";
@@ -27,14 +36,15 @@ export type WordstatIntakeRepository = {
     frequencyCheckedAt: string;
     analysisStatus: "analyzed";
   }): Promise<
-    | { status: "created"; query: StoredQuery }
+    | { status: "created"; query: WordstatStoredQuery }
     | { status: "conflict" }
     | { status: "error" }
   >;
 };
 
+export type WordstatIntakeStatus = "created" | "promoted" | "refreshed" | "needs_review" | "not_applicable" | "error";
 export type WordstatIntakeResult =
-  | { id: string; phrase: string; frequency: number; status: "created" | "refreshed" }
+  | { id: string; phrase: string; frequency: number; status: Exclude<WordstatIntakeStatus, "error">; query: WordstatStoredQuery }
   | { phrase: string; frequency: number; status: "error" };
 
 function readPhrase(value: unknown): string | null {
@@ -69,59 +79,48 @@ export function readWordstatIntakeItems(value: unknown):
   return { ok: true, items };
 }
 
-async function refresh(
-  repository: WordstatIntakeRepository,
-  id: string,
-  item: WordstatIntakeItem,
-  frequencyCheckedAt: string,
-): Promise<WordstatIntakeResult> {
-  const query = await repository.refresh(id, item.count, frequencyCheckedAt);
-  return query
-    ? { id: query.id, phrase: item.phrase, frequency: query.frequency, status: "refreshed" }
-    : { phrase: item.phrase, frequency: item.count, status: "error" };
-}
-
 export async function importWordstatIntakeItem(
   item: WordstatIntakeItem,
   repository: WordstatIntakeRepository,
   now: () => string = () => new Date().toISOString(),
 ): Promise<WordstatIntakeResult> {
-  const normalizedQuery = await repository.normalize(item.phrase);
-  if (!normalizedQuery) {
-    return { phrase: item.phrase, frequency: item.count, status: "error" };
-  }
-
-  const frequencyCheckedAt = now();
-  const existing = await repository.findByNormalized(normalizedQuery);
-  if (existing === undefined) {
-    return { phrase: item.phrase, frequency: item.count, status: "error" };
-  }
-  if (existing) {
-    return refresh(repository, existing.id, item, frequencyCheckedAt);
-  }
-
-  const created = await repository.create({
-    queryText: item.phrase,
-    source: "wordstat",
-    frequency: item.count,
-    frequencyCheckedAt,
-    analysisStatus: "analyzed",
+  const failure: WordstatIntakeResult = { phrase: item.phrase, frequency: item.count, status: "error" };
+  const success = (query: WordstatStoredQuery, status: Exclude<WordstatIntakeStatus, "error">): WordstatIntakeResult => ({
+    id: query.id, phrase: item.phrase, frequency: query.frequency, status, query,
   });
-  if (created.status === "created") {
-    return {
-      id: created.query.id,
-      phrase: item.phrase,
-      frequency: created.query.frequency,
-      status: "created",
-    };
-  }
-
-  if (created.status === "conflict") {
-    const concurrent = await repository.findByNormalized(normalizedQuery);
-    if (concurrent) {
-      return refresh(repository, concurrent.id, item, frequencyCheckedAt);
+  try {
+    const normalizedQuery = await repository.normalize(item.phrase);
+    if (!normalizedQuery) return failure;
+    const frequencyCheckedAt = now();
+    let existing = await repository.findByNormalized(normalizedQuery);
+    if (existing === undefined) return failure;
+    if (!existing) {
+      const created = await repository.create({
+        queryText: item.phrase, source: "wordstat", frequency: item.count,
+        frequencyCheckedAt, analysisStatus: "analyzed",
+      });
+      if (created.status === "created") return success(created.query, "created");
+      if (created.status !== "conflict") return failure;
+      existing = await repository.findByNormalized(normalizedQuery);
     }
+    // Bounded retries cover concurrent moderation without claiming an unconfirmed promotion.
+    for (let attempt = 0; existing && attempt < 3; attempt++) {
+      if (existing.analysisStatus === "not_analyzed" && !existing.hasProposal) {
+        const promoted = await repository.promote(existing.id, item.count, frequencyCheckedAt);
+        if (promoted === undefined) return failure;
+        if (promoted) return success(promoted, "promoted");
+        existing = await repository.findByNormalized(normalizedQuery);
+        continue;
+      }
+      const query = await repository.refresh(existing.id, item.count, frequencyCheckedAt);
+      if (!query) return failure;
+      // Use the returned status in case moderation completed during the refresh.
+      const status = query.analysisStatus === "analyzed" ? "refreshed"
+        : query.analysisStatus === "not_applicable" ? "not_applicable" : "needs_review";
+      return success(query, status);
+    }
+    return failure;
+  } catch {
+    return failure;
   }
-
-  return { phrase: item.phrase, frequency: item.count, status: "error" };
 }

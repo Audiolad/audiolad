@@ -9,6 +9,8 @@ import {
   SEO_QUERY_INTENTS,
 } from "@/lib/seo-queries/analysis-taxonomy";
 
+import type { WordstatIntakeResult, WordstatIntakeStatus } from "@/lib/seo-queries/wordstat-intake";
+
 type Row = {
   id: string; queryText: string; normalizedQuery: string; source: string;
   frequency: number | null; cluster: string | null; intent: string | null;
@@ -53,7 +55,7 @@ type ReviewItem = {
 };
 
 function date(value: string | null) {
-  return value ? new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "—";
+  return value ? new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "–";
 }
 
 function readReviewItem(value: unknown): ReviewItem | null {
@@ -93,7 +95,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
   const [wordstatSeed, setWordstatSeed] = useState("");
   const [wordstatResults, setWordstatResults] = useState<WordstatResults | null>(null);
   const [selectedWordstatPhrases, setSelectedWordstatPhrases] = useState<Set<string>>(new Set());
-  const [importedWordstatPhrases, setImportedWordstatPhrases] = useState<Set<string>>(new Set());
+  const [importedWordstatPhrases, setImportedWordstatPhrases] = useState<Map<string, WordstatIntakeStatus>>(new Map());
   const [wordstatBusy, setWordstatBusy] = useState(false);
   const [wordstatNotice, setWordstatNotice] = useState<string | null>(null);
   const [selectedAnalysisIds, setSelectedAnalysisIds] = useState<Set<string>>(new Set());
@@ -197,7 +199,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     }
     setWordstatResults(payload);
     setSelectedWordstatPhrases(new Set());
-    setImportedWordstatPhrases(new Set());
+    setImportedWordstatPhrases(new Map());
   }
 
   function toggleWordstatSelection(phrase: string) {
@@ -222,19 +224,53 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     const items = wordstatResults.suggestions
       .filter((item) => selectedWordstatPhrases.has(item.phrase))
       .map((item) => ({ phrase: item.phrase, count: item.count }));
-    const response = await fetch("/api/admin/seo-queries/wordstat", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ items }),
-    });
-    const payload = await response.json();
-    setWordstatBusy(false);
-    if (!response.ok) return setWordstatNotice(payload.error ?? "Не удалось добавить выбранные запросы.");
-    const imported = payload.results
-      .filter((item: { status: string }) => item.status === "created" || item.status === "refreshed")
-      .map((item: { phrase: string }) => item.phrase);
-    setImportedWordstatPhrases((current) => new Set([...current, ...imported]));
-    setWordstatNotice(`Добавлено: ${payload.summary.created}; обновлено: ${payload.summary.refreshed}; ошибок: ${payload.summary.errors}.`);
+    try {
+      const response = await fetch("/api/admin/seo-queries/wordstat", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new Error(`сервер вернул некорректный ответ (HTTP ${response.status})`);
+      }
+      if (!response.ok) throw new Error(payload?.error ?? `HTTP ${response.status}`);
+      if (!Array.isArray(payload?.results) || !payload?.summary) throw new Error("некорректный ответ сервера");
+      const results: WordstatIntakeResult[] = payload.results;
+      setImportedWordstatPhrases((current) => {
+        const next = new Map(current);
+        for (const item of results) next.set(item.phrase, item.status);
+        return next;
+      });
+      setRows((current) => {
+        const next = [...current];
+        for (const item of results) {
+          if (item.status === "error") continue;
+          const query = item.query;
+          const index = next.findIndex((row) => row.id === query.id);
+          if (index >= 0) {
+            const row = next[index];
+            next[index] = { ...row, frequency: query.frequency, analysisStatus: query.analysisStatus,
+              needsReview: row.proposedByAuthor && query.analysisStatus === "not_analyzed" };
+          } else {
+            next.unshift({ ...query, cluster: null, clusterId: null, intent: null,
+              recommendedFormat: null, audioFit: null, lifecycle: "Свободен",
+              author: null, product: null, reservedAt: null, expiresAt: null,
+              reservationId: null, proposalId: null, proposalAuthorId: null,
+              proposalAuthorName: null, proposalAuthorSlug: null, proposalCreatedAt: null,
+              proposedByAuthor: false, needsReview: false, approvedUnreserved: false });
+          }
+        }
+        return next;
+      });
+      setWordstatNotice(`Добавлено: ${payload.summary.created + payload.summary.promoted}; уже в базе: ${payload.summary.refreshed}; ждут проверки: ${payload.summary.needsReview}; ранее отклонены: ${payload.summary.notApplicable}; ошибок: ${payload.summary.errors}.`);
+    } catch (error) {
+      setWordstatNotice(`Не удалось добавить выбранные запросы: ${error instanceof Error ? error.message : "ошибка сети"}`);
+    } finally {
+      setWordstatBusy(false);
+    }
   }
 
   function toggleAnalysis(id: string) {
@@ -398,7 +434,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
       {wordstatNotice ? <p role="status" className="mt-3 text-sm text-[#4c3d78]">{wordstatNotice}</p> : null}
       {wordstatResults ? <div className="mt-4 space-y-3">
         <p className="text-sm text-[#5f5484]">Период: {wordstatResults.periodLabel}. Регион: {wordstatResults.region.label}.</p>
-        <p className="text-sm text-[#5f5484]">Всего по теме: {wordstatResults.topicTotalCount ?? "—"} <span className="text-xs">(агрегат темы, не частотность исходной фразы)</span></p>
+        <p className="text-sm text-[#5f5484]">Всего по теме: {wordstatResults.topicTotalCount ?? "–"} <span className="text-xs">(агрегат темы, не частотность исходной фразы)</span></p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={selectAllWordstat} className="min-h-10 rounded-full border border-[#bda6e1] px-4 text-sm font-semibold text-[#7042c5]">Выбрать все</button>
           <button type="button" disabled={wordstatBusy || selectedWordstatPhrases.size === 0} onClick={importWordstatSelections} className="min-h-10 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60">Добавить выбранные в SEO-базу</button>
@@ -406,8 +442,16 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
         <div className="overflow-x-auto rounded-xl border border-[#eadff8] bg-white">
           <table className="min-w-full text-left text-sm"><thead className="bg-[#f4edff] text-[#796ba0]"><tr><th className="px-3 py-2"> </th><th className="px-3 py-2">Запрос</th><th className="px-3 py-2">Частотность</th><th className="px-3 py-2">Источник</th><th className="px-3 py-2">Оценка</th></tr></thead><tbody>
             {wordstatResults.suggestions.map((item) => {
-              const imported = importedWordstatPhrases.has(item.phrase);
-              return <tr key={`${item.source}-${item.phrase}`} className={`border-t border-[#f3edf9] ${imported ? "bg-[#f3faf1]" : ""}`}><td className="px-3 py-2"><input aria-label={`Выбрать ${item.phrase}`} type="checkbox" checked={selectedWordstatPhrases.has(item.phrase)} onChange={() => toggleWordstatSelection(item.phrase)} /></td><td className="px-3 py-2 font-medium">{item.phrase}{imported ? <span className="ml-2 text-xs text-[#2f6b2a]">Добавлено</span> : null}</td><td className="px-3 py-2">{item.count}</td><td className="px-3 py-2">{item.source === "result" ? "результат" : "ассоциация"}</td><td className="px-3 py-2"><span className={item.opportunity.color === "green" ? "text-[#2f6b2a]" : item.opportunity.color === "yellow" ? "text-[#7a5b12]" : "text-[#8b2d2d]"} title={item.opportunity.description}>{item.opportunity.label}</span></td></tr>;
+              const importStatus = importedWordstatPhrases.get(item.phrase);
+              const imported = importStatus === "created" || importStatus === "promoted";
+              const importLabel = imported ? "Добавлено"
+                : importStatus === "refreshed" ? "Уже в базе"
+                : importStatus === "needs_review" ? "Ждёт проверки заявки автора"
+                : importStatus === "not_applicable" ? "Ранее отмечен как неподходящий"
+                : importStatus === "error" ? "Ошибка сохранения" : null;
+              const importColor = importStatus === "needs_review" ? "text-[#7a5b12]"
+                : importStatus === "not_applicable" || importStatus === "error" ? "text-[#8b2d2d]" : "text-[#2f6b2a]";
+              return <tr key={`${item.source}-${item.phrase}`} className={`border-t border-[#f3edf9] ${imported ? "bg-[#f3faf1]" : ""}`}><td className="px-3 py-2"><input aria-label={`Выбрать ${item.phrase}`} type="checkbox" checked={selectedWordstatPhrases.has(item.phrase)} onChange={() => toggleWordstatSelection(item.phrase)} /></td><td className="px-3 py-2 font-medium">{item.phrase}{importLabel ? <span className={`ml-2 text-xs ${importColor}`}>{importLabel}</span> : null}</td><td className="px-3 py-2">{item.count}</td><td className="px-3 py-2">{item.source === "result" ? "результат" : "ассоциация"}</td><td className="px-3 py-2"><span className={item.opportunity.color === "green" ? "text-[#2f6b2a]" : item.opportunity.color === "yellow" ? "text-[#7a5b12]" : "text-[#8b2d2d]"} title={item.opportunity.description}>{item.opportunity.label}</span></td></tr>;
             })}
           </tbody></table>
         </div>
@@ -424,7 +468,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     <section className="rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] p-4">
       <button type="button" disabled={analysisBusy || selectedAnalysisIds.size === 0} onClick={() => analyzeSelected()} className="min-h-10 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60">Анализировать выбранные</button>
       {analysisSummary ? <p role="status" className="mt-2 text-sm text-[#4c3d78]">{analysisSummary}</p> : null}
-      {reviewItems.map((item) => { const { suggested } = item; const queryText = String(item.query_text ?? ""); const frequency = typeof item.frequency === "number" ? String(item.frequency) : "—"; const reasons = Array.isArray(suggested.reasons) ? suggested.reasons.join(" ") : ""; return <article key={item.id} className="mt-3 rounded-xl border border-[#eadff8] bg-white p-3 text-sm"><p className="font-semibold">{queryText} · {frequency}</p><p className="mt-1 text-xs text-[#796ba0]">Уверенность: {suggested.confidence}. {reasons}</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={suggested.intent} onChange={(event) => setReviewValue(item.id, "intent", event.target.value)}>{SEO_QUERY_INTENTS.map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.recommended_format ?? ""} onChange={(event) => setReviewValue(item.id, "recommended_format", event.target.value)}><option value="">—</option>{SEO_QUERY_FORMATS.map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.audio_fit} onChange={(event) => setReviewValue(item.id, "audio_fit", event.target.value)}>{SEO_QUERY_AUDIO_FITS.map((value) => <option key={value} value={value}>{SEO_QUERY_AUDIO_FIT_LABELS[value]}</option>)}</select></div><p className="mt-2">Рекомендация: {suggested.recommended_disposition === "not_applicable" ? "Не подходит" : "Допустить авторам"}</p><div className="mt-2 flex gap-3"><button type="button" onClick={() => applyReview(item.id, "analyzed")} className="font-semibold text-[#7042c5]">Допустить авторам</button><button type="button" onClick={() => applyReview(item.id, "not_applicable")} className="font-semibold text-[#7042c5]">Не подходит</button></div></article>; })}
+      {reviewItems.map((item) => { const { suggested } = item; const queryText = String(item.query_text ?? ""); const frequency = typeof item.frequency === "number" ? String(item.frequency) : "–"; const reasons = Array.isArray(suggested.reasons) ? suggested.reasons.join(" ") : ""; return <article key={item.id} className="mt-3 rounded-xl border border-[#eadff8] bg-white p-3 text-sm"><p className="font-semibold">{queryText} · {frequency}</p><p className="mt-1 text-xs text-[#796ba0]">Уверенность: {suggested.confidence}. {reasons}</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={suggested.intent} onChange={(event) => setReviewValue(item.id, "intent", event.target.value)}>{SEO_QUERY_INTENTS.map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.recommended_format ?? ""} onChange={(event) => setReviewValue(item.id, "recommended_format", event.target.value)}><option value="">–</option>{SEO_QUERY_FORMATS.map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.audio_fit} onChange={(event) => setReviewValue(item.id, "audio_fit", event.target.value)}>{SEO_QUERY_AUDIO_FITS.map((value) => <option key={value} value={value}>{SEO_QUERY_AUDIO_FIT_LABELS[value]}</option>)}</select></div><p className="mt-2">Рекомендация: {suggested.recommended_disposition === "not_applicable" ? "Не подходит" : "Допустить авторам"}</p><div className="mt-2 flex gap-3"><button type="button" onClick={() => applyReview(item.id, "analyzed")} className="font-semibold text-[#7042c5]">Допустить авторам</button><button type="button" onClick={() => applyReview(item.id, "not_applicable")} className="font-semibold text-[#7042c5]">Не подходит</button></div></article>; })}
     </section>
     {editingId ? (() => {
       const row = rows.find((item) => item.id === editingId);
@@ -446,7 +490,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
         : row.approvedUnreserved
           ? "border-t border-[#f3edf9] bg-[#fff4ec]"
           : "border-t border-[#f3edf9]";
-      return <tr key={row.id} id={`seo-query-${row.id}`} className={rowTone}><td className="px-3 py-3">{row.analysisStatus === "not_analyzed" ? <input aria-label={`Анализировать ${row.queryText}`} type="checkbox" checked={selectedAnalysisIds.has(row.id)} onChange={() => toggleAnalysis(row.id)} /> : null}</td><td className="px-3 py-3 font-medium">{row.queryText}{row.needsReview ? <span className="ml-2 inline-flex rounded-full bg-[#f5c451] px-2 py-0.5 text-[11px] font-semibold text-[#7a5b12]">Нужно проверить</span> : null}{row.approvedUnreserved ? <span className="ml-2 inline-flex rounded-full bg-[#ffd0b0] px-2 py-0.5 text-[11px] font-semibold text-[#8a4b1a]">Одобрен — не закреплён</span> : null}{row.proposedByAuthor && row.proposalAuthorName ? <span className="mt-1 block text-xs font-normal text-[#796ba0]">Предложил: {row.proposalAuthorName}</span> : null}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "—"}</td><td className="px-3 py-3">{row.source}</td><td className="px-3 py-3">{row.cluster ?? "—"}</td><td className="px-3 py-3">{row.intent ?? "—"}</td><td className="px-3 py-3">{row.recommendedFormat ?? "—"}</td><td className="px-3 py-3">{row.audioFit ?? "—"}</td><td className="px-3 py-3">{row.analysisStatus === "analyzed" ? "Готов" : row.analysisStatus === "not_applicable" ? "Не подходит" : "Не анализировался"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? row.proposalAuthorName ?? "—"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3 whitespace-nowrap"><button onClick={() => setEditingId(row.id)} className="mr-2 text-xs font-semibold text-[#7042c5]">Изменить</button>{row.analysisStatus === "not_analyzed" ? <button onClick={() => analyzeSelected([row.id])} className="mr-2 text-xs font-semibold text-[#7042c5]">Анализировать</button> : null}{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mr-2 text-xs font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>;
+      return <tr key={row.id} id={`seo-query-${row.id}`} className={rowTone}><td className="px-3 py-3">{row.analysisStatus === "not_analyzed" ? <input aria-label={`Анализировать ${row.queryText}`} type="checkbox" checked={selectedAnalysisIds.has(row.id)} onChange={() => toggleAnalysis(row.id)} /> : null}</td><td className="px-3 py-3 font-medium">{row.queryText}{row.needsReview ? <span className="ml-2 inline-flex rounded-full bg-[#f5c451] px-2 py-0.5 text-[11px] font-semibold text-[#7a5b12]">Нужно проверить</span> : null}{row.approvedUnreserved ? <span className="ml-2 inline-flex rounded-full bg-[#ffd0b0] px-2 py-0.5 text-[11px] font-semibold text-[#8a4b1a]">Одобрен – не закреплён</span> : null}{row.proposedByAuthor && row.proposalAuthorName ? <span className="mt-1 block text-xs font-normal text-[#796ba0]">Предложил: {row.proposalAuthorName}</span> : null}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "–"}</td><td className="px-3 py-3">{row.source}</td><td className="px-3 py-3">{row.cluster ?? "–"}</td><td className="px-3 py-3">{row.intent ?? "–"}</td><td className="px-3 py-3">{row.recommendedFormat ?? "–"}</td><td className="px-3 py-3">{row.audioFit ?? "–"}</td><td className="px-3 py-3">{row.analysisStatus === "analyzed" ? "Готов" : row.analysisStatus === "not_applicable" ? "Не подходит" : "Не анализировался"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? row.proposalAuthorName ?? "–"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3 whitespace-nowrap"><button onClick={() => setEditingId(row.id)} className="mr-2 text-xs font-semibold text-[#7042c5]">Изменить</button>{row.analysisStatus === "not_analyzed" ? <button onClick={() => analyzeSelected([row.id])} className="mr-2 text-xs font-semibold text-[#7042c5]">Анализировать</button> : null}{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mr-2 text-xs font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>;
     })}</tbody></table></div>
     <div className="space-y-3 md:hidden">{filtered.map((row) => {
       const cardTone = row.needsReview
@@ -454,7 +498,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
         : row.approvedUnreserved
           ? "rounded-[22px] border border-[#f0a66a] bg-[#fff4ec] p-4"
           : "rounded-[22px] border border-[#eadff8] bg-white p-4";
-      return <article key={row.id} id={`seo-query-${row.id}`} className={cardTone}><h2 className="font-semibold text-[#25135c]">{row.queryText}</h2>{row.needsReview ? <p className="mt-1 text-xs font-semibold text-[#7a5b12]">Нужно проверить</p> : null}{row.approvedUnreserved ? <p className="mt-1 text-xs font-semibold text-[#8a4b1a]">Одобрен — не закреплён</p> : null}<p className="mt-1 text-xs text-[#796ba0]">{row.normalizedQuery}</p><div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484]"><span>{row.lifecycle}</span><span>{row.frequency ?? "—"} частотность</span><span>{row.cluster ?? "Без кластера"}</span><span>{row.author ?? row.proposalAuthorName ?? "Свободен"}</span></div>{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mt-3 text-sm font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}</article>;
+      return <article key={row.id} id={`seo-query-${row.id}`} className={cardTone}><h2 className="font-semibold text-[#25135c]">{row.queryText}</h2>{row.needsReview ? <p className="mt-1 text-xs font-semibold text-[#7a5b12]">Нужно проверить</p> : null}{row.approvedUnreserved ? <p className="mt-1 text-xs font-semibold text-[#8a4b1a]">Одобрен – не закреплён</p> : null}<p className="mt-1 text-xs text-[#796ba0]">{row.normalizedQuery}</p><div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#5f5484]"><span>{row.lifecycle}</span><span>{row.frequency ?? "–"} частотность</span><span>{row.cluster ?? "Без кластера"}</span><span>{row.author ?? row.proposalAuthorName ?? "Свободен"}</span></div>{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mt-3 text-sm font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}</article>;
     })}</div>
   </div>;
 }

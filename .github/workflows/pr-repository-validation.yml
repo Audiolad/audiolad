@@ -84,6 +84,7 @@ jobs:
           npm run test:seo-reservation-5d-reminder
           npm run test:seo-analytics-phase1
           npm run test:admin-seo-reservation-release
+          npm run test:supabase-fetch-all-pages
           npm run test:seo-wordstat-intake
           npm run test:wordstat
           npm run test:seo-query-analysis
