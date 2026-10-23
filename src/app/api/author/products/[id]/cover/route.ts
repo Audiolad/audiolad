@@ -7,9 +7,14 @@ import {
 import { assertPracticePublicContentEditableForActor } from "@/lib/author-products/moderation-actor";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
+import {
+  cleanupCoverManifestWithinPrefix,
+  createPracticeCoverStorageClient,
+  PRACTICE_COVERS_BUCKET,
+  productCoverVariantPrefix,
+} from "@/lib/author-products/cover-storage";
 import { removePracticeCoverFiles } from "@/lib/author-products/utils";
 import {
-  cleanupImageManifest,
   primaryPublicUrl,
   uploadOptimizedImageSet,
 } from "@/lib/images/image-upload-service";
@@ -26,8 +31,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-const PRACTICE_COVERS_BUCKET = "practice-covers";
 
 async function schedulePublishedCoverIndexNow(
   supabase: SupabaseClient,
@@ -65,13 +68,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
       .eq("id", id)
       .maybeSingle();
 
-    await removePracticeCoverFiles(supabase, id);
+    // Cover objects are server-only in Storage (1:1 is enforced here).
+    const coverStorage = createPracticeCoverStorageClient();
+    await removePracticeCoverFiles(coverStorage, id);
 
     if (existing?.cover_image) {
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        coverStorage,
         parseImageManifest(existing.cover_image),
+        productCoverVariantPrefix(id),
       );
     }
 
@@ -128,13 +133,15 @@ export async function POST(request: Request, context: RouteContext) {
       .maybeSingle();
 
     const previousManifest = parseImageManifest(previousRow?.cover_image);
+    // Cover objects are server-only in Storage (1:1 is enforced here).
+    const coverStorage = createPracticeCoverStorageClient();
 
     const uploaded = await uploadOptimizedImageSet({
       profile: "product-cover",
       bucket: PRACTICE_COVERS_BUCKET,
       buffer,
       declaredMime: file.type,
-      storage: supabase.storage,
+      storage: coverStorage.storage,
       context: { practiceId: id },
     });
 
@@ -169,23 +176,23 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (updateError) {
       console.error("author_cover_update_error", updateError.message);
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        coverStorage,
         uploaded.data.manifest,
+        productCoverVariantPrefix(id),
       );
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
     if (previousManifest) {
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        coverStorage,
         previousManifest,
+        productCoverVariantPrefix(id),
       );
     }
 
-    await removePracticeCoverFiles(supabase, id);
+    await removePracticeCoverFiles(coverStorage, id);
 
     const product = await getAuthorProductDetail(supabase, id);
     await schedulePublishedCoverIndexNow(supabase, practice);
