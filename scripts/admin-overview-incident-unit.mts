@@ -33,10 +33,6 @@ function testIndependentSectionFailure() {
     analytics: async () => {
       throw new Error("admin_analytics_dashboard_failed");
     },
-    commercial: async () => ({ newCount: 2 }),
-    authors: async () => {
-      throw new Error("admin_author_application_attention_load_failed");
-    },
     rethrow: () => {},
   }).then((loaded) => {
     assert.equal(loaded.stats.status, "ready");
@@ -44,10 +40,8 @@ function testIndependentSectionFailure() {
       assert.equal(loaded.stats.value.cards[0]?.value, 12);
     }
     assert.equal(loaded.analytics.status, "failed");
-    assert.equal(loaded.commercial.status, "ready");
-    assert.equal(loaded.authors.status, "failed");
     assert.equal("value" in loaded.analytics, false);
-    assert.equal("value" in loaded.authors, false);
+    assert.deepEqual(Object.keys(loaded).sort(), ["analytics", "stats"]);
   });
 }
 
@@ -57,8 +51,6 @@ function testStatsFailureKeepsAnalytics() {
       throw new Error("admin_overview_stats_load_failed");
     },
     analytics: async () => ({ period: "7d", visitors: 4 }),
-    commercial: null,
-    authors: null,
     rethrow: () => {},
   }).then((loaded) => {
     assert.equal(loaded.stats.status, "failed");
@@ -66,8 +58,6 @@ function testStatsFailureKeepsAnalytics() {
     if (loaded.analytics.status === "ready") {
       assert.equal(loaded.analytics.value.visitors, 4);
     }
-    assert.equal(loaded.commercial.status, "skipped");
-    assert.equal(loaded.authors.status, "skipped");
   });
 }
 
@@ -81,8 +71,6 @@ function testControlFlowIsNotSwallowed() {
           throw new RedirectSentinel("redirect");
         },
         analytics: async () => ({ ok: true }),
-        commercial: null,
-        authors: null,
         rethrow: (error) => {
           if (error instanceof RedirectSentinel) {
             throw error;
@@ -146,11 +134,13 @@ function testPageSplitsFailuresAndKeepsGuards() {
   assert.doesNotMatch(page, /Не удалось загрузить показатели\. Попробуйте обновить страницу\./);
   assert.match(page, /ADMIN_OVERVIEW_SECTION_ERRORS\.stats/);
   assert.match(page, /ADMIN_OVERVIEW_SECTION_ERRORS\.analytics/);
-  assert.match(page, /ADMIN_OVERVIEW_SECTION_ERRORS\.authors/);
-  assert.match(page, /ADMIN_OVERVIEW_SECTION_ERRORS\.commercial/);
+  // Request cards were removed from «Обзор»: the admin tabs already highlight pending requests.
+  assert.doesNotMatch(page, /ADMIN_OVERVIEW_SECTION_ERRORS\.(authors|commercial)/);
+  assert.doesNotMatch(page, /AuthorApplicationsAttentionCard|CommercialApplicationsAttentionCard/);
+  assert.doesNotMatch(page, /ApplicationAttentionSummary/);
+  assert.doesNotMatch(page, /Заявки авторов|Коммерческие заявки|Открыть заявки/);
   assert.match(page, /includeTest: params\.includeTest/);
   assert.match(page, /canViewAnalytics/);
-  assert.match(page, /canViewAuthors/);
   assert.equal(ADMIN_OVERVIEW_SECTION_ERRORS.stats.includes("0"), false);
   assert.match(nav, /href: "\/admin"/);
   assert.match(nav, /requiredPermission: "dashboard\.view"/);

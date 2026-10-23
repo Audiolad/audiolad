@@ -170,8 +170,9 @@ function testSourceGuards() {
   assert.match(list, /getCommercialApplicationStatusLabel/);
 
   const page = read("src/app/(platform)/admin/page.tsx");
-  assert.match(page, /CommercialApplicationsAttentionCard/);
-  assert.match(page, /getCachedAdminCommercialApplicationAttentionSummary/);
+  // The «Обзор» card was removed; the admin tab badge (nav attention) signals new applications.
+  assert.doesNotMatch(page, /CommercialApplicationsAttentionCard/);
+  assert.doesNotMatch(page, /getCachedAdminCommercialApplicationAttentionSummary/);
 
   const layout = read("src/app/(platform)/admin/layout.tsx");
   assert.match(layout, /buildAdminNavAttention/);

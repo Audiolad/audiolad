@@ -1,7 +1,5 @@
 import {
   sortAdminCommercialApplicationsByAttention,
-  summarizeCommercialApplicationAttention,
-  type CommercialApplicationAttentionSummary,
 } from "@/lib/admin/commercial-application-attention";
 import {
   AUTHOR_COMMERCIAL_APPLICATION_COLUMNS,
@@ -100,27 +98,6 @@ export async function listAdminCommercialApplications(input?: {
   const items = (data ?? []).map((row) => mapListRow(row));
 
   return sortAdminCommercialApplicationsByAttention(items);
-}
-
-export async function getAdminCommercialApplicationAttentionSummary(): Promise<CommercialApplicationAttentionSummary> {
-  const service = createServiceRoleClient();
-
-  const { data, error } = await service
-    .from("author_commercial_applications")
-    .select("status")
-    .in("status", ["submitted", "needs_changes", "in_review"]);
-
-  if (error) {
-    console.error(
-      "admin_commercial_applications_attention_error",
-      error.message,
-    );
-    throw new Error("admin_commercial_applications_attention_failed");
-  }
-
-  return summarizeCommercialApplicationAttention(
-    (data ?? []).map((row) => String(row.status ?? "")),
-  );
 }
 
 export async function getAdminCommercialApplication(

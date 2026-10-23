@@ -148,14 +148,9 @@ function testWiringAndFilters() {
   assert.match(listPage, /AUTHOR_APPLICATION_ATTENTION_FILTER_KEY/);
   assert.match(listPage, /resolveAdminAuthorApplicationFilterStatuses/);
 
+  // The «Обзор» card was removed; the admin tab badge (nav attention) signals new applications.
   const dashboard = read("src/app/(platform)/admin/page.tsx");
-  assert.match(dashboard, /AuthorApplicationsAttentionCard/);
-
-  const attentionCard = read(
-    "src/components/admin/AuthorApplicationsAttentionCard.tsx",
-  );
-  assert.match(attentionCard, /status=attention/);
-  assert.match(attentionCard, /status=new/);
+  assert.doesNotMatch(dashboard, /AuthorApplicationsAttentionCard/);
 
   const layout = read("src/app/(platform)/admin/layout.tsx");
   assert.match(layout, /getCachedAdminNavAttentionCounts/);
