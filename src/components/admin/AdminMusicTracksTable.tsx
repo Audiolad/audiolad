@@ -79,6 +79,8 @@ export default function AdminMusicTracksTable({
       .sort((left, right) => compareRows(left, right, sort));
   }, [tracks, query, sort]);
 
+  const publishedCount = filtered.filter((track) => track.isPublished).length;
+
   const grouped = useMemo(() => {
     if (group === "none") {
       return [{ label: "", rows: filtered }];
@@ -144,6 +146,8 @@ export default function AdminMusicTracksTable({
         <span>
           Показано: <strong className="text-[#25135c]">{filtered.length}</strong>
           {filtered.length !== tracks.length ? " из " + tracks.length : ""}
+          {" "}(опубликовано {publishedCount}, не опубликовано{" "}
+          {filtered.length - publishedCount})
         </span>
         {query ? (
           <button
@@ -199,6 +203,11 @@ export default function AdminMusicTracksTable({
                           </td>
                           <td className="px-4 py-4 font-medium text-[#25135c]">
                             {track.title}
+                            {!track.isPublished ? (
+                              <span className="ml-2 inline-block rounded-full bg-[#f3ecfb] px-2 py-0.5 text-xs font-medium text-[#796ba0]">
+                                не опубликован
+                              </span>
+                            ) : null}
                           </td>
                           <td className="px-4 py-4 text-[#5f5574]">
                             <div>{track.artistName}</div>

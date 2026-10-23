@@ -25,6 +25,11 @@ function buildDataset(practiceCount: number, tracksPerPractice: number) {
     id: randomUUID(),
     title: `Альбом ${i}`,
     author_id: authors[i % authors.length].id,
+    status: "published",
+    scheduled_publish_at: null as string | null,
+    published_at: null as string | null,
+    deleted_at: null as string | null,
+    catalog_visibility: "listed",
   }));
   let seq = 0;
   const audio = practices.flatMap((p) =>
@@ -34,6 +39,7 @@ function buildDataset(practiceCount: number, tracksPerPractice: number) {
       title: `Трек ${pos}`,
       position: pos,
       music_track_code: `AL-T-${String(++seq).padStart(9, "0")}`,
+      status: "published",
     })),
   );
   return { authors, practices, audio };
@@ -109,6 +115,37 @@ assert.ok(ADMIN_MUSIC_TRACKS_ID_CHUNK_SIZE <= 50);
     again.map((r) => [r.id, r.trackCode]),
     rows.map((r) => [r.id, r.trackCode]),
   );
+}
+
+// Publication requires both a published audio item and a publicly available product.
+{
+  const data = buildDataset(7, 2);
+  data.audio[1].status = "draft";
+  data.practices[1].status = "draft";
+  data.practices[2].catalog_visibility = "hidden";
+  data.practices[3].scheduled_publish_at = "2999-01-01T00:00:00Z";
+  data.practices[4].catalog_visibility = "unlisted";
+  data.practices[5].scheduled_publish_at = "2000-01-01T00:00:00Z";
+  data.practices[6].scheduled_publish_at = "2999-01-01T00:00:00Z";
+  data.practices[6].published_at = "2000-01-01T00:00:00Z";
+  const urls: string[] = [];
+  const rows = await listAdminMusicTracks(client(fakeFetch(data, urls) as typeof fetch));
+  assert.equal(rows.length, data.audio.length, "unpublished tracks stay in the registry");
+  assert.deepEqual(rows.map((row) => row.isPublished), [
+    true, false, false, false, false, false, false, false,
+    true, true, true, true, true, true,
+  ]);
+  // Ensure the real query requests the fields too (the fake returns full rows).
+  const selects = urls.map((url) => new URL(url));
+  const practiceQuery = selects.find((url) => url.pathname.endsWith("/practices"))!;
+  for (const field of ["status", "scheduled_publish_at", "published_at", "deleted_at", "catalog_visibility"]) {
+    assert.ok(practiceQuery.searchParams.get("select")!.split(",").includes(field));
+  }
+  assert.equal(practiceQuery.searchParams.get("deleted_at"), "is.null");
+  assert.equal(practiceQuery.searchParams.get("product_kind"), "eq.music");
+  const audioQuery = selects.find((url) => url.pathname.endsWith("/audio_items"))!;
+  assert.ok(audioQuery.searchParams.get("select")!.split(",").includes("status"));
+  assert.equal(audioQuery.searchParams.get("status"), null, "all audio statuses are loaded");
 }
 
 // Empty registry → empty list, no error.
