@@ -1,8 +1,9 @@
 "use client";
 
-import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
+import CoverCropperModal from "@/components/author-dashboard/CoverCropperModal";
 import type { UseCoverUploadOptions } from "@/components/author-dashboard/useCoverUpload";
 import { useCoverUpload } from "@/components/author-dashboard/useCoverUpload";
+import { ResponsiveCoverImage } from "@/components/images/ResponsiveImage";
 
 function CoverPlaceholderIcon() {
   return (
@@ -87,7 +88,14 @@ export default function CoverUploadBlock({
     handleFileChange,
     handlePreviewLoad,
     handlePreviewError,
+    isPreparingCrop,
+    isCropOpen,
     isBusy,
+    cropImageSrc,
+    cropSourceFile,
+    isSavingCrop,
+    closeCropper,
+    handleCropConfirm,
   } = useCoverUpload({ ...uploadOptions, disabled });
 
   const previewClassName =
@@ -153,9 +161,11 @@ export default function CoverUploadBlock({
             >
               {uploading
                 ? "Загрузка…"
-                : showPreview
-                  ? "Изменить"
-                  : "Загрузить"}
+                : isPreparingCrop
+                  ? "Подготовка…"
+                  : showPreview
+                    ? "Изменить"
+                    : "Загрузить"}
             </button>
             {uploadOptions.coverUrl ? (
               <button
@@ -178,15 +188,26 @@ export default function CoverUploadBlock({
         className="sr-only"
         onChange={handleFileChange}
       />
-      {displayError ? (
+      {displayError && !isCropOpen ? (
         <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
           {displayError}
         </p>
       ) : null}
-      {error ? (
+      {error && !isCropOpen ? (
         <p className="mt-3 rounded-[18px] border border-[#f2c7c7] bg-[#fff5f5] px-4 py-3 text-sm text-[#9b3d3d]">
           {error}
         </p>
+      ) : null}
+      {cropImageSrc && cropSourceFile ? (
+        <CoverCropperModal
+          imageSrc={cropImageSrc}
+          sourceFile={cropSourceFile}
+          isOpen={isCropOpen}
+          isSaving={isSavingCrop || uploading}
+          externalError={error}
+          onCancel={closeCropper}
+          onConfirm={handleCropConfirm}
+        />
       ) : null}
     </div>
   );
