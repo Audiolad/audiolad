@@ -162,6 +162,7 @@ export function useCoverUpload({
       const objectUrl = URL.createObjectURL(file);
       localPreviewUrlRef.current = objectUrl;
       setLocalPreviewUrl(objectUrl);
+      let saved = false;
 
       try {
         const practiceId = await getPracticeId();
@@ -242,11 +243,16 @@ export function useCoverUpload({
         setError(null);
         setDisplayError(null);
         setPreviewFailureKey(null);
+        saved = true;
         return true;
       } catch {
         setError("Не удалось загрузить обложку.");
         return false;
       } finally {
+        if (!saved) {
+          // A failed upload must not leave the unsaved file as the preview.
+          clearLocalPreview();
+        }
         setUploading(false);
       }
     },

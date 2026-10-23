@@ -174,6 +174,38 @@ function testCropUiContract() {
   assert(practice.includes("aspect-square"), "product page frame is square");
 }
 
+function testCropCancelAndFocusGuards() {
+  const modal = readSource("src/components/images/AvatarCropperModal.tsx");
+  const hook = readSource("src/components/author-dashboard/useCoverUpload.ts");
+
+  assert(
+    modal.includes("const isBusy = isSaving || isPreparing;"),
+    "crop preparation must count as busy",
+  );
+  assert(
+    /disabled=\{isBusy\}\s*onClick=\{onCancel\}/.test(modal),
+    "Cancel must be disabled while the crop is prepared or saved",
+  );
+  assert(
+    modal.includes("if (!mountedRef.current) {") &&
+      modal.includes("await onConfirm(file);"),
+    "closed dialog must not upload a pending crop",
+  );
+  assert(
+    modal.includes("preparingRef.current = true;"),
+    "repeated confirm clicks must not start parallel crops",
+  );
+  assert(
+    modal.includes("dialogRef.current?.focus();") &&
+      modal.includes('event.key !== "Tab"'),
+    "dialog must take focus and keep Tab inside",
+  );
+  assert(
+    /if \(!saved\) \{[\s\S]*?clearLocalPreview\(\);/.test(hook),
+    "failed upload must drop the unsaved local preview",
+  );
+}
+
 async function main() {
   await testSquareSourceStaysSquare();
   await testNearSquareIsStoredSquare();
@@ -182,6 +214,7 @@ async function main() {
   await testPlaylistCoverStillAllowsLandscape();
   testUploadDecision();
   testCropUiContract();
+  testCropCancelAndFocusGuards();
   console.log("product-cover-square-unit: ok");
 }
 

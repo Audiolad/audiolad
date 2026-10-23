@@ -67,11 +67,71 @@ function AvatarCropperContent({
   const [maxZoom, setMaxZoom] = useState(4);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+  const preparingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const isBusy = isSaving || isPreparing;
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      // Pending crop work must not upload after the dialog was closed.
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    dialogRef.current?.focus();
+
+    return () => {
+      if (previouslyFocused && document.contains(previouslyFocused)) {
+        previouslyFocused.focus();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !isSaving) {
-        onCancel();
+      if (event.key === "Escape") {
+        if (!isBusy && !preparingRef.current) {
+          onCancel();
+        }
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const inside = active instanceof Node && dialogRef.current.contains(active);
+
+      if (event.shiftKey && (active === first || !inside || active === dialogRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !inside)) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
@@ -80,7 +140,7 @@ function AvatarCropperContent({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isSaving, onCancel]);
+  }, [isBusy, onCancel]);
 
   const onCropComplete = useCallback((_area: Area, areaPixels: Area) => {
     setCroppedAreaPixels(areaPixels);
@@ -121,18 +181,20 @@ function AvatarCropperContent({
   );
 
   const handleBackdropClick = useCallback(() => {
-    if (dragActiveRef.current || isSaving) {
+    if (dragActiveRef.current || isBusy || preparingRef.current) {
       return;
     }
 
     onCancel();
-  }, [isSaving, onCancel]);
+  }, [isBusy, onCancel]);
 
   const handleConfirm = useCallback(async () => {
-    if (!croppedAreaPixels || isSaving) {
+    if (!croppedAreaPixels || isSaving || preparingRef.current) {
       return;
     }
 
+    preparingRef.current = true;
+    setIsPreparing(true);
     setLocalError(null);
 
     try {
@@ -146,9 +208,20 @@ function AvatarCropperContent({
         lastModified: Date.now(),
       });
 
+      if (!mountedRef.current) {
+        return;
+      }
+
       await onConfirm(file);
     } catch {
-      setLocalError("Не удалось подготовить изображение. Попробуйте ещё раз.");
+      if (mountedRef.current) {
+        setLocalError("Не удалось подготовить изображение. Попробуйте ещё раз.");
+      }
+    } finally {
+      preparingRef.current = false;
+      if (mountedRef.current) {
+        setIsPreparing(false);
+      }
     }
   }, [
     croppedAreaPixels,
@@ -167,12 +240,14 @@ function AvatarCropperContent({
       onClick={handleBackdropClick}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         data-crop-kind={cropKind}
-        className="flex max-h-[100dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-[24px] border border-[#eadff8] bg-white shadow-[0_20px_50px_rgba(86,52,141,0.22)] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]"
+        className="flex max-h-[100dvh] w-full max-w-[480px] outline-none flex-col overflow-y-auto rounded-t-[24px] border border-[#eadff8] bg-white shadow-[0_20px_50px_rgba(86,52,141,0.22)] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]"
         style={{
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
@@ -191,7 +266,7 @@ function AvatarCropperContent({
           <button
             type="button"
             aria-label="Закрыть"
-            disabled={isSaving}
+            disabled={isBusy}
             onClick={onCancel}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[#7042c5] hover:bg-[#f4ecfb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
           >
@@ -242,7 +317,7 @@ function AvatarCropperContent({
               max={maxZoom}
               step={0.01}
               value={zoom}
-              disabled={isSaving}
+              disabled={isBusy}
               onChange={(event) => setZoom(Number(event.target.value))}
               className="mt-2 w-full accent-[#7042c5]"
             />
@@ -264,7 +339,7 @@ function AvatarCropperContent({
         >
           <button
             type="button"
-            disabled={isSaving}
+            disabled={isBusy}
             onClick={onCancel}
             className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#d9c6f2] px-5 py-2.5 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
           >
@@ -272,11 +347,11 @@ function AvatarCropperContent({
           </button>
           <button
             type="button"
-            disabled={isSaving || !croppedAreaPixels}
+            disabled={isBusy || !croppedAreaPixels}
             onClick={() => void handleConfirm()}
             className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {isSaving ? "Сохранение…" : confirmLabel}
+            {isBusy ? "Сохранение…" : confirmLabel}
           </button>
         </div>
       </div>
