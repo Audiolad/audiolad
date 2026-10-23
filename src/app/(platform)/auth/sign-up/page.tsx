@@ -3,6 +3,10 @@
 import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {
+  AUTH_NETWORK_ERROR_MESSAGE,
+  withAuthNetworkTimeout,
+} from "@/lib/auth/network-timeout";
+import {
   EMAIL_FIELD_HINT,
   getEmailValidationMessage,
   PASSWORD_MIN_LENGTH,
@@ -197,15 +201,25 @@ function SignUpForm() {
       return;
     }
 
-    const result = await signUpAction({
-      firstName,
-      lastName,
-      email,
-      password,
-      legalConsent,
-      marketingConsent,
-      next: nextParam,
-    });
+    let result: Awaited<ReturnType<typeof signUpAction>>;
+
+    try {
+      result = await withAuthNetworkTimeout(() =>
+        signUpAction({
+          firstName,
+          lastName,
+          email,
+          password,
+          legalConsent,
+          marketingConsent,
+          next: nextParam,
+        }),
+      );
+    } catch {
+      setFormError(AUTH_NETWORK_ERROR_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
 
     if (!result.ok) {
       if (result.error.field === "form") {
@@ -222,7 +236,11 @@ function SignUpForm() {
       const sessionId = getCachedAnalyticsSessionId();
 
       if (sessionId) {
-        await recordPlatformSignupCompleted();
+        try {
+          await withAuthNetworkTimeout(() => recordPlatformSignupCompleted());
+        } catch {
+          // Analytics must never block the signup redirect.
+        }
       }
 
       router.replace(result.destination || SIGN_UP_DEFAULT_REDIRECT);
