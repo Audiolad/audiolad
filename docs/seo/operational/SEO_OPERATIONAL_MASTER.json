@@ -3794,6 +3794,196 @@
         "evidence": "Creator article published from approved SEO parameters and authoritative text. Frequency remains UNVERIFIED because no committed verified value is available. Production smoke evidence is recorded after deploy.",
         "operationalAddedAt": "2026-08-16"
       }
+    },
+    {
+      "articleId": "ART_new_20261023_molitva-angelu-hranitelyu-na-kazhdyy-den",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Молитва Ангелу-Хранителю на каждый день: что слушать утром, днём и вечером",
+      "slug": "molitva-angelu-hranitelyu-na-kazhdyy-den",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/molitva-angelu-hranitelyu-na-kazhdyy-den",
+      "primaryQuery": "молитва Ангелу-Хранителю на каждый слушать",
+      "primaryQueryFrequency": 413,
+      "frequencyStatus": "PROVIDED_BY_OWNER",
+      "status": "PLANNED",
+      "articleType": "practice",
+      "cluster": "Молитвы Ангелу-Хранителю",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Guardian Angel prayer article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": "meditatsiya-angel-hranitel",
+        "title": "Медитация «Ангел Хранитель»",
+        "slug": "meditatsiya-angel-hranitel",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/meditatsiya-angel-hranitel",
+        "authorPath": "sergey-and-zoya",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "validationStatus": "NOT_VALIDATED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Article prepared for the articles section. Status stays PLANNED until a production smoke check.",
+        "operationalAddedAt": "2026-10-23"
+      }
+    },
+    {
+      "articleId": "ART_new_20261023_molitva-angelu-hranitelyu-slushat-onlayn",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Молитва Ангелу-Хранителю слушать онлайн: как выбрать запись и сверять текст",
+      "slug": "molitva-angelu-hranitelyu-slushat-onlayn",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/molitva-angelu-hranitelyu-slushat-onlayn",
+      "primaryQuery": "молитва Ангелу-Хранителю слушать онлайн",
+      "primaryQueryFrequency": 190,
+      "frequencyStatus": "PROVIDED_BY_OWNER",
+      "status": "PLANNED",
+      "articleType": "practice",
+      "cluster": "Молитвы Ангелу-Хранителю",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Guardian Angel prayer article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": "meditatsiya-angel-hranitel",
+        "title": "Медитация «Ангел Хранитель»",
+        "slug": "meditatsiya-angel-hranitel",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/meditatsiya-angel-hranitel",
+        "authorPath": "sergey-and-zoya",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "validationStatus": "NOT_VALIDATED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Article prepared for the articles section. Status stays PLANNED until a production smoke check.",
+        "operationalAddedAt": "2026-10-23"
+      }
+    },
+    {
+      "articleId": "ART_new_20261023_molitva-angelu-hranitelyu-slushat-besplatno",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Молитва Ангелу-Хранителю слушать бесплатно: где найти запись и чего избегать",
+      "slug": "molitva-angelu-hranitelyu-slushat-besplatno",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/molitva-angelu-hranitelyu-slushat-besplatno",
+      "primaryQuery": "молитва Ангелу-Хранителю слушать бесплатно",
+      "primaryQueryFrequency": 167,
+      "frequencyStatus": "PROVIDED_BY_OWNER",
+      "status": "PLANNED",
+      "articleType": "practice",
+      "cluster": "Молитвы Ангелу-Хранителю",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Guardian Angel prayer article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": "meditatsiya-angel-hranitel",
+        "title": "Медитация «Ангел Хранитель»",
+        "slug": "meditatsiya-angel-hranitel",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/meditatsiya-angel-hranitel",
+        "authorPath": "sergey-and-zoya",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "validationStatus": "NOT_VALIDATED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Article prepared for the articles section. Status stays PLANNED until a production smoke check.",
+        "operationalAddedAt": "2026-10-23"
+      }
+    },
+    {
+      "articleId": "ART_new_20261023_molitva-angelu-hranitelyu-audio",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Молитва Ангелу-Хранителю аудио: как выбрать запись и слушать дома",
+      "slug": "molitva-angelu-hranitelyu-audio",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/molitva-angelu-hranitelyu-audio",
+      "primaryQuery": "молитва Ангелу-Хранителю аудио",
+      "primaryQueryFrequency": 73,
+      "frequencyStatus": "PROVIDED_BY_OWNER",
+      "status": "PLANNED",
+      "articleType": "practice",
+      "cluster": "Молитвы Ангелу-Хранителю",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Guardian Angel prayer article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": "meditatsiya-angel-hranitel",
+        "title": "Медитация «Ангел Хранитель»",
+        "slug": "meditatsiya-angel-hranitel",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/meditatsiya-angel-hranitel",
+        "authorPath": "sergey-and-zoya",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "validationStatus": "NOT_VALIDATED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Article prepared for the articles section. Status stays PLANNED until a production smoke check.",
+        "operationalAddedAt": "2026-10-23"
+      }
+    },
+    {
+      "articleId": "ART_new_20261023_kak-prizvat-angela-hranitelya",
+      "articleIdStatus": "OPERATIONAL_ID_ASSIGNED",
+      "title": "Как призвать Ангела-Хранителя: православный взгляд и практические рекомендации",
+      "slug": "kak-prizvat-angela-hranitelya",
+      "productionUrl": null,
+      "plannedUrl": "https://audiolad.ru/articles/kak-prizvat-angela-hranitelya",
+      "primaryQuery": "как призвать Ангела-Хранителя",
+      "primaryQueryFrequency": 108,
+      "frequencyStatus": "PROVIDED_BY_OWNER",
+      "status": "PLANNED",
+      "articleType": "practice",
+      "cluster": "Молитвы Ангелу-Хранителю",
+      "hub": {
+        "slug": null,
+        "title": null,
+        "url": null,
+        "status": "PENDING_EXISTING_HUB_RECONCILIATION",
+        "note": "Guardian Angel prayer article; no Topic Hub assigned and no new hub was created."
+      },
+      "practice": {
+        "key": "meditatsiya-angel-hranitel",
+        "title": "Медитация «Ангел Хранитель»",
+        "slug": "meditatsiya-angel-hranitel",
+        "productionUrl": "https://audiolad.ru/practice/sergey-and-zoya/meditatsiya-angel-hranitel",
+        "authorPath": "sergey-and-zoya",
+        "availabilityStatus": "PUBLISHED_CATALOG_CONFIRMED_PUBLIC_URL"
+      },
+      "practiceRelevance": "ACCEPTABLE",
+      "publishedAt": "2026-10-23T00:00:00.000Z",
+      "updatedAt": "2026-10-23T00:00:00.000Z",
+      "validationStatus": "NOT_VALIDATED",
+      "sources": {
+        "type": "AUTHORITATIVE_EDITORIAL_MARKDOWN",
+        "evidence": "Article prepared for the articles section. Status stays PLANNED until a production smoke check.",
+        "operationalAddedAt": "2026-10-23"
+      }
     }
   ],
   "nextQueue": [],

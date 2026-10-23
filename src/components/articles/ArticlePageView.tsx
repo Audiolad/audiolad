@@ -143,6 +143,42 @@ function ArticleSectionContent({
                   ))}
                 </ul>
               );
+            case "table":
+              return (
+                <div key={key} className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[36rem] border-collapse text-left text-[15px] leading-6 text-[#4a3d73]">
+                    {block.caption ? (
+                      <caption className="mb-2 text-left text-sm font-medium text-[#25135c]">
+                        {block.caption}
+                      </caption>
+                    ) : null}
+                    <thead>
+                      <tr className="border-b border-[#e4dcf5]">
+                        {block.columns.map((column, columnIndex) => (
+                          <th
+                            key={`${column}-${columnIndex}`}
+                            scope="col"
+                            className="px-3 py-2 font-semibold text-[#25135c]"
+                          >
+                            {column}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {block.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-[#f0eaf8]">
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-3 py-2 align-top">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
           }
         })}
       </div>
