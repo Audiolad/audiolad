@@ -86,7 +86,11 @@ BEGIN
     AND p.activated_at <= clock_timestamp()
     AND p.ceased_at IS NULL
   ORDER BY p.version DESC
-  LIMIT 1;
+  LIMIT 1
+  -- Hold the profile until commit: a concurrent supersession waits instead of
+  -- making the activation trigger raise and roll back the whole onboarding.
+  -- If it was superseded before we locked, the re-check drops it (NULL).
+  FOR SHARE OF p;
 
   IF v_profile_id IS NULL THEN
     RETURN NULL;

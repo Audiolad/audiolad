@@ -20,6 +20,26 @@ export function isBusinessVenueProgramKind(kind: unknown): kind is BusinessVenue
 }
 
 /**
+ * Maps business_locations.business_category to a program kind. Onboarding
+ * persists Russian labels («Кафе», «Спа»); older rows use "cafe" / "spa".
+ */
+const CATEGORY_TO_KIND: Readonly<Record<string, BusinessVenueProgramKind>> = {
+  cafe: "cafe",
+  "кафе": "cafe",
+  "кафе / кофейня": "cafe",
+  "кофейня": "cafe",
+  spa: "spa",
+  "спа": "spa",
+};
+
+export function venueProgramKindForCategory(
+  businessCategory: string | null | undefined,
+): BusinessVenueProgramKind | null {
+  const key = (businessCategory ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  return CATEGORY_TO_KIND[key] ?? null;
+}
+
+/**
  * Deterministic choice for one venue: a program whose kind matches the venue's
  * business_category wins; otherwise the oldest allowed program (the old spa-only
  * behaviour). Ties: created_at, then id.
@@ -33,6 +53,6 @@ export function pickVenueProgram<T extends VenueProgramCandidate>(
     .slice()
     .sort((a, b) => (a.created_at === b.created_at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.created_at < b.created_at ? -1 : 1));
   if (allowed.length === 0) return null;
-  const category = (businessCategory ?? "").trim().toLowerCase();
-  return allowed.find((p) => p.kind === category) ?? allowed[0];
+  const preferred = venueProgramKindForCategory(businessCategory);
+  return (preferred ? allowed.find((p) => p.kind === preferred) : undefined) ?? allowed[0];
 }

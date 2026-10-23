@@ -4,7 +4,7 @@
 // (AUDIOLAD_ONBOARDING_TEST_CONTAINER) or a scratch local postgres
 // (AUDIOLAD_TEST_PGHOST + AUDIOLAD_TEST_PGPORT). Never against production.
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +21,7 @@ const coreMigration = read("supabase/migrations/20261201120000_business_domain_c
 assert.match(migration, /CREATE OR REPLACE FUNCTION public\.business_ensure_location_rights_context\(\s*p_location_id uuid\s*\)\s*RETURNS uuid/);
 assert.match(migration, /SECURITY DEFINER\s+SET search_path = public, pg_temp/);
 assert.match(migration, /FOR UPDATE;/, "location row lock serialises retries");
+assert.match(migration, /LIMIT 1\s+(?:--[^\n]*\n\s*)*FOR SHARE OF p;/, "country profile locked until commit");
 assert.match(migration, /c\.status = 'active'[\s\S]*RETURN v_context_id;/, "returns existing active context");
 assert.match(migration, /r\.service_status = 'supported'/);
 assert.match(migration, /r\.client_requirement = 'none'/);
@@ -94,6 +95,40 @@ function runPsql(db, input) {
   return `${res.stdout}\n${res.stderr}`;
 }
 
+function runPsqlAsync(db, input) {
+  const [cmd, args] = psqlCommand(db);
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { stdio: ["pipe", "pipe", "pipe"] });
+    let out = "";
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (out += d));
+    child.on("close", (status) => resolve({ status, out }));
+    child.stdin.end(input);
+  });
+}
+
+// OnbCtxH: while onboarding holds the new context, the chosen country profile
+// cannot be superseded underneath it (FOR SHARE OF p) – the writer waits.
+async function profileLockCase(db) {
+  const onboarding = runPsqlAsync(db, `
+SELECT set_config('request.jwt.claim.sub', 'd0000000-0000-4000-8000-000000000001', false);
+BEGIN;
+SELECT 'ctx=' || ((public.create_business_organization_with_location('Кафе AA 3', 'Точка AA 3', 'cafe', 'AA', 'UTC'))->>'rights_context_id' IS NOT NULL);
+SELECT pg_sleep(4);
+COMMIT;
+`);
+  await new Promise((r) => setTimeout(r, 1500));
+  const supersede = await runPsqlAsync(db, `
+SET lock_timeout = '1000ms';
+UPDATE public.music_country_rights_profiles SET status = 'superseded' WHERE country_code = 'AA' AND status = 'active';
+`);
+  const a = await onboarding;
+  assert.equal(a.status, 0, `onboarding session ok:\n${a.out}`);
+  assert.match(a.out, /ctx=true/, "onboarding created the context");
+  assert.notEqual(supersede.status, 0, "profile supersession must wait for onboarding");
+  assert.match(supersede.out, /lock timeout/i, `supersession blocked by profile lock:\n${supersede.out}`);
+}
+
 let mode = "contract-only";
 if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1" || !psqlCommand("postgres")) {
   assert.notEqual(process.env.AUDIOLAD_REQUIRE_ONBOARDING_SQL, "1", "isolated SQL required; provide disposable test container");
@@ -106,6 +141,7 @@ if (process.env.AUDIOLAD_SKIP_ISOLATED_SQL === "1" || !psqlCommand("postgres")) 
     for (const c of ["OnbCtxA", "OnbCtxB", "OnbCtxC", "OnbCtxD", "OnbCtxE", "OnbCtxF", "OnbCtxG"]) {
       assert.ok(out.includes(`${c} ok`), `isolated ${c} passed`);
     }
+    await profileLockCase(db);
     mode = "isolated-sql";
   } finally {
     runPsql("postgres", `DROP DATABASE IF EXISTS ${db} WITH (FORCE);`);

@@ -6,7 +6,9 @@ import {
   BUSINESS_VENUE_PROGRAM_KINDS,
   isBusinessVenueProgramKind,
   pickVenueProgram,
+  venueProgramKindForCategory,
 } from "../src/lib/business-app/venue-programs";
+import { BUSINESS_ONBOARDING_TYPES } from "../src/lib/business-app/onboarding-wizard";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
@@ -40,9 +42,11 @@ const pilot = read("src/lib/business-app/spa-pilot.ts");
 const admin = read("src/lib/business-app/spa-admin.ts");
 for (const [name, src] of [["spa-pilot", pilot], ["spa-admin", admin]] as const) {
   assert.doesNotMatch(src, /\.eq\("kind", "spa"\)/, `${name}: no spa-only filter`);
-  assert.match(src, /\.in\("kind", \[\.\.\.BUSINESS_VENUE_PROGRAM_KINDS\]\)/, `${name}: shared kinds`);
 }
-assert.match(pilot, /pickVenueProgram\(programs as VenueProgramCandidate\[\], location\.business_category/);
+assert.match(admin, /\.in\("kind", \[\.\.\.BUSINESS_VENUE_PROGRAM_KINDS\]\)/, "spa-admin: shared kinds");
+assert.match(pilot, /\.in\("kind", \[\.\.\.kinds\]\)/, "spa-pilot: kind filter");
+assert.match(pilot, /loadOldestProgram\(BUSINESS_VENUE_PROGRAM_KINDS\)/, "spa-pilot: fallback over shared kinds");
+assert.match(pilot, /pickVenueProgram\(programs, location\.business_category/);
 assert.ok(pilot.indexOf(".eq(\"enabled\", true)") < pilot.indexOf("pickVenueProgram("), "allowlist gate first");
 assert.match(pilot, /rpc\("business_spa_program_manifest"/, "tracks only from the ELIGIBLE manifest");
 assert.doesNotMatch(read("src/lib/business-app/venue-programs.ts"), /server-only|supabase/);
@@ -67,6 +71,31 @@ for (const name of ["report_business_spa_player_playback", "get_business_owner_p
 assert.ok(newMig.includes("GRANT EXECUTE ON FUNCTION public.report_business_spa_player_playback(uuid, text, text, uuid, boolean, text) TO authenticated;"));
 assert.ok(newMig.includes("GRANT EXECUTE ON FUNCTION public.get_business_owner_player_live_state(uuid) TO authenticated;"));
 assert.doesNotMatch(newMig, /\b(INSERT|UPDATE|DELETE)\s+(INTO\s+)?public\.business_programs/i, "no data writes in the migration");
+
+// --- persisted onboarding categories map to program kinds --------------------
+assert.equal(venueProgramKindForCategory("Кафе"), "cafe");
+assert.equal(venueProgramKindForCategory(" кафе "), "cafe");
+assert.equal(venueProgramKindForCategory("Спа"), "spa");
+assert.equal(venueProgramKindForCategory("cafe"), "cafe");
+assert.equal(venueProgramKindForCategory("spa"), "spa");
+assert.equal(venueProgramKindForCategory("Магазин"), null);
+assert.equal(venueProgramKindForCategory(null), null);
+{
+  const both = [
+    { id: "s", name: "spa", kind: "spa", created_at: "2026-01-01T00:00:00Z" },
+    { id: "c", name: "cafe", kind: "cafe", created_at: "2026-02-01T00:00:00Z" },
+  ];
+  const byCategory = new Map(BUSINESS_ONBOARDING_TYPES.map((t) => [t.category, t] as const));
+  assert.equal(pickVenueProgram(both, byCategory.get("Кафе")?.category)?.id, "c", "onboarding «Кафе» gets cafe program");
+  assert.equal(pickVenueProgram(both, byCategory.get("Спа")?.category)?.id, "s", "onboarding «Спа» gets spa program");
+  assert.equal(pickVenueProgram(both, "Магазин")?.id, "s", "unknown category falls back to oldest");
+}
+{
+  const pilotSrc = read("src/lib/business-app/spa-pilot.ts");
+  assert.match(pilotSrc, /venueProgramKindForCategory\(location\.business_category/);
+  assert.match(pilotSrc, /loadOldestProgram\(\[preferredKind\]\)/, "matching kind queried first");
+  assert.doesNotMatch(pilotSrc, /\.limit\(20\)/, "no candidate cap that could hide the matching program");
+}
 
 // --- owner rule: no "no rights-confirmed tracks" claim on venue surfaces -----
 for (const file of [

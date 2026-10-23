@@ -7,7 +7,12 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { parseSpaManifest } from "./spa-manifest";
 import { spaSignedUrlTtlSeconds } from "./spa-player-core";
-import { BUSINESS_VENUE_PROGRAM_KINDS, pickVenueProgram, type VenueProgramCandidate } from "./venue-programs";
+import {
+  BUSINESS_VENUE_PROGRAM_KINDS,
+  pickVenueProgram,
+  venueProgramKindForCategory,
+  type VenueProgramCandidate,
+} from "./venue-programs";
 
 /**
  * Business SPA pilot (0e05333f): server context for the allowlisted owner page.
@@ -54,17 +59,6 @@ export async function loadSpaPilotContext(): Promise<SpaPilotContext | null> {
   if (!allow?.organization_id) return null;
   const orgId = allow.organization_id as string;
 
-  // Spa and cafe programs (RLS: org members only). Final choice needs the venue category.
-  const { data: programs } = await supabase
-    .from("business_programs")
-    .select("id, name, kind, created_at")
-    .eq("organization_id", orgId)
-    .in("kind", [...BUSINESS_VENUE_PROGRAM_KINDS])
-    .neq("status", "archived")
-    .order("created_at", { ascending: true })
-    .limit(20);
-  if (!programs || programs.length === 0) return null;
-
   // Topology lookups are org-scoped; service role used only after the access gate above.
   const db = createServiceRoleClient();
   const { data: location } = await db
@@ -77,7 +71,24 @@ export async function loadSpaPilotContext(): Promise<SpaPilotContext | null> {
     .maybeSingle();
   if (!location) return null;
 
-  const program = pickVenueProgram(programs as VenueProgramCandidate[], location.business_category as string | null);
+  // Spa and cafe programs (RLS: org members only). The kind matching the venue
+  // category is queried first, so the choice never depends on a candidate limit.
+  const preferredKind = venueProgramKindForCategory(location.business_category as string | null);
+  const loadOldestProgram = async (kinds: readonly string[]) => {
+    const { data } = await supabase
+      .from("business_programs")
+      .select("id, name, kind, created_at")
+      .eq("organization_id", orgId)
+      .in("kind", [...kinds])
+      .neq("status", "archived")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .limit(1);
+    return (data ?? []) as VenueProgramCandidate[];
+  };
+  const candidates = preferredKind ? await loadOldestProgram([preferredKind]) : [];
+  const programs = candidates.length > 0 ? candidates : await loadOldestProgram(BUSINESS_VENUE_PROGRAM_KINDS);
+  const program = pickVenueProgram(programs, location.business_category as string | null);
   if (!program) return null;
 
   const { data: zones } = await db.from("business_zones").select("id").eq("location_id", location.id);
