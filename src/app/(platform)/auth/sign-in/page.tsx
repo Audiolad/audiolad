@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/sign-in-messages";
 import { createClient } from "@/lib/supabase/client";
 import { claimPartnerAttributionAction } from "@/app/(platform)/auth/claim-partner-attribution/actions";
+import { claimGuestRatingsAction } from "@/app/(platform)/auth/claim-guest-ratings/actions";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -59,6 +60,12 @@ function SignInForm() {
       await claimPartnerAttributionAction();
     } catch {
       // Attribution must never break login.
+    }
+
+    try {
+      await claimGuestRatingsAction();
+    } catch {
+      // Guest rating claim must never break login.
     }
 
     const destination = getSafeNextPath(searchParams.get("next"));

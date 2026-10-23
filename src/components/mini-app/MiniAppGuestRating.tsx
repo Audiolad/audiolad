@@ -5,7 +5,10 @@ import { useState } from "react";
 import {
   formatPracticeRatingAggregateCountSr,
   formatPracticeRatingAggregateStarsSr,
+  buildPracticeRatingApiPath,
 } from "@/lib/ratings/client";
+import { GUEST_RATING_AGGREGATE_LABEL } from "@/lib/ratings/guest/copy";
+import { useGuestPracticeRating } from "@/lib/ratings/guest/use-guest-rating";
 import { MAX_PRACTICE_RATING_STARS } from "@/lib/ratings/stars";
 import type { PracticeRatingAggregate } from "@/lib/ratings/types";
 
@@ -28,6 +31,9 @@ type MiniAppGuestRatingProps = {
   aggregate: PracticeRatingAggregate;
   signInAction: MiniAppRatingSignInAction;
   surface: "max" | "vk";
+  guestCollect?: boolean;
+  authorSlug?: string;
+  productSlug?: string;
 };
 
 function RatingAggregateStarIcon() {
@@ -51,10 +57,22 @@ export default function MiniAppGuestRating({
   aggregate,
   signInAction,
   surface,
+  guestCollect = false,
+  authorSlug = "",
+  productSlug = "",
 }: MiniAppGuestRatingProps) {
   const [promptOpen, setPromptOpen] = useState(false);
+  const canRate = guestCollect && authorSlug.length > 0 && productSlug.length > 0;
+  const guest = useGuestPracticeRating({
+    enabled: enabled && canRate,
+    apiPath: buildPracticeRatingApiPath(authorSlug || "guest", productSlug || "guest"),
+    initialAggregate: aggregate,
+  });
 
   if (!enabled) return null;
+
+  const displayStars = canRate ? (guest.ui.pendingStars ?? guest.ui.stars) : null;
+  const shownAggregate = canRate ? guest.ui.aggregate : aggregate;
 
   return (
     <section
@@ -67,17 +85,26 @@ export default function MiniAppGuestRating({
       <div className="mt-2 flex items-center gap-1" role="group" aria-label="Оценка от 1 до 5">
         {Array.from({ length: MAX_PRACTICE_RATING_STARS }, (_, index) => {
           const value = index + 1;
+          const filled = displayStars != null && value <= displayStars;
           return (
             <button
               key={value}
               type="button"
               data-practice-rating-star={value}
               aria-label={`Оценка ${value} из 5`}
-              aria-pressed={false}
-              onClick={() => setPromptOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-[22px] leading-none text-[#c8bddc] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+              aria-pressed={displayStars === value}
+              onClick={() => {
+                if (canRate) {
+                  void guest.onSelectStar(value);
+                  return;
+                }
+                setPromptOpen(true);
+              }}
+              className={`flex h-10 w-10 items-center justify-center rounded-full text-[22px] leading-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] ${
+                filled ? "text-[#7042c5]" : "text-[#c8bddc]"
+              }`}
             >
-              <span aria-hidden="true">☆</span>
+              <span aria-hidden="true">{filled ? "★" : "☆"}</span>
             </button>
           );
         })}
@@ -85,23 +112,36 @@ export default function MiniAppGuestRating({
       <div
         className="mt-2"
         data-practice-rating-public-aggregate=""
-        data-practice-rating-total-stars={aggregate.totalStars}
-        data-practice-rating-count={aggregate.ratingCount}
+        data-practice-rating-total-stars={shownAggregate.totalStars}
+        data-practice-rating-count={shownAggregate.ratingCount}
       >
-        <p className="sr-only">{formatPracticeRatingAggregateStarsSr(aggregate.totalStars)}</p>
-        <p className="sr-only">{formatPracticeRatingAggregateCountSr(aggregate.ratingCount)}</p>
+        <p className="sr-only">{formatPracticeRatingAggregateStarsSr(shownAggregate.totalStars)}</p>
+        <p className="sr-only">{formatPracticeRatingAggregateCountSr(shownAggregate.ratingCount)}</p>
         <div aria-hidden="true" className="flex items-center gap-4 text-sm leading-5 text-[#65577f]">
           <span className="inline-flex items-center gap-1">
-            <span>{aggregate.totalStars}</span>
+            <span>{shownAggregate.totalStars}</span>
             <RatingAggregateStarIcon />
           </span>
           <span className="inline-flex items-center gap-1">
-            <span>{aggregate.ratingCount}</span>
+            <span>{shownAggregate.ratingCount}</span>
             <RatingAggregateUserIcon />
           </span>
         </div>
       </div>
-      {promptOpen ? (
+      {canRate && guest.ui.guestAggregate ? (
+        <p className="mt-1 text-sm leading-5 text-[#65577f]" data-practice-rating-guest-aggregate="">
+          {GUEST_RATING_AGGREGATE_LABEL}: {guest.ui.guestAggregate.ratingCount}
+        </p>
+      ) : null}
+      {canRate && guest.ui.notice ? (
+        <p className="mt-2 text-sm leading-5 text-[#65577f]">{guest.ui.notice}</p>
+      ) : null}
+      {canRate && guest.ui.message ? (
+        <p className="mt-2 text-sm leading-5 text-[#65577f]" role="status" aria-live="polite">
+          {guest.ui.message}
+        </p>
+      ) : null}
+      {!canRate && promptOpen ? (
         <div className="mt-2" role="status" aria-live="polite" data-practice-rating-sign-in="">
           <p className="text-sm leading-5 text-[#65577f]">{signInAction.message}</p>
           <button

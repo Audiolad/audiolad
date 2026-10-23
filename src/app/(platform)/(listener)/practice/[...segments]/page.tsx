@@ -111,6 +111,7 @@ import { resolvePracticeFileViewerRoute } from "@/lib/course-content/learner-fil
 import { isCoursePublication } from "@/lib/course-content/validators";
 import type { LearnerCourse } from "@/lib/course-content/learner-types";
 import { isRatingsUiEnabled } from "@/lib/ratings/feature";
+import { isGuestRatingsCollectEnabled } from "@/lib/ratings/guest/feature";
 import { getPracticeRatingAggregate } from "@/lib/ratings/read";
 import { EMPTY_RATING_AGGREGATE } from "@/lib/ratings/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -891,6 +892,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     showAuthorAppreciationPrototype,
     ratingsUiEnabled,
     ratingAggregate,
+    guestRatingsCollect: ratingsUiEnabled && isGuestRatingsCollectEnabled(),
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {

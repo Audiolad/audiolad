@@ -17,6 +17,8 @@ import {
   runAuthenticatedPracticeRatingClick,
   type PracticeRatingUiState,
 } from "@/lib/ratings/star-click";
+import { useGuestPracticeRating } from "@/lib/ratings/guest/use-guest-rating";
+import { GUEST_RATING_AGGREGATE_LABEL } from "@/lib/ratings/guest/copy";
 import { MAX_PRACTICE_RATING_STARS } from "@/lib/ratings/stars";
 import type { PracticeRatingAggregate } from "@/lib/ratings/types";
 
@@ -26,6 +28,7 @@ type PracticeRatingStarsProps = {
   signInReturnPath: string;
   isAuthenticated: boolean;
   initialAggregate: PracticeRatingAggregate;
+  guestCollectEnabled?: boolean;
 };
 
 function emptyRatingUi(
@@ -72,9 +75,16 @@ export default function PracticeRatingStars({
   signInReturnPath,
   isAuthenticated,
   initialAggregate,
+  guestCollectEnabled = false,
 }: PracticeRatingStarsProps) {
   const router = useRouter();
   const apiPath = buildPracticeRatingApiPath(authorSlug, productSlug);
+  const guestMode = !isAuthenticated && guestCollectEnabled;
+  const guest = useGuestPracticeRating({
+    enabled: guestMode,
+    apiPath,
+    initialAggregate,
+  });
   const [ui, setUi] = useState<PracticeRatingUiState>(() =>
     emptyRatingUi(initialAggregate),
   );
@@ -109,10 +119,17 @@ export default function PracticeRatingStars({
     };
   }, [apiPath, isAuthenticated]);
 
-  const displayStars = ui.pendingStars ?? ui.stars;
-  const isPending = ui.pendingStars != null;
+  const displayStars = guestMode ? (guest.ui.pendingStars ?? guest.ui.stars) : (ui.pendingStars ?? ui.stars);
+  const isPending = guestMode ? guest.ui.pendingStars != null : ui.pendingStars != null;
+  const aggregate = guestMode ? guest.ui.aggregate : ui.aggregate;
+  const message = guestMode ? guest.ui.message : ui.message;
+  const ratingEligible = guestMode ? guest.ui.ratingEligible : ui.ratingEligible;
 
   async function onSelectStar(nextStars: number) {
+    if (guestMode) {
+      await guest.onSelectStar(nextStars);
+      return;
+    }
     const action = resolvePracticeRatingStarClick({
       isAuthenticated,
       isPending,
@@ -147,7 +164,8 @@ export default function PracticeRatingStars({
       className="mt-5"
       data-practice-section="rating"
       data-practice-rating
-      data-practice-rating-eligible={ui.ratingEligible ? "true" : "false"}
+      data-practice-rating-eligible={ratingEligible ? "true" : "false"}
+      data-practice-rating-guest={guestMode ? "true" : "false"}
       data-practice-rating-value={displayStars ?? ""}
     >
       <p className="text-sm font-medium text-[#25135c]">Насколько вам откликнулось?</p>
@@ -179,37 +197,50 @@ export default function PracticeRatingStars({
       <div
         className="mt-2"
         data-practice-rating-public-aggregate=""
-        data-practice-rating-total-stars={ui.aggregate.totalStars}
-        data-practice-rating-count={ui.aggregate.ratingCount}
+        data-practice-rating-total-stars={aggregate.totalStars}
+        data-practice-rating-count={aggregate.ratingCount}
       >
         <p className="sr-only">
-          {formatPracticeRatingAggregateStarsSr(ui.aggregate.totalStars)}
+          {formatPracticeRatingAggregateStarsSr(aggregate.totalStars)}
         </p>
         <p className="sr-only">
-          {formatPracticeRatingAggregateCountSr(ui.aggregate.ratingCount)}
+          {formatPracticeRatingAggregateCountSr(aggregate.ratingCount)}
         </p>
         <div
           aria-hidden="true"
           className="flex items-center gap-4 text-sm leading-5 text-[#65577f]"
         >
           <span className="inline-flex items-center gap-1">
-            <span>{ui.aggregate.totalStars}</span>
+            <span>{aggregate.totalStars}</span>
             <RatingAggregateStarIcon />
           </span>
           <span className="inline-flex items-center gap-1">
-            <span>{ui.aggregate.ratingCount}</span>
+            <span>{aggregate.ratingCount}</span>
             <RatingAggregateUserIcon />
           </span>
         </div>
       </div>
-      {ui.message ? (
+      {guestMode && guest.ui.guestAggregate ? (
+        <p
+          className="mt-1 text-sm leading-5 text-[#65577f]"
+          data-practice-rating-guest-aggregate=""
+          data-practice-rating-guest-total-stars={guest.ui.guestAggregate.totalStars}
+          data-practice-rating-guest-count={guest.ui.guestAggregate.ratingCount}
+        >
+          {GUEST_RATING_AGGREGATE_LABEL}: {guest.ui.guestAggregate.ratingCount}
+        </p>
+      ) : null}
+      {guest.ui.notice ? (
+        <p className="mt-2 text-sm leading-5 text-[#65577f]">{guest.ui.notice}</p>
+      ) : null}
+      {message ? (
         <p
           className="mt-2 text-sm leading-5 text-[#65577f]"
           role="status"
           aria-live="polite"
           data-practice-rating-message=""
         >
-          {ui.message}
+          {message}
         </p>
       ) : null}
     </section>

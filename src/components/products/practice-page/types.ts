@@ -87,4 +87,5 @@ export type PracticePageViewModel = {
   publishPreview: PracticePagePublishPreview | null;
   ratingsUiEnabled: boolean;
   ratingAggregate: PracticeRatingAggregate;
+  guestRatingsCollect: boolean;
 };

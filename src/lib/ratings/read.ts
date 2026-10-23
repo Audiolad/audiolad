@@ -3,6 +3,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { aggregateActivePracticeRatings } from "@/lib/ratings/aggregate";
+import { combineRatingAggregates } from "@/lib/ratings/guest/aggregate";
+import { isGuestRatingsIncludedInPublicAggregate } from "@/lib/ratings/guest/feature";
 import { isActiveRatingEligibleAt } from "@/lib/ratings/eligibility";
 import {
   EMPTY_RATING_AGGREGATE,
@@ -45,8 +47,8 @@ function parseStars(value: number | string | null | undefined): number | null {
   return parsed;
 }
 
-/** Public-safe totals only: active stars sum + count. No user_id or HMAC. */
-export async function getPracticeRatingAggregate(
+/** Registered votes only. Guest rows are never read here. */
+export async function getRegisteredPracticeRatingAggregate(
   practiceId: string,
   client: SupabaseClient = createServiceRoleClient(),
 ): Promise<PracticeRatingAggregate> {
@@ -68,6 +70,56 @@ export async function getPracticeRatingAggregate(
   return aggregateActivePracticeRatings(
     rows.map((row) => ({ stars: parseCount(row.stars) })),
   );
+}
+
+export async function getGuestOnlyPracticeRatingAggregate(
+  practiceId: string,
+  client: SupabaseClient = createServiceRoleClient(),
+): Promise<PracticeRatingAggregate> {
+  const { data, error } = await client
+    .from("guest_practice_ratings")
+    .select("stars")
+    .eq("practice_id", practiceId)
+    .is("excluded_at", null)
+    .is("superseded_at", null)
+    .is("claimed_by_user_id", null);
+
+  if (error) {
+    throw new Error("guest_rating_aggregate_failed");
+  }
+
+  const rows = (data ?? []) as Array<{ stars: number | string }>;
+  if (rows.length === 0) {
+    return EMPTY_RATING_AGGREGATE;
+  }
+
+  return aggregateActivePracticeRatings(
+    rows.map((row) => ({ stars: parseCount(row.stars) })),
+  );
+}
+
+/**
+ * Public-safe totals only. Guest votes are added only when
+ * GUEST_RATINGS_INCLUDE_IN_AGGREGATE is explicitly on. Otherwise this is
+ * the registered arithmetic mean, unchanged. A guest query failure returns
+ * the registered totals.
+ */
+export async function getPracticeRatingAggregate(
+  practiceId: string,
+  client: SupabaseClient = createServiceRoleClient(),
+): Promise<PracticeRatingAggregate> {
+  const registered = await getRegisteredPracticeRatingAggregate(practiceId, client);
+  if (!isGuestRatingsIncludedInPublicAggregate()) {
+    return registered;
+  }
+
+  try {
+    const guest = await getGuestOnlyPracticeRatingAggregate(practiceId, client);
+    return combineRatingAggregates(registered, guest);
+  } catch (error) {
+    console.error("guest_rating_include_failed", error);
+    return registered;
+  }
 }
 
 export async function getOwnPracticeRating(
