@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { isBusinessHostname } from "./host";
 
-/** Public prefix for business.audiolad.ru brand assets (espresso-on-cream original AudioLad mark; see docs/business/brand-icons). */
+/** Public prefix for business.audiolad.ru brand assets (leather lotus + clef; see docs/business/brand-icons). */
 export const BUSINESS_BRAND_ASSET_PREFIX = "/business/brand/";
 
 type HostBrandMetadata = Pick<Metadata, "manifest" | "icons">;
@@ -30,11 +30,12 @@ export const CLASSIC_BRAND_METADATA: HostBrandMetadata = {
   },
 };
 
-/** business.audiolad.ru — own manifest («АудиоЛад Бизнес») and espresso-on-cream icons (original mark, recoloured). */
+/** business.audiolad.ru — own manifest («АудиоЛад Бизнес») and the leather lotus mark. */
 export const BUSINESS_BRAND_METADATA: HostBrandMetadata = {
   manifest: `${BUSINESS_BRAND_ASSET_PREFIX}manifest.webmanifest`,
   icons: {
     icon: [
+      { url: `${BUSINESS_BRAND_ASSET_PREFIX}favicon.svg`, type: "image/svg+xml" },
       { url: `${BUSINESS_BRAND_ASSET_PREFIX}favicon.ico` },
       { url: `${BUSINESS_BRAND_ASSET_PREFIX}favicon-48x48.png`, sizes: "48x48", type: "image/png" },
       { url: `${BUSINESS_BRAND_ASSET_PREFIX}favicon-32x32.png`, sizes: "32x32", type: "image/png" },

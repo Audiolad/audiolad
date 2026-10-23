@@ -188,6 +188,7 @@ export default function BusinessSidebar() {
         ? "Точка ещё не создана"
         : "Гостевой режим";
   const ownerInitial = ownerFirstName.slice(0, 1).toUpperCase() || "А";
+  const cabinet = !normalizeBusinessAppPathname(usePathname() || "/").startsWith("/guest");
 
   return (
     <aside
@@ -200,18 +201,28 @@ export default function BusinessSidebar() {
       }}
     >
       <div
-        className={`flex items-start gap-2 border-b border-[var(--biz-border)] px-3 py-4 ${
+        className={`flex ${cabinet ? "items-center" : "items-start"} gap-2 border-b border-[var(--biz-border)] px-3 py-4 ${
           collapsed ? "justify-center" : ""
         }`}
       >
+        {cabinet ? (
+          // eslint-disable-next-line @next/next/no-img-element -- same 2 KB vector as the favicon
+          <img
+            src="/business/brand/favicon.svg"
+            alt={collapsed ? "АудиоЛад Бизнес" : ""}
+            width={40}
+            height={40}
+            className="business-app-brand-mark"
+          />
+        ) : null}
         {!collapsed ? (
           <div className="min-w-0 flex-1">
-            <p className="text-[1.05rem] font-bold leading-tight text-[var(--biz-text)]">
+            <p className={`${cabinet ? "business-app-brand-name " : ""}text-[1.05rem] font-bold leading-tight text-[var(--biz-text)]`}>
               Аудиолад
             </p>
             <p className="text-sm font-medium text-[var(--biz-accent)]">Бизнес</p>
           </div>
-        ) : (
+        ) : cabinet ? null : (
           <span
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--biz-accent-soft)] text-sm font-bold text-[var(--biz-accent)]"
             aria-hidden

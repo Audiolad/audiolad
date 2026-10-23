@@ -1,8 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
+import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -25,10 +27,16 @@ export default function BusinessAppShell({
   initialGuestLimit?: GuestCoffeeLimitState | null;
 }) {
   const access = resolveBusinessAccess(useBusinessDomain());
+  // Public guest player (/guest/coffee) keeps the base theme. Cabinet screens opt into leather.
+  const guestPlayer = normalizeBusinessAppPathname(usePathname() || "/").startsWith("/guest");
 
   return (
     <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
-      <div className="business-app-shell" data-access={access.level}>
+      <div
+        className="business-app-shell"
+        data-access={access.level}
+        data-biz-chrome={guestPlayer ? "guest-player" : "cabinet"}
+      >
         <BusinessSidebar />
         <div className="business-app-main">
           {access.level === "guest" ? <BusinessGuestStatusBar /> : null}

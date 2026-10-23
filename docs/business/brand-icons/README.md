@@ -1,28 +1,28 @@
-# AudioLad Business — icon set (espresso on cream)
+# AudioLad Business — icon set (leather lotus)
 
 Icons for `business.audiolad.ru` live in `public/business/brand/`
 (audiolad.ru keeps its own icons in `public/`, unchanged).
 
-**Source:** the original AudioLad mark `public/master-logo-icon.png` (1254×1254,
-white mark on dark purple — the same artwork as the audiolad.ru icons).
-The mark is **not redrawn**: `render_icons.py` recovers its coverage exactly from
-the white-on-dark original and recolours it — strictly two colours, no gradients:
+**Source:** `public/business/brand/favicon.svg` — a lotus whose central petal
+forms a treble clef, traced as line art from the approved embossed-leather mark.
+The SVG is the only vector (under 5 KB). Rasters are rendered from it:
 
-- mark: `--biz-espresso #2b1d14`
-- background: `--biz-cream #f7f1e8` (opaque, full-bleed)
+- mark: leather `#3d2618`
+- background: cream `#f7f1e8` (opaque, full-bleed, same as `--biz-bg`)
 
-Every file is only a uniform Lanczos downscale of the original (antialiased edges are
-blends of the two colours); the geometry and proportions match `master-logo-icon.png`.
+Antialiased edges are blends of those two colours. 16 and 32 px icons use a
+thickened trace so the flower still reads. No leather photograph is shipped.
 
 | File | Notes |
 | --- | --- |
+| `favicon.svg` | vector mark, also the cabinet brand slot |
 | `icon-512.png`, `icon-192.png` | manifest `purpose: any` |
-| `icon-maskable-512.png` | manifest `purpose: maskable`; whole mark scaled uniformly to 80 % and centred (inside the 0.4·N safe-zone circle) |
+| `icon-maskable-512.png` | manifest `purpose: maskable`; mark scaled to 76 % and centred (inside the 0.4·N safe-zone circle) |
 | `apple-touch-icon.png` | 180×180, opaque |
 | `favicon-16x16.png`, `favicon-32x32.png`, `favicon-48x48.png` | |
 | `favicon.ico` | embeds the three favicon PNGs byte-for-byte (16/32/48) |
 
-Regenerate (repo root, needs Python 3 with Pillow + numpy; output is deterministic):
+Regenerate (repo root; needs `rsvg-convert`, `pngquant`, `optipng`, Pillow, numpy):
 
 ```sh
 python3 docs/business/brand-icons/render_icons.py

@@ -71,25 +71,28 @@ for (const f of ["favicon.ico", "icon.svg", "icon.png", "icon.ico", "apple-icon.
 assert.ok(existsSync(pub("/favicon.ico")));
 assert.equal(classic.icons.icon[0].url, "/favicon.ico?favicon.2vob68tjqpejf.ico");
 
-// Espresso-on-cream icon set (original AudioLad mark, recoloured only): real PNG sizes,
-// opaque RGB, strictly two colours (every pixel is a blend of espresso and cream),
+// Leather-on-cream lotus + treble clef (favicon.svg). Real PNG sizes, opaque
+// (RGB or palette), strictly two colours (every pixel is a blend of leather and cream),
 // maskable mark inside the safe zone, and never the same bytes as the audiolad.ru icons.
 function readPng(path) {
   const b = readFileSync(path);
   assert.equal(b.toString("latin1", 1, 4), "PNG", path);
   const w = b.readUInt32BE(16), h = b.readUInt32BE(20), depth = b[24], colorType = b[25], interlace = b[28];
   const idat = [];
+  let plte = null;
   for (let o = 8; o < b.length; ) {
     const len = b.readUInt32BE(o), type = b.toString("latin1", o + 4, o + 8);
     if (type === "IDAT") idat.push(b.subarray(o + 8, o + 8 + len));
+    if (type === "PLTE") plte = b.subarray(o + 8, o + 8 + len);
+    if (type === "tRNS") assert.fail(`${path} must be opaque (tRNS)`);
     o += 12 + len;
   }
-  return { w, h, depth, colorType, interlace, data: inflateSync(Buffer.concat(idat)) };
+  return { w, h, depth, colorType, interlace, data: inflateSync(Buffer.concat(idat)), plte };
 }
-function decodeRgb({ w, h, depth, colorType, interlace, data }, path) {
+function decodeRgb({ w, h, depth, colorType, interlace, data, plte }, path) {
   assert.equal(depth, 8, path); assert.equal(interlace, 0, path);
-  assert.equal(colorType, 2, `${path} must be opaque RGB (no alpha, no palette)`);
-  const bpp = 3, stride = w * bpp, rows = [];
+  assert.ok(colorType === 2 || colorType === 3, `${path} must be opaque RGB or palette (no alpha)`);
+  const bpp = colorType === 2 ? 3 : 1, stride = w * bpp, rows = [];
   let prev = Buffer.alloc(stride);
   for (let r = 0; r < h; r++) {
     const f = data[r * (stride + 1)], line = Buffer.from(data.subarray(r * (stride + 1) + 1, (r + 1) * (stride + 1)));
@@ -101,10 +104,17 @@ function decodeRgb({ w, h, depth, colorType, interlace, data }, path) {
     }
     rows.push(line); prev = line;
   }
+  if (colorType === 3) {
+    assert.ok(plte && plte.length % 3 === 0, `${path} palette`);
+    return (x, y) => {
+      const i = rows[y][x] * 3;
+      return [plte[i], plte[i + 1], plte[i + 2]];
+    };
+  }
   return (x, y) => [...rows[y].subarray(x * bpp, x * bpp + bpp)];
 }
-const ESPRESSO = [0x2b, 0x1d, 0x14], CREAM = [0xf7, 0xf1, 0xe8];
-const D = CREAM.map((c, i) => c - ESPRESSO[i]), DD = D.reduce((s, d) => s + d * d, 0);
+const LEATHER = [0x3d, 0x26, 0x18], CREAM = [0xf7, 0xf1, 0xe8];
+const D = CREAM.map((c, i) => c - LEATHER[i]), DD = D.reduce((s, d) => s + d * d, 0);
 /** Position on the cream(0)→espresso(1) line and distance from that line. */
 function onPalette(px) {
   const t = px.reduce((s, v, i) => s + (CREAM[i] - v) * D[i], 0) / DD;
@@ -133,13 +143,13 @@ for (const { src, sizes, purpose } of bizPngs) {
   let maxT = 0, exactMark = 0, maxR = 0;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const p = px(x, y), { t, off } = onPalette(p);
-    assert.ok(off <= 2 && t >= -0.01 && t <= 1.01, `${src} (${x},${y}) ${p} is not an espresso/cream blend`);
+    assert.ok(off <= 2 && t >= -0.01 && t <= 1.01, `${src} (${x},${y}) ${p} is not a leather/cream blend`);
     maxT = Math.max(maxT, t);
-    if (p.every((v, i) => v === ESPRESSO[i])) exactMark++;
+    if (p.every((v, i) => v === LEATHER[i])) exactMark++;
     if (t > 0.01) maxR = Math.max(maxR, Math.hypot(x + 0.5 - N / 2, y + 0.5 - N / 2) / N);
   }
-  assert.ok(maxT > (N >= 32 ? 0.9 : 0.5), `${src} has no espresso mark (max blend ${maxT.toFixed(2)})`);
-  if (N >= 180) assert.ok(exactMark > 0, `${src} has no solid espresso #2b1d14 pixels`);
+  assert.ok(maxT > (N >= 32 ? 0.9 : 0.5), `${src} has no leather mark (max blend ${maxT.toFixed(2)})`);
+  if (N >= 180) assert.ok(exactMark > 0, `${src} has no solid leather #3d2618 pixels`);
   if (purpose === "maskable") assert.ok(maxR <= 0.4, `${src} mark leaves the maskable safe zone (r=${maxR.toFixed(3)}N)`);
 }
 const ico = readFileSync(pub("/business/brand/favicon.ico"));
@@ -171,8 +181,15 @@ for (const f of ["icon.svg", "icon-fullbleed.svg", "icon-maskable.svg", "icon-sm
   assert.ok(!existsSync(join(root, "docs/business/brand-icons", f)), `redrawn SVG ${f} must not come back`);
 }
 const readme = readFileSync(join(root, "docs/business/brand-icons/README.md"), "utf8");
-assert.match(readme, /master-logo-icon\.png/);
+assert.match(readme, /favicon\.svg/);
 assert.match(readme, /render_icons\.py/);
 assert.ok(existsSync(join(root, "docs/business/brand-icons/render_icons.py")));
+const svgPath = pub("/business/brand/favicon.svg");
+const svgStat = readFileSync(svgPath);
+assert.ok(svgStat.length > 200 && svgStat.length < 5 * 1024, `favicon.svg is ${svgStat.length} bytes`);
+assert.match(svgStat.toString("utf8"), /<svg\b/);
+let payload = svgStat.length + ico.length;
+for (const src of new Set(bizPngs.map((i) => i.src))) payload += readFileSync(pub(src)).length;
+assert.ok(payload < 80 * 1024, `business icon payload ${payload} bytes`);
 
 console.log("business-brand-icons-unit: ok");
