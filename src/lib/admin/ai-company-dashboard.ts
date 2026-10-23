@@ -22,6 +22,12 @@ export const CODEX_PROBE_STALE_MS = 20 * 60 * 1000;
 export const LEGACY_TASK_CAP = 100;
 export const LEGACY_EVENT_CAP = 50;
 export const HISTORY_PAGE_SIZE = 20;
+/** «Архив»: rows added per «Показать ещё» and the default archive window (Core default history page). */
+export const ARCHIVE_PAGE_SIZE = 100;
+/** Upper bound for `archive_limit` in the URL. Larger archives page further with the history cursor. */
+export const ARCHIVE_LIMIT_MAX = 5000;
+/** Largest `history_limit` one Core request may ask for (Core STATUS_LIMITS.historyMax). An older Core clamps to 100: the loader then follows the cursor. */
+export const CORE_HISTORY_REQUEST_MAX = 500;
 
 /**
  * Label dictionary for historical role values in task records (audit, history filter).
@@ -399,6 +405,17 @@ export type HistoryFilters = {
   agent: string;
   historyOffset: number;
   historyBefore: string;
+  /** How many archived (terminal) tasks to load for «Архив», newest first. Default ARCHIVE_PAGE_SIZE. */
+  archiveLimit?: number;
+};
+
+/** Core `board_counts`: server-side task counts per board tab over all tasks, not the length of a page. */
+export type BoardCounts = {
+  plan: number | null;
+  working: number | null;
+  review: number | null;
+  archive: number | null;
+  archiveByStatus: Record<string, number>;
 };
 
 export type ExecutiveRun = {
@@ -649,6 +666,10 @@ export type Completeness = {
   tasksLimit: number | null;
   eventsLimit: number | null;
   gatesComplete: boolean | null;
+  /** tasks_page.history_included: terminal rows in this answer (summed over merged pages). */
+  historyIncluded?: number | null;
+  /** tasks_page.omitted_history_count: terminal rows Core left out of this answer. */
+  omittedHistoryCount?: number | null;
 };
 
 export type QuotaBucket = {
@@ -707,6 +728,8 @@ export type CompanyStatus = {
   };
   acceptanceContract: boolean;
   acceptanceView: "current" | "archive" | "all" | null;
+  /** Core `board_counts` (server count). null for an older Core without it. */
+  boardCounts?: BoardCounts | null;
 };
 
 export type EngineeringPanel = {
@@ -921,6 +944,19 @@ export type DashboardModel = {
   historyNextCursor: string | null;
   archivedBlockers: GateCard[];
   quotas: QuotaLine[];
+  /** Core server-side tab counts. The «Архив» counter uses them instead of the length of a loaded page. */
+  boardCounts?: BoardCounts | null;
+  /** «Архив» load-more state. null when the archive window is not known. */
+  archivePage?: ArchivePageModel | null;
+};
+
+export type ArchivePageModel = {
+  /** Archived (terminal) tasks loaded from Core into this page. */
+  loaded: number;
+  /** Server-side total, when Core reports it. */
+  total: number | null;
+  /** `archive_limit` for «Показать ещё», or null when everything is loaded. */
+  nextLimit: number | null;
 };
 
 type Receipt = { at: string; kind: "received" | "created" };
@@ -1643,6 +1679,8 @@ function parseCompleteness(root: Record<string, unknown>): Completeness {
       readString(eventsPage, CORE_FIELD_MAP.page.nextCursor),
       readString(coverage, CORE_FIELD_MAP.completeness.nextCursor),
     ),
+    historyIncluded: readNumber(tasksPage, ["history_included"]),
+    omittedHistoryCount: readNumber(tasksPage, ["omitted_history_count"]),
     tasksLimit: firstNumber(
       readNumber(tasksPage, CORE_FIELD_MAP.page.historyLimit),
       readNumber(root, CORE_FIELD_MAP.gatesHistory.limit),
@@ -1942,7 +1980,104 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
     },
     acceptanceContract: tasks.some((task) => task.acceptanceContract) || acceptanceView != null,
     acceptanceView,
+    boardCounts: parseBoardCounts(record.board_counts),
   };
+}
+
+function countValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/** Core `board_counts`. Only non-negative integers are taken; anything else is «no server count». */
+export function parseBoardCounts(raw: unknown): BoardCounts | null {
+  const record = asRecord(raw);
+  if (!record) return null;
+  const byStatus: Record<string, number> = {};
+  const rawByStatus = asRecord(record.archive_by_status);
+  if (rawByStatus) {
+    for (const [key, value] of Object.entries(rawByStatus)) {
+      const count = countValue(value);
+      if (count != null) byStatus[key] = count;
+    }
+  }
+  const counts: BoardCounts = {
+    plan: countValue(record.plan),
+    working: countValue(record.working),
+    review: countValue(record.review),
+    archive: countValue(record.archive),
+    archiveByStatus: byStatus,
+  };
+  return counts.plan == null && counts.working == null && counts.review == null && counts.archive == null ? null : counts;
+}
+
+/**
+ * Appends an older history page (same acceptance view, fetched with `history_before`) to a status.
+ * Tasks keep Core order (newest first) and are deduplicated by id; page facts come from the last page.
+ */
+export function mergeStatusHistoryPage(base: CompanyStatus, next: CompanyStatus): CompanyStatus {
+  const ids = new Set(base.tasks.flatMap((task) => (task.id ? [task.id] : [])));
+  const added = next.tasks.filter((task) => !task.id || !ids.has(task.id));
+  return {
+    ...base,
+    tasks: [...base.tasks, ...added],
+    events: dedupeEvents([...base.events, ...added.flatMap((task) => task.taskEvents)]),
+    completeness: {
+      ...base.completeness,
+      historyComplete: next.completeness.historyComplete,
+      nextCursor: next.completeness.nextCursor,
+      omittedHistoryCount: next.completeness.omittedHistoryCount ?? null,
+      historyIncluded:
+        base.completeness.historyIncluded != null && next.completeness.historyIncluded != null
+          ? base.completeness.historyIncluded + next.completeness.historyIncluded
+          : null,
+    },
+  };
+}
+
+function parseArchiveLimit(value: string | null | undefined): number {
+  if (!value || !/^\d+$/.test(value.trim())) return ARCHIVE_PAGE_SIZE;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed < ARCHIVE_PAGE_SIZE) return ARCHIVE_PAGE_SIZE;
+  return Math.min(parsed, ARCHIVE_LIMIT_MAX);
+}
+
+export type CompanyStatusPageFetch = (
+  path: string,
+) => Promise<{ data: CompanyStatus | null; error: string | null }>;
+
+/**
+ * Loads one acceptance view with an archive window of `filters.archiveLimit` terminal tasks:
+ * the first request asks Core for up to CORE_HISTORY_REQUEST_MAX rows, further pages follow
+ * `history_next_before` until the window is filled or Core says the history is complete.
+ * A failed later page keeps the rows already loaded (the load-more state then shows what is missing).
+ */
+export async function loadCompanyStatusWindow(
+  fetchPage: CompanyStatusPageFetch,
+  filters: HistoryFilters,
+  acceptance: "current" | "archive" | "all",
+): Promise<{ data: CompanyStatus | null; error: string | null }> {
+  const want = filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
+  const first = await fetchPage(
+    companyStatusRequestPath(filters, acceptance, { historyLimit: Math.min(want, CORE_HISTORY_REQUEST_MAX) }),
+  );
+  if (!first.data) return first;
+  let data = first.data;
+  // Bounded: ARCHIVE_LIMIT_MAX / 100 pages even against an older Core that clamps to 100 rows.
+  for (let page = 0; page < Math.ceil(ARCHIVE_LIMIT_MAX / ARCHIVE_PAGE_SIZE); page += 1) {
+    const loaded = data.completeness.historyIncluded;
+    const cursor = data.completeness.nextCursor;
+    if (loaded == null || loaded >= want || data.completeness.historyComplete !== false || !cursor) break;
+    const next = await fetchPage(
+      companyStatusRequestPath(
+        { ...filters, historyBefore: cursor },
+        acceptance,
+        { historyLimit: Math.min(want - loaded, CORE_HISTORY_REQUEST_MAX) },
+      ),
+    );
+    if (!next.data || !next.data.completeness.historyIncluded) break;
+    data = mergeStatusHistoryPage(data, next.data);
+  }
+  return { data, error: null };
 }
 
 function parseOffset(value: string | null | undefined): number {
@@ -1958,6 +2093,7 @@ export function parseHistoryFilters(input: {
   agent?: string | null;
   history_offset?: string | null;
   history_before?: string | null;
+  archive_limit?: string | null;
 }): HistoryFilters {
   const period =
     input.period === "today" || input.period === "week" || input.period === "month"
@@ -1973,21 +2109,30 @@ export function parseHistoryFilters(input: {
     agent: (input.agent ?? "").trim(),
     historyOffset: parseOffset(input.history_offset),
     historyBefore,
+    archiveLimit: parseArchiveLimit(input.archive_limit),
   };
 }
 
 export function companyStatusRequestPath(
   filters: HistoryFilters,
   acceptance: "current" | "archive" | "all" = "all",
+  options: { historyLimit?: number } = {},
 ): string {
   const params = new URLSearchParams();
   if (filters.historyBefore) params.set(CORE_FIELD_MAP.query.historyBefore, filters.historyBefore);
+  // Core's default page is 100 rows; ask explicitly only for a different window.
+  if (options.historyLimit != null && options.historyLimit !== ARCHIVE_PAGE_SIZE && options.historyLimit > 0) {
+    params.set(CORE_FIELD_MAP.query.historyLimit, String(Math.min(options.historyLimit, CORE_HISTORY_REQUEST_MAX)));
+  }
   if (acceptance === "current" || acceptance === "archive") params.set("acceptance", acceptance);
   const query = params.toString();
   return query ? `/v1/status?${query}` : "/v1/status";
 }
 
-export function historyHref(filters: HistoryFilters, patch: { historyOffset?: number; historyBefore?: string }): string {
+export function historyHref(
+  filters: HistoryFilters,
+  patch: { historyOffset?: number; historyBefore?: string; archiveLimit?: number },
+): string {
   const params = new URLSearchParams();
   if (filters.period !== "all") params.set("period", filters.period);
   if (filters.status) params.set("status", filters.status);
@@ -1995,6 +2140,8 @@ export function historyHref(filters: HistoryFilters, patch: { historyOffset?: nu
   const offset = patch.historyOffset ?? 0;
   if (offset > 0) params.set("history_offset", String(offset));
   if (patch.historyBefore) params.set("history_before", patch.historyBefore);
+  const archiveLimit = patch.archiveLimit ?? filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
+  if (archiveLimit > ARCHIVE_PAGE_SIZE) params.set("archive_limit", String(archiveLimit));
   const query = params.toString();
   return query ? `/admin/ai-company?${query}` : "/admin/ai-company";
 }
@@ -3596,8 +3743,15 @@ export function composeAiCompanyBoard(
       ? archive.data.tasks.filter((task) => task.boardTab === "archive").flatMap((task) => (task.id ? [task.id] : []))
       : [],
   );
-  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
-  if (!currentModel) return { model: null, acceptanceAvailable, sourceError: current.error };
+  const builtModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
+  if (!builtModel || !current.data) return { model: null, acceptanceAvailable, sourceError: current.error };
+  // Tab counts come from Core's server count over all tasks, never from the length of a loaded page.
+  const boardCounts = current.data.boardCounts ?? archive.data?.boardCounts ?? null;
+  const currentModel: DashboardModel = {
+    ...builtModel,
+    boardCounts,
+    archivePage: archivePageModel(current.data, filters, boardCounts),
+  };
   if (!acceptanceAvailable) {
     return { model: { ...currentModel, acceptedArchive: [], acceptedArchiveError: null }, acceptanceAvailable, sourceError: null };
   }
@@ -3615,4 +3769,19 @@ export function composeAiCompanyBoard(
     acceptanceAvailable,
     sourceError: null,
   };
+}
+
+/** «Архив» load-more state from the current snapshot's history window and Core's server count. */
+export function archivePageModel(
+  status: CompanyStatus,
+  filters: HistoryFilters,
+  boardCounts: BoardCounts | null,
+): ArchivePageModel | null {
+  const loaded = status.completeness.historyIncluded;
+  if (loaded == null) return null;
+  const total = boardCounts?.archive ?? null;
+  const limit = filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
+  const more = status.completeness.historyComplete === false || (total != null && loaded < total);
+  const nextLimit = more && limit < ARCHIVE_LIMIT_MAX ? Math.min(Math.max(limit, loaded) + ARCHIVE_PAGE_SIZE, ARCHIVE_LIMIT_MAX) : null;
+  return { loaded, total, nextLimit };
 }
