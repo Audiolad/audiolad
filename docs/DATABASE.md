@@ -15,7 +15,7 @@ Continuation: the owner applies the migration through the established process.
 
 ## Guest practice ratings (pending owner apply)
 
-Migration `20270116120000_guest_practice_ratings.sql` is additive and is not
+Migration `20270121120000_guest_practice_ratings.sql` is additive and is not
 applied by the draft that adds it. It creates `guest_listen_stats`,
 `guest_listen_item_credit`, `guest_practice_ratings`,
 `guest_practice_rating_events`, `guest_captcha_tokens`,

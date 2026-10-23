@@ -779,7 +779,7 @@ function testSurfacesAndRegisteredRegression() {
 }
 
 function testSourceContracts() {
-  const migration = read("supabase/migrations/20270116120000_guest_practice_ratings.sql");
+  const migration = read("supabase/migrations/20270121120000_guest_practice_ratings.sql");
   assert.match(migration, /UNIQUE \(guest_id, practice_id\)/);
   assert.doesNotMatch(migration, /INSERT INTO auth\.users/i);
   assert.doesNotMatch(migration, /DELETE FROM public\.practice_ratings/i);

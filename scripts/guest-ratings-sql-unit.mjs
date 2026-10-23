@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationName = "20270116120000_guest_practice_ratings.sql";
+const migrationName = "20270121120000_guest_practice_ratings.sql";
 const migration = readFileSync(
   join(repoRoot, "supabase/migrations", migrationName),
   "utf8",
