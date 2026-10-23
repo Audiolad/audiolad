@@ -2,6 +2,11 @@
 
 Migration: `supabase/migrations/20270117120000_practice_covers_server_only_cover_writes.sql`
 
+> Follow-up: `20270118120000_cover_columns_server_only.sql` drops the gallery
+> upload policy (gallery files are uploaded by the server), adds the `..` check
+> to the gallery delete policy and makes cover / slide image columns
+> server-only. See `docs/security/cover-columns-server-only.md`.
+
 ## What changes
 
 Bucket `practice-covers` (public read). Policies on `storage.objects`:

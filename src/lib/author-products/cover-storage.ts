@@ -10,6 +10,11 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
  * no longer insert, update or delete them, so the 1:1 check in the cover
  * routes cannot be bypassed through the Storage API.
  *
+ * Since migration 20270118120000 the same applies to the database columns
+ * that point at these images (practices.cover_url / cover_image,
+ * audio_items.cover_url / cover_image, publication_gallery_slides image
+ * columns) and to gallery uploads: only the server writes them.
+ *
  * Use this client only after the route has authorised the actor
  * (requirePracticeMutationAccess) and resolved the practice / audio item ids
  * from the database. Never pass it paths taken from the request body.
@@ -20,6 +25,78 @@ export type CoverStorageClient = Pick<SupabaseClient, "storage">;
 
 export function createPracticeCoverStorageClient(): CoverStorageClient {
   return createServiceRoleClient();
+}
+
+/**
+ * Server client for cover / gallery image rows and objects. Same rules as
+ * createPracticeCoverStorageClient: only after access checks, only with ids
+ * resolved by the route.
+ */
+export function createPracticeImageWriteClient(): SupabaseClient {
+  return createServiceRoleClient();
+}
+
+export type CoverColumnsPatch = {
+  cover_url: string | null;
+  cover_image: unknown;
+  updated_at: string;
+};
+
+type CoverWriteResult = { ok: true } | { ok: false; error: string };
+
+/** Sets practices.cover_url / cover_image. Server path only. */
+export async function writePracticeCoverColumns(
+  client: Pick<SupabaseClient, "from">,
+  practiceId: string,
+  patch: CoverColumnsPatch,
+): Promise<CoverWriteResult> {
+  const { data, error } = await client
+    .from("practices")
+    .update(patch)
+    .eq("id", practiceId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return data ? { ok: true } : { ok: false, error: "practice_not_found" };
+}
+
+/** Sets audio_items.cover_url / cover_image for one track of a practice. */
+export async function writeTrackCoverColumns(
+  client: Pick<SupabaseClient, "from">,
+  practiceId: string,
+  audioItemId: string,
+  patch: CoverColumnsPatch,
+): Promise<CoverWriteResult> {
+  const { data, error } = await client
+    .from("audio_items")
+    .update(patch)
+    .eq("id", audioItemId)
+    .eq("practice_id", practiceId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return data ? { ok: true } : { ok: false, error: "audio_item_not_found" };
+}
+
+const GALLERY_SLIDE_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Slide ids are server-generated UUIDs; anything else never reaches Storage. */
+export function isGallerySlideId(value: unknown): value is string {
+  return typeof value === "string" && GALLERY_SLIDE_ID_RE.test(value);
+}
+
+export function gallerySlidePrefix(practiceId: string, slideId: string): string {
+  return `practices/${practiceId}/gallery/${slideId}/`;
 }
 
 export function productCoverVariantPrefix(practiceId: string): string {

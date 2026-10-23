@@ -150,25 +150,25 @@ const coverRoutes = [
   {
     path: "src/app/api/author/products/[id]/cover/route.ts",
     prefixFn: "productCoverVariantPrefix(id)",
-    legacyRemove: "removePracticeCoverFiles(coverStorage, id)",
+    legacyRemove: "removePracticeCoverFiles(coverWriter, id)",
   },
   {
     path: "src/app/api/author/products/[id]/audio/[audioId]/cover/route.ts",
     prefixFn: "trackCoverVariantPrefix(id, audioId)",
-    legacyRemove: "removeTrackCoverFiles(coverStorage, id, audioId)",
+    legacyRemove: "removeTrackCoverFiles(coverWriter, id, audioId)",
   },
 ];
 
 for (const route of coverRoutes) {
   const text = source(route.path);
-  assert(text.includes("createPracticeCoverStorageClient()"), `${route.path}: uses service cover storage`);
-  assert(text.includes("storage: coverStorage.storage"), `${route.path}: uploads with cover storage`);
+  assert(text.includes("createPracticeImageWriteClient()"), `${route.path}: uses the server image write client`);
+  assert(text.includes("storage: coverWriter.storage"), `${route.path}: uploads with cover storage`);
   assert(!text.includes("supabase.storage"), `${route.path}: no user-scoped storage access`);
   assert(!text.includes("cleanupImageManifest("), `${route.path}: no unscoped manifest cleanup`);
   assert(text.includes(route.prefixFn), `${route.path}: cleanup scoped to ${route.prefixFn}`);
   assert(text.includes(route.legacyRemove), `${route.path}: legacy cleanup via cover storage`);
   const access = text.indexOf("requirePracticeMutationAccess(");
-  const firstStorage = text.indexOf("createPracticeCoverStorageClient()");
+  const firstStorage = text.indexOf("createPracticeImageWriteClient()");
   assert(access >= 0 && firstStorage > access, `${route.path}: access check before storage client`);
   const decide = text.indexOf("uploadOptimizedImageSet(");
   assert(decide > firstStorage, `${route.path}: upload goes through the image pipeline`);
