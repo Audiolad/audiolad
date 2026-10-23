@@ -30,6 +30,12 @@ function sectionBlockText(section: ArticleDefinition["sections"][number]): strin
           return [block.title];
         case "list":
           return block.items;
+        case "table":
+          return [
+            ...(block.caption ? [block.caption] : []),
+            ...block.columns,
+            ...block.rows.flat(),
+          ];
       }
     }) ?? []
   );

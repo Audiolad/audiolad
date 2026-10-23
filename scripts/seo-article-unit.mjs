@@ -9612,4 +9612,113 @@ assert(
   "suppress handled inside usePromoPagePlayback",
 );
 
+const GUARDIAN_ANGEL_ARTICLES = [
+  {
+    slug: "molitva-angelu-hranitelyu-na-kazhdyy-den",
+    key: "молитва Ангелу-Хранителю на каждый день слушать",
+    awkwardKey: "молитва Ангелу-Хранителю на каждый слушать",
+  },
+  {
+    slug: "molitva-angelu-hranitelyu-slushat-onlayn",
+    key: "молитва Ангелу-Хранителю слушать онлайн",
+  },
+  {
+    slug: "molitva-angelu-hranitelyu-slushat-besplatno",
+    key: "молитва Ангелу-Хранителю слушать бесплатно",
+  },
+  {
+    slug: "molitva-angelu-hranitelyu-audio",
+    key: "молитва Ангелу-Хранителю аудио",
+  },
+  {
+    slug: "kak-prizvat-angela-hranitelya",
+    key: "как призвать Ангела-Хранителя",
+  },
+];
+
+function articleTables(article) {
+  const sections = [...article.sections, article.closingSection];
+  return sections.flatMap((section) =>
+    (section.blocks ?? []).filter((block) => block.kind === "table"),
+  );
+}
+
+function articleHrefBlob(article) {
+  return JSON.stringify(article);
+}
+
+for (const spec of GUARDIAN_ANGEL_ARTICLES) {
+  const item = getArticleBySlug(spec.slug);
+  assert(item, `${spec.slug} registered`);
+  assert(item.productContinuation.kind === "practice", `${spec.slug} is practice`);
+  assert(
+    item.primaryPractice.practiceKey === "meditatsiya-angel-hranitel",
+    `${spec.slug} primary practice`,
+  );
+  assert(
+    item.topicSlug === "pending-hub-reconciliation" &&
+      item.topicTitle === "Статьи" &&
+      item.topicHref === "/articles",
+    `${spec.slug} keeps the articles topic without a new hub`,
+  );
+  assert(item.authorLabel === "Редакция АудиоЛада", `${spec.slug} author`);
+  assert(
+    item.publishedAt.startsWith("2026-10-23") &&
+      item.updatedAt.startsWith("2026-10-23"),
+    `${spec.slug} dates`,
+  );
+  assert(item.faq.length >= 3 && item.faq.length <= 5, `${spec.slug} faq size`);
+  assert(item.relatedPractices.length >= 2, `${spec.slug} related practices`);
+  assert(item.shortAnswer.length > 0, `${spec.slug} short answer`);
+  const blob = articleHrefBlob(item);
+  assert(!blob.includes("\u2014"), `${spec.slug} has no em dash`);
+  assert(
+    blob.includes("/practice/sergey-and-zoya/meditatsiya-angel-hranitel"),
+    `${spec.slug} links to the meditation practice`,
+  );
+  assert(
+    blob.toLowerCase().includes(spec.key.toLowerCase()),
+    `${spec.slug} contains its query`,
+  );
+  if (spec.awkwardKey) {
+    assert(blob.includes(spec.awkwardKey), `${spec.slug} contains the awkward query`);
+    assert(
+      item.metaDescription.includes(spec.awkwardKey),
+      `${spec.slug} meta description contains the awkward query`,
+    );
+  } else {
+    assert(
+      item.metaTitle.toLowerCase().includes(spec.key.toLowerCase()) &&
+        item.metaDescription.toLowerCase().includes(spec.key.toLowerCase()),
+      `${spec.slug} meta contains the primary query`,
+    );
+  }
+  const tables = articleTables(item);
+  assert(tables.length >= 1, `${spec.slug} has a table`);
+  assert(
+    tables.every((table) => table.columns.length >= 2 && table.columns.length <= 3),
+    `${spec.slug} table has 2–3 columns`,
+  );
+  assert(
+    tables.every((table) => table.rows.length >= 3 && table.rows.length <= 5),
+    `${spec.slug} table has 3–5 rows`,
+  );
+  const siblingLinks = GUARDIAN_ANGEL_ARTICLES.filter(
+    (other) => other.slug !== spec.slug && blob.includes(`/articles/${other.slug}`),
+  );
+  assert(siblingLinks.length >= 3, `${spec.slug} links to three sibling articles`);
+  assert(estimateArticleReadingTimeMinutes(item) >= 3, `${spec.slug} reading time`);
+}
+
+assert(
+  articlePageViewSource.includes('scope="col"') &&
+    articlePageViewSource.includes("overflow-x-auto") &&
+    articlePageViewSource.includes("<table"),
+  "article renderer prints a scrollable semantic table",
+);
+assert(
+  read("src/lib/seo/articles/reading-time.ts").includes('case "table"'),
+  "reading time counts table cells",
+);
+
 console.log("seo-article-unit: OK");
