@@ -392,7 +392,7 @@ export type ExecutorRunView = {
 /** One real Codex session on the Codex host (codex exec process or live tracked run). No command line, prompt or env. */
 export type ExecutorSessionView = {
   key: string;
-  /** «Задача ba344b7f («…»)», «Каталог archive-fix» or «Задача не определена». */
+  /** «Задача ba344b7f («…»)» or «Задача не определена». */
   task: string;
   taskId: string | null;
   taskHref: string | null;
@@ -712,7 +712,6 @@ export type CodexSession = {
   tracked: boolean;
   runId: string | null;
   taskId: string | null;
-  workName: string | null;
   mode: "write" | "read_only" | "bypass" | "other" | null;
   startedAt: string | null;
   elapsedS: number | null;
@@ -1854,9 +1853,23 @@ function parseCodexCliProbe(value: unknown): CodexCliProbe | null {
   const sessions = parseCodexSessions(record.sessions);
   // Older Core sends only a count of unregistered codex exec processes: still real occupancy.
   const legacyUntracked = readNumber(record, ["untracked_exec_count"]) ?? 0;
-  if (!Array.isArray(record.sessions) && legacyUntracked > 0) {
+  if (!Array.isArray(record.sessions)) {
+    if (readBoolean(record, ["busy"]) === true && runId && run) {
+      const pid = readNumber(run, ["pid"]);
+      const startedAt = readString(run, ["started_at"]);
+      const taskId = readString(run, ["task_id"]);
+      sessions.push({
+        pid: pid != null && pid > 0 ? Math.round(pid) : null,
+        tracked: true,
+        runId: SESSION_TOKEN.test(runId) ? runId : null,
+        taskId: taskId && SESSION_TOKEN.test(taskId) ? taskId : null,
+        mode: null,
+        startedAt,
+        elapsedS: null,
+      });
+    }
     for (let i = 0; i < Math.min(legacyUntracked, 20); i += 1) {
-      sessions.push({ pid: null, tracked: false, runId: null, taskId: null, workName: null, mode: null, startedAt: null, elapsedS: null });
+      sessions.push({ pid: null, tracked: false, runId: null, taskId: null, mode: null, startedAt: null, elapsedS: null });
     }
   }
   const slotsRecord = asRecord(record.slots);
@@ -1905,7 +1918,6 @@ function parseCodexSessions(value: unknown): CodexSession[] {
       tracked: readBoolean(record, ["tracked"]) === true,
       runId: token("run_id"),
       taskId: token("task_id"),
-      workName: token("work_name"),
       mode: mode && SESSION_MODES.has(mode) ? (mode as CodexSession["mode"]) : null,
       startedAt: readString(record, ["started_at"]),
       elapsedS: elapsed != null && elapsed >= 0 ? elapsed : null,
@@ -1942,9 +1954,7 @@ function codexSessionViews(sessions: CodexSession[], tasks: CompanyTask[], now: 
       key: `${session.pid ?? "p"}:${session.runId ?? index}`,
       task: shortId
         ? `Задача ${shortId}${task ? ` («${clip(task.title, 80)}»)` : ""}`
-        : session.workName
-          ? `Каталог ${session.workName}, задача не определена`
-          : "Задача не определена",
+        : "Задача не определена",
       taskId: session.taskId,
       taskHref: task ? issueHref(task.githubIssueNumber) : null,
       mode: session.mode ? SESSION_MODE_LABEL[session.mode] : "режим не определён",
@@ -1959,7 +1969,7 @@ function codexSessionViews(sessions: CodexSession[], tasks: CompanyTask[], now: 
 
 /**
  * Codex card from the real CLI probe (9a63f86e rework). Connection only from a fresh probe; occupancy only
- * from a live tracked run. Core tasks/runs that name Codex are assignments, not occupancy.
+ * from real sessions (codex exec processes or a live tracked run). Core tasks/runs that name Codex are assignments, not occupancy.
  */
 function codexFromCliProbe(probe: CodexCliProbe, now: number): {
   connection: ConnectionState;
@@ -1985,7 +1995,8 @@ function codexFromCliProbe(probe: CodexCliProbe, now: number): {
   if (probe.status === "failed" && fresh) {
     return {
       connection: "unavailable",
-      occupancy: "unknown",
+      // A failed login check does not hide codex exec processes the fresh probe saw running.
+      occupancy: probe.sessions.length > 0 ? "working" : "unknown",
       connectionSource: `Недоступен. ${probe.reason ?? "Проба Codex CLI завершилась ошибкой."} Проверено в ${at}.`,
     };
   }

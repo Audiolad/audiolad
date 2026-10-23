@@ -90,7 +90,7 @@ const busy = codexCard(probe({
   current_run: { run_id: "codex-review-841-a8", task_id: "0e05333f-2458-4c53-9e81-ece5f353693c", pid: 4130138, started_at: minutesAgo(20), heartbeat_at: minutesAgo(5) },
 })).card;
 assert.equal(busy.occupancy, "working");
-assert.equal(busy.summary, "проверено · выполняет задачу");
+assert.equal(busy.summary, "проверено · занят 1");
 assert.equal(busy.runId, "codex-review-841-a8");
 assert.equal(busy.currentTask, "Audiolad Business: технический SPA-пилот");
 assert.match(busy.detail, /отслеживаемый запуск codex-review-841-a8/);
@@ -104,8 +104,8 @@ const twoSessions = codexCard(probe({
   untracked_exec_count: 2,
   slots: { used: 2, max: 2 },
   sessions: [
-    { pid: 3085834, tracked: false, run_id: null, task_id: "0e05333f", task_source: "worktree", work_name: "0e05333f-fix", mode: "write", started_at: minutesAgo(30), elapsed_s: 1500 },
-    { pid: 3082951, tracked: false, run_id: null, task_id: null, task_source: null, work_name: "archive-fix", mode: "read_only", started_at: minutesAgo(7), elapsed_s: 120 },
+    { pid: 3085834, tracked: false, run_id: null, task_id: "0e05333f", task_source: "worktree", mode: "write", started_at: minutesAgo(30), elapsed_s: 1500 },
+    { pid: 3082951, tracked: false, run_id: null, task_id: null, task_source: null, mode: "read_only", started_at: minutesAgo(7), elapsed_s: 120 },
   ],
 })).card;
 assert.equal(twoSessions.occupancy, "working");
@@ -118,7 +118,7 @@ assert.equal(twoSessions.sessions[0].mode, "пишет (workspace-write)");
 assert.match(twoSessions.sessions[0].started, /МСК$/);
 assert.equal(twoSessions.sessions[0].elapsed, "идёт 30 мин");
 assert.equal(twoSessions.sessions[0].registration, "без регистрации запуска (pid 3085834)");
-assert.equal(twoSessions.sessions[1].task, "Каталог archive-fix, задача не определена");
+assert.equal(twoSessions.sessions[1].task, "Задача не определена");
 assert.equal(twoSessions.sessions[1].mode, "ревью read-only");
 assert.equal(twoSessions.runId, "Нет данных");
 assert.equal(twoSessions.currentTask, twoSessions.sessions[0].task);
@@ -128,7 +128,7 @@ assert.doesNotMatch(twoSessions.detail, /отслеживаемый запуск
   const { model: busyModel } = codexCard(probe({
     busy: true,
     slots: { used: 1, max: 2 },
-    sessions: [{ pid: 77, tracked: true, run_id: "codex-9a63f86e-20261023T0936Z-1", task_id: "9a63f86e", task_source: "env", work_name: "9a63f86e", mode: "read_only", started_at: minutesAgo(3), elapsed_s: 180 }],
+    sessions: [{ pid: 77, tracked: true, run_id: "codex-9a63f86e-20261023T0936Z-1", task_id: "9a63f86e", task_source: "env", mode: "read_only", started_at: minutesAgo(3), elapsed_s: 180 }],
     current_run: { run_id: "codex-9a63f86e-20261023T0936Z-1", task_id: "9a63f86e", pid: 77, started_at: minutesAgo(3), heartbeat_at: minutesAgo(1) },
   }));
   const card = busyModel.executors.find((item) => item.id === "codex")!;
@@ -150,6 +150,25 @@ const legacy = codexCard(probe({ untracked_exec_count: 1 })).card;
 assert.equal(legacy.occupancy, "working");
 assert.equal(legacy.occupancyLabel, "занят 1");
 assert.equal(legacy.sessions[0].task, "Задача не определена");
+
+// Older Core with a live tracked run and an unregistered process: two sessions, tracked run kept.
+const legacyMixed = codexCard(probe({
+  busy: true,
+  busy_source: "tracked_run",
+  untracked_exec_count: 1,
+  current_run: { run_id: "codex-review-841-a8", task_id: "0e05333f", pid: 41, started_at: minutesAgo(20), heartbeat_at: minutesAgo(1) },
+})).card;
+assert.equal(legacyMixed.occupancyLabel, "занят 2");
+assert.equal(legacyMixed.runId, "codex-review-841-a8");
+assert.equal(legacyMixed.sessions[0].registration, "запуск codex-review-841-a8");
+assert.match(legacyMixed.sessions[0].task, /^Задача 0e05333f/);
+assert.equal(legacyMixed.sessions[1].task, "Задача не определена");
+
+// A failed login check does not hide sessions the fresh probe saw.
+const failedBusy = codexCard(probe({ status: "failed", chatgpt_authorized: false, login_mode: "none", reason: "Недоступен: не авторизован.", busy: true, busy_source: "process", slots: { used: 1, max: 2 }, sessions: [{ pid: 9, tracked: false, task_id: "9a63f86e", mode: "write", started_at: minutesAgo(2), elapsed_s: 120 }] })).card;
+assert.equal(failedBusy.connection, "unavailable");
+assert.equal(failedBusy.occupancy, "working");
+assert.equal(failedBusy.occupancyLabel, "занят 1 из 2");
 
 // Malformed session fields are dropped, never rendered raw.
 const odd = codexCard(probe({ sessions: [{ pid: 5, task_id: "x; rm -rf", work_name: "a b", mode: "evil", started_at: null }], slots: { max: 2 } })).card;
