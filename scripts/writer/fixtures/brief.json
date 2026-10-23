@@ -1,0 +1,56 @@
+{
+  "articleType": "practice",
+  "slug": "writer-unit-test-article",
+  "topic": "Тестовая тема",
+  "primaryKeyword": "тестовая забота о себе",
+  "cluster": "Тест",
+  "intent": "проверка валидаторов",
+  "primaryPractice": {
+    "key": "lyubov-k-sebe",
+    "authorPath": "zoya-petrova",
+    "title": "Любовь к себе",
+    "description": "медитация"
+  },
+  "relatedPractices": [
+    {
+      "key": "elixir-molodosti",
+      "authorPath": "sergey-and-zoya",
+      "title": "Эликсир",
+      "description": "медитация"
+    }
+  ],
+  "internalLinks": [
+    {
+      "href": "/articles/kak-razvit-lyubov-k-sebe"
+    },
+    {
+      "href": "/articles/kak-prinyat-sebya"
+    }
+  ],
+  "sources": [
+    {
+      "id": "S1",
+      "title": "Поговорка",
+      "url": "https://example.org/proverb",
+      "text": "Тише едешь – дальше будешь, а торопливость нужна лишь при ловле блох."
+    }
+  ],
+  "requiredQuotes": [
+    "S1"
+  ],
+  "wordCount": {
+    "min": 60,
+    "max": 2000
+  },
+  "sections": {
+    "min": 2,
+    "max": 4
+  },
+  "faq": {
+    "min": 2,
+    "max": 3
+  },
+  "table": {
+    "mode": "optional"
+  }
+}
