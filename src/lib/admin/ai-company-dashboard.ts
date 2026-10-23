@@ -3790,11 +3790,6 @@ export function composeAiCompanyBoard(
   };
 }
 
-/**
- * Older Core without `board_counts`: tasks_page.history_included + omitted_history_count is Core's own
- * SQL count of terminal tasks (history count query), plus active tasks Core projects into «Архив».
- * Only on the first history page – with history_before the count covers older tasks only.
- */
 /** Active (non-terminal) tasks the board shows in «Архив», unique across the loaded snapshots. */
 function activeArchivedIds(pages: readonly (CompanyStatus | null | undefined)[]): Set<string> {
   return new Set(
@@ -3804,6 +3799,11 @@ function activeArchivedIds(pages: readonly (CompanyStatus | null | undefined)[])
   );
 }
 
+/**
+ * Older Core without `board_counts`: tasks_page.history_included + omitted_history_count is Core's own
+ * SQL count of terminal tasks (history count query), plus active tasks Core projects into «Архив».
+ * Only on the first history page – with history_before the count covers older tasks only.
+ */
 export function legacyArchiveCount(
   current: CompanyStatus,
   archive: CompanyStatus | null,

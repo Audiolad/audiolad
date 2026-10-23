@@ -1771,7 +1771,9 @@ export function AiCompanyDashboardView({
                   Показать ещё
                 </Link>
                 <p className="mt-1 text-xs text-[#796ba0]">
-                  Следующие {ARCHIVE_PAGE_SIZE} архивных задач – с сохранением фильтров.
+                  {archivePage?.nextLimit === (filters.archiveLimit ?? ARCHIVE_PAGE_SIZE)
+                    ? "Часть архива не загрузилась – повторить загрузку с сохранением фильтров."
+                    : `Следующие ${ARCHIVE_PAGE_SIZE} архивных задач – с сохранением фильтров.`}
                 </p>
               </div>
             ) : null}

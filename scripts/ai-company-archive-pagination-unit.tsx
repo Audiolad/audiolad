@@ -78,6 +78,8 @@ function capped(name: string): RawStatus {
   assert.ok(model);
   assert.equal(model.boardCounts?.archive, 130);
   assert.deepEqual(model.archivePage, { loaded: 100, total: 130, nextLimit: 200 });
+  assert.match(render(model, filters), /Следующие 100 архивных задач/, "normal next page label");
+  assert.doesNotMatch(render(model, filters), /Часть архива не загрузилась/);
   const html = render(model, filters);
   assert.equal(count(html, "archive"), 130, "«Архив» shows the server count, not the loaded rows");
   assert.equal(count(html, "working"), 13);
@@ -296,6 +298,7 @@ async function cursorChaining() {
   assert.ok(halfModel);
   assert.deepEqual(halfModel.archivePage, { loaded: 100, total: 130, nextLimit: 200 }, "retry the same window");
   assert.match(render(halfModel, twoHundred), /href="\/admin\/ai-company\?archive_limit=200&amp;tab=archive"[^>]*>Показать ещё</);
+  assert.match(render(halfModel, twoHundred), /Часть архива не загрузилась – повторить загрузку/, "retry label for a short window");
   // Both views complete: 130 of 130, no link.
   const archiveFull = await loadCompanyStatusWindow(async (path) => view(path, "archive"), twoHundred, "archive");
   const fullModel = composeAiCompanyBoard(currentWindow, archiveFull, twoHundred).model;
