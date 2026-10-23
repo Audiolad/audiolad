@@ -16,6 +16,11 @@ import {
   type AdminRatingsListenersBundle,
 } from "@/lib/admin/analytics-ratings-listeners";
 import { formatAdminAverageStars } from "@/lib/admin/analytics-ratings";
+import { AdminRatingsGuestListeners } from "@/components/admin/AdminRatingsGuestListeners";
+import {
+  GUEST_RATING_ADMIN_LIST_LABEL,
+  GUEST_RATING_ADMIN_REGISTERED_LABEL,
+} from "@/lib/ratings/guest/copy";
 
 const SORT_OPTIONS: ReadonlyArray<readonly [AdminRatingsListenerSort, string]> = [
   ["last_activity", "Последняя активность"],
@@ -62,6 +67,7 @@ export function AdminRatingsListenersPanel() {
   const [detail, setDetail] = useState<AdminRatingsListenerDetailBundle | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<"registered" | "guests">("registered");
   const listAbort = useRef<AbortController | null>(null);
   const detailAbort = useRef<AbortController | null>(null);
 
@@ -78,6 +84,11 @@ export function AdminRatingsListenersPanel() {
     void (async () => {
       await Promise.resolve();
       if (controller.signal.aborted) return;
+      if (audience !== "registered") {
+        setLoading(false);
+        setError(null);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -105,7 +116,7 @@ export function AdminRatingsListenersPanel() {
     })();
 
     return () => controller.abort();
-  }, [submittedQuery, sort, sortDir, offset]);
+  }, [submittedQuery, sort, sortDir, offset, audience]);
 
   useEffect(() => {
     detailAbort.current?.abort();
@@ -152,6 +163,33 @@ export function AdminRatingsListenersPanel() {
 
   return (
     <div className="mt-4" data-testid="admin-ratings-listeners">
+      <div className="mb-3 flex gap-2" role="tablist" aria-label="Тип слушателей">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={audience === "registered"}
+          onClick={() => setAudience("registered")}
+          className={`rounded-full px-4 py-2 text-sm ${
+            audience === "registered" ? "bg-[#7042c5] text-white" : "border border-[#eadff8] text-[#7042c5]"
+          }`}
+        >
+          {GUEST_RATING_ADMIN_REGISTERED_LABEL}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={audience === "guests"}
+          onClick={() => setAudience("guests")}
+          className={`rounded-full px-4 py-2 text-sm ${
+            audience === "guests" ? "bg-[#7042c5] text-white" : "border border-[#eadff8] text-[#7042c5]"
+          }`}
+        >
+          {GUEST_RATING_ADMIN_LIST_LABEL}
+        </button>
+      </div>
+      {audience === "guests" ? <AdminRatingsGuestListeners /> : null}
+      {audience === "registered" ? (
+      <>
       <p className="text-sm text-[#796ba0]">
         Слушатели, поставившие хотя бы одну оценку. «Оценок» — число оценённых продуктов
         (одна активная оценка на пару слушатель×продукт). Средняя — по неисключённым
@@ -432,6 +470,8 @@ export function AdminRatingsListenersPanel() {
             </div>
           ) : null}
         </section>
+      ) : null}
+      </>
       ) : null}
     </div>
   );

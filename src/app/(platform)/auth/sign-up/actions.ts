@@ -20,6 +20,8 @@ import {
   type OnNewListenerCreatedResult,
 } from "@/lib/email/on-new-listener-created";
 import { claimPartnerAttribution } from "@/lib/author-partner/attribution";
+import { claimGuestRatingsForUser } from "@/lib/ratings/guest/claim-server";
+import { GUEST_RATING_COOKIE_NAME } from "@/lib/ratings/guest/session";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
 import {
   clearPartnerAttributionCookie,
@@ -268,6 +270,34 @@ export async function signUpAction(
     } catch (error) {
       console.error(
         "signup_partner_attribution_failed",
+        error instanceof Error ? error.message : "unknown",
+      );
+    }
+
+    try {
+      const cookieStore = await cookies();
+      const header = cookieStore
+        .getAll()
+        .map((cookie) => `${cookie.name}=${cookie.value}`)
+        .join("; ");
+      await claimGuestRatingsForUser({
+        userId: data.user.id,
+        cookieHeader: header,
+      });
+      if (cookieStore.get(GUEST_RATING_COOKIE_NAME)) {
+        cookieStore.set({
+          name: GUEST_RATING_COOKIE_NAME,
+          value: "",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 0,
+        });
+      }
+    } catch (error) {
+      console.error(
+        "signup_guest_rating_claim_failed",
         error instanceof Error ? error.message : "unknown",
       );
     }

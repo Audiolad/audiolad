@@ -16,6 +16,12 @@ import {
   type AdminRatingsListenersBundle,
 } from "@/lib/admin/analytics-ratings-listeners";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  normalizeAdminRatingsGuestListenerDetailRpc,
+  normalizeAdminRatingsGuestListenersRpc,
+  type AdminRatingsGuestListenerDetail,
+  type AdminRatingsGuestListenersBundle,
+} from "@/lib/admin/analytics-ratings-listeners";
 
 export async function getAdminRatingsListenersBundle(input: {
   search: string | null;
@@ -53,6 +59,42 @@ export async function getAdminRatingsListenerDetailBundle(
   return normalizeAdminRatingsListenerDetailRpc(data);
 }
 
+export async function getAdminRatingsGuestListenersBundle(input: {
+  search: string | null;
+  sort: "last_activity" | "rating_count" | "average";
+  sortDir: "asc" | "desc";
+  offset: number;
+}): Promise<AdminRatingsGuestListenersBundle> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase.rpc("admin_ratings_guest_listeners", {
+    p_search: input.search,
+    p_sort: input.sort,
+    p_sort_dir: input.sortDir,
+    p_limit: ADMIN_RATINGS_LISTENERS_PAGE_SIZE,
+    p_offset: input.offset,
+  });
+  if (error) {
+    console.error("admin_ratings_guest_listeners_error", error.message);
+    throwIfAdminRatingsRpcFailed(error);
+  }
+  return normalizeAdminRatingsGuestListenersRpc(data);
+}
+
+export async function getAdminRatingsGuestListenerDetailBundle(
+  guestId: string,
+): Promise<AdminRatingsGuestListenerDetail> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase.rpc("admin_ratings_guest_listener_detail", {
+    p_guest_id: guestId,
+    p_limit: ADMIN_RATINGS_LISTENER_DETAIL_LIMIT,
+  });
+  if (error) {
+    console.error("admin_ratings_guest_listener_detail_error", error.message);
+    throwIfAdminRatingsRpcFailed(error);
+  }
+  return normalizeAdminRatingsGuestListenerDetailRpc(data);
+}
+
 /** sha256 of normalized email; never the email itself. */
 export function hashListenerEmailForAudit(email: string | null): string {
   const normalized = (email ?? "").trim().toLowerCase();
@@ -71,7 +113,7 @@ export async function writeAdminRatingsListenersAccessLog(input: {
   kind: "list" | "detail";
   targetUserId?: string | null;
   targetEmail?: string | null;
-  counts: Record<string, number | boolean>;
+  counts: Record<string, number | boolean | string>;
 }): Promise<boolean> {
   try {
     const service = createServiceRoleClient();

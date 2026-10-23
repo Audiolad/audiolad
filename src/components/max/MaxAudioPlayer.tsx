@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { useMaxAudioPlayback } from "@/components/max/useMaxAudioPlayback";
 import { formatMaxDuration } from "@/lib/max/format-duration";
+import { reportGuestListenSample } from "@/lib/ratings/guest/listen-client";
 import {
   isMaxPreviewPlaybackMode,
   formatMaxPlayerTrackListLabel,
@@ -34,6 +35,7 @@ export default function MaxAudioPlayer({
   onPlaybackCompleted,
   externalQueue,
   hideTrackList = false,
+  guestListen = false,
 }: {
   session: MaxPlaybackSession;
   fetchAudio: (
@@ -55,6 +57,8 @@ export default function MaxAudioPlayer({
   externalQueue?: MaxExternalQueueNavigation;
   /** Product pages already render the track rows. Playlist and promo keep the player list. */
   hideTrackList?: boolean;
+  /** Unauthenticated MAX/VK listen samples for guest ratings. No-op when a site session exists. */
+  guestListen?: boolean;
 }) {
   const {
     audioRef,
@@ -77,6 +81,36 @@ export default function MaxAudioPlayer({
     canGoPrevious: internalCanGoPrevious,
     canGoNext: internalCanGoNext,
   } = useMaxAudioPlayback({ session, fetchAudio });
+  const lastGuestListenRef = useRef({ trackId: "", positionMs: 0, at: 0 });
+
+  useEffect(() => {
+    if (!guestListen || !isPlaying || !currentTrack?.trackId) {
+      return;
+    }
+    const trackId = currentTrack.trackId;
+    const positionMs = Math.max(0, Math.floor(currentTime * 1000));
+    const last = lastGuestListenRef.current;
+    const sameTrack = last.trackId === trackId;
+    if (sameTrack && positionMs - last.positionMs < 5000 && Date.now() - last.at < 5000) {
+      return;
+    }
+    const prior = sameTrack ? last.positionMs : null;
+    lastGuestListenRef.current = { trackId, positionMs, at: Date.now() };
+    reportGuestListenSample({
+      authorSlug: session.authorSlug,
+      productSlug: session.productSlug,
+      audioItemId: trackId,
+      positionMs,
+      priorPositionMs: prior,
+    });
+  }, [
+    currentTime,
+    currentTrack?.trackId,
+    guestListen,
+    isPlaying,
+    session.authorSlug,
+    session.productSlug,
+  ]);
   const usesExternalQueue = externalQueue != null;
   const internalNavigation = shouldShowMaxTrackNavigation(session.playbackMode);
   const showNavigation = usesExternalQueue || internalNavigation;

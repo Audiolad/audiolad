@@ -641,6 +641,7 @@ export default function MaxAuthenticatedHome({
                 <MaxAudioPlayer
                   session={playback.session}
                   hideTrackList
+                  guestListen={guestMode && detail.status === "ready" && detail.product.rating.guestCollect === true}
                   onBindPlay={bindPlay}
                   onBindPause={(pause) => {
                     pauseRef.current = pause;

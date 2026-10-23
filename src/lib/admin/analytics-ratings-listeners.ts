@@ -373,3 +373,195 @@ export function describeAdminRatingsListenerSignals(
   }
   return out;
 }
+
+export type AdminRatingsGuestListenerRow = {
+  guestId: string;
+  ratingCount: number;
+  activeCount: number;
+  supersededCount: number;
+  excludedCount: number;
+  average: number | null;
+  firstRatedAt: string | null;
+  lastActivityAt: string | null;
+};
+
+export type AdminRatingsGuestSegmentTotals = {
+  totalStars: number;
+  ratingCount: number;
+  average: number | null;
+};
+
+export type AdminRatingsGuestListenersBundle = {
+  total: number;
+  limit: number;
+  offset: number;
+  sort: "last_activity" | "rating_count" | "average";
+  sortDir: AdminRatingsListenerSortDir;
+  rows: AdminRatingsGuestListenerRow[];
+  segments: {
+    music: AdminRatingsGuestSegmentTotals;
+    practice: AdminRatingsGuestSegmentTotals;
+  };
+};
+
+export type AdminRatingsGuestListenerDetail =
+  | { found: false }
+  | {
+      found: true;
+      guestId: string;
+      ratingTotal: number;
+      eventTotal: number;
+      limit: number;
+      ratings: Array<{
+        ratingId: string;
+        practiceId: string;
+        title: string;
+        productKind: string | null;
+        stars: number;
+        createdAt: string | null;
+        updatedAt: string | null;
+        excluded: boolean;
+        superseded: boolean;
+        verification: string | null;
+        ratingEligibleAt: string | null;
+        realListenedMs: number | null;
+      }>;
+      events: Array<{
+        id: string;
+        practiceId: string;
+        title: string;
+        oldStars: number | null;
+        newStars: number;
+        action: string;
+        occurredAt: string | null;
+      }>;
+      signals: {
+        captchaFailures: number;
+        voteCount: number;
+        otherGuestsOnNetwork: number;
+      };
+    };
+
+export function normalizeGuestListenerSearch(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!/^[0-9a-f-]{4,36}$/i.test(trimmed)) return null;
+  return trimmed;
+}
+
+function segmentTotals(value: unknown): AdminRatingsGuestSegmentTotals {
+  const row = record(value);
+  const totalStars = num(row.total_stars);
+  const ratingCount = num(row.rating_count);
+  return {
+    totalStars,
+    ratingCount,
+    average: ratingCount > 0 ? totalStars / ratingCount : null,
+  };
+}
+
+export function normalizeAdminRatingsGuestListenersRpc(
+  raw: unknown,
+): AdminRatingsGuestListenersBundle {
+  const source = record(raw);
+  const rows = Array.isArray(source.rows) ? source.rows : [];
+  const segments = record(source.segments);
+  const sort = text(source.sort);
+  return {
+    total: num(source.total),
+    limit: num(source.limit, ADMIN_RATINGS_LISTENERS_PAGE_SIZE),
+    offset: num(source.offset),
+    sort: sort === "rating_count" || sort === "average" ? sort : "last_activity",
+    sortDir: parseAdminRatingsListenerSortDir(text(source.sort_dir)),
+    rows: rows.map((item) => {
+      const row = record(item);
+      return {
+        guestId: text(row.guest_id) ?? "",
+        ratingCount: num(row.rating_count),
+        activeCount: num(row.active_count),
+        supersededCount: num(row.superseded_count),
+        excludedCount: num(row.excluded_count),
+        average: nullableNum(row.average),
+        firstRatedAt: text(row.first_rated_at),
+        lastActivityAt: text(row.last_activity_at),
+      };
+    }).filter((row) => row.guestId !== ""),
+    segments: {
+      music: segmentTotals(segments.music),
+      practice: segmentTotals(segments.practice),
+    },
+  };
+}
+
+export function normalizeAdminRatingsGuestListenerDetailRpc(
+  raw: unknown,
+): AdminRatingsGuestListenerDetail {
+  const source = record(raw);
+  if (source.found !== true) return { found: false };
+  const guestId = text(source.guest_id);
+  if (!guestId) return { found: false };
+  const signals = record(source.signals);
+  const ratings = Array.isArray(source.ratings) ? source.ratings : [];
+  const events = Array.isArray(source.events) ? source.events : [];
+  return {
+    found: true,
+    guestId,
+    ratingTotal: num(source.rating_total),
+    eventTotal: num(source.event_total),
+    limit: num(source.limit),
+    ratings: ratings.map((item) => {
+      const row = record(item);
+      return {
+        ratingId: text(row.rating_id) ?? "",
+        practiceId: text(row.practice_id) ?? "",
+        title: text(row.title) ?? "Практика",
+        productKind: text(row.product_kind),
+        stars: num(row.stars),
+        createdAt: text(row.created_at),
+        updatedAt: text(row.updated_at),
+        excluded: row.excluded === true,
+        superseded: row.superseded === true,
+        verification: text(row.verification),
+        ratingEligibleAt: text(row.rating_eligible_at),
+        realListenedMs: nullableNum(row.real_listened_ms),
+      };
+    }),
+    events: events.map((item) => {
+      const row = record(item);
+      return {
+        id: text(row.id) ?? "",
+        practiceId: text(row.practice_id) ?? "",
+        title: text(row.title) ?? "Практика",
+        oldStars: nullableNum(row.old_stars),
+        newStars: num(row.new_stars),
+        action: text(row.action) ?? "changed",
+        occurredAt: text(row.occurred_at),
+      };
+    }),
+    signals: {
+      captchaFailures: num(signals.captcha_failures),
+      voteCount: num(signals.vote_count),
+      otherGuestsOnNetwork: num(signals.other_guests_on_network),
+    },
+  };
+}
+
+export function describeAdminRatingsGuestSignals(signals: {
+  captchaFailures: number;
+  voteCount: number;
+  otherGuestsOnNetwork: number;
+}): string[] {
+  const out: string[] = [];
+  if (signals.captchaFailures > 0) {
+    out.push(`Неудачных проверок: ${signals.captchaFailures}. Это не блокировка.`);
+  }
+  if (signals.otherGuestsOnNetwork > 0) {
+    out.push(
+      `На том же сетевом сигнале за сутки были и другие гостевые сессии: ${signals.otherGuestsOnNetwork}. Общий IP не блокируется.`,
+    );
+  }
+  if (signals.voteCount > 0) {
+    out.push(`Сохранённых изменений оценки: ${signals.voteCount}.`);
+  }
+  return out;
+}

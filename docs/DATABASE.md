@@ -1,3 +1,17 @@
+## Guest practice ratings (pending owner apply)
+
+Migration `20270113120000_guest_practice_ratings.sql` is additive and is not
+applied by the draft that adds it. It creates `guest_listen_stats`,
+`guest_listen_item_credit`, `guest_practice_ratings`,
+`guest_practice_rating_events`, `guest_captcha_tokens`,
+`guest_rating_activity` and `guest_rating_network_guests`. RLS is enabled and
+only `service_role` can use the tables and RPCs. No `auth.users` rows are
+inserted. `practice_ratings` and `set_practice_rating` are not altered.
+`claim_guest_practice_ratings` copies a guest vote once through the existing
+`set_practice_rating` or marks the guest row superseded when the account
+already has a vote. Rows are not deleted. Apply and rollback steps are in
+`docs/ratings/GUEST_RATINGS_ENABLEMENT.md`.
+
 ## Business declared rightsholder (pending owner approval)
 
 Migration `20270112120000_business_declared_rightsholder.sql` is prepared but
