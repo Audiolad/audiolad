@@ -410,6 +410,8 @@ export type ExecutorSessionView = {
   elapsed: string;
   /** «запуск codex-…» or «без регистрации запуска (pid 123)». */
   registration: string;
+  /** Grok/Cursor live sessions: «сигнал 16:46 МСК, 4 мин назад» replaces «начата … · идёт …». */
+  signal?: string;
 };
 export type ExecutorId = "codex" | "cursor" | "grok";
 export type ResultKind = "engineering" | "document" | "unknown";
@@ -650,7 +652,25 @@ export type CompanyHeartbeat = {
   currentTaskId: string | null;
 };
 
+/** Core executors[].live for Grok and Cursor: occupancy from fresh callbacks (Core board-live-signal). */
+export type ExecutorLiveSession = {
+  taskId: string | null;
+  title: string | null;
+  githubIssue: number | null;
+  runId: string | null;
+  lastSignalAt: string | null;
+  source: string | null;
+};
+export type ExecutorLive = {
+  status: "busy" | "free" | "unknown";
+  sessions: ExecutorLiveSession[];
+  staleRuns: ExecutorLiveSession[];
+  abandonedRuns: number;
+  reason: string | null;
+};
+
 export type ExecutorObservation = {
+  live?: ExecutorLive | null;
   provider: string | null;
   channel: string | null;
   model: string | null;
@@ -1611,7 +1631,66 @@ function parseExecutorObservation(value: unknown): ExecutorObservation | null {
     lastHeartbeatAt: readString(record, CORE_FIELD_MAP.executor.lastHeartbeatAt),
     currentTaskId: readString(record, CORE_FIELD_MAP.executor.currentTaskId),
     runId: readString(record, CORE_FIELD_MAP.executor.runId),
+    live: parseExecutorLive(record.live),
   };
+}
+
+function parseLiveSession(value: unknown): ExecutorLiveSession | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  return {
+    taskId: readString(record, ["task_id"]),
+    title: readString(record, ["title"]),
+    githubIssue: readNumber(record, ["github_issue"]),
+    runId: readString(record, ["run_id"]),
+    lastSignalAt: readString(record, ["last_signal_at"]),
+    source: readString(record, ["source"]),
+  };
+}
+
+function parseExecutorLive(value: unknown): ExecutorLive | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const status = readString(record, ["status"]);
+  if (status !== "busy" && status !== "free" && status !== "unknown") return null;
+  const list = (key: string) => (Array.isArray(record[key]) ? (record[key] as unknown[]) : [])
+    .map((item) => parseLiveSession(item))
+    .filter((item): item is ExecutorLiveSession => item !== null);
+  return {
+    status,
+    sessions: list("sessions"),
+    staleRuns: list("stale_runs"),
+    abandonedRuns: readNumber(record, ["abandoned_runs"]) ?? 0,
+    reason: readString(record, ["reason"]),
+  };
+}
+
+const LIVE_SOURCE_LABEL: Record<string, string> = {
+  callback: "колбэк задачи в Company Core",
+  codex_session: "сессия Codex по задаче на сервере",
+};
+
+function liveSessionViews(sessions: ExecutorLiveSession[], tasks: CompanyTask[], now: number): ExecutorSessionView[] {
+  return sessions.map((session, index) => {
+    const task = session.taskId ? tasks.find((item) => item.id === session.taskId) ?? null : null;
+    const shortId = session.taskId ? session.taskId.slice(0, 8) : null;
+    const title = task?.title ?? session.title;
+    const signalMs = parseInstant(session.lastSignalAt);
+    const ago = signalMs != null ? Math.max(0, Math.round((now - signalMs) / 60000)) : null;
+    return {
+      key: `live:${session.taskId ?? index}`,
+      task: shortId ? `Задача ${shortId}${title ? ` («${clip(title, 80)}»)` : ""}` : "Задача не определена",
+      taskId: session.taskId,
+      taskHref: issueHref(task?.githubIssueNumber ?? session.githubIssue ?? null),
+      mode: session.source ? LIVE_SOURCE_LABEL[session.source] ?? "сигнал Company Core" : "сигнал Company Core",
+      started: NO_DATA,
+      elapsed: NO_DATA,
+      registration: session.runId ? `запуск ${session.runId}` : "запуск не указан",
+      signal: session.lastSignalAt
+        ? `сигнал ${formatDateTime(session.lastSignalAt)} МСК${ago != null ? `, ${ago} мин назад` : ""}`
+        : "сигнал без времени",
+    };
+  });
 }
 
 function parseGate(value: unknown): GateFact | null {
@@ -3774,9 +3853,13 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       .map((task) => ({ task, view: executorRunView(task, now) }))
       .sort((left, right) => (parseInstant(right.view.lastProgressAt) ?? 0) - (parseInstant(left.view.lastProgressAt) ?? 0));
     const freshRuns = runs.filter((item) => item.view.fresh);
+    // Grok/Cursor: Core's live occupancy (fresh callbacks, Codex sessions of box tasks) wins over run freshness.
+    const live = spec.id !== "codex" ? observations.find((item) => item.live && item.provider?.toLowerCase() === spec.id)?.live ?? null : null;
     let occupancy: OccupancyState;
     if (cli) {
       occupancy = cli.occupancy;
+    } else if (live) {
+      occupancy = live.status === "busy" ? "working" : live.status === "free" ? "free" : "unknown";
     } else if (freshRuns.length > 0) {
       const allWaiting = freshRuns.every((item) => {
         const blob = `${item.task.status} ${item.task.humanGate ?? ""}`.toLowerCase();
@@ -3788,7 +3871,10 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     } else {
       occupancy = "unknown";
     }
-    const lastRunSignal = latestInstant(runs.map((item) => item.view.lastProgressAt));
+    const lastRunSignal = latestInstant([
+      ...runs.map((item) => item.view.lastProgressAt),
+      ...(live ? live.sessions.map((item) => item.lastSignalAt) : []),
+    ]);
     const heartbeatAt = latestInstant([checkedAt, lastRunSignal]);
     const probeAt = cli && facts?.cliProbe ? facts.cliProbe.checkedAt : null;
     const signalSource = cli
@@ -3824,10 +3910,18 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       : null;
     const untracked = cli ? facts?.cliProbe?.untrackedExecCount ?? null : null;
     const cliSessions = cli && occupancy === "working" ? facts?.cliProbe?.sessions ?? [] : [];
-    const sessionViews = codexSessionViews(cliSessions, status.tasks, now);
+    const sessionViews = live
+      ? liveSessionViews(live.status === "busy" ? live.sessions : [], status.tasks, now)
+      : codexSessionViews(cliSessions, status.tasks, now);
     const slots = cli ? facts?.cliProbe?.slots ?? null : null;
     const slotsText = slots ? `${cliSessions.length} из ${slots.max}` : `${cliSessions.length}`;
+    const liveStale = live ? live.staleRuns.length : 0;
     const detailParts = [
+      live?.reason ? `Занятость: ${live.reason}` : null,
+      live && liveStale > 0
+        ? `Без сигнала от 20 минут до 2 часов: ${live.staleRuns.map((item) => (item.taskId ?? "").slice(0, 8)).filter(Boolean).join(", ")}.`
+        : null,
+      live && live.abandonedRuns > 0 ? `Запусков без сигнала дольше 2 часов (не считаются занятостью): ${live.abandonedRuns}.` : null,
       tracked
         ? `Выполняет: отслеживаемый запуск ${tracked.runId}${trackedTask ? ` («${clip(trackedTask.title, 80)}»)` : ""}, начат ${formatDateTime(tracked.startedAt)} МСК, пульс ${formatDateTime(tracked.heartbeatAt)} МСК.`
         : null,
@@ -3844,7 +3938,7 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       spec.id === "codex" && runs.length > 0 && !current?.executiveRun?.provider
         ? "Исполнитель запуска определён по идентификатору запуска: Company Core не хранит провайдера."
         : null,
-      staleRuns > 0
+      !live && staleRuns > 0
         ? `Без подтверждённого прогресса дольше ${threshold}: ${staleRuns}. Такие запуски не считаются текущей работой.`
         : null,
       observations.some((item) => item.model && /grok|xai/i.test(item.model) && spec.id === "cursor")
@@ -3854,7 +3948,9 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     const connectionLabel = connectionCopy(connection);
     const occupancyLabel = cli && occupancy === "working" && cliSessions.length > 0
       ? `занят ${slotsText}`
-      : occupancyCopy(occupancy);
+      : live && live.status === "busy" && sessionViews.length > 0
+        ? `занят ${sessionViews.length}`
+        : occupancyCopy(occupancy);
     return {
       id: spec.id,
       label: spec.label,
@@ -3876,11 +3972,13 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
         ? (sessionViews.length > 0
           ? `Сессий Codex: ${slotsText}`
           : tracked ? "Отслеживаемый запуск Codex: 1" : runs.length === 0 ? "Нет активных запусков" : `Назначено Codex: ${runs.length} · не подтверждает занятость`)
-        : runs.length === 0 ? "Нет активных запусков" : `Активных запусков: ${runs.length}`,
+        : live && sessionViews.length > 0
+          ? `Задач в работе по свежим сигналам: ${sessionViews.length}`
+          : runs.length === 0 ? "Нет активных запусков" : `Активных запусков: ${runs.length}`,
       currentTask: cli
         ? (tracked && cliSessions.every((item) => item.tracked) ? (trackedTask?.title ?? tracked.runId) : sessionViews[0]?.task ?? "Нет отслеживаемого запуска Codex")
-        : runs[0]?.view.title ?? "Нет активных запусков",
-      runId: cli ? (tracked?.runId ?? NO_DATA) : (runs[0] && runs[0].view.runId !== NO_DATA ? runs[0].view.runId : null) ?? observations.map((item) => item.runId).find(Boolean) ?? NO_DATA,
+        : live && sessionViews.length > 0 ? sessionViews[0].task : runs[0]?.view.title ?? "Нет активных запусков",
+      runId: cli ? (tracked?.runId ?? NO_DATA) : live && live.status === "busy" && live.sessions[0]?.runId ? live.sessions[0].runId : (runs[0] && runs[0].view.runId !== NO_DATA ? runs[0].view.runId : null) ?? observations.map((item) => item.runId).find(Boolean) ?? NO_DATA,
       detail: joinFound(detailParts),
     };
   });
