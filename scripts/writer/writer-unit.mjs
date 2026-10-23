@@ -1,0 +1,338 @@
+#!/usr/bin/env node
+/** Offline unit tests for the «Райтер» pipeline: validators, normalizer, converter. */
+import assert from "node:assert/strict";
+import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { normalizeBrief } from "./lib/brief.mjs";
+import { AUDIT_PATH, MASTER_PATH, loadContext } from "./lib/context.mjs";
+import { COUNT_TEST_FILES, bumpCountTests, constName, toDefinition, toTypeScript, updateOperational, masterEntry } from "./lib/convert.mjs";
+import { chargedCost, costRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
+import { normalizeArticle } from "./lib/normalize.mjs";
+import { articleSchema, buildExpandMessages, buildMessages, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
+import { findTextAddresses, validateArticle } from "./lib/validate.mjs";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const context = await loadContext(root);
+const [linkA, linkB] = ["kak-razvit-lyubov-k-sebe", "kak-prinyat-sebya"];
+assert(context.articleBySlug.has(linkA) && context.articleBySlug.has(linkB), "fixture articles exist");
+
+const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+const brief = normalizeBrief(JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8")));
+const FIXTURE = readFileSync(join(fixtureDir, "article.json"), "utf8");
+
+const para = (text) => ({ kind: "paragraph", text });
+function fixture() {
+  return JSON.parse(FIXTURE);
+}
+
+async function check(article) {
+  const { article: normalized } = normalizeArticle(article, context);
+  return validateArticle(normalized, brief, context, { live: false });
+}
+
+// 1. Valid fixture passes; normalizer fixes typography and seeAlso titles.
+{
+  const raw = fixture();
+  raw.leadBeforeAudio = raw.leadBeforeAudio.replace(":", " \u2014").replace("несколько", "не\u2011сколько");
+  raw.metaTitle = raw.metaTitle.replace(" – АудиоЛад", " | AudioLad");
+  const { article, changes } = normalizeArticle(raw, context);
+  assert(!JSON.stringify(article).includes("\u2014"));
+  assert(article.metaTitle.endsWith(" – АудиоЛад"), article.metaTitle);
+  assert.equal(article.seeAlsoLinks[0].title, context.articleBySlug.get(linkA).title);
+  assert(changes.length >= 3, changes.join("; "));
+  const result = await validateArticle(article, brief, context, { live: false });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.stats.quotes.verbatim, 1);
+}
+
+// 2. Altered quote and missing required quote.
+{
+  const raw = fixture();
+  raw.sections[0].blocks[0] = para("Старая поговорка: «Тише едешь – дальше будешь, а спешка нужна лишь при ловле блох.»");
+  const result = await check(raw);
+  assert(result.errors.some((e) => e.includes("не дословна")), result.errors.join("\n"));
+  assert(result.errors.some((e) => e.includes("[S1]")));
+}
+
+// 3. Promises are rejected unless negated.
+{
+  const raw = fixture();
+  raw.introAfterAudio = ["Эта практика гарантирует исцеление и защитит от любых бед."];
+  const result = await check(raw);
+  assert(result.errors.filter((e) => e.includes("запрещённое обещание")).length >= 3, result.errors.join("\n"));
+  raw.introAfterAudio = ["Практика не обещает исцеления и не заменяет врача: это просто пауза."];
+  assert.deepEqual((await check(raw)).errors, []);
+}
+
+// 4. Links: unknown article, foreign practice, external URL not in brief, missing primary practice link.
+{
+  const raw = fixture();
+  raw.sections[0].blocks[1].segments[1].href = "/practice/someone/other";
+  raw.sections[1].blocks[2].segments[1].href = "/articles/net-takoy-stati";
+  raw.sections[1].blocks[2].segments.push({ href: "https://evil.example.com/x", label: "x" });
+  const result = await check(raw);
+  for (const needle of ["не из брифа", "не существует в реестре", "внешняя ссылка", "нет ссылки на основную практику"]) {
+    assert(result.errors.some((e) => e.includes(needle)), `${needle}\n${result.errors.join("\n")}`);
+  }
+}
+
+// 4b. Owner rule: no links to other websites. Only audiolad.ru and sergey-zoya.ru (from the brief).
+{
+  assert(!brief.externalLinks.some((url) => url.includes("example.org")), "source url is not linkable");
+  const raw = fixture();
+  raw.sections[1].blocks[2].segments.push({ text: " и " }, { href: "https://sergey-zoya.ru/about", label: "о нас" });
+  raw.sections[0].blocks.push(para("Подробнее на www.psychologies.ru/test или https://example.org/a."));
+  const local = normalizeBrief({ ...JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8")), externalLinks: ["https://sergey-zoya.ru/about"] });
+  const { article } = normalizeArticle(raw, context);
+  const result = await validateArticle(article, local, context, { live: false });
+  assert(!result.errors.some((e) => e.includes("sergey-zoya")), result.errors.join("\n"));
+  assert.equal(result.errors.filter((e) => e.includes("в тексте:")).length, 2, result.errors.join("\n"));
+  const linked = fixture();
+  linked.sections[1].blocks[2].segments.push({ href: "https://example.org/proverb", label: "поговорка" });
+  const linkedResult = await check(linked);
+  assert(linkedResult.errors.some((e) => e.includes("внешняя ссылка на другой сайт запрещена (example.org)")), linkedResult.errors.join("\n"));
+  assert.throws(
+    () => normalizeBrief({ ...JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8")), externalLinks: ["https://example.org/x"] }),
+    /ссылки на другие сайты запрещены/,
+  );
+}
+
+// 4c. Review #1: any address of another site in plain text is a hard failure.
+{
+  const bad = [
+    "Подробнее: example.com/page.",
+    "Канал t.me/somechannel",
+    "Смотрите //evil.example/x",
+    "Пишите mailto:a@b.ru",
+    "Почта a@b.ru для вопросов",
+    "Сайт пример.рф",
+    "Сайт https://psychologies.ru",
+    "Адрес WWW.Example.org",
+    "Зеркало audiolad.ru.evil.com/x",
+    "Почта info@audiolad.ru",
+  ];
+  for (const text of bad) assert.equal(findTextAddresses(text).length, 1, `${text}: ${findTextAddresses(text).join("; ")}`);
+  const fine = [
+    "Практики есть на audiolad.ru и на sergey-zoya.ru.",
+    "Т.е. это и т.д., версия 1.2, 10.30 утра, «Сила настоящего» Экхарта Толле.",
+    "Полный адрес https://audiolad.ru/articles/x тоже допустим.",
+  ];
+  for (const text of fine) assert.deepEqual(findTextAddresses(text), [], text);
+  const raw = fixture();
+  raw.sections[0].blocks.push(para("Канал t.me/somechannel и почта a@b.ru."));
+  const result = await check(raw);
+  assert.equal(result.ok, false);
+  assert.equal(result.errors.filter((e) => e.includes("в тексте:")).length, 2, result.errors.join("\n"));
+}
+
+// 4d. Review #2: --max-rub / --max-tokens are parsed strictly.
+{
+  assert.deepEqual(parseLimits("3", "16000"), { maxRub: 3, maxTokens: 16000 });
+  assert.deepEqual(parseLimits("0,5", "800"), { maxRub: 0.5, maxTokens: 800 });
+  for (const [rub, tokens] of [["", "16000"], ["NaN", "16000"], ["3р", "16000"], ["0", "16000"], ["-1", "16000"], ["1e3", "16000"], ["Infinity", "16000"], ["31", "16000"], [undefined, "16000"], ["3", ""], ["3", "NaN"], ["3", "16k"], ["3", "1.5"], ["3", "0"], ["3", "999999"]]) {
+    assert.throws(() => parseLimits(rub, tokens), /--max-(rub|tokens)/, `${rub} / ${tokens}`);
+  }
+}
+
+// 4e. Review #6: a call without numeric usage is charged at the worst case, not 0.
+{
+  const worst = worstCaseRub("openai/gpt-oss-120b", 3000, 16000);
+  assert(worst > 0.9);
+  assert.deepEqual(chargedCost({ ok: true, cost_rub: 0.2 }, worst), { cost: 0.2, estimated: false });
+  assert.deepEqual(chargedCost({ ok: false, error: "generate.py: код 255" }, worst), { cost: worst, estimated: true });
+  assert.deepEqual(chargedCost(undefined, worst), { cost: worst, estimated: true });
+  assert.deepEqual(chargedCost({ cost_rub: "0.1" }, worst), { cost: worst, estimated: true });
+  assert.deepEqual(chargedCost({ cost_rub: Number.NaN }, worst), { cost: worst, estimated: true });
+}
+
+// 4f. Review #3: extraInstructions as a string or an array; other types are a brief error.
+{
+  const base = JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8"));
+  assert.deepEqual(normalizeBrief({ ...base, extraInstructions: "Одна строка." }).extraInstructions, ["Одна строка."]);
+  assert.deepEqual(normalizeBrief({ ...base, extraInstructions: ["А.", " ", "Б."] }).extraInstructions, ["А.", "Б."]);
+  assert.throws(() => normalizeBrief({ ...base, extraInstructions: 5 }), /extraInstructions/);
+  assert.throws(() => normalizeBrief({ ...base, extraInstructions: ["ok", 1] }), /extraInstructions/);
+  const pilot = normalizeBrief(JSON.parse(readFileSync(join(root, "scripts/writer/examples/pilot-brief.json"), "utf8")));
+  assert.equal(pilot.extraInstructions.length, 1);
+  const prompt = buildMessages(pilot, context).messages[1].content;
+  assert(prompt.includes(pilot.extraInstructions[0]), "pilot instruction is one prompt line");
+  assert(!/\n- .\n- .\n/.test(prompt), "no one-character prompt lines");
+}
+
+// 4g. Review #4: straight-quoted quotes get the same verbatim check as «ёлочки».
+{
+  const source = brief.sources[0].text;
+  const altered = source.replace("дальше", "быстрее");
+  for (const [open, close] of [['"', '"'], ["„", "“"], ["“", "”"]]) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(`Поговорка: ${open}${altered}${close}`));
+    const result = await check(raw);
+    assert(result.errors.some((e) => e.includes("похожа на источник, но не дословна")), `${open}: ${result.errors.join("; ")}`);
+    const long = fixture();
+    long.sections[0].blocks.push(para(`Молитва: ${open}Господи, даруй мне силу и терпение принять то, что я не могу изменить сегодня никак${close}`));
+    const longResult = await check(long);
+    assert(longResult.errors.some((e) => e.includes("длинная цитата без источника")), `${open}: ${longResult.errors.join("; ")}`);
+  }
+  const ok = fixture();
+  ok.sections[0].blocks.push(para(`Поговорка: "${source}"`));
+  const okResult = await check(ok);
+  assert(!okResult.errors.some((e) => e.includes("цитата")), okResult.errors.join("; "));
+}
+
+// 4h. Review #5: only a direct negation of the promise excuses it.
+{
+  const flagged = ["Это не сложно, и молитва исцелит вас.", "Без спешки практика гарантирует покой.", "Не торопитесь: медитация защитит от тревоги.", "Нельзя сказать иначе: практика исцелит."];
+  for (const text of flagged) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(text));
+    const result = await check(raw);
+    assert(result.errors.some((e) => e.includes("запрещённое обещание")), `${text}: ${result.errors.join("; ")}`);
+  }
+  const negated = ["Практика не исцелит болезнь.", "Медитация не может гарантировать результат.", "Это мягкая поддержка без гарантий.", "Здесь нет гарантий исхода.", "Невозможно гарантировать исход.", "Гарантирует ли практика покой?"];
+  for (const text of negated) {
+    const raw = fixture();
+    raw.sections[0].blocks.push(para(text));
+    const result = await check(raw);
+    assert(!result.errors.some((e) => e.includes("запрещённое обещание")), `${text}: ${result.errors.join("; ")}`);
+  }
+}
+
+// 5. Em dash survives only if inserted after normalization; HTML and table without support.
+{
+  const { article } = normalizeArticle(fixture(), context);
+  article.closingSection.paragraphs[0] += " \u2014 <a href=\"/x\">x</a>";
+  const result = await validateArticle(article, brief, { ...context, supportsTable: false }, { live: false });
+  for (const needle of ["длинное тире", "HTML-тег", "table не поддерживается"]) {
+    assert(result.errors.some((e) => e.includes(needle)), `${needle}\n${result.errors.join("\n")}`);
+  }
+}
+
+// 5b. The fixture table is valid where types.ts supports tables.
+{
+  const { article } = normalizeArticle(fixture(), context);
+  const result = await validateArticle(article, brief, { ...context, supportsTable: true }, { live: false });
+  assert(!result.errors.some((e) => e.includes("table")), result.errors.join("\n"));
+}
+
+// 6. Duplicates: existing slug and existing title.
+{
+  const raw = fixture();
+  raw.title = context.articleBySlug.get(linkA).title;
+  const result = await validateArticle(normalizeArticle(raw, context).article, { ...brief, slug: linkA }, context, { live: false });
+  assert(result.errors.some((e) => e.includes("уже есть в реестре")));
+  assert(result.errors.some((e) => e.includes("title совпадает")));
+}
+
+// 7. Brief: only practice type; schema follows table support and related practices.
+assert.throws(() => normalizeBrief({ ...brief, articleType: "creator" }), /practice/);
+{
+  const { messages, tableAllowed } = buildMessages(brief, { ...context, supportsTable: false });
+  assert.equal(tableAllowed, false);
+  assert(!messages[1].content.includes('kind:"table"'));
+  const schema = articleSchema(brief, { tableAllowed: true });
+  assert.deepEqual(schema.properties.relatedPracticeBlurbs.required, ["elixir-molodosti"]);
+  assert.equal(schema.properties.sections.items.properties.blocks.items.anyOf.length, 5);
+}
+
+// 8. Converter: TS module, count bump, operational files on a temporary copy.
+{
+  const { article } = normalizeArticle(fixture(), context);
+  const definition = toDefinition(article, brief, "2026-10-23");
+  assert.equal(definition.closingSection.id, "glavnoe");
+  assert.equal(definition.topicSlug, "pending-hub-reconciliation");
+  const ts = toTypeScript(definition, brief, "Cloud.ru gpt-oss-120b");
+  assert(ts.includes(`export const ${constName(brief.slug)} = {`));
+  assert(ts.includes("as const satisfies ArticleDefinition;"));
+  const tmp = mkdtempSync(join(tmpdir(), "writer-unit-"));
+  try {
+    for (const file of [...COUNT_TEST_FILES, MASTER_PATH, AUDIT_PATH]) cpSync(join(root, file), join(tmp, file), { recursive: true });
+    const counts = bumpCountTests(tmp, context.articles.length);
+    assert.equal(counts.reduce((sum, item) => sum + item.hits, 0) >= 3, true);
+    assert.throws(() => bumpCountTests(tmp, 1), /не найдено/);
+    const before = JSON.parse(readFileSync(join(tmp, MASTER_PATH), "utf8"));
+    updateOperational(tmp, masterEntry(definition, brief, "2026-10-23"));
+    const master = JSON.parse(readFileSync(join(tmp, MASTER_PATH), "utf8"));
+    const audit = JSON.parse(readFileSync(join(tmp, AUDIT_PATH), "utf8"));
+    assert.equal(master.articles.length, before.articles.length + 1);
+    assert.equal(master.articles.at(-1).status, "PLANNED");
+    assert.equal(audit.entries.at(-1).validationStatus, "PLANNED");
+    assert.deepEqual(master.nextQueue, before.nextQueue);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// 9. Tariff.
+assert.equal(costRub("openai/gpt-oss-120b", 1_000_000, 1_000_000), 76.86);
+assert.throws(() => costRub("unknown/model", 1, 1));
+
+// 10. A model loop of empty blocks is folded into one message; schema bounds follow the brief.
+{
+  const raw = fixture();
+  for (let i = 0; i < 50; i += 1) raw.sections[1].blocks.push({ kind: "paragraph", text: "" });
+  const result = await check(raw);
+  const empty = result.errors.filter((e) => e.includes("пустой абзац"));
+  assert.equal(empty.length, 1, empty.join("\n"));
+  assert(empty[0].includes("×50"), empty[0]);
+  const schema = articleSchema(brief, { tableAllowed: true });
+  assert.equal(schema.properties.sections.minItems, undefined, "no grammar minimums (whitespace loops)");
+  assert.equal(schema.properties.sections.maxItems, brief.sections.max);
+  assert.equal(schema.properties.faq.maxItems, brief.faq.max);
+  assert(schema.properties.sections.items.properties.blocks.maxItems <= 12);
+}
+
+// 11. Segment spacing: spaces inside segments survive; missing spaces around links are added.
+{
+  const raw = fixture();
+  raw.sections[0].blocks.push({
+    kind: "rich_paragraph",
+    segments: [{ text: "Попробуйте" }, { href: "/x", label: " практику " }, { text: "и статью " }, { href: "/y", label: "Y" }, { text: "." }],
+  });
+  const { article } = normalizeArticle(raw, context);
+  const segments = article.sections[0].blocks.at(-1).segments;
+  assert.equal(segments.map((s) => s.text ?? s.label).join(""), "Попробуйте практику и статью Y.");
+}
+
+// 11b. Numeric ranges get an en dash; dates and versions stay untouched.
+{
+  const raw = fixture();
+  raw.sections[0].blocks.push(para("Хватит 30-60 секунд, а дата 2026-10-23 и версия 1.2-3 не меняются."));
+  const { article } = normalizeArticle(raw, context);
+  assert.equal(article.sections[0].blocks.at(-1).text, "Хватит 30\u201360 секунд, а дата 2026-10-23 и версия 1.2-3 не меняются.");
+}
+
+// 11c. A reference to a missing table is an error.
+{
+  const raw = fixture();
+  raw.sections = raw.sections.map((section) => ({ ...section, blocks: section.blocks.filter((block) => block.kind !== "table") }));
+  raw.sections[0].blocks.push(para("Таблица ниже показывает примеры."));
+  const result = await check(raw);
+  assert(result.errors.some((e) => e.includes("блока table нет")), result.errors.join("; "));
+}
+
+// 12. Expansion: paragraphs are appended to the named sections, unknown sections and empty
+// strings are ignored, the per-section cap holds and the input is not mutated.
+{
+  const raw = fixture();
+  const before = raw.sections[0].blocks.length;
+  const { article, added } = mergeExpansion(raw, {
+    additions: [
+      { sectionIndex: 0, paragraphs: ["Новый абзац.", "  "] },
+      { sectionIndex: 99, paragraphs: ["Потеряется."] },
+    ],
+  });
+  assert.equal(added, 1);
+  assert.equal(article.sections[0].blocks.length, before + 1);
+  assert.equal(raw.sections[0].blocks.length, before);
+  const capped = mergeExpansion(raw, { additions: [{ sectionIndex: 0, paragraphs: Array(20).fill("Абзац.") }] }, { maxBlocks: before + 2 });
+  assert.equal(capped.added, 2);
+  const schema = expandSchema(brief);
+  assert.equal(schema.properties.additions.items.properties.paragraphs.maxItems, 3);
+  const messages = buildExpandMessages(brief, raw, 500);
+  assert.match(messages[1].content, /500 слов/);
+}
+
+console.log("writer-unit: OK");
