@@ -4,6 +4,7 @@
  */
 import { readFileSync } from "node:fs";
 
+import { decideCoverUploadAction } from "../src/lib/author-products/cover-validation-client.ts";
 import {
   clampCropAreaToImage,
   computeAvatarOutputSize,
@@ -127,7 +128,7 @@ function testAvatarSourceValidationAllowsNonSquare() {
   );
 }
 
-function testCoverValidationAllowsServerCrop() {
+function testCoverValidationSquareCrop() {
   const source = readFileSync(
     new URL("../src/lib/author-products/cover-validation-client.ts", import.meta.url),
     "utf8",
@@ -138,8 +139,26 @@ function testCoverValidationAllowsServerCrop() {
     "product cover validation uses relaxed 400px minimum",
   );
   assert(
-    !source.includes('width !== height'),
-    "product cover client validation no longer enforces strict 1:1",
+    !source.includes("1000 × 1000"),
+    "product cover validation does not require 1000px minimum",
+  );
+  assert(
+    source.includes("Загрузите квадратную обложку (соотношение сторон 1:1)"),
+    "non-square cover fallback message is present",
+  );
+  assert(decideCoverUploadAction(1000, 1000, false).action === "upload", "exact square uploads");
+  assert(decideCoverUploadAction(1000, 998, false).action === "upload", "2px tolerance uploads");
+  assert(decideCoverUploadAction(1600, 900, true).action === "crop", "landscape opens cropper");
+  const blocked = decideCoverUploadAction(1600, 900, false);
+  assert(blocked.action === "reject", "landscape without cropper is rejected");
+  assert(
+    blocked.action === "reject" &&
+      blocked.message === "Загрузите квадратную обложку (соотношение сторон 1:1)",
+    "fallback copy is exact",
+  );
+  assert(
+    decideCoverUploadAction(300, 900, true).action === "reject",
+    "short side below 400 is rejected before crop",
   );
 }
 
@@ -197,7 +216,7 @@ function run() {
   testClampCropArea();
   testRestrictCropPosition();
   testAvatarSourceValidationAllowsNonSquare();
-  testCoverValidationAllowsServerCrop();
+  testCoverValidationSquareCrop();
   testAvatarUploadHintUpdated();
   testSharedCropperComponentExists();
   testBannerHintUsesDedicatedValidation();

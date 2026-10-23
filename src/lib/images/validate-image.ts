@@ -134,6 +134,19 @@ export function validateImageBufferForProfile(
   };
 }
 
+/** Pixel size after EXIF orientation 5–8, which swaps the stored axes. */
+export function orientedDimensions(
+  width: number,
+  height: number,
+  orientation: number | undefined,
+): { width: number; height: number } {
+  if (orientation !== undefined && orientation >= 5 && orientation <= 8) {
+    return { width: height, height: width };
+  }
+
+  return { width, height };
+}
+
 export function validateImageSourceBounds(
   width: number,
   height: number,
@@ -184,6 +197,10 @@ export function validateImageDimensions(
   if (config.requireSquare && !avatarProfile) {
     const tolerance = 2;
     if (Math.abs(width - height) > tolerance) {
+      if (profile === "product-cover" || profile === "track-cover") {
+        return "not_square";
+      }
+
       return "invalid_aspect_ratio";
     }
   }
@@ -194,16 +211,8 @@ export function validateImageDimensions(
     const target = config.targetAspectRatio;
 
     if (Math.abs(ratio - target) / target > tolerance) {
-      // Soft aspect check for covers/banners — server will center-crop.
+      // Banners can be wider than the target ratio; variants fit inside.
       if (profile === "author-banner" && width >= 1200 && height >= 400) {
-        return null;
-      }
-
-      if (
-        (profile === "product-cover" || profile === "track-cover") &&
-        width >= 400 &&
-        height >= 400
-      ) {
         return null;
       }
     }

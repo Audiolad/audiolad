@@ -432,15 +432,23 @@ async function testExifOrientation() {
   const rawNormal = await processImageForProfile(normal, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
-  assert(rawRight.ok && rawNormal.ok, "cover EXIF 6 still works");
-  const normalLg = rawNormal.data.variants.find((variant) => variant.key === "lg");
-  const orientedLg = rawRight.data.variants.find((variant) => variant.key === "lg");
+  assert(!rawRight.ok && rawRight.code === "not_square", "cover EXIF 6 landscape is rejected");
+  assert(!rawNormal.ok && rawNormal.code === "not_square", "cover landscape is rejected");
+  const diagRight = await processImageForProfile(right, "image/jpeg", "diagnostic-image", {
+    skipOriginalStore: true,
+  });
+  const diagNormal = await processImageForProfile(normal, "image/jpeg", "diagnostic-image", {
+    skipOriginalStore: true,
+  });
+  assert(diagRight.ok && diagNormal.ok, "EXIF 6 still processes outside product covers");
+  const normalLg = diagNormal.data.variants.find((variant) => variant.key === "lg");
+  const orientedLg = diagRight.data.variants.find((variant) => variant.key === "lg");
   assert(
     normalLg &&
       orientedLg &&
       normalLg.width === orientedLg.height &&
       normalLg.height === orientedLg.width,
-    "EXIF 6 should swap rendered dimensions like the cover pipeline",
+    "EXIF 6 should swap rendered dimensions",
   );
 }
 

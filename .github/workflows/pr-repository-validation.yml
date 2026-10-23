@@ -77,6 +77,7 @@ jobs:
           npm run test:author-payout-profiles-save
           npm run test:author-payout-profiles-route
           npm run test:product-video-export
+          npm run test:product-cover-square
           npm run test:author-product-publish-preview-flow
           npm run test:platform-analytics-p2
           npm run test:seo-core-v1
