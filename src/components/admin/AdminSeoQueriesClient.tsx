@@ -3,11 +3,24 @@
 import { useMemo, useState } from "react";
 
 import {
+  chunkIds,
+  planSeoAnalysisRecommendations,
+  seoAnalysisPlanConfirmText,
+  sortByFrequencyDesc,
+  type SeoFrequencyRefreshResult,
+} from "@/lib/seo-queries/analysis-plan";
+import {
   SEO_QUERY_AUDIO_FITS,
   SEO_QUERY_AUDIO_FIT_LABELS,
+  SEO_QUERY_CONFIDENCE_LABELS,
   SEO_QUERY_FORMATS,
   SEO_QUERY_INTENTS,
+  SEO_QUERY_INTENT_LABELS,
+  SEO_QUERY_SOURCE_LABELS,
+  seoQueryLabel,
 } from "@/lib/seo-queries/analysis-taxonomy";
+import { SEO_QUERY_ANALYSIS_MAX_ITEMS } from "@/lib/seo-queries/analysis-validation";
+import { evaluateWordstatOpportunity } from "@/lib/seo/wordstat/opportunity";
 
 import type { WordstatIntakeResult, WordstatIntakeStatus } from "@/lib/seo-queries/wordstat-intake";
 
@@ -47,12 +60,28 @@ type ReviewSuggestion = {
   confidence: string;
   reasons: string[];
 };
+type FrequencyStatus = "present" | "loading" | "fetched" | "not_found" | "failed";
 type ReviewItem = {
   id: string;
   query_text: string;
   frequency: number | null;
+  frequencyStatus: FrequencyStatus;
+  frequencyMessage: string | null;
   suggested: ReviewSuggestion;
 };
+type Decision = { item: ReviewItem; analysis_status: "analyzed" | "not_applicable" };
+type DecisionSummary = { analyzed: number; not_applicable: number; conflicts: number; errors: number; lastFailure: string | undefined };
+
+const FREQUENCY_FETCH_FAILED = "Не удалось связаться с сервером.";
+
+function isLowConfidence(item: ReviewItem) {
+  return item.suggested.confidence !== "high" && item.suggested.confidence !== "medium";
+}
+
+function frequencyTone(frequency: number) {
+  const color = evaluateWordstatOpportunity(frequency).color;
+  return color === "green" ? "bg-[#e8f5e4] text-[#2f6b2a]" : color === "yellow" ? "bg-[#fff3d6] text-[#7a5b12]" : "bg-[#fde8e8] text-[#8b2d2d]";
+}
 
 function date(value: string | null) {
   return value ? new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)) : "–";
@@ -76,6 +105,7 @@ function readReviewItem(value: unknown): ReviewItem | null {
   ) return null;
   return {
     id: item.id, query_text: item.query_text, frequency: item.frequency as number | null,
+    frequencyStatus: typeof item.frequency === "number" ? "present" : "loading", frequencyMessage: null,
     suggested: recommendation as unknown as ReviewSuggestion,
   };
 }
@@ -102,6 +132,7 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisSummary, setAnalysisSummary] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"created" | "frequency">("created");
   const clusters = useMemo(() => [...new Set(rows.map((row) => row.cluster).filter((value): value is string => Boolean(value)))], [rows]);
   const sources = useMemo(() => [...new Set(rows.map((row) => row.source))], [rows]);
   const filtered = useMemo(() => {
@@ -117,9 +148,16 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
       if (a.approvedUnreserved !== b.approvedUnreserved) {
         return a.approvedUnreserved ? -1 : 1;
       }
+      if (sortBy === "frequency" && a.frequency !== b.frequency) {
+        if (a.frequency === null) return 1;
+        if (b.frequency === null) return -1;
+        return b.frequency - a.frequency;
+      }
       return b.createdAt.localeCompare(a.createdAt);
     });
-  }, [rows, search, status, analysisStatus, source, cluster]);
+  }, [rows, search, status, analysisStatus, source, cluster, sortBy]);
+  const selectableAnalysisIds = useMemo(() => filtered.filter((row) => row.analysisStatus === "not_analyzed").map((row) => row.id), [filtered]);
+  const reviewPlan = useMemo(() => planSeoAnalysisRecommendations(reviewItems), [reviewItems]);
 
   async function addQuery(event: React.FormEvent) {
     event.preventDefault();
@@ -281,19 +319,72 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     });
   }
 
+  function selectAllForAnalysis() {
+    setSelectedAnalysisIds(new Set(selectableAnalysisIds));
+  }
+
+  function mergeFrequencyResults(results: SeoFrequencyRefreshResult[]) {
+    const byId = new Map(results.map((result) => [result.id, result]));
+    setReviewItems((current) => sortByFrequencyDesc(current.map((item) => {
+      const result = byId.get(item.id);
+      if (!result) return item;
+      if (result.status === "not_found" || result.status === "failed") {
+        return { ...item, frequency: null, frequencyStatus: result.status, frequencyMessage: result.message };
+      }
+      return { ...item, frequency: result.frequency, frequencyStatus: result.status, frequencyMessage: null };
+    })));
+    setRows((current) => current.map((row) => {
+      const result = byId.get(row.id);
+      return result?.status === "fetched" ? { ...row, frequency: result.frequency } : row;
+    }));
+  }
+
+  async function refreshFrequencies(ids: string[]) {
+    if (!ids.length) return;
+    const pending = new Set(ids);
+    setReviewItems((current) => current.map((item) => pending.has(item.id) ? { ...item, frequencyStatus: "loading", frequencyMessage: null } : item));
+    for (const chunk of chunkIds(ids, SEO_QUERY_ANALYSIS_MAX_ITEMS)) {
+      let results: SeoFrequencyRefreshResult[] | null = null;
+      try {
+        const response = await fetch("/api/admin/seo-queries/frequency", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query_ids: chunk }) });
+        const payload = await response.json();
+        if (response.ok && Array.isArray(payload?.results)) results = payload.results as SeoFrequencyRefreshResult[];
+      } catch {
+        results = null;
+      }
+      const returned = new Set((results ?? []).map((result) => result.id));
+      mergeFrequencyResults([
+        ...(results ?? []),
+        ...chunk.filter((id) => !returned.has(id)).map((id): SeoFrequencyRefreshResult => ({ id, status: "failed", frequency: null, code: "UPSTREAM_ERROR", message: FREQUENCY_FETCH_FAILED })),
+      ]);
+    }
+  }
+
   async function analyzeSelected(ids = [...selectedAnalysisIds]) {
     if (!ids.length) return;
     setAnalysisBusy(true);
-    const response = await fetch("/api/admin/seo-queries/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query_ids: ids }) });
-    const payload = await response.json();
+    const prepared: ReviewItem[] = [];
+    let failedChunks = 0;
+    for (const chunk of chunkIds(ids, SEO_QUERY_ANALYSIS_MAX_ITEMS)) {
+      try {
+        const response = await fetch("/api/admin/seo-queries/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query_ids: chunk }) });
+        const payload = await response.json();
+        if (!response.ok) { failedChunks += 1; continue; }
+        const results: unknown[] = Array.isArray(payload.results) ? payload.results : [];
+        prepared.push(...results
+          .filter((item: unknown) => typeof item === "object" && item !== null && (item as Record<string, unknown>).status === "ready_for_review")
+          .map(readReviewItem)
+          .filter((item): item is ReviewItem => item !== null));
+      } catch {
+        failedChunks += 1;
+      }
+    }
     setAnalysisBusy(false);
-    if (!response.ok) return setAnalysisSummary("Не удалось подготовить рекомендации.");
-    const results: unknown[] = Array.isArray(payload.results) ? payload.results : [];
-    setReviewItems(results
-      .filter((item: unknown) => typeof item === "object" && item !== null && (item as Record<string, unknown>).status === "ready_for_review")
-      .map(readReviewItem)
-      .filter((item): item is ReviewItem => item !== null));
-    setAnalysisSummary("Рекомендации подготовлены. Перед сохранением проверьте их.");
+    if (!prepared.length && failedChunks) return setAnalysisSummary("Не удалось подготовить рекомендации.");
+    setReviewItems(sortByFrequencyDesc(prepared));
+    const plan = planSeoAnalysisRecommendations(prepared);
+    setAnalysisSummary(`Рекомендации подготовлены: ${prepared.length}. Допустить ${plan.approve.length}, отклонить ${plan.reject.length}, на ручное решение ${plan.manual.length}.${failedChunks ? " Часть запросов не удалось проанализировать – повторите." : ""}`);
+    await refreshFrequencies(prepared.filter((item) => item.frequency === null).map((item) => item.id));
   }
 
   function setReviewValue(id: string, key: "intent" | "recommended_format" | "audio_fit", value: string) {
@@ -316,61 +407,108 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
     return "Не удалось применить решение: запись уже просмотрена или зарезервирована.";
   }
 
+  async function submitDecisions(decisions: Decision[]): Promise<DecisionSummary> {
+    const summary: DecisionSummary = { analyzed: 0, not_applicable: 0, conflicts: 0, errors: 0, lastFailure: undefined };
+    const applied = new Map<string, { status: Row["analysisStatus"]; reservationId: string | null; expiresAt: string | null; item: ReviewItem }>();
+    for (const chunk of chunkIds(decisions, SEO_QUERY_ANALYSIS_MAX_ITEMS)) {
+      const items = chunk.map(({ item, analysis_status }) => {
+        const bodyItem: Record<string, unknown> = {
+          id: item.id,
+          intent: item.suggested.intent,
+          recommended_format: item.suggested.recommended_format,
+          audio_fit: item.suggested.audio_fit,
+          analysis_status,
+        };
+        const row = rows.find((candidate) => candidate.id === item.id);
+        if (row?.proposalId) bodyItem.proposal_id = row.proposalId;
+        return bodyItem;
+      });
+      let payload: { results?: Array<Record<string, unknown>>; summary?: Omit<DecisionSummary, "lastFailure"> } | null = null;
+      try {
+        const response = await fetch("/api/admin/seo-queries/analyze", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ items }) });
+        payload = await response.json();
+        if (!response.ok) payload = null;
+      } catch {
+        payload = null;
+      }
+      if (!payload?.results || !payload.summary) {
+        summary.errors += chunk.length;
+        continue;
+      }
+      summary.analyzed += payload.summary.analyzed;
+      summary.not_applicable += payload.summary.not_applicable;
+      summary.conflicts += payload.summary.conflicts;
+      summary.errors += payload.summary.errors;
+      for (const [index, result] of payload.results.entries()) {
+        const decision = chunk[index];
+        if (!decision || result.id !== decision.item.id) continue;
+        if (result.status !== "applied") {
+          summary.lastFailure = typeof result.status === "string" ? result.status : undefined;
+          continue;
+        }
+        applied.set(decision.item.id, {
+          status: (result.analysis_status ?? decision.analysis_status) as Row["analysisStatus"],
+          reservationId: typeof result.reservation_id === "string" ? result.reservation_id : null,
+          expiresAt: typeof result.expires_at === "string" ? result.expires_at : null,
+          item: decision.item,
+        });
+      }
+    }
+    if (applied.size) {
+      setRows((current) => current.map((candidate) => {
+        const result = applied.get(candidate.id);
+        if (!result) return candidate;
+        const { status: nextStatus, reservationId, expiresAt, item } = result;
+        const reserved = Boolean(reservationId);
+        return {
+          ...candidate,
+          intent: item.suggested.intent,
+          recommendedFormat: item.suggested.recommended_format,
+          audioFit: item.suggested.audio_fit,
+          analysisStatus: nextStatus,
+          reservationId,
+          reservedAt: reserved ? new Date().toISOString() : candidate.reservedAt,
+          expiresAt: reserved ? expiresAt : candidate.expiresAt,
+          lifecycle: reserved ? "В работе" : nextStatus === "not_applicable" ? "Свободен" : candidate.lifecycle,
+          author: reserved
+            ? (candidate.proposalAuthorName ?? candidate.author)
+            : nextStatus === "not_applicable"
+              ? null
+              : candidate.author,
+          needsReview: false,
+          approvedUnreserved: nextStatus === "analyzed" && !reserved && Boolean(candidate.proposalId),
+        };
+      }));
+      setReviewItems((current) => current.filter((candidate) => !applied.has(candidate.id)));
+      setSelectedAnalysisIds((current) => { const next = new Set(current); for (const id of applied.keys()) next.delete(id); return next; });
+    }
+    return summary;
+  }
+
   async function applyReview(id: string, analysis_status: "analyzed" | "not_applicable") {
     const item = reviewItems.find((candidate) => candidate.id === id);
-    const row = rows.find((candidate) => candidate.id === id);
     if (!item) return;
-    const suggested = item.suggested;
     setAnalysisBusy(true);
-    const bodyItem: Record<string, unknown> = {
-      id,
-      intent: suggested.intent,
-      recommended_format: suggested.recommended_format,
-      audio_fit: suggested.audio_fit,
-      analysis_status,
-    };
-    if (row?.proposalId) bodyItem.proposal_id = row.proposalId;
-    const response = await fetch("/api/admin/seo-queries/analyze", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ items: [bodyItem] }),
-    });
-    const payload = await response.json();
+    const summary = await submitDecisions([{ item, analysis_status }]);
     setAnalysisBusy(false);
-    const result = payload.results?.[0];
-    if (!response.ok || result?.status !== "applied") {
-      return setAnalysisSummary(applyFailureMessage(result?.status));
+    if (summary.analyzed + summary.not_applicable === 0) {
+      return setAnalysisSummary(applyFailureMessage(summary.lastFailure));
     }
-    const reservationId =
-      typeof result.reservation_id === "string" ? result.reservation_id : null;
-    const expiresAt =
-      typeof result.expires_at === "string" ? result.expires_at : null;
-    setRows((current) => current.map((candidate) => {
-      if (candidate.id !== id) return candidate;
-      const nextStatus = (result.analysis_status ?? analysis_status) as Row["analysisStatus"];
-      const reserved = Boolean(reservationId);
-      return {
-        ...candidate,
-        intent: suggested.intent,
-        recommendedFormat: suggested.recommended_format,
-        audioFit: suggested.audio_fit,
-        analysisStatus: nextStatus,
-        reservationId,
-        reservedAt: reserved ? new Date().toISOString() : candidate.reservedAt,
-        expiresAt: reserved ? expiresAt : candidate.expiresAt,
-        lifecycle: reserved ? "В работе" : nextStatus === "not_applicable" ? "Свободен" : candidate.lifecycle,
-        author: reserved
-          ? (candidate.proposalAuthorName ?? candidate.author)
-          : nextStatus === "not_applicable"
-            ? null
-            : candidate.author,
-        needsReview: false,
-        approvedUnreserved: nextStatus === "analyzed" && !reserved && Boolean(candidate.proposalId),
-      };
-    }));
-    setReviewItems((current) => current.filter((candidate) => candidate.id !== id));
-    setSelectedAnalysisIds((current) => { const next = new Set(current); next.delete(id); return next; });
-    setAnalysisSummary(`Применено: готово ${payload.summary.analyzed}; не подходит ${payload.summary.not_applicable}; конфликтов ${payload.summary.conflicts}; ошибок ${payload.summary.errors}.`);
+    setAnalysisSummary(`Применено: готово ${summary.analyzed}; не подходит ${summary.not_applicable}; конфликтов ${summary.conflicts}; ошибок ${summary.errors}.`);
+  }
+
+  async function applyRecommendations() {
+    const plan = planSeoAnalysisRecommendations(reviewItems);
+    if (plan.approve.length + plan.reject.length === 0) return;
+    if (!window.confirm(seoAnalysisPlanConfirmText(plan))) return;
+    const approve = new Set(plan.approve);
+    const decisions: Decision[] = reviewItems
+      .filter((item) => !isLowConfidence(item))
+      .map((item) => ({ item, analysis_status: approve.has(item.id) ? "analyzed" : "not_applicable" }));
+    setAnalysisBusy(true);
+    const summary = await submitDecisions(decisions);
+    setAnalysisBusy(false);
+    setAnalysisSummary(`Рекомендации применены: допущено ${summary.analyzed}, отклонено ${summary.not_applicable}; на ручное решение осталось ${plan.manual.length}; конфликтов ${summary.conflicts}; ошибок ${summary.errors}.`);
   }
 
   async function reconcileReservation(row: Row) {
@@ -457,18 +595,46 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
         </div>
       </div> : null}
     </section>
-    <div className="grid gap-2 sm:grid-cols-5">
+    <div className="grid gap-2 sm:grid-cols-6">
       <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск" className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm" />
       <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все статусы</option>{["Свободен", "В работе", "На модерации", "Опубликован"].map((value) => <option key={value}>{value}</option>)}</select>
       <select value={analysisStatus} onChange={(event) => setAnalysisStatus(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все</option><option value="not_analyzed">Не проверены</option><option value="analyzed">Готовы</option><option value="not_applicable">Не подходят</option></select>
-      <select value={source} onChange={(event) => setSource(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все источники</option>{sources.map((value) => <option key={value}>{value}</option>)}</select>
+      <select value={source} onChange={(event) => setSource(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все источники</option>{sources.map((value) => <option key={value} value={value}>{seoQueryLabel(SEO_QUERY_SOURCE_LABELS, value)}</option>)}</select>
       <select value={cluster} onChange={(event) => setCluster(event.target.value)} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="">Все кластеры</option>{clusters.map((value) => <option key={value}>{value}</option>)}</select>
+      <select aria-label="Сортировка" value={sortBy} onChange={(event) => setSortBy(event.target.value === "frequency" ? "frequency" : "created")} className="min-h-11 rounded-xl border border-[#d7c4f5] bg-white px-3 text-sm"><option value="created">Сначала новые</option><option value="frequency">По частотности</option></select>
     </div>
     {notice ? <p role="status" className="text-sm text-[#4c3d78]">{notice}</p> : null}
     <section className="rounded-[22px] border border-[#d7c4f5] bg-[#faf6ff] p-4">
-      <button type="button" disabled={analysisBusy || selectedAnalysisIds.size === 0} onClick={() => analyzeSelected()} className="min-h-10 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60">Анализировать выбранные</button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={analysisBusy || selectableAnalysisIds.length === 0} onClick={selectAllForAnalysis} className="min-h-10 rounded-full border border-[#bda6e1] px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-60">Выбрать все непроверенные ({selectableAnalysisIds.length})</button>
+        <button type="button" disabled={analysisBusy || selectedAnalysisIds.size === 0} onClick={() => analyzeSelected()} className="min-h-10 rounded-full bg-[#7042c5] px-4 text-sm font-semibold text-white disabled:opacity-60">Анализировать выбранные{selectedAnalysisIds.size ? ` (${selectedAnalysisIds.size})` : ""}</button>
+        {reviewItems.length ? <button type="button" disabled={analysisBusy || reviewPlan.approve.length + reviewPlan.reject.length === 0} onClick={applyRecommendations} className="min-h-10 rounded-full bg-[#2f6b2a] px-4 text-sm font-semibold text-white disabled:opacity-60">Применить рекомендации к выбранным</button> : null}
+      </div>
+      {reviewItems.length ? <p className="mt-2 text-xs text-[#796ba0]">Сразу применятся рекомендации с высокой и средней уверенностью: допустить {reviewPlan.approve.length}, отклонить {reviewPlan.reject.length}. На ручное решение останется {reviewPlan.manual.length} – они отмечены жёлтым.</p> : null}
       {analysisSummary ? <p role="status" className="mt-2 text-sm text-[#4c3d78]">{analysisSummary}</p> : null}
-      {reviewItems.map((item) => { const { suggested } = item; const queryText = String(item.query_text ?? ""); const frequency = typeof item.frequency === "number" ? String(item.frequency) : "–"; const reasons = Array.isArray(suggested.reasons) ? suggested.reasons.join(" ") : ""; return <article key={item.id} className="mt-3 rounded-xl border border-[#eadff8] bg-white p-3 text-sm"><p className="font-semibold">{queryText} · {frequency}</p><p className="mt-1 text-xs text-[#796ba0]">Уверенность: {suggested.confidence}. {reasons}</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><select value={suggested.intent} onChange={(event) => setReviewValue(item.id, "intent", event.target.value)}>{SEO_QUERY_INTENTS.map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.recommended_format ?? ""} onChange={(event) => setReviewValue(item.id, "recommended_format", event.target.value)}><option value="">–</option>{SEO_QUERY_FORMATS.map((value) => <option key={value}>{value}</option>)}</select><select value={suggested.audio_fit} onChange={(event) => setReviewValue(item.id, "audio_fit", event.target.value)}>{SEO_QUERY_AUDIO_FITS.map((value) => <option key={value} value={value}>{SEO_QUERY_AUDIO_FIT_LABELS[value]}</option>)}</select></div><p className="mt-2">Рекомендация: {suggested.recommended_disposition === "not_applicable" ? "Не подходит" : "Допустить авторам"}</p><div className="mt-2 flex gap-3"><button type="button" onClick={() => applyReview(item.id, "analyzed")} className="font-semibold text-[#7042c5]">Допустить авторам</button><button type="button" onClick={() => applyReview(item.id, "not_applicable")} className="font-semibold text-[#7042c5]">Не подходит</button></div></article>; })}
+      {reviewItems.map((item) => {
+        const { suggested } = item;
+        const queryText = String(item.query_text ?? "");
+        const reasons = Array.isArray(suggested.reasons) ? suggested.reasons.join(" ") : "";
+        const manual = isLowConfidence(item);
+        const confidence = seoQueryLabel(SEO_QUERY_CONFIDENCE_LABELS, suggested.confidence);
+        const frequencyBadge = typeof item.frequency === "number"
+          ? <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${frequencyTone(item.frequency)}`} title={evaluateWordstatOpportunity(item.frequency).label}>Частотность: {item.frequency.toLocaleString("ru-RU")}</span>
+          : item.frequencyStatus === "loading"
+            ? <span className="inline-flex rounded-full bg-[#f4edff] px-3 py-1 text-sm text-[#5f5484]">Частотность: запрашиваем в Wordstat…</span>
+            : <span className="inline-flex flex-wrap items-center gap-2 rounded-full bg-[#fde8e8] px-3 py-1 text-sm text-[#8b2d2d]">Частотность не получена{item.frequencyMessage ? ` – ${item.frequencyMessage}` : ""}<button type="button" disabled={analysisBusy} onClick={() => refreshFrequencies([item.id])} className="font-semibold underline disabled:opacity-60">Повторить</button></span>;
+        return <article key={item.id} className={`mt-3 rounded-xl border p-3 text-sm ${manual ? "border-[#f0c35a] bg-[#fff7e8]" : "border-[#eadff8] bg-white"}`}>
+          <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{queryText}</p>{frequencyBadge}{manual ? <span className="inline-flex rounded-full bg-[#f5c451] px-2 py-0.5 text-[11px] font-semibold text-[#7a5b12]">Нужно ваше решение</span> : null}</div>
+          <p className="mt-1 text-xs text-[#796ba0]">Уверенность: {confidence}. {reasons}</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <select aria-label="Намерение" value={suggested.intent} onChange={(event) => setReviewValue(item.id, "intent", event.target.value)}>{SEO_QUERY_INTENTS.map((value) => <option key={value} value={value}>{SEO_QUERY_INTENT_LABELS[value]}</option>)}</select>
+            <select aria-label="Формат" value={suggested.recommended_format ?? ""} onChange={(event) => setReviewValue(item.id, "recommended_format", event.target.value)}><option value="">Формат не выбран</option>{SEO_QUERY_FORMATS.map((value) => <option key={value}>{value}</option>)}</select>
+            <select aria-label="Аудио-потенциал" value={suggested.audio_fit} onChange={(event) => setReviewValue(item.id, "audio_fit", event.target.value)}>{SEO_QUERY_AUDIO_FITS.map((value) => <option key={value} value={value}>{SEO_QUERY_AUDIO_FIT_LABELS[value]}</option>)}</select>
+          </div>
+          <p className="mt-2">Рекомендация: {manual ? "нет уверенной рекомендации – решите сами" : suggested.recommended_disposition === "not_applicable" ? "Не подходит" : "Допустить авторам"}</p>
+          <div className="mt-2 flex gap-3"><button type="button" disabled={analysisBusy} onClick={() => applyReview(item.id, "analyzed")} className="font-semibold text-[#7042c5] disabled:opacity-60">Допустить авторам</button><button type="button" disabled={analysisBusy} onClick={() => applyReview(item.id, "not_applicable")} className="font-semibold text-[#7042c5] disabled:opacity-60">Не подходит</button></div>
+        </article>;
+      })}
     </section>
     {editingId ? (() => {
       const row = rows.find((item) => item.id === editingId);
@@ -476,21 +642,21 @@ export default function AdminSeoQueriesClient({ initialRows, clusters: initialCl
         <input type="hidden" name="id" value={row.id} />
         <input name="query_text" defaultValue={row.queryText} required className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm sm:col-span-2" />
         <input name="frequency" type="number" min="0" defaultValue={row.frequency ?? ""} placeholder="Частотность" className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
-        <select name="source" defaultValue={row.source} className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm">{["manual", "wordstat", "search_console", "yandex_webmaster", "other"].map((value) => <option key={value}>{value}</option>)}</select>
+        <select name="source" defaultValue={row.source} className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm">{["manual", "wordstat", "search_console", "yandex_webmaster", "other"].map((value) => <option key={value} value={value}>{seoQueryLabel(SEO_QUERY_SOURCE_LABELS, value)}</option>)}</select>
         <select name="cluster_id" defaultValue={row.clusterId ?? ""} className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm"><option value="">Без кластера</option>{clusterOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-        <input name="intent" defaultValue={row.intent ?? ""} placeholder="Intent" className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
+        <input name="intent" defaultValue={row.intent ?? ""} placeholder="Намерение (код, например practice)" className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
         <input name="recommended_format" defaultValue={row.recommendedFormat ?? ""} placeholder="Рекомендуемый формат" className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
-        <input name="audio_fit" defaultValue={row.audioFit ?? ""} placeholder="Audio Fit" className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
+        <input name="audio_fit" defaultValue={row.audioFit ?? ""} placeholder="Аудио-потенциал (high, medium, low, none)" className="min-h-11 rounded-xl border border-[#d7c4f5] px-3 text-sm" />
         <div className="flex gap-2"><button className="min-h-11 rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white">Сохранить</button><button type="button" onClick={() => setEditingId("")} className="min-h-11 px-4 text-sm text-[#7042c5]">Отмена</button></div>
       </form> : null;
     })() : null}
-    <div className="hidden overflow-x-auto rounded-[22px] border border-[#eadff8] bg-white md:block"><table className="min-w-full text-left text-sm"><thead className="bg-[#faf6ff] text-[#796ba0]"><tr>{["", "Запрос", "Normalized", "Частотность", "Источник", "Кластер", "Intent", "Формат", "Audio Fit", "Анализ", "Статус", "Автор / продукт", "Бронь", "Создан", ""].map((title, index) => <th key={`${title}-${index}`} className="px-3 py-3 font-medium">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => {
+    <div className="hidden overflow-x-auto rounded-[22px] border border-[#eadff8] bg-white md:block"><table className="min-w-full text-left text-sm"><thead className="bg-[#faf6ff] text-[#796ba0]"><tr>{["", "Запрос", "Нормализованный", "Частотность", "Источник", "Кластер", "Намерение", "Формат", "Аудио-потенциал", "Анализ", "Статус", "Автор / продукт", "Бронь", "Создан", ""].map((title, index) => <th key={`${title}-${index}`} className="px-3 py-3 font-medium">{title}</th>)}</tr></thead><tbody>{filtered.map((row) => {
       const rowTone = row.needsReview
         ? "border-t border-[#f3edf9] bg-[#fff7e8]"
         : row.approvedUnreserved
           ? "border-t border-[#f3edf9] bg-[#fff4ec]"
           : "border-t border-[#f3edf9]";
-      return <tr key={row.id} id={`seo-query-${row.id}`} className={rowTone}><td className="px-3 py-3">{row.analysisStatus === "not_analyzed" ? <input aria-label={`Анализировать ${row.queryText}`} type="checkbox" checked={selectedAnalysisIds.has(row.id)} onChange={() => toggleAnalysis(row.id)} /> : null}</td><td className="px-3 py-3 font-medium">{row.queryText}{row.needsReview ? <span className="ml-2 inline-flex rounded-full bg-[#f5c451] px-2 py-0.5 text-[11px] font-semibold text-[#7a5b12]">Нужно проверить</span> : null}{row.approvedUnreserved ? <span className="ml-2 inline-flex rounded-full bg-[#ffd0b0] px-2 py-0.5 text-[11px] font-semibold text-[#8a4b1a]">Одобрен – не закреплён</span> : null}{row.proposedByAuthor && row.proposalAuthorName ? <span className="mt-1 block text-xs font-normal text-[#796ba0]">Предложил: {row.proposalAuthorName}</span> : null}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "–"}</td><td className="px-3 py-3">{row.source}</td><td className="px-3 py-3">{row.cluster ?? "–"}</td><td className="px-3 py-3">{row.intent ?? "–"}</td><td className="px-3 py-3">{row.recommendedFormat ?? "–"}</td><td className="px-3 py-3">{row.audioFit ?? "–"}</td><td className="px-3 py-3">{row.analysisStatus === "analyzed" ? "Готов" : row.analysisStatus === "not_applicable" ? "Не подходит" : "Не анализировался"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? row.proposalAuthorName ?? "–"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3 whitespace-nowrap"><button onClick={() => setEditingId(row.id)} className="mr-2 text-xs font-semibold text-[#7042c5]">Изменить</button>{row.analysisStatus === "not_analyzed" ? <button onClick={() => analyzeSelected([row.id])} className="mr-2 text-xs font-semibold text-[#7042c5]">Анализировать</button> : null}{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mr-2 text-xs font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>;
+      return <tr key={row.id} id={`seo-query-${row.id}`} className={rowTone}><td className="px-3 py-3">{row.analysisStatus === "not_analyzed" ? <input aria-label={`Анализировать ${row.queryText}`} type="checkbox" checked={selectedAnalysisIds.has(row.id)} onChange={() => toggleAnalysis(row.id)} /> : null}</td><td className="px-3 py-3 font-medium">{row.queryText}{row.needsReview ? <span className="ml-2 inline-flex rounded-full bg-[#f5c451] px-2 py-0.5 text-[11px] font-semibold text-[#7a5b12]">Нужно проверить</span> : null}{row.approvedUnreserved ? <span className="ml-2 inline-flex rounded-full bg-[#ffd0b0] px-2 py-0.5 text-[11px] font-semibold text-[#8a4b1a]">Одобрен – не закреплён</span> : null}{row.proposedByAuthor && row.proposalAuthorName ? <span className="mt-1 block text-xs font-normal text-[#796ba0]">Предложил: {row.proposalAuthorName}</span> : null}</td><td className="px-3 py-3 text-[#796ba0]">{row.normalizedQuery}</td><td className="px-3 py-3">{row.frequency ?? "–"}</td><td className="px-3 py-3">{seoQueryLabel(SEO_QUERY_SOURCE_LABELS, row.source)}</td><td className="px-3 py-3">{row.cluster ?? "–"}</td><td className="px-3 py-3">{seoQueryLabel(SEO_QUERY_INTENT_LABELS, row.intent)}</td><td className="px-3 py-3">{row.recommendedFormat ?? "–"}</td><td className="px-3 py-3">{seoQueryLabel(SEO_QUERY_AUDIO_FIT_LABELS, row.audioFit)}</td><td className="px-3 py-3">{row.analysisStatus === "analyzed" ? "Готов" : row.analysisStatus === "not_applicable" ? "Не подходит" : "Не анализировался"}</td><td className="px-3 py-3">{row.lifecycle}</td><td className="px-3 py-3">{row.author ?? row.proposalAuthorName ?? "–"}{row.product ? ` / ${row.product}` : ""}</td><td className="px-3 py-3">{date(row.reservedAt)} / {date(row.expiresAt)}</td><td className="px-3 py-3">{date(row.createdAt)}</td><td className="px-3 py-3 whitespace-nowrap"><button onClick={() => setEditingId(row.id)} className="mr-2 text-xs font-semibold text-[#7042c5]">Изменить</button>{row.analysisStatus === "not_analyzed" ? <button onClick={() => analyzeSelected([row.id])} className="mr-2 text-xs font-semibold text-[#7042c5]">Анализировать</button> : null}{row.approvedUnreserved ? <button type="button" disabled={analysisBusy} onClick={() => reconcileReservation(row)} className="mr-2 text-xs font-semibold text-[#c45c16] disabled:opacity-60">Закрепить автору</button> : null}{row.reservationId && row.lifecycle !== "Опубликован" ? <button onClick={() => release(row.reservationId!)} className="text-xs font-semibold text-[#7042c5]">Снять бронь</button> : null}</td></tr>;
     })}</tbody></table></div>
     <div className="space-y-3 md:hidden">{filtered.map((row) => {
       const cardTone = row.needsReview

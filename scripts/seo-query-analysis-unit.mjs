@@ -7,6 +7,20 @@ import {
   parseSeoQueryIds,
   validateSeoQueryApplyItem,
 } from "../src/lib/seo-queries/analysis-validation.ts";
+import {
+  chunkIds,
+  exactWordstatFrequency,
+  planSeoAnalysisRecommendations,
+  refreshMissingSeoQueryFrequencies,
+  seoAnalysisPlanConfirmText,
+  sortByFrequencyDesc,
+} from "../src/lib/seo-queries/analysis-plan.ts";
+import {
+  SEO_QUERY_CONFIDENCE_LABELS,
+  SEO_QUERY_INTENTS,
+  SEO_QUERY_INTENT_LABELS,
+  seoQueryLabel,
+} from "../src/lib/seo-queries/analysis-taxonomy.ts";
 
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -28,6 +42,64 @@ assert.deepEqual(classify("личный кабинет аудиолад"), { int
 assert.equal(classify("погода сегодня").intent, "realtime");
 assert.deepEqual(classify("абстрактный запрос"), { intent: "other", recommendedFormat: null, audioFit: "low", recommendedDisposition: "not_applicable", confidence: "low", reasons: ["Явного аудио-намерения не обнаружено; требуется решение администратора."] });
 assert.deepEqual(classify("музыка для сна"), classify("музыка для сна"), "classifier is deterministic");
+
+// Seeded sprint pool: affirmations and lo-fi are audio opportunities, not «Не подходит».
+assert.deepEqual(classify("Аффирмация на денежное богатство"), { intent: "practice", recommendedFormat: "Свой формат", audioFit: "high", recommendedDisposition: "analyzed", confidence: "high", reasons: ["Есть явный сигнал аффирмации."] });
+assert.equal(classify("лоу фай радио").intent, "music");
+assert.equal(classify("lo fi hip hop").intent, "music");
+assert.equal(classify("скачать lo fi").intent, "transactional", "commercial rule still wins");
+
+// Russian labels for every intent and confidence value.
+for (const intent of SEO_QUERY_INTENTS) assert.match(SEO_QUERY_INTENT_LABELS[intent], /[а-яё]/i, intent);
+assert.equal(seoQueryLabel(SEO_QUERY_INTENT_LABELS, "other"), "Другое");
+assert.equal(seoQueryLabel(SEO_QUERY_CONFIDENCE_LABELS, "low"), "низкая");
+assert.equal(seoQueryLabel(SEO_QUERY_INTENT_LABELS, null), "–");
+
+// Bulk plan: low confidence is never applied automatically.
+const planItem = (id, recommended_disposition, confidence, frequency = null) => ({ id, frequency, suggested: { recommended_disposition, confidence } });
+const plan = planSeoAnalysisRecommendations([
+  planItem("a", "analyzed", "high"), planItem("b", "analyzed", "medium"), planItem("c", "not_applicable", "high"),
+  planItem("d", "not_applicable", "low"), planItem("e", "analyzed", "low"),
+]);
+assert.deepEqual(plan, { approve: ["a", "b"], reject: ["c"], manual: ["d", "e"] });
+assert.equal(seoAnalysisPlanConfirmText(plan), "Применить рекомендации к выбранным: допустить 2, отклонить 1, оставить 2 на ручное решение?");
+assert.deepEqual(sortByFrequencyDesc([planItem("x", "analyzed", "high", null), planItem("y", "analyzed", "high", 5), planItem("z", "analyzed", "high", 900)]).map((item) => item.id), ["z", "y", "x"]);
+assert.deepEqual(chunkIds([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+
+// Frequency refresh: exact phrase only, never topic aggregate; stops on quota errors.
+const ok = (suggestions, topicTotalCount = 99999) => ({ ok: true, data: { phrase: "p", region: { id: "225", label: "Россия" }, periodLabel: "последние 30 дней", topicTotalCount, suggestions: suggestions.map(([phrase, count]) => ({ phrase, count, source: "result", opportunity: { level: "green", color: "green", label: "", description: "" } })) } });
+const fail = (code) => ({ ok: false, error: { code, message: `msg ${code}` } });
+assert.equal(exactWordstatFrequency("Аффирмация  на деньги", ok([["аффирмация на деньги", 321]])), 321);
+assert.equal(exactWordstatFrequency("аффирмация на деньги", ok([["аффирмация на деньги быстро", 50]])), null, "no topic aggregate fallback");
+{
+  const calls = []; const saved = [];
+  const responses = { "один": ok([["один", 10]]), "два": ok([["другое", 7]]), "три": fail("NO_RESULTS"), "четыре": fail("TIMEOUT"), "пять": fail("RATE_LIMITED") };
+  const results = await refreshMissingSeoQueryFrequencies([
+    { id: "1", query_text: "один", frequency: null },
+    { id: "0", query_text: "есть", frequency: 42 },
+    { id: "2", query_text: "два", frequency: null },
+    { id: "3", query_text: "три", frequency: null },
+    { id: "4", query_text: "четыре", frequency: null },
+    { id: "5", query_text: "пять", frequency: null },
+    { id: "6", query_text: "шесть", frequency: null },
+  ], {
+    async fetchWordstat(phrase) { calls.push(phrase); return responses[phrase]; },
+    async saveFrequency(id, frequency, checkedAt) { saved.push([id, frequency, checkedAt]); return true; },
+    now: () => new Date("2026-10-23T18:00:00Z"),
+  });
+  assert.deepEqual(calls, ["один", "два", "три", "четыре", "пять"], "present rows and rows after RATE_LIMITED are not fetched");
+  assert.deepEqual(saved, [["1", 10, "2026-10-23T18:00:00.000Z"]]);
+  assert.deepEqual(results.map((item) => [item.id, item.status, item.frequency]), [["1", "fetched", 10], ["0", "present", 42], ["2", "not_found", null], ["3", "not_found", null], ["4", "failed", null], ["5", "failed", null], ["6", "failed", null]]);
+  assert.equal(results[6].code, "RATE_LIMITED");
+}
+{
+  const results = await refreshMissingSeoQueryFrequencies([{ id: "1", query_text: "один", frequency: null }], {
+    async fetchWordstat() { return ok([["один", 10]]); },
+    async saveFrequency() { return false; },
+  });
+  assert.equal(results[0].status, "failed");
+  assert.equal(results[0].code, "SAVE_FAILED");
+}
 
 const idA = "11111111-1111-4111-8111-111111111111";
 const idB = "22222222-2222-4222-8222-222222222222";
@@ -81,4 +153,21 @@ assert.match(ui, /Не подходит/);
 assert.match(ui, /SEO_QUERY_AUDIO_FIT_LABELS/);
 assert.doesNotMatch(ui, /\["listen_audio", "music", "practice"/, "UI uses shared intent taxonomy");
 assert.doesNotMatch(ui, /\["Медитация", "Энергопрактика"/, "UI uses shared format taxonomy");
+const frequencyRoute = read("src/app/api/admin/seo-queries/frequency/route.ts");
+assert.match(frequencyRoute, /requireAdminPermission\("seo\.manage"\)/);
+assert.match(frequencyRoute, /parseSeoQueryIds/);
+assert.match(frequencyRoute, /fetchWordstatSuggestions\(phrase, \{ userId: session\.userId \}\)/, "shared client keeps cache and quotas");
+assert.match(frequencyRoute, /\.update\(\{ frequency, frequency_checked_at: checkedAt \}\)/);
+assert.match(frequencyRoute, /\.is\("frequency", null\)/, "never overwrites an existing frequency");
+assert.equal((frequencyRoute.match(/\.update\(/g) ?? []).length, 1, "frequency refresh has a single update");
+assert.doesNotMatch(frequencyRoute.slice(frequencyRoute.indexOf(".update(")), /analysis_status|intent|audio_fit|recommended_format/, "frequency refresh does not touch review fields");
+assert.match(ui, /Применить рекомендации к выбранным/);
+assert.match(ui, /seoAnalysisPlanConfirmText/);
+assert.match(ui, /window\.confirm/);
+assert.match(ui, /Частотность не получена/);
+assert.match(ui, /Повторить/);
+assert.match(ui, /SEO_QUERY_INTENT_LABELS\[value\]/);
+assert.match(ui, /SEO_QUERY_CONFIDENCE_LABELS/);
+assert.doesNotMatch(ui, /Уверенность: \{suggested\.confidence\}/, "confidence is not shown raw");
+assert.doesNotMatch(ui, /—/, "admin copy uses en dash only");
 console.log("seo-query-analysis-unit: ok");
