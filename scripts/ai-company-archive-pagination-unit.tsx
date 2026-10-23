@@ -65,7 +65,7 @@ assert.deepEqual(parseBoardCounts({ plan: 87, working: 7, review: 0, archive: 13
 });
 
 // 3. Live shape of the bug: Core returns a 100-row history page, 130 archived tasks in total.
-const boardCounts = { plan: 0, working: 13, review: 1, archive: 130, archive_by_status: { accepted: 90, cancelled: 36, done: 4 }, scope: "all_tasks", source: "server_count" };
+const boardCounts = { plan: 0, working: 13, review: 1, archive: 130, archive_by_status: { accepted: 90, cancelled: 36, done: 4 }, not_on_board: 0, scope: "board_tabs", source: "server_count" };
 function capped(name: string): RawStatus {
   const value = raw(name);
   value.tasks_page = { ...value.tasks_page, history_included: 100, history_complete: false, omitted_history_count: 30 };
