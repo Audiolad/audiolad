@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:business-ru-copy": "npx tsx scripts/business-ru-copy-unit.mts",
     "dev": "node scripts/lib/guard-dev.mjs && next dev",
     "build": "next build",
     "start": "node scripts/lib/guard-production-start.mjs && next start",

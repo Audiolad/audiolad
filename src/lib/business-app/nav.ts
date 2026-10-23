@@ -42,7 +42,7 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
   },
   {
     id: "player",
-    title: "Player",
+    title: "Плеер",
     href: "/player",
     icon: "music",
     available: true,

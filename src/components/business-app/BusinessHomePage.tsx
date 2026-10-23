@@ -168,7 +168,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
     domain.status === "anonymous"
       ? "Войдите, чтобы управлять точкой."
       : domain.status === "authenticated" && !domain.location
-        ? "Создайте организацию и первую точку – это займёт минуту."
+        ? "Подключите своё заведение – это займёт минуту."
         : buildBusinessGreetingSubtitle();
 
   const playback = deriveOwnerPlaybackSignal(
@@ -229,9 +229,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
             Первая точка
           </h2>
           <p className="mt-2 text-[var(--biz-text-muted)]">
-            Пройдите Zero-to-Music: тип → атмосфера → preview → подтверждение. Создадим
-            Organization → Location → зону «по умолчанию» через production RPC
-            <code className="mx-1 text-sm">create_business_organization_with_location</code>.
+            Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия создадим точку. Всё в одном кабинете.
           </p>
           <Link
             href="/onboarding"
@@ -241,7 +239,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
           </Link>
           <details className="mt-4">
             <summary className="cursor-pointer text-sm font-medium text-[var(--biz-text-muted)]">
-              Быстрая форма без мастера
+              Быстрое подключение без вопросов
             </summary>
             <BusinessDomainBootstrapForm />
           </details>
@@ -279,12 +277,12 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
               </div>
             ) : (
               <p className="mt-3 text-[var(--biz-text-muted)]">
-                Что звучит сейчас – появится, когда плеер точки начнёт присылать подтверждения
+                Название трека появится, когда плеер сообщит, что музыка играет.
               </p>
             )}
             {lastPlayAge && (
               <p className="mt-3 text-sm text-[var(--biz-text-muted)]">
-                Последнее зарегистрированное событие воспроизведения: {lastPlayAge}.
+                Последнее воспроизведение: {lastPlayAge}.
               </p>
             )}
           </section>

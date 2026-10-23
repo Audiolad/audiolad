@@ -27,7 +27,7 @@ export type BusinessThemeMeta = {
 export const BUSINESS_THEMES: Readonly<Record<BusinessThemeId, BusinessThemeMeta>> = {
   "jazz-coffee": {
     id: "jazz-coffee",
-    label: "Jazz & Coffee",
+    label: "Джаз и кофе",
     segments: ["coffee", "cafe", "bar", "restaurant", "hotel"],
     themeColor: "#f7f1e8",
   },

@@ -40,7 +40,7 @@ export const BUSINESS_AIRPLAY_CANDIDATE_PROBES: readonly {
 }[] = [
   {
     audioItemId: VENUE_PLAYER_SLICE_POP_AUDIO_ITEM_ID,
-    label: "Slice probe track (PoP allowlist id)",
+    label: "Проверочный трек",
   },
 ];
 
@@ -103,26 +103,26 @@ export function venueAirplayEmptyStateCopy(input: {
     return {
       title: "Нет точки для проверки прав",
       description:
-        "Сначала создайте организацию и точку на Главной. Без Location нельзя вызвать resolve_business_track_eligibility.",
+        "Проверка доступна после подключения заведения.",
     };
   }
   if (!input.probed) {
     return {
-      title: "Проверка eligibility…",
+      title: "Проверяем права…",
       description:
-        "Читаем статус прав через A5 RPC. UNKNOWN не считается разрешением на эфир.",
+        "Проверяем разрешение на воспроизведение. Треки без подтверждённых прав в подборку не попадут.",
     };
   }
   if (input.eligibleCount === 0) {
     return {
-      title: "Каталог для эфира пуст",
+      title: "Подборка для заведения пока пуста",
       description:
-        "Нет треков со статусом ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Технический пилот-тон Player остаётся отдельно и не является eligible-каталогом. Реальные сиды прав / freeze-list – после решений HG-3/HG-4 (P0-06).",
+        "Пока нет треков с подтверждёнными правами для заведения. Проверочный звук плеера помогает проверить подключение, но не входит в музыкальную подборку.",
     };
   }
   return {
-    title: "Eligible для эфира",
-    description: `В пуле эфира: ${input.eligibleCount} трек(ов) со статусом ELIGIBLE.`,
+    title: "Доступно для заведения",
+    description: `Доступно треков: ${input.eligibleCount}. Права на воспроизведение подтверждены.`,
   };
 }
 
@@ -131,13 +131,13 @@ export function formatEligibilityDecisionLabel(
 ): string {
   switch (decision) {
     case "ELIGIBLE":
-      return "ELIGIBLE";
+      return "Разрешено";
     case "INELIGIBLE":
-      return "INELIGIBLE";
+      return "Недоступно";
     case "CONDITIONAL":
-      return "CONDITIONAL";
+      return "Есть ограничения";
     case "UNKNOWN":
     default:
-      return "UNKNOWN";
+      return "Нет подтверждения";
   }
 }

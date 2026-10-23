@@ -48,21 +48,21 @@ export const BUSINESS_ONBOARDING_TYPES: readonly BusinessOnboardingTypeOption[] 
       id: "cafe",
       label: "Кафе / кофейня",
       category: "Кафе",
-      hint: "Мягкий дневной эфир под разговоры и работу.",
+      hint: "Мягкая музыка для разговоров и работы.",
       defaultOrgName: "Кафе",
       defaultLocationName: "Зал",
     },
     {
       id: "spa",
-      label: "SPA / wellness",
-      category: "SPA",
+      label: "Спа и отдых",
+      category: "Спа",
       hint: "Тихий, ровный фон для процедур.",
-      defaultOrgName: "SPA",
-      defaultLocationName: "Зона отдыха",
+      defaultOrgName: "Спа",
+      defaultLocationName: "Зал отдыха",
     },
     {
       id: "retail",
-      label: "Магазин / ритейл",
+      label: "Магазин",
       category: "Магазин",
       hint: "Нейтральный фон торгового зала.",
       defaultOrgName: "Магазин",
@@ -73,7 +73,7 @@ export const BUSINESS_ONBOARDING_TYPES: readonly BusinessOnboardingTypeOption[] 
       label: "Другой бизнес",
       category: "Другой бизнес",
       hint: "Укажем категорию и настроим точку.",
-      defaultOrgName: "Организация",
+      defaultOrgName: "Заведение",
       defaultLocationName: "Точка 1",
     },
   ] as const;
@@ -83,13 +83,13 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
     {
       id: "calm_premium",
       label: "Спокойный · премиальный",
-      vibe: "Тихо, ровно, без резких пиков – гости остаются в комфорте.",
+      vibe: "Тихая, ровная музыка без резких переходов – гостям комфортно.",
       energyHint: "calm",
     },
     {
       id: "modern_soft",
       label: "Современный · мягкий",
-      vibe: "Лёгкая современная фактура, без давления на разговор.",
+      vibe: "Лёгкая современная музыка, которая не мешает разговору.",
       energyHint: "balanced",
     },
     {
@@ -101,10 +101,10 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
   ] as const;
 
 export const BUSINESS_ONBOARDING_RIGHTS_SAFE_DISCLAIMER =
-  "Каталог эфира пока без подтверждённых ELIGIBLE-треков. Статус прав – UNKNOWN, пока нет evidence и freeze-list. Мы не утверждаем, что музыка «лицензирована».";
+  "Для музыки в заведении нужны подтверждённые права на каждый трек. Пока таких треков в подборке нет.";
 
 export const BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE =
-  "Preview в этом шаге описательный: без воспроизведения треков Case A и без выдачи в эфир. Подключение плеера – после подтверждения точки.";
+  "На этом шаге можно прочитать описание будущей атмосферы. Музыка здесь пока не играет. Плеер станет доступен после подтверждения точки.";
 
 export function isBusinessOnboardingStep(
   value: string,
@@ -187,16 +187,16 @@ export function validateBusinessOnboardingConfirm(
     (input.timezone ?? "Europe/Moscow").trim() || "Europe/Moscow";
 
   if (organizationName.length < 1 || organizationName.length > 120) {
-    return { ok: false, error: "invalid_organization_name" };
+    return { ok: false, error: "Укажите название заведения: от 1 до 120 символов." };
   }
   if (locationName.length < 1 || locationName.length > 120) {
-    return { ok: false, error: "invalid_location_name" };
+    return { ok: false, error: "Укажите название точки: от 1 до 120 символов." };
   }
   if (businessCategory.length < 1 || businessCategory.length > 120) {
-    return { ok: false, error: "invalid_business_category" };
+    return { ok: false, error: "Укажите тип заведения: от 1 до 120 символов." };
   }
   if (!/^[A-Z]{2}$/.test(countryCode)) {
-    return { ok: false, error: "invalid_country_code" };
+    return { ok: false, error: "Не удалось определить страну. Проверьте данные и попробуйте ещё раз." };
   }
 
   return {
@@ -241,7 +241,7 @@ export function suggestBusinessOnboardingNames(typeId: string | null): {
 } {
   const type = getBusinessOnboardingType(typeId);
   return {
-    organizationName: type?.defaultOrgName ?? "Организация",
+    organizationName: type?.defaultOrgName ?? "Заведение",
     locationName: type?.defaultLocationName ?? "Точка 1",
     businessCategory: type?.category ?? "Другой бизнес",
   };

@@ -15,7 +15,7 @@ export type BusinessSpace = {
 
 export const BUSINESS_SPACES: readonly BusinessSpace[] = [
   { id: "cafe", title: "Кафе, рестораны и отели", enabled: true },
-  { id: "spa", title: "SPA и расслабление", enabled: false },
+  { id: "spa", title: "Спа и расслабление", enabled: false },
   { id: "retail", title: "Магазины и салоны красоты", enabled: false },
   { id: "fitness", title: "Фитнес и активность", enabled: false },
 ];

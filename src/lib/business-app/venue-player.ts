@@ -35,9 +35,9 @@ export function getVenuePlayerPilotTrack(): VenuePlayerPilotTrack {
   if (!cachedPilot) {
     cachedPilot = {
       id: "pilot-tone-v0",
-      title: "Pilot tone (slice v0)",
-      program: "Venue Player runtime",
-      description: "Технический пилот-тон. Не eligible-каталог.",
+      title: "Проверочный звук",
+      program: "Проверка плеера",
+      description: "Короткий проверочный звук для проверки подключения плеера.",
       src: buildPilotToneDataUri(),
     };
   }

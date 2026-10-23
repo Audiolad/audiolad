@@ -138,11 +138,11 @@ export default function SpaOnlinePlayer({ programName, initialManifest }: Props)
   return (
     <section className="spa-pilot business-app-card mx-auto max-w-[720px]" data-testid="spa-pilot">
       <h1 className="text-2xl font-semibold text-[var(--biz-text)]">{programName}</h1>
-      <p className="mt-1 text-[0.82rem] business-app-muted">Пилот: страница видна только участникам пилота. Воспроизведение через интернет.</p>
+      <p className="mt-1 text-[0.82rem] business-app-muted">Ранний доступ: страница открыта только участникам. Музыка играет через интернет.</p>
       {status === "no_access" ? (
-        <p className="mt-3" data-testid="spa-no-access">Доступ к пилоту закрыт.</p>
+        <p className="mt-3" data-testid="spa-no-access">Доступ к музыке закрыт.</p>
       ) : items.length === 0 ? (
-        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
+        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков с подтверждёнными правами для заведений.</p>
       ) : (
         <>
           <BusinessPlayerControls

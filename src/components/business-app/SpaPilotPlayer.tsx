@@ -173,15 +173,15 @@ export default function SpaPilotPlayer({ programId, programName, initialManifest
   return (
     <section className="spa-pilot business-app-card mx-auto max-w-[720px]" data-testid="spa-pilot">
       <h1 className="text-2xl font-semibold text-[var(--biz-text)]">{programName}</h1>
-      <p className="mt-1 text-[0.82rem] business-app-muted">Пилот: страница видна только участникам пилота.</p>
+      <p className="mt-1 text-[0.82rem] business-app-muted">Ранний доступ: страница открыта только участникам.</p>
       <p data-testid="spa-network" className={`business-app-alert mt-3 ${online ? "" : "font-semibold"}`} data-tone={online ? "ok" : "warn"}>
-        {online ? "Онлайн" : formatOfflineLabel(until)}
+        {online ? "Есть интернет" : formatOfflineLabel(until)}
         {online && until ? ` · сохранено ${cachedCount}/${items.length}, ${formatOfflineLabel(until)}` : null}
       </p>
       {status === "no_access" ? (
-        <p className="mt-3" data-testid="spa-no-access">Доступ к пилоту закрыт.</p>
+        <p className="mt-3" data-testid="spa-no-access">Доступ к музыке закрыт.</p>
       ) : items.length === 0 ? (
-        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков, разрешённых для Business.</p>
+        <p className="mt-3 business-app-muted" data-testid="spa-empty">В программе пока нет треков с подтверждёнными правами для заведений.</p>
       ) : (
         <>
           <div className="mt-4 flex flex-wrap items-center gap-3">

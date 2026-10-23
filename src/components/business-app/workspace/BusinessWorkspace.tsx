@@ -273,7 +273,7 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
 
       {model.status === "anonymous" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-anonymous">
-          <p>Чтобы открыть кабинет, подтвердите email. Карта не нужна.</p>
+          <p>Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна.</p>
           <div className="flex flex-wrap gap-2">
             <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.signUpHref} data-testid="biz-workspace-signup">
               {BUSINESS_GIFT_CTA}

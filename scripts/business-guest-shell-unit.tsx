@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { PathnameContext } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 
+import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessAppShell from "../src/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
@@ -22,6 +23,7 @@ import {
   isBusinessNavItemLocked,
   resolveBusinessAccess,
 } from "../src/lib/business-app/access";
+import type { BusinessChromeAccess } from "../src/lib/access-grants/access-line";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import type { GuestCoffeePlaylist } from "../src/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_GUEST_COFFEE_URL } from "../src/lib/business-app/host";
@@ -211,8 +213,8 @@ async function closedApis() {
 
 // ---------------------------------------------------------------- live gift hides the guest strip (Sergey 23.10.2026)
 {
-  const trial = { mode: "trial" as const, endsAt: "2026-11-22T14:11:37.762Z" };
-  const withAccess = (domain: BusinessOwnerHomeContext, pathname: string, customerAccess: typeof trial | null) =>
+  const trial: BusinessChromeAccess = { mode: "trial", endsAt: "2026-11-22T14:11:37.762Z" };
+  const withAccess = (domain: BusinessOwnerHomeContext, pathname: string, customerAccess: BusinessChromeAccess | null) =>
     wrap(domain, pathname, <BusinessAppShell customerAccess={customerAccess}><main data-testid="page">page</main></BusinessAppShell>);
   for (const path of ["/", "/music", "/onboarding", "/settings"]) {
     const t = withAccess(signedInNoOrg, path, trial);
@@ -227,6 +229,17 @@ async function closedApis() {
   has(withAccess(anonymous, "/", null), /data-testid="biz-guest-status"/, "anonymous guest still sees the strip");
   hasNot(withAccess(signedInNoOrg, "/workspace", trial), /biz-access-line|biz-guest-status/, "workspace shows its own period block");
   hasNot(withAccess(member, "/", null), /biz-guest-status/, "member never sees the guest strip");
+
+  // Onboarding and the listening limit must not re-offer the gift or show its price either.
+  const inTrial = (domain: BusinessOwnerHomeContext, pathname: string, node: React.ReactNode) =>
+    wrap(domain, pathname, <BusinessChromeAccessProvider value={trial}>{node}</BusinessChromeAccessProvider>);
+  const onb = inTrial(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />);
+  hasNot(onb, /onboarding-terms-note|30 дней в подарок|799/, "onboarding in trial: no gift terms / price");
+  has(onb, /data-testid="onboarding-access-line"[^>]*>Бесплатный доступ до 22 ноября 2026/, "onboarding in trial: end date line");
+  has(wrap(signedInNoOrg, "/onboarding", <BusinessOnboardingWizardPage initialTypeId="cafe" />), /onboarding-terms-note/, "onboarding without gift keeps the terms");
+  const studio = inTrial(signedInNoOrg, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
+  hasNot(studio, /biz-trial-cta|Получить 30 дней бесплатно|799/, "sound limit in trial: no gift CTA");
+  has(studio, /data-testid="biz-connect-cta"/, "sound limit in trial: connect the venue instead");
 }
 
 // ---------------------------------------------------------------- permanent atlas URL

@@ -60,8 +60,8 @@ const u1 = offlineUntil(m, new Map([[id(1), gen]]));
 assert.ok(u1 && u1.getTime() <= gen.getTime() + 7 * DAY, "never beyond 7 days");
 assert.equal(offlineUntil(m, new Map([[id(1), gen], [id(2), gen]])).getTime(), gen.getTime() + 3 * DAY, "earliest deadline wins");
 assert.equal(offlineUntil(m, new Map([[id(3), gen]])), null, "non-offline track never counts");
-assert.match(formatOfflineLabel(new Date("2026-10-20T06:00:00Z")), /^офлайн до 20\.10\.2026/);
-assert.match(formatOfflineLabel(null), /недоступен/);
+assert.match(formatOfflineLabel(new Date("2026-10-20T06:00:00Z")), /^Без интернета до 20\.10\.2026/);
+assert.match(formatOfflineLabel(null), /недоступно/);
 
 // log queue
 const ev = (n, extra = {}) => ({
