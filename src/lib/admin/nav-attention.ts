@@ -8,12 +8,14 @@ export const ADMIN_NAV_ATTENTION_QUEUES = [
   { href: "/admin/payout-profiles", permission: "authors.payout_profiles.review", label: "Ждут решения", table: "author_payout_profiles", column: "status", statuses: ["submitted", "in_review"] },
   { href: "/admin/business-verification", permission: "author_products.moderate", label: "Ждут решения", table: "business_rightsholder_verifications", column: "status", statuses: ["submitted"] },
   { href: "/classica/production", permission: "classica.production.moderate", label: "Ждут решения", table: "classica_production_jobs", column: "status", statuses: ["in_review"] },
+  { href: "/admin/seo-queries", permission: "seo.manage", label: "Не проверены", table: "seo_queries", column: "analysis_status", statuses: ["not_analyzed"] },
 ] as const;
 
 // Author attention includes submitted + needs_changes; commercial open includes
 // needs_changes; Business open includes needs_info. Payout defaults to all non-drafts.
 // needs_changes / needs_info wait for the applicant and are absent from nav counts.
 // Classica counts require production.moderate, matching the review action permission.
+// SEO counts all not_analyzed queries awaiting review, gated by seo.manage.
 export type AdminNavAttentionCounts = Partial<Record<string, number | null>>;
 export function canCountAdminQueue(access: PlatformAccessSnapshot, permission: string): boolean {
   return snapshotHasPermission(access, permission);
