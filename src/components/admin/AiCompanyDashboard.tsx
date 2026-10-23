@@ -1444,7 +1444,7 @@ export function AiCompanyDashboardView({
                   <p className="mt-1 text-sm text-[#796ba0]">Один оркестратор Grok и фактические исполнители. В строке – подключение и занятость по фактам Company Core.</p>
                   <HelpNote label="Справка об исполнителях">
                     <p>
-                      Подключение: проверено, недоступно, не удалось проверить, данные устарели или нет данных. Нет данных – это не «отключён». Занятость: выполняет задачу, занят N из M, ожидает, свободен или неизвестно. Codex занят, пока на его сервере идёт хотя бы один процесс codex exec (проба раз в минуту); «свободен» – только когда процессов нет. Запуск считается текущим, только если прогресс подтверждён за последние 60 минут. Grok – единственный оркестратор. Модель Grok внутри Cursor остаётся Cursor.
+                      Подключение: проверено, недоступно, не удалось проверить, данные устарели или нет данных. Нет данных – это не «отключён». Занятость: выполняет задачу, занят N из M, занят N, ожидает, свободен или неизвестно. Grok и Cursor заняты, пока по их задачам есть свежий колбэк в Company Core (до 20 минут; запуски bc-… – Cursor, остальные – воркеры бокса Grok) или идёт сессия Codex по задаче бокса; без сигнала от 20 минут до 2 часов – «занятость неизвестна». Codex занят, пока на его сервере идёт хотя бы один процесс codex exec (проба раз в минуту); «свободен» – только когда процессов нет. Запуск считается текущим, только если прогресс подтверждён за последние 60 минут. Grok – единственный оркестратор. Модель Grok внутри Cursor остаётся Cursor.
                     </p>
                   </HelpNote>
                   <div className="mt-2 flex flex-col gap-1.5">
@@ -1486,7 +1486,7 @@ export function AiCompanyDashboardView({
                                     <p className="break-words font-medium">
                                       {session.taskHref ? <a className="text-[#7042c5] underline" href={session.taskHref}>{session.task}</a> : session.task}
                                     </p>
-                                    <p className="break-words text-[#796ba0]">{session.mode} · начата {session.started} · {session.elapsed}</p>
+                                    <p className="break-words text-[#796ba0]">{session.signal ? `${session.mode} · ${session.signal}` : `${session.mode} · начата ${session.started} · ${session.elapsed}`}</p>
                                     <p className="break-words text-[#796ba0]">{session.registration}</p>
                                   </li>
                                 ))}
