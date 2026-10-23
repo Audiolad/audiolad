@@ -462,6 +462,7 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
               <MaxAudioPlayer
                 session={playback.session}
                 hideTrackList
+                guestListen={product.rating.guestCollect === true}
                 onBindPlay={bindPlay}
                 onBindPause={(pause) => {
                   pauseRef.current = pause;
@@ -527,6 +528,9 @@ function VkProductDetail({ selection }: { selection: VkProductSelection }) {
             key={`${product.authorSlug}/${product.productSlug}`}
             enabled={product.rating.enabled}
             aggregate={product.rating.aggregate}
+            guestCollect={product.rating.guestCollect === true}
+            authorSlug={product.authorSlug}
+            productSlug={product.productSlug}
             surface="vk"
             signInAction={{
               message: VK_RATING_SIGN_IN_COPY,
