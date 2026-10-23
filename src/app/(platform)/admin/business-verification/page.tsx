@@ -4,6 +4,7 @@ import {
   moderateBusinessVerificationAction,
   suspendBusinessProductAction,
 } from "@/app/(platform)/admin/business-verification/actions";
+import { BusinessCaseCollapsible } from "@/app/(platform)/admin/business-verification/BusinessCaseCollapsible";
 import { BusinessDecisionFields } from "@/app/(platform)/admin/business-verification/BusinessDecisionFields";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import {
@@ -228,6 +229,14 @@ export default async function AdminBusinessVerificationPage({
             const status = c.status as BusinessVerificationStatus;
             return (
               <li key={c.id} id={`case-${c.id}`} data-testid="business-verification-case" className="min-w-0 break-words rounded-[22px] border border-[#e4d7f4] bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
+                <BusinessCaseCollapsible
+                  caseId={c.id}
+                  applicantName={applicant.nameLabel}
+                  statusLabel={BUSINESS_VERIFICATION_STATUS_LABEL[status] ?? c.status}
+                  submittedLabel={formatMsk(c.submitted_at)}
+                  workspaceCountLabel={applicant.workspaceTotal}
+                  isOwnCase={isOwnCase}
+                >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-[#f3edfb] px-3 py-1 text-xs font-semibold text-[#7042c5]">
                     {BUSINESS_VERIFICATION_STATUS_LABEL[status] ?? c.status}
@@ -364,6 +373,7 @@ export default async function AdminBusinessVerificationPage({
                     </ul>
                   </details>
                 ) : null}
+                </BusinessCaseCollapsible>
               </li>
             );
           })}
