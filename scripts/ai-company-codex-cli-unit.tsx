@@ -179,7 +179,7 @@ assert.equal(odd.sessions[0].mode, "режим не определён");
 assert.equal(codexCard(probe({ busy: true, current_run: null })).card.occupancy, "free");
 
 // Failed probe → «недоступно» with reason, not green.
-const failed = codexCard(probe({ status: "failed", chatgpt_authorized: false, login_mode: "none", reason: "Недоступен: `codex login status` — не авторизован." })).card;
+const failed = codexCard(probe({ status: "failed", chatgpt_authorized: false, login_mode: "none", reason: "Недоступен: `codex login status` – не авторизован." })).card;
 assert.equal(failed.connection, "unavailable");
 assert.equal(failed.occupancy, "unknown");
 assert.match(failed.connectionSource, /не авторизован/);

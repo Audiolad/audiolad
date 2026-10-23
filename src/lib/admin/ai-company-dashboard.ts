@@ -2729,9 +2729,9 @@ function taskExecutor(task: CompanyTask): { id: ExecutorId | null; note: string 
   const executive = task.executorParts.some((part) => part != null && /\bexecutive\b/i.test(part));
   const note =
     id === "cursor" && model && /grok|xai/i.test(model)
-      ? "Модель Grok внутри Cursor — это исполнитель Cursor, не отдельный запуск xAI."
+      ? "Модель Grok внутри Cursor – это исполнитель Cursor, не отдельный запуск xAI."
       : executive && id === "grok"
-        ? "Поле executive — оркестрация, не фактический исполнитель."
+        ? "Поле executive – оркестрация, не фактический исполнитель."
         : "";
   return { id, note };
 }
@@ -3636,9 +3636,9 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     const connectionSource = cli
       ? cli.connectionSource
       : tokenOnlyCheck
-      ? "Company Core проверяет только ключ API Codex в своём процессе. Реальный канал — Codex на сервере компании по SSH со входом ChatGPT; его Company Core не проверяет и сигналов «жив» не получает. Поэтому подключение не подтверждено и не опровергнуто."
+      ? "Company Core проверяет только ключ API Codex в своём процессе. Реальный канал – Codex на сервере компании по SSH со входом ChatGPT; его Company Core не проверяет и сигналов «жив» не получает. Поэтому подключение не подтверждено и не опровергнуто."
       : checkedAt
-        ? `Проверка в Company Core, ${formatDateTime(checkedAt)} МСК. Срок свежести — ${threshold}.`
+        ? `Проверка в Company Core, ${formatDateTime(checkedAt)} МСК. Срок свежести – ${threshold}.`
         : "Company Core не прислал время проверки. Запись о провайдере не доказывает доступность.";
     const evidenceRun = observations.find((item) => item.provider || item.model) ?? null;
     const current = runs[0]?.task ?? null;
