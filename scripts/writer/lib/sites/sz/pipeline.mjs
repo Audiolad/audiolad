@@ -63,6 +63,31 @@ export function resolveCards(pack, ctx) {
   return { problems, portraits };
 }
 
+const hideCredentials = (text) => String(text).replace(/(:\/\/)[^@/\s]+@/g, "$1***@");
+
+/**
+ * The pack branch must be free both locally and on origin. `git ls-remote --exit-code` returns 2
+ * when the branch is absent (OK); 0 means it exists; anything else (no network, no auth, no
+ * origin) is a stop too – without knowing, the run could spend the budget and fail at push.
+ */
+export function assertBranchFree(repo, branch) {
+  if (run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], { cwd: repo }).status === 0) {
+    throw new SzStop(1, `ветка ${branch} уже есть в ${repo} – удалите её (git branch -D ${branch}) или смените pack`);
+  }
+  const remote = run("git", ["ls-remote", "--exit-code", "--heads", "origin", `refs/heads/${branch}`], {
+    cwd: repo,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    timeoutMs: 60 * 1000,
+  });
+  if (remote.status === 0) {
+    throw new SzStop(1, `ветка ${branch} уже есть на origin (${SZ.repo}) – закройте старый PR и удалите ветку или смените pack; генерация не запускалась`);
+  }
+  if (remote.status !== 2) {
+    const why = hideCredentials(remote.stderr.trim().split("\n").slice(-3).join(" "));
+    throw new SzStop(1, `не удалось проверить ветку ${branch} на origin (git ls-remote, код ${remote.status}${why ? `: ${why}` : ""}) – проверьте сеть и доступ к ${SZ.repo}; генерация не запускалась`);
+  }
+}
+
 function prepareSiteWorktree(repo, worktree) {
   mustRun("git", ["fetch", "-q", "origin", "main"], { cwd: repo });
   if (existsSync(worktree)) throw new Error(`worktree уже существует: ${worktree}`);
@@ -83,7 +108,7 @@ export function expertsReport(pool, ctx) {
   return ["| Эксперт | Пол, группа | Статей на сайте | Портрет | Осторожно |", "| --- | --- | --- | --- | --- |", ...rows].join("\n");
 }
 
-export async function runSzPipeline(args, { model, maxRub, maxTokens }) {
+export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }) {
   const pool = loadExpertPool(args.experts ? resolve(args.experts) : undefined);
   const repo = resolve(args.repo ?? process.env.WRITER_SZ_REPO ?? "");
   if (!args.repo && !process.env.WRITER_SZ_REPO) throw new SzStop(1, "--repo <клон sergey-zoya-site> обязателен для --site sz");
@@ -99,15 +124,14 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens }) {
   const outDir = resolve(args.out ?? join(process.env.HOME ?? ".", ".cache/writer/runs", runId));
   const worktree = join(outDir, "site");
   const branch = `writer/sz-${pack.pack}`;
-  // Fail before any Cloud.ru spend: the commit step would hit an existing branch only at the end.
-  if (run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], { cwd: repo }).status === 0) {
-    throw new SzStop(1, `ветка ${branch} уже есть в ${repo} – удалите её (git branch -D ${branch}) или смените pack`);
-  }
+  // Fail before any Cloud.ru spend (also in --dry-run / --offline): the push step would hit an
+  // existing branch only after the whole budget is spent.
+  assertBranchFree(repo, branch);
   const budget = Math.min(maxRub, pack.maxRub ?? Infinity);
   const state = { site: "sz", runId, model, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [], warnings: [] };
   mkdirSync(outDir, { recursive: true });
   writeJson(join(outDir, "pack.json"), pack);
-  const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article" });
+  const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate });
 
   let code = 0;
   try {

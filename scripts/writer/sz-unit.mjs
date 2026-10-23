@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOpening, wireGate } from "./lib/sites/sz/apply.mjs";
 import { assembleSzArticle, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
 import { BudgetError, makeCaller } from "./lib/call.mjs";
+import { DEFAULT_MODEL } from "./lib/cost.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ } from "./lib/sites/sz/config.mjs";
@@ -25,7 +26,7 @@ import {
 } from "./lib/sites/sz/experts.mjs";
 import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
-import { packView, resolveCards } from "./lib/sites/sz/pipeline.mjs";
+import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline } from "./lib/sites/sz/pipeline.mjs";
 import { buildSzMessages } from "./lib/sites/sz/prompt.mjs";
 import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack } from "./lib/sites/sz/rules.mjs";
 
@@ -301,6 +302,62 @@ test("site checks: only regressions block", () => {
   const bad = compareSzChecks(baseline, { steps: [step("a", false), step("b", false), step("gate", false)], tsc: step("tsc", true), build: null });
   assert.deepEqual(bad.blocking.map((item) => item.command), ["a", "gate"]);
   assert.deepEqual(bad.preexisting.map((item) => item.command), ["b"]);
+});
+
+// ── pack branch on origin: checked before any spend ──
+const testAsync = async (name, fn) => {
+  await fn();
+  count += 1;
+  console.log(`ok ${name}`);
+};
+await testAsync("branch: writer/sz-<pack> on origin stops the run before generate; absent → generate runs", async () => {
+  const root = mkdtempSync(join(tmpdir(), "writer-sz-remote-"));
+  const git = (cwd, ...args) => {
+    const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+    assert.equal(result.status, 0, `git ${args.join(" ")}: ${result.stderr}`);
+    return result.stdout;
+  };
+  const bare = join(root, "origin.git");
+  const clone = join(root, "site");
+  cpSync(site, clone, { recursive: true });
+  rmSync(join(clone, "content/articles/angel-hranitel.md"), { force: true });
+  git(root, "init", "-q", "--bare", "-b", "main", bare);
+  git(clone, "init", "-q", "-b", "main");
+  git(clone, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
+  git(clone, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "site");
+  git(clone, "remote", "add", "origin", bare);
+  git(clone, "push", "-q", "origin", "main");
+  mkdirSync(join(clone, "node_modules"), { recursive: true });
+  const branch = `writer/sz-${rawPack.pack}`;
+  let calls = 0;
+  const generate = () => {
+    calls += 1;
+    throw Object.assign(new Error("generate sentinel"), { code: 9 });
+  };
+  const args = (out) => ({ repo: clone, briefs: join(fixtures, "pack-angel-replay.json"), out: join(root, out) });
+  const limits = { model: DEFAULT_MODEL, maxRub: 3, maxTokens: 100, generate };
+
+  // Absent on origin (ls-remote exit 2) → the run proceeds to the first Cloud.ru call.
+  assert.doesNotThrow(() => assertBranchFree(clone, branch));
+  const proceeded = await runSzPipeline(args("run-absent"), limits);
+  assert.equal(calls, 1);
+  assert.equal(proceeded.code, 9);
+  assert.match(proceeded.state.failure, /generate sentinel/);
+
+  // Present on origin (left from an earlier successful run, local branch already deleted) → stop, 0 calls.
+  git(clone, "push", "-q", "origin", `main:refs/heads/${branch}`);
+  assert.notEqual(spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], { cwd: clone }).status, 0);
+  calls = 0;
+  await assert.rejects(runSzPipeline(args("run-present"), limits), (error) => error instanceof SzStop && /уже есть на origin/.test(error.message));
+  await assert.rejects(runSzPipeline({ ...args("run-present-dry"), "dry-run": true, offline: true }, limits), /уже есть на origin/);
+  assert.equal(calls, 0);
+  assert.equal(existsSync(join(root, "run-present")), false);
+
+  // ls-remote fails (origin unreachable) → stop too, not «absent».
+  git(clone, "remote", "set-url", "origin", join(root, "missing.git"));
+  await assert.rejects(runSzPipeline(args("run-broken"), limits), (error) => error instanceof SzStop && /не удалось проверить ветку/.test(error.message));
+  assert.equal(calls, 0);
+  rmSync(root, { recursive: true, force: true });
 });
 
 rmSync(site, { recursive: true, force: true });
