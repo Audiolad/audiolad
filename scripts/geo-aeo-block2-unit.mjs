@@ -41,7 +41,7 @@ function read(relPath) {
 
 const articles = listArticleDefinitions();
 assert(articles.length > 0, "article registry loaded");
-assert(articles.length === 103, `expected 103 articles, got ${articles.length}`);
+assert(articles.length === 108, `expected 108 articles, got ${articles.length}`);
 
 const practice = articles.find((article) => article.productContinuation?.kind === "practice") ?? articles[0];
 const creator = articles.find((article) => article.productContinuation?.kind === "creator_paths");

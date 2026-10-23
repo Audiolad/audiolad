@@ -242,7 +242,7 @@ function testNoNewTopicHubs() {
 
 function testRegistryTotals() {
   const all = listArticleDefinitions();
-  assert(all.length === 103, "article registry size unchanged");
+  assert(all.length === 108, "article registry size includes five Guardian Angel articles");
 
   const fiveHubTotal = EXISTING_HUBS.reduce(
     (sum, hub) => sum + listArticlesByTopicSlug(hub).length,

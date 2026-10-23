@@ -15,7 +15,13 @@ export type ArticleSectionBlock =
   | { kind: "paragraph"; text: string }
   | { kind: "rich_paragraph"; segments: readonly ArticleInlineSegment[] }
   | { kind: "heading"; level: 3; title: string }
-  | { kind: "list"; items: readonly string[] };
+  | { kind: "list"; items: readonly string[] }
+  | {
+      kind: "table";
+      caption?: string;
+      columns: readonly string[];
+      rows: readonly (readonly string[])[];
+    };
 
 export type ArticleSection = {
   id: string;
