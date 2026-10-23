@@ -68,6 +68,21 @@ function createWordstatIntakeRepository(): WordstatIntakeRepository {
         .maybeSingle();
       return error ? undefined : data ? mapQuery(data) : null;
     },
+    async hasProposal(id) {
+      const { data, error } = await supabase
+        .from("seo_query_proposals").select("id").eq("query_id", id).limit(1);
+      return error ? undefined : Boolean(data?.length);
+    },
+    async revertPromotion(id) {
+      const { data, error } = await supabase
+        .from("seo_queries")
+        .update({ analysis_status: "not_analyzed" })
+        .eq("id", id)
+        .eq("analysis_status", "analyzed")
+        .select(queryColumns)
+        .maybeSingle();
+      return error ? undefined : data ? mapQuery(data) : null;
+    },
     async create({ queryText, source, frequency, frequencyCheckedAt, analysisStatus }) {
       const { data, error } = await supabase
         .from("seo_queries")

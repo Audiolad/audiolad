@@ -29,6 +29,11 @@ export type WordstatIntakeRepository = {
   refresh(id: string, frequency: number, frequencyCheckedAt: string): Promise<WordstatStoredQuery | null>;
   // undefined signals a read/write error; null means the guarded update lost a race.
   promote(id: string, frequency: number, frequencyCheckedAt: string): Promise<WordstatStoredQuery | null | undefined>;
+  // Re-checked after a promotion: an author proposal saved between the first check and the
+  // promotion must still go through moderation. undefined signals a read error.
+  hasProposal(id: string): Promise<boolean | undefined>;
+  // Guarded revert analyzed -> not_analyzed; returns the stored row, null if the row changed meanwhile.
+  revertPromotion(id: string): Promise<WordstatStoredQuery | null | undefined>;
   create(input: {
     queryText: string;
     source: "wordstat";
@@ -108,7 +113,17 @@ export async function importWordstatIntakeItem(
       if (existing.analysisStatus === "not_analyzed" && !existing.hasProposal) {
         const promoted = await repository.promote(existing.id, item.count, frequencyCheckedAt);
         if (promoted === undefined) return failure;
-        if (promoted) return success(promoted, "promoted");
+        if (promoted) {
+          const proposalAppeared = await repository.hasProposal(promoted.id);
+          if (proposalAppeared === false) return success(promoted, "promoted");
+          if (proposalAppeared === undefined) {
+            // Cannot confirm the promotion is safe: roll it back and report an error.
+            await repository.revertPromotion(promoted.id);
+            return failure;
+          }
+          const reverted = await repository.revertPromotion(promoted.id);
+          return reverted ? success(reverted, "needs_review") : failure;
+        }
         existing = await repository.findByNormalized(normalizedQuery);
         continue;
       }

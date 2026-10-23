@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AuthorWorkspace } from "@/lib/author-products/types";
+import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { loadPublishedSeoOccupancyForQueries } from "./load-published-seo-occupancy";
@@ -110,22 +111,29 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
   const supabase = createServiceRoleClient();
   await supabase.rpc("expire_seo_query_reservation", { p_author_id: authorId });
 
-  const [{ data: queries, error: queryError }, { data: reservations, error: reservationError }] =
-    await Promise.all([
+  // Paginated: PostgREST caps a single response at 1000 rows, which silently hid older queries.
+  const [queries, reservations] = await Promise.all([
+    fetchAllPages((from, to) =>
       supabase
         .from("seo_queries")
         .select("id, query_text, normalized_query, source, frequency, intent, recommended_format, audio_fit, seo_clusters(name)")
         .eq("analysis_status", "analyzed")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to),
+    ),
+    fetchAllPages((from, to) =>
       supabase
         .from("seo_query_reservations")
         .select("id, query_id, author_id, product_id, expires_at, status")
-        .in("status", ["active", "used"]),
-    ]);
-
-  if (queryError || reservationError) {
+        .in("status", ["active", "used"])
+        .order("reserved_at")
+        .order("id")
+        .range(from, to),
+    ),
+  ]).catch(() => {
     throw new Error("seo_queries_load_failed");
-  }
+  });
 
   const now = new Date();
   const allReservations = ((reservations ?? []) as ReservationRow[]).filter((item) =>

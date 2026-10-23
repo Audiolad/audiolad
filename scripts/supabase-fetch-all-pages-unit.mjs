@@ -25,4 +25,9 @@ for (const table of ["seo_queries", "seo_query_reservations", "seo_query_proposa
   assert.ok(page.includes(`fetchAllPages((from, to) => supabase\n      .from("${table}")`));
 }
 assert.equal([...page.matchAll(/\.order\("id"\)\.range\(from, to\)/g)].length, 3);
+// Author SEO list (cabinet «SEO-возможности» and product creation step) must not be capped at 1000 rows.
+const authorQueries = readFileSync("src/lib/seo-queries/queries.ts", "utf8");
+const authorList = authorQueries.slice(authorQueries.indexOf("export async function listSeoOpportunitiesForAuthor"));
+assert.match(authorList, /fetchAllPages\(\(from, to\) =>\s*supabase\s*\.from\("seo_queries"\)[\s\S]*?\.eq\("analysis_status", "analyzed"\)[\s\S]*?\.order\("id"\)\s*\.range\(from, to\)/);
+assert.match(authorList, /fetchAllPages\(\(from, to\) =>\s*supabase\s*\.from\("seo_query_reservations"\)[\s\S]*?\.order\("id"\)\s*\.range\(from, to\)/);
 console.log("supabase-fetch-all-pages-unit: ok");
