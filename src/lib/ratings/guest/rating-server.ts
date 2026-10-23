@@ -6,7 +6,11 @@ import { checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { canBecomeRatingEligible } from "@/lib/listen/listen-stats-access";
 import type { ListenAccess } from "@/lib/listen/types";
-import { verifyGuestCaptchaToken, guestCaptchaSiteKey } from "@/lib/ratings/guest/captcha";
+import {
+  verifyGuestCaptchaToken,
+  guestCaptchaSiteKey,
+  type CaptchaVerifyResult,
+} from "@/lib/ratings/guest/captcha";
 import {
   guestRatingsCaptchaProvider,
   isGuestRatingsCollectEnabled,
@@ -24,7 +28,12 @@ import { hmacRatingSignal } from "@/lib/ratings/signal-hmac";
 import { parsePracticeRatingStars } from "@/lib/ratings/stars";
 import { resolveGuestRatingSessionSecret } from "@/lib/ratings/guest/session";
 import { readGuestSessionFromRequest } from "@/lib/ratings/guest/listen-server";
-import { decideGuestCaptcha, GUEST_RATING_HARD_LIMIT, GUEST_RATING_HARD_WINDOW_MS } from "@/lib/ratings/guest/suspicion";
+import {
+  decideGuestCaptcha,
+  guestCaptchaFailureAgeMs,
+  GUEST_RATING_HARD_LIMIT,
+  GUEST_RATING_HARD_WINDOW_MS,
+} from "@/lib/ratings/guest/suspicion";
 import { resolveDisplayedRatingAggregates } from "@/lib/ratings/guest/aggregate";
 import { EMPTY_RATING_AGGREGATE, type PracticeRatingAggregate } from "@/lib/ratings/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -110,6 +119,7 @@ export async function handleGuestPracticeRatingGet(input: {
   let votesIn10Min = 0;
   let votesIn60Min = 0;
   let captchaFailures = 0;
+  let captchaFailureAt: string | null = null;
 
   if (session && eligibleAccess) {
     const writer = createServiceRoleClient();
@@ -133,7 +143,7 @@ export async function handleGuestPracticeRatingGet(input: {
         .gte("occurred_at", new Date(Date.now() - 60 * 60 * 1000).toISOString()),
       writer
         .from("guest_rating_activity")
-        .select("captcha_failures")
+        .select("captcha_failures, last_captcha_failure_at")
         .eq("guest_id", session.guestId)
         .maybeSingle(),
     ]);
@@ -154,9 +164,12 @@ export async function handleGuestPracticeRatingGet(input: {
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
     votesIn10Min = events.filter((event) => Date.parse(event.occurred_at) >= tenMinAgo).length;
     votesIn60Min = events.length;
-    captchaFailures = Number(
-      (activity.data as { captcha_failures?: number } | null)?.captcha_failures ?? 0,
-    );
+    const activityRow = activity.data as {
+      captcha_failures?: number;
+      last_captcha_failure_at?: string | null;
+    } | null;
+    captchaFailures = Number(activityRow?.captcha_failures ?? 0);
+    captchaFailureAt = activityRow?.last_captcha_failure_at ?? null;
   }
 
   let aggregates: {
@@ -175,6 +188,7 @@ export async function handleGuestPracticeRatingGet(input: {
         votesIn10Min,
         votesIn60Min,
         captchaFailures,
+        captchaFailureAgeMs: guestCaptchaFailureAgeMs(captchaFailureAt, Date.now()),
         newGuestsOnNetwork24h: null,
       })
     : { mode: "none" as const, reason: null };
@@ -219,6 +233,7 @@ export async function handleGuestPracticeRatingPut(input: {
   let votesIn10Min = 0;
   let votesIn60Min = 0;
   let captchaFailures = 0;
+  let captchaFailureAt: string | null = null;
   let newGuests: number | null = null;
 
   if (writer && session && eligibleAccess && input.access && canBecomeRatingEligible(input.access)) {
@@ -243,7 +258,7 @@ export async function handleGuestPracticeRatingPut(input: {
         .gte("occurred_at", new Date(Date.now() - 60 * 60 * 1000).toISOString()),
       writer
         .from("guest_rating_activity")
-        .select("captcha_failures")
+        .select("captcha_failures, last_captcha_failure_at")
         .eq("guest_id", session.guestId)
         .maybeSingle(),
     ]);
@@ -258,9 +273,12 @@ export async function handleGuestPracticeRatingPut(input: {
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
     votesIn10Min = events.filter((event) => Date.parse(event.occurred_at) >= tenMinAgo).length;
     votesIn60Min = events.length;
-    captchaFailures = Number(
-      (activity.data as { captcha_failures?: number } | null)?.captcha_failures ?? 0,
-    );
+    const activityRow = activity.data as {
+      captcha_failures?: number;
+      last_captcha_failure_at?: string | null;
+    } | null;
+    captchaFailures = Number(activityRow?.captcha_failures ?? 0);
+    captchaFailureAt = activityRow?.last_captcha_failure_at ?? null;
 
     if (ipHmac) {
       const { error: networkError } = await writer
@@ -292,11 +310,38 @@ export async function handleGuestPracticeRatingPut(input: {
     votesIn10Min,
     votesIn60Min,
     captchaFailures,
+    captchaFailureAgeMs: guestCaptchaFailureAgeMs(captchaFailureAt, Date.now()),
     newGuestsOnNetwork24h: newGuests,
   });
 
-  let captchaResult = null;
-  if (captcha.mode !== "none" && session && isGuestRatingsCollectEnabled() && secretConfigured) {
+  const hardRateLimited = session
+    ? !checkAnalyticsRateLimit(
+        `guest-rating:${session.guestId}`,
+        GUEST_RATING_HARD_LIMIT,
+        GUEST_RATING_HARD_WINDOW_MS,
+      )
+    : false;
+
+  const writeInput = {
+    collectEnabled: isGuestRatingsCollectEnabled(),
+    sessionPresent: session != null,
+    sessionSecretConfigured: secretConfigured,
+    starsValid: stars != null,
+    eligible: eligible && eligibleAccess,
+    claimed,
+    hardRateLimited,
+    captcha,
+  };
+
+  // Eligibility, the session, and the rate limit are decided before a token
+  // is consumed. An ineligible guest does not burn a one-time token.
+  const preliminary = decideGuestRatingWrite({
+    ...writeInput,
+    captchaResult: null,
+  });
+
+  let captchaResult: CaptchaVerifyResult | null = null;
+  if (!preliminary.ok && preliminary.error === "captcha_required" && session) {
     const token =
       input.body && typeof input.body === "object" && "captchaToken" in input.body
         ? input.body.captchaToken
@@ -318,37 +363,23 @@ export async function handleGuestPracticeRatingPut(input: {
     });
   }
 
-  const hardRateLimited = session
-    ? !checkAnalyticsRateLimit(
-        `guest-rating:${session.guestId}`,
-        GUEST_RATING_HARD_LIMIT,
-        GUEST_RATING_HARD_WINDOW_MS,
-      )
-    : false;
-
-  const decision = decideGuestRatingWrite({
-    collectEnabled: isGuestRatingsCollectEnabled(),
-    sessionPresent: session != null,
-    sessionSecretConfigured: secretConfigured,
-    starsValid: stars != null,
-    eligible: eligible && eligibleAccess,
-    claimed,
-    hardRateLimited,
-    captcha,
-    captchaResult,
-  });
+  const decision =
+    captchaResult == null
+      ? preliminary
+      : decideGuestRatingWrite({
+          ...writeInput,
+          captchaResult,
+        });
 
   if (!decision.ok) {
     if (decision.error === "captcha_invalid" && session) {
       const db = createServiceRoleClient();
-      await db.from("guest_rating_activity").upsert(
-        {
-          guest_id: session.guestId,
-          captcha_failures: captchaFailures + 1,
-          last_captcha_failure_at: new Date().toISOString(),
-        },
-        { onConflict: "guest_id" },
-      );
+      const { error: failureError } = await db.rpc("record_guest_captcha_failure", {
+        p_guest_id: session.guestId,
+      });
+      if (failureError) {
+        console.error("guest_captcha_failure_record_error", failureError.message);
+      }
     }
     return NextResponse.json(
       {
@@ -402,6 +433,15 @@ export async function handleGuestPracticeRatingPut(input: {
   } | null;
   if (!row) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+
+  if (captchaFailures > 0 || decision.verification === "listen_captcha") {
+    const { error: resetError } = await db.rpc("reset_guest_captcha_failures", {
+      p_guest_id: session.guestId,
+    });
+    if (resetError) {
+      console.error("guest_captcha_failure_reset_error", resetError.message);
+    }
   }
 
   let aggregates: {

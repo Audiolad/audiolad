@@ -1,6 +1,9 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-import { isGuestRatingsTestMode } from "@/lib/ratings/guest/feature";
+import {
+  isGuestRatingsProductionEnv,
+  isGuestRatingsTestMode,
+} from "@/lib/ratings/guest/feature";
 
 export const GUEST_RATING_COOKIE_NAME = "al_guest";
 export const GUEST_RATING_COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
@@ -30,10 +33,12 @@ export function resolveGuestRatingSessionSecret(
   if (configured) {
     return configured;
   }
-  if (isGuestRatingsTestMode(env)) {
-    return GUEST_RATING_TEST_SESSION_SECRET;
+  // The constant is not a signing key on the public site. A missing
+  // production secret fails closed: collection stays disabled.
+  if (isGuestRatingsProductionEnv(env) || !isGuestRatingsTestMode(env)) {
+    return null;
   }
-  return null;
+  return GUEST_RATING_TEST_SESSION_SECRET;
 }
 
 export function createGuestRatingId(): string {

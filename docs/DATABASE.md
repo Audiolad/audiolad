@@ -7,9 +7,13 @@ applied by the draft that adds it. It creates `guest_listen_stats`,
 `guest_rating_activity` and `guest_rating_network_guests`. RLS is enabled and
 only `service_role` can use the tables and RPCs. No `auth.users` rows are
 inserted. `practice_ratings` and `set_practice_rating` are not altered.
-`claim_guest_practice_ratings` copies a guest vote once through the existing
-`set_practice_rating` or marks the guest row superseded when the account
-already has a vote. Rows are not deleted. Apply and rollback steps are in
+`claim_guest_practice_ratings` links a guest row to an account.
+`p_copy_to_account` defaults to false, so `practice_ratings` is not written.
+The application passes true only when `GUEST_RATINGS_CLAIM_COPY_ENABLED` is
+on, and only then calls the existing `set_practice_rating` once. An existing
+account vote wins and supersedes the guest row without a rewrite. Rows are
+not deleted. `guest_rating_listen_threshold_ms` is revoked from `PUBLIC`,
+`anon` and `authenticated`. Apply and rollback steps are in
 `docs/ratings/GUEST_RATINGS_ENABLEMENT.md`.
 
 ## Business declared rightsholder (pending owner approval)

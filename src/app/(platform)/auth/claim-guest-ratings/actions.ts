@@ -2,12 +2,13 @@
 
 import { cookies } from "next/headers";
 
+import { shouldClearGuestRatingCookie } from "@/lib/ratings/guest/claim";
 import { claimGuestRatingsForUser } from "@/lib/ratings/guest/claim-server";
 import { GUEST_RATING_COOKIE_NAME } from "@/lib/ratings/guest/session";
 import { createClient } from "@/lib/supabase/server";
 
 export type ClaimGuestRatingsActionResult =
-  | { ok: true; claimed: number; superseded: number }
+  | { ok: true; claimed: number; superseded: number; linked: number }
   | { ok: false; error: string };
 
 function clearGuestCookie(cookieStore: Awaited<ReturnType<typeof cookies>>) {
@@ -47,10 +48,13 @@ export async function claimGuestRatingsAction(): Promise<ClaimGuestRatingsAction
       userId: user.id,
       cookieHeader: header,
     });
-    if (cookieStore.get(GUEST_RATING_COOKIE_NAME)) {
+    if (
+      shouldClearGuestRatingCookie(result) &&
+      cookieStore.get(GUEST_RATING_COOKIE_NAME)
+    ) {
       clearGuestCookie(cookieStore);
     }
-    return { ok: true, claimed: result.claimed, superseded: result.superseded };
+    return { ok: true, ...result };
   } catch {
     return { ok: false, error: "claim_failed" };
   }

@@ -53,10 +53,25 @@ assert.match(migration, /FLOOR\(v_elapsed \* 1\.5\)/);
 assert.match(migration, /high_water_ms/);
 assert.match(migration, /SECURITY DEFINER/);
 assert.match(migration, /SET search_path = public, pg_temp/);
+assert.match(
+  migration,
+  /REVOKE ALL ON FUNCTION public\.guest_rating_listen_threshold_ms\(bigint\) FROM PUBLIC, anon, authenticated/,
+);
+assert.match(migration, /p_copy_to_account boolean DEFAULT false/);
+assert.match(migration, /IF COALESCE\(p_copy_to_account, false\) THEN/);
 assert.match(migration, /PERFORM public\.set_practice_rating/);
+assert.match(migration, /action := 'linked'/);
+assert.match(migration, /captcha_failures = public\.guest_rating_activity\.captcha_failures \+ 1/);
+assert.match(migration, /reset_guest_captcha_failures/);
 assert.match(migration, /superseded_reason = 'account_vote'/);
 assert.match(migration, /superseded_reason = 'claimed_to_account'/);
-assert.match(migration, /action IN \('first', 'changed', 'claimed', 'superseded'\)/);
+assert.match(migration, /action IN \('first', 'changed', 'claimed', 'superseded', 'linked'\)/);
+{
+  const copyAt = migration.indexOf("IF COALESCE(p_copy_to_account, false) THEN");
+  const performAt = migration.indexOf("PERFORM public.set_practice_rating");
+  const linkedAt = migration.indexOf("action := 'linked'");
+  assert.ok(copyAt >= 0 && performAt > copyAt && linkedAt > performAt);
+}
 assert.match(migration, /v_row\.stars = p_stars/);
 assert.doesNotMatch(migration, /CREATE POLICY/);
 assert.doesNotMatch(migration, /INSERT INTO auth\.users/i);

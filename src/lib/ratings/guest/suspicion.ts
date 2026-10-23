@@ -20,6 +20,9 @@ export const GUEST_VOTE_BURST_60_MIN = 10;
  */
 export const GUEST_HOT_NETWORK_NEW_GUESTS = 40;
 
+/** One failed check asks for a visible challenge only inside this window. */
+export const GUEST_CAPTCHA_FAILURE_VISIBLE_MS = 30 * 60 * 1000;
+
 export const GUEST_RATING_HARD_LIMIT = 30;
 export const GUEST_RATING_HARD_WINDOW_MS = 60_000;
 export const GUEST_LISTEN_HARD_LIMIT = 120;
@@ -31,18 +34,47 @@ export const GUEST_LISTEN_HARD_WINDOW_MS = 60_000;
  * challenge only after a failure or a fast series. There is no deny
  * outcome: one IP / CGNAT is not sanctioned.
  */
+export function guestCaptchaFailureAgeMs(
+  lastFailureAt: string | null | undefined,
+  nowMs: number,
+): number | null {
+  if (!lastFailureAt) return null;
+  const parsed = Date.parse(lastFailureAt);
+  if (!Number.isFinite(parsed)) return null;
+  return nowMs - parsed;
+}
+
+/**
+ * A single failure forces the visible challenge only while it is fresh.
+ * A successful vote resets the counter, and an old timestamp decays.
+ */
+export function guestCaptchaFailureForcesVisible(input: {
+  captchaFailures: number;
+  captchaFailureAgeMs: number | null;
+}): boolean {
+  return (
+    input.captchaFailures > 0 &&
+    input.captchaFailureAgeMs != null &&
+    input.captchaFailureAgeMs >= 0 &&
+    input.captchaFailureAgeMs <= GUEST_CAPTCHA_FAILURE_VISIBLE_MS
+  );
+}
+
 export function decideGuestCaptcha(input: {
   cookieAgeMs: number;
   votesIn10Min: number;
   votesIn60Min: number;
   captchaFailures: number;
+  /** Null when there is no failure timestamp. Stale or missing does not stick. */
+  captchaFailureAgeMs: number | null;
   /** Null when the network hash is unknown. Unknown is not suspicious. */
   newGuestsOnNetwork24h: number | null;
 }): GuestCaptchaDecision {
-  if (input.captchaFailures > 0 || input.votesIn10Min >= GUEST_VOTE_VISIBLE_10_MIN) {
+  const failureFresh = guestCaptchaFailureForcesVisible(input);
+  if (failureFresh || input.votesIn10Min >= GUEST_VOTE_VISIBLE_10_MIN) {
     return {
       mode: "visible",
-      reason: input.captchaFailures > 0 ? "captcha_retry" : "vote_series",
+      reason: failureFresh ? "captcha_retry" : "vote_series",
     };
   }
 

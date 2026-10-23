@@ -15,13 +15,18 @@ import {
   resolveDisplayedRatingAggregates,
 } from "../src/lib/ratings/guest/aggregate";
 import { verifyGuestCaptchaToken } from "../src/lib/ratings/guest/captcha";
-import { planGuestRatingClaim, planGuestRatingUpdate } from "../src/lib/ratings/guest/claim";
+import {
+  planGuestRatingClaim,
+  planGuestRatingUpdate,
+  shouldClearGuestRatingCookie,
+} from "../src/lib/ratings/guest/claim";
 import {
   GUEST_RATING_ADMIN_NO_IP_SANCTION,
   formatGuestSessionAdminLabel,
 } from "../src/lib/ratings/guest/copy";
 import {
   guestRatingsCaptchaProvider,
+  isGuestRatingsClaimCopyEnabled,
   isGuestRatingsCollectEnabled,
   isGuestRatingsIncludedInPublicAggregate,
   isGuestRatingsPublicEnabled,
@@ -48,6 +53,7 @@ import {
 } from "../src/lib/ratings/guest/session";
 import { shouldReportGuestRatingListen } from "../src/lib/ratings/guest/surfaces";
 import {
+  GUEST_CAPTCHA_FAILURE_VISIBLE_MS,
   GUEST_HOT_NETWORK_NEW_GUESTS,
   GUEST_LISTEN_HARD_LIMIT,
   GUEST_RATING_HARD_LIMIT,
@@ -90,6 +96,7 @@ function warmedCaptcha() {
     votesIn10Min: 0,
     votesIn60Min: 0,
     captchaFailures: 0,
+    captchaFailureAgeMs: null,
     newGuestsOnNetwork24h: 1,
   });
 }
@@ -99,8 +106,35 @@ function testFlagsDefaultOff() {
   assert.equal(isGuestRatingsCollectEnabled(env), false);
   assert.equal(isGuestRatingsPublicEnabled(env), false);
   assert.equal(isGuestRatingsIncludedInPublicAggregate(env), false);
+  assert.equal(isGuestRatingsClaimCopyEnabled(env), false);
   assert.equal(isGuestRatingsTestMode(env), false);
-  assert.equal(isGuestRatingsCollectEnabled({ GUEST_RATINGS_COLLECT_ENABLED: "1" }), true);
+  assert.equal(
+    isGuestRatingsCollectEnabled({ NODE_ENV: "test", GUEST_RATINGS_COLLECT_ENABLED: "1" }),
+    true,
+  );
+  assert.equal(
+    isGuestRatingsClaimCopyEnabled({ GUEST_RATINGS_CLAIM_COPY_ENABLED: "1" }),
+    true,
+  );
+  assert.equal(
+    isGuestRatingsCollectEnabled({
+      NODE_ENV: "production",
+      GUEST_RATINGS_COLLECT_ENABLED: "1",
+    }),
+    false,
+  );
+  assert.equal(
+    isGuestRatingsCollectEnabled({
+      NODE_ENV: "production",
+      GUEST_RATINGS_COLLECT_ENABLED: "1",
+      GUEST_RATINGS_SESSION_SECRET: "real-secret",
+    }),
+    true,
+  );
+  assert.equal(
+    isGuestRatingsTestMode({ NODE_ENV: "production", GUEST_RATINGS_TEST_MODE: "1" }),
+    false,
+  );
   assert.equal(isGuestRatingsPublicEnabled({ GUEST_RATINGS_PUBLIC_ENABLED: "yes" }), true);
   assert.equal(
     isGuestRatingsIncludedInPublicAggregate({ GUEST_RATINGS_INCLUDE_IN_AGGREGATE: "on" }),
@@ -136,12 +170,27 @@ function testSignedCookie() {
 
   assert.equal(resolveGuestRatingSessionSecret({}), null);
   assert.equal(
-    resolveGuestRatingSessionSecret({ GUEST_RATINGS_TEST_MODE: "1" }),
+    resolveGuestRatingSessionSecret({ NODE_ENV: "test", GUEST_RATINGS_TEST_MODE: "1" }),
     GUEST_RATING_TEST_SESSION_SECRET,
   );
   assert.equal(
     resolveGuestRatingSessionSecret({
+      NODE_ENV: "test",
       GUEST_RATINGS_TEST_MODE: "1",
+      GUEST_RATINGS_SESSION_SECRET: "real",
+    }),
+    "real",
+  );
+  assert.equal(
+    resolveGuestRatingSessionSecret({
+      NODE_ENV: "production",
+      GUEST_RATINGS_TEST_MODE: "1",
+    }),
+    null,
+  );
+  assert.equal(
+    resolveGuestRatingSessionSecret({
+      NODE_ENV: "production",
       GUEST_RATINGS_SESSION_SECRET: "real",
     }),
     "real",
@@ -240,6 +289,7 @@ function testCaptchaAndSuspicion() {
       votesIn10Min: 0,
       votesIn60Min: 0,
       captchaFailures: 0,
+      captchaFailureAgeMs: null,
       newGuestsOnNetwork24h: null,
     }).mode,
     "invisible",
@@ -250,6 +300,7 @@ function testCaptchaAndSuspicion() {
       votesIn10Min: 0,
       votesIn60Min: 0,
       captchaFailures: 0,
+      captchaFailureAgeMs: null,
       newGuestsOnNetwork24h: GUEST_HOT_NETWORK_NEW_GUESTS - 1,
     }).mode,
     "none",
@@ -259,6 +310,7 @@ function testCaptchaAndSuspicion() {
     votesIn10Min: 0,
     votesIn60Min: 0,
     captchaFailures: 0,
+    captchaFailureAgeMs: null,
     newGuestsOnNetwork24h: GUEST_HOT_NETWORK_NEW_GUESTS,
   });
   assert.equal(hot.mode, "invisible");
@@ -270,9 +322,42 @@ function testCaptchaAndSuspicion() {
       votesIn10Min: 8,
       votesIn60Min: 8,
       captchaFailures: 0,
+      captchaFailureAgeMs: null,
       newGuestsOnNetwork24h: 1,
     }).mode,
     "visible",
+  );
+  const retry = decideGuestCaptcha({
+    cookieAgeMs: 60_000,
+    votesIn10Min: 0,
+    votesIn60Min: 0,
+    captchaFailures: 1,
+    captchaFailureAgeMs: 1_000,
+    newGuestsOnNetwork24h: 1,
+  });
+  assert.equal(retry.mode, "visible");
+  assert.equal(retry.reason, "captcha_retry");
+  assert.equal(
+    decideGuestCaptcha({
+      cookieAgeMs: 60_000,
+      votesIn10Min: 0,
+      votesIn60Min: 0,
+      captchaFailures: 1,
+      captchaFailureAgeMs: GUEST_CAPTCHA_FAILURE_VISIBLE_MS + 1,
+      newGuestsOnNetwork24h: 1,
+    }).mode,
+    "none",
+  );
+  assert.equal(
+    decideGuestCaptcha({
+      cookieAgeMs: 60_000,
+      votesIn10Min: 0,
+      votesIn60Min: 0,
+      captchaFailures: 3,
+      captchaFailureAgeMs: null,
+      newGuestsOnNetwork24h: 1,
+    }).mode,
+    "none",
   );
 
   assert.equal(isGuestHardRateLimited(GUEST_RATING_HARD_LIMIT - 1, GUEST_RATING_HARD_LIMIT), false);
@@ -294,7 +379,15 @@ async function testCaptchaTokens() {
   });
   assert.deepEqual(off, { ok: false, reason: "invalid_token" });
 
-  const env = { GUEST_RATINGS_TEST_MODE: "1" };
+  const refused = await verifyGuestCaptchaToken({
+    token: "test:pass",
+    env: { NODE_ENV: "production", GUEST_RATINGS_TEST_MODE: "1" },
+    consumeToken: consume,
+  });
+  assert.deepEqual(refused, { ok: false, reason: "invalid_token" });
+  assert.equal(seen.size, 0);
+
+  const env = { NODE_ENV: "test", GUEST_RATINGS_TEST_MODE: "1" };
   const pass = await verifyGuestCaptchaToken({ token: "test:pass", env, consumeToken: consume });
   assert.equal(pass.ok, true);
   const reused = await verifyGuestCaptchaToken({
@@ -397,6 +490,7 @@ function testPolicy() {
     votesIn10Min: 0,
     votesIn60Min: 0,
     captchaFailures: 0,
+    captchaFailureAgeMs: null,
     newGuestsOnNetwork24h: null,
   });
   const required = decideGuestRatingWrite({ ...base, captcha: invisible });
@@ -421,14 +515,68 @@ function testPolicy() {
 }
 
 function testClaimAggregateAndSegments() {
-  assert.deepEqual(planGuestRatingClaim({ guestStars: 4, accountStars: null }), {
-    action: "copy_to_account",
-    stars: 4,
-  });
-  assert.deepEqual(planGuestRatingClaim({ guestStars: 4, accountStars: 5 }), {
-    action: "supersede_guest",
-    reason: "account_vote",
-  });
+  assert.deepEqual(
+    planGuestRatingClaim({
+      collectEnabled: false,
+      copyEnabled: false,
+      guestStars: 4,
+      accountStars: null,
+    }),
+    { action: "skip", reason: "collect_off" },
+  );
+  assert.deepEqual(
+    planGuestRatingClaim({
+      collectEnabled: false,
+      copyEnabled: true,
+      guestStars: 4,
+      accountStars: null,
+    }),
+    { action: "skip", reason: "collect_off" },
+  );
+  assert.deepEqual(
+    planGuestRatingClaim({
+      collectEnabled: true,
+      copyEnabled: false,
+      guestStars: 4,
+      accountStars: null,
+    }),
+    { action: "link_only" },
+  );
+  assert.deepEqual(
+    planGuestRatingClaim({
+      collectEnabled: true,
+      copyEnabled: false,
+      guestStars: 4,
+      accountStars: 5,
+    }),
+    { action: "supersede_guest", reason: "account_vote" },
+  );
+  assert.deepEqual(
+    planGuestRatingClaim({
+      collectEnabled: true,
+      copyEnabled: true,
+      guestStars: 4,
+      accountStars: null,
+    }),
+    { action: "copy_to_account", stars: 4 },
+  );
+  assert.deepEqual(
+    planGuestRatingClaim({
+      collectEnabled: true,
+      copyEnabled: true,
+      guestStars: 4,
+      accountStars: 5,
+    }),
+    { action: "supersede_guest", reason: "account_vote" },
+  );
+  assert.equal(
+    shouldClearGuestRatingCookie({ claimed: 0, superseded: 0, linked: 0 }),
+    false,
+  );
+  assert.equal(
+    shouldClearGuestRatingCookie({ claimed: 0, superseded: 0, linked: 1 }),
+    true,
+  );
   assert.deepEqual(planGuestRatingUpdate({ previousStars: null, nextStars: 5 }), {
     changed: true,
     event: "first",
@@ -568,8 +716,23 @@ function testSourceContracts() {
   assert.doesNotMatch(migration, /ALTER TABLE public\.practice_ratings/);
   const signup = read("src/app/(platform)/auth/sign-up/actions.ts");
   assert.match(signup, /claimGuestRatingsForUser/);
+  assert.match(signup, /shouldClearGuestRatingCookie/);
   const signin = read("src/app/(platform)/auth/sign-in/page.tsx");
   assert.match(signin, /claimGuestRatingsAction/);
+  const claimAction = read("src/app/(platform)/auth/claim-guest-ratings/actions.ts");
+  assert.match(claimAction, /shouldClearGuestRatingCookie/);
+  const claimServer = read("src/lib/ratings/guest/claim-server.ts");
+  const collectGate = claimServer.indexOf("isGuestRatingsCollectEnabled");
+  const claimRpc = claimServer.indexOf("claim_guest_practice_ratings");
+  assert.ok(collectGate >= 0 && claimRpc > collectGate);
+  assert.match(claimServer, /p_copy_to_account: isGuestRatingsClaimCopyEnabled/);
+  const ratingServer = read("src/lib/ratings/guest/rating-server.ts");
+  const captchaGate = ratingServer.indexOf('preliminary.error === "captcha_required"');
+  const captchaVerify = ratingServer.indexOf("await verifyGuestCaptchaToken");
+  assert.ok(captchaGate >= 0 && captchaVerify > captchaGate);
+  assert.doesNotMatch(ratingServer, /captcha_failures \+ 1/);
+  assert.match(ratingServer, /record_guest_captcha_failure/);
+  assert.match(ratingServer, /reset_guest_captcha_failures/);
 }
 
 async function main() {

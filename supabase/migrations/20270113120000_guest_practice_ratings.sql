@@ -4,7 +4,10 @@ BEGIN;
 -- Does not alter practice_ratings, practice_rating_events, practice_listen_stats,
 -- set_practice_rating, or registered eligibility. No auth.users rows are created.
 -- Guest votes stay out of the public aggregate until an explicit owner flag
--- in the application. Claim copies a vote at most once and never deletes rows.
+-- in the application. Copying a guest vote into practice_ratings happens
+-- only when claim is called with p_copy_to_account true. The default is
+-- false: the guest row is linked to the account and practice_ratings is
+-- unchanged. Nothing is deleted.
 
 CREATE OR REPLACE FUNCTION public.guest_rating_listen_threshold_ms(
   p_accessible_ms bigint
@@ -33,7 +36,7 @@ $$;
 COMMENT ON FUNCTION public.guest_rating_listen_threshold_ms(bigint) IS
   'Guest listen threshold. 30000ms, or 80% of a shorter accessible fragment (the whole fragment when it is 5s or less). Never above the fragment length.';
 
-REVOKE ALL ON FUNCTION public.guest_rating_listen_threshold_ms(bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.guest_rating_listen_threshold_ms(bigint) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.guest_rating_listen_threshold_ms(bigint) TO service_role;
 
 CREATE TABLE IF NOT EXISTS public.guest_listen_stats (
@@ -100,7 +103,7 @@ CREATE INDEX IF NOT EXISTS guest_practice_ratings_practice_active_idx
   WHERE excluded_at IS NULL AND superseded_at IS NULL AND claimed_by_user_id IS NULL;
 
 COMMENT ON TABLE public.guest_practice_ratings IS
-  'One current guest vote per guest_id×practice. Edits update this row and append an event. Claim sets superseded_at and does not delete the row. Not part of the registered public aggregate unless the application include-flag is on.';
+  'One current guest vote per guest_id×practice. Edits update this row and append an event. A copy-claim sets superseded_at. A link-only claim sets claimed_by_user_id and leaves superseded_at null. Rows are not deleted. Not part of the registered public aggregate unless the application include-flag is on and the row is still unclaimed.';
 
 CREATE TABLE IF NOT EXISTS public.guest_practice_rating_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -111,7 +114,7 @@ CREATE TABLE IF NOT EXISTS public.guest_practice_rating_events (
   action text NOT NULL,
   occurred_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT guest_practice_rating_events_action_check
-    CHECK (action IN ('first', 'changed', 'claimed', 'superseded')),
+    CHECK (action IN ('first', 'changed', 'claimed', 'superseded', 'linked')),
   CONSTRAINT guest_practice_rating_events_old_stars_check
     CHECK (old_stars IS NULL OR (old_stars >= 1 AND old_stars <= 5)),
   CONSTRAINT guest_practice_rating_events_new_stars_check
@@ -508,7 +511,8 @@ GRANT EXECUTE ON FUNCTION public.set_guest_practice_rating(
 CREATE OR REPLACE FUNCTION public.claim_guest_practice_ratings(
   p_guest_id uuid,
   p_user_id uuid,
-  p_now timestamptz DEFAULT now()
+  p_now timestamptz DEFAULT now(),
+  p_copy_to_account boolean DEFAULT false
 )
 RETURNS TABLE (
   practice_id uuid,
@@ -532,6 +536,7 @@ BEGIN
     FROM public.guest_practice_ratings
     WHERE guest_id = p_guest_id
       AND superseded_at IS NULL
+      AND claimed_by_user_id IS NULL
     ORDER BY created_at
     FOR UPDATE
   LOOP
@@ -559,7 +564,7 @@ BEGIN
       practice_id := v_guest.practice_id;
       action := 'superseded';
       RETURN NEXT;
-    ELSE
+    ELSIF COALESCE(p_copy_to_account, false) THEN
       PERFORM public.set_practice_rating(
         p_user_id,
         v_guest.practice_id,
@@ -587,17 +592,101 @@ BEGIN
       practice_id := v_guest.practice_id;
       action := 'claimed';
       RETURN NEXT;
+    ELSE
+      UPDATE public.guest_practice_ratings
+      SET
+        claimed_by_user_id = p_user_id,
+        claimed_at = v_now
+      WHERE id = v_guest.id;
+
+      INSERT INTO public.guest_practice_rating_events (
+        guest_id, practice_id, old_stars, new_stars, action, occurred_at
+      ) VALUES (
+        p_guest_id, v_guest.practice_id, v_guest.stars, v_guest.stars,
+        'linked', v_now
+      );
+
+      practice_id := v_guest.practice_id;
+      action := 'linked';
+      RETURN NEXT;
     END IF;
   END LOOP;
 END;
 $$;
 
-COMMENT ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz) IS
-  'Binds guest votes to an account without a second public vote. Existing account stars win and the guest row is superseded. Otherwise set_practice_rating copies the stars once and the guest row is superseded. Nothing is deleted.';
+COMMENT ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz, boolean) IS
+  'Binds guest votes to an account. Existing account stars win and the guest row is superseded without rewriting practice_ratings. When p_copy_to_account is true and the account has no vote, set_practice_rating copies the stars once and the guest row is superseded. Otherwise the guest row is only linked and practice_ratings is not written. Already linked rows are left as they are. Nothing is deleted.';
 
-REVOKE ALL ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz)
+REVOKE ALL ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz, boolean)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz)
+GRANT EXECUTE ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz, boolean)
+  TO service_role;
+
+CREATE OR REPLACE FUNCTION public.record_guest_captcha_failure(
+  p_guest_id uuid,
+  p_now timestamptz DEFAULT now()
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_failures integer;
+BEGIN
+  IF p_guest_id IS NULL THEN
+    RAISE EXCEPTION 'guest_captcha_failure_invalid_args';
+  END IF;
+
+  INSERT INTO public.guest_rating_activity (
+    guest_id, captcha_failures, last_captcha_failure_at
+  ) VALUES (
+    p_guest_id, 1, COALESCE(p_now, now())
+  )
+  ON CONFLICT (guest_id) DO UPDATE
+  SET captcha_failures = public.guest_rating_activity.captcha_failures + 1,
+      last_captcha_failure_at = EXCLUDED.last_captcha_failure_at
+  RETURNING captcha_failures INTO v_failures;
+
+  RETURN v_failures;
+END;
+$$;
+
+COMMENT ON FUNCTION public.record_guest_captcha_failure(uuid, timestamptz) IS
+  'Atomically increments captcha_failures for one guest session and stores the failure time.';
+
+REVOKE ALL ON FUNCTION public.record_guest_captcha_failure(uuid, timestamptz)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_guest_captcha_failure(uuid, timestamptz)
+  TO service_role;
+
+CREATE OR REPLACE FUNCTION public.reset_guest_captcha_failures(
+  p_guest_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF p_guest_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.guest_rating_activity
+  SET
+    captcha_failures = 0,
+    last_captcha_failure_at = NULL
+  WHERE guest_id = p_guest_id;
+END;
+$$;
+
+COMMENT ON FUNCTION public.reset_guest_captcha_failures(uuid) IS
+  'Clears a guest captcha failure streak after a successful vote.';
+
+REVOKE ALL ON FUNCTION public.reset_guest_captcha_failures(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reset_guest_captcha_failures(uuid)
   TO service_role;
 
 CREATE OR REPLACE FUNCTION public.admin_ratings_guest_listeners(

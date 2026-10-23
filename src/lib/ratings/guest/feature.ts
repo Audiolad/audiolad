@@ -6,11 +6,32 @@ function enabled(value: string | undefined): boolean {
 }
 
 /**
+ * Production is refused for test secrets and test captcha tokens.
+ * An explicit NODE_ENV on the passed env wins, so tests can simulate
+ * production without changing the process. A missing NODE_ENV follows
+ * the process, which is production on the public site.
+ */
+export function isGuestRatingsProductionEnv(env: EnvLike = process.env): boolean {
+  if (env.NODE_ENV === "production") return true;
+  if (env.NODE_ENV == null && process.env.NODE_ENV === "production") return true;
+  return false;
+}
+
+/**
  * Collect guest votes into guest_practice_ratings.
  * Default off. Does not change the public aggregate.
  */
 export function isGuestRatingsCollectEnabled(env: EnvLike = process.env): boolean {
-  return enabled(env.GUEST_RATINGS_COLLECT_ENABLED);
+  if (!enabled(env.GUEST_RATINGS_COLLECT_ENABLED)) return false;
+  // Production without a session secret cannot sign a guest cookie.
+  // Treat collection as off so login and voting have no guest effect.
+  if (
+    isGuestRatingsProductionEnv(env) &&
+    !env.GUEST_RATINGS_SESSION_SECRET?.trim()
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -34,11 +55,21 @@ export function isGuestRatingsIncludedInPublicAggregate(
 }
 
 /**
+ * Copy a linked guest vote into practice_ratings on registration.
+ * Default off. Does nothing unless collection is also on. Without this
+ * flag a claim only records the account on the guest row.
+ */
+export function isGuestRatingsClaimCopyEnabled(env: EnvLike = process.env): boolean {
+  return enabled(env.GUEST_RATINGS_CLAIM_COPY_ENABLED);
+}
+
+/**
  * Explicit test mode. Allows a non-production session secret and the
  * `test:` captcha tokens. Must stay off on the public site.
  * The feature can be exercised with this flag and without provider keys.
  */
 export function isGuestRatingsTestMode(env: EnvLike = process.env): boolean {
+  if (isGuestRatingsProductionEnv(env)) return false;
   return enabled(env.GUEST_RATINGS_TEST_MODE);
 }
 

@@ -2,14 +2,27 @@ import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
+  isGuestRatingsClaimCopyEnabled,
+  isGuestRatingsCollectEnabled,
+} from "@/lib/ratings/guest/feature";
+import {
   readGuestRatingCookieValue,
   resolveGuestRatingSessionSecret,
   verifyGuestRatingSession,
 } from "@/lib/ratings/guest/session";
 
+type EnvLike = { [key: string]: string | undefined };
+
 export type GuestRatingClaimResult = {
   claimed: number;
   superseded: number;
+  linked: number;
+};
+
+const EMPTY_CLAIM: GuestRatingClaimResult = {
+  claimed: 0,
+  superseded: 0,
+  linked: 0,
 };
 
 /**
@@ -20,10 +33,18 @@ export type GuestRatingClaimResult = {
 export async function claimGuestRatingsForUser(input: {
   userId: string;
   cookieHeader: string | null;
+  env?: EnvLike;
 }): Promise<GuestRatingClaimResult> {
-  const secret = resolveGuestRatingSessionSecret();
+  const env = input.env ?? process.env;
+  // Flags off: do not read or write ratings. The guest cookie stays so a
+  // later explicit enable can still link it.
+  if (!isGuestRatingsCollectEnabled(env)) {
+    return EMPTY_CLAIM;
+  }
+
+  const secret = resolveGuestRatingSessionSecret(env);
   if (!secret) {
-    return { claimed: 0, superseded: 0 };
+    return EMPTY_CLAIM;
   }
 
   const session = verifyGuestRatingSession(
@@ -32,13 +53,14 @@ export async function claimGuestRatingsForUser(input: {
     Date.now(),
   );
   if (!session) {
-    return { claimed: 0, superseded: 0 };
+    return EMPTY_CLAIM;
   }
 
   const writer = createServiceRoleClient();
   const { data, error } = await writer.rpc("claim_guest_practice_ratings", {
     p_guest_id: session.guestId,
     p_user_id: input.userId,
+    p_copy_to_account: isGuestRatingsClaimCopyEnabled(env),
   });
 
   if (error) {
@@ -49,5 +71,6 @@ export async function claimGuestRatingsForUser(input: {
   return {
     claimed: rows.filter((row) => row.action === "claimed").length,
     superseded: rows.filter((row) => row.action === "superseded").length,
+    linked: rows.filter((row) => row.action === "linked").length,
   };
 }

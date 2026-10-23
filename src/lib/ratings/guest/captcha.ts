@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   guestRatingsCaptchaProvider,
+  isGuestRatingsProductionEnv,
   isGuestRatingsTestMode,
   type GuestCaptchaProvider,
 } from "@/lib/ratings/guest/feature";
@@ -118,7 +119,7 @@ export async function verifyGuestCaptchaToken(input: {
 
   const testMode = isGuestRatingsTestMode(env);
   if (token.startsWith("test:")) {
-    if (!testMode) {
+    if (isGuestRatingsProductionEnv(env) || !testMode) {
       return { ok: false, reason: "invalid_token" };
     }
     if (token === "test:outage") {

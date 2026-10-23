@@ -20,6 +20,7 @@ import {
   type OnNewListenerCreatedResult,
 } from "@/lib/email/on-new-listener-created";
 import { claimPartnerAttribution } from "@/lib/author-partner/attribution";
+import { shouldClearGuestRatingCookie } from "@/lib/ratings/guest/claim";
 import { claimGuestRatingsForUser } from "@/lib/ratings/guest/claim-server";
 import { GUEST_RATING_COOKIE_NAME } from "@/lib/ratings/guest/session";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
@@ -280,11 +281,14 @@ export async function signUpAction(
         .getAll()
         .map((cookie) => `${cookie.name}=${cookie.value}`)
         .join("; ");
-      await claimGuestRatingsForUser({
+      const guestClaim = await claimGuestRatingsForUser({
         userId: data.user.id,
         cookieHeader: header,
       });
-      if (cookieStore.get(GUEST_RATING_COOKIE_NAME)) {
+      if (
+        shouldClearGuestRatingCookie(guestClaim) &&
+        cookieStore.get(GUEST_RATING_COOKIE_NAME)
+      ) {
         cookieStore.set({
           name: GUEST_RATING_COOKIE_NAME,
           value: "",
