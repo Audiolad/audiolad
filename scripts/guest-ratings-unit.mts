@@ -28,6 +28,7 @@ import {
   formatGuestSessionAdminLabel,
   formatGuestRatingNotEligibleCopy,
   formatRussianSecondsAccusative,
+  GUEST_RATING_HINT_LISTEN_SECONDS,
   GUEST_RATING_NOT_ELIGIBLE_COPY,
 } from "../src/lib/ratings/guest/copy";
 import {
@@ -879,8 +880,10 @@ async function testClaimServerTouchesNoDbWhenOff() {
 function testNotEligibleCopy() {
   assert.equal(
     GUEST_RATING_NOT_ELIGIBLE_COPY,
-    `Послушайте минимум ${formatRussianSecondsAccusative(RATING_ELIGIBILITY_LISTEN_MS / 1000)}, чтобы оставить свой отклик.`,
+    "Послушайте минимум 40 секунд, чтобы оставить свой отклик.",
   );
+  assert.equal(GUEST_RATING_HINT_LISTEN_SECONDS, 40);
+  assert.equal(RATING_ELIGIBILITY_LISTEN_MS, 30_000);
   assert.equal(formatGuestRatingNotEligibleCopy(40_000), "Послушайте минимум 40 секунд, чтобы оставить свой отклик.");
   assert.equal(formatGuestRatingNotEligibleCopy(30_000), "Послушайте минимум 30 секунд, чтобы оставить свой отклик.");
   const cases: Array<[number, string]> = [
