@@ -5,6 +5,7 @@ import { fetchAllPages } from "@/lib/supabase/fetch-all-pages";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { loadPublishedSeoOccupancyForQueries } from "./load-published-seo-occupancy";
+import { selectAuthorSeoOpportunities } from "./opportunity-list.mjs";
 import { lifecycleForSeoOpportunity } from "./published-query-occupancy";
 import { isEffectiveSeoReservation } from "./reservation-effective";
 import type { SeoQueryOpportunity, SeoWorkspaceReservation } from "./types";
@@ -169,15 +170,20 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
     })),
   );
 
-  return (queries ?? []).map((row) => {
+  // These are transport pages, not listing pagination. Resolve ownership and
+  // publication over the complete source before exposing rows to filters/counts.
+  const opportunities = (queries ?? []).flatMap((row): SeoQueryOpportunity[] => {
     const reservation = reservationByQuery.get(row.id as string);
+    if (reservation && reservation.author_id !== authorId) return [];
     const product = reservation?.product_id
       ? productById.get(reservation.product_id)
       : undefined;
     const publishedOccupancy = occupancyByQueryId.get(row.id as string) ?? null;
+    const lifecycle = lifecycleForSeoOpportunity({ reservation, product, publishedOccupancy });
+    if (lifecycle === "published") return [];
     const cluster = Array.isArray(row.seo_clusters) ? row.seo_clusters[0] : row.seo_clusters;
 
-    return {
+    return [{
       id: row.id as string,
       queryText: row.query_text as string,
       source: row.source as string,
@@ -187,11 +193,7 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
       recommendedFormat:
         typeof row.recommended_format === "string" ? row.recommended_format : null,
       audioFit: typeof row.audio_fit === "string" ? row.audio_fit : null,
-      lifecycle: lifecycleForSeoOpportunity({
-        reservation,
-        product,
-        publishedOccupancy,
-      }),
+      lifecycle,
       reservationId: reservation?.author_id === authorId ? reservation.id : null,
       expiresAt: reservation?.author_id === authorId ? reservation.expires_at : null,
       productId: reservation?.author_id === authorId ? reservation.product_id : null,
@@ -199,6 +201,7 @@ export async function listSeoOpportunitiesForAuthor(authorId: string): Promise<S
         reservation?.author_id === authorId && typeof product?.title === "string"
           ? product.title
           : null,
-    };
+    }];
   });
+  return selectAuthorSeoOpportunities(opportunities);
 }
