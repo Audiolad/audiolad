@@ -25,7 +25,7 @@ GoTrue allow-list URLs stay exact, without a query string. Sign-up does not set 
 
 ## Migration
 
-`supabase/migrations/20270115120000_access_grants_and_workspace.sql`
+`supabase/migrations/20270120120000_access_grants_and_workspace.sql`
 
 Prepared, not applied. Validation: `npm run test:business-workspace-trial`.
 

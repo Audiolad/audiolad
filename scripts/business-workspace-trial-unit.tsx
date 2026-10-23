@@ -624,7 +624,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(read("src/app/api/business/workspace/state/route.ts"), /export async function GET/);
 }
 
-const migration = read("supabase/migrations/20270115120000_access_grants_and_workspace.sql");
+const migration = read("supabase/migrations/20270120120000_access_grants_and_workspace.sql");
 const migrationSql = migration.replace(/--[^\n]*/g, "");
 assert.doesNotMatch(migrationSql, /\b(DELETE|TRUNCATE|DROP)\b/i);
 assert.match(migrationSql, /CREATE TABLE IF NOT EXISTS public\.access_grants/);
