@@ -20,8 +20,8 @@ const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 const articles = listArticleDefinitions();
 const slugs = listArticleSlugs();
-assert.equal(articles.length, 108);
-assert.equal(slugs.length, 108);
+assert.equal(articles.length, 109);
+assert.equal(slugs.length, 109);
 assert.ok(slugs.includes("meditatsii-dlya-klientov-psikhologa"));
 
 const view = read("src/components/articles/ArticlePageView.tsx");
@@ -90,7 +90,7 @@ for (const article of [practice, creator]) {
 }
 
 const sitemap = mapArticleDefinitionsToSitemapEntries();
-assert.equal(sitemap.length, 108);
+assert.equal(sitemap.length, 109);
 const sample = sitemap.find((entry) => String(entry.url).includes(practice.slug));
 assert.ok(sample?.lastModified, "sitemap lastModified kept from updatedAt/publishedAt");
 
