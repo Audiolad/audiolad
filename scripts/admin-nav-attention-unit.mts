@@ -13,6 +13,7 @@ const expected = [
   ["/admin/payout-profiles", "authors.payout_profiles.review", "author_payout_profiles", "status", ["submitted", "in_review"]],
   ["/admin/business-verification", "author_products.moderate", "business_rightsholder_verifications", "status", ["submitted"]],
   ["/classica/production", "classica.production.moderate", "classica_production_jobs", "status", ["in_review"]],
+  ["/admin/seo-queries", "seo.manage", "seo_queries", "analysis_status", ["not_analyzed"]],
 ];
 assert.deepEqual(ADMIN_NAV_ATTENTION_QUEUES.map((q) => [q.href, q.permission, q.table, q.column, [...q.statuses]]), expected);
 const counts = Object.fromEntries(ADMIN_NAV_ATTENTION_QUEUES.map((q) => [q.href, 150]));

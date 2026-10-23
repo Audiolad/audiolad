@@ -1,4 +1,7 @@
 import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
+import AiCompanySeoUncheckedSignal from "@/components/admin/AiCompanySeoUncheckedSignal";
+import { canCountAdminQueue } from "@/lib/admin/nav-attention";
+import { getCachedAdminNavAttentionCounts } from "@/lib/admin/nav-attention-cache";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { isAiCompanyOwner, requireAiCompanyView } from "@/lib/admin/guard";
 import {
@@ -64,6 +67,9 @@ export default async function AiCompanyPage({
 }) {
   // Owner/admin with ai_company.view, or the read-only ai_company_viewer role.
   const session = await requireAiCompanyView();
+  const seoUncheckedCount = canCountAdminQueue(session.access, "seo.manage")
+    ? (await getCachedAdminNavAttentionCounts(session.access))["/admin/seo-queries"]
+    : null;
   const params = await searchParams;
   const filters = parseHistoryFilters({
     period: params.period,
@@ -81,6 +87,7 @@ export default async function AiCompanyPage({
   return (
     <>
       <AiCompanyLiveRefresh />
+      <AiCompanySeoUncheckedSignal count={seoUncheckedCount} />
       <AiCompanyDashboard
         model={model}
         filters={filters}
