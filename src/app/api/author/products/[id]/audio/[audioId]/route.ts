@@ -20,6 +20,7 @@ import {
   saleLockConflictResponse,
 } from "@/lib/author-products/sale-lock";
 import { normalizeClearableTextField } from "@/lib/author-products/text-fields";
+import { createPracticeCoverStorageClient } from "@/lib/author-products/cover-storage";
 import { removeTrackCoverFiles } from "@/lib/author-products/utils";
 import {
   AUDIO_PREPARING_CODE,
@@ -263,7 +264,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
       }
     }
 
-    await removeTrackCoverFiles(supabase, id, audioId);
+    // Cover objects are server-only in Storage; audioItem was verified above.
+    await removeTrackCoverFiles(createPracticeCoverStorageClient(), id, audioId);
 
     const { data: remaining, error: remainingError } = await supabase
       .from("audio_items")

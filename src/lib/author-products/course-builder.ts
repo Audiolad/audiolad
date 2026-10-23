@@ -44,6 +44,7 @@ import {
   PRODUCT_AUDIO_LOCKED_AFTER_SALE_MESSAGE,
   assertPracticeContentMutable,
 } from "@/lib/author-products/sale-lock";
+import { createPracticeCoverStorageClient } from "@/lib/author-products/cover-storage";
 import { removeTrackCoverFiles } from "@/lib/author-products/utils";
 import {
   PUBLICATION_FILES_BUCKET,
@@ -1100,7 +1101,12 @@ async function deleteUnreferencedAudioItem(
     await supabase.storage.from("practice-audio").remove([data.audio_path]);
   }
 
-  await removeTrackCoverFiles(supabase, publicationId, audioId);
+  // Cover objects are server-only in Storage; the row was verified above.
+  await removeTrackCoverFiles(
+    createPracticeCoverStorageClient(),
+    publicationId,
+    audioId,
+  );
   await supabase
     .from("audio_items")
     .delete()
