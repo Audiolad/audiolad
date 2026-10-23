@@ -40,7 +40,7 @@ export function classifySeoQuery({ queryText }: { queryText: string }): SeoQuery
   if (has(text, /(сейчас|сегодня|завтра|погода|курс валют|новости|онлайн трансляция)/)) {
     return { intent: "realtime", recommendedFormat: null, audioFit: "none", recommendedDisposition: "not_applicable", confidence: "high", reasons: ["Запрос зависит от текущих данных."] };
   }
-  if (has(text, /(музыка|джаз|классическ\w* музыка|фонов\w* музыка)/)) {
+  if (has(text, /(музыка|джаз|классическ\w* музыка|фонов\w* музыка|лоу[ -]?фай|lo[ -]?fi|лофи)/)) {
     return { intent: "music", recommendedFormat: "Музыка", audioFit: "high", recommendedDisposition: "analyzed", confidence: "high", reasons: ["Есть явный музыкальный сигнал."] };
   }
   if (has(text, /молитв\w*/)) {
@@ -48,6 +48,9 @@ export function classifySeoQuery({ queryText }: { queryText: string }): SeoQuery
   }
   if (has(text, /(аудиокниг\w*|слушать книг\w*)/)) {
     return { intent: "specific_content", recommendedFormat: "Аудиокнига", audioFit: "high", recommendedDisposition: "analyzed", confidence: "high", reasons: ["Запрос явно относится к аудиокниге."] };
+  }
+  if (has(text, /аффирмац\w*/)) {
+    return { intent: "practice", recommendedFormat: "Свой формат", audioFit: "high", recommendedDisposition: "analyzed", confidence: "high", reasons: ["Есть явный сигнал аффирмации."] };
   }
   if (has(text, /энергопрактик\w*/)) {
     return { intent: "practice", recommendedFormat: "Энергопрактика", audioFit: "high", recommendedDisposition: "analyzed", confidence: "high", reasons: ["Есть явный сигнал энергопрактики."] };
