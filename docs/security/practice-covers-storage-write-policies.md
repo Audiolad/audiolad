@@ -49,8 +49,8 @@ with both the old and the new policies (service_role bypasses RLS). The
 standard deploy (`deploy.sh`) applies pending migrations first and only then
 switches traffic to the new app code. So for a short window between the
 migration and the switch-over the old code is still live and its cover routes
-(user-scoped client) cannot upload product/track covers; gallery uploads keep
-working. The window ends when the new release is live; no extra step is needed.
+(user-scoped client) cannot upload product/track covers. The window ends when
+the new release is live; no extra step is needed.
 
 ## Verification after deploy (read-only)
 
