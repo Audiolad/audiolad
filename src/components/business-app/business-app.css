@@ -21,6 +21,13 @@
   flex-shrink: 0;
 }
 
+.business-app-brand-mark img {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+}
+
 .business-app-root code {
   border-radius: 6px;
   background: var(--biz-surface-soft);

@@ -206,14 +206,24 @@ export default function BusinessSidebar() {
         }`}
       >
         {cabinet ? (
-          // eslint-disable-next-line @next/next/no-img-element -- same 2 KB vector as the favicon
-          <img
-            src="/business/brand/favicon.svg"
-            alt={collapsed ? "АудиоЛад Бизнес" : ""}
-            width={40}
-            height={40}
-            className="business-app-brand-mark"
-          />
+          <picture className="business-app-brand-mark">
+            <source
+              type="image/avif"
+              srcSet="/business/brand/mark-64.avif 64w, /business/brand/mark-128.avif 128w"
+              sizes="40px"
+            />
+            <source
+              type="image/webp"
+              srcSet="/business/brand/mark-64.webp 64w, /business/brand/mark-128.webp 128w"
+              sizes="40px"
+            />
+            <img
+              src="/business/brand/mark-64.png"
+              alt={collapsed ? "АудиоЛад Бизнес" : ""}
+              width={40}
+              height={40}
+            />
+          </picture>
         ) : null}
         {!collapsed ? (
           <div className="min-w-0 flex-1">

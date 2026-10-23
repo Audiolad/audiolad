@@ -103,6 +103,10 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   assert.equal((g.match(/data-locked="true"/g) ?? []).length, 10, "7 locked in the sidebar + 3 in the bottom nav");
   has(g, /доступно после подключения/);
   has(g, /aria-label="Точки – доступно после подключения"/);
+  has(g, /data-biz-chrome="guest-player"/, "guest coffee stays off the cabinet chrome");
+  hasNot(g, /business-app-brand-mark/, "guest coffee keeps the wordmark, not the leather crop");
+  has(shell(anonymous, "/"), /data-biz-chrome="cabinet"/, "cabinet home");
+  has(shell(anonymous, "/"), /business-app-brand-mark/, "cabinet home shows the leather crop");
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
   has(g, /В гостевом режиме доступно 30 минут прослушивания/);
   has(g, /Первые 7 дней – в подарок, затем 799\u00a0₽ в месяц/);
