@@ -563,7 +563,7 @@ export default function BusinessLandingView({
                     <span className="business-point__now">{point.now}</span>
                   </span>
                   <span className="business-point__status">
-                    {point.status === "playing" ? "Музыка играет" : "Offline"}
+                    {point.status === "playing" ? "Музыка играет" : "Нет связи"}
                   </span>
                 </li>
               ))}

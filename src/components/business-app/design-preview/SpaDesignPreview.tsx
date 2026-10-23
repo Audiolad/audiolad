@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import styles from "./design-preview.module.css";
 
@@ -22,17 +24,17 @@ type Screen = (typeof screens)[number][0];
 type Tab = "home" | "music" | "locations" | "more";
 const tabOf = (s: Screen): Tab => (s === "license" || s === "alerts" || s === "company" || s === "support" ? "more" : s);
 
-const POINT = "SPA «Тихий сад»";
-const PLAYER = "Ресепшн";
+const POINT = "Спа «Тихий сад»";
+const PLAYER = "Стойка администратора";
 
 // Two distinct signals: connectivity (player heartbeat) and sound confirmation.
 // Only a confirmed playback failure is red. A long track never turns anything red.
 const states = {
   playing: { label: "Играет", tone: "ok", icon: "♪", title: `В ${POINT} музыка играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["ok", "Воспроизведение подтверждено"], action: null },
-  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["calm", "Воспроизведение на паузе"], action: "Продолжить можно в плеере точки на ресепшн." },
+  paused: { label: "Пауза", tone: "calm", icon: "Ⅱ", title: `В ${POINT} музыка на паузе`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["calm", "Воспроизведение на паузе"], action: "Продолжить можно в плеере точки у администратора." },
   offline: { label: "Нет связи более 5 минут", tone: "closed", icon: "!", title: `${POINT}: нет связи с плеером`, checked: "Последняя связь 6 минут назад", link: ["closed", "Нет связи с плеером"], sound: ["closed", "Нет свежего подтверждения звука"], action: "Музыка на точке может продолжать играть." },
   closed: { label: "Точка закрыта", tone: "closed", icon: "☾", title: `${POINT} сейчас закрыт`, checked: "Последняя связь вчера в 21:05 · откроется в 08:30", link: ["closed", "Точка закрыта"], sound: ["closed", "Воспроизведение не подтверждено"], action: null },
-  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["bad", "Сбой воспроизведения подтверждён"], action: "Откройте плеер точки на ресепшн или напишите в поддержку." },
+  failed: { label: "Сбой воспроизведения", tone: "bad", icon: "×", title: `В ${POINT} музыка не играет`, checked: "Проверено минуту назад", link: ["ok", "Плеер на связи"], sound: ["bad", "Сбой воспроизведения подтверждён"], action: "Проверьте плеер точки или напишите в поддержку." },
 } as const;
 type PreviewState = keyof typeof states;
 
@@ -44,15 +46,15 @@ const history = [
 ] as const;
 const dayArc = [
   ["08:30", "Открытие дня", "Мягко и светло", "past"],
-  ["10:00", "Утро в SPA", "Спокойно", "now"],
+  ["10:00", "Утро в спа", "Спокойно", "now"],
   ["13:00", "Дневное спокойствие", "Ровно, чуть живее", "next"],
   ["18:00", "Вечер", "Глубже и тише", "later"],
   ["21:00", "Закрытие", "Тихое завершение", "later"],
 ] as const;
 const venues = [
-  ["SPA «Тихий сад» · Тверская", "Музыка играет", "ok"],
-  ["SPA «Тихий сад» · Арбат", "Музыка играет", "ok"],
-  ["SPA «Тихий сад» · Химки", "Точка закрыта", "closed"],
+  ["Спа «Тихий сад» · Тверская", "Музыка играет", "ok"],
+  ["Спа «Тихий сад» · Арбат", "Музыка играет", "ok"],
+  ["Спа «Тихий сад» · Химки", "Точка закрыта", "closed"],
 ] as const;
 
 const AUTO_ENERGY = 25;
@@ -97,7 +99,7 @@ export default function SpaDesignPreview() {
           <li><span className={`${styles.dot} ${styles[status.link[0]]}`} aria-hidden="true" />{status.link[1]}</li>
           <li><span className={`${styles.dot} ${styles[status.sound[0]]}`} aria-hidden="true" />{status.sound[1]}</li>
         </ul>
-        {status.action && <p className={styles.action}>{status.action}</p>}
+        {status.action && <p className={styles.action}>{status.action} <Link href="/player">Открыть плеер</Link> · <Link href="/help">Поддержка</Link></p>}
       </div>
     </section>
   );
@@ -128,7 +130,7 @@ export default function SpaDesignPreview() {
         <span className={`${styles.dot} ${styles[state === "playing" ? "ok" : state === "paused" ? "calm" : "closed"]}`} aria-hidden="true" />
         {state === "playing" ? `Играет на плеере точки · ${PLAYER}` : state === "paused" ? `На паузе на плеере точки · ${PLAYER}` : `Плеер точки · ${PLAYER}`}
       </p>
-      <button type="button" className={styles.primaryWide}>Управление музыкой ↗</button>
+      <button type="button" className={styles.primaryWide}>Управление музыкой</button>
       <p className={styles.note}>Откроется отдельный плеер точки – его использует персонал.</p>
     </section>
   );
@@ -167,7 +169,7 @@ export default function SpaDesignPreview() {
     <section className={styles.card} aria-labelledby="next">
       <h3 id="next">Музыкальный день</h3>
       <div className={styles.nextRow}>
-        <div><strong>Утро в SPA</strong><p className={styles.muted}>Следом: «Дневное спокойствие»</p></div>
+        <div><strong>Утро в спа</strong><p className={styles.muted}>Следом: «Дневное спокойствие»</p></div>
         <span className={styles.timePill}>13:00</span>
       </div>
     </section>
@@ -213,13 +215,13 @@ export default function SpaDesignPreview() {
       <h3 id="lic">Лицензия и документы</h3>
       <p>Музыка точки лицензирована · пример</p>
       <dl className={styles.facts}>
-        <div><dt>Точка</dt><dd>SPA «Тихий сад» · Тверская</dd></div>
+        <div><dt>Точка</dt><dd>Спа «Тихий сад» · Тверская</dd></div>
         <div><dt>Период</dt><dd>01.10.2026 – 30.09.2027</dd></div>
         <div><dt>Покрывает</dt><dd>Фоновая музыка в зале и кабинетах</dd></div>
       </dl>
       <div className={styles.row}>
         <button type="button" className={styles.secondary}>Скачать паспорт лицензии</button>
-        <button type="button" className={styles.secondary}>QR для проверки</button>
+        <button type="button" className={styles.secondary}>Код для проверки</button>
       </div>
     </section>
   );
@@ -228,11 +230,11 @@ export default function SpaDesignPreview() {
     <section className={styles.card} aria-labelledby="al">
       <h3 id="al">Уведомления</h3>
       {needsAction ? (
-        <div className={`${styles.alert} ${styles[status.tone]}`}><strong>{status.title}</strong><p>{status.action}</p></div>
+        <div className={`${styles.alert} ${styles[status.tone]}`}><strong>{status.title}</strong><p>{status.action} <Link href="/player">Открыть плеер</Link> · <Link href="/help">Поддержка</Link></p></div>
       ) : (
         <p className={styles.muted}>Ничего делать не нужно. Мы напишем, только если потребуется ваше действие.</p>
       )}
-      <p className={styles.note}>Канал: MAX · почта. Без рекламы и «отчётов ради отчётов».</p>
+      <p className={styles.note}>Свяжемся через мессенджер или почту. Без рекламы и лишних отчётов.</p>
     </section>
   );
 
@@ -275,7 +277,7 @@ export default function SpaDesignPreview() {
       <h3 id="sup">Поддержка</h3>
       <p className={styles.muted}>Ответим в рабочее время в течение 15 минут.</p>
       <div className={styles.row}>
-        <button type="button" className={styles.secondary}>Написать в MAX</button>
+        <button type="button" className={styles.secondary}>Написать в поддержку</button>
         <button type="button" className={styles.secondary}>Позвонить</button>
       </div>
     </section>
@@ -287,7 +289,7 @@ export default function SpaDesignPreview() {
   return (
     <section className={styles.preview} aria-label="Согласование дизайна кабинета владельца">
       <header className={styles.reviewHeader}>
-        <p className={styles.eyebrow}>Аудиолад Бизнес · макеты v3</p>
+        <p className={styles.eyebrow}>АудиоЛад Бизнес · макеты, версия 3</p>
         <h1>Пульт звуковой атмосферы</h1>
       </header>
       <div className={styles.banner}>
@@ -307,8 +309,8 @@ export default function SpaDesignPreview() {
         </label>
         <label>Рамка
           <select value={frame} onChange={(e) => setFrame(e.target.value as "desktop" | "phone")} data-testid="frame">
-            <option value="desktop">Десктоп</option>
-            <option value="phone">Телефон · 390px</option>
+            <option value="desktop">Компьютер</option>
+            <option value="phone">Телефон</option>
           </select>
         </label>
       </div>

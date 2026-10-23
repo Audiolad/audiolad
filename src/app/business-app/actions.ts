@@ -29,7 +29,7 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ok: false, error: "not_authenticated" };
+    return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
   }
 
   const countryCode = (input.countryCode ?? "RU").trim().toUpperCase();
@@ -47,7 +47,7 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
   );
 
   if (error) {
-    return { ok: false, error: error.message || "bootstrap_failed" };
+    return { ok: false, error: "Не удалось подключить заведение. Попробуйте ещё раз." };
   }
 
   const payload = data as {
@@ -63,7 +63,7 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
     !payload.location_id ||
     !payload.zone_id
   ) {
-    return { ok: false, error: "bootstrap_invalid_response" };
+    return { ok: false, error: "Не удалось подтвердить подключение заведения. Попробуйте ещё раз." };
   }
 
   revalidatePath(BUSINESS_SITE_PATH);
@@ -103,10 +103,10 @@ export async function provisionVenuePlayer(input: {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ok: false, error: "not_authenticated" };
+    return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
   }
 
-  const displayName = (input.displayName ?? "Venue Player").trim() || "Venue Player";
+  const displayName = (input.displayName ?? "Плеер точки").trim() || "Плеер точки";
 
   const { data: created, error: createError } = await supabase.rpc(
     "create_business_player",
@@ -117,7 +117,7 @@ export async function provisionVenuePlayer(input: {
   );
 
   if (createError) {
-    return { ok: false, error: createError.message || "create_player_failed" };
+    return { ok: false, error: "Не удалось подключить плеер. Попробуйте ещё раз." };
   }
 
   const createdPayload = created as {
@@ -133,7 +133,7 @@ export async function provisionVenuePlayer(input: {
     !createdPayload.player_code ||
     !createdPayload.credential
   ) {
-    return { ok: false, error: "create_player_invalid_response" };
+    return { ok: false, error: "Не удалось подтвердить подключение плеера. Попробуйте ещё раз." };
   }
 
   const { data: assigned, error: assignError } = await supabase.rpc(
@@ -145,7 +145,7 @@ export async function provisionVenuePlayer(input: {
   );
 
   if (assignError) {
-    return { ok: false, error: assignError.message || "assign_player_failed" };
+    return { ok: false, error: "Не удалось подключить плеер к залу. Попробуйте ещё раз." };
   }
 
   const assignedPayload = assigned as {
@@ -155,7 +155,7 @@ export async function provisionVenuePlayer(input: {
   } | null;
 
   if (!assignedPayload?.ok || !assignedPayload.assignment_id) {
-    return { ok: false, error: "assign_player_invalid_response" };
+    return { ok: false, error: "Не удалось подтвердить подключение плеера к залу. Попробуйте ещё раз." };
   }
 
   revalidatePath(BUSINESS_SITE_PATH);
@@ -199,12 +199,12 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { ok: false, error: "not_authenticated" };
+    return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
   }
 
   const locationId = input.locationId.trim();
   if (!locationId) {
-    return { ok: false, error: "location_id_required" };
+    return { ok: false, error: "Точка не выбрана." };
   }
 
   const { data: location, error: locationError } = await supabase
@@ -214,10 +214,10 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
     .maybeSingle();
 
   if (locationError) {
-    return { ok: false, error: locationError.message || "location_read_failed" };
+    return { ok: false, error: "Не удалось загрузить точку. Попробуйте ещё раз." };
   }
   if (!location?.organization_id) {
-    return { ok: false, error: "location_not_found" };
+    return { ok: false, error: "Точка не найдена." };
   }
 
   const { data: membership, error: membershipError } = await supabase
@@ -230,11 +230,11 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
   if (membershipError) {
     return {
       ok: false,
-      error: membershipError.message || "membership_read_failed",
+      error: "Не удалось проверить доступ к заведению. Попробуйте ещё раз.",
     };
   }
   if (!membership) {
-    return { ok: false, error: "not_org_member" };
+    return { ok: false, error: "У вас нет доступа к этому заведению." };
   }
 
   const zoneId =
@@ -254,7 +254,7 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
   try {
     service = createServiceRoleClient();
   } catch {
-    return { ok: false, error: "supabase_service_role_not_configured" };
+    return { ok: false, error: "Проверка прав на музыку временно недоступна. Попробуйте позже." };
   }
 
   const rows: BusinessEligibilityProbeRow[] = [];
@@ -280,7 +280,7 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
         engineVersion: null,
         locationId,
         zoneId,
-        error: rpcError.message || "eligibility_rpc_failed",
+        error: "Не удалось проверить права на музыку. Попробуйте позже.",
       });
       continue;
     }
@@ -296,7 +296,7 @@ export async function resolveBusinessAirplayEligibilityProbe(input: {
         engineVersion: null,
         locationId,
         zoneId,
-        error: "eligibility_invalid_response",
+        error: "Не удалось получить сведения о правах на музыку. Попробуйте позже.",
       });
       continue;
     }

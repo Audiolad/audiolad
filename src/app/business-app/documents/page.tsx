@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   CLIENT_DOCUMENT_EDITION_LABEL,
   CLIENT_DOCUMENT_REQUISITES,
@@ -53,7 +55,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                   <span className="font-semibold">{CLIENT_DOCUMENT_EDITION_LABEL}</span>
                 </div>
                 <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{doc.summary}</p>
-                <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Открыть полный текст →</span>
+                <span className="mt-1 inline-block text-sm font-semibold text-[var(--biz-accent)]">Открыть полный текст</span>
               </a>
             </li>
           ))}
@@ -84,9 +86,9 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           и длительность сообщает плеер. Время – по часовому поясу точки.
         </p>
         {result.kind === "anonymous" ? (
-          <p className="mt-3 text-sm">Войдите, чтобы построить отчёт.</p>
+          <p className="mt-3 text-sm"><a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите</a>, чтобы построить отчёт.</p>
         ) : result.kind === "no_location" ? (
-          <p className="mt-3 text-sm">Сначала добавьте точку.</p>
+          <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте точку</Link>.</p>
         ) : (
           <>
             <form method="get" className="mt-3 flex flex-wrap items-end gap-3">

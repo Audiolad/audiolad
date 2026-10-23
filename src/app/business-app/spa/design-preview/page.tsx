@@ -7,7 +7,7 @@ import { loadSpaPilotContext } from "@/lib/business-app/spa-pilot";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Макет кабинета SPA · Аудиолад Бизнес",
+  title: "Макет кабинета спа · АудиоЛад Бизнес",
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
 };
 

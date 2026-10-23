@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { bootstrapBusinessOrganizationWithLocation } from "@/app/business-app/actions";
+import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { businessAccessLine } from "@/lib/access-grants/access-line";
 import {
   GUEST_COFFEE_COPY,
   GUEST_COFFEE_INQUIRY_EMAIL,
@@ -33,6 +35,8 @@ export default function BusinessOnboardingWizardPage({
   initialTypeId?: string | null;
 } = {}) {
   const domain = useBusinessDomain();
+  // Gift already live: show its end date instead of re-offering «30 дней в подарок, затем 799 ₽».
+  const accessLine = businessAccessLine(useBusinessChromeAccess());
   const router = useRouter();
   const [step, setStep] = useState<BusinessOnboardingStep>("type");
   const [typeId, setTypeId] = useState<string | null>(
@@ -71,11 +75,10 @@ export default function BusinessOnboardingWizardPage({
         />
         <section className="business-app-card space-y-3" data-testid="onboarding-sign-in">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
-            Аккаунт АудиоЛада общий для audiolad.ru и business.audiolad.ru: после входа кабинет узнает вас автоматически.
+            Вход в АудиоЛад общий: кабинет узнает вас автоматически.
           </p>
           <p className="text-sm text-[var(--biz-text-muted)]">
-            После входа откройте business.audiolad.ru/onboarding – автоматического возврата в кабинет пока нет.
-          </p>
+            После входа вернитесь к <Link href="/onboarding" className="underline">подключению точки</Link>.</p>
           <p className="text-sm text-[var(--biz-text-muted)]">
             {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
           </p>
@@ -95,7 +98,7 @@ export default function BusinessOnboardingWizardPage({
           </div>
           <p className="text-sm text-[var(--biz-text-muted)]">
             {GUEST_COFFEE_COPY.connectContact}{" "}
-            <a className="underline" href={`mailto:${GUEST_COFFEE_INQUIRY_EMAIL}`}>{GUEST_COFFEE_INQUIRY_EMAIL}</a>
+            <a className="underline" href={`mailto:${GUEST_COFFEE_INQUIRY_EMAIL}`}>Написать нам</a>
           </p>
         </section>
       </div>
@@ -107,7 +110,7 @@ export default function BusinessOnboardingWizardPage({
       <div className="mx-auto max-w-2xl">
         <WizardHeader
           title="Точка уже подключена"
-          subtitle={`${domain.organizationName ?? "Организация"} · ${domain.location.name}`}
+          subtitle={`${domain.organizationName ?? "Заведение"} · ${domain.location.name}`}
         />
         <section className="business-app-card space-y-3">
           <p className="text-[var(--biz-text-muted)]">
@@ -130,7 +133,7 @@ export default function BusinessOnboardingWizardPage({
               href="/music"
               className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
-              Музыка / eligibility
+              Музыка
             </Link>
           </div>
         </section>
@@ -194,13 +197,19 @@ export default function BusinessOnboardingWizardPage({
   return (
     <div className="mx-auto max-w-2xl">
       <WizardHeader
-        title="Zero-to-Music"
-        subtitle="Тип → атмосфера → preview → подтвердить → плеер"
+        title="Музыка для заведения за минуту"
+        subtitle="Выберите тип заведения и атмосферу, затем подтвердите подключение."
       />
       {step !== "done" ? (
-        <p className="mb-4 text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-terms-note">
-          {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
-        </p>
+        accessLine ? (
+          <p className="mb-4 text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-access-line">
+            {accessLine}.
+          </p>
+        ) : (
+          <p className="mb-4 text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-terms-note">
+            {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
+          </p>
+        )
       ) : null}
 
       <div
@@ -218,12 +227,12 @@ export default function BusinessOnboardingWizardPage({
         {step === "type" ? (
           <>
             <h2 id="wizard-step-title" className="text-[1.25rem] font-bold">
-              Что у вас?
+              Тип заведения
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Выберите тип бизнеса – это станет категорией точки в A1 domain.
+              Выберите, для какого заведения нужна музыка.
             </p>
-            <ul className="space-y-2" role="listbox" aria-label="Тип бизнеса">
+            <ul className="space-y-2" role="listbox" aria-label="Тип заведения">
               {BUSINESS_ONBOARDING_TYPES.map((option) => {
                 const selected = typeId === option.id;
                 return (
@@ -256,11 +265,10 @@ export default function BusinessOnboardingWizardPage({
         {step === "atmosphere" ? (
           <>
             <h2 id="wizard-step-title" className="text-[1.25rem] font-bold">
-              Как должно ощущаться?
+              Какую атмосферу вы хотите создать?
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Выбор атмосферы пока только для онбординга. Sonic DNA / dayparts –
-              отдельный этап (P1-02), после Passport trust.
+              Выберите настроение музыки. На этом шаге выбор помогает описать желаемое звучание.
             </p>
             <ul className="space-y-2" role="listbox" aria-label="Атмосфера">
               {BUSINESS_ONBOARDING_ATMOSPHERES.map((option) => {
@@ -295,11 +303,11 @@ export default function BusinessOnboardingWizardPage({
         {step === "preview" ? (
           <>
             <h2 id="wizard-step-title" className="text-[1.25rem] font-bold">
-              Послушайте (описательно)
+              Знакомство со звучанием
             </h2>
             <div className="rounded-2xl border border-[var(--biz-border)] bg-[var(--biz-surface-soft)] px-4 py-4">
               <p className="text-sm font-semibold uppercase tracking-wide text-[var(--biz-text-muted)]">
-                Черновик эфира
+                Ваша будущая атмосфера
               </p>
               <p className="mt-2 text-lg font-semibold text-[var(--biz-text)]">
                 {preview.typeLabel}
@@ -324,8 +332,8 @@ export default function BusinessOnboardingWizardPage({
               Подтвердите точку
             </h2>
             <p className="text-[var(--biz-text-muted)]">
-              Создадим Organization → Location → зону «по умолчанию» через{" "}
-              <code className="text-sm">create_business_organization_with_location</code>.
+              После подтверждения подключим заведение и подготовим {" "}
+              основной зал.
             </p>
             <div className="space-y-3">
               <div>
@@ -333,7 +341,7 @@ export default function BusinessOnboardingWizardPage({
                   className="block text-sm font-medium text-[var(--biz-text)]"
                   htmlFor="onboarding-org"
                 >
-                  Организация
+                  Название заведения
                 </label>
                 <input
                   id="onboarding-org"
@@ -371,11 +379,10 @@ export default function BusinessOnboardingWizardPage({
                     suggested.businessCategory}
                 </strong>
                 {" · "}
-                RU · Europe/Moscow
+                Россия · московское время
               </p>
               <p className="text-sm text-[var(--biz-text-muted)]">
-                Атмосфера «{preview.atmosphereLabel}» сохраняется как предпочтение
-                онбординга (не DNA config).
+                Атмосфера «{preview.atmosphereLabel}» выбрана для знакомства со звучанием.
               </p>
             </div>
           </>
@@ -387,14 +394,13 @@ export default function BusinessOnboardingWizardPage({
               Точка создана
             </h2>
             <p className="text-[var(--biz-text)]">
-              Дальше: откройте Venue Player и проверьте статус музыки. Каталог
-              ELIGIBLE пока пуст – eligibility остаётся UNKNOWN-safe.
+              Точка готова. Откройте плеер и проверьте подключение. Музыка появится, когда права на треки будут подтверждены.
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
-                location <code className="text-xs">{created.locationId.slice(0, 8)}…</code>
+                Код точки: <code className="text-xs">{created.locationId.slice(0, 8)}…</code>
                 {" · "}
-                zone <code className="text-xs">{created.zoneId.slice(0, 8)}…</code>
+                Код зала: <code className="text-xs">{created.zoneId.slice(0, 8)}…</code>
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2 pt-1">
@@ -408,7 +414,7 @@ export default function BusinessOnboardingWizardPage({
                 href="/music"
                 className="business-app-btn business-app-btn-secondary business-app-focus-ring"
               >
-                Музыка / eligibility
+                Музыка
               </Link>
               <Link
                 href="/"
@@ -489,11 +495,11 @@ function WizardHeader({
 function stepLabel(step: BusinessOnboardingStep): string {
   switch (step) {
     case "type":
-      return "Тип бизнеса";
+      return "Тип заведения";
     case "atmosphere":
       return "Атмосфера";
     case "preview":
-      return "Preview";
+      return "Послушать";
     case "confirm":
       return "Подтверждение";
     case "done":

@@ -105,11 +105,11 @@ const empty = venueAirplayEmptyStateCopy({
   eligibleCount: 0,
 });
 assert.match(empty.title, /пуст/i);
-assert.match(empty.description, /UNKNOWN ≠ ELIGIBLE|UNKNOWN/);
-assert.match(empty.description, /HG-3|HG-4|P0-06/);
+assert.match(empty.description, /нет треков с подтверждёнными правами/);
+assert.match(empty.description, /Проверочный звук плеера.*не входит в музыкальную подборку/);
 assert.doesNotMatch(empty.description, /лицензирован/i);
 
-assert.equal(formatEligibilityDecisionLabel("ELIGIBLE"), "ELIGIBLE");
+assert.equal(formatEligibilityDecisionLabel("ELIGIBLE"), "Разрешено");
 
 assert.ok(
   BUSINESS_PRIMARY_NAV_ITEMS.some((i) => i.id === "music" && i.available),
@@ -134,14 +134,14 @@ const actions = readFileSync(
 assert.match(actions, /resolveBusinessAirplayEligibilityProbe/);
 assert.match(actions, /resolve_business_track_eligibility/);
 assert.match(actions, /createServiceRoleClient/);
-assert.match(actions, /not_org_member/);
+assert.match(actions, /У вас нет доступа к этому заведению/);
 
 const player = readFileSync(
   join(repoRoot, "src/components/business-app/VenuePlayerPage.tsx"),
   "utf8",
 );
 assert.match(player, /BusinessEligibilityProbePanel/);
-assert.match(player, /UNKNOWN ≠ ELIGIBLE|ELIGIBLE/);
+assert.match(player, /подтверждёнными правами/);
 
 const music = readFileSync(
   join(repoRoot, "src/app/business-app/music/page.tsx"),

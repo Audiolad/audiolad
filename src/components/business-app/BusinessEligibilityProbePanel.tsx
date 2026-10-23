@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useState } from "react";
 
 import { resolveBusinessAirplayEligibilityProbe } from "@/app/business-app/actions";
@@ -52,10 +54,9 @@ export default function BusinessEligibilityProbePanel({
   if (domain.status === "anonymous") {
     return (
       <section className="business-app-card">
-        <h2 className="text-lg font-bold text-[var(--biz-text)]">Eligibility (A5)</h2>
+        <h2 className="text-lg font-bold text-[var(--biz-text)]">Права на музыку</h2>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
-          Войдите как владелец, чтобы увидеть read-only статус прав для кандидатов
-          эфира. Без Location вызов RPC недоступен.
+          <a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите как владелец</a>, чтобы проверить права на музыку.
         </p>
       </section>
     );
@@ -65,10 +66,10 @@ export default function BusinessEligibilityProbePanel({
     probe.status === "idle"
       ? {
           title: compact
-            ? "Пул эфира (eligibility)"
-            : "Проверка eligibility",
+            ? "Музыка для заведения"
+            : "Проверка прав",
           description:
-            "Нажмите «Проверить», чтобы вызвать resolve_business_track_eligibility. В эфир попадают только ELIGIBLE (UNKNOWN ≠ ELIGIBLE). Сиды прав – после HG-3/HG-4.",
+            "Нажмите «Проверить», чтобы узнать, какие треки можно включать в заведении. Неподтверждённые треки в подборку не попадают.",
         }
       : venueAirplayEmptyStateCopy({
           hasLocation: Boolean(domain.location),
@@ -81,16 +82,14 @@ export default function BusinessEligibilityProbePanel({
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="business-app-eyebrow">
-            Rights Eligibility · read-only
+            Проверка прав на музыку
           </p>
           <h2 className="text-lg font-bold text-[var(--biz-text)]">
-            {compact && probe.status !== "idle" ? "Пул эфира (eligibility)" : empty.title}
+            {compact && probe.status !== "idle" ? "Музыка для заведения" : empty.title}
           </h2>
-          <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{empty.description}</p>
+          <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{empty.description}{!domain.location ? <> <Link href="/onboarding" className="underline">Подключить заведение</Link></> : null}</p>
           <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
-            RPC <code>resolve_business_track_eligibility</code> · UNKNOWN ≠
-            ELIGIBLE · без claims «лицензировано»
-          </p>
+            Проверяем разрешение на воспроизведение. Отсутствие сведений не означает, что права подтверждены.</p>
         </div>
         <button
           type="button"
@@ -139,21 +138,21 @@ export default function BusinessEligibilityProbePanel({
                 </span>
               </div>
               <p className="mt-1 break-all text-xs text-[var(--biz-text-muted)]">
-                audio_item: <code>{row.audioItemId}</code>
+                Запись: <code>{row.audioItemId}</code>
                 {row.trackCode ? (
                   <>
                     {" "}
-                    · track <code>{row.trackCode}</code>
+                     · Код трека: <code>{row.trackCode}</code>
                   </>
                 ) : null}
               </p>
               {row.reasonCodes.length > 0 ? (
                 <p className="mt-1 text-xs text-[var(--biz-text-muted)]">
-                  reasons: {row.reasonCodes.join(", ")}
+                  Причины: права на воспроизведение не подтверждены.
                 </p>
               ) : null}
               {row.error ? (
-                <p className="mt-1 text-xs text-[var(--biz-red-ink)]">error: {row.error}</p>
+                <p className="mt-1 text-xs text-[var(--biz-red-ink)]">Ошибка: не удалось проверить права на трек.</p>
               ) : null}
             </li>
           ))}
@@ -161,7 +160,7 @@ export default function BusinessEligibilityProbePanel({
       ) : null}
 
       {probe.status === "loading" ? (
-        <p className="text-sm text-[var(--biz-text-muted)]">Вызов A5 eligibility…</p>
+        <p className="text-sm text-[var(--biz-text-muted)]">Проверяем права…</p>
       ) : null}
     </section>
   );

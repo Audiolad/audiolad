@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
@@ -121,6 +122,9 @@ function assemblingSteps(profile: GuestCoffeeProfile): string[] {
 export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
   const access = resolveBusinessAccess(useBusinessDomain());
   const guest = access.level === "guest";
+  // 30-day gift / paid period already live: never offer the gift again (Sergey 23.10.2026).
+  const liveAccess = useHasLiveBusinessAccess();
+  const offerGift = guest && !liveAccess;
   const { setLimit: reportLimitToShell } = useBusinessGuestStatus();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
@@ -386,9 +390,24 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           </h2>
           {showExhaustedPanel ? (
             <div className="business-app-card business-sound-limit" role="status" data-testid="biz-sound-exhausted">
-              <h3 className="text-[1.05rem] font-bold text-[var(--biz-text)]">{GUEST_COFFEE_COPY.exhaustedTitle}</h3>
-              <p className="mt-1 text-[var(--biz-text-muted)]">{guest ? GUEST_COFFEE_COPY.exhaustedText : GUEST_COFFEE_COPY.exhaustedMember}</p>
-              {guest ? (
+              <h3 className="text-[1.05rem] font-bold text-[var(--biz-text)]">
+                {liveAccess ? GUEST_COFFEE_COPY.exhaustedTrialTitle : GUEST_COFFEE_COPY.exhaustedTitle}
+              </h3>
+              <p className="mt-1 text-[var(--biz-text-muted)]">
+                {offerGift
+                  ? GUEST_COFFEE_COPY.exhaustedText
+                  : guest
+                    ? GUEST_COFFEE_COPY.exhaustedTrialText
+                    : GUEST_COFFEE_COPY.exhaustedMember}
+              </p>
+              {guest && liveAccess ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-connect-cta">
+                    Подключить точку
+                  </Link>
+                </div>
+              ) : null}
+              {offerGift ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <a href={BUSINESS_TRIAL_SIGN_UP_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-trial-cta">
                     {BUSINESS_GIFT_CTA}
@@ -524,8 +543,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           {guest ? (
             <p className="text-sm">
               <a className="underline" href={GUEST_COFFEE_ATLAS_URL} data-testid="biz-back-to-atlas">
-                ← Вернуться в атлас кофеен
-              </a>
+                Вернуться в атлас кофеен</a>
             </p>
           ) : null}
         </section>

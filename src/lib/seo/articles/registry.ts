@@ -101,6 +101,11 @@ import { ZHIZN_MUZHCHINY_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-muzhchiny
 import { ZHIZN_ZHENSHCHINY_POSLE_RAZVODA_ARTICLE } from "./content/zhizn-zhenshchiny-posle-razvoda";
 import { ZHIZN_POSLE_RAZVODA_S_REBENKOM_ARTICLE } from "./content/zhizn-posle-razvoda-s-rebenkom";
 import { ODINOCHESTVO_POSLE_RAZVODA_ARTICLE } from "./content/odinochestvo-posle-razvoda";
+import { MOLITVA_ANGELU_HRANITELYU_NA_KAZHDYY_DEN_ARTICLE } from "./content/molitva-angelu-hranitelyu-na-kazhdyy-den";
+import { MOLITVA_ANGELU_HRANITELYU_SLUSHAT_ONLAYN_ARTICLE } from "./content/molitva-angelu-hranitelyu-slushat-onlayn";
+import { MOLITVA_ANGELU_HRANITELYU_SLUSHAT_BESPLATNO_ARTICLE } from "./content/molitva-angelu-hranitelyu-slushat-besplatno";
+import { MOLITVA_ANGELU_HRANITELYU_AUDIO_ARTICLE } from "./content/molitva-angelu-hranitelyu-audio";
+import { KAK_PRIZVAT_ANGELA_HRANITELYA_ARTICLE } from "./content/kak-prizvat-angela-hranitelya";
 import type { ArticleDefinition } from "./types";
 
 const ARTICLE_DEFINITIONS = [
@@ -207,6 +212,11 @@ const ARTICLE_DEFINITIONS = [
   ZHIZN_ZHENSHCHINY_POSLE_RAZVODA_ARTICLE,
   ZHIZN_POSLE_RAZVODA_S_REBENKOM_ARTICLE,
   ODINOCHESTVO_POSLE_RAZVODA_ARTICLE,
+  MOLITVA_ANGELU_HRANITELYU_NA_KAZHDYY_DEN_ARTICLE,
+  MOLITVA_ANGELU_HRANITELYU_SLUSHAT_ONLAYN_ARTICLE,
+  MOLITVA_ANGELU_HRANITELYU_SLUSHAT_BESPLATNO_ARTICLE,
+  MOLITVA_ANGELU_HRANITELYU_AUDIO_ARTICLE,
+  KAK_PRIZVAT_ANGELA_HRANITELYA_ARTICLE,
 ] as const satisfies readonly ArticleDefinition[];
 
 const ARTICLE_BY_SLUG = new Map<string, ArticleDefinition>(
