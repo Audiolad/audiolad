@@ -110,21 +110,55 @@ function runPsqlAsync(db, input) {
 // OnbCtxH: while onboarding holds the new context, the chosen country profile
 // cannot be superseded underneath it (FOR SHARE OF p) – the writer waits.
 async function profileLockCase(db) {
+  // Explicit handshake via pg_stat_activity (no fixed sleeps): the supersession
+  // starts only once onboarding holds its transaction open, and onboarding
+  // commits only after the supersession attempt has finished.
   const onboarding = runPsqlAsync(db, `
+SET application_name = 'onbctx_h_onboarding';
 SELECT set_config('request.jwt.claim.sub', 'd0000000-0000-4000-8000-000000000001', false);
 BEGIN;
 SELECT 'ctx=' || ((public.create_business_organization_with_location('Кафе AA 3', 'Точка AA 3', 'cafe', 'AA', 'UTC'))->>'rights_context_id' IS NOT NULL);
-SELECT pg_sleep(4);
+DO $wait$
+DECLARE v_seen boolean := false;
+BEGIN
+  FOR i IN 1..1200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    IF EXISTS (SELECT 1 FROM pg_stat_activity WHERE application_name = 'onbctx_h_supersede') THEN
+      v_seen := true;
+    ELSIF v_seen THEN
+      RETURN;
+    END IF;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+  RAISE EXCEPTION 'OnbCtxH: supersession session never finished';
+END
+$wait$;
 COMMIT;
 `);
-  await new Promise((r) => setTimeout(r, 1500));
   const supersede = await runPsqlAsync(db, `
+SET application_name = 'onbctx_h_supersede';
+DO $wait$
+BEGIN
+  FOR i IN 1..1200 LOOP
+    PERFORM pg_stat_clear_snapshot();
+    IF EXISTS (
+      SELECT 1 FROM pg_stat_activity
+      WHERE application_name = 'onbctx_h_onboarding' AND state = 'active' AND wait_event = 'PgSleep'
+    ) THEN
+      RETURN;
+    END IF;
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+  RAISE EXCEPTION 'OnbCtxH: onboarding session never reached its open transaction';
+END
+$wait$;
 SET lock_timeout = '1000ms';
 UPDATE public.music_country_rights_profiles SET status = 'superseded' WHERE country_code = 'AA' AND status = 'active';
 `);
   const a = await onboarding;
   assert.equal(a.status, 0, `onboarding session ok:\n${a.out}`);
   assert.match(a.out, /ctx=true/, "onboarding created the context");
+  assert.doesNotMatch(supersede.out, /never reached/, `handshake ok:\n${supersede.out}`);
   assert.notEqual(supersede.status, 0, "profile supersession must wait for onboarding");
   assert.match(supersede.out, /lock timeout/i, `supersession blocked by profile lock:\n${supersede.out}`);
 }
