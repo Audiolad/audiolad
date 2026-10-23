@@ -86,8 +86,40 @@
     linear-gradient(145deg, var(--biz-coffee), var(--biz-espresso));
   --biz-shadow: 0 10px 30px rgba(43, 29, 20, 0.07);
   --biz-shadow-strong: 0 12px 40px rgba(43, 29, 20, 0.12);
+  /* Defaults keep the guest player (/guest/coffee) on the base jazz-coffee look.
+     The cabinet shell below redefines them. */
+  --biz-btn-emboss: none;
+  --biz-chrome-bg: var(--biz-surface);
 
   color-scheme: light;
+}
+
+/* Leather cabinet chrome (lotus mark). Scoped to the venue cabinet so the public
+   guest player keeps the tokens above. Dark text on parchment, WCAG AA pairs. */
+.business-app-shell[data-biz-chrome="cabinet"] {
+  --biz-accent: #5e3418;
+  --biz-accent-hover: #4a2812;
+  --biz-accent-soft: #f0e0cc;
+  --biz-accent-border: #d7c0a4;
+  --biz-eyebrow: #7a4e28;
+  --biz-highlight: #8d6230;
+  --biz-border: #ddcbb6;
+  --biz-border-strong: #c4a88a;
+  --biz-surface-soft: #f3e6d4;
+  --biz-chrome-bg: #f3e6d4;
+  --biz-shadow:
+    inset 0 1px 0 rgba(255, 250, 243, 0.95),
+    inset 0 0 0 1px rgba(122, 78, 40, 0.28),
+    inset 0 0 0 4px rgba(255, 250, 243, 0.65),
+    inset 0 0 0 5px rgba(122, 78, 40, 0.2),
+    0 10px 24px rgba(43, 29, 20, 0.06);
+  --biz-shadow-strong:
+    inset 0 1px 0 rgba(255, 248, 239, 0.28),
+    0 8px 18px rgba(74, 40, 18, 0.16);
+  --biz-btn-emboss:
+    inset 0 1px 0 rgba(255, 236, 214, 0.4),
+    inset 0 -2px 0 rgba(42, 22, 10, 0.35),
+    0 1px 0 rgba(255, 250, 243, 0.35);
 }
 
 /* Overscroll / rubber-band area behind the cabinet matches the theme background

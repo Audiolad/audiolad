@@ -14,6 +14,20 @@
   letter-spacing: -0.01em;
 }
 
+.business-app-brand-mark {
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.business-app-brand-mark img {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+}
+
 .business-app-root code {
   border-radius: 6px;
   background: var(--biz-surface-soft);
@@ -36,7 +50,7 @@
   flex-direction: column;
   flex-shrink: 0;
   width: var(--biz-sidebar-width, var(--biz-sidebar-expanded));
-  background: var(--biz-surface);
+  background: var(--biz-chrome-bg);
   border-right: 1px solid var(--biz-border);
   transition: width 180ms ease;
   position: sticky;
@@ -171,6 +185,7 @@
 .business-app-btn-primary {
   background: var(--biz-accent);
   color: var(--biz-on-accent);
+  box-shadow: var(--biz-btn-emboss);
 }
 
 .business-app-btn-primary:hover:not(:disabled) {
@@ -916,5 +931,58 @@
 
   .business-sound-player {
     bottom: 1rem;
+  }
+}
+
+/* Leather cabinet only. /guest/coffee stays on the base tokens (data-biz-chrome=guest-player). */
+.business-app-shell[data-biz-chrome="cabinet"] h2,
+.business-app-shell[data-biz-chrome="cabinet"] h3,
+.business-app-shell[data-biz-chrome="cabinet"] .business-app-brand-name {
+  font-family: var(--biz-font-display);
+}
+
+.business-app-shell[data-biz-chrome="cabinet"] .business-app-brand-mark {
+  filter: drop-shadow(0 1px 0 var(--biz-border-strong));
+}
+
+.business-app-shell[data-biz-chrome="cabinet"] .business-app-btn-primary {
+  border-color: var(--biz-accent-hover);
+}
+
+.business-app-shell[data-biz-chrome="cabinet"] .business-app-bottom-nav {
+  background: var(--biz-surface);
+  box-shadow: inset 0 1px 0 var(--biz-border-strong);
+}
+
+@media (max-width: 899px) {
+  .business-app-shell[data-biz-chrome="cabinet"] {
+    flex-direction: column;
+  }
+
+  .business-app-shell[data-biz-chrome="cabinet"] .business-app-sidebar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    height: auto;
+    position: sticky;
+    top: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--biz-border);
+  }
+
+  .business-app-shell[data-biz-chrome="cabinet"] .business-app-sidebar > nav,
+  .business-app-shell[data-biz-chrome="cabinet"] .business-app-sidebar > div:last-child {
+    display: none;
+  }
+
+  .business-app-shell[data-biz-chrome="cabinet"] .business-app-sidebar > div:first-child {
+    width: 100%;
+    align-items: center;
+    border-bottom: 0;
+  }
+
+  .business-app-shell[data-biz-chrome="cabinet"] .business-app-sidebar > div:first-child > button {
+    display: none;
   }
 }
