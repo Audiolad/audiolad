@@ -5,6 +5,11 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import { BUSINESS_REGISTERED_NOTE } from "@/lib/access-grants/copy";
 import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref, getSafeNextPath } from "@/lib/auth/routes";
+import {
+  AUTH_NETWORK_ERROR_MESSAGE,
+  isAuthNetworkFailure,
+  withAuthNetworkTimeout,
+} from "@/lib/auth/network-timeout";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
 import { helpArticlePath } from "@/lib/help/paths";
 import { PASSWORD_RESET_SUCCESS_MESSAGE } from "@/lib/auth/recovery-messages";
@@ -44,26 +49,40 @@ function SignInForm() {
 
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    let result: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
+
+    try {
+      result = await withAuthNetworkTimeout(() =>
+        supabase.auth.signInWithPassword({ email, password }),
+      );
+    } catch {
+      setIsError(true);
+      setMessage(AUTH_NETWORK_ERROR_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
+
+    const { error } = result;
 
     if (error) {
       setIsError(true);
-      setMessage(SIGN_IN_GENERIC_ERROR);
+      setMessage(
+        isAuthNetworkFailure(error)
+          ? AUTH_NETWORK_ERROR_MESSAGE
+          : SIGN_IN_GENERIC_ERROR,
+      );
       setIsLoading(false);
       return;
     }
 
     try {
-      await claimPartnerAttributionAction();
+      await withAuthNetworkTimeout(() => claimPartnerAttributionAction());
     } catch {
       // Attribution must never break login.
     }
 
     try {
-      await claimGuestRatingsAction();
+      await withAuthNetworkTimeout(() => claimGuestRatingsAction());
     } catch {
       // Guest rating claim must never break login.
     }

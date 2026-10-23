@@ -3,6 +3,10 @@
 import BottomNav from "@/components/BottomNav";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
+  AUTH_NETWORK_ERROR_MESSAGE,
+  withAuthNetworkTimeout,
+} from "@/lib/auth/network-timeout";
+import {
   PASSWORD_RECOVERY_RATE_LIMIT_MESSAGE,
   PASSWORD_RECOVERY_SPAM_HINT_MESSAGE,
 } from "@/lib/auth/recovery-messages";
@@ -59,10 +63,21 @@ function ForgotPasswordForm() {
     setMessage("");
     setIsError(false);
 
-    const result = await requestPasswordRecoveryAction({
-      email,
-      next: nextParam,
-    });
+    let result: Awaited<ReturnType<typeof requestPasswordRecoveryAction>>;
+
+    try {
+      result = await withAuthNetworkTimeout(() =>
+        requestPasswordRecoveryAction({
+          email,
+          next: nextParam,
+        }),
+      );
+    } catch {
+      setIsError(true);
+      setMessage(AUTH_NETWORK_ERROR_MESSAGE);
+      setIsLoading(false);
+      return;
+    }
 
     cooldownUntilRef.current = Date.now() + COOLDOWN_MS;
     setCooldownRemainingMs(COOLDOWN_MS);
