@@ -259,6 +259,47 @@ async function cursorChaining() {
   assert.equal(repeated.data?.completeness.historyIncluded, 100, "a repeated page adds no history");
   assert.equal(repeated.data?.completeness.omittedHistoryCount, 150);
   assert.equal(repeatRequests.length, 2, "one retry of the cursor, then stop");
+
+  // Only the archive view's later page fails: the list is not reported complete and a retry stays offered.
+  const view = (path: string, acceptance: "current" | "archive") => {
+    const url = new URL(path, "https://core.test");
+    const before = url.searchParams.get("history_before");
+    const start = before ? all.findIndex((task) => String(task.updated_at) < before) : 0;
+    const rows = all.slice(0, 130).slice(start, start + 100);
+    const complete = start + rows.length >= 130;
+    return load({
+      ...raw(acceptance === "current" ? "stnow-current" : "stnow-archive"),
+      tasks: rows,
+      board_counts: boardCounts,
+      tasks_page: {
+        active_complete: true,
+        history_included: rows.length,
+        history_limit: 100,
+        history_next_before: complete ? null : rows.at(-1)?.updated_at ?? null,
+        history_complete: complete,
+        omitted_history_count: 130 - start - rows.length,
+        acceptance_view: acceptance,
+      },
+    });
+  };
+  const twoHundred = parseHistoryFilters({ archive_limit: "200" });
+  const currentWindow = await loadCompanyStatusWindow(async (path) => view(path, "current"), twoHundred, "current");
+  let archiveCalls = 0;
+  const archiveWindow = await loadCompanyStatusWindow(
+    async (path) => (archiveCalls++ === 0 ? view(path, "archive") : { data: null, error: "down" }),
+    twoHundred,
+    "archive",
+  );
+  assert.equal(currentWindow.data?.completeness.historyComplete, true);
+  assert.equal(archiveWindow.data?.completeness.historyComplete, false);
+  const halfModel = composeAiCompanyBoard(currentWindow, archiveWindow, twoHundred).model;
+  assert.ok(halfModel);
+  assert.deepEqual(halfModel.archivePage, { loaded: 100, total: 130, nextLimit: 200 }, "retry the same window");
+  assert.match(render(halfModel, twoHundred), /href="\/admin\/ai-company\?archive_limit=200&amp;tab=archive"[^>]*>Показать ещё</);
+  // Both views complete: 130 of 130, no link.
+  const archiveFull = await loadCompanyStatusWindow(async (path) => view(path, "archive"), twoHundred, "archive");
+  const fullModel = composeAiCompanyBoard(currentWindow, archiveFull, twoHundred).model;
+  assert.deepEqual(fullModel?.archivePage, { loaded: 130, total: 130, nextLimit: null });
 }
 
 cursorChaining().then(

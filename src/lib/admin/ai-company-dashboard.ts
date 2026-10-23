@@ -3827,14 +3827,28 @@ export function archivePageModel(
   boardCounts: BoardCounts | null,
   archive: CompanyStatus | null = null,
 ): ArchivePageModel | null {
-  const history = status.completeness.historyIncluded;
-  if (history == null) return null;
+  if (status.completeness.historyIncluded == null) return null;
+  // Both acceptance views make up the «Архив» list: progress is the smaller window, and the list
+  // is complete only when every loaded window is (a failed later page of either view stays incomplete).
+  const windows = [status, archive].filter(
+    (value): value is CompanyStatus => value != null && value.completeness.historyIncluded != null,
+  );
+  const history = Math.min(...windows.map((value) => value.completeness.historyIncluded as number));
+  const flags = windows.map((value) => value.completeness.historyComplete);
+  const complete = flags.includes(false) ? false : flags.every((flag) => flag === true) ? true : null;
   // Same population as the counter: loaded terminal history plus active tasks shown in «Архив».
   const loaded = history + activeArchivedIds([status, archive]).size;
   const total = boardCounts?.archive ?? null;
   const limit = filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
-  const complete = status.completeness.historyComplete;
   const more = complete === false || (complete == null && total != null && loaded < total);
-  const nextLimit = more && limit < ARCHIVE_LIMIT_MAX ? Math.min(Math.max(limit, history) + ARCHIVE_PAGE_SIZE, ARCHIVE_LIMIT_MAX) : null;
+  // The window fell short of the requested limit (a later page failed): retry the same window.
+  const retry = more && history < limit;
+  const nextLimit = !more
+    ? null
+    : retry
+      ? limit
+      : limit < ARCHIVE_LIMIT_MAX
+        ? Math.min(Math.max(limit, history) + ARCHIVE_PAGE_SIZE, ARCHIVE_LIMIT_MAX)
+        : null;
   return { loaded, total, nextLimit };
 }
