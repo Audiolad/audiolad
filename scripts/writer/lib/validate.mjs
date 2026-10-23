@@ -283,6 +283,12 @@ function checkText(article, brief, strings, errors, warnings, stats) {
     if (lower(all).includes(lower(phrase))) errors.push(`запрещённая брифом фраза: «${phrase}»`);
   }
 
+  // Text that points to a table must have one (seen in a dry run: the table got lost in repair).
+  const hasTable = (article.sections ?? []).some((section) => (section?.blocks ?? []).some((block) => block?.kind === "table"));
+  if (!hasTable && /(таблиц[аеуы]? ниже|в таблице ниже|ниже в таблице|следующ[а-я]+ таблиц)/iu.test(all)) {
+    errors.push("текст ссылается на таблицу («таблица ниже»), но блока table нет");
+  }
+
   // Word count (body without FAQ and meta fields, plus lead).
   const bodyText = [article.leadBeforeAudio ?? "", ...strings.filter((s) => s.kind === "body").map((s) => s.text)].join(" ");
   stats.words = words(bodyText).length;
@@ -464,11 +470,32 @@ async function checkLive(targets, errors, warnings, live) {
   return results;
 }
 
+/**
+ * Removes duplicates and folds runs of the same message that differ only in array
+ * indices (e.g. a model loop emitting hundreds of empty paragraphs) into one line.
+ */
+export function compactMessages(list) {
+  const groups = new Map();
+  for (const message of new Set(list)) {
+    const key = message.replace(/\[\d+\]/g, "[*]");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(message);
+  }
+  const result = [];
+  for (const [key, messages] of groups) {
+    if (messages.length <= 3) result.push(...messages);
+    else result.push(`${key} (×${messages.length}, первое: ${messages[0].split(":")[0]})`);
+  }
+  return result;
+}
+
 export async function validateArticle(article, brief, context, options = {}) {
   const errors = [];
   const warnings = [];
   const stats = {};
-  if (!checkStructure(article, brief, context, errors, warnings)) return { ok: false, errors, warnings, stats };
+  if (!checkStructure(article, brief, context, errors, warnings)) {
+    return { ok: false, errors: compactMessages(errors), warnings: compactMessages(warnings), stats };
+  }
   const strings = collectStrings(article);
   checkText(article, brief, strings, errors, warnings, stats);
   const verbatim = checkQuotes(brief, strings, errors, warnings, stats);
@@ -477,6 +504,5 @@ export async function validateArticle(article, brief, context, options = {}) {
   checkLinks(article, brief, context, errors, warnings, stats, liveTargets);
   checkDuplicates(article, brief, context, errors, warnings);
   stats.live = await checkLive(liveTargets, errors, warnings, options.live !== false);
-  const unique = (list) => [...new Set(list)];
-  return { ok: errors.length === 0, errors: unique(errors), warnings: unique(warnings), stats };
+  return { ok: errors.length === 0, errors: compactMessages(errors), warnings: compactMessages(warnings), stats };
 }

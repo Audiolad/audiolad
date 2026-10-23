@@ -11,7 +11,7 @@ import { AUDIT_PATH, MASTER_PATH, loadContext } from "./lib/context.mjs";
 import { COUNT_TEST_FILES, bumpCountTests, constName, toDefinition, toTypeScript, updateOperational, masterEntry } from "./lib/convert.mjs";
 import { costRub } from "./lib/cost.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
-import { articleSchema, buildMessages } from "./lib/prompt.mjs";
+import { articleSchema, buildExpandMessages, buildMessages, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
 import { validateArticle } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -147,5 +147,71 @@ assert.throws(() => normalizeBrief({ ...brief, articleType: "creator" }), /pract
 // 9. Tariff.
 assert.equal(costRub("openai/gpt-oss-120b", 1_000_000, 1_000_000), 76.86);
 assert.throws(() => costRub("unknown/model", 1, 1));
+
+// 10. A model loop of empty blocks is folded into one message; schema bounds follow the brief.
+{
+  const raw = fixture();
+  for (let i = 0; i < 50; i += 1) raw.sections[1].blocks.push({ kind: "paragraph", text: "" });
+  const result = await check(raw);
+  const empty = result.errors.filter((e) => e.includes("пустой абзац"));
+  assert.equal(empty.length, 1, empty.join("\n"));
+  assert(empty[0].includes("×50"), empty[0]);
+  const schema = articleSchema(brief, { tableAllowed: true });
+  assert.equal(schema.properties.sections.minItems, undefined, "no grammar minimums (whitespace loops)");
+  assert.equal(schema.properties.sections.maxItems, brief.sections.max);
+  assert.equal(schema.properties.faq.maxItems, brief.faq.max);
+  assert(schema.properties.sections.items.properties.blocks.maxItems <= 12);
+}
+
+// 11. Segment spacing: spaces inside segments survive; missing spaces around links are added.
+{
+  const raw = fixture();
+  raw.sections[0].blocks.push({
+    kind: "rich_paragraph",
+    segments: [{ text: "Попробуйте" }, { href: "/x", label: " практику " }, { text: "и статью " }, { href: "/y", label: "Y" }, { text: "." }],
+  });
+  const { article } = normalizeArticle(raw, context);
+  const segments = article.sections[0].blocks.at(-1).segments;
+  assert.equal(segments.map((s) => s.text ?? s.label).join(""), "Попробуйте практику и статью Y.");
+}
+
+// 11b. Numeric ranges get an en dash; dates and versions stay untouched.
+{
+  const raw = fixture();
+  raw.sections[0].blocks.push(para("Хватит 30-60 секунд, а дата 2026-10-23 и версия 1.2-3 не меняются."));
+  const { article } = normalizeArticle(raw, context);
+  assert.equal(article.sections[0].blocks.at(-1).text, "Хватит 30\u201360 секунд, а дата 2026-10-23 и версия 1.2-3 не меняются.");
+}
+
+// 11c. A reference to a missing table is an error.
+{
+  const raw = fixture();
+  raw.sections = raw.sections.map((section) => ({ ...section, blocks: section.blocks.filter((block) => block.kind !== "table") }));
+  raw.sections[0].blocks.push(para("Таблица ниже показывает примеры."));
+  const result = await check(raw);
+  assert(result.errors.some((e) => e.includes("блока table нет")), result.errors.join("; "));
+}
+
+// 12. Expansion: paragraphs are appended to the named sections, unknown sections and empty
+// strings are ignored, the per-section cap holds and the input is not mutated.
+{
+  const raw = fixture();
+  const before = raw.sections[0].blocks.length;
+  const { article, added } = mergeExpansion(raw, {
+    additions: [
+      { sectionIndex: 0, paragraphs: ["Новый абзац.", "  "] },
+      { sectionIndex: 99, paragraphs: ["Потеряется."] },
+    ],
+  });
+  assert.equal(added, 1);
+  assert.equal(article.sections[0].blocks.length, before + 1);
+  assert.equal(raw.sections[0].blocks.length, before);
+  const capped = mergeExpansion(raw, { additions: [{ sectionIndex: 0, paragraphs: Array(20).fill("Абзац.") }] }, { maxBlocks: before + 2 });
+  assert.equal(capped.added, 2);
+  const schema = expandSchema(brief);
+  assert.equal(schema.properties.additions.items.properties.paragraphs.maxItems, 3);
+  const messages = buildExpandMessages(brief, raw, 500);
+  assert.match(messages[1].content, /500 слов/);
+}
 
 console.log("writer-unit: OK");

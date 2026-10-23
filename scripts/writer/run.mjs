@@ -22,7 +22,7 @@ import { applyToRepo } from "./lib/convert.mjs";
 import { DEFAULT_MODEL, SUPPORTED_MODELS, estimatePromptTokens, formatRub, worstCaseRub } from "./lib/cost.mjs";
 import { generateOnMoscow } from "./lib/moscow.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
-import { articleSchema, buildMessages, buildRepairMessages, buildRequest } from "./lib/prompt.mjs";
+import { articleSchema, buildExpandMessages, buildMessages, buildRepairMessages, buildRequest, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "./lib/publish.mjs";
 import { buildReport } from "./lib/report.mjs";
 import { validateArticle } from "./lib/validate.mjs";
@@ -147,8 +147,20 @@ async function main() {
   let validation = await validateWithLog(article, context, "первичная");
   state.normalization = changes;
 
+  if (!args.article && validation.stats?.words && validation.stats.words < brief.wordCount.min) {
+    const expansion = callWriter("expand", buildExpandMessages(brief, raw, validation.stats.words), expandSchema(brief));
+    const merged = mergeExpansion(raw, expansion);
+    log(`expand: добавлено абзацев ${merged.added}`);
+    if (merged.added > 0) {
+      raw = merged.article;
+      ({ article, changes } = normalizeArticle(raw, context));
+      state.normalization = changes;
+      validation = await validateWithLog(article, context, "после дописывания");
+    }
+  }
+
   if (!validation.ok && !args["no-repair"] && !args.article) {
-    const repaired = callWriter("repair", buildRepairMessages(messages, raw, validation.errors), schema);
+    const repaired = callWriter("repair", buildRepairMessages(messages, raw, validation.errors, validation.stats), schema);
     if (repaired) {
       state.firstValidation = validation;
       ({ article, changes } = normalizeArticle(repaired, context));

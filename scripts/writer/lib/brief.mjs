@@ -114,7 +114,7 @@ export function normalizeBrief(raw) {
     facts: raw.facts ?? [],
     forbiddenPhrases: raw.forbiddenPhrases ?? [],
     externalLinks,
-    wordCount: range(raw.wordCount, { min: 900, max: 1500 }, "wordCount", errors),
+    wordCount: range(raw.wordCount, { min: 750, max: 1500 }, "wordCount", errors),
     sections: range(raw.sections, { min: 4, max: 7 }, "sections", errors),
     faq: range(raw.faq, { min: 3, max: 5 }, "faq", errors),
     table: {

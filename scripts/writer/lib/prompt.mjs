@@ -1,7 +1,13 @@
 // Prompt and strict JSON schema for «Райтер» (Cloud.ru Foundation Models).
 
 const str = { type: "string" };
-const strArray = { type: "array", items: str };
+// Only array upper bounds go into the grammar: they stop runaway loops (seen in a pilot
+// dry run: hundreds of empty blocks). Lower bounds are NOT enforced by the grammar, because
+// forcing a model past the point where it wants to stop makes it emit whitespace until
+// max_tokens; string maxLength cuts words in half. Lengths are requested in the prompt and
+// checked by the validators instead.
+const text = () => str;
+const arrayOf = (items, _min, maxItems) => ({ type: "array", items, maxItems });
 
 function object(properties) {
   return {
@@ -21,43 +27,44 @@ export function articleSchema(brief, { tableAllowed }) {
     ],
   };
   const blocks = [
-    object({ kind: { type: "string", enum: ["paragraph"] }, text: str }),
+    object({ kind: { type: "string", enum: ["paragraph"] }, text: text(200) }),
     object({
       kind: { type: "string", enum: ["rich_paragraph"] },
-      segments: { type: "array", items: segment },
+      segments: arrayOf(segment, 2, 12),
     }),
-    object({ kind: { type: "string", enum: ["heading"] }, level: { type: "integer", enum: [3] }, title: str }),
-    object({ kind: { type: "string", enum: ["list"] }, items: strArray }),
+    object({ kind: { type: "string", enum: ["heading"] }, level: { type: "integer", enum: [3] }, title: text(3) }),
+    object({ kind: { type: "string", enum: ["list"] }, items: arrayOf(text(3), 2, 10) }),
   ];
   if (tableAllowed) {
     blocks.push(
       object({
         kind: { type: "string", enum: ["table"] },
         caption: str,
-        columns: strArray,
-        rows: { type: "array", items: strArray },
+        columns: arrayOf(text(1), 2, 4),
+        rows: arrayOf(arrayOf(text(1), 2, 4), brief.table.rows.min, brief.table.rows.max),
       }),
     );
   }
   const blurbs = {};
   for (const practice of brief.relatedPractices) blurbs[practice.key] = str;
   return object({
-    title: str,
-    breadcrumbTitle: str,
-    metaTitle: str,
-    metaDescription: str,
-    leadBeforeAudio: str,
-    shortAnswer: str,
-    primaryPracticeIntro: str,
-    introAfterAudio: strArray,
-    sections: {
-      type: "array",
-      items: object({ id: str, title: str, blocks: { type: "array", items: { anyOf: blocks } } }),
-    },
-    faq: { type: "array", items: object({ question: str, answer: str }) },
-    closingSection: object({ paragraphs: strArray }),
+    title: text(20, 110),
+    breadcrumbTitle: text(3, 45),
+    metaTitle: text(25, 70),
+    metaDescription: text(110, 170),
+    leadBeforeAudio: text(80, 700),
+    shortAnswer: text(80, 700),
+    primaryPracticeIntro: text(30, 400),
+    introAfterAudio: arrayOf(text(40), 1, 4),
+    sections: arrayOf(
+      object({ id: text(2, 60), title: text(3, 120), blocks: arrayOf({ anyOf: blocks }, 4, 12) }),
+      brief.sections.min,
+      brief.sections.max,
+    ),
+    faq: arrayOf(object({ question: text(10), answer: text(40) }), brief.faq.min, brief.faq.max),
+    closingSection: object({ paragraphs: arrayOf(text(40), 1, 3) }),
     relatedPracticeBlurbs: object(blurbs),
-    seeAlsoLinks: { type: "array", items: object({ href: str, title: str, description: str }) },
+    seeAlsoLinks: arrayOf(object({ href: str, title: str, description: str }), brief.seeAlso.min, brief.seeAlso.max),
   });
 }
 
@@ -98,15 +105,17 @@ export function buildMessages(brief, context) {
     brief.audience ? `Аудитория: ${brief.audience}` : null,
     `Главный ключ: «${brief.primaryKeyword}». Он должен стоять в title, metaTitle и metaDescription и 1–3 раза в тексте, без переспама.`,
     brief.secondaryKeywords.length
-      ? `Дополнительные ключи (по 1 разу, естественно): ${brief.secondaryKeywords.map((k) => `«${k}»`).join(", ")}.`
+      ? `Дополнительные ключи (по 1 разу, естественно; можно склонять и менять лицо, текст должен оставаться грамматически правильным): ${brief.secondaryKeywords.map((k) => `«${k}»`).join(", ")}.`
       : null,
-    `Объём основного текста: ${brief.wordCount.min}–${brief.wordCount.max} слов (без FAQ и метаданных).`,
-    `Разделов (sections): ${brief.sections.min}–${brief.sections.max}; id разделов – латиница через дефис; в каждом разделе 2–5 блоков.`,
+    `Объём основного текста (leadBeforeAudio + introAfterAudio + sections + closingSection, без FAQ и метаданных): ${brief.wordCount.min}–${brief.wordCount.max} слов. Это жёсткое требование: короче ${brief.wordCount.min} слов статья не принимается. Ориентир – ${Math.round(brief.wordCount.min * 7.5)}–${Math.round(brief.wordCount.max * 7)} знаков основного текста; лучше чуть длиннее минимума, чем короче.`,
+    `Разделов (sections): ${brief.sections.min}–${brief.sections.max}; id разделов – латиница через дефис; в каждом разделе 4–7 содержательных блоков и около ${Math.ceil((brief.wordCount.min + 150) / brief.sections.min)} слов; абзацы по 50–100 слов, без пустых и повторяющихся блоков.`,
     `FAQ: ${brief.faq.min}–${brief.faq.max} вопросов, каждый вопрос заканчивается «?».`,
     `seeAlsoLinks: ${brief.seeAlso.min}–${brief.seeAlso.max} ссылок только из списка разрешённых статей /articles/…`,
     "metaTitle до 70 символов и заканчивается « – АудиоЛад»; metaDescription 120–170 символов; breadcrumbTitle до 45 символов.",
     "closingSection.paragraphs – 1–2 абзаца итога (раздел «Главное» добавится автоматически).",
     `Ссылка на основную практику ${brief.primaryPractice.href} обязательна хотя бы в одном rich_paragraph.`,
+    "Практики называй точно так, как в их title выше, в «ёлочках»; другие названия не придумывай.",
+    "Между текстовым сегментом и ссылкой ставь пробел внутри text (\"попробуйте \", затем ссылка). Числовые диапазоны – через «–»: 5–10 минут.",
     `Минимум ${brief.minInternalArticleLinks} ссылки на разные статьи /articles/… в rich_paragraph (только из списка).`,
     tableAllowed
       ? `Таблица (block kind "table"): ${brief.table.mode === "required" ? "обязательна, ровно одна" : "по желанию, не больше одной"}; ${brief.table.columns ? `колонки: ${brief.table.columns.join(" | ")}` : "2–4 колонки"}; строк ${brief.table.rows.min}–${brief.table.rows.max}; у каждой строки столько ячеек, сколько колонок. ${brief.table.note}`
@@ -155,7 +164,12 @@ export function buildMessages(brief, context) {
   return { messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }], tableAllowed };
 }
 
-export function buildRepairMessages(messages, previousArticle, errors) {
+export function buildRepairMessages(messages, previousArticle, errors, stats = {}) {
+  const hints = [];
+  if (errors.some((e) => e.startsWith("объём основного текста")) && stats.words) {
+    hints.push(`Сейчас в основном тексте ${stats.words} слов: допиши содержательные абзацы в разделы, чтобы попасть в диапазон.`);
+  }
+  hints.push("Сохрани все ссылки {href, label} (на практики и статьи) и все дословные цитаты.");
   return [
     ...messages,
     { role: "assistant", content: JSON.stringify(previousArticle) },
@@ -167,6 +181,8 @@ export function buildRepairMessages(messages, previousArticle, errors) {
         "",
         "ОШИБКИ:",
         list(errors),
+        "",
+        ...hints,
       ].join("\n"),
     },
   ];
@@ -184,4 +200,54 @@ export function buildRequest(model, messages, schema, options = {}) {
       json_schema: { name: "audiolad_practice_article", strict: true, schema },
     },
   };
+}
+
+// --- Expansion -------------------------------------------------------------------------
+// gpt-oss tends to stop well below the requested length, and a full rewrite ("repair") rarely
+// grows the text. So, when the first draft is too short, one extra call asks only for new
+// plain paragraphs per section; they are merged deterministically and then validated as usual.
+export const EXPAND_MAX_PARAGRAPHS = 3;
+
+export function expandSchema(brief) {
+  return object({
+    additions: arrayOf(
+      object({ sectionIndex: { type: "integer" }, paragraphs: arrayOf(str, 0, EXPAND_MAX_PARAGRAPHS) }),
+      0,
+      brief.sections.max,
+    ),
+  });
+}
+
+export function buildExpandMessages(brief, article, words) {
+  const missing = Math.max(0, brief.wordCount.min + 120 - words);
+  const outline = (article.sections ?? []).map((section, index) => `${index}. ${section?.title ?? ""}`).join("\n");
+  const user = [
+    `Статья ниже слишком короткая: ${words} слов в основном тексте, нужно не меньше ${brief.wordCount.min}.`,
+    `Допиши примерно ${missing} слов новыми абзацами в разделы (sectionIndex – номер раздела из списка).`,
+    `Каждый абзац 60–100 слов, по делу, без повторов уже сказанного и без воды. Не больше ${EXPAND_MAX_PARAGRAPHS} абзацев на раздел.`,
+    "Только обычный текст: без ссылок, без цитат в кавычках, без обещаний лечения и гарантированного результата, без длинного тире (U+2014) – только «–».",
+    "Пиши на «вы», тем же тоном, что и статья.",
+    "",
+    "РАЗДЕЛЫ:",
+    outline,
+    "",
+    "СТАТЬЯ (JSON):",
+    JSON.stringify(article),
+  ].join("\n");
+  return [{ role: "system", content: SYSTEM }, { role: "user", content: user }];
+}
+
+export function mergeExpansion(article, expansion, { maxBlocks = 12 } = {}) {
+  const merged = structuredClone(article);
+  let added = 0;
+  for (const addition of expansion?.additions ?? []) {
+    const section = merged.sections?.[addition?.sectionIndex];
+    if (!section || !Array.isArray(section.blocks)) continue;
+    for (const paragraph of addition.paragraphs ?? []) {
+      if (typeof paragraph !== "string" || !paragraph.trim() || section.blocks.length >= maxBlocks) continue;
+      section.blocks.push({ kind: "paragraph", text: paragraph.trim() });
+      added += 1;
+    }
+  }
+  return { article: merged, added };
 }
