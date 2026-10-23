@@ -2,8 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  canUseInteractiveCoverCrop,
+  COVER_NOT_SQUARE_MESSAGE,
+  decideCoverUploadAction,
+  isCoverSquare,
+  readCoverImageDimensions,
+  validateCoverFile,
+} from "@/lib/author-products/cover-validation-client";
 import type { AuthorProductDetail } from "@/lib/author-products/types";
-import { validateCoverFile } from "@/lib/author-products/cover-validation-client";
 import { buildProductCoverResponsiveProps } from "@/lib/products/cover-display";
 
 export type CoverUploadResult = {
@@ -47,6 +54,12 @@ export function useCoverUpload({
   );
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const localPreviewUrlRef = useRef<string | null>(null);
+  const cropUrlRef = useRef<string | null>(null);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [cropSourceFile, setCropSourceFile] = useState<File | null>(null);
+  const [isCropOpen, setIsCropOpen] = useState(false);
+  const [isSavingCrop, setIsSavingCrop] = useState(false);
+  const [isPreparingCrop, setIsPreparingCrop] = useState(false);
 
   const resolvedCover = useMemo(
     () =>
@@ -71,6 +84,11 @@ export function useCoverUpload({
         URL.revokeObjectURL(localPreviewUrlRef.current);
         localPreviewUrlRef.current = null;
       }
+
+      if (cropUrlRef.current) {
+        URL.revokeObjectURL(cropUrlRef.current);
+        cropUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -84,15 +102,33 @@ export function useCoverUpload({
   }, []);
 
   const openPicker = useCallback(() => {
-    if (disabled || uploading || deleting) {
+    if (disabled || uploading || deleting || isPreparingCrop || isSavingCrop || isCropOpen) {
       return;
     }
 
     fileInputRef.current?.click();
-  }, [deleting, disabled, uploading]);
+  }, [deleting, disabled, isCropOpen, isPreparingCrop, isSavingCrop, uploading]);
+
+  const revokeCropUrl = useCallback(() => {
+    if (cropUrlRef.current) {
+      URL.revokeObjectURL(cropUrlRef.current);
+      cropUrlRef.current = null;
+    }
+  }, []);
+
+  const closeCropper = useCallback(() => {
+    if (isSavingCrop || uploading) {
+      return;
+    }
+
+    setIsCropOpen(false);
+    setCropImageSrc(null);
+    setCropSourceFile(null);
+    revokeCropUrl();
+  }, [isSavingCrop, revokeCropUrl, uploading]);
 
   const uploadFile = useCallback(
-    async (file: File) => {
+    async (file: File): Promise<boolean> => {
       setUploading(true);
       setError(null);
       setDisplayError(null);
@@ -103,7 +139,23 @@ export function useCoverUpload({
       if (validationError) {
         setError(validationError);
         setUploading(false);
-        return;
+        return false;
+      }
+
+      try {
+        const { width, height } = await readCoverImageDimensions(file);
+
+        if (!isCoverSquare(width, height)) {
+          setError(COVER_NOT_SQUARE_MESSAGE);
+          setUploading(false);
+          return false;
+        }
+      } catch {
+        setError(
+          "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.",
+        );
+        setUploading(false);
+        return false;
       }
 
       clearLocalPreview();
@@ -116,7 +168,7 @@ export function useCoverUpload({
 
         if (!practiceId) {
           setError("Не удалось загрузить обложку.");
-          return;
+          return false;
         }
 
         const formData = new FormData();
@@ -137,9 +189,9 @@ export function useCoverUpload({
 
         if (response.status === 413) {
           setError(
-            "Файл слишком большой. Максимальный размер обложки — 3 МБ.",
+            "Файл слишком большой. Максимальный размер обложки – 3 МБ.",
           );
-          return;
+          return false;
         }
 
         const responseText = await response.text();
@@ -156,7 +208,7 @@ export function useCoverUpload({
           } catch {
             if (!response.ok) {
               setError("Не удалось загрузить обложку.");
-              return;
+              return false;
             }
           }
         }
@@ -167,7 +219,7 @@ export function useCoverUpload({
           } else {
             setError("Не удалось загрузить обложку.");
           }
-          return;
+          return false;
         }
 
         const nextCoverUrl =
@@ -190,8 +242,10 @@ export function useCoverUpload({
         setError(null);
         setDisplayError(null);
         setPreviewFailureKey(null);
+        return true;
       } catch {
         setError("Не удалось загрузить обложку.");
+        return false;
       } finally {
         setUploading(false);
       }
@@ -284,16 +338,95 @@ export function useCoverUpload({
     onUpdated,
   ]);
 
+  const openCropper = useCallback(
+    (file: File) => {
+      revokeCropUrl();
+      const objectUrl = URL.createObjectURL(file);
+      cropUrlRef.current = objectUrl;
+      setCropSourceFile(file);
+      setCropImageSrc(objectUrl);
+      setIsCropOpen(true);
+    },
+    [revokeCropUrl],
+  );
+
+  const handleCropConfirm = useCallback(
+    async (file: File) => {
+      setIsSavingCrop(true);
+
+      try {
+        const saved = await uploadFile(file);
+
+        if (saved) {
+          setIsCropOpen(false);
+          setCropImageSrc(null);
+          setCropSourceFile(null);
+          revokeCropUrl();
+        }
+      } finally {
+        setIsSavingCrop(false);
+      }
+    },
+    [revokeCropUrl, uploadFile],
+  );
+
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       event.target.value = "";
 
-      if (file) {
-        void uploadFile(file);
+      if (!file || disabled || uploading || deleting || isSavingCrop) {
+        return;
       }
+
+      setError(null);
+      setDisplayError(null);
+      setIsPreparingCrop(true);
+
+      void (async () => {
+        try {
+          const validationError = await validateCoverFile(file);
+
+          if (validationError) {
+            setError(validationError);
+            return;
+          }
+
+          const { width, height } = await readCoverImageDimensions(file);
+          const decision = decideCoverUploadAction(
+            width,
+            height,
+            canUseInteractiveCoverCrop(),
+          );
+
+          if (decision.action === "reject") {
+            setError(decision.message);
+            return;
+          }
+
+          if (decision.action === "upload") {
+            await uploadFile(file);
+            return;
+          }
+
+          openCropper(file);
+        } catch {
+          setError(
+            "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.",
+          );
+        } finally {
+          setIsPreparingCrop(false);
+        }
+      })();
     },
-    [uploadFile],
+    [
+      deleting,
+      disabled,
+      isSavingCrop,
+      openCropper,
+      uploadFile,
+      uploading,
+    ],
   );
 
   const handlePreviewLoad = useCallback(() => {
@@ -323,6 +456,13 @@ export function useCoverUpload({
     handleFileChange,
     handlePreviewLoad,
     handlePreviewError,
-    isBusy: uploading || deleting,
+    isPreparingCrop,
+    isCropOpen,
+    isBusy: uploading || deleting || isPreparingCrop || isSavingCrop,
+    cropImageSrc,
+    cropSourceFile,
+    isSavingCrop,
+    closeCropper,
+    handleCropConfirm,
   };
 }

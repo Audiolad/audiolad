@@ -12,6 +12,15 @@ type AvatarCropperModalProps = {
   sourceMime?: string;
   isOpen: boolean;
   isSaving?: boolean;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  frameLabel?: string;
+  externalError?: string | null;
+  minCropSourcePx?: number;
+  maxOutputSize?: number;
+  outputFileBase?: string;
+  cropKind?: string;
   onCancel: () => void;
   onConfirm: (file: File) => void | Promise<void>;
 };
@@ -36,6 +45,15 @@ function AvatarCropperContent({
   sourceBlob,
   sourceMime,
   isSaving = false,
+  title = "Настройте фотографию",
+  description = "Перемещайте и масштабируйте изображение, чтобы выбрать область, которая будет видна в профиле",
+  confirmLabel = "Сохранить",
+  frameLabel,
+  externalError = null,
+  minCropSourcePx,
+  maxOutputSize,
+  outputFileBase,
+  cropKind,
   onCancel,
   onConfirm,
 }: AvatarCropperContentProps) {
@@ -74,19 +92,32 @@ function AvatarCropperContent({
         cropContainerRef.current?.clientWidth ??
         cropContainerRef.current?.offsetWidth ??
         360;
-      const nextMinZoom = computeCoverMinZoom(
+      let nextMinZoom = computeCoverMinZoom(
         mediaSize.naturalWidth,
         mediaSize.naturalHeight,
         cropSize,
         cropSize,
       );
-      const nextMaxZoom = Math.max(nextMinZoom * 4, 4);
+      const shortSide = Math.min(
+        mediaSize.naturalWidth,
+        mediaSize.naturalHeight,
+      );
+      let nextMaxZoom = Math.max(nextMinZoom * 4, 4);
+
+      if (minCropSourcePx && minCropSourcePx > 0 && shortSide > 0) {
+        const room = Math.min(4, Math.max(1, shortSide / minCropSourcePx));
+        // react-easy-crop shows the whole short side at zoom 1. A lower
+        // computed minimum stays clamped there, so the slider would not zoom.
+        const coverZoom = Math.max(nextMinZoom, 1);
+        nextMinZoom = coverZoom;
+        nextMaxZoom = coverZoom * room;
+      }
 
       setMinZoom(nextMinZoom);
-      setMaxZoom(nextMaxZoom);
+      setMaxZoom(Math.max(nextMaxZoom, nextMinZoom));
       setZoom(nextMinZoom);
     },
-    [],
+    [minCropSourcePx],
   );
 
   const handleBackdropClick = useCallback(() => {
@@ -107,6 +138,8 @@ function AvatarCropperContent({
     try {
       const output = await cropAvatarToBlob(sourceBlob, croppedAreaPixels, {
         sourceMime: sourceMime ?? sourceBlob.type,
+        maxOutputSize,
+        fileBase: outputFileBase,
       });
       const file = new File([output.blob], output.fileName, {
         type: output.mimeType,
@@ -117,7 +150,15 @@ function AvatarCropperContent({
     } catch {
       setLocalError("Не удалось подготовить изображение. Попробуйте ещё раз.");
     }
-  }, [croppedAreaPixels, isSaving, onConfirm, sourceBlob, sourceMime]);
+  }, [
+    croppedAreaPixels,
+    isSaving,
+    maxOutputSize,
+    onConfirm,
+    outputFileBase,
+    sourceBlob,
+    sourceMime,
+  ]);
 
   return (
     <div
@@ -130,7 +171,8 @@ function AvatarCropperContent({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="flex max-h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[24px] border border-[#eadff8] bg-white shadow-[0_20px_50px_rgba(86,52,141,0.22)] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]"
+        data-crop-kind={cropKind}
+        className="flex max-h-[100dvh] w-full max-w-[480px] flex-col overflow-y-auto rounded-t-[24px] border border-[#eadff8] bg-white shadow-[0_20px_50px_rgba(86,52,141,0.22)] sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]"
         style={{
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
@@ -139,11 +181,10 @@ function AvatarCropperContent({
         <div className="flex items-start justify-between gap-3 border-b border-[#f0e8f8] px-5 pb-4 pt-5">
           <div className="min-w-0">
             <h2 id={titleId} className="text-[20px] font-semibold text-[#25135c]">
-              Настройте фотографию
+              {title}
             </h2>
             <p id={descriptionId} className="mt-2 text-sm leading-6 text-[#796ba0]">
-              Перемещайте и масштабируйте изображение, чтобы выбрать область, которая
-              будет видна в профиле
+              {description}
             </p>
           </div>
 
@@ -158,9 +199,14 @@ function AvatarCropperContent({
           </button>
         </div>
 
+        {frameLabel ? (
+          <p className="px-5 pt-4 text-sm font-medium text-[#65577f]">{frameLabel}</p>
+        ) : null}
+
         <div
           ref={cropContainerRef}
-          className="relative mx-auto mt-4 aspect-square w-full max-w-[min(100%,360px)] touch-none bg-[#1b1230]"
+          aria-label={frameLabel ?? "Область кадрирования"}
+          className="relative mx-auto mt-4 aspect-square w-full max-w-[min(100%,360px)] max-h-[min(360px,52dvh)] touch-none bg-[#1b1230]"
         >
           <Cropper
             image={imageSrc}
@@ -206,6 +252,9 @@ function AvatarCropperContent({
         {localError ? (
           <p className="px-5 pt-4 text-sm text-[#b34f63]">{localError}</p>
         ) : null}
+        {externalError ? (
+          <p className="px-5 pt-4 text-sm text-[#b34f63]">{externalError}</p>
+        ) : null}
 
         <div
           className="mt-5 flex flex-col-reverse gap-3 px-5 pb-5 sm:flex-row sm:justify-end"
@@ -227,7 +276,7 @@ function AvatarCropperContent({
             onClick={() => void handleConfirm()}
             className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {isSaving ? "Сохранение…" : "Сохранить"}
+            {isSaving ? "Сохранение…" : confirmLabel}
           </button>
         </div>
       </div>
@@ -241,6 +290,15 @@ export default function AvatarCropperModal({
   sourceMime,
   isOpen,
   isSaving = false,
+  title,
+  description,
+  confirmLabel,
+  frameLabel,
+  externalError,
+  minCropSourcePx,
+  maxOutputSize,
+  outputFileBase,
+  cropKind,
   onCancel,
   onConfirm,
 }: AvatarCropperModalProps) {
@@ -268,6 +326,15 @@ export default function AvatarCropperModal({
       sourceBlob={sourceBlob}
       sourceMime={sourceMime}
       isSaving={isSaving}
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      frameLabel={frameLabel}
+      externalError={externalError}
+      minCropSourcePx={minCropSourcePx}
+      maxOutputSize={maxOutputSize}
+      outputFileBase={outputFileBase}
+      cropKind={cropKind}
       onCancel={onCancel}
       onConfirm={onConfirm}
     />
