@@ -424,7 +424,7 @@ BEGIN
   WHERE guest_id = p_guest_id AND practice_id = p_practice_id
   FOR UPDATE;
 
-  IF FOUND AND v_row.superseded_at IS NOT NULL THEN
+  IF FOUND AND (v_row.superseded_at IS NOT NULL OR v_row.claimed_by_user_id IS NOT NULL) THEN
     RAISE EXCEPTION 'guest_rating_claimed';
   END IF;
 
@@ -456,7 +456,7 @@ BEGIN
     END;
   END IF;
 
-  IF FOUND AND v_row.superseded_at IS NOT NULL THEN
+  IF FOUND AND (v_row.superseded_at IS NOT NULL OR v_row.claimed_by_user_id IS NOT NULL) THEN
     RAISE EXCEPTION 'guest_rating_claimed';
   END IF;
 
@@ -537,6 +537,9 @@ BEGIN
     WHERE guest_id = p_guest_id
       AND superseded_at IS NULL
       AND claimed_by_user_id IS NULL
+      -- Votes excluded by moderation never reach the account or the public
+      -- aggregate. They stay with the guest, unclaimed and unchanged.
+      AND excluded_at IS NULL
     ORDER BY created_at
     FOR UPDATE
   LOOP
@@ -615,7 +618,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz, boolean) IS
-  'Binds guest votes to an account. Existing account stars win and the guest row is superseded without rewriting practice_ratings. When p_copy_to_account is true and the account has no vote, set_practice_rating copies the stars once and the guest row is superseded. Otherwise the guest row is only linked and practice_ratings is not written. Already linked rows are left as they are. Nothing is deleted.';
+  'Binds guest votes to an account. Existing account stars win and the guest row is superseded without rewriting practice_ratings. When p_copy_to_account is true and the account has no vote, set_practice_rating copies the stars once and the guest row is superseded. Otherwise the guest row is only linked and practice_ratings is not written. Already linked rows are left as they are. Rows with excluded_at set are skipped entirely: they are not copied, superseded or linked. Nothing is deleted.';
 
 REVOKE ALL ON FUNCTION public.claim_guest_practice_ratings(uuid, uuid, timestamptz, boolean)
   FROM PUBLIC, anon, authenticated;

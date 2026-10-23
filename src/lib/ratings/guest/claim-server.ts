@@ -19,6 +19,14 @@ export type GuestRatingClaimResult = {
   linked: number;
 };
 
+type ClaimRpc = (
+  fn: "claim_guest_practice_ratings",
+  args: { p_guest_id: string; p_user_id: string; p_copy_to_account: boolean },
+) => PromiseLike<{ data: unknown; error: unknown }>;
+
+const defaultClaimRpc: ClaimRpc = (fn, args) =>
+  createServiceRoleClient().rpc(fn, args);
+
 const EMPTY_CLAIM: GuestRatingClaimResult = {
   claimed: 0,
   superseded: 0,
@@ -34,6 +42,8 @@ export async function claimGuestRatingsForUser(input: {
   userId: string;
   cookieHeader: string | null;
   env?: EnvLike;
+  /** Test seam. Production always uses the service-role client. */
+  rpc?: ClaimRpc;
 }): Promise<GuestRatingClaimResult> {
   const env = input.env ?? process.env;
   // Flags off: do not read or write ratings. The guest cookie stays so a
@@ -56,8 +66,8 @@ export async function claimGuestRatingsForUser(input: {
     return EMPTY_CLAIM;
   }
 
-  const writer = createServiceRoleClient();
-  const { data, error } = await writer.rpc("claim_guest_practice_ratings", {
+  const rpc = input.rpc ?? defaultClaimRpc;
+  const { data, error } = await rpc("claim_guest_practice_ratings", {
     p_guest_id: session.guestId,
     p_user_id: input.userId,
     p_copy_to_account: isGuestRatingsClaimCopyEnabled(env),

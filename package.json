@@ -288,7 +288,7 @@
     "test:practice-audio-progress-security": "npx tsx scripts/practice-audio-progress-security-unit.mts && node scripts/practice-audio-progress-rls-sql-unit.mjs",
     "test:practice-listen-stats": "npx tsx scripts/practice-listen-stats-unit.mts && node scripts/practice-listen-stats-rls-sql-unit.mjs",
     "test:practice-ratings": "npx tsx scripts/practice-ratings-unit.mts && node scripts/practice-ratings-rls-sql-unit.mjs",
-    "test:guest-ratings": "npx tsx scripts/guest-ratings-unit.mts && node scripts/guest-ratings-sql-unit.mjs",
+    "test:guest-ratings": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/guest-ratings-unit.mts && node scripts/guest-ratings-sql-unit.mjs",
     "test:admin-ratings": "npx tsx scripts/admin-ratings-analytics-unit.mts && node scripts/admin-ratings-analytics-sql-unit.mjs",
     "test:admin-ratings-listeners": "npx tsx scripts/admin-ratings-listeners-unit.mts && node scripts/admin-ratings-listeners-sql-unit.mjs",
     "test:listen-session-slug-collision": "npx tsx scripts/listen-session-slug-collision-unit.mts",

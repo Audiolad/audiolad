@@ -6,6 +6,8 @@ DECLARE
   v_guest_short uuid := '22222222-2222-4222-8222-222222222222';
   v_guest_gap uuid := '44444444-4444-4444-8444-444444444444';
   v_guest_link uuid := '55555555-5555-4555-8555-555555555555';
+  v_guest_excl uuid := '66666666-6666-4666-8666-666666666666';
+  v_excl uuid := 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   v_user uuid := '33333333-3333-4333-8333-333333333333';
   v_practice uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   v_music uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -28,7 +30,8 @@ BEGIN
   INSERT INTO public.practices (id, title, product_kind) VALUES
     (v_practice, 'Тишина', 'practice'),
     (v_music, 'Ночной мотив', 'music'),
-    (v_link, 'Связка', 'practice');
+    (v_link, 'Связка', 'practice'),
+    (v_excl, 'Исключённая', 'practice');
   INSERT INTO auth.users (id) VALUES (v_user);
   INSERT INTO public.practice_ratings (user_id, practice_id, stars)
   VALUES (v_user, v_music, 2);
@@ -183,6 +186,23 @@ BEGIN
     RAISE EXCEPTION 'link-only changed the registered count';
   END IF;
 
+  -- A link-only row is bound to the account: the old guest cookie can no
+  -- longer change it, even though superseded_at stays null.
+  BEGIN
+    PERFORM * FROM public.set_guest_practice_rating(
+      v_guest_link, v_link, 5, 'listen', NULL, NULL, NULL, v_t0 + interval '71 seconds'
+    );
+    RAISE EXCEPTION 'linked guest row was editable';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM <> 'guest_rating_claimed' THEN
+        RAISE;
+      END IF;
+  END;
+  IF (SELECT stars FROM public.guest_practice_ratings WHERE guest_id = v_guest_link AND practice_id = v_link) <> 3 THEN
+    RAISE EXCEPTION 'linked guest row stars changed';
+  END IF;
+
   SELECT action INTO v_action
   FROM public.claim_guest_practice_ratings(v_guest_link, v_user, v_t0 + interval '72 seconds', true)
   WHERE practice_id = v_link;
@@ -217,6 +237,47 @@ BEGIN
     WHERE superseded_at IS NULL AND claimed_by_user_id IS NULL
   ) THEN
     RAISE EXCEPTION 'guest rows stayed in the active aggregate';
+  END IF;
+
+  -- Moderation-excluded guest vote: claim with copy on must skip it, so it
+  -- never reaches practice_ratings (account or public rating).
+  PERFORM public.apply_guest_listen_stats_heartbeat(
+    v_guest_excl, v_excl, v_track, 0, true, 4000, 4000, NULL, v_t0
+  );
+  PERFORM public.apply_guest_listen_stats_heartbeat(
+    v_guest_excl, v_excl, v_track, 4000, true, 4000, 4000, NULL, v_t0 + interval '4 seconds'
+  );
+  PERFORM public.set_guest_practice_rating(
+    v_guest_excl, v_excl, 1, 'listen', NULL, NULL, NULL, v_t0 + interval '5 seconds'
+  );
+  UPDATE public.guest_practice_ratings
+  SET excluded_at = v_t0 + interval '6 seconds'
+  WHERE guest_id = v_guest_excl AND practice_id = v_excl;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.claim_guest_practice_ratings(v_guest_excl, v_user, v_t0 + interval '74 seconds', true)
+  ) THEN
+    RAISE EXCEPTION 'excluded guest vote was claimed';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.practice_ratings WHERE practice_id = v_excl) THEN
+    RAISE EXCEPTION 'excluded guest vote reached practice_ratings';
+  END IF;
+  IF (SELECT count(*) FROM public.practice_ratings) <> 2 THEN
+    RAISE EXCEPTION 'excluded claim changed the registered count';
+  END IF;
+  SELECT claimed_by_user_id, superseded_at
+  INTO v_linked_user, v_linked_at
+  FROM public.guest_practice_ratings
+  WHERE guest_id = v_guest_excl AND practice_id = v_excl;
+  IF v_linked_user IS NOT NULL OR v_linked_at IS NOT NULL THEN
+    RAISE EXCEPTION 'excluded guest row was linked or superseded';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.guest_practice_rating_events
+    WHERE guest_id = v_guest_excl AND action IN ('claimed', 'superseded', 'linked')
+  ) THEN
+    RAISE EXCEPTION 'excluded guest vote produced a claim event';
   END IF;
 
   SELECT count(*) INTO v_events

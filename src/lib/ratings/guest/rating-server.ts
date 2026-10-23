@@ -35,6 +35,7 @@ import {
   GUEST_RATING_HARD_WINDOW_MS,
 } from "@/lib/ratings/guest/suspicion";
 import { resolveDisplayedRatingAggregates } from "@/lib/ratings/guest/aggregate";
+import { isGuestRatingRowClaimed } from "@/lib/ratings/guest/claim";
 import { EMPTY_RATING_AGGREGATE, type PracticeRatingAggregate } from "@/lib/ratings/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -43,6 +44,7 @@ type GuestRatingRow = {
   created_at: string;
   updated_at: string;
   superseded_at: string | null;
+  claimed_by_user_id: string | null;
 };
 
 type ListenRow = {
@@ -126,7 +128,7 @@ export async function handleGuestPracticeRatingGet(input: {
     const [ratingResult, listenResult, recent, activity] = await Promise.all([
       writer
         .from("guest_practice_ratings")
-        .select("stars, created_at, updated_at, superseded_at")
+        .select("stars, created_at, updated_at, superseded_at, claimed_by_user_id")
         .eq("guest_id", session.guestId)
         .eq("practice_id", input.practiceId)
         .maybeSingle(),
@@ -153,7 +155,7 @@ export async function handleGuestPracticeRatingGet(input: {
     }
 
     const row = ratingResult.data as GuestRatingRow | null;
-    if (row && row.superseded_at == null) {
+    if (row && !isGuestRatingRowClaimed(row)) {
       stars = parseStars(row.stars);
       createdAt = row.created_at;
       updatedAt = row.updated_at;
@@ -247,7 +249,7 @@ export async function handleGuestPracticeRatingPut(input: {
         .maybeSingle(),
       writer
         .from("guest_practice_ratings")
-        .select("superseded_at")
+        .select("superseded_at, claimed_by_user_id")
         .eq("guest_id", session.guestId)
         .eq("practice_id", input.practiceId)
         .maybeSingle(),
@@ -268,7 +270,11 @@ export async function handleGuestPracticeRatingPut(input: {
     }
 
     eligible = (listenResult.data as ListenRow | null)?.rating_eligible_at != null;
-    claimed = (ratingResult.data as { superseded_at?: string | null } | null)?.superseded_at != null;
+    const ratingRow = ratingResult.data as Pick<
+      GuestRatingRow,
+      "superseded_at" | "claimed_by_user_id"
+    > | null;
+    claimed = ratingRow != null && isGuestRatingRowClaimed(ratingRow);
     const events = (recent.data ?? []) as Array<{ occurred_at: string }>;
     const tenMinAgo = Date.now() - 10 * 60 * 1000;
     votesIn10Min = events.filter((event) => Date.parse(event.occurred_at) >= tenMinAgo).length;

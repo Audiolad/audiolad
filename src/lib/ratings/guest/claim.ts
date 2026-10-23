@@ -6,7 +6,7 @@
  * Rows are not deleted.
  */
 export type GuestRatingClaimPlan =
-  | { action: "skip"; reason: "collect_off" }
+  | { action: "skip"; reason: "collect_off" | "excluded" }
   | { action: "link_only" }
   | { action: "copy_to_account"; stars: number }
   | { action: "supersede_guest"; reason: "account_vote" };
@@ -16,9 +16,16 @@ export function planGuestRatingClaim(input: {
   copyEnabled: boolean;
   guestStars: number;
   accountStars: number | null;
+  /** Moderation excluded this guest vote (excluded_at is set). */
+  excluded?: boolean;
 }): GuestRatingClaimPlan {
   if (!input.collectEnabled) {
     return { action: "skip", reason: "collect_off" };
+  }
+  // Mirrors claim_guest_practice_ratings: an excluded vote is never copied,
+  // superseded or linked, so it cannot reach the account or public rating.
+  if (input.excluded) {
+    return { action: "skip", reason: "excluded" };
   }
   if (input.accountStars != null) {
     return { action: "supersede_guest", reason: "account_vote" };
@@ -27,6 +34,19 @@ export function planGuestRatingClaim(input: {
     return { action: "link_only" };
   }
   return { action: "copy_to_account", stars: input.guestStars };
+}
+
+/**
+ * A guest row is closed for edits once it is bound to an account: either a
+ * copy-claim / account vote superseded it, or a link-only claim set
+ * claimed_by_user_id. Mirrors the guest_rating_claimed check in
+ * set_guest_practice_rating.
+ */
+export function isGuestRatingRowClaimed(row: {
+  superseded_at?: string | null;
+  claimed_by_user_id?: string | null;
+}): boolean {
+  return row.superseded_at != null || row.claimed_by_user_id != null;
 }
 
 export function shouldClearGuestRatingCookie(result: {

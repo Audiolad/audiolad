@@ -1,20 +1,17 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
+  GUEST_RATING_TEST_SESSION_SECRET,
   isGuestRatingsProductionEnv,
   isGuestRatingsTestMode,
 } from "@/lib/ratings/guest/feature";
+
+export { GUEST_RATING_TEST_SESSION_SECRET };
 
 export const GUEST_RATING_COOKIE_NAME = "al_guest";
 export const GUEST_RATING_COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
 const MAX_AGE_MS = GUEST_RATING_COOKIE_MAX_AGE_SECONDS * 1000;
 const FUTURE_SKEW_MS = 5 * 60 * 1000;
-
-/**
- * Used only when GUEST_RATINGS_TEST_MODE is explicitly on and no
- * GUEST_RATINGS_SESSION_SECRET is configured. Not a production secret.
- */
-export const GUEST_RATING_TEST_SESSION_SECRET = "guest-ratings-test-mode-v1";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,6 +28,15 @@ export function resolveGuestRatingSessionSecret(
 ): string | null {
   const configured = env.GUEST_RATINGS_SESSION_SECRET?.trim();
   if (configured) {
+    // The test constant is public (it ships in this repository). If it is
+    // set as the production secret by mistake, cookie signatures would be
+    // forgeable, so production fails closed instead.
+    if (
+      configured === GUEST_RATING_TEST_SESSION_SECRET &&
+      isGuestRatingsProductionEnv(env)
+    ) {
+      return null;
+    }
     return configured;
   }
   // The constant is not a signing key on the public site. A missing

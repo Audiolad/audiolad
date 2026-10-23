@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const migrationName = "20270113120000_guest_practice_ratings.sql";
+const migrationName = "20270116120000_guest_practice_ratings.sql";
 const migration = readFileSync(
   join(repoRoot, "supabase/migrations", migrationName),
   "utf8",
@@ -73,6 +73,17 @@ assert.match(migration, /action IN \('first', 'changed', 'claimed', 'superseded'
   assert.ok(copyAt >= 0 && performAt > copyAt && linkedAt > performAt);
 }
 assert.match(migration, /v_row\.stars = p_stars/);
+{
+  const claimAt = migration.indexOf("CREATE OR REPLACE FUNCTION public.claim_guest_practice_ratings");
+  const loopAt = migration.indexOf("FOR v_guest IN", claimAt);
+  const exclAt = migration.indexOf("AND excluded_at IS NULL", loopAt);
+  const forUpdateAt = migration.indexOf("FOR UPDATE", loopAt);
+  assert.ok(claimAt >= 0 && loopAt > claimAt && exclAt > loopAt && forUpdateAt > exclAt);
+}
+assert.equal(
+  migration.match(/IF FOUND AND \(v_row\.superseded_at IS NOT NULL OR v_row\.claimed_by_user_id IS NOT NULL\) THEN/g)?.length,
+  2,
+);
 assert.doesNotMatch(migration, /CREATE POLICY/);
 assert.doesNotMatch(migration, /INSERT INTO auth\.users/i);
 assert.doesNotMatch(migration, /DELETE FROM/i);
@@ -149,7 +160,7 @@ function runIsolatedSmoke() {
     const psql = existsSync(join(bin, "psql")) ? join(bin, "psql") : "psql";
     const out = execFileSync(
       psql,
-      ["-h", dir, "-p", port, "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-q", "-At"],
+      ["-X", "-h", dir, "-p", port, "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-q", "-At"],
       { input: sql, stdio: ["pipe", "pipe", "inherit"] },
     ).toString();
     assert.match(out, /guest_practice_ratings_smoke: PASS/);

@@ -6,6 +6,13 @@ function enabled(value: string | undefined): boolean {
 }
 
 /**
+ * Used only when GUEST_RATINGS_TEST_MODE is explicitly on and no
+ * GUEST_RATINGS_SESSION_SECRET is configured. Not a production secret:
+ * it is public, so production refuses it even when it is set explicitly.
+ */
+export const GUEST_RATING_TEST_SESSION_SECRET = "guest-ratings-test-mode-v1";
+
+/**
  * Production is refused for test secrets and test captcha tokens.
  * An explicit NODE_ENV on the passed env wins, so tests can simulate
  * production without changing the process. A missing NODE_ENV follows
@@ -25,9 +32,11 @@ export function isGuestRatingsCollectEnabled(env: EnvLike = process.env): boolea
   if (!enabled(env.GUEST_RATINGS_COLLECT_ENABLED)) return false;
   // Production without a session secret cannot sign a guest cookie.
   // Treat collection as off so login and voting have no guest effect.
+  // The public test constant is treated as missing in production.
+  const secret = env.GUEST_RATINGS_SESSION_SECRET?.trim();
   if (
     isGuestRatingsProductionEnv(env) &&
-    !env.GUEST_RATINGS_SESSION_SECRET?.trim()
+    (!secret || secret === GUEST_RATING_TEST_SESSION_SECRET)
   ) {
     return false;
   }

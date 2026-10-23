@@ -16,10 +16,12 @@ import {
 } from "../src/lib/ratings/guest/aggregate";
 import { verifyGuestCaptchaToken } from "../src/lib/ratings/guest/captcha";
 import {
+  isGuestRatingRowClaimed,
   planGuestRatingClaim,
   planGuestRatingUpdate,
   shouldClearGuestRatingCookie,
 } from "../src/lib/ratings/guest/claim";
+import { claimGuestRatingsForUser } from "../src/lib/ratings/guest/claim-server";
 import {
   GUEST_RATING_ADMIN_NO_IP_SANCTION,
   formatGuestSessionAdminLabel,
@@ -194,6 +196,52 @@ function testSignedCookie() {
       GUEST_RATINGS_SESSION_SECRET: "real",
     }),
     "real",
+  );
+  // The public test constant is refused as a production secret, even when
+  // it is set explicitly, and collection stays off.
+  for (const value of [
+    GUEST_RATING_TEST_SESSION_SECRET,
+    ` ${GUEST_RATING_TEST_SESSION_SECRET} `,
+  ]) {
+    assert.equal(
+      resolveGuestRatingSessionSecret({
+        NODE_ENV: "production",
+        GUEST_RATINGS_SESSION_SECRET: value,
+      }),
+      null,
+    );
+    assert.equal(
+      resolveGuestRatingSessionSecret({
+        NODE_ENV: "production",
+        GUEST_RATINGS_TEST_MODE: "1",
+        GUEST_RATINGS_SESSION_SECRET: value,
+      }),
+      null,
+    );
+    assert.equal(
+      isGuestRatingsCollectEnabled({
+        NODE_ENV: "production",
+        GUEST_RATINGS_COLLECT_ENABLED: "1",
+        GUEST_RATINGS_SESSION_SECRET: value,
+      }),
+      false,
+    );
+  }
+  assert.equal(
+    isGuestRatingsCollectEnabled({
+      NODE_ENV: "production",
+      GUEST_RATINGS_COLLECT_ENABLED: "1",
+      GUEST_RATINGS_SESSION_SECRET: "real",
+    }),
+    true,
+  );
+  // Outside production the explicit constant still works for local tests.
+  assert.equal(
+    resolveGuestRatingSessionSecret({
+      NODE_ENV: "test",
+      GUEST_RATINGS_SESSION_SECRET: GUEST_RATING_TEST_SESSION_SECRET,
+    }),
+    GUEST_RATING_TEST_SESSION_SECRET,
   );
 }
 
@@ -569,6 +617,29 @@ function testClaimAggregateAndSegments() {
     }),
     { action: "supersede_guest", reason: "account_vote" },
   );
+  for (const copyEnabled of [false, true]) {
+    for (const accountStars of [null, 5]) {
+      assert.deepEqual(
+        planGuestRatingClaim({
+          collectEnabled: true,
+          copyEnabled,
+          guestStars: 4,
+          accountStars,
+          excluded: true,
+        }),
+        { action: "skip", reason: "excluded" },
+      );
+    }
+  }
+  assert.equal(isGuestRatingRowClaimed({ superseded_at: null, claimed_by_user_id: null }), false);
+  assert.equal(
+    isGuestRatingRowClaimed({ superseded_at: "2026-10-23T08:00:00Z", claimed_by_user_id: null }),
+    true,
+  );
+  assert.equal(
+    isGuestRatingRowClaimed({ superseded_at: null, claimed_by_user_id: guestId }),
+    true,
+  );
   assert.equal(
     shouldClearGuestRatingCookie({ claimed: 0, superseded: 0, linked: 0 }),
     false,
@@ -702,13 +773,13 @@ function testSurfacesAndRegisteredRegression() {
   assert.doesNotMatch(copy, /—/);
   assert.match(formatGuestSessionAdminLabel(guestId), /^Гость · ID сессии /);
   assert.match(GUEST_RATING_ADMIN_NO_IP_SANCTION, /не блокируется/);
-  assert.equal(normalizeGuestListenerSearch("sergey@audiolad.ru"), null);
+  assert.equal(normalizeGuestListenerSearch("listener@example.test"), null);
   assert.equal(normalizeGuestListenerSearch("Иван"), null);
   assert.equal(normalizeGuestListenerSearch(guestId), guestId);
 }
 
 function testSourceContracts() {
-  const migration = read("supabase/migrations/20270113120000_guest_practice_ratings.sql");
+  const migration = read("supabase/migrations/20270116120000_guest_practice_ratings.sql");
   assert.match(migration, /UNIQUE \(guest_id, practice_id\)/);
   assert.doesNotMatch(migration, /INSERT INTO auth\.users/i);
   assert.doesNotMatch(migration, /DELETE FROM public\.practice_ratings/i);
@@ -722,10 +793,11 @@ function testSourceContracts() {
   const claimAction = read("src/app/(platform)/auth/claim-guest-ratings/actions.ts");
   assert.match(claimAction, /shouldClearGuestRatingCookie/);
   const claimServer = read("src/lib/ratings/guest/claim-server.ts");
-  const collectGate = claimServer.indexOf("isGuestRatingsCollectEnabled");
-  const claimRpc = claimServer.indexOf("claim_guest_practice_ratings");
-  assert.ok(collectGate >= 0 && claimRpc > collectGate);
   assert.match(claimServer, /p_copy_to_account: isGuestRatingsClaimCopyEnabled/);
+  // Exactly one database entry point, and it goes through the rpc seam that
+  // testClaimServerTouchesNoDbWhenOff() exercises.
+  assert.equal(claimServer.match(/createServiceRoleClient\(\)/g)?.length, 1);
+  assert.doesNotMatch(claimServer, /\.from\(/);
   const ratingServer = read("src/lib/ratings/guest/rating-server.ts");
   const captchaGate = ratingServer.indexOf('preliminary.error === "captcha_required"');
   const captchaVerify = ratingServer.indexOf("await verifyGuestCaptchaToken");
@@ -733,6 +805,71 @@ function testSourceContracts() {
   assert.doesNotMatch(ratingServer, /captcha_failures \+ 1/);
   assert.match(ratingServer, /record_guest_captcha_failure/);
   assert.match(ratingServer, /reset_guest_captcha_failures/);
+}
+
+async function testClaimServerTouchesNoDbWhenOff() {
+  const userId = "33333333-3333-4333-8333-333333333333";
+  const now = Date.now();
+  const token = signGuestRatingSession({ guestId, issuedAtMs: now - 60_000 }, secret);
+  const cookieHeader = `${GUEST_RATING_COOKIE_NAME}=${encodeURIComponent(token)}`;
+  const calls: Array<{ fn: string; args: Record<string, unknown> }> = [];
+  const rpc = async (fn: string, args: Record<string, unknown>) => {
+    calls.push({ fn, args });
+    return { data: [{ action: "linked" }, { action: "claimed" }], error: null };
+  };
+  const empty = { claimed: 0, superseded: 0, linked: 0 };
+  const on = {
+    NODE_ENV: "test",
+    GUEST_RATINGS_COLLECT_ENABLED: "1",
+    GUEST_RATINGS_SESSION_SECRET: secret,
+  };
+
+  // Collection off (default, explicit "0", production without a secret,
+  // production with the public test constant): no database call at all.
+  for (const env of [
+    { NODE_ENV: "test", GUEST_RATINGS_SESSION_SECRET: secret },
+    { NODE_ENV: "test", GUEST_RATINGS_COLLECT_ENABLED: "0", GUEST_RATINGS_SESSION_SECRET: secret },
+    { NODE_ENV: "production", GUEST_RATINGS_COLLECT_ENABLED: "1" },
+    {
+      NODE_ENV: "production",
+      GUEST_RATINGS_COLLECT_ENABLED: "1",
+      GUEST_RATINGS_SESSION_SECRET: GUEST_RATING_TEST_SESSION_SECRET,
+    },
+  ]) {
+    assert.deepEqual(await claimGuestRatingsForUser({ userId, cookieHeader, env, rpc }), empty);
+  }
+  // Collection on but no cookie / forged cookie: still no database call.
+  assert.deepEqual(await claimGuestRatingsForUser({ userId, cookieHeader: null, env: on, rpc }), empty);
+  assert.deepEqual(
+    await claimGuestRatingsForUser({
+      userId,
+      cookieHeader: `${GUEST_RATING_COOKIE_NAME}=${encodeURIComponent(`${token}x`)}`,
+      env: on,
+      rpc,
+    }),
+    empty,
+  );
+  assert.equal(calls.length, 0, JSON.stringify(calls));
+
+  // Collection on with a valid cookie: exactly one rpc, copy flag off by default.
+  assert.deepEqual(await claimGuestRatingsForUser({ userId, cookieHeader, env: on, rpc }), {
+    claimed: 1,
+    superseded: 0,
+    linked: 1,
+  });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], {
+    fn: "claim_guest_practice_ratings",
+    args: { p_guest_id: guestId, p_user_id: userId, p_copy_to_account: false },
+  });
+  await claimGuestRatingsForUser({
+    userId,
+    cookieHeader,
+    env: { ...on, GUEST_RATINGS_CLAIM_COPY_ENABLED: "1" },
+    rpc,
+  });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].args.p_copy_to_account, true);
 }
 
 async function main() {
@@ -746,6 +883,7 @@ async function main() {
   testClaimAggregateAndSegments();
   testSurfacesAndRegisteredRegression();
   testSourceContracts();
+  await testClaimServerTouchesNoDbWhenOff();
   console.log("guest-ratings-unit: ok");
 }
 
