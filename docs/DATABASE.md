@@ -1,6 +1,6 @@
 ## Business access grants and workspace (pending owner approval)
 
-Migration `20270113120000_access_grants_and_workspace.sql` is prepared but has
+Migration `20270115120000_access_grants_and_workspace.sql` is prepared but has
 not been applied by this task. It is the single trial module for tasks
 ba344b7f and 1e008ee8: `access_grants`, `access_paid_periods`,
 `access_grant_events`, `business_space_admissions` and
