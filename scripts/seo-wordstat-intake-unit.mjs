@@ -43,8 +43,10 @@ assert.doesNotMatch(
   /\.update\(\{[^}]*?(?:query_text|source|cluster_id|intent|recommended_format|audio_fit)/s,
 );
 assert.match(route, /\.update\(\{ frequency, frequency_checked_at: frequencyCheckedAt, analysis_status: "analyzed" \}\)\s*\.eq\("id", id\)\s*\.eq\("analysis_status", "not_analyzed"\)/);
-assert.equal([...route.matchAll(/\.update\(/g)].length, 3);
-assert.match(route, /\.update\(\{ analysis_status: "not_analyzed" \}\)\s*\.eq\("id", id\)\s*\.eq\("analysis_status", "analyzed"\)/);
+assert.equal([...route.matchAll(/\.update\(/g)].length, 2);
+// No rollback of a promotion (it could undo a concurrent moderation approval).
+assert.doesNotMatch(route, /analysis_status: "not_analyzed"/);
+assert.doesNotMatch(route, /revertPromotion/);
 assert.match(route, /from\("seo_query_proposals"\).*?\.eq\("query_id", data.id\)/);
 assert.doesNotMatch(route, /reservation_id|product_id|primary_seo_query_id/);
 
@@ -106,16 +108,6 @@ function createRepository({ rows = [], conflictOnCreate = false } = {}) {
       row.frequency = frequency;
       row.frequency_checked_at = frequencyCheckedAt;
       row.analysis_status = "analyzed";
-      return storedQuery(row);
-    },
-    async hasProposal(id) {
-      const row = records.find((item) => item.id === id);
-      return Boolean(row?.hasProposal);
-    },
-    async revertPromotion(id) {
-      const row = records.find((item) => item.id === id && item.analysis_status === "analyzed");
-      if (!row) return null;
-      row.analysis_status = "not_analyzed";
       return storedQuery(row);
     },
     async create(input) {
@@ -271,25 +263,21 @@ for (const [status, hasProposal, expected] of [
 
 console.log("seo-wordstat-intake-unit: ok");
 
-// Regression (review of #955): an author proposal saved between the proposal check and the
-// promotion must not bypass moderation – the promotion is rolled back to not_analyzed.
+// Regression (review of #955): a promotion is never rolled back. If moderation approves the query
+// right after the promotion, the approved state must stay intact.
 {
   const repository = createRepository({ rows: [{ ...existingRow, analysis_status: "not_analyzed", hasProposal: false }] });
   const basePromote = repository.promote;
   repository.promote = async (...args) => {
     const promoted = await basePromote(...args);
-    repository.records[0].hasProposal = true;
+    repository.records[0].hasProposal = true; // proposal + approval landed concurrently
+    repository.records[0].reservation_id = "reservation-approved";
     return promoted;
   };
   const result = await importWordstatIntakeItem({ phrase: existingRow.query_text, count: 11 }, repository);
-  assert.equal(result.status, "needs_review");
-  assert.equal(repository.records[0].analysis_status, "not_analyzed");
-}
-{
-  const repository = createRepository({ rows: [{ ...existingRow, analysis_status: "not_analyzed", hasProposal: false }] });
-  repository.hasProposal = async () => undefined;
-  const result = await importWordstatIntakeItem({ phrase: existingRow.query_text, count: 12 }, repository);
-  assert.equal(result.status, "error");
-  assert.equal(repository.records[0].analysis_status, "not_analyzed");
+  assert.equal(result.status, "promoted");
+  assert.equal(repository.records[0].analysis_status, "analyzed");
+  assert.equal(repository.records[0].reservation_id, "reservation-approved");
+  assert.equal("revertPromotion" in repository, false);
 }
 console.log("seo-wordstat-intake-unit: race regression ok");
