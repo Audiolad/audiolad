@@ -6,9 +6,15 @@ import {
 } from "@/lib/author-products/auth";
 import { MAX_COVER_BYTES } from "@/lib/author-products/media";
 import { getAuthorProductDetail } from "@/lib/author-products/products";
+import {
+  cleanupCoverManifestWithinPrefix,
+  createPracticeImageWriteClient,
+  PRACTICE_COVERS_BUCKET,
+  trackCoverVariantPrefix,
+  writeTrackCoverColumns,
+} from "@/lib/author-products/cover-storage";
 import { removeTrackCoverFiles } from "@/lib/author-products/utils";
 import {
-  cleanupImageManifest,
   primaryPublicUrl,
   uploadOptimizedImageSet,
 } from "@/lib/images/image-upload-service";
@@ -18,8 +24,6 @@ import { imageProcessErrorMessage } from "@/lib/images/process-image";
 type RouteContext = {
   params: Promise<{ id: string; audioId: string }>;
 };
-
-const PRACTICE_COVERS_BUCKET = "practice-covers";
 
 const SHARED_COVER_ENABLED_MESSAGE =
   "Сначала отключите использование общей обложки для всех треков.";
@@ -45,30 +49,30 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
+    // Cover objects and cover columns are server-only (1:1 is enforced
+    // here; migrations 20270117120000 and 20270118120000).
+    const coverWriter = createPracticeImageWriteClient();
+
     if (audioItem.cover_image) {
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        coverWriter,
         parseImageManifest(audioItem.cover_image),
+        trackCoverVariantPrefix(id, audioId),
       );
     }
 
-    await removeTrackCoverFiles(supabase, id, audioId);
+    await removeTrackCoverFiles(coverWriter, id, audioId);
 
     const now = new Date().toISOString();
 
-    const { error: updateError } = await supabase
-      .from("audio_items")
-      .update({
-        cover_url: null,
-        cover_image: null,
-        updated_at: now,
-      })
-      .eq("id", audioId)
-      .eq("practice_id", id);
+    const cleared = await writeTrackCoverColumns(coverWriter, id, audioId, {
+      cover_url: null,
+      cover_image: null,
+      updated_at: now,
+    });
 
-    if (updateError) {
-      console.error("author_track_cover_delete_error", updateError.message);
+    if (!cleared.ok) {
+      console.error("author_track_cover_delete_error", cleared.error);
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
@@ -124,13 +128,16 @@ export async function POST(request: Request, context: RouteContext) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const previousManifest = parseImageManifest(audioItem.cover_image);
+    // Cover objects and cover columns are server-only (1:1 is enforced
+    // here; migrations 20270117120000 and 20270118120000).
+    const coverWriter = createPracticeImageWriteClient();
 
     const uploaded = await uploadOptimizedImageSet({
       profile: "track-cover",
       bucket: PRACTICE_COVERS_BUCKET,
       buffer,
       declaredMime: file.type,
-      storage: supabase.storage,
+      storage: coverWriter.storage,
       context: { practiceId: id, audioItemId: audioId },
     });
 
@@ -154,35 +161,31 @@ export async function POST(request: Request, context: RouteContext) {
       now,
     );
 
-    const { error: updateError } = await supabase
-      .from("audio_items")
-      .update({
-        cover_url: coverUrl,
-        cover_image: uploaded.data.manifest,
-        updated_at: now,
-      })
-      .eq("id", audioId)
-      .eq("practice_id", id);
+    const written = await writeTrackCoverColumns(coverWriter, id, audioId, {
+      cover_url: coverUrl,
+      cover_image: uploaded.data.manifest,
+      updated_at: now,
+    });
 
-    if (updateError) {
-      console.error("author_track_cover_update_error", updateError.message);
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+    if (!written.ok) {
+      console.error("author_track_cover_update_error", written.error);
+      await cleanupCoverManifestWithinPrefix(
+        coverWriter,
         uploaded.data.manifest,
+        trackCoverVariantPrefix(id, audioId),
       );
       return NextResponse.json({ error: "internal_error" }, { status: 500 });
     }
 
     if (previousManifest) {
-      await cleanupImageManifest(
-        supabase.storage,
-        PRACTICE_COVERS_BUCKET,
+      await cleanupCoverManifestWithinPrefix(
+        coverWriter,
         previousManifest,
+        trackCoverVariantPrefix(id, audioId),
       );
     }
 
-    await removeTrackCoverFiles(supabase, id, audioId);
+    await removeTrackCoverFiles(coverWriter, id, audioId);
 
     const product = await getAuthorProductDetail(supabase, id);
 

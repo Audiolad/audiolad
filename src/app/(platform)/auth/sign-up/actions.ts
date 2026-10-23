@@ -10,6 +10,7 @@ import {
   validateEmailForRegistrationServer,
   LEGAL_CONSENT_REQUIRED_MESSAGE,
 } from "@/lib/auth/email";
+import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import {
   getSafeNextPath,
   SIGN_UP_DEFAULT_REDIRECT,
@@ -200,6 +201,7 @@ export async function signUpAction(
         first_name: firstName,
         last_name: lastName,
         full_name: `${firstName} ${lastName}`.trim(),
+        ...(isBusinessTrialNext(input.next) ? { business_trial: "1" } : {}),
       },
     },
   });

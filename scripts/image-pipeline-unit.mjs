@@ -17,8 +17,6 @@ import sharp from "sharp";
 import {
   createAvatarPortrait,
   createBannerFixture,
-  createExifOrientedLandscape,
-  createLandscapeJpegFixture,
   createNoisyGradientSquare,
   createPngWithAlpha,
   createPortraitJpegFixture,
@@ -34,15 +32,13 @@ function assert(condition, message) {
 
 /** Programmatic JPEG buffers — no committed binary fixtures required. */
 let portraitJpeg;
-let landscapeJpeg;
 
 async function loadProgrammaticFixtures() {
   portraitJpeg = await createPortraitJpegFixture();
-  landscapeJpeg = await createLandscapeJpegFixture();
 }
 
 async function testPngToWebpVariants() {
-  const input = portraitJpeg;
+  const input = await createNoisyGradientSquare(900);
   const result = await processImageForProfile(input, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
@@ -83,6 +79,7 @@ async function testSmallSourceNotUpscaled() {
   const md = result.data.variants.find((v) => v.key === "md");
   assert(md, "md variant required");
   assert(md.width <= 400 && md.height <= 400, "small source must not be upscaled");
+  assert(md.width === md.height, "square source must stay square");
 }
 
 async function testExifOrientation() {
@@ -105,10 +102,26 @@ async function testExifOrientation() {
     skipOriginalStore: true,
   });
 
-  assert(normalResult.ok && orientedResult.ok, "oriented images should process");
+  assert(
+    !normalResult.ok && normalResult.code === "not_square",
+    "landscape product cover must be rejected",
+  );
+  assert(
+    !orientedResult.ok && orientedResult.code === "not_square",
+    "EXIF-rotated landscape product cover must be rejected",
+  );
 
-  const normalLg = normalResult.data.variants.find((v) => v.key === "lg");
-  const orientedLg = orientedResult.data.variants.find((v) => v.key === "lg");
+  const diagNormal = await processImageForProfile(normal, "image/jpeg", "diagnostic-image", {
+    skipOriginalStore: true,
+  });
+  const diagOriented = await processImageForProfile(oriented, "image/jpeg", "diagnostic-image", {
+    skipOriginalStore: true,
+  });
+
+  assert(diagNormal.ok && diagOriented.ok, "oriented images should process");
+
+  const normalLg = diagNormal.data.variants.find((v) => v.key === "lg");
+  const orientedLg = diagOriented.data.variants.find((v) => v.key === "lg");
 
   assert(normalLg && orientedLg, "lg variants required");
   assert(
@@ -118,7 +131,7 @@ async function testExifOrientation() {
 }
 
 async function testMetadataStripped() {
-  const input = landscapeJpeg;
+  const input = await createNoisyGradientSquare(1000);
   const result = await processImageForProfile(input, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
@@ -158,7 +171,7 @@ async function testHugeImageRejected() {
 }
 
 async function testPlaceholderSmall() {
-  const input = landscapeJpeg;
+  const input = await createNoisyGradientSquare(1000);
   const result = await processImageForProfile(input, "image/jpeg", "product-cover", {
     skipOriginalStore: true,
   });
@@ -223,7 +236,21 @@ async function testRichFixturesReport() {
     ["author-banner", await createBannerFixture(), "image/jpeg"],
     ["author-avatar", await createAvatarPortrait(), "image/jpeg"],
     ["product-cover", await createPngWithAlpha(), "image/png"],
-    ["product-cover", await createExifOrientedLandscape(), "image/jpeg"],
+    [
+      "product-cover",
+      await sharp({
+        create: {
+          width: 1000,
+          height: 1000,
+          channels: 3,
+          background: { r: 30, g: 120, b: 210 },
+        },
+      })
+        .jpeg()
+        .withMetadata({ orientation: 6 })
+        .toBuffer(),
+      "image/jpeg",
+    ],
   ];
 
   console.log("\nRich fixture sizes:");

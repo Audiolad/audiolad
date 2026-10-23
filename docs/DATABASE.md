@@ -1,3 +1,18 @@
+## Business access grants and workspace (pending owner approval)
+
+Migration `20270120120000_access_grants_and_workspace.sql` is prepared but has
+not been applied by this task. It is the single trial module for tasks
+ba344b7f and 1e008ee8: `access_grants`, `access_paid_periods`,
+`access_grant_events`, `business_space_admissions` and
+`business_workspace_playback`. Additive only. No seed rows, no email in clear
+text, no foreign key to `auth.users`. The admissions table is empty until
+task 28d2b5bb writes rows. Payment providers are not called; a later payment
+writes `access_paid_periods` through `recordPaidRenewal`.
+
+Validation: `npm run test:business-workspace-trial`.
+Details and rollback: `docs/business/access-grants.md`.
+Continuation: the owner applies the migration through the established process.
+
 ## Guest practice ratings (pending owner apply)
 
 Migration `20270116120000_guest_practice_ratings.sql` is additive and is not
@@ -2075,6 +2090,11 @@ updated_at). Все FK — ON DELETE RESTRICT. RLS включён, прямых 
 точный predicate членства из health RPC, название только разрешённого трека, без URL.
 Старые таблицы и данные не меняются. Решение о применении отдельно принимает Сергей.
 Подробности и откат: [11-real-1-migration.md](business/ux-c02fe282/11-real-1-migration.md).
+
+Follow-up `supabase/migrations/20270119120000_business_player_live_claim_atomic.sql`
+replaces `business_player_live_claim` so the first device claim is one atomic write.
+Signature, security settings, grants and later claims stay the same. Prepared only;
+not applied by this change.
 
 ### Business rightsholder onboarding — 8d9cd0af / PR-1
 

@@ -6,6 +6,8 @@ import BusinessListenStudio from "@/components/business/BusinessListenStudio";
 import BusinessSnapCarousel from "@/components/business/BusinessSnapCarousel";
 import BusinessSocialProofSlot from "@/components/business/BusinessSocialProofSlot";
 import LegalLinksNav from "@/components/legal/LegalLinksNav";
+import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
+import { BUSINESS_TRIAL_SIGN_UP_HREF, BUSINESS_TRIAL_SIGN_IN_HREF } from "@/lib/access-grants/paths";
 import {
   BUSINESS_BENEFITS,
   BUSINESS_CLOSER,
@@ -595,8 +597,11 @@ export default function BusinessLandingView({
                 Сначала слушаете музыку, затем пользуетесь периодом и подключаете оплату, когда она нужна.
               </p>
               <div className="business-actions">
-                <a className="business-btn business-btn--primary" href="#listen">
-                  {BUSINESS_TRIAL_FREE}
+                <a className="business-btn business-btn--primary" href={BUSINESS_TRIAL_SIGN_UP_HREF}>
+                  {BUSINESS_GIFT_CTA}
+                </a>
+                <a className="business-btn business-btn--secondary" href={BUSINESS_TRIAL_SIGN_IN_HREF}>
+                  Уже есть аккаунт – войти
                 </a>
                 <a className="business-btn business-btn--secondary" href="#venues">
                   {BUSINESS_TRIAL_CARD}
@@ -605,7 +610,7 @@ export default function BusinessLandingView({
             </div>
             <Poster
               file="12-free-trial.webp"
-              alt="Телефон в руке, на экране надпись «7 дней бесплатно»."
+              alt="Телефон в руке с экраном предложения бесплатного периода."
               width={1254}
               height={1254}
               sizes="(min-width: 1100px) 46vw, 100vw"

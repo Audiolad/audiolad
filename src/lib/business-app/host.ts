@@ -55,6 +55,8 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/onboarding": `${BUSINESS_SITE_PATH}/onboarding`,
   "/player": `${BUSINESS_SITE_PATH}/player`,
   "/spa": `${BUSINESS_SITE_PATH}/spa`,
+  // ba344b7f: one workspace for every business_space. Cafe is the enabled direction.
+  "/workspace": `${BUSINESS_SITE_PATH}/workspace`,
   // a8240527: permanent URL from the PDF atlas — keep forever.
   [BUSINESS_GUEST_COFFEE_PUBLIC_PATH]: BUSINESS_GUEST_COFFEE_INTERNAL_PATH,
 };

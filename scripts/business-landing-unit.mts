@@ -178,11 +178,11 @@ assert.equal(
   copy.includes("Без надоедливых повторов и лишних забот. Стабильный онлайн-плеер."),
   true,
 );
-assert.match(copy, /7 дней бесплатно/);
+assert.match(copy, /30 дней в подарок/);
 assert.match(copy, /Без привязки карты/);
 assert.match(copy, /Музыка не надоедает/);
 assert.match(copy, /Интернет пропал – музыка продолжает играть/);
-assert.match(copy, /7 дней бесплатно · без привязки карты/);
+assert.match(copy, /30 дней в подарок · без привязки карты/);
 assert.match(copy, /Без повторов одних и тех же треков/);
 assert.match(copy, /Музыка подобрана под выбранную атмосферу/);
 assert.doesNotMatch(copy, /\u2014/);

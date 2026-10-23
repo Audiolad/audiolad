@@ -1,6 +1,12 @@
 import { MAX_COVER_BYTES } from "@/lib/author-products/limits";
+import { isNearlySquare } from "@/lib/images/avatar-crop-math";
 
 export const MIN_COVER_DIMENSION = 400;
+export const COVER_SQUARE_TOLERANCE_PX = 2;
+/** Largest square written by the cropper. Matches the xl cover variant. */
+export const COVER_CROP_MAX_OUTPUT = 1200;
+export const COVER_NOT_SQUARE_MESSAGE =
+  "Загрузите квадратную обложку (соотношение сторон 1:1)";
 export { MAX_COVER_BYTES as COVER_MAX_BYTES };
 
 const ALLOWED_COVER_MIME_TYPES = new Set([
@@ -9,7 +15,66 @@ const ALLOWED_COVER_MIME_TYPES = new Set([
   "image/webp",
 ]);
 
-function readImageDimensions(
+export function isCoverSquare(width: number, height: number): boolean {
+  return isNearlySquare(width, height, COVER_SQUARE_TOLERANCE_PX);
+}
+
+export type CoverUploadDecision =
+  | { action: "upload" }
+  | { action: "crop" }
+  | { action: "reject"; message: string };
+
+/**
+ * Square files upload as-is. Other files open the 1:1 cropper when the
+ * browser can crop; otherwise they are rejected with COVER_NOT_SQUARE_MESSAGE.
+ */
+export function decideCoverUploadAction(
+  width: number,
+  height: number,
+  cropAvailable: boolean,
+): CoverUploadDecision {
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width < MIN_COVER_DIMENSION ||
+    height < MIN_COVER_DIMENSION
+  ) {
+    return {
+      action: "reject",
+      message: `Минимальный размер обложки – ${MIN_COVER_DIMENSION} × ${MIN_COVER_DIMENSION} пикселей.`,
+    };
+  }
+
+  if (isCoverSquare(width, height)) {
+    return { action: "upload" };
+  }
+
+  if (!cropAvailable) {
+    return { action: "reject", message: COVER_NOT_SQUARE_MESSAGE };
+  }
+
+  return { action: "crop" };
+}
+
+export function canUseInteractiveCoverCrop(): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  try {
+    const canvas = document.createElement("canvas");
+
+    if (typeof canvas.toBlob !== "function") {
+      return false;
+    }
+
+    return Boolean(canvas.getContext("2d"));
+  } catch {
+    return false;
+  }
+}
+
+export function readCoverImageDimensions(
   file: File,
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -53,10 +118,10 @@ export async function validateCoverFile(file: File): Promise<string | null> {
   }
 
   try {
-    const { width, height } = await readImageDimensions(file);
+    const { width, height } = await readCoverImageDimensions(file);
 
     if (width < MIN_COVER_DIMENSION || height < MIN_COVER_DIMENSION) {
-      return `Минимальный размер обложки — ${MIN_COVER_DIMENSION} × ${MIN_COVER_DIMENSION} пикселей.`;
+      return `Минимальный размер обложки – ${MIN_COVER_DIMENSION} × ${MIN_COVER_DIMENSION} пикселей.`;
     }
   } catch {
     return "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.";

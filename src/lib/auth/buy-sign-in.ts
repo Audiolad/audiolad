@@ -1,3 +1,5 @@
+import { BUSINESS_SIGN_IN_INTRO } from "@/lib/access-grants/copy";
+import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import { buildAuthRouteHref, resolveValidatedNextPath } from "@/lib/auth/routes";
 
 export const PRACTICE_BUY_SIGN_IN_INTRO =
@@ -49,6 +51,10 @@ export function isAccessLinkSignInNext(
 export function resolveSignInIntroCopy(next: string | null | undefined): string {
   if (isAccessLinkSignInNext(next)) {
     return ACCESS_LINK_SIGN_IN_INTRO;
+  }
+
+  if (isBusinessTrialNext(next)) {
+    return BUSINESS_SIGN_IN_INTRO;
   }
 
   return isPracticeProductSignInNext(next)

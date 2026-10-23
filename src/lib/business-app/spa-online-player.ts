@@ -148,6 +148,7 @@ export class SpaOnlinePlayer {
     if (i < 0 || i >= this.items.length) return;
     const op = ++this.op;
     const item = this.items[i];
+    if (this.expired(item)) return this.onDeadline(false);
     this.index = i;
     if (this.retryTrackId !== item.audioItemId) {
       this.retryTrackId = item.audioItemId;
@@ -163,6 +164,8 @@ export class SpaOnlinePlayer {
       if (SKIP_REASONS.has(r.reason) && this.failures < this.items.length) return this.next();
       return this.set("error", "Не удалось получить трек. Проверьте интернет и нажмите «Играть».");
     }
+    const fresh = this.fresh(item.audioItemId);
+    if (!fresh || this.expired(fresh)) return this.onDeadline(false);
     this.d.audio.src = r.data.url;
     try {
       await this.d.audio.play();
@@ -177,7 +180,7 @@ export class SpaOnlinePlayer {
   }
 
   async toggle(): Promise<void> {
-    if (this.status === "no_access" || this.items.length === 0) return;
+    if (this.disposed || this.status === "no_access" || this.items.length === 0) return;
     if (this.status === "playing" || this.status === "loading") {
       this.op++;
       this.clearDeadline();

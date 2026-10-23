@@ -15,7 +15,10 @@ import {
   PUBLICATION_GALLERY_TABLE,
   type PublicationGallerySlideRow,
 } from "@/lib/catalog/publication-gallery";
-import { cleanupImageManifest } from "@/lib/images/image-upload-service";
+import {
+  cleanupCoverManifestWithinPrefix,
+  gallerySlidePrefix,
+} from "@/lib/author-products/cover-storage";
 import { parseImageManifest } from "@/lib/images/image-manifest";
 
 export const PRACTICE_COVERS_BUCKET = "practice-covers";
@@ -73,8 +76,14 @@ export async function listAuthorGallerySlides(
   return ((data ?? []) as PublicationGallerySlideRow[]).map(toAuthorSlide);
 }
 
+/**
+ * Slide inserts, image replacement and deletion go through the server client
+ * (`writer`, service role) after the route's access checks: since migration
+ * 20270118120000 `authenticated` cannot insert slides or change slide images,
+ * and gallery objects are uploaded by the server after the 1:1 check.
+ */
 export async function insertAuthorGallerySlide(
-  supabase: SupabaseClient,
+  writer: SupabaseClient,
   input: {
     id: string;
     publicationId: string;
@@ -83,13 +92,13 @@ export async function insertAuthorGallerySlide(
     alt?: string | null;
   },
 ): Promise<AuthorGallerySlide> {
-  const existing = await listAuthorGallerySlides(supabase, input.publicationId);
+  const existing = await listAuthorGallerySlides(writer, input.publicationId);
 
   if (existing.length >= CATALOG_GALLERY_MAX_SLIDES) {
     throw new GalleryLimitError();
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await writer
     .from(PUBLICATION_GALLERY_TABLE)
     .insert({
       id: input.id,
@@ -146,7 +155,7 @@ export async function reorderAuthorGallerySlides(
 }
 
 export async function replaceAuthorGallerySlideImage(
-  supabase: SupabaseClient,
+  writer: SupabaseClient,
   publicationId: string,
   slideId: string,
   input: {
@@ -154,7 +163,7 @@ export async function replaceAuthorGallerySlideImage(
     imageManifest: unknown;
   },
 ): Promise<AuthorGallerySlide> {
-  const { data: existing, error: lookupError } = await supabase
+  const { data: existing, error: lookupError } = await writer
     .from(PUBLICATION_GALLERY_TABLE)
     .select(AUTHOR_GALLERY_SELECT)
     .eq("id", slideId)
@@ -170,7 +179,7 @@ export async function replaceAuthorGallerySlideImage(
   }
 
   const previous = existing as PublicationGallerySlideRow;
-  const { error: updateError, data } = await supabase
+  const { error: updateError, data } = await writer
     .from(PUBLICATION_GALLERY_TABLE)
     .update(buildGallerySlideReplacePatch(input))
     .eq("id", slideId)
@@ -183,21 +192,21 @@ export async function replaceAuthorGallerySlideImage(
     throw new Error("gallery_replace_failed");
   }
 
-  await cleanupImageManifest(
-    supabase.storage,
-    PRACTICE_COVERS_BUCKET,
+  await cleanupCoverManifestWithinPrefix(
+    writer,
     parseImageManifest(previous.image_manifest),
+    gallerySlidePrefix(publicationId, slideId),
   );
 
   return toAuthorSlide(data as PublicationGallerySlideRow);
 }
 
 export async function deleteAuthorGallerySlide(
-  supabase: SupabaseClient,
+  writer: SupabaseClient,
   publicationId: string,
   slideId: string,
 ): Promise<AuthorGallerySlide[]> {
-  const { data: existing, error: lookupError } = await supabase
+  const { data: existing, error: lookupError } = await writer
     .from(PUBLICATION_GALLERY_TABLE)
     .select(AUTHOR_GALLERY_SELECT)
     .eq("id", slideId)
@@ -212,7 +221,7 @@ export async function deleteAuthorGallerySlide(
     throw new GalleryNotFoundError();
   }
 
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await writer
     .from(PUBLICATION_GALLERY_TABLE)
     .delete()
     .eq("id", slideId)
@@ -223,22 +232,22 @@ export async function deleteAuthorGallerySlide(
     throw new Error("gallery_delete_failed");
   }
 
-  await cleanupImageManifest(
-    supabase.storage,
-    PRACTICE_COVERS_BUCKET,
+  await cleanupCoverManifestWithinPrefix(
+    writer,
     parseImageManifest(
       (existing as PublicationGallerySlideRow).image_manifest,
     ),
+    gallerySlidePrefix(publicationId, slideId),
   );
 
-  const remaining = await listAuthorGallerySlides(supabase, publicationId);
+  const remaining = await listAuthorGallerySlides(writer, publicationId);
 
   if (remaining.length === 0) {
     return remaining;
   }
 
   return reorderAuthorGallerySlides(
-    supabase,
+    writer,
     publicationId,
     remaining.map((slide, index) => ({ id: slide.id, position: index })),
   );

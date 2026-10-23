@@ -22,6 +22,12 @@ export const CODEX_PROBE_STALE_MS = 20 * 60 * 1000;
 export const LEGACY_TASK_CAP = 100;
 export const LEGACY_EVENT_CAP = 50;
 export const HISTORY_PAGE_SIZE = 20;
+/** «Архив»: rows added per «Показать ещё» and the default archive window (Core default history page). */
+export const ARCHIVE_PAGE_SIZE = 100;
+/** Upper bound for `archive_limit` in the URL. Larger archives page further with the history cursor. */
+export const ARCHIVE_LIMIT_MAX = 5000;
+/** Largest `history_limit` one Core request may ask for (Core STATUS_LIMITS.historyMax). An older Core clamps to 100: the loader then follows the cursor. */
+export const CORE_HISTORY_REQUEST_MAX = 500;
 
 /**
  * Label dictionary for historical role values in task records (audit, history filter).
@@ -389,6 +395,22 @@ export type ExecutorRunView = {
   lastProgress: string;
   fresh: boolean;
 };
+/** One real Codex session on the Codex host (codex exec process or live tracked run). No command line, prompt or env. */
+export type ExecutorSessionView = {
+  key: string;
+  /** «Задача ba344b7f («…»)» or «Задача не определена». */
+  task: string;
+  taskId: string | null;
+  taskHref: string | null;
+  /** «пишет (workspace-write)», «ревью read-only», … */
+  mode: string;
+  /** «12:36 МСК» or «Нет данных». */
+  started: string;
+  /** «идёт 7 мин». */
+  elapsed: string;
+  /** «запуск codex-…» or «без регистрации запуска (pid 123)». */
+  registration: string;
+};
 export type ExecutorId = "codex" | "cursor" | "grok";
 export type ResultKind = "engineering" | "document" | "unknown";
 export type HistoryPeriod = "all" | "today" | "week" | "month";
@@ -399,6 +421,19 @@ export type HistoryFilters = {
   agent: string;
   historyOffset: number;
   historyBefore: string;
+  /** How many archived (terminal) tasks to load for «Архив», newest first. Default ARCHIVE_PAGE_SIZE. */
+  archiveLimit?: number;
+};
+
+/** Core `board_counts`: server-side task counts per board tab over all tasks, not the length of a page. */
+export type BoardCounts = {
+  plan: number | null;
+  working: number | null;
+  review: number | null;
+  archive: number | null;
+  archiveByStatus: Record<string, number>;
+  /** "board_counts": Core board_counts. "history_count": older Core – tasks_page history count (server count) + active archived tasks. */
+  source: "board_counts" | "history_count";
 };
 
 export type ExecutiveRun = {
@@ -649,6 +684,10 @@ export type Completeness = {
   tasksLimit: number | null;
   eventsLimit: number | null;
   gatesComplete: boolean | null;
+  /** tasks_page.history_included: terminal rows in this answer (summed over merged pages). */
+  historyIncluded?: number | null;
+  /** tasks_page.omitted_history_count: terminal rows Core left out of this answer. */
+  omittedHistoryCount?: number | null;
 };
 
 export type QuotaBucket = {
@@ -686,6 +725,19 @@ export type CodexCliProbe = {
   busy: boolean;
   currentRun: { runId: string; taskId: string | null; startedAt: string | null; heartbeatAt: string | null } | null;
   untrackedExecCount: number | null;
+  /** Real Codex sessions at the probe (Core codex.cli_probe.sessions). */
+  sessions: CodexSession[];
+  slots: { used: number; max: number } | null;
+};
+
+export type CodexSession = {
+  pid: number | null;
+  tracked: boolean;
+  runId: string | null;
+  taskId: string | null;
+  mode: "write" | "read_only" | "bypass" | "other" | null;
+  startedAt: string | null;
+  elapsedS: number | null;
 };
 
 export type CompanyStatus = {
@@ -707,6 +759,8 @@ export type CompanyStatus = {
   };
   acceptanceContract: boolean;
   acceptanceView: "current" | "archive" | "all" | null;
+  /** Core `board_counts` (server count). null for an older Core without it. */
+  boardCounts?: BoardCounts | null;
 };
 
 export type EngineeringPanel = {
@@ -872,6 +926,8 @@ export type ExecutorCard = {
   signalSource: string;
   freshness: string;
   activeRuns: ExecutorRunView[];
+  /** Codex only: real sessions on the Codex host («занят N из 2»). Empty otherwise. */
+  sessions: ExecutorSessionView[];
   /** «Нет активных запусков» or a count. */
   activeRunsLabel: string;
   /** Kept for compatibility: first active run title or «Нет активных запусков». */
@@ -921,6 +977,19 @@ export type DashboardModel = {
   historyNextCursor: string | null;
   archivedBlockers: GateCard[];
   quotas: QuotaLine[];
+  /** Core server-side tab counts. The «Архив» counter uses them instead of the length of a loaded page. */
+  boardCounts?: BoardCounts | null;
+  /** «Архив» load-more state. null when the archive window is not known. */
+  archivePage?: ArchivePageModel | null;
+};
+
+export type ArchivePageModel = {
+  /** Archived (terminal) tasks loaded from Core into this page. */
+  loaded: number;
+  /** Server-side total, when Core reports it. */
+  total: number | null;
+  /** `archive_limit` for «Показать ещё», or null when everything is loaded. */
+  nextLimit: number | null;
 };
 
 type Receipt = { at: string; kind: "received" | "created" };
@@ -1643,6 +1712,8 @@ function parseCompleteness(root: Record<string, unknown>): Completeness {
       readString(eventsPage, CORE_FIELD_MAP.page.nextCursor),
       readString(coverage, CORE_FIELD_MAP.completeness.nextCursor),
     ),
+    historyIncluded: readNumber(tasksPage, ["history_included"]),
+    omittedHistoryCount: readNumber(tasksPage, ["omitted_history_count"]),
     tasksLimit: firstNumber(
       readNumber(tasksPage, CORE_FIELD_MAP.page.historyLimit),
       readNumber(root, CORE_FIELD_MAP.gatesHistory.limit),
@@ -1819,6 +1890,30 @@ function parseCodexCliProbe(value: unknown): CodexCliProbe | null {
   if (!status || !CLI_PROBE_STATUSES.has(status)) return null;
   const run = asRecord(record.current_run);
   const runId = run ? readString(run, ["run_id"]) : null;
+  const sessions = parseCodexSessions(record.sessions);
+  // Older Core sends only a count of unregistered codex exec processes: still real occupancy.
+  const legacyUntracked = readNumber(record, ["untracked_exec_count"]) ?? 0;
+  if (!Array.isArray(record.sessions)) {
+    if (readBoolean(record, ["busy"]) === true && runId && run) {
+      const pid = readNumber(run, ["pid"]);
+      const startedAt = readString(run, ["started_at"]);
+      const taskId = readString(run, ["task_id"]);
+      sessions.push({
+        pid: pid != null && pid > 0 ? Math.round(pid) : null,
+        tracked: true,
+        runId: SESSION_TOKEN.test(runId) ? runId : null,
+        taskId: taskId && SESSION_TOKEN.test(taskId) ? taskId : null,
+        mode: null,
+        startedAt,
+        elapsedS: null,
+      });
+    }
+    for (let i = 0; i < Math.min(legacyUntracked, 20); i += 1) {
+      sessions.push({ pid: null, tracked: false, runId: null, taskId: null, mode: null, startedAt: null, elapsedS: null });
+    }
+  }
+  const slotsRecord = asRecord(record.slots);
+  const slotsMax = slotsRecord ? readNumber(slotsRecord, ["max"]) : null;
   return {
     status: status as CodexCliProbe["status"],
     checkedAt: readString(record, ["checked_at"]),
@@ -1827,7 +1922,7 @@ function parseCodexCliProbe(value: unknown): CodexCliProbe | null {
     cliVersion: readString(record, ["cli_version"]),
     chatgptAuthorized: readBoolean(record, ["chatgpt_authorized"]),
     reason: readString(record, ["reason"]),
-    busy: readBoolean(record, ["busy"]) === true && Boolean(runId),
+    busy: (readBoolean(record, ["busy"]) === true && Boolean(runId)) || sessions.length > 0,
     currentRun: run && runId
       ? {
           runId,
@@ -1837,12 +1932,84 @@ function parseCodexCliProbe(value: unknown): CodexCliProbe | null {
         }
       : null,
     untrackedExecCount: readNumber(record, ["untracked_exec_count"]),
+    sessions,
+    slots: slotsMax != null && slotsMax >= 1 ? { used: sessions.length, max: Math.round(slotsMax) } : null,
   };
+}
+
+const SESSION_MODES = new Set(["write", "read_only", "bypass", "other"]);
+const SESSION_TOKEN = /^[A-Za-z0-9._:-]{1,120}$/;
+
+function parseCodexSessions(value: unknown): CodexSession[] {
+  if (!Array.isArray(value)) return [];
+  const out: CodexSession[] = [];
+  for (const item of value.slice(0, 20)) {
+    const record = asRecord(item);
+    if (!record) continue;
+    const token = (key: string) => {
+      const text = readString(record, [key]);
+      return text && SESSION_TOKEN.test(text) ? text : null;
+    };
+    const mode = readString(record, ["mode"]);
+    const pid = readNumber(record, ["pid"]);
+    const elapsed = readNumber(record, ["elapsed_s"]);
+    out.push({
+      pid: pid != null && pid > 0 ? Math.round(pid) : null,
+      tracked: readBoolean(record, ["tracked"]) === true,
+      runId: token("run_id"),
+      taskId: token("task_id"),
+      mode: mode && SESSION_MODES.has(mode) ? (mode as CodexSession["mode"]) : null,
+      startedAt: readString(record, ["started_at"]),
+      elapsedS: elapsed != null && elapsed >= 0 ? elapsed : null,
+    });
+  }
+  return out;
+}
+
+const SESSION_MODE_LABEL: Record<string, string> = {
+  write: "пишет (workspace-write)",
+  read_only: "ревью read-only",
+  bypass: "без песочницы – нарушение правила",
+  other: "режим не определён",
+};
+
+function elapsedLabel(seconds: number | null): string {
+  if (seconds == null || !Number.isFinite(seconds)) return NO_DATA;
+  const minutes = Math.max(0, Math.floor(seconds / 60));
+  if (minutes < 1) return "идёт меньше минуты";
+  if (minutes < 60) return `идёт ${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  return `идёт ${hours} ч ${String(minutes % 60).padStart(2, "0")} мин`;
+}
+
+function codexSessionViews(sessions: CodexSession[], tasks: CompanyTask[], now: number): ExecutorSessionView[] {
+  return sessions.map((session, index) => {
+    const task = session.taskId
+      ? tasks.find((item) => item.id === session.taskId || (item.id ?? "").startsWith(session.taskId ?? "\u0000")) ?? null
+      : null;
+    const startedMs = parseInstant(session.startedAt);
+    const elapsedS = startedMs != null ? Math.max(session.elapsedS ?? 0, (now - startedMs) / 1000) : session.elapsedS;
+    const shortId = session.taskId ? (/^[0-9a-f]{8}-/.test(session.taskId) ? session.taskId.slice(0, 8) : session.taskId) : null;
+    return {
+      key: `${session.pid ?? "p"}:${session.runId ?? index}`,
+      task: shortId
+        ? `Задача ${shortId}${task ? ` («${clip(task.title, 80)}»)` : ""}`
+        : "Задача не определена",
+      taskId: session.taskId,
+      taskHref: task ? issueHref(task.githubIssueNumber) : null,
+      mode: session.mode ? SESSION_MODE_LABEL[session.mode] : "режим не определён",
+      started: session.startedAt ? `${formatDateTime(session.startedAt)} МСК` : NO_DATA,
+      elapsed: elapsedLabel(elapsedS),
+      registration: session.runId
+        ? `запуск ${session.runId}`
+        : `без регистрации запуска${session.pid ? ` (pid ${session.pid})` : ""}`,
+    };
+  });
 }
 
 /**
  * Codex card from the real CLI probe (9a63f86e rework). Connection only from a fresh probe; occupancy only
- * from a live tracked run. Core tasks/runs that name Codex are assignments, not occupancy.
+ * from real sessions (codex exec processes or a live tracked run). Core tasks/runs that name Codex are assignments, not occupancy.
  */
 function codexFromCliProbe(probe: CodexCliProbe, now: number): {
   connection: ConnectionState;
@@ -1868,7 +2035,8 @@ function codexFromCliProbe(probe: CodexCliProbe, now: number): {
   if (probe.status === "failed" && fresh) {
     return {
       connection: "unavailable",
-      occupancy: "unknown",
+      // A failed login check does not hide codex exec processes the fresh probe saw running.
+      occupancy: probe.sessions.length > 0 ? "working" : "unknown",
       connectionSource: `Недоступен. ${probe.reason ?? "Проба Codex CLI завершилась ошибкой."} Проверено в ${at}.`,
     };
   }
@@ -1942,7 +2110,120 @@ export function parseCompanyStatus(raw: unknown): CompanyStatus | null {
     },
     acceptanceContract: tasks.some((task) => task.acceptanceContract) || acceptanceView != null,
     acceptanceView,
+    boardCounts: parseBoardCounts(record.board_counts),
   };
+}
+
+function countValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/** Core `board_counts`. Only non-negative integers are taken; anything else is «no server count». */
+export function parseBoardCounts(raw: unknown): BoardCounts | null {
+  const record = asRecord(raw);
+  if (!record) return null;
+  const byStatus: Record<string, number> = {};
+  const rawByStatus = asRecord(record.archive_by_status);
+  if (rawByStatus) {
+    for (const [key, value] of Object.entries(rawByStatus)) {
+      const count = countValue(value);
+      if (count != null) byStatus[key] = count;
+    }
+  }
+  const counts: BoardCounts = {
+    plan: countValue(record.plan),
+    working: countValue(record.working),
+    review: countValue(record.review),
+    archive: countValue(record.archive),
+    archiveByStatus: byStatus,
+    source: "board_counts",
+  };
+  return counts.plan == null && counts.working == null && counts.review == null && counts.archive == null ? null : counts;
+}
+
+/**
+ * Appends an older history page (same acceptance view, fetched with `history_before`) to a status.
+ * Tasks keep Core order (newest first) and are deduplicated by id; page facts come from the last page.
+ */
+export function mergeStatusHistoryPage(base: CompanyStatus, next: CompanyStatus): CompanyStatus {
+  const ids = new Set(base.tasks.flatMap((task) => (task.id ? [task.id] : [])));
+  const added = next.tasks.filter((task) => !task.id || !ids.has(task.id));
+  return {
+    ...base,
+    tasks: [...base.tasks, ...added],
+    // next.events already holds the page's top-level and embedded task events.
+    events: dedupeEvents([...base.events, ...next.events, ...added.flatMap((task) => task.taskEvents)]),
+    completeness: {
+      ...base.completeness,
+      historyComplete: next.completeness.historyComplete,
+      nextCursor: next.completeness.nextCursor,
+      omittedHistoryCount: next.completeness.omittedHistoryCount ?? null,
+      historyIncluded:
+        base.completeness.historyIncluded != null && next.completeness.historyIncluded != null
+          ? base.completeness.historyIncluded + next.completeness.historyIncluded
+          : null,
+    },
+  };
+}
+
+function historyCursorAdvanced(requested: string, returned: string | null): boolean {
+  if (returned == null) return true;
+  const before = Date.parse(requested);
+  const after = Date.parse(returned);
+  return Number.isFinite(before) && Number.isFinite(after) && after < before;
+}
+
+function parseArchiveLimit(value: string | null | undefined): number {
+  if (!value || !/^\d+$/.test(value.trim())) return ARCHIVE_PAGE_SIZE;
+  const parsed = Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed < ARCHIVE_PAGE_SIZE) return ARCHIVE_PAGE_SIZE;
+  return Math.min(parsed, ARCHIVE_LIMIT_MAX);
+}
+
+export type CompanyStatusPageFetch = (
+  path: string,
+) => Promise<{ data: CompanyStatus | null; error: string | null }>;
+
+/**
+ * Loads one acceptance view with an archive window of `filters.archiveLimit` terminal tasks:
+ * the first request asks Core for up to CORE_HISTORY_REQUEST_MAX rows, further pages follow
+ * `history_next_before` until the window is filled or Core says the history is complete.
+ * A failed later page keeps the rows already loaded (the load-more state then shows what is missing).
+ */
+export async function loadCompanyStatusWindow(
+  fetchPage: CompanyStatusPageFetch,
+  filters: HistoryFilters,
+  acceptance: "current" | "archive" | "all",
+): Promise<{ data: CompanyStatus | null; error: string | null }> {
+  const want = filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
+  const first = await fetchPage(
+    companyStatusRequestPath(filters, acceptance, { historyLimit: Math.min(want, CORE_HISTORY_REQUEST_MAX) }),
+  );
+  if (!first.data) return first;
+  let data = first.data;
+  // Bounded: ARCHIVE_LIMIT_MAX / 100 pages even against an older Core that clamps to 100 rows.
+  const requested = new Set<string>();
+  for (let page = 0; page < Math.ceil(ARCHIVE_LIMIT_MAX / ARCHIVE_PAGE_SIZE); page += 1) {
+    const loaded = data.completeness.historyIncluded;
+    const cursor = data.completeness.nextCursor;
+    if (loaded == null || loaded >= want || data.completeness.historyComplete !== false || !cursor) break;
+    // A repeated cursor would re-read the same page: stop and keep the last valid page facts.
+    if (requested.has(cursor) || (filters.historyBefore != null && cursor === filters.historyBefore)) break;
+    requested.add(cursor);
+    const next = await fetchPage(
+      companyStatusRequestPath(
+        { ...filters, historyBefore: cursor },
+        acceptance,
+        { historyLimit: Math.min(want - loaded, CORE_HISTORY_REQUEST_MAX) },
+      ),
+    );
+    if (!next.data || !next.data.completeness.historyIncluded) break;
+    // Core reads `updated_at < cursor`, so a real next page ends strictly older than the cursor.
+    // A repeated or non-advancing page (e.g. a Core that ignores history_before) is not merged.
+    if (!historyCursorAdvanced(cursor, next.data.completeness.nextCursor)) break;
+    data = mergeStatusHistoryPage(data, next.data);
+  }
+  return { data, error: null };
 }
 
 function parseOffset(value: string | null | undefined): number {
@@ -1958,6 +2239,7 @@ export function parseHistoryFilters(input: {
   agent?: string | null;
   history_offset?: string | null;
   history_before?: string | null;
+  archive_limit?: string | null;
 }): HistoryFilters {
   const period =
     input.period === "today" || input.period === "week" || input.period === "month"
@@ -1973,21 +2255,30 @@ export function parseHistoryFilters(input: {
     agent: (input.agent ?? "").trim(),
     historyOffset: parseOffset(input.history_offset),
     historyBefore,
+    archiveLimit: parseArchiveLimit(input.archive_limit),
   };
 }
 
 export function companyStatusRequestPath(
   filters: HistoryFilters,
   acceptance: "current" | "archive" | "all" = "all",
+  options: { historyLimit?: number } = {},
 ): string {
   const params = new URLSearchParams();
   if (filters.historyBefore) params.set(CORE_FIELD_MAP.query.historyBefore, filters.historyBefore);
+  // Core's default page is 100 rows; ask explicitly only for a different window.
+  if (options.historyLimit != null && options.historyLimit !== ARCHIVE_PAGE_SIZE && options.historyLimit > 0) {
+    params.set(CORE_FIELD_MAP.query.historyLimit, String(Math.min(options.historyLimit, CORE_HISTORY_REQUEST_MAX)));
+  }
   if (acceptance === "current" || acceptance === "archive") params.set("acceptance", acceptance);
   const query = params.toString();
   return query ? `/v1/status?${query}` : "/v1/status";
 }
 
-export function historyHref(filters: HistoryFilters, patch: { historyOffset?: number; historyBefore?: string }): string {
+export function historyHref(
+  filters: HistoryFilters,
+  patch: { historyOffset?: number; historyBefore?: string; archiveLimit?: number },
+): string {
   const params = new URLSearchParams();
   if (filters.period !== "all") params.set("period", filters.period);
   if (filters.status) params.set("status", filters.status);
@@ -1995,6 +2286,8 @@ export function historyHref(filters: HistoryFilters, patch: { historyOffset?: nu
   const offset = patch.historyOffset ?? 0;
   if (offset > 0) params.set("history_offset", String(offset));
   if (patch.historyBefore) params.set("history_before", patch.historyBefore);
+  const archiveLimit = patch.archiveLimit ?? filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
+  if (archiveLimit > ARCHIVE_PAGE_SIZE) params.set("archive_limit", String(archiveLimit));
   const query = params.toString();
   return query ? `/admin/ai-company?${query}` : "/admin/ai-company";
 }
@@ -2601,9 +2894,9 @@ function taskExecutor(task: CompanyTask): { id: ExecutorId | null; note: string 
   const executive = task.executorParts.some((part) => part != null && /\bexecutive\b/i.test(part));
   const note =
     id === "cursor" && model && /grok|xai/i.test(model)
-      ? "Модель Grok внутри Cursor — это исполнитель Cursor, не отдельный запуск xAI."
+      ? "Модель Grok внутри Cursor – это исполнитель Cursor, не отдельный запуск xAI."
       : executive && id === "grok"
-        ? "Поле executive — оркестрация, не фактический исполнитель."
+        ? "Поле executive – оркестрация, не фактический исполнитель."
         : "";
   return { id, note };
 }
@@ -3499,7 +3792,7 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     const heartbeatAt = latestInstant([checkedAt, lastRunSignal]);
     const probeAt = cli && facts?.cliProbe ? facts.cliProbe.checkedAt : null;
     const signalSource = cli
-      ? (probeAt ? "проба Codex CLI (version, login status, отслеживаемые запуски)" : "нет сигналов в Company Core")
+      ? (probeAt ? "проба Codex CLI (version, login status, процессы codex exec и отслеживаемые запуски)" : "нет сигналов в Company Core")
       : checkedAt && checkedAt === heartbeatAt
       ? "проверка подключения в Company Core"
       : lastRunSignal
@@ -3508,9 +3801,9 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
     const connectionSource = cli
       ? cli.connectionSource
       : tokenOnlyCheck
-      ? "Company Core проверяет только ключ API Codex в своём процессе. Реальный канал — Codex на сервере компании по SSH со входом ChatGPT; его Company Core не проверяет и сигналов «жив» не получает. Поэтому подключение не подтверждено и не опровергнуто."
+      ? "Company Core проверяет только ключ API Codex в своём процессе. Реальный канал – Codex на сервере компании по SSH со входом ChatGPT; его Company Core не проверяет и сигналов «жив» не получает. Поэтому подключение не подтверждено и не опровергнуто."
       : checkedAt
-        ? `Проверка в Company Core, ${formatDateTime(checkedAt)} МСК. Срок свежести — ${threshold}.`
+        ? `Проверка в Company Core, ${formatDateTime(checkedAt)} МСК. Срок свежести – ${threshold}.`
         : "Company Core не прислал время проверки. Запись о провайдере не доказывает доступность.";
     const evidenceRun = observations.find((item) => item.provider || item.model) ?? null;
     const current = runs[0]?.task ?? null;
@@ -3520,11 +3813,20 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       evidenceRun?.model ?? current?.executiveRun?.model ?? null,
     ]);
     const staleRuns = runs.length - freshRuns.length;
-    const tracked = cli ? facts?.cliProbe?.currentRun ?? null : null;
+    // Older Core fills current_run for an unregistered process too (codex-exec-<pid>); that is not a tracked run.
+    const probeRun = cli ? facts?.cliProbe?.currentRun ?? null : null;
+    const probeSessions = cli ? facts?.cliProbe?.sessions ?? [] : [];
+    const tracked = probeRun && (probeSessions.length === 0 || probeSessions.some((item) => item.tracked && item.runId === probeRun.runId))
+      ? probeRun
+      : null;
     const trackedTask = tracked?.taskId
       ? status.tasks.find((task) => task.id === tracked.taskId || (task.id ?? "").startsWith(tracked.taskId ?? "\u0000")) ?? null
       : null;
     const untracked = cli ? facts?.cliProbe?.untrackedExecCount ?? null : null;
+    const cliSessions = cli && occupancy === "working" ? facts?.cliProbe?.sessions ?? [] : [];
+    const sessionViews = codexSessionViews(cliSessions, status.tasks, now);
+    const slots = cli ? facts?.cliProbe?.slots ?? null : null;
+    const slotsText = slots ? `${cliSessions.length} из ${slots.max}` : `${cliSessions.length}`;
     const detailParts = [
       tracked
         ? `Выполняет: отслеживаемый запуск ${tracked.runId}${trackedTask ? ` («${clip(trackedTask.title, 80)}»)` : ""}, начат ${formatDateTime(tracked.startedAt)} МСК, пульс ${formatDateTime(tracked.heartbeatAt)} МСК.`
@@ -3533,7 +3835,10 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
         ? `Назначено Codex в Company Core: ${runs.length}. Это назначение, а не подтверждённая занятость Codex.`
         : null,
       cli && untracked != null && untracked > 0
-        ? `Процессов codex exec без регистрации запуска: ${untracked}. Они не считаются занятостью: нет run-id владельца и пульса.`
+        ? `Процессов codex exec без регистрации запуска: ${untracked}. Они считаются занятостью: процесс идёт на сервере Codex.`
+        : null,
+      cli && slots && cliSessions.length > slots.max
+        ? `Сессий больше лимита: ${cliSessions.length} при лимите ${slots.max}.`
         : null,
       spec.id === "codex" ? "Работа Грога на своём боксе не приписывается Codex." : null,
       spec.id === "codex" && runs.length > 0 && !current?.executiveRun?.provider
@@ -3547,7 +3852,9 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
         : null,
     ];
     const connectionLabel = connectionCopy(connection);
-    const occupancyLabel = occupancyCopy(occupancy);
+    const occupancyLabel = cli && occupancy === "working" && cliSessions.length > 0
+      ? `занят ${slotsText}`
+      : occupancyCopy(occupancy);
     return {
       id: spec.id,
       label: spec.label,
@@ -3564,11 +3871,14 @@ function buildExecutors(status: CompanyStatus, now: number): ExecutorCard[] {
       signalSource,
       freshness: freshnessLabel(cli ? probeAt : heartbeatAt, now),
       activeRuns: runs.map((item) => item.view),
+      sessions: sessionViews,
       activeRunsLabel: cli
-        ? (tracked ? "Отслеживаемый запуск Codex: 1" : runs.length === 0 ? "Нет активных запусков" : `Назначено Codex: ${runs.length} · не подтверждает занятость`)
+        ? (sessionViews.length > 0
+          ? `Сессий Codex: ${slotsText}`
+          : tracked ? "Отслеживаемый запуск Codex: 1" : runs.length === 0 ? "Нет активных запусков" : `Назначено Codex: ${runs.length} · не подтверждает занятость`)
         : runs.length === 0 ? "Нет активных запусков" : `Активных запусков: ${runs.length}`,
       currentTask: cli
-        ? (tracked ? (trackedTask?.title ?? tracked.runId) : "Нет отслеживаемого запуска Codex")
+        ? (tracked && cliSessions.every((item) => item.tracked) ? (trackedTask?.title ?? tracked.runId) : sessionViews[0]?.task ?? "Нет отслеживаемого запуска Codex")
         : runs[0]?.view.title ?? "Нет активных запусков",
       runId: cli ? (tracked?.runId ?? NO_DATA) : (runs[0] && runs[0].view.runId !== NO_DATA ? runs[0].view.runId : null) ?? observations.map((item) => item.runId).find(Boolean) ?? NO_DATA,
       detail: joinFound(detailParts),
@@ -3596,8 +3906,16 @@ export function composeAiCompanyBoard(
       ? archive.data.tasks.filter((task) => task.boardTab === "archive").flatMap((task) => (task.id ? [task.id] : []))
       : [],
   );
-  const currentModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
-  if (!currentModel) return { model: null, acceptanceAvailable, sourceError: current.error };
+  const builtModel = current.data ? buildAiCompanyDashboard(current.data, filters, { archivedTaskIds }) : null;
+  if (!builtModel || !current.data) return { model: null, acceptanceAvailable, sourceError: current.error };
+  // Tab counts come from Core's server count over all tasks, never from the length of a loaded page.
+  const boardCounts =
+    current.data.boardCounts ?? archive.data?.boardCounts ?? legacyArchiveCount(current.data, archive.data, filters);
+  const currentModel: DashboardModel = {
+    ...builtModel,
+    boardCounts,
+    archivePage: archivePageModel(current.data, filters, boardCounts, archive.data),
+  };
   if (!acceptanceAvailable) {
     return { model: { ...currentModel, acceptedArchive: [], acceptedArchiveError: null }, acceptanceAvailable, sourceError: null };
   }
@@ -3615,4 +3933,67 @@ export function composeAiCompanyBoard(
     acceptanceAvailable,
     sourceError: null,
   };
+}
+
+/** Active (non-terminal) tasks the board shows in «Архив», unique across the loaded snapshots. */
+function activeArchivedIds(pages: readonly (CompanyStatus | null | undefined)[]): Set<string> {
+  return new Set(
+    pages.flatMap((status) =>
+      (status?.tasks ?? []).flatMap((task) => (task.active === true && task.boardTab === "archive" && task.id ? [task.id] : [])),
+    ),
+  );
+}
+
+/**
+ * Older Core without `board_counts`: tasks_page.history_included + omitted_history_count is Core's own
+ * SQL count of terminal tasks (history count query), plus active tasks Core projects into «Архив».
+ * Only on the first history page – with history_before the count covers older tasks only.
+ */
+export function legacyArchiveCount(
+  current: CompanyStatus,
+  archive: CompanyStatus | null,
+  filters: HistoryFilters,
+): BoardCounts | null {
+  if (filters.historyBefore) return null;
+  const pages = [current, archive].filter((status): status is CompanyStatus => status != null);
+  const counted = pages.find(
+    (status) => status.completeness.historyIncluded != null && status.completeness.omittedHistoryCount != null,
+  );
+  if (!counted) return null;
+  const terminal = (counted.completeness.historyIncluded ?? 0) + (counted.completeness.omittedHistoryCount ?? 0);
+  const activeArchived = activeArchivedIds(pages);
+  return { plan: null, working: null, review: null, archive: terminal + activeArchived.size, archiveByStatus: {}, source: "history_count" };
+}
+
+/** «Архив» load-more state from the current snapshot's history window and Core's server count. */
+export function archivePageModel(
+  status: CompanyStatus,
+  filters: HistoryFilters,
+  boardCounts: BoardCounts | null,
+  archive: CompanyStatus | null = null,
+): ArchivePageModel | null {
+  if (status.completeness.historyIncluded == null) return null;
+  // Both acceptance views make up the «Архив» list: progress is the smaller window, and the list
+  // is complete only when every loaded window is (a failed later page of either view stays incomplete).
+  const windows = [status, archive].filter(
+    (value): value is CompanyStatus => value != null && value.completeness.historyIncluded != null,
+  );
+  const history = Math.min(...windows.map((value) => value.completeness.historyIncluded as number));
+  const flags = windows.map((value) => value.completeness.historyComplete);
+  const complete = flags.includes(false) ? false : flags.every((flag) => flag === true) ? true : null;
+  // Same population as the counter: loaded terminal history plus active tasks shown in «Архив».
+  const loaded = history + activeArchivedIds([status, archive]).size;
+  const total = boardCounts?.archive ?? null;
+  const limit = filters.archiveLimit ?? ARCHIVE_PAGE_SIZE;
+  const more = complete === false || (complete == null && total != null && loaded < total);
+  // The window fell short of the requested limit (a later page failed): retry the same window.
+  const retry = more && history < limit;
+  const nextLimit = !more
+    ? null
+    : retry
+      ? limit
+      : limit < ARCHIVE_LIMIT_MAX
+        ? Math.min(Math.max(limit, history) + ARCHIVE_PAGE_SIZE, ARCHIVE_LIMIT_MAX)
+        : null;
+  return { loaded, total, nextLimit };
 }

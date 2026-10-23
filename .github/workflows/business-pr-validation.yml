@@ -45,6 +45,7 @@ jobs:
           npm run test:business-app-proxy-routing
           AUDIOLAD_REQUIRE_GUEST_COFFEE_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-guest-coffee
           npm run test:business-guest-shell
+          npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere
           npm run test:business-guest-passport
           npm run test:business-brand-icons

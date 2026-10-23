@@ -2,8 +2,9 @@ import AiCompanyDashboard from "@/components/admin/AiCompanyDashboard";
 import AiCompanyLiveRefresh from "@/components/admin/AiCompanyLiveRefresh";
 import { isAiCompanyOwner, requireAiCompanyView } from "@/lib/admin/guard";
 import {
-  companyStatusRequestPath,
+  ARCHIVE_PAGE_SIZE,
   composeAiCompanyBoard,
+  loadCompanyStatusWindow,
   parseBoardTabParam,
   parseCompanyStatus,
   parseHistoryFilters,
@@ -11,9 +12,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-async function loadStatus(
-  filters: ReturnType<typeof parseHistoryFilters>,
-  acceptance: "current" | "archive" | "all",
+async function loadStatusPage(
+  path: string,
+  timeoutMs: number,
 ): Promise<{
   data: ReturnType<typeof parseCompanyStatus>;
   error: string | null;
@@ -24,10 +25,10 @@ async function loadStatus(
     return { data: null, error: "Company Core не настроен: отсутствует URL или серверный токен." };
   }
   try {
-    const response = await fetch(`${base.replace(/\/$/, "")}${companyStatusRequestPath(filters, acceptance)}`, {
+    const response = await fetch(`${base.replace(/\/$/, "")}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) return { data: null, error: `Company Core вернул HTTP ${response.status}.` };
     const data = parseCompanyStatus(await response.json());
@@ -39,6 +40,15 @@ async function loadStatus(
   }
 }
 
+/** One acceptance view with the requested «Архив» window (cursor pages are chained in loadCompanyStatusWindow). */
+function loadStatus(
+  filters: ReturnType<typeof parseHistoryFilters>,
+  acceptance: "current" | "archive" | "all",
+) {
+  const timeoutMs = (filters.archiveLimit ?? ARCHIVE_PAGE_SIZE) > ARCHIVE_PAGE_SIZE ? 15000 : 8000;
+  return loadCompanyStatusWindow((path) => loadStatusPage(path, timeoutMs), filters, acceptance);
+}
+
 export default async function AiCompanyPage({
   searchParams,
 }: {
@@ -48,6 +58,7 @@ export default async function AiCompanyPage({
     agent?: string;
     history_offset?: string;
     history_before?: string;
+    archive_limit?: string;
     tab?: string;
   }>;
 }) {
@@ -60,6 +71,7 @@ export default async function AiCompanyPage({
     agent: params.agent,
     history_offset: params.history_offset,
     history_before: params.history_before,
+    archive_limit: params.archive_limit,
   });
   const [current, archive] = await Promise.all([loadStatus(filters, "current"), loadStatus(filters, "archive")]);
   const { model, acceptanceAvailable, sourceError } = composeAiCompanyBoard(current, archive, filters);
