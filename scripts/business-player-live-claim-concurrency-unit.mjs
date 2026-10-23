@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationPath = join(
   repoRoot,
-  "supabase/migrations/20270114120000_business_player_live_claim_atomic.sql",
+  "supabase/migrations/20270119120000_business_player_live_claim_atomic.sql",
 );
 const migration = readFileSync(migrationPath, "utf8");
 

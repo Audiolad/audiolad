@@ -2055,7 +2055,7 @@ updated_at). Все FK — ON DELETE RESTRICT. RLS включён, прямых 
 Старые таблицы и данные не меняются. Решение о применении отдельно принимает Сергей.
 Подробности и откат: [11-real-1-migration.md](business/ux-c02fe282/11-real-1-migration.md).
 
-Follow-up `supabase/migrations/20270114120000_business_player_live_claim_atomic.sql`
+Follow-up `supabase/migrations/20270119120000_business_player_live_claim_atomic.sql`
 replaces `business_player_live_claim` so the first device claim is one atomic write.
 Signature, security settings, grants and later claims stay the same. Prepared only;
 not applied by this change.
