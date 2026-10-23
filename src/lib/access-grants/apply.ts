@@ -11,9 +11,7 @@ export type ActivationResult = {
 };
 
 async function existingGrant(store: AccessGrantStore, emailHash: string, userId: string, kind: string) {
-  const byEmail = await store.findGrantByEmail(emailHash, kind);
-  if (byEmail) return byEmail;
-  return store.findGrantByUser(userId, kind);
+  return store.resolveGrant(emailHash, userId, kind);
 }
 
 /**
@@ -55,7 +53,7 @@ export async function activateBusinessTrial(
       endsAt: decision.endsAt,
     };
     const inserted = await store.insertGrant(row);
-    grant = inserted === "inserted" ? row : await existingGrant(store, emailHash, input.userId, kind);
+    grant = await existingGrant(store, emailHash, input.userId, kind);
     if (inserted === "inserted") {
       await store.insertEvent({
         emailHash,
@@ -139,7 +137,8 @@ export async function recordPaidRenewal(
     kind,
     paidUntil: input.paidUntil.toISOString(),
   });
-  if (isPeriodActive(input.paidUntil.toISOString(), now)) {
+  const paidUntil = await store.findPaidUntil(emailHash, input.userId, kind);
+  if (paidUntil && isPeriodActive(paidUntil, now)) {
     await recordAccessActivity(store, { userId: input.userId, email: input.email, now, action: "renewal", kind });
   }
   const grant = await existingGrant(store, emailHash, input.userId, kind);
@@ -147,6 +146,6 @@ export async function recordPaidRenewal(
     now,
     emailConfirmed: true,
     grant,
-    paidUntil: input.paidUntil.toISOString(),
+    paidUntil,
   });
 }

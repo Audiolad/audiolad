@@ -46,36 +46,19 @@ export function createSupabaseAccessGrantStore(): AccessGrantStore {
   }
 
   return {
-    async findGrantByEmail(emailHash, kind) {
-      const result = await db
-        .from("access_grants")
-        .select("email_hash, user_id, kind, starts_at, ends_at")
-        .eq("email_hash", emailHash)
-        .eq("kind", kind)
-        .maybeSingle();
-      return asGrant(unwrap(result) as Record<string, unknown> | null);
-    },
-    async findGrantByUser(userId, kind) {
-      const result = await db
-        .from("access_grants")
-        .select("email_hash, user_id, kind, starts_at, ends_at")
-        .eq("user_id", userId)
-        .eq("kind", kind)
-        .maybeSingle();
-      return asGrant(unwrap(result) as Record<string, unknown> | null);
+    async resolveGrant(emailHash, userId, kind) {
+      const result = await db.rpc("resolve_access_grant", {
+        p_email_hash: emailHash, p_user_id: userId, p_kind: kind,
+      });
+      const rows = unwrap(result) as Record<string, unknown>[] | null;
+      return asGrant(rows?.[0] ?? null);
     },
     async insertGrant(row) {
-      const { error } = await db.from("access_grants").insert({
-        email_hash: row.emailHash,
-        user_id: row.userId,
-        kind: row.kind,
-        starts_at: row.startsAt,
-        ends_at: row.endsAt,
-        source: "trial",
+      const result = await db.rpc("insert_access_grant", {
+        p_email_hash: row.emailHash, p_user_id: row.userId, p_kind: row.kind,
+        p_starts_at: row.startsAt, p_ends_at: row.endsAt,
       });
-      if (!error) return "inserted";
-      if (isUniqueViolation(error)) return "exists";
-      throw new AccessGrantStoreError();
+      return unwrap(result) === true ? "inserted" : "exists";
     },
     async findPaidUntil(emailHash, userId, kind) {
       const byEmail = await db
@@ -106,9 +89,15 @@ export function createSupabaseAccessGrantStore(): AccessGrantStore {
           paid_until: row.paidUntil,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "email_hash,kind" },
+        { onConflict: "email_hash,kind", ignoreDuplicates: true },
       );
       if (error) throw new AccessGrantStoreError();
+      // Atomic predicate is rechecked after a concurrent updater releases its row lock.
+      const updated = await db.from("access_paid_periods")
+        .update({ paid_until: row.paidUntil, updated_at: new Date().toISOString() })
+        .eq("email_hash", row.emailHash).eq("kind", row.kind)
+        .lt("paid_until", row.paidUntil);
+      unwrap(updated);
     },
     async listEvents(emailHash, kind) {
       const result = await db

@@ -8,6 +8,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { PathnameContext } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 
+import { getSafeNextPath } from "../src/lib/auth/routes";
+import { BUSINESS_TRIAL_RETURN_PATH, BUSINESS_TRIAL_SIGN_IN_HREF } from "../src/lib/access-grants/paths";
 import { signUpAction } from "../src/app/(platform)/auth/sign-up/actions";
 import BusinessAppShell from "../src/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
@@ -32,7 +34,7 @@ import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy
 import { SpaOnlinePlayer } from "../src/lib/business-app/spa-online-player";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
 import { selectWorkspaceTracks } from "../src/lib/business-workspace/catalog";
-import type { WorkspacePageModel } from "../src/lib/business-workspace/model";
+import { workspaceItems, workspaceDeadlineDelay, workspacePlaybackAllowed, type WorkspacePageModel } from "../src/lib/business-workspace/model";
 import { handleWorkspaceState, handleWorkspaceTrackUrl } from "../src/lib/business-workspace/routes";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -40,7 +42,7 @@ const DAY = 86_400_000;
 const TRACK = "157f8644-4ad1-4bea-9de0-d44f911ae009";
 const USER_A = "11111111-2222-4333-8444-555555555555";
 const USER_B = "22222222-3333-4444-8555-666666666666";
-const EMAIL = "cafe-trial@yandex.ru";
+const EMAIL = "cafe-trial@example.test";
 
 function atMoscow(isoDate: string, hour = 12): Date {
   return new Date(`${isoDate}T${String(hour).padStart(2, "0")}:00:00+03:00`);
@@ -59,10 +61,10 @@ async function main() {
   assert.equal(trialDaysLeft(ends, start), 30);
   assert.equal(trialDaysLeft(ends, new Date(ends.getTime() - 1)), 1);
   assert.equal(trialDaysLeft(ends, ends), 0);
-  const hash = hashAccessEmail("  Cafe-Trial@Yandex.ru ");
+  const hash = hashAccessEmail("  Cafe-Trial@Example.test ");
   assert.equal(hash, hashAccessEmail(EMAIL));
   assert.equal(hash?.length, 64);
-  assert.doesNotMatch(hash ?? "", /cafe|yandex/i);
+  assert.doesNotMatch(hash ?? "", /cafe|example/i);
 }
 
 // ---------------------------------------------------------------- new client, repeat registration, paid, unconfirmed
@@ -92,7 +94,7 @@ async function main() {
   assert.equal(otherAccount.grant?.endsAt, first.grant?.endsAt);
   assert.equal(store.grants.length, 1, "same address, new registration, no second gift");
 
-  const otherEmail = await activateBusinessTrial(store, { userId: USER_A, email: "other-cafe@yandex.ru", now: start });
+  const otherEmail = await activateBusinessTrial(store, { userId: USER_A, email: "other-cafe@example.test", now: start });
   assert.equal(otherEmail.decision, "existing");
   assert.equal(store.grants.length, 1, "same user id cannot open a second gift on another address");
   assert.equal(store.grants[0]?.emailHash, hashAccessEmail(EMAIL));
@@ -193,6 +195,104 @@ async function main() {
     now: new Date(expiredAt.getTime() + DAY),
   });
   assert.equal(store.events.filter((row) => row.name === "subscription_renewed").length, 1);
+}
+
+// ---------------------------------------------------------------- retained identities and collisions (including expired windows)
+{
+  const store = createMemoryAccessGrantStore();
+  const first = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
+  const inherited = await activateBusinessTrial(store, { userId: USER_B, email: EMAIL, now: new Date(start.getTime() + DAY) });
+  assert.equal(inherited.grant?.endsAt, first.grant?.endsAt);
+  const changed = await activateBusinessTrial(store, { userId: USER_B, email: "changed@example.test", now: new Date(start.getTime() + 31 * DAY) });
+  assert.equal(changed.grant?.endsAt, first.grant?.endsAt);
+  assert.equal(changed.access.mode, "offer", "inheriting then changing email cannot restart an expired gift");
+  const registeredAgain = await activateBusinessTrial(store, { userId: "33333333-4444-4555-8666-777777777777", email: "changed@example.test", now: new Date(start.getTime() + 32 * DAY) });
+  assert.equal(registeredAgain.access.mode, "offer", "the changed email is also consumed");
+  assert.equal(store.grants.length, 1);
+}
+for (const reverse of [false, true]) {
+  const store = createMemoryAccessGrantStore();
+  const original = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
+  const other = await activateBusinessTrial(store, { userId: USER_B, email: "second@example.test", now: new Date(start.getTime() + 20 * DAY) });
+  const collided = await activateBusinessTrial(store, {
+    userId: reverse ? USER_A : USER_B,
+    email: reverse ? "second@example.test" : EMAIL,
+    now: new Date(start.getTime() + 31 * DAY),
+  });
+  assert.equal(collided.access.mode, "offer", "an expired original wins over a live later grant");
+  assert.equal(collided.grant?.endsAt, original.grant?.endsAt);
+  assert.notEqual(other.grant?.endsAt, original.grant?.endsAt);
+  for (const [userId, email] of [[USER_A, EMAIL], [USER_B, "second@example.test"]]) {
+    const again = await activateBusinessTrial(store, { userId, email, now: new Date(start.getTime() + 32 * DAY) });
+    assert.equal(again.grant?.endsAt, original.grant?.endsAt, "both original identities keep the earliest window");
+    assert.equal(again.access.player, false);
+  }
+  assert.equal(store.grants.length, 2, "collision retains both original rows without issuing another");
+}
+{
+  const store = createMemoryAccessGrantStore();
+  const results = await Promise.all(Array.from({ length: 5 }, () => activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start })));
+  assert.equal(store.grants.length, 1);
+  assert.ok(results.every((r) => r.grant?.endsAt === addGiftPeriod(start).toISOString()));
+  const max = new Date(start.getTime() + 60 * DAY);
+  await recordPaidRenewal(store, { userId: USER_A, email: EMAIL, now: start, paidUntil: max });
+  const stale = await recordPaidRenewal(store, {
+    userId: USER_A, email: EMAIL, now: new Date(start.getTime() + 40 * DAY),
+    paidUntil: new Date(start.getTime() + 35 * DAY),
+  });
+  assert.equal(store.paid[0].paidUntil, max.toISOString());
+  assert.equal(stale.mode, "paid", "access uses the stored maximum even if the supplied renewal is expired");
+  assert.equal(stale.endsAt, max.toISOString());
+}
+
+// ---------------------------------------------------------------- deadline items, capped timer, hard stop and buffered resume
+{
+  const end = addGiftPeriod(start).toISOString();
+  const deadline = Date.parse(end);
+  const items = workspaceItems([{ audioItemId: TRACK, title: "Утро", durationSeconds: 180 }], end);
+  assert.equal(items[0].playableUntil?.toISOString(), end);
+  assert.equal(workspacePlaybackAllowed(end, deadline - 1), true);
+  assert.equal(workspacePlaybackAllowed(end, deadline), false);
+  assert.equal(workspacePlaybackAllowed(null, deadline), false);
+  assert.equal(workspaceDeadlineDelay(end, deadline - 1), 1);
+  assert.equal(workspaceDeadlineDelay(end, deadline), 0);
+  assert.equal(workspaceDeadlineDelay(end, deadline + 1), 0);
+  assert.equal(workspaceDeadlineDelay(end, start.getTime()), 2 ** 31 - 1);
+  for (const pauseFirst of [false, true]) {
+    let now = deadline - 1000;
+    let playCount = 0;
+    let paused = true;
+    let stopAt: (() => void) | null = null;
+    let delay = -1;
+    const audio = {
+      src: "", currentTime: 0,
+      async play() { playCount++; paused = false; },
+      pause() { paused = true; },
+      removeAttribute() { this.src = ""; },
+      load() {},
+    };
+    const ctl = new SpaOnlinePlayer({
+      audio, now: () => now, onChange() {},
+      sign: async () => ({ ok: true, data: { url: "https://example.test/track" } }),
+      setTimer: (fn, ms) => { stopAt = fn; delay = ms; return 1; },
+      clearTimer: () => { stopAt = null; },
+    }, items);
+    await ctl.playIndex(0);
+    assert.equal(delay, 1000);
+    if (pauseFirst) await ctl.toggle();
+    now = deadline;
+    if (pauseFirst) await ctl.toggle();
+    else {
+      const fire = stopAt as (() => void) | null;
+      assert.ok(fire);
+      fire();
+    }
+    assert.equal(paused, true, "no buffered audio plays at the deadline");
+    assert.equal(audio.src, "");
+    await ctl.toggle();
+    assert.equal(playCount, 1, "expired buffered audio never resumes");
+    ctl.dispose();
+  }
 }
 
 // ---------------------------------------------------------------- server catalog and stream gates
@@ -336,7 +436,14 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
   assert.doesNotMatch(actions, /emailRedirectTo/);
   assert.doesNotMatch(actions, /activateBusinessTrial|createSupabaseAccessGrantStore/);
   const callback = read("src/app/(platform)/auth/callback/route.ts");
-  assert.match(callback, /explicitNext/);
+  assert.match(callback, /getSafeNextPath/);
+  assert.doesNotMatch(callback, /resolveValidatedNextPath/);
+  assert.equal(getSafeNextPath("/my-practices", BUSINESS_TRIAL_RETURN_PATH), "/my-practices");
+  assert.equal(getSafeNextPath(BUSINESS_TRIAL_RETURN_PATH), BUSINESS_TRIAL_RETURN_PATH);
+  for (const next of [null, "//example.test", "/auth/sign-in"]) {
+    assert.equal(getSafeNextPath(next, BUSINESS_TRIAL_RETURN_PATH), BUSINESS_TRIAL_RETURN_PATH);
+    assert.equal(getSafeNextPath(next, "/profile"), "/profile");
+  }
   assert.match(callback, /business_trial === "1"/);
   const back = read("src/app/(platform)/auth/business-return/page.tsx");
   const confirmAt = back.indexOf("if (!isEmailConfirmed");
@@ -345,33 +452,43 @@ for (const api of ["/api/business/workspace/track-url", "/api/business/workspace
 
   async function submit(next: string | null, authError: string | null = null) {
     const box: { trial?: string } = {};
-    const result = await signUpAction(
-      {
-        firstName: "Анна",
-        lastName: "Иванова",
-        email: EMAIL,
-        password: "password123",
-        legalConsent: true,
-        marketingConsent: false,
-        next,
-      },
-      {
-        createClient: async () => ({
-          auth: {
-            signUp: async (args: { options?: { data?: Record<string, string> } }) => {
-              box.trial = args.options?.data?.business_trial;
-              return {
-                data: { user: authError ? null : { id: USER_A }, session: null },
-                error: authError ? { message: authError } : null,
-              };
+    const previousCorporateDomains = process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS;
+    process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS = "example.test";
+    try {
+      const result = await signUpAction(
+        {
+          firstName: "Анна",
+          lastName: "Иванова",
+          email: EMAIL,
+          password: "password123",
+          legalConsent: true,
+          marketingConsent: false,
+          next,
+        },
+        {
+          createClient: async () => ({
+            auth: {
+              signUp: async (args: { options?: { data?: Record<string, string> } }) => {
+                box.trial = args.options?.data?.business_trial;
+                return {
+                  data: { user: authError ? null : { id: USER_A }, session: null },
+                  error: authError ? { message: authError } : null,
+                };
+              },
             },
-          },
-          rpc: async () => ({ error: null }),
-        }),
-        onNewListenerCreated: async () => ({ ok: true, status: "sent" }),
-      },
-    );
-    return { result, trial: box.trial };
+            rpc: async () => ({ error: null }),
+          }),
+          onNewListenerCreated: async () => ({ ok: true, status: "sent" }),
+        },
+      );
+      return { result, trial: box.trial };
+    } finally {
+      if (previousCorporateDomains === undefined) {
+        delete process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS;
+      } else {
+        process.env.AUDIOLAD_CORPORATE_EMAIL_DOMAINS = previousCorporateDomains;
+      }
+    }
   }
 
   const gift = await submit("/auth/business-return");
@@ -445,6 +562,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
     status: "trial",
     daysLeft: 12,
     endsAtLabel: "12 марта 2026 г., 10:00 МСК",
+    endsAt: addGiftPeriod(start).toISOString(),
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
     rules: businessGiftRulesText(),
@@ -489,12 +607,34 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.deepEqual(literals, []);
 }
 
+{
+  const html = renderToStaticMarkup(<BusinessWorkspace model={model({ status: "unavailable" })} />);
+  assert.match(html, /href="\/workspace\?space=cafe"[^>]*>Перейти и повторить/);
+  assert.doesNotMatch(html, /href="\/help"/);
+  const back = read("src/app/(platform)/auth/business-return/page.tsx");
+  assert.doesNotMatch(back, /href="\/help"/);
+  assert.match(back, /href=\{BUSINESS_TRIAL_RETURN_PATH\}/);
+  const landing = read("src/components/business/BusinessLandingView.tsx");
+  assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
+  assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
+  assert.ok(BUSINESS_TRIAL_SIGN_IN_HREF.includes("next=%2Fauth%2Fbusiness-return"));
+  assert.match(workspaceSource, /workspaceItems\(model.tracks, model.endsAt\)/);
+  assert.match(workspaceSource, /setTimeout\(check, workspaceDeadlineDelay/);
+  assert.match(workspaceSource, /applyManifest\(null\)/);
+  assert.match(read("src/app/api/business/workspace/state/route.ts"), /export async function GET/);
+}
+
 const migration = read("supabase/migrations/20270115120000_access_grants_and_workspace.sql");
 const migrationSql = migration.replace(/--[^\n]*/g, "");
 assert.doesNotMatch(migrationSql, /\b(DELETE|TRUNCATE|DROP)\b/i);
 assert.match(migrationSql, /CREATE TABLE IF NOT EXISTS public\.access_grants/);
 assert.match(migrationSql, /CREATE TABLE IF NOT EXISTS public\.business_space_admissions/);
-assert.doesNotMatch(migrationSql, /INSERT INTO/i);
+// Function bodies persist identities/grants only at runtime; the migration seeds no rows.
+assert.doesNotMatch(migrationSql.replace(/\$\$[\s\S]*?\$\$/g, ""), /INSERT INTO/i);
+assert.match(migrationSql, /access_grant_identities ENABLE ROW LEVEL SECURITY/);
+assert.match(migrationSql, /pg_advisory_xact_lock/);
+assert.match(migrationSql, /ON CONFLICT DO NOTHING/);
+assert.match(migrationSql, /ORDER BY g\.starts_at, g\.ends_at/);
 assert.doesNotMatch(migrationSql, /REFERENCES\s+auth\.users/i);
 
 const loader = read("src/lib/business-workspace/load.server.ts");

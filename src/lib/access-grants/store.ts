@@ -31,8 +31,8 @@ export type PlaybackRow = {
  * Grant and playback rows are updated or inserted, never deleted, when a period ends.
  */
 export type AccessGrantStore = {
-  findGrantByEmail(emailHash: string, kind: string): Promise<GrantRow | null>;
-  findGrantByUser(userId: string, kind: string): Promise<GrantRow | null>;
+  /** Persist both consumed identities and return the earliest connected original window. */
+  resolveGrant(emailHash: string, userId: string, kind: string): Promise<GrantRow | null>;
   insertGrant(row: GrantRow): Promise<"inserted" | "exists">;
   findPaidUntil(emailHash: string, userId: string, kind: string): Promise<string | null>;
   upsertPaid(row: PaidRow): Promise<void>;

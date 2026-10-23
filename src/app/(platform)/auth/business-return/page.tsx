@@ -9,7 +9,7 @@ import {
   BUSINESS_UNCONFIRMED_NOTE,
   businessGiftRulesText,
 } from "@/lib/access-grants/copy";
-import { businessWorkspaceHref, BUSINESS_TRIAL_SIGN_IN_HREF } from "@/lib/access-grants/paths";
+import { businessWorkspaceHref, BUSINESS_TRIAL_SIGN_IN_HREF, BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
 import { isEmailConfirmed } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
@@ -43,10 +43,10 @@ export default async function BusinessTrialReturnPage() {
         <p className="mt-3 text-sm leading-6 text-[#7d70a2]">{businessGiftRulesText()}</p>
         <p className="mt-6 flex flex-wrap gap-3 text-sm">
           <Link className="font-semibold text-[#7042c5] underline" href={BUSINESS_TRIAL_SIGN_IN_HREF}>
-            Войти после подтверждения
+            Перейти и войти после подтверждения
           </Link>
           <Link className="font-semibold text-[#7042c5] underline" href={HELP_HREF}>
-            Письмо не пришло
+            Перейти и найти письмо
           </Link>
         </p>
       </main>
@@ -64,9 +64,9 @@ export default async function BusinessTrialReturnPage() {
         <h1 className="text-[28px] font-semibold">{BUSINESS_GIFT_TITLE}</h1>
         <p className="mt-4 text-sm leading-6 text-[#7d70a2]">{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
         <p className="mt-6">
-          <Link className="font-semibold text-[#7042c5] underline" href="/help">
-            Открыть помощь
-          </Link>
+          <a className="font-semibold text-[#7042c5] underline" href={BUSINESS_TRIAL_RETURN_PATH}>
+            Перейти и повторить
+          </a>
         </p>
       </main>
     );

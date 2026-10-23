@@ -114,4 +114,74 @@ GRANT ALL ON TABLE public.access_grant_events TO service_role;
 GRANT ALL ON TABLE public.business_space_admissions TO service_role;
 GRANT ALL ON TABLE public.business_workspace_playback TO service_role;
 
+-- Retain every consumed identity, including re-registered accounts and changed emails.
+CREATE TABLE IF NOT EXISTS public.access_grant_identities (
+  email_hash text NOT NULL CHECK (email_hash ~ '^[0-9a-f]{64}$'),
+  user_id uuid NOT NULL,
+  kind text NOT NULL CHECK (kind = 'business_new_client'),
+  PRIMARY KEY (email_hash, user_id, kind)
+);
+CREATE INDEX IF NOT EXISTS access_grant_identities_user_idx
+  ON public.access_grant_identities (user_id, kind);
+ALTER TABLE public.access_grant_identities ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.access_grant_identities FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.access_grant_identities TO service_role;
+
+-- A transaction lock serializes graph changes and issuance, including collisions
+-- discovered through different identities. Old original windows remain immutable.
+CREATE OR REPLACE FUNCTION public.resolve_access_grant(
+  p_email_hash text, p_user_id uuid, p_kind text
+) RETURNS SETOF public.access_grants
+LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('access_grants:' || p_kind, 0));
+  INSERT INTO public.access_grant_identities (email_hash, user_id, kind)
+    VALUES (p_email_hash, p_user_id, p_kind) ON CONFLICT DO NOTHING;
+  RETURN QUERY
+    WITH RECURSIVE edges AS (
+      SELECT i.email_hash, i.user_id FROM public.access_grant_identities i WHERE i.kind = p_kind
+      UNION
+      SELECT g.email_hash, g.user_id FROM public.access_grants g WHERE g.kind = p_kind
+    ), identities (identity) AS (
+      SELECT 'email:' || p_email_hash
+      UNION
+      SELECT CASE WHEN n.identity = 'email:' || e.email_hash
+        THEN 'user:' || e.user_id::text ELSE 'email:' || e.email_hash END
+      FROM identities n JOIN edges e
+        ON n.identity = 'email:' || e.email_hash OR n.identity = 'user:' || e.user_id::text
+    )
+    SELECT g.* FROM public.access_grants g
+    WHERE g.kind = p_kind AND (
+      'email:' || g.email_hash IN (SELECT identity FROM identities)
+      OR 'user:' || g.user_id::text IN (SELECT identity FROM identities)
+    )
+    ORDER BY g.starts_at, g.ends_at, g.email_hash LIMIT 1;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.insert_access_grant(
+  p_email_hash text, p_user_id uuid, p_kind text,
+  p_starts_at timestamptz, p_ends_at timestamptz
+) RETURNS boolean
+LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+DECLARE
+  existing public.access_grants;
+  inserted_count integer;
+BEGIN
+  -- resolve takes the same transaction lock and records the binding before reading.
+  SELECT * INTO existing FROM public.resolve_access_grant(p_email_hash, p_user_id, p_kind);
+  IF FOUND THEN RETURN false; END IF;
+  INSERT INTO public.access_grants (email_hash, user_id, kind, starts_at, ends_at, source)
+    VALUES (p_email_hash, p_user_id, p_kind, p_starts_at, p_ends_at, 'trial')
+    ON CONFLICT DO NOTHING;
+  GET DIAGNOSTICS inserted_count = ROW_COUNT;
+  RETURN inserted_count = 1;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.resolve_access_grant(text, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.insert_access_grant(text, uuid, text, timestamptz, timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_access_grant(text, uuid, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.insert_access_grant(text, uuid, text, timestamptz, timestamptz) TO service_role;
+
 COMMIT;

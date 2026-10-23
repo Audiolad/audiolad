@@ -15,9 +15,8 @@ import {
   BUSINESS_WORKSPACE_AUTOPLAY_NOTE,
 } from "@/lib/access-grants/copy";
 import { ruDaysWord } from "@/lib/access-grants/policy";
-import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
-import { workspacePlayerOpen, type WorkspacePageModel, type WorkspaceTrack } from "@/lib/business-workspace/model";
+import { workspacePlayerOpen, workspaceItems, workspaceDeadlineDelay, workspacePlaybackAllowed, type WorkspacePageModel } from "@/lib/business-workspace/model";
 import {
   clampWorkspacePlayback,
   newerPlayback,
@@ -33,20 +32,6 @@ const JSON_POST = {
   credentials: "same-origin" as const,
   cache: "no-store" as const,
 };
-
-function toItems(tracks: readonly WorkspaceTrack[]): SpaManifestItem[] {
-  return tracks.map((track, position) => ({
-    position,
-    audioItemId: track.audioItemId,
-    trackCode: null,
-    title: track.title,
-    durationSeconds: track.durationSeconds,
-    gainDb: null,
-    playableUntil: null,
-    offlineAllowed: false,
-    offlineCacheUntil: null,
-  }));
-}
 
 function readLocal(spaceId: string, trackCount: number): WorkspacePlayback | null {
   try {
@@ -66,7 +51,9 @@ function writeLocal(spaceId: string, playback: WorkspacePlayback): void {
   }
 }
 
-export default function BusinessWorkspace({ model }: { model: WorkspacePageModel }) {
+export default function BusinessWorkspace({ model: initialModel }: { model: WorkspacePageModel }) {
+  const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
+  const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
   const open = workspacePlayerOpen(model);
   const canPlay = open && model.tracks.length > 0;
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -158,7 +145,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
           });
         },
       },
-      toItems(model.tracks),
+      workspaceItems(model.tracks, model.endsAt),
     );
     ctlRef.current = ctl;
     const onTime = () => {
@@ -179,7 +166,46 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
     };
     // remember is recreated each render; the controller must not restart on every tick.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canPlay, model.spaceId, model.tracks]);
+  }, [canPlay, model.spaceId, model.tracks, model.endsAt]);
+
+  useEffect(() => {
+    if (!open) return;
+    let timer: ReturnType<typeof setTimeout>;
+    let expired = false;
+    const check = () => {
+      if (expired) return;
+      if (workspacePlaybackAllowed(model.endsAt, Date.now())) {
+        clearTimeout(timer);
+        timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
+        return;
+      }
+      expired = true;
+      // Revoke buffered audio immediately, even if the state request is offline.
+      void ctlRef.current?.applyManifest(null);
+      audioRef.current?.pause();
+      setRefreshed({ source: initialModel, value: { ...model, status: "offer", daysLeft: 0, tracks: [] } });
+      const params = new URLSearchParams({ space: model.spaceId });
+      void fetch(`/api/business/workspace/state?${params.toString()}`, { credentials: "same-origin", cache: "no-store" })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const json = await res.json() as { ok?: boolean; model?: WorkspacePageModel };
+          if (!json.ok || !json.model) return;
+          // Do not reopen an already-expired window if the client clock is ahead.
+          const value = workspacePlayerOpen(json.model) && !workspacePlaybackAllowed(json.model.endsAt, Date.now())
+            ? { ...json.model, status: "offer" as const, daysLeft: 0, tracks: [] }
+            : json.model;
+          setRefreshed({ source: initialModel, value });
+        }).catch(() => { /* The local offer stays closed until access can be refreshed. */ });
+    };
+    timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [open, model, initialModel]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -191,7 +217,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
 
   const play = async () => {
     const ctl = ctlRef.current;
-    if (!ctl) return;
+    if (!ctl || !workspacePlaybackAllowed(model.endsAt, Date.now())) return;
     const index = playbackRef.current.index;
     if (ctl.status === "playing" || ctl.status === "loading") {
       await ctl.toggle();
@@ -208,7 +234,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
 
   const next = async () => {
     const ctl = ctlRef.current;
-    if (!ctl) return;
+    if (!ctl || !workspacePlaybackAllowed(model.endsAt, Date.now())) return;
     seekRef.current = 0;
     await ctl.next();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
@@ -263,8 +289,8 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
         <section className="business-app-card space-y-3" data-testid="biz-workspace-unconfirmed">
           <p>{BUSINESS_UNCONFIRMED_NOTE}</p>
           <p className="flex flex-wrap gap-3">
-            <a className="underline" href={model.signInHref}>Войти после подтверждения</a>
-            <Link className="underline" href={model.helpHref}>Письмо не пришло</Link>
+            <a className="underline" href={model.signInHref}>Перейти и войти после подтверждения</a>
+            <Link className="underline" href={model.helpHref}>Перейти и найти письмо</Link>
           </p>
         </section>
       ) : null}
@@ -272,14 +298,14 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
       {model.status === "unavailable" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-unavailable">
           <p>{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
-          <Link className="underline" href="/help">Открыть помощь</Link>
+          <a className="underline" href={`/workspace?space=${model.spaceId}`}>Перейти и повторить</a>
         </section>
       ) : null}
 
       {!model.spaceEnabled ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-closed-space">
           <p>{BUSINESS_SPACE_CLOSED_NOTE}</p>
-          <Link className="underline" href={model.cafeHref}>Открыть «Кафе, рестораны и отели»</Link>
+          <Link className="underline" href={model.cafeHref}>Перейти и открыть «Кафе, рестораны и отели»</Link>
         </section>
       ) : null}
 
@@ -300,7 +326,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
           <p>{BUSINESS_EMPTY_CATALOG_NOTE}</p>
           <p className="flex flex-wrap gap-3">
             <a className="underline" href={model.rightsHref}>Как устроены права на музыку</a>
-            <Link className="underline" href={model.onboardingHref}>Подключение точки</Link>
+            <Link className="underline" href={model.onboardingHref}>Перейти и подключить точку</Link>
           </p>
         </section>
       ) : null}
@@ -315,6 +341,7 @@ export default function BusinessWorkspace({ model }: { model: WorkspacePageModel
                   type="button"
                   className="business-atmosphere-track business-app-focus-ring"
                   onClick={() => {
+                    if (!workspacePlaybackAllowed(model.endsAt, Date.now())) return;
                     seekRef.current = 0;
                     void ctlRef.current?.playIndex(index).then(() => remember({ index, positionSec: 0 }, true));
                   }}

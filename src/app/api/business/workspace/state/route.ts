@@ -3,13 +3,19 @@ import { NextResponse } from "next/server";
 import { recordAccessActivity } from "@/lib/access-grants/apply";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
-import { loadWorkspaceActor } from "@/lib/business-workspace/load.server";
+import { loadWorkspaceActor, loadWorkspacePage } from "@/lib/business-workspace/load.server";
 import { clampWorkspacePlayback } from "@/lib/business-workspace/playback";
 import { handleWorkspaceState } from "@/lib/business-workspace/routes";
 
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
+
+/** Refresh the authenticated access model after its local deadline. */
+export async function GET(request: Request) {
+  const model = await loadWorkspacePage(new URL(request.url).searchParams.get("space"));
+  return NextResponse.json({ ok: true, model }, { headers: NO_STORE });
+}
 
 /** Persist playback and record trial analytics. Does not open a closed player. */
 export async function POST(request: Request) {
