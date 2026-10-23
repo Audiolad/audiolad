@@ -127,8 +127,11 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(at("near_end", "/"), /скоро подойдёт к концу/);
   has(at("unavailable", "/"), /data-limit="unavailable"/);
   const layout = read("src/app/business-app/layout.tsx");
-  has(layout, /resolveBusinessAccess\(domain\)\.level === "guest"\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests only");
-  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\}>/);
+  has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
+  has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\}>/);
+  const peek = read("src/lib/access-grants/peek.server.ts");
+  hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }
 
 // ---------------------------------------------------------------- real player + settings (Music section)
@@ -204,6 +207,26 @@ async function closedApis() {
   for (const path of ["/locations", "/stats", "/documents", "/team", "/preferences"]) {
     assert.equal(resolveBusinessProxyAction("business.audiolad.ru", path).action, "rewrite_business_app", `${path} is still a real cabinet route`);
   }
+}
+
+// ---------------------------------------------------------------- live gift hides the guest strip (Sergey 23.10.2026)
+{
+  const trial = { mode: "trial" as const, endsAt: "2026-11-22T14:11:37.762Z" };
+  const withAccess = (domain: BusinessOwnerHomeContext, pathname: string, customerAccess: typeof trial | null) =>
+    wrap(domain, pathname, <BusinessAppShell customerAccess={customerAccess}><main data-testid="page">page</main></BusinessAppShell>);
+  for (const path of ["/", "/music", "/onboarding", "/settings"]) {
+    const t = withAccess(signedInNoOrg, path, trial);
+    hasNot(t, /biz-guest-status|Гостевой режим|Получить 30 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
+    has(t, /data-testid="biz-access-line"[^>]*>[\s\S]*Бесплатный доступ до 22 ноября 2026/, `${path}: calm access line with the Moscow end date`);
+  }
+  const paid = withAccess(signedInNoOrg, "/", { mode: "paid" as const, endsAt: "2026-12-31T10:00:00Z" });
+  hasNot(paid, /biz-guest-status/, "paid: no guest strip");
+  has(paid, /Подписка действует до 31 декабря 2026/, "paid: quiet paid line");
+  const expired = withAccess(signedInNoOrg, "/", { mode: "offer" as never, endsAt: null } as never);
+  has(expired, /data-testid="biz-guest-status"/, "expired / no gift: guest strip and offer stay");
+  has(withAccess(anonymous, "/", null), /data-testid="biz-guest-status"/, "anonymous guest still sees the strip");
+  hasNot(withAccess(signedInNoOrg, "/workspace", trial), /biz-access-line|biz-guest-status/, "workspace shows its own period block");
+  hasNot(withAccess(member, "/", null), /biz-guest-status/, "member never sees the guest strip");
 }
 
 // ---------------------------------------------------------------- permanent atlas URL
