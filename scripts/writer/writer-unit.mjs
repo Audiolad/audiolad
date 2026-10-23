@@ -83,11 +83,17 @@ async function check(article) {
 {
   const { article } = normalizeArticle(fixture(), context);
   article.closingSection.paragraphs[0] += " \u2014 <a href=\"/x\">x</a>";
-  article.sections[1].blocks.push({ kind: "table", caption: "", columns: ["a", "b"], rows: [["1", "2"]] });
   const result = await validateArticle(article, brief, { ...context, supportsTable: false }, { live: false });
   for (const needle of ["длинное тире", "HTML-тег", "table не поддерживается"]) {
     assert(result.errors.some((e) => e.includes(needle)), `${needle}\n${result.errors.join("\n")}`);
   }
+}
+
+// 5b. The fixture table is valid where types.ts supports tables.
+{
+  const { article } = normalizeArticle(fixture(), context);
+  const result = await validateArticle(article, brief, { ...context, supportsTable: true }, { live: false });
+  assert(!result.errors.some((e) => e.includes("table")), result.errors.join("\n"));
 }
 
 // 6. Duplicates: existing slug and existing title.
