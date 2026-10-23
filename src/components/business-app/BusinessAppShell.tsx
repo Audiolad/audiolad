@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 
@@ -9,6 +10,7 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
 import BusinessSidebar from "@/components/business-app/BusinessSidebar";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
+import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
 
 /**
  * One AudioLad Business cabinet for everyone (a8240527, Sergey 17.10.2026): the guest from the
@@ -25,13 +27,15 @@ export default function BusinessAppShell({
   initialGuestLimit?: GuestCoffeeLimitState | null;
 }) {
   const access = resolveBusinessAccess(useBusinessDomain());
+  const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
+  const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
 
   return (
     <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
       <div className="business-app-shell" data-access={access.level}>
         <BusinessSidebar />
         <div className="business-app-main">
-          {access.level === "guest" ? <BusinessGuestStatusBar /> : null}
+          {access.level === "guest" && !workspace ? <BusinessGuestStatusBar /> : null}
           {children}
         </div>
         <BusinessBottomNav />

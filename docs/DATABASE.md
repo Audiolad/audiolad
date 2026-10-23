@@ -1,3 +1,18 @@
+## Business access grants and workspace (pending owner approval)
+
+Migration `20270120120000_access_grants_and_workspace.sql` is prepared but has
+not been applied by this task. It is the single trial module for tasks
+ba344b7f and 1e008ee8: `access_grants`, `access_paid_periods`,
+`access_grant_events`, `business_space_admissions` and
+`business_workspace_playback`. Additive only. No seed rows, no email in clear
+text, no foreign key to `auth.users`. The admissions table is empty until
+task 28d2b5bb writes rows. Payment providers are not called; a later payment
+writes `access_paid_periods` through `recordPaidRenewal`.
+
+Validation: `npm run test:business-workspace-trial`.
+Details and rollback: `docs/business/access-grants.md`.
+Continuation: the owner applies the migration through the established process.
+
 ## Business declared rightsholder (pending owner approval)
 
 Migration `20270112120000_business_declared_rightsholder.sql` is prepared but

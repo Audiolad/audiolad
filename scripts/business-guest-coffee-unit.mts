@@ -66,7 +66,8 @@ assert.equal(resolveBusinessProxyAction("business.audiolad.ru", "/api/catalog/pl
 // a8240527 rework (Sergey 17.10.2026): ONE cabinet – the guest entry renders inside the shared
 // BusinessAppShell (sidebar / bottom nav), no separate guest branch or guest chrome.
 const shell = read("src/components/business-app/BusinessAppShell.tsx");
-assert.doesNotMatch(shell, /isBusinessGuestPathname|business-app-guest"|usePathname/, "no guest-only shell branch");
+assert.doesNotMatch(shell, /isBusinessGuestPathname|business-app-guest"/, "no separate guest chrome");
+assert.match(shell, /pathname === "\/workspace"/, "gift workspace hides the 30-minute guest meter");
 assert.match(shell, /<BusinessSidebar \/>[\s\S]*<BusinessBottomNav \/>/, "sidebar + bottom nav for everyone");
 assert.doesNotMatch(read("src/lib/business-app/host.ts"), /isBusinessGuestPathname/);
 const page = read("src/app/business-app/guest/coffee/page.tsx");
@@ -360,7 +361,8 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   assert.match(constants, /COFFEE_ATLAS_CTA_HREF = BUSINESS_GUEST_COFFEE_URL;/);
   assert.match(cabinet, /GUEST_COFFEE_ATLAS_URL/, "way back to the atlas");
   assert.match(copy, /COFFEE_ATLAS_OFFER\.price/, "terms share the atlas offer source");
-  assert.match(copy, /7 дней – в подарок/);
+  assert.match(copy, /BUSINESS_GIFT_TITLE/);
+  assert.match(copy, /30 дней в подарок начинаются после подтверждения email/);
 // Typography (as in the atlas, #900): visible texts use the en dash, never the em dash.
 for (const file of [
   "src/lib/business-app/guest-coffee/copy.ts",
@@ -397,7 +399,7 @@ for (const file of [
   assert.doesNotMatch(code, /—/, `${file}: no em dash in visible text`);
 }
   // Honest conversion state: no online trial activation / payment exists yet.
-  assert.match(copy, /Онлайн-активация 7 дней в подарок и оплата пока не подключены – ничего не списывается/);
+  assert.match(copy, /Оплата и автосписания пока не подключены – ничего не списывается/);
   assert.doesNotMatch(cabinet + read("src/components/business-app/BusinessGuestStatus.tsx"), /checkout|payment|\/api\/payments|tochka|prodamus/i, "no payment wiring in this stage");
   // Free public albums are evaluation listening, not the licensed airplay catalogue.
   assert.match(copy, /Это не каталог эфира/);

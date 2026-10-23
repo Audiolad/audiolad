@@ -1,7 +1,8 @@
 /**
  * a8240527 – honest copy of the guest coffee cabinet. Terms come from the same source as
- * the atlas offer (799 ₽/month, first 7 days free) so they can never drift apart.
+ * the atlas offer (plan price, 30 дней в подарок) so they can never drift apart.
  */
+import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { COFFEE_ATLAS_CANONICAL, COFFEE_ATLAS_OFFER } from "@/lib/business/coffee-atlas/constants";
 import { BUSINESS_INQUIRY_EMAIL } from "@/lib/business/landing";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
@@ -12,7 +13,7 @@ export const GUEST_COFFEE_INQUIRY_EMAIL = BUSINESS_INQUIRY_EMAIL;
 
 /** "799 ₽" with a no-break space so the price never wraps. */
 export const GUEST_COFFEE_PRICE = COFFEE_ATLAS_OFFER.price.replace(/ /g, "\u00a0");
-export const GUEST_COFFEE_TERMS = `Первые 7 дней – в подарок, затем ${GUEST_COFFEE_PRICE} в месяц`;
+export const GUEST_COFFEE_TERMS = `${BUSINESS_GIFT_TITLE}, затем ${GUEST_COFFEE_PRICE} в месяц`;
 
 export const GUEST_COFFEE_COPY = {
   title: "Настройте звучание вашей кофейни",
@@ -37,9 +38,9 @@ export const GUEST_COFFEE_COPY = {
   shelfSource:
     "Подборки – бесплатные публичные альбомы каталога АудиоЛада для знакомства со звучанием. Это не каталог эфира: в заведении звучат только треки с подтверждёнными для бизнеса правами.",
   settingsSaved: "Настройки сохраняются на этом устройстве и останутся в кабинете после подключения точки.",
-  /** Honest state of the conversion path (phase 1): no online trial activation or payment yet. */
+  /** Gift starts after email confirmation. Payment is not charged from this cabinet. */
   connectNote:
-    "Подключение – в этом же кабинете: вход в аккаунт АудиоЛада и создание точки. Онлайн-активация 7 дней в подарок и оплата пока не подключены – ничего не списывается.",
+    "Подключение точки – в этом же кабинете. 30 дней в подарок начинаются после подтверждения email. Оплата и автосписания пока не подключены – ничего не списывается.",
   connectContact: "Вопросы о подключении – напишите нам:",
 } as const;
 

@@ -17,6 +17,8 @@ import {
   evaluateSignUpClientFormState,
   type SignUpClientField,
 } from "@/lib/auth/sign-up-client-form";
+import { BUSINESS_SIGN_UP_INTRO } from "@/lib/access-grants/copy";
+import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import {
   buildAuthRouteHref,
   SIGN_UP_DEFAULT_REDIRECT,
@@ -246,8 +248,9 @@ function SignUpForm() {
           <h1 className="mt-8 text-[30px] font-semibold">Создать аккаунт</h1>
 
           <p className="mt-3 text-sm leading-6 text-[#7d70a2]">
-            Сохраняйте практики, создавайте плейлисты и слушайте материалы на
-            разных устройствах.
+            {isBusinessTrialNext(nextParam)
+              ? BUSINESS_SIGN_UP_INTRO
+              : "Сохраняйте практики, создавайте плейлисты и слушайте материалы на разных устройствах."}
           </p>
         </header>
 

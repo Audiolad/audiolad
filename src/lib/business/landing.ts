@@ -1,3 +1,4 @@
+import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 
 /** Public contact already printed in the site footer. Not a new inbox. */
@@ -31,9 +32,9 @@ export const BUSINESS_UNIFYING =
 
 export const BUSINESS_CLOSER = "Одной заботой становится меньше.";
 
-export const BUSINESS_TRIAL_FREE = "7 дней бесплатно";
+export const BUSINESS_TRIAL_FREE = BUSINESS_GIFT_TITLE;
 export const BUSINESS_TRIAL_CARD = "Без привязки карты";
-export const BUSINESS_HERO_TRUST = "7 дней бесплатно · без привязки карты";
+export const BUSINESS_HERO_TRUST = `${BUSINESS_GIFT_TITLE} · без привязки карты`;
 
 export const BUSINESS_ASSET_FILES = [
   "01-business-music.webp",
@@ -303,7 +304,7 @@ export const BUSINESS_FAQ = [
     id: "trial",
     question: "Как устроен бесплатный период?",
     answer:
-      "7 дней бесплатно и без привязки карты. Сначала слушаете музыку для своего бизнеса, затем пользуетесь периодом и подключаете оплату, когда она нужна.",
+      "30 дней в подарок и без привязки карты. Сначала слушаете музыку для своего бизнеса, затем пользуетесь периодом. Дальше подписка только если вы сами её оформите: ничего не списывается само. Дата окончания видна в кабинете.",
   },
   {
     id: "price",
