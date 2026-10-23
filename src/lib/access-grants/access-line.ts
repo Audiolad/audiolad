@@ -38,14 +38,16 @@ export function formatMoscowDay(iso: string): string | null {
  * gift was issued (the /workspace page activates it in the same request, and the shared layout
  * is not re-rendered on client navigation) – the live period the workspace itself reported.
  * Only a live report can lift the guest strip; a report never hides a live server value.
+ * `server === null` means an anonymous visitor (no peek at all): a report is never applied then.
  */
 export function effectiveChromeAccess(
   server: BusinessChromeAccess | null | undefined,
   reported: BusinessChromeAccess | null | undefined,
 ): BusinessChromeAccess {
-  if (hasLiveBusinessAccess(server)) return server as BusinessChromeAccess;
+  if (server == null) return BUSINESS_NO_ACCESS;
+  if (hasLiveBusinessAccess(server)) return server;
   if (hasLiveBusinessAccess(reported)) return reported as BusinessChromeAccess;
-  return server ?? BUSINESS_NO_ACCESS;
+  return server;
 }
 
 export function businessAccessLine(access: BusinessChromeAccess | null | undefined): string | null {

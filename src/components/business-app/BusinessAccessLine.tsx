@@ -24,6 +24,8 @@ export function BusinessChromeAccessProvider({ value, children }: { value: Busin
     if (!hasLiveBusinessAccess(next)) return;
     setReported((prev) => (prev && prev.mode === next.mode && prev.endsAt === next.endsAt ? prev : next));
   }, []);
+  // Signed out (the layout sends null): forget a period reported for the previous session.
+  if (value == null && reported !== null) setReported(null);
   const access = effectiveChromeAccess(value, reported);
   const state = useMemo(() => ({ access, report }), [access, report]);
   return <ChromeAccessContext.Provider value={state}>{children}</ChromeAccessContext.Provider>;

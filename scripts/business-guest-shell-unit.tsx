@@ -247,7 +247,7 @@ async function closedApis() {
   // answered "no access" – the workspace reports its live period so the strip does not return.
   const none = BUSINESS_NO_ACCESS;
   assert.deepEqual(effectiveChromeAccess(none, trial), trial, "stale guest peek + live workspace report → live");
-  assert.deepEqual(effectiveChromeAccess(null, trial), trial, "no peek + live report → live");
+  assert.deepEqual(effectiveChromeAccess(null, trial), BUSINESS_NO_ACCESS, "anonymous (no peek): a report is never applied");
   assert.deepEqual(effectiveChromeAccess(trial, null), trial, "live peek stays live");
   assert.deepEqual(effectiveChromeAccess(paid0(), trial), paid0(), "a report never overrides a live server value");
   assert.deepEqual(effectiveChromeAccess(none, { mode: "trial", endsAt: null }), none, "a report without an end date is ignored");
