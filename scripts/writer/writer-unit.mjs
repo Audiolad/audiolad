@@ -79,6 +79,27 @@ async function check(article) {
   }
 }
 
+// 4b. Owner rule: no links to other websites. Only audiolad.ru and sergey-zoya.ru (from the brief).
+{
+  assert(!brief.externalLinks.some((url) => url.includes("example.org")), "source url is not linkable");
+  const raw = fixture();
+  raw.sections[1].blocks[2].segments.push({ text: " и " }, { href: "https://sergey-zoya.ru/about", label: "о нас" });
+  raw.sections[0].blocks.push(para("Подробнее на www.psychologies.ru/test или https://example.org/a."));
+  const local = normalizeBrief({ ...JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8")), externalLinks: ["https://sergey-zoya.ru/about"] });
+  const { article } = normalizeArticle(raw, context);
+  const result = await validateArticle(article, local, context, { live: false });
+  assert(!result.errors.some((e) => e.includes("sergey-zoya")), result.errors.join("\n"));
+  assert.equal(result.errors.filter((e) => e.includes("адрес другого сайта в тексте")).length, 2, result.errors.join("\n"));
+  const linked = fixture();
+  linked.sections[1].blocks[2].segments.push({ href: "https://example.org/proverb", label: "поговорка" });
+  const linkedResult = await check(linked);
+  assert(linkedResult.errors.some((e) => e.includes("внешняя ссылка на другой сайт запрещена (example.org)")), linkedResult.errors.join("\n"));
+  assert.throws(
+    () => normalizeBrief({ ...JSON.parse(readFileSync(join(fixtureDir, "brief.json"), "utf8")), externalLinks: ["https://example.org/x"] }),
+    /ссылки на другие сайты запрещены/,
+  );
+}
+
 // 5. Em dash survives only if inserted after normalization; HTML and table without support.
 {
   const { article } = normalizeArticle(fixture(), context);

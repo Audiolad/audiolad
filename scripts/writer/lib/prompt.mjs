@@ -91,7 +91,7 @@ export function buildMessages(brief, context) {
   const sources = brief.sources
     .map((source) =>
       [
-        `[${source.id}] ${source.title}${source.url ? ` – ${source.url}` : ""}`,
+        `[${source.id}] ${source.title}`,
         "<<<",
         source.text,
         ">>>",
@@ -141,7 +141,7 @@ export function buildMessages(brief, context) {
     "РАЗРЕШЁННЫЕ ВНУТРЕННИЕ ССЫЛКИ (кроме практик выше других нет):",
     list(articleLinks.length ? articleLinks : ["(нет)"]),
     "",
-    "РАЗРЕШЁННЫЕ ВНЕШНИЕ ССЫЛКИ:",
+    "ВНЕШНИЕ ССЫЛКИ: ссылки на любые другие сайты запрещены. Можно ссылаться только на audiolad.ru (статьи и практики выше) и на sergey-zoya.ru, и только на адреса из списка ниже. Источники (книги, исследования, сайты) называй обычным текстом, без ссылки и без адреса.",
     list(brief.externalLinks.length ? brief.externalLinks : ["(нет – внешние ссылки не ставить)"]),
     "",
     "ПРОВЕРЕННЫЕ ФАКТЫ:",

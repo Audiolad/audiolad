@@ -66,3 +66,20 @@ export function tail(text, lines = 25) {
 export function log(message) {
   process.stdout.write(`[writer ${mskNow().slice(11)}] ${message}\n`);
 }
+
+// Owner rule (23.10.2026): articles link only to audiolad.ru (internal) and sergey-zoya.ru.
+// Any other website may be named in plain text only, never linked.
+export const ALLOWED_EXTERNAL_HOSTS = ["sergey-zoya.ru"];
+
+export function hostOf(url) {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+export function isAllowedExternal(url) {
+  const host = hostOf(url);
+  return Boolean(host) && /^https:\/\//.test(url) && ALLOWED_EXTERNAL_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+}

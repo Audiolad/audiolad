@@ -1,5 +1,5 @@
 // Brief loading and validation. The brief is the only editorial input of a run.
-import { readJson } from "./util.mjs";
+import { ALLOWED_EXTERNAL_HOSTS, isAllowedExternal, readJson } from "./util.mjs";
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const KEY_RE = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
@@ -82,11 +82,15 @@ export function normalizeBrief(raw) {
     if (!sourceIds.has(id)) errors.push(`requiredQuotes: нет источника ${id}`);
   }
 
+  // Source URLs are for the reviewer only; they become linkable just on allowed hosts.
   const externalLinks = [
-    ...new Set([...(raw.externalLinks ?? []), ...sources.map((item) => item.url).filter(Boolean)]),
+    ...new Set([...(raw.externalLinks ?? []), ...sources.map((item) => item.url).filter((url) => url && isAllowedExternal(url))]),
   ];
   for (const url of externalLinks) {
     if (!/^https:\/\/[^\s]+$/.test(url)) errors.push(`externalLinks: недопустимый URL ${url}`);
+    else if (!isAllowedExternal(url)) {
+      errors.push(`externalLinks: ссылки на другие сайты запрещены (разрешены только audiolad.ru и ${ALLOWED_EXTERNAL_HOSTS.join(", ")}): ${url}`);
+    }
   }
 
   const tableMode = raw.table?.mode ?? "optional";

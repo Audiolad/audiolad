@@ -1,5 +1,5 @@
 // Deterministic validators for a «Райтер» article. No network unless options.live is set.
-import { EM_DASH } from "./util.mjs";
+import { ALLOWED_EXTERNAL_HOSTS, EM_DASH, hostOf, isAllowedExternal } from "./util.mjs";
 
 const SECTION_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const NEGATION_RE = /(^|[^а-яё])(не|без|ни|нет|никаких|никакой|никто|вместо)([^а-яё]|$)/iu;
@@ -283,6 +283,16 @@ function checkText(article, brief, strings, errors, warnings, stats) {
     if (lower(all).includes(lower(phrase))) errors.push(`запрещённая брифом фраза: «${phrase}»`);
   }
 
+  // Bare URLs in text count as links to other websites too.
+  for (const item of strings) {
+    for (const match of item.text.matchAll(/(?:https?:\/\/|www\.)[^\s«»"()<>]+/giu)) {
+      const url = match[0].startsWith("www.") ? `https://${match[0]}` : match[0];
+      const host = hostOf(url.replace(/[.,;:!?]+$/u, ""));
+      if (host === "audiolad.ru" || isAllowedExternal(url)) continue;
+      errors.push(`${item.path}: адрес другого сайта в тексте (${host ?? match[0]}) – источник называйте без ссылки и адреса`);
+    }
+  }
+
   // Text that points to a table must have one (seen in a dry run: the table got lost in repair).
   const hasTable = (article.sections ?? []).some((section) => (section?.blocks ?? []).some((block) => block?.kind === "table"));
   if (!hasTable && /(таблиц[аеуы]? ниже|в таблице ниже|ниже в таблице|следующ[а-я]+ таблиц)/iu.test(all)) {
@@ -384,9 +394,15 @@ function checkLinks(article, brief, context, errors, warnings, stats, liveTarget
       errors.push(`${link.path}: пустой href`);
       continue;
     }
-    if (/^https?:\/\//.test(href) && !href.startsWith("https://audiolad.ru/")) {
+    if (/^\/\//.test(href) || (/^[a-z][a-z0-9+.-]*:/i.test(href) && !/^https?:\/\//i.test(href))) {
+      errors.push(`${link.path}: недопустимая ссылка ${href}`);
+      continue;
+    }
+    if (/^https?:\/\//i.test(href) && !href.startsWith("https://audiolad.ru/")) {
       if (link.where === "seeAlso") errors.push(`${link.path}: в «Смотрите также» только статьи АудиоЛада`);
-      else if (!externals.has(href.replace(/\/$/, ""))) errors.push(`${link.path}: внешняя ссылка не из брифа: ${href}`);
+      else if (!isAllowedExternal(href)) {
+        errors.push(`${link.path}: внешняя ссылка на другой сайт запрещена (${hostOf(href) ?? href}); разрешены только audiolad.ru и ${ALLOWED_EXTERNAL_HOSTS.join(", ")}, источники – только названием в тексте`);
+      } else if (!externals.has(href.replace(/\/$/, ""))) errors.push(`${link.path}: внешняя ссылка не из брифа: ${href}`);
       else liveTargets.add(href);
       continue;
     }
