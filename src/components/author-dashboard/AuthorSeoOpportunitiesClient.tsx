@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
+import { subscribeToPageReturn } from "@/lib/author-payout-profiles/display-status";
+import { selectAuthorSeoOpportunities } from "@/lib/seo-queries/opportunity-list.mjs";
 import { SEO_NON_AURAFON_RESERVATION_PUBLICATION_CLASS } from "@/lib/seo-queries/discovery-beta";
 import {
   buildReleaseSeoReservationBody,
@@ -41,10 +44,31 @@ function formatMonthlyFrequency(value: number | null) {
 export default function AuthorSeoOpportunitiesClient({
   authorId, authorSlug, discoveryEnabled = false, opportunities, products,
 }: Props) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [cluster, setCluster] = useState("");
   const [format, setFormat] = useState("");
-  const [items, setItems] = useState(opportunities);
+  const [local, setLocal] = useState({ authorId, source: opportunities, items: opportunities });
+  // Fresh server props replace optimistic data, including after publication or
+  // switching cabinets. Never carry another workspace's local assignments over.
+  const items = useMemo(() => selectAuthorSeoOpportunities(
+    local.authorId === authorId && local.source === opportunities ? local.items : opportunities,
+  ), [local, authorId, opportunities]);
+
+  function setItems(update: (current: SeoQueryOpportunity[]) => SeoQueryOpportunity[]) {
+    setLocal((current) => ({
+      authorId,
+      source: opportunities,
+      items: update(current.authorId === authorId && current.source === opportunities
+        ? current.items : opportunities),
+    }));
+  }
+
+  useEffect(() => {
+    // Also refresh on mount when client navigation restores an older route.
+    router.refresh();
+    return subscribeToPageReturn({ document, window }, () => router.refresh());
+  }, [router]);
   const [message, setMessage] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Record<string, string>>({});
@@ -70,6 +94,7 @@ export default function AuthorSeoOpportunitiesClient({
       }),
     });
     const payload = await response.json().catch(() => ({}));
+    router.refresh();
     setPendingId(null);
     if (!response.ok) {
       setMessage(
@@ -97,6 +122,7 @@ export default function AuthorSeoOpportunitiesClient({
       })),
     });
     const payload = await response.json().catch(() => ({}));
+    router.refresh();
     setPendingId(null);
     if (!response.ok) {
       return setMessage(releaseSeoReservationErrorMessage(payload));
@@ -114,6 +140,7 @@ export default function AuthorSeoOpportunitiesClient({
       body: JSON.stringify({ author_id: authorId, reservation_id: reservationId, product_id: productId }),
     });
     const payload = await response.json().catch(() => ({}));
+    router.refresh();
     setPendingId(null);
     if (!response.ok) {
       return setMessage(
@@ -139,6 +166,7 @@ export default function AuthorSeoOpportunitiesClient({
           activeReservationCount={activeCount}
           analyzedOpportunities={items}
           onReserved={(event) => {
+            router.refresh();
             setItems((current) => {
               const exists = current.some((item) => item.id === event.queryId);
               if (exists) {
@@ -196,7 +224,7 @@ export default function AuthorSeoOpportunitiesClient({
                 <div>
                   <h2 className="text-lg font-semibold text-[#25135c]">{item.queryText}</h2>
                 </div>
-                <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">{lifecycleLabel(item.lifecycle)}</span>
+                <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">{lifecycleLabel(own ? "in_progress" : "available")}</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#5f5484]">
                 {item.frequency !== null ? <span>{formatMonthlyFrequency(item.frequency)}</span> : null}
