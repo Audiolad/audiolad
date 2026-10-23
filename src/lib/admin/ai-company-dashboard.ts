@@ -1635,40 +1635,56 @@ function parseExecutorObservation(value: unknown): ExecutorObservation | null {
   };
 }
 
+const LIVE_TASK_ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$/i;
+const LIVE_RUN_ID = /^[A-Za-z0-9._:-]{1,120}$/;
+
+// A live session counts only with a task id and a signal time; anything less is not proof of work.
 function parseLiveSession(value: unknown): ExecutorLiveSession | null {
   const record = asRecord(value);
   if (!record) return null;
+  const taskId = readString(record, ["task_id"]);
+  const lastSignalAt = readString(record, ["last_signal_at"]);
+  if (!taskId || !LIVE_TASK_ID.test(taskId) || !lastSignalAt || parseInstant(lastSignalAt) == null) return null;
+  const runId = readString(record, ["run_id"]);
+  const source = readString(record, ["source"]);
   return {
-    taskId: readString(record, ["task_id"]),
+    taskId,
     title: readString(record, ["title"]),
     githubIssue: readNumber(record, ["github_issue"]),
-    runId: readString(record, ["run_id"]),
-    lastSignalAt: readString(record, ["last_signal_at"]),
-    source: readString(record, ["source"]),
+    runId: runId && LIVE_RUN_ID.test(runId) ? runId : null,
+    lastSignalAt,
+    source: source === "callback" || source === "codex_session" ? source : null,
   };
 }
 
 function parseExecutorLive(value: unknown): ExecutorLive | null {
   const record = asRecord(value);
   if (!record) return null;
-  const status = readString(record, ["status"]);
-  if (status !== "busy" && status !== "free" && status !== "unknown") return null;
+  const raw = readString(record, ["status"]);
+  if (raw !== "busy" && raw !== "free" && raw !== "unknown") return null;
   const list = (key: string) => (Array.isArray(record[key]) ? (record[key] as unknown[]) : [])
     .map((item) => parseLiveSession(item))
     .filter((item): item is ExecutorLiveSession => item !== null);
+  const sessions = list("sessions");
+  const reason = readString(record, ["reason"]);
+  // «busy» without a single usable session is not shown as busy: the signal is incomplete.
+  const status = raw === "busy" && sessions.length === 0 ? "unknown" : raw;
   return {
     status,
-    sessions: list("sessions"),
+    sessions,
     staleRuns: list("stale_runs"),
-    abandonedRuns: readNumber(record, ["abandoned_runs"]) ?? 0,
-    reason: readString(record, ["reason"]),
+    abandonedRuns: Math.max(0, Math.floor(readNumber(record, ["abandoned_runs"]) ?? 0)),
+    reason: status !== raw
+      ? "Company Core сообщил о занятости без задачи и времени сигнала – занятость не подтверждена."
+      : reason ? clip(reason, 300) : null,
   };
 }
 
-const LIVE_SOURCE_LABEL: Record<string, string> = {
-  callback: "колбэк задачи в Company Core",
-  codex_session: "сессия Codex по задаче на сервере",
-};
+function liveSourceLabel(source: string | null): string {
+  if (source === "callback") return "колбэк задачи в Company Core";
+  if (source === "codex_session") return "сессия Codex по задаче на сервере";
+  return "сигнал Company Core";
+}
 
 function liveSessionViews(sessions: ExecutorLiveSession[], tasks: CompanyTask[], now: number): ExecutorSessionView[] {
   return sessions.map((session, index) => {
@@ -1682,7 +1698,7 @@ function liveSessionViews(sessions: ExecutorLiveSession[], tasks: CompanyTask[],
       task: shortId ? `Задача ${shortId}${title ? ` («${clip(title, 80)}»)` : ""}` : "Задача не определена",
       taskId: session.taskId,
       taskHref: issueHref(task?.githubIssueNumber ?? session.githubIssue ?? null),
-      mode: session.source ? LIVE_SOURCE_LABEL[session.source] ?? "сигнал Company Core" : "сигнал Company Core",
+      mode: liveSourceLabel(session.source),
       started: NO_DATA,
       elapsed: NO_DATA,
       registration: session.runId ? `запуск ${session.runId}` : "запуск не указан",

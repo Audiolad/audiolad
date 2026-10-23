@@ -95,4 +95,27 @@ assert.equal(legacy.executors.find((item) => item.id === "grok")!.occupancy === 
 const leak = build([{ ...freeCursor, provider: "codex" }]);
 assert.notEqual(leak.executors.find((item) => item.id === "cursor")!.occupancy, "free");
 
+// Garbage or partial live data never yields «занят»: an empty session is not proof of work.
+const legacyBase = { provider: "grok", role: "orchestrator", connection: "online", freshness_at: minutesAgo(3) };
+for (const sessions of [[{}], [{ task_id: GROK_TASK }], [{ last_signal_at: minutesAgo(1) }], [{ task_id: "x@y.z", last_signal_at: minutesAgo(1) }], "nope"]) {
+  const row = build([{ ...legacyBase, live: { status: "busy", sessions, stale_runs: [], abandoned_runs: 0, reason: "r" } }])
+    .executors.find((item) => item.id === "grok")!;
+  assert.equal(row.occupancy, "unknown");
+  assert.equal(row.sessions.length, 0);
+  assert.doesNotMatch(row.occupancyLabel, /занят \d/);
+}
+// Reason and run id are masked / validated; an unknown source gets the neutral label.
+const odd = build([{ ...legacyBase, live: { status: "busy", sessions: [{ task_id: GROK_TASK, last_signal_at: minutesAgo(2), run_id: "x@y.z run", source: "__proto__" }], stale_runs: [], abandoned_runs: -5, reason: "пишет owner@example.com" } }])
+  .executors.find((item) => item.id === "grok")!;
+assert.equal(odd.occupancyLabel, "занят 1");
+assert.equal(odd.sessions[0].mode, "сигнал Company Core");
+assert.equal(odd.sessions[0].registration, "запуск не указан");
+assert.doesNotMatch(odd.detail, /@/);
+assert.doesNotMatch(odd.detail, /дольше 2 часов/);
+// An invalid live block leaves the row exactly as an older Core without live.
+const legacyRow = build([legacyBase]).executors.find((item) => item.id === "grok")!;
+for (const live of [null, "busy", { status: "weird" }, []]) {
+  assert.deepEqual(build([{ ...legacyBase, live }]).executors.find((item) => item.id === "grok")!, legacyRow);
+}
+
 console.log("ai-company-live-occupancy-unit: ok");
