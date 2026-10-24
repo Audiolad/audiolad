@@ -35,6 +35,9 @@ export function normalizeSzFields(raw) {
 const paragraphs = (items) => list(items).map(s).filter(Boolean);
 const cell = (text) => s(text).replace(/\|/g, "/").replace(/\n+/g, " ");
 
+/** Inner quotes inside «…» become „…“ (Russian typography): «… „алфавит чувств“.» */
+export const nestQuotes = (text) => String(text).replace(/«([^«»]*)»/g, "„$1“");
+
 function expertCard(expert, written, site) {
   const known = expert.resolvedCard ?? resolveCard(expert.name, { siteCards: site?.expertCards, override: expert.card });
   if (!known.photo) throw new Error(`«${expert.name}»: нет портрета (public/media/experts) – добавьте портрет или card.photo в брифе`);
@@ -46,7 +49,7 @@ function expertCard(expert, written, site) {
     "",
     `Источник: ${expert.source}.`,
     "",
-    `> «${expert.quote}»`,
+    `> «${nestQuotes(expert.quote)}»`,
     "",
     s(written?.bridge),
     "",

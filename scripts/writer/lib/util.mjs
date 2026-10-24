@@ -42,6 +42,7 @@ export function run(cmd, args, options = {}) {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     timeout: options.timeoutMs ?? 30 * 60 * 1000,
+    killSignal: options.killSignal ?? "SIGTERM",
   });
   return {
     status: result.status ?? (result.error ? 127 : 1),

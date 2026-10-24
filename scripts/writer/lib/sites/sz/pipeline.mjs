@@ -208,7 +208,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
     log("sz: проверки на чистом main (baseline)");
     const baseline = runSzChecks(worktree, { build, log });
     const cost = `${formatRub(state.spentRub)} (${state.calls.length} вызовов)`;
-    const applied = applyPack(worktree, { pack: pack.pack, stage: ctx.nextStage, date, items, cost, model, packBrief: pack, pool });
+    const applied = applyPack(worktree, { pack: pack.pack, stage: ctx.nextStage, date, items, cost, model, packBrief: pack.pack, pool });
     state.files = [...applied.changed, ...[...cards.portraits.keys()].map((photo) => `public/media/experts/${photo}`)];
     log(`sz: проверки после пакета (${applied.gateFile})`);
     const after = runSzChecks(worktree, { build, log, extraSteps: [`node scripts/${applied.gateFile}`] });

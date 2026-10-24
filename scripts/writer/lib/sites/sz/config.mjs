@@ -11,8 +11,9 @@ export const SZ = {
   maxLabel: "Выбрать ангела и получить послание в MAX",
   referenceGallerySlug: "kak-perestat-sebya-kritikovat",
   allAngelsImage: '<img src="/media/angels/four-angels-06-all-angels.webp" alt="Все четыре ангела вместе" width="1254" height="1254" loading="lazy">',
-  // Same wording as angel-hranitel (stage 24); a brief may override it with `phones`.
-  phones: "При острой необходимости звоните 112. При психологическом кризисе – телефон доверия 8-800-7000-600. При опасных телесных симптомах (боль в груди, сильная одышка) – 103 или 112.",
+  // 8-800-7000-600 is the line for women who suffered domestic violence, not a general crisis line
+  // (review of sergey-zoya-site #77). A brief may override the whole sentence with `phones`.
+  phones: "При острой необходимости звоните 112. При домашнем насилии – Всероссийский телефон доверия для женщин 8-800-7000-600 (бесплатно, круглосуточно). При опасных телесных симптомах (боль в груди, сильная одышка) – 103 или 112.",
   disclaimer: "Эта статья не заменяет консультацию психолога или врача. Эзотерические представления описаны как культурные и духовные традиции, а не как наука; упражнения не являются лечением.",
   specialistHeading: "Когда стоит обратиться к специалисту",
   readmoreHeading: "Читайте также",
