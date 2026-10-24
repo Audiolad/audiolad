@@ -14,10 +14,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOpening, wireGate } from "./lib/sites/sz/apply.mjs";
-import { assembleSzArticle, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
+import { assembleSzArticle, nestQuotes, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
 import { BudgetError, makeCaller } from "./lib/call.mjs";
 import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
-import { runDetached } from "./lib/moscow.mjs";
+import { collectResult, runDetached } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ } from "./lib/sites/sz/config.mjs";
@@ -385,7 +385,7 @@ test("runDetached: finished remote call is picked up on the next poll, no long s
   // Remote done after two polls; one poll hit an ssh timeout (status 255) and was retried.
   const done = fake([{ status: 0, stdout: "", stderr: "" }, { status: 255, stdout: "", stderr: "timeout" }, { status: 0, stdout: "0\n", stderr: "" }]);
   const result = runDetached("/root/writer/runs/r/c", done);
-  assert.deepEqual(result, { status: 0, timedOut: false });
+  assert.deepEqual(result, { status: 0, timedOut: false, started: true });
   assert.equal(done.commands.length, 4);
   assert.ok(done.commands.every((c) => c.timeoutMs <= 60000), "every ssh call is short");
   assert.match(done.commands[0].command, /exit\.code\.tmp && mv exit\.code\.tmp exit\.code/);
@@ -394,7 +394,7 @@ test("runDetached: finished remote call is picked up on the next poll, no long s
   // Never finishes → stops at the deadline with timedOut, not later.
   const never = fake([]);
   const late = runDetached("/d", { ...never, timeoutMs: 60000, pollMs: 10000 });
-  assert.deepEqual(late, { status: 124, timedOut: true });
+  assert.deepEqual(late, { status: 124, timedOut: true, started: true });
   assert.ok(never.now() <= 60000);
   // Start failed → no polling.
   const broken = { sshCall: () => ({ status: 255, stdout: "", stderr: "Connection refused" }), sleep: () => assert.fail("must not poll") };
@@ -406,6 +406,42 @@ test("runDetached: finished remote call is picked up on the next poll, no long s
   assert.match(done.commands[0].command, /rm -f exit\.code exit\.code\.tmp meta\.json article\.json article\.txt/);
 });
 
+test("expert quotes: inner «…» kept by the brief and nested as „…“; phones line is accurate", () => {
+  assert.equal(nestQuotes("не сформирован «алфавит чувств»."), "не сформирован „алфавит чувств“.");
+  assert.equal(nestQuotes("без внутренних кавычек"), "без внутренних кавычек");
+  assert.doesNotMatch(SZ.phones, /кризисе – телефон доверия 8-800-7000-600/);
+  assert.match(SZ.phones, /домашнем насилии – Всероссийский телефон доверия для женщин 8-800-7000-600/);
+});
+
+test("brief: a quote ending with an inner «…» pair keeps it; a fully wrapped quote loses only the outer pair", () => {
+  const withInner = clone();
+  const expert = withInner.articles[0].experts[0];
+  delete expert.sourceFile;
+  expert.sourceText = "Ребёнок, у которого не сформирован «алфавит чувств», плохо понимает себя.";
+  expert.quote = "у которого не сформирован «алфавит чувств»";
+  assert.equal(normalizePack(withInner, { baseDir: fixtures, pool }).articles[0].experts[0].quote, "у которого не сформирован «алфавит чувств»");
+  expert.quote = "«плохо понимает себя.»";
+  assert.equal(normalizePack(withInner, { baseDir: fixtures, pool }).articles[0].experts[0].quote, "плохо понимает себя.");
+});
+
+test("collectResult: a refused start never takes the remote dir's artifacts as this call's result", () => {
+  const dir = mkdtempSync(join(tmpdir(), "writer-collect-"));
+  writeFileSync(join(dir, "meta.json"), JSON.stringify({ ok: true, cost_rub: 1 })); // stale local leftovers
+  const stale = (name, localPath) => { writeFileSync(localPath, name === "meta.json" ? JSON.stringify({ ok: true, cost_rub: 35 }) : JSON.stringify({ title: "чужая статья" })); return true; };
+  const refused = collectResult({ status: 3, timedOut: false, started: false, error: "предыдущая генерация в этом каталоге ещё идёт" }, () => assert.fail("must not download"), dir);
+  assert.equal(refused.meta.ok, false);
+  assert.match(refused.meta.error, /ещё идёт/);
+  assert.equal(refused.article, null);
+  assert.ok(!existsSync(join(dir, "meta.json")), "local leftovers removed");
+  const done = collectResult({ status: 0, timedOut: false, started: true }, stale, dir);
+  assert.equal(done.meta.cost_rub, 35);
+  assert.equal(done.article.title, "чужая статья");
+  const died = collectResult({ status: 1, timedOut: false, started: true }, () => false, dir);
+  assert.deepEqual([died.meta.ok, died.article], [false, null]);
+  assert.match(died.meta.error, /код 1/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test("runDetached: ssh poll duration counts against the deadline", () => {
   let clock = 0;
   const sshCall = (command, options) => {
@@ -414,7 +450,7 @@ test("runDetached: ssh poll duration counts against the deadline", () => {
     return { status: 255, stdout: "", stderr: "timeout" };
   };
   const result = runDetached("/d", { sshCall, sleep: (ms) => { clock += ms; }, now: () => clock, timeoutMs: 60000, pollMs: 10000 });
-  assert.deepEqual(result, { status: 124, timedOut: true });
+  assert.deepEqual(result, { status: 124, timedOut: true, started: true });
   assert.ok(clock <= 60000, `stopped at ${clock} ms, limit 60000`);
 });
 

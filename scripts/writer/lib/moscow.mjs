@@ -69,7 +69,7 @@ export function runDetached(remoteDir, { sshCall, sleep = sleepSync, now = Date.
   );
   if (start.status !== 0 || !start.stdout.includes("started")) {
     const busy = start.stdout.includes("busy");
-    return { status: start.status || 1, timedOut: false, error: busy ? "предыдущая генерация в этом каталоге ещё идёт" : start.stderr.trim().slice(0, 300) };
+    return { status: start.status || 1, timedOut: false, started: false, error: busy ? "предыдущая генерация в этом каталоге ещё идёт" : start.stderr.trim().slice(0, 300) };
   }
   for (let left = deadline - now(); left > 0; left = deadline - now()) {
     sleep(Math.min(pollMs, left));
@@ -78,9 +78,9 @@ export function runDetached(remoteDir, { sshCall, sleep = sleepSync, now = Date.
     // Every wait is capped by the time left, so the whole call never outlives timeoutMs by more than ~1 s.
     const poll = sshCall(`cat ${remoteDir}/exit.code 2>/dev/null || true`, { timeoutMs: Math.max(1000, Math.min(POLL_SSH_TIMEOUT_MS, left)) });
     const code = poll.status === 0 ? poll.stdout.trim() : "";
-    if (/^\d+$/.test(code)) return { status: Number(code), timedOut: false };
+    if (/^\d+$/.test(code)) return { status: Number(code), timedOut: false, started: true };
   }
-  return { status: 124, timedOut: true };
+  return { status: 124, timedOut: true, started: true };
 }
 
 // File transfer over ssh stdin/stdout (no scp dependency on the box).
@@ -110,16 +110,25 @@ export function generateOnMoscow(runId, callName, requestPath, localDir) {
     if (copy.status !== 0) throw new Error(`Не удалось передать ${basename(file)} на Москву: ${copy.stderr.trim().slice(0, 300)}`);
   }
   const call = runDetached(remoteDir, { sshCall });
+  const fetchFile = (name, localPath) => download(config, `${remoteDir}/${name}`, localPath);
+  return { ...collectResult(call, fetchFile, localDir), remoteDir };
+}
+
+/**
+ * Brings meta.json / article.json of THIS call to localDir. If the start was refused (a previous
+ * generation still running) or failed, nothing is downloaded: whatever lies in the remote dir
+ * belongs to another attempt and must not be taken as this call's article or cost.
+ */
+export function collectResult(call, fetchFile, localDir) {
   mkdirSync(localDir, { recursive: true });
   for (const name of ["meta.json", "article.json", "article.txt"]) rmSync(join(localDir, name), { force: true });
-  for (const name of ["meta.json", "article.json", "article.txt"]) {
-    download(config, `${remoteDir}/${name}`, join(localDir, name));
-  }
+  if (!call.started) return { meta: { ok: false, error: `generate.py не запущен: ${call.error || `код ${call.status}`}` }, article: null };
+  for (const name of ["meta.json", "article.json", "article.txt"]) fetchFile(name, join(localDir, name));
   const metaPath = join(localDir, "meta.json");
   const meta = existsSync(metaPath)
     ? JSON.parse(readFileSync(metaPath, "utf8"))
-    : { ok: false, error: call.timedOut ? "generate.py: нет результата за 20 минут" : call.error ? `generate.py: ${call.error}` : `generate.py: код ${call.status}` };
+    : { ok: false, error: call.timedOut ? "generate.py: нет результата за 20 минут" : `generate.py: код ${call.status}` };
   const articlePath = join(localDir, "article.json");
   const article = existsSync(articlePath) ? JSON.parse(readFileSync(articlePath, "utf8")) : null;
-  return { meta, article, remoteDir };
+  return { meta, article };
 }
