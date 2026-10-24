@@ -1,7 +1,7 @@
 // Moscow transport: only request.json and generate.py go to the host; only the
 // extracted article and usage metadata come back. GitHub credentials never leave the box
 // (no agent forwarding, no env), and the Cloud.ru key never leaves the Moscow host.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -57,17 +57,26 @@ const POLL_SSH_TIMEOUT_MS = 60 * 1000;
  * (seen on the box: a 20-minute wait after a finished call). Returns { status, timedOut }.
  */
 export function runDetached(remoteDir, { sshCall, sleep = sleepSync, now = Date.now, timeoutMs = GENERATE_TIMEOUT_MS, pollMs = POLL_INTERVAL_MS } = {}) {
+  const deadline = now() + timeoutMs;
+  // A previous generation still running in this directory must not be mixed with a new one;
+  // stale results of a finished one are removed so they can never be taken for the new call.
   const start = sshCall(
-    `cd ${remoteDir} && rm -f exit.code exit.code.tmp && ` +
-      `(setsid nohup sh -c 'python3 generate.py > generate.log 2>&1; echo $? > exit.code.tmp && mv exit.code.tmp exit.code' ` +
+    `cd ${remoteDir} && if [ -f generate.pid ] && kill -0 "$(cat generate.pid)" 2>/dev/null; then echo busy; exit 3; fi && ` +
+      "rm -f exit.code exit.code.tmp meta.json article.json article.txt generate.log generate.pid && " +
+      `(setsid nohup sh -c 'echo $$ > generate.pid; python3 generate.py > generate.log 2>&1; echo $? > exit.code.tmp && mv exit.code.tmp exit.code' ` +
       "</dev/null >/dev/null 2>&1 &) && echo started",
     { timeoutMs: POLL_SSH_TIMEOUT_MS },
   );
-  if (start.status !== 0 || !start.stdout.includes("started")) return { status: start.status || 1, timedOut: false, error: start.stderr.trim().slice(0, 300) };
-  const deadline = now() + timeoutMs;
-  while (now() < deadline) {
-    sleep(pollMs);
-    const poll = sshCall(`cat ${remoteDir}/exit.code 2>/dev/null || true`, { timeoutMs: POLL_SSH_TIMEOUT_MS });
+  if (start.status !== 0 || !start.stdout.includes("started")) {
+    const busy = start.stdout.includes("busy");
+    return { status: start.status || 1, timedOut: false, error: busy ? "предыдущая генерация в этом каталоге ещё идёт" : start.stderr.trim().slice(0, 300) };
+  }
+  for (let left = deadline - now(); left > 0; left = deadline - now()) {
+    sleep(Math.min(pollMs, left));
+    left = deadline - now();
+    if (left <= 0) break;
+    // Every wait is capped by the time left, so the whole call never outlives timeoutMs by more than ~1 s.
+    const poll = sshCall(`cat ${remoteDir}/exit.code 2>/dev/null || true`, { timeoutMs: Math.max(1000, Math.min(POLL_SSH_TIMEOUT_MS, left)) });
     const code = poll.status === 0 ? poll.stdout.trim() : "";
     if (/^\d+$/.test(code)) return { status: Number(code), timedOut: false };
   }
@@ -102,13 +111,14 @@ export function generateOnMoscow(runId, callName, requestPath, localDir) {
   }
   const call = runDetached(remoteDir, { sshCall });
   mkdirSync(localDir, { recursive: true });
+  for (const name of ["meta.json", "article.json", "article.txt"]) rmSync(join(localDir, name), { force: true });
   for (const name of ["meta.json", "article.json", "article.txt"]) {
     download(config, `${remoteDir}/${name}`, join(localDir, name));
   }
   const metaPath = join(localDir, "meta.json");
   const meta = existsSync(metaPath)
     ? JSON.parse(readFileSync(metaPath, "utf8"))
-    : { ok: false, error: call.timedOut ? "generate.py: нет результата за 20 минут" : `generate.py: код ${call.status}` };
+    : { ok: false, error: call.timedOut ? "generate.py: нет результата за 20 минут" : call.error ? `generate.py: ${call.error}` : `generate.py: код ${call.status}` };
   const articlePath = join(localDir, "article.json");
   const article = existsSync(articlePath) ? JSON.parse(readFileSync(articlePath, "utf8")) : null;
   return { meta, article, remoteDir };

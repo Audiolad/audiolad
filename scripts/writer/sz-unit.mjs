@@ -399,6 +399,32 @@ test("runDetached: finished remote call is picked up on the next poll, no long s
   // Start failed → no polling.
   const broken = { sshCall: () => ({ status: 255, stdout: "", stderr: "Connection refused" }), sleep: () => assert.fail("must not poll") };
   assert.equal(runDetached("/d", broken).timedOut, false);
+  // Previous generation still alive in the same directory → refused, nothing polled.
+  const busy = { sshCall: () => ({ status: 3, stdout: "busy\n", stderr: "" }), sleep: () => assert.fail("must not poll") };
+  assert.match(runDetached("/d", busy).error, /ещё идёт/);
+  // Stale results of an earlier attempt are removed before the new start.
+  assert.match(done.commands[0].command, /rm -f exit\.code exit\.code\.tmp meta\.json article\.json article\.txt/);
+});
+
+test("runDetached: ssh poll duration counts against the deadline", () => {
+  let clock = 0;
+  const sshCall = (command, options) => {
+    if (command.includes("setsid nohup")) return { status: 0, stdout: "started\n", stderr: "" };
+    clock += options.timeoutMs; // every poll hangs until its own ssh timeout
+    return { status: 255, stdout: "", stderr: "timeout" };
+  };
+  const result = runDetached("/d", { sshCall, sleep: (ms) => { clock += ms; }, now: () => clock, timeoutMs: 60000, pollMs: 10000 });
+  assert.deepEqual(result, { status: 124, timedOut: true });
+  assert.ok(clock <= 60000, `stopped at ${clock} ms, limit 60000`);
+});
+
+test("both pipelines estimate prompt tokens with the model's own ratio", () => {
+  for (const file of ["run.mjs", "lib/call.mjs"]) {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), file), "utf8");
+    const calls = [...source.matchAll(/estimatePromptTokens\(([^)]*)\)/g)].map((m) => m[1]);
+    assert.ok(calls.length > 0, file);
+    for (const args of calls) assert.match(args, /,\s*model\b/, `${file}: estimatePromptTokens(${args}) без model`);
+  }
 });
 
 rmSync(site, { recursive: true, force: true });

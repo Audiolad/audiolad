@@ -132,7 +132,7 @@ function prepareWorktree() {
 
 function callWriter(callName, messages, schema) {
   const request = buildRequest(model, messages, schema, { maxTokens });
-  const worst = worstCaseRub(model, estimatePromptTokens(messages), maxTokens);
+  const worst = worstCaseRub(model, estimatePromptTokens(messages, model), maxTokens);
   if (state.spentRub + worst > maxRub) {
     throw new Stop(5, `бюджет: потрачено ${formatRub(state.spentRub)}, худший случай вызова ${formatRub(worst)}, лимит ${formatRub(maxRub)} (--max-rub)`);
   }
