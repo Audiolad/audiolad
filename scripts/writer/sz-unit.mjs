@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOpening, wireGate } from "./lib/sites/sz/apply.mjs";
 import { assembleSzArticle, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
 import { BudgetError, makeCaller } from "./lib/call.mjs";
-import { DEFAULT_MODEL } from "./lib/cost.mjs";
+import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
+import { runDetached } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ } from "./lib/sites/sz/config.mjs";
@@ -358,6 +359,46 @@ await testAsync("branch: writer/sz-<pack> on origin stops the run before generat
   await assert.rejects(runSzPipeline(args("run-broken"), limits), (error) => error instanceof SzStop && /не удалось проверить ветку/.test(error.message));
   assert.equal(calls, 0);
   rmSync(root, { recursive: true, force: true });
+});
+
+
+test("site default model: sz → gpt-5.5, audiolad unchanged, explicit --model wins", () => {
+  assert.equal(SZ_DEFAULT_MODEL, "openai/gpt-5.5");
+  assert.ok(SUPPORTED_MODELS.includes(SZ_DEFAULT_MODEL));
+  assert.equal(defaultModelFor("sz", undefined), "openai/gpt-5.5");
+  assert.equal(defaultModelFor("audiolad", undefined), DEFAULT_MODEL);
+  assert.equal(defaultModelFor("sz", "anthropic/claude-opus-4.8"), "anthropic/claude-opus-4.8");
+});
+
+test("runDetached: finished remote call is picked up on the next poll, no long ssh session", () => {
+  const fake = (pollReplies) => {
+    const commands = [];
+    let clock = 0;
+    const sshCall = (command, options) => {
+      commands.push({ command, timeoutMs: options?.timeoutMs });
+      if (command.includes("setsid nohup")) return { status: 0, stdout: "started\n", stderr: "" };
+      const reply = pollReplies.shift() ?? { status: 0, stdout: "", stderr: "" };
+      return reply;
+    };
+    return { commands, sshCall, sleep: (ms) => { clock += ms; }, now: () => clock };
+  };
+  // Remote done after two polls; one poll hit an ssh timeout (status 255) and was retried.
+  const done = fake([{ status: 0, stdout: "", stderr: "" }, { status: 255, stdout: "", stderr: "timeout" }, { status: 0, stdout: "0\n", stderr: "" }]);
+  const result = runDetached("/root/writer/runs/r/c", done);
+  assert.deepEqual(result, { status: 0, timedOut: false });
+  assert.equal(done.commands.length, 4);
+  assert.ok(done.commands.every((c) => c.timeoutMs <= 60000), "every ssh call is short");
+  assert.match(done.commands[0].command, /exit\.code\.tmp && mv exit\.code\.tmp exit\.code/);
+  // Non-zero exit of generate.py is passed through.
+  assert.equal(runDetached("/d", fake([{ status: 0, stdout: "2\n", stderr: "" }])).status, 2);
+  // Never finishes → stops at the deadline with timedOut, not later.
+  const never = fake([]);
+  const late = runDetached("/d", { ...never, timeoutMs: 60000, pollMs: 10000 });
+  assert.deepEqual(late, { status: 124, timedOut: true });
+  assert.ok(never.now() <= 60000);
+  // Start failed → no polling.
+  const broken = { sshCall: () => ({ status: 255, stdout: "", stderr: "Connection refused" }), sleep: () => assert.fail("must not poll") };
+  assert.equal(runDetached("/d", broken).timedOut, false);
 });
 
 rmSync(site, { recursive: true, force: true });

@@ -14,7 +14,7 @@ npm run writer -- --brief path/to/brief.json
 
 | Флаг | Назначение |
 |---|---|
-| `--model` | `openai/gpt-oss-120b` (по умолчанию) или `Qwen/Qwen3.6-35B-A3B` |
+| `--model` | по умолчанию `openai/gpt-oss-120b`, для `--site sz` – `openai/gpt-5.5` (победитель сравнения моделей на пакете 07). Доступны все модели из `TARIFF` в `lib/cost.mjs` |
 | `--dry-run` | всё, кроме push и PR: коммит остаётся в локальном worktree |
 | `--no-repair` | без автоматического раунда исправлений |
 | `--offline` | без живой проверки ссылок на audiolad.ru |
