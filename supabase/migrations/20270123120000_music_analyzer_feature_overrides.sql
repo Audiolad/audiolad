@@ -1,7 +1,7 @@
 -- Задача 09d393ce. Только новая таблица; существующие схемы и данные не меняются.
 -- Не применять без отдельного согласования владельца перед deploy.
 BEGIN;
-CREATE TABLE public.music_analyzer_feature_overrides (
+CREATE TABLE IF NOT EXISTS public.music_analyzer_feature_overrides (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   run_id uuid NOT NULL REFERENCES public.music_analyzer_runs(id) ON DELETE RESTRICT,
   created_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
@@ -10,7 +10,7 @@ CREATE TABLE public.music_analyzer_feature_overrides (
   reason text NOT NULL CHECK (char_length(reason) BETWEEN 3 AND 1000),
   patch jsonb NOT NULL CHECK (jsonb_typeof(patch) = 'object' AND octet_length(patch::text) <= 16384)
 );
-CREATE INDEX music_analyzer_feature_overrides_run_idx
+CREATE INDEX IF NOT EXISTS music_analyzer_feature_overrides_run_idx
   ON public.music_analyzer_feature_overrides(run_id, id);
 ALTER TABLE public.music_analyzer_feature_overrides ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.music_analyzer_feature_overrides FROM PUBLIC, anon, authenticated, service_role;

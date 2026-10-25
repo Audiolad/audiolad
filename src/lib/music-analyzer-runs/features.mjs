@@ -18,6 +18,15 @@ function fact(value, meta = {}) {
     status: value === null ? "unknown" : "candidate", reason: null, ...meta };
 }
 
+/** Shared withholding rule for automatic tags and passport materialization.
+ * @param {unknown} value
+ */
+export function isWithheldTag(value) {
+  const tag = record(value);
+  return tag.status === "withheld" || tag.research_only === true
+    || (typeof tag.label === "string" && /dark[ _-]*jazz/i.test(tag.label));
+}
+
 /** @param {unknown} list @param {string} source @param {string} version @param {number} limit */
 function tags(list, source, version, limit) {
   return (Array.isArray(list) ? list : []).slice(0, limit).flatMap(item => {
@@ -101,7 +110,7 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
     const candidates = tags(list, `analyzer:normalized.${key}`, version, limit);
     // Удерживаем узкий жанр без независимого подтверждения. Ambient не назначается по имени файла.
     const values = candidates.map(c => ({ ...c.value, confidence: c.confidence, source: c.source, model_version: c.model_version,
-      status: /dark[ _-]*jazz/i.test(c.value.label) || c.value.research_only ? "withheld" : "candidate" }));
+      status: isWithheldTag(c.value) ? "withheld" : "candidate" }));
     features[key] = fact(values.length ? values : null, { ...model,
       reason: key === "genre" || key === "subgenre" ? "Жанры – гипотезы. Dark Jazz удержан до ручной проверки; автоматической замены на Ambient нет." : "Гипотезы модели, не измеренные факты." });
   }

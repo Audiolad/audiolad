@@ -183,7 +183,9 @@ test("Стенд проверяет SHA и происхождение рефер
 
 test("Миграция добавляет только изолированную историю, доступ закрыт, старые строки не обновляются", async () => {
   const sql = await readFile(new URL("../supabase/migrations/20270123120000_music_analyzer_feature_overrides.sql", import.meta.url), "utf8");
-  assert.match(sql, /CREATE TABLE public\.music_analyzer_feature_overrides/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.music_analyzer_feature_overrides/);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS music_analyzer_feature_overrides_run_idx/);
+  assert.doesNotMatch(sql, /CREATE POLICY/); // RLS denies clients; service_role bypasses it.
   assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
   assert.match(sql, /REVOKE ALL ON public\.music_analyzer_feature_overrides FROM PUBLIC, anon, authenticated, service_role/);
   assert.match(sql, /GRANT SELECT, INSERT ON public\.music_analyzer_feature_overrides TO service_role/);

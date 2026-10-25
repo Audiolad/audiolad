@@ -5,7 +5,7 @@
  * mood, or instruments.
  */
 
-import { readFeatures, type FeatureSet } from "./features.mjs";
+import { isWithheldTag, readFeatures, type FeatureSet } from "./features.mjs";
 
 export type PassportTone = "high" | "medium" | "low";
 
@@ -801,6 +801,17 @@ function labelFacts(rows: PassportRow[]): MusicAnalyzerLabelFact[] {
   });
 }
 
+/** Feature values retain withholding metadata that legacy display rows omit. */
+function materializedLabelFacts(value: unknown): MusicAnalyzerLabelFact[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item: unknown) => {
+    if (!item || typeof item !== "object" || isWithheldTag(item)) return [];
+    const tag = item as { label?: unknown; score?: unknown };
+    const label = cleanText(tag.label);
+    return label ? [{ label, score: finiteNumber(tag.score) }] : [];
+  });
+}
+
 export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnalyzerStructuredFacts {
   const analysisFeatures = readFeatures(normalized);
   const nodes = collect(normalized);
@@ -853,8 +864,8 @@ export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnal
       candidate: candidateKeyNode ? cleanText(candidateKeyNode.value) : null,
       candidateMode: candidateModeNode ? cleanText(candidateModeNode.value) : null,
     },
-    genres: labelFacts(analysisFeatures ? genres.rows.filter(row => !/dark[ _-]*jazz/i.test(row.label)) : genres.rows),
-    styles: labelFacts(analysisFeatures ? styles.rows.filter(row => !/dark[ _-]*jazz/i.test(row.label)) : styles.rows),
+    genres: analysisFeatures ? materializedLabelFacts(analysisFeatures.features.genre?.value) : labelFacts(genres.rows),
+    styles: analysisFeatures ? materializedLabelFacts(analysisFeatures.features.subgenre?.value) : labelFacts(styles.rows),
     moods: labelFacts(moods.rows),
     instruments: labelFacts(instruments.rows),
     soundCharacter: sound,
