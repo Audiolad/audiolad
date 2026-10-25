@@ -1,3 +1,4 @@
+import { sourceTagDecision, type TagDecision, type TagGroup } from "./tag-withholding";
 import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 import type { MusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
 
@@ -130,7 +131,8 @@ export function storedFactsFromStructured(
   };
 }
 
-export function parseStoredStructuredFacts(value: unknown): StoredStructuredFacts | null {
+export function parseStoredStructuredFacts(value: unknown, normalized?: unknown): StoredStructuredFacts | null {
+  const permits = sourceTagDecision(normalized);
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Partial<StoredStructuredFacts>;
   if (!record.bpm || typeof record.bpm !== "object" || Array.isArray(record.bpm)) return null;
@@ -147,11 +149,11 @@ export function parseStoredStructuredFacts(value: unknown): StoredStructuredFact
       candidate: textOrNull(record.key.candidate),
       candidate_mode: textOrNull(record.key.candidate_mode),
     },
-    genres: labelList(record.genres),
-    styles: labelList(record.styles),
-    moods: labelList(record.moods),
-    instruments: labelList(record.instruments),
-    sound_character: labelOrNull(record.sound_character),
+    genres: labelList(record.genres).filter((item) => permits("genres", item)),
+    styles: labelList(record.styles).filter((item) => permits("styles", item)),
+    moods: labelList(record.moods).filter((item) => permits("moods", item)),
+    instruments: labelList(record.instruments).filter((item) => permits("instruments", item)),
+    sound_character: permits("sound_character", record.sound_character) ? labelOrNull(record.sound_character) : null,
     loudness_lufs: numberOrNull(record.loudness_lufs),
     energy: numberOrNull(record.energy),
   };
@@ -354,7 +356,7 @@ function emptyDraft(
 export function albumPassportSummaryLines(draft: Pick<
   AlbumPassportDraft,
   "bpmProfile" | "keyProfile" | "genreProfile" | "moodProfile" | "instrumentProfile"
->): string[] {
+>, permits: TagDecision = sourceTagDecision()): string[] {
   const lines: string[] = [];
   const published = draft.bpmProfile.published;
   if (published) {
@@ -369,11 +371,11 @@ export function albumPassportSummaryLines(draft: Pick<
       item.mode ? `${item.key} ${item.mode}` : item.key
     )).join(", ")}`);
   }
-  const genres = draft.genreProfile.items.filter((item) => !isWithheldTag(item)).map((item) => item.label);
+  const genres = draft.genreProfile.items.filter((item) => permits("genres", item)).map((item) => item.label);
   if (genres.length > 0) lines.push(`Жанры: ${genres.join(", ")}`);
-  const moods = draft.moodProfile.items.filter((item) => !isWithheldTag(item)).map((item) => item.label);
+  const moods = draft.moodProfile.items.filter((item) => permits("moods", item)).map((item) => item.label);
   if (moods.length > 0) lines.push(`Настроение: ${moods.join(", ")}`);
-  const instruments = draft.instrumentProfile.items.filter((item) => !isWithheldTag(item)).map((item) => item.label);
+  const instruments = draft.instrumentProfile.items.filter((item) => permits("instruments", item)).map((item) => item.label);
   if (instruments.length > 0) lines.push(`Инструменты: ${instruments.join(", ")}`);
   return lines;
 }
@@ -382,7 +384,7 @@ export function albumPassportSummaryLines(draft: Pick<
  * Prompt facts from one frozen album snapshot.
  * Unpublished BPM/key candidates are omitted so the model cannot treat them as fact.
  */
-export function albumPassportPromptFacts(draft: AlbumPassportDraft): string {
+export function albumPassportPromptFacts(draft: AlbumPassportDraft, permits: TagDecision = sourceTagDecision()): string {
   const lines = [
     "Музыкальные факты ниже сняты с замороженной версии альбомного паспорта.",
     "Это единственный источник BPM, тональности, жанра, стиля, настроения и инструментов.",
@@ -404,16 +406,16 @@ export function albumPassportPromptFacts(draft: AlbumPassportDraft): string {
         : item.key
     )).join("; ")}.`);
   }
-  const section = (title: string, items: LabelProfileItem[]) => {
-    items = items.filter((item) => !isWithheldTag(item));
+  const section = (title: string, group: TagGroup, items: LabelProfileItem[]) => {
+    items = items.filter((item) => permits(group, item));
     if (items.length === 0) return;
     lines.push(`${title}: ${items.map((item) => item.label).join(", ")}.`);
   };
-  section("Жанры", draft.genreProfile.items);
-  section("Стили", draft.styleProfile.items);
-  section("Настроение", draft.moodProfile.items);
-  section("Инструменты", draft.instrumentProfile.items);
-  section("Характер звука", draft.characterProfile.items);
+  section("Жанры", "genres", draft.genreProfile.items);
+  section("Стили", "styles", draft.styleProfile.items);
+  section("Настроение", "moods", draft.moodProfile.items);
+  section("Инструменты", "instruments", draft.instrumentProfile.items);
+  section("Характер звука", "sound_character", draft.characterProfile.items);
   if (lines.length === 4) {
     lines.push("Опубликованных музыкальных полей в этой версии паспорта нет.");
   }
@@ -500,4 +502,38 @@ export function nextDescriptionAlbumBinding(input: {
 }): string | null {
   if (input.existingVersionId) return input.existingVersionId;
   return input.generatedFromVersionId;
+}
+
+/** Read-only projection of a frozen row; never rewrites the snapshot or musical measures. */
+export function albumTagProjection(draft: AlbumPassportDraft, runs: ReadonlyMap<string, { normalized_json: unknown }>): {
+  draft: AlbumPassportDraft; permits: TagDecision;
+} {
+  const byPassport = new Map<string, TagDecision>();
+  for (const source of draft.sources ?? []) {
+    if (source.outcome !== "succeeded" || !source.track_passport_version_id) continue;
+    byPassport.set(source.track_passport_version_id,
+      sourceTagDecision(runs.get(source.music_analyzer_run_id ?? "")?.normalized_json));
+  }
+  const fallback = sourceTagDecision();
+  const filter = (group: TagGroup, items: LabelProfileItem[]): LabelProfileItem[] => items.flatMap((item) => {
+    if (isWithheldTag(item)) return [];
+    const ids = item.track_passport_version_ids ?? [];
+    if (!ids.length) return fallback(group, item) ? [item] : [];
+    const kept = ids.filter((id) => (byPassport.get(id) ?? fallback)(group, item));
+    if (!kept.length) return [];
+    return [{ ...item, track_passport_version_ids: kept,
+      scores: item.scores.filter((_, index) => kept.includes(ids[index])) }];
+  });
+  const projected = { ...draft };
+  const allowed = new Set<string>();
+  for (const [profile, group] of [
+    ["genreProfile", "genres"], ["styleProfile", "styles"], ["moodProfile", "moods"],
+    ["instrumentProfile", "instruments"], ["characterProfile", "sound_character"],
+  ] as const) {
+    const items = filter(group, draft[profile]?.items ?? []);
+    projected[profile] = { ...draft[profile], items };
+    for (const item of items) allowed.add(`${group}:${item.label}`);
+  }
+  return { draft: projected, permits: (group, tag) => !isWithheldTag(tag)
+    && allowed.has(`${group}:${(tag as { label?: string })?.label}`) };
 }

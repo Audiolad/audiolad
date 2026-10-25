@@ -1,3 +1,4 @@
+import { sourceTagDecision, type TagDecision, type TagGroup } from "./tag-withholding";
 import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 import type {
   AlbumPassportDraft,
@@ -102,12 +103,12 @@ function succeededPair(source: AlbumPassportSource): string[] {
   return audioId && passportId ? [`${audioId}:${passportId}`] : [];
 }
 
-function readLabelItems(items: LabelProfileItem[] | undefined): Array<{ label: string; trackIds: string[] }> {
+function readLabelItems(items: LabelProfileItem[] | undefined, group: TagGroup, permits: TagDecision): Array<{ label: string; trackIds: string[] }> {
   if (!Array.isArray(items)) return [];
   const out: Array<{ label: string; trackIds: string[] }> = [];
   for (const item of items) {
     const label = text(item?.label);
-    if (!label || isWithheldTag(item)) continue;
+    if (!label || isWithheldTag(item) || !permits(group, item)) continue;
     const trackIds = Array.isArray(item.track_passport_version_ids)
       ? item.track_passport_version_ids.flatMap((id) => {
         const value = text(id);
@@ -207,16 +208,18 @@ export function readAlbumPassportDisplay(input: {
   id: string;
   version: number;
   draft: AlbumPassportDraft;
+  permits?: TagDecision;
 }): AlbumPassportDisplay | null {
   if (input.draft.status !== "completed" && input.draft.status !== "partial") return null;
   const id = text(input.id);
   if (!id || !Number.isInteger(input.version) || input.version < 1) return null;
   const succeededIds = succeededPassportIds(input.draft.sources);
   if (succeededIds.length === 0) return null;
-  const genres = readLabelItems(input.draft.genreProfile?.items);
-  const styles = readLabelItems(input.draft.styleProfile?.items);
-  const moods = readLabelItems(input.draft.moodProfile?.items);
-  const instruments = readLabelItems(input.draft.instrumentProfile?.items);
+  const permits = input.permits ?? sourceTagDecision();
+  const genres = readLabelItems(input.draft.genreProfile?.items, "genres", permits);
+  const styles = readLabelItems(input.draft.styleProfile?.items, "styles", permits);
+  const moods = readLabelItems(input.draft.moodProfile?.items, "moods", permits);
+  const instruments = readLabelItems(input.draft.instrumentProfile?.items, "instruments", permits);
   const bpmRead = readBpm(input.draft);
   const ambiguity: AlbumAmbiguityItem[] = [];
   const tempo = tempoAmbiguity(bpmRead.bpm, bpmRead.values);

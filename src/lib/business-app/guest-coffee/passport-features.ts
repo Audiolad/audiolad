@@ -1,3 +1,5 @@
+import { sourceTagDecision, type TagDecision, type TagGroup } from "@/lib/music-passport/tag-withholding";
+
 /**
  * a8240527 (passport stage, Sergey 17.10.2026) – turns ONE verified track passport into the
  * hidden sound features of the coffee-shop recommendations. Pure; used on the server only
@@ -48,11 +50,13 @@ export type GuestCoffeePassportVersionRow = {
   sealed_at: string | null;
   ceased_at: string | null;
   structured_fields: unknown;
+  analyzer_run_id?: string | null;
 };
 
 /** A row of music_passport_attributes as read by the server adapter. */
 export type GuestCoffeePassportAttributeRow = {
   id?: string;
+  source_ref?: string | null;
   passport_id: string;
   attribute_key: string;
   origin: string;
@@ -97,11 +101,11 @@ function rankedLabels(items: Array<{ label: string; score: number | null }>): Gu
   return out;
 }
 
-function labelItems(value: unknown): Array<{ label: string; score: number | null }> {
+function labelItems(value: unknown, group: TagGroup, permits: TagDecision): Array<{ label: string; score: number | null }> {
   if (!Array.isArray(value)) return [];
   const out: Array<{ label: string; score: number | null }> = [];
   for (const item of value) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    if (!item || typeof item !== "object" || Array.isArray(item) || !permits(group, item)) continue;
     const rec = item as { label?: unknown; score?: unknown };
     if (typeof rec.label !== "string" || !rec.label.trim()) continue;
     out.push({ label: rec.label, score: num(rec.score) });
@@ -117,26 +121,29 @@ function labelItems(value: unknown): Array<{ label: string; score: number | null
 export function guestCoffeeFeaturesFromPassport(
   version: GuestCoffeePassportVersionRow | null | undefined,
   attributes: readonly GuestCoffeePassportAttributeRow[] = [],
+  normalized?: unknown,
 ): GuestCoffeeSoundFeatures | null {
   if (!version) return null;
   if (version.status !== "active" || !version.sealed_at || version.ceased_at) return null;
   const facts = version.structured_fields && typeof version.structured_fields === "object" && !Array.isArray(version.structured_fields)
     ? (version.structured_fields as Record<string, unknown>)
     : {};
+  const permits = sourceTagDecision(normalized);
   const own = attributes.filter((a) => a.passport_id === version.id);
-  const attrLabels = (key: string) =>
+  const attrLabels = (key: string, group: TagGroup) =>
     own
-      .filter((a) => a.attribute_key === key && typeof a.value_text === "string")
+      .filter((a) => a.attribute_key === key && typeof a.value_text === "string"
+        && permits(group, { ...a, label: a.value_text }))
       .map((a) => ({ label: a.value_text as string, score: num(a.confidence) }));
 
   // The analyzer snapshot keeps the ranked lists; the attribute rows are the same labels
   // (slugs) and serve as the source when a snapshot has none.
-  const pick = (factsKey: string, attrKey: string | null) => {
-    const fromFacts = labelItems(facts[factsKey]);
-    return rankedLabels(fromFacts.length > 0 || !attrKey ? fromFacts : attrLabels(attrKey));
+  const pick = (factsKey: TagGroup, attrKey: string | null) => {
+    const fromFacts = labelItems(facts[factsKey], factsKey, permits);
+    return rankedLabels(fromFacts.length > 0 || !attrKey ? fromFacts : attrLabels(attrKey, factsKey));
   };
   const character = facts.sound_character && typeof facts.sound_character === "object"
-    ? rankedLabels(labelItems([facts.sound_character]))
+    ? rankedLabels(labelItems([facts.sound_character], "sound_character", permits))
     : [];
 
   const features: GuestCoffeeSoundFeatures = {

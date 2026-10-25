@@ -9,11 +9,13 @@ import {
   MUSIC_ANALYZER_RUNS_BUCKET,
 } from "@/lib/music-analyzer-runs/constants";
 import { buildRunStoragePath, safeAudioFilename, sha256Hex } from "@/lib/music-analyzer-runs/policy";
+import { chunkIds } from "@/lib/supabase/chunk";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import {
   ALBUM_PASSPORT_AGGREGATION_VERSION,
   albumPassportPromptFacts,
+  albumTagProjection,
   albumPassportSummaryLines,
   attributesFromStructuredFacts,
   buildAlbumPassportDraft,
@@ -227,12 +229,14 @@ async function loadLinks(practiceId: string): Promise<LinkRow[]> {
 async function loadRuns(ids: string[]): Promise<Map<string, RunRow>> {
   const map = new Map<string, RunRow>();
   if (ids.length === 0) return map;
-  const { data, error } = await service()
-    .from("music_analyzer_runs")
-    .select("id, status, sha256, error_code, finished_at, analyzer_version, analyzer_git_commit, normalized_json")
-    .in("id", ids);
-  if (error) throw new JazzRelaxPassportError("passport_storage_failed", 500);
-  for (const row of data ?? []) map.set(row.id as string, row as RunRow);
+  await Promise.all(chunkIds([...new Set(ids)]).map(async (chunk) => {
+    const { data, error } = await service()
+      .from("music_analyzer_runs")
+      .select("id, status, sha256, error_code, finished_at, analyzer_version, analyzer_git_commit, normalized_json")
+      .in("id", chunk);
+    if (error) throw new JazzRelaxPassportError("passport_storage_failed", 500);
+    for (const row of data ?? []) map.set(row.id as string, row as RunRow);
+  }));
   return map;
 }
 
@@ -380,7 +384,7 @@ async function syncPassports(
       continue;
     }
     if (run.status === "succeeded" && passport) {
-      const facts = parseStoredStructuredFacts(passport.structured_fields);
+      const facts = parseStoredStructuredFacts(passport.structured_fields, run.normalized_json);
       if (!facts) {
         failed.push({ audioItemId: track.id, runId: run.id });
         continue;
@@ -760,12 +764,14 @@ async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
   });
   const running = trackViews.some((track) => track.state === "queued" || track.state === "processing");
   const matched = running ? null : matchSettledAlbum(albums, trackViews);
+  const projection = matched ? albumTagProjection(matched.draft, runs) : null;
   const tracksForView = matched ? attachFrozenTrackPassports(trackViews, matched.draft, runs) : trackViews;
   const album = matched
     ? readAlbumPassportDisplay({
       id: matched.row.id,
       version: matched.row.version,
-      draft: matched.draft,
+      draft: projection!.draft,
+      permits: projection!.permits,
     })
     : null;
   return buildJazzRelaxPassportView({
@@ -773,7 +779,7 @@ async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
     completedAlbumPassportVersionId: matched?.row.status === "completed" ? matched.row.id : null,
     album,
     summary: matched?.draft.status === "completed"
-      ? albumPassportSummaryLines(matched.draft)
+      ? albumPassportSummaryLines(projection!.draft, projection!.permits)
       : [],
   });
 }
@@ -1017,7 +1023,7 @@ export async function runJazzRelaxPassportAction(input: {
         continue;
       }
       if (run.status === "succeeded" && passport) {
-        const facts = parseStoredStructuredFacts(passport.structured_fields);
+        const facts = parseStoredStructuredFacts(passport.structured_fields, run.normalized_json);
         if (facts) {
           succeeded.push({
             audioItemId: track.id,
@@ -1120,9 +1126,13 @@ export async function jazzRelaxAlbumFactsForDescription(input: {
       alreadyBound: Boolean(bound),
     };
   }
+  // Bound descriptions can reference historical runs, not the current/latest analysis.
+  const runIds = draft.sources.flatMap((source) => source.music_analyzer_run_id ? [source.music_analyzer_run_id] : []);
+  const runs = await loadRuns(runIds).catch(() => new Map<string, RunRow>());
+  const projection = albumTagProjection(draft, runs);
   return {
     albumPassportVersionId: versionId,
-    facts: albumPassportPromptFacts(draft),
+    facts: albumPassportPromptFacts(projection.draft, projection.permits),
     alreadyBound: Boolean(bound),
   };
 }

@@ -447,3 +447,88 @@ for (const [name, plan] of plans) {
 }
 
 console.log("business-guest-passport-unit: OK");
+
+// Historical {label, score} storage and attribute fallback: withheld labels never affect
+// features, track affinities, album ranking or the 64-setting recommendation plan.
+{
+  const blocked = [
+    { label: "Dark Jazz", score: 0.99 },
+    { label: "Relaxation Music", score: 0.98 },
+    { label: "Hidden Candidate", score: 0.97 },
+  ];
+  const allowed = Array.from({ length: 7 }, (_, i) => ({ label: `allowed-${i}`, score: 0.4 }));
+  const original = Object.fromEntries(["genres", "styles", "moods", "instruments"].map(key => [key, [
+    blocked[0], { ...blocked[1], research_only: true }, { ...blocked[2], status: "withheld" }, ...allowed,
+  ]]));
+  const dirty = version(Object.fromEntries(Object.keys(original).map(key => [key, [...blocked, ...allowed]])));
+  const clean = version(Object.fromEntries(Object.keys(original).map(key => [key, allowed])));
+  const snapshot = JSON.stringify({ dirty, original });
+  const f = guestCoffeeFeaturesFromPassport(dirty, [], original)!;
+  const expected = guestCoffeeFeaturesFromPassport(clean, [], original)!;
+  assert.deepEqual(f, expected, "withhold before normalization, deduplication and the six-label limit");
+  assert.equal(f.styles.length, 6);
+  assert.equal(f.styles[0].weight, 1, "withheld labels consume no rank or weight");
+  assert.doesNotMatch(JSON.stringify(f), /dark jazz|relaxation music|hidden candidate/);
+  const realClean = guestCoffeeFeaturesFromPassport(version(ROME.version.structured_fields))!;
+  const realDirty = guestCoffeeFeaturesFromPassport(version({ ...ROME.version.structured_fields,
+    styles: [...blocked, ...ROME.version.structured_fields.styles] }), [], original)!;
+  assert.deepEqual(realDirty, realClean, "real ranking labels and weights remain unchanged");
+  assert.deepEqual(guestCoffeeTrackAffinity(realDirty), guestCoffeeTrackAffinity(realClean));
+  const asMap = (features: GuestCoffeeSoundFeatures) => new Map(shelf.flatMap(p => p.tracks.map(t => [t.audioItemId, features] as const)));
+  assert.deepEqual(buildGuestCoffeeRecommendationPlan(shelf, asMap(realDirty)),
+    buildGuestCoffeeRecommendationPlan(shelf, asMap(realClean)), "all 64 recommendations unchanged by withheld evidence");
+  const attrs = [...blocked, ...allowed].map(tag => ({ passport_id: "v1", attribute_key: "genre_class",
+    origin: "interpreted", value_numeric: null, value_text: tag.label.replaceAll(" ", "_"), confidence: tag.score }));
+  assert.deepEqual(guestCoffeeFeaturesFromPassport(version({}), attrs, original)?.genres, expected.genres,
+    "attribute fallback resolves the original labels, including slugs");
+  assert.deepEqual(guestCoffeeFeaturesFromPassport(version({ genres: blocked }), attrs, original)?.genres, expected.genres,
+    "filtered stored labels cannot reappear through attribute fallback");
+  const metadata = blocked.map((tag, i) => ({ ...tag, research_only: i === 1, status: i === 2 ? "withheld" : "candidate" }));
+  assert.equal(guestCoffeeFeaturesFromPassport(version({ genres: metadata })), null);
+  const missing = guestCoffeeFeaturesFromPassport(version({ genres: blocked.slice(0, 2) }));
+  assert.equal(missing, null, "known research label fails closed if original is missing");
+  const permitted = guestCoffeeFeaturesFromPassport(version({ genres: [blocked[1]] }), [], { genres: [blocked[1]] });
+  assert.equal(permitted?.genres[0].label, "relaxation music", "same label explicitly permitted by its own run survives");
+  assert.equal(JSON.stringify({ dirty, original }), snapshot);
+}
+
+// Run reads are batched and reuse the server adapter's cache. Legacy source_ref is read
+// only when the immutable version has no run ID. Missing/error runs fail closed.
+{
+  const runId = (i: number) => `00000000-0000-0000-0000-${String(i).padStart(12, "0")}`;
+  const calls: Array<{ table: string; count: number }> = [];
+  const tracks = Array.from({ length: 101 }, (_, i) => `historical-${i}`);
+  const versions = tracks.map((id, i) => version({ genres: [
+    { label: "Relaxation Music", score: 0.9 }, { label: "Dark Jazz", score: 0.8 }, { label: "Ambient", score: 0.7 },
+  ] }, { id: `pv-${i}`, audio_item_id: id, analyzer_run_id: i === 100 ? null : runId(i) }));
+  const attrs = [{ id: "attr", passport_id: "pv-100", source_ref: `analyzer-run:${runId(100)}`,
+    attribute_key: "genre_class", origin: "interpreted", value_numeric: null, value_text: "relaxation_music", confidence: null }];
+  let failRuns = false;
+  const fake = {
+    from(table: string) { return { select() { return { in(_column: string, ids: string[]) {
+      calls.push({ table, count: ids.length });
+      const rows = table === "music_passport_versions" ? versions.filter(v => ids.includes(v.audio_item_id))
+        : table === "music_passport_attributes" ? attrs.filter(a => ids.includes(a.passport_id))
+        : ids.flatMap(id => id === runId(99) ? [] : [{ id, normalized_json: { genres: [
+          { label: "Relaxation Music", research_only: id !== runId(1) }, { label: "Ambient" },
+        ] } }]);
+      const result = Promise.resolve(table === "music_analyzer_runs" && failRuns
+        ? { data: null, error: { message: "unavailable" } } : { data: rows, error: null });
+      return Object.assign(result, {
+        eq() { return { is() { return { not() { return result; } }; } }; },
+        order() { return { range(from: number, to: number) { return Promise.resolve({ data: rows.slice(from, to + 1), error: null }); } }; },
+      });
+    } }; } }; },
+  } as unknown as GuestCoffeePassportClient;
+  const result = await queryGuestCoffeePassportFeatures(fake, tracks);
+  assert.equal(result.size, 101);
+  assert.deepEqual(result.get(tracks[0])?.genres.map(x => x.label), ["ambient"]);
+  assert.deepEqual(result.get(tracks[1])?.genres.map(x => x.label), ["relaxation music", "ambient"]);
+  assert.deepEqual(result.get(tracks[99])?.genres.map(x => x.label), ["ambient"], "missing run");
+  assert.deepEqual(result.get(tracks[100])?.genres.map(x => x.label), ["ambient"], "attribute source_ref");
+  assert.deepEqual(calls.filter(c => c.table === "music_analyzer_runs").map(c => c.count), [50, 50, 1], "no per-track run query");
+  failRuns = true;
+  const unavailable = await queryGuestCoffeePassportFeatures(fake, tracks);
+  assert.ok([...unavailable.values()].every(f => f.genres.map(x => x.label).join() === "ambient"));
+}
+console.log("business historical stored withholding: OK");
