@@ -1,12 +1,12 @@
 /** Версионированные признаки. Score модели не является вероятностью. */
 export const FEATURE_VERSION = "audiolad-features:1";
-export const LOCAL_VERSION = "audiolad-dsp:1";
+export const LOCAL_VERSION = "audiolad-dsp:2";
 
-// Sergey, 25.10.2026: hide energy until calibration against listener labels.
-export const MUSIC_ANALYZER_ENERGY_PUBLIC = false;
+// Sergey, 25.10.2026 15:05 MSK: publish a preliminary estimate; calibration continues.
+export const MUSIC_ANALYZER_ENERGY_PUBLIC = true;
 
 /** Project run features for passports, album/description context and public UI.
- * Internal run JSON and manual overrides retain the uncalibrated score.
+ * Preliminary energy remains a candidate, never a calibrated probability.
  * @param {FeatureSet|null} set @returns {FeatureSet|null}
  */
 export function publicMusicAnalyzerFeatures(set) {
@@ -77,17 +77,20 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
     features[key] = fact(value, value === null ? {} : { ...model, source: `analyzer:technical.${key}`, origin: "measured", status: "measured",
       reason: key === "dynamics_db" ? "Исходный DSP: P95–P5 RMS активных окон выше −60 dBFS; не LRA." : null });
   }
-  for (const key of ["rms_dbfs", "sample_peak_dbfs", "dynamic_spread_db", "onset_density", "rhythm_salience"]) {
+  for (const key of ["rms_dbfs", "sample_peak_dbfs", "dynamic_spread_db", "onset_density", "rhythm_salience", "spectral_flux", "low_band_onset_ratio", "percussive_ratio", "local_spectral_centroid_hz"]) {
     const v = finite(local[key]);
-    features[key] = fact(v, v === null ? {} : { source: "local:mono-8khz-envelope", model_version: LOCAL_VERSION,
-      origin: "measured", status: "measured", reason: key === "dynamic_spread_db" ? "P95–P10 RMS непустых окон 50 мс; это не LRA." : null });
+    features[key] = fact(v, v === null ? {} : { source: "local:mono-8khz-dsp", model_version: local.algorithm_version ?? LOCAL_VERSION,
+      origin: "measured", status: "measured", reason: key === "dynamic_spread_db" ? "P95–P10 RMS окон 50 мс выше 1% RMS трека; это не LRA." : null });
   }
   const energy = unit(t.energy ?? n.energy);
-  const rmsProxy = finite(t.rms_db);
-  const localEnergy = finite(local.energy_0_100) ?? (rmsProxy === null ? null : Math.round(Math.max(0, Math.min(100, (rmsProxy + 60) / 60 * 80))));
-  features.energy_0_100 = fact(energy !== null ? energy * 100 : localEnergy,
-    energy !== null ? { ...model, reason: "Исходная шкала 0–1; воспринимаемая энергия не проверена." }
-      : localEnergy !== null ? { source: finite(local.energy_0_100) !== null ? "local:rms-onsets" : "analyzer:technical.rms_db", model_version: LOCAL_VERSION, reason: "RMS-прокси, при наличии локального измерения дополнен плотностью атак; не калиброван на слушателях." } : {});
+  const localEnergy = finite(local.energy_0_100);
+  const localVersion = typeof local.algorithm_version === "string" ? local.algorithm_version : LOCAL_VERSION;
+  features.energy_0_100 = fact(localEnergy ?? (energy !== null ? energy * 100 : null),
+    localEnergy !== null ? { source: localVersion === "audiolad-dsp:1" ? "local:rms-onsets" : "local:spectral-rhythm", model_version: localVersion,
+      reason: localVersion === "audiolad-dsp:1"
+        ? "Историческая RMS-оценка DSP v1; для независимости от громкости нужен повторный анализ DSP v2."
+        : "Предварительная оценка, шкала калибруется. Относительная спектральная и ритмическая активность; громкость не входит в оценку." }
+      : energy !== null ? { ...model, reason: "Предварительная оценка, шкала калибруется. Историческая шкала 0–1; для независимости от громкости нужен повторный анализ DSP v2." } : {});
   const candidate = finite(t.bpm) ?? finite(d.bpm_candidate) ?? finite(t.bpm_candidate);
   const raw = finite(d.bpm_candidate_raw) ?? finite(t.bpm_raw);
   const salience = finite(local.rhythm_salience);

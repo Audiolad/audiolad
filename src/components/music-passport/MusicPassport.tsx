@@ -283,7 +283,7 @@ export function MusicPassport({
                 {featureDisplayRows(passport.features).map(row => (
                   <div key={row.key}>
                     <dt className="text-sm text-[#796ba0]">{row.label}</dt>
-                    <dd className="mt-1 text-[#25135c]">{row.value}<span className="block text-xs text-[#796ba0]">{row.status} · {row.confidence}</span></dd>
+                    <dd className="mt-1 text-[#25135c]">{row.value}<span className="block text-xs text-[#796ba0]">{row.status} · {row.confidence}</span>{row.key === "energy_0_100" ? <span className="block text-xs text-[#796ba0]">Шкала калибруется.</span> : null}</dd>
                     <details className="mt-1 text-xs text-[#796ba0]"><summary>Источник и ограничения</summary>{row.source} · {row.version}{row.reason ? <p>{row.reason}</p> : null}</details>
                   </div>
                 ))}
