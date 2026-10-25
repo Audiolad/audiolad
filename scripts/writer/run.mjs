@@ -19,7 +19,7 @@ import { loadBrief } from "./lib/brief.mjs";
 import { runChecks, runTests } from "./lib/checks.mjs";
 import { loadContext } from "./lib/context.mjs";
 import { applyToRepo } from "./lib/convert.mjs";
-import { DEFAULT_MODEL, SUPPORTED_MODELS, chargedCost, estimatePromptTokens, formatRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
+import { SUPPORTED_MODELS, defaultModelFor, chargedCost, estimatePromptTokens, formatRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
 import { generateOnMoscow } from "./lib/moscow.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
 import { articleSchema, buildExpandMessages, buildMessages, buildRepairMessages, buildRequest, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
@@ -31,7 +31,7 @@ import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } fr
 const { values: args } = parseArgs({
   options: {
     brief: { type: "string" },
-    model: { type: "string", default: DEFAULT_MODEL },
+    model: { type: "string" },
     "dry-run": { type: "boolean", default: false },
     "no-repair": { type: "boolean", default: false },
     offline: { type: "boolean", default: false },
@@ -74,6 +74,7 @@ if (args.help || (!args.brief && !szMode) || (szMode && !args.briefs && !args.br
   ].join("\n"));
   process.exit(args.help ? 0 : 1);
 }
+args.model = defaultModelFor(args.site, args.model);
 if (!SUPPORTED_MODELS.includes(args.model)) {
   process.stderr.write(`Модель ${args.model} не поддерживается. Доступны: ${SUPPORTED_MODELS.join(", ")}\n`);
   process.exit(1);
@@ -131,7 +132,7 @@ function prepareWorktree() {
 
 function callWriter(callName, messages, schema) {
   const request = buildRequest(model, messages, schema, { maxTokens });
-  const worst = worstCaseRub(model, estimatePromptTokens(messages), maxTokens);
+  const worst = worstCaseRub(model, estimatePromptTokens(messages, model), maxTokens);
   if (state.spentRub + worst > maxRub) {
     throw new Stop(5, `бюджет: потрачено ${formatRub(state.spentRub)}, худший случай вызова ${formatRub(worst)}, лимит ${formatRub(maxRub)} (--max-rub)`);
   }

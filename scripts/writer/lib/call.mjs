@@ -23,7 +23,7 @@ export function makeCaller({ model, maxTokens, maxRub, outDir, runId, state, sch
   }
   return function callWriter(callName, messages, schema) {
     const request = buildRequest(model, messages, schema, { maxTokens, schemaName });
-    const worst = worstCaseRub(model, estimatePromptTokens(messages), maxTokens);
+    const worst = worstCaseRub(model, estimatePromptTokens(messages, model), maxTokens);
     if (state.spentRub + worst > maxRub) {
       throw new BudgetError(`бюджет: потрачено ${formatRub(state.spentRub)}, худший случай вызова ${formatRub(worst)}, лимит ${formatRub(maxRub)} (--max-rub)`);
     }

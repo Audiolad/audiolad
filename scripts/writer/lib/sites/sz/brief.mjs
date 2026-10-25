@@ -102,7 +102,12 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
       sourceText = expert.sourceText;
     }
     need(sourceText !== null, `${where}: нужен sourceFile или sourceText – текст источника для сверки дословности`, errors);
-    const quote = String(expert?.quote ?? "").trim().replace(/^«/, "").replace(/»\.?$/, "");
+    // Strip the outer «…» only when the quote itself starts with «. A quote that merely ends with
+    // an inner pair (… не сформирован «алфавит чувств».) keeps it (review of sergey-zoya-site #77).
+    const raw = String(expert?.quote ?? "").trim();
+    const inner = raw.slice(1).replace(/»\.?$/, "");
+    const wrapped = /^«[\s\S]*»\.?$/.test(raw) && inner.split("«").length === inner.split("»").length;
+    const quote = wrapped ? inner : raw;
     if (sourceText !== null && quote) {
       need(quoteText(sourceText).includes(quoteText(quote)), `${where}.quote: нет дословно в источнике`, errors);
     }

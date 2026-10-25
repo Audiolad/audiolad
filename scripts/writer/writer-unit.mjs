@@ -132,7 +132,7 @@ async function check(article) {
 {
   assert.deepEqual(parseLimits("3", "16000"), { maxRub: 3, maxTokens: 16000 });
   assert.deepEqual(parseLimits("0,5", "800"), { maxRub: 0.5, maxTokens: 800 });
-  for (const [rub, tokens] of [["", "16000"], ["NaN", "16000"], ["3р", "16000"], ["0", "16000"], ["-1", "16000"], ["1e3", "16000"], ["Infinity", "16000"], ["31", "16000"], [undefined, "16000"], ["3", ""], ["3", "NaN"], ["3", "16k"], ["3", "1.5"], ["3", "0"], ["3", "999999"]]) {
+  for (const [rub, tokens] of [["", "16000"], ["NaN", "16000"], ["3р", "16000"], ["0", "16000"], ["-1", "16000"], ["1e3", "16000"], ["Infinity", "16000"], ["801", "16000"], [undefined, "16000"], ["3", ""], ["3", "NaN"], ["3", "16k"], ["3", "1.5"], ["3", "0"], ["3", "999999"]]) {
     assert.throws(() => parseLimits(rub, tokens), /--max-(rub|tokens)/, `${rub} / ${tokens}`);
   }
 }

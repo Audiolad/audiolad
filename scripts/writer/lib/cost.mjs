@@ -2,9 +2,22 @@
 export const TARIFF = {
   "openai/gpt-oss-120b": { inputPer1M: 15.86, outputPer1M: 61 },
   "Qwen/Qwen3.6-35B-A3B": { inputPer1M: 219.6, outputPer1M: 329.4 },
+  // Stronger models for the sz model trial (c62ac1d5), prices from GET /v1/models metadata, 2026-10-24.
+  "anthropic/claude-opus-4.8": { inputPer1M: 854, outputPer1M: 4270 },
+  "openai/gpt-5.5": { inputPer1M: 854, outputPer1M: 5124 },
+  "google/gemini-3.1-pro-preview": { inputPer1M: 341.6, outputPer1M: 2049.6 },
+  "deepseek-ai/DeepSeek-V4-Pro": { inputPer1M: 183, outputPer1M: 732 },
 };
 
 export const DEFAULT_MODEL = "openai/gpt-oss-120b";
+// --site sz default: winner of the pack-07 model trial (c62ac1d5): 0 gate errors on 5/5, ≈300 ₽ per pack.
+export const SZ_DEFAULT_MODEL = "openai/gpt-5.5";
+
+/** Model for a run: an explicit --model wins, otherwise the site default. */
+export function defaultModelFor(site, explicit) {
+  if (explicit) return explicit;
+  return site === "sz" ? SZ_DEFAULT_MODEL : DEFAULT_MODEL;
+}
 export const SUPPORTED_MODELS = Object.keys(TARIFF);
 
 export function costRub(model, promptTokens, completionTokens) {
@@ -20,10 +33,17 @@ export function worstCaseRub(model, estimatedPromptTokens, maxTokens) {
   return costRub(model, estimatedPromptTokens, maxTokens);
 }
 
-/** Rough upper estimate of prompt tokens for Russian text (≈2.2 chars per token). */
-export function estimatePromptTokens(messages) {
+/**
+ * Rough upper estimate of prompt tokens for Russian text: ≈2.2 chars per token for o200k-like
+ * tokenizers; Claude's tokenizer splits Russian much finer (smoke 2026-10-24: 406 vs 170 tokens), ≈1.3.
+ */
+export function charsPerToken(model = "") {
+  return String(model).startsWith("anthropic/") ? 1.3 : 2.2;
+}
+
+export function estimatePromptTokens(messages, model) {
   const chars = messages.reduce((sum, message) => sum + String(message.content).length, 0);
-  return Math.ceil(chars / 2.2) + 200;
+  return Math.ceil(chars / charsPerToken(model)) + 200;
 }
 
 export function formatRub(value) {
@@ -34,7 +54,7 @@ export function formatRub(value) {
  * Strict parsing of --max-rub / --max-tokens. Anything that is not a plain positive number
  * (empty, NaN, "3р", "1e9", Infinity) is refused: a NaN limit would silently disable the budget.
  */
-export const MAX_RUB_CEILING = 30;
+export const MAX_RUB_CEILING = 800;
 export const MAX_TOKENS_CEILING = 32000;
 
 /** Rouble limit: a positive finite number ≤ MAX_RUB_CEILING (CLI string like «3» or «2,5», or a JSON number). */
