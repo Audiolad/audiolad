@@ -2116,3 +2116,11 @@ No legal versions are seeded: submit/opt-in fail with
 Verification and opt-in do not create Rights Grants or change track eligibility.
 Full schema/RPC lifecycle, RLS, backup and manual rollback:
 [business/rightsholder-onboarding-8d9cd0af.md](business/rightsholder-onboarding-8d9cd0af.md).
+
+## Подготовлено в задаче 09d393ce: история признаков анализатора
+
+Миграция `20270123120000_music_analyzer_feature_overrides.sql` добавляет только `music_analyzer_feature_overrides`. На production в этой сессии не применялась; перед deploy требуется отдельное OK владельца. Проверена в PostgreSQL 17.11 single-user на временной схеме с минимальными FK-заглушками; это не проверка всей истории миграций.
+
+Поля: identity `id`, FK `run_id` на неизменяемый прогон, FK `created_by` на пользователя, `created_at`, `schema_version`, `reason`, JSON `patch` ≤16 KiB. Индекс `(run_id,id)` задаёт порядок истории. RLS включён; anon/authenticated не имеют прав; service_role имеет SELECT/INSERT и доступ к sequence, без UPDATE/DELETE. Owner/admin проверяет API. Политики, таблицы и данные существующих паспортов не меняются. null в patch возвращает автоматическое значение выбранного признака; история сохраняется.
+
+Автоматические признаки версии `audiolad-features:1` добавляются в существующий `music_analyzer_runs.normalized_json.analysis_features_v1` при новых прогонах. Ранее сохранённые raw/normalized не пересчитываются. Старые поля и масштаб энергии 0–1 сохранены. Расширенный блок не дублируется в `structured_fields` с лимитом 20 000 байт; доступен через существующий `analyzer_run_id`. Поправки не меняют sealed паспорт, альбом и описание. Подробности: `docs/music-analyzer/INVENTORY-09d393ce.md`, `EVAL-09d393ce.md`.

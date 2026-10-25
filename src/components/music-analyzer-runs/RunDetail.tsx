@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { MusicPassport } from "@/components/music-passport/MusicPassport";
 import type { MusicAnalyzerRunClient } from "@/lib/music-analyzer-runs/contract";
 import { readMusicAnalyzerPassport } from "@/lib/music-analyzer-runs/passport";
+import { FeatureControls } from "./FeatureControls";
+import { publicMusicAnalyzerFeatures, type FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
 
 const ERRORS: Record<string, string> = {
   analyzer_commit_mismatch: "Чекаут анализатора не совпал с зафиксированным коммитом.",
@@ -34,6 +36,8 @@ export function RunDetail({
   siblings: MusicAnalyzerRunClient[];
 }) {
   const [run, setRun] = useState(initial);
+  const [effective, setEffective] = useState<FeatureSet | null>(null);
+  const updateFeatures = useCallback((features: FeatureSet) => setEffective(features), []);
   useEffect(() => {
     if (run.status === "succeeded" || run.status === "failed") return undefined;
     const timer = setInterval(() => {
@@ -57,6 +61,8 @@ export function RunDetail({
     taxonomyVersion: run.taxonomyVersion,
     promptVersion: run.promptVersion,
   });
+  const hasFeatures = Boolean(passport.features);
+  if (effective) passport.features = publicMusicAnalyzerFeatures(effective);
 
   const notice = run.status === "failed"
     ? {
@@ -100,6 +106,9 @@ export function RunDetail({
         developerJson={run.status === "succeeded" ? run.normalizedJson : null}
         notice={notice}
       />
+      {run.status === "succeeded" ? (
+        <FeatureControls runId={run.id} hasFeatures={hasFeatures} onChange={updateFeatures} />
+      ) : null}
       {run.status === "succeeded" ? (
         <div className="flex flex-wrap gap-4 text-sm font-medium text-[#7042c5]">
           <a href={`/api/music-analyzer/runs/${run.id}/export?format=json`}>JSON</a>

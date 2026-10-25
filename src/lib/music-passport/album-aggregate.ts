@@ -468,7 +468,7 @@ export function attributesFromStructuredFacts(
       const label = item.label.trim();
       if (!SLUG.test(label) || seen.has(label)) continue;
       seen.add(label);
-      const confidence = item.score != null && item.score >= 0 && item.score <= 1
+      const confidence = !facts.analysisFeatures && item.score != null && item.score >= 0 && item.score <= 1
         ? item.score
         : null;
       out.push({
