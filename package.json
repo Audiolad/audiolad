@@ -79,7 +79,7 @@
     "test:ecompany-catalog-stats": "npx tsx scripts/ecompany-catalog-stats-unit.mts",
     "test:music-lab": "npx tsx scripts/music-lab-unit.mts",
     "test:music-analyzer-runs": "npx tsx scripts/music-analyzer-runs-unit.mts && npx tsx scripts/music-passport-ui-unit.tsx",
-    "test:music-analyzer-features": "node scripts/music-analyzer-features-unit.mjs && npx tsx scripts/music-analyzer-passport-compat-unit.mts",
+    "test:music-analyzer-features": "node scripts/music-analyzer-features-unit.mjs && npx tsx scripts/music-analyzer-passport-compat-unit.mts && npx tsx scripts/music-analyzer-withheld-legacy-unit.mts",
     "test:music-analyzer-migration:isolated": "python3 scripts/music-analyzer-migration-isolated.py",
     "test:studio-author-provisioning": "node scripts/studio-author-provisioning-unit.mjs",
     "test:playlists-stage1": "npx tsx scripts/playlists-stage1-validation-smoke.mjs",

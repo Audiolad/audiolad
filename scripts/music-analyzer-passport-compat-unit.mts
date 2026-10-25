@@ -93,10 +93,10 @@ const allWithheld = { genres: withheldInput.genres.slice(0, 2), styles: withheld
 const emptyFacts = readMusicAnalyzerStructuredFacts({ ...allWithheld, analysis_features_v1: buildFeatures(allWithheld) });
 assert.deepEqual(emptyFacts.genres, []);
 assert.deepEqual(emptyFacts.styles, []);
-// Existing passports without feature metadata keep their historical structured fields.
+// Legacy passports apply the same withholding rule without feature metadata.
 const oldStored = storedFactsFromStructured(readMusicAnalyzerStructuredFacts(withheldInput));
-assert.equal(oldStored.genres.length, 3);
-assert.equal(oldStored.styles.length, 3);
+assert.equal(oldStored.genres.length, 1);
+assert.equal(oldStored.styles.length, 1);
 assert.deepEqual(parseStoredStructuredFacts(oldStored), oldStored);
 
 assert.equal(collectAnalyzerDocuments({ "track.json": { analysis: { analyzer_version: "music-analyzer-0.1", taxonomy_version: "0.1" } } }).hints.analyzerVersion, "music-analyzer-0.1");

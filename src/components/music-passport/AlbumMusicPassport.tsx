@@ -1,3 +1,4 @@
+import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 import { formatDisplayedBpm } from "@/lib/music-analyzer-runs/passport-display";
 import type { AlbumBpmDisplay, AlbumPassportDisplay } from "@/lib/music-passport/album-passport-display";
 
@@ -15,6 +16,7 @@ function bpmHeadline(bpm: AlbumBpmDisplay | null): string | null {
 }
 
 function LabelCard({ title, labels }: { title: string; labels: string[] }) {
+  labels = labels.filter((label) => !isWithheldTag({ label }));
   return (
     <section className={CARD}>
       <h3 className={TITLE}>{title}</h3>
@@ -38,6 +40,10 @@ function ambiguityText(field: string, value: string): string {
 
 export function AlbumMusicPassport({ album }: { album: AlbumPassportDisplay }) {
   const tempo = bpmHeadline(album.bpm);
+  const ambiguity = album.ambiguity.map((item) => ({
+    ...item,
+    values: item.values.filter((label) => !isWithheldTag({ label })),
+  })).filter((item) => item.values.length > 0);
   return (
     <section
       className="space-y-4"
@@ -69,11 +75,11 @@ export function AlbumMusicPassport({ album }: { album: AlbumPassportDisplay }) {
       </div>
       <LabelCard title="Характер и настроение" labels={album.moods} />
       <LabelCard title="Инструменты" labels={album.instruments} />
-      {album.ambiguity.length > 0 ? (
+      {ambiguity.length > 0 ? (
         <section className={CARD} data-album-ambiguity="true">
           <h3 className={TITLE}>Расхождения между треками</h3>
           <ul className="mt-3 space-y-2 text-sm text-[#25135c]">
-            {album.ambiguity.map((item) => (
+            {ambiguity.map((item) => (
               <li key={item.field}>
                 {item.field}: {item.values.map((value) => ambiguityText(item.field, value)).join(", ")}
               </li>
