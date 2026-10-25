@@ -150,6 +150,27 @@ test("Стенд проверяет SHA и происхождение рефер
     assert.equal(report.compared, 1); assert.equal(report.totals.before.genre.error, 1);
     assert.equal(report.totals.after.genre.abstained, 1); assert.equal(report.totals.after.genre.match, 0);
     assert.equal(report.results[0].measured_audio, false);
+    // Реальный экспорт БД использует normalized_json. Owner statement задаёт
+    // отдельные ограничения, а не полную слушательскую разметку жанров.
+    const normalized = { genres: [{ label: "New Age" }, { label: "Ambient" }],
+      styles: [{ label: "Dark Jazz" }, { label: "Relaxation Music", research_only: true }],
+      technical: { bpm: null, diagnostics: { pulse_accepted: false, bpm_candidate: 70, bpm_candidate_raw: 140 } },
+      vocal: { type: "mixed" } };
+    await writeFile(join(dir, "before.json"), JSON.stringify({ sha256, normalized_json: normalized }));
+    track.reference = {};
+    track.reference_evidence = { type: "owner_statement", required_labels: ["Ambient"], excluded_labels: ["Dark Jazz"] };
+    await writeFile(join(dir, "manifest.json"), JSON.stringify({ tracks: [track] }));
+    const realShape = (await evaluate(join(dir, "manifest.json"), join(dir, "out"))).results[0];
+    assert.deepEqual(realShape.before.prediction.genre, ["new age", "ambient"]);
+    assert.equal(realShape.before.prediction.vocal, "mixed");
+    assert.equal(realShape.before.prediction.rhythm, "uncertain");
+    assert.equal(realShape.after.features.features.tempo.value.raw_bpm, 140);
+    assert.equal(realShape.before.owner_statement.excluded[0].asserted, true);
+    assert.equal(realShape.after.owner_statement.excluded[0].asserted, false);
+    assert.equal(realShape.after.owner_statement.required[0].present, true);
+    assert.equal(realShape.after.errors.genre.status, "unlabelled");
+    assert.equal(realShape.ml_model_rerun, false);
+    assert.equal(realShape.comparison_mode, "same_before_run_new_adapter");
     const snapshot = { ...track, sha256: "0".repeat(64) };
     await writeFile(join(dir, "manifest.json"), JSON.stringify({ tracks: [snapshot] }));
     await assert.rejects(evaluate(join(dir, "manifest.json"), join(dir, "out")), /SHA256/);

@@ -1,0 +1,633 @@
+{
+  "schema_version": "music-eval-summary:1",
+  "date": "2026-10-25",
+  "scope": "Два разрешённых трека, без пересчёта каталога",
+  "ml_model_rerun": false,
+  "method": "Новый адаптер того же before-run и локальный DSP реального аудио; слушательская панель не проводилась",
+  "permission": "owner approval 24.10.2026 (Sergey)",
+  "tracks": [
+    {
+      "id": "aurafon-quiet-harmony",
+      "sha256": "adda7e8735f90686ed52516cd979b875ba7f955d15aee8faf412d018e20c291c",
+      "comparison_mode": "same_before_run_new_adapter",
+      "measured_audio": true,
+      "reference_evidence": {
+        "type": "owner_statement",
+        "statement": "Ambient, NOT Dark Jazz",
+        "required_labels": [
+          "Ambient"
+        ],
+        "excluded_labels": [
+          "Dark Jazz"
+        ],
+        "verified_listening_panel": false
+      },
+      "local_measurements": {
+        "duration_s": 241.72775,
+        "rms_dbfs": -10.57976032469941,
+        "sample_peak_dbfs": 1.9894109009932512,
+        "dynamic_spread_db": 9.457994562062424,
+        "onset_density": 0.4426467379107281,
+        "rhythm_salience": 0.3896709554209802,
+        "energy_0_100": 68,
+        "algorithm_version": "audiolad-dsp:1",
+        "loudness_lufs": -10.5,
+        "true_peak_dbtp": 0.8,
+        "loudness_range_lu": 6,
+        "ffmpeg_version": "7.0.2-static"
+      },
+      "title": "Aurafon – Тихая гармония",
+      "album": "Расслабляющая музыка для СПА",
+      "versions": {
+        "analyzer_version": "snapshot:932c4ce",
+        "analyzer_git_commit": "932c4ce8325c537668195afce0a56fa68d40a08c",
+        "analyzer_content_commit": "3750f3b4f9b2736ed7fc72021fbf0c1294fca71e",
+        "taxonomy_version": null,
+        "prompt_version": null,
+        "model_checkpoint": "music_audioset_epoch_15_esc_90.14.pt"
+      },
+      "feature_schema": "audiolad-features:1",
+      "calibration_version": "conservative:1",
+      "before": {
+        "prediction": {
+          "genre": [
+            "new age",
+            "jazz",
+            "ambient"
+          ],
+          "subgenre": [
+            "new age",
+            "dark jazz",
+            "relaxation music"
+          ],
+          "rhythm": "uncertain",
+          "tempo_bpm": null,
+          "vocal": "mixed",
+          "instruments": [
+            "strings",
+            "double bass",
+            "saxophone",
+            "woodwinds",
+            "harp",
+            "synth pad",
+            "organ",
+            "flute",
+            "cello",
+            "bass guitar"
+          ],
+          "energy": null,
+          "mood": [
+            "warm",
+            "melancholic",
+            "romantic",
+            "meditative",
+            "relaxing"
+          ]
+        },
+        "technical": {
+          "duration_seconds": 241.727664,
+          "lufs": -10.500565,
+          "true_peak_dbtp": 0.750042,
+          "rms_db": -13.55848,
+          "dynamics_db": 13.071077,
+          "bpm": null,
+          "bpm_confidence": "low"
+        },
+        "tempo_diagnostics": {
+          "bpm_candidate": 59.840426,
+          "pulse_accepted": false,
+          "bpm_candidate_raw": 119.680851,
+          "tempo_octave_factor": 0.5,
+          "tempo_octave_score_raw": 0.764348,
+          "tempo_octave_half_ratio": 0.92,
+          "tempo_octave_score_half": 0.80471,
+          "tempo_octave_double_ratio": 1.15,
+          "tempo_octave_score_double": null
+        },
+        "vocal_decision": "top two of instrumental/vocal/mixed differ by 0.0079, within tie_margin 0.0200; type set to mixed",
+        "owner_statement": {
+          "type": "owner_statement",
+          "verified_listening_panel": false,
+          "required": [
+            {
+              "label": "Ambient",
+              "present": true
+            }
+          ],
+          "excluded": [
+            {
+              "label": "Dark Jazz",
+              "asserted": true
+            }
+          ]
+        }
+      },
+      "after": {
+        "prediction": {
+          "genre": [
+            "new age",
+            "jazz",
+            "ambient"
+          ],
+          "subgenre": [
+            "new age"
+          ],
+          "rhythm": "uncertain",
+          "tempo_bpm": null,
+          "vocal": "mixed",
+          "instruments": [
+            "strings",
+            "double bass",
+            "saxophone",
+            "woodwinds",
+            "harp",
+            "synth pad",
+            "organ",
+            "flute",
+            "cello",
+            "bass guitar"
+          ],
+          "energy": 68,
+          "mood": [
+            "warm",
+            "melancholic",
+            "romantic",
+            "meditative",
+            "relaxing"
+          ]
+        },
+        "features": {
+          "loudness_lufs": {
+            "value": -10.5,
+            "confidence": null,
+            "source": "ffmpeg:ebur128",
+            "model_version": "7.0.2-static",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "true_peak_dbtp": {
+            "value": 0.750042,
+            "confidence": null,
+            "source": "analyzer:technical.true_peak_dbtp",
+            "model_version": "music-analyzer-0.1",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "loudness_range_lu": {
+            "value": 6,
+            "confidence": null,
+            "source": "ffmpeg:ebur128",
+            "model_version": "7.0.2-static",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "dynamics_db": {
+            "value": 13.071077,
+            "confidence": null,
+            "source": "analyzer:technical.dynamics_db",
+            "model_version": "music-analyzer-0.1",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "energy_0_100": {
+            "value": 68,
+            "confidence": null,
+            "source": "local:rms-onsets",
+            "model_version": "audiolad-dsp:1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "rhythm_state": {
+            "value": "uncertain",
+            "confidence": null,
+            "source": "local:envelope-autocorrelation",
+            "model_version": "audiolad-dsp:1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "tempo": {
+            "value": {
+              "bpm": null,
+              "candidate_bpm": 59.840426,
+              "raw_bpm": 119.680851,
+              "alternatives_bpm": [
+                29.920213,
+                59.840426,
+                119.680852
+              ],
+              "octave_factor": 0.5,
+              "rhythm": "uncertain",
+              "confidence_label": "low",
+              "octave_scores": {
+                "half": 0.80471,
+                "raw": 0.764348,
+                "double": null
+              }
+            },
+            "confidence": null,
+            "source": "analyzer:normalized",
+            "model_version": "music-analyzer-0.1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "perceived_speed": {
+            "value": null,
+            "confidence": null,
+            "source": "local:onset-density",
+            "model_version": "audiolad-dsp:1",
+            "origin": "interpreted",
+            "status": "unknown"
+          },
+          "speech": {
+            "value": {
+              "score": 0.134156,
+              "primary_type": "mixed",
+              "speech_leads": false,
+              "ambiguous": false
+            },
+            "confidence": null,
+            "source": "analyzer:vocal.scores.spoken_word",
+            "model_version": "music-analyzer-0.1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "subgenre": {
+            "value": [
+              {
+                "label": "New Age",
+                "score": 0.446066,
+                "segment_consistency": 0.750097,
+                "research_only": false,
+                "confidence": null,
+                "source": "analyzer:normalized.subgenre",
+                "model_version": "music-analyzer-0.1",
+                "status": "candidate"
+              },
+              {
+                "label": "Dark Jazz",
+                "score": 0.400336,
+                "segment_consistency": 0.057675,
+                "research_only": false,
+                "confidence": null,
+                "source": "analyzer:normalized.subgenre",
+                "model_version": "music-analyzer-0.1",
+                "status": "withheld"
+              },
+              {
+                "label": "Relaxation Music",
+                "score": 0.389272,
+                "segment_consistency": 0.524917,
+                "research_only": true,
+                "confidence": null,
+                "source": "analyzer:normalized.subgenre",
+                "model_version": "music-analyzer-0.1",
+                "status": "withheld"
+              }
+            ],
+            "confidence": null,
+            "source": "analyzer:normalized",
+            "model_version": "music-analyzer-0.1",
+            "origin": "interpreted",
+            "status": "candidate"
+          }
+        },
+        "owner_statement": {
+          "type": "owner_statement",
+          "verified_listening_panel": false,
+          "required": [
+            {
+              "label": "Ambient",
+              "present": true
+            }
+          ],
+          "excluded": [
+            {
+              "label": "Dark Jazz",
+              "asserted": false
+            }
+          ]
+        }
+      },
+      "reference_status": {
+        "genre": {
+          "status": "unlabelled"
+        },
+        "subgenre": {
+          "status": "unlabelled"
+        },
+        "rhythm": {
+          "status": "unlabelled"
+        },
+        "tempo_bpm": {
+          "status": "unlabelled"
+        },
+        "vocal": {
+          "status": "unlabelled"
+        },
+        "instruments": {
+          "status": "unlabelled"
+        },
+        "energy": {
+          "status": "unlabelled"
+        },
+        "mood": {
+          "status": "unlabelled"
+        }
+      }
+    },
+    {
+      "id": "jazz-relax",
+      "sha256": "d7dcece23bcbd07d2c845e8eaca1b0082b802d3352e7a7b44ecdcf502511f533",
+      "comparison_mode": "same_before_run_new_adapter",
+      "measured_audio": true,
+      "reference_evidence": {
+        "type": "unlabelled",
+        "verified_listening_panel": false
+      },
+      "local_measurements": {
+        "duration_s": 182.606625,
+        "rms_dbfs": -7.08619170699789,
+        "sample_peak_dbfs": 2.2968607283098095,
+        "dynamic_spread_db": 5.256698667336046,
+        "onset_density": 2.2835973229339297,
+        "rhythm_salience": 0.37067410667819534,
+        "energy_0_100": 82,
+        "algorithm_version": "audiolad-dsp:1",
+        "loudness_lufs": -8,
+        "true_peak_dbtp": 0.3,
+        "loudness_range_lu": 1.9,
+        "ffmpeg_version": "7.0.2-static"
+      },
+      "title": "Jazz Relax – Кофе на площади Сан-Марко",
+      "album": "Итальянский джаз",
+      "versions": {
+        "analyzer_version": "snapshot:932c4ce",
+        "analyzer_git_commit": "932c4ce8325c537668195afce0a56fa68d40a08c",
+        "analyzer_content_commit": "3750f3b4f9b2736ed7fc72021fbf0c1294fca71e",
+        "taxonomy_version": null,
+        "prompt_version": null,
+        "model_checkpoint": "music_audioset_epoch_15_esc_90.14.pt"
+      },
+      "feature_schema": "audiolad-features:1",
+      "calibration_version": "conservative:1",
+      "before": {
+        "prediction": {
+          "genre": [
+            "new age",
+            "jazz",
+            "ambient"
+          ],
+          "subgenre": [
+            "lounge jazz",
+            "contemporary jazz",
+            "smooth jazz"
+          ],
+          "rhythm": "uncertain",
+          "tempo_bpm": null,
+          "vocal": "instrumental",
+          "instruments": [
+            "organ",
+            "brushes",
+            "strings",
+            "flute",
+            "electric piano",
+            "harp",
+            "piano",
+            "saxophone",
+            "percussion",
+            "grand piano"
+          ],
+          "energy": null,
+          "mood": [
+            "dreamy",
+            "warm",
+            "happy",
+            "melancholic",
+            "relaxing"
+          ]
+        },
+        "technical": {
+          "duration_seconds": 182.606576,
+          "lufs": -8.084578,
+          "true_peak_dbtp": 0.331735,
+          "rms_db": -10.059029,
+          "dynamics_db": 7.122341,
+          "bpm": null,
+          "bpm_confidence": "low"
+        },
+        "tempo_diagnostics": {
+          "bpm_candidate": 80.357143,
+          "pulse_accepted": false,
+          "bpm_candidate_raw": 160.714286,
+          "tempo_octave_factor": 0.5,
+          "tempo_octave_score_raw": 0.877324,
+          "tempo_octave_half_ratio": 0.92,
+          "tempo_octave_score_half": 0.863856,
+          "tempo_octave_double_ratio": 1.15,
+          "tempo_octave_score_double": null
+        },
+        "vocal_decision": "highest average among instrumental, vocal, mixed is instrumental (gap to second 0.0209, tie_margin 0.0200)",
+        "owner_statement": null
+      },
+      "after": {
+        "prediction": {
+          "genre": [
+            "new age",
+            "jazz",
+            "ambient"
+          ],
+          "subgenre": [
+            "lounge jazz",
+            "contemporary jazz",
+            "smooth jazz"
+          ],
+          "rhythm": "uncertain",
+          "tempo_bpm": null,
+          "vocal": "instrumental",
+          "instruments": [
+            "organ",
+            "brushes",
+            "strings",
+            "flute",
+            "electric piano",
+            "harp",
+            "piano",
+            "saxophone",
+            "percussion",
+            "grand piano"
+          ],
+          "energy": 82,
+          "mood": [
+            "dreamy",
+            "warm",
+            "happy",
+            "melancholic",
+            "relaxing"
+          ]
+        },
+        "features": {
+          "loudness_lufs": {
+            "value": -8,
+            "confidence": null,
+            "source": "ffmpeg:ebur128",
+            "model_version": "7.0.2-static",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "true_peak_dbtp": {
+            "value": 0.331735,
+            "confidence": null,
+            "source": "analyzer:technical.true_peak_dbtp",
+            "model_version": "music-analyzer-0.1",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "loudness_range_lu": {
+            "value": 1.9,
+            "confidence": null,
+            "source": "ffmpeg:ebur128",
+            "model_version": "7.0.2-static",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "dynamics_db": {
+            "value": 7.122341,
+            "confidence": null,
+            "source": "analyzer:technical.dynamics_db",
+            "model_version": "music-analyzer-0.1",
+            "origin": "measured",
+            "status": "measured"
+          },
+          "energy_0_100": {
+            "value": 82,
+            "confidence": null,
+            "source": "local:rms-onsets",
+            "model_version": "audiolad-dsp:1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "rhythm_state": {
+            "value": "uncertain",
+            "confidence": null,
+            "source": "local:envelope-autocorrelation",
+            "model_version": "audiolad-dsp:1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "tempo": {
+            "value": {
+              "bpm": null,
+              "candidate_bpm": 80.357143,
+              "raw_bpm": 160.714286,
+              "alternatives_bpm": [
+                40.1785715,
+                80.357143,
+                160.714286
+              ],
+              "octave_factor": 0.5,
+              "rhythm": "uncertain",
+              "confidence_label": "low",
+              "octave_scores": {
+                "half": 0.863856,
+                "raw": 0.877324,
+                "double": null
+              }
+            },
+            "confidence": null,
+            "source": "analyzer:normalized",
+            "model_version": "music-analyzer-0.1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "perceived_speed": {
+            "value": null,
+            "confidence": null,
+            "source": "local:onset-density",
+            "model_version": "audiolad-dsp:1",
+            "origin": "interpreted",
+            "status": "unknown"
+          },
+          "speech": {
+            "value": {
+              "score": 0.052751,
+              "primary_type": "instrumental",
+              "speech_leads": false,
+              "ambiguous": false
+            },
+            "confidence": null,
+            "source": "analyzer:vocal.scores.spoken_word",
+            "model_version": "music-analyzer-0.1",
+            "origin": "interpreted",
+            "status": "candidate"
+          },
+          "subgenre": {
+            "value": [
+              {
+                "label": "Lounge Jazz",
+                "score": 0.450659,
+                "segment_consistency": 0.589821,
+                "research_only": false,
+                "confidence": null,
+                "source": "analyzer:normalized.subgenre",
+                "model_version": "music-analyzer-0.1",
+                "status": "candidate"
+              },
+              {
+                "label": "Contemporary Jazz",
+                "score": 0.421737,
+                "segment_consistency": 0.293016,
+                "research_only": false,
+                "confidence": null,
+                "source": "analyzer:normalized.subgenre",
+                "model_version": "music-analyzer-0.1",
+                "status": "candidate"
+              },
+              {
+                "label": "Smooth Jazz",
+                "score": 0.404777,
+                "segment_consistency": 0.688155,
+                "research_only": false,
+                "confidence": null,
+                "source": "analyzer:normalized.subgenre",
+                "model_version": "music-analyzer-0.1",
+                "status": "candidate"
+              }
+            ],
+            "confidence": null,
+            "source": "analyzer:normalized",
+            "model_version": "music-analyzer-0.1",
+            "origin": "interpreted",
+            "status": "candidate"
+          }
+        },
+        "owner_statement": null
+      },
+      "reference_status": {
+        "genre": {
+          "status": "unlabelled"
+        },
+        "subgenre": {
+          "status": "unlabelled"
+        },
+        "rhythm": {
+          "status": "unlabelled"
+        },
+        "tempo_bpm": {
+          "status": "unlabelled"
+        },
+        "vocal": {
+          "status": "unlabelled"
+        },
+        "instruments": {
+          "status": "unlabelled"
+        },
+        "energy": {
+          "status": "unlabelled"
+        },
+        "mood": {
+          "status": "unlabelled"
+        }
+      }
+    }
+  ]
+}

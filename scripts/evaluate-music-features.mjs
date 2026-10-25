@@ -20,6 +20,21 @@ export function predictions(normalized, features = null) {
     instruments: tag("instruments"), energy: f.energy_0_100?.value ?? null, mood: tag("mood") };
 }
 
+// Экспорт строки БД, экспорт лаборатории и самостоятельный normalized-документ.
+function normalizedDocument(document) {
+  return record(document.normalized_json ?? document.normalized ?? document);
+}
+
+function ownerStatementComparison(evidence, prediction) {
+  if (evidence?.type !== "owner_statement") return null;
+  const actual = [...prediction.genre, ...prediction.subgenre];
+  return {
+    type: "owner_statement", verified_listening_panel: false,
+    required: (evidence.required_labels ?? []).map(label => ({ label, present: actual.includes(label.toLowerCase()) })),
+    excluded: (evidence.excluded_labels ?? []).map(label => ({ label, asserted: actual.includes(label.toLowerCase()) })),
+  };
+}
+
 /** Референс null не участвует в знаменателе; abstention не записывается как успех. */
 export function compareReference(reference, predicted) {
   return Object.fromEntries(FIELDS.map(key => {
@@ -62,17 +77,24 @@ export async function evaluate(manifestPath, outputDir, { ids = [], measure = fa
     if (!track.audio) { results.push({ id: track.id, status: "pending_audio_identity", measured_audio: false }); continue; }
     const bytes = await readFile(resolve(root, track.audio));
     if (createHash("sha256").update(bytes).digest("hex") !== track.sha256) throw new Error(`SHA256 не совпадает: ${track.id}`);
-    const beforeDoc = await readJson(track.before), before = record(beforeDoc.normalized ?? beforeDoc);
+    const beforeDoc = await readJson(track.before), before = normalizedDocument(beforeDoc);
     if (beforeDoc.sha256 !== track.sha256) throw new Error(`Исходный паспорт не связан с аудио: ${track.id}`);
     const afterDoc = track.after ? await readJson(track.after) : null;
     if (afterDoc && afterDoc.sha256 !== track.sha256) throw new Error(`Новый паспорт не связан с аудио: ${track.id}`);
-    const after = afterDoc ? record(afterDoc.normalized ?? afterDoc) : before;
+    const after = afterDoc ? normalizedDocument(afterDoc) : before;
     const local = measure ? await measureLocalAudio(resolve(root, track.audio)) : {};
     const featureSet = measure ? buildFeatures(after, local) : readFeatures(after) ?? buildFeatures(after);
     const oldPrediction = predictions(before), newPrediction = predictions(after, featureSet);
+    const reference = track.reference ?? {};
     results.push({ id: track.id, status: "compared", measured_audio: measure, sha256: track.sha256,
-      before: { prediction: oldPrediction, errors: compareReference(track.reference, oldPrediction) },
-      after: { prediction: newPrediction, errors: compareReference(track.reference, newPrediction), features: featureSet } });
+      comparison_mode: afterDoc ? "provided_after_export" : "same_before_run_new_adapter",
+      ml_model_rerun: false, // Стенд не запускает ML; внешний after требует собственного provenance.
+      reference_evidence: track.reference_evidence ?? { type: "unlabelled" },
+      local_measurements: measure ? local : null,
+      before: { prediction: oldPrediction, errors: compareReference(reference, oldPrediction),
+        owner_statement: ownerStatementComparison(track.reference_evidence, oldPrediction) },
+      after: { prediction: newPrediction, errors: compareReference(reference, newPrediction), features: featureSet,
+        owner_statement: ownerStatementComparison(track.reference_evidence, newPrediction) } });
   }
   const totals = Object.fromEntries(["before", "after"].map(stage => [stage, Object.fromEntries(FIELDS.map(key => {
     const statuses = results.filter(r => r.status === "compared").map(r => r[stage].errors[key].status);

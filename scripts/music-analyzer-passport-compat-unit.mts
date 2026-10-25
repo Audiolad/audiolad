@@ -26,7 +26,7 @@ assert.equal(attributes.find(a => a.attribute_key === "mood")?.confidence, null)
 assert.equal(attributesFromStructuredFacts(readMusicAnalyzerStructuredFacts(legacy), "old").find(a => a.attribute_key === "mood")?.origin, "measured");
 assert.ok(Buffer.byteLength(JSON.stringify(storedFactsFromStructured(facts))) < 20000);
 assert.equal(collectAnalyzerDocuments({ "track.json": { analysis: { analyzer_version: "music-analyzer-0.1", taxonomy_version: "0.1" } } }).hints.analyzerVersion, "music-analyzer-0.1");
-const env = analyzerChildEnv({ SUPABASE_SERVICE_ROLE_KEY: "do-not-pass", MUSIC_ANALYZER_CLAP_BACKEND: "hf" }, "/test/.venv-v03-clap/bin/python", "/test/models");
+const env = analyzerChildEnv({ NODE_ENV: "test", SUPABASE_SERVICE_ROLE_KEY: "do-not-pass", MUSIC_ANALYZER_CLAP_BACKEND: "hf" }, "/test/.venv-v03-clap/bin/python", "/test/models");
 assert.equal(env.HF_HUB_OFFLINE, "1");
 assert.equal(env.TRANSFORMERS_OFFLINE, "1");
 assert.equal(env.MUSIC_ANALYZER_CHECKPOINT_DIR, "/test/models");
