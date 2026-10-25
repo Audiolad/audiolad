@@ -1,3 +1,19 @@
+# Раунд 5 — решение владельца от 25.10.2026
+
+Сергей разрешил выпуск анализатора со скрытой новой энергией. Единый экспорт `MUSIC_ANALYZER_ENERGY_PUBLIC = false` в `features.mjs` исключает `energy_0_100` из паспорта, structured facts и UI, включая effective-поправки. Расчёт и хранение в JSON прогона сохранены для будущей калибровки по слушательским меткам. Admin-поле явно обозначено как внутреннее, некалиброванное и скрытое из паспорта.
+
+Сравнение с `67bf081a` подтвердило: legacy energy 0–1, album aggregate/profile/description и guest-coffee используют прежние поля; они не изменены. Регрессия проверяет отсутствие новой энергии в паспортных props, HTML full/product (даже при передаче сырых features), materialization, альбоме и контексте описания; внутреннее значение и legacy energy сохраняются. GET/POST features API возвращают 400 `invalid_run_id` до storage для невалидного UUID; обработчики проверены с заглушками auth/storage.
+
+Рабочая копия на `b5740492` была чистой. Изучены AGENTS.md, связанные адаптеры/потребители, baseline diff и локальная документация Route Handlers Next.js. Коммит/push, обращения к удалённой БД, чтение секретов и изменения инфраструктуры не выполнялись.
+
+Изменённые файлы: `src/lib/music-analyzer-runs/{features.mjs,feature-display.mjs,passport.ts}`, `src/components/music-analyzer-runs/{RunDetail.tsx,FeatureControls.tsx}`, `src/components/music-passport/MusicPassport.tsx`, `src/app/api/music-analyzer/runs/[id]/features/route.ts`, `scripts/music-analyzer-{features-unit.mjs,passport-compat-unit.mts}`, `docs/music-analyzer/{REPORT-09d393ce.md,EVAL-09d393ce.md}`. Diff просмотрен через `git diff`.
+
+Проверки раунда 5: `node scripts/music-analyzer-features-unit.mjs` — 15/15; `node --import tsx scripts/music-analyzer-passport-compat-unit.mts` — OK (включая HTML и UUID GET/POST); `node --import tsx scripts/music-analyzer-runs-unit.mts` — OK; music-passport-ui и business-guest-passport — OK; `npm run lint` и lint всех изменённых исходников — OK; typecheck с heap 6 ГБ — OK; `git diff --check` — OK. `npm run build` с фиктивными loopback Supabase-настройками остановлен по таймауту 90 секунд на Creating an optimized production build (exit 124); успешная сборка в этом раунде не получена. Ручная браузерная проверка не выполнена: авторизованный локальный стенд без удалённой БД не подготовлен; выполнен серверный HTML-render тест.
+
+Следующий шаг: review раунда 5 и авторизованная браузерная проверка перед выпуском. Для включения энергии требуется отдельное решение после слушательской калибровки.
+
+---
+
 # Отчёт рабочей сессии – 09d393ce, раунд 2
 
 Дата: 25.10.2026. База раунда – `7405acf5`, ветка `ai-company/task-09d393ce`, существующий Draft PR #977. Перед работой полностью прочитан AGENTS.md, проверен git status: рабочая копия была чистой. Выполнение этого раунда прямо поручено владельцем. Коммит и push в этом раунде не выполнялись.

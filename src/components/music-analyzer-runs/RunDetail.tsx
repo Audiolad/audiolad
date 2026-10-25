@@ -7,7 +7,7 @@ import { MusicPassport } from "@/components/music-passport/MusicPassport";
 import type { MusicAnalyzerRunClient } from "@/lib/music-analyzer-runs/contract";
 import { readMusicAnalyzerPassport } from "@/lib/music-analyzer-runs/passport";
 import { FeatureControls } from "./FeatureControls";
-import type { FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
+import { publicMusicAnalyzerFeatures, type FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
 
 const ERRORS: Record<string, string> = {
   analyzer_commit_mismatch: "Чекаут анализатора не совпал с зафиксированным коммитом.",
@@ -62,7 +62,7 @@ export function RunDetail({
     promptVersion: run.promptVersion,
   });
   const hasFeatures = Boolean(passport.features);
-  if (effective) passport.features = effective;
+  if (effective) passport.features = publicMusicAnalyzerFeatures(effective);
 
   const notice = run.status === "failed"
     ? {

@@ -5,7 +5,7 @@
  * mood, or instruments.
  */
 
-import { isWithheldTag, readFeatures, type FeatureSet } from "./features.mjs";
+import { isWithheldTag, publicMusicAnalyzerFeatures, readFeatures, type FeatureSet } from "./features.mjs";
 
 export type PassportTone = "high" | "medium" | "low";
 
@@ -719,7 +719,7 @@ export function readMusicAnalyzerPassport(input: {
   const prompt = columnText(input.promptVersion) ?? promptHit?.text ?? null;
   return {
     bpm: bpm.fact,
-    features: readFeatures(input.normalized),
+    features: publicMusicAnalyzerFeatures(readFeatures(input.normalized)),
     bpmDisplay: bpm.display,
     key: key.fact,
     keyDisplay: key.display,
@@ -813,7 +813,7 @@ function materializedLabelFacts(value: unknown): MusicAnalyzerLabelFact[] {
 }
 
 export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnalyzerStructuredFacts {
-  const analysisFeatures = readFeatures(normalized);
+  const analysisFeatures = publicMusicAnalyzerFeatures(readFeatures(normalized));
   const nodes = collect(normalized);
   const publishedMatches = nodes.filter((node) => (
     bpmKind(node.segments) === "published" && isScalarQuantity(node.value)

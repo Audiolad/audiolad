@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { buildFeatures, readFeatures, applyOverrides, validateOverride } from "../src/lib/music-analyzer-runs/features.mjs";
+import { MUSIC_ANALYZER_ENERGY_PUBLIC, publicMusicAnalyzerFeatures, buildFeatures, readFeatures, applyOverrides, validateOverride } from "../src/lib/music-analyzer-runs/features.mjs";
 import { EnvelopeMeter, parseEbur128, measureLocalAudio } from "../src/lib/music-analyzer-runs/local-dsp.mjs";
 import { featureDisplayRows } from "../src/lib/music-analyzer-runs/feature-display.mjs";
 import { reanalysisSelection, reanalysisId } from "../src/lib/music-analyzer-runs/selective-reanalysis.mjs";
@@ -123,8 +123,11 @@ test("Выборка ограничена, дедуплицирована и п�
 
 test("UI различает оценку, измерение и неизвестное", () => {
   const rows = featureDisplayRows(buildFeatures({}, { energy_0_100: 42, rhythm_salience: 0.2, loudness_lufs: -18.3 }));
-  assert.equal(rows.find(r => r.key === "energy_0_100").value, "42 / 100");
-  assert.equal(rows.find(r => r.key === "energy_0_100").status, "оценка");
+  assert.equal(MUSIC_ANALYZER_ENERGY_PUBLIC, false);
+  assert.equal(rows.some(r => r.key === "energy_0_100"), false);
+  const internal = buildFeatures({}, { energy_0_100: 42 });
+  assert.equal(publicMusicAnalyzerFeatures(internal).features.energy_0_100, undefined);
+  assert.equal(readFeatures({ analysis_features_v1: internal }).features.energy_0_100.value, 42);
   assert.equal(rows.find(r => r.key === "vocal_role").value, "не определено");
   assert.equal(rows.find(r => r.key === "loudness_lufs").status, "измерено");
 });

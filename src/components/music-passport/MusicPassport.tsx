@@ -288,7 +288,7 @@ export function MusicPassport({
                   </div>
                 ))}
               </dl>
-              <p className="mt-3 text-xs text-[#796ba0]">Жанр, настроение, инструменты и энергия требуют проверки. Удержанные узкие жанры доступны в исходных данных. Версия признаков: {passport.features.schema_version}.</p>
+              <p className="mt-3 text-xs text-[#796ba0]">Жанр, настроение и инструменты требуют проверки. Удержанные узкие жанры доступны в исходных данных. Версия признаков: {passport.features.schema_version}.</p>
             </section>
           ) : null}
           <TagGroup title="Характер и настроение" rows={featureTags(passport.features, "mood", passport.moods)} />

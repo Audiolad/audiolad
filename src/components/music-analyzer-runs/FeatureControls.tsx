@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
 
 const FIELDS: Record<string, string> = {
-  energy_0_100: "Энергия 0–100", rhythm_salience: "Ритмическая активность 0–1",
+  energy_0_100: "Энергия 0–100 (внутренняя, не калибрована, скрыта из паспорта)", rhythm_salience: "Ритмическая активность 0–1",
   perceived_speed: "Скорость: slow / moderate / fast / unknown",
   vocal_role: "Вокал: instrumental / vocal / mixed / spoken / unknown",
   genre: "Жанры", subgenre: "Поджанры", mood: "Настроения", instruments: "Инструменты",

@@ -1,10 +1,12 @@
+import { MUSIC_ANALYZER_ENERGY_PUBLIC } from "./features.mjs";
+
 /** @param {import('./features.mjs').FeatureSet} set */
 export function featureDisplayRows(set) {
   const f = set.features;
   const labels = { energy_0_100: "Энергия", rhythm_salience: "Ритмическая активность", perceived_speed: "Воспринимаемая скорость", vocal_role: "Вокал / речь", dynamic_spread_db: "Динамические перепады", loudness_range_lu: "Диапазон громкости (LRA)", loudness_lufs: "Интегральная громкость", true_peak_dbtp: "Истинный пик" };
   /** @type {Record<string, string>} */
   const words = { instrumental: "инструментал", vocal: "вокал", mixed: "смешанный", spoken: "речь", slow: "медленно", moderate: "умеренно", fast: "быстро", unknown: "не определено" };
-  return Object.entries(labels).map(([key, label]) => {
+  return Object.entries(labels).filter(([key]) => MUSIC_ANALYZER_ENERGY_PUBLIC || key !== "energy_0_100").map(([key, label]) => {
     const existingDynamics = key === "dynamic_spread_db" && f.dynamic_spread_db?.status !== "manual" && f.dynamics_db?.value != null;
     const item = existingDynamics ? f.dynamics_db : f[key];
     const displayLabel = existingDynamics ? "Динамика (P95–P5)" : label;

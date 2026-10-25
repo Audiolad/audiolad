@@ -2,6 +2,19 @@
 export const FEATURE_VERSION = "audiolad-features:1";
 export const LOCAL_VERSION = "audiolad-dsp:1";
 
+// Sergey, 25.10.2026: hide energy until calibration against listener labels.
+export const MUSIC_ANALYZER_ENERGY_PUBLIC = false;
+
+/** Project run features for passports, album/description context and public UI.
+ * Internal run JSON and manual overrides retain the uncalibrated score.
+ * @param {FeatureSet|null} set @returns {FeatureSet|null}
+ */
+export function publicMusicAnalyzerFeatures(set) {
+  if (!set || MUSIC_ANALYZER_ENERGY_PUBLIC) return set;
+  return { ...set, features: Object.fromEntries(Object.entries(set.features)
+    .filter(([key]) => key !== "energy_0_100")) };
+}
+
 /** @typedef {{value: any, confidence: number|null, source: string, model_version: string, origin: 'measured'|'interpreted', status: 'measured'|'candidate'|'unknown'|'manual', reason: string|null}} Feature */
 /** @typedef {{schema_version: string, calibration_version: string, model_id?: string|null, features: Record<string, Feature>}} FeatureSet */
 /** @param {unknown} v */
