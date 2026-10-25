@@ -12,10 +12,20 @@ import {
 } from "../src/components/author-dashboard/product-wizard/JazzRelaxMusicPassportPanel";
 import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon";
 import {
+  CHILI_NA_VINILE_AUTHOR_ID,
+  CHILI_NA_VINILE_AUTHOR_SLUG,
+  isChiliNaVinileAuthor,
+} from "../src/lib/authors/chili-na-vinile";
+import {
   JAZZ_RELAX_AUTHOR_ID,
   JAZZ_RELAX_AUTHOR_SLUG,
   isJazzRelaxAuthor,
 } from "../src/lib/authors/jazz-relax";
+import {
+  KOFEYNIK_AUTHOR_ID,
+  KOFEYNIK_AUTHOR_SLUG,
+  isKofeynikAuthor,
+} from "../src/lib/authors/kofeynik";
 import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
 import {
   albumPassportMatchesTracks,
@@ -99,16 +109,56 @@ assert.match(
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /if \(!versionId\) \{[\s\S]*?facts: null/);
 assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Продолжить без музыкального паспорта/);
 
-// --- Music passport pilot allowlist: Jazz Relax + Aurafon (18.10.2026) -----
+// --- Music passport pilot allowlist: Jazz Relax, Aurafon, Чили на виниле, Кофейник (25.10.2026) -----
 {
-  assert.deepEqual([...MUSIC_PASSPORT_PILOT_AUTHOR_IDS], [JAZZ_RELAX_AUTHOR_ID, AURAFON_AUTHOR_ID]);
+  assert.equal(CHILI_NA_VINILE_AUTHOR_ID, "3a10c97d-cf97-4a00-8f14-76d70b02d906");
+  assert.equal(CHILI_NA_VINILE_AUTHOR_SLUG, "chili-na-vinile");
+  assert.equal(KOFEYNIK_AUTHOR_ID, "8bab9913-8e09-4918-913a-556b0f9b3998");
+  assert.equal(KOFEYNIK_AUTHOR_SLUG, "kofeynik");
+  for (const [predicate, authorId, otherAuthorId] of [
+    [isChiliNaVinileAuthor, CHILI_NA_VINILE_AUTHOR_ID, KOFEYNIK_AUTHOR_ID],
+    [isKofeynikAuthor, KOFEYNIK_AUTHOR_ID, CHILI_NA_VINILE_AUTHOR_ID],
+  ] as const) {
+    assert.equal(predicate(authorId), true);
+    assert.equal(predicate(`  ${authorId}  `), true);
+    for (const other of [
+      otherAuthorId,
+      JAZZ_RELAX_AUTHOR_ID,
+      AURAFON_AUTHOR_ID,
+      CHILI_NA_VINILE_AUTHOR_SLUG,
+      KOFEYNIK_AUTHOR_SLUG,
+      "Чили на виниле",
+      "Кофейник",
+      "",
+      "   ",
+      null,
+      undefined,
+    ]) {
+      assert.equal(predicate(other), false);
+    }
+  }
+  assert.deepEqual([...MUSIC_PASSPORT_PILOT_AUTHOR_IDS], [
+    JAZZ_RELAX_AUTHOR_ID,
+    AURAFON_AUTHOR_ID,
+    CHILI_NA_VINILE_AUTHOR_ID,
+    KOFEYNIK_AUTHOR_ID,
+  ]);
   assert.equal(isMusicPassportPilotAuthor(JAZZ_RELAX_AUTHOR_ID), true);
   assert.equal(isMusicPassportPilotAuthor(AURAFON_AUTHOR_ID), true);
   assert.equal(isMusicPassportPilotAuthor(`  ${AURAFON_AUTHOR_ID}  `), true);
+  for (const authorId of [CHILI_NA_VINILE_AUTHOR_ID, KOFEYNIK_AUTHOR_ID]) {
+    assert.equal(isMusicPassportPilotAuthor(authorId), true);
+    assert.equal(isMusicPassportPilotAuthor(`  ${authorId}  `), true);
+    assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId, productKind: "music" }));
+  }
   for (const other of [
     "11111111-1111-1111-1111-111111111111",
     "aurafon",
     "jazz-relax",
+    CHILI_NA_VINILE_AUTHOR_SLUG,
+    KOFEYNIK_AUTHOR_SLUG,
+    "Чили на виниле",
+    "Кофейник",
     "Аурафон",
     "",
     "   ",
