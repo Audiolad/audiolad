@@ -27,6 +27,11 @@ test("Старая энергия не меняется, новая шкала 0
   assert.equal(f.features.genre.value[0].confidence, null);
   assert.equal(f.features.genre.origin, "interpreted");
   assert.equal(buildFeatures({ technical: { energy: 40 } }).features.energy_0_100.value, null);
+  const old = buildFeatures({}, { energy_0_100: 68, algorithm_version: "audiolad-dsp:1" });
+  const restored = readFeatures({ analysis_features_v1: old });
+  assert.equal(restored.features.energy_0_100.value, 68);
+  assert.equal(restored.features.energy_0_100.model_version, "audiolad-dsp:1");
+  assert.equal(restored.features.energy_0_100.source, "local:rms-onsets");
 });
 
 test("Dark Jazz удерживается в жанрах и поджанрах без подмены на Ambient", () => {
@@ -66,7 +71,7 @@ test("Реальная схема freeze 932c4ce: скрытые DSP, vocal.type
   assert.equal(f.duration_s.value, 188);
   assert.equal(f.true_peak_dbtp.value, -1.1);
   assert.equal(f.dynamics_db.value, 4);
-  assert.equal(f.energy_0_100.value, 53);
+  assert.equal(f.energy_0_100.value, null); // RMS alone cannot estimate energy.
   assert.equal(f.vocal_role.value, "spoken");
   assert.equal(f.vocal_role.confidence, null);
   assert.equal(f.subgenre.value[0].status, "withheld");
@@ -84,6 +89,10 @@ test("Измерения отличают тишину, постоянный т�
   assert.equal(s.rms_dbfs, null); assert.equal(s.energy_0_100, 0); assert.equal(s.rhythm_salience, 0);
   assert.ok(Math.abs(t.rms_dbfs - -16.9897) < 0.001);
   assert.equal(t.rhythm_salience, 0); assert.ok(t.dynamic_spread_db < 0.001);
+  assert.ok(Math.abs(t.local_spectral_centroid_hz - 200) < 20);
+  assert.ok(t.spectral_flux < 0.001);
+  assert.deepEqual(tone.finish(), t); // Deterministic, repeatable finish.
+  assert.ok(p.energy_0_100 - t.energy_0_100 >= 20);
   assert.ok(p.rhythm_salience > 0.9); assert.ok(p.onset_density > 1.5);
   assert.throws(() => silence.push(NaN), /invalid_pcm/);
 });
@@ -123,10 +132,11 @@ test("Выборка ограничена, дедуплицирована и п�
 
 test("UI различает оценку, измерение и неизвестное", () => {
   const rows = featureDisplayRows(buildFeatures({}, { energy_0_100: 42, rhythm_salience: 0.2, loudness_lufs: -18.3 }));
-  assert.equal(MUSIC_ANALYZER_ENERGY_PUBLIC, false);
-  assert.equal(rows.some(r => r.key === "energy_0_100"), false);
+  assert.equal(MUSIC_ANALYZER_ENERGY_PUBLIC, true);
+  assert.match(rows.find(r => r.key === "energy_0_100").label, /предварительная оценка/);
+  assert.match(rows.find(r => r.key === "energy_0_100").reason, /калибруется/);
   const internal = buildFeatures({}, { energy_0_100: 42 });
-  assert.equal(publicMusicAnalyzerFeatures(internal).features.energy_0_100, undefined);
+  assert.equal(publicMusicAnalyzerFeatures(internal).features.energy_0_100.value, 42);
   assert.equal(readFeatures({ analysis_features_v1: internal }).features.energy_0_100.value, 42);
   assert.equal(rows.find(r => r.key === "vocal_role").value, "не определено");
   assert.equal(rows.find(r => r.key === "loudness_lufs").status, "измерено");
@@ -199,4 +209,27 @@ test("Миграция добавляет только изолированну�
     assert.match(route, /requireMusicLabApiAccess/);
     assert.match(route, /invalid_origin/);
   }
+});
+
+
+test("DSP v2: gain-invariant percussion exceeds a sustained pad, including very quiet input", () => {
+  const scores = { pad: [], clicks: [] };
+  for (const gain of [0.001, 10 ** (-6 / 20), 1, 10 ** (3 / 20)]) {
+    const pad = new EnvelopeMeter(), clicks = new EnvelopeMeter();
+    for (let i = 0; i < 8000 * 12; i++) {
+      pad.push(gain * (0.12 * Math.sin(2 * Math.PI * 220 * i / 8000) + 0.06 * Math.sin(2 * Math.PI * 330 * i / 8000)));
+      const phase = i % 4000;
+      clicks.push(gain * (phase < 800 ? 0.4 * Math.exp(-phase / 180) * Math.sin(2 * Math.PI * 120 * i / 8000) : 0));
+    }
+    for (const [name, meter] of [["pad", pad], ["clicks", clicks]]) {
+      const result = meter.finish();
+      assert.equal(result.algorithm_version, "audiolad-dsp:2");
+      scores[name].push(result.energy_0_100);
+      assert.equal(buildFeatures({ technical: { energy: 0.99, rms_db: -1 } }, result).features.energy_0_100.value, result.energy_0_100);
+      assert.equal(buildFeatures({}, { ...result, loudness_lufs: -5 }).features.energy_0_100.value,
+        buildFeatures({}, { ...result, loudness_lufs: -40 }).features.energy_0_100.value);
+    }
+  }
+  for (const values of Object.values(scores)) assert.ok(Math.max(...values) - Math.min(...values) <= 3);
+  assert.ok(Math.min(...scores.clicks) - Math.max(...scores.pad) >= 20);
 });

@@ -25,30 +25,37 @@ assert.equal(after.features?.features.tempo.value.rhythm, "uncertain");
 assert.equal(readMusicAnalyzerStructuredFacts(normalized).energy, 0.4);
 const facts = readMusicAnalyzerStructuredFacts(normalized);
 assert.equal(facts.genres.some(row => row.label === "dark_jazz"), false);
-// New energy is internal; historical 0..1 energy remains unchanged.
-assert.equal(MUSIC_ANALYZER_ENERGY_PUBLIC, false);
-assert.equal(after.features?.features.energy_0_100, undefined);
-assert.equal(facts.analysisFeatures?.features.energy_0_100, undefined);
-assert.equal(readFeatures(normalized)?.features.energy_0_100.value, 40);
+// Preliminary DSP energy is public; historical technical.energy remains unchanged.
+assert.equal(MUSIC_ANALYZER_ENERGY_PUBLIC, true);
+assert.equal(after.features?.features.energy_0_100.value, 55);
+assert.equal(facts.analysisFeatures?.features.energy_0_100.value, 55);
+assert.equal(readFeatures(normalized)?.features.energy_0_100.value, 55);
 const internalOnly = { analysis_features_v1: buildFeatures({}, { energy_0_100: 82 }) };
 const publicFacts = readMusicAnalyzerStructuredFacts(internalOnly);
 const publicPassport = readMusicAnalyzerPassport({ normalized: internalOnly });
 const publicStored = storedFactsFromStructured(publicFacts);
 const publicAlbum = buildAlbumPassportDraft({ succeeded: [{ audioItemId: "energy-track", passportId: "energy-passport", runId: "energy-run",
   analyzerVersion: "test", analyzerGitCommit: null, facts: publicStored }], failed: [] });
-for (const output of [publicPassport, publicFacts, publicStored, publicAlbum,
-  attributesFromStructuredFacts(publicFacts, "energy-test"), albumPassportSummaryLines(publicAlbum), albumPassportPromptFacts(publicAlbum)]) {
+for (const output of [publicPassport, publicFacts]) {
+  assert.match(JSON.stringify(output), /energy_0_100/);
+}
+// Album storage retains its historical 0..1 contract; DSP features do not
+// silently become a measured attribute or a calibrated recommendation signal.
+for (const output of [publicStored, publicAlbum, attributesFromStructuredFacts(publicFacts, "energy-test"),
+  albumPassportSummaryLines(publicAlbum), albumPassportPromptFacts(publicAlbum)]) {
   assert.doesNotMatch(JSON.stringify(output), /energy_0_100|82/);
 }
 for (const mode of ["full", "product"] as const) {
-  // Defense in depth: even raw features accidentally passed to UI cannot expose energy.
+  // Full and product passports both expose the preliminary label and calibration hint.
   const html = renderToStaticMarkup(createElement(MusicPassport, {
     mode, snapshot: { version: "test", commit: null }, passport: { ...publicPassport, features: internalOnly.analysis_features_v1 },
     header: { filename: "test.wav", analyzedAt: null, analyzerVersion: "test", statusLabel: "Готово", fileVersion: null },
     provenance: { sha256: null, analyzerGitCommit: null, analyzerContentCommit: null, modelCheckpoint: null,
       device: null, taxonomy: null, prompt: null },
   }));
-  assert.doesNotMatch(html, /Энергия|82|energy_0_100/);
+  assert.match(html, /Энергия — предварительная оценка/);
+  assert.match(html, /82 \/ 100/);
+  assert.match(html, /калибруется/);
 }
 assert.equal(publicFacts.energy, null);
 assert.equal(publicStored.energy, null);
