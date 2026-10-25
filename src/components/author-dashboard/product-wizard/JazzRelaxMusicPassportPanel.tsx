@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 
 import { AlbumMusicPassport } from "@/components/music-passport/AlbumMusicPassport";
 import { MusicPassport } from "@/components/music-passport/MusicPassport";
@@ -215,7 +216,13 @@ export function JazzRelaxPassportBody({
       {album ? <AlbumMusicPassport album={album} /> : null}
       {!album && status.phase === "completed" && status.summary.length > 0 ? (
         <ul className="space-y-1 text-sm text-[#5c5278]">
-          {status.summary.map((line) => (
+          {status.summary.flatMap((line) => {
+            const match = /^(Жанры|Стили|Настроение|Инструменты|Характер звука):\s*(.*)$/.exec(line);
+            if (!match) return [line];
+            const labels = match[2].split(",").map((label) => label.trim())
+              .filter((label) => !isWithheldTag({ label }));
+            return labels.length > 0 ? [`${match[1]}: ${labels.join(", ")}`] : [];
+          }).map((line) => (
             <li key={line}>{line}</li>
           ))}
         </ul>

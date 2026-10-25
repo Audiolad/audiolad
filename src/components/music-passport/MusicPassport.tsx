@@ -15,14 +15,14 @@ import type {
   PassportTone,
 } from "@/lib/music-analyzer-runs/passport";
 import { featureDisplayRows } from "@/lib/music-analyzer-runs/feature-display.mjs";
-import type { FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
+import { isWithheldTag, type FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
 
 function featureTags(set: FeatureSet | null | undefined, key: string, fallback: PassportRow[]): PassportRow[] {
-  if (!set) return fallback;
+  if (!set) return fallback.filter((row) => !isWithheldTag(row));
   const feature = set.features[key];
   if (!Array.isArray(feature?.value)) return [];
   return feature.value.flatMap((item: string | { label: string; status?: string; score?: number }) => {
-    if (typeof item !== "string" && item.status === "withheld") return [];
+    if (isWithheldTag(typeof item === "string" ? { label: item } : item)) return [];
     const label = typeof item === "string" ? item : item.label;
     if (!label) return [];
     return [{ label, score: typeof item !== "string" && typeof item.score === "number" ? String(item.score) : null,
@@ -301,7 +301,7 @@ export function MusicPassport({
               data-sound-character="fit"
             >
               <h3 className="text-sm font-medium text-[#796ba0]">Характер звучания</h3>
-              {passport.sound ? (
+              {passport.sound && !isWithheldTag(passport.sound) ? (
                 <ul className="mt-3 flex flex-wrap gap-2">
                   <Tag row={passport.sound} />
                 </ul>

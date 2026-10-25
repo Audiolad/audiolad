@@ -220,7 +220,9 @@ function readLabel(record: Record<string, unknown>): string | null {
 }
 
 function parseRow(value: unknown): PassportRow | null {
+  if (isWithheldTag(value)) return null;
   if (typeof value === "string" && value.trim()) {
+    if (isWithheldTag({ label: value })) return null;
     return {
       label: value.trim().slice(0, 200),
       score: null,
@@ -233,7 +235,7 @@ function parseRow(value: unknown): PassportRow | null {
   }
   if (!isRecord(value)) return null;
   const label = readLabel(value);
-  if (!label) return null;
+  if (!label || isWithheldTag({ ...value, label })) return null;
   const band = readBand(value.band ?? value.tier ?? value.level ?? value.confidence_band);
   return {
     label,
@@ -247,6 +249,7 @@ function parseRow(value: unknown): PassportRow | null {
 }
 
 function rowsFromValue(value: unknown): PassportRow[] {
+  if (isWithheldTag(value)) return [];
   if (Array.isArray(value)) {
     return value.flatMap((item) => {
       const row = parseRow(item);
@@ -280,6 +283,7 @@ function rowsFromValue(value: unknown): PassportRow[] {
         bandLabel: null,
         tone: null,
       }))
+      .filter((row) => !isWithheldTag(row))
       .sort((left, right) => Number(right.score) - Number(left.score) || left.label.localeCompare(right.label));
   }
   return direct ? [direct] : [];

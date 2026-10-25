@@ -1,3 +1,4 @@
+import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 import type {
   AlbumPassportDraft,
   AlbumPassportSource,
@@ -106,7 +107,7 @@ function readLabelItems(items: LabelProfileItem[] | undefined): Array<{ label: s
   const out: Array<{ label: string; trackIds: string[] }> = [];
   for (const item of items) {
     const label = text(item?.label);
-    if (!label) continue;
+    if (!label || isWithheldTag(item)) continue;
     const trackIds = Array.isArray(item.track_passport_version_ids)
       ? item.track_passport_version_ids.flatMap((id) => {
         const value = text(id);

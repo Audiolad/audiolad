@@ -1,3 +1,4 @@
+import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 import type { MusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
 
 /** Bump only when the album snapshot shape changes. Old rows stay readable. */
@@ -117,11 +118,11 @@ export function storedFactsFromStructured(
       candidate: facts.key.candidate,
       candidate_mode: facts.key.candidateMode,
     },
-    genres: facts.genres.map((item) => ({ label: item.label, score: item.score })),
-    styles: facts.styles.map((item) => ({ label: item.label, score: item.score })),
-    moods: facts.moods.map((item) => ({ label: item.label, score: item.score })),
-    instruments: facts.instruments.map((item) => ({ label: item.label, score: item.score })),
-    sound_character: facts.soundCharacter
+    genres: facts.genres.filter((item) => !isWithheldTag(item)).map((item) => ({ label: item.label, score: item.score })),
+    styles: facts.styles.filter((item) => !isWithheldTag(item)).map((item) => ({ label: item.label, score: item.score })),
+    moods: facts.moods.filter((item) => !isWithheldTag(item)).map((item) => ({ label: item.label, score: item.score })),
+    instruments: facts.instruments.filter((item) => !isWithheldTag(item)).map((item) => ({ label: item.label, score: item.score })),
+    sound_character: facts.soundCharacter && !isWithheldTag(facts.soundCharacter)
       ? { label: facts.soundCharacter.label, score: facts.soundCharacter.score }
       : null,
     loudness_lufs: facts.loudnessLufs,
@@ -173,7 +174,7 @@ function labelList(value: unknown): Array<{ label: string; score: number | null 
 }
 
 function labelOrNull(value: unknown): { label: string; score: number | null } | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value) || isWithheldTag(value)) return null;
   const record = value as { label?: unknown; score?: unknown };
   const label = textOrNull(record.label);
   if (!label) return null;
@@ -186,7 +187,7 @@ function groupLabels(
   const grouped = new Map<string, LabelProfileItem>();
   for (const item of items) {
     const label = item.label.trim();
-    if (!label) continue;
+    if (!label || isWithheldTag(item)) continue;
     const current = grouped.get(label) ?? {
       label,
       track_passport_version_ids: [],
@@ -368,11 +369,11 @@ export function albumPassportSummaryLines(draft: Pick<
       item.mode ? `${item.key} ${item.mode}` : item.key
     )).join(", ")}`);
   }
-  const genres = draft.genreProfile.items.map((item) => item.label);
+  const genres = draft.genreProfile.items.filter((item) => !isWithheldTag(item)).map((item) => item.label);
   if (genres.length > 0) lines.push(`Жанры: ${genres.join(", ")}`);
-  const moods = draft.moodProfile.items.map((item) => item.label);
+  const moods = draft.moodProfile.items.filter((item) => !isWithheldTag(item)).map((item) => item.label);
   if (moods.length > 0) lines.push(`Настроение: ${moods.join(", ")}`);
-  const instruments = draft.instrumentProfile.items.map((item) => item.label);
+  const instruments = draft.instrumentProfile.items.filter((item) => !isWithheldTag(item)).map((item) => item.label);
   if (instruments.length > 0) lines.push(`Инструменты: ${instruments.join(", ")}`);
   return lines;
 }
@@ -404,6 +405,7 @@ export function albumPassportPromptFacts(draft: AlbumPassportDraft): string {
     )).join("; ")}.`);
   }
   const section = (title: string, items: LabelProfileItem[]) => {
+    items = items.filter((item) => !isWithheldTag(item));
     if (items.length === 0) return;
     lines.push(`${title}: ${items.map((item) => item.label).join(", ")}.`);
   };
@@ -466,7 +468,7 @@ export function attributesFromStructuredFacts(
     const seen = new Set<string>();
     for (const item of items) {
       const label = item.label.trim();
-      if (!SLUG.test(label) || seen.has(label)) continue;
+      if (isWithheldTag(item) || !SLUG.test(label) || seen.has(label)) continue;
       seen.add(label);
       const confidence = !facts.analysisFeatures && item.score != null && item.score >= 0 && item.score <= 1
         ? item.score
