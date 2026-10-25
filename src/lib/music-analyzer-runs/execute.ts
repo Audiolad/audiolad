@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { collectAnalyzerDocuments, parseAnalyzerJsonFiles } from "./analyze-output";
 import {
@@ -20,6 +20,8 @@ import {
   type CommandRunner,
 } from "./python-plan";
 import type { MusicAnalyzerExecuteResult } from "./worker";
+import { buildFeatures, FEATURE_VERSION } from "./features.mjs";
+import { measureLocalAudio } from "./local-dsp.mjs";
 
 export class MusicAnalyzerRunError extends Error {
   constructor(readonly code: string) {
@@ -164,6 +166,7 @@ export async function executePinnedAnalysis(input: {
 
   let checkpointSha256: string;
   try {
+    if (basename(input.checkpointPath) !== MUSIC_ANALYZER_CHECKPOINT_FILENAME) throw new Error("checkpoint_missing");
     await stat(input.checkpointPath);
     checkpointSha256 = await hashFile(input.checkpointPath);
   } catch (error) {
@@ -199,7 +202,7 @@ export async function executePinnedAnalysis(input: {
       buildAnalyzeTrackArgs(wavPath, outputDir),
       {
         cwd: input.root,
-        env: analyzerChildEnv(process.env, input.pythonPath),
+        env: analyzerChildEnv(process.env, input.pythonPath, dirname(input.checkpointPath)),
         signal,
         timeoutMs: MUSIC_ANALYZER_ANALYZE_TIMEOUT_MS,
       },
@@ -217,6 +220,17 @@ export async function executePinnedAnalysis(input: {
       }
     }
     const collected = collectAnalyzerDocuments(files);
+    // Независимый локальный проход. Автоматика Python и raw JSON остаются исходными.
+    let local: Record<string, unknown> = {};
+    let localStatus = "measured";
+    try {
+      local = await measureLocalAudio(wavPath, signal);
+    } catch {
+      if (signal.aborted) throw new MusicAnalyzerAbortedError();
+      localStatus = "unavailable";
+    }
+    const features = buildFeatures(collected.normalized, local,
+      `${checkout.head}:${MUSIC_ANALYZER_CHECKPOINT_FILENAME}:${checkpointSha256}`);
     return {
       analyzerVersion: collected.hints.analyzerVersion ?? MUSIC_ANALYZER_VERSION_FALLBACK,
       analyzerGitCommit: checkout.head,
@@ -226,8 +240,8 @@ export async function executePinnedAnalysis(input: {
       promptVersion: collected.hints.promptVersion,
       device: "cpu",
       rawJson: collected.raw,
-      normalizedJson: collected.normalized,
-      provenance: buildAnalyzerProvenance({
+      normalizedJson: { ...collected.normalized, analysis_features_v1: features },
+      provenance: { ...buildAnalyzerProvenance({
         head: checkout.head,
         content: checkout.content,
         checkpointFilename: MUSIC_ANALYZER_CHECKPOINT_FILENAME,
@@ -235,7 +249,7 @@ export async function executePinnedAnalysis(input: {
         normalizedSource: collected.normalizedSource,
         outputFiles: collected.outputFiles,
         pythonPath: input.pythonPath,
-      }),
+      }), feature_schema: FEATURE_VERSION, local_measurement_status: localStatus },
     };
   } finally {
     await rm(workspace, { recursive: true, force: true });

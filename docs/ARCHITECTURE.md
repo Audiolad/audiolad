@@ -469,3 +469,11 @@ Business Organization и Author Workspace — разные bounded contexts; о�
 ## Зависимости
 
 Определяются по `package.json` и `package-lock.json`. Основные: Next.js, React, `@supabase/ssr`, `@supabase/supabase-js`, Tailwind CSS.
+
+## Уточнение ревизии анализатора 09d393ce, 24.10.2026
+
+Код `pilot-authors.ts` уже разрешает Jazz Relax и Aurafon; старые описания «только Jazz Relax» выше не отражают актуальный allowlist. `jazz-relax-pilot.ts` также содержит worker-hook `settleJazzRelaxPassportForAnalyzerRun`, поэтому материализация не ограничена чтением статуса браузером.
+
+Для новых прогонов подготовлен аддитивный блок `normalized_json.analysis_features_v1`, рассчитанный из существующих Python DSP/CLAP-полей и ограниченного локального прохода ffmpeg. Freeze `932c4ce` и Candidate A не меняются. Score сходства остаётся score; новые CLAP-теги материализуются как interpreted с nullable confidence. Старые поля/версии не переписываются. Расширенный блок читается через связанный прогон, не копируется в ограниченный `structured_fields`. Автоматический результат и ручные поправки разделены: новый owner/admin API `/api/music-analyzer/runs/[id]/features` возвращает automatic/effective/history, append-only журнал хранится в новой таблице, требующей отдельного согласования миграции перед deploy.
+
+`/api/music-analyzer/runs/reanalyze` принимает явный список до 10 source run IDs и request UUID, использует прежние очередь и воркер, не обходит каталог и не активирует новые продуктовые версии. Существующий продуктовый reanalyze продолжает работать по прежней схеме. Python явно получает каталог проверенного checkpoint и offline-флаги; отсутствующий локальный cache не восполняется сетевой загрузкой. Локальный проход может вернуть unavailable без потери основного анализа. Правила Атласа, кабинет кофейни и воспроизведение не изменялись. Ограничения проверки и продолжение: `docs/music-analyzer/EVAL-09d393ce.md`. Деплой не выполнялся.

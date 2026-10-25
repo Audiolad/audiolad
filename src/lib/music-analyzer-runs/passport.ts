@@ -5,6 +5,8 @@
  * mood, or instruments.
  */
 
+import { readFeatures, type FeatureSet } from "./features.mjs";
+
 export type PassportTone = "high" | "medium" | "low";
 
 export type PassportRow = {
@@ -68,6 +70,7 @@ export type PassportSources = {
 };
 
 export type MusicAnalyzerPassport = {
+  features?: FeatureSet | null;
   bpm: PassportFact;
   bpmDisplay: PassportMeasureDisplay;
   key: PassportFact;
@@ -129,6 +132,7 @@ function walk(value: unknown, segments: string[], into: Found[], depth: number):
   }
   if (!isRecord(value)) return;
   for (const key of Object.keys(value)) {
+    if (key === "analysis_features_v1") continue;
     walk(value[key], [...segments, key], into, depth + 1);
   }
 }
@@ -715,6 +719,7 @@ export function readMusicAnalyzerPassport(input: {
   const prompt = columnText(input.promptVersion) ?? promptHit?.text ?? null;
   return {
     bpm: bpm.fact,
+    features: readFeatures(input.normalized),
     bpmDisplay: bpm.display,
     key: key.fact,
     keyDisplay: key.display,
@@ -752,6 +757,7 @@ export type MusicAnalyzerLabelFact = {
 };
 
 export type MusicAnalyzerStructuredFacts = {
+  analysisFeatures?: FeatureSet;
   bpm: {
     published: number | null;
     candidate: number | null;
@@ -796,6 +802,7 @@ function labelFacts(rows: PassportRow[]): MusicAnalyzerLabelFact[] {
 }
 
 export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnalyzerStructuredFacts {
+  const analysisFeatures = readFeatures(normalized);
   const nodes = collect(normalized);
   const publishedMatches = nodes.filter((node) => (
     bpmKind(node.segments) === "published" && isScalarQuantity(node.value)
@@ -833,6 +840,7 @@ export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnal
   const energy = technicalValue(nodes, ["energy"]);
   const sound = labelFacts(soundRows)[0] ?? null;
   return {
+    ...(analysisFeatures ? { analysisFeatures } : {}),
     bpm: {
       published: publishedNode ? finiteNumber(publishedNode.value) : null,
       candidate: candidateNode ? finiteNumber(candidateNode.value) : null,
@@ -845,8 +853,8 @@ export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnal
       candidate: candidateKeyNode ? cleanText(candidateKeyNode.value) : null,
       candidateMode: candidateModeNode ? cleanText(candidateModeNode.value) : null,
     },
-    genres: labelFacts(genres.rows),
-    styles: labelFacts(styles.rows),
+    genres: labelFacts(analysisFeatures ? genres.rows.filter(row => !/dark[ _-]*jazz/i.test(row.label)) : genres.rows),
+    styles: labelFacts(analysisFeatures ? styles.rows.filter(row => !/dark[ _-]*jazz/i.test(row.label)) : styles.rows),
     moods: labelFacts(moods.rows),
     instruments: labelFacts(instruments.rows),
     soundCharacter: sound,

@@ -1,0 +1,138 @@
+{
+  "schema_version": "music-eval:1",
+  "note": "Кандидаты в референсный набор. Название и группа не являются проверенными метками. Заполнить после разрешённого прослушивания.",
+  "tracks": [
+    {
+      "id": "aurafon-quiet-harmony",
+      "title": "Aurafon – Тихая гармония",
+      "stratum": "Aurafon",
+      "permission_confirmed": false,
+      "verified_by": null,
+      "verified_at": null,
+      "sha256": null,
+      "audio": null,
+      "before": null,
+      "after": null,
+      "reference": {
+        "genre": null,
+        "rhythm": null,
+        "vocal": null,
+        "instruments": null,
+        "energy": null,
+        "mood": null,
+        "tempo_bpm": null,
+        "subgenre": null
+      }
+    },
+    {
+      "id": "jazz-relax",
+      "title": "Jazz Relax – трек предстоит выбрать",
+      "stratum": "Jazz Relax",
+      "permission_confirmed": false,
+      "verified_by": null,
+      "verified_at": null,
+      "sha256": null,
+      "audio": null,
+      "before": null,
+      "after": null,
+      "reference": {
+        "genre": null,
+        "rhythm": null,
+        "vocal": null,
+        "instruments": null,
+        "energy": null,
+        "mood": null,
+        "tempo_bpm": null,
+        "subgenre": null
+      }
+    },
+    {
+      "id": "ambient",
+      "title": "Ambient – трек предстоит выбрать",
+      "stratum": "Ambient",
+      "permission_confirmed": false,
+      "verified_by": null,
+      "verified_at": null,
+      "sha256": null,
+      "audio": null,
+      "before": null,
+      "after": null,
+      "reference": {
+        "genre": null,
+        "rhythm": null,
+        "vocal": null,
+        "instruments": null,
+        "energy": null,
+        "mood": null,
+        "tempo_bpm": null,
+        "subgenre": null
+      }
+    },
+    {
+      "id": "lofi",
+      "title": "Лоу-фай – трек предстоит выбрать",
+      "stratum": "lo-fi",
+      "permission_confirmed": false,
+      "verified_by": null,
+      "verified_at": null,
+      "sha256": null,
+      "audio": null,
+      "before": null,
+      "after": null,
+      "reference": {
+        "genre": null,
+        "rhythm": null,
+        "vocal": null,
+        "instruments": null,
+        "energy": null,
+        "mood": null,
+        "tempo_bpm": null,
+        "subgenre": null
+      }
+    },
+    {
+      "id": "bossa",
+      "title": "Босса-нова – трек предстоит выбрать",
+      "stratum": "bossa nova",
+      "permission_confirmed": false,
+      "verified_by": null,
+      "verified_at": null,
+      "sha256": null,
+      "audio": null,
+      "before": null,
+      "after": null,
+      "reference": {
+        "genre": null,
+        "rhythm": null,
+        "vocal": null,
+        "instruments": null,
+        "energy": null,
+        "mood": null,
+        "tempo_bpm": null,
+        "subgenre": null
+      }
+    },
+    {
+      "id": "acoustic",
+      "title": "Акустика – трек предстоит выбрать",
+      "stratum": "acoustic",
+      "permission_confirmed": false,
+      "verified_by": null,
+      "verified_at": null,
+      "sha256": null,
+      "audio": null,
+      "before": null,
+      "after": null,
+      "reference": {
+        "genre": null,
+        "rhythm": null,
+        "vocal": null,
+        "instruments": null,
+        "energy": null,
+        "mood": null,
+        "tempo_bpm": null,
+        "subgenre": null
+      }
+    }
+  ]
+}

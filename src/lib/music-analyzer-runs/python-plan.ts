@@ -44,11 +44,13 @@ export function buildAnalyzeTrackArgs(wavPath: string, outputDir: string): strin
   ];
 }
 
-export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string): NodeJS.ProcessEnv {
+export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string, checkpointDir?: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     NODE_ENV: source.NODE_ENV ?? "production",
     PYTHONNOUSERSITE: "1",
     PYTHONDONTWRITEBYTECODE: "1",
+    HF_HUB_OFFLINE: "1",
+    TRANSFORMERS_OFFLINE: "1",
   };
   for (const key of CHILD_ENV_ALLOW) {
     const value = source[key];
@@ -56,6 +58,7 @@ export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string):
   }
   const venv = pythonPath.slice(0, pythonPath.lastIndexOf("/bin/python"));
   if (venv) env.VIRTUAL_ENV = venv;
+  if (checkpointDir) env.MUSIC_ANALYZER_CHECKPOINT_DIR = checkpointDir;
   for (const key of Object.keys(env)) {
     if (/candidate[_-]?a/i.test(key) || /instrument[_-]?strateg/i.test(key)) {
       delete env[key];

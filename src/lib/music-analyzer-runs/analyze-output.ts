@@ -24,7 +24,7 @@ function readTopLevelString(documents: Record<string, unknown>, keys: readonly s
   for (const document of Object.values(documents)) {
     if (!isRecord(document)) continue;
     for (const key of keys) {
-      const value = document[key];
+      const value = document[key] ?? (isRecord(document.analysis) ? document.analysis[key] : null);
       if (typeof value === "string" && value.trim()) {
         return value.trim().slice(0, 200);
       }

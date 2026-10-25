@@ -14,6 +14,21 @@ import type {
   PassportRow,
   PassportTone,
 } from "@/lib/music-analyzer-runs/passport";
+import { featureDisplayRows } from "@/lib/music-analyzer-runs/feature-display.mjs";
+import type { FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
+
+function featureTags(set: FeatureSet | null | undefined, key: string, fallback: PassportRow[]): PassportRow[] {
+  if (!set) return fallback;
+  const feature = set.features[key];
+  if (!Array.isArray(feature?.value)) return [];
+  return feature.value.flatMap((item: string | { label: string; status?: string; score?: number }) => {
+    if (typeof item !== "string" && item.status === "withheld") return [];
+    const label = typeof item === "string" ? item : item.label;
+    if (!label) return [];
+    return [{ label, score: typeof item !== "string" && typeof item.score === "number" ? String(item.score) : null,
+      average: null, max: null, rank: null, bandLabel: feature.status === "manual" ? "ручная проверка" : "гипотеза", tone: null }];
+  });
+}
 
 export type MusicPassportMode = "full" | "product";
 
@@ -127,7 +142,7 @@ function MeasureCard({
     <section className="rounded-[22px] border border-[#e4d7f4] bg-white p-4">
       <h3 className="text-sm font-medium text-[#796ba0]">{title}</h3>
       <p className="mt-3 text-[2rem] font-semibold leading-none tracking-tight text-[#25135c]">
-        {primary ?? "—"}
+        {primary ?? "–"}
       </p>
       {primary && unit ? <p className="mt-2 text-sm font-medium text-[#796ba0]">{unit}</p> : null}
       {!primary ? <p className="mt-2 text-sm text-[#796ba0]">не указано</p> : null}
@@ -235,7 +250,7 @@ export function MusicPassport({
 }: MusicPassportProps) {
   const research = mode === "full";
   const showDeveloperJson = research && developerJson != null;
-  const instruments = passport?.instruments.slice(0, INSTRUMENT_LIMIT[mode]) ?? [];
+  const instruments = passport ? featureTags(passport.features, "instruments", passport.instruments).slice(0, INSTRUMENT_LIMIT[mode]) : [];
   const statusLine = [
     research ? "Музыкальный паспорт · экспериментальная версия" : "Музыкальный паспорт",
     header.statusLabel,
@@ -258,10 +273,25 @@ export function MusicPassport({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MeasureCard title="Темп" measure={passport.bpmDisplay} unit="BPM" />
             <MeasureCard title="Тональность" measure={passport.keyDisplay} unit={null} />
-            <TagGroup title="Жанр" rows={passport.genres} />
-            <TagGroup title="Стиль" rows={passport.styles} />
+            <TagGroup title={passport.features ? "Жанр – гипотезы" : "Жанр"} rows={featureTags(passport.features, "genre", passport.genres)} />
+            <TagGroup title={passport.features ? "Стиль – гипотезы" : "Стиль"} rows={featureTags(passport.features, "subgenre", passport.styles)} />
           </div>
-          <TagGroup title="Характер и настроение" rows={passport.moods} />
+          {passport.features ? (
+            <section aria-label="Структурированные признаки" className="rounded-[22px] border border-[#e4d7f4] bg-white p-4">
+              <h3 className="text-sm font-medium text-[#796ba0]">Признаки звучания</h3>
+              <dl className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {featureDisplayRows(passport.features).map(row => (
+                  <div key={row.key}>
+                    <dt className="text-sm text-[#796ba0]">{row.label}</dt>
+                    <dd className="mt-1 text-[#25135c]">{row.value}<span className="block text-xs text-[#796ba0]">{row.status} · {row.confidence}</span></dd>
+                    <details className="mt-1 text-xs text-[#796ba0]"><summary>Источник и ограничения</summary>{row.source} · {row.version}{row.reason ? <p>{row.reason}</p> : null}</details>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-3 text-xs text-[#796ba0]">Жанр, настроение, инструменты и энергия требуют проверки. Удержанные узкие жанры доступны в исходных данных. Версия признаков: {passport.features.schema_version}.</p>
+            </section>
+          ) : null}
+          <TagGroup title="Характер и настроение" rows={featureTags(passport.features, "mood", passport.moods)} />
           <div className="flex flex-wrap items-start gap-3">
             <div className="min-w-0 flex-1 basis-full lg:basis-[28rem]">
               <InstrumentList rows={instruments} />
