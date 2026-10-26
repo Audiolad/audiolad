@@ -44,10 +44,10 @@ export function paragraphsTooClose(a, b) {
 // the stage gate copies these rules verbatim. One allowlist for the gate, the fragment
 // validator and the plain-text scanner.
 const ALLOWED_SITE_HOSTS = ["audiolad.ru", "sergey-zoya.ru"];
-// Real public suffixes only. File and runtime suffixes (.js, .css, .webp, …) are not TLDs,
-// so «Node.js» and «Vue.js» are not addresses. «ASP.NET» uses a real TLD and is listed apart.
+// Real public suffixes only. File and runtime suffixes (.js, .jpg, .webp, …) are not TLDs,
+// so «Node.js», «Vue.js», «Next.js» and «photo.jpg» are not addresses. «ASP.NET» uses a real TLD.
 const KNOWN_TLDS = ["com", "org", "net", "ru", "su", "info", "biz", "pro", "name", "mobi", "app", "dev", "io", "ai", "co", "me", "uk", "ly", "cc", "tv", "xyz", "site", "online", "shop", "ua", "by", "kz", "eu", "de", "fr", "it", "es", "nl", "pl", "us", "ca", "au", "edu", "gov", "int", "fm", "to"];
-const TECHNOLOGY_NAMES = new Set(["node.js", "vue.js", "asp.net"]);
+const TECHNOLOGY_NAMES = new Set(["node.js", "vue.js", "next.js", "asp.net"]);
 const TLD_PATTERN = [...KNOWN_TLDS].sort((a, b) => b.length - a.length).join("|");
 const OUTGOING_ADDRESS_PATTERNS = [
   { name: "e-mail", re: /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)*\.\p{L}{2,}/gu, always: true },
@@ -108,6 +108,15 @@ function tailHasDisallowedAddress(raw, seen) {
       if (pattern.always || addressDisallowed(nested, seen)) return true;
     }
   }
+  // A slash hides a domain from the plain-text lookbehind (/path/evil.com, #evil.com).
+  const nestedDomain = new RegExp(`(?:^|[^\\p{L}\\d@._-])(?:www\\.)?(?:[a-z\\d][a-z\\d-]*\\.)+(?:${TLD_PATTERN})(?![\\p{L}\\d-])`, "giu");
+  const nestedRf = /(?:^|[^\p{L}\d@._-])(?:[а-яё\d][а-яё\d-]*\.)+рф(?![\p{L}\d-])/giu;
+  for (const re of [nestedDomain, nestedRf]) {
+    for (const match of tail.matchAll(re)) {
+      const nested = match[0].replace(/^[^a-zа-яё\d]+/iu, "").replace(/[.,;:!?…]+$/u, "");
+      if (nested && addressDisallowed(nested, seen)) return true;
+    }
+  }
   return false;
 }
 
@@ -135,7 +144,8 @@ export function allowedSiteAddress(value) {
 /**
  * Bare domains (example.com/candle, t.me/x, www.example.com), //host, http(s)://,
  * mailto:/tel: and e-mails. audiolad.ru and sergey-zoya.ru, with www and subdomains, are allowed.
- * E-mail is never allowed. «т.е.», «т.д.», initials, decimals and Node.js / Vue.js / ASP.NET do not match.
+ * E-mail is never allowed. «т.е.», «т.д.», initials, decimals, Node.js / Vue.js / Next.js,
+ * ASP.NET and file names such as photo.jpg do not match.
  */
 export function outgoingAddressProblems(text) {
   const problems = [];

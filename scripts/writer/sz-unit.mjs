@@ -1928,6 +1928,7 @@ test("tiered: an inline quote is not a query-count rewrite target", () => {
     "Мастер сказал: ‘Цвет свечи при гадании выбирают вечером’. Дальше разговор стал тише, и в комнате остался только свет лампы.",
     "Мастер сказал: ‹Цвет свечи при гадании выбирают вечером›. Дальше разговор стал тише, и в комнате остался только свет лампы.",
     "Мастер сказал: «Цвет свечи при гадании выбирают вечером. Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    "Мастер сказал: “Цвет свечи при гадании выбирают вечером. Дальше разговор стал тише, и в комнате остался только свет лампы.",
     "Мастер сказал: „Цвет свечи при гадании выбирают вечером. Дальше разговор стал тише, и в комнате остался только свет лампы.",
   ];
   for (const storyLine of quoted) {
@@ -1968,6 +1969,15 @@ test("tiered: an inline quote is not a query-count rewrite target", () => {
   assert.ok(!prompt.includes(raw.sectionsBefore[0].title));
   assert.ok(!prompt.includes(raw.transition.slice(0, 40)));
   assert.ok(!prompt.includes(raw.description.slice(0, 40)));
+  const named = structuredClone(fields);
+  const apostrophe = "Д'Артаньян сказал, что цвет свечи при гадании выбирают вечером, и разговор стал тише.";
+  named.story[1] = apostrophe;
+  named.sectionsBefore[0].title = "Цвет свечи при гадании дома вечером";
+  named.transition = `${named.transition} Цвет свечи при гадании. Цвет свечи при гадании.`;
+  const namedFailure = szQuantityReport(named, errorsOf(candleBuild(named).problems)).failures.find((row) => row.code === "query-count");
+  const namedJob = buildSzFragment(candleBrief, named, namedFailure);
+  assert.equal(namedJob.key, "query-count:story[1]");
+  assert.ok(namedJob.messages.map((message) => message.content).join("\n").includes("Д'Артаньян"));
 });
 
 test("tiered: bare addresses and mail fail the fragment and the gate", () => {
@@ -1983,16 +1993,19 @@ test("tiered: bare addresses and mail fail the fragment and the gate", () => {
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Заметка есть на https://www.sergey-zoya.ru/about и на https://www.audiolad.ru/articles/x.`] }));
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Заметка есть на www.sergey-zoya.ru/about и на www.audiolad.ru/x.`] }));
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Зеркало https://cdn.audiolad.ru/media/a и https://blog.sergey-zoya.ru/about.`] }));
-  assert.ok(job.apply(raw, { paragraphs: [`${addition} На Node.js, Vue.js и ASP.NET пишут сервисы, и это не адрес сайта.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} На Node.js, Vue.js, Next.js и ASP.NET пишут сервисы, файл зовут photo.jpg, и это не адрес сайта.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Картинка лежит на https://audiolad.ru/media/photo.jpg.`] }));
   for (const sample of [
     "example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle", "https://example.com/candle",
     "https://audiolad.ru/?next=https://evil.com", "https://audiolad.ru/?u=evil.com",
+    "https://audiolad.ru/path/evil.com", "https://audiolad.ru/page#evil.com", "https://audiolad.ru/#https://evil.com",
   ]) {
     assert.equal(job.apply(raw, { paragraphs: [`${addition} Подробнее: ${sample}.`] }), null, sample);
   }
   for (const sample of [
     "example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle",
     "https://audiolad.ru/?next=https://evil.com", "https://audiolad.ru/?u=evil.com",
+    "https://audiolad.ru/path/evil.com", "https://audiolad.ru/page#evil.com", "https://audiolad.ru/#https://evil.com",
   ]) {
     const codes = errorsOf(checkSzArticle(firstPara(assembled, `Подробнее: ${sample}.`), cfg, env)).map((problem) => problem.code);
     assert.ok(codes.includes("links-external"), `${sample}: ${codes.join(",")}`);
@@ -2003,7 +2016,8 @@ test("tiered: bare addresses and mail fail the fragment and the gate", () => {
     "А.\u00A0С.\u00A0Пушкин писал коротко и ясно.",
     "Версия 1.5 остаётся прежней и понятной.",
     "Практики есть на audiolad.ru и на sergey-zoya.ru.",
-    "На Node.js, Vue.js и ASP.NET пишут сервисы, и это не адрес сайта.",
+    "На Node.js, Vue.js, Next.js и ASP.NET пишут сервисы, файл зовут photo.jpg, и это не адрес сайта.",
+    "Картинка лежит на https://audiolad.ru/media/photo.jpg.",
     "Смотрите https://www.sergey-zoya.ru/about и https://www.audiolad.ru/articles/x.",
     "Смотрите www.sergey-zoya.ru/about и www.audiolad.ru/x.",
     "Зеркало https://cdn.audiolad.ru/media/a и https://blog.sergey-zoya.ru/about.",

@@ -322,15 +322,16 @@ function boltedQuerySentence(text, query) {
   return plants.some((plant) => text.includes(plant));
 }
 
-/** Any quote mark, an unclosed « or „, a markdown blockquote or an HTML blockquote. */
+/** Any quote mark, an unclosed « “ or „, a markdown blockquote or an HTML blockquote.
+ * An apostrophe inside a word (Д'Артаньян) is not a quotation. */
 function isQuoteParagraph(text) {
   const raw = String(text ?? "");
   const trimmed = raw.trim();
   if (!trimmed) return false;
-  if (/[«»"“”„‟"'‘’‚‛‹›]/u.test(trimmed)) return true;
   if (/(^|\n)\s*>/.test(raw)) return true;
   if (/<\s*\/?\s*blockquote\b/i.test(raw)) return true;
-  return false;
+  const withoutApostrophe = trimmed.replace(/(\p{L})['’ʼ](\p{L})/gu, "$1$2");
+  return /[«»"“”„‟'‘’‚‛‹›]/u.test(withoutApostrophe);
 }
 
 /** Body paragraphs a surplus query may leave. Headings, description, transition, quotes and FAQ stay. */
