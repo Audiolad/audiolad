@@ -6,10 +6,12 @@ import {
   disposeIndexNowAttempt,
   disposeYandexAttempt,
   recrawlBackoffMs,
+  SEARCH_RECRAWL_BACKOFF_BASE_MS,
   SEARCH_RECRAWL_BATCH_LIMIT,
   SEARCH_RECRAWL_QUOTA_DELAY_MS,
   shouldAlertYandexStale,
   yandexSendBudget,
+  type YandexQuotaSnapshot,
 } from "@/lib/seo/search-recrawl/policy";
 
 export type SearchRecrawlLog = (
@@ -47,7 +49,7 @@ export type SearchRecrawlCycleDeps = {
     oldestPendingAt: number | null;
     lastDeliveredAt: number | null;
   }>;
-  readQuota: () => Promise<{ ok: boolean; remainder: number | null }>;
+  readQuota: () => Promise<YandexQuotaSnapshot>;
   sendYandex: (
     url: string,
     reason: string,
@@ -142,36 +144,67 @@ export async function runSearchRecrawlCycle(
     return result;
   }
 
-  let quota: { ok: boolean; remainder: number | null } = { ok: false, remainder: null };
+  let quota: YandexQuotaSnapshot = {
+    state: "unknown",
+    remainder: null,
+    reason: null,
+  };
 
   if (rows.some((row) => row.engine === "yandex")) {
     try {
       quota = await deps.readQuota();
     } catch {
-      quota = { ok: false, remainder: null };
+      quota = { state: "unknown", remainder: null, reason: null };
     }
   }
 
   let yandexBudget = yandexSendBudget({
-    quotaOk: quota.ok,
+    quotaState: quota.state,
     quotaRemainder: quota.remainder,
   });
-  let quotaHeld = quota.ok && yandexBudget === 0;
+  let quotaHeld = quota.state === "known" && yandexBudget === 0;
+  let yandexPaused = quota.state === "blocked" || quota.state === "unknown";
+  let indexNowPaused = false;
 
   for (const row of rows) {
     try {
       if (row.engine === "indexnow") {
+        if (indexNowPaused) {
+          await deps.retry(
+            row,
+            row.attempts,
+            "disabled",
+            null,
+            deps.now() + SEARCH_RECRAWL_BACKOFF_BASE_MS,
+          );
+          result.retried += 1;
+          continue;
+        }
+
         const sent = await deps.sendIndexNow(row.url, row.reason);
-        const outcome = await settle(
-          deps,
-          row,
-          disposeIndexNowAttempt({
-            status: sent.status,
-            attemptsAfter: row.attempts + 1,
-          }),
-          null,
-        );
+        const disposition = disposeIndexNowAttempt({
+          status: sent.status,
+          attemptsAfter: row.attempts + 1,
+        });
+
+        if (disposition.action === "retry" && disposition.pauseQueue) {
+          indexNowPaused = true;
+        }
+
+        const outcome = await settle(deps, row, disposition, null);
         result[outcome] += 1;
+        continue;
+      }
+
+      if (yandexPaused) {
+        await deps.retry(
+          row,
+          row.attempts,
+          quota.reason ?? "quota_unknown",
+          null,
+          deps.now() + SEARCH_RECRAWL_BACKOFF_BASE_MS,
+        );
+        result.retried += 1;
         continue;
       }
 
@@ -194,17 +227,19 @@ export async function runSearchRecrawlCycle(
         quotaHeld = true;
       }
 
-      const outcome = await settle(
-        deps,
-        row,
-        disposeYandexAttempt({
-          status: sent.status,
-          errorCode: sent.errorCode,
-          httpStatus: sent.httpStatus,
-          attemptsAfter: row.attempts + 1,
-        }),
-        sent.httpStatus ?? null,
-      );
+      const disposition = disposeYandexAttempt({
+        status: sent.status,
+        errorCode: sent.errorCode,
+        httpStatus: sent.httpStatus,
+        attemptsAfter: row.attempts + 1,
+      });
+
+      if (disposition.action === "retry" && disposition.pauseQueue) {
+        yandexPaused = true;
+        quota = { state: "blocked", remainder: quota.remainder, reason: disposition.error };
+      }
+
+      const outcome = await settle(deps, row, disposition, sent.httpStatus ?? null);
       result[outcome] += 1;
     } catch {
       result.retried += 1;
@@ -250,7 +285,7 @@ export async function runSearchRecrawlCycle(
     dead: result.dead,
     rejected: result.rejected,
     alerted: result.alerted,
-    quotaOk: quota.ok,
+    quotaState: quota.state,
     quotaRemainder: quota.remainder,
   });
 

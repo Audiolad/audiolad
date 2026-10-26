@@ -599,6 +599,25 @@ main() {
     exit 1
   fi
 
+  SEARCH_RECRAWL_WORKER_ECOSYSTEM="$RELEASE_DIR/deploy/search-recrawl-worker.ecosystem.config.cjs"
+  SEARCH_RECRAWL_WORKER_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-search-recrawl-worker.sh"
+  if [[ ! -f "$SEARCH_RECRAWL_WORKER_ECOSYSTEM" ]]; then
+    log_error "search_recrawl_worker_ecosystem_missing"
+    send_deploy_alert "deploy_failed" "Search recrawl worker ecosystem missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if [[ ! -x "$SEARCH_RECRAWL_WORKER_ENSURE" ]]; then
+    log_error "search_recrawl_worker_ensure_missing"
+    send_deploy_alert "deploy_failed" "Search recrawl worker ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$SEARCH_RECRAWL_WORKER_ENSURE"; then
+    log_error "search_recrawl_worker_ensure_failed"
+    send_deploy_alert "deploy_failed" "Search recrawl worker ensure failed for $RELEASE_NAME"
+    # Cutover already completed: do not roll back the web process.
+    exit 1
+  fi
+
   rm -f "$RELEASE_DIR/.deploy-inflight"
   unset CANDIDATE_RELEASE_DIR
   prune_old_releases "${RELEASE_RETENTION_KEEP_EXTRA:-1}"

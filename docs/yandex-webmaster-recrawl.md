@@ -90,9 +90,19 @@ Queue outcomes:
 - `429 QUOTA_EXCEEDED` or remainder `0` → retry next day
 - `5xx`, including `504`, timeout, network → exponential backoff from 5 minutes,
   capped at 6 hours, then `dead` after 20 attempts
-- `400 INVALID_URL`, `401`, `403 INVALID_USER_ID`, `404 HOST_NOT_VERIFIED`,
-  host mismatch → `dead` (no send to another host)
+- `400 INVALID_URL` and a URL whose origin is not `https://audiolad.ru` →
+  terminal for that URL only (`dead` or `rejected`). Not a success.
+- `disabled` (flag off, missing token, `SEO_INDEXING=false`, non-production
+  origin, worker without Yandex env) for Yandex or IndexNow → stays `pending`,
+  `delivered_at` is not set, and that engine's remaining batch is not taken
+- `401`, `403`, empty host list (`host_empty`), `host_not_found`,
+  `host_ambiguous`, `host_unverified`, `host_id_missing`, and a pin that does
+  not match the audiolad.ru entry (`host_mismatch`) → distinct reasons, stay
+  pending with backoff, no `delivered_at`, and the worker does not take
+  another Yandex batch while that config or auth error stands
 - host list timeout → retry with backoff, no POST
+- an unknown quota read is not a full send budget. A timed-out quota check
+  still POSTs. A known remainder of 0 does not.
 
 Yandex is enqueued for listed product publish, admin approve-and-publish,
 scheduled first go-live, SEO/content/slug edits, unlisted→listed, public
@@ -106,19 +116,39 @@ more than 24 hours while rows are pending, the worker logs
 
 ## 7. Production worker
 
-Do not start this from a deploy script in the same change that only reviews
-the code. After the migration is applied and production approval is given:
+`deploy.sh` restarts only this worker after a successful web cutover, from
+the new release, before old releases are pruned. It does not change how the
+`audiolad` web process is started or stopped.
+
+```text
+deploy/scripts/ensure-search-recrawl-worker.sh
+```
+
+The script deletes `audiolad-search-recrawl-worker` if it exists and starts
+`deploy/search-recrawl-worker.ecosystem.config.cjs` again. `cwd` is the
+stable symlink `/var/www/audiolad-deploy/current`. Before each cycle the
+process compares the real path it booted from with that symlink. When they
+differ it exits 0 and PM2 starts it again on the new release. If the symlink
+cannot be read it does not take a batch.
+
+The process is long-lived (`autorestart: true`, no `cron_restart`).
+`max_restarts` is 1000000 with `exp_backoff_restart_delay`, so a crash loop
+backs off and does not stay stopped. `min_uptime` is 10 seconds. It loads
+`.env.production` from the release cwd and sleeps about five minutes between
+cycles (`SEARCH_RECRAWL_INTERVAL_MS`, minimum 60 seconds). Secrets stay in
+the env file, not in the ecosystem file and not in logs.
+
+Release prune keeps this worker's cwd even when the process is `errored` or
+`stopped`. The web apps `audiolad` and `audiolad-p*` are still protected only
+while they are online.
+
+Manual start, if the ensure script was not used:
 
 ```text
 pm2 start deploy/search-recrawl-worker.ecosystem.config.cjs
 pm2 save
 pm2 describe audiolad-search-recrawl-worker
 ```
-
-The process is long-lived (`autorestart: true`, no `cron_restart`). It loads
-`.env.production` from `/var/www/audiolad-deploy/current` and sleeps about
-five minutes between cycles (`SEARCH_RECRAWL_INTERVAL_MS`, minimum 60 seconds).
-Secrets stay in the env file, not in the ecosystem file and not in logs.
 
 Until that process is running, new Yandex rows wait in `search_recrawl_queue`.
 Public pages still stamp due `published_at`, but they no longer call Webmaster

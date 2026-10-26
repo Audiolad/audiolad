@@ -29,6 +29,11 @@ export type YandexRecrawlErrorCode =
   | "disabled"
   | "invalid_url"
   | "foreign_origin"
+  | "host_empty"
+  | "host_not_found"
+  | "host_ambiguous"
+  | "host_unverified"
+  | "host_id_missing"
   | "host_mismatch"
   | "host_unresolved"
   | "aborted";
@@ -512,7 +517,7 @@ export async function resolveAudioladWebmasterHost(
 
   if (!resolved.ok) {
     audioladHostCache = null;
-    return { ok: false, errorCode: "host_mismatch", status: null };
+    return { ok: false, errorCode: resolved.reason, status: null };
   }
 
   audioladHostCache = {

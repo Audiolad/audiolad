@@ -14,6 +14,7 @@ export type YandexWebmasterHostRecord = {
 };
 
 export type AudioladHostMatchFailure =
+  | "host_empty"
   | "host_not_found"
   | "host_ambiguous"
   | "host_unverified"
@@ -91,6 +92,10 @@ export function resolveAudioladHostId(
 ):
   | { ok: true; hostId: string }
   | { ok: false; reason: AudioladHostMatchFailure } {
+  if (hosts.length === 0) {
+    return { ok: false, reason: "host_empty" };
+  }
+
   const matches = hosts.filter(
     (host) =>
       hostUrlMatchesAudiolad(host.asciiHostUrl) ||

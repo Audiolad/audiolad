@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { checkYandexRecrawlQuota } from "@/lib/seo/yandex-webmaster/client";
+import { classifyYandexQuotaRead } from "@/lib/seo/search-recrawl/policy";
 import {
   runSearchRecrawlCycle,
   sendQueuedIndexNowUrl,
@@ -149,10 +150,11 @@ export function createSupabaseSearchRecrawlDeps(
     },
     readQuota: async () => {
       const quota = await checkYandexRecrawlQuota();
-      return {
+      return classifyYandexQuotaRead({
         ok: quota.ok,
         remainder: quota.quotaRemainder ?? null,
-      };
+        errorCode: quota.errorCode ?? null,
+      });
     },
     sendYandex: (url, reason) => sendQueuedYandexUrl(url, reason),
     sendIndexNow: (url, reason) => sendQueuedIndexNowUrl(url, reason),

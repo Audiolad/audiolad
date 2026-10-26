@@ -20,6 +20,11 @@ export type NotifyYandexRecrawlStatus =
   | "quota_exhausted"
   | "quota_check_failed"
   | "foreign_origin"
+  | "host_empty"
+  | "host_not_found"
+  | "host_ambiguous"
+  | "host_unverified"
+  | "host_id_missing"
   | "host_mismatch"
   | "host_unresolved";
 
@@ -218,6 +223,11 @@ export async function notifyYandexRecrawlUrl(
 
     if (
       http.errorCode === "foreign_origin" ||
+      http.errorCode === "host_empty" ||
+      http.errorCode === "host_not_found" ||
+      http.errorCode === "host_ambiguous" ||
+      http.errorCode === "host_unverified" ||
+      http.errorCode === "host_id_missing" ||
       http.errorCode === "host_mismatch" ||
       http.errorCode === "host_unresolved"
     ) {

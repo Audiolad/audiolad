@@ -10,7 +10,22 @@ export type RecrawlDisposition =
   | { action: "delivered" }
   | { action: "dead"; error: string }
   | { action: "rejected"; error: string }
-  | { action: "retry"; delayMs: number; error: string; countAttempt: boolean };
+  | {
+      action: "retry";
+      delayMs: number;
+      error: string;
+      countAttempt: boolean;
+      /** Config or auth is broken for every URL. Do not take another batch. */
+      pauseQueue?: boolean;
+    };
+
+export type YandexQuotaState = "known" | "transient" | "unknown" | "blocked";
+
+export type YandexQuotaSnapshot = {
+  state: YandexQuotaState;
+  remainder: number | null;
+  reason: string | null;
+};
 
 /** Exponential delay after a failed attempt. `attemptsAfter` is 1 on the first failure. */
 export function recrawlBackoffMs(attemptsAfter: number): number {
@@ -40,9 +55,87 @@ function cappedRetry(
 }
 
 /**
+ * Config, auth, or an unresolved audiolad.ru host. The URL was not accepted.
+ * Leave it pending and pause the rest of the batch. Do not set delivered_at
+ * and do not burn attempts toward dead-letter.
+ */
+function pausedRetry(error: string): RecrawlDisposition {
+  return {
+    action: "retry",
+    delayMs: SEARCH_RECRAWL_BACKOFF_BASE_MS,
+    error,
+    countAttempt: false,
+    pauseQueue: true,
+  };
+}
+
+const YANDEX_QUEUE_PAUSE_REASONS = new Set([
+  "disabled",
+  "auth_failed",
+  "invalid_user_id",
+  "host_not_verified",
+  "host_not_found",
+  "host_empty",
+  "host_ambiguous",
+  "host_unverified",
+  "host_id_missing",
+  "host_mismatch",
+  "host_unresolved",
+]);
+
+const QUOTA_TRANSIENT_REASONS = new Set([
+  "timeout",
+  "network",
+  "quota_check_failed",
+  "http_error",
+]);
+
+const QUOTA_BLOCKED_REASONS = YANDEX_QUEUE_PAUSE_REASONS;
+
+function isYandexQueuePause(status: string, errorCode: string | null, httpStatus: number | null): boolean {
+  if (YANDEX_QUEUE_PAUSE_REASONS.has(status) || (errorCode != null && YANDEX_QUEUE_PAUSE_REASONS.has(errorCode))) {
+    return true;
+  }
+
+  return httpStatus === 401 || httpStatus === 403 || httpStatus === 404;
+}
+
+/**
+ * A quota read with no remainder and no classified transport/config error.
+ * Not a license to send the whole batch.
+ */
+export function classifyYandexQuotaRead(input: {
+  ok: boolean;
+  remainder?: number | null;
+  errorCode?: string | null;
+}): YandexQuotaSnapshot {
+  if (input.ok) {
+    return {
+      state: "known",
+      remainder: input.remainder ?? 0,
+      reason: null,
+    };
+  }
+
+  const reason = input.errorCode ?? null;
+
+  if (reason && QUOTA_TRANSIENT_REASONS.has(reason)) {
+    return { state: "transient", remainder: null, reason };
+  }
+
+  if (reason && QUOTA_BLOCKED_REASONS.has(reason)) {
+    return { state: "blocked", remainder: null, reason };
+  }
+
+  return { state: "unknown", remainder: null, reason };
+}
+
+/**
  * Yandex POST outcome for one leased queue row.
  * 409 URL_ALREADY_ADDED is done. 429 waits until the next day.
  * 5xx, including 504, uses exponential backoff.
+ * disabled, auth, and host-list failures stay pending and pause the queue.
+ * Only a malformed URL (400) or a foreign origin is terminal.
  */
 export function disposeYandexAttempt(input: {
   status: string;
@@ -57,7 +150,6 @@ export function disposeYandexAttempt(input: {
   if (
     status === "submitted" ||
     status === "already_queued" ||
-    status === "disabled" ||
     errorCode === "already_queued" ||
     httpStatus === 409
   ) {
@@ -68,23 +160,12 @@ export function disposeYandexAttempt(input: {
     return { action: "rejected", error: "foreign_origin" };
   }
 
-  if (
-    status === "auth_failed" ||
-    status === "invalid_user_id" ||
-    status === "host_not_verified" ||
-    status === "host_mismatch" ||
-    errorCode === "auth_failed" ||
-    errorCode === "invalid_user_id" ||
-    errorCode === "host_not_verified" ||
-    errorCode === "host_mismatch" ||
-    errorCode === "invalid_url" ||
-    errorCode === "disabled" ||
-    httpStatus === 400 ||
-    httpStatus === 401 ||
-    httpStatus === 403 ||
-    httpStatus === 404
-  ) {
-    return { action: "dead", error: errorCode ?? status };
+  if (status === "invalid_url" || errorCode === "invalid_url" || httpStatus === 400) {
+    return { action: "dead", error: errorCode ?? status ?? "invalid_url" };
+  }
+
+  if (isYandexQueuePause(status, errorCode, httpStatus)) {
+    return pausedRetry(errorCode ?? status);
   }
 
   if (
@@ -113,11 +194,11 @@ export function disposeIndexNowAttempt(input: {
   status: string;
   attemptsAfter: number;
 }): RecrawlDisposition {
-  if (
-    input.status === "submitted" ||
-    input.status === "disabled" ||
-    input.status === "no_urls"
-  ) {
+  if (input.status === "disabled") {
+    return pausedRetry("disabled");
+  }
+
+  if (input.status === "submitted" || input.status === "no_urls") {
     return { action: "delivered" };
   }
 
@@ -129,14 +210,22 @@ export function disposeIndexNowAttempt(input: {
   );
 }
 
+/**
+ * Known remainder limits the batch. A timed-out quota check still allows
+ * POSTs. An unknown or blocked read allows none: it is not a full budget.
+ */
 export function yandexSendBudget(input: {
-  quotaOk: boolean;
+  quotaState: YandexQuotaState;
   quotaRemainder: number | null;
   batchLimit?: number;
 }): number {
   const cap = input.batchLimit ?? SEARCH_RECRAWL_BATCH_LIMIT;
 
-  if (!input.quotaOk) {
+  if (input.quotaState === "unknown" || input.quotaState === "blocked") {
+    return 0;
+  }
+
+  if (input.quotaState === "transient") {
     return cap;
   }
 

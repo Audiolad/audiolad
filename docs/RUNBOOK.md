@@ -36,6 +36,36 @@ pm2 restart audiolad
 ```
 
 Выполнять **только после подтверждения** владельца или архитектора.
+Эта команда не перезапускает воркер переобхода.
+
+## Воркер переобхода Яндекса
+
+Процесс PM2: `audiolad-search-recrawl-worker`. Каталог: стабильный symlink
+`/var/www/audiolad-deploy/current`. Очередь только для `https://audiolad.ru`.
+
+`deploy.sh` после успешного cutover веб-процесса сам удаляет этот процесс и
+запускает его заново из ecosystem нового релиза
+(`deploy/scripts/ensure-search-recrawl-worker.sh`). Веб-процесс `audiolad`
+при этом не меняется. Перед prune каталог воркера защищён, в том числе если
+процесс в статусе `errored` или `stopped`.
+
+Если symlink `current` уехал, а процесс ещё жив, воркер до следующего цикла
+видит чужой релиз, пишет `release_mismatch` и выходит с кодом 0. PM2
+поднимает его снова уже на новом `current`. `max_restarts` большой, с
+backoff: падения не оставляют процесс навсегда остановленным.
+
+Проверка:
+
+```bash
+pm2 describe audiolad-search-recrawl-worker
+```
+
+Остановка только отдельным решением:
+
+```bash
+pm2 delete audiolad-search-recrawl-worker
+pm2 save
+```
 
 ## Деплой
 

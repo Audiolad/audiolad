@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,14 +14,19 @@ import { isAudioladRecrawlUrl } from "../src/lib/seo/search-recrawl/origin.ts";
 import { recordIndexNowFailures } from "../src/lib/seo/search-recrawl/indexnow-failures.ts";
 import { runSearchRecrawlCycle } from "../src/lib/seo/search-recrawl/cycle.ts";
 import {
+  classifyYandexQuotaRead,
+  disposeIndexNowAttempt,
   disposeYandexAttempt,
   recrawlBackoffMs,
   SEARCH_RECRAWL_BACKOFF_BASE_MS,
   SEARCH_RECRAWL_BACKOFF_CAP_MS,
+  SEARCH_RECRAWL_BATCH_LIMIT,
   SEARCH_RECRAWL_MAX_ATTEMPTS,
   SEARCH_RECRAWL_QUOTA_DELAY_MS,
   shouldAlertYandexStale,
+  yandexSendBudget,
 } from "../src/lib/seo/search-recrawl/policy.ts";
+import { compareSearchRecrawlRelease } from "../src/lib/seo/search-recrawl/worker-release.ts";
 import {
   clearAudioladWebmasterHostCache,
   submitYandexRecrawl,
@@ -75,9 +81,10 @@ assert.deepEqual(
   resolveAudioladHostId([otherHost(), audioladHost()], AUDIOLAD_HOST_ID),
   { ok: true, hostId: AUDIOLAD_HOST_ID },
 );
+assert.equal(resolveAudioladHostId([], AUDIOLAD_HOST_ID).reason, "host_empty");
 assert.equal(
-  resolveAudioladHostId([otherHost()], OTHER_HOST_ID).ok,
-  false,
+  resolveAudioladHostId([otherHost()], OTHER_HOST_ID).reason,
+  "host_not_found",
 );
 assert.equal(
   resolveAudioladHostId([audioladHost()], OTHER_HOST_ID).reason,
@@ -137,14 +144,79 @@ assert.equal(
   }).action,
   "dead",
 );
+const hostMismatch = disposeYandexAttempt({
+  status: "host_mismatch",
+  errorCode: "host_mismatch",
+  httpStatus: null,
+  attemptsAfter: 1,
+});
+assert.equal(hostMismatch.action, "retry");
+assert.equal(hostMismatch.pauseQueue, true);
+assert.equal(hostMismatch.countAttempt, false);
+const disabledSend = disposeYandexAttempt({
+  status: "disabled",
+  errorCode: "disabled",
+  httpStatus: null,
+  attemptsAfter: 1,
+});
+assert.equal(disabledSend.action, "retry");
+assert.equal(disabledSend.pauseQueue, true);
+assert.notEqual(disabledSend.action, "delivered");
 assert.equal(
   disposeYandexAttempt({
-    status: "host_mismatch",
-    errorCode: "host_mismatch",
-    httpStatus: null,
+    status: "auth_failed",
+    errorCode: "auth_failed",
+    httpStatus: 401,
+    attemptsAfter: SEARCH_RECRAWL_MAX_ATTEMPTS,
+  }).action,
+  "retry",
+);
+assert.equal(
+  disposeYandexAttempt({
+    status: "failed",
+    errorCode: "invalid_url",
+    httpStatus: 400,
     attemptsAfter: 1,
   }).action,
   "dead",
+);
+const indexNowDisabled = disposeIndexNowAttempt({
+  status: "disabled",
+  attemptsAfter: 1,
+});
+assert.equal(indexNowDisabled.action, "retry");
+assert.equal(indexNowDisabled.pauseQueue, true);
+assert.equal(
+  yandexSendBudget({
+    quotaState: "unknown",
+    quotaRemainder: null,
+    batchLimit: SEARCH_RECRAWL_BATCH_LIMIT,
+  }),
+  0,
+);
+assert.equal(
+  yandexSendBudget({
+    quotaState: "blocked",
+    quotaRemainder: null,
+  }),
+  0,
+);
+assert.equal(
+  yandexSendBudget({
+    quotaState: "transient",
+    quotaRemainder: null,
+    batchLimit: 20,
+  }),
+  20,
+);
+assert.equal(classifyYandexQuotaRead({ ok: false, remainder: null }).state, "unknown");
+assert.equal(
+  classifyYandexQuotaRead({ ok: false, remainder: null, errorCode: "timeout" }).state,
+  "transient",
+);
+assert.equal(
+  classifyYandexQuotaRead({ ok: false, remainder: null, errorCode: "disabled" }).state,
+  "blocked",
 );
 assert.equal(
   disposeYandexAttempt({
@@ -365,7 +437,11 @@ const cycle = await runSearchRecrawlCycle({
     cycleQueue.reject(row.id, row.leaseToken, error);
   },
   health: async () => cycleQueue.health(),
-  readQuota: async () => ({ ok: false, remainder: null }),
+  readQuota: async () => ({
+    state: "transient",
+    remainder: null,
+    reason: "quota_check_failed",
+  }),
   sendYandex: async (url) => {
     sends.push(url);
     return { status: "failed", errorCode: "http_error", httpStatus: 504 };
@@ -385,6 +461,136 @@ assert.equal(
   cycleQueue.rows()[0].nextAttemptAt,
   now + SEARCH_RECRAWL_BACKOFF_BASE_MS,
 );
+assert.equal(cycleQueue.rows()[0].deliveredAt, null);
+
+function cycleDeps(queue, clock, overrides) {
+  return {
+    now: () => clock,
+    claimDueScheduled: async () => {},
+    handoffScheduled: async () => {},
+    takeDue: async () => queue.take(20),
+    complete: async (row, attempts, httpStatus) => {
+      queue.complete(row.id, row.leaseToken, attempts, httpStatus);
+    },
+    retry: async (row, attempts, error, httpStatus, nextAttemptAt) => {
+      queue.retry(row.id, row.leaseToken, attempts, error, httpStatus, nextAttemptAt);
+    },
+    dead: async (row, attempts, error, httpStatus) => {
+      queue.dead(row.id, row.leaseToken, attempts, error, httpStatus);
+    },
+    reject: async (row, error) => {
+      queue.reject(row.id, row.leaseToken, error);
+    },
+    health: async () => queue.health(),
+    readQuota: async () => ({ state: "known", remainder: 10, reason: null }),
+    sendYandex: async () => ({ status: "submitted", httpStatus: 202 }),
+    sendIndexNow: async () => ({ status: "submitted" }),
+    log: () => {},
+    ...overrides,
+  };
+}
+
+const disabledClock = now;
+const disabledCreated = disabledClock - 25 * 60 * 60 * 1000;
+const disabledQueue = createMemorySearchRecrawlQueue(() => disabledCreated);
+disabledQueue.enqueue({
+  url: PRACTICE_URL,
+  engine: "yandex",
+  reason: "practice_published",
+});
+disabledQueue.enqueue({
+  url: "https://audiolad.ru/practice/sergey/second",
+  engine: "yandex",
+  reason: "practice_published",
+});
+disabledQueue.enqueue({
+  url: PRACTICE_URL,
+  engine: "indexnow",
+  reason: "practice_published",
+});
+const disabledSends = [];
+const disabledCycle = await runSearchRecrawlCycle(
+  cycleDeps(disabledQueue, disabledClock, {
+    readQuota: async () => ({ state: "blocked", remainder: null, reason: "disabled" }),
+    sendYandex: async (url) => {
+      disabledSends.push(url);
+      return { status: "disabled", errorCode: "disabled", httpStatus: null };
+    },
+    sendIndexNow: async () => ({ status: "disabled" }),
+  }),
+);
+assert.equal(disabledSends.length, 0);
+assert.equal(disabledCycle.delivered, 0);
+assert.equal(disabledCycle.dead, 0);
+assert.equal(disabledCycle.alerted, true);
+for (const row of disabledQueue.rows()) {
+  assert.equal(row.status, "pending");
+  assert.equal(row.deliveredAt, null);
+  assert.equal(row.attempts, 0);
+}
+
+const unknownQueue = createMemorySearchRecrawlQueue(() => now);
+unknownQueue.enqueue({ url: PRACTICE_URL, engine: "yandex", reason: "practice_published" });
+unknownQueue.enqueue({
+  url: "https://audiolad.ru/practice/sergey/second",
+  engine: "yandex",
+  reason: "practice_published",
+});
+const unknownSends = [];
+await runSearchRecrawlCycle(
+  cycleDeps(unknownQueue, now, {
+    readQuota: async () => ({ state: "unknown", remainder: null, reason: null }),
+    sendYandex: async (url) => {
+      unknownSends.push(url);
+      return { status: "submitted", httpStatus: 202 };
+    },
+  }),
+);
+assert.equal(unknownSends.length, 0);
+assert.equal(unknownQueue.rows().every((row) => row.status === "pending" && row.deliveredAt == null), true);
+
+const authQueue = createMemorySearchRecrawlQueue(() => now);
+authQueue.enqueue({ url: PRACTICE_URL, engine: "yandex", reason: "practice_published" });
+authQueue.enqueue({
+  url: "https://audiolad.ru/practice/sergey/second",
+  engine: "yandex",
+  reason: "practice_published",
+});
+const authSends = [];
+await runSearchRecrawlCycle(
+  cycleDeps(authQueue, now, {
+    sendYandex: async (url) => {
+      authSends.push(url);
+      return { status: "auth_failed", errorCode: "auth_failed", httpStatus: 401 };
+    },
+  }),
+);
+assert.equal(authSends.length, 1);
+assert.equal(authQueue.rows().every((row) => row.status === "pending" && row.deliveredAt == null), true);
+assert.equal(authQueue.rows().some((row) => row.status === "dead"), false);
+
+const badUrlQueue = createMemorySearchRecrawlQueue(() => now);
+badUrlQueue.enqueue({ url: PRACTICE_URL, engine: "yandex", reason: "practice_published" });
+badUrlQueue.enqueue({
+  url: "https://audiolad.ru/practice/sergey/second",
+  engine: "yandex",
+  reason: "practice_published",
+});
+const badUrlSends = [];
+await runSearchRecrawlCycle(
+  cycleDeps(badUrlQueue, now, {
+    sendYandex: async (url) => {
+      badUrlSends.push(url);
+      if (badUrlSends.length === 1) {
+        return { status: "failed", errorCode: "invalid_url", httpStatus: 400 };
+      }
+      return { status: "submitted", httpStatus: 202 };
+    },
+  }),
+);
+assert.equal(badUrlSends.length, 2);
+assert.equal(badUrlQueue.rows().filter((row) => row.status === "dead").length, 1);
+assert.equal(badUrlQueue.rows().filter((row) => row.status === "delivered").length, 1);
 
 function jsonResponse(status, body) {
   return {
@@ -495,10 +701,88 @@ await withEnv(productionEnv(), async () => {
     env: { ...process.env, YANDEX_WEBMASTER_HOST_ID: OTHER_HOST_ID },
   });
   assert.equal(result.ok, false);
-  assert.equal(result.errorCode, "host_mismatch");
+  assert.equal(result.errorCode, "host_not_found");
   assert.equal(calls.some((url) => url.includes("recrawl/queue")), false);
   assert.equal(calls.some((url) => url.includes("recrawl/quota")), false);
 });
+
+async function expectHostRefusal(body, hostId, errorCode) {
+  await withEnv(productionEnv(), async () => {
+    clearAudioladWebmasterHostCache();
+    const calls = [];
+    const result = await submitYandexRecrawl(PRACTICE_URL, {
+      fetchImpl: async (url) => {
+        calls.push(String(url));
+        return jsonResponse(body.status ?? 200, body.json);
+      },
+      sleepImpl: async () => {},
+      env: { ...process.env, YANDEX_WEBMASTER_HOST_ID: hostId },
+    });
+    assert.equal(result.errorCode, errorCode);
+    assert.equal(calls.some((url) => url.includes("recrawl/queue")), false);
+  });
+}
+
+await expectHostRefusal({ json: { hosts: [] } }, AUDIOLAD_HOST_ID, "host_empty");
+await expectHostRefusal(
+  {
+    json: {
+      hosts: [
+        {
+          host_id: AUDIOLAD_HOST_ID,
+          ascii_host_url: "https://audiolad.ru/",
+          unicode_host_url: "https://audiolad.ru/",
+          verified: false,
+        },
+      ],
+    },
+  },
+  AUDIOLAD_HOST_ID,
+  "host_unverified",
+);
+await expectHostRefusal(
+  {
+    json: {
+      hosts: [
+        {
+          host_id: AUDIOLAD_HOST_ID,
+          ascii_host_url: "https://audiolad.ru/",
+          unicode_host_url: "https://audiolad.ru/",
+          verified: true,
+        },
+        {
+          host_id: "https:audiolad.ru:443-dup",
+          ascii_host_url: "https://audiolad.ru/",
+          unicode_host_url: "https://audiolad.ru/",
+          verified: true,
+        },
+      ],
+    },
+  },
+  AUDIOLAD_HOST_ID,
+  "host_ambiguous",
+);
+await expectHostRefusal(
+  {
+    json: {
+      hosts: [
+        {
+          host_id: AUDIOLAD_HOST_ID,
+          ascii_host_url: "https://audiolad.ru/",
+          unicode_host_url: "https://audiolad.ru/",
+          verified: true,
+        },
+      ],
+    },
+  },
+  OTHER_HOST_ID,
+  "host_mismatch",
+);
+await expectHostRefusal(
+  { status: 401, json: { error_code: "INVALID_OAUTH_TOKEN" } },
+  AUDIOLAD_HOST_ID,
+  "auth_failed",
+);
 
 await withEnv(productionEnv(), async () => {
   clearAudioladWebmasterHostCache();
@@ -573,6 +857,54 @@ assert.doesNotMatch(
 assert.match(read("src/lib/seo/indexnow/hooks.ts"), /recordIndexNowFailures/);
 assert.match(read("src/lib/seo/indexnow/notify.ts"), /new Date\(\)\.toISOString\(\)/);
 assert.match(read("src/lib/seo/yandex-webmaster/notify.ts"), /new Date\(\)\.toISOString\(\)/);
+assert.match(read("deploy/scripts/deploy.sh"), /ensure-search-recrawl-worker\.sh/);
+assert.match(read("deploy/scripts/ensure-search-recrawl-worker.sh"), /search_recrawl_worker_cutover_restart/);
+assert.doesNotMatch(read("deploy/scripts/ensure-search-recrawl-worker.sh"), /pm2 restart audiolad$/m);
+assert.match(read("deploy/scripts/lib/release-retention.sh"), /audiolad-search-recrawl-worker/);
+assert.match(read("deploy/search-recrawl-worker.ecosystem.config.cjs"), /max_restarts: 1000000/);
+assert.doesNotMatch(read("deploy/search-recrawl-worker.ecosystem.config.cjs"), /max_restarts:\s*10\b/);
+const workerScript = read("scripts/run-search-recrawl-worker.mts");
+const releaseCheck = workerScript.indexOf("await compareSearchRecrawlRelease");
+const cycleCall = workerScript.lastIndexOf("runSupabaseSearchRecrawlCycle");
+assert.ok(releaseCheck > 0 && releaseCheck < cycleCall);
+assert.match(read("docs/RUNBOOK.md"), /audiolad-search-recrawl-worker/);
+
+const releaseRoot = mkdtempSync(path.join(tmpdir(), "audiolad-recrawl-release-"));
+const oldRelease = path.join(releaseRoot, "old");
+const newRelease = path.join(releaseRoot, "new");
+mkdirSync(oldRelease);
+mkdirSync(newRelease);
+writeFileSync(path.join(oldRelease, ".deploy-commit"), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
+writeFileSync(path.join(newRelease, ".deploy-commit"), "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n");
+const currentLink = path.join(releaseRoot, "current");
+symlinkSync(newRelease, currentLink);
+assert.equal(
+  (
+    await compareSearchRecrawlRelease({
+      boot: { path: oldRelease, sha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      currentLinkPath: currentLink,
+    })
+  ).state,
+  "STALE",
+);
+assert.equal(
+  (
+    await compareSearchRecrawlRelease({
+      boot: { path: newRelease, sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      currentLinkPath: currentLink,
+    })
+  ).state,
+  "CURRENT",
+);
+assert.equal(
+  (
+    await compareSearchRecrawlRelease({
+      boot: { path: newRelease, sha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+      currentLinkPath: path.join(releaseRoot, "missing"),
+    })
+  ).state,
+  "UNKNOWN",
+);
 
 const migration = read("supabase/migrations/20270125120000_search_recrawl_queue.sql");
 assert.doesNotMatch(migration, /sergey-zoya/);

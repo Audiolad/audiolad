@@ -1,10 +1,15 @@
 // Long-lived audiolad.ru search recrawl worker. One process, about every
 // five minutes. Not cron_restart and not triggered by public page loads.
 //
-// Start once, after the migration is applied and with explicit production
-// approval:
-//   pm2 start deploy/search-recrawl-worker.ecosystem.config.cjs
-//   pm2 save
+// deploy/scripts/ensure-search-recrawl-worker.sh deletes and starts this
+// app from the new release after cutover. cwd stays the stable
+// /var/www/audiolad-deploy/current symlink. Before each cycle the process
+// compares its boot realpath with that symlink and exits 0 when they
+// differ so PM2 respawns onto the new release. It does not touch the
+// audiolad web process.
+//
+// max_restarts is intentionally huge: a crash loop backs off, it does not
+// stay stopped. min_uptime still resets the counter after a healthy run.
 //
 // Env: PM2 only sets NODE_ENV. The process loads authoritative
 // `.env.production` from cwd via Next.js `@next/env`. Do not put secrets
@@ -21,8 +26,9 @@ module.exports = {
       instances: 1,
       exec_mode: "fork",
       min_uptime: "10s",
-      max_restarts: 10,
-      kill_timeout: 15000,
+      max_restarts: 1000000,
+      exp_backoff_restart_delay: 2000,
+      kill_timeout: 120000,
       treekill: true,
       env: { NODE_ENV: "production" },
     },

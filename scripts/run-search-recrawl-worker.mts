@@ -15,6 +15,10 @@ import {
   formatSearchRecrawlWorkerEnvLog,
   redactSearchRecrawlSecrets,
 } from "../src/lib/seo/search-recrawl/worker-env";
+import {
+  captureSearchRecrawlBootRelease,
+  compareSearchRecrawlRelease,
+} from "../src/lib/seo/search-recrawl/worker-release";
 
 const stop = { stopped: false };
 
@@ -56,6 +60,15 @@ async function main() {
 
   console.info(formatSearchRecrawlWorkerEnvLog(presence));
 
+  const bootRelease = await captureSearchRecrawlBootRelease();
+  console.info(
+    `[search-recrawl] ${new Date().toISOString()} worker_boot`,
+    {
+      bootReleasePath: bootRelease.path,
+      bootSha: bootRelease.sha,
+    },
+  );
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
     process.env.SUPABASE_SERVICE_ROLE_KEY as string,
@@ -65,6 +78,33 @@ async function main() {
   const once = process.env.SEARCH_RECRAWL_ONCE === "1";
 
   do {
+    const release = await compareSearchRecrawlRelease({ boot: bootRelease });
+
+    if (release.state === "STALE") {
+      console.info(
+        `[search-recrawl] ${new Date().toISOString()} release_mismatch`,
+        {
+          bootSha: release.bootSha,
+          currentSha: release.currentSha,
+        },
+      );
+      break;
+    }
+
+    if (release.state === "UNKNOWN") {
+      console.error(
+        `[search-recrawl] ${new Date().toISOString()} release_guard_unavailable`,
+        { reason: release.reason ?? "unknown" },
+      );
+
+      if (once || stop.stopped) {
+        break;
+      }
+
+      await sleep(intervalMs());
+      continue;
+    }
+
     try {
       await runSupabaseSearchRecrawlCycle(supabase);
     } catch (error) {
