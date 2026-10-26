@@ -1910,6 +1910,93 @@ test("tiered: a query above the maximum is not shortened in place", () => {
   assert.equal(kept.sectionsBefore[0].paragraphs[0], angelCrowded.sectionsBefore[0].paragraphs[0]);
 });
 
+test("tiered: an inline quote is not a query-count rewrite target", () => {
+  const query = "цвет свечи при гадании";
+  const candleBrief = { ...brief, query, title: brief.title };
+  const candleCfg = ruleConfig(candleBrief, pack.publishedAt, pool);
+  const candleBuild = (value) => {
+    const { fields: normalized } = normalizeSzFields(value);
+    const md = assembleSzArticle(candleBrief, normalized, view.site, { date: pack.publishedAt });
+    return { fields: normalized, md, problems: checkSzArticle(md, candleCfg, env) };
+  };
+  const quoted = [
+    "Мастер сказал: «Цвет свечи при гадании выбирают вечером». Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    'Мастер сказал: "Цвет свечи при гадании выбирают вечером". Дальше разговор стал тише, и в комнате остался только свет лампы.',
+    "Мастер сказал так.\n> Цвет свечи при гадании выбирают вечером.\nДальше разговор стал тише, и в комнате остался только свет лампы.",
+  ];
+  for (const storyLine of quoted) {
+    const raw = structuredClone(fields);
+    raw.story[1] = storyLine;
+    raw.sectionsBefore[0].title = "Цвет свечи при гадании дома вечером";
+    raw.transition = `${raw.transition} Цвет свечи при гадании. Цвет свечи при гадании.`;
+    raw.description = `${raw.description.slice(0, 80)} цвет свечи при гадании.`;
+    const counted = bodyQueryCountOf(candleBuild(raw).md, query);
+    assert.ok(counted > 4, `${counted}: ${storyLine.slice(0, 24)}`);
+    const failure = szQuantityReport(raw, errorsOf(candleBuild(raw).problems)).failures.find((row) => row.code === "query-count");
+    assert.equal(buildSzFragment(candleBrief, raw, failure), null, storyLine.slice(0, 24));
+    let calls = 0;
+    const repaired = repairSzArticleTiered({
+      brief: candleBrief, raw, build: candleBuild, repair: tierRepair(), args: { "no-repair": true },
+      state: { spentRub: 0, calls: [], warnings: [] },
+      callTier: () => { calls += 1; return { text: "Другой абзац без запроса." }; },
+    });
+    assert.equal(calls, 0);
+    assert.equal(repaired.result.fields.story[1], storyLine);
+    assert.equal(repaired.result.fields.sectionsBefore[0].title, raw.sectionsBefore[0].title);
+    assert.equal(repaired.result.fields.transition, raw.transition);
+    assert.equal(repaired.result.fields.description, raw.description);
+  }
+  const raw = structuredClone(fields);
+  const storyLine = quoted[0];
+  raw.story[1] = storyLine;
+  raw.sectionsBefore[0].title = "Цвет свечи при гадании дома вечером";
+  raw.transition = `${raw.transition} Цвет свечи при гадании. Цвет свечи при гадании.`;
+  const open = "Здесь назван цвет свечи при гадании обычной фразой, без кавычек и без врезки.";
+  raw.finalInvite = open;
+  const failure = szQuantityReport(raw, errorsOf(candleBuild(raw).problems)).failures.find((row) => row.code === "query-count");
+  const job = buildSzFragment(candleBrief, raw, failure);
+  assert.equal(job.key, "query-count:finalInvite");
+  const prompt = job.messages.map((message) => message.content).join("\n");
+  assert.ok(prompt.includes(open));
+  assert.ok(!prompt.includes("Мастер сказал"));
+  assert.ok(!prompt.includes(raw.sectionsBefore[0].title));
+  assert.ok(!prompt.includes(raw.transition.slice(0, 40)));
+  assert.ok(!prompt.includes(raw.description.slice(0, 40)));
+});
+
+test("tiered: bare addresses and mail fail the fragment and the gate", () => {
+  const raw = structuredClone(fields);
+  raw.sectionsBefore[0].paragraphs = raw.sectionsBefore[0].paragraphs.slice(0, 1);
+  const failure = { code: "body-length", field: "sections", message: "основная часть 720 слов, нужно 880–1400", actual: 720, min: 880, max: 1400 };
+  const job = buildSzFragment(brief, raw, failure);
+  const addition = "Новый абзац спокойно поясняет образ и не обещает чуда. Он остаётся в рамках темы и помогает добрать нужный объём раздела без переписывания уже сказанного.";
+  assert.ok(job.apply(raw, { paragraphs: [addition] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Это не гарантирует внешний результат, а только даёт паузу.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Подробнее в материале [Эзотерика и церковь](/s/ezoterika-i-tserkov).`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Заметка есть на https://sergey-zoya.ru/about и на https://audiolad.ru/articles/x.`] }));
+  for (const sample of ["example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle", "https://example.com/candle"]) {
+    assert.equal(job.apply(raw, { paragraphs: [`${addition} Подробнее: ${sample}.`] }), null, sample);
+  }
+  for (const sample of ["example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle"]) {
+    const codes = errorsOf(checkSzArticle(firstPara(assembled, `Подробнее: ${sample}.`), cfg, env)).map((problem) => problem.code);
+    assert.ok(codes.includes("links-external"), `${sample}: ${codes.join(",")}`);
+  }
+  const safe = [
+    "То есть т.е. и т.д. остаются обычными сокращениями.",
+    "А. С. Пушкин писал коротко и ясно.",
+    "А.\u00A0С.\u00A0Пушкин писал коротко и ясно.",
+    "Версия 1.5 остаётся прежней и понятной.",
+    "Практики есть на audiolad.ru и на sergey-zoya.ru.",
+  ];
+  for (const sample of safe) {
+    const codes = errorsOf(checkSzArticle(firstPara(assembled, sample), cfg, env)).map((problem) => problem.code);
+    assert.ok(!codes.includes("links-external"), `${sample}: ${codes.join(",")}`);
+  }
+  const cross = firstPara(assembled, "Смотрите https://sergey-zoya.ru/about и https://audiolad.ru/articles/x.");
+  const crossCodes = errorsOf(checkSzArticle(cross, cfg, env)).map((problem) => problem.code);
+  assert.ok(!crossCodes.includes("links-external"), crossCodes.join(","));
+});
+
 test("tiered: strong reserve is the real fragment cap and is not dropped", () => {
   const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
   assert.equal(repair.strongModel, SZ_DEFAULT_MODEL);

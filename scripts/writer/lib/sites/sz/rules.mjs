@@ -2,7 +2,8 @@
 // Self-contained on purpose (no imports): apply.mjs copies this file's text into
 // scripts/check-stageNN-articles.mjs of the site, so the site checks exactly what «Райтер» checked.
 // Rules = check-stage24-articles.mjs (sz, angel-hranitel) + editorial lessons from the angel edits
-// (EDITS.md) + Sergey's rules: no outgoing links except the practice on audiolad.ru, en dash only,
+// (EDITS.md) + Sergey's rules: no outgoing links to other websites (internal /s/ and
+// cross-links of audiolad.ru and sergey-zoya.ru only; a bare domain or e-mail counts too), en dash only,
 // practice is described only positively (no discomfort priming), MAX only via the default funnel label.
 // Each problem: { code, field, message, severity: "error" | "warn" }. Warnings never fail the gate.
 
@@ -38,6 +39,63 @@ export function paragraphSimilarity(a, b) {
 export function paragraphsTooClose(a, b) {
   return paragraphSimilarity(a, b) >= PARAGRAPH_SIMILARITY;
 }
+
+// Same owner rule as findTextAddresses in lib/validate.mjs. This file cannot import it:
+// the stage gate copies these rules verbatim.
+const ALLOWED_SITE_HOSTS = ["audiolad.ru", "sergey-zoya.ru"];
+const OUTGOING_ADDRESS_PATTERNS = [
+  { name: "e-mail", re: /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)*\.\p{L}{2,}/gu, always: true },
+  { name: "ссылка mailto:/tel:", re: /\b(?:mailto|tel|sms|tg|whatsapp|viber|skype):[^\s«»"]*/giu, always: true },
+  { name: "адрес сайта", re: /(?:https?:)?\/\/[^\s«»"()<>]+/giu },
+  { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:www\.)?(?:[a-z\d][a-z\d-]*\.)+(?:[a-z]{2,24}|рф)(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
+  { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:[а-яё\d][а-яё\d-]*\.)+рф(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
+];
+
+function addressHost(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
+  let url = trimmed;
+  if (trimmed.startsWith("//")) url = `https:${trimmed}`;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) url = `https://${trimmed}`;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** True for http(s) and protocol-relative addresses of audiolad.ru and sergey-zoya.ru, including subdomains. */
+export function allowedSiteAddress(value) {
+  const host = addressHost(value);
+  return Boolean(host) && ALLOWED_SITE_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+}
+
+/**
+ * Bare domains (example.com/candle, t.me/x, www.…), //host, http(s)://, mailto:/tel: and e-mails.
+ * Plain mentions of audiolad.ru and sergey-zoya.ru are allowed. E-mail is never allowed.
+ * Cyrillic abbreviations («т.е.», «т.д.»), initials and decimals do not match: the domain
+ * pattern is ASCII (or a .рф name) and is not preceded by a letter, digit or slash.
+ */
+export function outgoingAddressProblems(text) {
+  const problems = [];
+  const taken = [];
+  const source = String(text ?? "");
+  for (const pattern of OUTGOING_ADDRESS_PATTERNS) {
+    const re = new RegExp(pattern.re.source, pattern.re.flags);
+    for (const match of source.matchAll(re)) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (taken.some(([from, to]) => start < to && end > from)) continue;
+      taken.push([start, end]);
+      const raw = match[0].replace(/[.,;:!?…]+$/u, "");
+      if (!pattern.always && allowedSiteAddress(raw)) continue;
+      problems.push(`${pattern.name} в тексте: ${raw.slice(0, 60)}`);
+    }
+  }
+  return problems;
+}
+
 export const quoteText = (text) => String(text).replace(/[«»"“”„]/g, "").replace(/[—–-]/g, "–").replace(/\s+/g, " ").trim();
 // Assembler placeholder. A thesis of «а» or «главная мысль а» is the same failure as the exact phrase.
 export const EXPERT_PLACEHOLDER_THESIS = "главная мысль";
@@ -510,8 +568,14 @@ export function checkSzArticle(md, cfg, env) {
   for (const link of links) if (!env.published.has(link)) add("links-target", "sections", `ссылка /s/${link} не на опубликованную статью`);
   const urls = [...(fm + "\n" + body).matchAll(/(?:https?:)?\/\/[^\s)"'<>]+/g)].map((m) => m[0]);
   const practiceUrls = [`https://audiolad.ru/practice/${p.path}`, `https://audiolad.ru/embed/practice/${p.path}`];
-  if (urls.join("\n") !== practiceUrls.join("\n")) add("links-external", "*", `внешние адреса запрещены (кроме pageUrl/embedUrl практики): ${urls.filter((u) => !practiceUrls.includes(u)).join(", ") || "порядок"}`);
-  for (const [, href] of body.matchAll(/(?:href="|\]\()([^")]+)/g)) if (!/^\/s\/[a-z0-9-]+$/.test(href)) add("links-internal", "sections", `ссылка ${href}: только /s/<slug>`);
+  const practiceHits = urls.filter((url) => practiceUrls.includes(url));
+  if (practiceHits.join("\n") !== practiceUrls.join("\n")) add("links-external", "*", `нужны pageUrl и embedUrl практики в этом порядке: ${practiceUrls.join(", ")}`);
+  for (const url of urls) if (!practiceUrls.includes(url) && !allowedSiteAddress(url)) add("links-external", "*", `внешний адрес запрещён: ${url}`);
+  for (const [, href] of body.matchAll(/(?:href="|\]\()([^")]+)/g)) {
+    if (/^\/s\/[a-z0-9-]+$/.test(href) || allowedSiteAddress(href)) continue;
+    add("links-internal", "sections", `ссылка ${href}: только /s/<slug> или адрес audiolad.ru / sergey-zoya.ru`);
+  }
+  for (const problem of outgoingAddressProblems(fm + "\n" + body)) add("links-external", "*", problem);
   if (/azbyka|wikipedia|litres|www\.|max\.ru|max-potok/i.test(body + faqText)) add("links-external", "*", "упоминание сторонних сайтов / MAX в тексте");
 
   // ── content safety ──

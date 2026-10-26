@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, danglingFragment, fieldProseDefect, normalize, paragraphTokens, paragraphsTooClose, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, allowedSiteAddress, danglingFragment, fieldProseDefect, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -322,9 +322,18 @@ function boltedQuerySentence(text, query) {
   return plants.some((plant) => text.includes(plant));
 }
 
+/** A quotation anywhere in the paragraph, or a blockquote, is not a query-count rewrite target. */
 function isQuoteParagraph(text) {
-  const trimmed = String(text ?? "").trim();
-  return trimmed.startsWith("«") || trimmed.startsWith(">");
+  const raw = String(text ?? "");
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  if (/^[«"“„>]/.test(trimmed)) return true;
+  if (/(^|\n)\s*>/.test(raw)) return true;
+  if (/«[^»]*»/.test(trimmed)) return true;
+  if (/“[^”]*”/.test(trimmed)) return true;
+  if (/„[^“]*“/.test(trimmed)) return true;
+  if (/"(?:[^"\n]+)"/.test(trimmed)) return true;
+  return false;
 }
 
 /** Body paragraphs a surplus query may leave. Headings, description, transition, quotes and FAQ stay. */
@@ -427,12 +436,16 @@ function fragmentDiscomfort(text) {
 }
 
 function fragmentLinksRejected(text, brief) {
-  if (/https?:\/\//i.test(text) || /\bwww\./i.test(text)) return true;
+  if (outgoingAddressProblems(text).length) return true;
+  if (/\bwww\./i.test(text)) return true;
   if (/azbyka|wikipedia|litres|max\.ru|max-potok/i.test(text)) return true;
   const allowed = allowedSlugSet(brief?.links);
   for (const match of String(text).matchAll(/(?:href="|\]\()([^")\s]+)/g)) {
-    const slug = match[1].match(/^\/s\/([a-z0-9-]+)$/)?.[1];
-    if (!slug || !allowed.has(slug)) return true;
+    const href = match[1];
+    const slug = href.match(/^\/s\/([a-z0-9-]+)$/)?.[1];
+    if (slug && allowed.has(slug)) continue;
+    if (allowedSiteAddress(href)) continue;
+    return true;
   }
   return false;
 }
