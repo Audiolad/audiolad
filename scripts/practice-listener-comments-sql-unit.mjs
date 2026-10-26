@@ -39,6 +39,14 @@ const executableSql = migration
 assert.doesNotMatch(executableSql, /\bDROP TABLE\b|\bTRUNCATE\b|DELETE FROM public\./);
 assert.match(migration, /REVOKE ALL ON TABLE public\.practice_listener_comment_reports FROM authenticated/);
 assert.match(migration, /GRANT SELECT ON TABLE public\.practice_listener_comment_notices TO authenticated/);
+assert.match(
+  migration,
+  /REVOKE SELECT ON TABLE public\.practice_listener_comment_feed FROM anon, authenticated/,
+);
+assert.match(migration, /pg_advisory_xact_lock/);
+assert.match(migration, /practice_listener_comment_insert_limited/);
+assert.match(migration, /practice_listener_comment_edit_limited/);
+assert.match(migration, /practice_listener_comment_report_limited/);
 assert.doesNotMatch(migration, /GRANT INSERT ON TABLE public\.practice_listener_comments TO authenticated/);
 
 function findPgBin() {

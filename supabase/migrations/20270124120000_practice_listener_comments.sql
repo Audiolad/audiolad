@@ -6,9 +6,15 @@
 --
 -- Rollback is not executed by this file.
 -- Disable the feature and keep the rows: do not deploy the listener-comment
--- routes. RLS already blocks anon and authenticated writes, so the tables can
--- stay while the app stops using them. practice_ratings is not part of this
--- feature and is left as it is.
+-- routes. The public feed is a view granted to anon and authenticated. To hide
+-- that feed and keep every row, revoke the view read (this file does not run it):
+--   REVOKE SELECT ON TABLE public.practice_listener_comment_feed FROM anon, authenticated;
+-- RLS already blocks anon and authenticated writes. Reports, the moderation
+-- journal and edit marks are not granted to those roles. Notices stay readable
+-- by the recipient. practice_ratings is not part of this feature and is left
+-- as it is. Rate limits (create, reply, edit, report) are taken with
+-- pg_advisory_xact_lock and the insert in one transaction, so a parallel
+-- burst cannot pass the same count.
 -- When the owner confirms the data may go, remove dependents first, then the
 -- parent table, then the functions. Copy of the operator statements, still
 -- comments, not run here:
@@ -322,5 +328,157 @@ REVOKE ALL ON TABLE public.practice_listener_comment_feed FROM PUBLIC;
 REVOKE ALL ON TABLE public.practice_listener_comment_feed FROM anon;
 REVOKE ALL ON TABLE public.practice_listener_comment_feed FROM authenticated;
 GRANT SELECT ON TABLE public.practice_listener_comment_feed TO anon, authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.practice_listener_comment_insert_limited(
+  p_id uuid,
+  p_practice_id uuid,
+  p_user_id uuid,
+  p_parent_id uuid,
+  p_kind text,
+  p_body text,
+  p_public_name text,
+  p_status text,
+  p_client_request_id uuid,
+  p_body_fingerprint text,
+  p_created_at timestamptz,
+  p_since timestamptz,
+  p_limit integer
+) RETURNS text
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext(p_user_id::text), hashtext('listener-comment-' || p_kind));
+  IF p_kind = 'impression' THEN
+    SELECT count(*) INTO v_count
+    FROM public.practice_listener_comments
+    WHERE user_id = p_user_id
+      AND kind = 'impression'
+      AND status <> 'deleted'
+      AND created_at >= p_since;
+  ELSIF p_kind = 'author_reply' THEN
+    SELECT count(*) INTO v_count
+    FROM public.practice_listener_comments
+    WHERE user_id = p_user_id
+      AND kind = 'author_reply'
+      AND created_at >= p_since;
+  ELSE
+    RAISE EXCEPTION 'listener_comment_rate_kind';
+  END IF;
+  IF v_count >= p_limit THEN
+    RETURN 'rate_limited';
+  END IF;
+  INSERT INTO public.practice_listener_comments (
+    id, practice_id, user_id, parent_id, kind, body, public_name, status,
+    client_request_id, body_fingerprint, created_at, updated_at
+  ) VALUES (
+    p_id, p_practice_id, p_user_id, p_parent_id, p_kind, p_body, p_public_name, p_status,
+    p_client_request_id, p_body_fingerprint, p_created_at, p_created_at
+  );
+  RETURN 'created';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.practice_listener_comment_edit_limited(
+  p_comment_id uuid,
+  p_user_id uuid,
+  p_edit_id uuid,
+  p_body text,
+  p_public_name text,
+  p_body_fingerprint text,
+  p_updated_at timestamptz,
+  p_since timestamptz,
+  p_limit integer
+) RETURNS text
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext(p_user_id::text), hashtext('listener-comment-edit'));
+  SELECT count(*) INTO v_count
+  FROM public.practice_listener_comment_edits
+  WHERE user_id = p_user_id
+    AND created_at >= p_since;
+  IF v_count >= p_limit THEN
+    RETURN 'rate_limited';
+  END IF;
+  UPDATE public.practice_listener_comments
+  SET
+    body = p_body,
+    public_name = p_public_name,
+    body_fingerprint = p_body_fingerprint,
+    updated_at = p_updated_at,
+    edited_at = p_updated_at
+  WHERE id = p_comment_id
+    AND user_id = p_user_id
+    AND status <> 'deleted';
+  IF NOT FOUND THEN
+    RETURN 'missing';
+  END IF;
+  INSERT INTO public.practice_listener_comment_edits (id, comment_id, user_id, created_at)
+  VALUES (p_edit_id, p_comment_id, p_user_id, p_updated_at);
+  RETURN 'updated';
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.practice_listener_comment_report_limited(
+  p_id uuid,
+  p_comment_id uuid,
+  p_reporter_user_id uuid,
+  p_reason text,
+  p_details text,
+  p_created_at timestamptz,
+  p_since timestamptz,
+  p_limit integer
+) RETURNS text
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext(p_reporter_user_id::text), hashtext('listener-comment-report'));
+  SELECT count(*) INTO v_count
+  FROM public.practice_listener_comment_reports
+  WHERE reporter_user_id = p_reporter_user_id
+    AND created_at >= p_since;
+  IF v_count >= p_limit THEN
+    RETURN 'rate_limited';
+  END IF;
+  BEGIN
+    INSERT INTO public.practice_listener_comment_reports (
+      id, comment_id, reporter_user_id, reason, details, created_at
+    ) VALUES (
+      p_id, p_comment_id, p_reporter_user_id, p_reason, p_details, p_created_at
+    );
+    RETURN 'created';
+  EXCEPTION
+    WHEN unique_violation THEN
+      RETURN 'duplicate';
+  END;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.practice_listener_comment_insert_limited(uuid, uuid, uuid, uuid, text, text, text, text, uuid, text, timestamptz, timestamptz, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_insert_limited(uuid, uuid, uuid, uuid, text, text, text, text, uuid, text, timestamptz, timestamptz, integer) FROM anon;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_insert_limited(uuid, uuid, uuid, uuid, text, text, text, text, uuid, text, timestamptz, timestamptz, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.practice_listener_comment_insert_limited(uuid, uuid, uuid, uuid, text, text, text, text, uuid, text, timestamptz, timestamptz, integer) TO service_role;
+
+REVOKE ALL ON FUNCTION public.practice_listener_comment_edit_limited(uuid, uuid, uuid, text, text, text, timestamptz, timestamptz, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_edit_limited(uuid, uuid, uuid, text, text, text, timestamptz, timestamptz, integer) FROM anon;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_edit_limited(uuid, uuid, uuid, text, text, text, timestamptz, timestamptz, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.practice_listener_comment_edit_limited(uuid, uuid, uuid, text, text, text, timestamptz, timestamptz, integer) TO service_role;
+
+REVOKE ALL ON FUNCTION public.practice_listener_comment_report_limited(uuid, uuid, uuid, text, text, timestamptz, timestamptz, integer) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_report_limited(uuid, uuid, uuid, text, text, timestamptz, timestamptz, integer) FROM anon;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_report_limited(uuid, uuid, uuid, text, text, timestamptz, timestamptz, integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.practice_listener_comment_report_limited(uuid, uuid, uuid, text, text, timestamptz, timestamptz, integer) TO service_role;
 
 COMMIT;

@@ -12,11 +12,13 @@ import { CommentStoreUnavailable, createSupabaseCommentStore } from "@/lib/pract
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-export function commentJson(result: { ok: false; status: number; error: string } | { ok: true }): NextResponse {
+export function commentJson(
+  result: { ok: false; status: number; error: string } | { ok: true },
+): NextResponse {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
-  const { ok: _ok, ...body } = result;
+  const body = Object.fromEntries(Object.entries(result).filter(([key]) => key !== "ok"));
   return NextResponse.json(body);
 }
 

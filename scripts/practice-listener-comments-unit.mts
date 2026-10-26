@@ -22,6 +22,7 @@ import {
 } from "../src/lib/practice-comments/memory-store";
 import { decodeCommentCursor, encodeCommentCursor } from "../src/lib/practice-comments/pagination";
 import {
+  COMMENT_CREATE_LIMIT,
   COMMENT_EDIT_LIMIT,
   COMMENT_REPLY_LIMIT,
   createImpression,
@@ -627,6 +628,23 @@ async function testEditAndReplyRateLimits() {
   });
   assert.equal(tooMany.ok, false);
   if (!tooMany.ok) assert.equal(tooMany.error, "rate_limited");
+
+  const burstStore = createMemoryCommentStore(state());
+  const burst = await Promise.all(
+    Array.from({ length: COMMENT_CREATE_LIMIT + 4 }, (_, index) =>
+      createImpression(burstStore, actor(listener), clock(), {
+        authorSlug: "anna",
+        productSlug: "tihaya",
+        body: `Спокойное впечатление ${index + 1}`,
+        publicName: "Мария",
+        clientRequestId: null,
+      }),
+    ),
+  );
+  assert.equal(burst.filter((item) => item.ok).length, COMMENT_CREATE_LIMIT);
+  for (const item of burst) {
+    if (!item.ok) assert.equal(item.error, "rate_limited");
+  }
 }
 
 async function testModeratorScopeAndQueueSource() {
@@ -638,8 +656,20 @@ async function testModeratorScopeAndQueueSource() {
     service.indexOf("export async function listModerationQueue"),
   );
   assert.doesNotMatch(moderate, /status: "published"|action: "restore"/);
-  assert.match(service, /countRecentReplies/);
-  assert.match(service, /countRecentEdits/);
+  assert.match(service, /insertCommentLimited/);
+  assert.match(service, /commitEditLimited/);
+  assert.match(service, /insertReportLimited/);
+  assert.doesNotMatch(service, /countRecentReplies|countRecentEdits|countRecentReports|countRecentImpressions/);
+  assert.doesNotMatch(read("src/lib/practice-comments/types.ts"), /restore/);
+  assert.doesNotMatch(read("src/lib/practice-comments/copy.ts"), /restore/);
+  assert.doesNotMatch(read("src/lib/practice-comments/supabase-store.ts"), /restore/);
+  assert.equal("restore" in MODERATION_ACTION_LABELS, false);
+  assert.doesNotMatch(read("src/lib/practice-comments/server.ts"), /_ok/);
+  const commentsUi = read("src/components/products/practice-page/PracticeComments.tsx");
+  assert.match(
+    commentsUi,
+    /role="alert"[\s\S]{0,500}formError === "unauthorized"[\s\S]{0,400}buildAuthRouteHref\("\/auth\/sign-in", signInReturnPath\)/,
+  );
   const panel = read("src/components/admin/AdminListenerCommentsPanel.tsx");
   assert.equal(LISTENER_IMPRESSION_LOAD_MORE, "Показать ещё");
   assert.match(panel, /LISTENER_IMPRESSION_LOAD_MORE/);

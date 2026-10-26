@@ -394,6 +394,14 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: ["src/app/api/author/terms/accept/route.ts"],
     },
     {
+      // Marking a listener-comment notice read uses auth.getUser(), not the
+      // support acting user, and writes no support audit. Block the POST.
+      key: "author_listener_comment_notice_read",
+      group: "blocked",
+      disposition: "blocked",
+      routePatterns: ["src/app/api/author/listener-comments/route.ts"],
+    },
+    {
       key: "commercial_application",
       group: "cabinet",
       disposition: "allowed_audited",

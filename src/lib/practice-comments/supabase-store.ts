@@ -311,6 +311,67 @@ export function createSupabaseCommentStore(input: {
       throwIfUnavailable(error);
       if (error) throw new Error("listener_comment_edit_log_failed");
     },
+    async insertCommentLimited(row, claim) {
+      const { data, error } = await writer.rpc("practice_listener_comment_insert_limited", {
+        p_id: row.id,
+        p_practice_id: row.practiceId,
+        p_user_id: row.userId,
+        p_parent_id: row.parentId,
+        p_kind: row.kind,
+        p_body: row.body,
+        p_public_name: row.publicName,
+        p_status: row.status,
+        p_client_request_id: row.clientRequestId,
+        p_body_fingerprint: row.bodyFingerprint,
+        p_created_at: row.createdAt,
+        p_since: claim.sinceIso,
+        p_limit: claim.limit,
+      });
+      throwIfUnavailable(error);
+      if (error) throw error;
+      if (data === "rate_limited") return "rate_limited";
+      if (data !== "created") throw new Error("listener_comment_insert_failed");
+      return row;
+    },
+    async commitEditLimited(id, patch, edit, claim) {
+      if (!patch.body || !patch.publicName || !patch.bodyFingerprint || !patch.updatedAt) {
+        throw new Error("listener_comment_update_failed");
+      }
+      const { data, error } = await writer.rpc("practice_listener_comment_edit_limited", {
+        p_comment_id: id,
+        p_user_id: edit.userId,
+        p_edit_id: edit.id,
+        p_body: patch.body,
+        p_public_name: patch.publicName,
+        p_body_fingerprint: patch.bodyFingerprint,
+        p_updated_at: patch.updatedAt,
+        p_since: claim.sinceIso,
+        p_limit: claim.limit,
+      });
+      throwIfUnavailable(error);
+      if (error) throw error;
+      if (data === "rate_limited") return "rate_limited";
+      if (data !== "updated") throw new Error("listener_comment_update_failed");
+      const updated = await this.getRaw(id);
+      if (!updated) throw new Error("listener_comment_update_failed");
+      return updated;
+    },
+    async insertReportLimited(row, claim) {
+      const { data, error } = await writer.rpc("practice_listener_comment_report_limited", {
+        p_id: row.id,
+        p_comment_id: row.commentId,
+        p_reporter_user_id: row.reporterUserId,
+        p_reason: row.reason,
+        p_details: row.details,
+        p_created_at: row.createdAt,
+        p_since: claim.sinceIso,
+        p_limit: claim.limit,
+      });
+      throwIfUnavailable(error);
+      if (error) throw error;
+      if (data === "created" || data === "duplicate" || data === "rate_limited") return data;
+      throw new Error("listener_comment_report_failed");
+    },
     async findRecentDuplicate(query) {
       let request = writer
         .from("practice_listener_comments")
@@ -503,7 +564,7 @@ export function createSupabaseCommentStore(input: {
       if (error) throw new Error("listener_comment_moderation_events_failed");
       return (data ?? []).map((item) => {
         const row = item as Record<string, unknown>;
-        const action = row.action === "hide" || row.action === "restore" ? row.action : "report";
+        const action = row.action === "hide" ? "hide" : "report";
         return {
           id: String(row.id),
           commentId: String(row.comment_id),

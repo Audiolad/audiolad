@@ -138,6 +138,27 @@ BEGIN
     WHEN insufficient_privilege THEN
       NULL;
   END;
+  BEGIN
+    PERFORM public.practice_listener_comment_insert_limited(
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      practice,
+      listener,
+      NULL,
+      'impression',
+      'Чужой слот',
+      'Мария',
+      'published',
+      NULL,
+      'чужой слот',
+      now(),
+      now() - interval '10 minutes',
+      6
+    );
+    RAISE EXCEPTION 'authenticated must not claim a comment slot';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
   RESET ROLE;
 
   SELECT count(*) INTO cnt FROM public.practice_listener_comment_reports;

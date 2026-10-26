@@ -15,16 +15,26 @@ email or SMS. A moderator with `products.moderate` can hide a comment. The
 application does not restore a hidden comment. `practice_listener_comment_edits`
 stores one row per successful text edit so the edit rate limit is shared by
 every app process. Reply throttling counts `author_reply` rows in the window.
+Create, reply, edit and report limits are claimed with `pg_advisory_xact_lock`
+and the matching insert in one transaction (`practice_listener_comment_insert_limited`,
+`practice_listener_comment_edit_limited`, `practice_listener_comment_report_limited`).
+A parallel burst cannot pass the same count. Those functions are executable
+only by `service_role`.
 Apply on production needs a separate decision from Sergey.
 
 ### Disable without deleting data
 
-Leave the tables in place. Do not deploy the listener-comment routes. RLS
-already denies anon and authenticated writes, so existing impressions, reports,
-the moderation journal, edit marks and notices stay stored and are not readable
-by the public client. Notices stay readable by the recipient. `practice_ratings`
-and product moderation stay independent. No rows need to be deleted to turn
-the feature off.
+Leave the tables in place. Do not deploy the listener-comment routes. The feed
+view is granted `SELECT` to `anon` and `authenticated`. To hide that feed and
+keep every row, revoke the view read. This statement is operator-only and is
+not executed by the migration:
+
+`REVOKE SELECT ON TABLE public.practice_listener_comment_feed FROM anon, authenticated;`
+
+RLS already denies anon and authenticated writes. Reports, the moderation
+journal and edit marks are not granted to those roles. Notices stay readable
+by the recipient. `practice_ratings` and product moderation stay independent.
+No rows need to be deleted to turn the feature off.
 
 ### Rollback of objects (operator only, not executed)
 

@@ -45,7 +45,7 @@ export type CommentReportRow = {
   createdAt: string;
 };
 
-export type ModerationAction = "hide" | "restore" | "report";
+export type ModerationAction = "hide" | "report";
 
 export type CommentEditMark = {
   id: string;

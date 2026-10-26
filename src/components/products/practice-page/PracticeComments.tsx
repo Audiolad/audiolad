@@ -159,13 +159,13 @@ export default function PracticeComments({
       });
       const payload = (await response.json()) as { error?: string; comment?: PublicCommentDto };
       if (!response.ok || !payload.comment) {
-        setFormError(messageFor(payload.error));
+        setFormError(payload.error ?? "internal_error");
         return;
       }
       setBody("");
       setComments((current) => [payload.comment!, ...current.filter((item) => item.id !== payload.comment!.id)]);
     } catch {
-      setFormError(messageFor("internal_error"));
+      setFormError("internal_error");
     } finally {
       setPending(false);
     }
@@ -239,7 +239,19 @@ export default function PracticeComments({
           </label>
           {formError ? (
             <p className="mt-2 text-sm text-[#9a3d55]" role="alert">
-              {formError}
+              {formError === "unauthorized" ? (
+                <>
+                  Войдите, чтобы оставить отзыв.{" "}
+                  <a
+                    className="font-semibold underline"
+                    href={buildAuthRouteHref("/auth/sign-in", signInReturnPath)}
+                  >
+                    Войти
+                  </a>
+                </>
+              ) : (
+                messageFor(formError)
+              )}
             </p>
           ) : null}
           <button

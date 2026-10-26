@@ -55,6 +55,20 @@ export type CommentStore = {
   countRecentReplies(userId: string, sinceIso: string): Promise<number>;
   countRecentEdits(userId: string, sinceIso: string): Promise<number>;
   recordEdit(row: CommentEditMark): Promise<void>;
+  insertCommentLimited(
+    row: ListenerCommentRow,
+    claim: CommentRateClaim,
+  ): Promise<ListenerCommentRow | "rate_limited">;
+  commitEditLimited(
+    id: string,
+    patch: CommentWritePatch,
+    edit: CommentEditMark,
+    claim: CommentRateClaim,
+  ): Promise<ListenerCommentRow | "rate_limited">;
+  insertReportLimited(
+    row: CommentReportRow,
+    claim: CommentRateClaim,
+  ): Promise<"created" | "duplicate" | "rate_limited">;
   findRecentDuplicate(input: {
     userId: string;
     practiceId: string;
@@ -101,6 +115,25 @@ export type CommentStore = {
     limit: number;
   }): Promise<ListenerCommentRow[]>;
 };
+
+export type CommentRateClaim = {
+  sinceIso: string;
+  limit: number;
+};
+
+export type CommentWritePatch = Partial<
+  Pick<
+    ListenerCommentRow,
+    | "body"
+    | "publicName"
+    | "bodyFingerprint"
+    | "status"
+    | "updatedAt"
+    | "editedAt"
+    | "deletedAt"
+    | "hiddenReason"
+  >
+> & { hiddenBy?: string | null; hiddenAt?: string | null };
 
 export type NewCommentInput = {
   practiceId: string;

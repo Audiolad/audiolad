@@ -84,6 +84,5 @@ export const REPORT_REASON_LABELS = {
 
 export const MODERATION_ACTION_LABELS = {
   hide: "Скрыт",
-  restore: "Возвращён",
   report: "Жалоба",
 } as const;

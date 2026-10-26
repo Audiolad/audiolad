@@ -13,6 +13,21 @@ import type {
   ModerationEventRow,
 } from "@/lib/practice-comments/types";
 
+const rateLocks = new Map<string, Promise<unknown>>();
+
+function withRateLock<T>(key: string, work: () => Promise<T> | T): Promise<T> {
+  const previous = rateLocks.get(key) ?? Promise.resolve();
+  const run = previous.then(work, work);
+  rateLocks.set(
+    key,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
 export type MemoryCommentState = {
   gates: ListenerCommentPracticeGate[];
   memberships: Array<{ userId: string; practiceId: string; authorId: string }>;
@@ -166,6 +181,45 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     },
     async recordEdit(row) {
       state.edits.push(row);
+    },
+    async insertCommentLimited(row, claim) {
+      const bucket = row.kind === "author_reply" ? "reply" : "impression";
+      return withRateLock(`${row.userId}:${bucket}`, async () => {
+        const count =
+          bucket === "reply"
+            ? state.comments.filter(
+                (item) => item.userId === row.userId && item.kind === "author_reply" && item.createdAt >= claim.sinceIso,
+              ).length
+            : state.comments.filter(
+                (item) =>
+                  item.userId === row.userId &&
+                  item.kind === "impression" &&
+                  item.status !== "deleted" &&
+                  item.createdAt >= claim.sinceIso,
+              ).length;
+        if (count >= claim.limit) return "rate_limited" as const;
+        return this.insertComment(row);
+      });
+    },
+    async commitEditLimited(id, patch, edit, claim) {
+      return withRateLock(`${edit.userId}:edit`, async () => {
+        const count = state.edits.filter(
+          (item) => item.userId === edit.userId && item.createdAt >= claim.sinceIso,
+        ).length;
+        if (count >= claim.limit) return "rate_limited" as const;
+        const updated = await this.updateComment(id, patch);
+        state.edits.push(edit);
+        return updated;
+      });
+    },
+    async insertReportLimited(row, claim) {
+      return withRateLock(`${row.reporterUserId}:report`, async () => {
+        const count = state.reports.filter(
+          (item) => item.reporterUserId === row.reporterUserId && item.createdAt >= claim.sinceIso,
+        ).length;
+        if (count >= claim.limit) return "rate_limited" as const;
+        return this.insertReport(row);
+      });
     },
     async findRecentDuplicate(input) {
       return (

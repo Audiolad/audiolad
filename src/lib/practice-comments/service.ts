@@ -258,11 +258,6 @@ export async function createImpression(
     return commentFailure(429, "rate_limited");
   }
   const now = clock.now();
-  const recent = await store.countRecentImpressions(
-    actor.userId,
-    minus(now, COMMENT_CREATE_WINDOW_MS),
-  );
-  if (recent >= COMMENT_CREATE_LIMIT) return commentFailure(429, "rate_limited");
 
   const fingerprint = commentFingerprint(body.value);
   const duplicate = await store.findRecentDuplicate({
@@ -292,7 +287,11 @@ export async function createImpression(
   };
 
   try {
-    await store.insertComment(row);
+    const inserted = await store.insertCommentLimited(row, {
+      sinceIso: minus(now, COMMENT_CREATE_WINDOW_MS),
+      limit: COMMENT_CREATE_LIMIT,
+    });
+    if (inserted === "rate_limited") return commentFailure(429, "rate_limited");
   } catch (error) {
     if (isUniqueViolation(error) && requestId.value) {
       const existing = await store.findByRequest(actor.userId, requestId.value);
@@ -350,22 +349,25 @@ export async function updateOwnComment(
     return commentFailure(429, "rate_limited");
   }
   const nowDate = clock.now();
-  const edits = await store.countRecentEdits(actor.userId, minus(nowDate, COMMENT_EDIT_WINDOW_MS));
-  if (edits >= COMMENT_EDIT_LIMIT) return commentFailure(429, "rate_limited");
   const now = iso(nowDate);
-  const updated = await store.updateComment(row.id, {
-    body: body.value,
-    publicName,
-    bodyFingerprint: fingerprint,
-    updatedAt: now,
-    editedAt: now,
-  });
-  await store.recordEdit({
-    id: randomUUID(),
-    commentId: row.id,
-    userId: actor.userId,
-    createdAt: now,
-  });
+  const updated = await store.commitEditLimited(
+    row.id,
+    {
+      body: body.value,
+      publicName,
+      bodyFingerprint: fingerprint,
+      updatedAt: now,
+      editedAt: now,
+    },
+    {
+      id: randomUUID(),
+      commentId: row.id,
+      userId: actor.userId,
+      createdAt: now,
+    },
+    { sinceIso: minus(nowDate, COMMENT_EDIT_WINDOW_MS), limit: COMMENT_EDIT_LIMIT },
+  );
+  if (updated === "rate_limited") return commentFailure(429, "rate_limited");
   return { ok: true, comment: await attachReply(store, updated, actor.userId) };
 }
 
@@ -423,11 +425,6 @@ export async function replyAsAuthor(
     return commentFailure(429, "rate_limited");
   }
   const now = clock.now();
-  const recentReplies = await store.countRecentReplies(
-    actor.userId,
-    minus(now, COMMENT_REPLY_WINDOW_MS),
-  );
-  if (recentReplies >= COMMENT_REPLY_LIMIT) return commentFailure(429, "rate_limited");
   const row: ListenerCommentRow = {
     id: randomUUID(),
     practiceId: parent.practiceId,
@@ -446,7 +443,11 @@ export async function replyAsAuthor(
     deletedAt: null,
   };
   try {
-    await store.insertComment(row);
+    const inserted = await store.insertCommentLimited(row, {
+      sinceIso: minus(now, COMMENT_REPLY_WINDOW_MS),
+      limit: COMMENT_REPLY_LIMIT,
+    });
+    if (inserted === "rate_limited") return commentFailure(429, "rate_limited");
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
     return { ok: true, comment: await attachReply(store, parent, actor.userId), replayed: true };
@@ -479,17 +480,19 @@ export async function reportComment(
   if (!clock.rateLimit(`listener-comment:report:${actor.userId}`, COMMENT_REPORT_LIMIT, COMMENT_REPORT_WINDOW_MS)) {
     return commentFailure(429, "rate_limited");
   }
-  const recent = await store.countRecentReports(actor.userId, minus(clock.now(), COMMENT_REPORT_WINDOW_MS));
-  if (recent >= COMMENT_REPORT_LIMIT) return commentFailure(429, "rate_limited");
   const createdAt = iso(clock.now());
-  const result = await store.insertReport({
-    id: randomUUID(),
-    commentId: row.id,
-    reporterUserId: actor.userId,
-    reason: input.reason,
-    details: details.value,
-    createdAt,
-  });
+  const result = await store.insertReportLimited(
+    {
+      id: randomUUID(),
+      commentId: row.id,
+      reporterUserId: actor.userId,
+      reason: input.reason,
+      details: details.value,
+      createdAt,
+    },
+    { sinceIso: minus(clock.now(), COMMENT_REPORT_WINDOW_MS), limit: COMMENT_REPORT_LIMIT },
+  );
+  if (result === "rate_limited") return commentFailure(429, "rate_limited");
   if (result === "created") {
     const event: ModerationEventRow = {
       id: randomUUID(),
