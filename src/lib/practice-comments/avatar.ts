@@ -2,6 +2,9 @@ const AVATAR_COLORS = ["#7042c5", "#5b4b8a", "#8a5a9a", "#3f6f8a", "#6a4a3a", "#
 
 export const LISTENER_COMMENT_AVATAR_PREFIX = "/api/listener-comment-avatars/";
 
+/** Same-origin preview of the signed-in listener's own profile avatar. */
+export const LISTENER_VIEWER_AVATAR_PATH = `${LISTENER_COMMENT_AVATAR_PREFIX}me`;
+
 const COMMENT_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -38,6 +41,8 @@ export function sanitizePublicAvatarUrl(
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > 2000 || trimmed !== value.trim()) return null;
 
+  if (trimmed === LISTENER_VIEWER_AVATAR_PATH) return trimmed;
+
   const proxyId = trimmed.slice(LISTENER_COMMENT_AVATAR_PREFIX.length);
   if (
     trimmed.startsWith(LISTENER_COMMENT_AVATAR_PREFIX) &&
@@ -73,6 +78,26 @@ export function sanitizePublicAvatarUrl(
   const surname = surnameOf(forbidden?.fullName)?.toLocaleLowerCase("ru-RU");
   if (surname && lower.includes(surname)) return null;
   return href;
+}
+
+/**
+ * Avatar the signed-in listener will see on their own review.
+ * A public https address is used as-is. A stored profile file is served
+ * from the same-origin preview, never as a storage path or signed URL.
+ */
+export function resolveViewerCommentAvatar(input: {
+  userId: string;
+  profileUrl?: string | null;
+  profilePath?: string | null;
+  profileFullName?: string | null;
+}): string | null {
+  const safe = sanitizePublicAvatarUrl(input.profileUrl, {
+    userId: input.userId,
+    fullName: input.profileFullName,
+  });
+  if (safe) return safe;
+  if (input.profilePath?.trim()) return LISTENER_VIEWER_AVATAR_PATH;
+  return null;
 }
 
 export function resolveListenerAvatarUrl(input: {

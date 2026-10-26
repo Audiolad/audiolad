@@ -1,5 +1,6 @@
 import { USER_AVATARS_BUCKET, isValidUserAvatarPath } from "@/lib/profile/avatar";
 import { listenerImpressionInFeed, openListenerCommentAvatar } from "@/lib/practice-comments/avatar-proxy";
+import { openSignedInListenerAvatar } from "@/lib/practice-comments/viewer-avatar";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -16,6 +17,9 @@ function hiddenAvatar(): Response {
 
 export async function GET(request: Request, context: RouteContext) {
   const { commentId } = await context.params;
+  if (commentId === "me") {
+    return openSignedInListenerAvatar(request);
+  }
   if (!COMMENT_ID_RE.test(commentId)) {
     return hiddenAvatar();
   }

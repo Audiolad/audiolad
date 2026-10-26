@@ -1,8 +1,11 @@
 "use client";
 
-import type { FormEvent } from "react";
+import { useEffect, useRef, type FormEvent } from "react";
 
+import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import {
+  LISTENER_IMPRESSION_EMOJIS,
+  LISTENER_IMPRESSION_EMOJI_LABEL,
   LISTENER_IMPRESSION_NAME_LABEL,
   LISTENER_IMPRESSION_PLACEHOLDER,
   LISTENER_IMPRESSION_SAVING,
@@ -10,9 +13,10 @@ import {
   LISTENER_IMPRESSION_SUBMIT,
 } from "@/lib/practice-comments/copy";
 import type { ListenerCommentComposerMode } from "@/lib/practice-comments/composer";
+import { COMMENT_BODY_MAX, insertImpressionEmoji } from "@/lib/practice-comments/text";
 
 const fieldClass =
-  "mt-2 w-full rounded-[16px] border border-[#e4d7f4] bg-white px-3 py-3 text-base text-[#2b2144] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+  "mt-2 box-border w-full min-w-0 max-w-full rounded-[16px] border border-[#e4d7f4] bg-white px-3 py-3 text-base text-[#2b2144] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
 const buttonClass =
   "inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold";
@@ -20,6 +24,7 @@ const buttonClass =
 export default function ListenerCommentComposer({
   mode,
   publicName,
+  avatarUrl,
   body,
   pending,
   formError,
@@ -31,6 +36,7 @@ export default function ListenerCommentComposer({
 }: {
   mode: ListenerCommentComposerMode;
   publicName: string;
+  avatarUrl: string | null;
   body: string;
   pending: boolean;
   formError: string | null;
@@ -40,6 +46,34 @@ export default function ListenerCommentComposer({
   onBodyChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
 }) {
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const caretRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const caret = caretRef.current;
+    const field = bodyRef.current;
+    if (caret == null || !field) return;
+    caretRef.current = null;
+    field.focus();
+    field.setSelectionRange(caret, caret);
+  }, [body]);
+
+  function insertEmoji(emoji: string) {
+    const field = bodyRef.current;
+    const next = insertImpressionEmoji({
+      body,
+      emoji,
+      selectionStart: field?.selectionStart ?? body.length,
+      selectionEnd: field?.selectionEnd ?? body.length,
+      maxLength: COMMENT_BODY_MAX,
+    });
+    if (!next) return;
+    caretRef.current = next.caret;
+    onBodyChange(next.body);
+  }
+
+  if (mode === "hidden") return null;
+
   if (mode === "sign_in") {
     return (
       <p className="mt-4 text-sm leading-6 text-[#6d628c]" data-listener-comment-composer="sign_in">
@@ -53,32 +87,53 @@ export default function ListenerCommentComposer({
 
   return (
     <form
-      className="mt-4"
+      className="mt-4 min-w-0 max-w-full"
       data-listener-comment-composer="form"
       onSubmit={onSubmit}
     >
-      <label className="block text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-name">
-        {LISTENER_IMPRESSION_NAME_LABEL}
-        <input
-          id="listener-impression-name"
-          className={fieldClass}
-          value={publicName}
-          maxLength={40}
-          onChange={(event) => onPublicNameChange(event.target.value)}
-          autoComplete="nickname"
-        />
-      </label>
-      <label className="mt-3 block text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-body">
+      <div className="flex min-w-0 items-end gap-3" data-listener-comment-preview="avatar">
+        <span className="mb-1 shrink-0">
+          <ListenerImpressionAvatar name={publicName} url={avatarUrl} />
+        </span>
+        <label className="block min-w-0 flex-1 text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-name">
+          {LISTENER_IMPRESSION_NAME_LABEL}
+          <input
+            id="listener-impression-name"
+            className={fieldClass}
+            value={publicName}
+            maxLength={40}
+            onChange={(event) => onPublicNameChange(event.target.value)}
+            autoComplete="nickname"
+          />
+        </label>
+      </div>
+      <label className="mt-3 block min-w-0 max-w-full text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-body">
         Ваше впечатление
         <textarea
+          ref={bodyRef}
           id="listener-impression-body"
           className={`${fieldClass} min-h-28`}
           value={body}
-          maxLength={2000}
+          maxLength={COMMENT_BODY_MAX}
           placeholder={LISTENER_IMPRESSION_PLACEHOLDER}
           onChange={(event) => onBodyChange(event.target.value)}
         />
       </label>
+      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={LISTENER_IMPRESSION_EMOJI_LABEL}>
+        {LISTENER_IMPRESSION_EMOJIS.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            aria-label={item.label}
+            data-listener-impression-emoji={item.label}
+            className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-[#e4d7f4] bg-white px-2 text-xl leading-none"
+            onPointerDown={(event) => event.preventDefault()}
+            onClick={() => insertEmoji(item.emoji)}
+          >
+            {item.emoji}
+          </button>
+        ))}
+      </div>
       {formError ? (
         <p className="mt-2 text-sm text-[#9a3d55]" role="alert">
           {formError === "unauthorized" ? (

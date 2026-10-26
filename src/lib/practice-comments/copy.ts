@@ -10,7 +10,7 @@ export const LISTENER_IMPRESSION_INVITE_ACTION = "Написать отзыв";
 export const LISTENER_IMPRESSION_INVITE_DISMISS = "Не сейчас";
 
 export const LISTENER_IMPRESSION_PRIVACY =
-  "Отзыв виден на странице практики другим слушателям и автору. Публикуется только имя, которое вы укажете здесь. Фамилия и почта не показываются. Поделитесь впечатлением от практики – тем, что хотите оставить на странице. Отзыв можно изменить или удалить. Это по желанию и ни на что не влияет.";
+  "Отзыв виден на странице практики другим слушателям и автору. Публикуется имя из поля. Его можно сократить перед публикацией. Почта не показывается. Поделитесь впечатлением от практики – тем, что хотите оставить на странице. Отзыв можно изменить или удалить. Это по желанию и ни на что не влияет.";
 
 export const LISTENER_IMPRESSION_EMPTY =
   "Пока нет отзывов. Если захотите, можно поделиться впечатлением.";
@@ -23,7 +23,17 @@ export const LISTENER_IMPRESSION_SUBMIT = "Опубликовать отзыв";
 export const LISTENER_IMPRESSION_SAVING = "Публикуем…";
 
 export const LISTENER_IMPRESSION_PLACEHOLDER =
-  "Что вы заметили, пока слушали";
+  "Что вы почувствовали, заметили, ощутили, когда слушали";
+
+export const LISTENER_IMPRESSION_EMOJI_LABEL = "Добавить в отзыв";
+
+export const LISTENER_IMPRESSION_EMOJIS = [
+  { emoji: "❤️", label: "Сердце" },
+  { emoji: "🔥", label: "Огонь" },
+  { emoji: "🙏", label: "Благодарю" },
+  { emoji: "😇", label: "Ангел" },
+  { emoji: "🕊️", label: "Голубь" },
+] as const;
 
 export const LISTENER_IMPRESSION_NAME_LABEL = "Имя в отзыве";
 
