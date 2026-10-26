@@ -936,15 +936,36 @@ function linkHostIsProtected(path, text) {
   return isQuoteParagraph(text);
 }
 
-/** Drop every glued «Подробнее:» / «Читайте также:» suffix, then any remaining copy of this token. */
+const GLUE_BODY = /^(?:Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности)\s*:\s*\[[^\]]*\]\(\/s\/[a-z0-9-]+\)\.?/iu;
+
+/** Length of one glued lead+link at `index`, including exactly one adjacent space (the space before the lead). 0 if none. */
+function glueSpanAt(text, index) {
+  const rest = text.slice(index);
+  if (rest.startsWith(" ") && GLUE_BODY.test(rest.slice(1))) {
+    return 1 + rest.slice(1).match(GLUE_BODY)[0].length;
+  }
+  const body = rest.match(GLUE_BODY);
+  return body ? body[0].length : 0;
+}
+
+/** Drop every glued «Подробнее:» / «Читайте также:» sentence anywhere in the paragraph, then a bare copy of this token. */
 function stripProtectedLinks(text, anchor, slug) {
-  const suffix = /\s*(?:Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности)\s*:\s*\[[^\]]*\]\(\/s\/[a-z0-9-]+\)\.?/giu;
   let next = String(text ?? "");
-  let previous = "";
-  while (next !== previous) {
-    previous = next;
-    suffix.lastIndex = 0;
-    next = next.replace(suffix, "");
+  let guard = 0;
+  while (guard < 12) {
+    const spans = [];
+    for (let index = 0; index < next.length;) {
+      const cut = glueSpanAt(next, index);
+      if (!cut) {
+        index += 1;
+        continue;
+      }
+      spans.push([index, index + cut]);
+      index += cut;
+    }
+    if (!spans.length) break;
+    for (const [start, end] of spans.reverse()) next = next.slice(0, start) + next.slice(end);
+    guard += 1;
   }
   if (anchor && slug) {
     const token = `[${anchor}](/s/${slug})`;
@@ -1060,32 +1081,28 @@ function currentPathText(fields, path, fallback) {
   return typeof value === "string" ? value : fallback;
 }
 
-/** Kept characters stay in order. Every deleted span is a glued lead or one markdown token, and no residue remains. */
+/** Kept characters stay in order. A glued lead is removed wherever it sits, with one space before it, and no residue remains. */
 function keptAfterGluedSuffix(original, stripped) {
   if (typeof stripped !== "string" || !stripped.trim() || linkLeadResidue(stripped).length) return false;
-  const cutOnce = (rest) => {
-    const glued = rest.match(/^\s*(?:Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности)\s*:\s*\[[^\]]*\]\(\/s\/[a-z0-9-]+\)\.?/iu);
-    if (glued) return glued[0].length;
-    const token = rest.match(/^\[[^\]]+\]\(\/s\/[a-z0-9-]+\)/u);
-    if (token) return token[0].length;
-    return 0;
-  };
   let o = 0;
-  for (let s = 0; s < stripped.length; s += 1) {
-    if (original[o] === stripped[s]) {
-      o += 1;
+  let s = 0;
+  while (o < original.length || s < stripped.length) {
+    const cut = glueSpanAt(original, o);
+    if (cut) {
+      o += cut;
       continue;
     }
-    const cut = cutOnce(original.slice(o));
-    if (!cut) return false;
-    o += cut;
-    s -= 1;
-  }
-  let tail = original.slice(o);
-  while (tail.length) {
-    const cut = cutOnce(tail);
-    if (!cut) return false;
-    tail = tail.slice(cut);
+    const token = original.slice(o).match(/^\[[^\]]+\]\(\/s\/[a-z0-9-]+\)/u);
+    if (token && (s >= stripped.length || original[o] !== stripped[s])) {
+      o += token[0].length;
+      continue;
+    }
+    if (s < stripped.length && original[o] === stripped[s]) {
+      o += 1;
+      s += 1;
+      continue;
+    }
+    return false;
   }
   return true;
 }
