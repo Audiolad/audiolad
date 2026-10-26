@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import * as ListenerCommentComposerModule from "../src/components/products/practice-page/ListenerCommentComposer";
 import * as ListenerImpressionAvatarModule from "../src/components/products/practice-page/ListenerImpressionAvatar";
 import {
   listenerAvatarColor,
@@ -20,10 +21,13 @@ import {
 import { openListenerCommentAvatar } from "../src/lib/practice-comments/avatar-proxy";
 import { isListenerCommentFeedVisible } from "../src/lib/practice-comments/visibility";
 
+import { resolveListenerCommentComposer } from "../src/lib/practice-comments/composer";
 import {
   LISTENER_IMPRESSION_INVITE,
   LISTENER_IMPRESSION_LOAD_MORE,
   LISTENER_IMPRESSION_PRIVACY,
+  LISTENER_IMPRESSION_SIGN_IN,
+  LISTENER_IMPRESSION_SUBMIT,
   MODERATION_ACTION_LABELS,
   REPORT_REASON_LABELS,
 } from "../src/lib/practice-comments/copy";
@@ -659,6 +663,110 @@ async function testEditAndReplyRateLimits() {
   }
 }
 
+function componentExport<Props>(module: { default: unknown }): (props: Props) => unknown {
+  let value: unknown = module.default;
+  while (value && typeof value === "object" && "default" in value) {
+    value = (value as { default: unknown }).default;
+  }
+  if (typeof value !== "function") {
+    throw new Error("component export is not a function");
+  }
+  return value as (props: Props) => unknown;
+}
+
+async function testSignedInListenerSeesComposer() {
+  const store = createMemoryCommentStore(state());
+  const stranger = "66666666-6666-4666-8666-666666666666";
+  const signedIn = await listPracticeComments(store, actor(stranger), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(signedIn.ok, true);
+  if (!signedIn.ok) return;
+  assert.equal(signedIn.viewer.authenticated, true);
+  assert.equal(signedIn.viewer.canComment, true);
+  const created = await createImpression(store, actor(stranger), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Тихий вечер после практики",
+    publicName: "Олег",
+    clientRequestId: null,
+  });
+  assert.equal(created.ok, true, "a signed-in listener needs no purchase to review a practice");
+
+  const guestPayload = resolveListenerCommentComposer({
+    isAuthenticated: true,
+    viewerCanComment: false,
+    viewerAuthenticated: false,
+  });
+  assert.equal(guestPayload, "form");
+  assert.equal(
+    resolveListenerCommentComposer({
+      isAuthenticated: false,
+      viewerCanComment: false,
+      viewerAuthenticated: false,
+    }),
+    "sign_in",
+  );
+
+  const Composer = componentExport<Record<string, unknown>>(ListenerCommentComposerModule);
+  const signInHref = "/auth/sign-in?next=%2Fpractice%2Fanna%2Ftihaya";
+  const formMarkup = renderToStaticMarkup(
+    createElement(Composer, {
+      mode: "form",
+      publicName: "Олег",
+      body: "",
+      pending: false,
+      formError: null,
+      signInHref,
+      errorMessage: null,
+      onPublicNameChange: () => undefined,
+      onBodyChange: () => undefined,
+      onSubmit: () => undefined,
+    }),
+  );
+  assert.match(formMarkup, /data-listener-comment-composer="form"/);
+  assert.match(formMarkup, new RegExp(LISTENER_IMPRESSION_SUBMIT));
+  assert.match(formMarkup, /id="listener-impression-body"/);
+  assert.doesNotMatch(formMarkup, /Оценки гостей/);
+
+  const guestMarkup = renderToStaticMarkup(
+    createElement(Composer, {
+      mode: "sign_in",
+      publicName: "",
+      body: "",
+      pending: false,
+      formError: null,
+      signInHref,
+      errorMessage: null,
+      onPublicNameChange: () => undefined,
+      onBodyChange: () => undefined,
+      onSubmit: () => undefined,
+    }),
+  );
+  assert.match(guestMarkup, /data-listener-comment-composer="sign_in"/);
+  assert.ok(guestMarkup.includes(LISTENER_IMPRESSION_SIGN_IN));
+  assert.ok(guestMarkup.includes(`href="${signInHref}"`));
+  assert.doesNotMatch(guestMarkup, /data-listener-comment-composer="form"/);
+  assert.doesNotMatch(guestMarkup, /—/);
+
+  const route = read("src/app/api/listen/product/[slug]/[productSlug]/comments/route.ts");
+  const server = read("src/lib/practice-comments/server.ts");
+  const commentsUi = read("src/components/products/practice-page/PracticeComments.tsx");
+  const stars = read("src/components/products/practice-page/PracticeRatingStars.tsx");
+  assert.match(route, /export const dynamic = "force-dynamic"/);
+  assert.match(server, /Cache-Control": "private, no-store"/);
+  assert.match(server, /Vary: "Cookie"/);
+  assert.match(commentsUi, /cache: "no-store"/);
+  assert.match(commentsUi, /resolveListenerCommentComposer/);
+  assert.doesNotMatch(commentsUi, /viewer\?\.canComment \?/);
+  assert.doesNotMatch(stars, /Оценки гостей/);
+  assert.doesNotMatch(stars, /data-practice-rating-guest-aggregate/);
+}
+
 async function testModeratorScopeAndQueueSource() {
   const restoreRoute = join(root, "src/app/api/admin/listener-comments/[commentId]/restore/route.ts");
   assert.equal(existsSync(restoreRoute), false);
@@ -678,10 +786,15 @@ async function testModeratorScopeAndQueueSource() {
   assert.equal("restore" in MODERATION_ACTION_LABELS, false);
   assert.doesNotMatch(read("src/lib/practice-comments/server.ts"), /_ok/);
   const commentsUi = read("src/components/products/practice-page/PracticeComments.tsx");
+  const composerUi = read("src/components/products/practice-page/ListenerCommentComposer.tsx");
+  assert.match(commentsUi, /buildAuthRouteHref\("\/auth\/sign-in", signInReturnPath\)/);
+  assert.match(commentsUi, /signInHref=\{signInHref\}/);
   assert.match(
-    commentsUi,
-    /role="alert"[\s\S]{0,500}formError === "unauthorized"[\s\S]{0,400}buildAuthRouteHref\("\/auth\/sign-in", signInReturnPath\)/,
+    composerUi,
+    /role="alert"[\s\S]{0,500}formError === "unauthorized"[\s\S]{0,400}href=\{signInHref\}/,
   );
+  assert.match(composerUi, /data-listener-comment-composer="sign_in"/);
+  assert.match(composerUi, /href=\{signInHref\}/);
   const panel = read("src/components/admin/AdminListenerCommentsPanel.tsx");
   assert.equal(LISTENER_IMPRESSION_LOAD_MORE, "Показать ещё");
   assert.match(panel, /LISTENER_IMPRESSION_LOAD_MORE/);
@@ -997,5 +1110,6 @@ await testReportModeration();
 await testModerationQueuePagesPastTwentyOne();
 await testEditAndReplyRateLimits();
 await testEmptyAndPlayerCopy();
+await testSignedInListenerSeesComposer();
 await testModeratorScopeAndQueueSource();
 console.log("practice-listener-comments-unit: ok");

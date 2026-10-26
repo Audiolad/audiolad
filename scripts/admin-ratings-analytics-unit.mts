@@ -18,6 +18,7 @@ import {
   adminEligibleConversion,
   classifyAdminRatingEventKind,
   compareAdminRatingEventsDesc,
+  countGuestRatingsInWindow,
   isCreatedAtInAdminRatingsWindow,
   observeAdminRatingDiagnostics,
   paginateStable,
@@ -46,6 +47,38 @@ const yearAgo = "2025-09-05T12:00:00.000Z";
 const window7d = { from: "2026-08-30T21:00:00.000Z", to: now };
 const window30d = { from: "2026-08-07T21:00:00.000Z", to: now };
 const allTime = { from: null, to: null };
+
+function testGuestAndRegisteredSplit() {
+  const window = { from: "2026-10-01T00:00:00.000Z", to: "2026-10-27T00:00:00.000Z" };
+  const count = countGuestRatingsInWindow(
+    [
+      { createdAt: "2026-10-02T00:00:00.000Z" },
+      { createdAt: "2026-10-03T00:00:00.000Z", excludedAt: "2026-10-04T00:00:00.000Z" },
+      { createdAt: "2026-10-04T00:00:00.000Z", supersededAt: "2026-10-05T00:00:00.000Z" },
+      { createdAt: "2026-09-01T00:00:00.000Z" },
+      { createdAt: "2026-10-06T00:00:00.000Z" },
+    ],
+    window,
+  );
+  assert.equal(count, 2);
+
+  const panel = read("src/components/admin/AdminRatingsPanel.tsx");
+  const queries = read("src/lib/admin/analytics-ratings-queries.ts");
+  assert.match(panel, /data-admin-ratings-audience/);
+  assert.match(panel, /Зарегистрированные: \{registered\}/);
+  assert.match(panel, /Гости: \{guests\}/);
+  assert.match(panel, /registeredRatingCount/);
+  assert.match(panel, /guestRatingCount/);
+  assert.match(queries, /guest_practice_ratings/);
+  assert.match(queries, /superseded_at/);
+  const split = panel.slice(
+    panel.indexOf("export function AdminRatingsAudienceSplit"),
+    panel.indexOf("function formatWhen"),
+  );
+  assert.doesNotMatch(split, /—/);
+  assert.match(split, /Зарегистрированные:/);
+  assert.match(split, /Гости:/);
+}
 
 function testSummaryFixture() {
   const ratings: AdminRatingFact[] = [
@@ -541,6 +574,7 @@ function testSourceContracts() {
   assert.match(panel, /включая авторизованных preview-слушателей/);
 }
 
+testGuestAndRegisteredSplit();
 testSummaryFixture();
 testTemporalAB();
 testEligibleConversionGrain();

@@ -18,7 +18,6 @@ import {
   type PracticeRatingUiState,
 } from "@/lib/ratings/star-click";
 import { useGuestPracticeRating } from "@/lib/ratings/guest/use-guest-rating";
-import { GUEST_RATING_AGGREGATE_LABEL } from "@/lib/ratings/guest/copy";
 import { MAX_PRACTICE_RATING_STARS } from "@/lib/ratings/stars";
 import type { PracticeRatingAggregate } from "@/lib/ratings/types";
 
@@ -220,16 +219,6 @@ export default function PracticeRatingStars({
           </span>
         </div>
       </div>
-      {guestMode && guest.ui.guestAggregate ? (
-        <p
-          className="mt-1 text-sm leading-5 text-[#65577f]"
-          data-practice-rating-guest-aggregate=""
-          data-practice-rating-guest-total-stars={guest.ui.guestAggregate.totalStars}
-          data-practice-rating-guest-count={guest.ui.guestAggregate.ratingCount}
-        >
-          {GUEST_RATING_AGGREGATE_LABEL}: {guest.ui.guestAggregate.ratingCount}
-        </p>
-      ) : null}
       {guest.ui.notice ? (
         <p className="mt-2 text-sm leading-5 text-[#65577f]">{guest.ui.notice}</p>
       ) : null}
