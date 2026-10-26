@@ -94,6 +94,45 @@ function download(config, remotePath, localPath) {
   return result.status === 0;
 }
 
+/** Remote directory names. Do not widen: the host rejects anything outside this set. */
+export function isWriterId(value) {
+  return /^[a-z0-9-]+$/.test(value);
+}
+
+export const WRITER_ID_MAX = 120;
+
+/**
+ * Lowercase [a-z0-9-] id safe for isWriterId. Brackets, dots and underscores become
+ * hyphens. Repeated hyphens collapse; ends are trimmed; the result is capped.
+ * Pass `used` so two attempts in one article do not share a directory.
+ */
+export function writerCallId(raw, { used, maxLength = WRITER_ID_MAX } = {}) {
+  const limit = Math.max(1, maxLength);
+  const cleaned = String(raw ?? "")
+    .replace(/[\[\]._{}]+/g, "-")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const body = cleaned || "call";
+  const fit = (value) => {
+    const cut = value.slice(0, limit).replace(/-+$/g, "");
+    return cut || "call";
+  };
+  let id = fit(body);
+  if (used) {
+    let n = 2;
+    while (used.has(id)) {
+      const suffix = `-${n}`;
+      id = fit(`${body.slice(0, Math.max(1, limit - suffix.length))}${suffix}`);
+      n += 1;
+      if (n > limit + 2) break;
+    }
+    used.add(id);
+  }
+  return id;
+}
+
 /**
  * Executes one generation call on the Moscow host.
  * Returns { meta, article } where article is the parsed model JSON or null.
@@ -101,7 +140,7 @@ function download(config, remotePath, localPath) {
 export function generateOnMoscow(runId, callName, requestPath, localDir) {
   const config = settings();
   const sshCall = (command, options) => ssh(config, command, options);
-  if (!/^[a-z0-9-]+$/.test(runId) || !/^[a-z0-9-]+$/.test(callName)) throw new Error("bad run id");
+  if (!isWriterId(runId) || !isWriterId(callName)) throw new Error("bad run id");
   const remoteDir = `/root/writer/runs/${runId}/${callName}`;
   const prepare = ssh(config, `umask 077 && mkdir -p ${remoteDir}`);
   if (prepare.status !== 0) throw new Error(`Москва недоступна: ${prepare.stderr.trim().slice(0, 300)}`);

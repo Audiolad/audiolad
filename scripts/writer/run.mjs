@@ -20,7 +20,7 @@ import { runChecks, runTests } from "./lib/checks.mjs";
 import { loadContext } from "./lib/context.mjs";
 import { applyToRepo } from "./lib/convert.mjs";
 import { SUPPORTED_MODELS, defaultModelFor, chargedCost, estimatePromptTokens, formatRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
-import { generateOnMoscow } from "./lib/moscow.mjs";
+import { generateOnMoscow, writerCallId } from "./lib/moscow.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
 import { articleSchema, buildExpandMessages, buildMessages, buildRepairMessages, buildRequest, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "./lib/publish.mjs";
@@ -123,7 +123,7 @@ if (szMode) {
 const brief = loadBrief(resolve(args.brief));
 const today = mskDate();
 const stamp = mskNow().slice(11, 16).replace(":", "");
-const runId = `${today}-${stamp}-${brief.slug}`.slice(0, 100);
+const runId = writerCallId(`${today}-${stamp}-${brief.slug}`, { maxLength: 100 });
 const outDir = resolve(args.out ?? join(homedir(), ".cache/writer/runs", runId));
 const repoRoot = mustRun("git", ["rev-parse", "--show-toplevel"]).trim();
 const worktree = join(outDir, "worktree");
@@ -148,7 +148,8 @@ function prepareWorktree() {
   state.baseSha = mustRun("git", ["rev-parse", "HEAD"], { cwd: worktree }).trim();
 }
 
-function callWriter(callName, messages, schema) {
+function callWriter(rawName, messages, schema) {
+  const callName = writerCallId(rawName);
   const request = buildRequest(model, messages, schema, { maxTokens });
   const worst = worstCaseRub(model, estimatePromptTokens(messages, model), maxTokens);
   if (state.spentRub + worst > maxRub) {

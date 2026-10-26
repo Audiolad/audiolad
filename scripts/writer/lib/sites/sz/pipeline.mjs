@@ -8,6 +8,7 @@ import { copyFileSync, existsSync, mkdirSync, realpathSync, symlinkSync } from "
 import { join, resolve } from "node:path";
 
 import { BudgetError, makeCaller } from "../../call.mjs";
+import { writerCallId } from "../../moscow.mjs";
 import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, formatRub, parseMaxRub, parseMaxTokens } from "../../cost.mjs";
 import { szPackCost } from "./metrics.mjs";
 import { repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
@@ -123,7 +124,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   const today = mskDate();
   const date = pack.publishedAt ?? today;
   const stamp = mskNow().slice(11, 16).replace(":", "");
-  const runId = `${today}-${stamp}-sz-${pack.pack}`.slice(0, 100);
+  const runId = writerCallId(`${today}-${stamp}-sz-${pack.pack}`, { maxLength: 100 });
   const outDir = resolve(args.out ?? join(process.env.HOME ?? ".", ".cache/writer/runs", runId));
   const worktree = join(outDir, "site");
   const branch = `writer/sz-${pack.pack}`;
@@ -191,7 +192,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         raw = readJson(file);
         state.calls.push({ name: `${brief.slug}-offline`, costRub: 0, note: file });
       } else {
-        raw = callWriter(`${brief.slug}-generate`, messages, schema);
+        raw = callWriter(writerCallId(`${brief.slug}-generate`), messages, schema);
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
       const repaired = repair.mode === "tiered"
@@ -364,7 +365,7 @@ export function repairSzArticle({ brief, raw, build, messages, schema = szArticl
   if (errors.length && !args.offline && !args["no-repair"]) {
     const target = repair.mode === "targeted" ? buildSzTargetedRepair(brief, raw, result.problems) : null;
     try {
-      const answer = callRepair(`${brief.slug}-repair`, target?.messages ?? buildSzRepairMessages(messages, raw, result.problems), target?.schema ?? schema);
+      const answer = callRepair(writerCallId(`${brief.slug}-repair`), target?.messages ?? buildSzRepairMessages(messages, raw, result.problems), target?.schema ?? schema);
       const rejection = target ? szRepairPatchRejection(raw, answer, target.schema, brief) : null;
       const repaired = rejection ? null : target ? applySzRepairPatch(raw, answer, target.schema, brief) : answer;
       if (repaired) {

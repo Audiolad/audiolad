@@ -17,13 +17,13 @@ import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOp
 import { assembleSzArticle, nestQuotes, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
 import { BudgetError, makeCaller } from "./lib/call.mjs";
 import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, TARIFF, defaultModelFor, costRub, estimatePromptTokens, worstCaseRub } from "./lib/cost.mjs";
-import { collectResult, runDetached } from "./lib/moscow.mjs";
+import { collectResult, isWriterId, runDetached, writerCallId, WRITER_ID_MAX } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
 import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
-import { applyDeterministicSzFixes, buildSzFragment, repairSzArticleTiered, repairSzPackDuplicates } from "./lib/sites/sz/tiered.mjs";
+import { applyDeterministicSzFixes, buildSzFragment, repairSzArticleTiered, repairSzPackDuplicates, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -1155,6 +1155,112 @@ test("pack FAQ repair counts cheap spend already charged for the article and the
   assert.equal(packCalls, 0);
   assert.ok(packState.warnings.some((warning) => warning.includes(otherBrief.slug)));
   assert.equal(second.fields.faq[0].question, question);
+});
+
+test("tiered call ids pass the Moscow run-id validator", () => {
+  const live = "tsvet-svechi-v-ezoterike-repair-cheap-body-length-sectionsBefore[0]";
+  assert.equal(isWriterId(live), false);
+  const slug = "tsvet-svechi-v-ezoterike";
+  const bodyFailure = { code: "body-length", field: "sections", message: "основная часть 700 слов, нужно 880–1400", actual: 700, min: 880 };
+  const shortSection = structuredClone(fields);
+  shortSection.sectionsBefore[0].paragraphs.splice(2);
+  const sectionJob = buildSzFragment(brief, shortSection, bodyFailure);
+  assert.match(sectionJob.key, /sectionsBefore\[\d+\]/);
+  const stepFields = structuredClone(fields);
+  for (const key of ["sectionsBefore", "sectionsAfter"]) {
+    for (const section of stepFields[key] ?? []) section.paragraphs = ["длинный абзац ".repeat(120)];
+  }
+  stepFields.steps.items[0].text = "Короткий шаг без лишних подробностей.";
+  const stepJob = buildSzFragment(brief, stepFields, bodyFailure);
+  assert.match(stepJob.key, /steps\.items\[\d+\]\.text/);
+  const summoned = structuredClone(fields);
+  summoned.sectionsBefore[0].paragraphs[0] = "В этом абзаце достаточно слов и есть оберег, чтобы путь фрагмента содержал скобки.";
+  const summonJob = buildSzFragment(brief, summoned, { code: "summoning", field: "*", message: "«оберег» – без призыва" });
+  assert.match(summonJob.key, /sectionsBefore\[0\]\.paragraphs\[0\]/);
+  const forbiddenFields = structuredClone(fields);
+  forbiddenFields.sectionsAfter = [{ title: "Отдельный раздел", paragraphs: ["Здесь стоит запретная фраза и больше ничего опасного для проверки пути."] }];
+  const forbiddenJob = buildSzFragment(brief, forbiddenFields, { code: "forbidden", field: "*", message: "«запретная фраза»" });
+  assert.match(forbiddenJob.key, /sectionsAfter\[0\]\.paragraphs\[0\]/);
+  const mixedFields = structuredClone(fields);
+  mixedFields.sectionsBefore[1].paragraphs[0] = `Слово молитв${"a"} с латинской буквой внутри достаточно длинное для пути фрагмента.`;
+  const mixedJob = buildSzFragment(brief, mixedFields, { code: "mixed-script", field: "*", message: "латиница внутри кириллицы" });
+  assert.match(mixedJob.key, /sectionsBefore\[1\]\.paragraphs\[0\]/);
+  const jobs = [
+    sectionJob,
+    stepJob,
+    summonJob,
+    forbiddenJob,
+    mixedJob,
+    buildSzFragment(brief, { ...fields, description: "Ангел-хранитель слишком коротко." }, { code: "description-length", field: "description", path: "description", message: "description 20 символов, нужно 140–160" }),
+    buildSzFragment(brief, { ...fields, description: `${fields.description.slice(0, -1)} Это не` }, { code: "description-fragment", field: "description", path: "description", message: "description нет конца предложения" }),
+    buildSzFragment(brief, fields, { code: "seoTitle-length", field: "seoTitle", path: "seoTitle", message: "seoTitle 80 символов, нужно ≤ 60" }),
+    buildSzFragment(brief, fields, { code: "seoTitle-query", field: "seoTitle", path: "seoTitle", message: "seoTitle должен начинаться с запроса" }),
+    buildSzFragment(brief, fields, { code: "faq-length", field: "faq", path: "faq[0].answer", message: `ответ на «${fields.faq[0].question}» 10 слов, нужно 40–80` }),
+    buildSzFragment(brief, fields, { code: "faq-fragment", field: "faq", path: "faq[1].answer", message: `ответ на «${fields.faq[1].question}» нет конца предложения` }),
+    buildSzFragment(brief, fields, { code: "unique-pack", field: "faq", path: "faq[2].question", message: `«${fields.faq[2].question}» повторяет статью пакета other` }),
+  ];
+  assert.ok(jobs.every(Boolean));
+  const used = new Set();
+  const ids = [];
+  for (const job of jobs) {
+    for (const tier of ["cheap", "strong"]) {
+      for (const attempt of [0, 1]) ids.push(tieredRepairCallName({ slug, tier, attempt, fragmentKey: job.key, used }));
+    }
+    ids.push(tieredRepairCallName({ slug, tier: "cheap", attempt: "pack-0", fragmentKey: job.key, used }));
+  }
+  ids.push(writerCallId(`${slug}-repair-cheap-0-body-length:sectionsBefore[0]`, { used }));
+  ids.push(writerCallId("Slug_With.Dots[2]", { used }));
+  const longA = `${"a".repeat(200)}X[0]`;
+  const longB = `${"a".repeat(200)}Y[1]`;
+  ids.push(writerCallId(longA, { used, maxLength: WRITER_ID_MAX }));
+  ids.push(writerCallId(longB, { used, maxLength: WRITER_ID_MAX }));
+  assert.equal(new Set(ids).size, ids.length);
+  for (const id of ids) {
+    assert.equal(isWriterId(id), true, id);
+    assert.ok(id.length <= WRITER_ID_MAX, id);
+    assert.equal(id, id.toLowerCase());
+  }
+  const sectionId = tieredRepairCallName({ slug, tier: "cheap", attempt: 0, fragmentKey: sectionJob.key });
+  assert.match(sectionId, /sectionsbefore-\d+/);
+  assert.equal(isWriterId(sectionId), true);
+  const raw = structuredClone(shortSection);
+  raw.description = "Ангел-хранитель слишком коротко.";
+  const names = [];
+  repairSzArticleTiered({
+    brief: { ...brief, slug }, raw, build: hybridBuild, repair: tierRepair({ cheapTries: 2, maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name) => {
+      names.push({ tier, name });
+      assert.equal(isWriterId(name), true, name);
+      if (name.includes("description")) return { description: "ещё короче" };
+      return { paragraphs: fields.sectionsBefore[0].paragraphs.slice(0, 2) };
+    },
+  });
+  const cheapDescription = names.filter((call) => call.tier === "cheap" && call.name.includes("description"));
+  assert.ok(cheapDescription.length >= 2);
+  assert.notEqual(cheapDescription[0].name, cheapDescription[1].name);
+  assert.ok(names.some((call) => call.tier === "strong" && call.name.includes("description")));
+  assert.ok(names.some((call) => /sectionsbefore-\d+/.test(call.name)), names.map((call) => call.name).join(", "));
+  assert.ok(names.every((call) => call.name !== live));
+  const packNames = [];
+  const packItem = {
+    brief: { ...brief, slug },
+    fields: structuredClone(fields),
+    build: hybridBuild,
+    packProblems: [{ code: "unique-pack", field: "faq", slug, message: `«${fields.faq[0].question}» повторяет статью пакета other`, severity: "error" }],
+    attempts: [],
+  };
+  repairSzPackDuplicates({
+    items: [packItem], repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name) => {
+      packNames.push(name);
+      assert.equal(tier, "cheap");
+      assert.equal(isWriterId(name), true, name);
+      return { question: "Чем домашняя молитва отличается от короткой паузы?" };
+    },
+  });
+  assert.equal(packNames.length, 1);
+  assert.match(packNames[0], /faq-\d+-question/);
 });
 
 rmSync(site, { recursive: true, force: true });

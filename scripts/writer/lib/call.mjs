@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { chargedCost, estimatePromptTokens, formatRub, worstCaseRub } from "./cost.mjs";
-import { generateOnMoscow } from "./moscow.mjs";
+import { generateOnMoscow, writerCallId } from "./moscow.mjs";
 import { buildRequest } from "./prompt.mjs";
 import { log, mskNow, writeJson } from "./util.mjs";
 
@@ -21,7 +21,8 @@ export function makeCaller({ model, maxTokens, maxRub, outDir, runId, state, sch
   if (typeof maxRub !== "number" || !Number.isFinite(maxRub) || maxRub <= 0) {
     throw new BudgetError(`бюджет: лимит должен быть положительным конечным числом рублей, получено «${maxRub}» – без лимита вызовы не делаются`);
   }
-  return function callWriter(callName, messages, schema) {
+  return function callWriter(rawName, messages, schema) {
+    const callName = writerCallId(rawName);
     const request = buildRequest(model, messages, schema, { maxTokens, schemaName });
     const worst = worstCaseRub(model, estimatePromptTokens(messages, model), maxTokens);
     if (state.spentRub + worst > maxRub) {

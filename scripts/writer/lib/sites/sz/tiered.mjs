@@ -3,6 +3,7 @@
 // misses. The full article is never the request. The full gate runs after each apply.
 import { BudgetError } from "../../call.mjs";
 import { estimatePromptTokens, worstCaseRub } from "../../cost.mjs";
+import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
@@ -333,6 +334,11 @@ function pickFailure(failures, cheapTries, strongTries, cheapLimit) {
   }) ?? null;
 }
 
+/** Moscow call name for one tiered attempt. Unique per article while `used` is shared. */
+export function tieredRepairCallName({ slug, tier, attempt, fragmentKey, used }) {
+  return writerCallId(`${slug}-repair-${tier}-${attempt}-${fragmentKey}`, { used });
+}
+
 function tierSpent(attempts, tier) {
   return attempts.filter((attempt) => attempt.tier === tier).reduce((sum, attempt) => sum + attempt.costRub, 0);
 }
@@ -351,6 +357,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const attempts = [];
   const cheapTries = new Map();
   const strongTries = new Map();
+  const callIds = new Set();
   const allowModel = !args.offline && !args["no-repair"];
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
@@ -378,8 +385,9 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     }
     const before = state.spentRub ?? 0;
     let answer = null;
+    const attempt = tier === "cheap" ? (cheapTries.get(key) ?? 0) : (strongTries.get(key) ?? 0);
     try {
-      answer = callTier(tier, `${brief.slug}-repair-${tier}-${fragmentJob.key.replace(/[^a-z0-9[\].-]+/gi, "-")}`, fragmentJob.messages, fragmentJob.schema);
+      answer = callTier(tier, tieredRepairCallName({ slug: brief.slug, tier, attempt, fragmentKey: fragmentJob.key, used: callIds }), fragmentJob.messages, fragmentJob.schema);
     } catch (error) {
       if (!(error instanceof BudgetError) && error?.code !== 5) throw error;
       state.warnings.push(`${brief.slug}: ярус ${tier} остановлен общим бюджетом`);
@@ -433,6 +441,7 @@ function cheapSpent(items, state, slug = null) {
 export function repairSzPackDuplicates({ items, repair, callTier, state, args = {} }) {
   if (args.offline || args["no-repair"]) return;
   const seen = new Set();
+  const callIds = new Set();
   const packCap = repair.cheapBudget * Math.max(items.length, 1);
   for (const item of items) {
     const problems = item.packProblems ?? [];
@@ -457,7 +466,7 @@ export function repairSzPackDuplicates({ items, repair, callTier, state, args = 
       const before = state.spentRub ?? 0;
       let answer = null;
       try {
-        answer = callTier("cheap", `${item.brief.slug}-repair-cheap-faq-${index}`, job.messages, job.schema);
+        answer = callTier("cheap", tieredRepairCallName({ slug: item.brief.slug, tier: "cheap", attempt: `pack-${index}`, fragmentKey: job.key, used: callIds }), job.messages, job.schema);
       } catch (error) {
         if (!(error instanceof BudgetError) && error?.code !== 5) throw error;
         continue;
