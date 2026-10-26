@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, isSpecialistQuestion, linkLeadResidue, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, sectionRetellsStory, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -826,7 +826,7 @@ function endingRejected(text, original) {
 function wovenLinkRejected(text, found, slug, brief) {
   if (typeof text !== "string" || fieldProseDefect(text, found.path) || endingRejected(text, found.text)) return true;
   if (text.trim().startsWith(String(found.text).trim())) return true;
-  if (/Подробнее:\s*\[/u.test(text)) return true;
+  if (hasGluedLead(text)) return true;
   const links = markdownLinks(text);
   const allowed = new Set((brief.links?.contextual ?? []).filter((item) => /^[a-z0-9-]+$/.test(item)));
   if (!links.length || links.some((link) => !allowed.has(link.slug))) return true;
@@ -936,16 +936,12 @@ function linkHostIsProtected(path, text) {
   return isQuoteParagraph(text);
 }
 
-const GLUE_BODY = /^(?:Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности)\s*:\s*\[[^\]]*\]\(\/s\/[a-z0-9-]+\)\.?/iu;
-
-/** Length of one glued lead+link at `index`, including exactly one adjacent space (the space before the lead). 0 if none. */
+/** Length of one whole lead+link at `index`, plus exactly one space before the lead. 0 inside a word. */
 function glueSpanAt(text, index) {
-  const rest = text.slice(index);
-  if (rest.startsWith(" ") && GLUE_BODY.test(rest.slice(1))) {
-    return 1 + rest.slice(1).match(GLUE_BODY)[0].length;
-  }
-  const body = rest.match(GLUE_BODY);
-  return body ? body[0].length : 0;
+  const body = gluedLeadBodyLength(text, index);
+  if (body) return body;
+  if (text[index] === " " && gluedLeadBodyLength(text, index + 1)) return 1 + gluedLeadBodyLength(text, index + 1);
+  return 0;
 }
 
 /** Drop every glued «Подробнее:» / «Читайте также:» sentence anywhere in the paragraph, then a bare copy of this token. */
@@ -969,9 +965,13 @@ function stripProtectedLinks(text, anchor, slug) {
   }
   if (anchor && slug) {
     const token = `[${anchor}](/s/${slug})`;
-    if (next.includes(token)) next = next.split(token).join("");
+    const at = next.indexOf(token);
+    if (at >= 0) {
+      const candidate = next.slice(0, at) + next.slice(at + token.length);
+      if (candidate.trim() && protectedRemovalOk(text, candidate)) next = candidate;
+    }
   }
-  if (!next.trim() || next === text) return null;
+  if (!next.trim() || next === text || !protectedRemovalOk(text, next)) return null;
   return next;
 }
 
@@ -1000,7 +1000,7 @@ function anchorSentenceAccepted(text, original, anchor, slug, brief, path) {
   if (typeof text !== "string" || text === original) return false;
   if (isQuoteParagraph(original) || isQuoteParagraph(text)) return false;
   if (fieldProseDefect(text, path) || endingRejected(text, original)) return false;
-  if (/Подробнее:\s*\[/u.test(text)) return false;
+  if (hasGluedLead(text)) return false;
   if (!linkSetAccepted(text, original, slug, brief)) return false;
   const before = splitSentences(original);
   const after = splitSentences(text);
@@ -1050,7 +1050,7 @@ function anchorFragment(brief, fields, failure, allowed) {
       if (wovenLinkRejected(text, dest, slug, brief)) return null;
       const original = currentPathText(current, host.path, host.text);
       const stripped = stripProtectedLinks(original, anchor, slug);
-      if (stripped == null || !keptAfterGluedSuffix(original, stripped)) return null;
+      if (stripped == null || !protectedRemovalOk(original, stripped)) return null;
       return setPath(setPath(current, dest.path, text), host.path, stripped);
     }, dest.text);
     job.outputTokens = 420;
@@ -1081,31 +1081,6 @@ function currentPathText(fields, path, fallback) {
   return typeof value === "string" ? value : fallback;
 }
 
-/** Kept characters stay in order. A glued lead is removed wherever it sits, with one space before it, and no residue remains. */
-function keptAfterGluedSuffix(original, stripped) {
-  if (typeof stripped !== "string" || !stripped.trim() || linkLeadResidue(stripped).length) return false;
-  let o = 0;
-  let s = 0;
-  while (o < original.length || s < stripped.length) {
-    const cut = glueSpanAt(original, o);
-    if (cut) {
-      o += cut;
-      continue;
-    }
-    const token = original.slice(o).match(/^\[[^\]]+\]\(\/s\/[a-z0-9-]+\)/u);
-    if (token && (s >= stripped.length || original[o] !== stripped[s])) {
-      o += token[0].length;
-      continue;
-    }
-    if (s < stripped.length && original[o] === stripped[s]) {
-      o += 1;
-      s += 1;
-      continue;
-    }
-    return false;
-  }
-  return true;
-}
 
 function openingStory(fields) {
   return [...(fields.story ?? []), fields.transition ?? ""].filter((part) => typeof part === "string" && part.trim()).join("\n\n");

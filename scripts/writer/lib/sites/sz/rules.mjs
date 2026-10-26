@@ -53,18 +53,183 @@ export function genericLinkAnchor(anchor) {
   return tokens.every((token) => GENERIC_LINK_ANCHORS.has(token));
 }
 
-const LINK_LEAD = String.raw`Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности`;
+const NOT_WORD_BEFORE = String.raw`(?<![\p{L}\p{N}])`;
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+// Whole leads, longest first. JS `\b` is ASCII-only, so the boundary is a Unicode lookbehind.
+// «Читайте также» must not match inside «Прочитайте» / «Дочитайте» / «Перечитайте».
+const LINK_LEADS = [
+  "прочитайте также",
+  "прочитайте ещё",
+  "прочтите также",
+  "прочтите ещё",
+  "читайте также",
+  "читайте ещё",
+  "смотрите также",
+  "смотрите ещё",
+  "см. также",
+  "см. ещё",
+  "узнать больше",
+  "узнайте больше",
+  "подробнее",
+  "подробности",
+];
+const LINK_LEAD_PATTERN = [...LINK_LEADS]
+  .sort((a, b) => b.length - a.length)
+  .map((lead) => lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/е/g, "[её]"))
+  .join("|");
+const LINK_HEADS = [...new Set(LINK_LEADS.map((lead) => lead.split(/[\s.]+/u)[0]).filter((word) => word.length >= 4))];
+
+function foldLead(text) {
+  return String(text).toLocaleLowerCase("ru").replace(/ё/g, "е");
+}
+
+/** Length of one whole lead+colon+markdown link at `index`. 0 when the lead continues a word. */
+export function gluedLeadBodyLength(text, index = 0) {
+  const source = String(text ?? "");
+  if (index < 0 || index >= source.length) return 0;
+  if (index > 0 && WORD_CHAR.test(source[index - 1]) && WORD_CHAR.test(source[index])) return 0;
+  const match = source.slice(index).match(new RegExp(`^(?:${LINK_LEAD_PATTERN})\\s*:\\s*\\[[^\\]\\n]*\\]\\(\\/s\\/[a-z0-9-]+\\)\\.?`, "iu"));
+  return match ? match[0].length : 0;
+}
+
+/** A glued lead at a word boundary, including «Прочитайте также: [..]». A prefix inside a longer word is not a lead. */
+export function hasGluedLead(text) {
+  return new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})\\s*:\\s*\\[`, "iu").test(String(text ?? ""));
+}
 
 /** Orphan link glue: «Подробнее: .», empty [](), a colon before a closing quote. A real [анкор](/s/…) is not residue. */
 export function linkLeadResidue(text) {
   const raw = String(text ?? "");
   const hits = [];
-  const lead = new RegExp(`(?:${LINK_LEAD})\\s*:(?!\\s*\\[[^\\]\\n]+\\]\\([^)\\n]+\\))`, "giu");
+  const lead = new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})\\s*:(?!\\s*\\[[^\\]\\n]+\\]\\([^)\\n]+\\))`, "giu");
   for (const match of raw.matchAll(lead)) hits.push(match[0].trim());
   for (const match of raw.matchAll(/(?<!!)\[\s*\]\([^)]*\)/g)) hits.push(match[0]);
   for (const match of raw.matchAll(/:\s*\.(?=\s|$|[»”’"])/gu)) hits.push(match[0]);
   for (const match of raw.matchAll(/:\s*[»”’"]/gu)) hits.push(match[0]);
   return hits;
+}
+
+/**
+ * A protected paragraph cut down to a lead prefix: «Про» left from «Прочитайте», then a capital
+ * or the end of the paragraph. «про брата» (lowercase continuation) is not a fragment.
+ */
+export function leadWordFragments(text) {
+  const raw = String(text ?? "");
+  const hits = [];
+  for (const match of raw.matchAll(/(?<![\p{L}\p{N}])(\p{L}{2,})(?![\p{L}\p{N}])/gu)) {
+    const token = foldLead(match[1]);
+    if (!LINK_HEADS.some((head) => head.startsWith(token) && head.length > token.length)) continue;
+    const after = raw.slice(match.index + match[1].length);
+    if (/^[.!?…»"”’]*$/u.test(after) || /^\s+\p{Lu}/u.test(after)) hits.push(match[1]);
+  }
+  const stuck = new RegExp(`(?<=[\\p{L}\\p{N}])(?:${LINK_LEAD_PATTERN})(?![\\p{L}\\p{N}])`, "giu");
+  for (const match of raw.matchAll(stuck)) hits.push(match[0]);
+  for (const match of raw.matchAll(/:\s*\.(?=[\p{L}\p{N}])/gu)) hits.push(match[0]);
+  return hits;
+}
+
+function wordBoundary(text, index) {
+  if (index <= 0 || index >= text.length) return true;
+  return !(WORD_CHAR.test(text[index - 1]) && WORD_CHAR.test(text[index]));
+}
+
+function joinsLetters(text, start, end) {
+  if (start <= 0 || end >= text.length) return false;
+  return WORD_CHAR.test(text[start - 1]) && WORD_CHAR.test(text[end]);
+}
+
+function spanIsWholeLeadOrToken(span) {
+  const core = span.replace(/^\s/u, "").replace(/\s$/u, "");
+  if (/^\[[^\]]*\]\([^)\n]*\)$/u.test(core)) return true;
+  return new RegExp(`^(?:${LINK_LEAD_PATTERN})\\s*:\\s*\\[[^\\]\\n]*\\]\\(\\/s\\/[a-z0-9-]+\\)\\.?$`, "iu").test(core);
+}
+
+function edgeSpaces(span) {
+  const trimmed = span.trim();
+  if (!trimmed) return span.length;
+  return span.indexOf(trimmed) + (span.length - span.indexOf(trimmed) - trimmed.length);
+}
+
+function countSentences(text) {
+  const parts = String(text).split(/(?<=[.!?…])\s+/u).map((part) => part.trim()).filter(Boolean);
+  return parts.length;
+}
+
+function linkSentences(span) {
+  return span.match(/[.!?…]/gu)?.length ?? 0;
+}
+
+function candidateRemovalEnds(original, start, stripped, s) {
+  const found = original.slice(start).match(/\[[^\]]*\]\([^)\n]*\)/u);
+  if (!found || found.index > 80) return [];
+  const minEnd = start + found.index + found[0].length;
+  const limit = Math.min(original.length, minEnd + 8);
+  const ends = [];
+  for (let end = minEnd; end <= limit; end += 1) {
+    if (!wordBoundary(original, end) || joinsLetters(original, start, end)) continue;
+    const span = original.slice(start, end);
+    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span)) continue;
+    ends.push(end);
+  }
+  return ends;
+}
+
+/** Removed spans that turn `original` into `stripped`: each is a whole link sentence at a word boundary. */
+function explainLinkRemovals(original, stripped) {
+  const memo = new Map();
+  const walk = (startO, startS) => {
+    const key = `${startO}:${startS}`;
+    if (memo.has(key)) return memo.get(key);
+    let o = startO;
+    let s = startS;
+    while (o < original.length && s < stripped.length && original[o] === stripped[s]) {
+      if (o !== startO && wordBoundary(original, o)) break;
+      o += 1;
+      s += 1;
+    }
+    let result = null;
+    if (o === original.length && s === stripped.length) result = [];
+    else if (o < original.length && wordBoundary(original, o)) {
+      for (const end of candidateRemovalEnds(original, o, stripped, s)) {
+        const rest = walk(end, s);
+        if (rest) {
+          result = [[o, end], ...rest];
+          break;
+        }
+      }
+    }
+    if (!result && o < original.length && s < stripped.length && original[o] === stripped[s]) {
+      const rest = walk(o + 1, s + 1);
+      if (rest) result = rest;
+    }
+    memo.set(key, result);
+    return result;
+  };
+  return walk(0, 0);
+}
+
+/**
+ * A protected paragraph may lose only whole link sentences. Each removed span starts and ends on a
+ * word boundary, contains a markdown link, and is a listed lead (or the link token alone). The cut
+ * must not join the letters on either side, and the sentence count cannot fall by more than the
+ * removed link sentences. Anything else – including «Прочитайте» shortened to «Про» – is rejected.
+ */
+export function protectedRemovalOk(original, stripped) {
+  if (typeof original !== "string" || typeof stripped !== "string") return false;
+  if (!stripped.trim() || stripped === original) return false;
+  if (linkLeadResidue(stripped).length || leadWordFragments(stripped).length) return false;
+  if (!original.includes("  ") && stripped.includes("  ")) return false;
+  const spans = explainLinkRemovals(original, stripped);
+  if (!spans?.length) return false;
+  let removed = 0;
+  for (const [start, end] of spans) {
+    const span = original.slice(start, end);
+    if (!wordBoundary(original, start) || !wordBoundary(original, end)) return false;
+    if (joinsLetters(original, start, end)) return false;
+    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span)) return false;
+    removed += linkSentences(span);
+  }
+  return countSentences(stripped) >= countSentences(original) - removed;
 }
 
 const RETELL_STOP = new Set(["ангел", "ангела", "ангелу", "ангеле", "хранитель", "хранителя", "хранителю", "молитва", "молитвы", "молитву", "молитве", "образ", "образа", "человек", "человека", "можно", "когда", "этот", "этой", "этого", "только", "после", "перед", "через", "чтобы", "который", "которая", "которые", "практика", "практике", "также", "будет", "были", "было", "очень", "просто", "потом", "тогда", "здесь", "свой", "свою", "свои"]);
@@ -865,6 +1030,21 @@ export function checkSzArticle(md, cfg, env) {
   }
   for (const residue of linkLeadResidue(`${body}\n${faqText}`)) {
     add("links-residue", "sections", `оборванный ярлык ссылки: «${residue}»`);
+  }
+  const protectedBlocks = [...storyParagraphs];
+  for (const match of body.matchAll(/^>[^\n]*$/gm)) protectedBlocks.push(match[0]);
+  for (const block of body.split(/\n\n+/)) {
+    const trimmed = block.trim();
+    if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith(":::") || trimmed.startsWith("|")) continue;
+    if (/[«»"“”„]|^\s*>/u.test(trimmed)) protectedBlocks.push(trimmed);
+  }
+  const seenFragment = new Set();
+  for (const block of protectedBlocks) {
+    for (const fragment of leadWordFragments(block)) {
+      if (seenFragment.has(fragment)) continue;
+      seenFragment.add(fragment);
+      add("links-fragment", "story", `защищённый абзац обрезан на обломке ярлыка: «${fragment}»`);
+    }
   }
   const links = [...body.matchAll(/(?:\]\(|href=")\/s\/([a-z0-9-]+)(?:[)#"?])/g)].map((m) => m[1]);
   for (const link of links) if (!env.published.has(link)) add("links-target", "sections", `ссылка /s/${link} не на опубликованную статью`);
