@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, stripOrphanLead, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -240,13 +240,6 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
   const beforeNorm = JSON.stringify(next);
   next = normalizeSzFields(next).fields;
   if (beforeNorm.includes("\u2014") && !JSON.stringify(next).includes("\u2014")) fixes.push("длинное тире заменено на «–»");
-  let residueFixes = 0;
-  next = mapStrings(next, (text) => {
-    const stripped = stripOrphanLead(text);
-    if (stripped !== text) residueFixes += 1;
-    return stripped;
-  });
-  if (residueFixes) fixes.push(residueFixes === 1 ? "оборванный ярлык ссылки снят" : `оборванные ярлыки ссылок сняты: ${residueFixes}`);
   const limits = SZ.limits;
   if (typeof next.description === "string" && descriptionOpensWithQuotedQuery(next.description, query)) {
     const opened = naturalDescriptionStart(next.description, query);

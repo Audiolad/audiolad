@@ -228,42 +228,6 @@ export function linkLeadResidue(text, draft) {
   return hits;
 }
 
-function nextResidueSpan(raw) {
-  const lead = leadResidueSpan(raw, 0);
-  const extras = punctuationResidueSpans(raw);
-  const spans = [...(lead ? [lead] : []), ...extras];
-  spans.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
-  return spans[0] ?? null;
-}
-
-/** Drop an orphan lead+separator, an empty [](), or a dangling colon. A real link stays. */
-export function stripOrphanLead(text) {
-  let next = String(text ?? "");
-  let guard = 0;
-  while (guard < 12) {
-    const span = nextResidueSpan(next);
-    if (!span) break;
-    let start = span.start;
-    if (start > 0 && next[start - 1] === " ") start -= 1;
-    const candidate = next.slice(0, start) + next.slice(span.end);
-    if (!candidate.trim()) break;
-    next = candidate;
-    guard += 1;
-  }
-  return next;
-}
-
-/** Drop a lead left behind after its link was deleted. Ordinary «подробнее.» in the draft stays. */
-export function stripRemovedLinkLead(draft, text) {
-  let next = String(text ?? "");
-  for (const lead of linkRemovedResidue(draft, next)) {
-    const escaped = lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`${NOT_WORD_BEFORE}${escaped}(?![\\p{L}\\p{N}])\\s*[.!?…]+`, "iu");
-    next = next.replace(re, "");
-  }
-  return next.replace(/[ ]{2,}/g, " ");
-}
-
 function wordBoundary(text, index) {
   if (index <= 0 || index >= text.length) return true;
   return !(WORD_CHAR.test(text[index - 1]) && WORD_CHAR.test(text[index]));

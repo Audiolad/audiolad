@@ -33,7 +33,7 @@ import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } f
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, statedListCount, stripOrphanLead, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -306,11 +306,9 @@ test("gate: a lead without a separator is prose, and nested brackets are one lin
     assert.ok(linkLeadResidue(sample).length > 0, sample);
   }
   assert.equal(linkLeadResidue('Мастер сказал: "Цвет свечи при гадании выбирают вечером".').length, 0);
-  assert.equal(stripOrphanLead('Мастер сказал: "Цвет свечи при гадании выбирают вечером".'), 'Мастер сказал: "Цвет свечи при гадании выбирают вечером".');
   assert.equal(linkLeadResidue("записала: «цитата остаётся».").length, 0);
-  assert.equal(stripOrphanLead("Расскажем подробнее."), "Расскажем подробнее.");
-  assert.equal(stripOrphanLead("направи. Подробнее: .»").includes("»"), true);
-  assert.equal(stripOrphanLead("направи. Подробнее: .»").includes("Подробнее"), false);
+  assert.equal(linkLeadResidue("Расскажем подробнее.").length, 0);
+  assert.ok(linkLeadResidue("направи. Подробнее: .»").length > 0);
   const nested = "Подробнее: [см. [это]](/s/ezoterika-i-tserkov).";
   const links = markdownLinks(nested);
   assert.equal(links.length, 1);
@@ -3078,6 +3076,44 @@ test("tiered: ordinary lead prefixes stay clean, and a dash glue is not publishe
   const publishedCodes = errorsOf(hybridBuild(published).problems).map((problem) => problem.code);
   assert.ok(publishedCodes.includes("links-residue"), publishedCodes.join(","));
   assert.equal(publishedCodes.includes("links-fragment"), false, publishedCodes.join(","));
+});
+
+test("tiered: an orphan lead is not stripped in place, so the sentence is not published damaged", () => {
+  const opening = fields.story[0];
+  const prayer = fields.sectionsBefore[0].paragraphs[1];
+  assert.equal(opening.endsWith("приезжать."), true);
+  assert.ok(prayer.includes("направи. Аминь.»"));
+  const raw = structuredClone(fields);
+  const storyMid = `${opening} Подробнее: . Брат всё ещё ждал этого звонка.`;
+  const storyEnd = String(fields.story[2]).replace(/\.?$/u, ", и я записала подробности:");
+  const prayerMid = prayer.replace("направи. Аминь.»", "направи. Подробнее: . Аминь.»");
+  const section = `${raw.sectionsBefore[0].paragraphs[2]} Об этом расскажем подробнее:`;
+  raw.story[0] = storyMid;
+  raw.story[2] = storyEnd;
+  raw.sectionsBefore[0].paragraphs[1] = prayerMid;
+  raw.sectionsBefore[0].paragraphs[2] = section;
+  const settled = applyDeterministicSzFixes(raw, { query: brief.query, links: brief.links });
+  assert.equal(settled.fields.story[0], storyMid);
+  assert.equal(settled.fields.story[2], storyEnd);
+  assert.equal(settled.fields.sectionsBefore[0].paragraphs[1], prayerMid);
+  assert.equal(settled.fields.sectionsBefore[0].paragraphs[2], section);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return {}; },
+  });
+  assert.equal(calls, 0, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.story[0], storyMid);
+  assert.equal(repaired.result.fields.story[2], storyEnd);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[1], prayerMid);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[2], section);
+  assert.equal(repaired.result.fields.story[0].includes("Подробнее Брат"), false);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[1].includes("Подробнее Аминь"), false);
+  assert.ok(repaired.result.fields.story[2].endsWith("подробности:"));
+  assert.ok(repaired.result.fields.sectionsBefore[0].paragraphs[2].endsWith("подробнее:"));
+  assert.ok(errorsOf(repaired.result.problems).some((problem) => problem.code === "links-residue"));
+  assert.equal(repaired.passed, false);
 });
 
 test("tiered: a later section that retells the story is rewritten forward", () => {
