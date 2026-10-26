@@ -77,6 +77,25 @@ function ratingsPeriodRange(period: AdminRatingsPeriod) {
   return resolveAdminAnalyticsPeriodRange(period);
 }
 
+async function countWindowedGuestRatings(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  range: { from: string | null; to: string | null },
+): Promise<number> {
+  let query = supabase
+    .from("guest_practice_ratings")
+    .select("id", { count: "exact", head: true })
+    .is("excluded_at", null)
+    .is("superseded_at", null);
+  if (range.from) query = query.gte("created_at", range.from);
+  if (range.to) query = query.lt("created_at", range.to);
+  const { count, error } = await query;
+  if (error) {
+    console.error("admin_ratings_guest_count_error", error.message);
+    throwIfAdminRatingsRpcFailed(error);
+  }
+  return count ?? 0;
+}
+
 export async function getAdminRatingsSummaryBundle(input: {
   period?: string | null;
 }): Promise<AdminRatingsSummaryBundle> {
@@ -98,6 +117,7 @@ export async function getAdminRatingsSummaryBundle(input: {
   const totalStars = asNumber(raw.total_stars);
   const average = asNullableNumber(raw.average);
   const conversion = asNullableNumber(raw.conversion);
+  const guestRatingCount = await countWindowedGuestRatings(supabase, range);
 
   return {
     period,
@@ -115,6 +135,8 @@ export async function getAdminRatingsSummaryBundle(input: {
     conversionFormatted: formatAdminConversion(conversion),
     activeCount: asNumber(raw.active_count),
     excludedCount: asNumber(raw.excluded_count),
+    registeredRatingCount: ratingCount,
+    guestRatingCount,
     notes: {
       temporal: ADMIN_RATINGS_TEMPORAL_NOTE,
       average: ADMIN_RATINGS_AVG_NOTE,

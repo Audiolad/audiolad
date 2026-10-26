@@ -12,14 +12,23 @@ import { CommentStoreUnavailable, createSupabaseCommentStore } from "@/lib/pract
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+/** Viewer flags depend on the session cookie. Never reuse a guest payload. */
+export const COMMENT_RESPONSE_HEADERS = {
+  "Cache-Control": "private, no-store",
+  Vary: "Cookie",
+} as const;
+
 export function commentJson(
   result: { ok: false; status: number; error: string } | { ok: true },
 ): NextResponse {
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json(
+      { error: result.error },
+      { status: result.status, headers: COMMENT_RESPONSE_HEADERS },
+    );
   }
   const body = Object.fromEntries(Object.entries(result).filter(([key]) => key !== "ok"));
-  return NextResponse.json(body);
+  return NextResponse.json(body, { headers: COMMENT_RESPONSE_HEADERS });
 }
 
 export async function runCommentAction(
@@ -29,10 +38,16 @@ export async function runCommentAction(
     return commentJson(await work());
   } catch (error) {
     if (error instanceof CommentStoreUnavailable) {
-      return NextResponse.json({ error: "comments_unavailable" }, { status: 503 });
+      return NextResponse.json(
+        { error: "comments_unavailable" },
+        { status: 503, headers: COMMENT_RESPONSE_HEADERS },
+      );
     }
     console.error("listener_comment_error", error);
-    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "internal_error" },
+      { status: 500, headers: COMMENT_RESPONSE_HEADERS },
+    );
   }
 }
 

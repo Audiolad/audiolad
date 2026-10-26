@@ -174,6 +174,30 @@ export type AdminRatingsSummaryCounts = {
   excludedCount: number;
 };
 
+export type GuestRatingFact = {
+  createdAt: string;
+  excludedAt?: string | null;
+  supersededAt?: string | null;
+};
+
+/**
+ * Guest votes that still live only in guest_practice_ratings.
+ * A copy into an account sets superseded_at and is counted on the
+ * registered side instead. A link-only claim stays here.
+ * Excluded rows are omitted, same as registered aggregates.
+ */
+export function countGuestRatingsInWindow(
+  rows: readonly GuestRatingFact[],
+  window: AdminRatingsWindow,
+): number {
+  return rows.filter(
+    (row) =>
+      row.excludedAt == null &&
+      row.supersededAt == null &&
+      isCreatedAtInAdminRatingsWindow(row.createdAt, window),
+  ).length;
+}
+
 export function summarizeAdminRatings(input: {
   ratings: AdminRatingFact[];
   eligible: AdminEligibleFact[];
@@ -655,6 +679,10 @@ export type AdminRatingsSummaryBundle = {
   conversionFormatted: string;
   activeCount: number;
   excludedCount: number;
+  /** Active practice_ratings in the same window as ratingCount. */
+  registeredRatingCount: number;
+  /** Active guest_practice_ratings that were not copied onto an account. */
+  guestRatingCount: number;
   notes: {
     temporal: string;
     average: string;

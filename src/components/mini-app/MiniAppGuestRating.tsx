@@ -7,7 +7,6 @@ import {
   formatPracticeRatingAggregateStarsSr,
   buildPracticeRatingApiPath,
 } from "@/lib/ratings/client";
-import { GUEST_RATING_AGGREGATE_LABEL } from "@/lib/ratings/guest/copy";
 import { useGuestPracticeRating } from "@/lib/ratings/guest/use-guest-rating";
 import { MAX_PRACTICE_RATING_STARS } from "@/lib/ratings/stars";
 import type { PracticeRatingAggregate } from "@/lib/ratings/types";
@@ -128,11 +127,6 @@ export default function MiniAppGuestRating({
           </span>
         </div>
       </div>
-      {canRate && guest.ui.guestAggregate ? (
-        <p className="mt-1 text-sm leading-5 text-[#65577f]" data-practice-rating-guest-aggregate="">
-          {GUEST_RATING_AGGREGATE_LABEL}: {guest.ui.guestAggregate.ratingCount}
-        </p>
-      ) : null}
       {canRate && guest.ui.notice ? (
         <p className="mt-2 text-sm leading-5 text-[#65577f]">{guest.ui.notice}</p>
       ) : null}

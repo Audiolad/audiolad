@@ -289,6 +289,8 @@ assert.equal(
 // ---------------------------------------------------------------------------
 const guestRatingSource = read("src/components/mini-app/MiniAppGuestRating.tsx");
 assert.doesNotMatch(guestRatingSource, /fetch\(|initData|localStorage|sessionStorage|MAX_RATING_PATH|\/api\//, "guest rating never writes");
+assert.doesNotMatch(guestRatingSource, /Оценки гостей/, "listeners do not see the guest/registered split");
+assert.doesNotMatch(guestRatingSource, /data-practice-rating-guest-aggregate/);
 
 const nextStepSource = read("src/components/mini-app/MiniAppNextStep.tsx");
 assert.match(nextStepSource, /if \(opened\) event\.preventDefault\(\)/, "bridge first, anchor fallback");
