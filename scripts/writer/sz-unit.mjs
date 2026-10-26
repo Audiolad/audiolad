@@ -33,7 +33,7 @@ import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } f
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, examplePhraseStats, faqAnswerTypeMismatch, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, examplePhraseStats, faqAnswerTypeMismatch, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -398,7 +398,14 @@ test("article #3: extra queries, links, steps, length, stance, examples, case, P
   assert.equal(oversizedParagraphs("Одно предложение. Второе. Третье.").length, 0);
   assert.equal(statedListCount("Пять фраз для утра"), 5);
   assert.equal(statedListCount("Пять правил, чтобы начать"), 5);
+  assert.equal(statedListCount("Повторите эту фразу три раза вслух"), null);
+  assert.equal(statedListCount("Три правильных шага"), 3);
+  assert.equal(stepHeadingCount("Три шага, чтобы начать"), 3);
+  assert.equal(stepHeadingCount("5 шагов – бережное обращение"), 5);
+  assert.equal(stepHeadingCount("Пять правил для утра"), null);
+  assert.equal(stepHeadingCount("Повторите эту фразу три раза вслух"), null);
   assert.equal(alignListCount("Пять правил, чтобы начать", 3), "Три правила, чтобы начать");
+  assert.equal(alignListCount("Три правильных шага к утру", 5), "Три правильных шага к утру");
   assert.equal(examplePhraseStats("## Примеры фраз\n\n- одна\n- две\n").count, 2);
   const withSlots = buildSzMessages({ ...brief, additionalQueries: queries, additionalQueryForms: { [queries[4]]: [colorForm] }, storyHeroine: "Вера", faqHints: [{ match: "сильная вера", stance: "нет" }], examplePhrases: { min: 8, max: 12 }, practice: { ...brief.practice, subtitle: "утренняя практика" } }, view.site).map((message) => message.content).join("\n");
   for (const phrase of queries) {
@@ -448,16 +455,77 @@ test("article #3: extra queries, links, steps, length, stance, examples, case, P
   assert.equal(missed.some((message) => message.includes(queries[4])), false, missed.join(" | "));
   const localCfg = ruleConfig(article, pack.publishedAt, pool);
   const md = assembleSzArticle(article, raw, view.site, { date: pack.publishedAt });
-  const gate = errorsOf(checkSzArticle(md, localCfg, env));
+  const checked = checkSzArticle(md, localCfg, env);
+  const gate = errorsOf(checked);
   const gateCodes = gate.map((problem) => problem.code);
-  for (const code of ["extra-query", "links-required", "links-map", "links-grammar", "paragraph-size", "dangling-lead", "count-mismatch", "query-case", "faq-stance", "story-pov", "practice-name", "example-count"]) {
+  for (const code of ["extra-query", "links-required", "links-map", "paragraph-size", "query-case", "story-pov", "practice-name", "example-count"]) {
     assert.ok(gateCodes.includes(code), `${code} missing in ${gateCodes.join(",")}`);
+  }
+  for (const code of ["links-grammar", "dangling-lead", "faq-stance", "count-mismatch"]) {
+    assert.equal(gateCodes.includes(code), false, `${code} must not fail the gate`);
+    assert.ok(checked.some((problem) => problem.code === code && problem.severity !== "error"), `${code} warning missing`);
   }
   const extra = gate.filter((problem) => problem.code === "extra-query").map((problem) => problem.message);
   assert.equal(extra.some((message) => message.includes(queries[1])), false, extra.join(" | "));
   assert.equal(extra.some((message) => message.includes(queries[4])), false, extra.join(" | "));
   assert.ok(extra.some((message) => message.includes(queries[0])));
   assert.equal(faqAnswerTypeMismatch(raw.faq[2].question, raw.faq[2].answer), false);
+});
+
+test("review: ordinary Вот/Ниже, и-через, фразу and Можно do not fail the gate", () => {
+  const warnOf = (problems, code) => problems.filter((problem) => problem.code === code && problem.severity !== "error");
+  const gateOf = (raw, extraCfg = {}) => {
+    const { fields: normalized } = normalizeSzFields(raw);
+    const md = assembleSzArticle(brief, normalized, view.site, { date: pack.publishedAt });
+    return checkSzArticle(md, { ...cfg, ...extraCfg }, env);
+  };
+  const bullet = (label) => `- ${label} спокойное действие утром.`;
+  assert.deepEqual(errorsOf(gateOf(fields)), []);
+
+  const lead = structuredClone(fields);
+  lead.sectionsBefore[0].paragraphs.push("Вот – спокойный разговор остаётся рядом с человеком.");
+  lead.sectionsBefore[0].paragraphs.push("Ниже – то же спокойствие остаётся в этом разговоре.");
+  const leadProblems = gateOf(lead);
+  assert.equal(errorsOf(leadProblems).length, 0, errorsOf(leadProblems).map((problem) => `${problem.code}: ${problem.message}`).join("; "));
+  assert.ok(warnOf(leadProblems, "dangling-lead").length >= 2, warnOf(leadProblems, "dangling-lead").map((problem) => problem.message).join("; "));
+  assert.ok(draftFieldDefects(lead, brief).some((hit) => hit.code === "draft-dangling"));
+
+  const linked = structuredClone(fields);
+  linked.sectionsBefore[0].paragraphs[0] += " Это можно держать и [Эзотерика и церковь](/s/ezoterika-i-tserkov) через неделю.";
+  const linkProblems = gateOf(linked);
+  assert.equal(errorsOf(linkProblems).length, 0, errorsOf(linkProblems).map((problem) => `${problem.code}: ${problem.message}`).join("; "));
+  assert.equal(warnOf(linkProblems, "links-grammar").length, 1);
+  assert.ok(draftFieldDefects(linked, brief).some((hit) => hit.code === "draft-link-grammar"));
+  const report = szReportMarkdown({
+    calls: [], spentRub: 0, warnings: [],
+    articles: [{ slug: brief.slug, passed: true, costRub: 0, errorsBeforeRepair: [], errorsAfterRepair: [], repairSkipped: null, warnings: warnOf(linkProblems, "links-grammar") }],
+  });
+  assert.match(report, /Предупреждения редактору/);
+  assert.match(report, /links-grammar/);
+
+  const counted = structuredClone(fields);
+  counted.sectionsBefore[0].paragraphs.push(["Повторите эту фразу три раза вслух перед началом дня.", bullet("Первое"), bullet("Второе"), bullet("Третье"), bullet("Четвёртое"), bullet("Пятое")].join("\n\n"));
+  const countProblems = gateOf(counted);
+  assert.equal(countProblems.some((problem) => problem.code === "count-mismatch"), false);
+  assert.equal(errorsOf(countProblems).length, 0, errorsOf(countProblems).map((problem) => `${problem.code}: ${problem.message}`).join("; "));
+  assert.equal(draftFieldDefects(counted, brief).some((hit) => /фразу/.test(hit.message)), false);
+
+  const promised = structuredClone(fields);
+  promised.sectionsBefore[0].paragraphs.push(["Пять шагов перед практикой.", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n"));
+  const promisedProblems = gateOf(promised);
+  assert.ok(errorsOf(promisedProblems).some((problem) => problem.code === "count-mismatch"), promisedProblems.map((problem) => problem.code).join(","));
+
+  let stanceAnswer = "Можно повторять фразу и без сильной веры, если слова уже свои и не спорят с утром.";
+  while (words(stanceAnswer) < 40) stanceAnswer += " Повтор остаётся коротким.";
+  assert.ok(words(stanceAnswer) <= 80, words(stanceAnswer));
+  const asked = structuredClone(fields);
+  asked.faq[2] = { question: "Нужна ли сильная вера, чтобы повторять фразу?", answer: stanceAnswer };
+  const stanceCfg = { faqHints: [{ match: "сильная вера", stance: "нет" }] };
+  const stanceProblems = gateOf(asked, stanceCfg);
+  assert.equal(faqAnswerTypeMismatch(asked.faq[2].question, asked.faq[2].answer), false);
+  assert.equal(errorsOf(stanceProblems).length, 0, errorsOf(stanceProblems).map((problem) => `${problem.code}: ${problem.message}`).join("; "));
+  assert.equal(warnOf(stanceProblems, "faq-stance").length, 1);
+  assert.ok(draftFieldDefects(asked, { ...brief, ...stanceCfg }).some((hit) => hit.code === "draft-faq-stance"));
 });
 
 test("LESSONS.md: every bullet is a «Неверно → Верно» item, seeded from EDITS.md and review #72", () => {

@@ -5,7 +5,7 @@ import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { szH2Count } from "./metrics.mjs";
 import {
   anchorHasBrackets, faqAnswerTypeMismatch, genericLinkAnchor, hasGluedLead, linkLeadResidue,
-  danglingLeads, faqStanceMismatch, firstPersonNarration, linkAnchorMismatches, markdownLinks,
+  danglingLeads, faqStanceMismatch, firstPersonNarration, linkAnchorMismatches, listPromiseMismatches, markdownLinks,
   paragraphSentenceCount, paragraphsTooClose, phraseInProse, sectionRetellsStory, statedListCount,
   ungrammaticalLinks, words,
 } from "./rules.mjs";
@@ -43,6 +43,8 @@ function quotedBlock(text) {
  * draft-extra-query, draft-faq-type, draft-faq-stance, draft-steps-count, draft-body-short,
  * draft-body-target, draft-h2, draft-paragraph, draft-dangling, draft-link-map,
  * draft-link-grammar, draft-story-pov, draft-practice-name, draft-example-count.
+ * draft-dangling, draft-link-grammar, draft-faq-stance and a count that is not
+ * «N шаг/шага/шагов» are hints for one cheap look. They do not fail the publish gate.
  */
 export function draftFieldDefects(fields, article = {}) {
   const hits = [];
@@ -74,6 +76,9 @@ export function draftFieldDefects(fields, article = {}) {
     add("draft-link-map", "sections", `анкор «${item.anchor}» должен вести на ${item.href}`);
   }
   for (const lead of danglingLeads(bodyText(fields))) add("draft-dangling", "sections", `подводка без списка: «${lead.slice(0, 60)}»`);
+  for (const hit of listPromiseMismatches(bodyText(fields))) {
+    add("draft-steps-count", "sections", `«${hit.title}» обещает ${hit.stated}, а пунктов ${hit.count}`);
+  }
   for (const slug of article.links?.contextual ?? []) {
     if (!bodySlugs.has(slug)) add("draft-link-missing", "sections", `нет /s/${slug} в основной части`);
   }

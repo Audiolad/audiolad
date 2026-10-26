@@ -341,6 +341,8 @@ export function szReportMarkdown(state) {
     lines.push(`## ${article.slug}`, "", `repairSkipped: ${article.repairSkipped ?? "нет"}`, "");
     if (typeof article.costRub === "number") lines.push(article.passed ? `стоимость готовой статьи: ${formatRub(article.costRub)}` : `потрачено без прохождения гейта: ${formatRub(article.costRub)}`, "");
     lines.push("До repair:", ...(article.errorsBeforeRepair ?? []).map((p) => `- ${p.field}: ${p.message}`), "", "После repair:", ...(article.errorsAfterRepair ?? []).map((p) => `- ${p.field}: ${p.message}`), "");
+    const notes = article.warnings ?? [];
+    if (notes.length) lines.push("Предупреждения редактору (гейт не останавливают):", ...notes.map((p) => `- ${p.code ?? ""} ${p.field}: ${p.message}`.replace(/\s+/g, " ").trim()), "");
   }
   if (state.articles?.some((article) => typeof article.costRub === "number")) {
     const pack = szPackCost(state.articles);

@@ -506,16 +506,34 @@ export function sectionRetellsStory(story, section) {
 }
 
 const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["два", 2], ["две", 2], ["три", 3], ["четыре", 4], ["пять", 5], ["шесть", 6], ["семь", 7], ["восемь", 8], ["девять", 9], ["десять", 10]];
+const NOT_WORD = String.raw`(?<![\p{L}\p{N}])`;
+const WORD_END = String.raw`(?![\p{L}\p{N}])`;
+const LIST_NOUN = String.raw`шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?|правило|правила|правил|фраза|фразы|фраз`;
+const STEP_NOUN = String.raw`шаг(?:а|ов)?`;
 
-/** A heading that promises N steps/items, or null when it does not count a list. */
+function countWordBefore(text, nounAt) {
+  const head = text.slice(0, nounAt);
+  for (const [word, num] of LIST_COUNT_WORDS) {
+    if (new RegExp(`${NOT_WORD}${word}${WORD_END}`, "u").test(head)) return num;
+  }
+  const digit = head.match(new RegExp(`${NOT_WORD}(\\d{1,2})${WORD_END}`, "u"));
+  return digit ? Number(digit[1]) : null;
+}
+
+/** Whole-word шаг/шага/шагов with a number before it. «фразу» and «правильных» are not a count. */
+export function stepHeadingCount(title) {
+  const text = normalize(title);
+  const noun = text.match(new RegExp(`${NOT_WORD}(${STEP_NOUN})${WORD_END}`, "u"));
+  if (!noun) return null;
+  return countWordBefore(text, noun.index);
+}
+
+/** A heading that names N items, or null. Nouns are whole words, never a stem inside another word. */
 export function statedListCount(title) {
   const text = normalize(title);
-  if (!/(шаг|пункт|признак|правил|фраз)/.test(text)) return null;
-  for (const [word, num] of LIST_COUNT_WORDS) {
-    if (new RegExp(`(?:^|\\s)${word}(?=\\s)`).test(text)) return num;
-  }
-  const digit = text.match(/(?:^|\s)(\d{1,2})(?=\s)/);
-  return digit ? Number(digit[1]) : null;
+  const noun = text.match(new RegExp(`${NOT_WORD}(?:${LIST_NOUN})${WORD_END}`, "u"));
+  if (!noun) return null;
+  return countWordBefore(text, noun.index);
 }
 
 function listNoun(stem, count) {
@@ -537,11 +555,11 @@ function listNoun(stem, count) {
 export function alignListCount(title, count) {
   const stated = statedListCount(title);
   if (stated == null || stated === count || count < 1 || count > 10) return title;
-  const stem = /пункт/iu.test(title) ? "пункт" : (/признак/iu.test(title) ? "признак" : (/правил/iu.test(title) ? "правил" : (/фраз/iu.test(title) ? "фраз" : "шаг")));
+  const stem = listStem(title);
   const noun = listNoun(stem, count);
   const word = LIST_COUNT_WORDS.find(([, num]) => num === count)?.[0] ?? String(count);
   return String(title).replace(
-    /(\d{1,2}|[Оо]дин|[Оо]дна|[Оо]дно|[Дд]ва|[Дд]ве|[Тт]ри|[Чч]етыре|[Пп]ять|[Шш]есть|[Сс]емь|[Вв]осемь|[Дд]евять|[Дд]есять)(\s+)(правило|правила|правил|фраза|фразы|фраз|шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?)/u,
+    /(\d{1,2}|[Оо]дин|[Оо]дна|[Оо]дно|[Дд]ва|[Дд]ве|[Тт]ри|[Чч]етыре|[Пп]ять|[Шш]есть|[Сс]емь|[Вв]осемь|[Дд]евять|[Дд]есять)(\s+)(правило|правила|правил|фраза|фразы|фраз|шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?)(?![\p{L}\p{N}])/u,
     (full, num, space) => {
       const digit = /^\d/.test(num);
       const cap = !digit && num[0] !== num[0].toLocaleLowerCase("ru");
@@ -551,8 +569,15 @@ export function alignListCount(title, count) {
   );
 }
 
-const NOT_WORD = String.raw`(?<![\p{L}\p{N}])`;
-const WORD_END = String.raw`(?![\p{L}\p{N}])`;
+function listStem(title) {
+  const text = normalize(title);
+  const has = (body) => new RegExp(`${NOT_WORD}(?:${body})${WORD_END}`, "u").test(text);
+  if (has("пункт(?:а|ов)?")) return "пункт";
+  if (has("признак(?:а|ов)?")) return "признак";
+  if (has("правило|правила|правил")) return "правил";
+  if (has("фраза|фразы|фраз")) return "фраз";
+  return "шаг";
+}
 
 function escapeRegExp(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -651,8 +676,19 @@ function followingListCount(blocks, index) {
   return count;
 }
 
+function promiseHit(title, count) {
+  const strictCount = stepHeadingCount(title);
+  if (strictCount != null) {
+    return strictCount === count ? null : { title: String(title).slice(0, 80), stated: strictCount, count, strict: true };
+  }
+  const stated = statedListCount(title);
+  if (stated == null || stated === count) return null;
+  return { title: String(title).slice(0, 80), stated, count, strict: false };
+}
+
 /**
- * A heading or a lead-in that promises N шагов/правил/фраз and is followed by a different list.
+ * A heading or a lead-in immediately before a list whose count differs.
+ * strict is only «<число> шаг/шага/шагов». Other nouns are warnings for the editor.
  * The «## Три шага» section is left to the steps check (it uses ###, not a bullet list).
  */
 export function listPromiseMismatches(markdown) {
@@ -661,19 +697,20 @@ export function listPromiseMismatches(markdown) {
   for (const section of sections) {
     const heading = section.match(/^## (.+)$/m)?.[1];
     const h3 = (section.match(/^### /gm) || []).length;
-    const stated = heading ? statedListCount(heading) : null;
-    const bullets = (section.match(/^(?:[-*] |\d+\. )/gm) || []).length;
-    if (heading && h3 < 2 && stated != null && bullets > 0 && stated !== bullets) {
-      hits.push({ title: heading, stated, count: bullets });
-    }
     const blocks = section.split(/\n\n+/);
+    if (heading && h3 < 2) {
+      const headingIndex = blocks.findIndex((block) => /^## /.test(block.trim()));
+      const count = headingIndex >= 0 ? followingListCount(blocks, headingIndex) : 0;
+      const hit = count > 0 ? promiseHit(heading, count) : null;
+      if (hit) hits.push(hit);
+    }
     for (let i = 0; i < blocks.length; i += 1) {
       const block = blocks[i].trim();
       if (!block || /^## /.test(block)) continue;
-      const promised = statedListCount(block);
-      if (promised == null) continue;
       const count = followingListCount(blocks, i);
-      if (count > 0 && promised !== count) hits.push({ title: block.slice(0, 80), stated: promised, count });
+      if (count < 1) continue;
+      const hit = promiseHit(block, count);
+      if (hit) hits.push(hit);
     }
   }
   return hits;
@@ -1326,8 +1363,10 @@ export function checkSzArticle(md, cfg, env) {
   const items = [...checklist.matchAll(/^ {2}text: (.+)$/gm)].map((m) => m[1]);
   if (items.length !== 5 || [...checklist.matchAll(/^- id: /gm)].length !== 5) add("checklist", "checklist", "ровно 5 пунктов чек-листа");
   const checklistTitle = checklist.match(/^title: (.+)$/m)?.[1] ?? "";
+  const strictChecklist = stepHeadingCount(checklistTitle);
   const statedChecklist = statedListCount(checklistTitle);
-  if (statedChecklist != null && items.length > 0 && statedChecklist !== items.length) add("count-mismatch", "checklist", `заголовок «${checklistTitle}» обещает ${statedChecklist}, а пунктов ${items.length}`);
+  if (strictChecklist != null && items.length > 0 && strictChecklist !== items.length) add("count-mismatch", "checklist", `заголовок «${checklistTitle}» обещает ${strictChecklist}, а пунктов ${items.length}`);
+  else if (strictChecklist == null && statedChecklist != null && items.length > 0 && statedChecklist !== items.length) add("count-mismatch", "checklist", `заголовок «${checklistTitle}» обещает ${statedChecklist}, а пунктов ${items.length}`, "warn");
   for (const item of items) {
     if (words(item) > L.checklistWords) add("checklist-length", "checklist", `пункт чек-листа длиннее ${L.checklistWords} слов: «${item}»`);
     const itemDefect = proseDefect(item, proseLimit("checklist.items"));
@@ -1411,8 +1450,10 @@ export function checkSzArticle(md, cfg, env) {
   const stepItems = (stepSection?.match(/^### /gm) || []).length;
   const stepsTitle = stepSection?.match(/^## (.+)$/m)?.[1] ?? "";
   if (stepItems !== 3 || !/^## Три шага/m.test(stepSection ?? "")) add("steps", "steps", "первый раздел с H3 после таблицы – «## Три шага…» ровно с тремя «###»");
+  const strictSteps = stepHeadingCount(stepsTitle);
   const statedSteps = statedListCount(stepsTitle);
-  if (statedSteps != null && stepItems > 0 && statedSteps !== stepItems) add("count-mismatch", "steps", `заголовок «${stepsTitle}» обещает ${statedSteps}, а пунктов ${stepItems}`);
+  if (strictSteps != null && stepItems > 0 && strictSteps !== stepItems) add("count-mismatch", "steps", `заголовок «${stepsTitle}» обещает ${strictSteps}, а пунктов ${stepItems}`);
+  else if (strictSteps == null && statedSteps != null && stepItems > 0 && statedSteps !== stepItems) add("count-mismatch", "steps", `заголовок «${stepsTitle}» обещает ${statedSteps}, а пунктов ${stepItems}`, "warn");
   for (const [, heading] of (stepSection ?? "").matchAll(/^### (.+)$/gm)) {
     // docs/article-numbered-steps.md: the site numbers steps itself; «Если …» headings are scenarios, not steps.
     if (/^(?:\d|Если\s)/iu.test(heading)) add("steps", "steps", `заголовок шага – глагол без номера и без «Если»: «${heading}»`);
@@ -1429,7 +1470,7 @@ export function checkSzArticle(md, cfg, env) {
     const answerFragment = danglingFragment(a);
     if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
     if (faqAnswerTypeMismatch(q, a)) add("faq-answer-type", "faq", `ответ на «${q}» начинается как да/нет, а вопрос открытый`);
-    if (faqStanceMismatch(q, a, cfg.faqHints)) add("faq-stance", "faq", `ответ на «${q}» противоречит позиции брифа «${(cfg.faqHints ?? []).find((hint) => normalize(q).includes(normalize(hint.match)))?.stance ?? ""}»`);
+    if (faqStanceMismatch(q, a, cfg.faqHints)) add("faq-stance", "faq", `ответ на «${q}» противоречит позиции брифа «${(cfg.faqHints ?? []).find((hint) => normalize(q).includes(normalize(hint.match)))?.stance ?? ""}»`, "warn");
   }
   const faqText = faq.flat().join("\n");
 
@@ -1445,7 +1486,7 @@ export function checkSzArticle(md, cfg, env) {
     add("links-map", "sections", `анкор «${item.anchor}» должен вести на ${item.href}, сейчас: ${actual}`);
   }
   for (const link of ungrammaticalLinks(proseBeforeFaq)) {
-    add("links-grammar", "sections", `ссылка «${link.anchor}» стоит в конструкции «и […] через»`);
+    add("links-grammar", "sections", `ссылка «${link.anchor}» стоит в конструкции «и […] через»`, "warn");
   }
   let anchorIndex = 0;
   for (const link of proseLinks) {
@@ -1535,9 +1576,9 @@ export function checkSzArticle(md, cfg, env) {
   for (const hit of oversizedParagraphs(mainBody)) {
     add("paragraph-size", "sections", `абзац из ${hit.count} предложений (больше 7) – не наполнитель, разбейте на абзацы по 3–5`);
   }
-  for (const lead of danglingLeads(mainBody)) add("dangling-lead", "sections", `подводка без списка: «${lead}»`);
+  for (const lead of danglingLeads(mainBody)) add("dangling-lead", "sections", `подводка без списка: «${lead}»`, "warn");
   for (const hit of listPromiseMismatches(mainBody)) {
-    add("count-mismatch", "sections", `«${hit.title}» обещает ${hit.stated}, а пунктов ${hit.count}`);
+    add("count-mismatch", "sections", `«${hit.title}» обещает ${hit.stated}, а пунктов ${hit.count}`, hit.strict ? "error" : "warn");
   }
   if (cfg.examplePhrases) {
     const examples = examplePhraseStats(mainBody);
