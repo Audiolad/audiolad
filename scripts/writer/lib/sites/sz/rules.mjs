@@ -79,40 +79,189 @@ const LINK_LEAD_PATTERN = [...LINK_LEADS]
   .join("|");
 // Colon, en dash, em dash, hyphen. The hyphen stays at the end of the class.
 const LEAD_SEPARATOR = "[:–—-]";
-const GLUE_TAIL = String.raw`\s*[:–—-]\s*\[[^\]\n]*\]\(/s/[a-z0-9-]+\)\.?`;
+
+/** One markdown link starting at `index`, with balanced [] in the anchor. Null for images and for a `[` that is not a link. */
+export function markdownLinkAt(text, index) {
+  const raw = String(text ?? "");
+  if (raw[index] !== "[" || (index > 0 && raw[index - 1] === "!")) return null;
+  let depth = 0;
+  let close = -1;
+  for (let i = index; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (ch === "\n") return null;
+    if (ch === "[") depth += 1;
+    else if (ch === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        close = i;
+        break;
+      }
+    }
+  }
+  if (close < 0 || raw[close + 1] !== "(") return null;
+  const hrefEnd = raw.indexOf(")", close + 2);
+  if (hrefEnd < 0) return null;
+  const href = raw.slice(close + 2, hrefEnd);
+  if (/[\s\n]/.test(href)) return null;
+  const anchor = raw.slice(index + 1, close);
+  const slug = /^\/s\/([a-z0-9-]+)$/u.exec(href)?.[1] ?? "";
+  return { anchor, href, slug, start: index, end: hrefEnd + 1, raw: raw.slice(index, hrefEnd + 1) };
+}
+
+/** Every markdown link in `text`. An inner `[…]` inside an anchor is not a second link. */
+export function markdownLinks(text) {
+  const raw = String(text ?? "");
+  const links = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const link = markdownLinkAt(raw, i);
+    if (!link) continue;
+    links.push(link);
+    i = link.end - 1;
+  }
+  return links;
+}
+
+export function anchorHasBrackets(anchor) {
+  return /[\[\]]/u.test(String(anchor ?? ""));
+}
+
+function realInternalLink(link) {
+  return Boolean(link?.slug && String(link.anchor ?? "").trim());
+}
 
 /** Length of one whole lead+separator+markdown link at `index`. 0 when the lead continues a word. */
 export function gluedLeadBodyLength(text, index = 0) {
   const source = String(text ?? "");
   if (index < 0 || index >= source.length) return 0;
   if (index > 0 && WORD_CHAR.test(source[index - 1]) && WORD_CHAR.test(source[index])) return 0;
-  const match = source.slice(index).match(new RegExp(`^(?:${LINK_LEAD_PATTERN})${GLUE_TAIL}`, "iu"));
-  return match ? match[0].length : 0;
+  const head = source.slice(index).match(new RegExp(`^(?:${LINK_LEAD_PATTERN})`, "iu"));
+  if (!head) return 0;
+  const afterLead = index + head[0].length;
+  if (afterLead < source.length && WORD_CHAR.test(source[afterLead - 1]) && WORD_CHAR.test(source[afterLead])) return 0;
+  const sep = source.slice(afterLead).match(new RegExp(`^\\s*${LEAD_SEPARATOR}\\s*`, "u"));
+  if (!sep) return 0;
+  const link = markdownLinkAt(source, afterLead + sep[0].length);
+  if (!realInternalLink(link)) return 0;
+  let end = link.end;
+  if (source[end] === ".") end += 1;
+  return end - index;
 }
 
-/** A glued lead at a word boundary, including «Прочитайте также: [..]» and «Подробнее – [..]». A prefix inside a longer word is not a lead. */
+/** A glued lead at a word boundary, including «Прочитайте также: [..]» and «Подробнее – [см. [это]]». */
 export function hasGluedLead(text) {
-  return new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})\\s*${LEAD_SEPARATOR}\\s*\\[`, "iu").test(String(text ?? ""));
+  const source = String(text ?? "");
+  for (let i = 0; i < source.length; i += 1) {
+    if (i > 0 && WORD_CHAR.test(source[i - 1])) continue;
+    if (gluedLeadBodyLength(source, i)) return true;
+  }
+  return false;
 }
 
-/** Orphan link glue. A whole lead, an optional «:» / «–» / «—» / «-», then only punctuation or the end of the line. A real [анкор](/s/…) is not residue. */
-export function linkLeadResidue(text) {
-  const raw = String(text ?? "");
-  const hits = [];
+function leadResidueSpan(raw, from = 0) {
   const lead = new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})(?![\\p{L}\\p{N}])`, "giu");
   for (const match of raw.matchAll(lead)) {
+    if (match.index < from) continue;
     const after = raw.slice(match.index + match[0].length);
     const sep = after.match(new RegExp(`^\\s*${LEAD_SEPARATOR}`, "u"));
-    const rest = sep ? after.slice(sep[0].length) : after;
-    if (/^\s*\[[^\]\n]+\]\([^)\n]+\)/u.test(rest)) continue;
-    const line = rest.split("\n", 1)[0];
+    if (!sep) continue;
+    const sepEnd = match.index + match[0].length + sep[0].length;
+    const ws = raw.slice(sepEnd).match(/^\s*/u)?.[0] ?? "";
+    const link = markdownLinkAt(raw, sepEnd + ws.length);
+    if (realInternalLink(link)) continue;
+    const line = raw.slice(sepEnd).split("\n", 1)[0];
     if (!/^[\s\p{P}]*$/u.test(line)) continue;
-    hits.push(`${match[0]}${sep ? sep[0] : ""}${line}`.replace(/\s+/g, " ").trim());
+    let end = sepEnd;
+    while (end < raw.length && raw[end] !== "\n" && /[\s.!?…]/u.test(raw[end])) end += 1;
+    return { start: match.index, end, label: raw.slice(match.index, end).replace(/\s+/g, " ").trim() };
   }
-  for (const match of raw.matchAll(/(?<!!)\[\s*\]\([^)]*\)/g)) hits.push(match[0]);
-  for (const match of raw.matchAll(/:\s*\.(?=\s|$|[»”’"])/gu)) hits.push(match[0]);
-  for (const match of raw.matchAll(/:\s*[»”’"]/gu)) hits.push(match[0]);
+  return null;
+}
+
+function punctuationResidueSpans(raw) {
+  const spans = [];
+  for (const match of raw.matchAll(/(?<!!)\[\s*\]\([^)\n]*\)/g)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  for (const match of raw.matchAll(/:\s*\.(?=\s|$|[»”’"])/gu)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  // Closing quotes only. ASCII " before a letter opens a quotation («сказал: "Цвет…»).
+  for (const match of raw.matchAll(/:\s*(?=[»”’])/gu)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  for (const match of raw.matchAll(/:\s*"(?![\p{L}\p{N}])/gu)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  return spans;
+}
+
+/** A lead whose separator and link were cut away, leaving the lead. Unchanged prose is not residue. */
+export function linkRemovedResidue(draft, repaired) {
+  if (typeof draft !== "string" || typeof repaired !== "string" || draft === repaired) return [];
+  const spans = deletionSpans(draft, repaired);
+  if (!spans) return [];
+  const hits = [];
+  const leadBefore = new RegExp(`(?:${LINK_LEAD_PATTERN})$`, "iu");
+  for (const [start, end] of spans) {
+    const deleted = draft.slice(start, end);
+    if (!markdownLinks(deleted).some((link) => link.slug)) continue;
+    const before = draft.slice(0, start);
+    const lead = before.match(leadBefore);
+    const sepFirst = new RegExp(`^\\s*${LEAD_SEPARATOR}`, "u").test(deleted) || new RegExp(`\\s*${LEAD_SEPARATOR}\\s*$`, "u").test(before);
+    if (!lead || !sepFirst) continue;
+    hits.push(lead[0]);
+  }
   return hits;
+}
+
+/**
+ * Orphan link glue. A whole lead plus an explicit «:» / «–» / «—» / «-», then only punctuation.
+ * «Расскажем подробнее.» has no separator and is not residue. A real [анкор](/s/…) is not residue.
+ * Pass `draft` to also flag a lead whose link the repair removed.
+ */
+export function linkLeadResidue(text, draft) {
+  const raw = String(text ?? "");
+  const hits = [];
+  let from = 0;
+  let guard = 0;
+  while (guard < 12) {
+    const span = leadResidueSpan(raw, from);
+    if (!span) break;
+    if (span.label) hits.push(span.label);
+    from = Math.max(span.end, span.start + 1);
+    guard += 1;
+  }
+  for (const span of punctuationResidueSpans(raw)) hits.push(span.label);
+  if (typeof draft === "string") hits.push(...linkRemovedResidue(draft, raw));
+  return hits;
+}
+
+function nextResidueSpan(raw) {
+  const lead = leadResidueSpan(raw, 0);
+  const extras = punctuationResidueSpans(raw);
+  const spans = [...(lead ? [lead] : []), ...extras];
+  spans.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  return spans[0] ?? null;
+}
+
+/** Drop an orphan lead+separator, an empty [](), or a dangling colon. A real link stays. */
+export function stripOrphanLead(text) {
+  let next = String(text ?? "");
+  let guard = 0;
+  while (guard < 12) {
+    const span = nextResidueSpan(next);
+    if (!span) break;
+    let start = span.start;
+    if (start > 0 && next[start - 1] === " ") start -= 1;
+    const candidate = next.slice(0, start) + next.slice(span.end);
+    if (!candidate.trim()) break;
+    next = candidate;
+    guard += 1;
+  }
+  return next;
+}
+
+/** Drop a lead left behind after its link was deleted. Ordinary «подробнее.» in the draft stays. */
+export function stripRemovedLinkLead(draft, text) {
+  let next = String(text ?? "");
+  for (const lead of linkRemovedResidue(draft, next)) {
+    const escaped = lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`${NOT_WORD_BEFORE}${escaped}(?![\\p{L}\\p{N}])\\s*[.!?…]+`, "iu");
+    next = next.replace(re, "");
+  }
+  return next.replace(/[ ]{2,}/g, " ");
 }
 
 function wordBoundary(text, index) {
@@ -126,15 +275,16 @@ function joinsLetters(text, start, end) {
 }
 
 function spanIsWholeLeadOrToken(span, original = "", start = 0) {
-  const core = span.replace(/^\s/u, "").replace(/\s$/u, "");
-  if (/^\[[^\]]*\]\([^)\n]*\)$/u.test(core)) {
-    const coreStart = start + Math.max(0, span.indexOf(core));
-    const before = original.slice(0, coreStart);
-    // The link is the tail of a lead. Removing only the token would publish «Подробнее: .» or «начПодробнее: .ать».
-    if (new RegExp(`(?:${LINK_LEAD_PATTERN})\\s*${LEAD_SEPARATOR}\\s*$`, "iu").test(before)) return false;
-    return true;
-  }
-  return new RegExp(`^(?:${LINK_LEAD_PATTERN})${GLUE_TAIL}$`, "iu").test(core);
+  const leadSpace = /^\s/u.test(span) ? 1 : 0;
+  const trimmed = span.trim();
+  const trailSpace = trimmed && span.endsWith(" ") ? span.length - leadSpace - trimmed.length : 0;
+  const core = span.slice(leadSpace, span.length - trailSpace);
+  if (core && gluedLeadBodyLength(core, 0) === core.length) return true;
+  const link = markdownLinkAt(core, 0);
+  if (!link || link.end !== core.length || !link.slug) return false;
+  const before = original.slice(0, start + leadSpace);
+  if (new RegExp(`(?:${LINK_LEAD_PATTERN})\\s*${LEAD_SEPARATOR}\\s*$`, "iu").test(before)) return false;
+  return true;
 }
 
 /** Pure deletions that turn `original` into `next`. Null when `next` inserts or replaces text. */
@@ -271,9 +421,9 @@ function linkSentences(span) {
 }
 
 function candidateRemovalEnds(original, start, stripped, s) {
-  const found = original.slice(start).match(/\[[^\]]*\]\([^)\n]*\)/u);
-  if (!found || found.index > 80) return [];
-  const minEnd = start + found.index + found[0].length;
+  const link = markdownLinks(original.slice(start)).find((item) => item.slug && item.start <= 80);
+  if (!link) return [];
+  const minEnd = start + link.end;
   const limit = Math.min(original.length, minEnd + 8);
   const ends = [];
   for (let end = minEnd; end <= limit; end += 1) {
@@ -328,7 +478,7 @@ function explainLinkRemovals(original, stripped) {
 export function protectedRemovalOk(original, stripped) {
   if (typeof original !== "string" || typeof stripped !== "string") return false;
   if (!stripped.trim() || stripped === original) return false;
-  if (linkLeadResidue(stripped).length || leadWordFragments(original, stripped).length) return false;
+  if (linkLeadResidue(stripped).length || linkRemovedResidue(original, stripped).length || leadWordFragments(original, stripped).length) return false;
   if (!original.includes("  ") && stripped.includes("  ")) return false;
   const spans = explainLinkRemovals(original, stripped);
   if (!spans?.length) return false;
@@ -1131,12 +1281,14 @@ export function checkSzArticle(md, cfg, env) {
   const faqText = faq.flat().join("\n");
 
   // ── links ──
-  const contextual = [...body.slice(0, pFaq).matchAll(/\[[^\]]+\]\(\/s\/([a-z0-9-]+)\)/g)];
-  if (contextual.length < L.contextualLinks[0] || contextual.length > L.contextualLinks[1]) add("links-contextual", "sections", `${contextual.length} ссылок /s в тексте, нужно ${L.contextualLinks[0]}–${L.contextualLinks[1]}`);
+  const proseLinks = markdownLinks(body.slice(0, pFaq)).filter((link) => link.slug);
+  if (proseLinks.length < L.contextualLinks[0] || proseLinks.length > L.contextualLinks[1]) add("links-contextual", "sections", `${proseLinks.length} ссылок /s в тексте, нужно ${L.contextualLinks[0]}–${L.contextualLinks[1]}`);
   let anchorIndex = 0;
-  for (const match of body.slice(0, pFaq).matchAll(/\[([^\]]+)\]\(\/s\/([a-z0-9-]+)\)/g)) {
-    if (!genericLinkAnchor(match[1])) continue;
-    add("links-anchor", "sections", `анкор «${match[1]}» у ссылки /s/${match[2]} слишком общий (#${anchorIndex})`);
+  for (const link of proseLinks) {
+    const brackets = anchorHasBrackets(link.anchor);
+    if (!brackets && !genericLinkAnchor(link.anchor)) continue;
+    const why = brackets ? "содержит скобки" : "слишком общий";
+    add("links-anchor", "sections", `анкор «${link.anchor}» у ссылки /s/${link.slug} ${why} (#${anchorIndex})`);
     anchorIndex += 1;
   }
   for (const residue of linkLeadResidue(`${body}\n${faqText}`)) {
@@ -1148,6 +1300,12 @@ export function checkSzArticle(md, cfg, env) {
       if (seenFragment.has(fragment)) continue;
       seenFragment.add(fragment);
       add("links-fragment", "story", `защищённый абзац обрезан на обломке ярлыка: «${fragment}»`);
+    }
+    const seenResidue = new Set();
+    for (const residue of linkRemovedResidue(env.draftMd, md)) {
+      if (seenResidue.has(residue)) continue;
+      seenResidue.add(residue);
+      add("links-residue", "sections", `оборванный ярлык ссылки: «${residue}»`);
     }
   }
   const links = [...body.matchAll(/(?:\]\(|href=")\/s\/([a-z0-9-]+)(?:[)#"?])/g)].map((m) => m[1]);

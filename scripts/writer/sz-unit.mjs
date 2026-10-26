@@ -31,8 +31,9 @@ import {
 import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
+import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, isSpecialistQuestion, leadWordFragments, linkLeadResidue, normalize, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, statedListCount, stripOrphanLead, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -269,6 +270,92 @@ test("prompt: lessons, caution, siblings and tone sample reach the model", () =>
   assert.match(text, /не «материал», не «здесь», не «подробнее»/);
   assert.match(text, /открытый вопрос/);
   assert.match(text, /не «Пять шагов»/);
+  const linksAt = text.indexOf("ОБЯЗАТЕЛЬНЫЕ ССЫЛКИ");
+  const structureAt = text.indexOf("СТРУКТУРА (поля JSON)");
+  assert.ok(linksAt >= 0 && linksAt < structureAt, "список ссылок до структуры");
+  for (const slug of brief.links.contextual) assert.ok(text.slice(linksAt, structureAt).includes(`/s/${slug}`), slug);
+  assert.match(text, /История и молитва остаются без ссылок/);
+  assert.match(text, /950–1100/);
+  assert.match(text, /СВЕРКА ПЕРЕД ОТПРАВКОЙ/);
+  assert.match(text, /не начинается с «Да» или «Нет»/);
+});
+
+test("gate: a lead without a separator is prose, and nested brackets are one link", () => {
+  const endings = [
+    "Расскажем подробнее.",
+    "Хотите узнать больше?",
+    "См. также.",
+    "Читайте также.",
+    "Узнайте больше.",
+    "Подробности.",
+    "смотрите также!",
+    "скажем подробнее»",
+    "ПОДРОБНЕЕ.",
+    "узнать больше, если спросить священника.",
+    "Подробнее – в другой главе книги.",
+    "Подробнее о границах использования образов.",
+    "Читайте еще: [Эзотерика и церковь](/s/ezoterika-i-tserkov).",
+  ];
+  for (const sample of endings) {
+    assert.equal(linkLeadResidue(sample).length, 0, sample);
+    const md = firstPara(assembled, sample);
+    const codes = errorsOf(checkSzArticle(md, cfg, { ...env, draftMd: md })).map((problem) => problem.code);
+    assert.equal(codes.includes("links-residue"), false, `${sample}: ${codes.join(",")}`);
+  }
+  for (const sample of ["Подробнее: .", "Подробнее – .", "Подробнее — .", "Подробнее - .", "[]().", "Цитата оборвалась:»"]) {
+    assert.ok(linkLeadResidue(sample).length > 0, sample);
+  }
+  assert.equal(linkLeadResidue('Мастер сказал: "Цвет свечи при гадании выбирают вечером".').length, 0);
+  assert.equal(stripOrphanLead('Мастер сказал: "Цвет свечи при гадании выбирают вечером".'), 'Мастер сказал: "Цвет свечи при гадании выбирают вечером".');
+  assert.equal(linkLeadResidue("записала: «цитата остаётся».").length, 0);
+  assert.equal(stripOrphanLead("Расскажем подробнее."), "Расскажем подробнее.");
+  assert.equal(stripOrphanLead("направи. Подробнее: .»").includes("»"), true);
+  assert.equal(stripOrphanLead("направи. Подробнее: .»").includes("Подробнее"), false);
+  const nested = "Подробнее: [см. [это]](/s/ezoterika-i-tserkov).";
+  const links = markdownLinks(nested);
+  assert.equal(links.length, 1);
+  assert.equal(links[0].anchor, "см. [это]");
+  assert.equal(anchorHasBrackets(links[0].anchor), true);
+  assert.equal(gluedLeadBodyLength(nested), nested.length);
+  const followed = `${nested} Дальше обычное предложение о практике.`;
+  assert.equal(markdownLinks(followed).length, 1);
+  assert.equal(gluedLeadBodyLength(followed), nested.length);
+  for (const sample of [nested, followed]) {
+    const codes = errorsOf(checkSzArticle(firstPara(assembled, sample), cfg, env)).map((problem) => problem.code);
+    assert.ok(codes.includes("links-anchor"), `${sample}: ${codes.join(",")}`);
+    assert.equal(codes.includes("links-residue"), false, codes.join(","));
+  }
+  assert.equal(markdownLinks("Картинка ![](/s/ezoterika-i-tserkov) рядом.").length, 0);
+  assert.equal(linkLeadResidue("Подробнее: [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+});
+
+test("draft: prompt rules and cheap checks catch the 830372c9 defects without a model call", () => {
+  const clean = draftFieldDefects(fields, brief);
+  assert.deepEqual(clean.map((hit) => hit.code), [], clean.map((hit) => `${hit.code} ${hit.where} ${hit.message}`).join(" | "));
+  const queries = ["денежная формула", "сильная аффирмация", "слова которым веришь", "утреннее намерение"];
+  const article = { ...brief, additionalQueries: queries, links: brief.links };
+  const raw = structuredClone(fields);
+  raw.story[0] = `${raw.story[0]} Подробнее: [материал](/s/affirmacii-lyubvi-k-sebe). Подробнее: [материал](/s/affirmacii-na-chakry).`;
+  raw.sectionsBefore[0].paragraphs[1] = `«${raw.sectionsBefore[0].paragraphs[1]} [Эзотерика и церковь](/s/ezoterika-i-tserkov).»`;
+  raw.sectionsBefore[1].paragraphs = [raw.story[1], raw.story[2]];
+  raw.steps.title = "Пять шагов, чтобы выбрать слова";
+  raw.faq[2] = { ...raw.faq[2], question: "Как понять, что фраза своя?", answer: "Да, если слова уже не вызывают внутреннего спора и их можно повторять спокойно каждый день без оговорки." };
+  while (words(raw.faq[2].answer) < 40) raw.faq[2].answer += " Пауза остаётся короткой.";
+  const codes = draftFieldDefects(raw, article).map((hit) => hit.code);
+  for (const code of ["draft-link-place", "draft-link-glue", "draft-link-anchor", "draft-retell", "draft-duplicate", "draft-extra-query", "draft-faq-type", "draft-steps-count"]) {
+    assert.ok(codes.includes(code), `${code} missing in ${codes.join(",")}`);
+  }
+  const short = structuredClone(fields);
+  short.sectionsBefore = short.sectionsBefore.slice(0, 1).map((section) => ({ ...section, paragraphs: section.paragraphs.slice(0, 1) }));
+  short.sectionsAfter = [];
+  assert.ok(draftFieldDefects(short, brief).some((hit) => hit.code === "draft-body-short" || hit.code === "draft-h2"));
+  const saved = findControlDrafts();
+  console.log(`draft replay saved control-out: ${saved.length ? saved.map((item) => item.dir).join(", ") : "830372c9-a1 and a2 are not on this machine"}`);
+  for (const item of saved) {
+    if (!item.fields) continue;
+    const hits = draftFieldDefects(item.fields, item.fields.brief ?? {});
+    console.log(`draft replay ${item.dir}: ${hits.map((hit) => hit.code).join(",") || "none"}`);
+  }
 });
 
 test("LESSONS.md: every bullet is a «Неверно → Верно» item, seeded from EDITS.md and review #72", () => {

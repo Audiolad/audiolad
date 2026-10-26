@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, stripOrphanLead, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -167,7 +167,7 @@ function markdownSlugs(fields) {
   const slugs = [];
   const walk = (value) => {
     if (typeof value === "string") {
-      for (const match of value.matchAll(/\[[^\]]+\]\(\/s\/([a-z0-9-]+)\)/g)) slugs.push(match[1]);
+      for (const link of markdownLinks(value)) if (link.slug) slugs.push(link.slug);
       return;
     }
     if (Array.isArray(value)) value.forEach(walk);
@@ -240,6 +240,13 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
   const beforeNorm = JSON.stringify(next);
   next = normalizeSzFields(next).fields;
   if (beforeNorm.includes("\u2014") && !JSON.stringify(next).includes("\u2014")) fixes.push("длинное тире заменено на «–»");
+  let residueFixes = 0;
+  next = mapStrings(next, (text) => {
+    const stripped = stripOrphanLead(text);
+    if (stripped !== text) residueFixes += 1;
+    return stripped;
+  });
+  if (residueFixes) fixes.push(residueFixes === 1 ? "оборванный ярлык ссылки снят" : `оборванные ярлыки ссылок сняты: ${residueFixes}`);
   const limits = SZ.limits;
   if (typeof next.description === "string" && descriptionOpensWithQuotedQuery(next.description, query)) {
     const opened = naturalDescriptionStart(next.description, query);
@@ -814,10 +821,6 @@ function linkHostParagraph(fields, { skipPath = "", ignoreQuoteLinks = false } =
   return null;
 }
 
-function markdownLinks(text) {
-  return [...String(text ?? "").matchAll(/\[([^\]]+)\]\(\/s\/([a-z0-9-]+)\)/g)].map((match) => ({ anchor: match[1], slug: match[2] }));
-}
-
 function endingRejected(text, original) {
   if (danglingFragment(original)) return false;
   return Boolean(danglingFragment(text));
@@ -914,7 +917,7 @@ function genericAnchorHits(fields) {
   const hits = [];
   for (const site of anchorProse(fields)) {
     for (const link of markdownLinks(site.text)) {
-      if (!genericLinkAnchor(link.anchor)) continue;
+      if (!link.slug || (!genericLinkAnchor(link.anchor) && !anchorHasBrackets(link.anchor))) continue;
       hits.push({ ...site, anchor: link.anchor, slug: link.slug });
     }
   }
@@ -1391,7 +1394,7 @@ export function buildSzFragment(brief, fields, failure) {
       const text = answer?.text;
       if (typeof text !== "string" || fieldProseDefect(text, found.path)) return null;
       if (findBadHref(text)) return null;
-      const slugs = [...text.matchAll(/\[[^\]]+\]\(\/s\/([a-z0-9-]+)\)/g)].map((match) => match[1]);
+      const slugs = markdownLinks(text).map((link) => link.slug).filter(Boolean);
       if (allowed.length && slugs.some((slug) => !allowed.includes(slug))) return null;
       return setPath(current, found.path, text);
     }, found.text);
@@ -1519,7 +1522,7 @@ export function buildSzFragment(brief, fields, failure) {
   return null;
 }
 
-const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "faq-answer-type", "faq-specialist", "links-anchor", "links-contextual", "count-mismatch", "query-count", "extra-query", "story-retell", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
+const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "faq-answer-type", "faq-specialist", "links-anchor", "links-residue", "links-contextual", "count-mismatch", "query-count", "extra-query", "story-retell", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
 
 function failureKey(failure) {
   return `${failure.code}:${failure.path ?? failure.field}`;
