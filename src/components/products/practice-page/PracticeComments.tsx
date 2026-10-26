@@ -44,6 +44,7 @@ type FeedResponse = {
     canComment: boolean;
     canReply: boolean;
     publicNameSuggestion: string;
+    avatarUrl: string | null;
   };
 };
 
@@ -195,14 +196,19 @@ export default function PracticeComments({
   return (
     <section
       id="listener-impressions"
-      className="mt-8 scroll-mt-24"
+      className="mt-8 w-full min-w-0 max-w-full scroll-mt-24"
       aria-labelledby="listener-impressions-title"
       data-listener-comments="true"
     >
       <h2 id="listener-impressions-title" className="text-[22px] font-semibold text-[#2b2144]">
         {LISTENER_IMPRESSIONS_TITLE}
       </h2>
-      <p className="mt-2 text-sm leading-6 text-[#6d628c]">{LISTENER_IMPRESSION_PRIVACY}</p>
+      <p
+        className="mt-2 w-full min-w-0 max-w-full whitespace-normal break-words text-sm leading-6 text-[#6d628c]"
+        data-listener-impression-privacy="true"
+      >
+        {LISTENER_IMPRESSION_PRIVACY}
+      </p>
       {showInvite ? (
         <div className="mt-4">
           <ListenerImpressionInvite
@@ -237,6 +243,7 @@ export default function PracticeComments({
       <ListenerCommentComposer
         mode={composerMode}
         publicName={publicName}
+        avatarUrl={viewer?.avatarUrl ?? null}
         body={body}
         pending={pending}
         formError={formError}

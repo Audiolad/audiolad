@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 
+import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import {
   LISTENER_IMPRESSION_NAME_LABEL,
   LISTENER_IMPRESSION_PLACEHOLDER,
@@ -12,7 +13,7 @@ import {
 import type { ListenerCommentComposerMode } from "@/lib/practice-comments/composer";
 
 const fieldClass =
-  "mt-2 w-full rounded-[16px] border border-[#e4d7f4] bg-white px-3 py-3 text-base text-[#2b2144] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
+  "mt-2 box-border w-full min-w-0 max-w-full rounded-[16px] border border-[#e4d7f4] bg-white px-3 py-3 text-base text-[#2b2144] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]";
 
 const buttonClass =
   "inline-flex min-h-11 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold";
@@ -20,6 +21,7 @@ const buttonClass =
 export default function ListenerCommentComposer({
   mode,
   publicName,
+  avatarUrl,
   body,
   pending,
   formError,
@@ -31,6 +33,7 @@ export default function ListenerCommentComposer({
 }: {
   mode: ListenerCommentComposerMode;
   publicName: string;
+  avatarUrl: string | null;
   body: string;
   pending: boolean;
   formError: string | null;
@@ -53,22 +56,27 @@ export default function ListenerCommentComposer({
 
   return (
     <form
-      className="mt-4"
+      className="mt-4 min-w-0 max-w-full"
       data-listener-comment-composer="form"
       onSubmit={onSubmit}
     >
-      <label className="block text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-name">
-        {LISTENER_IMPRESSION_NAME_LABEL}
-        <input
-          id="listener-impression-name"
-          className={fieldClass}
-          value={publicName}
-          maxLength={40}
-          onChange={(event) => onPublicNameChange(event.target.value)}
-          autoComplete="nickname"
-        />
-      </label>
-      <label className="mt-3 block text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-body">
+      <div className="flex min-w-0 items-end gap-3" data-listener-comment-preview="avatar">
+        <span className="mb-1 shrink-0">
+          <ListenerImpressionAvatar name={publicName} url={avatarUrl} />
+        </span>
+        <label className="block min-w-0 flex-1 text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-name">
+          {LISTENER_IMPRESSION_NAME_LABEL}
+          <input
+            id="listener-impression-name"
+            className={fieldClass}
+            value={publicName}
+            maxLength={40}
+            onChange={(event) => onPublicNameChange(event.target.value)}
+            autoComplete="nickname"
+          />
+        </label>
+      </div>
+      <label className="mt-3 block min-w-0 max-w-full text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-body">
         Ваше впечатление
         <textarea
           id="listener-impression-body"

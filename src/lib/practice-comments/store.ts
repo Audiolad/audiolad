@@ -34,6 +34,7 @@ export type CommentStore = {
   getGateBySlug(authorSlug: string, productSlug: string): Promise<ListenerCommentPracticeGate | null>;
   getPracticeContext(practiceId: string): Promise<PracticeContext | null>;
   suggestPublicName(userId: string): Promise<string>;
+  viewerAvatarUrl(userId: string): Promise<string | null>;
   authorDisplayName(practiceId: string): Promise<string>;
   isAuthorMember(userId: string, practiceId: string): Promise<boolean>;
   authorRecipientIds(practiceId: string): Promise<string[]>;

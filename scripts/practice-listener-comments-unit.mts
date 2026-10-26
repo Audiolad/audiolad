@@ -13,9 +13,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import * as ListenerCommentComposerModule from "../src/components/products/practice-page/ListenerCommentComposer";
 import * as ListenerImpressionAvatarModule from "../src/components/products/practice-page/ListenerImpressionAvatar";
 import {
+  LISTENER_VIEWER_AVATAR_PATH,
   listenerAvatarColor,
   listenerAvatarLetter,
   listenerAvatarPresentation,
+  resolveViewerCommentAvatar,
   sanitizePublicAvatarUrl,
 } from "../src/lib/practice-comments/avatar";
 import { openListenerCommentAvatar } from "../src/lib/practice-comments/avatar-proxy";
@@ -759,7 +761,8 @@ async function testSignedInListenerSeesComposer() {
   const formMarkup = renderToStaticMarkup(
     createElement(Composer, {
       mode: "form",
-      publicName: "Олег",
+      publicName: "Сергей",
+      avatarUrl: LISTENER_VIEWER_AVATAR_PATH,
       body: "",
       pending: false,
       formError: null,
@@ -771,14 +774,38 @@ async function testSignedInListenerSeesComposer() {
     }),
   );
   assert.match(formMarkup, /data-listener-comment-composer="form"/);
+  assert.match(formMarkup, /data-listener-comment-preview="avatar"/);
+  assert.match(formMarkup, new RegExp(`src="${LISTENER_VIEWER_AVATAR_PATH}"`));
   assert.match(formMarkup, new RegExp(LISTENER_IMPRESSION_SUBMIT));
   assert.match(formMarkup, /id="listener-impression-body"/);
   assert.doesNotMatch(formMarkup, /Оценки гостей/);
+  assert.doesNotMatch(formMarkup, /—/);
+
+  const letterMarkup = renderToStaticMarkup(
+    createElement(Composer, {
+      mode: "form",
+      publicName: "Сергей",
+      avatarUrl: null,
+      body: "",
+      pending: false,
+      formError: null,
+      signInHref,
+      errorMessage: null,
+      onPublicNameChange: () => undefined,
+      onBodyChange: () => undefined,
+      onSubmit: () => undefined,
+    }),
+  );
+  assert.match(letterMarkup, /data-listener-comment-preview="avatar"/);
+  assert.match(letterMarkup, /role="img"/);
+  assert.match(letterMarkup, />С</);
+  assert.doesNotMatch(letterMarkup, /<img /);
 
   const guestMarkup = renderToStaticMarkup(
     createElement(Composer, {
       mode: "sign_in",
       publicName: "",
+      avatarUrl: null,
       body: "",
       pending: false,
       formError: null,
@@ -804,6 +831,13 @@ async function testSignedInListenerSeesComposer() {
   assert.match(server, /Vary: "Cookie"/);
   assert.match(commentsUi, /cache: "no-store"/);
   assert.match(commentsUi, /resolveListenerCommentComposer/);
+  assert.match(commentsUi, /avatarUrl=\{viewer\?\.avatarUrl \?\? null\}/);
+  assert.match(commentsUi, /data-listener-impression-privacy="true"/);
+  assert.match(commentsUi, /whitespace-normal break-words/);
+  assert.match(
+    read("src/app/(platform)/(listener)/practice/[...segments]/layout.tsx"),
+    /min-w-0 max-w-full/,
+  );
   assert.doesNotMatch(commentsUi, /viewer\?\.canComment \?/);
   assert.doesNotMatch(stars, /Оценки гостей/);
   assert.doesNotMatch(stars, /data-practice-rating-guest-aggregate/);
@@ -886,6 +920,29 @@ async function testAvatars() {
   const proxy = `/api/listener-comment-avatars/${proxyId}`;
   assert.equal(sanitizePublicAvatarUrl(proxy), proxy);
   assert.equal(proxy.includes(listenerId), false);
+  assert.equal(sanitizePublicAvatarUrl(LISTENER_VIEWER_AVATAR_PATH), LISTENER_VIEWER_AVATAR_PATH);
+  assert.equal(sanitizePublicAvatarUrl(`${LISTENER_VIEWER_AVATAR_PATH}?token=secret`), null);
+  assert.equal(
+    resolveViewerCommentAvatar({
+      userId: listenerId,
+      profileUrl: safe,
+      profileFullName: "Мария Петрова",
+    }),
+    safe,
+  );
+  assert.equal(
+    resolveViewerCommentAvatar({
+      userId: listenerId,
+      profileUrl: `https://cdn.example/sign/${listenerId}/photo.webp?token=secret`,
+      profilePath: `${listenerId}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`,
+      profileFullName: "Мария Петрова",
+    }),
+    LISTENER_VIEWER_AVATAR_PATH,
+  );
+  assert.equal(
+    resolveViewerCommentAvatar({ userId: listenerId, profileUrl: null, profilePath: null }),
+    null,
+  );
 
   const shown = listenerAvatarPresentation({ name: "Мария", url: safe, imageFailed: false });
   assert.equal(shown.kind, "image");
@@ -1029,6 +1086,44 @@ async function testAvatars() {
   if (!bare.ok) return;
   assert.equal(bare.comments[0]?.avatarUrl, null);
   assert.equal(bare.viewer.canComment, false);
+  assert.equal(bare.viewer.avatarUrl, null);
+
+  const previewStore = createMemoryCommentStore(
+    state({
+      profileAvatars: {
+        [listener]: {
+          url: `https://cdn.example/sign/${listener}/photo.webp?token=secret`,
+          path: `${listener}/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp`,
+          fullName: "Мария Петрова",
+        },
+      },
+    }),
+  );
+  const preview = await listPracticeComments(previewStore, actor(listener), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(preview.ok, true);
+  if (!preview.ok) return;
+  assert.equal(preview.viewer.avatarUrl, LISTENER_VIEWER_AVATAR_PATH);
+  const previewJson = JSON.stringify(preview.viewer);
+  assert.equal(previewJson.includes(listener), false);
+  assert.equal(previewJson.includes("token="), false);
+  assert.equal(previewJson.includes("Петрова"), false);
+  assert.equal(previewJson.includes("/user-avatars/"), false);
+  const guestPreview = await listPracticeComments(previewStore, actor(null), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(guestPreview.ok, true);
+  if (!guestPreview.ok) return;
+  assert.equal(guestPreview.viewer.avatarUrl, null);
 
   const route = read("src/app/api/listener-comment-avatars/[commentId]/route.ts");
   assert.match(route, /isValidUserAvatarPath/);
@@ -1136,7 +1231,25 @@ async function testAvatars() {
     image: { bytes: photo, contentType: "image/webp" },
   });
   assert.equal(ownerHidden.status, 200);
+  const viewerAvatar = read("src/lib/practice-comments/viewer-avatar.ts");
+  assert.match(viewerAvatar, /getUser\(\)/);
+  assert.match(viewerAvatar, /avatar_path/);
+  assert.match(viewerAvatar, /isValidUserAvatarPath/);
+  assert.doesNotMatch(viewerAvatar, /searchParams|Response\.json/);
+  assert.match(route, /commentId === "me"/);
+  assert.match(route, /openSignedInListenerAvatar/);
+
   const migration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
+  const avatarFnStart = migration.indexOf(
+    "CREATE OR REPLACE FUNCTION public.practice_listener_comment_public_avatar",
+  );
+  const avatarFn = migration.slice(
+    avatarFnStart,
+    migration.indexOf("CREATE OR REPLACE VIEW public.practice_listener_comment_feed"),
+  );
+  assert.match(avatarFn, /FROM public\.profiles/);
+  assert.match(avatarFn, /p\.avatar_url, p\.avatar_path, p\.full_name/);
+  assert.match(avatarFn, /listener-comment-avatars/);
   const viewStart = migration.indexOf("CREATE OR REPLACE VIEW public.practice_listener_comment_feed");
   const viewSelect = migration.slice(viewStart, migration.indexOf("FROM public.practice_listener_comments AS c", viewStart));
   assert.match(viewSelect, /AS avatar_url/);

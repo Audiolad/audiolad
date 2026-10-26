@@ -155,6 +155,7 @@ export async function listPracticeComments(
         canComment: boolean;
         canReply: boolean;
         publicNameSuggestion: string;
+        avatarUrl: string | null;
       };
     }
 > {
@@ -201,6 +202,7 @@ export async function listPracticeComments(
       publicNameSuggestion: actor.userId
         ? await store.suggestPublicName(actor.userId)
         : LISTENER_COMMENT_DEFAULT_PUBLIC_NAME,
+      avatarUrl: actor.userId ? await store.viewerAvatarUrl(actor.userId) : null,
     },
   };
 }

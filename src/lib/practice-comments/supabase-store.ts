@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { sanitizePublicAvatarUrl } from "@/lib/practice-comments/avatar";
+import { resolveViewerCommentAvatar, sanitizePublicAvatarUrl } from "@/lib/practice-comments/avatar";
 import { LISTENER_COMMENT_AUTHOR_PUBLIC_NAME } from "@/lib/practice-comments/copy";
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
 import type { CommentCursor, CommentSort } from "@/lib/practice-comments/pagination";
@@ -155,6 +155,25 @@ export function createSupabaseCommentStore(input: {
         .maybeSingle();
       if (error) return deriveDefaultPublicName(null);
       return deriveDefaultPublicName((data as { full_name?: string | null } | null)?.full_name);
+    },
+    async viewerAvatarUrl(userId) {
+      const { data, error } = await reader
+        .from("profiles")
+        .select("avatar_url, avatar_path, full_name")
+        .eq("id", userId)
+        .maybeSingle();
+      if (error || !data) return null;
+      const row = data as {
+        avatar_url?: string | null;
+        avatar_path?: string | null;
+        full_name?: string | null;
+      };
+      return resolveViewerCommentAvatar({
+        userId,
+        profileUrl: row.avatar_url,
+        profilePath: row.avatar_path,
+        profileFullName: row.full_name,
+      });
     },
     async authorDisplayName(practiceId) {
       const { data } = await reader
