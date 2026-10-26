@@ -2524,7 +2524,132 @@ test("tiered: a generic anchor is rewritten inside the sentence", () => {
   });
   assert.equal(calls, 1, repaired.repairSkipped);
   assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[2], original);
+  const keptSentence = original.split(/(?<=[.!?…])\s+/u)[0];
+  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[2].split(/(?<=[.!?…])\s+/u)[0], keptSentence);
   assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "links-anchor"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+  const anchorJob = buildSzFragment(brief, raw, codes[0]);
+  const dropped = "Подробнее о границах использования образов читайте в статье [Эзотерика и психология](/s/psihologiya-i-ezoterika) и в материале [Ченнелинг в эзотерике](/s/chenneling-v-ezoterike).";
+  assert.equal(anchorJob.apply(raw, { text: dropped }), null);
+  assert.equal(raw.sectionsBefore[2].paragraphs[2].split(/(?<=[.!?…])\s+/u)[0], keptSentence);
+});
+
+test("tiered: a generic anchor inside the angel story moves out and keeps the quotation", () => {
+  const opening = fields.story[0];
+  const prayer = fields.sectionsBefore[0].paragraphs[1];
+  const raw = structuredClone(fields);
+  raw.story[0] = `${opening} Подробнее: [материал](/s/ezoterika-i-tserkov).`;
+  const anchorErrors = errorsOf(hybridBuild(raw).problems).filter((problem) => problem.code === "links-anchor");
+  assert.equal(anchorErrors.length, 1, anchorErrors.map((problem) => problem.message).join(" | "));
+  const job = buildSzFragment(brief, raw, anchorErrors[0]);
+  const prompt = job.messages.map((message) => message.content).join("\n");
+  assert.equal(job.key.includes("story"), false, job.key);
+  assert.match(job.key, /sectionsBefore\[0\]\.paragraphs\[\d+\]/);
+  assert.equal(prompt.includes(opening.slice(0, 40)), false);
+  assert.equal(prompt.includes("Ангеле Божий"), false);
+  assert.match(prompt, /АБЗАЦ:\nЗдесь просят сохранить жизнь/);
+  const bridge = "Образ остаётся тихой опорой рядом с человеком и не решает трудный разговор за него.";
+  let swap = "Границу церковного взгляда и современных практик спокойно разбирает статья [Эзотерика и церковь](/s/ezoterika-i-tserkov).";
+  while (words(swap) < 90) swap = `${swap} ${bridge}`;
+  const swapped = job.apply(raw, { text: swap });
+  assert.ok(swapped, "ответ без цитаты не должен отменяться: ссылка уходит в обычный абзац");
+  assert.equal(swapped.story[0], opening);
+  assert.equal(swapped.story[1], fields.story[1]);
+  assert.equal(swapped.story[2], fields.story[2]);
+  assert.equal(swapped.sectionsBefore[0].paragraphs[0], fields.sectionsBefore[0].paragraphs[0]);
+  assert.equal(swapped.sectionsBefore[0].paragraphs[1], prayer);
+  assert.notEqual(swapped.story[0], swap);
+  assert.equal(swapped.sectionsBefore[0].paragraphs[4], swap);
+  const gated = hybridBuild(swapped);
+  assert.ok(gated.md.includes(opening.slice(0, 80)));
+  assert.equal(gated.fields.story[0], opening);
+  assert.equal(errorsOf(gated.problems).some((problem) => problem.code === "links-anchor"), false);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(tier, "cheap");
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      assert.equal(text.includes(opening.slice(0, 40)), false);
+      assert.equal(text.includes("Ангеле Божий"), false);
+      const host = text.split("АБЗАЦ:\n").at(-1).trim();
+      assert.match(host, /^Здесь просят сохранить жизнь/);
+      const link = "[Эзотерика и церковь](/s/ezoterika-i-tserkov)";
+      const woven = host.includes(".") ? host.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${host}`;
+      return { text: woven };
+    },
+  });
+  assert.equal(calls, 1, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.story[0], opening);
+  assert.equal(repaired.result.fields.story[1], fields.story[1]);
+  assert.equal(repaired.result.fields.story[2], fields.story[2]);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], fields.sectionsBefore[0].paragraphs[0]);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.ok(repaired.result.fields.sectionsBefore[0].paragraphs[4].includes("[Эзотерика и церковь](/s/ezoterika-i-tserkov)"));
+  assert.ok(repaired.result.md.includes(opening.slice(0, 80)));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: a generic anchor inside the angel prayer moves out and keeps the quotation", () => {
+  const opening = fields.story[0];
+  const prayer = fields.sectionsBefore[0].paragraphs[1];
+  const glue = (slug) => ` Подробнее: [материал](/s/${slug}).`;
+  const raw = structuredClone(fields);
+  raw.sectionsBefore[0].paragraphs[1] = `${prayer}${glue("ezoterika-i-tserkov")}`;
+  const anchorErrors = errorsOf(hybridBuild(raw).problems).filter((problem) => problem.code === "links-anchor");
+  assert.equal(anchorErrors.length, 1, anchorErrors.map((problem) => problem.message).join(" | "));
+  const job = buildSzFragment(brief, raw, anchorErrors[0]);
+  const prompt = job.messages.map((message) => message.content).join("\n");
+  assert.equal(prompt.includes("Ангеле Божий"), false);
+  assert.equal(prompt.includes(opening.slice(0, 40)), false);
+  assert.match(job.key, /sectionsBefore\[0\]\.paragraphs\[\d+\]/);
+  assert.equal(job.key.includes("paragraphs[1]"), false, job.key);
+  const bridge = "Образ остаётся тихой опорой рядом с человеком и не решает трудный разговор за него.";
+  let swap = "Границу церковного взгляда и современных практик спокойно разбирает статья [Эзотерика и церковь](/s/ezoterika-i-tserkov).";
+  while (words(swap) < 90) swap = `${swap} ${bridge}`;
+  const swapped = job.apply(raw, { text: swap });
+  assert.ok(swapped, "молитва не должна заменяться абзацем без цитаты");
+  assert.equal(swapped.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(swapped.story[0], opening);
+  assert.notEqual(swapped.sectionsBefore[0].paragraphs[1], swap);
+  assert.equal(swapped.sectionsBefore[0].paragraphs[4], swap);
+  const gated = hybridBuild(swapped);
+  assert.ok(gated.md.includes("Ангеле Божий, хранителю мой святый"));
+  assert.equal(gated.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(errorsOf(gated.problems).some((problem) => problem.code === "links-anchor"), false);
+  const inline = structuredClone(fields);
+  const token = "[материал](/s/chenneling-v-ezoterike)";
+  inline.sectionsBefore[0].paragraphs[1] = prayer.replace("Аминь.»", `${token}Аминь.»`);
+  const inlineErrors = errorsOf(hybridBuild(inline).problems).filter((problem) => problem.code === "links-anchor");
+  assert.equal(inlineErrors.length, 1);
+  const inlineJob = buildSzFragment(brief, inline, inlineErrors[0]);
+  const inlinePrompt = inlineJob.messages.map((message) => message.content).join("\n");
+  assert.equal(inlinePrompt.includes("Ангеле Божий"), false);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw: inline, build: hybridBuild, repair: tierRepair({ maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(tier, "cheap");
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      assert.equal(text.includes("Ангеле Божий"), false);
+      const host = text.split("АБЗАЦ:\n").at(-1).trim();
+      const link = "[Ченнелинг в эзотерике](/s/chenneling-v-ezoterike)";
+      const woven = host.includes(".") ? host.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${host}`;
+      return { text: woven };
+    },
+  });
+  assert.equal(calls, 1, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(repaired.result.fields.story[0], opening);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], fields.sectionsBefore[0].paragraphs[0]);
+  assert.ok(repaired.result.fields.sectionsBefore[0].paragraphs[4].includes("[Ченнелинг в эзотерике](/s/chenneling-v-ezoterike)"));
+  assert.ok(repaired.result.md.includes("«Ангеле Божий, хранителю мой святый"));
   assert.equal(repaired.passed, true, repaired.repairSkipped);
 });
 

@@ -765,41 +765,51 @@ function findText(value, predicate, path = "") {
   return null;
 }
 
-function sectionHasLink(paragraphs) {
-  return (paragraphs ?? []).some((paragraph) => typeof paragraph === "string" && paragraph.includes("](/s/"));
+function sectionHasLink(paragraphs, ignoreQuoteLinks = false) {
+  return (paragraphs ?? []).some((paragraph) => {
+    if (typeof paragraph !== "string" || !paragraph.includes("](/s/")) return false;
+    if (ignoreQuoteLinks && isQuoteParagraph(paragraph)) return false;
+    return true;
+  });
 }
 
-function firstOpenParagraph(paragraphs, pathPrefix) {
+function firstOpenParagraph(paragraphs, pathPrefix, skipPath = "") {
   for (const [index, paragraph] of (paragraphs ?? []).entries()) {
+    const path = `${pathPrefix}[${index}]`;
+    if (skipPath && path === skipPath) continue;
     if (typeof paragraph !== "string" || words(paragraph) < 8 || isQuoteParagraph(paragraph)) continue;
     if (paragraph.includes("](/s/")) continue;
-    return { path: `${pathPrefix}[${index}]`, text: paragraph };
+    return { path, text: paragraph };
   }
   return null;
 }
 
-/** A non-quote paragraph in a section that does not already contain /s/. */
-function linkHostParagraph(fields) {
+/** A non-quote paragraph in a section that does not already contain /s/.
+ * ignoreQuoteLinks is only for moving a link out of a quotation: a /s/ that sits
+ * inside a quote does not make the section busy. */
+function linkHostParagraph(fields, { skipPath = "", ignoreQuoteLinks = false } = {}) {
   for (const key of ["sectionsBefore", "sectionsAfter"]) {
     for (const [index, section] of (fields[key] ?? []).entries()) {
-      if (sectionHasLink(section?.paragraphs)) continue;
-      const host = firstOpenParagraph(section?.paragraphs, `${key}[${index}].paragraphs`);
+      if (sectionHasLink(section?.paragraphs, ignoreQuoteLinks)) continue;
+      const host = firstOpenParagraph(section?.paragraphs, `${key}[${index}].paragraphs`, skipPath);
       if (host) return { ...host, title: section?.title ?? "" };
     }
   }
   const table = fields.tableSection;
   if (table) {
     const prose = [...(table.paragraphsBefore ?? []), ...(table.paragraphsAfter ?? [])];
-    if (!sectionHasLink(prose)) {
-      const before = firstOpenParagraph(table.paragraphsBefore, "tableSection.paragraphsBefore");
+    if (!sectionHasLink(prose, ignoreQuoteLinks)) {
+      const before = firstOpenParagraph(table.paragraphsBefore, "tableSection.paragraphsBefore", skipPath);
       if (before) return { ...before, title: table.title ?? "" };
-      const after = firstOpenParagraph(table.paragraphsAfter, "tableSection.paragraphsAfter");
+      const after = firstOpenParagraph(table.paragraphsAfter, "tableSection.paragraphsAfter", skipPath);
       if (after) return { ...after, title: table.title ?? "" };
     }
   }
   for (const [index, item] of (fields.steps?.items ?? []).entries()) {
+    const path = `steps.items[${index}].text`;
+    if (path === skipPath) continue;
     if (typeof item?.text !== "string" || item.text.includes("](/s/") || isQuoteParagraph(item.text) || words(item.text) < 8) continue;
-    return { path: `steps.items[${index}].text`, text: item.text, title: item.title ?? "" };
+    return { path, text: item.text, title: item.title ?? "" };
   }
   return null;
 }
@@ -832,29 +842,9 @@ function wovenLinkRejected(text, found, slug, brief) {
   return false;
 }
 
-function linkFragment(brief, fields, failure) {
-  let slug = failure.slug;
-  let found = null;
-  if (failure.code === "links-anchor") {
-    slug = slug || String(failure.message ?? "").match(/\/s\/([a-z0-9-]+)/)?.[1];
-    const anchor = failure.anchor || String(failure.message ?? "").match(/анкор «([^»]+)»/)?.[1];
-    if (!slug || !anchor) return null;
-    found = findText(fields, (text) => text.includes(`[${anchor}](/s/${slug})`));
-  } else {
-    slug = slug || String(failure.path ?? "").match(/^slug:([a-z0-9-]+)$/)?.[1];
-    if (!slug) {
-      const have = new Set(markdownSlugs(fields));
-      slug = (brief.links?.contextual ?? []).find((item) => /^[a-z0-9-]+$/.test(item) && !have.has(item));
-    }
-    if (!slug) return null;
-    found = linkHostParagraph(fields);
-  }
-  const allowed = (brief.links?.contextual ?? []).filter((item) => /^[a-z0-9-]+$/.test(item));
-  if (!found || !slug || !allowed.includes(slug)) return null;
-  const job = fragment(brief, `${failure.code}:${found.path}`, [
-    failure.code === "links-anchor"
-      ? `В этом абзаце ссылка /s/${slug} стоит с общим анкором. Вплети её в предложение и замени анкор на описание темы.`
-      : `В этом абзаце раздела «${found.title ?? ""}» ещё нет внутренней ссылки. Вплети в одно существующее предложение одну ссылку на /s/${slug}.`,
+function weaveLinkPrompt(found, slug, allowed) {
+  return [
+    `В этом абзаце раздела «${found.title ?? ""}» ещё нет внутренней ссылки. Вплети в одно существующее предложение одну ссылку на /s/${slug}.`,
     "Анкор называет тему статьи своими словами. Нельзя: «материал», «здесь», «подробнее», «тут», «ссылка», «статья».",
     "Не дописывай отдельное предложение «Подробнее: …» и не ставь две ссылки в конец одного абзаца.",
     `Разрешённые slug: ${allowed.join(", ")}. Других адресов нет.`,
@@ -862,13 +852,222 @@ function linkFragment(brief, fields, failure) {
     "",
     "АБЗАЦ:",
     found.text,
-  ].join("\n"), objectSchema({ text: stringSchema }), (current, answer) => {
+  ].join("\n");
+}
+
+/** Prose before FAQ, in the same order checkSzArticle numbers generic anchors. */
+function anchorProse(fields) {
+  const sites = [];
+  const push = (path, text, title = "") => {
+    if (typeof text !== "string" || !text) return;
+    sites.push({ path, text, title });
+  };
+  const pushList = (list, path, title = "") => {
+    (list ?? []).forEach((item, index) => push(`${path}[${index}]`, item, title));
+  };
+  pushList(fields.story, "story");
+  push("transition", fields.transition);
+  push("invitation", fields.invitation);
+  push("question", fields.question);
+  pushList(fields.practiceIntro, "practiceIntro");
+  pushList(fields.checklist?.items, "checklist.items");
+  push("psychologyIntro", fields.psychologyIntro);
+  (fields.experts ?? []).forEach((expert, index) => {
+    push(`experts[${index}].thesis`, expert?.thesis);
+    push(`experts[${index}].bridge`, expert?.bridge);
+  });
+  (fields.sectionsBefore ?? []).forEach((section, index) => {
+    const title = section?.title ?? "";
+    push(`sectionsBefore[${index}].title`, section?.title, title);
+    pushList(section?.paragraphs, `sectionsBefore[${index}].paragraphs`, title);
+  });
+  const table = fields.tableSection;
+  if (table) {
+    const title = table.title ?? "";
+    push("tableSection.title", table.title, title);
+    pushList(table.paragraphsBefore, "tableSection.paragraphsBefore", title);
+    (table.rows ?? []).forEach((row, rowIndex) => {
+      (row ?? []).forEach((cell, cellIndex) => push(`tableSection.rows[${rowIndex}][${cellIndex}]`, cell, title));
+    });
+    pushList(table.paragraphsAfter, "tableSection.paragraphsAfter", title);
+  }
+  if (fields.steps) {
+    const title = fields.steps.title ?? "";
+    push("steps.title", fields.steps.title, title);
+    push("steps.intro", fields.steps.intro, title);
+    (fields.steps.items ?? []).forEach((item, index) => {
+      push(`steps.items[${index}].title`, item?.title, item?.title ?? title);
+      push(`steps.items[${index}].text`, item?.text, item?.title ?? title);
+    });
+  }
+  (fields.sectionsAfter ?? []).forEach((section, index) => {
+    const title = section?.title ?? "";
+    push(`sectionsAfter[${index}].title`, section?.title, title);
+    pushList(section?.paragraphs, `sectionsAfter[${index}].paragraphs`, title);
+  });
+  push("specialist.intro", fields.specialist?.intro);
+  pushList(fields.specialist?.items, "specialist.items");
+  return sites;
+}
+
+function genericAnchorHits(fields) {
+  const hits = [];
+  for (const site of anchorProse(fields)) {
+    for (const link of markdownLinks(site.text)) {
+      if (!genericLinkAnchor(link.anchor)) continue;
+      hits.push({ ...site, anchor: link.anchor, slug: link.slug });
+    }
+  }
+  return hits;
+}
+
+function locateGenericAnchor(fields, failure) {
+  const slug = failure.slug || String(failure.message ?? "").match(/\/s\/([a-z0-9-]+)/)?.[1] || "";
+  const anchor = failure.anchor || String(failure.message ?? "").match(/анкор «([^»]+)»/)?.[1] || "";
+  const indexRaw = String(failure.path ?? "").match(/:(\d+)$/)?.[1] ?? String(failure.message ?? "").match(/#(\d+)/)?.[1];
+  const index = indexRaw == null ? Number.NaN : Number(indexRaw);
+  const hits = genericAnchorHits(fields);
+  if (Number.isInteger(index) && hits[index] && (!slug || hits[index].slug === slug) && (!anchor || hits[index].anchor === anchor)) return hits[index];
+  return hits.find((hit) => hit.slug === slug && (!anchor || hit.anchor === anchor)) ?? null;
+}
+
+function linkHostIsProtected(path, text) {
+  if (/^(?:story|storyEnding)(?:\.|\[|$)/.test(path)) return true;
+  return isQuoteParagraph(text);
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Drop one generic link. A glued «Подробнее:» suffix goes away; an inline token is cut out. Everything else stays. */
+function stripGenericLink(text, anchor, slug) {
+  const token = `[${anchor}](/s/${slug})`;
+  if (!String(text).includes(token)) return null;
+  const glued = String(text).match(new RegExp(`\\s*Подробнее:\\s*${escapeRegExp(token)}\\.?\\s*$`, "u"));
+  if (glued) {
+    const next = text.slice(0, text.length - glued[0].length);
+    if (next && text.startsWith(next) && !next.includes(token)) return next;
+  }
+  const parts = String(text).split(token);
+  if (parts.length !== 2) return null;
+  const next = parts.join("");
+  if (!next.trim()) return null;
+  return next;
+}
+
+function splitSentences(text) {
+  return String(text).split(/(?<=[.!?…])\s+/u);
+}
+
+function linkSetAccepted(text, original, slug, brief) {
+  const links = markdownLinks(text);
+  const allowed = new Set((brief.links?.contextual ?? []).filter((item) => /^[a-z0-9-]+$/.test(item)));
+  if (!links.length || links.some((link) => !allowed.has(link.slug))) return false;
+  if (links.some((link) => genericLinkAnchor(link.anchor))) return false;
+  if (links.filter((link) => link.slug === slug).length !== 1) return false;
+  const oldSlugs = markdownLinks(original).map((link) => link.slug);
+  for (const old of oldSlugs) {
+    if (!links.some((link) => link.slug === old)) return false;
+  }
+  for (const next of links) {
+    if (!oldSlugs.includes(next.slug)) return false;
+  }
+  return true;
+}
+
+/** In place: one sentence that holds the link may change. Every other sentence stays byte-identical. */
+function anchorSentenceAccepted(text, original, anchor, slug, brief, path) {
+  if (typeof text !== "string" || text === original) return false;
+  if (isQuoteParagraph(original) || isQuoteParagraph(text)) return false;
+  if (fieldProseDefect(text, path) || endingRejected(text, original)) return false;
+  if (/Подробнее:\s*\[/u.test(text)) return false;
+  if (!linkSetAccepted(text, original, slug, brief)) return false;
+  const before = splitSentences(original);
+  const after = splitSentences(text);
+  if (before.length !== after.length || !before.length) return false;
+  const token = `[${anchor}](/s/${slug})`;
+  let changed = -1;
+  for (let i = 0; i < before.length; i += 1) {
+    if (before[i] === after[i]) continue;
+    if (changed >= 0 || !before[i].includes(token)) return false;
+    changed = i;
+  }
+  if (changed < 0) return false;
+  for (const quote of before[changed].match(/«[^»]*»/gu) ?? []) {
+    if (!after[changed].includes(quote)) return false;
+  }
+  return true;
+}
+
+function linkFragment(brief, fields, failure) {
+  const allowed = (brief.links?.contextual ?? []).filter((item) => /^[a-z0-9-]+$/.test(item));
+  if (failure.code === "links-anchor") return anchorFragment(brief, fields, failure, allowed);
+  let slug = failure.slug || String(failure.path ?? "").match(/^slug:([a-z0-9-]+)$/)?.[1];
+  if (!slug) {
+    const have = new Set(markdownSlugs(fields));
+    slug = allowed.find((item) => !have.has(item));
+  }
+  const found = slug ? linkHostParagraph(fields) : null;
+  if (!found || !slug || !allowed.includes(slug)) return null;
+  const job = fragment(brief, `${failure.code}:${found.path}`, weaveLinkPrompt(found, slug, allowed), objectSchema({ text: stringSchema }), (current, answer) => {
     const text = answer?.text;
     if (wovenLinkRejected(text, found, slug, brief)) return null;
     return setPath(current, found.path, text);
   }, found.text);
   job.outputTokens = 420;
   return job;
+}
+
+function anchorFragment(brief, fields, failure, allowed) {
+  const host = locateGenericAnchor(fields, failure);
+  if (!host || !allowed.includes(host.slug)) return null;
+  const { slug, anchor } = host;
+  if (linkHostIsProtected(host.path, host.text)) {
+    const dest = linkHostParagraph(fields, { skipPath: host.path, ignoreQuoteLinks: true });
+    if (!dest) return null;
+    const job = fragment(brief, `links-anchor:${dest.path}`, weaveLinkPrompt(dest, slug, allowed), objectSchema({ text: stringSchema }), (current, answer) => {
+      const text = answer?.text;
+      if (wovenLinkRejected(text, dest, slug, brief)) return null;
+      const stripped = stripGenericLink(currentPathText(current, host.path, host.text), anchor, slug);
+      if (stripped == null || stripped === host.text) return null;
+      if (!quotesStay(host.text, stripped, anchor, slug)) return null;
+      return setPath(setPath(current, dest.path, text), host.path, stripped);
+    }, dest.text);
+    job.outputTokens = 420;
+    return job;
+  }
+  const job = fragment(brief, `links-anchor:${host.path}`, [
+    `В этом абзаце ссылка /s/${slug} стоит с общим анкором «${anchor}». Замени только этот анкор или, самое большее, предложение, в котором стоит ссылка.`,
+    "Остальные предложения оставь дословно. Цитаты не трогай и не переписывай абзац целиком.",
+    "Анкор называет тему статьи своими словами. Нельзя: «материал», «здесь», «подробнее», «тут», «ссылка», «статья».",
+    "Не дописывай отдельное предложение «Подробнее: …».",
+    `Разрешённые slug: ${allowed.join(", ")}. Других адресов нет.`,
+    "Верни JSON { text } – только этот абзац.",
+    "",
+    "АБЗАЦ:",
+    host.text,
+  ].join("\n"), objectSchema({ text: stringSchema }), (current, answer) => {
+    const text = answer?.text;
+    const original = currentPathText(current, host.path, host.text);
+    if (!anchorSentenceAccepted(text, original, anchor, slug, brief, host.path)) return null;
+    return setPath(current, host.path, text);
+  }, host.text);
+  job.outputTokens = 420;
+  return job;
+}
+
+function currentPathText(fields, path, fallback) {
+  const value = getPath(fields, path);
+  return typeof value === "string" ? value : fallback;
+}
+
+/** Quotations outside the removed link stay byte-identical. */
+function quotesStay(original, stripped, anchor, slug) {
+  const token = `[${anchor}](/s/${slug})`;
+  const glued = original.match(new RegExp(`\\s*Подробнее:\\s*${escapeRegExp(token)}\\.?\\s*$`, "u"));
+  if (glued && original.startsWith(stripped) && stripped.length === original.length - glued[0].length) return true;
+  return original.split(token).join("") === stripped;
 }
 
 function openingStory(fields) {
