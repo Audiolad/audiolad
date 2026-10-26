@@ -77,54 +77,41 @@ const LINK_LEAD_PATTERN = [...LINK_LEADS]
   .sort((a, b) => b.length - a.length)
   .map((lead) => lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/е/g, "[её]"))
   .join("|");
-const LINK_HEADS = [...new Set(LINK_LEADS.map((lead) => lead.split(/[\s.]+/u)[0]).filter((word) => word.length >= 4))];
+// Colon, en dash, em dash, hyphen. The hyphen stays at the end of the class.
+const LEAD_SEPARATOR = "[:–—-]";
+const GLUE_TAIL = String.raw`\s*[:–—-]\s*\[[^\]\n]*\]\(/s/[a-z0-9-]+\)\.?`;
 
-function foldLead(text) {
-  return String(text).toLocaleLowerCase("ru").replace(/ё/g, "е");
-}
-
-/** Length of one whole lead+colon+markdown link at `index`. 0 when the lead continues a word. */
+/** Length of one whole lead+separator+markdown link at `index`. 0 when the lead continues a word. */
 export function gluedLeadBodyLength(text, index = 0) {
   const source = String(text ?? "");
   if (index < 0 || index >= source.length) return 0;
   if (index > 0 && WORD_CHAR.test(source[index - 1]) && WORD_CHAR.test(source[index])) return 0;
-  const match = source.slice(index).match(new RegExp(`^(?:${LINK_LEAD_PATTERN})\\s*:\\s*\\[[^\\]\\n]*\\]\\(\\/s\\/[a-z0-9-]+\\)\\.?`, "iu"));
+  const match = source.slice(index).match(new RegExp(`^(?:${LINK_LEAD_PATTERN})${GLUE_TAIL}`, "iu"));
   return match ? match[0].length : 0;
 }
 
-/** A glued lead at a word boundary, including «Прочитайте также: [..]». A prefix inside a longer word is not a lead. */
+/** A glued lead at a word boundary, including «Прочитайте также: [..]» and «Подробнее – [..]». A prefix inside a longer word is not a lead. */
 export function hasGluedLead(text) {
-  return new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})\\s*:\\s*\\[`, "iu").test(String(text ?? ""));
+  return new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})\\s*${LEAD_SEPARATOR}\\s*\\[`, "iu").test(String(text ?? ""));
 }
 
-/** Orphan link glue: «Подробнее: .», empty [](), a colon before a closing quote. A real [анкор](/s/…) is not residue. */
+/** Orphan link glue. A whole lead, an optional «:» / «–» / «—» / «-», then only punctuation or the end of the line. A real [анкор](/s/…) is not residue. */
 export function linkLeadResidue(text) {
   const raw = String(text ?? "");
   const hits = [];
-  const lead = new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})\\s*:(?!\\s*\\[[^\\]\\n]+\\]\\([^)\\n]+\\))`, "giu");
-  for (const match of raw.matchAll(lead)) hits.push(match[0].trim());
+  const lead = new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})(?![\\p{L}\\p{N}])`, "giu");
+  for (const match of raw.matchAll(lead)) {
+    const after = raw.slice(match.index + match[0].length);
+    const sep = after.match(new RegExp(`^\\s*${LEAD_SEPARATOR}`, "u"));
+    const rest = sep ? after.slice(sep[0].length) : after;
+    if (/^\s*\[[^\]\n]+\]\([^)\n]+\)/u.test(rest)) continue;
+    const line = rest.split("\n", 1)[0];
+    if (!/^[\s\p{P}]*$/u.test(line)) continue;
+    hits.push(`${match[0]}${sep ? sep[0] : ""}${line}`.replace(/\s+/g, " ").trim());
+  }
   for (const match of raw.matchAll(/(?<!!)\[\s*\]\([^)]*\)/g)) hits.push(match[0]);
   for (const match of raw.matchAll(/:\s*\.(?=\s|$|[»”’"])/gu)) hits.push(match[0]);
   for (const match of raw.matchAll(/:\s*[»”’"]/gu)) hits.push(match[0]);
-  return hits;
-}
-
-/**
- * A protected paragraph cut down to a lead prefix: «Про» left from «Прочитайте», then a capital
- * or the end of the paragraph. «про брата» (lowercase continuation) is not a fragment.
- */
-export function leadWordFragments(text) {
-  const raw = String(text ?? "");
-  const hits = [];
-  for (const match of raw.matchAll(/(?<![\p{L}\p{N}])(\p{L}{2,})(?![\p{L}\p{N}])/gu)) {
-    const token = foldLead(match[1]);
-    if (!LINK_HEADS.some((head) => head.startsWith(token) && head.length > token.length)) continue;
-    const after = raw.slice(match.index + match[1].length);
-    if (/^[.!?…»"”’]*$/u.test(after) || /^\s+\p{Lu}/u.test(after)) hits.push(match[1]);
-  }
-  const stuck = new RegExp(`(?<=[\\p{L}\\p{N}])(?:${LINK_LEAD_PATTERN})(?![\\p{L}\\p{N}])`, "giu");
-  for (const match of raw.matchAll(stuck)) hits.push(match[0]);
-  for (const match of raw.matchAll(/:\s*\.(?=[\p{L}\p{N}])/gu)) hits.push(match[0]);
   return hits;
 }
 
@@ -138,10 +125,134 @@ function joinsLetters(text, start, end) {
   return WORD_CHAR.test(text[start - 1]) && WORD_CHAR.test(text[end]);
 }
 
-function spanIsWholeLeadOrToken(span) {
+function spanIsWholeLeadOrToken(span, original = "", start = 0) {
   const core = span.replace(/^\s/u, "").replace(/\s$/u, "");
-  if (/^\[[^\]]*\]\([^)\n]*\)$/u.test(core)) return true;
-  return new RegExp(`^(?:${LINK_LEAD_PATTERN})\\s*:\\s*\\[[^\\]\\n]*\\]\\(\\/s\\/[a-z0-9-]+\\)\\.?$`, "iu").test(core);
+  if (/^\[[^\]]*\]\([^)\n]*\)$/u.test(core)) {
+    const coreStart = start + Math.max(0, span.indexOf(core));
+    const before = original.slice(0, coreStart);
+    // The link is the tail of a lead. Removing only the token would publish «Подробнее: .» or «начПодробнее: .ать».
+    if (new RegExp(`(?:${LINK_LEAD_PATTERN})\\s*${LEAD_SEPARATOR}\\s*$`, "iu").test(before)) return false;
+    return true;
+  }
+  return new RegExp(`^(?:${LINK_LEAD_PATTERN})${GLUE_TAIL}$`, "iu").test(core);
+}
+
+/** Pure deletions that turn `original` into `next`. Null when `next` inserts or replaces text. */
+function deletionSpans(original, next) {
+  if (typeof original !== "string" || typeof next !== "string" || next.length > original.length) return null;
+  const spans = [];
+  let o = 0;
+  let s = 0;
+  while (o < original.length && s < next.length) {
+    if (original[o] === next[s]) {
+      o += 1;
+      s += 1;
+      continue;
+    }
+    const rest = next.slice(s);
+    const probe = rest.slice(0, Math.min(80, rest.length));
+    const found = original.indexOf(probe, o + 1);
+    if (found < 0) return null;
+    spans.push([o, found]);
+    o = found;
+  }
+  if (s < next.length) return null;
+  if (o < original.length) spans.push([o, original.length]);
+  return spans;
+}
+
+function fragmentLabel(original, start, end) {
+  let wordStart = start;
+  while (wordStart > 0 && WORD_CHAR.test(original[wordStart - 1])) wordStart -= 1;
+  const kept = original.slice(wordStart, start);
+  if (kept.length >= 2) return kept;
+  let wordEnd = end;
+  while (wordEnd < original.length && WORD_CHAR.test(original[wordEnd])) wordEnd += 1;
+  const leftover = original.slice(end, wordEnd);
+  if (leftover.length >= 2) return leftover;
+  const piece = original.slice(start, Math.min(end, start + 40)).replace(/\s+/g, " ").trim();
+  return piece || kept || leftover;
+}
+
+/**
+ * Scraps introduced by a repair. One argument is not a change, so ordinary prose is never a fragment.
+ * A hit is a deletion that starts or ends inside a word: a truncated lead («Прочитайте» → «Про»),
+ * letters joined across the cut, or part of a word removed. Words already in the draft are not hits.
+ */
+export function leadWordFragments(draft, repaired) {
+  if (typeof repaired !== "string") return [];
+  const original = String(draft ?? "");
+  const next = String(repaired);
+  if (!original || original === next) return [];
+  const spans = deletionSpans(original, next);
+  if (!spans?.length) return [];
+  const hits = [];
+  for (const [start, end] of spans) {
+    if (start >= end || (wordBoundary(original, start) && wordBoundary(original, end))) continue;
+    const label = fragmentLabel(original, start, end);
+    if (label) hits.push(label);
+  }
+  return hits;
+}
+
+function articleBody(md) {
+  return split(md)[1] ?? "";
+}
+
+function protectedBlocksOf(md) {
+  const body = articleBody(md);
+  const galleryAt = body.search(/^:::gallery\nvariant: angels-carousel/m);
+  if (galleryAt < 0) return [];
+  const storyParagraphs = body.slice(0, galleryAt).trimEnd().split("\n\n").slice(0, -2);
+  const blocks = [...storyParagraphs];
+  for (const match of body.matchAll(/^>[^\n]*$/gm)) blocks.push(match[0]);
+  for (const block of body.split(/\n\n+/)) {
+    const trimmed = block.trim();
+    if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith(":::") || trimmed.startsWith("|")) continue;
+    if (/[«»"“”„]|^\s*>/u.test(trimmed)) blocks.push(trimmed);
+  }
+  return blocks;
+}
+
+function edgeOverlap(a, b) {
+  let prefix = 0;
+  const n = Math.min(a.length, b.length);
+  while (prefix < n && a[prefix] === b[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < n && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix += 1;
+  return Math.max(prefix, suffix);
+}
+
+/** Fragments in protected paragraphs whose text changed relative to the draft. Unchanged words are ignored. */
+export function protectedDiffFragments(draftMd, md) {
+  if (typeof draftMd !== "string" || typeof md !== "string" || draftMd === md) return [];
+  const drafts = protectedBlocksOf(draftMd);
+  const blocks = protectedBlocksOf(md);
+  const hits = [];
+  const used = new Set();
+  for (const block of blocks) {
+    if (drafts.includes(block)) continue;
+    let best = -1;
+    let bestScore = 0;
+    let bestDeleted = Infinity;
+    for (let i = 0; i < drafts.length; i += 1) {
+      if (used.has(i)) continue;
+      const overlap = edgeOverlap(drafts[i], block);
+      if (overlap < 8) continue;
+      const spans = deletionSpans(drafts[i], block);
+      if (!spans) continue;
+      const deleted = spans.reduce((sum, [start, end]) => sum + (end - start), 0);
+      if (deleted < bestDeleted || (deleted === bestDeleted && overlap > bestScore)) {
+        best = i;
+        bestScore = overlap;
+        bestDeleted = deleted;
+      }
+    }
+    if (best < 0) continue;
+    used.add(best);
+    hits.push(...leadWordFragments(drafts[best], block));
+  }
+  return hits;
 }
 
 function edgeSpaces(span) {
@@ -168,7 +279,7 @@ function candidateRemovalEnds(original, start, stripped, s) {
   for (let end = minEnd; end <= limit; end += 1) {
     if (!wordBoundary(original, end) || joinsLetters(original, start, end)) continue;
     const span = original.slice(start, end);
-    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span)) continue;
+    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span, original, start)) continue;
     ends.push(end);
   }
   return ends;
@@ -217,7 +328,7 @@ function explainLinkRemovals(original, stripped) {
 export function protectedRemovalOk(original, stripped) {
   if (typeof original !== "string" || typeof stripped !== "string") return false;
   if (!stripped.trim() || stripped === original) return false;
-  if (linkLeadResidue(stripped).length || leadWordFragments(stripped).length) return false;
+  if (linkLeadResidue(stripped).length || leadWordFragments(original, stripped).length) return false;
   if (!original.includes("  ") && stripped.includes("  ")) return false;
   const spans = explainLinkRemovals(original, stripped);
   if (!spans?.length) return false;
@@ -226,7 +337,7 @@ export function protectedRemovalOk(original, stripped) {
     const span = original.slice(start, end);
     if (!wordBoundary(original, start) || !wordBoundary(original, end)) return false;
     if (joinsLetters(original, start, end)) return false;
-    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span)) return false;
+    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span, original, start)) return false;
     removed += linkSentences(span);
   }
   return countSentences(stripped) >= countSentences(original) - removed;
@@ -1031,16 +1142,9 @@ export function checkSzArticle(md, cfg, env) {
   for (const residue of linkLeadResidue(`${body}\n${faqText}`)) {
     add("links-residue", "sections", `оборванный ярлык ссылки: «${residue}»`);
   }
-  const protectedBlocks = [...storyParagraphs];
-  for (const match of body.matchAll(/^>[^\n]*$/gm)) protectedBlocks.push(match[0]);
-  for (const block of body.split(/\n\n+/)) {
-    const trimmed = block.trim();
-    if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith(":::") || trimmed.startsWith("|")) continue;
-    if (/[«»"“”„]|^\s*>/u.test(trimmed)) protectedBlocks.push(trimmed);
-  }
-  const seenFragment = new Set();
-  for (const block of protectedBlocks) {
-    for (const fragment of leadWordFragments(block)) {
+  if (typeof env?.draftMd === "string") {
+    const seenFragment = new Set();
+    for (const fragment of protectedDiffFragments(env.draftMd, md)) {
       if (seenFragment.has(fragment)) continue;
       seenFragment.add(fragment);
       add("links-fragment", "story", `защищённый абзац обрезан на обломке ярлыка: «${fragment}»`);

@@ -2661,7 +2661,13 @@ test("tiered: every glued link suffix leaves the story and the prayer, and resid
   assert.equal(linkLeadResidue("Подробнее: [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
   assert.equal(linkLeadResidue("Прочитайте также: [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
   assert.equal(linkLeadResidue("Дочитайте также: [материал](/s/ezoterika-i-tserkov).").length, 0);
-  for (const sample of ["Подробнее: .", "Подробнее:", "Читайте также: .", "Читайте также:", "Прочитайте также: .", "См. также: .", "Узнать больше:", "[]().", "Мысль обрывается: .", "Цитата оборвалась:»", "направи. Подробнее: .»"]) {
+  assert.equal(linkLeadResidue("Подробнее – [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+  assert.equal(linkLeadResidue("Подробнее — [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+  assert.equal(linkLeadResidue("Подробнее - [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+  assert.ok(linkLeadResidue("Подробнее – .").length > 0);
+  assert.ok(linkLeadResidue("Подробнее — .").length > 0);
+  assert.ok(linkLeadResidue("Подробнее - .").length > 0);
+  for (const sample of ["Подробнее: .", "Подробнее:", "Читайте также: .", "Читайте также:", "Прочитайте также: .", "См. также: .", "Узнать больше:", "Подробнее – .", "Подробнее — .", "Подробнее - .", "[]().", "Мысль обрывается: .", "Цитата оборвалась:»", "направи. Подробнее: .»"]) {
     const codes = errorsOf(checkSzArticle(firstPara(assembled, sample), cfg, env)).map((problem) => problem.code);
     assert.ok(codes.includes("links-residue"), `${sample}: ${codes.join(",")}`);
   }
@@ -2813,14 +2819,14 @@ test("tiered: a glued link in the middle of the story or the prayer comes out wi
   assert.equal(bothFixed.repaired.passed, true, bothFixed.repaired.repairSkipped);
 });
 
-test("tiered: a lead is a whole word, and a cut prefix fails the gate", () => {
+test("tiered: a lead is a whole word, and only a repair that cuts the word fails the gate", () => {
   const opening = fields.story[0];
   const prayer = fields.sectionsBefore[0].paragraphs[1];
   const tail = "Брат всё ещё ждал этого звонка.";
   assert.equal(opening.endsWith("приезжать."), true);
   assert.deepEqual(leadWordFragments(opening), []);
   assert.deepEqual(leadWordFragments("сказал про брата и замолчал."), []);
-  assert.deepEqual(leadWordFragments(`${opening} Про ${tail}`), ["Про"]);
+  assert.deepEqual(leadWordFragments("Я думала про Ангела и замолчала.", "Я думала про Ангела и замолчала."), []);
   const titles = { "ezoterika-i-tserkov": "Эзотерика и церковь", "psihologiya-i-ezoterika": "Эзотерика и психология", "chenneling-v-ezoterike": "Ченнелинг в эзотерике" };
   const repair = (raw) => {
     let calls = 0;
@@ -2844,7 +2850,11 @@ test("tiered: a lead is a whole word, and a cut prefix fails the gate", () => {
   };
   const whole = `${opening} Прочитайте также: [материал](/s/ezoterika-i-tserkov). ${tail}`;
   const cut = `${opening} Про ${tail}`;
-  assert.equal(protectedRemovalOk(whole, `${opening} ${tail}`), true);
+  const cleaned = `${opening} ${tail}`;
+  assert.deepEqual(leadWordFragments(whole, cleaned), []);
+  assert.deepEqual(leadWordFragments(whole, cut), ["Про"]);
+  assert.ok(leadWordFragments(opening.replace("начать", "начПодробнее: [ссылка](/s/ezoterika-i-tserkov).ать"), opening).length > 0);
+  assert.equal(protectedRemovalOk(whole, cleaned), true);
   assert.equal(protectedRemovalOk(whole, cut), false);
   assert.equal(protectedRemovalOk(opening.replace("начать", "начПодробнее: [ссылка](/s/ezoterika-i-tserkov).ать"), opening), false);
   const story = structuredClone(fields);
@@ -2883,18 +2893,104 @@ test("tiered: a lead is a whole word, and a cut prefix fails the gate", () => {
   assert.equal(insideFixed.repaired.result.fields.story[0].includes("начать"), false);
   assert.equal(insideFixed.repaired.result.fields.story[0].includes("начПодробнее:"), true);
   assert.equal(insideFixed.repaired.result.fields.story[0].includes("ать"), true);
-  for (const fragment of ["Про", "Под", "Чит", "Смо"]) {
+  for (const fragment of ["Про", "Под", "Чит", "Смо", "про Ангела", "по Москве", "под Богом"]) {
     const raw = structuredClone(fields);
     raw.story[0] = `${opening} ${fragment} ${tail}`;
-    const codes = errorsOf(hybridBuild(raw).problems).map((problem) => problem.code);
-    assert.ok(codes.includes("links-fragment"), `${fragment}: ${codes.join(",")}`);
-    assert.equal(raw.story[0].includes(fragment), true);
+    const built = hybridBuild(raw);
+    const codes = errorsOf(built.problems).map((problem) => problem.code);
+    assert.equal(codes.includes("links-fragment"), false, `${fragment}: ${codes.join(",")}`);
   }
   const prayerCut = structuredClone(fields);
   prayerCut.sectionsBefore[0].paragraphs[1] = prayer.replace(" Аминь.»", " Про.»");
   const prayerCodes = errorsOf(hybridBuild(prayerCut).problems).map((problem) => problem.code);
-  assert.ok(prayerCodes.includes("links-fragment"), prayerCodes.join(","));
+  assert.equal(prayerCodes.includes("links-fragment"), false, prayerCodes.join(","));
+  const draftStory = structuredClone(fields);
+  draftStory.story[0] = whole;
+  const cutStory = structuredClone(fields);
+  cutStory.story[0] = cut;
+  const draftMd = hybridBuild(draftStory).md;
+  const cutMd = hybridBuild(cutStory).md;
+  const flagged = errorsOf(checkSzArticle(cutMd, cfg, { ...env, draftMd })).map((problem) => problem.code);
+  assert.ok(flagged.includes("links-fragment"), flagged.join(","));
+  assert.equal(errorsOf(checkSzArticle(cutMd, cfg, env)).some((problem) => problem.code === "links-fragment"), false);
   assert.equal(errorsOf(checkSzArticle(assembled, cfg, env)).some((problem) => problem.code === "links-fragment"), false);
+});
+
+test("tiered: ordinary lead prefixes stay clean, and a dash glue is not published as a tail", () => {
+  const opening = fields.story[0];
+  const prayer = fields.sectionsBefore[0].paragraphs[1];
+  const tail = "Брат всё ещё ждал этого звонка.";
+  for (const phrase of [
+    "Я думала про Ангела и замолчала.",
+    "Дорога по Москве вела мимо «ангела».",
+    "Разговор шёл под Богом и не спешил.",
+    "Смотри.",
+    "Узнай.",
+    "Читай.",
+    "Прочитайте также канон утром.",
+    "Дочитайте также эту главу.",
+    "Прочитайте также: [Эзотерика и церковь](/s/ezoterika-i-tserkov).",
+    "Дочитайте также: [Эзотерика и церковь](/s/ezoterika-i-tserkov).",
+  ]) {
+    const raw = structuredClone(fields);
+    raw.story[0] = `${opening} ${phrase}`;
+    const codes = errorsOf(hybridBuild(raw).problems).map((problem) => problem.code);
+    assert.equal(codes.includes("links-fragment"), false, `${phrase}: ${codes.join(",")}`);
+    assert.equal(linkLeadResidue(phrase).some((hit) => /читайте также|про |по |под |смотри|узнай|читай/iu.test(hit)), false, phrase);
+  }
+  const prose = `${opening} Прочитайте также канон утром. Дочитайте также эту главу.`;
+  assert.deepEqual(leadWordFragments(prose, prose), []);
+  const dashWhole = `${opening} Подробнее – [материал](/s/ezoterika-i-tserkov). ${tail}`;
+  const dashLeft = `${opening} Подробнее – . ${tail}`;
+  assert.equal(protectedRemovalOk(dashWhole, `${opening} ${tail}`), true);
+  assert.equal(protectedRemovalOk(dashWhole, dashLeft), false);
+  assert.equal(linkLeadResidue("Подробнее о границах в статье [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+  const titles = { "ezoterika-i-tserkov": "Эзотерика и церковь", "psihologiya-i-ezoterika": "Эзотерика и психология", "chenneling-v-ezoterike": "Ченнелинг в эзотерике" };
+  const repair = (raw) => {
+    let calls = 0;
+    const repaired = repairSzArticleTiered({
+      brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 6 }),
+      state: { spentRub: 0, calls: [], warnings: [] },
+      callTier: (tier, name, messages) => {
+        calls += 1;
+        assert.equal(tier === "cheap" || tier === "strong", true, tier);
+        assert.equal(isWriterId(name), true, name);
+        const text = messages.map((message) => message.content).join("\n");
+        assert.equal(text.includes(opening.slice(0, 40)), false);
+        assert.equal(text.includes("Ангеле Божий"), false);
+        const slug = text.match(/ссылку на \/s\/([a-z0-9-]+)/)?.[1];
+        const host = text.split("АБЗАЦ:\n").at(-1).trim();
+        const link = `[${titles[slug]}](/s/${slug})`;
+        return { text: host.includes(".") ? host.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${host}` };
+      },
+    });
+    return { calls, repaired };
+  };
+  for (const separator of ["–", "—", "-"]) {
+    const raw = structuredClone(fields);
+    raw.story[0] = `${opening} Подробнее ${separator} [материал](/s/ezoterika-i-tserkov). ${tail}`;
+    const fixed = repair(raw);
+    assert.equal(fixed.calls, 1, `${separator}: ${fixed.repaired.repairSkipped}`);
+    assert.equal(fixed.repaired.result.fields.story[0], `${opening} ${tail}`, separator);
+    assert.equal(fixed.repaired.result.fields.story[0].includes("Подробнее"), false, separator);
+    assert.equal(fixed.repaired.result.fields.story[0].includes("  "), false, separator);
+    assert.equal(fixed.repaired.result.md.includes("Подробнее – ."), false, separator);
+    assert.equal(fixed.repaired.result.md.includes("Подробнее - ."), false, separator);
+    assert.equal(fixed.repaired.result.md.includes("Подробнее — ."), false, separator);
+    assert.equal(fixed.repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer, separator);
+    assert.equal(errorsOf(fixed.repaired.result.problems).some((problem) => problem.code === "links-fragment"), false, separator);
+    assert.equal(fixed.repaired.passed, true, fixed.repaired.repairSkipped);
+  }
+  const mid = structuredClone(fields);
+  mid.story[0] = `${opening} Подробнее – [материал](/s/ezoterika-i-tserkov). ${tail}`;
+  const midFixed = repair(mid);
+  assert.equal(midFixed.repaired.result.fields.story[0], `${opening} ${tail}`);
+  assert.equal(midFixed.repaired.passed, true, midFixed.repaired.repairSkipped);
+  const published = structuredClone(fields);
+  published.story[0] = `${opening} Подробнее – .`;
+  const publishedCodes = errorsOf(hybridBuild(published).problems).map((problem) => problem.code);
+  assert.ok(publishedCodes.includes("links-residue"), publishedCodes.join(","));
+  assert.equal(publishedCodes.includes("links-fragment"), false, publishedCodes.join(","));
 });
 
 test("tiered: a later section that retells the story is rewritten forward", () => {

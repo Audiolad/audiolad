@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -944,7 +944,7 @@ function glueSpanAt(text, index) {
   return 0;
 }
 
-/** Drop every glued «Подробнее:» / «Читайте также:» sentence anywhere in the paragraph, then a bare copy of this token. */
+/** Drop every glued lead (colon, dash, or hyphen) anywhere in the paragraph, then a bare copy of this token. */
 function stripProtectedLinks(text, anchor, slug) {
   let next = String(text ?? "");
   let guard = 0;
@@ -1627,19 +1627,35 @@ function bindQualityPaths(fields, brief, failures) {
   return out;
 }
 
+function annotateProtectedDiff(draftMd, result) {
+  if (!result?.md || typeof draftMd !== "string" || result.md === draftMd) return result;
+  const seen = new Set();
+  const extra = [];
+  for (const fragment of protectedDiffFragments(draftMd, result.md)) {
+    if (!fragment || seen.has(fragment)) continue;
+    seen.add(fragment);
+    extra.push({ code: "links-fragment", field: "story", message: `защищённый абзац обрезан на обломке ярлыка: «${fragment}»`, severity: "error" });
+  }
+  if (!extra.length) return result;
+  return { ...result, problems: [...result.problems, ...extra] };
+}
+
 /**
  * Repair until checkSzArticle is clean, or until every fragment has used its cheap
  * tries and one strong try. callTier(tier, name, messages, schema, { maxTokens }) performs the model call.
  * A truncated cheap call is retried once with a larger cap and still counts as one try.
+ * Protected paragraphs are compared with the draft: only a cut made by the repair is a fragment.
  */
 export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set(), unique = null }) {
   const errorsOf = (result) => result.problems.filter((problem) => problem.severity === "error");
+  const draftMd = build(raw).md;
+  const gate = (value) => annotateProtectedDiff(draftMd, build(value));
   const settle = (value) => {
     const deterministic = applyDeterministicSzFixes(value, { query: brief.query, links: brief.links });
     const next = deterministic.fields;
-    return { fields: next, result: build(next), fixes: [...deterministic.fixes] };
+    return { fields: next, result: gate(next), fixes: [...deterministic.fixes] };
   };
-  const errorsBeforeRepair = errorsOf(build(raw));
+  const errorsBeforeRepair = errorsOf(gate(raw));
   const settled = settle(raw);
   let fields = settled.fields;
   let result = settled.result;
