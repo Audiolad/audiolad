@@ -16,17 +16,20 @@ export type ListenerCommentPracticeGate = {
   deletedAt: string | null;
 };
 
+/**
+ * Product type only. The catalog shelf (`catalog_section`, including `music`)
+ * does not decide this: an older practice can sit on the music shelf and
+ * still be a practice. Music and audio posts stay excluded.
+ */
 export function isListenerCommentProductKind(input: {
   productKind: string | null | undefined;
-  catalogSection: string | null | undefined;
+  catalogSection?: string | null | undefined;
 }): boolean {
+  void input.catalogSection;
   if (isMusicProductKind(input.productKind) || isAudioPostProductKind(input.productKind)) {
     return false;
   }
-  if (normalizeProductKind(input.productKind) !== PRODUCT_KIND.PRACTICE) {
-    return false;
-  }
-  return input.catalogSection !== "music";
+  return normalizeProductKind(input.productKind) === PRODUCT_KIND.PRACTICE;
 }
 
 export function practiceAcceptsListenerComments(

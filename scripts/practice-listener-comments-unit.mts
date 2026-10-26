@@ -280,6 +280,48 @@ async function testProductGatesAndRatingsIsolation() {
     }),
     true,
   );
+  assert.equal(
+    practiceAcceptsListenerComments({
+      productKind: "practice",
+      catalogSection: "music",
+      status: "published",
+      publishedAt: "2026-08-16T00:00:00.000Z",
+    }),
+    true,
+    "a practice on the music shelf is still commentable",
+  );
+  assert.equal(
+    practiceAcceptsListenerComments({
+      productKind: null,
+      catalogSection: "music",
+      status: "published",
+    }),
+    true,
+  );
+  const shelfPractice = createMemoryCommentStore(
+    state({
+      gates: [
+        gate({
+          catalogSection: "music",
+          productSlug: "potok",
+          title: "Поток денег",
+        }),
+      ],
+    }),
+  );
+  const shelfWrite = await createImpression(shelfPractice, actor(listener), clock(), {
+    authorSlug: "anna",
+    productSlug: "potok",
+    body: "Отзыв к практике на музыкальной полке",
+    publicName: "Мария",
+    clientRequestId: null,
+  });
+  assert.equal(shelfWrite.ok, true);
+  const shelfFollowUp = read(
+    "supabase/migrations/20270124150000_listener_comments_by_product_type.sql",
+  );
+  assert.match(shelfFollowUp, /COALESCE\(p\.product_kind, 'practice'\) = 'practice'/);
+  assert.doesNotMatch(shelfFollowUp, /catalog_section <> 'music'/);
 
   const migration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
   const migrationSql = migration
