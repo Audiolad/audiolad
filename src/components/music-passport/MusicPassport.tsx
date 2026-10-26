@@ -15,20 +15,9 @@ import type {
   PassportTone,
 } from "@/lib/music-analyzer-runs/passport";
 import { featureDisplayRows } from "@/lib/music-analyzer-runs/feature-display.mjs";
-import { isWithheldTag, type FeatureSet } from "@/lib/music-analyzer-runs/features.mjs";
+import { isWithheldTag } from "@/lib/music-analyzer-runs/features.mjs";
 
-function featureTags(set: FeatureSet | null | undefined, key: string, fallback: PassportRow[]): PassportRow[] {
-  if (!set) return fallback.filter((row) => !isWithheldTag(row));
-  const feature = set.features[key];
-  if (!Array.isArray(feature?.value)) return [];
-  return feature.value.flatMap((item: string | { label: string; status?: string; score?: number }) => {
-    if (isWithheldTag(typeof item === "string" ? { label: item } : item)) return [];
-    const label = typeof item === "string" ? item : item.label;
-    if (!label) return [];
-    return [{ label, score: typeof item !== "string" && typeof item.score === "number" ? String(item.score) : null,
-      average: null, max: null, rank: null, bandLabel: feature.status === "manual" ? "ручная проверка" : "гипотеза", tone: null }];
-  });
-}
+import { resolvePassportTags as featureTags } from "@/lib/music-analyzer-runs/passport";
 
 export type MusicPassportMode = "full" | "product";
 
@@ -119,7 +108,7 @@ function TagGroup({ title, rows }: { title: string; rows: PassportRow[] }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-[#796ba0]">не указано</p>
+        <p className="mt-3 text-sm text-[#796ba0]">не определено</p>
       )}
     </section>
   );
@@ -188,7 +177,7 @@ function InstrumentList({ rows }: { rows: PassportRow[] }) {
           })}
         </ol>
       ) : (
-        <p className="mt-3 text-sm text-[#796ba0]">не указано</p>
+        <p className="mt-3 text-sm text-[#796ba0]">не определено</p>
       )}
     </section>
   );
@@ -306,7 +295,7 @@ export function MusicPassport({
                   <Tag row={passport.sound} />
                 </ul>
               ) : (
-                <p className="mt-3 text-sm text-[#796ba0]">не указано</p>
+                <p className="mt-3 text-sm text-[#796ba0]">не определено</p>
               )}
             </section>
           </div>
