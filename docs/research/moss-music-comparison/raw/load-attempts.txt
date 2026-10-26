@@ -1,0 +1,20 @@
+Попытка 1. AutoModel.from_pretrained, trust_remote_code, dtype bfloat16, max_memory cpu 6GiB.
+Результат: ValueError. Класс MossMusicConfig не входит в перечень AutoModel.
+Причина в config.json: auto_map без AutoModel. Официальный путь – MossMusicModel.from_pretrained.
+
+Попытка 2. Динамический класс modeling_moss_music.MossMusicModel из каталога весов.
+Результат: AttributeError: 'dict' object has no attribute 'downsample_hidden_size'.
+Минимальный configuration_moss_music.py из весов оставляет audio_config словарём.
+RSS на ошибке около 342 МБ. Веса в память не копировались.
+
+Попытка 3. Исходники commit ad107c7, MossMusicConfig.from_dict, MossMusicModel.from_pretrained,
+device_map=auto, max_memory cpu 6GiB, offload_folder, local_files_only.
+Загрузка шардов сообщила 4/4 за 0.2 с.
+Предупреждение: часть параметров осталась на meta device.
+Подсчёт: tensors_materialized=557, numel_real=2423632768, device cpu.
+tensors_meta=344, numel_meta=6628830720, device meta.
+Каталог offload после этого 4 КБ: вытесненные тензоры туда не записаны.
+Сумма numel = 9052463488, это полное число параметров карточки.
+Текстовый forward одного токена без аудио вернул CausalLMOutputWithPast.
+
+Попытка 4 описана в smoke-synthetic.txt. Это уже исполнение с аудио, но аудио синтетическое.

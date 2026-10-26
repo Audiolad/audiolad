@@ -1,0 +1,18 @@
+Вход: 16000 нулевых float32, то есть 1 секунда цифровой тишины.
+Это не трек каталога и не контрольный случай «Последняя пластинка» или «Тихая гармония».
+
+Промпт: Is there singing or speech in this audio? Answer in one short sentence.
+max_new_tokens=8, do_sample=false, enable_time_marker=false.
+
+loaded sec=0.2 rss_kb=376832
+processor keys=input_ids, attention_mask, audio_data, audio_data_seqlens
+SMOKE_OK sec=48.4 new_tokens=8 finite_ids=True rss_kb=2616340
+Текст модели:
+No, there is no singing or speech
+
+48.4 с на 8 новых токенов – около 6.1 с/токен на этом частичном CPU-offload.
+Пик RSS процесса по одному снимку ps во время генерации: 3245552 КиБ.
+cgroup в это время стоял у memory.max из-за файлового кэша шардов.
+
+Вывод ограничен: граф с коротким аудио на этой машине один раз выполнился и не поставил NaN в id.
+Фраза модели про тишину не является калиброванной вероятностью и не переносится на музыку.

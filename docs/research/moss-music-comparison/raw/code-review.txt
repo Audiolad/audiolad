@@ -1,0 +1,28 @@
+Код: https://github.com/OpenMOSS/MOSS-Music
+Закреплённый commit: ad107c7ddaa06de168a0dfbc18d3e1e6a40c0e5e
+Веса: OpenMOSS-Team/MOSS-Music-8B-Instruct
+Закреплённая ревизия: fce7f8304e96cc2d3398b8106456cbb2ecec3139
+
+Лицензия
+- Карточка Hugging Face: license apache-2.0, gated=false.
+- README модели и репозитория: «Models in MOSS-Music are licensed under the Apache License 2.0.»
+- pyproject.toml ссылается на файл LICENSE.
+- В дереве commit ad107c7 файла LICENSE у корня нет (сырой URL даёт 404).
+- В списке файлов ревизии весов LICENSE тоже нет.
+- Apache-2.0 есть у вложенного каталога sglang/. Это лицензия SGLang, не замена отсутствующего файла модели.
+- Для исследования публичный код и веса читались. В продукт модель не копировалась. Перед любым включением в АудиоЛад нужен сам текст Apache на закреплённой ревизии, а не только фраза в README.
+
+trust_remote_code
+- Официальный infer.py вызывает MossMusicModel.from_pretrained(..., trust_remote_code=True, device_map="cuda:0").
+- config.json auto_map содержит только AutoConfig и AutoProcessor. AutoModel нет.
+- Три файла ревизии весов просмотрены поиском по subprocess, os.system, requests, urllib, socket, pickle, eval(, exec(, base64, http. Совпадений нет.
+- configuration_moss_music.py в весах – укороченный файл. Он не превращает audio_config из словаря в объект и при импорте пытается зарегистрировать класс в SGLang, если пакет sglang установлен. SGLang здесь не ставился, ветка регистрация выходит по ImportError.
+- Полный src/configuration_moss_music.py из commit ad107c7 словарь audio_config превращает. processing_moss_music.py у commit и у ревизии весов совпал по diff.
+- modeling в весах и modeling в git различаются упаковкой импортов. Рабочий загрузчик этой сессии импортировал git src commit ad107c7 и читал веса ревизии fce7f830 с local_files_only и HF_HUB_OFFLINE=1.
+- Сеть после скачивания весов для прогона не использовалась.
+
+Что не ставилось рядом с приложением
+- Зависимости лежат в /tmp/moss-py, не в репозитории и не в package.json.
+- torch 2.9.1+cpu, torchaudio 2.9.1+cpu, transformers 4.57.1.
+- Официальный extra torch-runtime указывает torch==2.9.1+cu128. CUDA-колёса не использовались: первая попытка pip начала их тянуть, процесс остановлен, кэш pip удалён.
+- sglang, flash-attn и nvidia-cudnn не ставились.

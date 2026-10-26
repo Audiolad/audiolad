@@ -1,0 +1,122 @@
+{
+  "schema": "moss-comparison-manifest:1",
+  "purpose": "Кандидаты эталона для одинакового звука в действующем анализаторе и в MOSS-Music. Файлы в этой среде отсутствуют, поэтому идентичность здесь не подтверждена.",
+  "rules": [
+    "Оба прогона обязаны читать один и тот же байтовый файл.",
+    "SHA256 считается по исходному файлу до перекодирования.",
+    "Чужое и неразрешённое аудио не скачивать.",
+    "Пустой reference означает отсутствие человеческой разметки, а не согласие с моделью."
+  ],
+  "tracks": [
+    {
+      "id": "aurafon-quiet-harmony",
+      "title": "Тихая гармония",
+      "artist": "Aurafon",
+      "album": "Расслабляющая музыка для СПА",
+      "sha256": "adda7e8735f90686ed52516cd979b875ba7f955d15aee8faf412d018e20c291c",
+      "audio_path": null,
+      "file_status": "absent_on_this_machine",
+      "identity_rechecked_here": false,
+      "permission": "В docs/music-analyzer/EVAL-09d393ce.md локальный манифест той сессии помечен permission_confirmed=true, verified_by=owner approval 24.10.2026 (Sergey). Сам манифест и файл в репозиторий не входили и на этой VM не найдены.",
+      "human_labels": {
+        "status": "partial_owner_statement_only",
+        "owner_statement": "Ambient, NOT Dark Jazz",
+        "vocal": null,
+        "instruments": null,
+        "mood": null,
+        "rhythm": null,
+        "energy": null,
+        "tempo_bpm": null,
+        "note": "Восемь полей reference в той оценке оставлены null. Это не слепая панель."
+      }
+    },
+    {
+      "id": "last-plastinka",
+      "title": "Последняя пластинка",
+      "artist": null,
+      "album": "Чили на виниле",
+      "sha256": "793773feae95b724bce3c38d8f2c49a580c7e879a684d2349a6316acdb7759fa",
+      "audio_path": null,
+      "file_status": "absent_on_this_machine",
+      "identity_rechecked_here": false,
+      "permission": "Файл читался в сессии e20d8eb7 как ../eval/last-plastinka.wav и в репозиторий не копировался. На этой VM файла нет.",
+      "human_labels": {
+        "status": "owner_listening_label",
+        "vocal": "instrumental",
+        "genre": null,
+        "instruments": null,
+        "mood": null,
+        "rhythm": null,
+        "energy": null,
+        "note": "Слуховая метка владельца: инструментал. Это не слепая панель и не повторное прослушивание в этой сессии."
+      }
+    },
+    {
+      "id": "jazz-san-marco",
+      "title": "Кофе на площади Сан-Марко",
+      "artist": "Jazz Relax",
+      "album": "Итальянский джаз",
+      "sha256": "d7dcece23bcbd07d2c845e8eaca1b0082b802d3352e7a7b44ecdcf502511f533",
+      "audio_path": null,
+      "file_status": "absent_on_this_machine",
+      "identity_rechecked_here": false,
+      "permission": "Тот же локальный манифест 09d393ce: собственный каталог владельца, permission_confirmed=true на 2026-10-24. Файл на этой VM отсутствует.",
+      "human_labels": {
+        "status": "unlabelled",
+        "vocal": null,
+        "genre": null,
+        "instruments": null,
+        "mood": null,
+        "rhythm": null,
+        "energy": null,
+        "note": "Метка instrumental у действующего анализатора – прогноз CLAP, не человеческая разметка."
+      }
+    },
+    {
+      "id": "silent-resonance",
+      "title": "Космическая музыка для медитации / Беззвучный резонанс",
+      "artist": null,
+      "album": null,
+      "sha256": "7b546f258d468660fc89b0085d0b5ff3bdf465438d7d496c4ae8a5df04c353fb",
+      "audio_path": null,
+      "file_status": "absent_on_this_machine",
+      "identity_rechecked_here": false,
+      "permission": "Файл extra1.mp3 был в ../eval задачи энергии 09d393ce. Отдельного permission_confirmed в репозитории нет. Пока файл не предъявлен заново, в прогон MOSS его не брать.",
+      "human_labels": {
+        "status": "owner_character_for_energy_only",
+        "energy_character": "calm",
+        "vocal": null,
+        "genre": null,
+        "note": "Характер задан владельцем для проверки шкалы энергии, это не слепой тест жанра или вокала."
+      }
+    },
+    {
+      "id": "bachata-dancefloor",
+      "title": "Бачата на танцполе / Ближе, чем вчера",
+      "artist": null,
+      "album": null,
+      "sha256": "df3e65c642b67d3c97b79b482d863c21a66ea0f24f7267fbfba14fcef749ca3c",
+      "audio_path": null,
+      "file_status": "absent_on_this_machine",
+      "identity_rechecked_here": false,
+      "permission": "Файл extra3.mp3 был в ../eval задачи энергии 09d393ce. Отдельного permission_confirmed в репозитории нет. Пока файл не предъявлен заново, в прогон MOSS его не брать.",
+      "human_labels": {
+        "status": "owner_character_for_energy_only",
+        "energy_character": "upbeat",
+        "vocal": null,
+        "genre": null,
+        "note": "Нужен как контраст к спокойным трекам только после повторного подтверждения прав и SHA256."
+      }
+    }
+  ],
+  "excluded": [
+    {
+      "id": "lab-beethoven-moonlight",
+      "reason": "В data/music-lab/listening-v05 указан 07contrast_Beethoven_Moonlight_Piano.mp3. Это чужое произведение, в набор не входит. Самих файлов лаборатории в git нет: data/music-lab/.gitignore исключает аудио."
+    },
+    {
+      "id": "moss-upstream-samples",
+      "reason": "В OpenMOSS/MOSS-Music есть test/tonghua.mp3 и другие примеры. Это не каталог АудиоЛада. Они не скачивались в репозиторий и не анализировались."
+    }
+  ]
+}

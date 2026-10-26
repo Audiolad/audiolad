@@ -1,0 +1,19 @@
+Дата: 2026-10-26. Процесс выделения 15 ГиБ анонимных страниц.
+
+Код возврата родителя: -9 (процесс убит).
+stdout пустой: печать была после касания всех страниц и не успела выполниться.
+
+dmesg, путь pod убран:
+
+[Mon Oct 26 11:47:24 2026] python3 invoked oom-killer: gfp_mask=0xcc0(GFP_KERNEL), order=0, oom_score_adj=0
+[Mon Oct 26 11:47:24 2026] oom-kill:constraint=CONSTRAINT_MEMCG, task=python3, pid=3931, uid=1000
+[Mon Oct 26 11:47:24 2026] Memory cgroup out of memory: Killed process 3931 (python3) total-vm:15746492kB, anon-rss:15284992kB, file-rss:1244kB, shmem-rss:0kB, pgtables:29988kB
+
+memory.max этой workload-группы: 15706832896 байт (14.63 ГиБ).
+Убийство на anon-rss около 14.58 ГиБ.
+
+Отдельно, полным касанием каждой страницы:
+- 12 ГиБ, 13 ГиБ, 14 ГиБ: процесс завершился сам, печать TOUCHED.
+- 16 ГиБ bytearray: MemoryError ещё на создании буфера. MemTotal тогда был 16387280 КиБ, swap 0.
+
+Полный BF16-тензор модели, 18104928256 байт, больше и MemTotal, и memory.max.

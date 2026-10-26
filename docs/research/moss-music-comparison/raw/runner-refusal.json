@@ -1,0 +1,9 @@
+{
+  "code_commit": "ad107c7ddaa06de168a0dfbc18d3e1e6a40c0e5e",
+  "weight_revision": "fce7f8304e96cc2d3398b8106456cbb2ecec3139",
+  "tensor_bytes": 18104928256,
+  "cgroup_memory_max": 15706832896,
+  "in_ram_bf16_fits": false,
+  "manifest_ready": false,
+  "manifest_reason": "нет файлов: aurafon-quiet-harmony, last-plastinka, jazz-san-marco, silent-resonance, bachata-dancefloor"
+}
