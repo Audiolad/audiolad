@@ -1,9 +1,10 @@
 // Prompt and strict JSON schema for sergey-zoya.ru articles. The model writes ONLY texts
 // (fields); everything fixed – carousel, CTA, TOC, player, expert cards with quotes, phones,
 // disclaimer, «Читайте также», final picture – is inserted by assemble.mjs.
+import { normalizeSzFields } from "./assemble.mjs";
 import { SZ } from "./config.mjs";
 import { CORRECTIONS, LESSONS, toneSample } from "./knowledge.mjs";
-import { substantiveExpertText } from "./rules.mjs";
+import { fieldProseDefect } from "./rules.mjs";
 
 const str = { type: "string" };
 // As in lib/prompt.mjs: only upper bounds go into the grammar (runaway guard).
@@ -224,7 +225,34 @@ function matchesSchema(value, schema) {
     && schema.required.every((key) => Object.hasOwn(value, key) && matchesSchema(value[key], schema.properties[key]));
 }
 
-// Structural validity alone accepts experts: [] and a thesis of «главная мысль». Reject before merge.
+// Judge the patch only after sz normalization: «****» and «Чем закончилась история.» become empty,
+// and a one-letter thesis is not substantive. Applies to every string in the patch, not one field.
+function rejectHollow(normalized, patch, path) {
+  if (typeof patch === "string") return fieldProseDefect(typeof normalized === "string" ? normalized : "", path);
+  if (Array.isArray(patch)) {
+    if (!Array.isArray(normalized) || (patch.length && normalized.length < patch.length)) return `${path}: после нормализации непустые элементы исчезли`;
+    for (let i = 0; i < patch.length; i += 1) {
+      const reason = rejectHollow(normalized[i], patch[i], `${path}[${i}]`);
+      if (reason) return reason;
+    }
+    return null;
+  }
+  if (patch && typeof patch === "object") {
+    for (const [key, value] of Object.entries(patch)) {
+      const reason = rejectHollow(normalized?.[key], value, path ? `${path}.${key}` : key);
+      if (reason) return reason;
+    }
+  }
+  return null;
+}
+
+function project(source, shape) {
+  if (Array.isArray(shape)) return Array.isArray(source) ? source : [];
+  if (shape && typeof shape === "object") return Object.fromEntries(Object.keys(shape).map((key) => [key, project(source?.[key], shape[key])]));
+  return source;
+}
+
+// Structural validity alone accepts experts: [] and a thesis of «а» / «главная мысль а». Reject before merge.
 export function szRepairPatchRejection(previous, patch, schema, brief) {
   if (!schema?.required?.length || !matchesSchema(patch, schema)) return "невалидный/пустой patch: нарушение схемы";
   if (Object.hasOwn(patch, "experts")) {
@@ -232,12 +260,12 @@ export function szRepairPatchRejection(previous, patch, schema, brief) {
     if (!expected?.length || patch.experts.length !== expected.length) return "experts: требуется полный список экспертов из брифа";
     const names = patch.experts.map((expert) => expert.name);
     if (new Set(names).size !== names.length || names.some((name, i) => name !== expected[i].name)) return "experts: имена/порядок не совпадают с брифом или есть дубли";
-    for (const [i, expert] of patch.experts.entries()) {
-      for (const key of szArticleSchema().properties.experts.items.required) {
-        if (!substantiveExpertText(expert[key])) return `experts[${i}].${key}: требуется содержательный непустой текст, не заглушка «главная мысль»`;
-      }
-    }
   }
+  const merged = { ...structuredClone(previous ?? {}), ...structuredClone(patch) };
+  const normalized = normalizeSzFields(merged).fields;
+  const hollow = rejectHollow(normalized, patch, "");
+  if (hollow) return hollow;
+  const before = normalizeSzFields(previous ?? {}).fields;
   const lostContent = (before, after, path) => {
     if (typeof after === "string") return typeof before === "string" && before.trim() && !after.trim() ? `${path}: непустая строка стала пустой` : null;
     if (Array.isArray(after)) {
@@ -256,7 +284,7 @@ export function szRepairPatchRejection(previous, patch, schema, brief) {
     }
     return null;
   };
-  return lostContent(previous, patch, "");
+  return lostContent(project(before, patch), project(normalized, patch), "");
 }
 
 export function applySzRepairPatch(previous, patch, schema, brief) {

@@ -2,6 +2,7 @@
 import { normalizeArticle } from "../../normalize.mjs";
 import { SZ } from "./config.mjs";
 import { expertCard as resolveCard } from "./experts.mjs";
+import { stripInvisible } from "./rules.mjs";
 
 const q = (value) => JSON.stringify(String(value));
 const list = (value) => (Array.isArray(value) ? value : []);
@@ -9,8 +10,16 @@ const s = (value) => (typeof value === "string" ? value.trim() : "");
 const capital = (text) => text.charAt(0).toLocaleUpperCase("ru") + text.slice(1);
 
 /** Typography (shared writer rules) + sz-specific cleanups. Returns { fields, changes }. */
+const stripTree = (value) => {
+  if (typeof value === "string") return stripInvisible(value);
+  if (Array.isArray(value)) return value.map(stripTree);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, stripTree(item)]));
+  return value;
+};
+
 export function normalizeSzFields(raw) {
-  const { article: fields, changes } = normalizeArticle(raw ?? {}, {});
+  const { article, changes } = normalizeArticle(raw ?? {}, {});
+  const fields = stripTree(article);
   const counts = {};
   const bump = (name) => (counts[name] = (counts[name] ?? 0) + 1);
   const unbold = (text) => {

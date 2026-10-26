@@ -11,12 +11,128 @@ export const SZ_RULES_VERSION = 1;
 export const words = (text) => String(text).match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 export const normalize = (text) => String(text).trim().replace(/,/g, "").replace(/\s+/g, " ").toLocaleLowerCase("ru").replace(/ё/g, "е");
 export const quoteText = (text) => String(text).replace(/[«»"“”„]/g, "").replace(/[—–-]/g, "–").replace(/\s+/g, " ").trim();
-// Assembler fills a missing thesis with this placeholder. Card count cannot see that:
-// assemble always emits one card per brief expert.
+// Assembler placeholder. A thesis of «а» or «главная мысль а» is the same failure as the exact phrase.
 export const EXPERT_PLACEHOLDER_THESIS = "главная мысль";
-export function substantiveExpertText(text) {
-  const plain = String(text ?? "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ru").replace(/ё/g, "е");
-  return /\p{L}/u.test(plain) && plain !== EXPERT_PLACEHOLDER_THESIS;
+const INVISIBLE = /[\u200B\u200C\u200D\uFEFF\u2060\u00AD]/g;
+export const stripInvisible = (text) => String(text ?? "").replace(INVISIBLE, "");
+const WORD = /[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu;
+// What a reader still sees after sz normalization: no invisible chars, no markdown bold,
+// no heading the assembler strips («Чем закончилась история.»).
+export function visibleProse(text) {
+  return stripInvisible(text).replace(/\*\*/g, "").replace(/^Чем закончилась история\.?\s*/u, "").trim();
+}
+function meaningfulWords(text) {
+  return (visibleProse(text).match(WORD) ?? []).filter((token) => (token.match(/\p{L}/gu) ?? []).length >= 2);
+}
+// A sentence counts only when it has two real words. «А.» and «Б.» do not.
+function sentenceCount(text) {
+  return visibleProse(text).split(/[.!?…]+/u).filter((part) => meaningfulWords(part).length >= 2).length;
+}
+/** Minimum for any model string. Names and table cells stay short; prose does not. */
+export function proseLimit(path) {
+  const parts = String(path).replace(/\[\d+\]/g, "").split(".").filter(Boolean);
+  const key = parts.at(-1) ?? "";
+  const parent = parts.at(-2) ?? "";
+  if (key === "name") return { minWords: 1, minSentences: 0 };
+  if (key === "thesis") return { minWords: 3, minSentences: 0 };
+  if (key === "bridge" || key === "storyEnding") return { minWords: 8, minSentences: 2 };
+  if (key === "columns" || key === "rows") return { minWords: 1, minSentences: 0 };
+  if (key === "title" || key === "seoTitle" || key === "faqHeading") return { minWords: 2, minSentences: 0 };
+  if (key === "question" || key === "finalQuestion" || (key === "items" && (parent === "checklist" || parent === "specialist")) || key.startsWith("feedback")) return { minWords: 3, minSentences: 0 };
+  return { minWords: 4, minSentences: 0 };
+}
+/** Null when the text is still substantive after normalization. */
+export function proseDefect(text, spec = proseLimit("paragraph")) {
+  const count = meaningfulWords(text).length;
+  if (count < spec.minWords) return `после нормализации ${count} содержательных слов, нужно ≥ ${spec.minWords}`;
+  if (spec.minSentences) {
+    const sentences = sentenceCount(text);
+    if (sentences < spec.minSentences) return `после нормализации ${sentences} предложений, нужно ≥ ${spec.minSentences}`;
+  }
+  const plain = visibleProse(text).replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ru").replace(/ё/g, "е");
+  if (plain.includes(EXPERT_PLACEHOLDER_THESIS)) {
+    const rest = plain.replaceAll(EXPERT_PLACEHOLDER_THESIS, " ").replace(/\s+/g, " ").trim();
+    const restCount = meaningfulWords(rest).length;
+    if (restCount < spec.minWords) return "заглушка «главная мысль» или текст, который от неё почти не отличается";
+  }
+  return null;
+}
+
+// Drop one :::block through the line that closes it. A following :::name must stay,
+// including an empty block (`:::overview\n:::`).
+function stripDirectives(text) {
+  const kept = [];
+  let inside = false;
+  for (const line of text.split("\n")) {
+    if (!inside && line.startsWith(":::")) {
+      inside = true;
+      continue;
+    }
+    if (inside) {
+      if (line.trim() === ":::") inside = false;
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+// Every visible block, not only the fields a reviewer happened to name.
+function auditHollowProse(body, add) {
+  const plain = stripDirectives(body
+    .replace(/<section[\s\S]*?<\/section>/g, "\n")
+    .replace(/<p class="article-disclaimer">[\s\S]*?<\/p>/g, "\n"));
+  for (const row of plain.matchAll(/^\|(.+)\|$/gm)) {
+    if (/^[\s|:-]+$/.test(row[1])) continue;
+    for (const cell of row[1].split("|")) {
+      const text = cell.trim();
+      if (!text || /^:?-+:?$/.test(text)) continue;
+      const defect = proseDefect(text, proseLimit("tableSection.columns"));
+      if (defect) add("thin-prose", "tableSection", defect);
+    }
+  }
+  for (const paragraph of plain.replace(/^\|.*$/gm, "").split(/\n\n+/)) {
+    const block = paragraph.trim();
+    if (!block || block.startsWith("<") || block.startsWith(":::") || block.startsWith("**Чем закончилась история.")) continue;
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    const pieces = lines.every((line) => line.startsWith("- ")) ? lines : [block];
+    for (const text of pieces) {
+      if (/^#{1,3}\s/.test(text)) {
+        const defect = proseDefect(text.replace(/^#+\s*/, ""), proseLimit("title"));
+        if (defect) add("thin-prose", "sections", defect);
+      } else if (text.startsWith("- ")) {
+        const defect = proseDefect(text.replace(/^- /, ""), proseLimit("specialist.items"));
+        if (defect) add("thin-prose", "specialist", defect);
+      } else if (/^\*\*[^*\n]+\?\*\*$/.test(text)) {
+        const defect = proseDefect(text, proseLimit("question"));
+        if (defect) add("thin-prose", "question", defect);
+      } else {
+        const defect = proseDefect(text, proseLimit("paragraph"));
+        if (defect) add("thin-prose", "sections", defect);
+      }
+    }
+  }
+}
+
+export function fieldProseDefect(value, path = "") {
+  if (typeof value === "string") {
+    const defect = proseDefect(value, proseLimit(path));
+    return defect ? `${path}: ${defect}` : null;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      const defect = fieldProseDefect(value[i], `${path}[${i}]`);
+      if (defect) return defect;
+    }
+    return null;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      const defect = fieldProseDefect(item, path ? `${path}.${key}` : key);
+      if (defect) return defect;
+    }
+  }
+  return null;
 }
 const sharedHeading = (text) => /^(?:Частые вопросы|Читайте также$|Когда стоит обратиться к специалисту$)/iu.test(text);
 
@@ -184,7 +300,15 @@ export function checkSzArticle(md, cfg, env) {
   const question = beforeGallery.at(-1) ?? "";
   const invitation = beforeGallery.at(-2) ?? "";
   if (!/^\*\*[^\n]+\?\*\*$/.test(question)) add("question", "question", "перед каруселью – жирный вопрос-приглашение «**…?**»");
+  else {
+    const questionDefect = proseDefect(question, proseLimit("question"));
+    if (questionDefect) add("question", "question", questionDefect);
+  }
   if (!/ангел/i.test(invitation)) add("invitation", "invitation", "абзац-приглашение перед вопросом должен упоминать ангела");
+  else {
+    const invitationDefect = proseDefect(invitation, proseLimit("invitation"));
+    if (invitationDefect) add("invitation", "invitation", invitationDefect);
+  }
   const storyParagraphs = beforeGallery.slice(0, -2);
   const story = storyParagraphs.join("\n\n").trim();
   const sw = words(story);
@@ -213,7 +337,11 @@ export function checkSzArticle(md, cfg, env) {
   for (const key of ["title", "feedbackEmpty", "feedbackStart", "feedbackHalf", "feedbackDone"]) if (!new RegExp(`^${key}: .+$`, "m").test(checklist)) add("checklist", "checklist", `нет ${key} в чек-листе`);
   const items = [...checklist.matchAll(/^ {2}text: (.+)$/gm)].map((m) => m[1]);
   if (items.length !== 5 || [...checklist.matchAll(/^- id: /gm)].length !== 5) add("checklist", "checklist", "ровно 5 пунктов чек-листа");
-  for (const item of items) if (words(item) > L.checklistWords) add("checklist-length", "checklist", `пункт чек-листа длиннее ${L.checklistWords} слов: «${item}»`);
+  for (const item of items) {
+    if (words(item) > L.checklistWords) add("checklist-length", "checklist", `пункт чек-листа длиннее ${L.checklistWords} слов: «${item}»`);
+    const itemDefect = proseDefect(item, proseLimit("checklist.items"));
+    if (itemDefect) add("checklist", "checklist", itemDefect);
+  }
   if (cfg.materials) {
     const known = new Set(trigrams(cfg.materials));
     const novel = intro.flatMap((paragraph) => trigrams(paragraph)).filter((t) => /[а-яё]{5,}/.test(t) && !known.has(t));
@@ -227,7 +355,13 @@ export function checkSzArticle(md, cfg, env) {
   const pExpert = need(pos(/<section class="article-expert"/, pPsychology), "experts", "нет карточек экспертов");
   const pFaq = need(pos(/^:::faq\n:::$/m, pEarly), "order", "нет :::faq");
   if (pExpert < 0 || pFaq < 0) return problems;
-  if (body.slice(body.indexOf("\n", pPsychology) + 1, pExpert).trim().split(/\n\n+/).length !== 1) add("psychology-intro", "psychologyIntro", "ровно один вводный абзац перед карточками");
+  const psychologyIntro = body.slice(body.indexOf("\n", pPsychology) + 1, pExpert).trim();
+  const introParts = psychologyIntro.split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+  if (introParts.length !== 1) add("psychology-intro", "psychologyIntro", "ровно один вводный абзац перед карточками");
+  else {
+    const introDefect = proseDefect(introParts[0], proseLimit("psychologyIntro"));
+    if (introDefect) add("psychology-intro", "psychologyIntro", introDefect);
+  }
   const cards = [...body.matchAll(/<section class="article-expert" aria-label="([^"]+)">\n([\s\S]*?)<\/section>/g)];
   if (cards.length !== cfg.experts.length) add("experts", "experts", `${cfg.experts.length} карточки экспертов`);
   const tags = [];
@@ -238,9 +372,10 @@ export function checkSzArticle(md, cfg, env) {
     if (!src?.startsWith("/media/experts/") || !env.portraitExists(src)) add("portrait", "*", `${name}: нет локального портрета`);
     if (!/alt="[^"]+" width="96" height="96" loading="lazy"/.test(html)) add("portrait", "*", `${name}: alt/размер портрета`);
     for (const cls of ["name", "role", "credit"]) if (!new RegExp(`<p class="article-expert-${cls}">[^<]+<\\/p>`).test(html)) add("expert-card", "*", `${name}: нет ${cls}`);
-    // Card count is not enough: a missing thesis still renders as «Имя: главная мысль».
+    // Card count is not enough: the assembler still emits a card, and «а» / «главная мысль а» used to pass.
     const thesis = html.match(/^### [^:\n]+:\s*(.*)$/m)?.[1] ?? "";
-    if (!substantiveExpertText(thesis)) add("expert-thesis", "experts", `${name}: «### Имя: тезис» – содержательный тезис, не заглушка «главная мысль»`);
+    const thesisDefect = proseDefect(thesis, proseLimit("experts.thesis"));
+    if (thesisDefect) add("expert-thesis", "experts", `${name}: ${thesisDefect}`);
     const quotes = [...html.matchAll(/^> («[^\n]+»\.?)$/gm)];
     if (quotes.length !== 1) add("expert-quote", "*", `${name}: ровно одна цитата`);
     const quote = quotes[0]?.[1] ?? "";
@@ -249,7 +384,8 @@ export function checkSzArticle(md, cfg, env) {
     else if (quoteText(quote) !== quoteText(expected.quote)) add("expert-quote", "*", `${name}: цитата не совпадает дословно с брифом`);
     if (/article-expert-initials|href=|\]\(/.test(html)) add("expert-card", "experts", `${name}: в карточке нет ссылок и инициалов`);
     const bridge = html.split(/^> «[^\n]+»\.?$/m)[1] ?? "";
-    if (!substantiveExpertText(bridge.replace(/<\/section>/g, ""))) add("expert-bridge", "experts", `${name}: пояснение после цитаты пустое`);
+    const bridgeDefect = proseDefect(bridge.replace(/<[^>]+>/g, ""), proseLimit("experts.bridge"));
+    if (bridgeDefect) add("expert-bridge", "experts", `${name}: ${bridgeDefect}`);
     for (const phrase of expected?.forbiddenInBridge ?? []) if (normalize(bridge).includes(normalize(phrase))) add("expert-bridge", "experts", `${name}: в пояснении нельзя «${phrase}» – эксперт этого не говорит`);
     if (!cfg.expertTags[name]) add("expert-list", "*", `${name}: не из утверждённого списка`);
     else tags.push(...cfg.expertTags[name]);
@@ -351,7 +487,23 @@ export function checkSzArticle(md, cfg, env) {
   const pGrid = need(pos(/<img src="\/media\/angels\/four-angels-06-all-angels\.webp"/, Math.max(pReadmore, 0)), "order", "нет картинки всех ангелов");
   const pFinal = need(pos(/^:::cta final\n:::$/m, Math.max(pGrid, 0)), "order", "нет :::cta final");
   if (pReadmore >= 0 && pGrid >= 0 && pFinal >= 0) {
-    if (!/^\*\*Чем закончилась история\.\*\* /m.test(body.slice(pFaq, pReadmore))) add("story-ending", "storyEnding", "«**Чем закончилась история.**» между FAQ и «Читайте также»");
+    const endingBody = body.slice(pFaq, pReadmore);
+    const ending = endingBody.match(/\*\*Чем закончилась история\.\*\*([^\n]*)/);
+    if (!ending) add("story-ending", "storyEnding", "«**Чем закончилась история.**» между FAQ и «Читайте также»");
+    else {
+      const endingDefect = proseDefect(ending[1], proseLimit("storyEnding"));
+      if (endingDefect) add("story-ending", "storyEnding", endingDefect);
+    }
+    const moreAt = body.indexOf(":::morelinks\n:::");
+    if (moreAt >= 0 && pGrid > moreAt) {
+      const chunks = body.slice(moreAt + ":::morelinks\n:::".length, pGrid).trim().split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+      const invite = chunks.find((part) => !part.startsWith("**") && !part.startsWith("<"));
+      const inviteDefect = proseDefect(invite ?? "", proseLimit("finalInvite"));
+      if (inviteDefect) add("final-invite", "finalInvite", inviteDefect);
+      const finalQuestion = chunks.find((part) => part.startsWith("**")) ?? "";
+      const finalQuestionDefect = proseDefect(finalQuestion, proseLimit("finalQuestion"));
+      if (finalQuestionDefect) add("final-question", "finalQuestion", finalQuestionDefect);
+    }
     const readmore = body.slice(pReadmore, pGrid);
     if (!readmore.includes('<h2 id="readmore-heading">Читайте также</h2>') || [...readmore.matchAll(/<li><a href="\/s\//g)].length !== 3) add("readmore", "*", "«Читайте также» – 3 ссылки");
     if (body.slice(pFinal).trim() !== ":::cta final\n:::") add("order", "*", "статья заканчивается :::cta final");
@@ -361,6 +513,8 @@ export function checkSzArticle(md, cfg, env) {
   for (const marker of ["gallery", "practiceAudio", "checklist", "faq", "cta early", "cta final"]) {
     if (body.split(`:::${marker}\n`).length - 1 !== 1) add("order", "*", `ровно один блок :::${marker}`);
   }
+
+  auditHollowProse(body, add);
 
   // ── uniqueness against the site ──
   const own = uniqueKeys(md);

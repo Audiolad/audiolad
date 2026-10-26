@@ -339,7 +339,7 @@ test("targeted: rejects lost experts before assembly; the gate rejects placehold
     [], valid.slice(0, 1), [...valid].reverse(),
     valid.map((expert) => ({ ...expert, name: "Другой эксперт" })),
     [valid[0], valid[0]], missingBridge,
-    ...["thesis", "bridge"].flatMap((key) => ["", " \n\t", "… ** –", "главная мысль", "Главная мысль."].map((text) => valid.map((expert, i) => (i ? expert : { ...expert, [key]: text })))),
+    ...["thesis", "bridge"].flatMap((key) => ["", " \n\t", "… ** –", "а", "б", "главная мысль", "Главная мысль.", "главная мысль а", "главная мысль о выборе"].map((text) => valid.map((expert, i) => (i ? expert : { ...expert, [key]: text })))),
     placeholder("главная   мысль"),
   ];
   for (const experts of cases) {
@@ -382,6 +382,59 @@ test("targeted: rejects lost experts before assembly; the gate rejects placehold
   assert.deepEqual(fixed.errors, []);
   assert.equal(fixed.repairSkipped, null);
   assert.equal(state.warnings.length, 0);
+});
+
+test("targeted and gate: hollow prose is rejected after normalization for any field", () => {
+  const raw = structuredClone(fields);
+  const gateOf = (value) => errorsOf(checkSzArticle(assembleSzArticle(brief, value, view.site, { date: pack.publishedAt }), cfg, env));
+  const rejected = (field, value) => {
+    const target = buildSzTargetedRepair(brief, raw, [{ severity: "error", field, code: "test", message: "test" }]);
+    assert.equal(applySzRepairPatch(raw, { [field]: value }, target.schema, brief), null, `${field}: ${JSON.stringify(value).slice(0, 80)}`);
+  };
+  const has = (problems, code, message) => problems.some((problem) => problem.code === code && (!message || message.test(problem.message)));
+
+  const hollowExperts = raw.experts.map((expert) => ({ ...expert, thesis: "а", bridge: "б" }));
+  rejected("experts", hollowExperts);
+  const expertGate = gateOf({ ...structuredClone(raw), experts: hollowExperts });
+  assert.ok(has(expertGate, "expert-thesis") && has(expertGate, "expert-bridge"), expertGate.map((problem) => problem.code).join(","));
+
+  const nearPlaceholder = raw.experts.map((expert, index) => (index ? expert : { ...expert, thesis: "главная мысль а" }));
+  rejected("experts", nearPlaceholder);
+  assert.ok(has(gateOf({ ...structuredClone(raw), experts: nearPlaceholder }), "expert-thesis", /главная мысль|содержательн/));
+  const nearSentence = raw.experts.map((expert, index) => (index ? expert : { ...expert, thesis: "главная мысль о выборе" }));
+  rejected("experts", nearSentence);
+  assert.ok(has(gateOf({ ...structuredClone(raw), experts: nearSentence }), "expert-thesis", /главная мысль/));
+
+  for (const storyEnding of ["Чем закончилась история.", "****", "\u200B", "Чем закончилась история.\u200B"]) {
+    rejected("storyEnding", storyEnding);
+    assert.ok(has(gateOf({ ...structuredClone(raw), storyEnding }), "story-ending", /содержательн|предложен/), storyEnding);
+  }
+  rejected("psychologyIntro", "****");
+  assert.ok(has(gateOf({ ...structuredClone(raw), psychologyIntro: "****" }), "psychology-intro"));
+  rejected("finalInvite", "****");
+  assert.ok(has(gateOf({ ...structuredClone(raw), finalInvite: "****" }), "final-invite", /содержательн/));
+
+  rejected("invitation", "Это ангел.");
+  assert.ok(has(gateOf({ ...structuredClone(raw), invitation: "Это ангел." }), "invitation", /содержательн/));
+  const checklist = { ...raw.checklist, items: ["б", ...raw.checklist.items.slice(1)] };
+  rejected("checklist", checklist);
+  assert.ok(has(gateOf({ ...structuredClone(raw), checklist }), "checklist", /содержательн/));
+  const sectionsBefore = structuredClone(raw.sectionsBefore);
+  sectionsBefore[0] = { ...sectionsBefore[0], paragraphs: ["****", ...sectionsBefore[0].paragraphs.slice(1)] };
+  rejected("sectionsBefore", sectionsBefore);
+  assert.ok(has(gateOf({ ...structuredClone(raw), sectionsBefore }), "thin-prose", /содержательн/));
+  const tableSection = structuredClone(raw.tableSection);
+  tableSection.columns = ["а", ...tableSection.columns.slice(1)];
+  rejected("tableSection", tableSection);
+  assert.ok(has(gateOf({ ...structuredClone(raw), tableSection }), "thin-prose"));
+  rejected("question", "**а?**");
+  assert.ok(has(gateOf({ ...structuredClone(raw), question: "**а?**" }), "question", /содержательн/));
+
+  const substantive = raw.experts.map((expert, index) => (index ? expert : { ...expert, thesis: "главная мысль о бережном ежедневном выборе" }));
+  const target = buildSzTargetedRepair(brief, raw, [{ severity: "error", field: "experts", code: "test", message: "test" }]);
+  const accepted = applySzRepairPatch(raw, { experts: substantive }, target.schema, brief);
+  assert.ok(accepted);
+  assert.ok(!has(gateOf(accepted), "expert-thesis"));
 });
 
 test("targeted: cannot empty selected strings, arrays or nested mandatory fields", () => {
