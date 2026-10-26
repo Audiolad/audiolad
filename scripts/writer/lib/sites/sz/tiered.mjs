@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, allowedSiteAddress, danglingFragment, fieldProseDefect, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, fieldProseDefect, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -241,6 +241,13 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
   next = normalizeSzFields(next).fields;
   if (beforeNorm.includes("\u2014") && !JSON.stringify(next).includes("\u2014")) fixes.push("длинное тире заменено на «–»");
   const limits = SZ.limits;
+  if (typeof next.description === "string" && descriptionOpensWithQuotedQuery(next.description, query)) {
+    const opened = naturalDescriptionStart(next.description, query);
+    if (opened !== next.description) {
+      next.description = opened;
+      fixes.push("description начинается с запроса без кавычек и с заглавной");
+    }
+  }
   if (typeof next.description === "string" && [...next.description].length > limits.description[1]) {
     const trimmed = trimAtSentences(next.description, { maxChars: limits.description[1], minChars: limits.description[0] });
     if (trimmed && trimmed !== next.description && normalize(trimmed).includes(normalize(query)) && !danglingFragment(trimmed)) {
@@ -283,6 +290,8 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
     });
     if (slugFixes) fixes.push("полукириллический slug приведён к ссылке из брифа");
   }
+  const removed = dropDuplicateParagraphs(next);
+  if (removed) fixes.push(removed === 1 ? "повтор абзаца удалён" : `повторы абзацев удалены: ${removed}`);
   const contextual = (links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug));
   if (contextual.length) {
     const present = markdownSlugs(next);
@@ -297,6 +306,69 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
     }
   }
   return { fields: next, fixes };
+}
+
+/** «запрос» at the start becomes «Запрос» plus the rest. No mid-word cut. */
+function naturalDescriptionStart(description, query) {
+  const match = String(description).match(/^«\s*[^»]+?\s*»\s*/u);
+  if (!match || !query) return description;
+  const rest = description.slice(match[0].length).trim();
+  const chars = [...query];
+  if (!chars.length) return description;
+  chars[0] = chars[0].toLocaleUpperCase("ru");
+  const next = rest ? `${chars.join("")} ${rest}` : chars.join("");
+  if (!normalize(next).includes(normalize(query))) return description;
+  return next;
+}
+
+/**
+ * Drops a later exact or near-exact paragraph. The earlier paragraph stays byte-identical,
+ * including quotation marks. Single required fields (transition, invitation, steps) are
+ * only anchors: a later copy in a paragraph list is removed, the anchor itself is not.
+ */
+function dropDuplicateParagraphs(fields) {
+  const seen = [];
+  const drop = [];
+  const consider = (text, list = null, index = -1) => {
+    if (typeof text !== "string" || !text.trim()) return;
+    const close = seen.some((kept) => paragraphsTooClose(kept, text));
+    if (close && list) {
+      drop.push({ list, index });
+      seen.push(text);
+      return;
+    }
+    seen.push(text);
+  };
+  const walkList = (list) => {
+    if (!Array.isArray(list)) return;
+    for (let index = 0; index < list.length; index += 1) consider(list[index], list, index);
+  };
+  walkList(fields.story);
+  consider(fields.transition);
+  consider(fields.invitation);
+  if (Array.isArray(fields.practiceIntro)) walkList(fields.practiceIntro);
+  else consider(fields.practiceIntro);
+  consider(fields.psychologyIntro);
+  for (const section of fields.sectionsBefore ?? []) walkList(section?.paragraphs);
+  walkList(fields.tableSection?.paragraphsBefore);
+  walkList(fields.tableSection?.paragraphsAfter);
+  consider(fields.steps?.intro);
+  for (const item of fields.steps?.items ?? []) consider(item?.text);
+  for (const section of fields.sectionsAfter ?? []) walkList(section?.paragraphs);
+  consider(fields.specialist?.intro);
+  consider(fields.storyEnding);
+  consider(fields.finalInvite);
+  if (!drop.length) return 0;
+  const byList = new Map();
+  for (const item of drop) {
+    const indexes = byList.get(item.list) ?? [];
+    indexes.push(item.index);
+    byList.set(item.list, indexes);
+  }
+  for (const [list, indexes] of byList) {
+    for (const index of indexes.sort((a, b) => b - a)) list.splice(index, 1);
+  }
+  return drop.length;
 }
 
 function queryHits(text, query) {
@@ -419,13 +491,83 @@ function findBadHref(value, path = "") {
   return null;
 }
 
+function pathParts(path) {
+  return [...String(path).matchAll(/([^[\].]+)|\[(\d+)\]/g)].map((match) => (match[1] !== undefined ? match[1] : Number(match[2])));
+}
+
+function getPath(fields, path) {
+  const parts = pathParts(path);
+  if (!parts.length) return undefined;
+  let cursor = fields;
+  for (const part of parts) {
+    if (cursor == null) return undefined;
+    cursor = cursor[part];
+  }
+  return cursor;
+}
+
 function setPath(fields, path, text) {
   const next = structuredClone(fields);
-  const parts = [...path.matchAll(/([^[\].]+)|\[(\d+)\]/g)].map((match) => (match[1] !== undefined ? match[1] : Number(match[2])));
+  const parts = pathParts(path);
   let cursor = next;
   for (let i = 0; i < parts.length - 1; i += 1) cursor = cursor[parts[i]];
   cursor[parts.at(-1)] = text;
   return next;
+}
+
+function phraseSpec(failure) {
+  const banned = String(failure.message ?? "").match(/«([^»]+)»/)?.[1] ?? "";
+  if (failure.code === "mixed-script") {
+    return { kind: "regex", source: "[A-Za-zА-Яа-яЁё]*[A-Za-z][А-Яа-яЁё]|[A-Za-zА-Яа-яЁё]*[А-Яа-яЁё][A-Za-z]", flags: "u" };
+  }
+  if (failure.code === "summoning") return { kind: "regex", source: SUMMONING.source, flags: SUMMONING.flags.replace(/g/g, "") };
+  return { kind: "phrase", phrase: banned };
+}
+
+function textHasPhrase(text, spec) {
+  if (typeof text !== "string" || !spec) return false;
+  if (spec.kind === "phrase") return Boolean(spec.phrase) && normalize(text).includes(normalize(spec.phrase));
+  return new RegExp(spec.source, spec.flags).test(text);
+}
+
+function findAllStrings(value, spec, path = "") {
+  const out = [];
+  if (typeof value === "string") {
+    if (textHasPhrase(value, spec)) out.push({ path, text: value });
+    return out;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => out.push(...findAllStrings(item, spec, `${path}[${index}]`)));
+    return out;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) out.push(...findAllStrings(item, spec, path ? `${path}.${key}` : key));
+  }
+  return out;
+}
+
+/** One forbidden/summoning/mixed-script gate row becomes one failure per string, so tries are per location. */
+function locatePhraseFailures(fields, failures) {
+  const out = [];
+  for (const failure of failures) {
+    if (failure.code !== "forbidden" && failure.code !== "summoning" && failure.code !== "mixed-script") {
+      out.push(failure);
+      continue;
+    }
+    const spec = phraseSpec(failure);
+    const direct = typeof failure.path === "string" ? getPath(fields, failure.path) : undefined;
+    if (typeof direct === "string" && textHasPhrase(direct, spec)) {
+      out.push(failure);
+      continue;
+    }
+    const hits = findAllStrings(fields, spec);
+    if (!hits.length) {
+      out.push(failure);
+      continue;
+    }
+    for (const hit of hits) out.push({ ...failure, field: hit.path, path: hit.path });
+  }
+  return out;
 }
 
 function fragmentDiscomfort(text) {
@@ -570,19 +712,31 @@ function faqQuestionIndex(fields, failure) {
 }
 
 function faqQuestionFragment(brief, fields, failure) {
-  const index = faqQuestionIndex(fields, failure);
+  const specialistSlot = failure.code === "faq-specialist";
+  if (specialistSlot && (fields.faq ?? []).some((item) => isSpecialistQuestion(item?.question))) return null;
+  const index = specialistSlot ? (fields.faq?.length ?? 0) - 1 : faqQuestionIndex(fields, failure);
   const item = fields.faq?.[index];
-  if (!item) return null;
+  if (!item || index < 0) return null;
+  const keepSpecialist = specialistSlot || isSpecialistQuestion(item.question);
   const occupied = failure.occupiedQuestions instanceof Set ? failure.occupiedQuestions : new Set();
+  const role = keepSpecialist
+    ? "Роль этого слота: вопрос о том, когда обратиться к специалисту или психологу. Перефразируй его уникально, но не заменяй вопросом на другую тему. В вопросе должно остаться обращение к специалисту, психологу или слово «обратиться»."
+    : "Роль этого слота: вопрос по теме этой статьи. Не подменяй его вопросом из другой темы.";
   return fragment(brief, `${failure.code}:faq[${index}].question`, [
-    `Вопрос FAQ повторяется: «${item.question}».`,
+    specialistSlot
+      ? "В FAQ нет вопроса о том, когда обратиться к специалисту или психологу. Перепиши этот слот так, чтобы он стал таким вопросом."
+      : `Вопрос FAQ повторяется: «${item.question}».`,
     failure.message ? `Причина: ${failure.message}` : "",
-    "Придумай другой вопрос по той же теме. Не копируй формулировку и не повторяй вопрос, который уже есть в другой статье.",
+    `Тема статьи: ${brief.title}. Основной запрос: «${brief.query}».`,
+    brief.topic ? `Раздел: ${brief.topic}.` : "",
+    role,
+    "Не копируй формулировку и не повторяй вопрос, который уже есть в другой статье.",
     "Ответ и остальные вопросы не меняй.",
     "Верни JSON { question } – только этот вопрос.",
   ].filter(Boolean).join("\n"), objectSchema({ question: stringSchema }), (current, answer) => {
     const text = answer?.question;
     if (typeof text !== "string" || fieldProseDefect(text, "faq.question")) return null;
+    if (keepSpecialist && !isSpecialistQuestion(text)) return null;
     const key = normalize(text);
     if (!key || key === normalize(item.question)) return null;
     if ((current.faq ?? []).some((entry, entryIndex) => entryIndex !== index && normalize(entry.question) === key)) return null;
@@ -609,6 +763,7 @@ export function buildSzFragment(brief, fields, failure) {
     ];
     if (length > max) lines.push(`Вариант длиннее диапазона. Перепиши его короче целыми предложениями, ближе к ${target}. Не обрезай слово посередине и не отрезай хвост механически.`);
     else if (length < min) lines.push(`Вариант короче диапазона. Допиши целыми предложениями ближе к ${target}. Не обрывай фразу.`);
+    lines.push(`Не начинай description с запроса в кавычках («${brief.query}») и не со строчной буквы. Первое слово – с заглавной, запрос вплетён в фразу.`);
     lines.push("Не присылай статью целиком.", "", description);
     return fragment(brief, `${failure.code}:description`, lines.join("\n"), objectSchema({ description: stringSchema }), (current, answer) => {
       const text = answer?.description;
@@ -616,6 +771,7 @@ export function buildSzFragment(brief, fields, failure) {
       const nextLength = [...text].length;
       if (nextLength < min || nextLength > max) return null;
       if (!normalize(text).includes(normalize(brief.query))) return null;
+      if (descriptionOpensWithQuotedQuery(text, brief.query)) return null;
       return { ...current, description: text };
     }, articleDescription);
   }
@@ -652,6 +808,7 @@ export function buildSzFragment(brief, fields, failure) {
       return { ...current, faq };
     }, item.answer);
   }
+  if (failure.code === "faq-specialist") return faqQuestionFragment(brief, fields, failure);
   if ((failure.code === "unique" || failure.code === "unique-pack") && (failure.field === "faq" || String(failure.path ?? "").includes("faq["))) {
     return faqQuestionFragment(brief, fields, failure);
   }
@@ -857,11 +1014,15 @@ export function buildSzFragment(brief, fields, failure) {
     return job;
   }
   if (failure.code === "summoning" || failure.code === "forbidden" || failure.code === "mixed-script") {
-    const banned = failure.message.match(/«([^»]+)»/)?.[1] ?? "";
-    const pattern = failure.code === "mixed-script"
-      ? /[A-Za-zА-Яа-яЁё]*[A-Za-z][А-Яа-яЁё]|[A-Za-zА-Яа-яЁё]*[А-Яа-яЁё][A-Za-z]/u
-      : (failure.code === "summoning" ? SUMMONING : new RegExp(banned.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu"));
-    const found = findString(fields, pattern);
+    const spec = phraseSpec(failure);
+    const banned = spec.phrase ?? "";
+    const pattern = spec.kind === "regex"
+      ? new RegExp(spec.source, spec.flags)
+      : new RegExp(banned.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu");
+    const direct = typeof failure.path === "string" ? getPath(fields, failure.path) : undefined;
+    const found = typeof direct === "string" && textHasPhrase(direct, spec)
+      ? { path: failure.path, text: direct }
+      : findString(fields, pattern);
     if (!found?.path) return null;
     return fragment(brief, `${failure.code}:${found.path}`, [
       `В этом фрагменте ошибка «${failure.code}»: ${failure.message}`,
@@ -879,7 +1040,7 @@ export function buildSzFragment(brief, fields, failure) {
   return null;
 }
 
-const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "links-contextual", "query-count", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
+const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "faq-specialist", "links-contextual", "query-count", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
 
 function failureKey(failure) {
   return `${failure.code}:${failure.path ?? failure.field}`;
@@ -966,7 +1127,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const allowModel = !args.offline && !args["no-repair"];
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
-    const { failures } = szQuantityReport(fields, errorsOf(result));
+    const failures = locatePhraseFailures(fields, szQuantityReport(fields, errorsOf(result)).failures);
     const failure = pickFailure(failures, cheapTries, strongTries, repair.cheapTries);
     if (!failure) break;
     const queryCount = bodyQueryCount(result.md, brief.query);
@@ -976,7 +1137,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     if ((failure.code === "description-length" || failure.code === "description-fragment") && descriptionDrafts.has(key)) {
       failure.descriptionDraft = descriptionDrafts.get(key).text;
     }
-    if (failure.code === "unique" || failure.code === "unique-pack") {
+    if (failure.code === "unique" || failure.code === "unique-pack" || failure.code === "faq-specialist") {
       const occupied = new Set();
       for (const [norm, slug] of unique?.questions ?? []) {
         if (slug !== brief.slug) occupied.add(norm);

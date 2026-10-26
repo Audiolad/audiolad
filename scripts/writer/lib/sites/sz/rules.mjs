@@ -40,6 +40,19 @@ export function paragraphsTooClose(a, b) {
   return paragraphSimilarity(a, b) >= PARAGRAPH_SIMILARITY;
 }
 
+/** The one FAQ question that must stay about seeing a specialist. */
+export function isSpecialistQuestion(question) {
+  return /специалист|психолог|обратиться/iu.test(String(question ?? ""));
+}
+
+/** Description opened with the query in «ёлочки», including a lowercase query. */
+export function descriptionOpensWithQuotedQuery(description, query) {
+  const nq = normalize(query);
+  if (!nq) return false;
+  const match = String(description ?? "").match(/^«\s*([^»]+?)\s*»/u);
+  return Boolean(match && normalize(match[1]) === nq);
+}
+
 // Same owner rule as findTextAddresses in lib/validate.mjs. This file cannot import it:
 // the stage gate copies these rules verbatim. One allowlist for the gate, the fragment
 // validator and the plain-text scanner.
@@ -487,14 +500,19 @@ function visibleParagraphs(body) {
   return out;
 }
 
-function duplicateParagraph(body) {
+/** Every later paragraph that repeats an earlier one. Each later paragraph is reported once. */
+function duplicateParagraphs(body) {
   const paragraphs = visibleParagraphs(body);
+  const duplicated = [];
+  const reported = new Set();
   for (let i = 0; i < paragraphs.length; i += 1) {
     for (let j = i + 1; j < paragraphs.length; j += 1) {
-      if (paragraphsTooClose(paragraphs[i], paragraphs[j])) return paragraphs[i];
+      if (reported.has(j) || !paragraphsTooClose(paragraphs[i], paragraphs[j])) continue;
+      reported.add(j);
+      duplicated.push(paragraphs[j]);
     }
   }
-  return null;
+  return duplicated;
 }
 
 /**
@@ -533,6 +551,7 @@ export function checkSzArticle(md, cfg, env) {
   const dl = [...description].length;
   if (dl < L.description[0] || dl > L.description[1]) add("description-length", "description", `description ${dl} символов, нужно ${L.description[0]}–${L.description[1]}`);
   if (!normalize(description).includes(nq)) add("description-query", "description", `в description нет запроса «${query}»`);
+  if (descriptionOpensWithQuotedQuery(description, query)) add("description-start", "description", `description начинается с запроса в кавычках «${query}» – начните фразу с заглавной, без кавычек`);
   const descriptionFragment = danglingFragment(description);
   if (descriptionFragment) add("description-fragment", "description", `description ${descriptionFragment}`);
   const faqHeading = get("faqHeading") ?? "";
@@ -682,7 +701,7 @@ export function checkSzArticle(md, cfg, env) {
   // ── FAQ ──
   const faq = faqEntries(fm);
   if (faq.length !== L.faqCount) add("faq-count", "faq", `ровно ${L.faqCount} вопросов FAQ`);
-  if (!faq.some(([q]) => /специалист|психолог|обратиться/iu.test(q))) add("faq-specialist", "faq", "один вопрос FAQ – про обращение к специалисту/психологу");
+  if (!faq.some(([q]) => isSpecialistQuestion(q))) add("faq-specialist", "faq", "один вопрос FAQ – про обращение к специалисту/психологу");
   for (const [q, a] of faq) {
     const aw = words(a);
     if (aw < L.faqAnswer[0] || aw > L.faqAnswer[1]) add("faq-length", "faq", `ответ на «${q}» ${aw} слов, нужно ${L.faqAnswer[0]}–${L.faqAnswer[1]}`);
@@ -743,8 +762,7 @@ export function checkSzArticle(md, cfg, env) {
   if (tw < L.total[0] || tw > L.total[1]) add("total-length", "sections", `всего ${tw} слов с FAQ, нужно ${L.total[0]}–${L.total[1]}`);
   const mainCount = normalize(body).split(nq).length - 1;
   if (mainCount < L.mainQuery[0] || mainCount > L.mainQuery[1]) add("query-count", "sections", `запрос «${query}» в тексте ${mainCount} раз, нужно ${L.mainQuery[0]}–${L.mainQuery[1]}`);
-  const duplicated = duplicateParagraph(body);
-  if (duplicated) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
+  for (const duplicated of duplicateParagraphs(body)) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
   for (const verbatim of cfg.verbatim ?? []) {
     // Verified texts (prayers, poems) quoted in «…»: the whole text or its beginning ending with «…».
     const head = verbatim.slice(0, 12);

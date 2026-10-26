@@ -32,7 +32,7 @@ import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack, normalize, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack, isSpecialistQuestion, normalize, paragraphsTooClose, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -2155,9 +2155,10 @@ test("tiered: a pathless or unaffordable strong error does not block the others"
   const summoning = rows.find((row) => row.code === "summoning");
   const order = rows.find((row) => row.code === "order");
   assert.equal(order.worst, null);
-  assert.ok(description.worst < summoning.worst, rows.map((row) => `${row.code}:${row.worst}`).join(" "));
-  const budget = Math.round(((description.worst + summoning.worst) / 2) * 1000) / 1000;
-  assert.ok(description.worst <= budget && summoning.worst > budget, `${description.worst} ${summoning.worst} ${budget}`);
+  assert.ok(description.worst > 0 && summoning.worst > 0);
+  const [affordable, blocked] = description.worst <= summoning.worst ? [description, summoning] : [summoning, description];
+  const budget = Math.round(((affordable.worst + blocked.worst) / 2) * 1000) / 1000;
+  assert.ok(affordable.worst <= budget && blocked.worst > budget, `${affordable.code}:${affordable.worst} ${blocked.code}:${blocked.worst} ${budget}`);
   const seen = [];
   const state = { spentRub: 0, calls: [], warnings: [] };
   repairSzArticleTiered({
@@ -2166,12 +2167,13 @@ test("tiered: a pathless or unaffordable strong error does not block the others"
     state,
     callTier: (tier, name) => {
       seen.push(name);
-      return { description: fields.description };
+      return { description: fields.description, text: raw.sectionsBefore[1].paragraphs[0].replace(" В этом абзаце упомянут оберег.", "") };
     },
   });
-  assert.ok(seen.some((name) => name.includes("description")), seen.join(","));
-  assert.ok(!seen.some((name) => name.includes("summoning")), seen.join(","));
-  assert.ok(state.warnings.some((warning) => warning.includes("summoning") && warning.includes("один не помещается") && warning.includes("остальные ошибки не блокируются")), state.warnings.join(" | "));
+  const marker = (code) => (code === "description-length" ? "description" : "summoning");
+  assert.ok(seen.some((name) => name.includes(marker(affordable.code))), seen.join(","));
+  assert.ok(!seen.some((name) => name.includes(marker(blocked.code))), seen.join(","));
+  assert.ok(state.warnings.some((warning) => warning.includes(blocked.code) && warning.includes("один не помещается") && warning.includes("остальные ошибки не блокируются")), state.warnings.join(" | "));
 });
 
 test("tiered: strong reserve is the real fragment cap and is not dropped", () => {
@@ -2263,6 +2265,189 @@ test("tiered: strong reserve is the real fragment cap and is not dropped", () =>
   const peerReserve = openLength.filter((row) => row.code !== "body-length").reduce((sum, row) => sum + row.worst, 0);
   const retryWorst = worstCaseRub(SZ_DEFAULT_MODEL, 400, retryTokenCap(lengthRow.cap));
   assert.ok(retryWorst > budget - peerReserve, `${retryWorst} should exceed the share left after ${peerReserve}`);
+});
+
+test("tiered: each banned phrase occurrence gets its own tries, including a table cell", () => {
+  const phrase = "магнит для денег";
+  const localBrief = { ...brief, forbiddenPhrases: [...brief.forbiddenPhrases, phrase] };
+  const localCfg = ruleConfig(localBrief, pack.publishedAt, pool);
+  const localBuild = (value) => {
+    const { fields: normalized } = normalizeSzFields(value);
+    const md = assembleSzArticle(localBrief, normalized, view.site, { date: pack.publishedAt });
+    return { fields: normalized, md, problems: checkSzArticle(md, localCfg, env) };
+  };
+  const raw = structuredClone(fields);
+  const storyText = raw.story[1];
+  const sectionText = raw.sectionsBefore[2].paragraphs[0];
+  const cellText = raw.tableSection.rows[0][1];
+  raw.story[1] = `${storyText.slice(0, -1)} и вспомнила фразу магнит для денег.`;
+  raw.sectionsBefore[2].paragraphs[0] = `${sectionText.slice(0, -1)} и отдельно звучит магнит для денег.`;
+  raw.tableSection.rows[0][1] = `${cellText}: магнит для денег`;
+  const tableJob = buildSzFragment(localBrief, raw, {
+    code: "forbidden",
+    path: "tableSection.rows[0][1]",
+    field: "tableSection.rows[0][1]",
+    message: `запрещённая брифом фраза «${phrase}»`,
+  });
+  const tablePrompt = tableJob.messages.map((message) => message.content).join("\n");
+  assert.ok(tablePrompt.includes(phrase));
+  assert.ok(!tablePrompt.includes(raw.story[1].slice(0, 40)));
+  assert.equal(tableJob.apply(raw, { text: `${cellText} и призвать ангела` }), null);
+  assert.equal(tableJob.apply(raw, { text: `${cellText}: ${phrase}` }), null);
+  const tableOnly = tableJob.apply(raw, { text: cellText });
+  assert.equal(tableOnly.tableSection.rows[0][1], cellText);
+  assert.ok(tableOnly.story[1].includes(phrase));
+  assert.ok(tableOnly.sectionsBefore[2].paragraphs[0].includes(phrase));
+  const names = [];
+  let storyCalls = 0;
+  const repaired = repairSzArticleTiered({
+    brief: localBrief, raw, build: localBuild, repair: tierRepair({ cheapTries: 2, maxRounds: 8 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name) => {
+      names.push({ tier, name });
+      assert.equal(isWriterId(name), true, name);
+      if (name.includes("forbidden-story")) {
+        storyCalls += 1;
+        if (storyCalls === 1) return { text: `${raw.story[1]} Нельзя призвать ангела ради удачи.` };
+        return { text: storyText };
+      }
+      if (name.includes("forbidden-sectionsbefore")) return { text: sectionText };
+      if (name.includes("forbidden-tablesection")) return { text: cellText };
+      return {};
+    },
+  });
+  const forbidden = names.filter((call) => call.name.includes("forbidden"));
+  assert.equal(storyCalls, 2, forbidden.map((call) => call.name).join(", "));
+  assert.equal(forbidden.filter((call) => call.name.includes("forbidden-sectionsbefore")).length, 1, forbidden.map((call) => `${call.tier}:${call.name}`).join(", "));
+  assert.equal(forbidden.filter((call) => call.name.includes("forbidden-tablesection")).length, 1, forbidden.map((call) => `${call.tier}:${call.name}`).join(", "));
+  assert.ok(forbidden.every((call) => call.tier === "cheap"), forbidden.map((call) => call.tier).join(","));
+  assert.equal(repaired.result.fields.story[1], storyText);
+  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[0], sectionText);
+  assert.equal(repaired.result.fields.tableSection.rows[0][1], cellText);
+  assert.ok(!JSON.stringify(repaired.result.fields).includes(phrase));
+  assert.ok(!repaired.result.fields.story[1].includes("призвать ангела"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: a later duplicate paragraph is deleted without a model and every duplicate is reported", () => {
+  const clean = applyDeterministicSzFixes(structuredClone(fields), { query: brief.query, links: brief.links });
+  assert.deepEqual(clean.fields.story, fields.story);
+  assert.deepEqual(clean.fields.sectionsBefore, fields.sectionsBefore);
+  const raw = structuredClone(fields);
+  const church = raw.sectionsBefore[0].paragraphs[0];
+  const plain = raw.sectionsBefore[2].paragraphs[0];
+  const near = plain.replace("часто", "нередко");
+  assert.notEqual(near, plain);
+  assert.equal(paragraphsTooClose(plain, near), true);
+  raw.sectionsBefore[2].paragraphs.push(near);
+  raw.sectionsBefore[2].paragraphs.push(church);
+  const reported = errorsOf(hybridBuild(raw).problems).filter((problem) => problem.code === "duplicate-paragraph");
+  assert.equal(reported.length, 2, reported.map((problem) => problem.message).join(" | "));
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return {}; },
+  });
+  assert.equal(calls, 0, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], church);
+  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[0], plain);
+  assert.ok(!repaired.result.fields.sectionsBefore[2].paragraphs.includes(near));
+  assert.ok(!repaired.result.fields.sectionsBefore[2].paragraphs.includes(church));
+  assert.ok(repaired.result.md.includes(church));
+  assert.ok(repaired.result.md.includes("| Подход |"));
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "duplicate-paragraph"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: a specialist FAQ keeps its role and a missing one is rewritten", () => {
+  const offTopic = "Как практика принятия себя меняет день?";
+  const fresh = "Когда стоит обсудить сильное переживание со специалистом, если образ не отпускает?";
+  const occupied = new Set([normalize("Когда стоит обратиться к специалисту?")]);
+  const raw = structuredClone(fields);
+  const answer = raw.faq[4].answer;
+  const others = raw.faq.slice(0, 4).map((item) => item.question);
+  raw.faq[4] = { ...raw.faq[4], question: "Как отличить спокойный образ от навязчивой мысли в конце дня?" };
+  assert.equal(isSpecialistQuestion(raw.faq[4].question), false);
+  assert.ok(errorsOf(hybridBuild(raw).problems).some((problem) => problem.code === "faq-specialist"));
+  const failure = szQuantityReport(raw, errorsOf(hybridBuild(raw).problems)).failures.find((row) => row.code === "faq-specialist");
+  const job = buildSzFragment(brief, raw, { ...failure, occupiedQuestions: occupied });
+  const prompt = job.messages.map((message) => message.content).join("\n");
+  assert.ok(prompt.includes(brief.query), prompt);
+  assert.ok(prompt.includes(brief.title));
+  assert.match(prompt, /Роль этого слота/);
+  assert.match(prompt, /специалист/);
+  assert.equal(job.apply(raw, { question: offTopic }), null);
+  assert.equal(job.apply(raw, { question: "Когда стоит обратиться к специалисту?" }), null);
+  const applied = job.apply(raw, { question: fresh });
+  assert.equal(applied.faq[4].question, fresh);
+  assert.equal(applied.faq[4].answer, answer);
+  assert.deepEqual(applied.faq.slice(0, 4).map((item) => item.question), others);
+  const specialist = structuredClone(fields);
+  const specialistQuestion = specialist.faq[4].question;
+  assert.equal(isSpecialistQuestion(specialistQuestion), true);
+  const uniqueJob = buildSzFragment(brief, specialist, {
+    code: "unique",
+    field: "faq",
+    path: "faq[4].question",
+    message: `«${specialistQuestion}» повторяет статью meditaciya-na-prinyatie-sebya`,
+    occupiedQuestions: occupied,
+  });
+  const uniquePrompt = uniqueJob.messages.map((message) => message.content).join("\n");
+  assert.ok(uniquePrompt.includes(brief.query));
+  assert.ok(uniquePrompt.includes(brief.title));
+  assert.match(uniquePrompt, /Роль этого слота/);
+  assert.equal(uniqueJob.apply(specialist, { question: offTopic }), null);
+  const rephrased = uniqueJob.apply(specialist, { question: fresh });
+  assert.equal(rephrased.faq[4].question, fresh);
+  assert.equal(rephrased.faq[4].answer, specialist.faq[4].answer);
+  assert.deepEqual(rephrased.faq.slice(0, 4).map((item) => item.question), others);
+  const seen = [];
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, unique: env.unique,
+    repair: tierRepair({ cheapTries: 2, maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      seen.push(name);
+      assert.equal(tier, "cheap");
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      assert.ok(text.includes(brief.query));
+      assert.match(text, /Роль этого слота/);
+      return seen.length === 1 ? { question: offTopic } : { question: fresh };
+    },
+  });
+  assert.ok(seen.some((name) => name.includes("faq-specialist")), seen.join(","));
+  assert.equal(repaired.result.fields.faq[4].question, fresh);
+  assert.equal(repaired.result.fields.faq[4].answer, answer);
+  assert.deepEqual(repaired.result.fields.faq.slice(0, 4).map((item) => item.question), others);
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "faq-specialist"), repaired.repairSkipped);
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: a description does not open with a lowercase quoted query", () => {
+  let rest = "остаётся тихим образом рядом с человеком и помогает сделать спокойную паузу без обещания чуда.";
+  const pad = " Тишина короткая.";
+  let desc = `«${brief.query}» ${rest}`;
+  while ([...desc].length < 140) {
+    rest += pad;
+    desc = `«${brief.query}» ${rest}`;
+  }
+  assert.ok([...desc].length >= 140 && [...desc].length <= 160, [...desc].length);
+  const raw = structuredClone(fields);
+  raw.description = desc;
+  const codes = errorsOf(hybridBuild(raw).problems).map((problem) => problem.code);
+  assert.ok(codes.includes("description-start"), codes.join(","));
+  const fixed = applyDeterministicSzFixes(raw, { query: brief.query });
+  assert.equal(fixed.fields.description, `Ангел-хранитель ${rest}`);
+  assert.equal(fixed.fields.description.startsWith("«"), false);
+  assert.ok(normalize(fixed.fields.description).includes(normalize(brief.query)));
+  assert.ok(!errorsOf(hybridBuild(fixed.fields).problems).some((problem) => problem.code === "description-start" || problem.code === "description-length"));
+  const job = buildSzFragment(brief, fields, { code: "description-length", field: "description", path: "description", message: "description 100 символов, нужно 140–160" });
+  assert.match(job.messages.map((message) => message.content).join("\n"), /кавычк/);
+  assert.equal(job.apply(fields, { description: desc }), null);
+  assert.equal(job.apply(fields, { description: fields.description }).description, fields.description);
+  assert.equal(errorsOf(checkSzArticle(assembled, cfg, env)).some((problem) => problem.code === "description-start"), false);
 });
 
 function bodyQueryCountOf(md, query) {
