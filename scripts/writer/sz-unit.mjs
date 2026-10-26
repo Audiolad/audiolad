@@ -319,6 +319,115 @@ test("targeted: schema subset, compact context, deterministic merge and repeated
   assert.deepEqual(szRepairFields(raw, [{ severity: "error", field: "*", code: "unknown", message: "неизвестная ошибка" }]), Object.keys(szArticleSchema().properties));
   for (const patch of [null, {}, [], "json", { description: 12 }, { description: fields.description, story: [] }]) assert.equal(applySzRepairPatch(raw, patch, target.schema), null);
   assert.equal(applySzRepairPatch(raw, { experts: [{ name: "x" }] }, experts.schema), null);
+  const bodyLength = szRepairFields(raw, [{ severity: "error", field: "sections", code: "body-length", message: "объём" }]);
+  assert.ok(bodyLength.includes("steps") && !bodyLength.includes("faqHeading"));
+});
+
+test("targeted: rejects lost experts before assembly; the gate rejects placeholder cards", () => {
+  const raw = structuredClone(fields);
+  raw.experts[0].bridge += " article-expert-initials";
+  const before = structuredClone(raw);
+  const problems = hybridBuild(raw).problems;
+  assert.deepEqual(errorsOf(problems).map((p) => p.code), ["expert-card"]);
+  const target = buildSzTargetedRepair(brief, raw, problems);
+  assert.deepEqual(target.fields, ["experts"]);
+  const valid = structuredClone(fields.experts);
+  const missingBridge = structuredClone(valid);
+  delete missingBridge[0].bridge;
+  const placeholder = (thesis) => valid.map((expert, i) => (i ? expert : { ...expert, thesis }));
+  const cases = [
+    [], valid.slice(0, 1), [...valid].reverse(),
+    valid.map((expert) => ({ ...expert, name: "Другой эксперт" })),
+    [valid[0], valid[0]], missingBridge,
+    ...["thesis", "bridge"].flatMap((key) => ["", " \n\t", "… ** –", "главная мысль", "Главная мысль."].map((text) => valid.map((expert, i) => (i ? expert : { ...expert, [key]: text })))),
+    placeholder("главная   мысль"),
+  ];
+  for (const experts of cases) {
+    const patch = { experts };
+    const patchBefore = structuredClone(patch);
+    assert.equal(applySzRepairPatch(raw, patch, target.schema, brief), null);
+    const state = { warnings: [] };
+    let builds = 0;
+    const result = repairSzArticle({
+      brief, raw, build: (value) => { builds += 1; return hybridBuild(value); },
+      repair: { mode: "targeted" }, callRepair: () => patch, state,
+    });
+    assert.equal(builds, 1);
+    assert.deepEqual(result.result, hybridBuild(raw));
+    assert.deepEqual(result.errors, result.errorsBeforeRepair);
+    assert.match(result.repairSkipped, /^rejected: .*(experts|схемы)/);
+    assert.ok(state.warnings[0].includes(result.repairSkipped));
+    const report = szReportMarkdown({ calls: [], spentRub: 0, warnings: state.warnings, articles: [{ slug: brief.slug, ...result, errorsAfterRepair: result.errors }] });
+    assert.ok(report.includes(`repairSkipped: ${result.repairSkipped}`));
+    assert.deepEqual(raw, before);
+    assert.deepEqual(patch, patchBefore);
+  }
+  const emptied = assembleSzArticle(brief, { ...structuredClone(raw), experts: [] }, view.site, { date: pack.publishedAt });
+  assert.match(emptied, /Марина Мелия: главная мысль/);
+  assert.match(emptied, /Эрих Фромм: главная мысль/);
+  const gate = errorsOf(checkSzArticle(emptied, cfg, env)).map((problem) => problem.code);
+  assert.ok(gate.includes("expert-thesis") && gate.includes("expert-bridge"), gate.join(","));
+  const accepted = applySzRepairPatch(raw, { experts: valid }, target.schema, brief);
+  assert.deepEqual(errorsOf(hybridBuild(accepted).problems), []);
+  assert.deepEqual(accepted.experts, valid);
+  for (const key of Object.keys(raw)) if (key !== "experts") assert.deepEqual(accepted[key], raw[key]);
+  assert.equal(applySzRepairPatch({ ...raw, experts: [] }, { experts: [] }, target.schema, brief), null);
+  const state = { warnings: [] };
+  let builds = 0;
+  const fixed = repairSzArticle({
+    brief, raw, build: (value) => { builds += 1; return hybridBuild(value); },
+    repair: { mode: "targeted" }, callRepair: () => ({ experts: structuredClone(valid) }), state,
+  });
+  assert.equal(builds, 2);
+  assert.deepEqual(fixed.errors, []);
+  assert.equal(fixed.repairSkipped, null);
+  assert.equal(state.warnings.length, 0);
+});
+
+test("targeted: cannot empty selected strings, arrays or nested mandatory fields", () => {
+  const cases = [
+    ["description", ""], ["description", " \n\t"], ["story", []], ["story", [" "]],
+    ["checklist", { ...fields.checklist, title: " " }],
+    ["checklist", { ...fields.checklist, items: [] }],
+    ["sectionsBefore", fields.sectionsBefore.map((section) => ({ ...section, paragraphs: [] }))],
+    ["tableSection", { ...fields.tableSection, rows: [[]] }],
+    ["faq", fields.faq.map((item) => ({ ...item, answer: "" }))],
+  ];
+  for (const [key, value] of cases) {
+    const target = buildSzTargetedRepair(brief, fields, [{ severity: "error", field: key, code: "test", message: "test" }]);
+    assert.equal(applySzRepairPatch(fields, { [key]: value }, target.schema, brief), null, key);
+  }
+  const raw = { ...structuredClone(fields), sectionsAfter: [] };
+  const target = buildSzTargetedRepair(brief, raw, [{ severity: "error", field: "sectionsAfter", code: "test", message: "test" }]);
+  assert.ok(applySzRepairPatch(raw, { sectionsAfter: [] }, target.schema, brief));
+  const shortened = applySzRepairPatch(fields, { description: `${fields.description.slice(0, -1)}ы` }, buildSzTargetedRepair(brief, fields, [{ severity: "error", field: "description", code: "test", message: "test" }]).schema, brief);
+  assert.ok(shortened);
+  assert.notEqual(shortened.description, fields.description);
+});
+
+test("targeted: duplicate FAQ heading and actual matching fields; story context is read-only", () => {
+  const problem = { severity: "error", field: "sections", code: "unique", message: `заголовок «${fields.faqHeading}» уже есть в статье other` };
+  assert.deepEqual(szRepairFields(fields, [problem]), ["faqHeading"]);
+  const same = { ...structuredClone(fields), sectionsBefore: [{ title: fields.faqHeading, paragraphs: ["текст"] }] };
+  assert.deepEqual(szRepairFields(same, [problem]), ["faqHeading", "sectionsBefore"]);
+  const unquoted = { ...problem, message: "заголовок повторяется внутри статьи" };
+  const unquotedFields = szRepairFields(fields, [unquoted]);
+  assert.ok(unquotedFields.includes("faqHeading") && unquotedFields.includes("steps"));
+  const packQuote = { severity: "error", field: "sections", code: "unique-pack", message: "«этой цитаты нет в полях» повторяет статью пакета other" };
+  assert.ok(!szRepairFields(fields, [packQuote]).includes("faqHeading"));
+  const bold = { severity: "error", field: "question", code: "bold-query", message: `запрос «${brief.query}» не выделяется жирным («${fields.finalQuestion.slice(0, 40)}»)` };
+  assert.deepEqual(szRepairFields(fields, [bold]), ["finalQuestion"]);
+  const boldMiss = { severity: "error", field: "question", code: "bold-query", message: "запрос «ангел-хранитель» не выделяется жирным («этой фразы нет нигде»)" };
+  assert.deepEqual(szRepairFields(fields, [boldMiss]), ["question", "finalQuestion"]);
+  for (const key of ["story", "transition", "storyEnding"]) {
+    const target = buildSzTargetedRepair(brief, fields, [{ severity: "error", field: key, code: "test", message: "test" }]);
+    assert.deepEqual(target.fields, [key]);
+    const context = JSON.parse(target.messages[1].content.split("БРИФ:\n")[1].split("\nОШИБКИ")[0]);
+    assert.deepEqual(context.storyContext, { story: fields.story, transition: fields.transition, storyEnding: fields.storyEnding });
+    assert.match(context.storyContextRule, /только для чтения.*героев.*детали/);
+    assert.deepEqual(target.schema.required, [key]);
+    assert.equal(target.schema.additionalProperties, false);
+  }
 });
 
 test("hybrid calls: repair model/tokens, ledger, invalid patch, default full and shared budget", () => {

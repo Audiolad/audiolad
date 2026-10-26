@@ -11,6 +11,13 @@ export const SZ_RULES_VERSION = 1;
 export const words = (text) => String(text).match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 export const normalize = (text) => String(text).trim().replace(/,/g, "").replace(/\s+/g, " ").toLocaleLowerCase("ru").replace(/ё/g, "е");
 export const quoteText = (text) => String(text).replace(/[«»"“”„]/g, "").replace(/[—–-]/g, "–").replace(/\s+/g, " ").trim();
+// Assembler fills a missing thesis with this placeholder. Card count cannot see that:
+// assemble always emits one card per brief expert.
+export const EXPERT_PLACEHOLDER_THESIS = "главная мысль";
+export function substantiveExpertText(text) {
+  const plain = String(text ?? "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ru").replace(/ё/g, "е");
+  return /\p{L}/u.test(plain) && plain !== EXPERT_PLACEHOLDER_THESIS;
+}
 const sharedHeading = (text) => /^(?:Частые вопросы|Читайте также$|Когда стоит обратиться к специалисту$)/iu.test(text);
 
 // Healing/outcome promise guard (stage 11/24). JS `\b` is ASCII-only → Unicode lookahead.
@@ -231,7 +238,9 @@ export function checkSzArticle(md, cfg, env) {
     if (!src?.startsWith("/media/experts/") || !env.portraitExists(src)) add("portrait", "*", `${name}: нет локального портрета`);
     if (!/alt="[^"]+" width="96" height="96" loading="lazy"/.test(html)) add("portrait", "*", `${name}: alt/размер портрета`);
     for (const cls of ["name", "role", "credit"]) if (!new RegExp(`<p class="article-expert-${cls}">[^<]+<\\/p>`).test(html)) add("expert-card", "*", `${name}: нет ${cls}`);
-    if (!/^### .+: .+$/m.test(html)) add("expert-thesis", "experts", `${name}: «### Имя: тезис»`);
+    // Card count is not enough: a missing thesis still renders as «Имя: главная мысль».
+    const thesis = html.match(/^### [^:\n]+:\s*(.*)$/m)?.[1] ?? "";
+    if (!substantiveExpertText(thesis)) add("expert-thesis", "experts", `${name}: «### Имя: тезис» – содержательный тезис, не заглушка «главная мысль»`);
     const quotes = [...html.matchAll(/^> («[^\n]+»\.?)$/gm)];
     if (quotes.length !== 1) add("expert-quote", "*", `${name}: ровно одна цитата`);
     const quote = quotes[0]?.[1] ?? "";
@@ -240,6 +249,7 @@ export function checkSzArticle(md, cfg, env) {
     else if (quoteText(quote) !== quoteText(expected.quote)) add("expert-quote", "*", `${name}: цитата не совпадает дословно с брифом`);
     if (/article-expert-initials|href=|\]\(/.test(html)) add("expert-card", "experts", `${name}: в карточке нет ссылок и инициалов`);
     const bridge = html.split(/^> «[^\n]+»\.?$/m)[1] ?? "";
+    if (!substantiveExpertText(bridge.replace(/<\/section>/g, ""))) add("expert-bridge", "experts", `${name}: пояснение после цитаты пустое`);
     for (const phrase of expected?.forbiddenInBridge ?? []) if (normalize(bridge).includes(normalize(phrase))) add("expert-bridge", "experts", `${name}: в пояснении нельзя «${phrase}» – эксперт этого не говорит`);
     if (!cfg.expertTags[name]) add("expert-list", "*", `${name}: не из утверждённого списка`);
     else tags.push(...cfg.expertTags[name]);

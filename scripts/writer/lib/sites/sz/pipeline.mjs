@@ -19,7 +19,7 @@ import { checksMarkdown, compareSzChecks, runSzChecks } from "./checks.mjs";
 import { SZ } from "./config.mjs";
 import { loadSzContext } from "./context.mjs";
 import { expertCard, loadExpertPool, rankExperts, rotationAdvice } from "./experts.mjs";
-import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema } from "./prompt.mjs";
+import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairPatchRejection } from "./prompt.mjs";
 import { checkSzArticle, checkSzPack, uniqueKeys } from "./rules.mjs";
 
 export class SzStop extends Error {
@@ -291,14 +291,16 @@ export function repairSzArticle({ brief, raw, build, messages, schema = szArticl
     const target = repair.mode === "targeted" ? buildSzTargetedRepair(brief, raw, result.problems) : null;
     try {
       const answer = callRepair(`${brief.slug}-repair`, target?.messages ?? buildSzRepairMessages(messages, raw, result.problems), target?.schema ?? schema);
-      const repaired = target ? applySzRepairPatch(raw, answer, target.schema) : answer;
+      const rejection = target ? szRepairPatchRejection(raw, answer, target.schema, brief) : null;
+      const repaired = rejection ? null : target ? applySzRepairPatch(raw, answer, target.schema, brief) : answer;
       if (repaired) {
         raw = repaired;
         result = build(raw);
         errors = result.problems.filter((problem) => problem.severity === "error");
         log(`${brief.slug} после исправления: ошибок ${errors.length}`);
       } else if (target) {
-        const warning = `${brief.slug}: невалидный/пустой patch – исходный вариант сохранён`;
+        repairSkipped = `rejected: ${rejection}`;
+        const warning = `${brief.slug}: ${repairSkipped} – исходный вариант сохранён`;
         state.warnings.push(warning);
         log(warning);
       }

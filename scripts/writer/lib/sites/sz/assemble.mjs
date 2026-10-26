@@ -45,6 +45,7 @@ function expertCard(expert, written, site) {
     `<section class="article-expert" aria-label="${expert.name}">`,
     `<div class="article-expert-head"><img class="article-expert-photo" src="/media/experts/${known.photo}" alt="${known.alt}" width="96" height="96" loading="lazy"><div><p class="article-expert-name">${expert.name}</p><p class="article-expert-role">${expert.role || known.role}</p><p class="article-expert-credit">${known.credit}</p></div></div>`,
     "",
+    // Empty thesis stays visible as a placeholder; checkSzArticle rejects it.
     `### ${expert.name}: ${s(written?.thesis) || "главная мысль"}`,
     "",
     `Источник: ${expert.source}.`,

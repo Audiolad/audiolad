@@ -3,6 +3,7 @@
 // disclaimer, «Читайте также», final picture – is inserted by assemble.mjs.
 import { SZ } from "./config.mjs";
 import { CORRECTIONS, LESSONS, toneSample } from "./knowledge.mjs";
+import { substantiveExpertText } from "./rules.mjs";
 
 const str = { type: "string" };
 // As in lib/prompt.mjs: only upper bounds go into the grammar (runaway guard).
@@ -169,6 +170,16 @@ export function szRepairFields(previous, problems) {
   for (const problem of problems.filter((item) => item.severity === "error")) {
     const field = String(problem.field).split(/[.[]/)[0];
     let matches = keys.includes(field) ? [field] : aliases[field];
+    // unique files every heading under "sections", so a duplicated faqHeading is not in that alias.
+    // bold-query is filed under "question" even when the bold text lives in finalQuestion or a section.
+    if (/^unique(?:-pack)?$|^bold-query$/.test(problem.code)) {
+      const quoted = [...String(problem.message).matchAll(/«([^»]+)»/g)].map((match) => match[1]);
+      const texts = problem.code === "bold-query" ? quoted.slice(-1) : quoted;
+      const actual = texts.some(Boolean) ? keys.filter((key) => texts.some((text) => text && JSON.stringify(previous[key] ?? null).includes(text))) : [];
+      if (actual.length) matches = actual;
+      else if (problem.code === "bold-query") matches = ["question", "finalQuestion"];
+      else if ((field === "sections" || field === "headings") && /заголовок/u.test(problem.message)) matches = [...sections, "faqHeading"];
+    }
     if (!matches) {
       const quoted = [...problem.message.matchAll(/«([^»]+)»/g)].map((match) => match[1]);
       matches = keys.filter((key) => quoted.some((text) => JSON.stringify(previous[key])?.includes(text)));
@@ -191,7 +202,11 @@ export function buildSzTargetedRepair(article, previous, problems) {
     relevant.experts = article.experts.map(({ name, quote, source, sourceText, context, doesNotSay, caution, forbiddenInBridge }) => ({ name, quote, source, sourceText, context, doesNotSay, caution, forbiddenInBridge }));
     relevant.verbatim = article.verbatim;
   }
-  if (fields.some((key) => ["story", "transition", "storyEnding"].includes(key))) relevant.storyHint = article.storyHint;
+  if (fields.some((key) => ["story", "transition", "storyEnding"].includes(key))) {
+    relevant.storyHint = article.storyHint;
+    relevant.storyContext = Object.fromEntries(["story", "transition", "storyEnding"].map((key) => [key, previous[key]]));
+    relevant.storyContextRule = "storyContext – контекст только для чтения, не включай его в ответ. Меняй только выбранные поля; сохрани героев, факты и детали, согласуй начало, переход и окончание истории.";
+  }
   if (fields.some((key) => ["sectionsBefore", "tableSection", "steps", "sectionsAfter"].includes(key))) relevant.links = article.links.contextual;
   const messages = [
     { role: "system", content: "Ты – Зоя Петрова. Пиши тепло, ясно, по-русски, на «вы», без пафоса. Зоя не психолог; эзотерика не наука. Только тире «–» и кавычки «». Цитаты строго дословно по материалам, не приписывай экспертам выводов. Без обещаний лечения, гарантий, защиты, призыва, предсказаний, дискомфорта и советов остановить запись. Без внешних адресов, MAX, видимых дат и служебных пометок. Не выдумывай факты. Сохрани внутренние ссылки. Исправь ошибки с указанными длинами полей. Верни только JSON patch по схеме: полные значения выбранных полей, без остальных полей и пояснений." },
@@ -209,7 +224,42 @@ function matchesSchema(value, schema) {
     && schema.required.every((key) => Object.hasOwn(value, key) && matchesSchema(value[key], schema.properties[key]));
 }
 
-export function applySzRepairPatch(previous, patch, schema) {
-  if (!schema.required.length || !matchesSchema(patch, schema)) return null;
+// Structural validity alone accepts experts: [] and a thesis of «главная мысль». Reject before merge.
+export function szRepairPatchRejection(previous, patch, schema, brief) {
+  if (!schema?.required?.length || !matchesSchema(patch, schema)) return "невалидный/пустой patch: нарушение схемы";
+  if (Object.hasOwn(patch, "experts")) {
+    const expected = brief?.experts;
+    if (!expected?.length || patch.experts.length !== expected.length) return "experts: требуется полный список экспертов из брифа";
+    const names = patch.experts.map((expert) => expert.name);
+    if (new Set(names).size !== names.length || names.some((name, i) => name !== expected[i].name)) return "experts: имена/порядок не совпадают с брифом или есть дубли";
+    for (const [i, expert] of patch.experts.entries()) {
+      for (const key of szArticleSchema().properties.experts.items.required) {
+        if (!substantiveExpertText(expert[key])) return `experts[${i}].${key}: требуется содержательный непустой текст, не заглушка «главная мысль»`;
+      }
+    }
+  }
+  const lostContent = (before, after, path) => {
+    if (typeof after === "string") return typeof before === "string" && before.trim() && !after.trim() ? `${path}: непустая строка стала пустой` : null;
+    if (Array.isArray(after)) {
+      if (Array.isArray(before) && before.length && !after.length) return `${path}: непустой массив стал пустым`;
+      for (let i = 0; i < after.length; i += 1) {
+        const reason = lostContent(before?.[i], after[i], `${path}[${i}]`);
+        if (reason) return reason;
+      }
+      return null;
+    }
+    if (after && typeof after === "object") {
+      for (const [key, value] of Object.entries(after)) {
+        const reason = lostContent(before?.[key], value, path ? `${path}.${key}` : key);
+        if (reason) return reason;
+      }
+    }
+    return null;
+  };
+  return lostContent(previous, patch, "");
+}
+
+export function applySzRepairPatch(previous, patch, schema, brief) {
+  if (szRepairPatchRejection(previous, patch, schema, brief)) return null;
   return { ...structuredClone(previous), ...structuredClone(patch) };
 }
