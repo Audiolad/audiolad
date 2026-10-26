@@ -1,5 +1,6 @@
 import { USER_AVATARS_BUCKET, isValidUserAvatarPath } from "@/lib/profile/avatar";
-import { commentActor } from "@/lib/practice-comments/server";
+import { listenerImpressionInFeed, openListenerCommentAvatar } from "@/lib/practice-comments/avatar-proxy";
+import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const COMMENT_ID_RE =
@@ -9,33 +10,46 @@ type RouteContext = {
   params: Promise<{ commentId: string }>;
 };
 
+function hiddenAvatar(): Response {
+  return new Response(null, { status: 404 });
+}
+
 export async function GET(request: Request, context: RouteContext) {
   const { commentId } = await context.params;
   if (!COMMENT_ID_RE.test(commentId)) {
-    return new Response(null, { status: 404 });
+    return hiddenAvatar();
+  }
+
+  let reader;
+  try {
+    reader = await createClientFromRequest(request);
+  } catch {
+    return hiddenAvatar();
+  }
+
+  const { data: feed, error: feedError } = await reader
+    .from("practice_listener_comment_feed")
+    .select("id, kind")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (feedError || !listenerImpressionInFeed(feed)) {
+    return hiddenAvatar();
   }
 
   let service;
   try {
     service = createServiceRoleClient();
   } catch {
-    return new Response(null, { status: 404 });
+    return hiddenAvatar();
   }
 
   const { data: comment, error } = await service
     .from("practice_listener_comments")
-    .select("id, user_id, kind, status, deleted_at")
+    .select("user_id")
     .eq("id", commentId)
     .maybeSingle();
-  if (error || !comment || comment.kind !== "impression" || comment.deleted_at || comment.status === "deleted") {
-    return new Response(null, { status: 404 });
-  }
-
-  if (comment.status !== "published") {
-    const actor = await commentActor(request);
-    if (!actor.userId || actor.userId !== comment.user_id) {
-      return new Response(null, { status: 404 });
-    }
+  if (error || !comment?.user_id) {
+    return hiddenAvatar();
   }
 
   const { data: profile } = await service
@@ -45,21 +59,17 @@ export async function GET(request: Request, context: RouteContext) {
     .maybeSingle();
   const path = profile?.avatar_path;
   if (!isValidUserAvatarPath(path, comment.user_id)) {
-    return new Response(null, { status: 404 });
+    return hiddenAvatar();
   }
 
   const downloaded = await service.storage.from(USER_AVATARS_BUCKET).download(path);
   if (downloaded.error || !downloaded.data) {
-    return new Response(null, { status: 404 });
+    return hiddenAvatar();
   }
 
   const bytes = new Uint8Array(await downloaded.data.arrayBuffer());
-  return new Response(bytes, {
-    status: 200,
-    headers: {
-      "content-type": downloaded.data.type || "image/webp",
-      "cache-control": "private, max-age=300",
-      "x-content-type-options": "nosniff",
-    },
+  return openListenerCommentAvatar({
+    feed: { kind: "impression" },
+    image: { bytes, contentType: downloaded.data.type || "image/webp" },
   });
 }

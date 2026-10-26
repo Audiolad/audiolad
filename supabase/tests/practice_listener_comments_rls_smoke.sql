@@ -18,6 +18,9 @@ DECLARE
   mail_comment uuid := 'f2222222-2222-4222-8222-222222222222';
   name_comment uuid := 'f3333333-3333-4333-8333-333333333333';
   reply_id uuid := 'f4444444-4444-4444-8444-444444444444';
+  draft uuid := '99999999-9999-4999-8999-999999999999';
+  draft_comment uuid := 'f5555555-5555-4555-8555-555555555555';
+  deleted_comment uuid := 'f6666666-6666-4666-8666-666666666666';
   workspace_avatar text := 'https://cdn.example/workspaces/55555555-5555-4555-8555-555555555555/avatar.webp';
   safe_avatar text := 'https://cdn.example/pictures/maria.webp';
   cnt integer;
@@ -31,7 +34,8 @@ BEGIN
     id, author_id, title, slug, status, product_kind, catalog_section, published_at
   ) VALUES
     (practice, author_id, 'Тихая', 'tihaya', 'published', 'practice', 'meditations', now()),
-    (music, author_id, 'Трек', 'trek', 'published', 'music', 'music', now());
+    (music, author_id, 'Трек', 'trek', 'published', 'music', 'music', now()),
+    (draft, author_id, 'Черновик', 'chernovik', 'draft', 'practice', 'meditations', NULL);
   INSERT INTO public.author_members (author_id, user_id) VALUES (author_id, author_user);
 
   INSERT INTO public.profiles (id, full_name, avatar_url, avatar_path) VALUES
@@ -50,7 +54,13 @@ BEGIN
     (leak_comment, practice, leak_user, 'impression', 'Тихий вечер', 'Илья', 'published', 'тихий вечер', NULL),
     (mail_comment, practice, mail_user, 'impression', 'Мягкий звук', 'Ольга', 'published', 'мягкий звук', NULL),
     (name_comment, practice, name_user, 'impression', 'Ровный голос', 'Ольга', 'published', 'ровный голос', NULL),
-    (reply_id, practice, author_user, 'author_reply', 'Спасибо за отзыв', 'Анна', 'published', 'спасибо за отзыв', comment_id);
+    (reply_id, practice, author_user, 'author_reply', 'Спасибо за отзыв', 'Анна', 'published', 'спасибо за отзыв', comment_id),
+    (draft_comment, draft, listener, 'impression', 'Черновой отзыв', 'Мария', 'published', 'черновой отзыв', NULL),
+    (deleted_comment, practice, listener, 'impression', 'Удалённый отзыв', 'Мария', 'deleted', 'удалённый отзыв', NULL);
+
+  UPDATE public.practice_listener_comments
+  SET deleted_at = now()
+  WHERE id = deleted_comment;
 
   SET ROLE anon;
   BEGIN
@@ -131,6 +141,33 @@ BEGIN
   SELECT public.practice_listener_comment_public_avatar(hidden_id) INTO seen_avatar;
   IF seen_avatar IS NOT NULL THEN
     RAISE EXCEPTION 'hidden impression avatar must stay hidden for anon';
+  END IF;
+
+  SELECT public.practice_listener_comment_public_avatar(comment_id) INTO seen_avatar;
+  IF seen_avatar IS DISTINCT FROM safe_avatar THEN
+    RAISE EXCEPTION 'visible impression avatar must follow the feed, got %', seen_avatar;
+  END IF;
+
+  SELECT count(*) INTO cnt
+  FROM public.practice_listener_comment_feed
+  WHERE id IN (draft_comment, music_comment, hidden_id, deleted_comment);
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'unpublished, music, hidden and deleted rows must stay out of the anon feed, got %', cnt;
+  END IF;
+
+  SELECT public.practice_listener_comment_public_avatar(draft_comment) INTO seen_avatar;
+  IF seen_avatar IS NOT NULL THEN
+    RAISE EXCEPTION 'unpublished practice must not serve an avatar, got %', seen_avatar;
+  END IF;
+
+  SELECT public.practice_listener_comment_public_avatar(music_comment) INTO seen_avatar;
+  IF seen_avatar IS NOT NULL THEN
+    RAISE EXCEPTION 'music product must not serve an avatar, got %', seen_avatar;
+  END IF;
+
+  SELECT public.practice_listener_comment_public_avatar(deleted_comment) INTO seen_avatar;
+  IF seen_avatar IS NOT NULL THEN
+    RAISE EXCEPTION 'deleted impression must not serve an avatar, got %', seen_avatar;
   END IF;
 
   BEGIN
@@ -215,6 +252,20 @@ BEGIN
   WHERE id = hidden_id;
   IF seen_avatar IS DISTINCT FROM safe_avatar THEN
     RAISE EXCEPTION 'owner should see the safe avatar on a hidden impression, got %', seen_avatar;
+  END IF;
+  SELECT count(*) INTO cnt
+  FROM public.practice_listener_comment_feed
+  WHERE id = deleted_comment;
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'owner must not see a deleted impression';
+  END IF;
+  SELECT public.practice_listener_comment_public_avatar(deleted_comment) INTO seen_avatar;
+  IF seen_avatar IS NOT NULL THEN
+    RAISE EXCEPTION 'owner must not receive an avatar for a deleted impression, got %', seen_avatar;
+  END IF;
+  SELECT public.practice_listener_comment_public_avatar(draft_comment) INTO seen_avatar;
+  IF seen_avatar IS DISTINCT FROM safe_avatar THEN
+    RAISE EXCEPTION 'owner still sees their own impression on an unpublished practice, got %', seen_avatar;
   END IF;
   RESET ROLE;
 

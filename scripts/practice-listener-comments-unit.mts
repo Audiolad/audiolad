@@ -17,6 +17,8 @@ import {
   listenerAvatarPresentation,
   sanitizePublicAvatarUrl,
 } from "../src/lib/practice-comments/avatar";
+import { openListenerCommentAvatar } from "../src/lib/practice-comments/avatar-proxy";
+import { isListenerCommentFeedVisible } from "../src/lib/practice-comments/visibility";
 
 import {
   LISTENER_IMPRESSION_INVITE,
@@ -875,9 +877,110 @@ async function testAvatars() {
 
   const route = read("src/app/api/listener-comment-avatars/[commentId]/route.ts");
   assert.match(route, /isValidUserAvatarPath/);
-  assert.match(route, /new Response\(bytes/);
+  assert.match(route, /practice_listener_comment_feed/);
+  assert.match(route, /openListenerCommentAvatar/);
   assert.doesNotMatch(route, /Response\.json|NextResponse\.json/);
-  assert.match(route, /actor\.userId !== comment\.user_id/);
+  assert.doesNotMatch(route, /status !== "published"|comment\.status|actor\.userId/);
+  const feedAt = route.indexOf("practice_listener_comment_feed");
+  const downloadAt = route.indexOf(".download(");
+  assert.ok(feedAt >= 0 && downloadAt > feedAt);
+
+  const photo = new Uint8Array([1, 2, 3, 4]);
+  const feedCases = [
+    {
+      name: "visible",
+      visible: isListenerCommentFeedVisible({
+        row: { userId: listener, parentId: null, status: "published", deletedAt: null },
+        viewerUserId: null,
+        practiceAcceptsComments: true,
+        parentPublished: true,
+        viewerIsPracticeAuthor: false,
+      }),
+      status: 200,
+    },
+    {
+      name: "unpublished practice",
+      visible: isListenerCommentFeedVisible({
+        row: { userId: listener, parentId: null, status: "published", deletedAt: null },
+        viewerUserId: other,
+        practiceAcceptsComments: false,
+        parentPublished: true,
+        viewerIsPracticeAuthor: false,
+      }),
+      status: 404,
+    },
+    {
+      name: "music product",
+      visible: isListenerCommentFeedVisible({
+        row: { userId: listener, parentId: null, status: "published", deletedAt: null },
+        viewerUserId: null,
+        practiceAcceptsComments: false,
+        parentPublished: true,
+        viewerIsPracticeAuthor: false,
+      }),
+      status: 404,
+    },
+    {
+      name: "hidden",
+      visible: isListenerCommentFeedVisible({
+        row: { userId: listener, parentId: null, status: "hidden", deletedAt: null },
+        viewerUserId: other,
+        practiceAcceptsComments: true,
+        parentPublished: true,
+        viewerIsPracticeAuthor: false,
+      }),
+      status: 404,
+    },
+    {
+      name: "deleted",
+      visible: isListenerCommentFeedVisible({
+        row: {
+          userId: listener,
+          parentId: null,
+          status: "deleted",
+          deletedAt: "2026-10-26T00:00:00.000Z",
+        },
+        viewerUserId: listener,
+        practiceAcceptsComments: true,
+        parentPublished: true,
+        viewerIsPracticeAuthor: false,
+      }),
+      status: 404,
+    },
+  ];
+  for (const item of feedCases) {
+    const response = openListenerCommentAvatar({
+      feed: item.visible ? { kind: "impression" } : null,
+      image: { bytes: photo, contentType: "image/webp" },
+    });
+    assert.equal(response.status, item.status, item.name);
+    const body = new Uint8Array(await response.arrayBuffer());
+    if (item.status === 404) {
+      assert.equal(body.byteLength, 0, item.name);
+    } else {
+      assert.deepEqual(body, photo);
+    }
+    assert.equal(new TextDecoder().decode(body).includes(listener), false, item.name);
+  }
+  assert.equal(feedCases.find((item) => item.name === "visible")?.visible, true);
+  assert.equal(
+    feedCases.filter((item) => item.name !== "visible").every((item) => item.visible === false),
+    true,
+  );
+
+  const hiddenOwner = isListenerCommentFeedVisible({
+    row: { userId: listener, parentId: null, status: "hidden", deletedAt: null },
+    viewerUserId: listener,
+    practiceAcceptsComments: true,
+    parentPublished: true,
+    viewerIsPracticeAuthor: false,
+  });
+  assert.equal(hiddenOwner, true);
+  const ownerHidden = openListenerCommentAvatar({
+    feed: { kind: "impression" },
+    image: { bytes: photo, contentType: "image/webp" },
+  });
+  assert.equal(ownerHidden.status, 200);
   const migration = read("supabase/migrations/20270124120000_practice_listener_comments.sql");
   const viewStart = migration.indexOf("CREATE OR REPLACE VIEW public.practice_listener_comment_feed");
   const viewSelect = migration.slice(viewStart, migration.indexOf("FROM public.practice_listener_comments AS c", viewStart));
