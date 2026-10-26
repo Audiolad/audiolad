@@ -17,7 +17,9 @@ export const TIERED_COST_PROFILE = {
   cheapOutputTokens: 500,
   strongCalls: 0,
   strongPromptTokens: 1200,
-  strongOutputTokens: 700,
+  // Same ceiling as the default --tier-strong-max-tokens. The pre-call guard bills this many
+  // output tokens; 1200 of gpt-5.5 already exceeds the 6 ₽ strong budget before the prompt.
+  strongOutputTokens: 800,
 };
 
 export function loadModelPrices(file = MODEL_PRICES_PATH) {

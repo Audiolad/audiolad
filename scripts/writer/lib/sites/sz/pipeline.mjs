@@ -207,7 +207,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         slug: brief.slug, errorsBeforeRepair, errorsAfterRepair: errors, repairSkipped, errors, passed, costRub, finishedCostRub: passed ? costRub : null,
         warnings: result.problems.filter((problem) => problem.severity !== "error"),
       });
-      items.push({ brief, cfg, fields: result.fields, md: result.md, build });
+      items.push({ brief, cfg, fields: result.fields, md: result.md, build, attempts: repaired.attempts ?? [] });
     }
     let packProblems = checkSzPack(items);
     if (repair.mode === "tiered" && packProblems.length) {
@@ -324,7 +324,9 @@ export function szRepairOptions(args, { model, maxTokens }) {
     strongModel: args["tier-strong-model"] ?? SZ_DEFAULT_MODEL,
     cheapTries: parseTierTries(args["tier-cheap-tries"]),
     cheapMaxTokens: parseMaxTokens(args["tier-cheap-max-tokens"] ?? "800", "--tier-cheap-max-tokens"),
-    strongMaxTokens: parseMaxTokens(args["tier-strong-max-tokens"] ?? "1200", "--tier-strong-max-tokens"),
+    // 1200 output tokens of gpt-5.5 are already 6.15 ₽, so the strong fragment never started.
+    // 800 keeps one fragment's worst case inside the default 6 ₽ budget.
+    strongMaxTokens: parseMaxTokens(args["tier-strong-max-tokens"] ?? "800", "--tier-strong-max-tokens"),
     cheapBudget: parseMaxRub(args["tier-cheap-budget"] ?? "8", "--tier-cheap-budget"),
     strongBudget: parseMaxRub(args["tier-strong-budget"] ?? "6", "--tier-strong-budget"),
   };

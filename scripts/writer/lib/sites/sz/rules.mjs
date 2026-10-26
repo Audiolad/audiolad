@@ -60,6 +60,21 @@ export function proseDefect(text, spec = proseLimit("paragraph")) {
   return null;
 }
 
+// A cut such as «…чудес. Это не» is still inside the length window, so length alone
+// used to accept it. Descriptions and FAQ answers must end on a finished sentence.
+const DANGLING_CLAUSE = /(?:^|\s)(?:это\s+)?не$/iu;
+export function danglingFragment(text) {
+  const visible = visibleProse(text).replace(/\s+/g, " ").trim();
+  if (!visible) return "пустой текст";
+  const bare = visible.replace(/[»"”']+$/u, "");
+  if (!/[.!?…]$/u.test(bare)) return "нет конца предложения";
+  const last = bare.split(/(?<=[.!?…])\s+/u).at(-1) ?? bare;
+  const clause = last.replace(/[.!?…]+$/u, "").trim();
+  if (meaningfulWords(clause).length < 2) return "последнее предложение оборвано";
+  if (DANGLING_CLAUSE.test(clause)) return "обрывается на «не»";
+  return null;
+}
+
 // Drop one :::block through the line that closes it. A following :::name must stay,
 // including an empty block (`:::overview\n:::`).
 function stripDirectives(text) {
@@ -274,6 +289,8 @@ export function checkSzArticle(md, cfg, env) {
   const dl = [...description].length;
   if (dl < L.description[0] || dl > L.description[1]) add("description-length", "description", `description ${dl} символов, нужно ${L.description[0]}–${L.description[1]}`);
   if (!normalize(description).includes(nq)) add("description-query", "description", `в description нет запроса «${query}»`);
+  const descriptionFragment = danglingFragment(description);
+  if (descriptionFragment) add("description-fragment", "description", `description ${descriptionFragment}`);
   const faqHeading = get("faqHeading") ?? "";
   if (!/^Частые вопросы об? /.test(faqHeading)) add("faqHeading", "faqHeading", "faqHeading начинается с «Частые вопросы о/об …»");
   if (get("ogImage") !== `/media/og/${slug}.jpg`) add("ogImage", "*", "ogImage");
@@ -425,6 +442,8 @@ export function checkSzArticle(md, cfg, env) {
   for (const [q, a] of faq) {
     const aw = words(a);
     if (aw < L.faqAnswer[0] || aw > L.faqAnswer[1]) add("faq-length", "faq", `ответ на «${q}» ${aw} слов, нужно ${L.faqAnswer[0]}–${L.faqAnswer[1]}`);
+    const answerFragment = danglingFragment(a);
+    if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
   }
   const faqText = faq.flat().join("\n");
 

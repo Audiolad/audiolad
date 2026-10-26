@@ -21,9 +21,9 @@ import { collectResult, runDetached } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
-import { TIERED_COST_PROFILE, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
+import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
 import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
-import { repairSzArticleTiered } from "./lib/sites/sz/tiered.mjs";
+import { applyDeterministicSzFixes, buildSzFragment, repairSzArticleTiered, repairSzPackDuplicates } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -32,7 +32,7 @@ import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack, normalize, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -983,8 +983,178 @@ test("offline price harness compares cheap models and does not call the network"
   assert.ok(Math.abs(full.total - 62.342) < 0.001, full.total);
   const [oss, qwen, mini] = ["openai/gpt-oss-120b", "Qwen/Qwen3.6-35B-A3B", "openai/gpt-5.4-mini"].map((model) => estimateTieredArticle(prices, { draftModel: model, cheapModel: model, strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE }));
   assert.ok(oss.total < 2 && qwen.total < mini.total && mini.total < 15);
-  const withStrong = estimateTieredArticle(prices, { draftModel: "openai/gpt-oss-120b", cheapModel: "openai/gpt-oss-120b", strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE, strongCalls: 1 });
-  assert.ok(withStrong.total > oss.total && withStrong.total < 8);
+  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  assert.equal(TIERED_COST_PROFILE.strongOutputTokens, repair.strongMaxTokens);
+  const strongCall = estimateCallRub(prices, "openai/gpt-5.5", TIERED_COST_PROFILE.strongPromptTokens, TIERED_COST_PROFILE.strongOutputTokens);
+  assert.ok(strongCall <= repair.strongBudget, `${strongCall} > ${repair.strongBudget}`);
+  const withStrong = [oss, qwen, mini].map((row) => estimateTieredArticle(prices, { draftModel: row.draftModel, cheapModel: row.cheapModel, strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE, strongCalls: 1 }));
+  assert.ok(withStrong[0].total > oss.total && withStrong[0].total < 12);
+  assert.ok(withStrong[1].total < 18 && withStrong[2].total < 18);
+  assert.ok(Math.abs(withStrong[0].total - 6.035) < 0.02, withStrong[0].total);
+  assert.ok(Math.abs(withStrong[1].total - 13.875) < 0.02, withStrong[1].total);
+  assert.ok(Math.abs(withStrong[2].total - 15.966) < 0.02, withStrong[2].total);
+});
+
+test("trim: a 172-character description is cut only at a sentence, and a dangling ending fails the gate", () => {
+  const long = `${fields.description} Это не обещание исцеления.`;
+  assert.equal([...long].length, 172);
+  const legacy = (() => {
+    const chars = [...long];
+    let cut = chars.slice(0, 160).join("");
+    const space = cut.lastIndexOf(" ");
+    if (space >= 40) cut = cut.slice(0, space);
+    return cut.replace(/[\s,.;:–\-]+$/u, "").trim();
+  })();
+  assert.equal([...legacy].length, 152);
+  assert.ok(legacy.endsWith("Это не"), legacy.slice(-20));
+  const fixed = applyDeterministicSzFixes({ ...structuredClone(fields), description: long }, { query: brief.query });
+  assert.equal(fixed.fields.description, fields.description);
+  assert.ok(fixed.fields.description.endsWith("чудес."));
+  assert.equal(errorsOf(hybridBuild(fixed.fields).problems).length, 0);
+  const dangling = hybridBuild({ ...structuredClone(fields), description: legacy });
+  const fragment = errorsOf(dangling.problems).filter((problem) => problem.code === "description-fragment");
+  assert.equal(fragment.length, 1);
+  assert.equal(fragment[0].field, "description");
+  assert.ok(!errorsOf(dangling.problems).some((problem) => problem.code === "description-length"));
+  assert.ok(normalize(legacy).includes(normalize(brief.query)));
+  const unanswered = structuredClone(fields);
+  unanswered.faq = unanswered.faq.map((item, index) => (index ? item : { ...item, answer: `${item.answer} Это не` }));
+  const faqFragment = errorsOf(hybridBuild(unanswered).problems).find((problem) => problem.code === "faq-fragment");
+  assert.ok(faqFragment, errorsOf(hybridBuild(unanswered).problems).map((problem) => problem.message).join("; "));
+  const tooLongSentence = `Ангел-хранитель ${"бережно ".repeat(30)}остаётся образом без точки`;
+  assert.ok([...tooLongSentence].length > 160);
+  const kept = applyDeterministicSzFixes({ ...structuredClone(fields), description: tooLongSentence }, { query: brief.query });
+  assert.equal(kept.fields.description, tooLongSentence);
+  const seo = `Ангел-хранитель: ${"длинное ".repeat(8)}название без точки`;
+  assert.ok([...seo].length > 60);
+  const seoKept = applyDeterministicSzFixes({ ...structuredClone(fields), seoTitle: seo }, { query: brief.query });
+  assert.equal([...seoKept.fields.seoTitle].length > 60, true);
+  assert.equal(seoKept.fields.seoTitle, seo);
+  const seoCut = "Ангел-хранитель: короткая мысль. И ещё много лишних слов, которые не входят в лимит символов заголовка.";
+  assert.ok([...seoCut].length > 60);
+  const seoFixed = applyDeterministicSzFixes({ ...structuredClone(fields), seoTitle: seoCut }, { query: brief.query });
+  assert.equal(seoFixed.fields.seoTitle, "Ангел-хранитель: короткая мысль.");
+  const faqOver = `${fields.faq[0].answer} ${"Дополнительное предложение остаётся законченным. ".repeat(8)}`;
+  assert.ok(words(faqOver) > 80);
+  const faqFixed = applyDeterministicSzFixes({
+    ...structuredClone(fields),
+    faq: fields.faq.map((item, index) => (index ? item : { ...item, answer: faqOver })),
+  }, { query: brief.query });
+  assert.ok(words(faqFixed.fields.faq[0].answer) >= 40 && words(faqFixed.fields.faq[0].answer) <= 80);
+  assert.ok(faqFixed.fields.faq[0].answer.endsWith("."));
+  assert.ok(faqOver.startsWith(faqFixed.fields.faq[0].answer));
+  const faqBlob = `Ангел-хранитель ${"бережно ".repeat(90)}остаётся образом`;
+  assert.ok(words(faqBlob) > 80);
+  const faqKept = applyDeterministicSzFixes({
+    ...structuredClone(fields),
+    faq: fields.faq.map((item, index) => (index ? item : { ...item, answer: faqBlob })),
+  }, { query: brief.query });
+  assert.equal(faqKept.fields.faq[0].answer, faqBlob);
+  let handed = 0;
+  const handedOff = repairSzArticleTiered({
+    brief, raw: faqKept.fields, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name) => {
+      handed += 1;
+      assert.equal(tier, "cheap");
+      assert.match(name, /faq/);
+      return { answer: fields.faq[0].answer };
+    },
+  });
+  assert.equal(handed, 1);
+  assert.equal(handedOff.passed, true, handedOff.repairSkipped);
+});
+
+test("tiered: default strong budget covers one fragment, and a skipped strong try does not drop later cheap fragments", () => {
+  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  assert.equal(repair.strongMaxTokens, 800);
+  assert.equal(repair.strongBudget, 6);
+  const short = structuredClone(fields);
+  short.faq = short.faq.map((item, index) => (index ? item : { ...item, answer: "Короткий ответ про Ангела-хранителя и молитву без подробностей." }));
+  const failure = szQuantityReport(short, errorsOf(hybridBuild(short).problems)).failures.find((row) => row.code === "faq-length");
+  const job = buildSzFragment(brief, short, failure);
+  const worst = worstCaseRub(repair.strongModel, estimatePromptTokens(job.messages, repair.strongModel), repair.strongMaxTokens);
+  assert.ok(worst <= repair.strongBudget, `${worst} > ${repair.strongBudget}`);
+  const blockedAt1200 = worstCaseRub(repair.strongModel, estimatePromptTokens(job.messages, repair.strongModel), 1200);
+  assert.ok(blockedAt1200 > 6, blockedAt1200);
+  const raw = structuredClone(fields);
+  raw.description = "Ангел-хранитель слишком коротко.";
+  raw.faq = short.faq;
+  const seen = [];
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, state,
+    repair: tierRepair({
+      cheapModel: "openai/gpt-5.4-mini", strongModel: SZ_DEFAULT_MODEL, cheapTries: 2,
+      cheapMaxTokens: 800, strongMaxTokens: 1200, cheapBudget: 8, strongBudget: 6,
+    }),
+    callTier: (tier, name) => {
+      seen.push({ tier, name });
+      const cost = tier === "strong" ? 6 : 0.2;
+      state.spentRub += cost;
+      state.calls.push({ name, model: tier === "strong" ? SZ_DEFAULT_MODEL : "openai/gpt-5.4-mini", costRub: cost });
+      if (String(name).includes("description")) return { description: "ещё короче" };
+      return { answer: fields.faq[0].answer };
+    },
+  });
+  assert.ok(state.warnings.some((warning) => warning.includes("ярус strong остановлен бюджетом 6")));
+  assert.equal(seen.filter((call) => call.tier === "strong").length, 0);
+  assert.ok(seen.some((call) => call.tier === "cheap" && String(call.name).includes("faq")), seen.map((call) => call.name).join(", "));
+  assert.equal(repaired.result.fields.faq[0].answer, fields.faq[0].answer);
+  assert.equal(repaired.passed, false);
+});
+
+test("pack FAQ repair counts cheap spend already charged for the article and the pack", () => {
+  const question = fields.faq[0].question;
+  const problem = { code: "unique-pack", field: "faq", slug: brief.slug, message: `«${question}» повторяет статью пакета other`, severity: "error" };
+  const repair = tierRepair({ cheapModel: "openai/gpt-5.4-mini", cheapMaxTokens: 800, cheapBudget: 8 });
+  const item = () => ({
+    brief,
+    fields: structuredClone(fields),
+    build: hybridBuild,
+    packProblems: [problem],
+    attempts: [],
+  });
+  const spent = item();
+  const blocked = { spentRub: 8, calls: [{ name: `${brief.slug}-repair-cheap-description`, model: repair.cheapModel, costRub: 8 }], warnings: [] };
+  let calls = 0;
+  repairSzPackDuplicates({
+    items: [spent], repair, state: blocked,
+    callTier: () => { calls += 1; return { question: "Чем молитва отличается от медитации на практике?" }; },
+  });
+  assert.equal(calls, 0);
+  assert.ok(blocked.warnings.some((warning) => warning.includes("ярус cheap")));
+  assert.equal(spent.fields.faq[0].question, question);
+  const open = item();
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  repairSzPackDuplicates({
+    items: [open], repair, state,
+    callTier: (tier, name) => {
+      calls += 1;
+      state.spentRub += 0.2;
+      state.calls.push({ name, model: repair.cheapModel, costRub: 0.2 });
+      return { question: "Чем молитва отличается от медитации на практике?" };
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(open.fields.faq[0].question, "Чем молитва отличается от медитации на практике?");
+  const otherBrief = { ...brief, slug: "drugaya-statya" };
+  const otherProblem = { ...problem, slug: otherBrief.slug };
+  const otherFields = structuredClone(fields);
+  const otherJob = buildSzFragment(otherBrief, otherFields, { code: "unique-pack", field: "faq", path: "faq[0].question", message: otherProblem.message });
+  const otherWorst = worstCaseRub(repair.cheapModel, estimatePromptTokens(otherJob.messages, repair.cheapModel), repair.cheapMaxTokens);
+  assert.ok(otherWorst < repair.cheapBudget);
+  const packCap = repair.cheapBudget * 2;
+  const first = { brief, fields: structuredClone(fields), build: hybridBuild, packProblems: [], attempts: [{ tier: "cheap", key: "description", costRub: packCap - otherWorst / 2 }] };
+  const second = { brief: otherBrief, fields: otherFields, build: hybridBuild, packProblems: [otherProblem], attempts: [] };
+  const packState = { spentRub: first.attempts[0].costRub, calls: [], warnings: [] };
+  let packCalls = 0;
+  repairSzPackDuplicates({
+    items: [first, second], repair, state: packState,
+    callTier: () => { packCalls += 1; return { question: "Новый вопрос пакета?" }; },
+  });
+  assert.equal(packCalls, 0);
+  assert.ok(packState.warnings.some((warning) => warning.includes(otherBrief.slug)));
+  assert.equal(second.fields.faq[0].question, question);
 });
 
 rmSync(site, { recursive: true, force: true });

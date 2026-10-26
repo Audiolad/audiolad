@@ -6,7 +6,7 @@ import { estimatePromptTokens, worstCaseRub } from "../../cost.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { SUMMONING, fieldProseDefect, normalize, words } from "./rules.mjs";
+import { SUMMONING, danglingFragment, fieldProseDefect, normalize, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -40,23 +40,22 @@ function fixAsciiDash(text) {
   return text.replace(/([а-яё])\s+-\s+([а-яё])/giu, "$1 – $2");
 }
 
-function trimChars(text, max) {
-  const chars = [...text];
-  if (chars.length <= max) return text;
-  let cut = chars.slice(0, max).join("");
-  const space = cut.lastIndexOf(" ");
-  if (space >= Math.min(max - 1, 40)) cut = cut.slice(0, space);
-  return cut.replace(/[\s,.;:–\-]+$/u, "").trim();
-}
-
-function trimSentences(text, maxWords, minWords) {
-  const parts = text.split(/(?<=[.!?…])\s+/u);
-  while (parts.length > 1 && words(parts.join(" ")) > maxWords) {
-    const next = parts.slice(0, -1).join(" ");
-    if (words(next) < minWords) break;
-    parts.pop();
+/** Longest prefix of complete sentences inside the range. Null when no boundary fits. */
+function trimAtSentences(text, { maxChars = null, minChars = 0, maxWords = null, minWords = 0 } = {}) {
+  const sentences = [];
+  for (const part of String(text).split(/(?<=[.!?…])\s+/u)) {
+    const bare = part.trim().replace(/[»"”']+$/u, "");
+    if (!/[.!?…]$/u.test(bare)) break;
+    sentences.push(part.trim());
   }
-  return parts.join(" ");
+  let chosen = null;
+  for (let i = 1; i <= sentences.length; i += 1) {
+    const candidate = sentences.slice(0, i).join(" ");
+    if (maxChars != null && [...candidate].length > maxChars) break;
+    if (maxWords != null && words(candidate) > maxWords) break;
+    if ([...candidate].length >= minChars && words(candidate) >= minWords) chosen = candidate;
+  }
+  return chosen;
 }
 
 function paragraphHollow(text) {
@@ -102,23 +101,23 @@ export function applyDeterministicSzFixes(fields, { query = "" } = {}) {
   if (beforeNorm.includes("\u2014") && !JSON.stringify(next).includes("\u2014")) fixes.push("длинное тире заменено на «–»");
   const limits = SZ.limits;
   if (typeof next.description === "string" && [...next.description].length > limits.description[1]) {
-    const trimmed = trimChars(next.description, limits.description[1]);
-    if ([...trimmed].length >= limits.description[0] && normalize(trimmed).includes(normalize(query))) {
+    const trimmed = trimAtSentences(next.description, { maxChars: limits.description[1], minChars: limits.description[0] });
+    if (trimmed && trimmed !== next.description && normalize(trimmed).includes(normalize(query)) && !danglingFragment(trimmed)) {
       next.description = trimmed;
-      fixes.push("description обрезан до 160 символов");
+      fixes.push("description обрезан по границе предложения");
     }
   }
   if (typeof next.seoTitle === "string" && [...next.seoTitle].length > limits.seoTitleMax) {
-    const trimmed = trimChars(next.seoTitle, limits.seoTitleMax);
-    if (normalize(trimmed).startsWith(normalize(query))) {
+    const trimmed = trimAtSentences(next.seoTitle, { maxChars: limits.seoTitleMax });
+    if (trimmed && trimmed !== next.seoTitle && normalize(trimmed).startsWith(normalize(query))) {
       next.seoTitle = trimmed;
-      fixes.push("seoTitle обрезан до лимита");
+      fixes.push("seoTitle обрезан по границе предложения");
     }
   }
   for (const item of next.faq ?? []) {
     if (words(item.answer) > limits.faqAnswer[1]) {
-      const trimmed = trimSentences(item.answer, limits.faqAnswer[1], limits.faqAnswer[0]);
-      if (trimmed !== item.answer && words(trimmed) >= limits.faqAnswer[0]) {
+      const trimmed = trimAtSentences(item.answer, { maxWords: limits.faqAnswer[1], minWords: limits.faqAnswer[0] });
+      if (trimmed && trimmed !== item.answer && !danglingFragment(trimmed)) {
         item.answer = trimmed;
         fixes.push("длинный ответ FAQ укорочен по предложениям");
       }
@@ -192,16 +191,16 @@ function shortestExpandable(fields) {
 /** One failing fragment. Null when the only safe fix would be the whole article. */
 export function buildSzFragment(brief, fields, failure) {
   const limits = SZ.limits;
-  if (failure.code === "description-length") {
+  if (failure.code === "description-length" || failure.code === "description-fragment") {
     const description = fields.description ?? "";
-    return fragment("description-length:description", [
-      `description сейчас ${[...description].length} символов. Нужно ровно ${limits.description[0]}–${limits.description[1]}.`,
-      `Запрос «${brief.query}» должен входить в текст. Не присылай статью целиком.`,
+    return fragment(`${failure.code}:description`, [
+      `description сейчас ${[...description].length} символов. Нужно ровно ${limits.description[0]}–${limits.description[1]}, одно или несколько целых предложений с точкой в конце.`,
+      `Запрос «${brief.query}» должен входить в текст. Не обрывай фразу и не присылай статью целиком.`,
       "",
       description,
     ].join("\n"), objectSchema({ description: stringSchema }), (current, answer) => {
       const text = answer?.description;
-      if (typeof text !== "string" || fieldProseDefect(text, "description")) return null;
+      if (typeof text !== "string" || fieldProseDefect(text, "description") || danglingFragment(text)) return null;
       const length = [...text].length;
       if (length < limits.description[0] || length > limits.description[1]) return null;
       if (!normalize(text).includes(normalize(brief.query))) return null;
@@ -222,19 +221,19 @@ export function buildSzFragment(brief, fields, failure) {
       return { ...current, seoTitle: text };
     });
   }
-  if (failure.code === "faq-length") {
+  if (failure.code === "faq-length" || failure.code === "faq-fragment") {
     const index = Number(failure.path?.match(/faq\[(\d+)\]/)?.[1]);
     const item = fields.faq?.[index];
     if (!item) return null;
-    return fragment(`faq-length:faq[${index}].answer`, [
-      `Ответ FAQ сейчас ${words(item.answer)} слов. Нужно ${limits.faqAnswer[0]}–${limits.faqAnswer[1]} (ориентир 45–70).`,
+    return fragment(`${failure.code}:faq[${index}].answer`, [
+      `Ответ FAQ сейчас ${words(item.answer)} слов. Нужно ${limits.faqAnswer[0]}–${limits.faqAnswer[1]} (ориентир 45–70), целыми предложениями.`,
       `Вопрос не меняй: «${item.question}».`,
-      "Верни JSON { answer } – только этот ответ.",
+      "Верни JSON { answer } – только этот ответ, без оборванной фразы.",
       "",
       item.answer,
     ].join("\n"), objectSchema({ answer: stringSchema }), (current, answer) => {
       const text = answer?.answer;
-      if (typeof text !== "string" || fieldProseDefect(text, "faq.answer")) return null;
+      if (typeof text !== "string" || fieldProseDefect(text, "faq.answer") || danglingFragment(text)) return null;
       const count = words(text);
       if (count < limits.faqAnswer[0] || count > limits.faqAnswer[1]) return null;
       const faq = current.faq.map((entry, entryIndex) => (entryIndex === index ? { ...entry, answer: text } : entry));
@@ -314,7 +313,7 @@ export function buildSzFragment(brief, fields, failure) {
   return null;
 }
 
-const PRIORITY = ["mixed-script", "em-dash", "description-length", "seoTitle-length", "seoTitle-query", "faq-length", "body-length", "body-sections", "summoning", "forbidden", "unique-pack"];
+const PRIORITY = ["mixed-script", "em-dash", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "faq-length", "faq-fragment", "body-length", "body-sections", "summoning", "forbidden", "unique-pack"];
 
 function failureKey(failure) {
   return `${failure.code}:${failure.path ?? failure.field}`;
@@ -372,11 +371,10 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     const worst = worstCaseRub(model, estimatePromptTokens(fragmentJob.messages, model), maxTokens);
     if (tierSpent(attempts, tier) + worst > budget) {
       state.warnings.push(`${brief.slug}: ярус ${tier} остановлен бюджетом ${budget} ₽`);
-      if (tier === "cheap") {
-        cheapTries.set(key, repair.cheapTries);
-        continue;
-      }
-      break;
+      // A blocked strong try is used up. Later fragments can still take their cheap tries.
+      if (tier === "cheap") cheapTries.set(key, repair.cheapTries);
+      else strongTries.set(key, 1);
+      continue;
     }
     const before = state.spentRub ?? 0;
     let answer = null;
@@ -385,11 +383,9 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     } catch (error) {
       if (!(error instanceof BudgetError) && error?.code !== 5) throw error;
       state.warnings.push(`${brief.slug}: ярус ${tier} остановлен общим бюджетом`);
-      if (tier === "cheap") {
-        cheapTries.set(key, repair.cheapTries);
-        continue;
-      }
-      break;
+      if (tier === "cheap") cheapTries.set(key, repair.cheapTries);
+      else strongTries.set(key, 1);
+      continue;
     }
     const costRub = (state.spentRub ?? 0) - before;
     const merged = fragmentJob.apply(fields, answer);
@@ -413,9 +409,31 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   };
 }
 
+function chargedCheap(calls, slug) {
+  return (calls ?? []).reduce((sum, call) => {
+    const name = String(call.name ?? "");
+    if (!name.includes("-repair-cheap-")) return sum;
+    if (slug && !name.startsWith(`${slug}-`)) return sum;
+    return sum + (Number(call.costRub) || 0);
+  }, 0);
+}
+
+function recordedCheap(items, slug) {
+  return items.reduce((sum, item) => {
+    if (slug && item.brief.slug !== slug) return sum;
+    return sum + (item.attempts ?? []).filter((attempt) => attempt.tier === "cheap").reduce((inner, attempt) => inner + (Number(attempt.costRub) || 0), 0);
+  }, 0);
+}
+
+/** Cheap-tier rubles already charged. Calls and attempts can describe the same spend; take the larger. */
+function cheapSpent(items, state, slug = null) {
+  return Math.max(chargedCheap(state?.calls, slug), recordedCheap(items, slug));
+}
+
 export function repairSzPackDuplicates({ items, repair, callTier, state, args = {} }) {
   if (args.offline || args["no-repair"]) return;
   const seen = new Set();
+  const packCap = repair.cheapBudget * Math.max(items.length, 1);
   for (const item of items) {
     const problems = item.packProblems ?? [];
     for (const problem of problems) {
@@ -430,7 +448,12 @@ export function repairSzPackDuplicates({ items, repair, callTier, state, args = 
       const job = buildSzFragment(item.brief, item.fields, failure);
       if (!job) continue;
       const worst = worstCaseRub(repair.cheapModel, estimatePromptTokens(job.messages, repair.cheapModel), repair.cheapMaxTokens);
-      if (worst > repair.cheapBudget) continue;
+      const articleSpent = cheapSpent(items, state, item.brief.slug);
+      const packSpent = cheapSpent(items, state);
+      if (articleSpent + worst > repair.cheapBudget || packSpent + worst > packCap) {
+        state.warnings.push(`${item.brief.slug}: ярус cheap остановлен бюджетом ${repair.cheapBudget} ₽`);
+        continue;
+      }
       const before = state.spentRub ?? 0;
       let answer = null;
       try {
