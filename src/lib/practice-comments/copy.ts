@@ -23,7 +23,7 @@ export const LISTENER_IMPRESSION_SUBMIT = "Опубликовать отзыв";
 export const LISTENER_IMPRESSION_SAVING = "Публикуем…";
 
 export const LISTENER_IMPRESSION_PLACEHOLDER =
-  "Что вы заметили, пока слушали";
+  "Что вы почувствовали, заметили, ощутили, когда слушали";
 
 export const LISTENER_IMPRESSION_NAME_LABEL = "Имя в отзыве";
 

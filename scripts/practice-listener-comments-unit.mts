@@ -27,6 +27,7 @@ import { resolveListenerCommentComposer } from "../src/lib/practice-comments/com
 import {
   LISTENER_IMPRESSION_INVITE,
   LISTENER_IMPRESSION_LOAD_MORE,
+  LISTENER_IMPRESSION_PLACEHOLDER,
   LISTENER_IMPRESSION_PRIVACY,
   LISTENER_IMPRESSION_SIGN_IN,
   LISTENER_IMPRESSION_SUBMIT,
@@ -778,6 +779,13 @@ async function testSignedInListenerSeesComposer() {
   assert.match(formMarkup, new RegExp(`src="${LISTENER_VIEWER_AVATAR_PATH}"`));
   assert.match(formMarkup, new RegExp(LISTENER_IMPRESSION_SUBMIT));
   assert.match(formMarkup, /id="listener-impression-body"/);
+  assert.equal(
+    LISTENER_IMPRESSION_PLACEHOLDER,
+    "Что вы почувствовали, заметили, ощутили, когда слушали",
+  );
+  assert.match(formMarkup, /placeholder="Что вы почувствовали, заметили, ощутили, когда слушали"/);
+  assert.doesNotMatch(formMarkup, /Что вы заметили, пока слушали/);
+  assert.doesNotMatch(read("src/lib/practice-comments/copy.ts"), /Что вы заметили, пока слушали/);
   assert.doesNotMatch(formMarkup, /Оценки гостей/);
   assert.doesNotMatch(formMarkup, /—/);
 
