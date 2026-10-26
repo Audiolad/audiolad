@@ -1,4 +1,6 @@
 # Локальные веса, выгрузки и аудио не коммитить.
+__pycache__/
+*.pyc
 weights/
 offload/
 *.safetensors
