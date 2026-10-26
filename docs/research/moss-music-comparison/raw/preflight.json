@@ -1,0 +1,33 @@
+{
+  "python": "3.12.3",
+  "machine": "x86_64",
+  "processor": "x86_64",
+  "cpu_count": 4,
+  "nvidia_smi": null,
+  "nvidia_rc": null,
+  "nvidia_output": null,
+  "torch_importable": false,
+  "meminfo_bytes": {
+    "MemTotal": 16780574720,
+    "MemFree": 10035052544,
+    "MemAvailable": 15891107840,
+    "SwapTotal": 0,
+    "CommitLimit": 8390287360,
+    "Committed_AS": 1678262272
+  },
+  "balloon_pages": {
+    "balloon_inflate": 2621440,
+    "balloon_deflate": 2621440,
+    "balloon_migrate": 0
+  },
+  "cgroup_memory_max": {
+    "path": "cgroup:workload/memory.max",
+    "bytes": 15706832896,
+    "raw": "15706832896"
+  },
+  "moss_weight_files_bytes": 18105036640,
+  "moss_tensor_bytes_bf16": 18104928256,
+  "in_ram_bf16_fits_cgroup": false,
+  "cgroup_shortfall_bytes": 2398095360,
+  "torch_error": "ModuleNotFoundError: No module named 'torch'"
+}

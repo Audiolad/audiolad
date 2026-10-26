@@ -1,0 +1,36 @@
+{
+  "tracks": 5,
+  "failed": 5,
+  "rows": [
+    {
+      "id": "aurafon-quiet-harmony",
+      "status": "missing",
+      "expected_sha256": "adda7e8735f90686ed52516cd979b875ba7f955d15aee8faf412d018e20c291c",
+      "actual_sha256": null
+    },
+    {
+      "id": "last-plastinka",
+      "status": "missing",
+      "expected_sha256": "793773feae95b724bce3c38d8f2c49a580c7e879a684d2349a6316acdb7759fa",
+      "actual_sha256": null
+    },
+    {
+      "id": "jazz-san-marco",
+      "status": "missing",
+      "expected_sha256": "d7dcece23bcbd07d2c845e8eaca1b0082b802d3352e7a7b44ecdcf502511f533",
+      "actual_sha256": null
+    },
+    {
+      "id": "silent-resonance",
+      "status": "missing",
+      "expected_sha256": "7b546f258d468660fc89b0085d0b5ff3bdf465438d7d496c4ae8a5df04c353fb",
+      "actual_sha256": null
+    },
+    {
+      "id": "bachata-dancefloor",
+      "status": "missing",
+      "expected_sha256": "df3e65c642b67d3c97b79b482d863c21a66ea0f24f7267fbfba14fcef749ca3c",
+      "actual_sha256": null
+    }
+  ]
+}

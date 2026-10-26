@@ -1,0 +1,14 @@
+# Локальные веса, выгрузки и аудио не коммитить.
+__pycache__/
+*.pyc
+weights/
+offload/
+*.safetensors
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.m4a
+*.pt
+*.bin
+*.gguf
