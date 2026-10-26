@@ -29,6 +29,8 @@ import {
 } from "@/lib/seo/indexnow/hooks";
 import { resolvePlaylistIndexNowEvent } from "@/lib/seo/indexnow/public-fields";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
+import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -373,6 +375,26 @@ export async function PATCH(request: Request, context: RouteContext) {
         absoluteUrls,
         INDEXNOW_REASONS[event.reason],
       );
+
+      if (event.reason !== "playlist_unpublished") {
+        const yandexReason =
+          event.reason === "playlist_slug_changed"
+            ? YANDEX_RECRAWL_REASONS.playlist_slug_changed
+            : event.reason === "playlist_updated"
+              ? YANDEX_RECRAWL_REASONS.playlist_updated
+              : YANDEX_RECRAWL_REASONS.playlist_published;
+        const yandexUrls =
+          event.reason === "playlist_slug_changed"
+            ? absoluteUrls.slice(-1)
+            : absoluteUrls;
+
+        for (const url of yandexUrls) {
+          scheduleYandexRecrawlNotification(url, yandexReason, {
+            entityType: "playlist",
+            entityId: id,
+          });
+        }
+      }
     }
   }
 

@@ -1,5 +1,7 @@
+import { isAudioladRecrawlUrl } from "@/lib/seo/search-recrawl/origin";
 import {
   YANDEX_RECRAWL_OFFICIAL_SUCCESS_STATUS,
+  YANDEX_WEBMASTER_API_ORIGIN,
   YANDEX_WEBMASTER_TIMEOUT_MS,
   buildYandexRecrawlQueueUrl,
   buildYandexRecrawlQuotaUrl,
@@ -8,6 +10,11 @@ import {
   readYandexWebmasterOAuthToken,
   type YandexWebmasterConfig,
 } from "@/lib/seo/yandex-webmaster/config";
+import {
+  parseYandexWebmasterHosts,
+  resolveAudioladHostId,
+  type YandexWebmasterHostRecord,
+} from "@/lib/seo/yandex-webmaster/host";
 
 export type YandexRecrawlErrorCode =
   | "auth_failed"
@@ -21,6 +28,9 @@ export type YandexRecrawlErrorCode =
   | "quota_exhausted"
   | "disabled"
   | "invalid_url"
+  | "foreign_origin"
+  | "host_mismatch"
+  | "host_unresolved"
   | "aborted";
 
 export type YandexRecrawlQuota = {
@@ -46,7 +56,30 @@ export type YandexWebmasterClientOptions = {
   sleepImpl?: (ms: number) => Promise<void>;
   env?: NodeJS.ProcessEnv;
   config?: YandexWebmasterConfig;
+  /** Override used after audiolad.ru host resolution. */
+  hostId?: string;
+  /**
+   * Test seam. Production send omits this so host_id comes from the
+   * hosts list, matched to exactly https://audiolad.ru.
+   */
+  verifiedHostId?: string;
+  now?: () => number;
 };
+
+const AUDIOLAD_HOST_CACHE_MS = 60 * 60 * 1000;
+
+type AudioladHostCache = {
+  hostId: string;
+  configuredHostId: string;
+  userId: string;
+  expiresAt: number;
+};
+
+let audioladHostCache: AudioladHostCache | null = null;
+
+export function clearAudioladWebmasterHostCache(): void {
+  audioladHostCache = null;
+}
 
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -306,12 +339,30 @@ export async function checkYandexRecrawlQuota(
     };
   }
 
+  let hostId = options.hostId?.trim() ?? "";
+
+  if (!hostId) {
+    const resolved = await resolveSubmitHostId(options, config);
+
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        status: resolved.status,
+        accepted: false,
+        retried: false,
+        errorCode: resolved.errorCode,
+      };
+    }
+
+    hostId = resolved.hostId;
+  }
+
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? YANDEX_WEBMASTER_TIMEOUT_MS;
   const sleepImpl = options.sleepImpl ?? defaultSleep;
   const url = buildYandexRecrawlQuotaUrl({
     userId: config.userId,
-    hostId: config.hostId,
+    hostId,
   });
 
   const first = await requestOnce(url, {
@@ -354,8 +405,149 @@ export async function checkYandexRecrawlQuota(
   };
 }
 
+function buildYandexHostsUrl(userId: string): string {
+  return `${YANDEX_WEBMASTER_API_ORIGIN}/v4/user/${encodeURIComponent(userId)}/hosts`;
+}
+
+async function listYandexWebmasterHosts(
+  options: YandexWebmasterClientOptions,
+  token: string,
+  userId: string,
+): Promise<
+  | { ok: true; hosts: YandexWebmasterHostRecord[] }
+  | { ok: false; errorCode: YandexRecrawlErrorCode; status: number | null }
+> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const timeoutMs = options.timeoutMs ?? YANDEX_WEBMASTER_TIMEOUT_MS;
+  const sleepImpl = options.sleepImpl ?? defaultSleep;
+  const url = buildYandexHostsUrl(userId);
+
+  const first = await requestOnce(url, {
+    method: "GET",
+    token,
+    fetchImpl,
+    timeoutMs,
+  });
+
+  if (first.status === 200) {
+    return { ok: true, hosts: parseYandexWebmasterHosts(first.body) };
+  }
+
+  const firstCode = classifyYandexWebmasterError(
+    first.status,
+    first.body,
+    first.errorCode,
+  );
+
+  if (
+    firstCode === "auth_failed" ||
+    firstCode === "invalid_user_id" ||
+    !isTransientWebmasterFailure(firstCode, first.status)
+  ) {
+    return { ok: false, errorCode: firstCode, status: first.status };
+  }
+
+  await sleepImpl(400);
+
+  const second = await requestOnce(url, {
+    method: "GET",
+    token,
+    fetchImpl,
+    timeoutMs,
+  });
+
+  if (second.status === 200) {
+    return { ok: true, hosts: parseYandexWebmasterHosts(second.body) };
+  }
+
+  const secondCode = classifyYandexWebmasterError(
+    second.status,
+    second.body,
+    second.errorCode,
+  );
+
+  if (secondCode === "auth_failed" || secondCode === "invalid_user_id") {
+    return { ok: false, errorCode: secondCode, status: second.status };
+  }
+
+  return { ok: false, errorCode: "host_unresolved", status: second.status };
+}
+
 /**
- * POST /recrawl/queue after a successful quota check.
+ * Resolve the audiolad.ru Webmaster host_id from GET /hosts.
+ * A configured id that belongs to any other host is not used.
+ */
+export async function resolveAudioladWebmasterHost(
+  options: YandexWebmasterClientOptions = {},
+): Promise<
+  | { ok: true; hostId: string }
+  | { ok: false; errorCode: YandexRecrawlErrorCode; status: number | null }
+> {
+  const config = options.config ?? getYandexWebmasterConfig(options.env);
+  const token = readYandexWebmasterOAuthToken(options.env);
+
+  if (!config.canSubmit || !token || !config.userId || !config.hostId) {
+    return { ok: false, errorCode: "disabled", status: null };
+  }
+
+  const now = options.now?.() ?? Date.now();
+
+  if (
+    audioladHostCache &&
+    audioladHostCache.expiresAt > now &&
+    audioladHostCache.configuredHostId === config.hostId &&
+    audioladHostCache.userId === config.userId
+  ) {
+    return { ok: true, hostId: audioladHostCache.hostId };
+  }
+
+  const listed = await listYandexWebmasterHosts(options, token, config.userId);
+
+  if (!listed.ok) {
+    audioladHostCache = null;
+    return listed;
+  }
+
+  const resolved = resolveAudioladHostId(listed.hosts, config.hostId);
+
+  if (!resolved.ok) {
+    audioladHostCache = null;
+    return { ok: false, errorCode: "host_mismatch", status: null };
+  }
+
+  audioladHostCache = {
+    hostId: resolved.hostId,
+    configuredHostId: config.hostId,
+    userId: config.userId,
+    expiresAt: now + AUDIOLAD_HOST_CACHE_MS,
+  };
+
+  return { ok: true, hostId: resolved.hostId };
+}
+
+async function resolveSubmitHostId(
+  options: YandexWebmasterClientOptions,
+  config: YandexWebmasterConfig,
+): Promise<
+  | { ok: true; hostId: string }
+  | { ok: false; errorCode: YandexRecrawlErrorCode; status: number | null }
+> {
+  const verified = options.verifiedHostId?.trim() ?? "";
+
+  if (verified) {
+    if (!config.hostId || verified !== config.hostId) {
+      return { ok: false, errorCode: "host_mismatch", status: null };
+    }
+
+    return { ok: true, hostId: verified };
+  }
+
+  return resolveAudioladWebmasterHost(options);
+}
+
+/**
+ * POST /recrawl/queue for an audiolad.ru URL on the audiolad.ru host only.
+ * A failed or timed-out quota check still sends. Quota remainder 0 does not.
  * Retries at most once on 5xx / timeout / network. Never throws.
  * Token never appears in the returned result.
  */
@@ -377,19 +569,41 @@ export async function submitYandexRecrawl(
     };
   }
 
-  if (!trimmedUrl) {
+  if (!trimmedUrl || !isAudioladRecrawlUrl(trimmedUrl)) {
     return {
       ok: false,
       status: null,
       accepted: false,
       retried: false,
-      errorCode: "invalid_url",
+      errorCode: trimmedUrl ? "foreign_origin" : "invalid_url",
     };
   }
 
-  const quota = await checkYandexRecrawlQuota(options);
+  const host = await resolveSubmitHostId(options, config);
 
-  if (!quota.ok) {
+  if (!host.ok) {
+    return {
+      ok: false,
+      status: host.status,
+      accepted: false,
+      retried: false,
+      errorCode: host.errorCode,
+    };
+  }
+
+  const quota = await checkYandexRecrawlQuota({
+    ...options,
+    hostId: host.hostId,
+  });
+
+  const quotaBlocksPost =
+    !quota.ok &&
+    (quota.errorCode === "disabled" ||
+      quota.errorCode === "auth_failed" ||
+      quota.errorCode === "invalid_user_id" ||
+      quota.errorCode === "host_not_verified");
+
+  if (quotaBlocksPost) {
     return {
       ok: false,
       status: quota.status,
@@ -402,7 +616,7 @@ export async function submitYandexRecrawl(
     };
   }
 
-  if ((quota.quotaRemainder ?? 0) <= 0) {
+  if (quota.ok && (quota.quotaRemainder ?? 0) <= 0) {
     return {
       ok: false,
       status: quota.status,
@@ -419,7 +633,7 @@ export async function submitYandexRecrawl(
   const sleepImpl = options.sleepImpl ?? defaultSleep;
   const endpoint = buildYandexRecrawlQueueUrl({
     userId: config.userId,
-    hostId: config.hostId,
+    hostId: host.hostId,
   });
 
   const first = await requestOnce(endpoint, {

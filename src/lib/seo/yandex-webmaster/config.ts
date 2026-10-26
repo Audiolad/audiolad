@@ -58,6 +58,12 @@ export function readYandexWebmasterUserId(
   return readNonEmptyEnv(env, "YANDEX_WEBMASTER_USER_ID");
 }
 
+/**
+ * Pin for the audiolad.ru Webmaster host only.
+ * Recrawl resolves host_id from the hosts list and sends only when that
+ * entry is exactly https://audiolad.ru and its host_id equals this value.
+ * Do not point it at another site.
+ */
 export function readYandexWebmasterHostId(
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {

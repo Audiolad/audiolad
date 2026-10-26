@@ -105,17 +105,24 @@ export async function approveAndPublishProductAction(
   const practiceSlug = publishedPractice.slug || detail?.slug || "";
 
   if (authorSlug && practiceSlug) {
-    schedulePracticePublishedSearchNotifications({
-      authorSlug,
-      practiceSlug,
-      previousStatus,
-      nextStatus: publishedPractice.status,
-      catalogVisibility: publishedPractice.catalog_visibility,
-      isCatalogListed: publishedPractice.is_catalog_listed,
-      isFirstPublishOfPractice,
-      publishedCountBefore,
-      publiclyAvailable,
-    });
+    schedulePracticePublishedSearchNotifications(
+      {
+        authorSlug,
+        practiceSlug,
+        previousStatus,
+        nextStatus: publishedPractice.status,
+        catalogVisibility: publishedPractice.catalog_visibility,
+        isCatalogListed: publishedPractice.is_catalog_listed,
+        isFirstPublishOfPractice,
+        publishedCountBefore,
+        publiclyAvailable,
+      },
+      {
+        entityType: "practice",
+        entityId: practiceId,
+        authorId: authorId ?? null,
+      },
+    );
   }
 
   console.info("admin_product_moderation_approved", {

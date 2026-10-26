@@ -462,26 +462,21 @@ const releaseSource = readFileSync(
 );
 assert.match(releaseSource, /import "server-only"/);
 assert.match(releaseSource, /createServiceRoleClient\(\)/);
-assert.match(releaseSource, /after\(async \(\) => \{/);
-assert.match(
-  releaseSource,
-  /await drainScheduledPublishOutbox\(supabase\)/,
+assert.match(releaseSource, /claim_due_scheduled_practice_publications/);
+assert.doesNotMatch(releaseSource, /drainScheduledPublishOutbox/);
+assert.doesNotMatch(releaseSource, /notifyYandexRecrawlUrl/);
+assert.doesNotMatch(releaseSource, /notifyIndexNowUrls/);
+assert.doesNotMatch(releaseSource, /enqueueSearchRecrawl/);
+const handoffSource = readFileSync(
+  "src/lib/seo/search-recrawl/scheduled-handoff.ts",
+  "utf8",
 );
-assert.doesNotMatch(
-  releaseSource,
-  /after\(\(\)\s*=>\s*\{[\s\S]*void\s+drainScheduledPublishOutbox/,
-  "after must track the drain promise",
-);
-assert.doesNotMatch(releaseSource, /void drainScheduledPublishOutbox/);
-const afterDrain = releaseSource.match(
-  /after\(async \(\) => \{[\s\S]*?\n\s+\}\);/,
-);
-assert.ok(afterDrain, "drain stays inside the after callback");
-assert.doesNotMatch(
-  releaseSource.replace(afterDrain?.[0] ?? "", ""),
-  /await drainScheduledPublishOutbox/,
-  "public request must not wait on IndexNow or Yandex",
-);
+assert.match(handoffSource, /enqueueSearchRecrawl/);
+assert.doesNotMatch(handoffSource, /notifyYandexRecrawlUrl/);
+assert.doesNotMatch(handoffSource, /notifyIndexNowUrls/);
+const workerSource = readFileSync("scripts/run-search-recrawl-worker.mts", "utf8");
+assert.match(workerSource, /runSupabaseSearchRecrawlCycle/);
+assert.doesNotMatch(workerSource, /releaseDueScheduledPublications/);
 assert.match(
   releaseSource,
   /export async function releaseDueScheduledPublications\(\)/,

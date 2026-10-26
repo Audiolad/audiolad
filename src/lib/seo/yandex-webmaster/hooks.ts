@@ -1,5 +1,10 @@
 import { after } from "next/server";
 
+import { enqueueSearchRecrawl } from "@/lib/seo/search-recrawl/enqueue";
+import type {
+  EnqueueSearchRecrawlInput,
+  EnqueueSearchRecrawlResult,
+} from "@/lib/seo/search-recrawl/memory";
 import {
   notifyYandexRecrawlUrl,
   type NotifyYandexRecrawlOptions,
@@ -9,16 +14,20 @@ import type { YandexRecrawlReason } from "@/lib/seo/yandex-webmaster/planner";
 
 export type ScheduleYandexRecrawlOptions = NotifyYandexRecrawlOptions & {
   /**
-   * When true, run inline (for unit tests) instead of Next.js `after()`.
-   * Never enables network by itself — still gated by env.
+   * When true, enqueue inline (for unit tests) instead of Next.js `after()`.
+   * Never enables network by itself.
    */
   syncForTests?: boolean;
+  entityType?: string | null;
+  entityId?: string | null;
+  enqueueImpl?: (
+    input: EnqueueSearchRecrawlInput,
+  ) => Promise<EnqueueSearchRecrawlResult>;
 };
 
 /**
- * Fire-and-forget Webmaster Recrawl after a successful domain write.
- * Uses Next.js `after()` so the API response is not blocked.
- * Never throws to callers.
+ * Enqueue Webmaster Recrawl after a successful domain write.
+ * The worker sends the request. Never throws to callers.
  */
 export function scheduleYandexRecrawlNotification(
   url: string | null | undefined,
@@ -32,8 +41,15 @@ export function scheduleYandexRecrawlNotification(
   }
 
   const run = () => {
-    void notifyYandexRecrawlUrl(cleaned, reason, options).catch(() => {
-      // notifyYandexRecrawlUrl already swallows errors.
+    const enqueue = options.enqueueImpl ?? enqueueSearchRecrawl;
+    void enqueue({
+      url: cleaned,
+      engine: "yandex",
+      reason,
+      entityType: options.entityType ?? null,
+      entityId: options.entityId ?? null,
+    }).catch(() => {
+      // enqueueSearchRecrawl already swallows errors.
     });
   };
 
@@ -45,7 +61,6 @@ export function scheduleYandexRecrawlNotification(
   try {
     after(run);
   } catch {
-    // Outside a request context (scripts/tests): do not block, still non-fatal.
     run();
   }
 }

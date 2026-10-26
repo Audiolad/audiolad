@@ -39,6 +39,8 @@ import {
 } from "@/lib/seo/indexnow/hooks";
 import { hasAuthorPublicIndexNowChanges } from "@/lib/seo/indexnow/public-fields";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
+import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
 
 export async function GET(request: Request) {
   try {
@@ -295,6 +297,11 @@ export async function PATCH(request: Request) {
       scheduleIndexNowNotification(
         [buildAuthorCanonicalUrl(profile.slug)],
         INDEXNOW_REASONS.author_profile_updated,
+      );
+      scheduleYandexRecrawlNotification(
+        buildAuthorCanonicalUrl(profile.slug),
+        YANDEX_RECRAWL_REASONS.author_profile_updated,
+        { entityType: "author", entityId: authorId },
       );
     }
 

@@ -93,7 +93,15 @@ assert.doesNotMatch(
 const helper = read("src/lib/seo/practice-publish-notifications.ts");
 assert.match(helper, /scheduleIndexNowNotification/);
 assert.match(helper, /scheduleYandexRecrawlNotification/);
+assert.match(helper, /author_became_public/);
 assert.match(helper, /Fail-open/);
+
+const yandexHooks = read("src/lib/seo/yandex-webmaster/hooks.ts");
+const scheduleStart = yandexHooks.indexOf("export function scheduleYandexRecrawlNotification");
+const scheduleEnd = yandexHooks.indexOf("export async function notifyYandexRecrawlForTests");
+const scheduleSource = yandexHooks.slice(scheduleStart, scheduleEnd);
+assert.match(scheduleSource, /enqueueSearchRecrawl/);
+assert.doesNotMatch(scheduleSource, /notifyYandexRecrawlUrl/);
 
 const patchRoute = read("src/app/api/author/products/[id]/route.ts");
 assert.match(patchRoute, /planPracticeYandexRecrawl/);

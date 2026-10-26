@@ -17,6 +17,8 @@ import {
   scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
+import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
 import { createClientFromRequest } from "@/lib/supabase/request-client";
 
 function toPlaylistResponse(row: PlaylistRow) {
@@ -265,6 +267,10 @@ export async function POST(request: Request) {
 
     if (url) {
       scheduleIndexNowNotification([url], INDEXNOW_REASONS.playlist_published);
+      scheduleYandexRecrawlNotification(url, YANDEX_RECRAWL_REASONS.playlist_published, {
+        entityType: "playlist",
+        entityId: created.id,
+      });
     }
   }
 
