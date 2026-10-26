@@ -35,6 +35,7 @@ export type CommentStore = {
   getPracticeContext(practiceId: string): Promise<PracticeContext | null>;
   suggestPublicName(userId: string): Promise<string>;
   viewerAvatarUrl(userId: string): Promise<string | null>;
+  hasOwnImpression(userId: string, practiceId: string): Promise<boolean>;
   authorDisplayName(practiceId: string): Promise<string>;
   isAuthorMember(userId: string, practiceId: string): Promise<boolean>;
   authorRecipientIds(practiceId: string): Promise<string[]>;

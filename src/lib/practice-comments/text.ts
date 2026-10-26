@@ -65,14 +65,41 @@ export function parsePublicCommentName(input: unknown): TextOk<string> | TextFai
   return { ok: true, value: name };
 }
 
-/** First given name only. Never an email, never a surname, never a local-part. */
+function publicNameToken(value: string): string | null {
+  const parsed = parsePublicCommentName(value);
+  return parsed.ok ? parsed.value : null;
+}
+
+/**
+ * Default for the review name field: first name and last name from the profile.
+ * A single given name stays as it is. Email and other unsafe tokens are dropped.
+ */
 export function deriveDefaultPublicName(fullName: string | null | undefined): string {
-  const first = fullName?.trim().split(/\s+/)[0] ?? "";
-  const parsed = parsePublicCommentName(first);
-  if (!parsed.ok) {
-    return LISTENER_COMMENT_DEFAULT_PUBLIC_NAME;
+  const parts = fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const first = publicNameToken(parts[0] ?? "");
+  const last = parts.length > 1 ? publicNameToken(parts[parts.length - 1] ?? "") : null;
+  if (first && last) {
+    const both = parsePublicCommentName(`${first} ${last}`);
+    if (both.ok) return both.value;
   }
-  return parsed.value;
+  if (first) return first;
+  return LISTENER_COMMENT_DEFAULT_PUBLIC_NAME;
+}
+
+/** Insert an emoji at the caret. Returns null when the result would exceed maxLength. */
+export function insertImpressionEmoji(input: {
+  body: string;
+  emoji: string;
+  selectionStart: number;
+  selectionEnd: number;
+  maxLength: number;
+}): { body: string; caret: number } | null {
+  const length = input.body.length;
+  const start = Math.min(Math.max(input.selectionStart, 0), length);
+  const end = Math.min(Math.max(input.selectionEnd, start), length);
+  const next = input.body.slice(0, start) + input.emoji + input.body.slice(end);
+  if (next.length > input.maxLength) return null;
+  return { body: next, caret: start + input.emoji.length };
 }
 
 /** Workspace name already public on the practice page. Not a listener surname. */

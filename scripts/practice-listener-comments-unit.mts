@@ -25,6 +25,7 @@ import { isListenerCommentFeedVisible } from "../src/lib/practice-comments/visib
 
 import { resolveListenerCommentComposer } from "../src/lib/practice-comments/composer";
 import {
+  LISTENER_IMPRESSION_EMOJIS,
   LISTENER_IMPRESSION_INVITE,
   LISTENER_IMPRESSION_LOAD_MORE,
   LISTENER_IMPRESSION_PLACEHOLDER,
@@ -59,6 +60,7 @@ import type { ListenerCommentRow } from "../src/lib/practice-comments/types";
 import {
   commentFingerprint,
   deriveDefaultPublicName,
+  insertImpressionEmoji,
   parseCommentBody,
 } from "../src/lib/practice-comments/text";
 import {
@@ -151,18 +153,55 @@ function clock(limited = false) {
 const actor = (userId: string | null, isModerator = false) => ({ userId, isModerator });
 
 async function testPrivacyAndXss() {
-  assert.equal(deriveDefaultPublicName("Мария Петрова"), "Мария");
+  assert.equal(deriveDefaultPublicName("Мария Петрова"), "Мария Петрова");
+  assert.equal(deriveDefaultPublicName("Сергей"), "Сергей");
+  assert.equal(deriveDefaultPublicName("Сергей Александрович Петров"), "Сергей Петров");
   assert.equal(deriveDefaultPublicName("maria@example.com"), "Слушатель");
   assert.equal(deriveDefaultPublicName("Мария petrov@mail.ru"), "Мария");
   assert.equal(parseCommentBody("<script>alert(1)</script>").ok, false);
   assert.equal(parseCommentBody('"><img src=x onerror=alert(1)>').ok, false);
   assert.equal(parseCommentBody("стало спокойнее").ok, true);
+  const withEmoji = parseCommentBody("Стало спокойнее ❤️ 🕊️");
+  assert.equal(withEmoji.ok, true);
+  if (withEmoji.ok) assert.equal(withEmoji.value, "Стало спокойнее ❤️ 🕊️");
+  const dove = "🕊️";
+  const inserted = insertImpressionEmoji({
+    body: "Спокойно",
+    emoji: dove,
+    selectionStart: 8,
+    selectionEnd: 8,
+    maxLength: 2000,
+  });
+  assert.deepEqual(inserted, { body: `Спокойно${dove}`, caret: 8 + dove.length });
+  assert.equal(
+    insertImpressionEmoji({
+      body: "абв",
+      emoji: "🔥",
+      selectionStart: 1,
+      selectionEnd: 2,
+      maxLength: 2000,
+    })?.body,
+    "а🔥в",
+  );
+  assert.equal(
+    insertImpressionEmoji({
+      body: "я".repeat(2000),
+      emoji: "❤️",
+      selectionStart: 2000,
+      selectionEnd: 2000,
+      maxLength: 2000,
+    }),
+    null,
+  );
   assert.equal(commentFingerprint("  Стало   спокойнее "), "стало спокойнее");
   assert.doesNotMatch(LISTENER_IMPRESSION_INVITE, /дискомфорт|лечен|гарант|терап|исцел/i);
   assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /дискомфорт|лечен|гарант|терап|исцел|диагноз|Не указывайте/i);
   assert.match(LISTENER_IMPRESSION_INVITE, /–/);
   assert.doesNotMatch(LISTENER_IMPRESSION_INVITE, /—/);
-  assert.match(LISTENER_IMPRESSION_PRIVACY, /Фамилия и почта не показываются/);
+  assert.match(LISTENER_IMPRESSION_PRIVACY, /Публикуется имя из поля/);
+  assert.match(LISTENER_IMPRESSION_PRIVACY, /Его можно сократить перед публикацией/);
+  assert.match(LISTENER_IMPRESSION_PRIVACY, /Почта не показывается/);
+  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /Фамилия и почта не показываются/);
   assert.match(LISTENER_IMPRESSION_PRIVACY, /Поделитесь впечатлением от практики/);
   assert.match(LISTENER_IMPRESSION_PRIVACY, /–/);
   assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /—/);
@@ -788,11 +827,18 @@ async function testSignedInListenerSeesComposer() {
   assert.doesNotMatch(read("src/lib/practice-comments/copy.ts"), /Что вы заметили, пока слушали/);
   assert.doesNotMatch(formMarkup, /Оценки гостей/);
   assert.doesNotMatch(formMarkup, /—/);
+  assert.equal(LISTENER_IMPRESSION_EMOJIS.length, 5);
+  for (const item of LISTENER_IMPRESSION_EMOJIS) {
+    assert.match(formMarkup, new RegExp(`aria-label="${item.label}"`));
+    assert.match(formMarkup, new RegExp(`data-listener-impression-emoji="${item.label}"`));
+    assert.ok(formMarkup.includes(item.emoji));
+  }
+  assert.match(formMarkup, /type="button"/);
 
   const letterMarkup = renderToStaticMarkup(
     createElement(Composer, {
       mode: "form",
-      publicName: "Сергей",
+      publicName: "Сергей Петров",
       avatarUrl: null,
       body: "",
       pending: false,
@@ -806,6 +852,7 @@ async function testSignedInListenerSeesComposer() {
   );
   assert.match(letterMarkup, /data-listener-comment-preview="avatar"/);
   assert.match(letterMarkup, /role="img"/);
+  assert.match(letterMarkup, /value="Сергей Петров"/);
   assert.match(letterMarkup, />С</);
   assert.doesNotMatch(letterMarkup, /<img /);
 
@@ -828,7 +875,109 @@ async function testSignedInListenerSeesComposer() {
   assert.ok(guestMarkup.includes(LISTENER_IMPRESSION_SIGN_IN));
   assert.ok(guestMarkup.includes(`href="${signInHref}"`));
   assert.doesNotMatch(guestMarkup, /data-listener-comment-composer="form"/);
+  assert.doesNotMatch(guestMarkup, /data-listener-impression-emoji/);
   assert.doesNotMatch(guestMarkup, /—/);
+
+  assert.equal(
+    resolveListenerCommentComposer({
+      isAuthenticated: true,
+      hasOwnImpression: true,
+    }),
+    "hidden",
+  );
+  assert.equal(
+    resolveListenerCommentComposer({
+      isAuthenticated: false,
+      viewerAuthenticated: false,
+      hasOwnImpression: true,
+    }),
+    "sign_in",
+  );
+  const hiddenMarkup = renderToStaticMarkup(
+    createElement(Composer, {
+      mode: "hidden",
+      publicName: "Сергей Петров",
+      avatarUrl: null,
+      body: "",
+      pending: false,
+      formError: null,
+      signInHref,
+      errorMessage: null,
+      onPublicNameChange: () => undefined,
+      onBodyChange: () => undefined,
+      onSubmit: () => undefined,
+    }),
+  );
+  assert.equal(hiddenMarkup, "");
+
+  const newer = Array.from({ length: 11 }, (_, index) => ({
+    ...impressionRow(commentUuid("99999999", index + 1), isoSeconds(20 + index), `Чужой отзыв ${index}`),
+    userId: other,
+    publicName: "Олег",
+  }));
+  const own = impressionRow(commentUuid("99999999", 40), isoSeconds(1), "Мой тихий вечер");
+  const paged = createMemoryCommentStore(state({ comments: [own, ...newer] }));
+  const firstPage = await listPracticeComments(paged, actor(listener), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(firstPage.ok, true);
+  if (!firstPage.ok) return;
+  assert.equal(firstPage.comments.some((item) => item.id === own.id), false);
+  assert.equal(firstPage.viewer.hasOwnImpression, true);
+  assert.equal(firstPage.comments.every((item) => item.mine === false), true);
+  const strangerPage = await listPracticeComments(paged, actor(moderator), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(strangerPage.ok, true);
+  if (!strangerPage.ok) return;
+  assert.equal(strangerPage.viewer.hasOwnImpression, false);
+  const guestPage = await listPracticeComments(paged, actor(null), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(guestPage.ok, true);
+  if (!guestPage.ok) return;
+  assert.equal(guestPage.viewer.hasOwnImpression, false);
+
+  const removed = await deleteOwnComment(paged, actor(listener), clock(), own.id);
+  assert.equal(removed.ok, true);
+  const afterDelete = await listPracticeComments(paged, actor(listener), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(afterDelete.ok, true);
+  if (!afterDelete.ok) return;
+  assert.equal(afterDelete.viewer.hasOwnImpression, false);
+
+  const emojiStore = createMemoryCommentStore(state());
+  const emojiSaved = await createImpression(emojiStore, actor(listener), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Стало спокойнее ❤️ 🕊️",
+    publicName: "Мария Петрова",
+    clientRequestId: null,
+  });
+  assert.equal(emojiSaved.ok, true);
+  if (emojiSaved.ok) {
+    assert.equal(emojiSaved.comment.body, "Стало спокойнее ❤️ 🕊️");
+    assert.equal(emojiSaved.comment.publicName, "Мария Петрова");
+    assert.equal(JSON.stringify(emojiSaved.comment).includes("❤️"), true);
+    assert.equal(JSON.stringify(emojiSaved.comment).includes("🕊️"), true);
+  }
 
   const route = read("src/app/api/listen/product/[slug]/[productSlug]/comments/route.ts");
   const server = read("src/lib/practice-comments/server.ts");
@@ -840,6 +989,10 @@ async function testSignedInListenerSeesComposer() {
   assert.match(commentsUi, /cache: "no-store"/);
   assert.match(commentsUi, /resolveListenerCommentComposer/);
   assert.match(commentsUi, /avatarUrl=\{viewer\?\.avatarUrl \?\? null\}/);
+  assert.match(commentsUi, /hasOwnImpression/);
+  assert.match(commentsUi, /comment\.mine/);
+  assert.match(read("src/components/products/practice-page/ListenerCommentComposer.tsx"), /mode === "hidden"/);
+  assert.match(read("src/lib/practice-comments/supabase-store.ts"), /listener_comment_own_lookup_failed/);
   assert.match(commentsUi, /data-listener-impression-privacy="true"/);
   assert.match(commentsUi, /whitespace-normal break-words/);
   assert.match(

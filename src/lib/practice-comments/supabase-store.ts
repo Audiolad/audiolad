@@ -175,6 +175,18 @@ export function createSupabaseCommentStore(input: {
         profileFullName: row.full_name,
       });
     },
+    async hasOwnImpression(userId, practiceId) {
+      const { count, error } = await writer
+        .from("practice_listener_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("practice_id", practiceId)
+        .eq("kind", "impression")
+        .neq("status", "deleted");
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_own_lookup_failed");
+      return (count ?? 0) > 0;
+    },
     async authorDisplayName(practiceId) {
       const { data } = await reader
         .from("practices")

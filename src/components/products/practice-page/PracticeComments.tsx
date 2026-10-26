@@ -45,6 +45,7 @@ type FeedResponse = {
     canReply: boolean;
     publicNameSuggestion: string;
     avatarUrl: string | null;
+    hasOwnImpression: boolean;
   };
 };
 
@@ -103,11 +104,15 @@ export default function PracticeComments({
   const [browserAuthenticated, setBrowserAuthenticated] = useState(false);
   const suggestionApplied = useRef(false);
   const signInHref = buildAuthRouteHref("/auth/sign-in", signInReturnPath);
+  const hasOwnImpression =
+    viewer?.hasOwnImpression === true || comments.some((comment) => comment.mine);
   const composerMode = resolveListenerCommentComposer({
     isAuthenticated: isAuthenticated || browserAuthenticated,
     viewerCanComment: viewer?.canComment,
     viewerAuthenticated: viewer?.authenticated,
+    hasOwnImpression,
   });
+  const showComposer = composerMode === "sign_in" || viewer !== null;
 
   const showInvite = Boolean(
     engine?.programCompleted &&
@@ -185,6 +190,7 @@ export default function PracticeComments({
         return;
       }
       setBody("");
+      setViewer((current) => (current ? { ...current, hasOwnImpression: true } : current));
       setComments((current) => [payload.comment!, ...current.filter((item) => item.id !== payload.comment!.id)]);
     } catch {
       setFormError("internal_error");
@@ -240,19 +246,21 @@ export default function PracticeComments({
         </SortButton>
       </div>
 
-      <ListenerCommentComposer
-        mode={composerMode}
-        publicName={publicName}
-        avatarUrl={viewer?.avatarUrl ?? null}
-        body={body}
-        pending={pending}
-        formError={formError}
-        signInHref={signInHref}
-        errorMessage={formError ? messageFor(formError) : null}
-        onPublicNameChange={setPublicName}
-        onBodyChange={setBody}
-        onSubmit={(event) => void submitComment(event)}
-      />
+      {showComposer ? (
+        <ListenerCommentComposer
+          mode={composerMode}
+          publicName={publicName}
+          avatarUrl={viewer?.avatarUrl ?? null}
+          body={body}
+          pending={pending}
+          formError={formError}
+          signInHref={signInHref}
+          errorMessage={formError ? messageFor(formError) : null}
+          onPublicNameChange={setPublicName}
+          onBodyChange={setBody}
+          onSubmit={(event) => void submitComment(event)}
+        />
+      ) : null}
 
       {error ? (
         <div className="mt-4" data-listener-comments-error="true">
@@ -309,6 +317,18 @@ export default function PracticeComments({
                     ? current.map((item) => (item.id === next.id ? next : item))
                     : current.filter((item) => item.id !== comment.id),
                 );
+                if (!next && comment.mine) {
+                  setViewer((current) =>
+                    current
+                      ? {
+                          ...current,
+                          hasOwnImpression: comments.some(
+                            (item) => item.mine && item.id !== comment.id,
+                          ),
+                        }
+                      : current,
+                  );
+                }
                 setEditingId(null);
               }}
             />

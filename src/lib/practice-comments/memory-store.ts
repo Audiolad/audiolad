@@ -138,6 +138,15 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
         profileFullName: profile.fullName,
       });
     },
+    async hasOwnImpression(userId, practiceId) {
+      return state.comments.some(
+        (row) =>
+          row.userId === userId &&
+          row.practiceId === practiceId &&
+          row.kind === "impression" &&
+          row.status !== "deleted",
+      );
+    },
     async authorDisplayName(practiceId) {
       return state.authorNames[practiceId] ?? "Автор";
     },
