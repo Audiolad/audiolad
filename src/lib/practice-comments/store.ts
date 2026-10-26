@@ -16,6 +16,7 @@ export type FeedCommentRow = {
   kind: ListenerCommentRow["kind"];
   body: string;
   publicName: string;
+  avatarUrl: string | null;
   status: "published" | "hidden";
   createdAt: string;
   editedAt: string | null;
@@ -50,6 +51,7 @@ export type CommentStore = {
     viewerUserId: string | null;
   }): Promise<FeedCommentRow[]>;
   getRaw(id: string): Promise<ListenerCommentRow | null>;
+  feedAvatar(commentId: string): Promise<string | null>;
   findByRequest(userId: string, requestId: string): Promise<ListenerCommentRow | null>;
   countRecentImpressions(userId: string, sinceIso: string): Promise<number>;
   countRecentReplies(userId: string, sinceIso: string): Promise<number>;

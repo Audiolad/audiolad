@@ -19,6 +19,8 @@
 -- parent table, then the functions. Copy of the operator statements, still
 -- comments, not run here:
 --   DROP VIEW IF EXISTS public.practice_listener_comment_feed;
+--   DROP FUNCTION IF EXISTS public.practice_listener_comment_public_avatar(uuid);
+--   DROP FUNCTION IF EXISTS public.practice_listener_safe_avatar_url(text, uuid, text);
 --   DROP TABLE IF EXISTS public.practice_listener_comment_notices;
 --   DROP TABLE IF EXISTS public.practice_listener_comment_edits;
 --   DROP TABLE IF EXISTS public.practice_listener_comment_moderation_events;
@@ -222,7 +224,11 @@ AS $$
           )
         )
       )
-      OR (p_user_id = auth.uid() AND p_status IS DISTINCT FROM 'deleted')
+      OR (
+        auth.uid() IS NOT NULL
+        AND p_user_id = auth.uid()
+        AND p_status IS DISTINCT FROM 'deleted'
+      )
       OR (
         p_status = 'published'
         AND EXISTS (
@@ -299,6 +305,119 @@ REVOKE ALL ON TABLE public.practice_listener_comment_notices FROM authenticated;
 GRANT SELECT ON TABLE public.practice_listener_comment_notices TO authenticated;
 GRANT ALL ON TABLE public.practice_listener_comment_notices TO service_role;
 
+CREATE OR REPLACE FUNCTION public.practice_listener_safe_avatar_url(
+  p_url text,
+  p_user_id uuid,
+  p_full_name text
+) RETURNS text
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $avatar_safe$
+DECLARE
+  trimmed text;
+  surname text;
+  folded text;
+  folded_surname text;
+  upper_cyr text := 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+  lower_cyr text := 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя';
+BEGIN
+  trimmed := btrim(p_url);
+  IF trimmed IS NULL OR trimmed = '' OR char_length(trimmed) > 2000 THEN
+    RETURN NULL;
+  END IF;
+  IF trimmed !~ '^https://' THEN
+    RETURN NULL;
+  END IF;
+  folded := lower(translate(trimmed, upper_cyr, lower_cyr));
+  IF position('@' in trimmed) > 0 THEN
+    RETURN NULL;
+  END IF;
+  IF position('token=' in folded) > 0 THEN
+    RETURN NULL;
+  END IF;
+  IF position('/user-avatars/' in folded) > 0 THEN
+    RETURN NULL;
+  END IF;
+  IF p_user_id IS NOT NULL AND position(lower(p_user_id::text) in folded) > 0 THEN
+    RETURN NULL;
+  END IF;
+  surname := (regexp_match(btrim(coalesce(p_full_name, '')), '^\S+\s+(\S+)'))[1];
+  IF surname IS NOT NULL AND char_length(surname) >= 2 THEN
+    folded_surname := lower(translate(surname, upper_cyr, lower_cyr));
+    IF position(folded_surname in folded) > 0 THEN
+      RETURN NULL;
+    END IF;
+  END IF;
+  RETURN trimmed;
+END;
+$avatar_safe$;
+
+CREATE OR REPLACE FUNCTION public.practice_listener_comment_public_avatar(p_comment_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $avatar_public$
+DECLARE
+  v_user_id uuid;
+  v_practice_id uuid;
+  v_parent_id uuid;
+  v_kind text;
+  v_status text;
+  v_deleted_at timestamptz;
+  v_url text;
+  v_path text;
+  v_name text;
+  v_safe text;
+BEGIN
+  SELECT c.user_id, c.practice_id, c.parent_id, c.kind, c.status, c.deleted_at
+  INTO v_user_id, v_practice_id, v_parent_id, v_kind, v_status, v_deleted_at
+  FROM public.practice_listener_comments AS c
+  WHERE c.id = p_comment_id;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+  IF NOT COALESCE(public.practice_listener_comment_row_visible(
+    v_user_id, v_practice_id, v_parent_id, v_status, v_deleted_at
+  ), false) THEN
+    RETURN NULL;
+  END IF;
+
+  IF v_kind = 'author_reply' THEN
+    SELECT a.avatar_url, a.name
+    INTO v_url, v_name
+    FROM public.practices AS pr
+    JOIN public.authors AS a ON a.id = pr.author_id
+    WHERE pr.id = v_practice_id;
+    RETURN public.practice_listener_safe_avatar_url(v_url, v_user_id, v_name);
+  END IF;
+
+  SELECT p.avatar_url, p.avatar_path, p.full_name
+  INTO v_url, v_path, v_name
+  FROM public.profiles AS p
+  WHERE p.id = v_user_id;
+
+  v_safe := public.practice_listener_safe_avatar_url(v_url, v_user_id, v_name);
+  IF v_safe IS NOT NULL THEN
+    RETURN v_safe;
+  END IF;
+  IF v_path IS NOT NULL AND btrim(v_path) <> '' THEN
+    RETURN '/api/listener-comment-avatars/' || p_comment_id::text;
+  END IF;
+  RETURN NULL;
+END;
+$avatar_public$;
+
+REVOKE ALL ON FUNCTION public.practice_listener_safe_avatar_url(text, uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.practice_listener_safe_avatar_url(text, uuid, text) FROM anon;
+REVOKE ALL ON FUNCTION public.practice_listener_safe_avatar_url(text, uuid, text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.practice_listener_safe_avatar_url(text, uuid, text) TO service_role;
+REVOKE ALL ON FUNCTION public.practice_listener_comment_public_avatar(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.practice_listener_comment_public_avatar(uuid) TO anon, authenticated, service_role;
+
 CREATE OR REPLACE VIEW public.practice_listener_comment_feed
 WITH (security_barrier = true) AS
 SELECT
@@ -311,6 +430,7 @@ SELECT
   c.status,
   c.created_at,
   c.edited_at,
+  public.practice_listener_comment_public_avatar(c.id) AS avatar_url,
   (c.user_id IS NOT NULL AND c.user_id = auth.uid()) AS mine
 FROM public.practice_listener_comments AS c
 WHERE public.practice_listener_comment_row_visible(
@@ -322,7 +442,7 @@ WHERE public.practice_listener_comment_row_visible(
 );
 
 COMMENT ON VIEW public.practice_listener_comment_feed IS
-  'Public impression feed without user_id, email or profile surname. security_barrier view filters with practice_listener_comment_row_visible.';
+  'Public impression feed. avatar_url is a safe public image address. No user_id, email, surname or storage path.';
 
 REVOKE ALL ON TABLE public.practice_listener_comment_feed FROM PUBLIC;
 REVOKE ALL ON TABLE public.practice_listener_comment_feed FROM anon;

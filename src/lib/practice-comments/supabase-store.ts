@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
+import { sanitizePublicAvatarUrl } from "@/lib/practice-comments/avatar";
 import { LISTENER_COMMENT_AUTHOR_PUBLIC_NAME } from "@/lib/practice-comments/copy";
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
 import type { CommentCursor, CommentSort } from "@/lib/practice-comments/pagination";
@@ -82,6 +83,7 @@ function mapFeed(value: unknown): FeedCommentRow | null {
     kind: row.kind === "author_reply" ? "author_reply" : "impression",
     body: text(row.body) ?? "",
     publicName: text(row.public_name) ?? "",
+    avatarUrl: sanitizePublicAvatarUrl(text(row.avatar_url)),
     status,
     createdAt: text(row.created_at) ?? new Date(0).toISOString(),
     editedAt: text(row.edited_at),
@@ -220,7 +222,7 @@ export function createSupabaseCommentStore(input: {
     async listFeed(query) {
       let request = reader
         .from("practice_listener_comment_feed")
-        .select("id, practice_id, parent_id, kind, body, public_name, status, created_at, edited_at, mine")
+        .select("id, practice_id, parent_id, kind, body, public_name, avatar_url, status, created_at, edited_at, mine")
         .eq("practice_id", query.practiceId)
         .is("parent_id", null)
         .order("created_at", { ascending: query.sort === "old" })
@@ -236,7 +238,7 @@ export function createSupabaseCommentStore(input: {
       if (query.parentIds.length === 0) return [];
       const { data, error } = await reader
         .from("practice_listener_comment_feed")
-        .select("id, practice_id, parent_id, kind, body, public_name, status, created_at, edited_at, mine")
+        .select("id, practice_id, parent_id, kind, body, public_name, avatar_url, status, created_at, edited_at, mine")
         .eq("practice_id", query.practiceId)
         .in("parent_id", query.parentIds);
       throwIfUnavailable(error);
@@ -254,6 +256,16 @@ export function createSupabaseCommentStore(input: {
       throwIfUnavailable(error);
       if (error) throw new Error("listener_comment_load_failed");
       return mapRaw(data);
+    },
+    async feedAvatar(commentId) {
+      const { data, error } = await writer
+        .from("practice_listener_comment_feed")
+        .select("avatar_url")
+        .eq("id", commentId)
+        .maybeSingle();
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_avatar_failed");
+      return sanitizePublicAvatarUrl(text((data as { avatar_url?: unknown } | null)?.avatar_url));
     },
     async findByRequest(userId, requestId) {
       const { data, error } = await writer

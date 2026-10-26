@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 
+import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import {
   AUTHOR_FEEDBACK_EMPTY,
   AUTHOR_FEEDBACK_MARK_READ,
@@ -18,6 +19,7 @@ type Item = {
   practiceTitle: string;
   practiceHref: string;
   publicName: string;
+  avatarUrl: string | null;
   body: string;
   createdAt: string;
   editedAt: string | null;
@@ -255,14 +257,21 @@ function FeedbackCard({
       <a className="mt-1 block font-semibold text-[#2b2144] underline" href={item.practiceHref}>
         {item.practiceTitle}
       </a>
-      <p className="mt-2 text-sm text-[#6d628c]">
-        {item.publicName} · {formatWhen(item.createdAt)}
-      </p>
+      <div className="mt-2 flex items-center gap-3">
+        <ListenerImpressionAvatar name={item.publicName} url={item.avatarUrl} />
+        <p className="text-sm text-[#6d628c]">
+          {item.publicName} · {formatWhen(item.createdAt)}
+        </p>
+      </div>
       <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{item.body}</p>
       {item.reply ? (
-        <div className="mt-3 rounded-[16px] bg-[#f7f3fc] px-3 py-3">
-          <p className="text-xs font-semibold text-[#7042c5]">{LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL}</p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{item.reply.body}</p>
+        <div className="mt-3 flex gap-3 rounded-[16px] bg-[#f7f3fc] px-3 py-3">
+          <ListenerImpressionAvatar name={item.reply.publicName} url={item.reply.avatarUrl} />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-[#7042c5]">{LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL}</p>
+            <p className="mt-1 text-sm font-semibold">{item.reply.publicName}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{item.reply.body}</p>
+          </div>
         </div>
       ) : (
         <form className="mt-3" onSubmit={(event) => void send(event)}>

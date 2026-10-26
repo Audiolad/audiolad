@@ -66,6 +66,7 @@ function toReply(row: FeedCommentRow): PublicReplyDto {
     createdAt: row.createdAt,
     editedAt: row.editedAt,
     mine: row.mine,
+    avatarUrl: row.avatarUrl,
   };
 }
 
@@ -82,6 +83,7 @@ function toDto(row: FeedCommentRow, reply: FeedCommentRow | null): PublicComment
     editedAt: row.editedAt,
     status: row.status,
     mine: row.mine,
+    avatarUrl: row.avatarUrl,
     reply: visibleReply,
   };
 }
@@ -109,6 +111,7 @@ function rawToPublic(row: ListenerCommentRow, mine: boolean): PublicCommentDto {
     editedAt: row.editedAt,
     status: row.status === "hidden" ? "hidden" : "published",
     mine,
+    avatarUrl: null,
     reply: null,
   };
 }
@@ -124,6 +127,7 @@ async function attachReply(
     viewerUserId,
   });
   const dto = rawToPublic(impression, viewerUserId != null && impression.userId === viewerUserId);
+  dto.avatarUrl = await store.feedAvatar(impression.id);
   const reply = replies.find((item) => item.parentId === impression.id && item.status === "published");
   dto.reply = reply ? toReply(reply) : null;
   return dto;
@@ -312,7 +316,9 @@ export async function createImpression(
     });
   }
 
-  return { ok: true, comment: rawToPublic(row, true), replayed: false };
+  const created = rawToPublic(row, true);
+  created.avatarUrl = await store.feedAvatar(row.id);
+  return { ok: true, comment: created, replayed: false };
 }
 
 export async function updateOwnComment(
@@ -526,6 +532,7 @@ export async function listAuthorFeedback(
         practiceTitle: string;
         practiceHref: string;
         publicName: string;
+        avatarUrl: string | null;
         body: string;
         createdAt: string;
         editedAt: string | null;
@@ -575,6 +582,7 @@ export async function listAuthorFeedback(
         ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-impressions`
         : "/catalog",
       publicName: row.publicName,
+      avatarUrl: row.avatarUrl,
       body: row.body,
       createdAt: row.createdAt,
       editedAt: row.editedAt,

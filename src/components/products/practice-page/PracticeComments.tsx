@@ -6,6 +6,7 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import ListenerImpressionInvite from "@/components/products/practice-page/ListenerImpressionInvite";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
@@ -517,12 +518,17 @@ function CommentCard({
 
   return (
     <article>
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="font-semibold text-[#2b2144]">{comment.publicName}</p>
-        <time className="text-xs text-[#7d70a2]" dateTime={comment.createdAt}>
-          {formatWhen(comment.createdAt)}
-          {comment.editedAt ? " · изменён" : ""}
-        </time>
+      <header className="flex items-center gap-3">
+        <ListenerImpressionAvatar name={comment.publicName} url={comment.avatarUrl} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="font-semibold text-[#2b2144]">{comment.publicName}</p>
+            <time className="text-xs text-[#7d70a2]" dateTime={comment.createdAt}>
+              {formatWhen(comment.createdAt)}
+              {comment.editedAt ? " · изменён" : ""}
+            </time>
+          </div>
+        </div>
       </header>
       {comment.status === "hidden" ? (
         <p className="mt-2 text-sm text-[#9a3d55]">{LISTENER_IMPRESSION_HIDDEN}</p>
@@ -577,12 +583,15 @@ function CommentCard({
         </form>
       ) : null}
       {comment.reply ? (
-        <div className="mt-3 rounded-[16px] bg-[#f7f3fc] px-3 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#7042c5]">
-            {LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL}
-          </p>
-          <p className="mt-1 text-sm font-semibold">{comment.reply.publicName}</p>
-          <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{comment.reply.body}</p>
+        <div className="mt-3 flex gap-3 rounded-[16px] bg-[#f7f3fc] px-3 py-3">
+          <ListenerImpressionAvatar name={comment.reply.publicName} url={comment.reply.avatarUrl} />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#7042c5]">
+              {LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL}
+            </p>
+            <p className="mt-1 text-sm font-semibold">{comment.reply.publicName}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{comment.reply.body}</p>
+          </div>
         </div>
       ) : null}
       {canReply && !comment.reply && comment.status === "published" ? (

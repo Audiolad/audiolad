@@ -8,7 +8,12 @@ applied by the draft that adds it. Do not apply it from this change. New tables:
 `practice_listener_comment_notices`, plus the read view
 `practice_listener_comment_feed`. No existing table is altered.
 `practice_ratings` is not altered. The feed does not expose `user_id`,
-email or a surname. Writes stay on `service_role`. Listeners read published
+email or a surname. `avatar_url` is the only picture field: a public https
+address, or `/api/listener-comment-avatars/{comment_id}` when the listener
+photo stays in private storage. The storage path and signed URLs are not
+selected. An author reply uses the workspace avatar when that public address
+is safe. When `avatar_url` is null, or the picture fails to load, the page
+draws a round letter from the public display name. Writes stay on `service_role`. Listeners read published
 rows and their own hidden rows. Authors read published rows on their practices
 and cannot delete them. Notices are in-app only: the migration does not send
 email or SMS. A moderator with `products.moderate` can hide a comment. The

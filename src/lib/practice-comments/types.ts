@@ -70,6 +70,7 @@ export type PublicReplyDto = {
   createdAt: string;
   editedAt: string | null;
   mine: boolean;
+  avatarUrl: string | null;
 };
 
 export type PublicCommentDto = {
@@ -80,6 +81,7 @@ export type PublicCommentDto = {
   editedAt: string | null;
   status: "published" | "hidden";
   mine: boolean;
+  avatarUrl: string | null;
   reply: PublicReplyDto | null;
 };
 

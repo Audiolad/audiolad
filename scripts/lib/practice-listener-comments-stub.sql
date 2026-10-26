@@ -36,8 +36,20 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
 CREATE TABLE IF NOT EXISTS public.authors (
   id uuid PRIMARY KEY,
   name text,
-  slug text
+  slug text,
+  avatar_url text
 );
+
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid PRIMARY KEY,
+  full_name text,
+  avatar_url text,
+  avatar_path text
+);
+
+REVOKE ALL ON TABLE public.profiles FROM PUBLIC;
+REVOKE ALL ON TABLE public.profiles FROM anon;
+REVOKE ALL ON TABLE public.profiles FROM authenticated;
 
 CREATE TABLE IF NOT EXISTS public.practices (
   id uuid PRIMARY KEY,

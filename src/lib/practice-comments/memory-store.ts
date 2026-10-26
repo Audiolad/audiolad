@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { resolveListenerAvatarUrl } from "@/lib/practice-comments/avatar";
 import { compareComments, isAfterCursor } from "@/lib/practice-comments/pagination";
 import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
 import { isListenerCommentFeedVisible } from "@/lib/practice-comments/visibility";
@@ -34,6 +35,8 @@ export type MemoryCommentState = {
   names: Record<string, string>;
   authorNames: Record<string, string>;
   comments: ListenerCommentRow[];
+  profileAvatars?: Record<string, { url?: string | null; path?: string | null; fullName?: string | null }>;
+  authorAvatars?: Record<string, { url?: string | null; name?: string | null }>;
   notices: CommentNoticeRow[];
   reports: CommentReportRow[];
   events: ModerationEventRow[];
@@ -81,11 +84,27 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
       kind: row.kind,
       body: row.body,
       publicName: row.publicName,
+      avatarUrl: avatarFor(row),
       status: row.status === "hidden" ? "hidden" : "published",
       createdAt: row.createdAt,
       editedAt: row.editedAt,
       mine: viewerUserId != null && row.userId === viewerUserId,
     };
+  }
+
+  function avatarFor(row: ListenerCommentRow): string | null {
+    const profile = state.profileAvatars?.[row.userId];
+    const author = state.authorAvatars?.[row.practiceId];
+    return resolveListenerAvatarUrl({
+      commentId: row.id,
+      kind: row.kind,
+      userId: row.userId,
+      profileUrl: profile?.url,
+      profilePath: profile?.path,
+      profileFullName: profile?.fullName,
+      authorUrl: author?.url,
+      authorName: author?.name,
+    });
   }
 
   return {
@@ -154,6 +173,10 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     },
     async getRaw(id) {
       return state.comments.find((row) => row.id === id) ?? null;
+    },
+    async feedAvatar(commentId) {
+      const row = state.comments.find((item) => item.id === commentId);
+      return row ? avatarFor(row) : null;
     },
     async findByRequest(userId, requestId) {
       return (

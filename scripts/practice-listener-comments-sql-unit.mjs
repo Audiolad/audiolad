@@ -47,7 +47,24 @@ assert.match(migration, /pg_advisory_xact_lock/);
 assert.match(migration, /practice_listener_comment_insert_limited/);
 assert.match(migration, /practice_listener_comment_edit_limited/);
 assert.match(migration, /practice_listener_comment_report_limited/);
+assert.match(migration, /practice_listener_safe_avatar_url/);
+assert.match(migration, /practice_listener_comment_public_avatar/);
+assert.match(migration, /practice_listener_comment_public_avatar\(c\.id\) AS avatar_url/);
+assert.match(migration, /\/api\/listener-comment-avatars\//);
+assert.match(migration, /position\(lower\(p_user_id::text\) in folded\)/);
+assert.match(migration, /token=/);
+assert.match(migration, /\/user-avatars\//);
+assert.match(migration, /translate\(trimmed, upper_cyr, lower_cyr\)/);
+assert.match(
+  migration,
+  /REVOKE ALL ON FUNCTION public\.practice_listener_safe_avatar_url\(text, uuid, text\) FROM anon/,
+);
+assert.match(
+  migration,
+  /GRANT EXECUTE ON FUNCTION public\.practice_listener_comment_public_avatar\(uuid\) TO anon, authenticated, service_role/,
+);
 assert.doesNotMatch(migration, /GRANT INSERT ON TABLE public\.practice_listener_comments TO authenticated/);
+assert.doesNotMatch(executableSql, /GRANT SELECT ON TABLE public\.profiles/);
 
 function findPgBin() {
   const candidates = [];
