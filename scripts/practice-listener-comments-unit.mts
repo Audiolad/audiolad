@@ -663,7 +663,7 @@ async function testEditAndReplyRateLimits() {
   }
 }
 
-function componentExport<Props>(module: { default: unknown }): (props: Props) => unknown {
+function componentExport<Props>(module: { default: unknown }): ComponentType<Props> {
   let value: unknown = module.default;
   while (value && typeof value === "object" && "default" in value) {
     value = (value as { default: unknown }).default;
@@ -671,7 +671,7 @@ function componentExport<Props>(module: { default: unknown }): (props: Props) =>
   if (typeof value !== "function") {
     throw new Error("component export is not a function");
   }
-  return value as (props: Props) => unknown;
+  return value as ComponentType<Props>;
 }
 
 async function testSignedInListenerSeesComposer() {
