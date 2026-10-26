@@ -35,6 +35,7 @@ export function makeCaller({ model, maxTokens, maxRub, outDir, runId, state, sch
     state.spentRub += cost;
     const call = {
       name: callName,
+      model,
       http: meta.http,
       seconds: meta.seconds,
       promptTokens: meta.prompt_tokens ?? 0,

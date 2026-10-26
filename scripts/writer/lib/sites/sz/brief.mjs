@@ -119,6 +119,7 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
       gender: known?.gender ?? null,
       group: known?.group ?? null,
       quote,
+      sourceText,
       source: String(expert?.source ?? "").trim().replace(/\.$/, ""),
       context: String(expert?.context ?? "").trim(),
       doesNotSay: String(expert?.doesNotSay ?? "").trim(),

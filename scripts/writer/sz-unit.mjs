@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOpening, wireGate } from "./lib/sites/sz/apply.mjs";
 import { assembleSzArticle, nestQuotes, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
 import { BudgetError, makeCaller } from "./lib/call.mjs";
-import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
+import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor, costRub, estimatePromptTokens, worstCaseRub } from "./lib/cost.mjs";
 import { collectResult, runDetached } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
@@ -27,8 +27,8 @@ import {
 } from "./lib/sites/sz/experts.mjs";
 import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
-import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline } from "./lib/sites/sz/pipeline.mjs";
-import { buildSzMessages } from "./lib/sites/sz/prompt.mjs";
+import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
+import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
 import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -273,6 +273,128 @@ test("LESSONS.md: every bullet is a «Неверно → Верно» item, seed
   assert.deepEqual(parseCorrections("- Неверно: «а» → Верно: «б». Почему: в.\n- просто строка"), ["Неверно: «а» → Верно: «б». Почему: в."]);
 });
 
+// ── hybrid repair: injected generation only, no subprocesses or network ──
+test("hybrid: strict repair options and unknown models fail before generate", () => {
+  const limits = { model: SZ_DEFAULT_MODEL, maxTokens: 16000 };
+  assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "full" });
+  assert.deepEqual(szRepairOptions({ "repair-model": "openai/gpt-5.4-mini", "repair-max-tokens": "4000", "repair-mode": "targeted" }, limits), { model: "openai/gpt-5.4-mini", maxTokens: 4000, mode: "targeted" });
+  for (const bad of ["0", "32001", "1.5", "1e3", "NaN", "", "-1", "Infinity"]) assert.throws(() => szRepairOptions({ "repair-max-tokens": bad }, limits), /repair-max-tokens/);
+  for (const token of ["1", "32000"]) assert.equal(szRepairOptions({ "repair-max-tokens": token }, limits).maxTokens, Number(token));
+  assert.throws(() => szRepairOptions({ "repair-model": "unknown" }, limits), (error) => error.code === 1);
+  assert.throws(() => szRepairOptions({}, { ...limits, model: "unknown" }), (error) => error.code === 1);
+  assert.throws(() => szRepairOptions({ "repair-mode": "other" }, limits), /repair-mode/);
+  assert.equal(costRub("openai/gpt-5.4-mini", 1e6, 1e6), 147.315 + 883.89);
+});
+
+const hybridBuild = (raw) => {
+  const { fields: normalized } = normalizeSzFields(raw);
+  const md = assembleSzArticle(brief, normalized, view.site, { date: pack.publishedAt });
+  return { fields: normalized, md, problems: checkSzArticle(md, cfg, env) };
+};
+const hybridRaw = () => ({ ...structuredClone(fields), description: "коротко" });
+
+test("targeted: schema subset, compact context, deterministic merge and repeated gate", () => {
+  const raw = hybridRaw();
+  const before = structuredClone(raw);
+  const problems = hybridBuild(raw).problems;
+  const target = buildSzTargetedRepair(brief, raw, problems);
+  assert.deepEqual(target.fields, ["description"]);
+  assert.deepEqual(target.schema.properties, { description: szArticleSchema().properties.description });
+  assert.equal(target.schema.additionalProperties, false);
+  const merged = applySzRepairPatch(raw, { description: fields.description }, target.schema);
+  assert.deepEqual(raw, before);
+  for (const key of Object.keys(raw)) if (key !== "description") assert.deepEqual(merged[key], raw[key]);
+  assert.deepEqual(errorsOf(hybridBuild(merged).problems), []);
+  const full = buildSzRepairMessages(buildSzMessages(brief, view.site), raw, problems);
+  const chars = (messages) => messages.reduce((sum, m) => sum + m.content.length, 0);
+  assert.ok(chars(target.messages) * 3 < chars(full));
+  console.log(`repair prompt chars: full=${chars(full)}, targeted=${chars(target.messages)}`);
+  const compact = JSON.stringify(target.messages);
+  assert.ok(!compact.includes("УРОКИ РЕДАКТУРЫ") && !compact.includes("sourceText") && !compact.includes('\\"story\\"'));
+  const experts = buildSzTargetedRepair(brief, raw, [{ severity: "error", field: "experts[0].bridge", code: "expert-bridge", message: "цитата" }]);
+  assert.deepEqual(experts.fields, ["experts"]);
+  assert.ok(JSON.stringify(experts.messages).includes(brief.experts[0].quote));
+  assert.ok(szRepairFields(raw, [{ severity: "error", field: "table", code: "table", message: "нет таблицы" }]).includes("tableSection"));
+  assert.ok(szRepairFields(raw, [{ severity: "error", field: "sections", code: "body-length", message: "объём" }]).includes("steps"));
+  assert.deepEqual(szRepairFields(raw, [{ severity: "error", field: "*", code: "unknown", message: "неизвестная ошибка" }]), Object.keys(szArticleSchema().properties));
+  for (const patch of [null, {}, [], "json", { description: 12 }, { description: fields.description, story: [] }]) assert.equal(applySzRepairPatch(raw, patch, target.schema), null);
+  assert.equal(applySzRepairPatch(raw, { experts: [{ name: "x" }] }, experts.schema), null);
+});
+
+test("hybrid calls: repair model/tokens, ledger, invalid patch, default full and shared budget", () => {
+  const root = mkdtempSync(join(tmpdir(), "writer-hybrid-"));
+  const oldHome = process.env.HOME;
+  process.env.HOME = root;
+  try {
+    const state = { spentRub: 0, calls: [], warnings: [] };
+    const requests = [];
+    let answer = { description: fields.description };
+    const generate = (_run, _call, requestFile) => {
+      requests.push(readJson(requestFile));
+      return { meta: { ok: true, http: 200, cost_rub: 0.1 }, article: structuredClone(answer) };
+    };
+    const model = "openai/gpt-5.4-mini";
+    const base = { model, maxTokens: 800, maxRub: 45, outDir: root, runId: "test", state, schemaName: "s", generate };
+    const repair = szRepairOptions({ "repair-model": SZ_DEFAULT_MODEL, "repair-mode": "targeted", "repair-max-tokens": "4000" }, base);
+    const messages = buildSzMessages(brief, view.site);
+    const callRepair = makeCaller({ ...base, ...repair });
+    const runRepair = (options = {}) => repairSzArticle({ brief, raw: hybridRaw(), build: hybridBuild, messages, repair, callRepair, state, ...options });
+    const fixed = runRepair();
+    assert.deepEqual(fixed.errors, []);
+    assert.ok(fixed.errorsBeforeRepair.length > 0);
+    assert.equal(requests[0].model, SZ_DEFAULT_MODEL);
+    assert.equal(requests[0].max_tokens, 4000);
+    assert.equal(state.calls[0].model, SZ_DEFAULT_MODEL);
+    const ledger = readFileSync(join(root, ".cache/writer/ledger.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+    assert.equal(ledger[0].model, SZ_DEFAULT_MODEL);
+    answer = {};
+    const invalid = runRepair();
+    assert.deepEqual(invalid.result.fields, hybridBuild(hybridRaw()).fields);
+    assert.ok(invalid.errors.length > 0);
+    assert.match(state.warnings.at(-1), /невалидный/);
+    answer = structuredClone(fields);
+    const defaults = szRepairOptions({}, base);
+    const full = runRepair({ repair: defaults, callRepair: makeCaller(base) });
+    assert.deepEqual(full.errors, []);
+    assert.equal(requests.at(-1).model, model);
+    assert.equal(requests.at(-1).max_tokens, 800);
+    assert.deepEqual(requests.at(-1).messages, buildSzRepairMessages(messages, hybridRaw(), hybridBuild(hybridRaw()).problems));
+    assert.deepEqual(requests.at(-1).response_format.json_schema.schema, szArticleSchema());
+
+    const budgetState = { spentRub: 0, calls: [], warnings: [] };
+    const cheap = makeCaller({ ...base, state: budgetState, maxRub: 5 });
+    const expensive = makeCaller({ ...base, ...repair, state: budgetState, maxRub: 5 });
+    answer = hybridRaw();
+    const draft = cheap("first-generate", messages, szArticleSchema());
+    const skipped = runRepair({ raw: draft, state: budgetState, callRepair: expensive });
+    assert.equal(skipped.repairSkipped, "budget");
+    assert.deepEqual(skipped.errorsBeforeRepair, skipped.errors);
+    assert.equal(budgetState.calls.length, 1);
+    assert.deepEqual(cheap("next-generate", messages, szArticleSchema()), draft);
+    assert.deepEqual(budgetState.calls.map((call) => call.model), [model, model]);
+    assert.equal(budgetState.spentRub, 0.2);
+    const blocked = makeCaller({ ...base, maxRub: 0.001, state: budgetState });
+    const countBefore = requests.length;
+    assert.throws(() => blocked("blocked-generate", messages, szArticleSchema()), BudgetError);
+    assert.equal(requests.length, countBefore);
+    const unknown = { "repair-model": "unknown" };
+    assert.throws(() => { szRepairOptions(unknown, base); cheap("never", messages, szArticleSchema()); }, (error) => error.code === 1);
+    assert.equal(requests.length, countBefore);
+    const report = szReportMarkdown({ ...budgetState, articles: [{ slug: brief.slug, ...skipped, errorsAfterRepair: skipped.errors }] });
+    assert.match(report, /repairSkipped: budget/);
+    assert.ok(report.includes(model) && report.includes("Итого:"));
+    // With missing usage each caller charges its own model's worst case against the same state.
+    const missing = makeCaller({ ...base, ...repair, generate: () => ({ meta: { ok: false }, article: null }) });
+    const start = state.spentRub;
+    missing("missing", [{ role: "user", content: "тест" }], szArticleSchema());
+    assert.ok(Math.abs(state.spentRub - start - worstCaseRub(repair.model, estimatePromptTokens([{ role: "user", content: "тест" }], repair.model), repair.maxTokens)) < 1e-9);
+  } finally {
+    if (oldHome === undefined) delete process.env.HOME;
+    else process.env.HOME = oldHome;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // ── apply helpers + generated gate ──
 test("apply: story opening, canonical counter, package.json wiring", () => {
   assert.equal(storyOpening(angelMd).length, 14);
@@ -344,6 +466,51 @@ await testAsync("branch: writer/sz-<pack> on origin stops the run before generat
   assert.equal(calls, 1);
   assert.equal(proceeded.code, 9);
   assert.match(proceeded.state.failure, /generate sentinel/);
+
+  // Hybrid pack: skipped repairs do not stop the next article; generate budget refusal
+  // retains completed drafts and both reports. Only local fixture Git operations are used.
+  const previousHome = process.env.HOME;
+  process.env.HOME = root;
+  try {
+    const hybridPack = structuredClone(rawPack);
+    const second = structuredClone(hybridPack.articles[0]);
+    second.slug = "angel-second";
+    second.query = "образ ангела";
+    for (const expert of second.experts) expert.quote = expert.quote.split(" ").slice(0, -2).join(" ");
+    hybridPack.articles.push(second);
+    const hybridBrief = join(root, "hybrid-pack.json");
+    writeFileSync(hybridBrief, JSON.stringify(hybridPack));
+    const hybridArgs = (name) => ({ ...args(name), briefs: hybridBrief, "repair-model": SZ_DEFAULT_MODEL, "repair-max-tokens": "4000", "repair-mode": "targeted" });
+    let billed = 0.01;
+    const generated = [];
+    const fakeGenerate = (_run, call, requestFile) => {
+      generated.push({ call, request: readJson(requestFile) });
+      return { meta: { ok: true, http: 200, cost_rub: billed }, article: hybridRaw() };
+    };
+    const hybridLimits = { ...limits, maxTokens: 100, generate: fakeGenerate };
+    const skippedPack = await runSzPipeline(hybridArgs("hybrid-skip"), hybridLimits);
+    assert.equal(skippedPack.code, 2);
+    assert.equal(generated.length, 2);
+    assert.ok(generated.every(({ call }) => call.endsWith("-generate")));
+    assert.deepEqual(skippedPack.state.articles.map((article) => article.repairSkipped), ["budget", "budget"]);
+    assert.ok(existsSync(join(root, "hybrid-skip", second.slug, "fields.json")));
+    billed = 2.99;
+    generated.length = 0;
+    const exhausted = await runSzPipeline(hybridArgs("hybrid-exhausted"), hybridLimits);
+    assert.equal(exhausted.code, 5);
+    assert.equal(generated.length, 1);
+    const saved = readJson(join(root, "hybrid-exhausted/report.json"));
+    assert.equal(saved.articles.length, 1);
+    assert.equal(saved.articles[0].repairSkipped, "budget");
+    assert.ok(existsSync(join(root, "hybrid-exhausted", brief.slug, "fields.json")));
+    assert.ok(existsSync(join(root, "hybrid-exhausted/report.md")));
+    await assert.rejects(runSzPipeline({ ...hybridArgs("hybrid-unknown"), "repair-model": "unknown" }, hybridLimits), (error) => error.code === 1);
+    assert.equal(generated.length, 1);
+
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+  }
 
   // Present on origin (left from an earlier successful run, local branch already deleted) → stop, 0 calls.
   git(clone, "push", "-q", "origin", `main:refs/heads/${branch}`);

@@ -4,6 +4,8 @@ export const TARIFF = {
   "Qwen/Qwen3.6-35B-A3B": { inputPer1M: 219.6, outputPer1M: 329.4 },
   // Stronger models for the sz model trial (c62ac1d5), prices from GET /v1/models metadata, 2026-10-24.
   "anthropic/claude-opus-4.8": { inputPer1M: 854, outputPer1M: 4270 },
+  // GET /v1/models Cloud.ru, 2026-10-24, models-prices.tsv; RUB incl. VAT per 1M tokens.
+  "openai/gpt-5.4-mini": { inputPer1M: 147.315, outputPer1M: 883.89 },
   "openai/gpt-5.5": { inputPer1M: 854, outputPer1M: 5124 },
   "google/gemini-3.1-pro-preview": { inputPer1M: 341.6, outputPer1M: 2049.6 },
   "deepseek-ai/DeepSeek-V4-Pro": { inputPer1M: 183, outputPer1M: 732 },
@@ -70,13 +72,17 @@ export function parseMaxRub(raw, label = "--max-rub") {
 
 export function parseLimits(maxRubRaw, maxTokensRaw) {
   const maxRub = parseMaxRub(maxRubRaw);
+  return { maxRub, maxTokens: parseMaxTokens(maxTokensRaw) };
+}
+
+export function parseMaxTokens(maxTokensRaw, label = "--max-tokens") {
   const tokensText = String(maxTokensRaw ?? "").trim();
-  if (!/^\d+$/.test(tokensText)) throw new Error(`--max-tokens: нужно целое положительное число, получено «${maxTokensRaw}»`);
+  if (!/^\d+$/.test(tokensText)) throw new Error(`${label}: нужно целое положительное число, получено «${maxTokensRaw}»`);
   const maxTokens = Number(tokensText);
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 1 || maxTokens > MAX_TOKENS_CEILING) {
-    throw new Error(`--max-tokens: допустимо от 1 до ${MAX_TOKENS_CEILING}, получено «${maxTokensRaw}»`);
+    throw new Error(`${label}: допустимо от 1 до ${MAX_TOKENS_CEILING}, получено «${maxTokensRaw}»`);
   }
-  return { maxRub, maxTokens };
+  return maxTokens;
 }
 
 /**

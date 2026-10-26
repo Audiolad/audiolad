@@ -159,3 +159,57 @@ export function buildSzRepairMessages(messages, previous, problems, stats = {}) 
     },
   ];
 }
+
+/** Select whole top-level fields; an ambiguous gate error conservatively keeps all candidates. */
+export function szRepairFields(previous, problems) {
+  const keys = Object.keys(szArticleSchema().properties);
+  const sections = ["sectionsBefore", "tableSection", "steps", "sectionsAfter", "specialist"];
+  const aliases = { sections, table: ["tableSection"], headings: [...sections, "faqHeading"], questions: ["faq"], quotations: ["experts"] };
+  const selected = new Set();
+  for (const problem of problems.filter((item) => item.severity === "error")) {
+    const field = String(problem.field).split(/[.[]/)[0];
+    let matches = keys.includes(field) ? [field] : aliases[field];
+    if (!matches) {
+      const quoted = [...problem.message.matchAll(/«([^»]+)»/g)].map((match) => match[1]);
+      matches = keys.filter((key) => quoted.some((text) => JSON.stringify(previous[key])?.includes(text)));
+      if (!matches.length && /expert|portrait/.test(problem.code)) matches = ["experts"];
+      if (!matches.length && /checklist/.test(problem.code)) matches = ["checklist"];
+      if (!matches.length && /specialist|disclaimer/.test(problem.code)) matches = ["specialist"];
+      if (!matches.length) matches = keys;
+    }
+    for (const key of matches) selected.add(key);
+  }
+  return keys.filter((key) => selected.has(key));
+}
+
+export function buildSzTargetedRepair(article, previous, problems) {
+  const fields = szRepairFields(previous, problems);
+  const schema = object(Object.fromEntries(fields.map((key) => [key, szArticleSchema().properties[key]])));
+  const relevant = { title: article.title, query: article.query, facts: article.facts, forbiddenPhrases: article.forbiddenPhrases, extraInstructions: article.extraInstructions };
+  if (fields.includes("practiceIntro") || fields.includes("checklist")) relevant.practice = article.practice;
+  if (fields.includes("experts") || problems.some((p) => /expert|quote|verbatim/.test(p.code))) {
+    relevant.experts = article.experts.map(({ name, quote, source, sourceText, context, doesNotSay, caution, forbiddenInBridge }) => ({ name, quote, source, sourceText, context, doesNotSay, caution, forbiddenInBridge }));
+    relevant.verbatim = article.verbatim;
+  }
+  if (fields.some((key) => ["story", "transition", "storyEnding"].includes(key))) relevant.storyHint = article.storyHint;
+  if (fields.some((key) => ["sectionsBefore", "tableSection", "steps", "sectionsAfter"].includes(key))) relevant.links = article.links.contextual;
+  const messages = [
+    { role: "system", content: "Ты – Зоя Петрова. Пиши тепло, ясно, по-русски, на «вы», без пафоса. Зоя не психолог; эзотерика не наука. Только тире «–» и кавычки «». Цитаты строго дословно по материалам, не приписывай экспертам выводов. Без обещаний лечения, гарантий, защиты, призыва, предсказаний, дискомфорта и советов остановить запись. Без внешних адресов, MAX, видимых дат и служебных пометок. Не выдумывай факты. Сохрани внутренние ссылки. Исправь ошибки с указанными длинами полей. Верни только JSON patch по схеме: полные значения выбранных полей, без остальных полей и пояснений." },
+    { role: "user", content: ["БРИФ:", JSON.stringify(relevant), "ОШИБКИ (включая требуемые длины):", ...problems.filter((p) => p.severity === "error").map((p) => `${p.field}: ${p.message}`), "ТЕКУЩИЕ ПОЛЯ:", JSON.stringify(Object.fromEntries(fields.map((key) => [key, previous[key]])))].join("\n") },
+  ];
+  return { fields, schema, messages };
+}
+
+// Validate the exact schema subset used above, including nested required fields and array bounds.
+function matchesSchema(value, schema) {
+  if (schema.type === "string") return typeof value === "string";
+  if (schema.type === "array") return Array.isArray(value) && value.length <= schema.maxItems && value.every((item) => matchesSchema(item, schema.items));
+  if (schema.type !== "object" || !value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.keys(value).every((key) => Object.hasOwn(schema.properties, key))
+    && schema.required.every((key) => Object.hasOwn(value, key) && matchesSchema(value[key], schema.properties[key]));
+}
+
+export function applySzRepairPatch(previous, patch, schema) {
+  if (!schema.required.length || !matchesSchema(patch, schema)) return null;
+  return { ...structuredClone(previous), ...structuredClone(patch) };
+}

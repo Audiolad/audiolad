@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { copyFileSync, existsSync, mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { makeCaller } from "../../call.mjs";
-import { formatRub } from "../../cost.mjs";
+import { BudgetError, makeCaller } from "../../call.mjs";
+import { SUPPORTED_MODELS, formatRub, parseMaxTokens } from "../../cost.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "../../publish.mjs";
 import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } from "../../util.mjs";
 import { DISCOMFORT_PATTERNS as BASE_DISCOMFORT } from "../../validate.mjs";
@@ -19,7 +19,7 @@ import { checksMarkdown, compareSzChecks, runSzChecks } from "./checks.mjs";
 import { SZ } from "./config.mjs";
 import { loadSzContext } from "./context.mjs";
 import { expertCard, loadExpertPool, rankExperts, rotationAdvice } from "./experts.mjs";
-import { buildSzMessages, buildSzRepairMessages, szArticleSchema } from "./prompt.mjs";
+import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema } from "./prompt.mjs";
 import { checkSzArticle, checkSzPack, uniqueKeys } from "./rules.mjs";
 
 export class SzStop extends Error {
@@ -109,6 +109,7 @@ export function expertsReport(pool, ctx) {
 }
 
 export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }) {
+  const repair = szRepairOptions(args, { model, maxTokens });
   const pool = loadExpertPool(args.experts ? resolve(args.experts) : undefined);
   const repo = resolve(args.repo ?? process.env.WRITER_SZ_REPO ?? "");
   if (!args.repo && !process.env.WRITER_SZ_REPO) throw new SzStop(1, "--repo <клон sergey-zoya-site> обязателен для --site sz");
@@ -128,10 +129,12 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   // existing branch only after the whole budget is spent.
   assertBranchFree(repo, branch);
   const budget = Math.min(maxRub, pack.maxRub ?? Infinity);
-  const state = { site: "sz", runId, model, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [], warnings: [] };
+  const state = { site: "sz", runId, model, repairModel: repair.model, repairMaxTokens: repair.maxTokens, repairMode: repair.mode, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [], warnings: [] };
   mkdirSync(outDir, { recursive: true });
   writeJson(join(outDir, "pack.json"), pack);
   const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate });
+
+  const callRepair = makeCaller({ ...repair, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate });
 
   let code = 0;
   try {
@@ -181,22 +184,13 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         raw = callWriter(`${brief.slug}-generate`, messages, schema);
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
-      let result = build(raw);
-      let errors = result.problems.filter((problem) => problem.severity === "error");
-      log(`${brief.slug}: ошибок ${errors.length}, предупреждений ${result.problems.length - errors.length}`);
-      if (errors.length && !args.offline && !args["no-repair"]) {
-        const repaired = callWriter(`${brief.slug}-repair`, buildSzRepairMessages(messages, raw, result.problems), schema);
-        if (repaired) {
-          raw = repaired;
-          result = build(raw);
-          errors = result.problems.filter((problem) => problem.severity === "error");
-          log(`${brief.slug} после исправления: ошибок ${errors.length}`);
-        }
-      }
+      const { result, errors, errorsBeforeRepair, repairSkipped } = repairSzArticle({
+        brief, raw, build, messages, schema, repair, callRepair, state, args,
+      });
       writeJson(join(outDir, brief.slug, "fields.json"), result.fields);
       writeText(join(outDir, brief.slug, `${brief.slug}.md`), result.md);
       for (const error of errors) log(`  ✗ ${brief.slug} ${error.field}: ${error.message}`);
-      state.articles.push({ slug: brief.slug, errors, warnings: result.problems.filter((problem) => problem.severity !== "error") });
+      state.articles.push({ slug: brief.slug, errorsBeforeRepair, errorsAfterRepair: errors, repairSkipped, errors, warnings: result.problems.filter((problem) => problem.severity !== "error") });
       items.push({ brief, cfg, fields: result.fields, md: result.md });
     }
     const packProblems = checkSzPack(items);
@@ -237,6 +231,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   }
   state.finishedAt = mskNow();
   writeJson(join(outDir, "report.json"), state);
+  writeText(join(outDir, "report.md"), szReportMarkdown(state));
   if (!args["keep-worktree"] && existsSync(worktree) && (code !== 0 || state.prUrl)) {
     run("git", ["worktree", "remove", "--force", worktree], { cwd: repo });
     run("git", ["branch", "-D", branch], { cwd: repo });
@@ -263,4 +258,55 @@ export function prBody(state, items, pack, stage) {
     "- независимая вычитка каждой статьи (факты, цитаты по источникам, тон);",
     "- merge и деплой – вручную, Райтер их не делает.",
   ].join("\n");
+}
+
+export function szRepairOptions(args, { model, maxTokens }) {
+  const repairModel = args["repair-model"] ?? model;
+  for (const candidate of [model, repairModel]) {
+    if (!SUPPORTED_MODELS.includes(candidate)) throw new SzStop(1, `Модель ${candidate} не поддерживается. Доступны: ${SUPPORTED_MODELS.join(", ")}`);
+  }
+  const mode = args["repair-mode"] ?? "full";
+  if (!["full", "targeted"].includes(mode)) throw new SzStop(1, "--repair-mode: full или targeted");
+  return { model: repairModel, maxTokens: parseMaxTokens(args["repair-max-tokens"] ?? maxTokens, "--repair-max-tokens"), mode };
+}
+
+export function szReportMarkdown(state) {
+  const lines = ["# Отчёт Райтера sz", "", ...state.calls.map((call) => `- ${call.name}: ${call.model ?? "offline"} – ${formatRub(call.costRub)}${call.costEstimated ? " (худший случай: нет usage)" : ""}`), "", `Итого: ${formatRub(state.spentRub)}`, ""];
+  for (const article of state.articles) {
+    lines.push(`## ${article.slug}`, "", `repairSkipped: ${article.repairSkipped ?? "нет"}`, "", "До repair:", ...article.errorsBeforeRepair.map((p) => `- ${p.field}: ${p.message}`), "", "После repair:", ...article.errorsAfterRepair.map((p) => `- ${p.field}: ${p.message}`), "");
+  }
+  lines.push(...state.warnings.map((warning) => `- ⚠ ${warning}`));
+  if (state.failure) lines.push("", `СТОП: ${state.failure}`);
+  return lines.join("\n");
+}
+
+/** One repair attempt, shared by the pack loop and offline tests with an injected caller. */
+export function repairSzArticle({ brief, raw, build, messages, schema = szArticleSchema(), repair, callRepair, state, args = {} }) {
+  let result = build(raw);
+  let errors = result.problems.filter((problem) => problem.severity === "error");
+  log(`${brief.slug}: ошибок ${errors.length}, предупреждений ${result.problems.length - errors.length}`);
+  const errorsBeforeRepair = errors;
+  let repairSkipped = null;
+  if (errors.length && !args.offline && !args["no-repair"]) {
+    const target = repair.mode === "targeted" ? buildSzTargetedRepair(brief, raw, result.problems) : null;
+    try {
+      const answer = callRepair(`${brief.slug}-repair`, target?.messages ?? buildSzRepairMessages(messages, raw, result.problems), target?.schema ?? schema);
+      const repaired = target ? applySzRepairPatch(raw, answer, target.schema) : answer;
+      if (repaired) {
+        raw = repaired;
+        result = build(raw);
+        errors = result.problems.filter((problem) => problem.severity === "error");
+        log(`${brief.slug} после исправления: ошибок ${errors.length}`);
+      } else if (target) {
+        const warning = `${brief.slug}: невалидный/пустой patch – исходный вариант сохранён`;
+        state.warnings.push(warning);
+        log(warning);
+      }
+    } catch (error) {
+      if (!(error instanceof BudgetError)) throw error;
+      repairSkipped = "budget";
+      log(`${brief.slug}: repair пропущен: бюджет`);
+    }
+  }
+  return { result, errors, errorsBeforeRepair, repairSkipped };
 }
