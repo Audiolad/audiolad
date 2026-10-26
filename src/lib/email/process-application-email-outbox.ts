@@ -194,16 +194,22 @@ export async function processApplicationEmailOutbox(options: {
       continue;
     }
 
-    const delivery = await options.deliver({
-      from: transport.from,
-      replyTo: transport.replyTo,
-      envelopeFrom: transport.envelopeFrom,
-      to: row.toEmail,
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      messageId: `<manual-campaign-${row.id}@audiolad.ru>`,
-    });
+    let delivery: EmailProviderResult;
+    try {
+      delivery = await options.deliver({
+        from: transport.from,
+        replyTo: transport.replyTo,
+        envelopeFrom: transport.envelopeFrom,
+        to: row.toEmail,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        messageId: `<manual-campaign-${row.id}@audiolad.ru>`,
+      });
+    } catch {
+      // Persist a retry without exposing transport exceptions (which may contain credentials).
+      delivery = { ok: false, code: "provider_error", message: "transport_exception", retryable: true };
+    }
 
     if (!delivery.ok) {
       const outcome = await options.runtime.failOutbox({
