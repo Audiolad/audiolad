@@ -427,6 +427,7 @@
     "test:business-declared-rightsholder-form": "npx tsx scripts/business-declared-rightsholder-form-unit.mts",
     "test:business-rightsholder-onboarding": "node scripts/business-rightsholder-onboarding-sql-unit.mjs",
     "test:business-owner-self-moderation": "node scripts/business-owner-self-moderation-sql-unit.mjs",
+    "test:business-catalog-approved-email": "node --import tsx scripts/business-catalog-approved-email-unit.mts",
     "test:admin-business-verification": "npx tsx scripts/admin-business-verification-unit.mts",
     "test:admin-business-case-collapsible": "npx tsx scripts/admin-business-case-collapsible-unit.tsx",
     "test:business-rightsholder-examples-ui": "node scripts/business-rightsholder-examples-ui-unit.mjs",

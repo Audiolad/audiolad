@@ -128,13 +128,13 @@ const migrationHits = readdirSync(path.join(root, "supabase/migrations")).filter
 );
 assert.deepEqual([...migrationHits].sort(), [
   "20261009120200_practice_catalog_sections.sql",
-  "20270124120000_practice_listener_comments.sql",
+  "20270124140000_practice_listener_comments.sql",
 ]);
 const sectionMigration = read("supabase/migrations/20261009120200_practice_catalog_sections.sql");
 for (const value of ["music", "meditations", "education", "stories", "books"]) {
   assert.match(sectionMigration, new RegExp(`'${value}'`));
 }
-const listenerMigration = read("supabase/migrations/20270124120000_practice_listener_comments.sql");
+const listenerMigration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
 assert.match(listenerMigration, /p\.catalog_section IS NULL OR p\.catalog_section <> 'music'/);
 assert.doesNotMatch(listenerMigration, /'(?:meditations|education|stories|books)'/);
 

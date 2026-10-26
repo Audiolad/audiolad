@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migration = readFileSync(
-  join(root, "supabase/migrations/20270124120000_practice_listener_comments.sql"),
+  join(root, "supabase/migrations/20270124140000_practice_listener_comments.sql"),
   "utf8",
 );
 

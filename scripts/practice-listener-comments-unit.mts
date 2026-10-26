@@ -277,7 +277,7 @@ async function testProductGatesAndRatingsIsolation() {
     true,
   );
 
-  const migration = read("supabase/migrations/20270124120000_practice_listener_comments.sql");
+  const migration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
   const migrationSql = migration
     .split("\n")
     .filter((line) => !line.trim().startsWith("--"))
@@ -486,7 +486,7 @@ async function testEmptyAndPlayerCopy() {
   assert.match(player, /Начать заново/);
   assert.match(player, /ListenerImpressionInvite/);
   assert.match(player, /session\.listenerImpressionHref/);
-  const migration = read("supabase/migrations/20270124120000_practice_listener_comments.sql");
+  const migration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
   assert.match(migration, /No email or SMS is sent from this table/);
   assert.equal(memoryId().length, 36);
 }
@@ -981,7 +981,7 @@ async function testAvatars() {
     image: { bytes: photo, contentType: "image/webp" },
   });
   assert.equal(ownerHidden.status, 200);
-  const migration = read("supabase/migrations/20270124120000_practice_listener_comments.sql");
+  const migration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
   const viewStart = migration.indexOf("CREATE OR REPLACE VIEW public.practice_listener_comment_feed");
   const viewSelect = migration.slice(viewStart, migration.indexOf("FROM public.practice_listener_comments AS c", viewStart));
   assert.match(viewSelect, /AS avatar_url/);

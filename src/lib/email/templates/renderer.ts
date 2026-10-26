@@ -1,4 +1,11 @@
 import {
+  BUSINESS_CATALOG_APPROVED_TEMPLATE_KEY,
+  BUSINESS_CATALOG_APPROVED_TEMPLATE_VERSION,
+  BUSINESS_CATALOG_APPROVED_SUBJECT,
+  BUSINESS_CATALOG_APPROVED_TEXT,
+  renderBusinessCatalogApprovedEmailHtml,
+} from "./business-catalog-approved";
+import {
   AUTHOR_APPLICATION_APPROVED_EMAIL_SUBJECT,
   AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_KEY,
   AUTHOR_APPLICATION_APPROVED_EMAIL_TEMPLATE_VERSION,
@@ -150,6 +157,17 @@ function readString(payload: Record<string, unknown>, key: string): string | nul
 
 export class BrandEmailTemplateRenderer implements EmailTemplateRenderer {
   async render(input: EmailTemplateRenderInput): Promise<EmailTemplateRenderResult> {
+    if (input.templateKey === BUSINESS_CATALOG_APPROVED_TEMPLATE_KEY) {
+      if (input.templateVersion !== BUSINESS_CATALOG_APPROVED_TEMPLATE_VERSION) {
+        return { ok: false, code: "invalid_payload" };
+      }
+      return {
+        ok: true,
+        subject: BUSINESS_CATALOG_APPROVED_SUBJECT,
+        html: renderBusinessCatalogApprovedEmailHtml(),
+        text: BUSINESS_CATALOG_APPROVED_TEXT,
+      };
+    }
     if (input.templateKey === WELCOME_EMAIL_TEMPLATE_KEY) {
       const userName = readString(input.payload, "userName");
 

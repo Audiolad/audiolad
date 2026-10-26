@@ -1,6 +1,6 @@
 ## Listener impressions (pending owner apply)
 
-Migration `20270124120000_practice_listener_comments.sql` is additive and is not
+Migration `20270124140000_practice_listener_comments.sql` is additive and is not
 applied by the draft that adds it. Do not apply it from this change. New tables:
 `practice_listener_comments`, `practice_listener_comment_reports`,
 `practice_listener_comment_moderation_events`,
@@ -2191,3 +2191,17 @@ Full schema/RPC lifecycle, RLS, backup and manual rollback:
 Поля: identity `id`, FK `run_id` на неизменяемый прогон, FK `created_by` на пользователя, `created_at`, `schema_version`, `reason`, JSON `patch` ≤16 KiB. Индекс `(run_id,id)` задаёт порядок истории. RLS включён; anon/authenticated не имеют прав; service_role имеет SELECT/INSERT и доступ к sequence, без UPDATE/DELETE. Owner/admin проверяет API. Политики, таблицы и данные существующих паспортов не меняются. null в patch возвращает автоматическое значение выбранного признака; история сохраняется.
 
 Автоматические признаки версии `audiolad-features:1` добавляются в существующий `music_analyzer_runs.normalized_json.analysis_features_v1` при новых прогонах. Ранее сохранённые raw/normalized не пересчитываются. Старые поля и масштаб энергии 0–1 сохранены. Расширенный блок не дублируется в `structured_fields` с лимитом 20 000 байт; доступен через существующий `analyzer_run_id`. Поправки не меняют sealed паспорт, альбом и описание. Подробности: `docs/music-analyzer/INVENTORY-09d393ce.md`, `EVAL-09d393ce.md`.
+
+## Подготовлено в задаче d60213c5: письмо о допуске каталога в Бизнес
+
+Миграция `20270124130000_business_catalog_approved_email.sql` подготовлена, к рабочей БД не применялась. Аддитивное изменение – новая SECURITY DEFINER trigger-функция `enqueue_business_catalog_approved_email()` с закрытым прямым доступом и новый AFTER UPDATE OF status trigger `business_catalog_approved_email`. Колонки, таблицы, данные, RLS и существующий RPC модерации не изменяются; backfill ранее одобренных заявок отсутствует.
+
+Только переход `business_rightsholder_verifications.status: submitted → verified` добавляет запись в существующую `email_outbox` в той же транзакции. Получатель – нормализованный `auth.users.email` по `owner_user_id` заявки, не email из доказательств или произвольного автора. Отсутствие email аккаунта блокирует сохранение с диагностикой `business_catalog_approved_account_email_missing`. Письмо недоступно отправщику до commit; rollback решения откатывает и очередь.
+
+Поля очереди: `message_type = author_operational`, `template_key = business_catalog_approved`, `template_version = business-catalog-approved-v1`, `payload = {senderIdentity: authors, verificationId}`, `deduplication_key = business-catalog-approved:<verification UUID>`. Используется постоянный уникальный индекс `email_outbox_deduplication_key_uidx` из миграции `20261219120000`, включая уже отправленные письма; конфликт не создаёт повторную запись.
+
+Доставку выполняет существующий application email outbox worker через Authors SMTP и фирменный HTML-макет. Он фиксирует `sent_at`, ошибки и попытки; временная ошибка возвращает запись в `pending` с задержкой, максимум 5 попыток. Исключение транспорта также фиксируется без вывода его содержимого. Ошибки почты не меняют решение модератора. После исчерпания попыток запись остаётся `failed`; ручной повтор требует отдельно согласованного возврата той же записи в очередь, без нового ключа и без сброса `sent`. Существующие правила suppressions сохраняются.
+
+Проверка: `npm run test:business-catalog-approved-email` – реальный PostgreSQL single-user в `/tmp` с минимальными заглушками связанных таблиц и неизменённым RPC модерации, затем существующий memory runtime и настоящий processor/renderer с тестовым транспортом. Это не применение всей истории миграций и не проверка рабочего SMTP. Бинарные файлы PostgreSQL определяются через `AUDIOLAD_PG_BINDIR` (совместимость: `AUDIOLAD_TEST_PG_BIN`), `PATH` или `pg_config --bindir`. При их отсутствии локально выводится явный пропуск; в CI проверка обязательна и завершается ошибкой. Тест включён в `business-pr-validation.yml`; временный кластер удаляется после SQL-проверки.
+
+Предел существующего SMTP-протокола: очередь исключает повторы сохранения и штатных обработчиков, но авария между принятием письма SMTP-сервером и записью `sent` может привести к повторной доставке после истечения lease. Стабильный Message-ID сохраняется; SMTP не предоставляет строгой гарантии exactly-once.
