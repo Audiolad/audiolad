@@ -32,7 +32,7 @@ import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, isSpecialistQuestion, normalize, paragraphsTooClose, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, isSpecialistQuestion, linkLeadResidue, normalize, paragraphsTooClose, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -2651,6 +2651,98 @@ test("tiered: a generic anchor inside the angel prayer moves out and keeps the q
   assert.ok(repaired.result.fields.sectionsBefore[0].paragraphs[4].includes("[Ченнелинг в эзотерике](/s/chenneling-v-ezoterike)"));
   assert.ok(repaired.result.md.includes("«Ангеле Божий, хранителю мой святый"));
   assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: every glued link suffix leaves the story and the prayer, and residue fails the gate", () => {
+  const opening = fields.story[0];
+  const prayer = fields.sectionsBefore[0].paragraphs[1];
+  assert.equal(errorsOf(checkSzArticle(assembled, cfg, env)).some((problem) => problem.code === "links-residue"), false);
+  assert.equal(linkLeadResidue("Подробнее о границах в статье [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+  assert.equal(linkLeadResidue("Подробнее: [Эзотерика и церковь](/s/ezoterika-i-tserkov).").length, 0);
+  for (const sample of ["Подробнее: .", "Подробнее:", "Читайте также: .", "Читайте также:", "[]().", "Мысль обрывается: .", "Цитата оборвалась:»", "направи. Подробнее: .»"]) {
+    const codes = errorsOf(checkSzArticle(firstPara(assembled, sample), cfg, env)).map((problem) => problem.code);
+    assert.ok(codes.includes("links-residue"), `${sample}: ${codes.join(",")}`);
+  }
+  const glue = (lead, slug, anchor = "материал") => ` ${lead}: [${anchor}](/s/${slug}).`;
+  const titles = { "ezoterika-i-tserkov": "Эзотерика и церковь", "psihologiya-i-ezoterika": "Эзотерика и психология", "chenneling-v-ezoterike": "Ченнелинг в эзотерике" };
+  const weave = (messages) => {
+    const text = messages.map((message) => message.content).join("\n");
+    assert.equal(text.includes(opening.slice(0, 40)), false);
+    assert.equal(text.includes("Ангеле Божий"), false);
+    const slug = text.match(/ссылку на \/s\/([a-z0-9-]+)/)?.[1];
+    const host = text.split("АБЗАЦ:\n").at(-1).trim();
+    const link = `[${titles[slug]}](/s/${slug})`;
+    return { text: host.includes(".") ? host.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${host}` };
+  };
+  const repair = (raw) => {
+    let calls = 0;
+    const repaired = repairSzArticleTiered({
+      brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 6 }),
+      state: { spentRub: 0, calls: [], warnings: [] },
+      callTier: (tier, name, messages) => {
+        calls += 1;
+        assert.equal(tier, "cheap");
+        assert.equal(isWriterId(name), true, name);
+        return weave(messages);
+      },
+    });
+    return { calls, repaired };
+  };
+  const two = structuredClone(fields);
+  two.story[0] = `${opening}${glue("Подробнее", "ezoterika-i-tserkov")}${glue("Подробнее", "psihologiya-i-ezoterika")}`;
+  const twoJob = buildSzFragment(brief, two, errorsOf(hybridBuild(two).problems).find((problem) => problem.code === "links-anchor"));
+  assert.equal(twoJob.messages.map((message) => message.content).join("\n").includes(opening.slice(0, 40)), false);
+  const bridge = "Образ остаётся тихой опорой рядом с человеком и не решает трудный разговор за него.";
+  let swap = "Границу церковного взгляда и современных практик спокойно разбирает статья [Эзотерика и церковь](/s/ezoterika-i-tserkov).";
+  while (words(swap) < 90) swap = `${swap} ${bridge}`;
+  const swapped = twoJob.apply(two, { text: swap });
+  assert.ok(swapped, "две склейки не должны оставлять «Подробнее: .»");
+  assert.equal(swapped.story[0], opening);
+  assert.equal(swapped.story[0].includes("Подробнее:"), false);
+  const twoFixed = repair(two);
+  assert.equal(twoFixed.calls, 1, twoFixed.repaired.repairSkipped);
+  assert.equal(twoFixed.repaired.result.fields.story[0], opening);
+  assert.equal(twoFixed.repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(twoFixed.repaired.passed, true, twoFixed.repaired.repairSkipped);
+  const twice = structuredClone(fields);
+  twice.story[0] = `${opening}${glue("Подробнее", "ezoterika-i-tserkov")}${glue("Подробнее", "ezoterika-i-tserkov")}`;
+  const sameSlug = repair(twice);
+  assert.equal(sameSlug.repaired.result.fields.story[0], opening);
+  assert.equal(sameSlug.repaired.passed, true, sameSlug.repaired.repairSkipped);
+  const three = structuredClone(fields);
+  three.story[0] = `${opening}${glue("Подробнее", "ezoterika-i-tserkov")}${glue("Читайте также", "psihologiya-i-ezoterika", "здесь")}${glue("Подробнее", "chenneling-v-ezoterike")}`;
+  const threeFixed = repair(three);
+  assert.equal(threeFixed.calls, 1, threeFixed.repaired.repairSkipped);
+  assert.equal(threeFixed.repaired.result.fields.story[0], opening);
+  assert.equal(threeFixed.repaired.result.fields.story[1], fields.story[1]);
+  assert.equal(threeFixed.repaired.result.fields.story[2], fields.story[2]);
+  assert.equal(threeFixed.repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(threeFixed.repaired.passed, true, threeFixed.repaired.repairSkipped);
+  const inside = structuredClone(fields);
+  inside.sectionsBefore[0].paragraphs[1] = `${prayer.slice(0, -1)}${glue("Подробнее", "ezoterika-i-tserkov")}${glue("Читайте также", "psihologiya-i-ezoterika")}${prayer.slice(-1)}`;
+  const insideFixed = repair(inside);
+  assert.equal(insideFixed.repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(insideFixed.repaired.result.fields.story[0], opening);
+  assert.equal(insideFixed.repaired.result.md.includes("Подробнее: ."), false);
+  assert.equal(insideFixed.repaired.passed, true, insideFixed.repaired.repairSkipped);
+  const shaped = structuredClone(fields);
+  shaped.sectionsBefore[0].paragraphs[1] = prayer.replace(" Аминь.»", " Подробнее: [материал](/s/ezoterika-i-tserkov).»");
+  const shapedFixed = repair(shaped);
+  assert.equal(shapedFixed.repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer.replace(" Аминь.»", "»"));
+  assert.equal(shapedFixed.repaired.result.fields.sectionsBefore[0].paragraphs[1].includes("Подробнее"), false);
+  assert.ok(shapedFixed.repaired.result.md.includes("направи.»"));
+  assert.equal(shapedFixed.repaired.result.md.includes("Подробнее: ."), false);
+  assert.equal(shapedFixed.repaired.passed, true, shapedFixed.repaired.repairSkipped);
+  const mixed = structuredClone(fields);
+  mixed.story[0] = `${opening}${glue("Подробнее", "ezoterika-i-tserkov")}${glue("Подробнее", "psihologiya-i-ezoterika")}`;
+  mixed.sectionsBefore[0].paragraphs[1] = `${prayer.slice(0, -1)}${glue("Читайте также", "chenneling-v-ezoterike")}${prayer.slice(-1)}`;
+  const mixedFixed = repair(mixed);
+  assert.equal(mixedFixed.calls, 2, mixedFixed.repaired.repairSkipped);
+  assert.equal(mixedFixed.repaired.result.fields.story[0], opening);
+  assert.equal(mixedFixed.repaired.result.fields.sectionsBefore[0].paragraphs[1], prayer);
+  assert.equal(mixedFixed.repaired.result.fields.sectionsBefore[0].paragraphs[0], fields.sectionsBefore[0].paragraphs[0]);
+  assert.equal(mixedFixed.repaired.result.md.includes("Подробнее: ."), false);
+  assert.equal(mixedFixed.repaired.passed, true, mixedFixed.repaired.repairSkipped);
 });
 
 test("tiered: a later section that retells the story is rewritten forward", () => {

@@ -53,6 +53,20 @@ export function genericLinkAnchor(anchor) {
   return tokens.every((token) => GENERIC_LINK_ANCHORS.has(token));
 }
 
+const LINK_LEAD = String.raw`Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности`;
+
+/** Orphan link glue: «Подробнее: .», empty [](), a colon before a closing quote. A real [анкор](/s/…) is not residue. */
+export function linkLeadResidue(text) {
+  const raw = String(text ?? "");
+  const hits = [];
+  const lead = new RegExp(`(?:${LINK_LEAD})\\s*:(?!\\s*\\[[^\\]\\n]+\\]\\([^)\\n]+\\))`, "giu");
+  for (const match of raw.matchAll(lead)) hits.push(match[0].trim());
+  for (const match of raw.matchAll(/(?<!!)\[\s*\]\([^)]*\)/g)) hits.push(match[0]);
+  for (const match of raw.matchAll(/:\s*\.(?=\s|$|[»”’"])/gu)) hits.push(match[0]);
+  for (const match of raw.matchAll(/:\s*[»”’"]/gu)) hits.push(match[0]);
+  return hits;
+}
+
 const RETELL_STOP = new Set(["ангел", "ангела", "ангелу", "ангеле", "хранитель", "хранителя", "хранителю", "молитва", "молитвы", "молитву", "молитве", "образ", "образа", "человек", "человека", "можно", "когда", "этот", "этой", "этого", "только", "после", "перед", "через", "чтобы", "который", "которая", "которые", "практика", "практике", "также", "будет", "были", "было", "очень", "просто", "потом", "тогда", "здесь", "свой", "свою", "свои"]);
 const RETELL_NAMES = new Set(["ангел", "ангела", "ангелу", "ангеле", "ангелом", "божий", "бога", "бог", "христос", "христа", "христов", "святый", "аминь", "господь", "господа", "крещении", "православного", "эзотерика", "ченнелинг", "молитвы", "хранителю", "молитва"]);
 
@@ -848,6 +862,9 @@ export function checkSzArticle(md, cfg, env) {
     if (!genericLinkAnchor(match[1])) continue;
     add("links-anchor", "sections", `анкор «${match[1]}» у ссылки /s/${match[2]} слишком общий (#${anchorIndex})`);
     anchorIndex += 1;
+  }
+  for (const residue of linkLeadResidue(`${body}\n${faqText}`)) {
+    add("links-residue", "sections", `оборванный ярлык ссылки: «${residue}»`);
   }
   const links = [...body.matchAll(/(?:\]\(|href=")\/s\/([a-z0-9-]+)(?:[)#"?])/g)].map((m) => m[1]);
   for (const link of links) if (!env.published.has(link)) add("links-target", "sections", `ссылка /s/${link} не на опубликованную статью`);

@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, sectionRetellsStory, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, isSpecialistQuestion, linkLeadResidue, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -936,23 +936,21 @@ function linkHostIsProtected(path, text) {
   return isQuoteParagraph(text);
 }
 
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Drop one generic link. A glued «Подробнее:» suffix goes away; an inline token is cut out. Everything else stays. */
-function stripGenericLink(text, anchor, slug) {
-  const token = `[${anchor}](/s/${slug})`;
-  if (!String(text).includes(token)) return null;
-  const glued = String(text).match(new RegExp(`\\s*Подробнее:\\s*${escapeRegExp(token)}\\.?\\s*$`, "u"));
-  if (glued) {
-    const next = text.slice(0, text.length - glued[0].length);
-    if (next && text.startsWith(next) && !next.includes(token)) return next;
+/** Drop every glued «Подробнее:» / «Читайте также:» suffix, then any remaining copy of this token. */
+function stripProtectedLinks(text, anchor, slug) {
+  const suffix = /\s*(?:Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности)\s*:\s*\[[^\]]*\]\(\/s\/[a-z0-9-]+\)\.?/giu;
+  let next = String(text ?? "");
+  let previous = "";
+  while (next !== previous) {
+    previous = next;
+    suffix.lastIndex = 0;
+    next = next.replace(suffix, "");
   }
-  const parts = String(text).split(token);
-  if (parts.length !== 2) return null;
-  const next = parts.join("");
-  if (!next.trim()) return null;
+  if (anchor && slug) {
+    const token = `[${anchor}](/s/${slug})`;
+    if (next.includes(token)) next = next.split(token).join("");
+  }
+  if (!next.trim() || next === text) return null;
   return next;
 }
 
@@ -1029,9 +1027,9 @@ function anchorFragment(brief, fields, failure, allowed) {
     const job = fragment(brief, `links-anchor:${dest.path}`, weaveLinkPrompt(dest, slug, allowed), objectSchema({ text: stringSchema }), (current, answer) => {
       const text = answer?.text;
       if (wovenLinkRejected(text, dest, slug, brief)) return null;
-      const stripped = stripGenericLink(currentPathText(current, host.path, host.text), anchor, slug);
-      if (stripped == null || stripped === host.text) return null;
-      if (!quotesStay(host.text, stripped, anchor, slug)) return null;
+      const original = currentPathText(current, host.path, host.text);
+      const stripped = stripProtectedLinks(original, anchor, slug);
+      if (stripped == null || !keptAfterGluedSuffix(original, stripped)) return null;
       return setPath(setPath(current, dest.path, text), host.path, stripped);
     }, dest.text);
     job.outputTokens = 420;
@@ -1062,12 +1060,34 @@ function currentPathText(fields, path, fallback) {
   return typeof value === "string" ? value : fallback;
 }
 
-/** Quotations outside the removed link stay byte-identical. */
-function quotesStay(original, stripped, anchor, slug) {
-  const token = `[${anchor}](/s/${slug})`;
-  const glued = original.match(new RegExp(`\\s*Подробнее:\\s*${escapeRegExp(token)}\\.?\\s*$`, "u"));
-  if (glued && original.startsWith(stripped) && stripped.length === original.length - glued[0].length) return true;
-  return original.split(token).join("") === stripped;
+/** Kept characters stay in order. Every deleted span is a glued lead or one markdown token, and no residue remains. */
+function keptAfterGluedSuffix(original, stripped) {
+  if (typeof stripped !== "string" || !stripped.trim() || linkLeadResidue(stripped).length) return false;
+  const cutOnce = (rest) => {
+    const glued = rest.match(/^\s*(?:Подробнее|Читайте также|Читайте ещё|Смотрите также|Подробности)\s*:\s*\[[^\]]*\]\(\/s\/[a-z0-9-]+\)\.?/iu);
+    if (glued) return glued[0].length;
+    const token = rest.match(/^\[[^\]]+\]\(\/s\/[a-z0-9-]+\)/u);
+    if (token) return token[0].length;
+    return 0;
+  };
+  let o = 0;
+  for (let s = 0; s < stripped.length; s += 1) {
+    if (original[o] === stripped[s]) {
+      o += 1;
+      continue;
+    }
+    const cut = cutOnce(original.slice(o));
+    if (!cut) return false;
+    o += cut;
+    s -= 1;
+  }
+  let tail = original.slice(o);
+  while (tail.length) {
+    const cut = cutOnce(tail);
+    if (!cut) return false;
+    tail = tail.slice(cut);
+  }
+  return true;
 }
 
 function openingStory(fields) {
