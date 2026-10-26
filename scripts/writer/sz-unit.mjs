@@ -33,7 +33,7 @@ import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } f
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, paragraphsTooClose, protectedRemovalOk, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, examplePhraseStats, faqAnswerTypeMismatch, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -270,6 +270,12 @@ test("prompt: lessons, caution, siblings and tone sample reach the model", () =>
   assert.match(text, /не «материал», не «здесь», не «подробнее»/);
   assert.match(text, /открытый вопрос/);
   assert.match(text, /не «Пять шагов»/);
+  assert.match(text, /Список шагов в статье один/);
+  assert.match(text, /Пять действий/);
+  assert.match(text, /разговор про ангел-хранитель» – ошибка/);
+  assert.match(text, /Единственное название практики – дословно «Медитация «Ангел Хранитель»»/);
+  assert.match(text, /Не смешивай «сказала я»/);
+  assert.match(text, /не больше 7/);
   const linksAt = text.indexOf("ОБЯЗАТЕЛЬНЫЕ ССЫЛКИ");
   const structureAt = text.indexOf("СТРУКТУРА (поля JSON)");
   assert.ok(linksAt >= 0 && linksAt < structureAt, "список ссылок до структуры");
@@ -348,12 +354,110 @@ test("draft: prompt rules and cheap checks catch the 830372c9 defects without a 
   short.sectionsAfter = [];
   assert.ok(draftFieldDefects(short, brief).some((hit) => hit.code === "draft-body-short" || hit.code === "draft-h2"));
   const saved = findControlDrafts();
-  console.log(`draft replay saved control-out: ${saved.length ? saved.map((item) => item.dir).join(", ") : "830372c9-a1 and a2 are not on this machine"}`);
+  console.log(`draft replay saved control-out: ${saved.length ? saved.map((item) => item.dir).join(", ") : "830372c9-a1, a2 and a3 are not on this machine"}`);
   for (const item of saved) {
     if (!item.fields) continue;
     const hits = draftFieldDefects(item.fields, item.fields.brief ?? {});
     console.log(`draft replay ${item.dir}: ${hits.map((hit) => hit.code).join(",") || "none"}`);
   }
+});
+
+test("article #3: extra queries, links, steps, length, stance, examples, case, POV and practice name", () => {
+  const queries = [
+    "богатство и удачу",
+    "привлечь удачу и деньги в свою жизнь",
+    "аффирмации на деньги и богатство слушать",
+    "аффирмации на удачу и деньги для женщин",
+    "цвет притягивающий деньги и удачу",
+  ];
+  const colorForm = "цвета притягивающего деньги и удачу";
+  const stuffed = [
+    "Сегодня привлечьбогатство и удачууже не отдельная фраза.",
+    "Отдельно звучит привлечь удачу и деньги в свою жизнь.",
+    "Запись [аффирмации на деньги и богатство слушать](/s/sostoyanie-izobiliya) стоит не на практике.",
+    "Можно использовать и [как привлечь деньги в дом](/s/kak-privlech-dengi-v-dom) через порядок на столе.",
+    "В комнате выбирают цвет, который притягивает деньги, а допустимая форма цвета притягивающего деньги и удачу названа отдельно.",
+    "Ниже – простые примеры фраз на удачу.",
+    "Раз. Два. Три. Четыре. Пять. Шесть. Семь. Восемь. Девять. Десять. Одиннадцать. Двенадцать. Тринадцать.",
+  ].join(" ");
+  assert.equal(phraseInProse(stuffed, queries[0]), false);
+  assert.equal(phraseInProse(stuffed, queries[1]), true);
+  assert.equal(phraseInProse(stuffed, queries[2]), false);
+  assert.equal(phraseInProse(stuffed, queries[3]), false);
+  assert.equal(phraseInProse(stuffed, queries[4]), false);
+  assert.equal(phraseInProse(stuffed, colorForm), true);
+  assert.equal(boltedPrepositionQuery("Так начинается разговор про аффирмация на удачу и деньги.", "аффирмация на удачу и деньги"), true);
+  assert.equal(boltedPrepositionQuery("Так начинается тема – аффирмация на удачу и деньги.", "аффирмация на удачу и деньги"), false);
+  assert.equal(boltedPrepositionQuery("Частые вопросы об Ангеле-хранителе.", "ангел-хранитель"), false);
+  assert.equal(firstPersonNarration("– сказала я, глядя на отражение в ванной."), true);
+  assert.equal(firstPersonNarration("– сказала Вера, глядя на отражение в ванной."), false);
+  assert.equal(firstPersonNarration("«Я должна позвонить брату», – сказала Вера."), false);
+  assert.equal(danglingLeads("Ниже – простые примеры фраз.\n\nДальше обычный абзац без списка.").length, 1);
+  assert.equal(danglingLeads("Ниже сравнение основных характеристик.\n\n| Подход | Что это |\n| --- | --- |\n| Молитва | Текст |").length, 0);
+  assert.equal(oversizedParagraphs("Раз. Два. Три. Четыре. Пять. Шесть. Семь. Восемь. Девять. Десять. Одиннадцать. Двенадцать. Тринадцать.").length, 1);
+  assert.equal(oversizedParagraphs("Одно предложение. Второе. Третье.").length, 0);
+  assert.equal(statedListCount("Пять фраз для утра"), 5);
+  assert.equal(statedListCount("Пять правил, чтобы начать"), 5);
+  assert.equal(alignListCount("Пять правил, чтобы начать", 3), "Три правила, чтобы начать");
+  assert.equal(examplePhraseStats("## Примеры фраз\n\n- одна\n- две\n").count, 2);
+  const withSlots = buildSzMessages({ ...brief, additionalQueries: queries, additionalQueryForms: { [queries[4]]: [colorForm] }, storyHeroine: "Вера", faqHints: [{ match: "сильная вера", stance: "нет" }], examplePhrases: { min: 8, max: 12 }, practice: { ...brief.practice, subtitle: "утренняя практика" } }, view.site).map((message) => message.content).join("\n");
+  for (const phrase of queries) {
+    const slot = withSlots.indexOf(`«${phrase}» –`);
+    assert.ok(slot > withSlots.indexOf("ДОПОЛНИТЕЛЬНЫЕ ЗАПРОСЫ"), phrase);
+  }
+  assert.match(withSlots, /sectionsBefore\[0\]/);
+  assert.match(withSlots, /sectionsBefore\[1\]/);
+  assert.match(withSlots, /первого шага/);
+  assert.match(withSlots, new RegExp(colorForm));
+  assert.match(withSlots, /Героиня «Вера»/);
+  assert.match(withSlots, /позицию «нет»/);
+  assert.match(withSlots, /8–12 фраз/);
+  assert.match(withSlots, /утренняя практика/);
+  const raw = structuredClone(fields);
+  raw.sectionsBefore[0].paragraphs.push(stuffed);
+  raw.sectionsBefore[0].paragraphs.push("Пять правил для утра.\n\n- Первое действие короткое.\n\n- Второе действие короткое.\n\n- Третье действие короткое.");
+  raw.transition = `${raw.transition} Так начинается разговор про ангел-хранитель.`;
+  let stanceAnswer = "Да, если фраза звучит правдоподобно, её легче повторять вслух и не спорить с собой каждое утро.";
+  while (words(stanceAnswer) < 40) stanceAnswer += " Повтор остаётся коротким.";
+  assert.ok(words(stanceAnswer) <= 80, words(stanceAnswer));
+  raw.faq[2] = { question: "Нужна ли сильная вера, чтобы повторять фразу?", answer: stanceAnswer };
+  raw.tableSection = { ...raw.tableSection, title: "Примеры фраз на утро", rows: raw.tableSection.rows.slice(0, 5) };
+  const article = {
+    ...brief,
+    additionalQueries: queries,
+    additionalQueryForms: { [queries[4]]: [colorForm] },
+    storyHeroine: "Вера",
+    faqHints: [{ match: "сильная вера", stance: "нет" }],
+    examplePhrases: { min: 8, max: 12 },
+    practice: { ...brief.practice, subtitle: "утренняя практика изобилия" },
+    links: {
+      ...brief.links,
+      contextual: [...brief.links.contextual, "tsvet-privlekayushchiy-dengi"],
+      anchors: [{ anchor: "аффирмации на деньги и богатство слушать", slug: "dengi-prihodyat-segodnya", href: "/s/dengi-prihodyat-segodnya" }],
+    },
+  };
+  const draftCodes = draftFieldDefects(raw, article).map((hit) => hit.code);
+  for (const code of ["draft-extra-query", "draft-link-map", "draft-link-grammar", "draft-paragraph", "draft-dangling", "draft-faq-stance", "draft-story-pov", "draft-practice-name", "draft-example-count"]) {
+    assert.ok(draftCodes.includes(code), `${code} missing in ${draftCodes.join(",")}`);
+  }
+  const missed = draftFieldDefects(raw, article).filter((hit) => hit.code === "draft-extra-query").map((hit) => hit.message);
+  assert.ok(missed.some((message) => message.includes(queries[0])), missed.join(" | "));
+  assert.ok(missed.some((message) => message.includes(queries[2])), missed.join(" | "));
+  assert.ok(missed.some((message) => message.includes(queries[3])), missed.join(" | "));
+  assert.equal(missed.some((message) => message.includes(queries[1])), false, missed.join(" | "));
+  assert.equal(missed.some((message) => message.includes(queries[4])), false, missed.join(" | "));
+  const localCfg = ruleConfig(article, pack.publishedAt, pool);
+  const md = assembleSzArticle(article, raw, view.site, { date: pack.publishedAt });
+  const gate = errorsOf(checkSzArticle(md, localCfg, env));
+  const gateCodes = gate.map((problem) => problem.code);
+  for (const code of ["extra-query", "links-required", "links-map", "links-grammar", "paragraph-size", "dangling-lead", "count-mismatch", "query-case", "faq-stance", "story-pov", "practice-name", "example-count"]) {
+    assert.ok(gateCodes.includes(code), `${code} missing in ${gateCodes.join(",")}`);
+  }
+  const extra = gate.filter((problem) => problem.code === "extra-query").map((problem) => problem.message);
+  assert.equal(extra.some((message) => message.includes(queries[1])), false, extra.join(" | "));
+  assert.equal(extra.some((message) => message.includes(queries[4])), false, extra.join(" | "));
+  assert.ok(extra.some((message) => message.includes(queries[0])));
+  assert.equal(faqAnswerTypeMismatch(raw.faq[2].question, raw.faq[2].answer), false);
 });
 
 test("LESSONS.md: every bullet is a «Неверно → Верно» item, seeded from EDITS.md and review #72", () => {
@@ -3133,7 +3237,7 @@ test("tiered: a later section that retells the story is rewritten forward", () =
   const kept = raw.sectionsBefore[2].paragraphs[2];
   raw.sectionsBefore[2].paragraphs = [paraphrase, quote, kept];
   assert.ok(errorsOf(hybridBuild(raw).problems).some((problem) => problem.code === "story-retell"));
-  const filler = "Назовите одно чувство своими словами и выберите короткую фразу, которую готовы повторить спокойно. Сделайте паузу и запишите эту фразу. Затем произнесите её ещё раз, когда дыхание выровняется.";
+  const filler = "Назовите одно чувство своими словами и выберите короткую фразу, которую готовы повторить спокойно, сделайте паузу и запишите эту фразу, затем произнесите её ещё раз, когда дыхание выровняется.";
   const pad = (target) => {
     let out = filler;
     while (words(out) < target) out = `${out} ${filler}`;

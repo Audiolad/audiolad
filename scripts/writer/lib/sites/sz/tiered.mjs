@@ -1392,7 +1392,7 @@ export function buildSzFragment(brief, fields, failure) {
       return setPath(current, found.path, text);
     }, found.text);
   }
-  if (failure.code === "links-anchor" || (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? limits.contextualLinks[0]))) {
+  if (failure.code === "links-required" || failure.code === "links-anchor" || (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? limits.contextualLinks[0]))) {
     return linkFragment(brief, fields, failure);
   }
   if (failure.code === "story-retell") return storyRetellFragment(brief, fields, failure);
@@ -1606,6 +1606,11 @@ function bindInstancePath(fields, failure) {
 function bindQualityPaths(fields, brief, failures) {
   const out = [];
   for (const failure of failures) {
+    if (failure.code === "links-required") {
+      const slug = String(failure.message ?? "").match(/\/s\/([a-z0-9-]+)/)?.[1] ?? "";
+      out.push(slug ? { ...failure, path: `slug:${slug}`, slug } : failure);
+      continue;
+    }
     if (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? SZ.limits.contextualLinks[0])) {
       const have = new Set(markdownSlugs(fields));
       const missing = (brief.links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug) && !have.has(slug));

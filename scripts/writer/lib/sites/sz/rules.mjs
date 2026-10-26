@@ -510,7 +510,7 @@ const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["�
 /** A heading that promises N steps/items, or null when it does not count a list. */
 export function statedListCount(title) {
   const text = normalize(title);
-  if (!/(шаг|пункт|признак)/.test(text)) return null;
+  if (!/(шаг|пункт|признак|правил|фраз)/.test(text)) return null;
   for (const [word, num] of LIST_COUNT_WORDS) {
     if (new RegExp(`(?:^|\\s)${word}(?=\\s)`).test(text)) return num;
   }
@@ -523,6 +523,8 @@ function listNoun(stem, count) {
     шаг: ["шаг", "шага", "шагов"],
     пункт: ["пункт", "пункта", "пунктов"],
     признак: ["признак", "признака", "признаков"],
+    правил: ["правило", "правила", "правил"],
+    фраз: ["фраза", "фразы", "фраз"],
   }[stem];
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -535,11 +537,11 @@ function listNoun(stem, count) {
 export function alignListCount(title, count) {
   const stated = statedListCount(title);
   if (stated == null || stated === count || count < 1 || count > 10) return title;
-  const stem = /пункт/iu.test(title) ? "пункт" : (/признак/iu.test(title) ? "признак" : "шаг");
+  const stem = /пункт/iu.test(title) ? "пункт" : (/признак/iu.test(title) ? "признак" : (/правил/iu.test(title) ? "правил" : (/фраз/iu.test(title) ? "фраз" : "шаг")));
   const noun = listNoun(stem, count);
   const word = LIST_COUNT_WORDS.find(([, num]) => num === count)?.[0] ?? String(count);
   return String(title).replace(
-    /(\d{1,2}|[Оо]дин|[Оо]дна|[Оо]дно|[Дд]ва|[Дд]ве|[Тт]ри|[Чч]етыре|[Пп]ять|[Шш]есть|[Сс]емь|[Вв]осемь|[Дд]евять|[Дд]есять)(\s+)(шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?)/u,
+    /(\d{1,2}|[Оо]дин|[Оо]дна|[Оо]дно|[Дд]ва|[Дд]ве|[Тт]ри|[Чч]етыре|[Пп]ять|[Шш]есть|[Сс]емь|[Вв]осемь|[Дд]евять|[Дд]есять)(\s+)(правило|правила|правил|фраза|фразы|фраз|шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?)/u,
     (full, num, space) => {
       const digit = /^\d/.test(num);
       const cap = !digit && num[0] !== num[0].toLocaleLowerCase("ru");
@@ -547,6 +549,186 @@ export function alignListCount(title, count) {
       return `${next}${space}${noun}`;
     },
   );
+}
+
+const NOT_WORD = String.raw`(?<![\p{L}\p{N}])`;
+const WORD_END = String.raw`(?![\p{L}\p{N}])`;
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Link anchor text is not prose: the query has to stand in the sentence around the link. */
+export function proseWithoutLinkText(text) {
+  const raw = String(text ?? "");
+  const links = markdownLinks(raw);
+  if (!links.length) return raw;
+  let out = "";
+  let cursor = 0;
+  for (const link of links) {
+    out += raw.slice(cursor, link.start);
+    out += " ";
+    cursor = link.end;
+  }
+  return out + raw.slice(cursor);
+}
+
+/** Exact phrase, with word boundaries, outside markdown link text and outside headings. */
+export function phraseInProse(text, phrase) {
+  const needle = normalize(phrase);
+  if (!needle) return false;
+  const hay = normalize(proseWithoutLinkText(text).replace(/^#{1,6} .+$/gm, " "));
+  return new RegExp(`${NOT_WORD}${escapeRegExp(needle)}${WORD_END}`, "u").test(hay);
+}
+
+/** True when the uninflected query sits immediately after «про», «о» or «об». */
+export function boltedPrepositionQuery(text, query) {
+  const needle = normalize(query);
+  if (!needle) return false;
+  const hay = normalize(text);
+  return new RegExp(`${NOT_WORD}(?:про|об|о)\\s+${escapeRegExp(needle)}${WORD_END}`, "u").test(hay);
+}
+
+const FIRST_PERSON_VERB = new RegExp(String.raw`${NOT_WORD}(?:сказал|сказала|подумал|подумала|прошептал|прошептала|спросил|спросила|ответил|ответила|шепнул|шепнула)\s+я${WORD_END}`, "iu");
+
+/** Speech tag of a first-person narrator («сказала я»). Quoted «Я…» inside the line does not match. */
+export function firstPersonNarration(text) {
+  return FIRST_PERSON_VERB.test(String(text ?? ""));
+}
+
+export function paragraphSentenceCount(text) {
+  return String(text ?? "").split(/(?<=[.!?…])\s+/u).filter((sentence) => /[\p{L}\p{N}]/u.test(sentence)).length;
+}
+
+/** Paragraphs longer than 7 sentences. Headings, lists, tables and directives are not paragraphs. */
+export function oversizedParagraphs(markdown) {
+  const hits = [];
+  for (const block of String(markdown ?? "").split(/\n\n+/)) {
+    const line = block.trim();
+    if (!line || /^[#|>]/.test(line) || line.startsWith(":::") || line.startsWith("<") || line.startsWith("|") || /^(?:[-*] |\d+\. |title:| {2}text:)/.test(line)) continue;
+    const count = paragraphSentenceCount(line);
+    if (count > 7) hits.push({ count, sample: line.slice(0, 80) });
+  }
+  return hits;
+}
+
+const DANGLING_LEAD = /(?:^|[.!?…]\s+|\n)(?:ниже|вот)\s*(?:[–—:-]|простые\s+примеры|примеры\b|пример\b)/iu;
+
+function blockIsList(block) {
+  const line = String(block ?? "").trim();
+  return /^(?:[-*] |\d+\. |\||«|### |>)/.test(line);
+}
+
+/** «Ниже – простые примеры…» / «Вот примеры…» whose next line is not a list, table or quoted line. */
+export function danglingLeads(markdown) {
+  const blocks = String(markdown ?? "").split(/\n\n+/);
+  const hits = [];
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i].trim();
+    if (!block || !DANGLING_LEAD.test(block)) continue;
+    const lines = block.split("\n");
+    const at = lines.findIndex((line) => DANGLING_LEAD.test(line));
+    const leadLine = at < 0 ? block : lines[at];
+    const rest = (at < 0 ? "" : lines.slice(at + 1).join("\n")).trim();
+    const next = rest || (blocks.slice(i + 1).map((part) => part.trim()).find(Boolean) ?? "");
+    if (blockIsList(next)) continue;
+    hits.push(leadLine.slice(0, 90));
+  }
+  return hits;
+}
+
+function followingListCount(blocks, index) {
+  let count = 0;
+  for (let j = index + 1; j < blocks.length; j += 1) {
+    const block = blocks[j].trim();
+    if (/^(?:[-*] |\d+\. |### )/u.test(block)) {
+      count += (block.match(/^(?:[-*] |\d+\. |### )/gm) || [1]).length;
+      continue;
+    }
+    if (count > 0 || /^## /.test(block) || block.startsWith(":::")) break;
+    return 0;
+  }
+  return count;
+}
+
+/**
+ * A heading or a lead-in that promises N шагов/правил/фраз and is followed by a different list.
+ * The «## Три шага» section is left to the steps check (it uses ###, not a bullet list).
+ */
+export function listPromiseMismatches(markdown) {
+  const hits = [];
+  const sections = String(markdown ?? "").split(/(?=^## )/m);
+  for (const section of sections) {
+    const heading = section.match(/^## (.+)$/m)?.[1];
+    const h3 = (section.match(/^### /gm) || []).length;
+    const stated = heading ? statedListCount(heading) : null;
+    const bullets = (section.match(/^(?:[-*] |\d+\. )/gm) || []).length;
+    if (heading && h3 < 2 && stated != null && bullets > 0 && stated !== bullets) {
+      hits.push({ title: heading, stated, count: bullets });
+    }
+    const blocks = section.split(/\n\n+/);
+    for (let i = 0; i < blocks.length; i += 1) {
+      const block = blocks[i].trim();
+      if (!block || /^## /.test(block)) continue;
+      const promised = statedListCount(block);
+      if (promised == null) continue;
+      const count = followingListCount(blocks, i);
+      if (count > 0 && promised !== count) hits.push({ title: block.slice(0, 80), stated: promised, count });
+    }
+  }
+  return hits;
+}
+
+export function linkAnchorMismatches(text, expected) {
+  const links = markdownLinks(text);
+  const hits = [];
+  for (const item of expected ?? []) {
+    const needle = normalize(item?.anchor);
+    const href = item?.href || (item?.slug ? `/s/${item.slug}` : "");
+    if (!needle || !href) continue;
+    const found = links.filter((link) => normalize(link.anchor) === needle);
+    const ok = found.some((link) => link.href === href || (item.slug && link.slug === item.slug));
+    if (!ok) hits.push({ ...item, href, found: found.map((link) => link.href) });
+  }
+  return hits;
+}
+
+/** «можно использовать и [анкор] через …» – the conjunction and the preposition do not meet. */
+export function ungrammaticalLinks(text) {
+  const raw = String(text ?? "");
+  const hits = [];
+  for (const link of markdownLinks(raw)) {
+    const before = raw.slice(Math.max(0, link.start - 48), link.start);
+    const after = raw.slice(link.end, link.end + 32);
+    if (/(?:^|[\s,.;])и\s*$/u.test(before) && /^\s*через(?![\p{L}\p{N}])/u.test(after)) hits.push(link);
+  }
+  return hits;
+}
+
+export function examplePhraseStats(markdown) {
+  let heading = false;
+  let count = 0;
+  for (const section of String(markdown ?? "").split(/(?=^## )/m)) {
+    const title = section.match(/^## (.+)$/m)?.[1] ?? "";
+    if (!/пример/iu.test(title)) continue;
+    heading = true;
+    count += (section.match(/^(?:[-*] |\d+\. )/gm) || []).length;
+    const rows = [...section.matchAll(/^\|(.+)\|\s*$/gm)].map((match) => match[1]).filter((row) => !/^[\s|:-]+$/.test(row));
+    if (rows.length > 1) count += rows.length - 1;
+    count += (section.match(/^«[^»\n]{1,120}»\.?\s*$/gm) || []).length;
+  }
+  return { heading, count };
+}
+
+export function faqStanceMismatch(question, answer, hints) {
+  const ask = normalize(question);
+  const hint = (hints ?? []).find((item) => item?.match && ask.includes(normalize(item.match)));
+  if (!hint) return false;
+  const stance = normalize(hint.stance);
+  const reply = String(answer ?? "").trim();
+  if (stance === "нет") return /^(?:да|можно|конечно)(?![\p{L}\p{N}])/iu.test(reply);
+  if (stance === "да") return /^(?:нет|нельзя)(?![\p{L}\p{N}])/iu.test(reply);
+  return false;
 }
 
 const NOT_LETTER = String.raw`(?![\p{L}\p{N}])`;
@@ -1115,6 +1297,9 @@ export function checkSzArticle(md, cfg, env) {
   if (sw < L.story[0] || sw > L.story[1]) add("story-length", "story", `история ${sw} слов, нужно ${L.story[0]}–${L.story[1]} (вместе с переходом)`);
   if (!/[«»]/.test(storyParagraphs.slice(0, 3).join(" "))) add("story-speech", "story", "прямая речь «…» в первых трёх абзацах истории");
   if (!normalize(storyParagraphs.at(-1) ?? "").includes(nq)) add("transition-query", "transition", `последний абзац истории (переход) должен содержать запрос «${query}»`);
+  if (cfg.storyHeroine && firstPersonNarration(storyParagraphs.slice(0, -1).join("\n"))) {
+    add("story-pov", "story", `история героини «${cfg.storyHeroine}» говорит от первого лица («сказала я»)`);
+  }
   if (FICTION.test(body)) add("fiction", "story", "оговорка о вымышленности истории запрещена");
   for (const bold of body.matchAll(/\*\*([^*\n]+)\*\*/g)) {
     if (normalize(bold[1]).includes(nq)) add("bold-query", "question", `запрос «${query}» не выделяется жирным («${bold[1].slice(0, 40)}»)`);
@@ -1131,6 +1316,9 @@ export function checkSzArticle(md, cfg, env) {
   const intro = body.slice(pToc + ":::overview\n:::".length, pAudio).trim().split(/\n\n+/).filter(Boolean);
   if (intro.length < 1 || intro.length > 2) add("practice-intro", "practiceIntro", "описание практики – 1–2 абзаца");
   for (const paragraph of intro) if (words(paragraph) > L.practiceIntroWords) add("practice-intro", "practiceIntro", `абзац о практике ${words(paragraph)} слов, нужно ≤ ${L.practiceIntroWords}`);
+  if (cfg.practiceSubtitle && cfg.practice?.title && !intro.join("\n").includes(cfg.practice.title)) {
+    add("practice-name", "practiceIntro", `название практики должно быть дословно «${cfg.practice.title}», не подзаголовок «${cfg.practiceSubtitle}»`);
+  }
   if (body.slice(pAudio + ":::practiceAudio\n:::".length, pChecklist).trim() !== "") add("order", "*", "чек-лист сразу после плеера");
   const checklist = body.slice(pChecklist).match(/^:::checklist\n([\s\S]*?)\n:::/)?.[1] ?? "";
   if (!checklist.includes(`storageKey: ${slug}-5-shagov\n`) || !/^persist: local$/m.test(checklist)) add("checklist", "*", "storageKey/persist чек-листа");
@@ -1241,12 +1429,24 @@ export function checkSzArticle(md, cfg, env) {
     const answerFragment = danglingFragment(a);
     if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
     if (faqAnswerTypeMismatch(q, a)) add("faq-answer-type", "faq", `ответ на «${q}» начинается как да/нет, а вопрос открытый`);
+    if (faqStanceMismatch(q, a, cfg.faqHints)) add("faq-stance", "faq", `ответ на «${q}» противоречит позиции брифа «${(cfg.faqHints ?? []).find((hint) => normalize(q).includes(normalize(hint.match)))?.stance ?? ""}»`);
   }
   const faqText = faq.flat().join("\n");
 
   // ── links ──
-  const proseLinks = markdownLinks(body.slice(0, pFaq)).filter((link) => link.slug);
+  const proseBeforeFaq = body.slice(0, pFaq);
+  const proseLinks = markdownLinks(proseBeforeFaq).filter((link) => link.slug);
   if (proseLinks.length < L.contextualLinks[0] || proseLinks.length > L.contextualLinks[1]) add("links-contextual", "sections", `${proseLinks.length} ссылок /s в тексте, нужно ${L.contextualLinks[0]}–${L.contextualLinks[1]}`);
+  for (const slug of cfg.requiredSlugs ?? []) {
+    if (slug && !proseLinks.some((link) => link.slug === slug)) add("links-required", "sections", `нет обязательной ссылки /s/${slug} в тексте до FAQ`);
+  }
+  for (const item of linkAnchorMismatches(proseBeforeFaq, cfg.linkAnchors)) {
+    const actual = item.found?.length ? item.found.join(", ") : "ссылки нет";
+    add("links-map", "sections", `анкор «${item.anchor}» должен вести на ${item.href}, сейчас: ${actual}`);
+  }
+  for (const link of ungrammaticalLinks(proseBeforeFaq)) {
+    add("links-grammar", "sections", `ссылка «${link.anchor}» стоит в конструкции «и […] через»`);
+  }
   let anchorIndex = 0;
   for (const link of proseLinks) {
     const brackets = anchorHasBrackets(link.anchor);
@@ -1321,11 +1521,29 @@ export function checkSzArticle(md, cfg, env) {
   if (tw < L.total[0] || tw > L.total[1]) add("total-length", "sections", `всего ${tw} слов с FAQ, нужно ${L.total[0]}–${L.total[1]}`);
   const mainCount = normalize(body).split(nq).length - 1;
   if (mainCount < L.mainQuery[0] || mainCount > L.mainQuery[1]) add("query-count", "sections", `запрос «${query}» в тексте ${mainCount} раз, нужно ${L.mainQuery[0]}–${L.mainQuery[1]}`);
-  const bodyNorm = normalize(body);
-  for (const phrase of cfg.additionalQueries ?? []) {
-    const needle = normalize(phrase);
-    if (!needle) continue;
-    if (!bodyNorm.includes(needle)) add("extra-query", "sections", `дополнительный запрос «${phrase}» не встречается в тексте`);
+  const queryPhrases = (cfg.additionalQueries ?? []).map((phrase) => (typeof phrase === "string" ? phrase : phrase?.text)).filter(Boolean);
+  for (const phrase of queryPhrases) {
+    const forms = cfg.additionalQueryForms?.[phrase] ?? [];
+    const ok = [phrase, ...forms].some((form) => phraseInProse(mainBody, form));
+    if (!ok) add("extra-query", "sections", `дополнительный запрос «${phrase}» не встречается в тексте`);
+  }
+  for (const phrase of [query, ...queryPhrases]) {
+    if (phrase && (boltedPrepositionQuery(storyParagraphs.at(-1) ?? "", phrase) || boltedPrepositionQuery(mainBody, phrase))) {
+      add("query-case", "transition", `запрос «${phrase}» стоит сразу после «про», «о» или «об»`);
+    }
+  }
+  for (const hit of oversizedParagraphs(mainBody)) {
+    add("paragraph-size", "sections", `абзац из ${hit.count} предложений (больше 7) – не наполнитель, разбейте на абзацы по 3–5`);
+  }
+  for (const lead of danglingLeads(mainBody)) add("dangling-lead", "sections", `подводка без списка: «${lead}»`);
+  for (const hit of listPromiseMismatches(mainBody)) {
+    add("count-mismatch", "sections", `«${hit.title}» обещает ${hit.stated}, а пунктов ${hit.count}`);
+  }
+  if (cfg.examplePhrases) {
+    const examples = examplePhraseStats(mainBody);
+    const { min, max } = cfg.examplePhrases;
+    if (!examples.heading) add("example-count", "sections", `нет раздела H2 «примеры фраз» (${min}–${max} фраз)`);
+    else if (examples.count < min || examples.count > max) add("example-count", "sections", `примеров фраз ${examples.count}, нужно ${min}–${max}`);
   }
   for (const duplicated of duplicateParagraphs(body)) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
   for (const verbatim of cfg.verbatim ?? []) {

@@ -131,12 +131,13 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
   for (const [a, b] of CONFLICTING_EXPERTS) need(!(names.includes(a) && names.includes(b)), `${at}.experts: «${a}» и «${b}» спорят друг с другом – не ставить в одну статью (EXPERTS_RU.md, «Осторожно»)`, errors);
   const mix = missingMix(names, pool);
   need(mix.length === 0, `${at}.experts: в статье нужен хотя бы один ${mix.join(", ")} (Ж, М, РУ, ЗАР)`, errors);
-  const contextual = list(raw?.links?.contextual).map(String);
+  const contextual = list(raw?.links?.contextual).map((item) => (typeof item === "string" ? item : String(item?.slug ?? ""))).map((item) => item.trim()).filter(Boolean);
   const readmore = list(raw?.links?.readmore).map(String);
   need(contextual.length >= 2 && contextual.length <= 8, `${at}.links.contextual: 2–8 статей /s для ссылок в тексте (опубликованные или статьи этого пакета)`, errors);
   need(readmore.length === 3, `${at}.links.readmore: ровно 3 статьи для «Читайте также»`, errors);
   for (const target of [...contextual, ...readmore]) need(SLUG.test(target) && target !== slug, `${at}.links: плохой slug «${target}»`, errors);
   need(new Set(readmore).size === 3, `${at}.links.readmore: без повторов`, errors);
+  const extras = parseBriefExtras(raw);
   return {
     slug,
     query,
@@ -147,13 +148,14 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
     storyHint: String(raw?.storyHint ?? "").trim(),
     practice: {
       title: practice.title,
+      subtitle: String(practice.subtitle ?? "").trim(),
       author: practice.author ?? SZ.practiceAuthor,
       duration: practice.duration,
       path: practice.path,
       materials: String(practice.materials ?? "").trim(),
     },
     experts,
-    links: { contextual, readmore },
+    links: { contextual, readmore, anchors: extras.anchors },
     facts: list(raw?.facts).map(String),
     commonMistakes: list(raw?.commonMistakes).map(String),
     sectionsHint: list(raw?.sectionsHint).map(String),
@@ -162,7 +164,62 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
     phones: String(raw?.phones ?? "").trim(),
     verbatim: list(raw?.verbatim).map(String),
     forbiddenPhrases: list(raw?.forbiddenPhrases).map(String),
-    additionalQueries: list(raw?.additionalQueries ?? raw?.secondaryKeywords).map(String).map((item) => item.trim()).filter(Boolean),
+    additionalQueries: extras.additionalQueries,
+    additionalQueryForms: extras.additionalQueryForms,
+    faqHints: extras.faqHints,
+    examplePhrases: extras.examplePhrases,
+    storyHeroine: extras.storyHeroine,
     extraInstructions: list(raw?.extraInstructions).map(String),
+  };
+}
+
+function parseAdditionalQueries(rawList) {
+  const queries = [];
+  const forms = {};
+  for (const item of list(rawList)) {
+    if (typeof item === "string") {
+      const text = item.trim();
+      if (text) queries.push(text);
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+    const text = String(item.text ?? item.query ?? "").trim();
+    if (!text) continue;
+    queries.push(text);
+    const variants = list(item.forms).map((form) => String(form).trim()).filter(Boolean);
+    if (variants.length) forms[text] = variants;
+  }
+  return { queries, forms };
+}
+
+function parseBriefExtras(raw) {
+  const { queries, forms } = parseAdditionalQueries(raw?.additionalQueries ?? raw?.secondaryKeywords);
+  const anchors = [];
+  for (const item of list(raw?.links?.anchors)) {
+    if (!item || typeof item !== "object") continue;
+    const anchor = String(item.anchor ?? "").trim();
+    const slug = String(item.slug ?? "").trim();
+    const href = String(item.href ?? (slug ? `/s/${slug}` : "")).trim();
+    if (anchor && href) anchors.push({ anchor, slug, href });
+  }
+  const faqHints = [];
+  for (const item of list(raw?.faqHints)) {
+    const match = String(item?.match ?? "").trim();
+    const stance = String(item?.stance ?? "").trim().toLocaleLowerCase("ru");
+    if (match && (stance === "да" || stance === "нет")) faqHints.push({ match, stance });
+  }
+  let examplePhrases = null;
+  if (raw?.examplePhrases && typeof raw.examplePhrases === "object") {
+    const min = Number(raw.examplePhrases.min);
+    const max = Number(raw.examplePhrases.max);
+    if (Number.isInteger(min) && Number.isInteger(max) && min >= 1 && max >= min) examplePhrases = { min, max };
+  }
+  return {
+    additionalQueries: queries,
+    additionalQueryForms: forms,
+    faqHints,
+    examplePhrases,
+    storyHeroine: String(raw?.storyHeroine ?? "").trim(),
+    anchors,
   };
 }

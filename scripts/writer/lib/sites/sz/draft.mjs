@@ -5,7 +5,9 @@ import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { szH2Count } from "./metrics.mjs";
 import {
   anchorHasBrackets, faqAnswerTypeMismatch, genericLinkAnchor, hasGluedLead, linkLeadResidue,
-  markdownLinks, normalize, paragraphsTooClose, sectionRetellsStory, statedListCount, words,
+  danglingLeads, faqStanceMismatch, firstPersonNarration, linkAnchorMismatches, markdownLinks,
+  paragraphSentenceCount, paragraphsTooClose, phraseInProse, sectionRetellsStory, statedListCount,
+  ungrammaticalLinks, words,
 } from "./rules.mjs";
 
 const LINK_FREE = /^(?:story|transition|storyEnding|invitation|question|practiceIntro|checklist|psychologyIntro|experts|specialist|faq|finalInvite|finalQuestion)(?:\.|\[|$)/;
@@ -38,7 +40,9 @@ function quotedBlock(text) {
 /**
  * Defects a draft can show before repair. Codes: draft-link-place, draft-link-glue,
  * draft-link-anchor, draft-link-residue, draft-link-missing, draft-retell, draft-duplicate,
- * draft-extra-query, draft-faq-type, draft-steps-count, draft-body-short, draft-h2.
+ * draft-extra-query, draft-faq-type, draft-faq-stance, draft-steps-count, draft-body-short,
+ * draft-body-target, draft-h2, draft-paragraph, draft-dangling, draft-link-map,
+ * draft-link-grammar, draft-story-pov, draft-practice-name, draft-example-count.
  */
 export function draftFieldDefects(fields, article = {}) {
   const hits = [];
@@ -61,7 +65,15 @@ export function draftFieldDefects(fields, article = {}) {
         add("draft-link-anchor", slot.path, `анкор «${link.anchor}»`);
       }
     }
+    if (ungrammaticalLinks(slot.text).length) add("draft-link-grammar", slot.path, "ссылка в конструкции «и […] через»");
+    if (/^(?:sectionsBefore|sectionsAfter|tableSection|steps|specialist)/.test(slot.path) && paragraphSentenceCount(slot.text) > 7) {
+      add("draft-paragraph", slot.path, `абзац из ${paragraphSentenceCount(slot.text)} предложений`);
+    }
   }
+  for (const item of linkAnchorMismatches(bodyText(fields), article.links?.anchors)) {
+    add("draft-link-map", "sections", `анкор «${item.anchor}» должен вести на ${item.href}`);
+  }
+  for (const lead of danglingLeads(bodyText(fields))) add("draft-dangling", "sections", `подводка без списка: «${lead.slice(0, 60)}»`);
   for (const slug of article.links?.contextual ?? []) {
     if (!bodySlugs.has(slug)) add("draft-link-missing", "sections", `нет /s/${slug} в основной части`);
   }
@@ -80,12 +92,35 @@ export function draftFieldDefects(fields, article = {}) {
       }
     }
   }
-  const bodyNorm = normalize(bodyText(fields));
+  const prose = bodyText(fields);
   for (const phrase of article.additionalQueries ?? []) {
-    if (phrase && !bodyNorm.includes(normalize(phrase))) add("draft-extra-query", "sections", `нет «${phrase}» в основной части`);
+    const forms = article.additionalQueryForms?.[phrase] ?? [];
+    if (phrase && ![phrase, ...forms].some((form) => phraseInProse(prose, form))) add("draft-extra-query", "sections", `нет «${phrase}» в основной части`);
   }
   for (const [index, item] of (fields?.faq ?? []).entries()) {
     if (faqAnswerTypeMismatch(item?.question, item?.answer)) add("draft-faq-type", `faq[${index}]`, `открытый вопрос «${item.question}» начинается как да/нет`);
+    if (faqStanceMismatch(item?.question, item?.answer, article.faqHints)) add("draft-faq-stance", `faq[${index}]`, `ответ противоречит позиции «${item.question}»`);
+  }
+  if (article.storyHeroine && firstPersonNarration((fields?.story ?? []).join("\n"))) {
+    add("draft-story-pov", "story", `героиня «${article.storyHeroine}», а в истории «сказала я»`);
+  }
+  const practiceTitle = article.practice?.title ?? "";
+  if (article.practice?.subtitle && practiceTitle && !(fields?.practiceIntro ?? []).join("\n").includes(practiceTitle)) {
+    add("draft-practice-name", "practiceIntro", `нужно дословное название «${practiceTitle}»`);
+  }
+  if (article.examplePhrases) {
+    const titled = [...(fields?.sectionsBefore ?? []), ...(fields?.sectionsAfter ?? []), fields?.tableSection]
+      .filter(Boolean)
+      .filter((section) => /пример/iu.test(section.title ?? ""));
+    const listed = titled.reduce((sum, section) => {
+      const rows = Math.max((section.rows?.length ?? 0) - 0, 0);
+      const quotes = (section.paragraphs ?? []).filter((paragraph) => /^«[^»]+»$/u.test(paragraph.trim())).length;
+      return sum + rows + (section.items?.length ?? 0) + quotes;
+    }, 0);
+    if (!titled.length) add("draft-example-count", "sections", `нет раздела с примерами фраз (${article.examplePhrases.min}–${article.examplePhrases.max})`);
+    else if (listed < article.examplePhrases.min || listed > article.examplePhrases.max) {
+      add("draft-example-count", "sections", `примеров ${listed}, нужно ${article.examplePhrases.min}–${article.examplePhrases.max}`);
+    }
   }
   const steps = fields?.steps;
   if (steps && statedListCount(steps.title) !== (steps.items ?? []).length) {
@@ -98,6 +133,8 @@ export function draftFieldDefects(fields, article = {}) {
   const proseWords = words(bodyText(fields));
   if (proseWords + SZ_BODY_PLAN.chromeWords < SZ.limits.mainBody[0]) {
     add("draft-body-short", "sections", `основная часть около ${proseWords + SZ_BODY_PLAN.chromeWords} слов, цель ${SZ_BODY_PLAN.target[0]}–${SZ_BODY_PLAN.target[1]}`);
+  } else if (fields && proseWords + SZ_BODY_PLAN.chromeWords < SZ_BODY_PLAN.target[0]) {
+    add("draft-body-target", "sections", `основная часть около ${proseWords + SZ_BODY_PLAN.chromeWords} слов, черновик должен попасть в ${SZ_BODY_PLAN.target[0]}–${SZ_BODY_PLAN.target[1]}`);
   }
   // The prompt aims at 5. The gate allows 4–6, and the approved angel article uses 6.
   if (fields && (szH2Count(fields) < SZ.limits.bodyH2[0] || szH2Count(fields) > SZ.limits.bodyH2[1])) {
@@ -113,6 +150,9 @@ const CONTROL_DIRS = [
   "1bbf9c05/control-out/830372c9-a2",
   "/workspace/1bbf9c05/control-out/830372c9-a1",
   "/workspace/1bbf9c05/control-out/830372c9-a2",
+  "control-out/830372c9-a3",
+  "1bbf9c05/control-out/830372c9-a3",
+  "/workspace/1bbf9c05/control-out/830372c9-a3",
 ];
 
 function readJsonIf(path) {
