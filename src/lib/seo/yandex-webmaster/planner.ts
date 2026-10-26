@@ -4,8 +4,14 @@ import { buildPracticeCanonicalUrl } from "@/lib/products/paths";
 export const YANDEX_RECRAWL_REASONS = {
   practice_published: "practice_published",
   practice_republished: "practice_republished",
+  practice_became_listed: "practice_became_listed",
   practice_seo_updated: "practice_seo_updated",
   practice_content_updated: "practice_content_updated",
+  playlist_published: "playlist_published",
+  playlist_updated: "playlist_updated",
+  playlist_slug_changed: "playlist_slug_changed",
+  author_profile_updated: "author_profile_updated",
+  author_became_public: "author_became_public",
 } as const;
 
 export type YandexRecrawlReason =
@@ -73,6 +79,8 @@ export function planPracticeYandexRecrawl(input: {
   nextStatus: string;
   catalogVisibility?: string | null;
   isCatalogListed?: boolean | null;
+  previousCatalogVisibility?: string | null;
+  previousIsCatalogListed?: boolean | null;
   changedFields?: ReadonlyArray<string>;
   authorSlug: string;
   practiceSlug: string;
@@ -110,6 +118,23 @@ export function planPracticeYandexRecrawl(input: {
         previousStatus === "unpublished"
           ? YANDEX_RECRAWL_REASONS.practice_republished
           : YANDEX_RECRAWL_REASONS.practice_published,
+      url,
+    };
+  }
+
+  const previousVisibilityKnown =
+    Object.prototype.hasOwnProperty.call(input, "previousCatalogVisibility") ||
+    Object.prototype.hasOwnProperty.call(input, "previousIsCatalogListed");
+
+  if (
+    previousVisibilityKnown &&
+    !isPublicListed({
+      catalogVisibility: input.previousCatalogVisibility,
+      isCatalogListed: input.previousIsCatalogListed,
+    })
+  ) {
+    return {
+      reason: YANDEX_RECRAWL_REASONS.practice_became_listed,
       url,
     };
   }

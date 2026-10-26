@@ -18,7 +18,15 @@ export type NotifyYandexRecrawlStatus =
   | "invalid_user_id"
   | "host_not_verified"
   | "quota_exhausted"
-  | "quota_check_failed";
+  | "quota_check_failed"
+  | "foreign_origin"
+  | "host_empty"
+  | "host_not_found"
+  | "host_ambiguous"
+  | "host_unverified"
+  | "host_id_missing"
+  | "host_mismatch"
+  | "host_unresolved";
 
 export type NotifyYandexRecrawlResult = {
   status: NotifyYandexRecrawlStatus;
@@ -51,7 +59,7 @@ function logYandexWebmasterEvent(
     ),
   );
 
-  console.info(`[yandex-webmaster] ${message}`, safe);
+  console.info(`[yandex-webmaster] ${new Date().toISOString()} ${message}`, safe);
 }
 
 function resultContainsSecret(
@@ -206,6 +214,32 @@ export async function notifyYandexRecrawlUrl(
 
       return {
         status: "host_not_verified",
+        reason,
+        url: trimmedUrl,
+        canSubmit: true,
+        http,
+      };
+    }
+
+    if (
+      http.errorCode === "foreign_origin" ||
+      http.errorCode === "host_empty" ||
+      http.errorCode === "host_not_found" ||
+      http.errorCode === "host_ambiguous" ||
+      http.errorCode === "host_unverified" ||
+      http.errorCode === "host_id_missing" ||
+      http.errorCode === "host_mismatch" ||
+      http.errorCode === "host_unresolved"
+    ) {
+      logYandexWebmasterEvent(http.errorCode, {
+        reason,
+        url: trimmedUrl,
+        status: http.status,
+        retried: http.retried,
+      });
+
+      return {
+        status: http.errorCode,
         reason,
         url: trimmedUrl,
         canSubmit: true,

@@ -21,6 +21,8 @@ import {
   scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
+import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function scheduleAuthorContactIndexNow(
@@ -36,10 +38,12 @@ async function scheduleAuthorContactIndexNow(
     return;
   }
 
-  scheduleIndexNowNotification(
-    [buildAuthorCanonicalUrl(slug)],
-    INDEXNOW_REASONS.author_profile_updated,
-  );
+  const url = buildAuthorCanonicalUrl(slug);
+  scheduleIndexNowNotification([url], INDEXNOW_REASONS.author_profile_updated);
+  scheduleYandexRecrawlNotification(url, YANDEX_RECRAWL_REASONS.author_profile_updated, {
+    entityType: "author",
+    entityId: authorId,
+  });
 }
 
 function readContactId(value: unknown): string | null {

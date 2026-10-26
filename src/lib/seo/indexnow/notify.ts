@@ -58,7 +58,7 @@ function logIndexNowEvent(
     Object.entries(fields).filter(([field]) => !blocked.has(field.toLowerCase())),
   );
 
-  console.info(`[indexnow] ${message}`, safe);
+  console.info(`[indexnow] ${new Date().toISOString()} ${message}`, safe);
 }
 
 /**
@@ -163,6 +163,7 @@ export async function notifyIndexNowUrls(
       logIndexNowEvent("batch_result", {
         reason,
         urlCount: batch.urlCount,
+        url: batch.urls.join(" ").slice(0, 500),
         status: batch.http.status,
         ok: batch.http.ok,
         retried: batch.http.retried,

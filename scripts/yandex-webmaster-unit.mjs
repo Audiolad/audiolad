@@ -306,7 +306,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 30, quota_remainder: 12 }),
     () => jsonResponse(202, { task_id: "task-202", quota_remainder: 11 }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, true);
   assert.equal(result.status, 202);
   assert.equal(result.taskId, "task-202");
@@ -319,7 +320,8 @@ await withEnvAsync(productionGateEnv(), async () => {
   const fetchImpl = mockFetch([
     () => jsonResponse(200, { daily_quota: 30, quota_remainder: 0 }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "quota_exhausted");
   assert.equal(fetchImpl.calls.length, 1);
@@ -331,7 +333,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
     () => jsonResponse(200, { task_id: "task-200" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false, "POST 200 is not a documented accepted response");
   assert.equal(result.accepted, false);
   assert.equal(result.errorCode, "http_error");
@@ -344,7 +347,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
     () => jsonResponse(201, { task_id: "task-201" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false, "POST 201 is not a documented accepted response");
   assert.equal(result.accepted, false);
   assert.equal(result.errorCode, "http_error");
@@ -370,6 +374,7 @@ await withEnvAsync(productionGateEnv(), async () => {
     const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
       fetchImpl,
       sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443",
     });
     assert.equal(result.status, "already_queued");
     assert.equal(result.http?.errorCode, "already_queued");
@@ -377,8 +382,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     assert.equal(result.http?.accepted, false);
     assert.notEqual(result.status, "failed");
     assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 1);
-    assert.match(logs.join("\n"), /\[yandex-webmaster\] already_queued/);
-    assert.doesNotMatch(logs.join("\n"), /\[yandex-webmaster\] failed/);
+    assert.match(logs.join("\n"), /\[yandex-webmaster\] \S+ already_queued/);
+    assert.doesNotMatch(logs.join("\n"), /\[yandex-webmaster\] \S+ failed/);
     assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
   } finally {
     console.info = original;
@@ -391,7 +396,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(429, { error_code: "QUOTA_EXCEEDED" }),
     () => jsonResponse(202, { task_id: "must-not-retry" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "quota_exhausted");
   assert.equal(result.retried, false);
@@ -402,7 +408,8 @@ await withEnvAsync(productionGateEnv(), async () => {
   const fetchImpl = mockFetch([
     () => jsonResponse(401, { error_code: "INVALID_OAUTH_TOKEN" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "auth_failed");
   assert.notEqual(result.errorCode, "quota_check_failed");
@@ -416,7 +423,8 @@ await withEnvAsync(productionGateEnv(), async () => {
   const fetchImpl = mockFetch([
     () => jsonResponse(403, { error_code: "INVALID_USER_ID" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "invalid_user_id");
   assert.notEqual(result.errorCode, "quota_check_failed");
@@ -428,7 +436,8 @@ await withEnvAsync(productionGateEnv(), async () => {
   const fetchImpl = mockFetch([
     () => jsonResponse(404, { error_code: "HOST_NOT_VERIFIED" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "host_not_verified");
   assert.notEqual(result.errorCode, "quota_check_failed");
@@ -441,7 +450,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
     () => jsonResponse(401, { error_code: "INVALID_OAUTH_TOKEN" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "auth_failed");
   assert.equal(result.retried, false);
@@ -454,7 +464,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
     () => jsonResponse(403, { error_code: "INVALID_USER_ID" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "invalid_user_id");
   assert.equal(result.retried, false);
@@ -466,7 +477,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
     () => jsonResponse(404, { error_code: "HOST_NOT_VERIFIED" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "host_not_verified");
   assert.equal(result.retried, false);
@@ -478,7 +490,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(200, { daily_quota: 10, quota_remainder: 4 }),
     () => jsonResponse(400, { error_code: "INVALID_URL" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "invalid_url");
   assert.equal(result.retried, false);
@@ -494,6 +507,7 @@ await withEnvAsync(productionGateEnv(), async () => {
   const notifyResult = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
     fetchImpl,
     sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443",
   });
   assert.equal(notifyResult.status, "quota_exhausted");
   assert.equal(notifyResult.http?.retried, false);
@@ -506,7 +520,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(500, { error_code: "INTERNAL" }),
     () => jsonResponse(202, { task_id: "after-500" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, true);
   assert.equal(result.accepted, true);
   assert.equal(result.status, 202);
@@ -521,7 +536,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => jsonResponse(500, { error_code: "INTERNAL" }),
     () => jsonResponse(202, { task_id: "must-not-third" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.retried, true);
   assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
@@ -537,7 +553,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     },
     () => jsonResponse(202, { task_id: "after-timeout" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, true);
   assert.equal(result.retried, true);
   assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
@@ -551,7 +568,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     },
     () => jsonResponse(202, { task_id: "after-network" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, true);
   assert.equal(result.retried, true);
   assert.equal(fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length, 2);
@@ -568,7 +586,8 @@ await withEnvAsync(productionGateEnv(), async () => {
     },
     () => jsonResponse(202, { task_id: "must-not-third" }),
   ]);
-  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {} });
+  const result = await submitYandexRecrawl(TEST_URL, { fetchImpl, sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443" });
   assert.equal(result.ok, false);
   assert.equal(result.errorCode, "network");
   assert.equal(result.retried, true);
@@ -588,11 +607,12 @@ await withEnvAsync(productionGateEnv(), async () => {
         () => jsonResponse(202, { task_id: "logged" }),
       ]),
       sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443",
     });
     assert.equal(result.status, "submitted");
     assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
     assert.equal(logs.join("\n").includes(TEST_TOKEN), false);
-    assert.match(logs.join("\n"), /\[yandex-webmaster\] submitted/);
+    assert.match(logs.join("\n"), /\[yandex-webmaster\] \d{4}-\d{2}-\d{2}T\S+ submitted/);
   } finally {
     console.info = original;
   }
@@ -606,14 +626,23 @@ await withEnvAsync(productionGateEnv(), async () => {
     () => {
       throw new Error("yandex down");
     },
+    () => jsonResponse(202, { task_id: "after-quota-timeout", quota_remainder: 3 }),
   ]);
   const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
     fetchImpl,
     sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443",
   });
-  assert.equal(result.status, "quota_check_failed");
-  assert.equal(result.http?.errorCode, "quota_check_failed");
-  assert.equal(result.http?.retried, true);
+  assert.equal(result.status, "submitted");
+  assert.equal(result.http?.status, 202);
+  assert.equal(
+    fetchImpl.calls.filter((call) => /recrawl\/queue$/.test(call.url)).length,
+    1,
+  );
+  assert.match(
+    fetchImpl.calls.at(-1).url,
+    /hosts\/https%3Aaudiolad.ru%3A443\/recrawl\/queue$/,
+  );
   assert.equal(JSON.stringify(result).includes(TEST_TOKEN), false);
 });
 
@@ -627,9 +656,10 @@ await withEnvAsync(productionGateEnv(), async () => {
     const result = await notifyYandexRecrawlUrl(TEST_URL, "practice_published", {
       fetchImpl: mockFetch([() => jsonResponse(401, {})]),
       sleepImpl: async () => {},
+    verifiedHostId: "https:audiolad.ru:443",
     });
     assert.equal(result.status, "auth_failed");
-    assert.match(logs.join("\n"), /\[yandex-webmaster\] auth_failed/);
+    assert.match(logs.join("\n"), /\[yandex-webmaster\] \S+ auth_failed/);
     assert.equal(logs.join("\n").includes(TEST_TOKEN), false);
   } finally {
     console.info = original;

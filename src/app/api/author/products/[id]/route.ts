@@ -1271,8 +1271,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
 
         const yandexPlan = planPracticeYandexRecrawl({
-          previousStatus: practice.status,
+          previousStatus: currentPractice.status,
           nextStatus: product.practice.status,
+          previousCatalogVisibility: currentPractice.catalog_visibility,
+          previousIsCatalogListed: currentPractice.is_catalog_listed,
           catalogVisibility: product.practice.catalog_visibility,
           isCatalogListed: product.practice.is_catalog_listed,
           changedFields,
@@ -1281,7 +1283,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
 
         if (yandexPlan) {
-          scheduleYandexRecrawlNotification(yandexPlan.url, yandexPlan.reason);
+          scheduleYandexRecrawlNotification(yandexPlan.url, yandexPlan.reason, {
+            entityType: "practice",
+            entityId: id,
+          });
         }
       }
     }

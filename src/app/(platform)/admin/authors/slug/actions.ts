@@ -14,6 +14,8 @@ import {
   scheduleIndexNowNotification,
 } from "@/lib/seo/indexnow/hooks";
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
+import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
+import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
 import { createClient } from "@/lib/supabase/server";
 
 export type ChangeAuthorSlugAdminState = {
@@ -182,6 +184,11 @@ export async function confirmAuthorSlugChangeAsAdmin(
         buildAuthorCanonicalUrl(payload.previousSlug),
       ],
       INDEXNOW_REASONS.author_profile_updated,
+    );
+    scheduleYandexRecrawlNotification(
+      buildAuthorCanonicalUrl(payload.slug),
+      YANDEX_RECRAWL_REASONS.author_profile_updated,
+      { entityType: "author", entityId: authorId },
     );
   }
 

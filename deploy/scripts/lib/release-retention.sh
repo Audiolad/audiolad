@@ -55,8 +55,10 @@ release_retention_resolve_pm2_cwd() {
           for (const entry of apps) {
             const name = String(entry?.name || "");
             const status = String(entry?.pm2_env?.status || "");
-            if (status && status !== "online") continue;
-            if (!(name === "audiolad" || name.startsWith("audiolad-p"))) continue;
+            const isWeb = name === "audiolad" || name.startsWith("audiolad-p");
+            const isRecrawl = name === "audiolad-search-recrawl-worker";
+            if (!isWeb && !isRecrawl) continue;
+            if (isWeb && status && status !== "online") continue;
             const cwd = entry?.pm2_env?.pm_cwd;
             if (cwd) paths.add(String(cwd));
           }

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect, unstable_rethrow } from "next/navigation";
 
 import AdminAnalyticsWorkbench from "@/components/admin/AdminAnalyticsWorkbench";
+import { YandexRecrawlAdminAlert } from "@/components/admin/YandexRecrawlAdminAlert";
 import AdminSectionError from "@/components/admin/AdminSectionError";
 import AdminStatGrid from "@/components/admin/AdminStatGrid";
 import {
@@ -73,6 +74,7 @@ export default async function AdminOverviewPage({
   // highlight (buildAdminNavAttention in layout), so «Обзор» has no cards for them.
   return (
     <div className="space-y-8">
+      <YandexRecrawlAdminAlert />
       {loaded.analytics.status === "ready" ? (
         <section aria-labelledby="admin-analytics-heading">
           <Suspense

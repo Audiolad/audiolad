@@ -8,6 +8,12 @@ import {
   type NotifyIndexNowResult,
 } from "@/lib/seo/indexnow/notify";
 import type { IndexNowReason } from "@/lib/seo/indexnow/reasons";
+import { enqueueSearchRecrawl } from "@/lib/seo/search-recrawl/enqueue";
+import { recordIndexNowFailures } from "@/lib/seo/search-recrawl/indexnow-failures";
+import type {
+  EnqueueSearchRecrawlInput,
+  EnqueueSearchRecrawlResult,
+} from "@/lib/seo/search-recrawl/memory";
 
 export {
   buildAuthorCanonicalUrl,
@@ -22,7 +28,35 @@ export type ScheduleIndexNowOptions = NotifyIndexNowOptions & {
    * Never enables network by itself — still gated by INDEXNOW_ENABLED.
    */
   syncForTests?: boolean;
+  entityType?: string | null;
+  entityId?: string | null;
+  enqueueImpl?: (
+    input: EnqueueSearchRecrawlInput,
+  ) => Promise<EnqueueSearchRecrawlResult>;
 };
+
+export async function deliverIndexNowNotification(
+  urls: ReadonlyArray<string>,
+  reason: IndexNowReason,
+  options: ScheduleIndexNowOptions = {},
+): Promise<NotifyIndexNowResult> {
+  const result = await notifyIndexNowUrls(urls, reason, options);
+
+  try {
+    await recordIndexNowFailures({
+      urls,
+      reason,
+      result,
+      entityType: options.entityType ?? null,
+      entityId: options.entityId ?? null,
+      enqueue: options.enqueueImpl ?? enqueueSearchRecrawl,
+    });
+  } catch {
+    // A missed retry row must not change the caller's HTTP response.
+  }
+
+  return result;
+}
 
 /**
  * Fire-and-forget IndexNow notify after a successful domain write.
@@ -41,8 +75,8 @@ export function scheduleIndexNowNotification(
   }
 
   const run = () => {
-    void notifyIndexNowUrls(cleaned, reason, options).catch(() => {
-      // notifyIndexNowUrls already swallows errors; keep an extra belt.
+    void deliverIndexNowNotification(cleaned, reason, options).catch(() => {
+      // deliverIndexNowNotification already swallows errors.
     });
   };
 

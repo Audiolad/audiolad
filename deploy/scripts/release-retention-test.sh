@@ -206,6 +206,41 @@ young_output="$(
 assert_dir_exists "$young_root/releases/20260725-100000-cccccccc" "young successful kept by 30m window"
 assert_contains "$young_output" "KEEP successful release" "young keep logged"
 
+# Errored recrawl worker cwd stays. A stopped web app and an unrelated
+# online process do not gain that protection.
+pm2_root="$TEST_ROOT/recrawl-pm2"
+mkdir -p "$pm2_root/bin" "$pm2_root/deploy/releases"
+mkrelease "$pm2_root/deploy" "20260726-120000-aaaaaaaa" "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" "2026-07-22 12:00:00"
+mkrelease "$pm2_root/deploy" "20260726-110000-bbbbbbbb" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" "2026-07-22 11:00:00"
+mkrelease "$pm2_root/deploy" "20260726-100000-cccccccc" "cccccccccccccccccccccccccccccccccccccccc" "2026-07-22 10:00:00"
+mkrelease "$pm2_root/deploy" "20260726-090000-dddddddd" "dddddddddddddddddddddddddddddddddddddddd" "2026-07-22 09:00:00"
+mkrelease "$pm2_root/deploy" "20260726-080000-eeeeeeee" "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" "2026-07-22 08:00:00"
+ln -sfn "$pm2_root/deploy/releases/20260726-120000-aaaaaaaa" "$pm2_root/deploy/current"
+ln -sfn "$pm2_root/deploy/releases/20260726-110000-bbbbbbbb" "$pm2_root/deploy/previous"
+recrawl_cwd="$pm2_root/deploy/releases/20260726-100000-cccccccc"
+web_cwd="$pm2_root/deploy/releases/20260726-090000-dddddddd"
+other_cwd="$pm2_root/deploy/releases/20260726-080000-eeeeeeee"
+cat > "$pm2_root/bin/pm2" << EOF
+#!/bin/bash
+if [[ "\${1:-}" == "jlist" ]]; then
+  printf '%s\\n' '[{"name":"audiolad-search-recrawl-worker","pm2_env":{"status":"errored","pm_cwd":"$recrawl_cwd"}},{"name":"audiolad","pm2_env":{"status":"stopped","pm_cwd":"$web_cwd"}},{"name":"other-app","pm2_env":{"status":"online","pm_cwd":"$other_cwd"}}]'
+fi
+EOF
+chmod +x "$pm2_root/bin/pm2"
+PATH="$pm2_root/bin:$PATH" \
+  DEPLOY_ROOT="$pm2_root/deploy" \
+  RELEASE_RETENTION_KEEP_EXTRA=0 \
+  RELEASE_RETENTION_DRY_RUN=0 \
+  RELEASE_RETENTION_MIN_AGE_SECONDS=0 \
+  RELEASE_RETENTION_INCOMPLETE_AGE_SECONDS=0 \
+  RELEASE_RETENTION_SKIP_LSOF=1 \
+  PM2_APP_NAME="__missing_app__" \
+  bash -c 'source "$1/lib/common.sh"; prune_old_releases 0' _ "$SCRIPT_DIR" >/dev/null
+assert_dir_exists "$recrawl_cwd" "errored recrawl worker cwd kept"
+assert_dir_exists "$pm2_root/deploy/releases/20260726-120000-aaaaaaaa" "current still kept beside recrawl cwd"
+assert_dir_missing "$web_cwd" "stopped audiolad cwd is not newly protected"
+assert_dir_missing "$other_cwd" "unrelated online cwd is not protected"
+
 echo "---"
 echo "release retention tests: pass=$pass fail=$fail"
 if (( fail > 0 )); then

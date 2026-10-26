@@ -233,7 +233,7 @@
     "test:author-product-recommendations-title": "npx tsx scripts/author-product-recommendations-title-unit.mjs",
     "test:product-seo": "npx tsx scripts/product-copy-architecture-unit.mjs && npx tsx scripts/product-seo-metadata-unit.mjs && npx tsx scripts/author-product-seo-form-unit.mjs && npx tsx scripts/related-product-seo-unit.mjs && npx tsx scripts/author-product-recommendations-title-unit.mjs && npx tsx scripts/topics-sleep-architecture-unit.mjs && npx tsx scripts/topics-single-word-catalog-unit.mjs && npm run test:wordstat && npm run test:product-seo-autofill",
     "test:product-seo:isolated": "node scripts/product-seo-v2-isolated.mjs",
-    "test:yandex-webmaster": "npx tsx scripts/yandex-webmaster-unit.mjs && npx tsx scripts/yandex-webmaster-hooks-unit.mjs",
+    "test:yandex-webmaster": "npx tsx scripts/yandex-webmaster-unit.mjs && npx tsx scripts/yandex-webmaster-hooks-unit.mjs && npx tsx scripts/search-recrawl-queue-unit.mjs && node scripts/search-recrawl-queue-sql-unit.mjs",
     "test:studio-guest-security": "npx tsx scripts/studio-guest-security-unit.mts",
     "test:studio-guest-limits": "npx tsx scripts/studio-guest-limits-unit.mts",
     "test:studio-guest-source": "npx tsx scripts/studio-guest-source-unit.mts",

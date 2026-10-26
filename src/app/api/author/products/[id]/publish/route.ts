@@ -170,21 +170,28 @@ export async function POST(_request: Request, context: RouteContext) {
       const authorSlug = await loadAuthorSlug(supabase, practice.author_id);
 
       if (authorSlug) {
-        schedulePracticePublishedSearchNotifications({
-          authorSlug,
-          practiceSlug: product.practice.slug,
-          previousStatus: practice.status,
-          nextStatus: product.practice.status,
-          catalogVisibility: product.practice.catalog_visibility,
-          isCatalogListed: product.practice.is_catalog_listed,
-          isFirstPublishOfPractice,
-          publishedCountBefore,
-          publiclyAvailable: isPracticePubliclyAvailable({
-            status: product.practice.status,
-            scheduledPublishAt: product.practice.scheduled_publish_at,
-            publishedAt: product.practice.published_at,
-          }),
-        });
+        schedulePracticePublishedSearchNotifications(
+          {
+            authorSlug,
+            practiceSlug: product.practice.slug,
+            previousStatus: practice.status,
+            nextStatus: product.practice.status,
+            catalogVisibility: product.practice.catalog_visibility,
+            isCatalogListed: product.practice.is_catalog_listed,
+            isFirstPublishOfPractice,
+            publishedCountBefore,
+            publiclyAvailable: isPracticePubliclyAvailable({
+              status: product.practice.status,
+              scheduledPublishAt: product.practice.scheduled_publish_at,
+              publishedAt: product.practice.published_at,
+            }),
+          },
+          {
+            entityType: "practice",
+            entityId: id,
+            authorId: practice.author_id,
+          },
+        );
       }
     }
 
