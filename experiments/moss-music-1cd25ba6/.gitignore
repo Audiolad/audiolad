@@ -1,0 +1,12 @@
+var/
+input/
+audio/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.aiff
+*.m4a
+__pycache__/
+*.pyc
+.pytest_cache/

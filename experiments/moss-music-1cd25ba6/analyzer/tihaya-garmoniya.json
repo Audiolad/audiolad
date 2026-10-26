@@ -1,0 +1,36 @@
+{
+  "schema": "audiolad-analyzer-snapshot",
+  "source": "docs/music-analyzer/EVAL-09d393ce.md и docs/music-analyzer/eval-results-09d393ce.json. Полный raw-экспорт в репозиторий не входил.",
+  "sha256": "adda7e8735f90686ed52516cd979b875ba7f955d15aee8faf412d018e20c291c",
+  "title": "Тихая гармония",
+  "artist": "Aurafon",
+  "album": "Расслабляющая музыка для СПА",
+  "duration_s": 241.728,
+  "vocal_raw": "mixed",
+  "vocal_screen": null,
+  "vocal_screen_note": "В отчёте 09d393ce тип до и после адаптера оставлен mixed. Четыре сходства instrumental/vocal/mixed/spoken_word в репозитории не опубликованы, поэтому порог 0.35/0.08 здесь не пересчитан.",
+  "vocal_decision": "top two of instrumental/vocal/mixed differ by 0.0079, within tie_margin 0.0200; type set to mixed",
+  "vocal_scores": {
+    "spoken_word": 0.134156
+  },
+  "speech_leads": false,
+  "genres": ["new age", "jazz", "ambient"],
+  "styles": ["new age", "dark jazz", "relaxation music"],
+  "styles_note": "Dark Jazz был в top 3 стилей и затем удержан адаптером. Владелец: ambient, не Dark Jazz. Это не слуховая панель.",
+  "instruments": [
+    "strings",
+    "double bass",
+    "saxophone",
+    "woodwinds",
+    "harp",
+    "synth pad",
+    "organ",
+    "flute",
+    "cello",
+    "bass guitar"
+  ],
+  "moods": ["warm", "melancholic", "romantic", "meditative", "relaxing"],
+  "tempo": "BPM не принят гейтом; pulse_accepted=false; кандидат 59.84, raw 119.68",
+  "energy": "68/100, audiolad-dsp:1, confidence=null, в паспорте скрыта",
+  "ground_truth_note": "Для этого эксперимента метка instrumental задана задачей: инструментальная spa-музыка. Слушательской панели в отчёте 09d393ce не было."
+}
