@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, phraseInProse, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -606,9 +606,32 @@ function existingParagraphs(fields, replacing) {
   });
 }
 
+/** True when the new fragment drops an extra query, required /s/ slug or brief anchor that the old text had. */
+export function fragmentDropsRequired(before, after, brief) {
+  const source = String(before ?? "");
+  if (!source.trim()) return false;
+  const texts = [];
+  collectText(after, texts);
+  const next = texts.join("\n");
+  for (const phrase of brief?.additionalQueries ?? []) {
+    const forms = [phrase, ...(brief?.additionalQueryForms?.[phrase] ?? [])].filter(Boolean);
+    if (forms.some((form) => phraseInProse(source, form)) && !forms.some((form) => phraseInProse(next, form))) return true;
+  }
+  for (const slug of brief?.links?.contextual ?? []) {
+    const needle = `/s/${slug}`;
+    if (source.includes(needle) && !next.includes(needle)) return true;
+  }
+  for (const item of brief?.links?.anchors ?? []) {
+    const anchor = String(item?.anchor ?? "");
+    if (anchor && normalize(source).includes(normalize(anchor)) && !normalize(next).includes(normalize(anchor))) return true;
+  }
+  return false;
+}
+
 /** One gate for every repair answer: bans, links, discomfort, em dash, templates, near-duplicates. */
 function repairOutputRejected(value, brief, current, replacing = "") {
   if (fragmentBanned(value, brief)) return true;
+  if (fragmentDropsRequired(replacing, value, brief)) return true;
   const texts = [];
   collectText(value, texts);
   const joined = texts.join("\n");

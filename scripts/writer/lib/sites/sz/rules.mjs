@@ -509,7 +509,7 @@ const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["�
 const NOT_WORD = String.raw`(?<![\p{L}\p{N}])`;
 const WORD_END = String.raw`(?![\p{L}\p{N}])`;
 const LIST_NOUN = String.raw`шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?|правило|правила|правил|фраза|фразы|фраз`;
-const STEP_NOUN = String.raw`шаг(?:а|ов)?`;
+const STEP_NOUN = String.raw`шаг(?:а|ов)?|действи(?:е|я|й)|пункт(?:а|ов)?`;
 
 function countWordBefore(text, nounAt) {
   const head = text.slice(0, nounAt).trimEnd();
@@ -519,7 +519,7 @@ function countWordBefore(text, nounAt) {
   return LIST_COUNT_WORDS.find(([word]) => word === token)?.[1] ?? null;
 }
 
-/** «пять шагов» / «5 шага» / «Пять шагов:» – the number and the noun are adjacent whole words. */
+/** «пять шагов», «5 действия», «Три пункта:» – the number and the noun are adjacent whole words. */
 export function stepHeadingCount(title) {
   const text = normalize(title);
   const noun = text.match(new RegExp(`${NOT_WORD}(${STEP_NOUN})${WORD_END}`, "u"));
@@ -687,7 +687,7 @@ function promiseHit(title, count) {
 
 /**
  * A heading or a lead-in immediately before a list whose count differs.
- * strict is only «<число> шаг/шага/шагов». Other nouns are warnings for the editor.
+ * strict is only an adjacent «<число> шаг/шага/шагов», «действие/действия/действий» or «пункт/пункта/пунктов». Other nouns are warnings for the editor.
  * The «## Три шага» section is left to the steps check (it uses ###, not a bullet list).
  */
 export function listPromiseMismatches(markdown) {
@@ -754,6 +754,13 @@ export function examplePhraseStats(markdown) {
     count += (section.match(/^«[^»\n]{1,120}»\.?\s*$/gm) || []).length;
   }
   return { heading, count };
+}
+
+const META_QUERY = /(?:запрос\s*«|как в теме\s*«|вопрос\s*:\s*«)/giu;
+
+/** Service leftovers: «запрос «…»», «как в теме «…»», «Вопрос: «…»». */
+export function metaQueryLeftovers(text) {
+  return [...String(text ?? "").matchAll(META_QUERY)].map((match) => match[0]);
 }
 
 export function faqStanceMismatch(question, answer, hints) {
@@ -1566,6 +1573,9 @@ export function checkSzArticle(md, cfg, env) {
     const forms = cfg.additionalQueryForms?.[phrase] ?? [];
     const ok = [phrase, ...forms].some((form) => phraseInProse(mainBody, form));
     if (!ok) add("extra-query", "sections", `дополнительный запрос «${phrase}» не встречается в тексте`);
+  }
+  for (const hit of metaQueryLeftovers(`${mainBody}\n${faqText}`)) {
+    add("query-meta", "sections", `служебная вставка вместо фразы: «${hit.trim()}»`);
   }
   for (const phrase of [query, ...queryPhrases]) {
     if (phrase && (boltedPrepositionQuery(storyParagraphs.at(-1) ?? "", phrase) || boltedPrepositionQuery(mainBody, phrase))) {

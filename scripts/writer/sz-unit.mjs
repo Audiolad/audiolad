@@ -23,7 +23,7 @@ import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
 import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
-import { applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
+import { applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -33,7 +33,7 @@ import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } f
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, examplePhraseStats, faqAnswerTypeMismatch, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, examplePhraseStats, faqAnswerTypeMismatch, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -282,6 +282,13 @@ test("prompt: lessons, caution, siblings and tone sample reach the model", () =>
   for (const slug of brief.links.contextual) assert.ok(text.slice(linksAt, structureAt).includes(`/s/${slug}`), slug);
   assert.match(text, /История и молитва остаются без ссылок/);
   assert.match(text, /950–1100/);
+  assert.match(text, /Обязательны все /);
+  assert.match(text, /не отменяет список/);
+  assert.match(text, /Число в заголовке равно числу пунктов/);
+  assert.match(text, /один раз/);
+  assert.match(text, /не повторяют концовку/);
+  assert.match(text, /около 1000/);
+  assert.match(text, /880–1400/);
   assert.match(text, /СВЕРКА ПЕРЕД ОТПРАВКОЙ/);
   assert.match(text, /не начинается с «Да» или «Нет»/);
 });
@@ -403,6 +410,9 @@ test("article #3: extra queries, links, steps, length, stance, examples, case, P
   assert.equal(stepHeadingCount("Сделайте три вдоха без лишнего шага."), null);
   assert.equal(stepHeadingCount("Пять шагов:"), 5);
   assert.equal(stepHeadingCount("Три шага"), 3);
+  assert.equal(stepHeadingCount("Пять действий:"), 5);
+  assert.equal(stepHeadingCount("Три пункта"), 3);
+  assert.equal(stepHeadingCount("Сделайте три вдоха без лишнего шага."), null);
   assert.equal(stepHeadingCount("Три шага, чтобы начать"), 3);
   assert.equal(stepHeadingCount("5 шагов – бережное обращение"), 5);
   assert.equal(stepHeadingCount("Пять правил для утра"), null);
@@ -422,6 +432,10 @@ test("article #3: extra queries, links, steps, length, stance, examples, case, P
   assert.match(withSlots, /Героиня «Вера»/);
   assert.match(withSlots, /позицию «нет»/);
   assert.match(withSlots, /8–12 фраз/);
+  assert.match(withSlots, /начинается с «Примеры»/);
+  assert.match(withSlots, /нельзя заменить/);
+  assert.match(withSlots, /вплетён в обычное предложение/);
+  assert.match(withSlots, /запрос «…»/);
   assert.match(withSlots, /утренняя практика/);
   const raw = structuredClone(fields);
   raw.sectionsBefore[0].paragraphs.push(stuffed);
@@ -544,11 +558,61 @@ test("count-mismatch: only an adjacent «N шаг/шага/шагов» immediat
   const breaths = ["Сделайте три вдоха без лишнего шага.", bullet("Первое"), bullet("Второе"), bullet("Третье"), bullet("Четвёртое"), bullet("Пятое")].join("\n\n");
   const five = ["Пять шагов:", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n");
   const three = ["Три шага", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n");
+  const actions = ["Пять действий:", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n");
+  const points = ["Три пункта", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n");
   assert.deepEqual(counts(gateOf(breaths)), []);
   const missed = counts(gateOf(five));
   assert.equal(missed.length, 1);
   assert.equal(missed[0].severity, "error");
   assert.deepEqual(counts(gateOf(three)), []);
+  assert.equal(counts(gateOf(actions)).length, 1);
+  assert.equal(counts(gateOf(actions))[0].severity, "error");
+  assert.deepEqual(counts(gateOf(points)), []);
+});
+
+test("query-meta: service leftovers fail the gate, a woven sentence does not", () => {
+  assert.deepEqual(metaQueryLeftovers("Фраза звучит спокойно и остаётся в обычном предложении."), []);
+  const gateOf = (mutate) => {
+    const raw = structuredClone(fields);
+    mutate(raw);
+    const { fields: normalized } = normalizeSzFields(raw);
+    const md = assembleSzArticle(brief, normalized, view.site, { date: pack.publishedAt });
+    return checkSzArticle(md, cfg, env);
+  };
+  const metas = errorsOf(gateOf((raw) => {
+    raw.sectionsBefore[0].paragraphs[0] += " Хорошо звучит и запрос «аффирмации на богатство», как в теме «что значит изобилие».";
+    raw.faq[1] = { ...raw.faq[1], answer: `Вопрос: «${raw.faq[1].question}». ${raw.faq[1].answer}` };
+  })).filter((problem) => problem.code === "query-meta");
+  assert.ok(metas.length >= 2, metas.map((problem) => problem.message).join(" | "));
+  assert.equal(errorsOf(gateOf(() => {})).some((problem) => problem.code === "query-meta"), false);
+});
+
+test("repair: a fragment that drops a required query or link is rejected", () => {
+  const phrase = "мощные аффирмации на деньги";
+  const slug = brief.links.contextual[0];
+  const before = `В этом абзаце уже есть ${phrase} и ссылка [практика изобилия](/s/${slug}).`;
+  const localBrief = {
+    ...brief,
+    additionalQueries: [phrase],
+    links: { ...brief.links, anchors: [{ anchor: "практика изобилия", slug, href: `/s/${slug}` }] },
+  };
+  assert.equal(fragmentDropsRequired(before, { text: before }, localBrief), false);
+  assert.equal(fragmentDropsRequired(before, { text: "В этом абзаце остаётся только порядок дня и короткая пауза без прежней фразы." }, localBrief), true);
+  assert.equal(fragmentDropsRequired(before, { paragraphs: [`Здесь по-прежнему ${phrase} и [практика изобилия](/s/${slug}).`] }, localBrief), false);
+  const raw = structuredClone(fields);
+  const story = [...raw.story, raw.transition].join("\n\n");
+  const plot = story.replace(/[«»"“”„]/g, "").split(/\s+/).slice(0, 130).join(" ");
+  const paraphrase = `${plot} Дальше сцена повторяется почти теми же подробностями. Здесь звучат ${phrase}.`;
+  assert.equal(sectionRetellsStory(story, paraphrase), true);
+  const title = raw.sectionsBefore[0].title;
+  const kept = raw.sectionsBefore[0].paragraphs.slice(1);
+  raw.sectionsBefore[0].paragraphs = [paraphrase, ...kept];
+  const job = buildSzFragment(localBrief, raw, { code: "story-retell", field: "sections", message: `раздел «${title}» пересказывает историю` });
+  assert.ok(job);
+  const filler = "Назовите одно чувство своими словами и выберите короткую фразу, которую готовы повторить спокойно, затем сделайте паузу и запишите её.";
+  const dropped = job.apply(raw, { paragraphs: [filler, ...kept] });
+  assert.equal(dropped, null);
+  assert.ok(raw.sectionsBefore[0].paragraphs[0].includes(phrase));
 });
 
 test("LESSONS.md: every bullet is a «Неверно → Верно» item, seeded from EDITS.md and review #72", () => {
