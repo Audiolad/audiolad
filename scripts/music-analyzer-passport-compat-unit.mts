@@ -4,8 +4,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MusicPassport } from "../src/components/music-passport/MusicPassport";
 import assert from "node:assert/strict";
-import { MUSIC_ANALYZER_ENERGY_PUBLIC, buildFeatures, readFeatures } from "../src/lib/music-analyzer-runs/features.mjs";
-import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
+import { MUSIC_ANALYZER_ENERGY_PUBLIC, applyOverrides, buildFeatures, readFeatures } from "../src/lib/music-analyzer-runs/features.mjs";
+import { readMusicAnalyzerFeatures, readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
 import { albumPassportPromptFacts, albumPassportSummaryLines, buildAlbumPassportDraft, parseStoredStructuredFacts, attributesFromStructuredFacts, storedFactsFromStructured } from "../src/lib/music-passport/album-aggregate";
 import { collectAnalyzerDocuments } from "../src/lib/music-analyzer-runs/analyze-output";
 import { analyzerChildEnv } from "../src/lib/music-analyzer-runs/python-plan";
@@ -130,3 +130,89 @@ for (const method of ["GET", "POST"]) {
   }
 }
 console.log("Features API: invalid UUID rejected before storage (GET/POST).");
+
+// Contract fixtures, not claimed to be saved runs or an audio accuracy evaluation.
+const legacyTags = {
+  moods: [{ label: "warm", average: 0.42 }],
+  instruments: [{ label: "organ", average: 0.51 }],
+  sound_character: [{ label: "soft", average: 0.4 }],
+};
+const renderPassport = (n: unknown, effective?: ReturnType<typeof buildFeatures>) => {
+  const passport = readMusicAnalyzerPassport({ normalized: n });
+  if (effective) passport.features = effective;
+  return renderToStaticMarkup(createElement(MusicPassport, {
+    mode: "full", passport, snapshot: { version: null, commit: null },
+    header: { filename: "contract-fixture.wav", analyzedAt: null, analyzerVersion: null, statusLabel: "Готово", fileVersion: 1 },
+    provenance: { sha256: null, analyzerGitCommit: null, analyzerContentCommit: null, modelCheckpoint: null, device: null, taxonomy: null, prompt: null },
+  }));
+};
+for (const value of [null, [], {}, "wrong", [null, 3, {}, { label: 42 }, { label: " " }]]) {
+  const set = buildFeatures(legacyTags, { energy_0_100: 62, rhythm_salience: 0.8, dynamic_spread_db: 5 });
+  set.features.mood.value = value;
+  set.features.instruments.value = value;
+  const n = { ...legacyTags, analysis_features_v1: set };
+  const original = structuredClone(n);
+  for (const output of [renderPassport(n), JSON.stringify(readMusicAnalyzerStructuredFacts(n))]) {
+    for (const label of ["warm", "organ", "soft"]) assert.match(output, new RegExp(label));
+  }
+  assert.match(renderPassport(n), /62 \/ 100/);
+  assert.match(renderPassport(n), /0.8 \/ 1/);
+  assert.match(renderPassport(n), /5 дБ/);
+  assert.deepEqual(n, original);
+}
+assert.match(renderPassport(legacyTags), /organ/);
+const featureOnly = buildFeatures({ moods: ["bright"], instruments: ["piano"] });
+const featureOnlyInput = { analysis_features_v1: featureOnly };
+assert.match(renderPassport(featureOnlyInput), /bright/);
+assert.match(renderPassport(featureOnlyInput), /piano/);
+assert.deepEqual(readMusicAnalyzerStructuredFacts(featureOnlyInput).instruments, [{ label: "piano", score: null }]);
+const held = buildFeatures(legacyTags);
+for (const key of ["mood", "instruments"]) held.features[key].value = [{ label: "Hidden", status: "withheld" }];
+assert.doesNotMatch(renderPassport({ ...legacyTags, analysis_features_v1: held }), /warm|organ|Hidden/);
+assert.deepEqual(readMusicAnalyzerStructuredFacts({ ...legacyTags, analysis_features_v1: held }).moods, []);
+const parentHeld = structuredClone(held);
+parentHeld.features.mood = { ...parentHeld.features.mood, value: null, status: "withheld" as typeof parentHeld.features.mood.status };
+assert.doesNotMatch(renderPassport({ ...legacyTags, analysis_features_v1: parentHeld }), /warm/);
+const researchConflict = { ...legacyTags, analysis_features_v1: buildFeatures(legacyTags) };
+researchConflict.analysis_features_v1.features.mood.value = [{ label: "warm", research_only: true }];
+assert.deepEqual(readMusicAnalyzerStructuredFacts(researchConflict).moods, []);
+assert.doesNotMatch(renderPassport(researchConflict), /warm/);
+const automatic = buildFeatures(legacyTags);
+const originalAutomatic = structuredClone(automatic);
+const effective = applyOverrides(automatic, [{ id: 1, patch: { mood: ["bright"], instruments: ["piano"], vocal_role: "instrumental" } }]);
+const manualHtml = renderPassport({ ...legacyTags, analysis_features_v1: automatic }, effective);
+assert.match(manualHtml, /bright/); assert.match(manualHtml, /piano/); assert.match(manualHtml, /инструментал/);
+assert.doesNotMatch(manualHtml, /warm|organ/);
+const cleared = applyOverrides(automatic, [{ id: 2, patch: { mood: [], instruments: [] } }]);
+assert.doesNotMatch(renderPassport({ ...legacyTags, analysis_features_v1: automatic }, cleared), /warm|organ/);
+assert.match(renderPassport({}), /не определено/);
+assert.deepEqual(automatic, originalAutomatic);
+console.log("E20D8EB7: fallback, feature-only, withholding, ручной приоритет и DSP совместимость пройдены.");
+
+const recoveredStored = storedFactsFromStructured(readMusicAnalyzerStructuredFacts(featureOnlyInput));
+const recoveredAlbum = buildAlbumPassportDraft({ succeeded: [{ audioItemId: "fixture", passportId: "fixture", runId: "fixture",
+  analyzerVersion: "test", analyzerGitCommit: null, facts: recoveredStored }], failed: [] });
+assert.match(albumPassportPromptFacts(recoveredAlbum), /bright/);
+assert.match(albumPassportPromptFacts(recoveredAlbum), /piano/);
+
+// The features endpoint must not overwrite the safe first render with unsafe saved tags.
+const overrideModule = { exports: {} as { getRunFeatures: (id: string) => Promise<{ automatic: ReturnType<typeof buildFeatures>; effective: ReturnType<typeof buildFeatures> }> } };
+let patches: { id: number; patch: unknown }[] = [];
+const overrideMocks = {
+  applyOverrides, readMusicAnalyzerFeatures,
+  getMusicAnalyzerRun: async () => ({ status: "succeeded", normalized_json: researchConflict }),
+  createServiceRoleClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ order: () => ({
+    range: async () => ({ data: patches, error: null }),
+  }) }) }) }) }),
+};
+new Function("require", "exports", ts.transpileModule(readFileSync(new URL(
+  "../src/lib/music-analyzer-runs/feature-overrides.ts", import.meta.url), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText)(() => overrideMocks, overrideModule.exports);
+const safeApi = await overrideModule.exports.getRunFeatures("fixture");
+assert.doesNotMatch(renderPassport(researchConflict, safeApi.effective), /warm/);
+patches = [{ id: 3, patch: { mood: ["bright"], vocal_role: "instrumental" } }];
+const manualApi = await overrideModule.exports.getRunFeatures("fixture");
+assert.match(renderPassport(researchConflict, manualApi.effective), /bright/);
+assert.equal(manualApi.effective.features.vocal_role.value, "instrumental");
+assert.equal(manualApi.automatic.features.vocal_role.value, null);

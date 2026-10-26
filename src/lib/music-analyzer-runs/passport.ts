@@ -7,6 +7,8 @@
 
 import { isWithheldTag, publicMusicAnalyzerFeatures, readFeatures, type FeatureSet } from "./features.mjs";
 
+import { sourceTagDecision, type TagGroup } from "@/lib/music-passport/tag-withholding";
+
 export type PassportTone = "high" | "medium" | "low";
 
 export type PassportRow = {
@@ -701,6 +703,42 @@ function columnText(value: string | null | undefined): string | null {
   return value.trim().slice(0, 200);
 }
 
+/** Resolve one list without turning withheld or deliberately cleared data into fallback. */
+export function resolvePassportTags(set: FeatureSet | null | undefined, key: string, fallback: PassportRow[]): PassportRow[] {
+  const safeFallback = fallback.filter(row => !isWithheldTag(row));
+  const feature = set?.features[key];
+  if (!feature) return safeFallback;
+  if (isWithheldTag(feature)) return [];
+  const values: unknown[] = Array.isArray(feature.value) ? feature.value : [];
+  const meaningful = values.some((item) => typeof item === "string" ? Boolean(item.trim())
+    : isRecord(item) && typeof item.label === "string" && Boolean(item.label.trim()));
+  if (!meaningful && feature.status !== "manual") return safeFallback;
+  return values.flatMap((item) => {
+    // Manual lists contain strings; automatic lists contain label objects.
+    if (typeof item !== "string" && (!isRecord(item) || typeof item.label !== "string")) return [];
+    const row = parseRow(item);
+    return row ? [{ ...row, bandLabel: feature.status === "manual" ? "ручная проверка" : "гипотеза" }] : [];
+  });
+}
+
+/** Keep source-level withholding before display rows lose their metadata. */
+export function readMusicAnalyzerFeatures(normalized: unknown): FeatureSet | null {
+  const set = publicMusicAnalyzerFeatures(readFeatures(normalized));
+  if (!set) return null;
+  const permits = sourceTagDecision(normalized);
+  const features = { ...set.features };
+  for (const [key, group] of Object.entries({ genre: "genres", subgenre: "styles", mood: "moods", instruments: "instruments" })) {
+    const feature = features[key];
+    if (!Array.isArray(feature?.value)) continue;
+    features[key] = { ...feature, value: feature.value.map((item: unknown) => {
+      const tag = typeof item === "string" ? { label: item } : item;
+      if (!isRecord(tag) || typeof tag.label !== "string" || !tag.label.trim()) return item;
+      return permits(group as TagGroup, tag) ? item : { ...(isRecord(tag) ? tag : {}), status: "withheld" };
+    }) };
+  }
+  return { ...set, features };
+}
+
 export function readMusicAnalyzerPassport(input: {
   normalized: unknown;
   raw?: unknown;
@@ -708,6 +746,7 @@ export function readMusicAnalyzerPassport(input: {
   promptVersion?: string | null;
 }): MusicAnalyzerPassport {
   const nodes = collect(input.normalized);
+  const permits = sourceTagDecision(input.normalized);
   const bpm = readBpm(nodes);
   const key = readKey(nodes);
   const genres = takeList(nodes, ["genres", "genre_top", "top_genres", "genre"], ["genre", "genres", "genre_class"], 3);
@@ -723,15 +762,15 @@ export function readMusicAnalyzerPassport(input: {
   const prompt = columnText(input.promptVersion) ?? promptHit?.text ?? null;
   return {
     bpm: bpm.fact,
-    features: publicMusicAnalyzerFeatures(readFeatures(input.normalized)),
+    features: readMusicAnalyzerFeatures(input.normalized),
     bpmDisplay: bpm.display,
     key: key.fact,
     keyDisplay: key.display,
     genres: genres.rows,
     styles: styles.rows,
-    moods: moods.rows,
-    instruments: instruments.rows,
-    sound: soundRows[0] ?? null,
+    moods: moods.rows.filter(row => permits("moods", row)),
+    instruments: instruments.rows.filter(row => permits("instruments", row)),
+    sound: soundRows.find(row => permits("sound_character", row)) ?? null,
     technical: technical.rows,
     taxonomy,
     prompt,
@@ -817,8 +856,9 @@ function materializedLabelFacts(value: unknown): MusicAnalyzerLabelFact[] {
 }
 
 export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnalyzerStructuredFacts {
-  const analysisFeatures = publicMusicAnalyzerFeatures(readFeatures(normalized));
+  const analysisFeatures = readMusicAnalyzerFeatures(normalized);
   const nodes = collect(normalized);
+  const permits = sourceTagDecision(normalized);
   const publishedMatches = nodes.filter((node) => (
     bpmKind(node.segments) === "published" && isScalarQuantity(node.value)
   ));
@@ -853,7 +893,7 @@ export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnal
   const soundRows = soundFound ? orderRows(rowsFromValue(soundFound.value)) : groupedRows(nodes, ["sound_character", "sound"]);
   const lufs = technicalValue(nodes, ["lufs", "integrated_lufs", "loudness_lufs"]);
   const energy = technicalValue(nodes, ["energy"]);
-  const sound = labelFacts(soundRows)[0] ?? null;
+  const sound = labelFacts(soundRows.filter(row => permits("sound_character", row)))[0] ?? null;
   return {
     ...(analysisFeatures ? { analysisFeatures } : {}),
     bpm: {
@@ -870,8 +910,8 @@ export function readMusicAnalyzerStructuredFacts(normalized: unknown): MusicAnal
     },
     genres: analysisFeatures ? materializedLabelFacts(analysisFeatures.features.genre?.value) : labelFacts(genres.rows),
     styles: analysisFeatures ? materializedLabelFacts(analysisFeatures.features.subgenre?.value) : labelFacts(styles.rows),
-    moods: labelFacts(moods.rows),
-    instruments: labelFacts(instruments.rows),
+    moods: labelFacts(resolvePassportTags(analysisFeatures, "mood", moods.rows.filter(row => permits("moods", row)))),
+    instruments: labelFacts(resolvePassportTags(analysisFeatures, "instruments", instruments.rows.filter(row => permits("instruments", row)))),
     soundCharacter: sound,
     loudnessLufs: lufs ? finiteNumber(lufs.value) : null,
     energy: energy ? finiteNumber(energy.value) : null,
