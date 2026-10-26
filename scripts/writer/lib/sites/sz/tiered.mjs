@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { MIXED_SCRIPT, PROMISE, SUMMONING, danglingFragment, fieldProseDefect, normalize, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, danglingFragment, fieldProseDefect, normalize, paragraphTokens, paragraphsTooClose, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -39,20 +39,6 @@ export function retryTokenCap(cap) {
 export function lengthFragmentTokens(needWords, ceiling = 800) {
   const words = Math.max(40, Math.min(160, Number(needWords) || 80));
   return Math.min(ceiling, Math.max(200, Math.ceil(words * 2.2) + 80));
-}
-
-/** Largest completion cap whose worst case still fits in `money`. */
-function tokensWithin(model, promptTokens, money, ceiling) {
-  const limit = Math.floor(ceiling);
-  if (!(money > 0) || limit < 1) return 0;
-  let lo = 0;
-  let hi = limit;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    if (worstCaseRub(model, promptTokens, mid) <= money) lo = mid;
-    else hi = mid - 1;
-  }
-  return worstCaseRub(model, promptTokens, lo) <= money ? lo : 0;
 }
 
 /** True when the fragment was cut off or is not JSON. A parsed object with finish_reason length still counts. */
@@ -336,110 +322,47 @@ function boltedQuerySentence(text, query) {
   return plants.some((plant) => text.includes(plant));
 }
 
-/** A shorter phrase that no longer contains the exact query. One- and two-word queries stay for the model. */
-function naturalVariant(query) {
-  const nq = normalize(query);
-  const words = nq.split(" ").filter(Boolean);
-  if (words.length < 3) return null;
-  const prep = nq.match(/^(.+?)\s+в\s+\S+$/u);
-  const shortened = prep && prep[1].split(" ").length >= 2 ? prep[1] : words.slice(0, -1).join(" ");
-  if (!shortened || shortened === nq || normalize(shortened).includes(nq)) return null;
-  return shortened;
+function isQuoteParagraph(text) {
+  const trimmed = String(text ?? "").trim();
+  return trimmed.startsWith("«") || trimmed.startsWith(">");
 }
 
-function queryPattern(query) {
-  const words = normalize(query).split(" ").filter(Boolean);
-  const body = words
-    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/е/gu, "[её]"))
-    .join("[,\\s]+");
-  return new RegExp(body, "giu");
-}
-
-function replaceLastQuery(text, pattern, variant, query) {
-  pattern.lastIndex = 0;
-  const matches = [...String(text).matchAll(pattern)];
-  if (!matches.length) return null;
-  const match = matches[matches.length - 1];
-  const shaped = /^\p{Lu}/u.test(match[0]) ? variant.charAt(0).toLocaleUpperCase("ru") + variant.slice(1) : variant;
-  const next = `${text.slice(0, match.index)}${shaped}${text.slice(match.index + match[0].length)}`;
-  if (queryHits(next, query) >= queryHits(text, query)) return null;
-  return next;
-}
-
-const SURPLUS_SKIP = new Set(["transition", "description", "seoTitle", "faq", "faqHeading"]);
-const SURPLUS_ORDER = ["story", "invitation", "question", "practiceIntro", "checklist", "psychologyIntro", "sectionsBefore", "tableSection", "steps", "sectionsAfter", "specialist", "storyEnding", "finalInvite", "finalQuestion"];
-
-function stringSlots(value, path, slots) {
-  if (typeof value === "string") slots.push({ path, text: value });
-  else if (Array.isArray(value)) value.forEach((item, index) => stringSlots(item, `${path}[${index}]`, slots));
-  else if (value && typeof value === "object") {
-    for (const [key, item] of Object.entries(value)) stringSlots(item, path ? `${path}.${key}` : key, slots);
-  }
-}
-
-function readPath(fields, path) {
-  const parts = [...path.matchAll(/([^[\].]+)|\[(\d+)\]/g)].map((match) => (match[1] !== undefined ? match[1] : Number(match[2])));
-  let cursor = fields;
-  for (const part of parts) {
-    if (cursor == null) return undefined;
-    cursor = cursor[part];
-  }
-  return cursor;
-}
-
-function writePath(fields, path, text) {
-  const parts = [...path.matchAll(/([^[\].]+)|\[(\d+)\]/g)].map((match) => (match[1] !== undefined ? match[1] : Number(match[2])));
-  let cursor = fields;
-  for (let i = 0; i < parts.length - 1; i += 1) cursor = cursor[parts[i]];
-  cursor[parts.at(-1)] = text;
-}
-
-/**
- * Drop surplus exact-query hits down to the maximum, never below the minimum.
- * Title/H1, description and the transition keep their occurrences. Returns how many hits were removed.
- */
-export function varySurplusQuery(fields, md, query, title = "") {
-  const min = SZ.limits.mainQuery[0];
-  const max = SZ.limits.mainQuery[1];
-  let count = bodyQueryCount(md, query);
-  if (!(count > max)) return 0;
-  const variant = naturalVariant(query);
-  if (!variant) return 0;
-  const pattern = queryPattern(query);
+/** Body paragraphs a surplus query may leave. Headings, description, transition, quotes and FAQ stay. */
+function surplusParagraphs(fields, title = "") {
   const slots = [];
-  for (const key of SURPLUS_ORDER) {
-    if (SURPLUS_SKIP.has(key) || fields?.[key] == null) continue;
-    stringSlots(fields[key], key, slots);
-  }
   const titleNorm = normalize(title);
-  let removed = 0;
-  for (let i = slots.length - 1; i >= 0 && count > max; i -= 1) {
-    const slot = slots[i];
-    const current = readPath(fields, slot.path);
-    if (typeof current !== "string") continue;
-    if (titleNorm && normalize(current) === titleNorm) continue;
-    const updated = replaceLastQuery(current, pattern, variant, query);
-    if (!updated) continue;
-    const delta = queryHits(current, query) - queryHits(updated, query);
-    if (delta < 1 || count - delta < min) continue;
-    writePath(fields, slot.path, updated);
-    count -= delta;
-    removed += delta;
-  }
-  return removed;
+  const add = (path, text) => {
+    if (typeof text !== "string" || !text.trim() || isQuoteParagraph(text)) return;
+    if (titleNorm && normalize(text) === titleNorm) return;
+    slots.push({ path, text });
+  };
+  const addList = (path, list) => {
+    for (const [index, text] of (list ?? []).entries()) add(`${path}[${index}]`, text);
+  };
+  const addSections = (key) => {
+    for (const [index, section] of (fields[key] ?? []).entries()) addList(`${key}[${index}].paragraphs`, section?.paragraphs);
+  };
+  addList("story", fields.story);
+  add("invitation", fields.invitation);
+  add("question", fields.question);
+  addList("practiceIntro", Array.isArray(fields.practiceIntro) ? fields.practiceIntro : [fields.practiceIntro]);
+  add("psychologyIntro", fields.psychologyIntro);
+  addSections("sectionsBefore");
+  addList("tableSection.paragraphsBefore", fields.tableSection?.paragraphsBefore);
+  addList("tableSection.paragraphsAfter", fields.tableSection?.paragraphsAfter);
+  for (const [index, item] of (fields.steps?.items ?? []).entries()) add(`steps.items[${index}].text`, item?.text);
+  addSections("sectionsAfter");
+  add("specialist.intro", fields.specialist?.intro);
+  add("storyEnding", fields.storyEnding);
+  add("finalInvite", fields.finalInvite);
+  add("finalQuestion", fields.finalQuestion);
+  return slots;
 }
 
 function findSurplusSlot(fields, query, title = "") {
-  const slots = [];
-  for (const key of SURPLUS_ORDER) {
-    if (SURPLUS_SKIP.has(key) || fields?.[key] == null) continue;
-    stringSlots(fields[key], key, slots);
-  }
-  const titleNorm = normalize(title);
+  const slots = surplusParagraphs(fields, title);
   for (let i = slots.length - 1; i >= 0; i -= 1) {
-    const slot = slots[i];
-    if (titleNorm && normalize(slot.text) === titleNorm) continue;
-    if (queryHits(slot.text, query) > 0) return slot;
+    if (queryHits(slots[i].text, query) > 0) return slots[i];
   }
   return null;
 }
@@ -498,14 +421,66 @@ function setPath(fields, path, text) {
   return next;
 }
 
-function fragment(brief, key, instructions, schema, apply) {
+function fragmentDiscomfort(text) {
+  if (DISCOMFORT_PATTERNS.some(({ re }) => re.test(text))) return true;
+  return SITE_DISCOMFORT.some((pattern) => pattern.test(text));
+}
+
+function fragmentLinksRejected(text, brief) {
+  if (/https?:\/\//i.test(text) || /\bwww\./i.test(text)) return true;
+  if (/azbyka|wikipedia|litres|max\.ru|max-potok/i.test(text)) return true;
+  const allowed = allowedSlugSet(brief?.links);
+  for (const match of String(text).matchAll(/(?:href="|\]\()([^")\s]+)/g)) {
+    const slug = match[1].match(/^\/s\/([a-z0-9-]+)$/)?.[1];
+    if (!slug || !allowed.has(slug)) return true;
+  }
+  return false;
+}
+
+function existingParagraphs(fields, replacing) {
+  const texts = [];
+  collectText(fields, texts);
+  const skip = paragraphTokens(replacing).join(" ");
+  let skipped = false;
+  return texts.filter((text) => {
+    const tokens = paragraphTokens(text);
+    if (tokens.length < 8) return false;
+    if (!skipped && skip && tokens.join(" ") === skip) {
+      skipped = true;
+      return false;
+    }
+    return true;
+  });
+}
+
+/** One gate for every repair answer: bans, links, discomfort, em dash, templates, near-duplicates. */
+function repairOutputRejected(value, brief, current, replacing = "") {
+  if (fragmentBanned(value, brief)) return true;
+  const texts = [];
+  collectText(value, texts);
+  const joined = texts.join("\n");
+  if (joined.includes("\u2014")) return true;
+  if (fragmentDiscomfort(joined)) return true;
+  if (texts.some((text) => boltedQuerySentence(text, brief?.query) || fragmentLinksRejected(text, brief))) return true;
+  const fresh = texts.filter((text) => paragraphTokens(text).length >= 8);
+  const existing = existingParagraphs(current, replacing);
+  for (let i = 0; i < fresh.length; i += 1) {
+    if (existing.some((other) => paragraphsTooClose(fresh[i], other))) return true;
+    for (let j = i + 1; j < fresh.length; j += 1) {
+      if (paragraphsTooClose(fresh[i], fresh[j])) return true;
+    }
+  }
+  return false;
+}
+
+function fragment(brief, key, instructions, schema, apply, replacing = "") {
   return {
     key,
     messages: [{ role: "system", content: FRAGMENT_SYSTEM }, { role: "user", content: instructions }],
     schema,
     apply: (current, answer) => {
       const value = coerceFragment(answer);
-      if (fragmentBanned(value, brief)) return null;
+      if (repairOutputRejected(value, brief, current, replacing)) return null;
       return apply(current, value);
     },
   };
@@ -545,7 +520,7 @@ export function buildSzFragment(brief, fields, failure) {
       if (length < limits.description[0] || length > limits.description[1]) return null;
       if (!normalize(text).includes(normalize(brief.query))) return null;
       return { ...current, description: text };
-    });
+    }, description);
   }
   if (failure.code === "seoTitle-length" || failure.code === "seoTitle-query") {
     const seoTitle = fields.seoTitle ?? "";
@@ -559,7 +534,7 @@ export function buildSzFragment(brief, fields, failure) {
       if ([...text].length > limits.seoTitleMax || text === brief.title) return null;
       if (!normalize(text).startsWith(normalize(brief.query))) return null;
       return { ...current, seoTitle: text };
-    });
+    }, seoTitle);
   }
   if (failure.code === "faq-length" || failure.code === "faq-fragment") {
     const index = Number(failure.path?.match(/faq\[(\d+)\]/)?.[1]);
@@ -578,7 +553,7 @@ export function buildSzFragment(brief, fields, failure) {
       if (count < limits.faqAnswer[0] || count > limits.faqAnswer[1]) return null;
       const faq = current.faq.map((entry, entryIndex) => (entryIndex === index ? { ...entry, answer: text } : entry));
       return { ...current, faq };
-    });
+    }, item.answer);
   }
   if (failure.code === "unique-pack" && failure.path?.includes("faq[")) {
     const index = Number(failure.path.match(/faq\[(\d+)\]/)?.[1]);
@@ -594,7 +569,7 @@ export function buildSzFragment(brief, fields, failure) {
       if (normalize(text) === normalize(item.question)) return null;
       const faq = current.faq.map((entry, entryIndex) => (entryIndex === index ? { ...entry, question: text } : entry));
       return { ...current, faq };
-    });
+    }, item.question);
   }
   if (failure.code === "transition-query") {
     const transition = fields.transition ?? "";
@@ -625,7 +600,7 @@ export function buildSzFragment(brief, fields, failure) {
         if (nextCount > maxQuery) return null;
       }
       return { ...current, transition: text };
-    });
+    }, transition);
   }
   if (failure.code === "story-length") {
     const actual = failure.actual ?? storyWordCount(fields);
@@ -665,7 +640,7 @@ export function buildSzFragment(brief, fields, failure) {
       if (meaningful < 3 || meaningful > 7) return null;
       const experts = current.experts.map((expert, expertIndex) => (expertIndex === index ? { ...expert, thesis: text } : expert));
       return { ...current, experts };
-    });
+    }, fields.experts[index].thesis ?? "");
   }
   if (failure.code === "links-internal") {
     const found = findBadHref(fields);
@@ -684,7 +659,7 @@ export function buildSzFragment(brief, fields, failure) {
       const slugs = [...text.matchAll(/\[[^\]]+\]\(\/s\/([a-z0-9-]+)\)/g)].map((match) => match[1]);
       if (allowed.length && slugs.some((slug) => !allowed.includes(slug))) return null;
       return setPath(current, found.path, text);
-    });
+    }, found.text);
   }
   if (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? limits.contextualLinks[0])) {
     const have = new Set(markdownSlugs(fields));
@@ -715,8 +690,8 @@ export function buildSzFragment(brief, fields, failure) {
     const actual = Number.isFinite(failure.actual) ? failure.actual : failure.queryCount;
     const job = fragment(brief, `query-count:${found.path}`, [
       `В этом абзаце запрос «${brief.query}» стоит дословно. В статье он встречается ${actual} раз, нужно ${min}–${max}.`,
-      `Замени одно дословное вхождение естественной вариацией: другой оборот или более короткое словосочетание, без точной фразы «${brief.query}».`,
-      `Остальные предложения абзаца сохрани. Общее число вхождений не должно стать меньше ${min}.`,
+      `Перепиши абзац без дословной фразы «${brief.query}». Остальные абзацы статьи не меняй и не копируй.`,
+      `Общее число вхождений не должно стать меньше ${min}. Не добавляй ссылок и шаблонных предложений.`,
       "Верни JSON { text } – только этот абзац.",
       "",
       found.text,
@@ -730,7 +705,7 @@ export function buildSzFragment(brief, fields, failure) {
       const nextCount = actual - oldHits + newHits;
       if (nextCount < min) return null;
       return setPath(current, found.path, text);
-    });
+    }, found.text);
     job.outputTokens = 320;
     return job;
   }
@@ -815,7 +790,7 @@ export function buildSzFragment(brief, fields, failure) {
       if (typeof text !== "string" || fieldProseDefect(text, found.path)) return null;
       if (failure.code === "forbidden" ? normalize(text).includes(normalize(banned)) : pattern.test(text)) return null;
       return setPath(current, found.path, text);
-    });
+    }, found.text);
   }
   return null;
 }
@@ -869,6 +844,20 @@ function acceptFragment(fragmentJob, fields, first, second) {
   return fragmentJob.apply(fields, first.answer);
 }
 
+/** Worst case of every still-open strong fragment, priced the same way as the call itself. */
+function strongFragmentPlan(repair, brief, fields, failures, strongTries, model) {
+  const plan = [];
+  for (const failure of failures) {
+    if ((strongTries.get(failureKey(failure)) ?? 0) >= 1) continue;
+    const job = buildSzFragment(brief, fields, failure);
+    if (!job) continue;
+    const cap = Math.min(job.outputTokens ?? repair.strongMaxTokens, repair.strongMaxTokens);
+    const tokens = estimatePromptTokens(job.messages, model);
+    plan.push({ key: failureKey(failure), cap, worst: worstCaseRub(model, tokens, cap) });
+  }
+  return plan;
+}
+
 /**
  * Repair until checkSzArticle is clean, or until every fragment has used its cheap
  * tries and one strong try. callTier(tier, name, messages, schema, { maxTokens }) performs the model call.
@@ -879,13 +868,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const settle = (value) => {
     const deterministic = applyDeterministicSzFixes(value, { query: brief.query, links: brief.links });
     const next = deterministic.fields;
-    let built = build(next);
-    const fixes = [...deterministic.fixes];
-    if (varySurplusQuery(next, built.md, brief.query, brief.title)) {
-      fixes.push("лишнее точное вхождение запроса заменено естественной вариацией");
-      built = build(next);
-    }
-    return { fields: next, result: built, fixes };
+    return { fields: next, result: build(next), fixes: [...deterministic.fixes] };
   };
   const errorsBeforeRepair = errorsOf(build(raw));
   const settled = settle(raw);
@@ -901,7 +884,9 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     const { failures } = szQuantityReport(fields, errorsOf(result));
     const failure = pickFailure(failures, cheapTries, strongTries, repair.cheapTries);
     if (!failure) break;
-    failure.queryCount = bodyQueryCount(result.md, brief.query);
+    const queryCount = bodyQueryCount(result.md, brief.query);
+    for (const item of failures) item.queryCount = queryCount;
+    failure.queryCount = queryCount;
     const key = failureKey(failure);
     const fragmentJob = buildSzFragment(brief, fields, failure);
     if (!fragmentJob) {
@@ -915,16 +900,21 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     const budget = tier === "strong" ? repair.strongBudget : repair.cheapBudget;
     const promptTokens = estimatePromptTokens(fragmentJob.messages, model);
     let maxTokens = tier === "strong" ? configured : cheapTokenCap({ model, fragmentKey: fragmentJob.key, configured });
-    if (tier === "strong" && fragmentJob.outputTokens) {
-      const spent = tierSpent(attempts, "strong");
-      const room = repair.strongBudget - spent;
-      const open = failures.filter((item) => (strongTries.get(failureKey(item)) ?? 0) < 1).length;
-      const peerReserve = Math.max(0, open - 1) * worstCaseRub(model, 400, 160);
-      const reserved = room - peerReserve;
-      const money = reserved >= worstCaseRub(model, promptTokens, 120) ? reserved : room;
-      const cap = Math.min(fragmentJob.outputTokens, configured, tokensWithin(model, promptTokens, money, Math.min(fragmentJob.outputTokens, configured)));
-      if (cap < 120) {
-        state.warnings.push(`${brief.slug}: ярус strong остановлен бюджетом ${repair.strongBudget} ₽`);
+    let peerReserve = 0;
+    if (tier === "strong") {
+      const room = budget - tierSpent(attempts, "strong");
+      const plan = strongFragmentPlan(repair, brief, fields, failures, strongTries, model);
+      const mine = plan.find((item) => item.key === key);
+      peerReserve = plan.filter((item) => item.key !== key).reduce((sum, item) => sum + item.worst, 0);
+      const cap = mine?.cap ?? Math.min(fragmentJob.outputTokens ?? configured, configured);
+      const thisWorst = mine?.worst ?? worstCaseRub(model, promptTokens, cap);
+      if (thisWorst + peerReserve > room + 1e-9) {
+        const covered = mine ? plan.length : plan.length + 1;
+        const why = peerReserve > 0
+          ? `худшие случаи ${covered} открытых ошибок не помещаются вместе, резерв не снимается`
+          : "худший случай фрагмента не помещается в бюджет";
+        state.warnings.push(`${brief.slug}: ярус strong остановлен бюджетом ${budget} ₽: ${why}`);
+        for (const item of plan) strongTries.set(item.key, 1);
         strongTries.set(key, 1);
         continue;
       }
@@ -955,8 +945,8 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
       const retryCap = retryTokenCap(maxTokens);
       const spentNow = (state.spentRub ?? 0) - before;
       const retryWorst = worstCaseRub(model, promptTokens, retryCap);
-      const room = budget - tierSpent(attempts, tier);
-      if (spentNow + retryWorst <= room) {
+      const room = budget - tierSpent(attempts, tier) - (tier === "strong" ? peerReserve : 0);
+      if (spentNow + retryWorst <= room + 1e-9) {
         try {
           second = invokeFragment({ tier, slug: brief.slug, attempt: `${attempt}-retry`, fragmentJob, callTier, state, callIds, maxTokens: retryCap });
         } catch (error) {

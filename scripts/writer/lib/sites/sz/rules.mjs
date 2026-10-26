@@ -10,6 +10,34 @@ export const SZ_RULES_VERSION = 1;
 
 export const words = (text) => String(text).match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 export const normalize = (text) => String(text).trim().replace(/,/g, "").replace(/\s+/g, " ").toLocaleLowerCase("ru").replace(/ё/g, "е");
+// A copied or lightly edited paragraph. 0.9 on similar-length word sets; the approved angel article stays under it.
+export const PARAGRAPH_SIMILARITY = 0.9;
+const PARAGRAPH_MIN_WORDS = 8;
+
+export function paragraphTokens(text) {
+  return normalize(text).replace(/[^\p{L}\p{N}\s]+/gu, " ").replace(/\s+/g, " ").trim().split(" ").filter((token) => token.length >= 2);
+}
+
+/** 1 when the paragraphs are the same after normalization, else token Jaccard. Short lines stay at 0. */
+export function paragraphSimilarity(a, b) {
+  const left = paragraphTokens(a);
+  const right = paragraphTokens(b);
+  if (left.length < PARAGRAPH_MIN_WORDS || right.length < PARAGRAPH_MIN_WORDS) return 0;
+  if (left.join(" ") === right.join(" ")) return 1;
+  const shorter = Math.min(left.length, right.length);
+  const longer = Math.max(left.length, right.length);
+  if (shorter / longer < 0.75) return 0;
+  const aSet = new Set(left);
+  const bSet = new Set(right);
+  let shared = 0;
+  for (const token of aSet) if (bSet.has(token)) shared += 1;
+  const union = aSet.size + bSet.size - shared;
+  return union ? shared / union : 0;
+}
+
+export function paragraphsTooClose(a, b) {
+  return paragraphSimilarity(a, b) >= PARAGRAPH_SIMILARITY;
+}
 export const quoteText = (text) => String(text).replace(/[«»"“”„]/g, "").replace(/[—–-]/g, "–").replace(/\s+/g, " ").trim();
 // Assembler placeholder. A thesis of «а» or «главная мысль а» is the same failure as the exact phrase.
 export const EXPERT_PLACEHOLDER_THESIS = "главная мысль";
@@ -253,6 +281,34 @@ export function uniqueKeys(md) {
   return out;
 }
 
+function visibleParagraphs(body) {
+  const plain = stripDirectives(String(body)
+    .replace(/<section[\s\S]*?<\/section>/g, "\n")
+    .replace(/<p class="article-disclaimer">[\s\S]*?<\/p>/g, "\n")
+    .replace(/<[^>]+>/g, "\n"));
+  const out = [];
+  for (const paragraph of plain.replace(/^\|.*$/gm, "").split(/\n\n+/)) {
+    const block = paragraph.trim();
+    if (!block || block.startsWith("<") || block.startsWith(":::") || block.startsWith("**Чем закончилась история.")) continue;
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (!lines.length || lines.every((line) => line.startsWith("- ") || /^#{1,3}\s/.test(line))) continue;
+    if (/^\*\*[^*\n]+\?\*\*$/.test(block)) continue;
+    const prose = lines.map((line) => line.replace(/^>\s?/, "").replace(/\*\*/g, "")).join(" ").trim();
+    if (words(prose) >= PARAGRAPH_MIN_WORDS) out.push(prose);
+  }
+  return out;
+}
+
+function duplicateParagraph(body) {
+  const paragraphs = visibleParagraphs(body);
+  for (let i = 0; i < paragraphs.length; i += 1) {
+    for (let j = i + 1; j < paragraphs.length; j += 1) {
+      if (paragraphsTooClose(paragraphs[i], paragraphs[j])) return paragraphs[i];
+    }
+  }
+  return null;
+}
+
 /**
  * Checks one assembled article.
  * cfg: { slug, query, title, topic, date, author, maxLabel, practice: {title, author, duration, path},
@@ -493,6 +549,8 @@ export function checkSzArticle(md, cfg, env) {
   if (tw < L.total[0] || tw > L.total[1]) add("total-length", "sections", `всего ${tw} слов с FAQ, нужно ${L.total[0]}–${L.total[1]}`);
   const mainCount = normalize(body).split(nq).length - 1;
   if (mainCount < L.mainQuery[0] || mainCount > L.mainQuery[1]) add("query-count", "sections", `запрос «${query}» в тексте ${mainCount} раз, нужно ${L.mainQuery[0]}–${L.mainQuery[1]}`);
+  const duplicated = duplicateParagraph(body);
+  if (duplicated) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
   for (const verbatim of cfg.verbatim ?? []) {
     // Verified texts (prayers, poems) quoted in «…»: the whole text or its beginning ending with «…».
     const head = verbatim.slice(0, 12);
