@@ -216,3 +216,41 @@ const manualApi = await overrideModule.exports.getRunFeatures("fixture");
 assert.match(renderPassport(researchConflict, manualApi.effective), /bright/);
 assert.equal(manualApi.effective.features.vocal_role.value, "instrumental");
 assert.equal(manualApi.automatic.features.vocal_role.value, null);
+
+// Раунд 2: минимальная форма реального экспорта, без идентификаторов,
+// путей, embedding и полного JSON. Четыре average сохранены для регрессии
+// низкого CLAP tie; остальные значения и сокращённые списки – тестовые.
+const realShape = {
+  vocal: { type: "mixed", scores: {
+    instrumental: { average: 0.058268 }, vocal: { average: 0.077916 },
+    spoken_word: { average: 0.021839 }, mixed: { average: 0.079067, segment_consistency: 0.96 },
+  } },
+  moods: [{ label: "warm", average: 0.31, max: 0.33 }],
+  instruments: [{ label: "brushes", average: 0.17, max: 0.19 }],
+  sound_character: [{ label: "intimate", average: 0.17, max: 0.19 }],
+};
+const savedSet = buildFeatures(realShape, { energy_0_100: 62, rhythm_salience: 0.8, dynamic_spread_db: 5 });
+// Исторический features.vocal_role уже материализован как mixed.
+savedSet.features.vocal_role = { ...savedSet.features.vocal_role, value: "mixed", status: "candidate" };
+const savedShape = { ...realShape, analysis_features_v1: savedSet };
+const savedOriginal = structuredClone(savedShape);
+const safeShape = readMusicAnalyzerFeatures(savedShape)!;
+assert.equal(safeShape.features.vocal_role.value, null);
+assert.equal(buildFeatures(realShape).features.vocal_role.value, null);
+assert.deepEqual(safeShape.features.mood, savedSet.features.mood);
+assert.deepEqual(safeShape.features.instruments, savedSet.features.instruments);
+for (const key of ["energy_0_100", "rhythm_salience", "dynamic_spread_db"]) {
+  assert.deepEqual(safeShape.features[key], savedSet.features[key]);
+}
+const realShapeHtml = renderPassport(savedShape);
+for (const [title, value] of [["Инструменты", "brushes"], ["Характер и настроение", "warm"], ["Характер звучания", "intimate"]]) {
+  assert.match(realShapeHtml, new RegExp(`${title}</h3>[\\s\\S]*?${value}[\\s\\S]*?</section>`));
+}
+assert.match(realShapeHtml, /Вокал \/ речь<\/dt><dd[^>]*>не определено/);
+assert.doesNotMatch(realShapeHtml, /смешанный/);
+const ownerCorrection = applyOverrides(safeShape, [{ id: "fixture", patch: { vocal_role: "instrumental" } }]);
+assert.match(renderPassport(savedShape, ownerCorrection), /Вокал \/ речь<\/dt><dd[^>]*>инструментал/);
+assert.equal(ownerCorrection.features.vocal_role.status, "manual");
+assert.equal(applyOverrides(safeShape, [{ id: "reset", patch: { vocal_role: null } }]).features.vocal_role.value, null);
+assert.deepEqual(savedShape, savedOriginal);
+console.log("Раунд 2: заполненные списки, исторический low-score mixed, ручной инструментал и reset проверены.");
