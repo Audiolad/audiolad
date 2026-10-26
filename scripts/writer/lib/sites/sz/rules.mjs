@@ -41,13 +41,19 @@ export function paragraphsTooClose(a, b) {
 }
 
 // Same owner rule as findTextAddresses in lib/validate.mjs. This file cannot import it:
-// the stage gate copies these rules verbatim.
+// the stage gate copies these rules verbatim. One allowlist for the gate, the fragment
+// validator and the plain-text scanner.
 const ALLOWED_SITE_HOSTS = ["audiolad.ru", "sergey-zoya.ru"];
+// Real public suffixes only. File and runtime suffixes (.js, .css, .webp, …) are not TLDs,
+// so «Node.js» and «Vue.js» are not addresses. «ASP.NET» uses a real TLD and is listed apart.
+const KNOWN_TLDS = ["com", "org", "net", "ru", "su", "info", "biz", "pro", "name", "mobi", "app", "dev", "io", "ai", "co", "me", "uk", "ly", "cc", "tv", "xyz", "site", "online", "shop", "ua", "by", "kz", "eu", "de", "fr", "it", "es", "nl", "pl", "us", "ca", "au", "edu", "gov", "int", "fm", "to"];
+const TECHNOLOGY_NAMES = new Set(["node.js", "vue.js", "asp.net"]);
+const TLD_PATTERN = [...KNOWN_TLDS].sort((a, b) => b.length - a.length).join("|");
 const OUTGOING_ADDRESS_PATTERNS = [
   { name: "e-mail", re: /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)*\.\p{L}{2,}/gu, always: true },
   { name: "ссылка mailto:/tel:", re: /\b(?:mailto|tel|sms|tg|whatsapp|viber|skype):[^\s«»"]*/giu, always: true },
   { name: "адрес сайта", re: /(?:https?:)?\/\/[^\s«»"()<>]+/giu },
-  { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:www\.)?(?:[a-z\d][a-z\d-]*\.)+(?:[a-z]{2,24}|рф)(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
+  { name: "адрес сайта", re: new RegExp(`(?<![\\p{L}\\d@._/-])(?:www\\.)?(?:[a-z\\d][a-z\\d-]*\\.)+(?:${TLD_PATTERN})(?![\\p{L}\\d-])(?:\\/[^\\s«»"()<>]*)?`, "giu") },
   { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:[а-яё\d][а-яё\d-]*\.)+рф(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
 ];
 
@@ -65,17 +71,71 @@ function addressHost(raw) {
   }
 }
 
-/** True for http(s) and protocol-relative addresses of audiolad.ru and sergey-zoya.ru, including subdomains. */
-export function allowedSiteAddress(value) {
-  const host = addressHost(value);
-  return Boolean(host) && ALLOWED_SITE_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+function hostAllowed(host) {
+  if (!host) return false;
+  const bare = host.toLowerCase().replace(/^www\./, "");
+  return ALLOWED_SITE_HOSTS.some((allowed) => bare === allowed || bare.endsWith(`.${allowed}`));
+}
+
+/** A bare technology token («Node.js», «Vue.js», «ASP.NET»), not a URL with a scheme or a path. */
+function technologyMention(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
+  if (/[/:?#]/.test(trimmed) || /\s/u.test(trimmed)) return false;
+  return TECHNOLOGY_NAMES.has(trimmed.toLowerCase());
+}
+
+function pathQueryHash(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
+  let url = trimmed;
+  if (trimmed.startsWith("//")) url = `https:${trimmed}`;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) url = `https://${trimmed}`;
+  try {
+    const parsed = new URL(url);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "";
+  }
+}
+
+/** True when path, query or hash hides another site, a bare domain or an e-mail. */
+function tailHasDisallowedAddress(raw, seen) {
+  const tail = pathQueryHash(raw);
+  if (!tail || tail === "/") return false;
+  for (const pattern of OUTGOING_ADDRESS_PATTERNS) {
+    const re = new RegExp(pattern.re.source, pattern.re.flags);
+    for (const match of tail.matchAll(re)) {
+      const nested = match[0].replace(/[.,;:!?…]+$/u, "");
+      if (pattern.always || addressDisallowed(nested, seen)) return true;
+    }
+  }
+  return false;
+}
+
+function addressDisallowed(raw, seen = new Set()) {
+  const key = String(raw ?? "");
+  if (seen.has(key)) return true;
+  if (technologyMention(key)) return false;
+  const next = new Set(seen);
+  next.add(key);
+  const host = addressHost(key);
+  if (!hostAllowed(host)) return true;
+  return tailHasDisallowedAddress(key, next);
 }
 
 /**
- * Bare domains (example.com/candle, t.me/x, www.…), //host, http(s)://, mailto:/tel: and e-mails.
- * Plain mentions of audiolad.ru and sergey-zoya.ru are allowed. E-mail is never allowed.
- * Cyrillic abbreviations («т.е.», «т.д.»), initials and decimals do not match: the domain
- * pattern is ASCII (or a .рф name) and is not preceded by a letter, digit or slash.
+ * http(s) and protocol-relative addresses of audiolad.ru and sergey-zoya.ru,
+ * including www and other subdomains. A nested address in the path or query
+ * (https://audiolad.ru/?next=https://evil.com, ?u=evil.com) is not allowed.
+ */
+export function allowedSiteAddress(value) {
+  if (technologyMention(value)) return false;
+  return !addressDisallowed(value);
+}
+
+/**
+ * Bare domains (example.com/candle, t.me/x, www.example.com), //host, http(s)://,
+ * mailto:/tel: and e-mails. audiolad.ru and sergey-zoya.ru, with www and subdomains, are allowed.
+ * E-mail is never allowed. «т.е.», «т.д.», initials, decimals and Node.js / Vue.js / ASP.NET do not match.
  */
 export function outgoingAddressProblems(text) {
   const problems = [];
@@ -87,10 +147,11 @@ export function outgoingAddressProblems(text) {
       const start = match.index;
       const end = start + match[0].length;
       if (taken.some(([from, to]) => start < to && end > from)) continue;
-      taken.push([start, end]);
       const raw = match[0].replace(/[.,;:!?…]+$/u, "");
+      if (technologyMention(raw)) continue;
+      taken.push([start, end]);
       if (!pattern.always && allowedSiteAddress(raw)) continue;
-      problems.push(`${pattern.name} в тексте: ${raw.slice(0, 60)}`);
+      problems.push(`${pattern.name} в тексте: ${raw.slice(0, 80)}`);
     }
   }
   return problems;
@@ -576,7 +637,7 @@ export function checkSzArticle(md, cfg, env) {
     add("links-internal", "sections", `ссылка ${href}: только /s/<slug> или адрес audiolad.ru / sergey-zoya.ru`);
   }
   for (const problem of outgoingAddressProblems(fm + "\n" + body)) add("links-external", "*", problem);
-  if (/azbyka|wikipedia|litres|www\.|max\.ru|max-potok/i.test(body + faqText)) add("links-external", "*", "упоминание сторонних сайтов / MAX в тексте");
+  if (/azbyka|wikipedia|litres|max\.ru|max-potok/i.test(body + faqText)) add("links-external", "*", "упоминание сторонних сайтов / MAX в тексте");
 
   // ── content safety ──
   const visible = visibleText(body);

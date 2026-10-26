@@ -322,17 +322,14 @@ function boltedQuerySentence(text, query) {
   return plants.some((plant) => text.includes(plant));
 }
 
-/** A quotation anywhere in the paragraph, or a blockquote, is not a query-count rewrite target. */
+/** Any quote mark, an unclosed « or „, a markdown blockquote or an HTML blockquote. */
 function isQuoteParagraph(text) {
   const raw = String(text ?? "");
   const trimmed = raw.trim();
   if (!trimmed) return false;
-  if (/^[«"“„>]/.test(trimmed)) return true;
+  if (/[«»"“”„‟"'‘’‚‛‹›]/u.test(trimmed)) return true;
   if (/(^|\n)\s*>/.test(raw)) return true;
-  if (/«[^»]*»/.test(trimmed)) return true;
-  if (/“[^”]*”/.test(trimmed)) return true;
-  if (/„[^“]*“/.test(trimmed)) return true;
-  if (/"(?:[^"\n]+)"/.test(trimmed)) return true;
+  if (/<\s*\/?\s*blockquote\b/i.test(raw)) return true;
   return false;
 }
 
@@ -437,7 +434,6 @@ function fragmentDiscomfort(text) {
 
 function fragmentLinksRejected(text, brief) {
   if (outgoingAddressProblems(text).length) return true;
-  if (/\bwww\./i.test(text)) return true;
   if (/azbyka|wikipedia|litres|max\.ru|max-potok/i.test(text)) return true;
   const allowed = allowedSlugSet(brief?.links);
   for (const match of String(text).matchAll(/(?:href="|\]\()([^")\s]+)/g)) {

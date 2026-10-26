@@ -1923,6 +1923,12 @@ test("tiered: an inline quote is not a query-count rewrite target", () => {
     "Мастер сказал: «Цвет свечи при гадании выбирают вечером». Дальше разговор стал тише, и в комнате остался только свет лампы.",
     'Мастер сказал: "Цвет свечи при гадании выбирают вечером". Дальше разговор стал тише, и в комнате остался только свет лампы.',
     "Мастер сказал так.\n> Цвет свечи при гадании выбирают вечером.\nДальше разговор стал тише, и в комнате остался только свет лампы.",
+    "<blockquote>Цвет свечи при гадании выбирают вечером.</blockquote> Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    "Мастер сказал: 'Цвет свечи при гадании выбирают вечером'. Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    "Мастер сказал: ‘Цвет свечи при гадании выбирают вечером’. Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    "Мастер сказал: ‹Цвет свечи при гадании выбирают вечером›. Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    "Мастер сказал: «Цвет свечи при гадании выбирают вечером. Дальше разговор стал тише, и в комнате остался только свет лампы.",
+    "Мастер сказал: „Цвет свечи при гадании выбирают вечером. Дальше разговор стал тише, и в комнате остался только свет лампы.",
   ];
   for (const storyLine of quoted) {
     const raw = structuredClone(fields);
@@ -1974,10 +1980,20 @@ test("tiered: bare addresses and mail fail the fragment and the gate", () => {
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Это не гарантирует внешний результат, а только даёт паузу.`] }));
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Подробнее в материале [Эзотерика и церковь](/s/ezoterika-i-tserkov).`] }));
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Заметка есть на https://sergey-zoya.ru/about и на https://audiolad.ru/articles/x.`] }));
-  for (const sample of ["example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle", "https://example.com/candle"]) {
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Заметка есть на https://www.sergey-zoya.ru/about и на https://www.audiolad.ru/articles/x.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Заметка есть на www.sergey-zoya.ru/about и на www.audiolad.ru/x.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Зеркало https://cdn.audiolad.ru/media/a и https://blog.sergey-zoya.ru/about.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} На Node.js, Vue.js и ASP.NET пишут сервисы, и это не адрес сайта.`] }));
+  for (const sample of [
+    "example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle", "https://example.com/candle",
+    "https://audiolad.ru/?next=https://evil.com", "https://audiolad.ru/?u=evil.com",
+  ]) {
     assert.equal(job.apply(raw, { paragraphs: [`${addition} Подробнее: ${sample}.`] }), null, sample);
   }
-  for (const sample of ["example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle"]) {
+  for (const sample of [
+    "example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle",
+    "https://audiolad.ru/?next=https://evil.com", "https://audiolad.ru/?u=evil.com",
+  ]) {
     const codes = errorsOf(checkSzArticle(firstPara(assembled, `Подробнее: ${sample}.`), cfg, env)).map((problem) => problem.code);
     assert.ok(codes.includes("links-external"), `${sample}: ${codes.join(",")}`);
   }
@@ -1987,6 +2003,10 @@ test("tiered: bare addresses and mail fail the fragment and the gate", () => {
     "А.\u00A0С.\u00A0Пушкин писал коротко и ясно.",
     "Версия 1.5 остаётся прежней и понятной.",
     "Практики есть на audiolad.ru и на sergey-zoya.ru.",
+    "На Node.js, Vue.js и ASP.NET пишут сервисы, и это не адрес сайта.",
+    "Смотрите https://www.sergey-zoya.ru/about и https://www.audiolad.ru/articles/x.",
+    "Смотрите www.sergey-zoya.ru/about и www.audiolad.ru/x.",
+    "Зеркало https://cdn.audiolad.ru/media/a и https://blog.sergey-zoya.ru/about.",
   ];
   for (const sample of safe) {
     const codes = errorsOf(checkSzArticle(firstPara(assembled, sample), cfg, env)).map((problem) => problem.code);
