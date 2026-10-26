@@ -20,10 +20,10 @@ import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, TARIFF, defaultModel
 import { collectResult, isWriterId, runDetached, writerCallId, WRITER_ID_MAX } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
-import { SZ, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
+import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
 import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
-import { applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentTruncated, latinizeSlug, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
+import { applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName, varySurplusQuery } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -805,6 +805,11 @@ test("prompt: main-body target is 950–1100 and the section budgets sum inside 
   assert.ok(text.includes("пустой массив"));
   assert.ok(text.includes("45–70"));
   assert.ok(text.includes("116–135"));
+  assert.ok(text.includes("500–800"));
+  assert.ok(text.includes(`разделы sectionsBefore: 2 × ${SZ_BODY_PLAN.sectionsBefore.wordsEach[0]}–${SZ_BODY_PLAN.sectionsBefore.wordsEach[1]}`));
+  assert.ok(text.includes(`каждый из трёх шагов: ${SZ_BODY_PLAN.stepText[0]}–${SZ_BODY_PLAN.stepText[1]}`));
+  assert.ok(text.includes("три абзаца"));
+  assert.ok(text.includes(`Гейт допускает ${SZ.limits.bodyH2[0]}–${SZ.limits.bodyH2[1]}`));
 });
 
 test("checklist: a two-word imperative passes; a letter and the placeholder do not", () => {
@@ -921,7 +926,7 @@ test("tiered: short main body is expanded one section at a time", () => {
       seen.push(text);
       state.spentRub += 0.3;
       state.calls.push({ name, model: "openai/gpt-oss-120b", costRub: 0.3 });
-      if (text.includes("Верни JSON { text }")) return { text: `${removed.join(" ")} Этот шаг остаётся бережным и не обещает результата.` };
+      if (text.includes("Верни JSON { addition }")) return { addition: `${removed.join(" ")} Этот шаг остаётся бережным и не обещает результата.` };
       return { paragraphs: removed.slice(0, 2) };
     },
   });
@@ -1546,6 +1551,7 @@ test("tiered: a two-word expert thesis is rewritten as a fragment, and a short s
       seen.push({ name, text });
       if (text.includes("Тезис эксперта")) return { thesis: "вера как опора" };
       if (text.includes("абзацы истории")) return { paragraphs: [paragraph, paragraph] };
+      if (text.includes("Верни JSON { addition }")) return { addition: paragraph };
       if (text.includes("Верни JSON { paragraphs }")) return { paragraphs: [paragraph] };
       if (text.includes("Верни JSON { text }")) return { text: `${paragraph} ${paragraph}` };
       return {};
@@ -1701,13 +1707,127 @@ test("tiered: a nine-word FAQ answer and a short total use fragment repair", () 
   assert.ok(!totalJob.messages.map((message) => message.content).join("\n").includes(fields.story[0].slice(0, 40)));
   const addition = "Этот новый абзац добавляет спокойное пояснение к короткому разделу и не обещает результата. Он остаётся в рамках темы и не зовёт к ритуалу.";
   const expanded = totalJob.key.includes("steps")
-    ? totalJob.apply(fields, { text: `${addition} ${addition}` })
+    ? totalJob.apply(fields, { addition })
     : totalJob.apply(fields, { paragraphs: [addition] });
   assert.ok(expanded);
   const beforeWords = words(JSON.stringify(fields.sectionsBefore) + JSON.stringify(fields.steps));
   const afterWords = words(JSON.stringify(expanded.sectionsBefore) + JSON.stringify(expanded.steps));
   assert.ok(afterWords > beforeWords);
 });
+
+test("tiered: a short main body reaches a strong expansion after the description has spent part of the budget", () => {
+  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  const raw = structuredClone(fields);
+  raw.description = "Ангел-хранитель слишком коротко.";
+  const kept = raw.sectionsBefore[0].paragraphs.slice(0, 1);
+  raw.sectionsBefore[0].paragraphs = kept;
+  const church = kept[0];
+  const failure = { code: "body-length", field: "sections", message: "основная часть 720 слов, нужно 880–1400", actual: 720, min: 880, max: 1400 };
+  const job = buildSzFragment(brief, raw, failure);
+  assert.ok(job.outputTokens);
+  assert.ok(job.outputTokens < repair.strongMaxTokens, job.outputTokens);
+  assert.equal(lengthFragmentTokens(160), job.outputTokens);
+  const promptTokens = estimatePromptTokens(job.messages, repair.strongModel);
+  const ceiling = worstCaseRub(repair.strongModel, promptTokens, repair.strongMaxTokens);
+  const sized = worstCaseRub(repair.strongModel, promptTokens, job.outputTokens);
+  const left = repair.strongBudget - 1.968;
+  assert.ok(ceiling > left, `${ceiling} should exceed the 4.03 ₽ left after description`);
+  assert.ok(sized <= left, `${sized} should fit in ${left}`);
+  assert.ok(!job.messages.map((message) => message.content).join("\n").includes(fields.story[0].slice(0, 40)));
+  const seen = [];
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const addition = "Новый абзац спокойно поясняет образ и не обещает чуда. Он остаётся в рамках темы и помогает добрать нужный объём раздела без переписывания уже сказанного.";
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild,
+    repair: tierRepair({
+      cheapModel: "openai/gpt-5.4-mini", strongModel: SZ_DEFAULT_MODEL, cheapTries: 2,
+      cheapMaxTokens: 800, strongMaxTokens: 800, cheapBudget: 8, strongBudget: 6, maxRounds: 12,
+    }),
+    state,
+    callTier: (tier, name, messages, schema, options = {}) => {
+      seen.push({ tier, name, maxTokens: options.maxTokens });
+      const cost = tier === "strong" && name.includes("description") ? 1.968 : (tier === "strong" ? 1.2 : 0.05);
+      state.spentRub += cost;
+      state.calls.push({ name, model: tier === "strong" ? SZ_DEFAULT_MODEL : "openai/gpt-5.4-mini", costRub: cost });
+      if (name.includes("description")) return tier === "strong" ? { description: fields.description } : { description: "всё ещё коротко" };
+      if (name.includes("body-length") || name.includes("total-length")) {
+        if (tier === "strong") {
+          const worst = worstCaseRub(SZ_DEFAULT_MODEL, estimatePromptTokens(messages, SZ_DEFAULT_MODEL), options.maxTokens);
+          assert.ok(options.maxTokens <= job.outputTokens, options.maxTokens);
+          assert.ok(worst <= left + 0.05, `${worst} > ${left}`);
+        }
+        return tier === "strong" ? { paragraphs: [addition, addition], addition } : { paragraphs: ["Мало слов для порога длины."], addition: "Мало слов для порога длины." };
+      }
+      return {};
+    },
+  });
+  const strongLength = seen.filter((call) => call.tier === "strong" && /body-length|total-length/.test(call.name));
+  assert.ok(strongLength.length >= 1, seen.map((call) => call.name).join(", "));
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], church);
+  assert.ok(repaired.result.fields.sectionsBefore[0].paragraphs.length > kept.length);
+});
+
+test("tiered: a query above the maximum is varied without touching the transition, and a fragment will not drop below 2", () => {
+  const query = "цвет свечи в эзотерике";
+  const candleBrief = { ...brief, query, title: brief.title };
+  const candleCfg = ruleConfig(candleBrief, pack.publishedAt, pool);
+  const candleBuild = (raw) => {
+    const { fields: normalized } = normalizeSzFields(raw);
+    const md = assembleSzArticle(candleBrief, normalized, view.site, { date: pack.publishedAt });
+    return { fields: normalized, md, problems: checkSzArticle(md, candleCfg, env) };
+  };
+  const raw = structuredClone(fields);
+  const church = raw.sectionsBefore[0].paragraphs[0];
+  const host = raw.sectionsBefore[1].paragraphs.at(-1);
+  raw.transition = `${raw.transition} Тема цвет свечи в эзотерике остаётся в этом абзаце.`;
+  raw.description = `${raw.description.slice(0, 80)} цвет свечи в эзотерике.`;
+  raw.sectionsBefore[1].paragraphs[raw.sectionsBefore[1].paragraphs.length - 1] = `${host} Здесь назван цвет свечи в эзотерике. И ещё раз цвет свечи в эзотерике. И третий раз цвет свечи в эзотерике.`;
+  const before = fieldStrings(raw);
+  const counted = bodyQueryCountOf(candleBuild(raw).md, query);
+  assert.equal(counted, 5, counted);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief: candleBrief, raw, build: candleBuild, repair: tierRepair(), args: { "no-repair": true },
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return {}; },
+  });
+  assert.equal(calls, 0);
+  const afterCount = bodyQueryCountOf(repaired.result.md, query);
+  assert.ok(afterCount >= 2 && afterCount <= 4, afterCount);
+  assert.ok(afterCount < counted);
+  assert.equal(repaired.result.fields.transition, raw.transition);
+  assert.equal(repaired.result.fields.description, raw.description);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], church);
+  const after = new Map(fieldStrings(repaired.result.fields));
+  const changed = before.filter(([path, text]) => after.get(path) !== text).map(([path]) => path);
+  assert.deepEqual(changed, ["sectionsBefore[1].paragraphs[" + (raw.sectionsBefore[1].paragraphs.length - 1) + "]"]);
+  assert.ok(repaired.result.fields.sectionsBefore[1].paragraphs.at(-1).includes("цвет свечи"));
+  assert.ok(!repaired.result.fields.sectionsBefore[1].paragraphs.at(-1).includes("Дальше речь пойдёт"));
+  const single = structuredClone(fields);
+  const extra = " В этом абзаце ещё раз назван ангел-хранитель и снова ангел-хранитель.";
+  single.sectionsBefore[1].paragraphs[0] = `${single.sectionsBefore[1].paragraphs[0]}${extra}`;
+  assert.equal(varySurplusQuery(structuredClone(single), hybridBuild(single).md, brief.query, brief.title), 0);
+  const over = szQuantityReport(single, errorsOf(hybridBuild(single).problems)).failures.find((row) => row.code === "query-count");
+  assert.ok(over.actual > 4, over?.message);
+  const crowded = structuredClone(fields);
+  crowded.finalInvite = "Первый ангел-хранитель. Второй ангел-хранитель. Третий ангел-хранитель. Четвёртый ангел-хранитель.";
+  const rejectJob = buildSzFragment(brief, crowded, { code: "query-count", field: "sections", message: "запрос «ангел-хранитель» в тексте 5 раз, нужно 2–4", actual: 5, min: 2, max: 4 });
+  assert.ok(rejectJob.messages.map((message) => message.content).join("\n").includes("Четвёртый ангел-хранитель"));
+  assert.ok(!rejectJob.messages.map((message) => message.content).join("\n").includes(crowded.transition.slice(0, 40)));
+  assert.equal(rejectJob.apply(crowded, { text: "Здесь речь об ангела-хранителе и о бережном обращении без точной фразы запроса." }), null);
+  const keptOne = "В абзаце один раз остаётся ангел-хранитель, остальные обороты уже другие и бережные.";
+  const applied = rejectJob.apply(crowded, { text: keptOne });
+  assert.ok(applied);
+  assert.equal(applied.transition, crowded.transition);
+  assert.equal(applied.finalInvite, keptOne);
+  assert.equal(applied.sectionsBefore[0].paragraphs[0], crowded.sectionsBefore[0].paragraphs[0]);
+});
+
+function bodyQueryCountOf(md, query) {
+  const body = String(md).match(/^---\r?\n[\s\S]*?\r?\n---\r?\n([\s\S]*)$/)?.[1] ?? "";
+  const nq = normalize(query);
+  return nq ? normalize(body).split(nq).length - 1 : 0;
+}
 
 rmSync(site, { recursive: true, force: true });
 console.log(`writer sz-unit: ${count} tests ok`);
