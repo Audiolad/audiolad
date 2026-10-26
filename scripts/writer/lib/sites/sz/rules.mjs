@@ -756,11 +756,14 @@ export function examplePhraseStats(markdown) {
   return { heading, count };
 }
 
-const META_QUERY = /(?:запрос\s*«|как в теме\s*«|вопрос\s*:\s*«)/giu;
+const META_QUERY = /(?:запрос\s*«|как в теме\s*«)/giu;
+/** «Вопрос: «» only as a service label: capital В at the start of a paragraph or FAQ answer. */
+const META_QUESTION_LABEL = /(?:^|\n)[ \t]*Вопрос:[ \t]*«/g;
 
-/** Service leftovers: «запрос «…»», «как в теме «…»», «Вопрос: «…»». */
+/** Service leftovers: «запрос «…»», «как в теме «…»», and a leading «Вопрос: «…»». */
 export function metaQueryLeftovers(text) {
-  return [...String(text ?? "").matchAll(META_QUERY)].map((match) => match[0]);
+  const source = String(text ?? "");
+  return [...source.matchAll(META_QUERY), ...source.matchAll(META_QUESTION_LABEL)].map((match) => match[0].trim());
 }
 
 export function faqStanceMismatch(question, answer, hints) {

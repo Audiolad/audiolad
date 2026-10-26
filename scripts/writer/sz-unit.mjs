@@ -571,7 +571,14 @@ test("count-mismatch: only an adjacent «N шаг/шага/шагов» immediat
 });
 
 test("query-meta: service leftovers fail the gate, a woven sentence does not", () => {
+  const honest = "Честный вопрос: «что я чувствую?» помогает остановиться и не спешить.";
   assert.deepEqual(metaQueryLeftovers("Фраза звучит спокойно и остаётся в обычном предложении."), []);
+  assert.deepEqual(metaQueryLeftovers(honest), []);
+  assert.deepEqual(metaQueryLeftovers(`Вступление.\n\n${honest}`), []);
+  assert.deepEqual(metaQueryLeftovers("Она задала вопрос: «Можно ли начать сегодня?»"), []);
+  assert.deepEqual(metaQueryLeftovers("вопрос: «что я чувствую?»"), []);
+  assert.ok(metaQueryLeftovers("Вопрос: «что я чувствую?»").some((hit) => hit.startsWith("Вопрос:")));
+  assert.ok(metaQueryLeftovers("\n  Вопрос: «что я чувствую?»").some((hit) => hit.startsWith("Вопрос:")));
   const gateOf = (mutate) => {
     const raw = structuredClone(fields);
     mutate(raw);
@@ -579,11 +586,19 @@ test("query-meta: service leftovers fail the gate, a woven sentence does not", (
     const md = assembleSzArticle(brief, normalized, view.site, { date: pack.publishedAt });
     return checkSzArticle(md, cfg, env);
   };
-  const metas = errorsOf(gateOf((raw) => {
+  const metas = (mutate) => errorsOf(gateOf(mutate)).filter((problem) => problem.code === "query-meta");
+  const leftovers = metas((raw) => {
     raw.sectionsBefore[0].paragraphs[0] += " Хорошо звучит и запрос «аффирмации на богатство», как в теме «что значит изобилие».";
     raw.faq[1] = { ...raw.faq[1], answer: `Вопрос: «${raw.faq[1].question}». ${raw.faq[1].answer}` };
-  })).filter((problem) => problem.code === "query-meta");
-  assert.ok(metas.length >= 2, metas.map((problem) => problem.message).join(" | "));
+  });
+  assert.ok(leftovers.length >= 2, leftovers.map((problem) => problem.message).join(" | "));
+  assert.ok(leftovers.some((problem) => problem.message.includes("Вопрос:")));
+  assert.deepEqual(metas((raw) => {
+    raw.sectionsBefore[0].paragraphs.push(honest);
+  }), []);
+  assert.ok(metas((raw) => {
+    raw.sectionsBefore[0].paragraphs.unshift("Вопрос: «что я чувствую?» Помогает остановиться и не спешить с ответом.");
+  }).length >= 1);
   assert.equal(errorsOf(gateOf(() => {})).some((problem) => problem.code === "query-meta"), false);
 });
 
