@@ -399,7 +399,10 @@ test("article #3: extra queries, links, steps, length, stance, examples, case, P
   assert.equal(statedListCount("Пять фраз для утра"), 5);
   assert.equal(statedListCount("Пять правил, чтобы начать"), 5);
   assert.equal(statedListCount("Повторите эту фразу три раза вслух"), null);
-  assert.equal(statedListCount("Три правильных шага"), 3);
+  assert.equal(statedListCount("Три правильных шага"), null);
+  assert.equal(stepHeadingCount("Сделайте три вдоха без лишнего шага."), null);
+  assert.equal(stepHeadingCount("Пять шагов:"), 5);
+  assert.equal(stepHeadingCount("Три шага"), 3);
   assert.equal(stepHeadingCount("Три шага, чтобы начать"), 3);
   assert.equal(stepHeadingCount("5 шагов – бережное обращение"), 5);
   assert.equal(stepHeadingCount("Пять правил для утра"), null);
@@ -526,6 +529,26 @@ test("review: ordinary Вот/Ниже, и-через, фразу and Можно
   assert.equal(errorsOf(stanceProblems).length, 0, errorsOf(stanceProblems).map((problem) => `${problem.code}: ${problem.message}`).join("; "));
   assert.equal(warnOf(stanceProblems, "faq-stance").length, 1);
   assert.ok(draftFieldDefects(asked, { ...brief, ...stanceCfg }).some((hit) => hit.code === "draft-faq-stance"));
+});
+
+test("count-mismatch: only an adjacent «N шаг/шага/шагов» immediately before its list", () => {
+  const bullet = (label) => `- ${label} спокойное действие утром.`;
+  const gateOf = (paragraph) => {
+    const raw = structuredClone(fields);
+    raw.sectionsBefore[0].paragraphs.push(paragraph);
+    const { fields: normalized } = normalizeSzFields(raw);
+    const md = assembleSzArticle(brief, normalized, view.site, { date: pack.publishedAt });
+    return checkSzArticle(md, cfg, env);
+  };
+  const counts = (problems) => problems.filter((problem) => problem.code === "count-mismatch");
+  const breaths = ["Сделайте три вдоха без лишнего шага.", bullet("Первое"), bullet("Второе"), bullet("Третье"), bullet("Четвёртое"), bullet("Пятое")].join("\n\n");
+  const five = ["Пять шагов:", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n");
+  const three = ["Три шага", bullet("Первое"), bullet("Второе"), bullet("Третье")].join("\n\n");
+  assert.deepEqual(counts(gateOf(breaths)), []);
+  const missed = counts(gateOf(five));
+  assert.equal(missed.length, 1);
+  assert.equal(missed[0].severity, "error");
+  assert.deepEqual(counts(gateOf(three)), []);
 });
 
 test("LESSONS.md: every bullet is a «Неверно → Верно» item, seeded from EDITS.md and review #72", () => {

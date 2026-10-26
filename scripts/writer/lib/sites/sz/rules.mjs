@@ -512,15 +512,14 @@ const LIST_NOUN = String.raw`шаг(?:а|ов)?|пункт(?:а|ов)?|приз�
 const STEP_NOUN = String.raw`шаг(?:а|ов)?`;
 
 function countWordBefore(text, nounAt) {
-  const head = text.slice(0, nounAt);
-  for (const [word, num] of LIST_COUNT_WORDS) {
-    if (new RegExp(`${NOT_WORD}${word}${WORD_END}`, "u").test(head)) return num;
-  }
-  const digit = head.match(new RegExp(`${NOT_WORD}(\\d{1,2})${WORD_END}`, "u"));
-  return digit ? Number(digit[1]) : null;
+  const head = text.slice(0, nounAt).trimEnd();
+  const token = head.match(new RegExp(`${NOT_WORD}(\\d{1,2}|[а-яё]+)$`, "u"))?.[1];
+  if (!token) return null;
+  if (/^\d{1,2}$/.test(token)) return Number(token);
+  return LIST_COUNT_WORDS.find(([word]) => word === token)?.[1] ?? null;
 }
 
-/** Whole-word шаг/шага/шагов with a number before it. «фразу» and «правильных» are not a count. */
+/** «пять шагов» / «5 шага» / «Пять шагов:» – the number and the noun are adjacent whole words. */
 export function stepHeadingCount(title) {
   const text = normalize(title);
   const noun = text.match(new RegExp(`${NOT_WORD}(${STEP_NOUN})${WORD_END}`, "u"));
