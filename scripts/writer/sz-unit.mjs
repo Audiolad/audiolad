@@ -32,7 +32,7 @@ import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack, isSpecialistQuestion, normalize, paragraphsTooClose, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, checkSzArticle, checkSzPack, faqAnswerTypeMismatch, genericLinkAnchor, isSpecialistQuestion, normalize, paragraphsTooClose, sectionRetellsStory, statedListCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -265,6 +265,10 @@ test("prompt: lessons, caution, siblings and tone sample reach the model", () =>
   assert.ok(LESSONS.some((lesson) => /не уверена[^.]*не упоминай/i.test(lesson)), "правило «не уверена – не упоминай»");
   assert.ok(text.includes("ОБРАЗЕЦ ТОНА"));
   assert.ok(text.includes(pool.get("Марина Мелия").caution.slice(0, 30)));
+  assert.match(text, /Сюжет рассказывается только здесь/);
+  assert.match(text, /не «материал», не «здесь», не «подробнее»/);
+  assert.match(text, /открытый вопрос/);
+  assert.match(text, /не «Пять шагов»/);
 });
 
 test("LESSONS.md: every bullet is a «Неверно → Верно» item, seeded from EDITS.md and review #72", () => {
@@ -1573,6 +1577,8 @@ test("tiered: a two-word expert thesis is rewritten as a fragment, and a short s
 
 test("tiered: missing internal links and a half-Cyrillic slug are fixed from the brief", () => {
   assert.equal(latinizeSlug("ogон-в-эзотерике"), "ogon-v-ezoterike");
+  assert.equal(genericLinkAnchor("материал"), true);
+  assert.equal(genericLinkAnchor("Эзотерика и психология"), false);
   const raw = structuredClone(fields);
   const stripLinks = (value) => {
     if (typeof value === "string") return value.replace(/\[[^\]]+\]\(\/s\/[^)]+\)/g, "материал");
@@ -1582,16 +1588,36 @@ test("tiered: missing internal links and a half-Cyrillic slug are fixed from the
   };
   const stripped = stripLinks(raw);
   assert.ok(errorsOf(hybridBuild(stripped).problems).some((problem) => problem.code === "links-contextual"));
+  const before = fieldStrings(stripped);
   let calls = 0;
+  const titles = { "ezoterika-i-tserkov": "Эзотерика и церковь", "psihologiya-i-ezoterika": "Эзотерика и психология", "chenneling-v-ezoterike": "Ченнелинг в эзотерике" };
   const linked = repairSzArticleTiered({
     brief, raw: stripped, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
-    callTier: () => { calls += 1; return {}; },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      const slug = text.match(/ссылку на \/s\/([a-z0-9-]+)/)?.[1];
+      const host = text.split("АБЗАЦ:\n").at(-1).trim();
+      assert.ok(slug && host && !host.includes(fields.faq[0].question));
+      const link = `[${titles[slug]}](/s/${slug})`;
+      const woven = host.includes(".") ? host.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${host}`;
+      return { text: woven };
+    },
   });
-  assert.equal(calls, 0);
+  assert.ok(calls >= 2, String(calls));
   const hrefs = [...linked.result.md.matchAll(/\]\(\/s\/([a-z0-9-]+)\)/g)].map((match) => match[1]);
   assert.ok(hrefs.length >= 2 && hrefs.length <= 5, hrefs.join(","));
   assert.ok(hrefs.every((slug) => brief.links.contextual.includes(slug)), hrefs.join(","));
+  assert.ok(!linked.result.md.includes("[материал]"), "общий анкор");
+  assert.ok(!linked.result.md.includes("Подробнее: ["));
+  const after = new Map(fieldStrings(linked.result.fields));
+  const changed = before.filter(([path, text]) => after.get(path) !== text).map(([path]) => path);
+  assert.ok(changed.length >= 2, changed.join(","));
+  const sections = new Set(changed.map((path) => path.match(/sections(?:Before|After)\[\d+\]|tableSection|steps/)?.[0]));
+  assert.ok(sections.size >= 2, changed.join(","));
   assert.equal(linked.passed, true, linked.repairSkipped);
+  calls = 0;
   const mixed = structuredClone(fields);
   const broken = `/s/${"\u0435"}z${"\u043e"}terika-i-tserk${"\u043e"}v`;
   mixed.sectionsBefore[1].paragraphs[4] = mixed.sectionsBefore[1].paragraphs[4].replace("/s/ezoterika-i-tserkov", broken);
@@ -1627,21 +1653,34 @@ test("tiered: one contextual slug is inserted once", () => {
   const raw = stripLinks(structuredClone(fields));
   const oneBrief = { ...brief, links: { ...brief.links, contextual: ["ezoterika-i-tserkov"] } };
   const before = fieldStrings(raw);
+  const preview = buildSzFragment(oneBrief, raw, { code: "links-contextual", path: "slug:ezoterika-i-tserkov", field: "sections", message: "0 ссылок /s в тексте, нужно 2–5", actual: 0, min: 2, max: 5 });
+  const host = preview.messages.map((message) => message.content).join("\n").split("АБЗАЦ:\n").at(-1).trim();
+  assert.equal(preview.apply(raw, { text: `${host} Подробнее: [материал](/s/ezoterika-i-tserkov).` }), null);
+  const foreign = host.includes(".") ? host.replace(/\.\s*/, " в статье [Чужой сайт](/s/religiya-i-ezoterika). ") : `В статье [Чужой сайт](/s/religiya-i-ezoterika) сказано иное. ${host}`;
+  assert.equal(preview.apply(raw, { text: foreign }), null);
   let calls = 0;
   const repaired = repairSzArticleTiered({
     brief: oneBrief, raw, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
-    callTier: () => {
+    callTier: (tier, name, messages) => {
       calls += 1;
-      return { sentence: "Подробнее: [материал](/s/ezoterika-i-tserkov)." };
+      const text = messages.map((message) => message.content).join("\n");
+      const paragraph = text.split("АБЗАЦ:\n").at(-1).trim();
+      if (calls === 1) return { text: `${paragraph} Подробнее: [материал](/s/ezoterika-i-tserkov).` };
+      const link = "[Эзотерика и церковь](/s/ezoterika-i-tserkov)";
+      const woven = paragraph.includes(".") ? paragraph.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${paragraph}`;
+      return { text: woven };
     },
   });
-  assert.equal(calls, 0);
+  assert.equal(calls, 2);
   const hrefs = [...repaired.result.md.matchAll(/\]\(\/s\/ezoterika-i-tserkov\)/g)];
   assert.equal(hrefs.length, 1);
+  assert.ok(!repaired.result.md.includes("[материал]"));
   const after = new Map(fieldStrings(repaired.result.fields));
   const changed = before.filter(([path, text]) => after.get(path) !== text).map(([path]) => path);
-  assert.deepEqual(changed, ["sectionsBefore[0].paragraphs[0]"]);
-  assert.ok(after.get("sectionsBefore[0].paragraphs[0]").startsWith(raw.sectionsBefore[0].paragraphs[0]));
+  assert.equal(changed.length, 1, changed.join(","));
+  assert.ok(after.get(changed[0]).includes("[Эзотерика и церковь](/s/ezoterika-i-tserkov)"));
+  assert.ok(!after.get(changed[0]).startsWith(before.find(([path]) => path === changed[0])[1]));
+  assert.deepEqual(repaired.result.fields.story, fields.story);
   const job = buildSzFragment(oneBrief, repaired.result.fields, { code: "links-contextual", field: "sections", message: "1 ссылок /s в тексте, нужно 2–5", actual: 1, min: 2, max: 5 });
   assert.equal(job, null);
 });
@@ -2448,6 +2487,201 @@ test("tiered: a description does not open with a lowercase quoted query", () => 
   assert.equal(job.apply(fields, { description: desc }), null);
   assert.equal(job.apply(fields, { description: fields.description }).description, fields.description);
   assert.equal(errorsOf(checkSzArticle(assembled, cfg, env)).some((problem) => problem.code === "description-start"), false);
+});
+
+test("brief: additional queries pass through, with secondaryKeywords as an alias", () => {
+  assert.deepEqual(brief.additionalQueries, []);
+  assert.deepEqual(cfg.additionalQueries, []);
+  const raw = structuredClone(rawPack);
+  raw.articles[0].additionalQueries = ["сильная аффирмация", "  "];
+  const parsed = normalizePack(raw, { baseDir: fixtures, pool });
+  assert.deepEqual(parsed.articles[0].additionalQueries, ["сильная аффирмация"]);
+  assert.deepEqual(ruleConfig(parsed.articles[0], pack.publishedAt, pool).additionalQueries, ["сильная аффирмация"]);
+  const alias = structuredClone(rawPack);
+  alias.articles[0].secondaryKeywords = ["утреннее намерение"];
+  assert.deepEqual(normalizePack(alias, { baseDir: fixtures, pool }).articles[0].additionalQueries, ["утреннее намерение"]);
+  const messages = buildSzMessages(parsed.articles[0], view.site);
+  assert.match(messages.map((message) => message.content).join("\n"), /сильная аффирмация/);
+});
+
+test("tiered: a generic anchor is rewritten inside the sentence", () => {
+  const raw = structuredClone(fields);
+  const original = raw.sectionsBefore[2].paragraphs[2];
+  raw.sectionsBefore[2].paragraphs[2] = original.replace("[Эзотерика и психология]", "[материал]").replace("[Ченнелинг в эзотерике]", "[здесь]");
+  const codes = errorsOf(hybridBuild(raw).problems).filter((problem) => problem.code === "links-anchor");
+  assert.equal(codes.length, 2, codes.map((problem) => problem.message).join(" | "));
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      const host = text.split("АБЗАЦ:\n").at(-1).trim();
+      return { text: host.replace("[материал]", "[Эзотерика и психология]").replace("[здесь]", "[Ченнелинг в эзотерике]") };
+    },
+  });
+  assert.equal(calls, 1, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[2], original);
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "links-anchor"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: a later section that retells the story is rewritten forward", () => {
+  const story = [...fields.story, fields.transition].join("\n\n");
+  for (const section of fields.sectionsBefore) {
+    assert.equal(sectionRetellsStory(story, section.paragraphs.join("\n\n")), false, section.title);
+  }
+  const raw = structuredClone(fields);
+  const plot = [...raw.story, raw.transition].join(" ").replace(/[«»"“”„]/g, "");
+  let paraphrase = plot.split(/\s+/).slice(0, 130).join(" ");
+  const tail = "Дальше сцена повторяется почти теми же подробностями и тем же ходом.";
+  while (words(paraphrase) < 160) paraphrase = `${paraphrase} ${tail}`;
+  paraphrase = `${paraphrase}.`;
+  for (const paragraph of raw.story) assert.equal(paragraphsTooClose(paragraph, paraphrase), false);
+  assert.equal(sectionRetellsStory(story, paraphrase), true);
+  const quote = "«Короткая фраза остаётся со мной до вечера и не требует чуда.»";
+  const kept = raw.sectionsBefore[2].paragraphs[2];
+  raw.sectionsBefore[2].paragraphs = [paraphrase, quote, kept];
+  assert.ok(errorsOf(hybridBuild(raw).problems).some((problem) => problem.code === "story-retell"));
+  const filler = "Назовите одно чувство своими словами и выберите короткую фразу, которую готовы повторить спокойно. Сделайте паузу и запишите эту фразу. Затем произнесите её ещё раз, когда дыхание выровняется.";
+  const pad = (target) => {
+    let out = filler;
+    while (words(out) < target) out = `${out} ${filler}`;
+    return out;
+  };
+  assert.equal(sectionRetellsStory(story, `${pad(40)}\n\n${quote}\n\n${kept}`), false);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 6 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(tier, "cheap");
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      assert.ok(!text.includes(fields.sectionsBefore[0].title), "чужой раздел в промпте");
+      assert.ok(!text.includes(fields.faq[0].question), "чужой вопрос в промпте");
+      const parts = text.split(/АБЗАЦ \d+:\n/).slice(1).map((part) => part.trim());
+      assert.ok(parts.length >= 1);
+      return { paragraphs: parts.map((part) => (part.includes("](/s/") ? part : pad(Math.max(40, words(part))))) };
+    },
+  });
+  assert.equal(calls, 1, repaired.repairSkipped);
+  assert.deepEqual(repaired.result.fields.story, fields.story);
+  assert.equal(repaired.result.fields.transition, fields.transition);
+  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[1], quote);
+  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[2], kept);
+  assert.ok(!repaired.result.fields.sectionsBefore[2].paragraphs[0].includes("позвонить"));
+  assert.equal(sectionRetellsStory(story, repaired.result.fields.sectionsBefore[2].paragraphs.join("\n\n")), false);
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "story-retell"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: every additional query is woven in, and a miss does not spend the others", () => {
+  const phrases = ["денежная формула", "сильная аффирмация", "слова которым веришь", "утреннее намерение"];
+  const localBrief = { ...brief, additionalQueries: phrases };
+  const localCfg = ruleConfig(localBrief, pack.publishedAt, pool);
+  const localBuild = (value) => {
+    const { fields: normalized } = normalizeSzFields(value);
+    const md = assembleSzArticle(localBrief, normalized, view.site, { date: pack.publishedAt });
+    return { fields: normalized, md, problems: checkSzArticle(md, localCfg, env) };
+  };
+  const raw = structuredClone(fields);
+  const missing = errorsOf(localBuild(raw).problems).filter((problem) => problem.code === "extra-query");
+  assert.equal(missing.length, phrases.length, missing.map((problem) => problem.message).join(" | "));
+  let calls = 0;
+  const seen = [];
+  const repaired = repairSzArticleTiered({
+    brief: localBrief, raw, build: localBuild, repair: tierRepair({ maxRounds: 12 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      const phrase = text.match(/Дополнительный запрос «([^»]+)»/)?.[1];
+      const host = text.split("АБЗАЦ:\n").at(-1).trim();
+      seen.push(phrase);
+      assert.ok(!text.includes(fields.faq[0].question));
+      if (calls === 1) return { text: host };
+      const woven = host.includes(".") ? host.replace(/\.\s*/, `, и здесь уместна формулировка ${phrase}. `) : `Формулировка ${phrase} стоит в начале мысли. ${host}`;
+      return { text: woven };
+    },
+  });
+  assert.equal(calls, phrases.length + 1, seen.join(" | "));
+  assert.equal(seen[0], seen[1], "отклонённый запрос повторён, а не заменён другим");
+  assert.equal(new Set(seen).size, phrases.length);
+  const body = repaired.result.md.replace(/^---\n[\s\S]*?\n---\n/, "");
+  for (const phrase of phrases) assert.ok(normalize(body).includes(normalize(phrase)), phrase);
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "extra-query"), repaired.repairSkipped);
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: an open FAQ question is not answered with yes or no", () => {
+  assert.equal(faqAnswerTypeMismatch(fields.faq[1].question, fields.faq[1].answer), false);
+  assert.equal(faqAnswerTypeMismatch(fields.faq[4].question, fields.faq[4].answer), false);
+  assert.equal(faqAnswerTypeMismatch("Как понять, что слова свои?", "Да, слова уже свои и этого достаточно для практики."), true);
+  const raw = structuredClone(fields);
+  const question = raw.faq[2].question;
+  let bad = "Да, это авторская практика внимания, а молитва остаётся обращением в церковной традиции и не смешивается с ней.";
+  while (words(bad) < 40) bad += " Обе формы дают паузу, но смысл у них разный.";
+  assert.ok(words(bad) <= 80, words(bad));
+  assert.equal(faqAnswerTypeMismatch(question, bad), true);
+  raw.faq[2] = { ...raw.faq[2], answer: bad };
+  let good = "Медитация остаётся авторской практикой внимания: дыхание, образ тёплого света и ощущение заботы. Молитва – обращение в церковной традиции, словами молитвослова или своими. Смысл у этих форм разный, поэтому их не смешивают в одном правиле. Вопрос был о различии, и ответ держится этого различия.";
+  while (words(good) < 40) good += " Различие остаётся.";
+  assert.ok(words(good) >= 40 && words(good) <= 80, words(good));
+  assert.equal(faqAnswerTypeMismatch(question, good), false);
+  const others = raw.faq.map((item, index) => (index === 2 ? item.question : item.answer));
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      calls += 1;
+      assert.equal(isWriterId(name), true, name);
+      const text = messages.map((message) => message.content).join("\n");
+      assert.ok(text.includes(question));
+      assert.ok(!text.includes(fields.sectionsBefore[0].title));
+      return calls === 1 ? { answer: bad } : { answer: good };
+    },
+  });
+  assert.equal(calls, 2, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.faq[2].question, question);
+  assert.equal(repaired.result.fields.faq[2].answer, good);
+  assert.deepEqual(repaired.result.fields.faq.map((item, index) => (index === 2 ? item.question : item.answer)), others);
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "faq-answer-type"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("tiered: a heading count is aligned with its own list", () => {
+  assert.equal(statedListCount(fields.checklist.title), 5);
+  assert.equal(statedListCount(fields.steps.title), 3);
+  assert.equal(alignListCount(fields.checklist.title, fields.checklist.items.length), fields.checklist.title);
+  assert.equal(alignListCount(fields.steps.title, fields.steps.items.length), fields.steps.title);
+  assert.equal(alignListCount("Пять шагов, чтобы выбрать слова", 3), "Три шага, чтобы выбрать слова");
+  const clean = applyDeterministicSzFixes(structuredClone(fields), { query: brief.query, links: brief.links });
+  assert.equal(clean.fields.checklist.title, fields.checklist.title);
+  assert.equal(clean.fields.steps.title, fields.steps.title);
+  const raw = structuredClone(fields);
+  raw.steps.title = "Пять шагов, чтобы обращаться к образу бережно";
+  raw.checklist.title = "Три шага – бережное обращение к образу";
+  const problems = errorsOf(hybridBuild(raw).problems).filter((problem) => problem.code === "count-mismatch");
+  assert.deepEqual(problems.map((problem) => problem.field).sort(), ["checklist", "steps"]);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair(),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return {}; },
+  });
+  assert.equal(calls, 0, repaired.repairSkipped);
+  assert.equal(repaired.result.fields.steps.title, "Три шага, чтобы обращаться к образу бережно");
+  assert.equal(repaired.result.fields.checklist.title, "Пять шагов – бережное обращение к образу");
+  assert.deepEqual(repaired.result.fields.steps.items, fields.steps.items);
+  assert.deepEqual(repaired.result.fields.checklist.items, fields.checklist.items);
+  assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "count-mismatch"));
+  assert.equal(repaired.passed, true, repaired.repairSkipped);
 });
 
 function bodyQueryCountOf(md, query) {

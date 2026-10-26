@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, fieldProseDefect, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, isSpecialistQuestion, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -292,17 +292,18 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
   }
   const removed = dropDuplicateParagraphs(next);
   if (removed) fixes.push(removed === 1 ? "повтор абзаца удалён" : `повторы абзацев удалены: ${removed}`);
-  const contextual = (links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug));
-  if (contextual.length) {
-    const present = markdownSlugs(next);
-    const seen = new Set(present);
-    const missing = contextual.filter((slug) => !seen.has(slug));
-    const [minLinks, maxLinks] = limits.contextualLinks;
-    for (const slug of missing) {
-      if (present.length >= minLinks || present.length >= maxLinks) break;
-      if (!appendSentence(next, `Подробнее: [материал](/s/${slug}).`)) break;
-      present.push(slug);
-      fixes.push(`добавлена внутренняя ссылка /s/${slug}`);
+  if (typeof next.checklist?.title === "string" && Array.isArray(next.checklist.items)) {
+    const aligned = alignListCount(next.checklist.title, next.checklist.items.length);
+    if (aligned !== next.checklist.title) {
+      next.checklist.title = aligned;
+      fixes.push("число в заголовке чек-листа совпало с числом пунктов");
+    }
+  }
+  if (typeof next.steps?.title === "string" && Array.isArray(next.steps.items)) {
+    const aligned = alignListCount(next.steps.title, next.steps.items.length);
+    if (aligned !== next.steps.title) {
+      next.steps.title = aligned;
+      fixes.push("число в заголовке шагов совпало с числом шагов");
     }
   }
   return { fields: next, fixes };
@@ -746,6 +747,288 @@ function faqQuestionFragment(brief, fields, failure) {
   }, item.question);
 }
 
+function findText(value, predicate, path = "") {
+  if (typeof value === "string") return predicate(value) ? { path, text: value, title: "" } : null;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const found = findText(value[index], predicate, `${path}[${index}]`);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      const found = findText(item, predicate, path ? `${path}.${key}` : key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function sectionHasLink(paragraphs) {
+  return (paragraphs ?? []).some((paragraph) => typeof paragraph === "string" && paragraph.includes("](/s/"));
+}
+
+function firstOpenParagraph(paragraphs, pathPrefix) {
+  for (const [index, paragraph] of (paragraphs ?? []).entries()) {
+    if (typeof paragraph !== "string" || words(paragraph) < 8 || isQuoteParagraph(paragraph)) continue;
+    if (paragraph.includes("](/s/")) continue;
+    return { path: `${pathPrefix}[${index}]`, text: paragraph };
+  }
+  return null;
+}
+
+/** A non-quote paragraph in a section that does not already contain /s/. */
+function linkHostParagraph(fields) {
+  for (const key of ["sectionsBefore", "sectionsAfter"]) {
+    for (const [index, section] of (fields[key] ?? []).entries()) {
+      if (sectionHasLink(section?.paragraphs)) continue;
+      const host = firstOpenParagraph(section?.paragraphs, `${key}[${index}].paragraphs`);
+      if (host) return { ...host, title: section?.title ?? "" };
+    }
+  }
+  const table = fields.tableSection;
+  if (table) {
+    const prose = [...(table.paragraphsBefore ?? []), ...(table.paragraphsAfter ?? [])];
+    if (!sectionHasLink(prose)) {
+      const before = firstOpenParagraph(table.paragraphsBefore, "tableSection.paragraphsBefore");
+      if (before) return { ...before, title: table.title ?? "" };
+      const after = firstOpenParagraph(table.paragraphsAfter, "tableSection.paragraphsAfter");
+      if (after) return { ...after, title: table.title ?? "" };
+    }
+  }
+  for (const [index, item] of (fields.steps?.items ?? []).entries()) {
+    if (typeof item?.text !== "string" || item.text.includes("](/s/") || isQuoteParagraph(item.text) || words(item.text) < 8) continue;
+    return { path: `steps.items[${index}].text`, text: item.text, title: item.title ?? "" };
+  }
+  return null;
+}
+
+function markdownLinks(text) {
+  return [...String(text ?? "").matchAll(/\[([^\]]+)\]\(\/s\/([a-z0-9-]+)\)/g)].map((match) => ({ anchor: match[1], slug: match[2] }));
+}
+
+function endingRejected(text, original) {
+  if (danglingFragment(original)) return false;
+  return Boolean(danglingFragment(text));
+}
+
+function wovenLinkRejected(text, found, slug, brief) {
+  if (typeof text !== "string" || fieldProseDefect(text, found.path) || endingRejected(text, found.text)) return true;
+  if (text.trim().startsWith(String(found.text).trim())) return true;
+  if (/Подробнее:\s*\[/u.test(text)) return true;
+  const links = markdownLinks(text);
+  const allowed = new Set((brief.links?.contextual ?? []).filter((item) => /^[a-z0-9-]+$/.test(item)));
+  if (!links.length || links.some((link) => !allowed.has(link.slug))) return true;
+  if (links.some((link) => genericLinkAnchor(link.anchor))) return true;
+  if (links.filter((link) => link.slug === slug).length !== 1) return true;
+  const oldSlugs = markdownLinks(found.text).map((link) => link.slug);
+  for (const old of oldSlugs) {
+    if (old !== slug && !links.some((link) => link.slug === old)) return true;
+  }
+  for (const next of links) {
+    if (next.slug !== slug && !oldSlugs.includes(next.slug)) return true;
+  }
+  return false;
+}
+
+function linkFragment(brief, fields, failure) {
+  let slug = failure.slug;
+  let found = null;
+  if (failure.code === "links-anchor") {
+    slug = slug || String(failure.message ?? "").match(/\/s\/([a-z0-9-]+)/)?.[1];
+    const anchor = failure.anchor || String(failure.message ?? "").match(/анкор «([^»]+)»/)?.[1];
+    if (!slug || !anchor) return null;
+    found = findText(fields, (text) => text.includes(`[${anchor}](/s/${slug})`));
+  } else {
+    slug = slug || String(failure.path ?? "").match(/^slug:([a-z0-9-]+)$/)?.[1];
+    if (!slug) {
+      const have = new Set(markdownSlugs(fields));
+      slug = (brief.links?.contextual ?? []).find((item) => /^[a-z0-9-]+$/.test(item) && !have.has(item));
+    }
+    if (!slug) return null;
+    found = linkHostParagraph(fields);
+  }
+  const allowed = (brief.links?.contextual ?? []).filter((item) => /^[a-z0-9-]+$/.test(item));
+  if (!found || !slug || !allowed.includes(slug)) return null;
+  const job = fragment(brief, `${failure.code}:${found.path}`, [
+    failure.code === "links-anchor"
+      ? `В этом абзаце ссылка /s/${slug} стоит с общим анкором. Вплети её в предложение и замени анкор на описание темы.`
+      : `В этом абзаце раздела «${found.title ?? ""}» ещё нет внутренней ссылки. Вплети в одно существующее предложение одну ссылку на /s/${slug}.`,
+    "Анкор называет тему статьи своими словами. Нельзя: «материал», «здесь», «подробнее», «тут», «ссылка», «статья».",
+    "Не дописывай отдельное предложение «Подробнее: …» и не ставь две ссылки в конец одного абзаца.",
+    `Разрешённые slug: ${allowed.join(", ")}. Других адресов нет.`,
+    "Верни JSON { text } – только этот абзац.",
+    "",
+    "АБЗАЦ:",
+    found.text,
+  ].join("\n"), objectSchema({ text: stringSchema }), (current, answer) => {
+    const text = answer?.text;
+    if (wovenLinkRejected(text, found, slug, brief)) return null;
+    return setPath(current, found.path, text);
+  }, found.text);
+  job.outputTokens = 420;
+  return job;
+}
+
+function openingStory(fields) {
+  return [...(fields.story ?? []), fields.transition ?? ""].filter((part) => typeof part === "string" && part.trim()).join("\n\n");
+}
+
+function retellTarget(fields, failure) {
+  const title = String(failure.message ?? "").match(/раздел «([^»]+)»/)?.[1] ?? "";
+  const want = normalize(title);
+  if (!want) return null;
+  for (const key of ["sectionsBefore", "sectionsAfter"]) {
+    for (const [index, section] of (fields[key] ?? []).entries()) {
+      if (normalize(section?.title) === want) return { key, index, title: section.title ?? title, section };
+    }
+  }
+  if (fields.tableSection && normalize(fields.tableSection.title) === want) {
+    return { key: "tableSection", index: 0, title: fields.tableSection.title ?? title, section: fields.tableSection };
+  }
+  return null;
+}
+
+function retellSlots(target, story) {
+  const slots = [];
+  const push = (list, path) => {
+    for (const [index, text] of (list ?? []).entries()) {
+      if (typeof text !== "string" || !text.trim() || isQuoteParagraph(text)) continue;
+      slots.push({ path: `${path}[${index}]`, text });
+    }
+  };
+  if (target.key === "tableSection") {
+    push(target.section.paragraphsBefore, "tableSection.paragraphsBefore");
+    push(target.section.paragraphsAfter, "tableSection.paragraphsAfter");
+  } else {
+    push(target.section.paragraphs, `${target.key}[${target.index}].paragraphs`);
+  }
+  const guilty = slots.filter((slot) => sectionRetellsStory(story, slot.text));
+  return guilty.length ? guilty : slots;
+}
+
+function sectionProse(section, key) {
+  if (key === "tableSection") return [...(section.paragraphsBefore ?? []), ...(section.paragraphsAfter ?? [])].join("\n\n");
+  return (section.paragraphs ?? []).join("\n\n");
+}
+
+function storyRetellFragment(brief, fields, failure) {
+  const target = retellTarget(fields, failure);
+  if (!target) return null;
+  const story = openingStory(fields);
+  const slots = retellSlots(target, story);
+  if (!slots.length) return null;
+  const lines = [
+    `Раздел «${target.title}» пересказывает историю из начала. Перепиши только эти абзацы: перейди к практическим шагам.`,
+    "Не повторяй сюжет, сцену и имена героини. Историю из начала не копируй.",
+    "Если в абзаце уже есть ссылка /s/, оставь тот же slug. Новых адресов не добавляй.",
+    `Верни JSON { paragraphs } – ровно ${slots.length} абзацев, в том же порядке.`,
+    "",
+  ];
+  slots.forEach((slot, index) => {
+    lines.push(`АБЗАЦ ${index + 1}:`, slot.text, "");
+  });
+  const job = fragment(brief, `story-retell:${target.path ?? `${target.key}[${target.index}]`}`, lines.join("\n"), objectSchema({
+    paragraphs: { type: "array", minItems: slots.length, maxItems: slots.length, items: stringSchema },
+  }), (current, answer) => {
+    const paragraphs = answer?.paragraphs;
+    if (!Array.isArray(paragraphs) || paragraphs.length !== slots.length) return null;
+    let next = current;
+    for (let index = 0; index < slots.length; index += 1) {
+      const text = paragraphs[index];
+      const slot = slots[index];
+      if (typeof text !== "string" || fieldProseDefect(text, slot.path) || danglingFragment(text)) return null;
+      const oldSlugs = markdownLinks(slot.text).map((link) => link.slug);
+      const newSlugs = markdownLinks(text).map((link) => link.slug);
+      if (oldSlugs.some((slug) => !newSlugs.includes(slug))) return null;
+      if (newSlugs.some((slug) => !oldSlugs.includes(slug))) return null;
+      next = setPath(next, slot.path, text);
+    }
+    const section = target.key === "tableSection" ? next.tableSection : next[target.key]?.[target.index];
+    if (sectionRetellsStory(story, sectionProse(section, target.key))) return null;
+    return next;
+  }, slots.map((slot) => slot.text).join("\n"));
+  job.outputTokens = 480;
+  return job;
+}
+
+function extraQueryHost(fields, phrase, phrases = []) {
+  const needle = normalize(phrase);
+  const others = phrases.map((item) => normalize(item)).filter((item) => item && item !== needle);
+  const ranked = [];
+  const push = (path, text) => {
+    if (typeof text !== "string" || words(text) < 8 || isQuoteParagraph(text)) return;
+    if (normalize(text).includes(needle)) return;
+    ranked.push({ path, text, crowded: others.some((item) => normalize(text).includes(item)) });
+  };
+  for (const key of ["sectionsBefore", "sectionsAfter"]) {
+    for (const [index, section] of (fields[key] ?? []).entries()) {
+      for (const [paragraphIndex, paragraph] of (section?.paragraphs ?? []).entries()) push(`${key}[${index}].paragraphs[${paragraphIndex}]`, paragraph);
+    }
+  }
+  for (const [index, paragraph] of (fields.tableSection?.paragraphsBefore ?? []).entries()) push(`tableSection.paragraphsBefore[${index}]`, paragraph);
+  for (const [index, paragraph] of (fields.tableSection?.paragraphsAfter ?? []).entries()) push(`tableSection.paragraphsAfter[${index}]`, paragraph);
+  for (const [index, item] of (fields.steps?.items ?? []).entries()) push(`steps.items[${index}].text`, item?.text);
+  ranked.sort((a, b) => Number(a.crowded) - Number(b.crowded));
+  return ranked[0] ?? null;
+}
+
+function extraQueryFragment(brief, fields, failure) {
+  const phrase = String(failure.message ?? "").match(/дополнительный запрос «([^»]+)»/)?.[1] ?? "";
+  if (!phrase) return null;
+  const found = extraQueryHost(fields, phrase, brief.additionalQueries ?? []);
+  if (!found) return null;
+  const max = SZ.limits.mainQuery[1];
+  const job = fragment(brief, `extra-query:${failure.path ?? phrase}`, [
+    `Дополнительный запрос «${phrase}» должен встретиться в тексте хотя бы один раз, дословно и без кавычек.`,
+    "Вплети его в существующее предложение этого абзаца. Не дописывай отдельное шаблонное предложение и не копируй другие разделы.",
+    `Основной запрос «${brief.query}» не добавляй, если из-за этого его станет больше ${max}.`,
+    "Верни JSON { text } – только этот абзац.",
+    "",
+    "АБЗАЦ:",
+    found.text,
+  ].join("\n"), objectSchema({ text: stringSchema }), (current, answer) => {
+    const text = answer?.text;
+    if (typeof text !== "string" || fieldProseDefect(text, found.path) || endingRejected(text, found.text)) return null;
+    if (!normalize(text).includes(normalize(phrase)) || text.includes(`«${phrase}»`)) return null;
+    if (text.trim().startsWith(found.text.trim())) return null;
+    const actual = Number.isFinite(failure.queryCount) ? failure.queryCount : null;
+    if (actual != null) {
+      const next = actual - queryHits(found.text, brief.query) + queryHits(text, brief.query);
+      if (next > max) return null;
+    }
+    return setPath(current, found.path, text);
+  }, found.text);
+  job.outputTokens = 420;
+  return job;
+}
+
+function faqAnswerFragment(brief, fields, failure) {
+  const index = Number(String(failure.path ?? "").match(/faq\[(\d+)\]/)?.[1]);
+  const item = fields.faq?.[index];
+  if (!item) return null;
+  const limits = SZ.limits;
+  const job = fragment(brief, `faq-answer-type:faq[${index}].answer`, [
+    `Вопрос открытый: «${item.question}».`,
+    "Ответ не начинай с «Да», «Нет», «Можно», «Нельзя», «Конечно» или «Разумеется». Ответь по сути вопроса.",
+    `Нужно ${limits.faqAnswer[0]}–${limits.faqAnswer[1]} слов, целыми предложениями. Вопрос не меняй.`,
+    "Верни JSON { answer } – только этот ответ.",
+    "",
+    item.answer,
+  ].join("\n"), objectSchema({ answer: stringSchema }), (current, answer) => {
+    const text = answer?.answer;
+    if (typeof text !== "string" || fieldProseDefect(text, "faq.answer") || danglingFragment(text)) return null;
+    if (faqAnswerTypeMismatch(item.question, text)) return null;
+    const count = words(text);
+    if (count < limits.faqAnswer[0] || count > limits.faqAnswer[1]) return null;
+    const faq = current.faq.map((entry, entryIndex) => (entryIndex === index ? { ...entry, answer: text } : entry));
+    return { ...current, faq };
+  }, item.answer);
+  job.outputTokens = 320;
+  return job;
+}
+
 /** One failing fragment. Null when the only safe fix would be the whole article. */
 export function buildSzFragment(brief, fields, failure) {
   const limits = SZ.limits;
@@ -902,27 +1185,12 @@ export function buildSzFragment(brief, fields, failure) {
       return setPath(current, found.path, text);
     }, found.text);
   }
-  if (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? limits.contextualLinks[0])) {
-    const have = new Set(markdownSlugs(fields));
-    const missing = (brief.links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug) && !have.has(slug));
-    const slug = missing[0];
-    if (!slug) return null;
-    return fragment(brief, "links-contextual:sections", [
-      `В тексте ${failure.actual ?? "меньше"} внутренних ссылок, нужно ${failure.min ?? limits.contextualLinks[0]}–${failure.max ?? limits.contextualLinks[1]}.`,
-      `Добавь одно предложение со ссылкой [материал](/s/${slug}). Других адресов не добавляй.`,
-      "Верни JSON { sentence } – только это предложение.",
-    ].join("\n"), objectSchema({ sentence: stringSchema }), (current, answer) => {
-      const text = answer?.sentence;
-      if (typeof text !== "string" || fieldProseDefect(text, "paragraph") || danglingFragment(text)) return null;
-      if (!text.includes(`](/s/${slug})`)) return null;
-      if (findBadHref(text)) return null;
-      const copy = structuredClone(current);
-      if (!appendSentence(copy, text)) return null;
-      const count = markdownSlugs(copy).length;
-      if (count < (failure.min ?? limits.contextualLinks[0]) || count > limits.contextualLinks[1]) return null;
-      return copy;
-    });
+  if (failure.code === "links-anchor" || (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? limits.contextualLinks[0]))) {
+    return linkFragment(brief, fields, failure);
   }
+  if (failure.code === "story-retell") return storyRetellFragment(brief, fields, failure);
+  if (failure.code === "extra-query") return extraQueryFragment(brief, fields, failure);
+  if (failure.code === "faq-answer-type") return faqAnswerFragment(brief, fields, failure);
   if (failure.code === "query-count" && (failure.actual ?? failure.queryCount ?? 0) > (failure.max ?? limits.mainQuery[1])) {
     const found = findSurplusSlot(fields, brief.query, brief.title);
     if (!found?.path) return null;
@@ -1040,7 +1308,7 @@ export function buildSzFragment(brief, fields, failure) {
   return null;
 }
 
-const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "faq-specialist", "links-contextual", "query-count", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
+const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "faq-answer-type", "faq-specialist", "links-anchor", "links-contextual", "count-mismatch", "query-count", "extra-query", "story-retell", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
 
 function failureKey(failure) {
   return `${failure.code}:${failure.path ?? failure.field}`;
@@ -1103,6 +1371,51 @@ function strongFragmentPlan(repair, brief, fields, failures, strongTries, model)
   return plan;
 }
 
+function bindInstancePath(fields, failure) {
+  if (failure.code === "extra-query") {
+    const phrase = String(failure.message ?? "").match(/дополнительный запрос «([^»]+)»/)?.[1] ?? "";
+    return phrase ? { ...failure, path: `extra:${phrase}` } : failure;
+  }
+  if (failure.code === "faq-answer-type") {
+    const question = String(failure.message ?? "").match(/ответ на «([\s\S]+)» начинается/)?.[1] ?? "";
+    const index = (fields.faq ?? []).findIndex((item) => item.question === question);
+    return index >= 0 ? { ...failure, path: `faq[${index}].answer` } : failure;
+  }
+  if (failure.code === "story-retell") {
+    const target = retellTarget(fields, failure);
+    return target ? { ...failure, path: `${target.key}[${target.index}]` } : failure;
+  }
+  if (failure.code === "links-anchor") {
+    const slug = String(failure.message ?? "").match(/\/s\/([a-z0-9-]+)/)?.[1] ?? "";
+    const anchor = String(failure.message ?? "").match(/анкор «([^»]+)»/)?.[1] ?? "";
+    const index = String(failure.message ?? "").match(/#(\d+)/)?.[1] ?? "0";
+    return { ...failure, path: `anchor:${slug}:${index}`, slug, anchor };
+  }
+  if (failure.code === "count-mismatch") return { ...failure, path: failure.field ?? "count" };
+  return failure;
+}
+
+/** One gate row per missing slug or per phrase, so a rejected candidate does not spend the next try. */
+function bindQualityPaths(fields, brief, failures) {
+  const out = [];
+  for (const failure of failures) {
+    if (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? SZ.limits.contextualLinks[0])) {
+      const have = new Set(markdownSlugs(fields));
+      const missing = (brief.links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug) && !have.has(slug));
+      const need = Math.max(1, (failure.min ?? SZ.limits.contextualLinks[0]) - (failure.actual ?? have.size));
+      const take = missing.slice(0, need);
+      if (!take.length) {
+        out.push(failure);
+        continue;
+      }
+      for (const slug of take) out.push({ ...failure, path: `slug:${slug}`, slug });
+      continue;
+    }
+    out.push(bindInstancePath(fields, failure));
+  }
+  return out;
+}
+
 /**
  * Repair until checkSzArticle is clean, or until every fragment has used its cheap
  * tries and one strong try. callTier(tier, name, messages, schema, { maxTokens }) performs the model call.
@@ -1127,7 +1440,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const allowModel = !args.offline && !args["no-repair"];
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
-    const failures = locatePhraseFailures(fields, szQuantityReport(fields, errorsOf(result)).failures);
+    const failures = bindQualityPaths(fields, brief, locatePhraseFailures(fields, szQuantityReport(fields, errorsOf(result)).failures));
     const failure = pickFailure(failures, cheapTries, strongTries, repair.cheapTries);
     if (!failure) break;
     const queryCount = bodyQueryCount(result.md, brief.query);

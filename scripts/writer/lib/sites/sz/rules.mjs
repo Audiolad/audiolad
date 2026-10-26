@@ -45,6 +45,120 @@ export function isSpecialistQuestion(question) {
   return /специалист|психолог|обратиться/iu.test(String(question ?? ""));
 }
 
+const GENERIC_LINK_ANCHORS = new Set(["материал", "здесь", "подробнее", "тут", "ссылка", "статья", "статье", "читать", "далее", "этом"]);
+/** Anchor is only a generic pointer («материал», «здесь», «подробнее»), not a description of the article. */
+export function genericLinkAnchor(anchor) {
+  const tokens = paragraphTokens(anchor).filter((token) => token.length >= 3);
+  if (!tokens.length) return true;
+  return tokens.every((token) => GENERIC_LINK_ANCHORS.has(token));
+}
+
+const RETELL_STOP = new Set(["ангел", "ангела", "ангелу", "ангеле", "хранитель", "хранителя", "хранителю", "молитва", "молитвы", "молитву", "молитве", "образ", "образа", "человек", "человека", "можно", "когда", "этот", "этой", "этого", "только", "после", "перед", "через", "чтобы", "который", "которая", "которые", "практика", "практике", "также", "будет", "были", "было", "очень", "просто", "потом", "тогда", "здесь", "свой", "свою", "свои"]);
+const RETELL_NAMES = new Set(["ангел", "ангела", "ангелу", "ангеле", "ангелом", "божий", "бога", "бог", "христос", "христа", "христов", "святый", "аминь", "господь", "господа", "крещении", "православного", "эзотерика", "ченнелинг", "молитвы", "хранителю", "молитва"]);
+
+function retellTokens(text) {
+  return paragraphTokens(text).filter((token) => token.length >= 5 && !RETELL_STOP.has(token));
+}
+
+function retellShards(tokens) {
+  const grams = [];
+  for (let i = 0; i < tokens.length - 1; i += 1) grams.push(`${tokens[i]} ${tokens[i + 1]}`);
+  return grams;
+}
+
+function properNames(text) {
+  const found = new Set();
+  for (const match of String(text).matchAll(/[А-ЯЁ][а-яё]{3,}/g)) {
+    const name = normalize(match[0]);
+    if (name.length < 4 || RETELL_NAMES.has(name)) continue;
+    found.add(name);
+  }
+  return found;
+}
+
+/**
+ * A later section retells the opening story: many of the same content tokens,
+ * the same word pairs (shards), or a named character plus a smaller overlap.
+ * The approved angel article stays under every threshold.
+ */
+export function sectionRetellsStory(story, section) {
+  const left = retellTokens(story);
+  const right = retellTokens(section);
+  const a = new Set(left);
+  const b = new Set(right);
+  if (a.size < 12 || b.size < 12) return false;
+  const shared = [...a].filter((token) => b.has(token));
+  const ratio = shared.length / Math.min(a.size, b.size);
+  const leftShards = new Set(retellShards(left));
+  const rightShards = new Set(retellShards(right));
+  let sharedShards = 0;
+  for (const gram of leftShards) if (rightShards.has(gram)) sharedShards += 1;
+  const shardRatio = leftShards.size && rightShards.size ? sharedShards / Math.min(leftShards.size, rightShards.size) : 0;
+  const names = [...properNames(story)].filter((name) => properNames(section).has(name));
+  if (shared.length >= 8 && ratio >= 0.28) return true;
+  if (sharedShards >= 5 && shardRatio >= 0.18) return true;
+  if (names.length && shared.length >= 6 && ratio >= 0.15) return true;
+  return false;
+}
+
+const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["два", 2], ["две", 2], ["три", 3], ["четыре", 4], ["пять", 5], ["шесть", 6], ["семь", 7], ["восемь", 8], ["девять", 9], ["десять", 10]];
+
+/** A heading that promises N steps/items, or null when it does not count a list. */
+export function statedListCount(title) {
+  const text = normalize(title);
+  if (!/(шаг|пункт|признак)/.test(text)) return null;
+  for (const [word, num] of LIST_COUNT_WORDS) {
+    if (new RegExp(`(?:^|\\s)${word}(?=\\s)`).test(text)) return num;
+  }
+  const digit = text.match(/(?:^|\s)(\d{1,2})(?=\s)/);
+  return digit ? Number(digit[1]) : null;
+}
+
+function listNoun(stem, count) {
+  const forms = {
+    шаг: ["шаг", "шага", "шагов"],
+    пункт: ["пункт", "пункта", "пунктов"],
+    признак: ["признак", "признака", "признаков"],
+  }[stem];
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+  return forms[2];
+}
+
+/** Replace the count in a heading so it agrees with the list. Other words stay. */
+export function alignListCount(title, count) {
+  const stated = statedListCount(title);
+  if (stated == null || stated === count || count < 1 || count > 10) return title;
+  const stem = /пункт/iu.test(title) ? "пункт" : (/признак/iu.test(title) ? "признак" : "шаг");
+  const noun = listNoun(stem, count);
+  const word = LIST_COUNT_WORDS.find(([, num]) => num === count)?.[0] ?? String(count);
+  return String(title).replace(
+    /(\d{1,2}|[Оо]дин|[Оо]дна|[Оо]дно|[Дд]ва|[Дд]ве|[Тт]ри|[Чч]етыре|[Пп]ять|[Шш]есть|[Сс]емь|[Вв]осемь|[Дд]евять|[Дд]есять)(\s+)(шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?)/u,
+    (full, num, space) => {
+      const digit = /^\d/.test(num);
+      const cap = !digit && num[0] !== num[0].toLocaleLowerCase("ru");
+      const next = digit ? String(count) : (cap ? word[0].toLocaleUpperCase("ru") + word.slice(1) : word);
+      return `${next}${space}${noun}`;
+    },
+  );
+}
+
+const NOT_LETTER = String.raw`(?![\p{L}\p{N}])`;
+const YES_NO_QUESTION = new RegExp(String.raw`^(?:а\s+)?(?:можно|нужно|нужен|нужна|нужны|стоит|есть|был|была|будет|верно|правда|должен|должна|надо|возможно|обязательно)\s+ли${NOT_LETTER}`, "iu");
+const OPEN_QUESTION = new RegExp(String.raw`^(?:а\s+)?(?:(?:с|со|о|об|на|в|во|для|от|по|при)\s+)?(?:как|почему|зачем|что|чем|какой|какая|какие|какое|какого|какую|каких|кто|кого|где|когда|откуда|куда|сколько|насколько)${NOT_LETTER}`, "iu");
+const YES_NO_ANSWER = new RegExp(String.raw`^(?:да|нет|можно|нельзя|конечно|разумеется)${NOT_LETTER}`, "iu");
+
+/** Open question («Как понять…») answered as yes/no («Да, …»). A question with «ли» may start with «Да». */
+export function faqAnswerTypeMismatch(question, answer) {
+  const ask = String(question ?? "").trim();
+  const reply = String(answer ?? "").trim();
+  if (!ask || !reply) return false;
+  if (YES_NO_QUESTION.test(ask) || !OPEN_QUESTION.test(ask)) return false;
+  return YES_NO_ANSWER.test(reply);
+}
+
 /** Description opened with the query in «ёлочки», including a lowercase query. */
 export function descriptionOpensWithQuotedQuery(description, query) {
   const nq = normalize(query);
@@ -619,6 +733,9 @@ export function checkSzArticle(md, cfg, env) {
   for (const key of ["title", "feedbackEmpty", "feedbackStart", "feedbackHalf", "feedbackDone"]) if (!new RegExp(`^${key}: .+$`, "m").test(checklist)) add("checklist", "checklist", `нет ${key} в чек-листе`);
   const items = [...checklist.matchAll(/^ {2}text: (.+)$/gm)].map((m) => m[1]);
   if (items.length !== 5 || [...checklist.matchAll(/^- id: /gm)].length !== 5) add("checklist", "checklist", "ровно 5 пунктов чек-листа");
+  const checklistTitle = checklist.match(/^title: (.+)$/m)?.[1] ?? "";
+  const statedChecklist = statedListCount(checklistTitle);
+  if (statedChecklist != null && items.length > 0 && statedChecklist !== items.length) add("count-mismatch", "checklist", `заголовок «${checklistTitle}» обещает ${statedChecklist}, а пунктов ${items.length}`);
   for (const item of items) {
     if (words(item) > L.checklistWords) add("checklist-length", "checklist", `пункт чек-листа длиннее ${L.checklistWords} слов: «${item}»`);
     const itemDefect = proseDefect(item, proseLimit("checklist.items"));
@@ -680,6 +797,14 @@ export function checkSzArticle(md, cfg, env) {
   if (h2.length < L.bodyH2[0] || h2.length > L.bodyH2[1]) add("body-sections", "sections", `в основной части ${h2.length} H2, нужно ${L.bodyH2[0]}–${L.bodyH2[1]}`);
   const mw = words(mainBody);
   if (mw < L.mainBody[0] || mw > L.mainBody[1]) add("body-length", "sections", `основная часть ${mw} слов, нужно ${L.mainBody[0]}–${L.mainBody[1]}`);
+  for (const block of mainBody.split(/(?=^## )/m)) {
+    const title = block.match(/^## (.+)$/m)?.[1];
+    if (!title) continue;
+    const heading = normalize(title);
+    if (heading.startsWith("три шага") || heading.startsWith("когда стоит обратиться")) continue;
+    const prose = block.replace(/^## .+$/m, " ").replace(/^### .+$/gm, " ").replace(/^\|.*$/gm, " ");
+    if (sectionRetellsStory(story, prose)) add("story-retell", "sections", `раздел «${title}» пересказывает историю`);
+  }
   if (!/^\|[^\n]+\|\n\|(?:\s*:?-+:?\s*\|)+$/m.test(mainBody)) add("table", "table", "нет сравнительной таблицы");
   const pSpecialist = pos(/^## Когда стоит обратиться к специалисту$/m, pExpert);
   if (pSpecialist < 0 || pSpecialist > pFaq) add("specialist", "*", "нет «## Когда стоит обратиться к специалисту» перед FAQ");
@@ -691,7 +816,11 @@ export function checkSzArticle(md, cfg, env) {
   }
   const tableAt = body.search(/^\|(?:\s*:?-+:?\s*\|)+$/m);
   const stepSection = tableAt < 0 ? undefined : body.slice(tableAt).split(/^(?=## )/m).find((section) => (section.match(/^### /gm) || []).length >= 2);
-  if ((stepSection?.match(/^### /gm) || []).length !== 3 || !/^## Три шага/m.test(stepSection ?? "")) add("steps", "steps", "первый раздел с H3 после таблицы – «## Три шага…» ровно с тремя «###»");
+  const stepItems = (stepSection?.match(/^### /gm) || []).length;
+  const stepsTitle = stepSection?.match(/^## (.+)$/m)?.[1] ?? "";
+  if (stepItems !== 3 || !/^## Три шага/m.test(stepSection ?? "")) add("steps", "steps", "первый раздел с H3 после таблицы – «## Три шага…» ровно с тремя «###»");
+  const statedSteps = statedListCount(stepsTitle);
+  if (statedSteps != null && stepItems > 0 && statedSteps !== stepItems) add("count-mismatch", "steps", `заголовок «${stepsTitle}» обещает ${statedSteps}, а пунктов ${stepItems}`);
   for (const [, heading] of (stepSection ?? "").matchAll(/^### (.+)$/gm)) {
     // docs/article-numbered-steps.md: the site numbers steps itself; «Если …» headings are scenarios, not steps.
     if (/^(?:\d|Если\s)/iu.test(heading)) add("steps", "steps", `заголовок шага – глагол без номера и без «Если»: «${heading}»`);
@@ -707,12 +836,19 @@ export function checkSzArticle(md, cfg, env) {
     if (aw < L.faqAnswer[0] || aw > L.faqAnswer[1]) add("faq-length", "faq", `ответ на «${q}» ${aw} слов, нужно ${L.faqAnswer[0]}–${L.faqAnswer[1]}`);
     const answerFragment = danglingFragment(a);
     if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
+    if (faqAnswerTypeMismatch(q, a)) add("faq-answer-type", "faq", `ответ на «${q}» начинается как да/нет, а вопрос открытый`);
   }
   const faqText = faq.flat().join("\n");
 
   // ── links ──
   const contextual = [...body.slice(0, pFaq).matchAll(/\[[^\]]+\]\(\/s\/([a-z0-9-]+)\)/g)];
   if (contextual.length < L.contextualLinks[0] || contextual.length > L.contextualLinks[1]) add("links-contextual", "sections", `${contextual.length} ссылок /s в тексте, нужно ${L.contextualLinks[0]}–${L.contextualLinks[1]}`);
+  let anchorIndex = 0;
+  for (const match of body.slice(0, pFaq).matchAll(/\[([^\]]+)\]\(\/s\/([a-z0-9-]+)\)/g)) {
+    if (!genericLinkAnchor(match[1])) continue;
+    add("links-anchor", "sections", `анкор «${match[1]}» у ссылки /s/${match[2]} слишком общий (#${anchorIndex})`);
+    anchorIndex += 1;
+  }
   const links = [...body.matchAll(/(?:\]\(|href=")\/s\/([a-z0-9-]+)(?:[)#"?])/g)].map((m) => m[1]);
   for (const link of links) if (!env.published.has(link)) add("links-target", "sections", `ссылка /s/${link} не на опубликованную статью`);
   const urls = [...(fm + "\n" + body).matchAll(/(?:https?:)?\/\/[^\s)"'<>]+/g)].map((m) => m[0]);
@@ -762,6 +898,12 @@ export function checkSzArticle(md, cfg, env) {
   if (tw < L.total[0] || tw > L.total[1]) add("total-length", "sections", `всего ${tw} слов с FAQ, нужно ${L.total[0]}–${L.total[1]}`);
   const mainCount = normalize(body).split(nq).length - 1;
   if (mainCount < L.mainQuery[0] || mainCount > L.mainQuery[1]) add("query-count", "sections", `запрос «${query}» в тексте ${mainCount} раз, нужно ${L.mainQuery[0]}–${L.mainQuery[1]}`);
+  const bodyNorm = normalize(body);
+  for (const phrase of cfg.additionalQueries ?? []) {
+    const needle = normalize(phrase);
+    if (!needle) continue;
+    if (!bodyNorm.includes(needle)) add("extra-query", "sections", `дополнительный запрос «${phrase}» не встречается в тексте`);
+  }
   for (const duplicated of duplicateParagraphs(body)) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
   for (const verbatim of cfg.verbatim ?? []) {
     // Verified texts (prayers, poems) quoted in «…»: the whole text or its beginning ending with «…».

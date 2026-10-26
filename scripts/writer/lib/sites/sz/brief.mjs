@@ -162,6 +162,7 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
     phones: String(raw?.phones ?? "").trim(),
     verbatim: list(raw?.verbatim).map(String),
     forbiddenPhrases: list(raw?.forbiddenPhrases).map(String),
+    additionalQueries: list(raw?.additionalQueries ?? raw?.secondaryKeywords).map(String).map((item) => item.trim()).filter(Boolean),
     extraInstructions: list(raw?.extraInstructions).map(String),
   };
 }
