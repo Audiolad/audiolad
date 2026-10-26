@@ -513,24 +513,111 @@ function shortestExpandable(fields) {
   return steps[0] ?? sections[0] ?? null;
 }
 
+function descriptionDistance(length, min, max) {
+  if (length < min) return min - length;
+  if (length > max) return length - max;
+  return 0;
+}
+
+function descriptionTarget(limits = SZ.limits) {
+  return Math.round((limits.description[0] + limits.description[1]) / 2);
+}
+
+/** An out-of-range description that is otherwise usable as the base of a rewrite. Never a sliced string. */
+function descriptionCandidate(answer, brief, fields) {
+  const value = coerceFragment(answer);
+  const text = value?.description;
+  if (typeof text !== "string") return null;
+  if (fieldProseDefect(text, "description") || danglingFragment(text)) return null;
+  if (!normalize(text).includes(normalize(brief.query))) return null;
+  if (repairOutputRejected({ description: text }, brief, fields, fields?.description ?? "")) return null;
+  const length = [...text].length;
+  const [min, max] = SZ.limits.description;
+  const distance = descriptionDistance(length, min, max);
+  if (distance === 0) return null;
+  return { text, length, distance };
+}
+
+function rememberDescription(drafts, key, candidate) {
+  if (!candidate) return;
+  const target = descriptionTarget();
+  const prev = drafts.get(key);
+  const closer = !prev
+    || candidate.distance < prev.distance
+    || (candidate.distance === prev.distance && Math.abs(candidate.length - target) < Math.abs(prev.length - target));
+  if (closer) drafts.set(key, candidate);
+}
+
+function faqQuestionIndex(fields, failure) {
+  const fromPath = String(failure.path ?? "").match(/faq\[(\d+)\]/);
+  if (fromPath) {
+    const index = Number(fromPath[1]);
+    if (fields.faq?.[index]) return index;
+  }
+  const quoted = String(failure.message ?? "").match(/«([^»]+)»/)?.[1];
+  if (quoted) {
+    const index = (fields.faq ?? []).findIndex((item) => normalize(item.question) === normalize(quoted));
+    if (index >= 0) return index;
+  }
+  const seen = new Map();
+  for (const [index, item] of (fields.faq ?? []).entries()) {
+    const key = normalize(item?.question ?? "");
+    if (!key) continue;
+    if (seen.has(key)) return index;
+    seen.set(key, index);
+  }
+  return -1;
+}
+
+function faqQuestionFragment(brief, fields, failure) {
+  const index = faqQuestionIndex(fields, failure);
+  const item = fields.faq?.[index];
+  if (!item) return null;
+  const occupied = failure.occupiedQuestions instanceof Set ? failure.occupiedQuestions : new Set();
+  return fragment(brief, `${failure.code}:faq[${index}].question`, [
+    `Вопрос FAQ повторяется: «${item.question}».`,
+    failure.message ? `Причина: ${failure.message}` : "",
+    "Придумай другой вопрос по той же теме. Не копируй формулировку и не повторяй вопрос, который уже есть в другой статье.",
+    "Ответ и остальные вопросы не меняй.",
+    "Верни JSON { question } – только этот вопрос.",
+  ].filter(Boolean).join("\n"), objectSchema({ question: stringSchema }), (current, answer) => {
+    const text = answer?.question;
+    if (typeof text !== "string" || fieldProseDefect(text, "faq.question")) return null;
+    const key = normalize(text);
+    if (!key || key === normalize(item.question)) return null;
+    if ((current.faq ?? []).some((entry, entryIndex) => entryIndex !== index && normalize(entry.question) === key)) return null;
+    if (occupied.has(key)) return null;
+    const faq = current.faq.map((entry, entryIndex) => (entryIndex === index ? { ...entry, question: text } : entry));
+    return { ...current, faq };
+  }, item.question);
+}
+
 /** One failing fragment. Null when the only safe fix would be the whole article. */
 export function buildSzFragment(brief, fields, failure) {
   const limits = SZ.limits;
   if (failure.code === "description-length" || failure.code === "description-fragment") {
-    const description = fields.description ?? "";
-    return fragment(brief, `${failure.code}:description`, [
-      `description сейчас ${[...description].length} символов. Нужно ровно ${limits.description[0]}–${limits.description[1]}, одно или несколько целых предложений с точкой в конце.`,
-      `Запрос «${brief.query}» должен входить в текст. Не обрывай фразу и не присылай статью целиком.`,
-      "",
-      description,
-    ].join("\n"), objectSchema({ description: stringSchema }), (current, answer) => {
+    const articleDescription = fields.description ?? "";
+    const description = typeof failure.descriptionDraft === "string" && failure.descriptionDraft
+      ? failure.descriptionDraft
+      : articleDescription;
+    const length = [...description].length;
+    const [min, max] = limits.description;
+    const target = descriptionTarget(limits);
+    const lines = [
+      `description сейчас ${length} символов. Цель ровно ${target} символов, допустимо ${min}–${max}.`,
+      `Запрос «${brief.query}» должен входить в текст. Одно или несколько целых предложений с точкой в конце.`,
+    ];
+    if (length > max) lines.push(`Вариант длиннее диапазона. Перепиши его короче целыми предложениями, ближе к ${target}. Не обрезай слово посередине и не отрезай хвост механически.`);
+    else if (length < min) lines.push(`Вариант короче диапазона. Допиши целыми предложениями ближе к ${target}. Не обрывай фразу.`);
+    lines.push("Не присылай статью целиком.", "", description);
+    return fragment(brief, `${failure.code}:description`, lines.join("\n"), objectSchema({ description: stringSchema }), (current, answer) => {
       const text = answer?.description;
       if (typeof text !== "string" || fieldProseDefect(text, "description") || danglingFragment(text)) return null;
-      const length = [...text].length;
-      if (length < limits.description[0] || length > limits.description[1]) return null;
+      const nextLength = [...text].length;
+      if (nextLength < min || nextLength > max) return null;
       if (!normalize(text).includes(normalize(brief.query))) return null;
       return { ...current, description: text };
-    }, description);
+    }, articleDescription);
   }
   if (failure.code === "seoTitle-length" || failure.code === "seoTitle-query") {
     const seoTitle = fields.seoTitle ?? "";
@@ -565,21 +652,8 @@ export function buildSzFragment(brief, fields, failure) {
       return { ...current, faq };
     }, item.answer);
   }
-  if (failure.code === "unique-pack" && failure.path?.includes("faq[")) {
-    const index = Number(failure.path.match(/faq\[(\d+)\]/)?.[1]);
-    const item = fields.faq?.[index];
-    if (!item) return null;
-    return fragment(brief, `unique-pack:faq[${index}].question`, [
-      `Вопрос FAQ повторяется: «${item.question}».`,
-      "Придумай другой вопрос по той же теме, не копируя формулировку. Ответ не меняй.",
-      "Верни JSON { question }.",
-    ].join("\n"), objectSchema({ question: stringSchema }), (current, answer) => {
-      const text = answer?.question;
-      if (typeof text !== "string" || fieldProseDefect(text, "faq.question")) return null;
-      if (normalize(text) === normalize(item.question)) return null;
-      const faq = current.faq.map((entry, entryIndex) => (entryIndex === index ? { ...entry, question: text } : entry));
-      return { ...current, faq };
-    }, item.question);
+  if ((failure.code === "unique" || failure.code === "unique-pack") && (failure.field === "faq" || String(failure.path ?? "").includes("faq["))) {
+    return faqQuestionFragment(brief, fields, failure);
   }
   if (failure.code === "transition-query") {
     const transition = fields.transition ?? "";
@@ -805,7 +879,7 @@ export function buildSzFragment(brief, fields, failure) {
   return null;
 }
 
-const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "links-contextual", "query-count", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique-pack"];
+const PRIORITY = ["mixed-script", "em-dash", "links-internal", "description-length", "description-fragment", "seoTitle-length", "seoTitle-query", "transition-query", "story-length", "expert-thesis", "faq-length", "faq-fragment", "links-contextual", "query-count", "body-length", "total-length", "body-sections", "summoning", "forbidden", "unique", "unique-pack"];
 
 function failureKey(failure) {
   return `${failure.code}:${failure.path ?? failure.field}`;
@@ -854,7 +928,7 @@ function acceptFragment(fragmentJob, fields, first, second) {
   return fragmentJob.apply(fields, first.answer);
 }
 
-/** Worst case of every still-open strong fragment, priced the same way as the call itself. */
+/** Worst case of each still-open strong fragment that has a repair path, priced as the call itself. */
 function strongFragmentPlan(repair, brief, fields, failures, strongTries, model) {
   const plan = [];
   for (const failure of failures) {
@@ -873,7 +947,7 @@ function strongFragmentPlan(repair, brief, fields, failures, strongTries, model)
  * tries and one strong try. callTier(tier, name, messages, schema, { maxTokens }) performs the model call.
  * A truncated cheap call is retried once with a larger cap and still counts as one try.
  */
-export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set() }) {
+export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set(), unique = null }) {
   const errorsOf = (result) => result.problems.filter((problem) => problem.severity === "error");
   const settle = (value) => {
     const deterministic = applyDeterministicSzFixes(value, { query: brief.query, links: brief.links });
@@ -888,6 +962,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const attempts = [];
   const cheapTries = new Map();
   const strongTries = new Map();
+  const descriptionDrafts = new Map();
   const allowModel = !args.offline && !args["no-repair"];
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
@@ -898,6 +973,16 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     for (const item of failures) item.queryCount = queryCount;
     failure.queryCount = queryCount;
     const key = failureKey(failure);
+    if ((failure.code === "description-length" || failure.code === "description-fragment") && descriptionDrafts.has(key)) {
+      failure.descriptionDraft = descriptionDrafts.get(key).text;
+    }
+    if (failure.code === "unique" || failure.code === "unique-pack") {
+      const occupied = new Set();
+      for (const [norm, slug] of unique?.questions ?? []) {
+        if (slug !== brief.slug) occupied.add(norm);
+      }
+      failure.occupiedQuestions = occupied;
+    }
     const fragmentJob = buildSzFragment(brief, fields, failure);
     if (!fragmentJob) {
       cheapTries.set(key, repair.cheapTries);
@@ -914,21 +999,25 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     if (tier === "strong") {
       const room = budget - tierSpent(attempts, "strong");
       const plan = strongFragmentPlan(repair, brief, fields, failures, strongTries, model);
+      for (const item of plan) {
+        if (item.worst <= budget + 1e-9) continue;
+        if ((strongTries.get(item.key) ?? 0) >= 1) continue;
+        strongTries.set(item.key, 1);
+        state.warnings.push(`${brief.slug}: ярус strong остановлен бюджетом ${budget} ₽: худший случай ${item.key} один не помещается, остальные ошибки не блокируются`);
+      }
       const mine = plan.find((item) => item.key === key);
-      peerReserve = plan.filter((item) => item.key !== key).reduce((sum, item) => sum + item.worst, 0);
-      const cap = mine?.cap ?? Math.min(fragmentJob.outputTokens ?? configured, configured);
-      const thisWorst = mine?.worst ?? worstCaseRub(model, promptTokens, cap);
-      if (thisWorst + peerReserve > room + 1e-9) {
-        const covered = mine ? plan.length : plan.length + 1;
-        const why = peerReserve > 0
-          ? `худшие случаи ${covered} открытых ошибок не помещаются вместе, резерв не снимается`
-          : "худший случай фрагмента не помещается в бюджет";
-        state.warnings.push(`${brief.slug}: ярус strong остановлен бюджетом ${budget} ₽: ${why}`);
-        for (const item of plan) strongTries.set(item.key, 1);
+      if (!mine || mine.worst > budget + 1e-9) {
         strongTries.set(key, 1);
         continue;
       }
-      maxTokens = cap;
+      if (mine.worst > room + 1e-9) {
+        strongTries.set(key, 1);
+        state.warnings.push(`${brief.slug}: ярус strong остановлен бюджетом ${budget} ₽: худший случай ${key} не помещается в оставшийся бюджет`);
+        continue;
+      }
+      // A truncated retry still leaves room for each other fixable error. The sum does not gate this call.
+      peerReserve = plan.filter((item) => item.key !== key && item.worst <= budget + 1e-9).reduce((sum, item) => sum + item.worst, 0);
+      maxTokens = mine.cap;
     }
     const worst = worstCaseRub(model, promptTokens, maxTokens);
     if (tierSpent(attempts, tier) + worst > budget) {
@@ -965,8 +1054,33 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
         }
       }
     }
+    const noteDescription = (answer) => {
+      if (failure.code !== "description-length" && failure.code !== "description-fragment") return;
+      rememberDescription(descriptionDrafts, key, descriptionCandidate(answer, brief, fields));
+    };
+    noteDescription(first?.answer);
+    noteDescription(second?.answer);
+    let merged = acceptFragment(fragmentJob, fields, first, second);
+    if (!merged && tier === "cheap" && descriptionDrafts.has(key) && (failure.code === "description-length" || failure.code === "description-fragment")) {
+      const tightenJob = buildSzFragment(brief, fields, { ...failure, descriptionDraft: descriptionDrafts.get(key).text });
+      const spentNow = (state.spentRub ?? 0) - before;
+      const tightenWorst = tightenJob ? worstCaseRub(model, estimatePromptTokens(tightenJob.messages, model), maxTokens) : Infinity;
+      const cheapRoom = budget - tierSpent(attempts, tier);
+      if (tightenJob && spentNow + tightenWorst <= cheapRoom + 1e-9) {
+        try {
+          const tighten = invokeFragment({
+            tier, slug: brief.slug, attempt: `${attempt}-tighten`, fragmentJob: tightenJob, callTier, state, callIds, maxTokens,
+          });
+          noteDescription(tighten.answer);
+          const rewritten = tightenJob.apply(fields, tighten.answer);
+          if (rewritten) merged = rewritten;
+        } catch (error) {
+          if (!(error instanceof BudgetError) && error?.code !== 5) throw error;
+          state.warnings.push(`${brief.slug}: уточнение длины description остановлено общим бюджетом`);
+        }
+      }
+    }
     const costRub = (state.spentRub ?? 0) - before;
-    const merged = acceptFragment(fragmentJob, fields, first, second);
     if (merged) {
       const again = settle(merged);
       fields = again.fields;

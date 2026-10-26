@@ -198,7 +198,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
       const repaired = repair.mode === "tiered"
-        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds })
+        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds, unique: env.unique })
         : repairSzArticle({ brief, raw, build, messages, schema, repair, callRepair, state, args });
       const { result, errors, errorsBeforeRepair, repairSkipped } = repaired;
       writeJson(join(outDir, brief.slug, "fields.json"), result.fields);

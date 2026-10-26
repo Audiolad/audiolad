@@ -69,10 +69,10 @@ export function szQuantityReport(fields, problems = [], packProblems = []) {
     const message = String(problem.message ?? "");
     const row = { field: problem.field ?? "*", code: problem.code, path: problem.field ?? "*", message, ...quantityOf(message) };
     if (problem.code === "body-length") row.parts = sections;
-    if (problem.code === "faq-length" || problem.code === "faq-fragment" || problem.code === "unique-pack") {
+    if (problem.code === "faq-length" || problem.code === "faq-fragment" || problem.code === "unique-pack" || (problem.code === "unique" && problem.field === "faq")) {
       const question = message.match(/«([^»]+)»/)?.[1];
       const index = (fields?.faq ?? []).findIndex((item) => item.question === question);
-      if (index >= 0) row.path = problem.code === "unique-pack" ? `faq[${index}].question` : `faq[${index}].answer`;
+      if (index >= 0) row.path = problem.code === "unique-pack" || problem.code === "unique" ? `faq[${index}].question` : `faq[${index}].answer`;
     }
     if (problem.slug) row.slug = problem.slug;
     failures.push(row);
