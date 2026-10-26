@@ -15,6 +15,7 @@ import {
   PracticeBackLink,
 } from "./PracticePageParts";
 import PracticeProductHero from "./PracticeProductHero";
+import PracticeComments from "./PracticeComments";
 import PracticeRatingStars from "./PracticeRatingStars";
 import type { PracticePageViewModel } from "./types";
 
@@ -103,6 +104,16 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
               authorSlug: resolvedAuthorSlug,
               productSlug: practice.slug,
             }}
+          />
+        ) : null}
+
+        {viewModel.listenerCommentsEnabled ? (
+          <PracticeComments
+            authorSlug={resolvedAuthorSlug}
+            productSlug={practice.slug}
+            practiceId={practice.id}
+            isAuthenticated={viewModel.isAuthenticated}
+            signInReturnPath={viewModel.practicePagePath}
           />
         ) : null}
 

@@ -1,3 +1,4 @@
+import ListenerCommentNotices from "@/components/profile/ListenerCommentNotices";
 import ProfilePageHeader from "@/components/profile/ProfilePageHeader";
 import ProfilePageShell from "@/components/profile/ProfilePageShell";
 import {
@@ -54,6 +55,7 @@ export default async function ProfilePage({
       ) : null}
 
       <ProfileUserCard card={profileData.card} />
+      <ListenerCommentNotices />
       <ProfileCounters counters={profileData.counters} />
       <ProfileQuickLinks
         showMyMaterialsNav={shellData.showMyMaterialsNav}

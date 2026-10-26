@@ -25,6 +25,7 @@ export type PublicPracticeRow = {
   description: string | null;
   format: string | null;
   product_kind?: string | null;
+  catalog_section?: string | null;
   publication_class?: string | null;
   music_usage_permission?: string | null;
   duration_minutes: number | null;
@@ -99,6 +100,7 @@ export async function getPracticeByAuthorAndSlug(
       description,
       format,
       product_kind,
+      catalog_section,
       publication_class,
       music_usage_permission,
       duration_minutes,

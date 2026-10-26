@@ -76,6 +76,11 @@ export type CatalogGlobalPlayerSession = GlobalPlayerSessionBase & {
    * `inline_only` (audio_post): play/pause stays on-page; no /listen fullscreen.
    */
   playbackNavigation?: "inline_only" | "fullscreen";
+  /**
+   * Set only for a published meditation or audio practice.
+   * Points at the impressions section. Absent for music and audio posts.
+   */
+  listenerImpressionHref?: string | null;
   /** Guest promo funnel: persist progress in localStorage instead of server. */
   guestProgressMode?: boolean;
   guestProgressMeta?: {

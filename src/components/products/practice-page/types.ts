@@ -88,4 +88,5 @@ export type PracticePageViewModel = {
   ratingsUiEnabled: boolean;
   ratingAggregate: PracticeRatingAggregate;
   guestRatingsCollect: boolean;
+  listenerCommentsEnabled: boolean;
 };

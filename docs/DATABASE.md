@@ -1,3 +1,70 @@
+## Listener impressions (pending owner apply)
+
+Migration `20270124140000_practice_listener_comments.sql` is additive and is not
+applied by the draft that adds it. Do not apply it from this change. New tables:
+`practice_listener_comments`, `practice_listener_comment_reports`,
+`practice_listener_comment_moderation_events`,
+`practice_listener_comment_edits`,
+`practice_listener_comment_notices`, plus the read view
+`practice_listener_comment_feed`. No existing table is altered.
+`practice_ratings` is not altered. The feed does not expose `user_id`,
+email or a surname. `avatar_url` is the only picture field: a public https
+address, or `/api/listener-comment-avatars/{comment_id}` when the listener
+photo stays in private storage. The storage path and signed URLs are not
+selected. An author reply uses the workspace avatar when that public address
+is safe. When `avatar_url` is null, or the picture fails to load, the page
+draws a round letter from the public display name. The private-photo proxy
+returns bytes only when `practice_listener_comment_feed` contains that
+impression, so an unpublished practice, a music product, a hidden row for
+another viewer, and a deleted row are an empty 404. Writes stay on `service_role`. Listeners read published
+rows and their own hidden rows. Authors read published rows on their practices
+and cannot delete them. Notices are in-app only: the migration does not send
+email or SMS. A moderator with `products.moderate` can hide a comment. The
+application does not restore a hidden comment. `practice_listener_comment_edits`
+stores one row per successful text edit so the edit rate limit is shared by
+every app process. Reply throttling counts `author_reply` rows in the window.
+Create, reply, edit and report limits are claimed with `pg_advisory_xact_lock`
+and the matching insert in one transaction (`practice_listener_comment_insert_limited`,
+`practice_listener_comment_edit_limited`, `practice_listener_comment_report_limited`).
+A parallel burst cannot pass the same count. Those functions are executable
+only by `service_role`.
+Apply on production needs a separate decision from Sergey.
+
+### Disable without deleting data
+
+Leave the tables in place. Do not deploy the listener-comment routes. The feed
+view is granted `SELECT` to `anon` and `authenticated`. To hide that feed and
+keep every row, revoke the view read. This statement is operator-only and is
+not executed by the migration:
+
+`REVOKE SELECT ON TABLE public.practice_listener_comment_feed FROM anon, authenticated;`
+
+RLS already denies anon and authenticated writes. Reports, the moderation
+journal and edit marks are not granted to those roles. Notices stay readable
+by the recipient. `practice_ratings` and product moderation stay independent.
+No rows need to be deleted to turn the feature off.
+
+### Rollback of objects (operator only, not executed)
+
+Run only after the feature is disabled and Sergey confirms the stored rows may
+go. The migration file repeats these statements as comments and does not run
+them. Order matters: the view and the child tables depend on
+`practice_listener_comments`, and the comment policy depends on
+`practice_listener_comment_row_visible`.
+
+1. `DROP VIEW IF EXISTS public.practice_listener_comment_feed;`
+2. `DROP TABLE IF EXISTS public.practice_listener_comment_notices;`
+3. `DROP TABLE IF EXISTS public.practice_listener_comment_edits;`
+4. `DROP TABLE IF EXISTS public.practice_listener_comment_moderation_events;`
+5. `DROP TABLE IF EXISTS public.practice_listener_comment_reports;`
+6. `DROP TABLE IF EXISTS public.practice_listener_comments;`
+7. `DROP FUNCTION IF EXISTS public.practice_listener_comment_row_visible(uuid, uuid, uuid, text, timestamptz);`
+8. `DROP FUNCTION IF EXISTS public.practice_accepts_listener_comments(uuid);`
+
+Do not drop or rewrite `practices`, `practice_ratings`, `auth.users` or the
+product-moderation tables. Those objects are not created by this migration, so
+there is nothing to put back.
+
 ## Business access grants and workspace (pending owner approval)
 
 Migration `20270120120000_access_grants_and_workspace.sql` is prepared but has

@@ -126,13 +126,17 @@ assert.equal(
 const migrationHits = readdirSync(path.join(root, "supabase/migrations")).filter(
   (name) => read(`supabase/migrations/${name}`).includes("catalog_section"),
 );
-assert.deepEqual(migrationHits, [
+assert.deepEqual([...migrationHits].sort(), [
   "20261009120200_practice_catalog_sections.sql",
+  "20270124140000_practice_listener_comments.sql",
 ]);
-const migration = read(`supabase/migrations/${migrationHits[0]}`);
+const sectionMigration = read("supabase/migrations/20261009120200_practice_catalog_sections.sql");
 for (const value of ["music", "meditations", "education", "stories", "books"]) {
-  assert.match(migration, new RegExp(`'${value}'`));
+  assert.match(sectionMigration, new RegExp(`'${value}'`));
 }
+const listenerMigration = read("supabase/migrations/20270124140000_practice_listener_comments.sql");
+assert.match(listenerMigration, /p\.catalog_section IS NULL OR p\.catalog_section <> 'music'/);
+assert.doesNotMatch(listenerMigration, /'(?:meditations|education|stories|books)'/);
 
 // 3. Create, save, and edit persistence of catalog_section.
 assert.deepEqual(

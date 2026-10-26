@@ -129,6 +129,13 @@ export function isAuthorSupportAllowedMutationPath(pathname: string): boolean {
   );
 }
 
+function isBlockedAuthorListenerNoticeRead(pathname: string, method: string | undefined): boolean {
+  const path = pathname.replace(/\/+$/, "");
+  if (path !== "/api/author/listener-comments") return false;
+  const verb = (method ?? "").toUpperCase();
+  return verb === "POST" || verb === "PUT" || verb === "PATCH" || verb === "DELETE";
+}
+
 export function isAuthorSupportBlockedMutation(input: {
   pathname: string;
   method?: string;
@@ -139,7 +146,12 @@ export function isAuthorSupportBlockedMutation(input: {
   // Password-reset flows remain outside impersonation/support semantics.
   // Legal acceptances/consents are a personal act of the author and are never
   // available in support mode (8dcba9d1 PR 1).
-  return isAuthorSupportSensitivePath(path) || isAuthorSupportConsentPath(path);
+  // Marking a listener impression as read is not an audited cabinet mutation.
+  return (
+    isAuthorSupportSensitivePath(path) ||
+    isAuthorSupportConsentPath(path) ||
+    isBlockedAuthorListenerNoticeRead(path, input.method)
+  );
 }
 
 export function evaluateAuthorSupportSqlAuthority(input: {

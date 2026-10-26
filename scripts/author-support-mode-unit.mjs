@@ -937,6 +937,51 @@ assert.match(studioRepo, /studio_asset_deleted/);
 assert.match(studioRepo, /replaceStudioProjectAsset/);
 assert.match(studioRepo, /deleteStudioProjectAsset/);
 
+const listenerNoticeRead = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "author_listener_comment_notice_read",
+);
+assert.equal(listenerNoticeRead?.group, "blocked");
+assert.equal(listenerNoticeRead?.disposition, "blocked");
+assert.deepEqual(listenerNoticeRead?.routePatterns, [
+  "src/app/api/author/listener-comments/route.ts",
+]);
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/author/listener-comments",
+    method: "POST",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/author/listener-comments/",
+    method: "POST",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/author/listener-comments?authorId=abc",
+    method: "POST",
+  }),
+  true,
+);
+assert.equal(
+  isAuthorSupportBlockedMutation({
+    pathname: "/api/author/listener-comments",
+    method: "GET",
+  }),
+  false,
+);
+assert.equal(
+  proxyGuardBlocksSupportMutation(
+    "opaque-author-support-token",
+    "/api/author/listener-comments",
+    "POST",
+  ),
+  true,
+);
+
 const inventoryRoutes = new Set(listAuthorSupportInventoryRoutePatterns());
 function walkRoutes(dir, acc = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

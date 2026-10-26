@@ -28,6 +28,7 @@ import {
   PRODUCT_KIND,
 } from "@/lib/author-products/product-kind";
 import { getAudioPostDisplayLabel } from "@/lib/author-products/format";
+import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
 import { releaseDueScheduledPublications } from "@/lib/products/release-due-scheduled-publications";
 import { resolvePublicPromoRecommendation } from "@/lib/products/promo-recommendation";
 import { formatProductMeta, sumDurationSeconds } from "@/lib/products/duration";
@@ -893,6 +894,16 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     ratingsUiEnabled,
     ratingAggregate,
     guestRatingsCollect: ratingsUiEnabled && isGuestRatingsCollectEnabled(),
+    listenerCommentsEnabled:
+      !isAudioPost &&
+      practiceAcceptsListenerComments({
+        productKind: practice.product_kind,
+        catalogSection: practice.catalog_section,
+        status: practice.status,
+        publishedAt: practice.published_at,
+        scheduledPublishAt: practice.scheduled_publish_at,
+        deletedAt: practice.deleted_at,
+      }),
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {

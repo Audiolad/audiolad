@@ -289,6 +289,12 @@ export default function AuthorDashboardNav({
       active: pathname.startsWith("/author-dashboard/stats"),
     },
     {
+      href: `/author-dashboard/feedback${authorQuery}`,
+      label: "Отзывы",
+      icon: StatsIcon,
+      active: pathname.startsWith("/author-dashboard/feedback"),
+    },
+    {
       href: `/author-dashboard/finance${authorQuery}`,
       label: "Продажи и финансы",
       icon: FinanceIcon,
