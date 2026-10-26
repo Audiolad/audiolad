@@ -29,6 +29,8 @@ import {
   getPracticeAuthorSlug,
   type PublicPracticeRow,
 } from "@/lib/products/lookup";
+import { buildPracticePublicPath } from "@/lib/products/paths";
+import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
 
 type PracticeRow = PublicPracticeRow & {
   use_shared_cover?: boolean | null;
@@ -244,6 +246,10 @@ export async function loadListenSessionPayload(
       use_shared_cover,
       updated_at,
       status,
+      deleted_at,
+      published_at,
+      scheduled_publish_at,
+      catalog_section,
       is_free,
       is_catalog_listed,
       catalog_visibility,
@@ -342,6 +348,16 @@ export async function loadListenSessionPayload(
     const playbackNavigation = resolvePlaybackNavigationPolicy(
       practiceRow.product_kind,
     );
+    const listenerImpressionHref = practiceAcceptsListenerComments({
+      productKind: practiceRow.product_kind,
+      catalogSection: practiceRow.catalog_section,
+      status: practiceRow.status,
+      publishedAt: practiceRow.published_at,
+      scheduledPublishAt: practiceRow.scheduled_publish_at,
+      deletedAt: practiceRow.deleted_at,
+    })
+      ? `${buildPracticePublicPath(resolvedAuthorSlug, practiceRow.slug)}#listener-impressions`
+      : null;
 
     return {
       ok: true,
@@ -371,6 +387,7 @@ export async function loadListenSessionPayload(
         isAuthorPreview: access.mode === "author_preview",
         forceStartAtBeginning: options?.forceStartAtBeginning === true,
         playbackNavigation,
+        listenerImpressionHref,
         // audio_post must never sync the browser URL to /listen.
         suppressListenUrlSync: playbackNavigation === "inline_only",
       },

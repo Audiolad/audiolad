@@ -20,6 +20,8 @@ import {
   useListenPlayer,
 } from "@/components/audio/listen-player-shared";
 import RepeatModeButton from "@/components/audio/RepeatModeButton";
+import ListenerImpressionInvite from "@/components/products/practice-page/ListenerImpressionInvite";
+import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
 
 export default function ListenPlayerMobile() {
@@ -80,6 +82,7 @@ export default function ListenPlayerMobile() {
     queueCompleted,
     restartPlaylistQueue,
     returnToPlaylistSource,
+    session,
     noticeMessage,
     clearNoticeMessage,
     repeatMode,
@@ -501,6 +504,14 @@ export default function ListenPlayerMobile() {
           >
             Начать заново
           </button>
+          {session &&
+          isCatalogGlobalPlayerSession(session) &&
+          session.listenerImpressionHref ? (
+            <ListenerImpressionInvite
+              href={session.listenerImpressionHref}
+              practiceId={session.practiceId}
+            />
+          ) : null}
         </section>
       ) : null}
 

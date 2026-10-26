@@ -1,3 +1,17 @@
+## Listener impressions (pending owner apply)
+
+Migration `20270124120000_practice_listener_comments.sql` is additive and is not
+applied by the draft that adds it. New tables:
+`practice_listener_comments`, `practice_listener_comment_reports`,
+`practice_listener_comment_moderation_events`,
+`practice_listener_comment_notices`, plus the read view
+`practice_listener_comment_feed`. No existing table is altered.
+`practice_ratings` is not altered. The feed does not expose `user_id`,
+email or a surname. Writes stay on `service_role`. Listeners read published
+rows and their own hidden rows. Authors read published rows on their practices
+and cannot delete them. Notices are in-app only: the migration does not send
+email or SMS. Apply on production needs a separate decision from Sergey.
+
 ## Business access grants and workspace (pending owner approval)
 
 Migration `20270120120000_access_grants_and_workspace.sql` is prepared but has

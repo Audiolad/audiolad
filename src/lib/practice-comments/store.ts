@@ -1,0 +1,128 @@
+import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
+import type { CommentCursor, CommentSort } from "@/lib/practice-comments/pagination";
+import type {
+  CommentNoticeRow,
+  CommentReportRow,
+  ListenerCommentRow,
+  ModerationEventRow,
+  ReportReason,
+} from "@/lib/practice-comments/types";
+
+export type FeedCommentRow = {
+  id: string;
+  practiceId: string;
+  parentId: string | null;
+  kind: ListenerCommentRow["kind"];
+  body: string;
+  publicName: string;
+  status: "published" | "hidden";
+  createdAt: string;
+  editedAt: string | null;
+  mine: boolean;
+};
+
+export type PracticeContext = {
+  id: string;
+  title: string;
+  authorSlug: string;
+  productSlug: string;
+};
+
+export type CommentStore = {
+  getGateBySlug(authorSlug: string, productSlug: string): Promise<ListenerCommentPracticeGate | null>;
+  getPracticeContext(practiceId: string): Promise<PracticeContext | null>;
+  suggestPublicName(userId: string): Promise<string>;
+  authorDisplayName(practiceId: string): Promise<string>;
+  isAuthorMember(userId: string, practiceId: string): Promise<boolean>;
+  authorRecipientIds(practiceId: string): Promise<string[]>;
+  listAuthorPracticeIds(userId: string, authorId: string | null): Promise<string[]>;
+  listFeed(input: {
+    practiceId: string;
+    viewerUserId: string | null;
+    sort: CommentSort;
+    cursor: CommentCursor | null;
+    limit: number;
+  }): Promise<FeedCommentRow[]>;
+  listReplies(input: {
+    practiceId: string;
+    parentIds: string[];
+    viewerUserId: string | null;
+  }): Promise<FeedCommentRow[]>;
+  getRaw(id: string): Promise<ListenerCommentRow | null>;
+  findByRequest(userId: string, requestId: string): Promise<ListenerCommentRow | null>;
+  countRecentImpressions(userId: string, sinceIso: string): Promise<number>;
+  findRecentDuplicate(input: {
+    userId: string;
+    practiceId: string;
+    fingerprint: string;
+    sinceIso: string;
+    exceptId?: string | null;
+  }): Promise<ListenerCommentRow | null>;
+  insertComment(row: ListenerCommentRow): Promise<ListenerCommentRow>;
+  updateComment(
+    id: string,
+    patch: Partial<
+      Pick<
+        ListenerCommentRow,
+        | "body"
+        | "publicName"
+        | "bodyFingerprint"
+        | "status"
+        | "updatedAt"
+        | "editedAt"
+        | "deletedAt"
+        | "hiddenReason"
+      >
+    > & { hiddenBy?: string | null; hiddenAt?: string | null },
+  ): Promise<ListenerCommentRow>;
+  insertNotice(row: CommentNoticeRow): Promise<void>;
+  listNotices(userId: string): Promise<
+    Array<
+      CommentNoticeRow & {
+        practiceTitle: string;
+        practiceHref: string;
+        preview: string;
+      }
+    >
+  >;
+  markNoticeRead(userId: string, noticeId: string, readAt: string): Promise<boolean>;
+  insertReport(row: CommentReportRow): Promise<"created" | "duplicate">;
+  countRecentReports(userId: string, sinceIso: string): Promise<number>;
+  listReports(commentId: string): Promise<CommentReportRow[]>;
+  insertModerationEvent(row: ModerationEventRow): Promise<void>;
+  listModerationEvents(commentId: string): Promise<ModerationEventRow[]>;
+  listModerationQueue(input: {
+    queue: "reports" | "hidden";
+    cursor: CommentCursor | null;
+    limit: number;
+  }): Promise<ListenerCommentRow[]>;
+};
+
+export type NewCommentInput = {
+  practiceId: string;
+  userId: string;
+  parentId: string | null;
+  kind: ListenerCommentRow["kind"];
+  body: string;
+  publicName: string;
+  clientRequestId: string | null;
+  bodyFingerprint: string;
+  createdAt: string;
+};
+
+export function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error != null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23505"
+  );
+}
+
+export type ReportInsert = {
+  commentId: string;
+  reporterUserId: string;
+  reason: ReportReason;
+  details: string | null;
+  createdAt: string;
+};
