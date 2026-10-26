@@ -59,6 +59,34 @@ function sortMark(active: boolean, dir: "asc" | "desc"): string {
   return dir === "desc" ? " ↓" : " ↑";
 }
 
+export function AdminRatingsAudienceSplit({
+  registeredRatingCount,
+  guestRatingCount,
+}: {
+  registeredRatingCount: number;
+  guestRatingCount: number;
+}) {
+  const registered = registeredRatingCount.toLocaleString("ru-RU");
+  const guests = guestRatingCount.toLocaleString("ru-RU");
+  return (
+    <div data-admin-ratings-audience="">
+      <div className="grid grid-cols-2 gap-2">
+        <article className="rounded-[18px] border border-[#eadff8] bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-[#796ba0]">Зарегистрированные</p>
+          <p className="mt-1 text-xl font-semibold text-[#25135c]">{registered}</p>
+        </article>
+        <article className="rounded-[18px] border border-[#eadff8] bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-[#796ba0]">Гости</p>
+          <p className="mt-1 text-xl font-semibold text-[#25135c]">{guests}</p>
+        </article>
+      </div>
+      <p className="text-sm text-[#25135c]">
+        Зарегистрированные: {registered}. Гости: {guests}.
+      </p>
+    </div>
+  );
+}
+
 function formatWhen(value: string): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -190,7 +218,7 @@ export default function AdminRatingsPanel({
         key: "count",
         label: "Всего оценок",
         value: summary.ratingCount.toLocaleString("ru-RU"),
-        hint: "Активные (excluded_at IS NULL) в окне created_at",
+        hint: "Активные оценки аккаунтов (excluded_at IS NULL) в окне created_at",
       },
       {
         key: "stars",
@@ -383,6 +411,10 @@ export default function AdminRatingsPanel({
               </article>
             ))}
           </div>
+          <AdminRatingsAudienceSplit
+            registeredRatingCount={summary.registeredRatingCount}
+            guestRatingCount={summary.guestRatingCount}
+          />
           <p className="text-xs text-[#796ba0]">
             Активных: {summary.activeCount.toLocaleString("ru-RU")}. Исключённых:{" "}
             {summary.excludedCount.toLocaleString("ru-RU")}. Период:{" "}

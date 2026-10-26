@@ -6,9 +6,12 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import ListenerCommentComposer from "@/components/products/practice-page/ListenerCommentComposer";
 import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import ListenerImpressionInvite from "@/components/products/practice-page/ListenerImpressionInvite";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
+import { resolveListenerCommentComposer } from "@/lib/practice-comments/composer";
+import { createClient } from "@/lib/supabase/client";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import {
   LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL,
@@ -19,18 +22,13 @@ import {
   LISTENER_IMPRESSION_ERROR,
   LISTENER_IMPRESSION_HIDDEN,
   LISTENER_IMPRESSION_LOAD_MORE,
-  LISTENER_IMPRESSION_NAME_LABEL,
-  LISTENER_IMPRESSION_PLACEHOLDER,
   LISTENER_IMPRESSION_PRIVACY,
   LISTENER_IMPRESSION_REPLY_ACTION,
   LISTENER_IMPRESSION_REPORT,
   LISTENER_IMPRESSION_RETRY,
   LISTENER_IMPRESSION_SAVE,
-  LISTENER_IMPRESSION_SAVING,
-  LISTENER_IMPRESSION_SIGN_IN,
   LISTENER_IMPRESSION_SORT_NEW,
   LISTENER_IMPRESSION_SORT_OLD,
-  LISTENER_IMPRESSION_SUBMIT,
   LISTENER_IMPRESSIONS_TITLE,
   REPORT_REASON_LABELS,
 } from "@/lib/practice-comments/copy";
@@ -57,6 +55,10 @@ const buttonClass =
 
 function commentsUrl(authorSlug: string, productSlug: string): string {
   return `/api/listen/product/${encodeURIComponent(authorSlug)}/${encodeURIComponent(productSlug)}/comments`;
+}
+
+function loadComments(url: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(url, { credentials: "same-origin", cache: "no-store", signal });
 }
 
 function formatWhen(value: string): string {
@@ -97,7 +99,14 @@ export default function PracticeComments({
   const [formError, setFormError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  const [browserAuthenticated, setBrowserAuthenticated] = useState(false);
   const suggestionApplied = useRef(false);
+  const signInHref = buildAuthRouteHref("/auth/sign-in", signInReturnPath);
+  const composerMode = resolveListenerCommentComposer({
+    isAuthenticated: isAuthenticated || browserAuthenticated,
+    viewerCanComment: viewer?.canComment,
+    viewerAuthenticated: viewer?.authenticated,
+  });
 
   const showInvite = Boolean(
     engine?.programCompleted &&
@@ -120,12 +129,23 @@ export default function PracticeComments({
   }
 
   useEffect(() => {
+    if (isAuthenticated) return;
+    let cancelled = false;
+    void createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (!cancelled && data.user) setBrowserAuthenticated(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({ sort, limit: "10" });
-    fetch(`${commentsUrl(authorSlug, productSlug)}?${params}`, {
-      credentials: "same-origin",
-      signal: controller.signal,
-    })
+    loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`, controller.signal)
       .then(async (response) => {
         if (!response.ok) throw new Error("load_failed");
         return (await response.json()) as FeedResponse;
@@ -214,66 +234,18 @@ export default function PracticeComments({
         </SortButton>
       </div>
 
-      {viewer?.canComment ? (
-        <form className="mt-4" onSubmit={(event) => void submitComment(event)}>
-          <label className="block text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-name">
-            {LISTENER_IMPRESSION_NAME_LABEL}
-            <input
-              id="listener-impression-name"
-              className={fieldClass}
-              value={publicName}
-              maxLength={40}
-              onChange={(event) => setPublicName(event.target.value)}
-              autoComplete="nickname"
-            />
-          </label>
-          <label className="mt-3 block text-sm font-medium text-[#2b2144]" htmlFor="listener-impression-body">
-            Ваше впечатление
-            <textarea
-              id="listener-impression-body"
-              className={`${fieldClass} min-h-28`}
-              value={body}
-              maxLength={2000}
-              placeholder={LISTENER_IMPRESSION_PLACEHOLDER}
-              onChange={(event) => setBody(event.target.value)}
-            />
-          </label>
-          {formError ? (
-            <p className="mt-2 text-sm text-[#9a3d55]" role="alert">
-              {formError === "unauthorized" ? (
-                <>
-                  Войдите, чтобы оставить отзыв.{" "}
-                  <a
-                    className="font-semibold underline"
-                    href={buildAuthRouteHref("/auth/sign-in", signInReturnPath)}
-                  >
-                    Войти
-                  </a>
-                </>
-              ) : (
-                messageFor(formError)
-              )}
-            </p>
-          ) : null}
-          <button
-            type="submit"
-            className={`${buttonClass} mt-3 bg-[#7042c5] text-white disabled:opacity-60`}
-            disabled={pending || body.trim().length < 2}
-          >
-            {pending ? LISTENER_IMPRESSION_SAVING : LISTENER_IMPRESSION_SUBMIT}
-          </button>
-        </form>
-      ) : !isAuthenticated && !loading ? (
-        <p className="mt-4 text-sm leading-6 text-[#6d628c]">
-          {LISTENER_IMPRESSION_SIGN_IN}{" "}
-          <a
-            className="font-semibold text-[#7042c5] underline"
-            href={buildAuthRouteHref("/auth/sign-in", signInReturnPath)}
-          >
-            Войти
-          </a>
-        </p>
-      ) : null}
+      <ListenerCommentComposer
+        mode={composerMode}
+        publicName={publicName}
+        body={body}
+        pending={pending}
+        formError={formError}
+        signInHref={signInHref}
+        errorMessage={formError ? messageFor(formError) : null}
+        onPublicNameChange={setPublicName}
+        onBodyChange={setBody}
+        onSubmit={(event) => void submitComment(event)}
+      />
 
       {error ? (
         <div className="mt-4" data-listener-comments-error="true">
@@ -285,9 +257,7 @@ export default function PracticeComments({
               setLoading(true);
               setError(false);
               const params = new URLSearchParams({ sort, limit: "10" });
-              void fetch(`${commentsUrl(authorSlug, productSlug)}?${params}`, {
-                credentials: "same-origin",
-              })
+              void loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`)
                 .then(async (response) => {
                   if (!response.ok) throw new Error("load_failed");
                   return (await response.json()) as FeedResponse;
@@ -347,9 +317,7 @@ export default function PracticeComments({
           onClick={() => {
             setLoading(true);
             const params = new URLSearchParams({ sort, limit: "10", cursor });
-            void fetch(`${commentsUrl(authorSlug, productSlug)}?${params}`, {
-              credentials: "same-origin",
-            })
+            void loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`)
               .then(async (response) => {
                 if (!response.ok) throw new Error("load_failed");
                 return (await response.json()) as FeedResponse;
