@@ -1995,18 +1995,26 @@ test("tiered: bare addresses and mail fail the fragment and the gate", () => {
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Зеркало https://cdn.audiolad.ru/media/a и https://blog.sergey-zoya.ru/about.`] }));
   assert.ok(job.apply(raw, { paragraphs: [`${addition} На Node.js, Vue.js, Next.js и ASP.NET пишут сервисы, файл зовут photo.jpg, и это не адрес сайта.`] }));
   assert.ok(job.apply(raw, { paragraphs: [`${addition} Картинка лежит на https://audiolad.ru/media/photo.jpg.`] }));
-  for (const sample of [
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} В конце.Далее идёт обычный текст.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} В конце. Далее идёт обычный текст.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Смотрите https://audiolad.ru/?next=https://sergey-zoya.ru/about.`] }));
+  assert.ok(job.apply(raw, { paragraphs: [`${addition} Смотрите https://audiolad.ru/?u=www.audiolad.ru.`] }));
+  const foreign = [
     "example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle", "https://example.com/candle",
+    "сайт.рф", "САЙТ.РФ", "www.сайт.рф", "пример.москва", "что.рус", "школа.дети", "портал.онлайн", "личный.сайт",
+    "xn--80aswg.xn--p1ai", "www.xn--80aswg.xn--p1ai", "XN--80ASWG.XN--P1AI",
+    "https://сайт.рф", "https://xn--80aswg.xn--p1ai", "https://www.xn--80aswg.xn--p1ai",
     "https://audiolad.ru/?next=https://evil.com", "https://audiolad.ru/?u=evil.com",
     "https://audiolad.ru/path/evil.com", "https://audiolad.ru/page#evil.com", "https://audiolad.ru/#https://evil.com",
-  ]) {
+    "https://audiolad.ru/сайт.рф", "https://audiolad.ru/?u=сайт.рф", "https://audiolad.ru/#сайт.рф",
+    "https://audiolad.ru/path/evil%2Ecom", "https://audiolad.ru/path/evil%252Ecom",
+    "https://audiolad.ru/?u=%D1%81%D0%B0%D0%B9%D1%82.%D1%80%D1%84",
+    "https://audiolad.ru/xn--80aswg.xn--p1ai", "https://audiolad.ru/?u=пример.москва",
+  ];
+  for (const sample of foreign) {
     assert.equal(job.apply(raw, { paragraphs: [`${addition} Подробнее: ${sample}.`] }), null, sample);
   }
-  for (const sample of [
-    "example.com/candle", "t.me/audiolad", "zoya@example.com", "//example.com/candle", "www.example.com/candle",
-    "https://audiolad.ru/?next=https://evil.com", "https://audiolad.ru/?u=evil.com",
-    "https://audiolad.ru/path/evil.com", "https://audiolad.ru/page#evil.com", "https://audiolad.ru/#https://evil.com",
-  ]) {
+  for (const sample of foreign) {
     const codes = errorsOf(checkSzArticle(firstPara(assembled, `Подробнее: ${sample}.`), cfg, env)).map((problem) => problem.code);
     assert.ok(codes.includes("links-external"), `${sample}: ${codes.join(",")}`);
   }
@@ -2021,6 +2029,10 @@ test("tiered: bare addresses and mail fail the fragment and the gate", () => {
     "Смотрите https://www.sergey-zoya.ru/about и https://www.audiolad.ru/articles/x.",
     "Смотрите www.sergey-zoya.ru/about и www.audiolad.ru/x.",
     "Зеркало https://cdn.audiolad.ru/media/a и https://blog.sergey-zoya.ru/about.",
+    "В конце.Далее идёт обычный текст.",
+    "В конце. Далее идёт обычный текст.",
+    "Смотрите https://audiolad.ru/?next=https://sergey-zoya.ru/about.",
+    "Смотрите https://audiolad.ru/?u=www.audiolad.ru.",
   ];
   for (const sample of safe) {
     const codes = errorsOf(checkSzArticle(firstPara(assembled, sample), cfg, env)).map((problem) => problem.code);

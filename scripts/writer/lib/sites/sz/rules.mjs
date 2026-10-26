@@ -49,12 +49,29 @@ const ALLOWED_SITE_HOSTS = ["audiolad.ru", "sergey-zoya.ru"];
 const KNOWN_TLDS = ["com", "org", "net", "ru", "su", "info", "biz", "pro", "name", "mobi", "app", "dev", "io", "ai", "co", "me", "uk", "ly", "cc", "tv", "xyz", "site", "online", "shop", "ua", "by", "kz", "eu", "de", "fr", "it", "es", "nl", "pl", "us", "ca", "au", "edu", "gov", "int", "fm", "to"];
 const TECHNOLOGY_NAMES = new Set(["node.js", "vue.js", "next.js", "asp.net"]);
 const TLD_PATTERN = [...KNOWN_TLDS].sort((a, b) => b.length - a.length).join("|");
+// Cyrillic public suffixes. A dotted Russian word is an address only when the last label is one of these,
+// so «в конце.Далее» and «т.е.» stay ordinary prose. Longer names first.
+const IDN_TLDS = ["онлайн", "москва", "дети", "сайт", "рус", "рф"];
+const IDN_TLD_PATTERN = [...IDN_TLDS].sort((a, b) => b.length - a.length).join("|");
+const HOST_BOUNDARY = "(?<![\\p{L}\\d@._/-])";
+const ASCII_HOST = `(?:www\\.)?(?:[a-z\\d][a-z\\d-]*\\.)+(?:${TLD_PATTERN})(?![\\p{L}\\d-])`;
+const IDN_HOST = `(?:www\\.)?(?:[а-яё\\d][а-яё\\d-]*\\.)+(?:${IDN_TLD_PATTERN})(?![\\p{L}\\d-])`;
+// A label xn-- is punycode (xn--80aswg.xn--p1ai, www.xn--80aswg.xn--p1ai), including when the last label is an ASCII TLD.
+const PUNY_HOST = `(?:www\\.)?(?=[a-z0-9.-]*xn--)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?:xn--[a-z0-9-]+|${TLD_PATTERN})(?![\\p{L}\\d-])`;
+const PATH_TAIL = "(?:\\/[^\\s«»\"()<>]*)?";
 const OUTGOING_ADDRESS_PATTERNS = [
   { name: "e-mail", re: /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)*\.\p{L}{2,}/gu, always: true },
   { name: "ссылка mailto:/tel:", re: /\b(?:mailto|tel|sms|tg|whatsapp|viber|skype):[^\s«»"]*/giu, always: true },
   { name: "адрес сайта", re: /(?:https?:)?\/\/[^\s«»"()<>]+/giu },
-  { name: "адрес сайта", re: new RegExp(`(?<![\\p{L}\\d@._/-])(?:www\\.)?(?:[a-z\\d][a-z\\d-]*\\.)+(?:${TLD_PATTERN})(?![\\p{L}\\d-])(?:\\/[^\\s«»"()<>]*)?`, "giu") },
-  { name: "адрес сайта", re: /(?<![\p{L}\d@._/-])(?:[а-яё\d][а-яё\d-]*\.)+рф(?![\p{L}\d-])(?:\/[^\s«»"()<>]*)?/giu },
+  { name: "адрес сайта", re: new RegExp(`${HOST_BOUNDARY}${ASCII_HOST}${PATH_TAIL}`, "giu") },
+  { name: "адрес сайта", re: new RegExp(`${HOST_BOUNDARY}${IDN_HOST}${PATH_TAIL}`, "giu") },
+  { name: "адрес сайта", re: new RegExp(`${HOST_BOUNDARY}${PUNY_HOST}${PATH_TAIL}`, "giu") },
+];
+// Inside a path, query or fragment the token may follow /, ?, # or =. The plain-text lookbehind hides those.
+const NESTED_HOST_SOURCES = [
+  `(?:^|[^\\p{L}\\d@._-])${ASCII_HOST}`,
+  `(?:^|[^\\p{L}\\d@._-])${IDN_HOST}`,
+  `(?:^|[^\\p{L}\\d@._-])${PUNY_HOST}`,
 ];
 
 function addressHost(raw) {
@@ -84,40 +101,79 @@ function technologyMention(raw) {
   return TECHNOLOGY_NAMES.has(trimmed.toLowerCase());
 }
 
-function pathQueryHash(raw) {
+/** Path, query and fragment of the original string. `new URL` would percent-encode «сайт.рф» before the scan. */
+function rawAddressTail(raw) {
   const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
-  let url = trimmed;
-  if (trimmed.startsWith("//")) url = `https:${trimmed}`;
-  else if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) url = `https://${trimmed}`;
-  try {
-    const parsed = new URL(url);
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return "";
-  }
+  const withScheme = trimmed.match(/^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#\s]+)([\s\S]*)$/i);
+  if (withScheme) return withScheme[2] ?? "";
+  const bare = trimmed.match(/^[^\s/?#]+([/?#][\s\S]*)$/u);
+  return bare?.[1] ?? "";
 }
 
-/** True when path, query or hash hides another site, a bare domain or an e-mail. */
-function tailHasDisallowedAddress(raw, seen) {
-  const tail = pathQueryHash(raw);
-  if (!tail || tail === "/") return false;
-  for (const pattern of OUTGOING_ADDRESS_PATTERNS) {
-    const re = new RegExp(pattern.re.source, pattern.re.flags);
-    for (const match of tail.matchAll(re)) {
-      const nested = match[0].replace(/[.,;:!?…]+$/u, "");
-      if (pattern.always || addressDisallowed(nested, seen)) return true;
+/**
+ * The original tail, then the same text with percent-escapes turned into separators,
+ * then up to two decodeURIComponent passes (evil%252Ecom → evil%2Ecom → evil.com).
+ * Separators stop %2F from gluing into a fake label (2Fevil.com / 2Faudiolad.ru).
+ */
+function tailScanTexts(tail) {
+  const texts = [];
+  const add = (value) => {
+    // %HH is not a host character. Replacing it before the scan keeps «сайт.рф» and «evil.com»
+    // and stops «%2Fevil.com» from being read as the fake label 2fevil.com.
+    const separated = value.replace(/%[0-9a-f]{2}/gi, "/");
+    if (!texts.includes(separated)) texts.push(separated);
+  };
+  let current = String(tail ?? "");
+  add(current);
+  for (let pass = 0; pass < 2; pass += 1) {
+    if (!/%[0-9a-f]{2}/i.test(current)) break;
+    try {
+      const next = decodeURIComponent(current);
+      if (next === current) break;
+      current = next;
+      add(current);
+    } catch {
+      break;
     }
   }
-  // A slash hides a domain from the plain-text lookbehind (/path/evil.com, #evil.com).
-  const nestedDomain = new RegExp(`(?:^|[^\\p{L}\\d@._-])(?:www\\.)?(?:[a-z\\d][a-z\\d-]*\\.)+(?:${TLD_PATTERN})(?![\\p{L}\\d-])`, "giu");
-  const nestedRf = /(?:^|[^\p{L}\d@._-])(?:[а-яё\d][а-яё\d-]*\.)+рф(?![\p{L}\d-])/giu;
-  for (const re of [nestedDomain, nestedRf]) {
-    for (const match of tail.matchAll(re)) {
-      const nested = match[0].replace(/^[^a-zа-яё\d]+/iu, "").replace(/[.,;:!?…]+$/u, "");
-      if (nested && addressDisallowed(nested, seen)) return true;
+  return texts;
+}
+
+/** A host token inside a tail. Technology names are not exempt here: asp.net in a path is still a domain. */
+function nestedHostDisallowed(raw, seen) {
+  const key = String(raw ?? "");
+  if (seen.has(key)) return true;
+  const next = new Set(seen);
+  next.add(key);
+  const host = addressHost(key);
+  if (!host || !hostAllowed(host)) return true;
+  return tailHasDisallowedAddress(key, next);
+}
+
+function textHasDisallowedTail(text, seen) {
+  for (const pattern of OUTGOING_ADDRESS_PATTERNS) {
+    const re = new RegExp(pattern.re.source, pattern.re.flags);
+    for (const match of text.matchAll(re)) {
+      const nested = match[0].replace(/^[^\p{L}\d]+/u, "").replace(/[.,;:!?…]+$/u, "");
+      if (!nested) continue;
+      if (pattern.always || nestedHostDisallowed(nested, seen)) return true;
+    }
+  }
+  for (const source of NESTED_HOST_SOURCES) {
+    const re = new RegExp(source, "giu");
+    for (const match of text.matchAll(re)) {
+      const nested = match[0].replace(/^[^\p{L}\d]+/u, "").replace(/[.,;:!?…]+$/u, "");
+      if (nested && nestedHostDisallowed(nested, seen)) return true;
     }
   }
   return false;
+}
+
+/** True when the raw path, query or fragment hides another site, a bare domain or an e-mail. */
+function tailHasDisallowedAddress(raw, seen) {
+  const tail = rawAddressTail(raw);
+  if (!tail || tail === "/") return false;
+  return tailScanTexts(tail).some((text) => textHasDisallowedTail(text, seen));
 }
 
 function addressDisallowed(raw, seen = new Set()) {
@@ -133,8 +189,10 @@ function addressDisallowed(raw, seen = new Set()) {
 
 /**
  * http(s) and protocol-relative addresses of audiolad.ru and sergey-zoya.ru,
- * including www and other subdomains. A nested address in the path or query
- * (https://audiolad.ru/?next=https://evil.com, ?u=evil.com) is not allowed.
+ * including www and other subdomains. The raw path, query and fragment, and the
+ * same text percent-decoded up to twice, may not hide another host
+ * (https://audiolad.ru/сайт.рф, ?u=сайт.рф, #сайт.рф, /path/evil%2Ecom).
+ * audiolad.ru and sergey-zoya.ru inside that tail stay allowed.
  */
 export function allowedSiteAddress(value) {
   if (technologyMention(value)) return false;
@@ -142,10 +200,11 @@ export function allowedSiteAddress(value) {
 }
 
 /**
- * Bare domains (example.com/candle, t.me/x, www.example.com), //host, http(s)://,
- * mailto:/tel: and e-mails. audiolad.ru and sergey-zoya.ru, with www and subdomains, are allowed.
- * E-mail is never allowed. «т.е.», «т.д.», initials, decimals, Node.js / Vue.js / Next.js,
- * ASP.NET and file names such as photo.jpg do not match.
+ * Bare domains (example.com/candle, t.me/x, www.example.com, сайт.рф, www.сайт.рф,
+ * пример.москва, xn--80aswg.xn--p1ai), //host, http(s)://, mailto:/tel: and e-mails.
+ * audiolad.ru and sergey-zoya.ru, with www and subdomains, are allowed.
+ * E-mail is never allowed. «т.е.», «т.д.», initials, decimals, «в конце.Далее»,
+ * Node.js / Vue.js / Next.js, ASP.NET and file names such as photo.jpg do not match.
  */
 export function outgoingAddressProblems(text) {
   const problems = [];
