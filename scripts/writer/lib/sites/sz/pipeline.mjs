@@ -172,6 +172,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
     const env = { published: view.published, unique: ctx.unique, referenceGallery: ctx.referenceGallery, portraitExists: (src) => existsSync(join(worktree, "public", src)), discomfort: BASE_DISCOMFORT };
     const schema = szArticleSchema();
     const items = [];
+    const callIds = new Set();
     for (const brief of pack.articles) {
       const cfg = ruleConfig(brief, date, pool);
       const avoid = [
@@ -197,7 +198,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
       const repaired = repair.mode === "tiered"
-        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args })
+        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds })
         : repairSzArticle({ brief, raw, build, messages, schema, repair, callRepair, state, args });
       const { result, errors, errorsBeforeRepair, repairSkipped } = repaired;
       writeJson(join(outDir, brief.slug, "fields.json"), result.fields);
@@ -214,7 +215,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
     let packProblems = checkSzPack(items);
     if (repair.mode === "tiered" && packProblems.length) {
       for (const item of items) item.packProblems = packProblems;
-      repairSzPackDuplicates({ items, repair, callTier, state, args });
+      repairSzPackDuplicates({ items, repair, callTier, state, args, callIds });
       for (const item of items) {
         const rebuilt = item.build(item.fields);
         item.fields = rebuilt.fields;

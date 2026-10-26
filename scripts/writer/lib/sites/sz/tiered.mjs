@@ -279,89 +279,41 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
   }
   const contextual = (links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug));
   if (contextual.length) {
-    let present = markdownSlugs(next);
+    const present = markdownSlugs(next);
+    const seen = new Set(present);
+    const missing = contextual.filter((slug) => !seen.has(slug));
     const [minLinks, maxLinks] = limits.contextualLinks;
-    const pool = [...contextual.filter((slug) => !present.includes(slug)), ...contextual];
-    let guardLinks = 0;
-    while (present.length < minLinks && present.length < maxLinks && guardLinks < pool.length) {
-      const slug = pool[guardLinks];
-      guardLinks += 1;
+    for (const slug of missing) {
+      if (present.length >= minLinks || present.length >= maxLinks) break;
       if (!appendSentence(next, `Подробнее: [материал](/s/${slug}).`)) break;
-      present = markdownSlugs(next);
+      present.push(slug);
       fixes.push(`добавлена внутренняя ссылка /s/${slug}`);
     }
   }
   return { fields: next, fixes };
 }
 
-function bodyQueryCount(md, query) {
-  const body = String(md).match(/^---\r?\n[\s\S]*?\r?\n---\r?\n([\s\S]*)$/)?.[1] ?? "";
+function queryHits(text, query) {
   const nq = normalize(query);
   if (!nq) return 0;
-  return normalize(body).split(nq).length - 1;
+  return normalize(text).split(nq).length - 1;
 }
 
-/** Free one body occurrence when the article is already at the query maximum. */
-function releaseOneQuery(fields, query) {
-  const re = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu");
-  const skip = new Set(["transition", "description", "seoTitle", "faq", "faqHeading"]);
-  let done = false;
-  const walk = (value, key) => {
-    if (done || value == null || skip.has(key)) return value;
-    if (typeof value === "string") {
-      if (!re.test(value)) return value;
-      done = true;
-      return value.replace(re, "этот образ");
-    }
-    if (Array.isArray(value)) return value.map((item) => walk(item, key));
-    if (typeof value === "object") return Object.fromEntries(Object.entries(value).map(([child, item]) => [child, walk(item, child)]));
-    return value;
-  };
-  const released = walk(fields, "");
-  if (!done) return false;
-  for (const key of Object.keys(fields)) fields[key] = released[key];
-  return true;
+function bodyQueryCount(md, query) {
+  const body = String(md).match(/^---\r?\n[\s\S]*?\r?\n---\r?\n([\s\S]*)$/)?.[1] ?? "";
+  return queryHits(body, query);
 }
 
-/** Put the exact query into the transition without pushing the article over the query maximum or 400 words. */
-function plantTransitionQuery(fields, md, query) {
-  if (!query || typeof fields.transition !== "string") return false;
-  if (normalize(fields.transition).includes(normalize(query))) return false;
-  const sentence = `Дальше речь пойдёт о ${query}.`;
-  const combined = `${fields.transition.trim()} ${sentence}`.trim();
-  if (combined.includes(`«${query}»`) || storyWordCount(fields, combined) > SZ.limits.story[1]) return false;
-  if (bodyQueryCount(md, query) >= SZ.limits.mainQuery[1] && !releaseOneQuery(fields, query)) return false;
-  fields.transition = combined;
-  return true;
-}
-
-/**
- * Query-count uses the assembled article, including the psychology H2.
- * Insert only the missing occurrences from that count, and stop at the maximum.
- */
-export function applyCountedSzFixes(fields, failures, brief) {
-  const fixes = [];
-  const next = structuredClone(fields);
-  const row = (failures ?? []).find((failure) => failure.code === "query-count" && Number.isFinite(failure.actual) && Number.isFinite(failure.min) && failure.actual < failure.min);
-  const query = brief?.query ?? "";
-  if (!row || !query) return { fields: next, fixes };
-  const max = Number.isFinite(row.max) ? row.max : SZ.limits.mainQuery[1];
-  let need = Math.min(row.min - row.actual, max - row.actual);
-  const lines = [
+/** Nominative bolted onto a preposition. The gate accepts the exact query and still misses the grammar. */
+function boltedQuerySentence(text, query) {
+  if (!query || typeof text !== "string") return false;
+  const plants = [
+    `Дальше речь пойдёт о ${query}.`,
     `Дальше речь идёт о ${query}.`,
     `Ниже ещё сказано про ${query}.`,
     `Тема ${query} остаётся в этом разделе.`,
   ];
-  let added = 0;
-  while (need > 0 && added < lines.length) {
-    const sentence = lines[added];
-    if (sentence.includes("«") || sentence.includes("»") || sentence.includes(`«${query}»`)) break;
-    if (!appendSentence(next, sentence)) break;
-    need -= 1;
-    added += 1;
-  }
-  if (added) fixes.push("добавлены вхождения запроса без кавычек");
-  return { fields: next, fixes };
+  return plants.some((plant) => text.includes(plant));
 }
 
 function findString(value, pattern, path = "") {
@@ -520,18 +472,30 @@ export function buildSzFragment(brief, fields, failure) {
     const transition = fields.transition ?? "";
     const storyWords = storyWordCount(fields) - words(transition);
     const room = limits.story[1] - storyWords;
-    return fragment(brief, "transition-query:transition", [
-      `Последний абзац истории должен содержать запрос «${brief.query}» именно в этой форме, без кавычек вокруг запроса.`,
+    const [minQuery, maxQuery] = limits.mainQuery;
+    const count = Number.isFinite(failure.queryCount) ? failure.queryCount : null;
+    const lines = [
+      `Последний абзац истории должен содержать запрос «${brief.query}» дословно, в этой форме, без кавычек вокруг запроса.`,
+      "Согласуй падеж вокруг запроса. Не приставляй именительный падеж к предлогу и не дописывай шаблонное предложение.",
       `Вместе с историей переход должен уложиться в ${limits.story[0]}–${limits.story[1]} слов. На сам переход остаётся около ${Math.max(room, 12)} слов.`,
-      "Верни JSON { transition } – только этот абзац.",
-      "",
-      transition,
-    ].join("\n"), objectSchema({ transition: stringSchema }), (current, answer) => {
+    ];
+    if (count != null && count >= maxQuery) {
+      lines.push(`В тексте запрос уже встречается ${count} раз, диапазон ${minQuery}–${maxQuery}. Перепиши только этот абзац так, чтобы суммарное число вхождений осталось в диапазоне ${minQuery}–${maxQuery}.`);
+    } else if (count != null) {
+      lines.push(`Сейчас в тексте ${count} вхождений, нужно ${minQuery}–${maxQuery}. Суммарное число не должно стать больше ${maxQuery}.`);
+    }
+    lines.push("Верни JSON { transition } – только этот абзац.", "", transition);
+    return fragment(brief, "transition-query:transition", lines.join("\n"), objectSchema({ transition: stringSchema }), (current, answer) => {
       const text = answer?.transition;
       if (typeof text !== "string" || fieldProseDefect(text, "transition") || danglingFragment(text)) return null;
       if (!normalize(text).includes(normalize(brief.query)) || text.includes(`«${brief.query}»`)) return null;
+      if (boltedQuerySentence(text, brief.query)) return null;
       const total = storyWordCount(current, text);
       if (total < limits.story[0] || total > limits.story[1]) return null;
+      if (count != null) {
+        const nextCount = count - queryHits(transition, brief.query) + queryHits(text, brief.query);
+        if (nextCount > maxQuery) return null;
+      }
       return { ...current, transition: text };
     });
   }
@@ -597,7 +561,7 @@ export function buildSzFragment(brief, fields, failure) {
   if (failure.code === "links-contextual" && (failure.actual ?? 0) < (failure.min ?? limits.contextualLinks[0])) {
     const have = new Set(markdownSlugs(fields));
     const missing = (brief.links?.contextual ?? []).filter((slug) => /^[a-z0-9-]+$/.test(slug) && !have.has(slug));
-    const slug = missing[0] ?? brief.links?.contextual?.find((item) => /^[a-z0-9-]+$/.test(item));
+    const slug = missing[0];
     if (!slug) return null;
     return fragment(brief, "links-contextual:sections", [
       `В тексте ${failure.actual ?? "меньше"} внутренних ссылок, нужно ${failure.min ?? limits.contextualLinks[0]}–${failure.max ?? limits.contextualLinks[1]}.`,
@@ -620,11 +584,15 @@ export function buildSzFragment(brief, fields, failure) {
     if ((failure.actual ?? 0) >= max) return null;
     return fragment(brief, "query-count:sections", [
       `Запрос «${brief.query}» встречается в тексте ${failure.actual ?? "меньше нужного"} раз. Нужно ${failure.min ?? limits.mainQuery[0]}–${max}.`,
-      "Верни JSON { sentence }: одно предложение, где запрос стоит в точной форме и без кавычек вокруг него.",
+      "Верни JSON { sentence }: одно грамматичное предложение, где запрос стоит в точной форме и без кавычек вокруг него.",
+      `Не приставляй именительный падеж к предлогу. После добавления вхождений должно остаться не больше ${max}.`,
     ].join("\n"), objectSchema({ sentence: stringSchema }), (current, answer) => {
       const text = answer?.sentence;
       if (typeof text !== "string" || fieldProseDefect(text, "paragraph") || danglingFragment(text)) return null;
       if (!normalize(text).includes(normalize(brief.query)) || text.includes(`«${brief.query}»`)) return null;
+      if (boltedQuerySentence(text, brief.query)) return null;
+      const hits = queryHits(text, brief.query);
+      if ((failure.actual ?? 0) + hits > max) return null;
       const copy = structuredClone(current);
       if (!appendSentence(copy, text)) return null;
       return copy;
@@ -743,23 +711,11 @@ function acceptFragment(fragmentJob, fields, first, second) {
  * tries and one strong try. callTier(tier, name, messages, schema, { maxTokens }) performs the model call.
  * A truncated cheap call is retried once with a larger cap and still counts as one try.
  */
-export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {} }) {
+export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set() }) {
   const errorsOf = (result) => result.problems.filter((problem) => problem.severity === "error");
   const settle = (value) => {
     const deterministic = applyDeterministicSzFixes(value, { query: brief.query, links: brief.links });
-    let next = deterministic.fields;
-    let built = build(next);
-    const fixes = [...deterministic.fixes];
-    if (plantTransitionQuery(next, built.md, brief.query)) {
-      fixes.push("в переход добавлена точная форма запроса");
-      built = build(next);
-    }
-    const counted = applyCountedSzFixes(next, errorsOf(built), brief);
-    if (counted.fixes.length) {
-      next = counted.fields;
-      built = build(next);
-    }
-    return { fields: next, result: built, fixes: [...fixes, ...counted.fixes] };
+    return { fields: deterministic.fields, result: build(deterministic.fields), fixes: deterministic.fixes };
   };
   const errorsBeforeRepair = errorsOf(build(raw));
   const settled = settle(raw);
@@ -769,13 +725,13 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const attempts = [];
   const cheapTries = new Map();
   const strongTries = new Map();
-  const callIds = new Set();
   const allowModel = !args.offline && !args["no-repair"];
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
     const { failures } = szQuantityReport(fields, errorsOf(result));
     const failure = pickFailure(failures, cheapTries, strongTries, repair.cheapTries);
     if (!failure) break;
+    failure.queryCount = bodyQueryCount(result.md, brief.query);
     const key = failureKey(failure);
     const fragmentJob = buildSzFragment(brief, fields, failure);
     if (!fragmentJob) {
@@ -868,10 +824,9 @@ function cheapSpent(items, state, slug = null) {
   return Math.max(chargedCheap(state?.calls, slug), recordedCheap(items, slug));
 }
 
-export function repairSzPackDuplicates({ items, repair, callTier, state, args = {} }) {
+export function repairSzPackDuplicates({ items, repair, callTier, state, args = {}, callIds = new Set() }) {
   if (args.offline || args["no-repair"]) return;
   const seen = new Set();
-  const callIds = new Set();
   const packCap = repair.cheapBudget * Math.max(items.length, 1);
   for (const item of items) {
     const problems = item.packProblems ?? [];

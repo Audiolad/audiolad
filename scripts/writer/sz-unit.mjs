@@ -23,7 +23,7 @@ import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
 import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
-import { applyCountedSzFixes, applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentTruncated, latinizeSlug, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
+import { applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentTruncated, latinizeSlug, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -1408,23 +1408,88 @@ test("tiered: repair output with a banned phrase or a brief ban is not accepted"
   assert.equal(repaired.passed, true, repaired.repairSkipped);
 });
 
-test("tiered: a transition without the exact query is fixed without a model call", () => {
+const fieldStrings = (value, path = "", out = []) => {
+  if (typeof value === "string") out.push([path, value]);
+  else if (Array.isArray(value)) value.forEach((item, index) => fieldStrings(item, `${path}[${index}]`, out));
+  else if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) fieldStrings(item, path ? `${path}.${key}` : key, out);
+  }
+  return out;
+};
+
+test("tiered: a transition without the exact query is a fragment, and the church sentence stays", () => {
   const raw = structuredClone(fields);
+  const church = raw.sectionsBefore[0].paragraphs[0];
+  assert.match(church, /Ангел-хранитель даётся человеку при Крещении/);
   raw.transition = raw.transition.replace(/ангел-хранитель/giu, "этом образе");
-  assert.ok(errorsOf(hybridBuild(raw).problems).some((problem) => problem.code === "transition-query"));
-  let calls = 0;
+  const before = fieldStrings(raw);
+  const deterministic = applyDeterministicSzFixes(raw, { query: brief.query, links: brief.links });
+  assert.deepEqual(fieldStrings(deterministic.fields), before);
+  const template = `Дальше речь пойдёт о ${brief.query}.`;
+  const planted = `${raw.transition.trim()} ${template}`;
+  const plantedWords = words([...raw.story, planted].join(" "));
+  assert.ok(plantedWords >= SZ.limits.story[0] && plantedWords <= SZ.limits.story[1], plantedWords);
+  const seen = [];
   const repaired = repairSzArticleTiered({
-    brief, raw, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
-    callTier: () => { calls += 1; return {}; },
+    brief, raw, build: hybridBuild, repair: tierRepair({ cheapTries: 2, maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      const text = messages.map((message) => message.content).join("\n");
+      seen.push({ tier, text });
+      assert.ok(text.includes(raw.transition.slice(0, 40)));
+      assert.ok(!text.includes(church.slice(0, 40)));
+      assert.ok(!text.includes(fields.sectionsBefore[0].title));
+      return seen.length === 1 ? { transition: planted } : { transition: fields.transition };
+    },
   });
-  assert.equal(calls, 0);
-  assert.ok(normalize(repaired.result.fields.transition).includes(normalize(brief.query)));
-  assert.ok(!repaired.result.fields.transition.includes(`«${brief.query}»`));
+  assert.equal(seen.length, 2);
+  assert.ok(seen[0].text.includes("дословно"));
+  assert.equal(repaired.result.fields.transition, fields.transition);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], church);
+  assert.ok(!repaired.result.md.includes(template));
+  assert.ok(!repaired.result.fields.transition.includes("этом образе"));
+  const after = new Map(fieldStrings(repaired.result.fields));
+  for (const [path, text] of before) {
+    if (path === "transition") continue;
+    assert.equal(after.get(path), text, path);
+  }
   assert.equal(repaired.passed, true, repaired.repairSkipped);
 });
 
-test("tiered: a search phrase that appears once is raised into range without guillemets", () => {
+test("tiered: a transition at the query maximum is not bought by rewriting another sentence", () => {
   const raw = structuredClone(fields);
+  const church = raw.sectionsBefore[0].paragraphs[0];
+  raw.transition = raw.transition.replace(/ангел-хранитель/giu, "этом образе");
+  raw.sectionsBefore[0].paragraphs[1] = `${raw.sectionsBefore[0].paragraphs[1]} Здесь назван ангел-хранитель. И ещё раз назван ангел-хранитель.`;
+  const problems = errorsOf(hybridBuild(raw).problems);
+  assert.ok(problems.some((problem) => problem.code === "transition-query"));
+  const counted = szQuantityReport(raw, problems).failures.find((row) => row.code === "query-count");
+  assert.equal(counted, undefined);
+  const template = `Дальше речь пойдёт о ${brief.query}.`;
+  const seen = [];
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ cheapTries: 1, strongBudget: 30, maxRounds: 4 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      const text = messages.map((message) => message.content).join("\n");
+      seen.push({ tier, text });
+      assert.match(text, /осталось в диапазоне 2–4/);
+      assert.ok(!text.includes(church.slice(0, 40)));
+      return seen.length === 1 ? { transition: template } : { transition: fields.transition };
+    },
+  });
+  assert.ok(seen.some((call) => call.tier === "cheap"));
+  assert.ok(seen.some((call) => call.tier === "strong"));
+  assert.equal(repaired.result.fields.transition, raw.transition);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], church);
+  assert.ok(!repaired.result.md.includes(template));
+  assert.ok(!repaired.result.md.includes("этот образ даётся"));
+  assert.equal(repaired.passed, false);
+});
+
+test("tiered: a search phrase below the range is raised by one grammatical sentence", () => {
+  const raw = structuredClone(fields);
+  const church = raw.sectionsBefore[0].paragraphs[0];
   const skip = new Set(["description", "seoTitle"]);
   const replaceQuery = (value, key) => {
     if (skip.has(key)) return value;
@@ -1436,20 +1501,33 @@ test("tiered: a search phrase that appears once is raised into range without gui
   const stripped = replaceQuery(raw, "");
   const before = szQuantityReport(stripped, errorsOf(hybridBuild(stripped).problems)).failures.find((row) => row.code === "query-count");
   assert.equal(before.actual, 1, before?.message);
-  let calls = 0;
+  const sentence = "В этом разделе слово ангел-хранитель стоит в точной форме и без кавычек вокруг него.";
+  const template = `Дальше речь пойдёт о ${brief.query}.`;
+  const seen = [];
   const repaired = repairSzArticleTiered({
-    brief, raw: stripped, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
-    callTier: () => { calls += 1; return {}; },
+    brief, raw: stripped, build: hybridBuild, repair: tierRepair({ maxRounds: 6 }),
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: (tier, name, messages) => {
+      const text = messages.map((message) => message.content).join("\n");
+      seen.push(text);
+      if (text.includes("Верни JSON { transition }")) return seen.filter((item) => item.includes("Верни JSON { transition }")).length === 1 ? { transition: template } : { transition: fields.transition };
+      if (text.includes("Верни JSON { sentence }")) return { sentence: template };
+      return {};
+    },
   });
-  assert.equal(calls, 0, repaired.repairSkipped);
+  assert.ok(seen.some((text) => text.includes("Верни JSON { transition }")));
+  assert.equal(repaired.result.fields.transition, fields.transition);
+  assert.equal(repaired.result.fields.sectionsBefore[0].paragraphs[0], stripped.sectionsBefore[0].paragraphs[0]);
+  assert.ok(!repaired.result.md.includes(template));
+  assert.ok(!repaired.result.fields.sectionsBefore[0].paragraphs[0].includes("Ангел-хранитель"));
+  assert.notEqual(stripped.sectionsBefore[0].paragraphs[0], church);
   const after = szQuantityReport(repaired.result.fields, errorsOf(repaired.result.problems)).failures.find((row) => row.code === "query-count");
   assert.equal(after, undefined);
   assert.ok(!JSON.stringify(repaired.result.fields).includes(`«${brief.query}»`));
   assert.equal(repaired.passed, true, repaired.repairSkipped);
-  const counted = applyCountedSzFixes(structuredClone(fields), [{ code: "query-count", actual: 1, min: 2, max: 4, message: "запрос «ангел-хранитель» в тексте 1 раз, нужно 2–4" }], brief);
-  const added = JSON.stringify(counted.fields).includes(`о ${brief.query}.`) || JSON.stringify(counted.fields).includes(`про ${brief.query}.`);
-  assert.equal(added, true);
-  assert.ok(!JSON.stringify(counted.fields).includes(`«${brief.query}»`));
+  const low = buildSzFragment(brief, stripped, { code: "query-count", field: "sections", message: "запрос «ангел-хранитель» в тексте 1 раз, нужно 2–4", actual: 1, min: 2, max: 4 });
+  assert.equal(low.apply(stripped, { sentence: template }), null);
+  assert.ok(low.apply(stripped, { sentence }));
 });
 
 test("tiered: a two-word expert thesis is rewritten as a fragment, and a short story is appended", () => {
@@ -1518,6 +1596,87 @@ test("tiered: missing internal links and a half-Cyrillic slug are fixed from the
   assert.ok(slugged.result.md.includes("](/s/ezoterika-i-tserkov)"));
   assert.ok(!slugged.result.md.includes(broken));
   assert.equal(slugged.passed, true, slugged.repairSkipped);
+  const slugBefore = fieldStrings(mixed);
+  const slugFixed = applyDeterministicSzFixes(mixed, { query: brief.query, links: brief.links });
+  const slugAfter = new Map(fieldStrings(slugFixed.fields));
+  for (const [path, text] of slugBefore) {
+    if (path === "sectionsBefore[1].paragraphs[4]") {
+      assert.ok(slugAfter.get(path).includes("](/s/ezoterika-i-tserkov)"));
+      assert.ok(!slugAfter.get(path).includes(broken));
+    } else {
+      assert.equal(slugAfter.get(path), text, path);
+    }
+  }
+});
+
+test("tiered: one contextual slug is inserted once", () => {
+  const stripLinks = (value) => {
+    if (typeof value === "string") return value.replace(/\[[^\]]+\]\(\/s\/[^)]+\)/g, "материал");
+    if (Array.isArray(value)) return value.map(stripLinks);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, stripLinks(item)]));
+    return value;
+  };
+  const raw = stripLinks(structuredClone(fields));
+  const oneBrief = { ...brief, links: { ...brief.links, contextual: ["ezoterika-i-tserkov"] } };
+  const before = fieldStrings(raw);
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief: oneBrief, raw, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => {
+      calls += 1;
+      return { sentence: "Подробнее: [материал](/s/ezoterika-i-tserkov)." };
+    },
+  });
+  assert.equal(calls, 0);
+  const hrefs = [...repaired.result.md.matchAll(/\]\(\/s\/ezoterika-i-tserkov\)/g)];
+  assert.equal(hrefs.length, 1);
+  const after = new Map(fieldStrings(repaired.result.fields));
+  const changed = before.filter(([path, text]) => after.get(path) !== text).map(([path]) => path);
+  assert.deepEqual(changed, ["sectionsBefore[0].paragraphs[0]"]);
+  assert.ok(after.get("sectionsBefore[0].paragraphs[0]").startsWith(raw.sectionsBefore[0].paragraphs[0]));
+  const job = buildSzFragment(oneBrief, repaired.result.fields, { code: "links-contextual", field: "sections", message: "1 ссылок /s в тексте, нужно 2–5", actual: 1, min: 2, max: 5 });
+  assert.equal(job, null);
+});
+
+test("tiered: article repair and pack repair share one used set", () => {
+  const callIds = new Set();
+  const names = [];
+  const raw = structuredClone(fields);
+  raw.transition = raw.transition.replace(/ангел-хранитель/giu, "этом образе");
+  repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ cheapTries: 1, strongBudget: 0.01, maxRounds: 2 }),
+    state: { spentRub: 0, calls: [], warnings: [] }, callIds,
+    callTier: (tier, name) => {
+      names.push(name);
+      assert.equal(isWriterId(name), true, name);
+      return { transition: fields.transition };
+    },
+  });
+  assert.ok(names.length >= 1);
+  assert.ok([...callIds].includes(names[0]));
+  const bare = tieredRepairCallName({
+    slug: brief.slug, tier: "cheap", attempt: "pack-0", fragmentKey: "unique-pack:faq[0].question", used: new Set(),
+  });
+  callIds.add(bare);
+  const packItem = {
+    brief,
+    fields: structuredClone(fields),
+    build: hybridBuild,
+    packProblems: [{ code: "unique-pack", field: "faq", slug: brief.slug, message: `«${fields.faq[0].question}» повторяет статью пакета other`, severity: "error" }],
+    attempts: [],
+  };
+  repairSzPackDuplicates({
+    items: [packItem], repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] }, callIds,
+    callTier: (tier, name) => {
+      names.push(name);
+      assert.equal(tier, "cheap");
+      assert.equal(isWriterId(name), true, name);
+      assert.notEqual(name, bare);
+      return { question: "Чем домашняя молитва отличается от короткой паузы?" };
+    },
+  });
+  assert.equal(new Set(names).size, names.length);
+  assert.ok(names.every((name) => name.startsWith(`${brief.slug}-`) && name.includes("-repair-cheap-")));
 });
 
 test("tiered: a nine-word FAQ answer and a short total use fragment repair", () => {
