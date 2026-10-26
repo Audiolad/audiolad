@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { accessSync, constants, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -10,7 +10,7 @@ import { processApplicationEmailOutbox, type OutboundApplicationEmail } from "..
 import { brandEmailTemplateRenderer } from "../src/lib/email/templates/renderer";
 
 const read = (file: string) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-const migration = read("supabase/migrations/20270124120000_business_catalog_approved_email.sql");
+const migration = read("supabase/migrations/20270124130000_business_catalog_approved_email.sql");
 const foundation = read("supabase/migrations/20260717150000_email_foundation.sql");
 const mailings = read("supabase/migrations/20261219120000_admin_author_mailings.sql");
 const moderation = read("supabase/migrations/20270107120000_business_owner_self_moderation.sql");
@@ -80,17 +80,50 @@ SELECT 'D60213C5_SQL_OK';
 `;
 
 // Disposable single-user PostgreSQL only: no network, socket, production URL or Docker.
-const scratch = mkdtempSync(path.join(tmpdir(), "audiolad-business-email-"));
-const pgBin = process.env.AUDIOLAD_TEST_PG_BIN ?? "/usr/lib/postgresql/17/bin";
 const exec = promisify(execFile);
-await exec(path.join(pgBin, "initdb"), ["-D", scratch, "-A", "trust", "--no-locale", "--encoding=UTF8"]);
-const compactSql = [setup, migration, checks].map((block) => block.split("\n").filter((line) => !line.trimStart().startsWith("--")).join(" ")).join(" ");
-// A single-user backend consumes one command per line; preserve dollar-quoted bodies.
-const sql = compactSql.replace(/\$\$[\s\S]*?\$\$|'(?:''|[^'])*'|;/g, (token) => token === ";" ? ";\n" : token) + "\n";
-const sqlRun = exec(path.join(pgBin, "postgres"), ["--single", "-D", scratch, "postgres"]);
-sqlRun.child.stdin!.end(sql);
-const { stdout: output, stderr } = await sqlRun;
-assert.doesNotMatch(stderr, /ERROR:|FATAL:/);
+async function findPgBin(): Promise<string | undefined> {
+  const configured = process.env.AUDIOLAD_PG_BINDIR ?? process.env.AUDIOLAD_TEST_PG_BIN;
+  const candidates = configured ? [configured] : (process.env.PATH ?? "").split(path.delimiter);
+  if (!configured) {
+    try {
+      const { stdout } = await exec("pg_config", ["--bindir"]);
+      candidates.push(stdout.trim());
+    } catch {
+      // PostgreSQL development tools are optional locally.
+    }
+  }
+  return candidates.find((dir) => {
+    try {
+      for (const binary of ["initdb", "postgres"]) accessSync(path.join(dir, binary), constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+const pgBin = await findPgBin();
+if (!pgBin) {
+  const message = "Тест письма о допуске каталога: PostgreSQL недоступен. Укажите AUDIOLAD_PG_BINDIR с initdb и postgres либо добавьте их в PATH.";
+  if (process.env.CI) throw new Error(message);
+  console.log(`ПРОПУСК: ${message}`);
+  process.exit(0);
+}
+const scratch = mkdtempSync(path.join(tmpdir(), "audiolad-business-email-"));
+const output = await (async () => {
+  try {
+    await exec(path.join(pgBin, "initdb"), ["-D", scratch, "-A", "trust", "--no-locale", "--encoding=UTF8"]);
+    const compactSql = [setup, migration, checks].map((block) => block.split("\n").filter((line) => !line.trimStart().startsWith("--")).join(" ")).join(" ");
+    // A single-user backend consumes one command per line; preserve dollar-quoted bodies.
+    const sql = compactSql.replace(/\$\$[\s\S]*?\$\$|'(?:''|[^'])*'|;/g, (token) => token === ";" ? ";\n" : token) + "\n";
+    const sqlRun = exec(path.join(pgBin, "postgres"), ["--single", "-D", scratch, "postgres"]);
+    sqlRun.child.stdin!.end(sql);
+    const { stdout, stderr } = await sqlRun;
+    assert.doesNotMatch(stderr, /ERROR:|FATAL:/);
+    return stdout;
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+})();
 assert.match(output, /D60213C5_SQL_OK/);
 const serialized = output.match(/D60213C5_ROW:(\{.*\})/)?.[1];
 assert.ok(serialized, "actual SQL queue row exported");
@@ -150,4 +183,4 @@ for (const throws of [false, true]) {
 }
 const invalidVersion = await brandEmailTemplateRenderer.render({ templateKey: dbRow.template_key, templateVersion: "unknown", payload: {} });
 assert.equal(invalidVersion.ok, false);
-console.log("Business approval email: PostgreSQL approval/rejection/rollback/dedup + exact branded email, concurrent workers, SMTP failure/exception and retry – OK");
+console.log("Письмо о допуске каталога: PostgreSQL, одобрение, отказ, откат, дедупликация, шаблон, параллельные обработчики и повтор после ошибки SMTP: ОК");
