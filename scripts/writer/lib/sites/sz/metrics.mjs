@@ -53,6 +53,10 @@ function quantityOf(message) {
   if (charsMax) return { actual: Number(charsMax[1]), min: null, max: Number(charsMax[2]), unit: "chars" };
   const counted = message.match(/(\d+) слов, нужно (\d+)–(\d+)/);
   if (counted) return { actual: Number(counted[1]), min: Number(counted[2]), max: Number(counted[3]), unit: "words" };
+  const times = message.match(/(\d+) раз, нужно (\d+)–(\d+)/);
+  if (times) return { actual: Number(times[1]), min: Number(times[2]), max: Number(times[3]), unit: "times" };
+  const linkCount = message.match(/(\d+) ссылок \/s в тексте, нужно (\d+)–(\d+)/);
+  if (linkCount) return { actual: Number(linkCount[1]), min: Number(linkCount[2]), max: Number(linkCount[3]), unit: "links" };
   return {};
 }
 

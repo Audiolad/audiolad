@@ -138,10 +138,11 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate });
 
   const callRepair = makeCaller({ model: repair.model, maxTokens: repair.maxTokens, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate });
-  const callTier = repair.mode === "tiered" ? ((tier, name, messages, schema) => {
+  const callTier = repair.mode === "tiered" ? ((tier, name, messages, schema, options = {}) => {
+    const configured = tier === "strong" ? repair.strongMaxTokens : repair.cheapMaxTokens;
     const caller = makeCaller({
       model: tier === "strong" ? repair.strongModel : repair.cheapModel,
-      maxTokens: tier === "strong" ? repair.strongMaxTokens : repair.cheapMaxTokens,
+      maxTokens: options.maxTokens ?? configured,
       maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_fragment", generate,
     });
     return caller(name, messages, schema);
