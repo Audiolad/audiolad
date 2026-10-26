@@ -50,7 +50,7 @@ function tags(list, source, version, limit) {
       confidence: unit(r.confidence), reason: "Оценка сходства не калибрована как вероятность.",
       // Сохраняется отдельно, никогда не копируется в confidence.
       value: { label: label.trim().slice(0, 120), score: finite(r.score ?? r.probability ?? r.weight ?? r.average),
-        segment_consistency: unit(r.segment_consistency), research_only: r.research_only === true },
+        segment_consistency: unit(r.segment_consistency), research_only: r.research_only === true, status: r.status },
     })];
   });
 }
@@ -109,18 +109,15 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
   const density = finite(local.onset_density);
   features.perceived_speed = fact(reliablePulse && density !== null ? (density < 0.8 ? "slow" : density < 2 ? "moderate" : "fast") : null,
     { source: "local:onset-density", model_version: LOCAL_VERSION, reason: "Плотность атак независимо от BPM; требуется слуховая калибровка." });
-  const v = record(n.vocal), scores = record(v.scores);
-  const primary = n.vocal_role ?? t.vocal_role ?? v.type;
+  // Preserve the existing diagnostic API; it is not a speech classification.
+  const scores = record(record(n.vocal).scores);
   const speech = finite(record(scores.spoken_word).average);
   const primaryScores = ["instrumental", "vocal", "mixed"].map(k => finite(record(scores[k]).average)).filter(x => x !== null);
-  const bestPrimary = primaryScores.length ? Math.max(...primaryScores) : null;
-  const speechWins = speech !== null && bestPrimary !== null && speech > bestPrimary + 0.02;
-  const speechTie = speech !== null && bestPrimary !== null && Math.abs(speech - bestPrimary) <= 0.02;
-  const vocal = speechWins ? "spoken" : speechTie && primary === "instrumental" ? null : primary;
-  features.speech = fact(speech === null ? null : { score: speech, primary_type: primary ?? null, speech_leads: speechWins, ambiguous: speechTie },
-    { ...model, source: "analyzer:vocal.scores.spoken_word", reason: "Zero-shot cosine; разрыв 0.02 – исследовательская эвристика, не проверенный детектор речи." });
-  features.vocal_role = fact(["instrumental", "vocal", "mixed", "spoken"].includes(vocal) ? vocal : null,
-    { ...model, source: v.type ? "analyzer:vocal.type+scores" : model.source, confidence: unit(n.vocal_confidence ?? t.vocal_confidence), reason: "Instrumental/vocal/mixed – исходный CLAP; speech – осторожная гипотеза по spoken_word. Отсутствие детектора не означает инструментал." });
+  const best = primaryScores.length ? Math.max(...primaryScores) : null;
+  features.speech = fact(speech === null ? null : { score: speech, primary_type: n.vocal_role ?? t.vocal_role ?? record(n.vocal).type ?? null,
+    speech_leads: best !== null && speech > best + 0.02, ambiguous: best !== null && Math.abs(speech - best) <= 0.02 },
+  { ...model, source: "analyzer:vocal.scores.spoken_word", reason: "Диагностика сходства CLAP; не детектор речи." });
+  features.vocal_role = conservativeVocal(n, version);
   for (const [key, list] of Object.entries({ genre: n.genres ?? n.genre_top, subgenre: n.styles ?? n.style_top, mood: n.moods ?? n.mood_top, instruments: n.instruments ?? n.instrument_top })) {
     const limit = key === "instruments" ? 10 : key === "mood" ? 5 : 3;
     const candidates = tags(list, `analyzer:normalized.${key}`, version, limit);
@@ -134,10 +131,40 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
     model_id: typeof record(n.analysis).embedding_model === "string" ? record(n.analysis).embedding_model : null, features };
 }
 
+/** CLAP averages are similarities, never probabilities. Fail closed on ties and
+ * missing alternatives. These initial gates need listening calibration.
+ * @param {Record<string, any>} n @param {string} version @returns {Feature}
+ */
+function conservativeVocal(n, version) {
+  const scores = record(record(n.vocal).scores);
+  const roles = ["instrumental", "vocal", "spoken_word", "mixed"];
+  const ranked = roles.map(role => ({ role, score: unit(record(scores[role]).average) }))
+    .filter(row => row.score !== null).sort((a, b) => b.score - a.score);
+  let value = null;
+  // A primary label alone (including mixed on a near tie) proves no voice.
+  if (ranked.length === roles.length) {
+    const [first, second] = ranked;
+    if (first.score >= 0.35 && first.score - second.score >= 0.08) {
+      if (first.role !== "mixed") value = first.role === "spoken_word" ? "spoken" : first.role;
+      // Mixed requires positive voice evidence as well as a stable mixed score.
+      else if (unit(record(scores.mixed).segment_consistency) >= 0.6
+        && record(scores.vocal).average >= 0.35
+        && record(scores.vocal).average - record(scores.instrumental).average >= 0.08) value = "mixed";
+    }
+  }
+  return fact(value, { source: "analyzer:vocal.scores:conservative-v2", model_version: version,
+    reason: "Гипотеза CLAP, не детектор голоса: нужны все 4 оценки, сходство ≥0.35 и отрыв ≥0.08. Для mixed дополнительно вокал ≥0.35, отрыв от инструментала ≥0.08 и согласованность mixed ≥0.6. Пороги не калиброваны слуховой проверкой; иначе не определено." });
+}
+
 /** @param {unknown} normalized @returns {FeatureSet|null} */
 export function readFeatures(normalized) {
   const data = record(record(normalized).analysis_features_v1);
-  return data.schema_version === FEATURE_VERSION && record(data.features).energy_0_100 ? /** @type {FeatureSet} */ (data) : null;
+  if (data.schema_version !== FEATURE_VERSION || !record(data.features).energy_0_100) return null;
+  const set = /** @type {FeatureSet} */ (data);
+  // Read-time projection also protects already saved runs, without rewriting ML JSON.
+  if (set.features.vocal_role?.status === "manual") return set;
+  return { ...set, features: { ...set.features,
+    vocal_role: conservativeVocal(record(normalized), set.features.vocal_role?.model_version ?? "unknown") } };
 }
 
 const NUMERIC = { energy_0_100: [0, 100], rhythm_salience: [0, 1], dynamic_spread_db: [0, 120], loudness_lufs: [-100, 10], true_peak_dbtp: [-150, 30], duration_s: [0, 86400] };

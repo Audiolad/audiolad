@@ -57,8 +57,8 @@ test("Половинный/двойной темп не превращается
 });
 
 test("Вокал и речь остаются разными прогнозами", () => {
-  assert.equal(buildFeatures({ vocal_role: "spoken", vocal_confidence: 0.8 }).features.vocal_role.value, "spoken");
-  assert.equal(buildFeatures({ vocal_role: "vocal" }).features.vocal_role.value, "vocal");
+  assert.equal(buildFeatures({ vocal_role: "spoken", vocal_confidence: 0.8 }).features.vocal_role.value, null);
+  assert.equal(buildFeatures({ vocal_role: "vocal" }).features.vocal_role.value, null);
   assert.equal(buildFeatures({ vocal_role: "instrumental" }).features.vocal_role.confidence, null);
   assert.equal(buildFeatures({ vocal_role: "garbage" }).features.vocal_role.value, null);
 });
@@ -232,4 +232,48 @@ test("DSP v2: gain-invariant percussion exceeds a sustained pad, including very 
   }
   for (const values of Object.values(scores)) assert.ok(Math.max(...values) - Math.min(...values) <= 3);
   assert.ok(Math.min(...scores.clicks) - Math.max(...scores.pad) >= 20);
+});
+
+// Synthetic regression inputs exercise the policy, not accuracy on real audio.
+test("Осторожный вокал: конкуренты, отрыв и положительные свидетельства mixed", () => {
+  const input = (instrumental, vocal, spoken_word, mixed, consistency = 0.9) => ({ vocal: { type: "mixed", scores:
+    Object.fromEntries(Object.entries({ instrumental, vocal, spoken_word, mixed }).map(([key, average]) =>
+      [key, { average, segment_consistency: consistency }])) } });
+  for (const [n, expected] of [
+    [input(0.15, 0.65, 0.1, 0.25), "vocal"],
+    [input(0.1, 0.2, 0.65, 0.3), "spoken"],
+    [input(0.65, 0.15, 0.1, 0.25), "instrumental"],
+    [input(0.30, 0.29, 0.12, 0.3079), null],
+    [input(0.05, 0.1, 0.04, 0.2), null],
+    [input(0.1, 0.4, 0.1, 0.6), "mixed"],
+    [input(0.1, 0.4, 0.1, 0.6, 0.3), null],
+    [input(0.1, 0.15, 0.1, 0.6), null],
+    [{ instruments: [{ label: "voice", score: 1 }], vocal: { type: "mixed" } }, null],
+    [{ vocal: { scores: { vocal: { average: 0.99 } } } }, null],
+  ]) {
+    const snapshot = structuredClone(n);
+    assert.equal(buildFeatures(n).features.vocal_role.value, expected);
+    assert.deepEqual(n, snapshot);
+  }
+  const n = input(0.30, 0.29, 0.12, 0.3079);
+  const saved = buildFeatures(n, { energy_0_100: 62 });
+  saved.features.vocal_role.value = "mixed"; // Old adapter result, retained in storage.
+  const snapshot = structuredClone(saved);
+  const read = readFeatures({ ...n, analysis_features_v1: saved });
+  assert.equal(read.features.vocal_role.value, null);
+  assert.equal(read.features.energy_0_100.value, 62);
+  const manual = applyOverrides(read, [{ id: 99, patch: { vocal_role: "instrumental" } }]);
+  assert.equal(manual.features.vocal_role.value, "instrumental");
+  assert.equal(manual.features.vocal_role.status, "manual");
+  assert.equal(readFeatures({ ...n, analysis_features_v1: manual }).features.vocal_role.value, "instrumental");
+  assert.equal(applyOverrides(read, [{ id: 99, patch: { vocal_role: "instrumental" } },
+    { id: 100, patch: { vocal_role: null } }]).features.vocal_role.value, null);
+  assert.deepEqual(saved, snapshot);
+});
+
+test("Нормализация сохраняет исходный status withheld", () => {
+  for (const [group, key] of [["moods", "mood"], ["instruments", "instruments"]]) {
+    const set = buildFeatures({ [group]: [{ label: "Hidden", status: "withheld", average: 0.9 }] });
+    assert.equal(set.features[key].value[0].status, "withheld");
+  }
 });
