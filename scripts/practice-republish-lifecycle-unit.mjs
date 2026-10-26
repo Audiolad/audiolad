@@ -383,6 +383,74 @@ function testPublishRouteStaysOnPublishAudioProduct() {
   assert.doesNotMatch(publishRoute, /approve_and_publish_practice/);
 }
 
+function assertLifecycleFunctionDoesNotResetProductHistory(name) {
+  const lifecycle = extractLatestFunction(name);
+
+  assert.doesNotMatch(
+    lifecycle.body,
+    /\b(?:DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?|UPDATE)\s+public\.(?:practice_ratings|practice_rating_events|practice_listen_stats|playback_usage_facts)\b/i,
+    "lifecycle " + name + " must not reset ratings or listening history",
+  );
+}
+
+function testRepublishPreservesRatingsAndListeningHistory() {
+  for (const name of [
+    "start_practice_editing",
+    "submit_practice_for_moderation",
+    "approve_and_publish_practice",
+    "publish_audio_product",
+  ]) {
+    assertLifecycleFunctionDoesNotResetProductHistory(name);
+  }
+
+  const ratingsSql = read(
+    "supabase/migrations/20260921120000_practice_ratings.sql",
+  );
+  assert.match(
+    ratingsSql,
+    /practice_id uuid NOT NULL REFERENCES public\.practices \(id\) ON DELETE CASCADE/,
+  );
+  assert.match(
+    ratingsSql,
+    /CONSTRAINT practice_ratings_user_practice_key UNIQUE \(user_id, practice_id\)/,
+  );
+
+  const listenStatsSql = read(
+    "supabase/migrations/20260920120000_practice_listen_stats.sql",
+  );
+  assert.match(
+    listenStatsSql,
+    /practice_id uuid NOT NULL REFERENCES public\.practices \(id\) ON DELETE CASCADE/,
+  );
+  assert.match(
+    listenStatsSql,
+    /CONSTRAINT practice_listen_stats_pkey PRIMARY KEY \(user_id, practice_id\)/,
+  );
+
+  const playbackUsageSql = read(
+    "supabase/migrations/20261127120000_playback_usage_facts.sql",
+  );
+  assert.match(playbackUsageSql, /practice_id uuid NOT NULL,/);
+  assert.match(
+    playbackUsageSql,
+    /practice_id, audio_item_id, and author_id_snapshot are immutable snapshots with no FK/,
+  );
+
+  const approve = extractLatestFunction("approve_and_publish_practice");
+  assert.match(
+    approve.body,
+    /published_at\s*=\s*COALESCE\(\s*published_at\s*,/i,
+    "moderated republish must preserve the original published_at",
+  );
+
+  const publish = extractLatestFunction("publish_audio_product");
+  assert.match(
+    publish.body,
+    /published_at\s*=\s*COALESCE\(\s*published_at\s*,/i,
+    "direct republish must preserve the original published_at",
+  );
+}
+
 function main() {
   testUnpublishSqlPreservesVisibility();
   testUnpublishRepublishVisibilityCycles();
@@ -390,6 +458,7 @@ function main() {
   testUiRepublishSkipsPatch();
   testImmutablePatchStill409();
   testPublishRouteStaysOnPublishAudioProduct();
+  testRepublishPreservesRatingsAndListeningHistory();
   console.log("practice-republish-lifecycle-unit: ok");
 }
 
