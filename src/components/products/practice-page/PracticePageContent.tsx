@@ -44,7 +44,7 @@ export default function PracticePageContent({ viewModel }: PracticePageContentPr
 
   return (
     <div className={`min-w-0 ${platformBottomContentPaddingClass}`}>
-      <div className="pt-6 xl:box-border xl:min-w-0 xl:max-w-full xl:px-6 xl:pt-3">
+      <div className="box-border w-full min-w-0 max-w-full pt-6 xl:px-6 xl:pt-3">
         <PracticeBackLink />
 
         <PracticeAccessBanners

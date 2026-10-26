@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { resolveListenerAvatarUrl } from "@/lib/practice-comments/avatar";
+import { resolveListenerAvatarUrl, resolveViewerCommentAvatar } from "@/lib/practice-comments/avatar";
 import { compareComments, isAfterCursor } from "@/lib/practice-comments/pagination";
 import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
 import { isListenerCommentFeedVisible } from "@/lib/practice-comments/visibility";
@@ -127,6 +127,25 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     },
     async suggestPublicName(userId) {
       return state.names[userId] ?? "Слушатель";
+    },
+    async viewerAvatarUrl(userId) {
+      const profile = state.profileAvatars?.[userId];
+      if (!profile) return null;
+      return resolveViewerCommentAvatar({
+        userId,
+        profileUrl: profile.url,
+        profilePath: profile.path,
+        profileFullName: profile.fullName,
+      });
+    },
+    async hasOwnImpression(userId, practiceId) {
+      return state.comments.some(
+        (row) =>
+          row.userId === userId &&
+          row.practiceId === practiceId &&
+          row.kind === "impression" &&
+          row.status !== "deleted",
+      );
     },
     async authorDisplayName(practiceId) {
       return state.authorNames[practiceId] ?? "Автор";

@@ -129,6 +129,7 @@ const migrationHits = readdirSync(path.join(root, "supabase/migrations")).filter
 assert.deepEqual([...migrationHits].sort(), [
   "20261009120200_practice_catalog_sections.sql",
   "20270124140000_practice_listener_comments.sql",
+  "20270124150000_listener_comments_by_product_type.sql",
 ]);
 const sectionMigration = read("supabase/migrations/20261009120200_practice_catalog_sections.sql");
 for (const value of ["music", "meditations", "education", "stories", "books"]) {
