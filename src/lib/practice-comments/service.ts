@@ -37,6 +37,8 @@ export const COMMENT_REPORT_LIMIT = 10;
 export const COMMENT_REPORT_WINDOW_MS = 60 * 60 * 1000;
 export const COMMENT_REPLY_LIMIT = 20;
 export const COMMENT_REPLY_WINDOW_MS = 60 * 60 * 1000;
+export const COMMENT_EDIT_LIMIT = 10;
+export const COMMENT_EDIT_WINDOW_MS = 10 * 60 * 1000;
 
 export type CommentActor = {
   userId: string | null;
@@ -114,13 +116,14 @@ function rawToPublic(row: ListenerCommentRow, mine: boolean): PublicCommentDto {
 async function attachReply(
   store: CommentStore,
   impression: ListenerCommentRow,
+  viewerUserId: string | null,
 ): Promise<PublicCommentDto> {
   const replies = await store.listReplies({
     practiceId: impression.practiceId,
     parentIds: [impression.id],
-    viewerUserId: impression.userId,
+    viewerUserId,
   });
-  const dto = rawToPublic(impression, true);
+  const dto = rawToPublic(impression, viewerUserId != null && impression.userId === viewerUserId);
   const reply = replies.find((item) => item.parentId === impression.id && item.status === "published");
   dto.reply = reply ? toReply(reply) : null;
   return dto;
@@ -247,7 +250,7 @@ export async function createImpression(
       ) {
         return commentFailure(409, "idempotency_conflict");
       }
-      return { ok: true, comment: await attachReply(store, existing), replayed: true };
+      return { ok: true, comment: await attachReply(store, existing, actor.userId), replayed: true };
     }
   }
 
@@ -293,7 +296,7 @@ export async function createImpression(
   } catch (error) {
     if (isUniqueViolation(error) && requestId.value) {
       const existing = await store.findByRequest(actor.userId, requestId.value);
-      if (existing) return { ok: true, comment: await attachReply(store, existing), replayed: true };
+      if (existing) return { ok: true, comment: await attachReply(store, existing, actor.userId), replayed: true };
     }
     throw error;
   }
@@ -343,7 +346,13 @@ export async function updateOwnComment(
     if (!parsed.ok) return commentFailure(400, parsed.error);
     publicName = parsed.value;
   }
-  const now = iso(clock.now());
+  if (!clock.rateLimit(`listener-comment:edit:${actor.userId}`, COMMENT_EDIT_LIMIT, COMMENT_EDIT_WINDOW_MS)) {
+    return commentFailure(429, "rate_limited");
+  }
+  const nowDate = clock.now();
+  const edits = await store.countRecentEdits(actor.userId, minus(nowDate, COMMENT_EDIT_WINDOW_MS));
+  if (edits >= COMMENT_EDIT_LIMIT) return commentFailure(429, "rate_limited");
+  const now = iso(nowDate);
   const updated = await store.updateComment(row.id, {
     body: body.value,
     publicName,
@@ -351,7 +360,13 @@ export async function updateOwnComment(
     updatedAt: now,
     editedAt: now,
   });
-  return { ok: true, comment: await attachReply(store, updated) };
+  await store.recordEdit({
+    id: randomUUID(),
+    commentId: row.id,
+    userId: actor.userId,
+    createdAt: now,
+  });
+  return { ok: true, comment: await attachReply(store, updated, actor.userId) };
 }
 
 export async function deleteOwnComment(
@@ -401,13 +416,18 @@ export async function replyAsAuthor(
   if (requestId.value) {
     const existing = await store.findByRequest(actor.userId, requestId.value);
     if (existing && existing.parentId === parent.id) {
-      return { ok: true, comment: await attachReply(store, parent), replayed: true };
+      return { ok: true, comment: await attachReply(store, parent, actor.userId), replayed: true };
     }
   }
   if (!clock.rateLimit(`listener-comment:reply:${actor.userId}`, COMMENT_REPLY_LIMIT, COMMENT_REPLY_WINDOW_MS)) {
     return commentFailure(429, "rate_limited");
   }
   const now = clock.now();
+  const recentReplies = await store.countRecentReplies(
+    actor.userId,
+    minus(now, COMMENT_REPLY_WINDOW_MS),
+  );
+  if (recentReplies >= COMMENT_REPLY_LIMIT) return commentFailure(429, "rate_limited");
   const row: ListenerCommentRow = {
     id: randomUUID(),
     practiceId: parent.practiceId,
@@ -429,7 +449,7 @@ export async function replyAsAuthor(
     await store.insertComment(row);
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
-    return { ok: true, comment: await attachReply(store, parent), replayed: true };
+    return { ok: true, comment: await attachReply(store, parent, actor.userId), replayed: true };
   }
   if (parent.userId !== actor.userId) {
     await notify(store, {
@@ -440,7 +460,7 @@ export async function replyAsAuthor(
       createdAt: row.createdAt,
     });
   }
-  return { ok: true, comment: await attachReply(store, parent), replayed: false };
+  return { ok: true, comment: await attachReply(store, parent, actor.userId), replayed: false };
 }
 
 export async function reportComment(
@@ -602,49 +622,30 @@ export async function moderateComment(
   store: CommentStore,
   actor: CommentActor,
   clock: CommentClock,
-  input: { commentId: string; action: "hide" | "restore"; reason: unknown },
+  input: { commentId: string; action: string; reason: unknown },
 ): Promise<CommentFailure | { ok: true }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   if (!actor.isModerator) return commentFailure(403, "forbidden");
+  if (input.action !== "hide") return commentFailure(403, "forbidden");
   const row = await store.getRaw(input.commentId);
   if (!row || row.status === "deleted") return commentFailure(404, "not_found");
   const reason = typeof input.reason === "string" ? input.reason.trim() : "";
-  if (input.action === "hide") {
-    if (!isReportReason(reason) && reason.length < 2) return commentFailure(400, "invalid_reason");
-    if (reason.length > 200 || /[<>]/.test(reason)) return commentFailure(400, "invalid_reason");
-    const now = iso(clock.now());
-    await store.updateComment(row.id, {
-      status: "hidden",
-      hiddenReason: reason,
-      hiddenBy: actor.userId,
-      hiddenAt: now,
-      updatedAt: now,
-    });
-    await store.insertModerationEvent({
-      id: randomUUID(),
-      commentId: row.id,
-      actorUserId: actor.userId,
-      action: "hide",
-      reason,
-      createdAt: now,
-    });
-    return { ok: true };
-  }
-  if (row.status !== "hidden") return commentFailure(409, "not_hidden");
+  if (!isReportReason(reason) && reason.length < 2) return commentFailure(400, "invalid_reason");
+  if (reason.length > 200 || /[<>]/.test(reason)) return commentFailure(400, "invalid_reason");
   const now = iso(clock.now());
   await store.updateComment(row.id, {
-    status: "published",
-    hiddenReason: null,
-    hiddenBy: null,
-    hiddenAt: null,
+    status: "hidden",
+    hiddenReason: reason,
+    hiddenBy: actor.userId,
+    hiddenAt: now,
     updatedAt: now,
   });
   await store.insertModerationEvent({
     id: randomUUID(),
     commentId: row.id,
     actorUserId: actor.userId,
-    action: "restore",
-    reason: reason || null,
+    action: "hide",
+    reason,
     createdAt: now,
   });
   return { ok: true };

@@ -6,6 +6,7 @@ import { isListenerCommentFeedVisible } from "@/lib/practice-comments/visibility
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
 import type { CommentStore, FeedCommentRow } from "@/lib/practice-comments/store";
 import type {
+  CommentEditMark,
   CommentNoticeRow,
   CommentReportRow,
   ListenerCommentRow,
@@ -21,6 +22,7 @@ export type MemoryCommentState = {
   notices: CommentNoticeRow[];
   reports: CommentReportRow[];
   events: ModerationEventRow[];
+  edits: CommentEditMark[];
 };
 
 export function createMemoryCommentStore(state: MemoryCommentState): CommentStore {
@@ -153,6 +155,17 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
           row.status !== "deleted" &&
           row.createdAt >= sinceIso,
       ).length;
+    },
+    async countRecentReplies(userId, sinceIso) {
+      return state.comments.filter(
+        (row) => row.userId === userId && row.kind === "author_reply" && row.createdAt >= sinceIso,
+      ).length;
+    },
+    async countRecentEdits(userId, sinceIso) {
+      return state.edits.filter((row) => row.userId === userId && row.createdAt >= sinceIso).length;
+    },
+    async recordEdit(row) {
+      state.edits.push(row);
     },
     async findRecentDuplicate(input) {
       return (

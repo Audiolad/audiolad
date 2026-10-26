@@ -11,7 +11,7 @@ type RouteContext = {
   params: Promise<{ commentId: string }>;
 };
 
-async function moderate(request: Request, context: RouteContext, action: "hide" | "restore") {
+export async function POST(request: Request, context: RouteContext) {
   const moderator = await commentModerator(request);
   if (!moderator.ok) return moderator.response;
   const { commentId } = await context.params;
@@ -19,12 +19,8 @@ async function moderate(request: Request, context: RouteContext, action: "hide" 
   return runCommentAction(async () =>
     moderateComment(await commentStore(request), moderator.actor, commentClock(), {
       commentId,
-      action,
+      action: "hide",
       reason: body.reason,
     }),
   );
-}
-
-export async function POST(request: Request, context: RouteContext) {
-  return moderate(request, context, "hide");
 }

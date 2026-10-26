@@ -131,6 +131,13 @@ BEGIN
     WHEN insufficient_privilege THEN
       NULL;
   END;
+  BEGIN
+    PERFORM 1 FROM public.practice_listener_comment_edits;
+    RAISE EXCEPTION 'authenticated must not read edit marks';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
   RESET ROLE;
 
   SELECT count(*) INTO cnt FROM public.practice_listener_comment_reports;

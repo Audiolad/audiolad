@@ -20,12 +20,23 @@ assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.practice_listener_co
 assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.practice_listener_comment_reports/);
 assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.practice_listener_comment_moderation_events/);
 assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.practice_listener_comment_notices/);
+assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.practice_listener_comment_edits/);
 assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+assert.match(migration, /Rollback is not executed by this file/);
+assert.match(migration, /keep the rows/);
+assert.match(migration, /DROP VIEW IF EXISTS public\.practice_listener_comment_feed/);
+assert.match(migration, /DROP TABLE IF EXISTS public\.practice_listener_comment_edits/);
+assert.match(migration, /DROP TABLE IF EXISTS public\.practice_listener_comments;/);
+assert.match(migration, /DROP FUNCTION IF EXISTS public\.practice_listener_comment_row_visible/);
 assert.match(migration, /Visible listener comments/);
 assert.match(migration, /Users read own listener comment notices/);
 assert.match(migration, /author_cannot|author_members/);
 assert.doesNotMatch(migration, /ALTER TABLE public\.(practices|profiles|practice_ratings|users)\b/);
-assert.doesNotMatch(migration, /\bDROP TABLE\b|\bTRUNCATE\b|DELETE FROM public\./);
+const executableSql = migration
+  .split("\n")
+  .filter((line) => !line.trim().startsWith("--"))
+  .join("\n");
+assert.doesNotMatch(executableSql, /\bDROP TABLE\b|\bTRUNCATE\b|DELETE FROM public\./);
 assert.match(migration, /REVOKE ALL ON TABLE public\.practice_listener_comment_reports FROM authenticated/);
 assert.match(migration, /GRANT SELECT ON TABLE public\.practice_listener_comment_notices TO authenticated/);
 assert.doesNotMatch(migration, /GRANT INSERT ON TABLE public\.practice_listener_comments TO authenticated/);

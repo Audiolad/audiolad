@@ -1,6 +1,7 @@
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
 import type { CommentCursor, CommentSort } from "@/lib/practice-comments/pagination";
 import type {
+  CommentEditMark,
   CommentNoticeRow,
   CommentReportRow,
   ListenerCommentRow,
@@ -51,6 +52,9 @@ export type CommentStore = {
   getRaw(id: string): Promise<ListenerCommentRow | null>;
   findByRequest(userId: string, requestId: string): Promise<ListenerCommentRow | null>;
   countRecentImpressions(userId: string, sinceIso: string): Promise<number>;
+  countRecentReplies(userId: string, sinceIso: string): Promise<number>;
+  countRecentEdits(userId: string, sinceIso: string): Promise<number>;
+  recordEdit(row: CommentEditMark): Promise<void>;
   findRecentDuplicate(input: {
     userId: string;
     practiceId: string;

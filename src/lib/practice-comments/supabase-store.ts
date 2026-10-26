@@ -280,6 +280,37 @@ export function createSupabaseCommentStore(input: {
       if (error) throw new Error("listener_comment_rate_failed");
       return count ?? 0;
     },
+    async countRecentReplies(userId, sinceIso) {
+      const { count, error } = await writer
+        .from("practice_listener_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("kind", "author_reply")
+        .gte("created_at", sinceIso);
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_reply_rate_failed");
+      return count ?? 0;
+    },
+    async countRecentEdits(userId, sinceIso) {
+      const { count, error } = await writer
+        .from("practice_listener_comment_edits")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .gte("created_at", sinceIso);
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_edit_rate_failed");
+      return count ?? 0;
+    },
+    async recordEdit(row) {
+      const { error } = await writer.from("practice_listener_comment_edits").insert({
+        id: row.id,
+        comment_id: row.commentId,
+        user_id: row.userId,
+        created_at: row.createdAt,
+      });
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_edit_log_failed");
+    },
     async findRecentDuplicate(query) {
       let request = writer
         .from("practice_listener_comments")
@@ -484,11 +515,18 @@ export function createSupabaseCommentStore(input: {
       });
     },
     async listModerationQueue(query) {
+      const columns =
+        "id, practice_id, user_id, parent_id, kind, body, public_name, status, client_request_id, body_fingerprint, hidden_reason, created_at, updated_at, edited_at, deleted_at";
+      // Reports: inner join keeps only comments that already have a report,
+      // then limit and cursor apply to that set. Limiting published rows first
+      // drops an older report behind a page of newer unreported comments.
+      const select =
+        query.queue === "reports"
+          ? `${columns}, practice_listener_comment_reports!inner(id)`
+          : columns;
       let request = writer
         .from("practice_listener_comments")
-        .select(
-          "id, practice_id, user_id, parent_id, kind, body, public_name, status, client_request_id, body_fingerprint, hidden_reason, created_at, updated_at, edited_at, deleted_at",
-        )
+        .select(select)
         .neq("status", "deleted")
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
@@ -499,14 +537,7 @@ export function createSupabaseCommentStore(input: {
       const { data, error } = await request;
       throwIfUnavailable(error);
       if (error) throw new Error("listener_comment_moderation_queue_failed");
-      const rows = (data ?? []).map(mapRaw).filter((row): row is ListenerCommentRow => row != null);
-      if (query.queue === "hidden") return rows;
-      const reported: ListenerCommentRow[] = [];
-      for (const row of rows) {
-        const reports = await this.listReports(row.id);
-        if (reports.length > 0) reported.push(row);
-      }
-      return reported;
+      return (data ?? []).map(mapRaw).filter((row): row is ListenerCommentRow => row != null);
     },
   };
 }

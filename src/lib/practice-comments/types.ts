@@ -47,6 +47,13 @@ export type CommentReportRow = {
 
 export type ModerationAction = "hide" | "restore" | "report";
 
+export type CommentEditMark = {
+  id: string;
+  commentId: string;
+  userId: string;
+  createdAt: string;
+};
+
 export type ModerationEventRow = {
   id: string;
   commentId: string;

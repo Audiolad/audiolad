@@ -1,9 +1,28 @@
-BEGIN;
-
 -- Listener impressions on published meditations and audio practices.
 -- Additive only: new tables, functions, policies and grants.
 -- Does not alter practice_ratings, product moderation or existing rows.
 -- Production apply requires a separate owner decision.
+-- This file does not apply itself and contains no executable rollback.
+--
+-- Rollback is not executed by this file.
+-- Disable the feature and keep the rows: do not deploy the listener-comment
+-- routes. RLS already blocks anon and authenticated writes, so the tables can
+-- stay while the app stops using them. practice_ratings is not part of this
+-- feature and is left as it is.
+-- When the owner confirms the data may go, remove dependents first, then the
+-- parent table, then the functions. Copy of the operator statements, still
+-- comments, not run here:
+--   DROP VIEW IF EXISTS public.practice_listener_comment_feed;
+--   DROP TABLE IF EXISTS public.practice_listener_comment_notices;
+--   DROP TABLE IF EXISTS public.practice_listener_comment_edits;
+--   DROP TABLE IF EXISTS public.practice_listener_comment_moderation_events;
+--   DROP TABLE IF EXISTS public.practice_listener_comment_reports;
+--   DROP TABLE IF EXISTS public.practice_listener_comments;
+--   DROP FUNCTION IF EXISTS public.practice_listener_comment_row_visible(uuid, uuid, uuid, text, timestamptz);
+--   DROP FUNCTION IF EXISTS public.practice_accepts_listener_comments(uuid);
+-- Do not remove practices, practice_ratings, auth.users or product moderation.
+
+BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.practice_listener_comments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,6 +79,10 @@ CREATE INDEX IF NOT EXISTS practice_listener_comments_fingerprint_idx
   ON public.practice_listener_comments (user_id, practice_id, body_fingerprint, created_at DESC)
   WHERE kind = 'impression' AND status <> 'deleted';
 
+CREATE INDEX IF NOT EXISTS practice_listener_comments_reply_rate_idx
+  ON public.practice_listener_comments (user_id, created_at DESC)
+  WHERE kind = 'author_reply';
+
 COMMENT ON TABLE public.practice_listener_comments IS
   'Voluntary public text impressions about meditations and audio practices, plus one author reply. Independent of practice_ratings. user_id is not granted to anon or authenticated.';
 
@@ -92,7 +115,7 @@ CREATE TABLE IF NOT EXISTS public.practice_listener_comment_moderation_events (
   reason text,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT practice_listener_comment_moderation_events_action_check
-    CHECK (action IN ('hide', 'restore', 'report')),
+    CHECK (action IN ('hide', 'report')),
   CONSTRAINT practice_listener_comment_moderation_events_reason_check
     CHECK (reason IS NULL OR char_length(reason) <= 200)
 );
@@ -101,7 +124,20 @@ CREATE INDEX IF NOT EXISTS practice_listener_comment_moderation_events_comment_i
   ON public.practice_listener_comment_moderation_events (comment_id, created_at);
 
 COMMENT ON TABLE public.practice_listener_comment_moderation_events IS
-  'Append-only moderation journal for listener impressions. Authors cannot hide criticism here.';
+  'Append-only moderation journal for listener impressions. Authors cannot hide criticism here. The application records hide and report only.';
+
+CREATE TABLE IF NOT EXISTS public.practice_listener_comment_edits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id uuid NOT NULL REFERENCES public.practice_listener_comments (id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS practice_listener_comment_edits_user_idx
+  ON public.practice_listener_comment_edits (user_id, created_at DESC);
+
+COMMENT ON TABLE public.practice_listener_comment_edits IS
+  'One row per successful text edit. Cross-process edit rate limit. No client read.';
 
 CREATE TABLE IF NOT EXISTS public.practice_listener_comment_notices (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -205,6 +241,7 @@ GRANT EXECUTE ON FUNCTION public.practice_listener_comment_row_visible(uuid, uui
 ALTER TABLE public.practice_listener_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.practice_listener_comment_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.practice_listener_comment_moderation_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.practice_listener_comment_edits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.practice_listener_comment_notices ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Visible listener comments" ON public.practice_listener_comments;
@@ -244,6 +281,11 @@ REVOKE ALL ON TABLE public.practice_listener_comment_moderation_events FROM PUBL
 REVOKE ALL ON TABLE public.practice_listener_comment_moderation_events FROM anon;
 REVOKE ALL ON TABLE public.practice_listener_comment_moderation_events FROM authenticated;
 GRANT ALL ON TABLE public.practice_listener_comment_moderation_events TO service_role;
+
+REVOKE ALL ON TABLE public.practice_listener_comment_edits FROM PUBLIC;
+REVOKE ALL ON TABLE public.practice_listener_comment_edits FROM anon;
+REVOKE ALL ON TABLE public.practice_listener_comment_edits FROM authenticated;
+GRANT ALL ON TABLE public.practice_listener_comment_edits TO service_role;
 
 REVOKE ALL ON TABLE public.practice_listener_comment_notices FROM PUBLIC;
 REVOKE ALL ON TABLE public.practice_listener_comment_notices FROM anon;

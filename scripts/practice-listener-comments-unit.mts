@@ -4,21 +4,26 @@
  * moderation and separation from star ratings.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   LISTENER_IMPRESSION_INVITE,
+  LISTENER_IMPRESSION_LOAD_MORE,
   LISTENER_IMPRESSION_PRIVACY,
+  MODERATION_ACTION_LABELS,
+  REPORT_REASON_LABELS,
 } from "../src/lib/practice-comments/copy";
 import {
   createMemoryCommentStore,
   memoryId,
   type MemoryCommentState,
 } from "../src/lib/practice-comments/memory-store";
-import { encodeCommentCursor } from "../src/lib/practice-comments/pagination";
+import { decodeCommentCursor, encodeCommentCursor } from "../src/lib/practice-comments/pagination";
 import {
+  COMMENT_EDIT_LIMIT,
+  COMMENT_REPLY_LIMIT,
   createImpression,
   deleteOwnComment,
   listAuthorFeedback,
@@ -30,6 +35,7 @@ import {
   reportComment,
   updateOwnComment,
 } from "../src/lib/practice-comments/service";
+import type { ListenerCommentRow } from "../src/lib/practice-comments/types";
 import {
   commentFingerprint,
   deriveDefaultPublicName,
@@ -77,7 +83,41 @@ function state(extra: Partial<MemoryCommentState> = {}): MemoryCommentState {
     notices: [],
     reports: [],
     events: [],
+    edits: [],
     ...extra,
+  };
+}
+
+function isoSeconds(seconds: number): string {
+  return new Date(Date.UTC(2026, 8, 1, 0, 0, seconds)).toISOString();
+}
+
+function commentUuid(prefix: string, n: number): string {
+  return `${prefix}-0000-4000-8000-${String(n).padStart(12, "0")}`;
+}
+
+function impressionRow(
+  id: string,
+  createdAt: string,
+  body: string,
+  status: "published" | "hidden" = "published",
+): ListenerCommentRow {
+  return {
+    id,
+    practiceId,
+    userId: listener,
+    parentId: null,
+    kind: "impression",
+    body,
+    publicName: "Мария",
+    status,
+    clientRequestId: null,
+    bodyFingerprint: body,
+    hiddenReason: status === "hidden" ? "spam" : null,
+    createdAt,
+    updatedAt: createdAt,
+    editedAt: null,
+    deletedAt: null,
   };
 }
 
@@ -99,10 +139,16 @@ async function testPrivacyAndXss() {
   assert.equal(parseCommentBody("стало спокойнее").ok, true);
   assert.equal(commentFingerprint("  Стало   спокойнее "), "стало спокойнее");
   assert.doesNotMatch(LISTENER_IMPRESSION_INVITE, /дискомфорт|лечен|гарант|терап|исцел/i);
-  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /дискомфорт|лечен|гарант|терап|исцел/i);
+  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /дискомфорт|лечен|гарант|терап|исцел|диагноз|Не указывайте/i);
   assert.match(LISTENER_IMPRESSION_INVITE, /–/);
   assert.doesNotMatch(LISTENER_IMPRESSION_INVITE, /—/);
   assert.match(LISTENER_IMPRESSION_PRIVACY, /Фамилия и почта не показываются/);
+  assert.match(LISTENER_IMPRESSION_PRIVACY, /Поделитесь впечатлением от практики/);
+  assert.match(LISTENER_IMPRESSION_PRIVACY, /–/);
+  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /—/);
+  assert.equal(MODERATION_ACTION_LABELS.hide, "Скрыт");
+  assert.equal(MODERATION_ACTION_LABELS.report, "Жалоба");
+  assert.equal(REPORT_REASON_LABELS.spam, "Спам");
 }
 
 async function testCreateListEditDelete() {
@@ -219,9 +265,13 @@ async function testProductGatesAndRatingsIsolation() {
   );
 
   const migration = read("supabase/migrations/20270124120000_practice_listener_comments.sql");
+  const migrationSql = migration
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n");
   const service = read("src/lib/practice-comments/service.ts");
   assert.doesNotMatch(
-    migration,
+    migrationSql,
     /ALTER TABLE public\.practice_ratings|INSERT INTO public\.practice_ratings|UPDATE public\.practice_ratings|DELETE FROM public\.practice_ratings|ALTER TABLE public\.practices|DROP TABLE/,
   );
   assert.doesNotMatch(service, /practice_ratings|ratings\/write|applyOwnPracticeRating/);
@@ -297,6 +347,8 @@ async function testSpamPaginationAndAuthorReply() {
   if (!reply.ok) return;
   assert.equal(reply.comment.reply?.publicName, "Анна Светлая");
   assert.equal(reply.comment.reply?.body, "Спасибо, что поделились");
+  assert.equal(reply.comment.mine, false);
+  assert.equal(reply.comment.reply?.mine, true);
 
   const stranger = await replyAsAuthor(store, actor(other), clock(), {
     commentId: page.comments[0]!.id,
@@ -394,7 +446,16 @@ async function testReportModeration() {
     action: "restore",
     reason: "уточнили",
   });
-  assert.equal(restored.ok, true);
+  assert.equal(restored.ok, false);
+  if (!restored.ok) assert.equal(restored.status, 403);
+  const stillHidden = await listPracticeComments(store, actor(listener), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(stillHidden.ok && stillHidden.comments[0]?.status, "hidden");
 }
 
 async function testEmptyAndPlayerCopy() {
@@ -417,10 +478,192 @@ async function testEmptyAndPlayerCopy() {
   assert.equal(memoryId().length, 36);
 }
 
+async function testModerationQueuePagesPastTwentyOne() {
+  const unreported = Array.from({ length: 21 }, (_, index) =>
+    impressionRow(commentUuid("88888888", index + 1), isoSeconds(100 + index), `Новый отзыв ${index + 1}`),
+  );
+  const older = impressionRow(commentUuid("88888888", 90), isoSeconds(1), "Старый отзыв с жалобой");
+  const sparse = createMemoryCommentStore(
+    state({
+      comments: [...unreported, older],
+      reports: [
+        {
+          id: commentUuid("99999999", 1),
+          commentId: older.id,
+          reporterUserId: other,
+          reason: "spam",
+          details: null,
+          createdAt: older.createdAt,
+        },
+      ],
+    }),
+  );
+  const sparsePage = await listModerationQueue(sparse, actor(moderator, true), {
+    queue: "reports",
+    cursor: null,
+    limit: 20,
+  });
+  assert.equal(sparsePage.ok, true);
+  if (!sparsePage.ok) return;
+  assert.equal(sparsePage.items.length, 1);
+  assert.equal(sparsePage.items[0]?.id, older.id);
+  assert.equal(sparsePage.nextCursor, null);
+
+  const reported = Array.from({ length: 22 }, (_, index) =>
+    impressionRow(commentUuid("77777777", index + 1), isoSeconds(index + 1), `Жалоба ${index + 1}`),
+  );
+  const paged = createMemoryCommentStore(
+    state({
+      comments: reported,
+      reports: reported.map((row, index) => ({
+        id: commentUuid("66666666", index + 1),
+        commentId: row.id,
+        reporterUserId: other,
+        reason: "spam" as const,
+        details: null,
+        createdAt: row.createdAt,
+      })),
+    }),
+  );
+  const first = await listModerationQueue(paged, actor(moderator, true), {
+    queue: "reports",
+    cursor: null,
+    limit: 20,
+  });
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.items.length, 20);
+  assert.equal(first.items[0]?.body, "Жалоба 22");
+  assert.ok(first.nextCursor);
+  const cursor = decodeCommentCursor(first.nextCursor);
+  assert.ok(cursor);
+  const second = await listModerationQueue(paged, actor(moderator, true), {
+    queue: "reports",
+    cursor,
+    limit: 20,
+  });
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+  assert.equal(second.items.length, 2);
+  assert.equal(second.items[0]?.body, "Жалоба 2");
+  assert.equal(second.items[1]?.body, "Жалоба 1");
+  assert.equal(second.nextCursor, null);
+
+  const hidden = Array.from({ length: 22 }, (_, index) =>
+    impressionRow(commentUuid("55555555", index + 1), isoSeconds(index + 1), `Скрытый ${index + 1}`, "hidden"),
+  );
+  const hiddenStore = createMemoryCommentStore(state({ comments: hidden }));
+  const hiddenPage = await listModerationQueue(hiddenStore, actor(moderator, true), {
+    queue: "hidden",
+    cursor: null,
+    limit: 20,
+  });
+  assert.equal(hiddenPage.ok, true);
+  if (!hiddenPage.ok) return;
+  assert.equal(hiddenPage.items.length, 20);
+  assert.ok(hiddenPage.nextCursor);
+}
+
+async function testEditAndReplyRateLimits() {
+  const blockedStore = createMemoryCommentStore(state());
+  const blockedCreated = await createImpression(blockedStore, actor(listener), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Стало спокойнее",
+    publicName: "Мария",
+    clientRequestId: null,
+  });
+  assert.equal(blockedCreated.ok, true);
+  if (!blockedCreated.ok) return;
+  const blockedEdit = await updateOwnComment(blockedStore, actor(listener), clock(true), {
+    commentId: blockedCreated.comment.id,
+    body: "Другая спокойная фраза",
+  });
+  assert.equal(blockedEdit.ok, false);
+  if (!blockedEdit.ok) assert.equal(blockedEdit.error, "rate_limited");
+
+  const store = createMemoryCommentStore(state());
+  const created = await createImpression(store, actor(listener), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Стало спокойнее",
+    publicName: "Мария",
+    clientRequestId: "55555555-5555-4555-8555-555555555561",
+  });
+  assert.equal(created.ok, true);
+  if (!created.ok) return;
+  for (let n = 1; n <= COMMENT_EDIT_LIMIT; n += 1) {
+    const edited = await updateOwnComment(store, actor(listener), clock(), {
+      commentId: created.comment.id,
+      body: `Спокойная фраза номер ${n}`,
+    });
+    assert.equal(edited.ok, true);
+    if (edited.ok) assert.equal(edited.comment.mine, true);
+  }
+  const overflow = await updateOwnComment(store, actor(listener), clock(), {
+    commentId: created.comment.id,
+    body: "Ещё одна спокойная фраза",
+  });
+  assert.equal(overflow.ok, false);
+  if (!overflow.ok) assert.equal(overflow.error, "rate_limited");
+
+  const parents = Array.from({ length: COMMENT_REPLY_LIMIT + 1 }, (_, index) =>
+    impressionRow(commentUuid("12121212", index + 1), isoSeconds(index + 1), `Отзыв для ответа ${index + 1}`),
+  );
+  const replyStore = createMemoryCommentStore(state({ comments: parents }));
+  for (let n = 0; n < COMMENT_REPLY_LIMIT; n += 1) {
+    const replied = await replyAsAuthor(replyStore, actor(authorUser), clock(), {
+      commentId: parents[n]!.id,
+      body: `Спасибо за отзыв ${n + 1}`,
+      clientRequestId: null,
+    });
+    assert.equal(replied.ok, true);
+    if (replied.ok) assert.equal(replied.comment.mine, false);
+  }
+  const tooMany = await replyAsAuthor(replyStore, actor(authorUser), clock(), {
+    commentId: parents[COMMENT_REPLY_LIMIT]!.id,
+    body: "Спасибо, что написали ещё",
+    clientRequestId: null,
+  });
+  assert.equal(tooMany.ok, false);
+  if (!tooMany.ok) assert.equal(tooMany.error, "rate_limited");
+}
+
+async function testModeratorScopeAndQueueSource() {
+  const restoreRoute = join(root, "src/app/api/admin/listener-comments/[commentId]/restore/route.ts");
+  assert.equal(existsSync(restoreRoute), false);
+  const service = read("src/lib/practice-comments/service.ts");
+  const moderate = service.slice(
+    service.indexOf("export async function moderateComment"),
+    service.indexOf("export async function listModerationQueue"),
+  );
+  assert.doesNotMatch(moderate, /status: "published"|action: "restore"/);
+  assert.match(service, /countRecentReplies/);
+  assert.match(service, /countRecentEdits/);
+  const panel = read("src/components/admin/AdminListenerCommentsPanel.tsx");
+  assert.equal(LISTENER_IMPRESSION_LOAD_MORE, "Показать ещё");
+  assert.match(panel, /LISTENER_IMPRESSION_LOAD_MORE/);
+  assert.match(panel, /nextCursor/);
+  assert.match(panel, /MODERATION_ACTION_LABELS/);
+  assert.doesNotMatch(panel, /\/restore/);
+  assert.doesNotMatch(panel, /\{event\.action\}/);
+  const queueFn = read("src/lib/practice-comments/supabase-store.ts").slice(
+    read("src/lib/practice-comments/supabase-store.ts").indexOf("async listModerationQueue"),
+  );
+  assert.match(queueFn, /practice_listener_comment_reports!inner/);
+  assert.doesNotMatch(queueFn, /reports\.length > 0/);
+  const copy = read("src/lib/practice-comments/copy.ts");
+  assert.doesNotMatch(copy, /—/);
+  assert.doesNotMatch(copy, /диагноз|дискомфорт|Не указывайте/i);
+}
+
 await testPrivacyAndXss();
 await testCreateListEditDelete();
 await testProductGatesAndRatingsIsolation();
 await testSpamPaginationAndAuthorReply();
 await testReportModeration();
+await testModerationQueuePagesPastTwentyOne();
+await testEditAndReplyRateLimits();
 await testEmptyAndPlayerCopy();
+await testModeratorScopeAndQueueSource();
 console.log("practice-listener-comments-unit: ok");
