@@ -1,0 +1,8 @@
+model	input_per_1m_rub	output_per_1m_rub
+openai/gpt-oss-120b	15.86	61
+Qwen/Qwen3.6-35B-A3B	219.6	329.4
+anthropic/claude-opus-4.8	854	4270
+openai/gpt-5.4-mini	147.315	883.89
+openai/gpt-5.5	854	5124
+google/gemini-3.1-pro-preview	341.6	2049.6
+deepseek-ai/DeepSeek-V4-Pro	183	732

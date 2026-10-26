@@ -16,11 +16,14 @@ import { fileURLToPath } from "node:url";
 import { bumpCanonicalCount, gateSource, insertStoryOpening, ruleConfig, storyOpening, wireGate } from "./lib/sites/sz/apply.mjs";
 import { assembleSzArticle, nestQuotes, normalizeSzFields } from "./lib/sites/sz/assemble.mjs";
 import { BudgetError, makeCaller } from "./lib/call.mjs";
-import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor, costRub, estimatePromptTokens, worstCaseRub } from "./lib/cost.mjs";
+import { DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, TARIFF, defaultModelFor, costRub, estimatePromptTokens, worstCaseRub } from "./lib/cost.mjs";
 import { collectResult, runDetached } from "./lib/moscow.mjs";
 import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
-import { SZ } from "./lib/sites/sz/config.mjs";
+import { SZ, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
+import { TIERED_COST_PROFILE, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
+import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
+import { repairSzArticleTiered } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -29,7 +32,7 @@ import { fieldsFromMarkdown } from "./lib/sites/sz/extract.mjs";
 import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } from "./lib/sites/sz/knowledge.mjs";
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, checkSzArticle, checkSzPack, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -790,6 +793,198 @@ test("both pipelines estimate prompt tokens with the model's own ratio", () => {
     assert.ok(calls.length > 0, file);
     for (const args of calls) assert.match(args, /,\s*model\b/, `${file}: estimatePromptTokens(${args}) без model`);
   }
+});
+
+test("prompt: main-body target is 950–1100 and the section budgets sum inside it", () => {
+  const budget = szBodyPlanBudget();
+  assert.ok(budget.low >= 950, `low ${budget.low}`);
+  assert.ok(budget.mid >= 950 && budget.mid <= 1100, `mid ${budget.mid}`);
+  const text = buildSzMessages(brief, view.site).map((message) => message.content).join("\n");
+  assert.ok(text.includes("950–1100"));
+  assert.ok(text.includes("ровно 2 раздела"));
+  assert.ok(text.includes("пустой массив"));
+  assert.ok(text.includes("45–70"));
+  assert.ok(text.includes("116–135"));
+});
+
+test("checklist: a two-word imperative passes; a letter and the placeholder do not", () => {
+  const target = buildSzTargetedRepair(brief, fields, [{ severity: "error", field: "checklist", code: "test", message: "test" }]);
+  const headphones = { ...fields.checklist, items: ["Наденьте наушники.", ...fields.checklist.items.slice(1)] };
+  const accepted = applySzRepairPatch(fields, { checklist: headphones }, target.schema, brief);
+  assert.ok(accepted);
+  assert.deepEqual(errorsOf(hybridBuild(accepted).problems), []);
+  for (const item of ["б", "главная мысль", "главная мысль а"]) {
+    assert.equal(applySzRepairPatch(fields, { checklist: { ...headphones, items: [item, ...headphones.items.slice(1)] } }, target.schema, brief), null, item);
+  }
+});
+
+test("quantity report: every numeric gate failure names a field, actual and bounds", () => {
+  const raw = structuredClone(fields);
+  raw.description = "Ангел-хранитель слишком коротко.";
+  raw.faq = raw.faq.map((item, index) => (index ? item : { ...item, answer: "Короткий ответ про Ангела-хранителя и молитву без подробностей." }));
+  const problems = errorsOf(hybridBuild(raw).problems);
+  const report = szQuantityReport(raw, problems, [{ code: "unique-pack", field: "faq", slug: "other", message: `«${raw.faq[1].question}» повторяет статью пакета angel`, severity: "error" }]);
+  const description = report.failures.find((row) => row.code === "description-length");
+  const faq = report.failures.find((row) => row.code === "faq-length");
+  const duplicate = report.failures.find((row) => row.code === "unique-pack");
+  assert.equal(description.field, "description");
+  assert.equal(description.unit, "chars");
+  assert.ok(description.actual < description.min && description.max === 160);
+  assert.equal(faq.path, "faq[0].answer");
+  assert.ok(faq.actual < faq.min && faq.min === 40 && faq.max === 80);
+  assert.equal(duplicate.path, "faq[1].question");
+  assert.ok(report.sections.every((section) => section.path && section.words > 0));
+  assert.ok(problems.some((problem) => problem.code === "body-length") === false);
+});
+
+const tierRepair = (overrides = {}) => ({
+  mode: "tiered", cheapModel: "openai/gpt-oss-120b", strongModel: SZ_DEFAULT_MODEL, cheapTries: 2,
+  cheapMaxTokens: 200, strongMaxTokens: 200, cheapBudget: 30, strongBudget: 30, maxRounds: 8, ...overrides,
+});
+
+test("tiered: deterministic homoglyph, dash and extra heading do not call a model", () => {
+  const raw = structuredClone(fields);
+  const at = raw.psychologyIntro.indexOf("а");
+  raw.psychologyIntro = `${raw.psychologyIntro.slice(0, at)}a${raw.psychologyIntro.slice(at + 1)}`;
+  raw.invitation = raw.invitation.replace("–", "—");
+  raw.sectionsBefore = [...raw.sectionsBefore, { title: "Лишний раздел про паузу", paragraphs: ["Этот абзац достаточно длинный, чтобы его слили с предыдущим разделом, а не выбросили как пустую заглушку для проверки."] }];
+  let calls = 0;
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return {}; },
+  });
+  assert.equal(calls, 0);
+  assert.equal(szH2Count(repaired.result.fields), 6);
+  assert.ok(!repaired.result.md.includes("—"));
+  assert.ok(!/[A-Za-z][А-Яа-яЁё]|[А-Яа-яЁё][A-Za-z]/u.test(repaired.result.fields.psychologyIntro));
+  assert.equal(repaired.passed, true, errorsOf(repaired.result.problems).map((problem) => problem.message).join("; "));
+});
+
+test("tiered: cheap fragment fixes description and never receives the article", () => {
+  const raw = structuredClone(fields);
+  const original = raw.description;
+  raw.description = "Ангел-хранитель слишком коротко.";
+  const seen = [];
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair(), state,
+    callTier: (tier, name, messages) => {
+      seen.push({ tier, text: messages.map((message) => message.content).join("\n") });
+      state.spentRub += 0.2;
+      state.calls.push({ name, model: "openai/gpt-oss-120b", costRub: 0.2 });
+      return { description: original };
+    },
+  });
+  assert.deepEqual(seen.map((call) => call.tier), ["cheap"]);
+  assert.ok(!seen[0].text.includes(fields.story[0].slice(0, 40)));
+  assert.ok(!seen[0].text.includes(fields.sectionsBefore[0].title));
+  assert.equal(repaired.passed, true);
+  assert.equal(repaired.result.fields.description, original);
+});
+
+test("tiered: FAQ answer reaches gpt-5.5 only after two cheap misses, still as a fragment", () => {
+  const raw = structuredClone(fields);
+  const original = raw.faq[0].answer;
+  raw.faq = raw.faq.map((item, index) => (index ? item : { ...item, answer: "Короткий ответ про Ангела-хранителя и молитву без подробностей." }));
+  const seen = [];
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair(), state,
+    callTier: (tier, name, messages) => {
+      seen.push({ tier, text: messages.map((message) => message.content).join("\n") });
+      state.spentRub += tier === "strong" ? 4 : 0.2;
+      state.calls.push({ name, model: tier === "strong" ? SZ_DEFAULT_MODEL : "openai/gpt-oss-120b", costRub: tier === "strong" ? 4 : 0.2 });
+      return tier === "strong" ? { answer: original } : { answer: "Все ещё слишком коротко для порога." };
+    },
+  });
+  assert.deepEqual(seen.map((call) => call.tier), ["cheap", "cheap", "strong"]);
+  for (const call of seen) {
+    assert.ok(!call.text.includes(fields.story[0].slice(0, 40)));
+    assert.ok(call.text.includes(raw.faq[0].question));
+    assert.ok(!call.text.includes(fields.sectionsBefore[0].paragraphs[0].slice(0, 40)));
+  }
+  assert.equal(repaired.passed, true, errorsOf(repaired.result.problems).map((problem) => problem.message).join("; "));
+});
+
+test("tiered: short main body is expanded one section at a time", () => {
+  const raw = structuredClone(fields);
+  const removed = raw.sectionsBefore[0].paragraphs.splice(2, 4);
+  assert.ok(words(removed.join(" ")) > 80);
+  const before = errorsOf(hybridBuild(raw).problems);
+  assert.ok(before.some((problem) => problem.code === "body-length"), before.map((problem) => problem.message).join("; "));
+  const seen = [];
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const repaired = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair(), state,
+    callTier: (tier, name, messages) => {
+      const text = messages.map((message) => message.content).join("\n");
+      seen.push(text);
+      state.spentRub += 0.3;
+      state.calls.push({ name, model: "openai/gpt-oss-120b", costRub: 0.3 });
+      if (text.includes("Верни JSON { text }")) return { text: `${removed.join(" ")} Этот шаг остаётся бережным и не обещает результата.` };
+      return { paragraphs: removed.slice(0, 2) };
+    },
+  });
+  assert.ok(seen.length >= 1 && seen.length <= 4);
+  assert.ok(seen.every((text) => !text.includes(fields.story[0].slice(0, 40))));
+  assert.ok(seen[0].includes(raw.sectionsBefore[0].title));
+  assert.equal(repaired.passed, true, errorsOf(repaired.result.problems).map((problem) => problem.message).join("; "));
+});
+
+test("tiered: banned word is rewritten from the fragment, and a failed article keeps its reasons", () => {
+  const raw = structuredClone(fields);
+  raw.finalInvite = "Если хотите короткую паузу, возьмите оберег ангела-хранителя перед следующим шагом.";
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const fixed = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair(), state,
+    callTier: (tier, name, messages) => {
+      assert.ok(messages.map((message) => message.content).join("\n").includes("оберег"));
+      assert.ok(!messages.map((message) => message.content).join("\n").includes(fields.story[0].slice(0, 40)));
+      state.spentRub += 0.2;
+      state.calls.push({ name, model: "openai/gpt-oss-120b", costRub: 0.2 });
+      return { text: fields.finalInvite };
+    },
+  });
+  assert.equal(fixed.passed, true, errorsOf(fixed.result.problems).map((problem) => problem.message).join("; "));
+  const stuck = repairSzArticleTiered({
+    brief, raw, build: hybridBuild, repair: tierRepair({ cheapTries: 1, maxRounds: 3 }), state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => ({ text: "оберег остаётся в фрагменте и не проходит." }),
+  });
+  assert.equal(stuck.passed, false);
+  assert.match(stuck.repairSkipped, /оберег|summoning|finalInvite/);
+});
+
+test("tiered defaults stay behind the flag; finished-article cost excludes failures", () => {
+  const limits = { model: SZ_DEFAULT_MODEL, maxTokens: 16000 };
+  assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "full" });
+  const tier = szRepairOptions({ "repair-mode": "tiered", "tier-cheap-model": "openai/gpt-oss-120b", "tier-cheap-tries": "2", "tier-cheap-budget": "4", "tier-strong-budget": "6" }, limits);
+  assert.equal(tier.mode, "tiered");
+  assert.equal(tier.cheapModel, "openai/gpt-oss-120b");
+  assert.equal(tier.strongModel, SZ_DEFAULT_MODEL);
+  assert.equal(tier.cheapTries, 2);
+  assert.equal(tier.cheapBudget, 4);
+  assert.equal(tier.strongBudget, 6);
+  assert.throws(() => szRepairOptions({ "repair-mode": "tiered", "tier-strong-model": "unknown" }, limits), (error) => error.code === 1);
+  const pack = szPackCost([{ slug: "a", passed: true, costRub: 4.2 }, { slug: "b", passed: false, costRub: 19.25 }]);
+  assert.deepEqual([pack.finished, pack.total, pack.finishedCostRub, pack.spentRub, pack.costPerFinished], [1, 2, 4.2, 23.45, 4.2]);
+  const report = szReportMarkdown({ calls: [], spentRub: 23.45, warnings: [], articles: [{ slug: "a", passed: true, costRub: 4.2, errorsBeforeRepair: [], errorsAfterRepair: [], repairSkipped: null }, { slug: "b", passed: false, costRub: 19.25, errorsBeforeRepair: [], errorsAfterRepair: [{ field: "description", message: "132" }], repairSkipped: "description: 132" }] });
+  assert.match(report, /стоимость готовой статьи: 4,200 ₽/);
+  assert.match(report, /Готовых статей: 1\/2/);
+  assert.match(report, /Цена одной готовой статьи: 4,200 ₽/);
+});
+
+test("offline price harness compares cheap models and does not call the network", () => {
+  const prices = loadModelPrices();
+  for (const [model, tariff] of Object.entries(TARIFF)) {
+    assert.equal(prices[model].inputPer1M, tariff.inputPer1M, model);
+    assert.equal(prices[model].outputPer1M, tariff.outputPer1M, model);
+  }
+  const full = estimateTieredArticle(prices, { draftModel: "openai/gpt-5.5", cheapModel: "openai/gpt-5.5", strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE, draftOutputTokens: 8000, cheapCalls: 0, strongCalls: 0 });
+  assert.ok(Math.abs(full.total - 62.342) < 0.001, full.total);
+  const [oss, qwen, mini] = ["openai/gpt-oss-120b", "Qwen/Qwen3.6-35B-A3B", "openai/gpt-5.4-mini"].map((model) => estimateTieredArticle(prices, { draftModel: model, cheapModel: model, strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE }));
+  assert.ok(oss.total < 2 && qwen.total < mini.total && mini.total < 15);
+  const withStrong = estimateTieredArticle(prices, { draftModel: "openai/gpt-oss-120b", cheapModel: "openai/gpt-oss-120b", strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE, strongCalls: 1 });
+  assert.ok(withStrong.total > oss.total && withStrong.total < 8);
 });
 
 rmSync(site, { recursive: true, force: true });

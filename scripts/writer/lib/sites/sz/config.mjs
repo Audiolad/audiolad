@@ -35,3 +35,40 @@ export const SZ = {
     contextualLinks: [2, 5],
   },
 };
+
+// Trial 2026-10 (gpt-5.4-mini, paid pack, 0/3 passed): main body 683/809/786 vs gate 880.
+// The previous prompt allowed 1–2 sections of 2 paragraphs × ~60 words plus short steps.
+// That low end is ~700 words, and the JSON schema only has upper bounds, so a finished
+// short JSON still validates. Default --max-tokens 16000 fits ~1000 words; those drafts
+// were short on purpose, not cut off. The band below sits inside the gate with margin.
+const rangeMid = ([min, max]) => (min + max) / 2;
+export const SZ_BODY_PLAN = {
+  target: [950, 1100],
+  sectionsBefore: { count: 2, wordsEach: [220, 250] },
+  tableProse: [80, 100],
+  stepsIntro: [40, 56],
+  stepText: [70, 80],
+  sectionsAfter: 0,
+  specialistIntro: [46, 60],
+  h2: 5,
+  // Headings, table cells, specialist items, phones and disclaimer are inside the gate's
+  // main-body count and are not part of the paragraph budgets above.
+  chromeWords: 180,
+};
+
+export function szBodyPlanBudget(plan = SZ_BODY_PLAN) {
+  const prose = (bound) => plan.sectionsBefore.count * plan.sectionsBefore.wordsEach[bound]
+    + plan.tableProse[bound]
+    + plan.stepsIntro[bound]
+    + 3 * plan.stepText[bound]
+    + plan.specialistIntro[bound];
+  const low = prose(0) + plan.chromeWords;
+  const high = prose(1) + plan.chromeWords;
+  const mid = plan.sectionsBefore.count * rangeMid(plan.sectionsBefore.wordsEach)
+    + rangeMid(plan.tableProse)
+    + rangeMid(plan.stepsIntro)
+    + 3 * rangeMid(plan.stepText)
+    + rangeMid(plan.specialistIntro)
+    + plan.chromeWords;
+  return { low, mid, high };
+}

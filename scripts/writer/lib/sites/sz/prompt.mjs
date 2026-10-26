@@ -2,7 +2,7 @@
 // (fields); everything fixed – carousel, CTA, TOC, player, expert cards with quotes, phones,
 // disclaimer, «Читайте также», final picture – is inserted by assemble.mjs.
 import { normalizeSzFields } from "./assemble.mjs";
-import { SZ } from "./config.mjs";
+import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./config.mjs";
 import { CORRECTIONS, LESSONS, toneSample } from "./knowledge.mjs";
 import { fieldProseDefect } from "./rules.mjs";
 
@@ -74,6 +74,8 @@ const bullets = (items) => items.filter(Boolean).map((item) => `- ${item}`).join
 
 export function buildSzMessages(article, site, { avoid, siblings = new Map() } = {}) {
   const L = SZ.limits;
+  const plan = SZ_BODY_PLAN;
+  const budget = szBodyPlanBudget(plan);
   const titles = (slugs) => slugs.map((slug) => `/s/${slug} – «${site.articles.get(slug)?.title ?? siblings.get(slug) ?? slug}»${siblings.has(slug) ? " (статья этого пакета)" : ""}`);
   const user = [
     `СТАТЬЯ: «${article.title}» (H1 уже задан). Основной запрос: «${article.query}».`,
@@ -82,7 +84,7 @@ export function buildSzMessages(article, site, { avoid, siblings = new Map() } =
     "",
     "СТРУКТУРА (поля JSON):",
     `- seoTitle: ≤ ${L.seoTitleMax} символов, начинается с «${article.query}» (с заглавной), отличается от H1, без названия сайта.`,
-    `- description: ${L.description[0]}–${L.description[1]} символов (считай!), содержит «${article.query}».`,
+    `- description: РОВНО ${L.description[0]}–${L.description[1]} символов. Посчитай символы перед ответом: 116–135 не проходит. Содержит «${article.query}».`,
     `- faqHeading: «Частые вопросы о …» / «Частые вопросы об …», уникальный.`,
     `- story: 3–6 абзацев истории от первого лица (Зоя или героиня), начинается с пика – с прямой речи «…»; прямая речь в первых трёх абзацах. Без оговорок «история вымышлена».`,
     `- transition: последний абзац истории – мостик к теме, содержит запрос «${article.query}» как есть (не жирным).`,
@@ -90,20 +92,21 @@ export function buildSzMessages(article, site, { avoid, siblings = new Map() } =
     "- invitation: 1–2 предложения – приглашение выбрать одного из четырёх ангелов (слово «ангел» обязательно).",
     `- question: короткий вопрос-приглашение со знаком «?», без запроса «${article.query}» (будет жирным).`,
     `- practiceIntro: 1–2 абзаца по ≤ ${L.practiceIntroWords} слов о практике «${article.practice.title}» (${article.practice.author}, ${article.practice.duration}). Свойства практики – ТОЛЬКО из материалов ниже, ничего не придумывай. Только позитивно.`,
-    `- checklist: title (например «5 шагов, чтобы …»), feedbackEmpty/Start/Half/Done – короткие ободряющие фразы; items – ровно 5 действий по ≤ ${L.checklistWords} слов, глаголом в повелительном наклонении.`,
+    `- checklist: title (например «5 шагов, чтобы …»), feedbackEmpty/Start/Half/Done – короткие ободряющие фразы; items – ровно 5 действий по 2–${L.checklistWords} слов, глаголом в повелительном наклонении. Короткая команда («Наденьте наушники.») подходит; одно слово и заглушка – нет.`,
     `- psychologyIntro: один абзац перед карточками экспертов (раздел «${article.query}: что говорит психология» – заголовок вставит сайт).`,
     "- experts: ровно 2, в порядке брифа: name (как в брифе), thesis – короткий тезис карточки (3–7 слов, со строчной), bridge – 2–3 предложения: что эксперт говорит в цитате (с учётом контекста) и чем это полезно читателю. Не приписывай эксперту того, чего он не говорит (см. «не говорит»). Цитату не пересказывай в кавычках – её вставит сайт.",
-    "- sectionsBefore: 1–2 раздела {title, paragraphs (2–4 абзаца по 60–110 слов)} – суть темы.",
-    "- tableSection: раздел со сравнительной таблицей: title, paragraphsBefore (1 абзац), columns (3–4), rows (3–5 строк, по одному короткому значению на колонку), paragraphsAfter (0–1 абзац).",
-    "- steps: title начинается с «Три шага, чтобы …»; intro – 1 абзац; items – ровно 3 {title – повелительный глагол, без цифр и без «Если»; text – 50–90 слов}.",
-    "- sectionsAfter: 0–1 раздел {title, paragraphs}.",
-    "- specialist: intro – 1 абзац о том, когда нужна помощь специалиста (заголовок, телефоны и дисклеймер вставит сайт); items – 3–5 признаков, каждый со строчной буквы и с «;» в конце (последний – с «.»).",
-    `- faq: ровно ${L.faqCount} вопросов; ответы ${L.faqAnswer[0]}–${L.faqAnswer[1]} слов каждый (считай!); один вопрос – про то, когда обратиться к психологу/специалисту. Вопросы и заголовки не повторяют уже опубликованные на сайте.`,
+    `- sectionsBefore: ровно ${plan.sectionsBefore.count} раздела {title, paragraphs}. Каждый раздел ${plan.sectionsBefore.wordsEach[0]}–${plan.sectionsBefore.wordsEach[1]} слов (2–3 абзаца). Не добавляй третий.`,
+    `- tableSection: раздел со сравнительной таблицей: title, paragraphsBefore + paragraphsAfter вместе ${plan.tableProse[0]}–${plan.tableProse[1]} слов, columns (3–4), rows (3–5 строк, по одному короткому значению на колонку).`,
+    `- steps: title начинается с «Три шага, чтобы …»; intro ${plan.stepsIntro[0]}–${plan.stepsIntro[1]} слов; items – ровно 3 {title – повелительный глагол, без цифр и без «Если»; text ${plan.stepText[0]}–${plan.stepText[1]} слов}.`,
+    "- sectionsAfter: пустой массив []. Лишний раздел даёт седьмой H2, гейт его отклоняет.",
+    `- specialist: intro ${plan.specialistIntro[0]}–${plan.specialistIntro[1]} слов о том, когда нужна помощь специалиста (заголовок, телефоны и дисклеймер вставит сайт); items – 3–5 признаков, каждый со строчной буквы и с «;» в конце (последний – с «.»).`,
+    `- faq: ровно ${L.faqCount} вопросов; каждый ответ 45–70 слов (гейт ${L.faqAnswer[0]}–${L.faqAnswer[1]}, 39 слов не проходит – посчитай). Один вопрос – про то, когда обратиться к психологу/специалисту. Вопросы и заголовки не повторяют уже опубликованные на сайте и другие статьи пакета.`,
     "- storyEnding: 2–3 предложения – чем закончилась история из начала (вставится после «**Чем закончилась история.**»).",
     "- finalInvite: 1 предложение – мягкое приглашение вернуться к образу ангела; finalQuestion: короткий вопрос со «?».",
     "",
     "ОБЪЁМ:",
-    `- От первого H2 после карточек экспертов до FAQ (все sections, tableSection, steps, specialist): ${L.mainBody[0]}–${L.mainBody[1]} слов; всего H2 в этой части ${L.bodyH2[0]}–${L.bodyH2[1]} (включая «Три шага» и «Когда стоит обратиться к специалисту»).`,
+    `- ЦЕЛЬ основной части (от первого H2 после карточек экспертов до FAQ): ${plan.target[0]}–${plan.target[1]} слов, ориентир середины диапазонов ≈ ${Math.round(budget.mid)} слов. Гейт пропускает ${L.mainBody[0]}–${L.mainBody[1]}, но черновик на 680–810 не проходит. Не останавливайся на нижней границе каждого раздела сразу.`,
+    `- H2 в этой части: ${plan.h2} (ровно ${plan.sectionsBefore.count} раздела + таблица + «Три шага» + «Когда стоит обратиться к специалисту»). Гейт: ${L.bodyH2[0]}–${L.bodyH2[1]}. Семь и больше – ошибка.`,
     `- Вся статья с FAQ: ${L.total[0]}–${L.total[1]} слов.`,
     `- Запрос «${article.query}» в тексте статьи всего ${L.mainQuery[0]}–${L.mainQuery[1]} раза (с учётом transition), не в жирном.`,
     "",

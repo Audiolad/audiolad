@@ -8,7 +8,9 @@ import { copyFileSync, existsSync, mkdirSync, realpathSync, symlinkSync } from "
 import { join, resolve } from "node:path";
 
 import { BudgetError, makeCaller } from "../../call.mjs";
-import { SUPPORTED_MODELS, formatRub, parseMaxTokens } from "../../cost.mjs";
+import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, formatRub, parseMaxRub, parseMaxTokens } from "../../cost.mjs";
+import { szPackCost } from "./metrics.mjs";
+import { repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "../../publish.mjs";
 import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } from "../../util.mjs";
 import { DISCOMFORT_PATTERNS as BASE_DISCOMFORT } from "../../validate.mjs";
@@ -134,7 +136,15 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   writeJson(join(outDir, "pack.json"), pack);
   const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate });
 
-  const callRepair = makeCaller({ ...repair, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate });
+  const callRepair = makeCaller({ model: repair.model, maxTokens: repair.maxTokens, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate });
+  const callTier = repair.mode === "tiered" ? ((tier, name, messages, schema) => {
+    const caller = makeCaller({
+      model: tier === "strong" ? repair.strongModel : repair.cheapModel,
+      maxTokens: tier === "strong" ? repair.strongMaxTokens : repair.cheapMaxTokens,
+      maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_fragment", generate,
+    });
+    return caller(name, messages, schema);
+  }) : null;
 
   let code = 0;
   try {
@@ -184,16 +194,46 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         raw = callWriter(`${brief.slug}-generate`, messages, schema);
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
-      const { result, errors, errorsBeforeRepair, repairSkipped } = repairSzArticle({
-        brief, raw, build, messages, schema, repair, callRepair, state, args,
-      });
+      const repaired = repair.mode === "tiered"
+        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args })
+        : repairSzArticle({ brief, raw, build, messages, schema, repair, callRepair, state, args });
+      const { result, errors, errorsBeforeRepair, repairSkipped } = repaired;
       writeJson(join(outDir, brief.slug, "fields.json"), result.fields);
       writeText(join(outDir, brief.slug, `${brief.slug}.md`), result.md);
       for (const error of errors) log(`  ✗ ${brief.slug} ${error.field}: ${error.message}`);
-      state.articles.push({ slug: brief.slug, errorsBeforeRepair, errorsAfterRepair: errors, repairSkipped, errors, warnings: result.problems.filter((problem) => problem.severity !== "error") });
-      items.push({ brief, cfg, fields: result.fields, md: result.md });
+      const costRub = state.calls.filter((call) => String(call.name).startsWith(`${brief.slug}-`)).reduce((sum, call) => sum + (call.costRub || 0), 0);
+      const passed = errors.length === 0;
+      state.articles.push({
+        slug: brief.slug, errorsBeforeRepair, errorsAfterRepair: errors, repairSkipped, errors, passed, costRub, finishedCostRub: passed ? costRub : null,
+        warnings: result.problems.filter((problem) => problem.severity !== "error"),
+      });
+      items.push({ brief, cfg, fields: result.fields, md: result.md, build });
     }
-    const packProblems = checkSzPack(items);
+    let packProblems = checkSzPack(items);
+    if (repair.mode === "tiered" && packProblems.length) {
+      for (const item of items) item.packProblems = packProblems;
+      repairSzPackDuplicates({ items, repair, callTier, state, args });
+      for (const item of items) {
+        const rebuilt = item.build(item.fields);
+        item.fields = rebuilt.fields;
+        item.md = rebuilt.md;
+        const errors = rebuilt.problems.filter((problem) => problem.severity === "error");
+        const article = state.articles.find((entry) => entry.slug === item.brief.slug);
+        if (article) {
+          article.errors = errors;
+          article.errorsAfterRepair = errors;
+          article.passed = errors.length === 0;
+          article.costRub = state.calls.filter((call) => String(call.name).startsWith(`${item.brief.slug}-`)).reduce((sum, call) => sum + (call.costRub || 0), 0);
+          article.finishedCostRub = article.passed ? article.costRub : null;
+          article.repairSkipped = article.passed ? null : errors.map((error) => `${error.field}: ${error.message}`).join("; ");
+        }
+      }
+      packProblems = checkSzPack(items);
+    }
+    const packCost = szPackCost(state.articles);
+    state.finishedArticles = packCost.finished;
+    state.finishedCostRub = packCost.finishedCostRub;
+    state.costPerFinished = packCost.costPerFinished;
     for (const problem of packProblems) log(`  ✗ пакет ${problem.slug ?? ""}: ${problem.message}`);
     state.packProblems = packProblems;
     if (packProblems.length || state.articles.some((article) => article.errors.length)) throw new SzStop(2, `пакет не прошёл проверки – PR не создан (черновики в ${outDir})`);
@@ -260,20 +300,52 @@ export function prBody(state, items, pack, stage) {
   ].join("\n");
 }
 
+function parseTierTries(raw) {
+  const text = String(raw ?? "2");
+  if (!/^[1-4]$/.test(text)) throw new SzStop(1, `--tier-cheap-tries: целое от 1 до 4, получено «${raw}»`);
+  return Number(text);
+}
+
 export function szRepairOptions(args, { model, maxTokens }) {
   const repairModel = args["repair-model"] ?? model;
-  for (const candidate of [model, repairModel]) {
+  const mode = args["repair-mode"] ?? "full";
+  if (!["full", "targeted", "tiered"].includes(mode)) throw new SzStop(1, "--repair-mode: full, targeted или tiered");
+  const candidates = mode === "tiered"
+    ? [model, args["tier-cheap-model"] ?? "openai/gpt-5.4-mini", args["tier-strong-model"] ?? SZ_DEFAULT_MODEL]
+    : [model, repairModel];
+  for (const candidate of candidates) {
     if (!SUPPORTED_MODELS.includes(candidate)) throw new SzStop(1, `Модель ${candidate} не поддерживается. Доступны: ${SUPPORTED_MODELS.join(", ")}`);
   }
-  const mode = args["repair-mode"] ?? "full";
-  if (!["full", "targeted"].includes(mode)) throw new SzStop(1, "--repair-mode: full или targeted");
-  return { model: repairModel, maxTokens: parseMaxTokens(args["repair-max-tokens"] ?? maxTokens, "--repair-max-tokens"), mode };
+  const base = { model: repairModel, maxTokens: parseMaxTokens(args["repair-max-tokens"] ?? maxTokens, "--repair-max-tokens"), mode };
+  if (mode !== "tiered") return base;
+  return {
+    ...base,
+    cheapModel: args["tier-cheap-model"] ?? "openai/gpt-5.4-mini",
+    strongModel: args["tier-strong-model"] ?? SZ_DEFAULT_MODEL,
+    cheapTries: parseTierTries(args["tier-cheap-tries"]),
+    cheapMaxTokens: parseMaxTokens(args["tier-cheap-max-tokens"] ?? "800", "--tier-cheap-max-tokens"),
+    strongMaxTokens: parseMaxTokens(args["tier-strong-max-tokens"] ?? "1200", "--tier-strong-max-tokens"),
+    cheapBudget: parseMaxRub(args["tier-cheap-budget"] ?? "8", "--tier-cheap-budget"),
+    strongBudget: parseMaxRub(args["tier-strong-budget"] ?? "6", "--tier-strong-budget"),
+  };
 }
 
 export function szReportMarkdown(state) {
   const lines = ["# Отчёт Райтера sz", "", ...state.calls.map((call) => `- ${call.name}: ${call.model ?? "offline"} – ${formatRub(call.costRub)}${call.costEstimated ? " (худший случай: нет usage)" : ""}`), "", `Итого: ${formatRub(state.spentRub)}`, ""];
   for (const article of state.articles) {
-    lines.push(`## ${article.slug}`, "", `repairSkipped: ${article.repairSkipped ?? "нет"}`, "", "До repair:", ...article.errorsBeforeRepair.map((p) => `- ${p.field}: ${p.message}`), "", "После repair:", ...article.errorsAfterRepair.map((p) => `- ${p.field}: ${p.message}`), "");
+    lines.push(`## ${article.slug}`, "", `repairSkipped: ${article.repairSkipped ?? "нет"}`, "");
+    if (typeof article.costRub === "number") lines.push(article.passed ? `стоимость готовой статьи: ${formatRub(article.costRub)}` : `потрачено без прохождения гейта: ${formatRub(article.costRub)}`, "");
+    lines.push("До repair:", ...(article.errorsBeforeRepair ?? []).map((p) => `- ${p.field}: ${p.message}`), "", "После repair:", ...(article.errorsAfterRepair ?? []).map((p) => `- ${p.field}: ${p.message}`), "");
+  }
+  if (state.articles?.some((article) => typeof article.costRub === "number")) {
+    const pack = szPackCost(state.articles);
+    lines.push(
+      `Готовых статей: ${pack.finished}/${pack.total}`,
+      `Стоимость готовых: ${formatRub(pack.finishedCostRub)}`,
+      `Всего по статьям: ${formatRub(pack.spentRub)}`,
+      pack.costPerFinished == null ? "Цена одной готовой статьи: нет готовых" : `Цена одной готовой статьи: ${formatRub(pack.costPerFinished)}`,
+      "",
+    );
   }
   lines.push(...state.warnings.map((warning) => `- ⚠ ${warning}`));
   if (state.failure) lines.push("", `СТОП: ${state.failure}`);

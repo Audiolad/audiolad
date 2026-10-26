@@ -38,7 +38,9 @@ export function proseLimit(path) {
   if (key === "bridge" || key === "storyEnding") return { minWords: 8, minSentences: 2 };
   if (key === "columns" || key === "rows") return { minWords: 1, minSentences: 0 };
   if (key === "title" || key === "seoTitle" || key === "faqHeading") return { minWords: 2, minSentences: 0 };
-  if (key === "question" || key === "finalQuestion" || (key === "items" && (parent === "checklist" || parent === "specialist")) || key.startsWith("feedback")) return { minWords: 3, minSentences: 0 };
+  // «Наденьте наушники.» is a real imperative (2 words). «а», «б» and «главная мысль» still fail.
+  if (key === "items" && parent === "checklist") return { minWords: 2, minSentences: 0 };
+  if (key === "question" || key === "finalQuestion" || (key === "items" && parent === "specialist") || key.startsWith("feedback")) return { minWords: 3, minSentences: 0 };
   return { minWords: 4, minSentences: 0 };
 }
 /** Null when the text is still substantive after normalization. */
