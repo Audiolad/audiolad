@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   const result = await handleWorkspaceTrackUrl(body, {
     access: async () => (actor.playerOpen ? "open" : "closed"),
     allowedIds: async () => allowed,
-    sign: (audioItemId) => signWorkspaceAudio(audioItemId, new Set(allowed), undefined, actor.locationId),
+    sign: (audioItemId) => signWorkspaceAudio(audioItemId, new Set(allowed), actor.locationId),
   });
   const status = !result.ok && result.reason === "invalid_request" ? 400 : 200;
   return NextResponse.json(result, { status, headers: NO_STORE });

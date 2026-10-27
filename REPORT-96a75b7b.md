@@ -16,8 +16,10 @@ production connection, issue changes or author notifications.
   within the page, automatic selection after save, and a filtered unchecked mode
   with pagination to continue across the whole queue. Decisions persist in DB.
 - One in-page audio element switches sources, supports seeking and stops after
-  15/30 seconds from playback/seek position. It uses the existing verified stream /
-  legacy signed-source resolver, metadata preload, and no download action.
+  15/30 seconds from playback/seek position. Playback is a same-origin admin
+  stream that re-checks both admin permissions on every request, does not give
+  the browser a storage signed URL, and caps each response to the preview window.
+  Cabinet and SPA signing are unchanged. No download action.
 - Atomic audited decisions, locked against concurrent replacement, stale audio
   version rejection. Changing source path/master/delivery pointer resets all
   decisions to unchecked, clears the current reason and appends a system event.

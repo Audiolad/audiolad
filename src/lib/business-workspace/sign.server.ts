@@ -1,7 +1,7 @@
 import "server-only";
 import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
 import { parseBusinessEligibilityPayload } from "@/lib/business-app/eligibility";
-import { sameSoundAudioIdentity } from "@/lib/business/track-sound-review.server";
+import { workspaceSignBlocked } from "@/lib/business-workspace/sign-gate";
 
 import { resolveMusicListenSource, type MusicStreamCandidate } from "@/lib/listen/music-delivery";
 import { LISTEN_SIGNED_URL_TTL_SECONDS, normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -10,7 +10,6 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export async function signWorkspaceAudio(
   audioItemId: string,
   allowed: ReadonlySet<string>,
-  expectedAudioIdentity?: string,
   locationId?: string | null,
 ): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
   if (!allowed.has(audioItemId)) return { ok: false, reason: "not_in_manifest" };
@@ -27,10 +26,7 @@ export async function signWorkspaceAudio(
     .eq("id", audioItemId)
     .maybeSingle();
   if (error || !row) return { ok: false, reason: "not_in_manifest" };
-  // Admin preview passes the queue identity and may play a track that is not yet Допущен.
-  if (expectedAudioIdentity) {
-    if (!sameSoundAudioIdentity(expectedAudioIdentity, row)) return { ok: false, reason: "audio_replaced_reload" };
-  } else if (locationId && await businessManualContentGateEnabled(db)) {
+  if (locationId && await businessManualContentGateEnabled(db)) {
     const decision = await db.rpc("resolve_business_track_eligibility", {
       p_audio_item_id: audioItemId,
       p_location_id: locationId,
@@ -38,7 +34,9 @@ export async function signWorkspaceAudio(
       p_use_type: "business_background_playback",
     });
     const parsed = decision.error ? null : parseBusinessEligibilityPayload(decision.data, audioItemId);
-    if (!parsed || parsed.decision !== "ELIGIBLE") return { ok: false, reason: "audio_replaced_reload" };
+    if (workspaceSignBlocked({ gateOn: true, locationId, decision: parsed?.decision ?? null })) {
+      return { ok: false, reason: "audio_replaced_reload" };
+    }
   }
 
   let activeStream: MusicStreamCandidate | null = null;

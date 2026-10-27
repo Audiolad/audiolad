@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireAdminPermission } from '@/lib/admin/guard';
-import { isSoundReviewStatus, type SoundReviewHistory, type SoundReviewRow } from '@/lib/business/track-sound-review';
-import { signWorkspaceAudio } from '@/lib/business-workspace/sign.server';
+import { isSoundReviewStatus, type SoundReviewHistory } from '@/lib/business/track-sound-review';
+import { locateSoundReviewRow } from '@/lib/business/track-sound-preview.server';
+import { businessTrackPreviewHref } from '@/lib/business/track-sound-preview';
 import { createClient } from '@/lib/supabase/server';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -32,25 +33,13 @@ export async function previewBusinessTrack(id: string, audioIdentity: string) {
   if (typeof id !== 'string' || !UUID.test(id) || typeof audioIdentity !== 'string' || audioIdentity.length > 4000) {
     return { ok: false as const, reason: 'invalid_request' };
   }
-  // Guard the queue membership and identity with the same session RPC as the page.
-  // Filter by album is derived from the requested track, never trusted from the client.
+  // The playback route checks the same grants again. This only fails fast for the button.
   const db = await createClient();
-  // Public track metadata is readable to the administrator; all decisions stay in guarded RPCs.
-  const { data: audio } = await db.from('audio_items').select('practice_id').eq('id', id).maybeSingle();
-  if (!audio) return { ok: false as const, reason: 'not_in_queue' };
-  const { data, error } = await db.rpc('admin_business_sound_queue', { p_album: audio.practice_id, p_page: 0 });
-  if (error) return { ok: false as const, reason: 'not_in_queue' };
-  // Albums can exceed one page. Walk the server queue without a fixed row ceiling.
-  let rows = data.rows as SoundReviewRow[];
-  let row = rows.find((item) => item.id === id);
-  for (let page = 1; !row && page * 100 < data.total; page++) {
-    const next = await db.rpc('admin_business_sound_queue', { p_album: audio.practice_id, p_page: page });
-    if (next.error) break;
-    rows = next.data.rows as SoundReviewRow[];
-    row = rows.find((item) => item.id === id);
+  const row = await locateSoundReviewRow(db, id);
+  if (!row || row.audio_identity !== audioIdentity) {
+    return { ok: false as const, reason: row ? 'audio_replaced_reload' : 'not_in_queue' };
   }
-  if (!row || row.audio_identity !== audioIdentity) return { ok: false as const, reason: 'audio_replaced_reload' };
-  return signWorkspaceAudio(id, new Set([id]), audioIdentity);
+  return { ok: true as const, url: businessTrackPreviewHref(id, audioIdentity) };
 }
 
 export async function businessTrackReviewHistory(id: string, before?: number): Promise<SoundReviewHistory[]> {
