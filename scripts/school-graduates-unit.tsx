@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { selectGraduateProducts, validateGraduateProductIds, graduateText, type SchoolGraduate } from "../src/lib/school/graduates";
+import { graduateCarouselEdges, graduateCarouselStep } from "../src/components/school-graduates/carousel";
 import { getPublishedCatalogProducts, type CatalogProduct } from "../src/lib/products/catalog";
 import { mapCatalogProductToListingItem } from "../src/lib/catalog/listing";
 import GraduateProducts from "../src/components/school-graduates/GraduateProducts";
@@ -97,9 +98,13 @@ for (const school of [true, false]) {
   assert.ok(html.includes("2 мин"));
   if (school) {
     assert.ok(html.includes("school-graduates") && html.includes("school-graduates__row") && html.includes("school-graduates__card"), "landing block uses the school section shell");
+    assert.ok(html.includes('aria-label="Назад"') && html.includes('aria-label="Вперёд"'), "desktop controls are in the school block");
+    assert.equal([...html.matchAll(/school-graduates__arrow[^>]*hidden=""/g)].length, 2, "arrows stay hidden until the row actually overflows");
+    assert.ok(html.includes("school-graduates__fade--start") && html.includes("school-graduates__fade--end"));
     assert.ok(!html.includes("max-w-6xl"));
   } else {
     assert.ok(html.includes("overflow-x-auto") && html.includes("snap-x") && html.includes("shrink-0"), "cards remain in one scrollable row");
+    assert.ok(!html.includes("school-graduates__arrow") && !html.includes("Назад"), "non-school row has no desktop arrows");
   }
   assert.ok(!html.includes("grid-cols-"));
   const links = [...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
@@ -108,6 +113,21 @@ for (const school of [true, false]) {
   assert.ok(!html.includes("—"));
   if (school) writeFileSync("/tmp/03f7-graduate-products.html", html);
 }
+assert.deepEqual(graduateCarouselEdges(0, 400, 400), { overflow: false, canPrev: false, canNext: false });
+assert.deepEqual(graduateCarouselEdges(0, 1000, 300), { overflow: true, canPrev: false, canNext: true });
+assert.deepEqual(graduateCarouselEdges(350, 1000, 300), { overflow: true, canPrev: true, canNext: true });
+assert.deepEqual(graduateCarouselEdges(700, 1000, 300), { overflow: true, canPrev: true, canNext: false });
+assert.equal(graduateCarouselStep(280, 14, 1), 294);
+assert.equal(graduateCarouselStep(280, 14, -1), -294);
+const graduatesCss = readFileSync("src/components/school/school-landing.css", "utf8");
+assert.match(graduatesCss, /flex:\s*0 0 80%/, "mobile card width stays a peek of the next card");
+assert.match(graduatesCss, /min-width:\s*768px\)[\s\S]*flex-basis:\s*calc\(\(100% - 0\.85rem\) \/ 2\)/);
+assert.match(graduatesCss, /min-width:\s*1024px\)[\s\S]*flex-basis:\s*calc\(\(100% - 3 \* 0\.85rem\) \/ 3\.3\)/);
+assert.match(graduatesCss, /\.school-graduates__arrow,\s*\.school-graduates__fade \{\s*display:\s*none;/);
+assert.match(graduatesCss, /\.school-graduates__arrow\[hidden\] \{\s*display:\s*none !important;/);
+const scrollerSource = readFileSync("src/components/school-graduates/SchoolGraduateScroller.tsx", "utf8");
+assert.equal(scrollerSource.includes("—"), false);
+assert.equal(readFileSync("src/components/school-graduates/GraduateProducts.tsx", "utf8").includes("—"), false);
 const schoolPage = readFileSync("src/app/(platform)/school-site/page.tsx", "utf8");
 assert.match(schoolPage, /<SchoolTestimonialsScreen \/>\s*<SchoolGraduateShowcase school \/>\s*<SchoolFaqScreen \/>/, "showcase must directly follow testimonials and precede FAQ");
 const catalogPage = readFileSync("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx", "utf8");
