@@ -22,7 +22,6 @@ import {
   LISTENER_IMPRESSION_ERROR,
   LISTENER_IMPRESSION_HIDDEN,
   LISTENER_IMPRESSION_LOAD_MORE,
-  LISTENER_IMPRESSION_PRIVACY,
   OWNER_COMMENT_DELETE_CONFIRM,
   OWNER_COMMENT_DELETE_LABEL,
   LISTENER_IMPRESSION_REPLY_ACTION,
@@ -224,12 +223,6 @@ export default function PracticeComments({
       <h2 id="listener-impressions-title" className="text-[22px] font-semibold text-[#2b2144]">
         {LISTENER_IMPRESSIONS_TITLE}
       </h2>
-      <p
-        className="mt-2 w-full min-w-0 max-w-full whitespace-normal break-words text-sm leading-6 text-[#6d628c]"
-        data-listener-impression-privacy="true"
-      >
-        {LISTENER_IMPRESSION_PRIVACY}
-      </p>
       {showInvite ? (
         <div className="mt-4">
           <ListenerImpressionInvite

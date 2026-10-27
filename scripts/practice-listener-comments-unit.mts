@@ -29,7 +29,6 @@ import {
   LISTENER_IMPRESSION_INVITE,
   LISTENER_IMPRESSION_LOAD_MORE,
   LISTENER_IMPRESSION_PLACEHOLDER,
-  LISTENER_IMPRESSION_PRIVACY,
   LISTENER_IMPRESSION_SIGN_IN,
   LISTENER_IMPRESSION_SUBMIT,
   moderationActorLabel,
@@ -209,16 +208,17 @@ async function testPrivacyAndXss() {
   );
   assert.equal(commentFingerprint("  Стало   спокойнее "), "стало спокойнее");
   assert.doesNotMatch(LISTENER_IMPRESSION_INVITE, /дискомфорт|лечен|гарант|терап|исцел/i);
-  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /дискомфорт|лечен|гарант|терап|исцел|диагноз|Не указывайте/i);
   assert.match(LISTENER_IMPRESSION_INVITE, /–/);
   assert.doesNotMatch(LISTENER_IMPRESSION_INVITE, /—/);
-  assert.match(LISTENER_IMPRESSION_PRIVACY, /Публикуется имя из поля/);
-  assert.match(LISTENER_IMPRESSION_PRIVACY, /Его можно сократить перед публикацией/);
-  assert.match(LISTENER_IMPRESSION_PRIVACY, /Почта не показывается/);
-  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /Фамилия и почта не показываются/);
-  assert.match(LISTENER_IMPRESSION_PRIVACY, /Поделитесь впечатлением от прослушивания/);
-  assert.match(LISTENER_IMPRESSION_PRIVACY, /–/);
-  assert.doesNotMatch(LISTENER_IMPRESSION_PRIVACY, /—/);
+  const impressionsCopy = read("src/lib/practice-comments/copy.ts");
+  assert.match(impressionsCopy, /export const LISTENER_IMPRESSIONS_TITLE = "Впечатления"/);
+  assert.doesNotMatch(impressionsCopy, /LISTENER_IMPRESSION_PRIVACY/);
+  assert.doesNotMatch(impressionsCopy, /Отзыв виден на странице продукта/);
+  assert.doesNotMatch(impressionsCopy, /Публикуется имя из поля/);
+  assert.doesNotMatch(impressionsCopy, /Его можно сократить перед публикацией/);
+  assert.doesNotMatch(impressionsCopy, /Почта не показывается/);
+  assert.doesNotMatch(impressionsCopy, /Поделитесь впечатлением от прослушивания/);
+  assert.doesNotMatch(impressionsCopy, /Это по желанию и ни на что не влияет/);
   assert.equal(MODERATION_ACTION_LABELS.hide, "Скрыт");
   assert.equal(MODERATION_ACTION_LABELS.report, "Жалоба");
   assert.equal(REPORT_REASON_LABELS.spam, "Спам");
@@ -1063,8 +1063,13 @@ async function testSignedInListenerSeesComposer() {
   assert.match(commentsUi, /comment\.mine/);
   assert.match(read("src/components/products/practice-page/ListenerCommentComposer.tsx"), /mode === "hidden"/);
   assert.match(read("src/lib/practice-comments/supabase-store.ts"), /listener_comment_own_lookup_failed/);
-  assert.match(commentsUi, /data-listener-impression-privacy="true"/);
-  assert.match(commentsUi, /whitespace-normal break-words/);
+  assert.doesNotMatch(commentsUi, /data-listener-impression-privacy/);
+  assert.doesNotMatch(commentsUi, /LISTENER_IMPRESSION_PRIVACY/);
+  assert.doesNotMatch(commentsUi, /Отзыв виден на странице продукта/);
+  assert.match(
+    commentsUi,
+    /\{LISTENER_IMPRESSIONS_TITLE\}[\s\S]{0,500}aria-label="Порядок отзывов"[\s\S]{0,400}\{LISTENER_IMPRESSION_SORT_NEW\}[\s\S]{0,250}\{LISTENER_IMPRESSION_SORT_OLD\}/,
+  );
   assert.match(
     read("src/app/(platform)/(listener)/practice/[...segments]/layout.tsx"),
     /min-w-0 max-w-full/,
