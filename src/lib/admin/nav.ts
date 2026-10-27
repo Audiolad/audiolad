@@ -11,6 +11,8 @@ export type AdminNavItem = {
   href: string;
   label: string;
   requiredPermission: PlatformPermission;
+  /** When set, the item is visible if the viewer has any of these permissions. */
+  anyPermissions?: readonly PlatformPermission[];
   /** Service routes that should highlight this item without appearing in the menu. */
   activePrefixes?: readonly string[];
   match: (path: string) => boolean;
@@ -74,6 +76,7 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     href: "/admin/listener-comments",
     label: "Отзывы слушателей",
     requiredPermission: "products.moderate",
+    anyPermissions: ["products.moderate", "analytics.view"],
     match: (path) => path.startsWith("/admin/listener-comments"),
   },
   {
@@ -135,9 +138,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
 export function getVisibleAdminNavItems(
   access: PlatformAccessSnapshot,
 ): AdminNavItem[] {
-  return ADMIN_NAV_ITEMS.filter((item) =>
-    snapshotHasPermission(access, item.requiredPermission),
-  );
+  return ADMIN_NAV_ITEMS.filter((item) => {
+    const permissions = item.anyPermissions ?? [item.requiredPermission];
+    return permissions.some((permission) =>
+      snapshotHasPermission(access, permission),
+    );
+  });
 }
 
 export function findAdminNavItemForPath(path: string): AdminNavItem | null {

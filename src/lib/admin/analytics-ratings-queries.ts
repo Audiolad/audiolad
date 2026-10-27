@@ -14,6 +14,7 @@ import {
   parseAdminRatingsAuthorSort,
   parseAdminRatingsPeriod,
   parseAdminRatingsProductSort,
+  tallyListenerReviewCounts,
   throwIfAdminRatingsRpcFailed,
   type AdminRatingsAuthorRow,
   type AdminRatingsBreakdownBundle,
@@ -147,6 +148,38 @@ export async function getAdminRatingsSummaryBundle(input: {
   };
 }
 
+/**
+ * Published text reviews next to star aggregates. A missing comments table
+ * leaves the cell empty; it does not fail the ratings breakdown.
+ */
+async function loadPublishedReviewCounts(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  practiceIds: string[],
+): Promise<Map<string, number> | null> {
+  if (practiceIds.length === 0) return new Map();
+  const counts = new Map<string, number>();
+  const pageSize = 1000;
+  for (let from = 0; from <= 20000; from += pageSize) {
+    const { data, error } = await supabase
+      .from("practice_listener_comments")
+      .select("practice_id")
+      .eq("kind", "impression")
+      .eq("status", "published")
+      .in("practice_id", practiceIds)
+      .range(from, from + pageSize - 1);
+    if (error) {
+      console.error("admin_ratings_review_counts_error", error.message);
+      return null;
+    }
+    const rows = data ?? [];
+    for (const [id, count] of tallyListenerReviewCounts(rows)) {
+      counts.set(id, (counts.get(id) ?? 0) + count);
+    }
+    if (rows.length < pageSize) return counts;
+  }
+  return counts;
+}
+
 export async function getAdminRatingsBreakdownBundle(input: {
   q?: string | null;
   productsSort?: string | null;
@@ -216,6 +249,7 @@ export async function getAdminRatingsBreakdownBundle(input: {
             ratingCount: asNumber(r.rating_count),
             average,
             averageFormatted: formatAdminAverageStars(average),
+            reviewCount: null,
             stars7d: asNumber(r.stars_7d),
             count7d: asNumber(r.count_7d),
             stars30d: asNumber(r.stars_30d),
@@ -228,6 +262,16 @@ export async function getAdminRatingsBreakdownBundle(input: {
         ];
       })
     : [];
+
+  const reviewCounts = await loadPublishedReviewCounts(
+    supabase,
+    productRows.map((row) => row.practiceId),
+  );
+  const productRowsWithReviews = productRows.map((row) => ({
+    ...row,
+    reviewCount:
+      reviewCounts == null ? null : (reviewCounts.get(row.practiceId) ?? 0),
+  }));
 
   const authorRows = Array.isArray(authorsRaw.rows)
     ? authorsRaw.rows.flatMap((row) => {
@@ -258,7 +302,7 @@ export async function getAdminRatingsBreakdownBundle(input: {
   return {
     products: {
       total: asNumber(productsRaw.total),
-      rows: productRows,
+      rows: productRowsWithReviews,
       sort: parseAdminRatingsProductSort(asText(productsRaw.sort)),
       sortDir: productsRaw.sort_dir === "asc" ? "asc" : "desc",
       error: null,

@@ -324,6 +324,7 @@ export default function AdminRatingsPanel({
           "total_stars",
           "rating_count",
           "average",
+          "review_count",
           "stars_7d",
           "count_7d",
           "stars_30d",
@@ -338,6 +339,7 @@ export default function AdminRatingsPanel({
           row.totalStars,
           row.ratingCount,
           row.averageFormatted,
+          row.reviewCount ?? "",
           row.stars7d,
           row.count7d,
           row.stars30d,
@@ -552,6 +554,7 @@ export default function AdminRatingsPanel({
                       </button>
                     </th>
                     <th className="px-2 py-2">Средняя</th>
+                    <th className="px-2 py-2">Отзывы</th>
                     <th className="px-2 py-2">
                       <button
                         type="button"
@@ -619,6 +622,14 @@ export default function AdminRatingsPanel({
                         {row.ratingCount.toLocaleString("ru-RU")}
                       </td>
                       <td className="px-2 py-3">{row.averageFormatted}</td>
+                      <td
+                        className="px-2 py-3"
+                        data-admin-ratings-review-count={row.practiceId}
+                      >
+                        {row.reviewCount == null
+                          ? "–"
+                          : row.reviewCount.toLocaleString("ru-RU")}
+                      </td>
                       <td className="px-2 py-3">
                         {row.stars7d.toLocaleString("ru-RU")}
                       </td>

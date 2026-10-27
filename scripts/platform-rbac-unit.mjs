@@ -121,6 +121,7 @@ assert.deepEqual(
     "/admin",
     "/admin/author-applications",
     "/admin/commercial-applications",
+    "/admin/listener-comments",
     "/admin/catalog-sections",
     "/admin/tracks",
     "/admin/seo-queries",
@@ -147,6 +148,13 @@ assert.equal(
   editorNav.some((item) => item.href === "/admin/payout-profiles"),
   false,
   "editor must not see payout profiles nav",
+);
+
+const analystNav = getVisibleAdminNavItems(accessForRoles(["analyst"]));
+assert.deepEqual(
+  analystNav.map((item) => item.href),
+  ["/admin", "/admin/listener-comments"],
+  "analyst opens star ratings from the listener reviews section",
 );
 
 const supportNav = getVisibleAdminNavItems(accessForRoles(["support"]));

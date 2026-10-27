@@ -1,7 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
+import AdminRatingsPanel from "@/components/admin/AdminRatingsPanel";
+import {
+  buildListenerCommentsSearchParams,
+  parseAdminAnalyticsUrlState,
+  resolveListenerCommentsQueue,
+  type AdminAnalyticsUrlState,
+  type ListenerCommentsQueue,
+} from "@/lib/admin/analytics-url-state";
+import {
+  replaceStatsQuery,
+  statsQueryHref,
+} from "@/lib/navigation/stats-query-navigation";
 import {
   ADMIN_LISTENER_COMMENTS_SUBTITLE,
   ADMIN_LISTENER_COMMENTS_TITLE,
@@ -16,7 +29,7 @@ import {
   REPORT_REASON_LABELS,
 } from "@/lib/practice-comments/copy";
 
-type Queue = "reports" | "hidden" | "deleted";
+type Queue = ListenerCommentsQueue;
 
 type Item = {
   id: string;
@@ -53,8 +66,23 @@ function journalLine(event: Item["journal"][number]): string {
   return `${moderationJournalActionLabel(event.action)} – ${moderationJournalReasonLabel(event.reason)} – ${actor}`;
 }
 
-export default function AdminListenerCommentsPanel() {
-  const [queue, setQueue] = useState<Queue>("reports");
+export default function AdminListenerCommentsPanel({
+  canModerate,
+  canViewRatings,
+}: {
+  canModerate: boolean;
+  canViewRatings: boolean;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlState = useMemo(
+    () => parseAdminAnalyticsUrlState(searchParams),
+    [searchParams],
+  );
+  const queue = resolveListenerCommentsQueue(searchParams.get("queue"), {
+    canModerate,
+    canViewRatings,
+  });
   const [items, setItems] = useState<Item[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -74,14 +102,26 @@ export default function AdminListenerCommentsPanel() {
 
   function selectQueue(next: Queue) {
     if (next === queue) return;
-    setLoading(true);
-    setItems([]);
-    setNextCursor(null);
-    setError(false);
-    setQueue(next);
+    if (next !== "ratings") {
+      setLoading(true);
+      setItems([]);
+      setNextCursor(null);
+      setError(false);
+    }
+    const params = buildListenerCommentsSearchParams(next, urlState);
+    replaceStatsQuery(statsQueryHref(pathname, params), window.history);
+  }
+
+  function patchRatings(patch: Partial<AdminAnalyticsUrlState>) {
+    const params = buildListenerCommentsSearchParams("ratings", {
+      ...urlState,
+      ...patch,
+    });
+    replaceStatsQuery(statsQueryHref(pathname, params), window.history);
   }
 
   useEffect(() => {
+    if (queue === "ratings") return;
     const controller = new AbortController();
     fetch(queueUrl(queue, null), {
       credentials: "same-origin",
@@ -156,20 +196,39 @@ export default function AdminListenerCommentsPanel() {
         {ADMIN_LISTENER_COMMENTS_TITLE}
       </h2>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-[#796ba0]">{ADMIN_LISTENER_COMMENTS_SUBTITLE}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" className={tab(queue === "reports")} onClick={() => selectQueue("reports")}>
-          Жалобы
-        </button>
-        <button type="button" className={tab(queue === "hidden")} onClick={() => selectQueue("hidden")}>
-          Скрытые
-        </button>
-        {canOwnerDelete ? (
+      <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Раздел отзывов">
+        {canModerate ? (
+          <button type="button" className={tab(queue === "reports")} onClick={() => selectQueue("reports")}>
+            Жалобы
+          </button>
+        ) : null}
+        {canModerate ? (
+          <button type="button" className={tab(queue === "hidden")} onClick={() => selectQueue("hidden")}>
+            Скрытые
+          </button>
+        ) : null}
+        {canViewRatings ? (
+          <button
+            type="button"
+            className={tab(queue === "ratings")}
+            data-admin-listener-comments-tab="ratings"
+            onClick={() => selectQueue("ratings")}
+          >
+            Оценки
+          </button>
+        ) : null}
+        {canModerate && canOwnerDelete ? (
           <button type="button" className={tab(queue === "deleted")} onClick={() => selectQueue("deleted")}>
             {OWNER_COMMENT_DELETED_QUEUE}
           </button>
         ) : null}
       </div>
-      {error ? (
+      {queue === "ratings" && canViewRatings ? (
+        <div className="mt-6">
+          <AdminRatingsPanel urlState={urlState} onPatch={patchRatings} />
+        </div>
+      ) : null}
+      {queue !== "ratings" && error ? (
         <p className="mt-4 text-sm text-[#9a3d55]" data-admin-listener-comments-error="true">
           Не удалось загрузить очередь.{" "}
           <button
@@ -194,11 +253,12 @@ export default function AdminListenerCommentsPanel() {
           </button>
         </p>
       ) : null}
-      {!loading && !error && items.length === 0 ? (
+      {queue !== "ratings" && !loading && !error && items.length === 0 ? (
         <p className="mt-4 text-sm text-[#796ba0]" data-admin-listener-comments-empty="true">
           В этой очереди пусто.
         </p>
       ) : null}
+      {queue !== "ratings" ? (
       <ul className="mt-4 space-y-3">
         {items.map((item) => (
           <li key={item.id} className="rounded-[22px] border border-[#eadff8] bg-white px-4 py-4">
@@ -262,7 +322,8 @@ export default function AdminListenerCommentsPanel() {
           </li>
         ))}
       </ul>
-      {nextCursor ? (
+      ) : null}
+      {queue !== "ratings" && nextCursor ? (
         <button
           type="button"
           className="mt-4 min-h-11 text-sm font-semibold text-[#7042c5]"
@@ -285,7 +346,7 @@ export default function AdminListenerCommentsPanel() {
           {LISTENER_IMPRESSION_LOAD_MORE}
         </button>
       ) : null}
-      {loading ? <p className="mt-3 text-sm text-[#796ba0]">Загрузка…</p> : null}
+      {queue !== "ratings" && loading ? <p className="mt-3 text-sm text-[#796ba0]">Загрузка…</p> : null}
     </section>
   );
 }
