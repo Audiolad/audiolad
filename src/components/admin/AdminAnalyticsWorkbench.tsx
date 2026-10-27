@@ -120,11 +120,6 @@ export default function AdminAnalyticsWorkbench({
     [pathname, urlState],
   );
 
-  useEffect(() => {
-    if (urlState.view !== "ratings") return;
-    router.replace(listenerCommentsRatingsHrefFromState(urlState));
-  }, [router, urlState]);
-
   const renderedSummaryQuery = {
     period: summary.period,
     includeTest: summary.includeTest,
@@ -341,28 +336,38 @@ export default function AdminAnalyticsWorkbench({
             { id: "sources", label: "Источники" },
             { id: "ratings", label: "Оценки" },
           ] as const satisfies ReadonlyArray<{ id: AdminAnalyticsView; label: string }>
-        ).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={view === item.id}
-            onClick={() => {
-              if (item.id === "ratings") {
-                router.push(listenerCommentsRatingsHrefFromState(urlState));
-                return;
-              }
-              replaceState({ view: item.id });
-            }}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${
-              view === item.id
-                ? "bg-[#25135c] text-white"
-                : "border border-[#eadff8] bg-white text-[#7042c5]"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+        ).map((item) =>
+          item.id === "ratings" ? (
+            <a
+              key={item.id}
+              href={listenerCommentsRatingsHrefFromState(urlState)}
+              role="tab"
+              aria-selected={view === item.id}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                view === item.id
+                  ? "bg-[#25135c] text-white"
+                  : "border border-[#eadff8] bg-white text-[#7042c5]"
+              }`}
+            >
+              {item.label}
+            </a>
+          ) : (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={view === item.id}
+              onClick={() => replaceState({ view: item.id })}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                view === item.id
+                  ? "bg-[#25135c] text-white"
+                  : "border border-[#eadff8] bg-white text-[#7042c5]"
+              }`}
+            >
+              {item.label}
+            </button>
+          ),
+        )}
       </div>
 
       {view === "money" ? (
