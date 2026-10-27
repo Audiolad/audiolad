@@ -1866,7 +1866,7 @@ RLS включён, политик для `anon` / `authenticated` нет: до�
 
 Миграция `supabase/migrations/20261217120000_music_analyzer_runs_v01.sql` — таблица `music_analyzer_runs` и приватный bucket `music-analyzer-runs`. Это не `music_lab_*` и не Music Passport.
 
-Очередь: `queued` → `processing` → `succeeded` | `failed`. Повтор того же `sha256` вставляет новую строку с следующим `version_number`. Успешная и неуспешная строка закрыта триггером: нет UPDATE и нет DELETE. `raw_json` и `normalized_json` появляются только при печати успешного прогона. Успех требует git-коммит с префиксом `932c4ce`, content-коммит с префиксом `3750f3b`, `device = cpu` и provenance `candidate_a=false`, `instrument_strategy=checkout_default`.
+Очередь: `queued` → `processing` → `succeeded` | `failed`. Повтор того же `sha256` вставляет новую строку с следующим `version_number`. Успешная и неуспешная строка закрыта триггером: нет UPDATE и нет DELETE. `raw_json` и `normalized_json` появляются только при печати успешного прогона. Успех требует git-коммит с префиксом `932c4ce`, content-коммит с префиксом `3750f3b`, `device = cpu` и provenance `candidate_a=false`, `instrument_strategy=checkout_default`. Пин приложения уже `cc5b2828` (содержание по-прежнему `3750f3b`), но CHECK таблицы и `complete_music_analyzer_run` по-прежнему принимают только префикс `932c4ce`. Отдельная миграция, которая примет оба префикса и сохранит старые успешные строки, в этот этап не входит: без неё печать прогона с новым HEAD завершится `invalid_music_analyzer_seal`.
 
 RLS включён. `anon` / `authenticated` не имеют прав. `service_role` только `SELECT` и RPC (`enqueue`, `claim`, `renew`, `complete`, `fail`, `release`, `recover`). Роль owner/admin проверяет приложение.
 

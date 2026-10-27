@@ -713,7 +713,8 @@ assert.match(form, /Продолжить без музыкального пас�
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /readAlbumPassportDisplay/);
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /bind_description_album_passport/);
 assert.match(read("src/lib/music-analyzer-runs/python-plan.ts"), /candidate_a:\s*false/);
-assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce/);
+assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /cc5b2828/);
+assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /3750f3b/);
 assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Перейти к оформлению/);
 
 {
@@ -1051,7 +1052,8 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   assert.match(panelEnqueueSource, /Продолжить без музыкального паспорта|Повторить анализ/);
   assert.match(routeSource, /enqueueAfterAudioItemId/);
   assert.match(read("src/lib/music-analyzer-runs/python-plan.ts"), /candidate_a:\s*false/);
-  assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce8325c537668195afce0a56fa68d40a08c|932c4ce/);
+  assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /cc5b2828a3dbb81e16e23808dab1520a4cb1a7d0|cc5b2828/);
+  assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /3750f3b/);
   assert.equal(read("src/lib/authors/aurafon.ts").includes("59c7e5b8-eae4-4394-82fb-b815a10be6c2"), true);
 }
 

@@ -6,7 +6,10 @@ import {
   MUSIC_ANALYZER_INSTRUMENT_STRATEGY,
   MUSIC_ANALYZER_SCRIPT,
   MUSIC_ANALYZER_VENV_DIR,
+  MUSIC_ANALYZER_VOICE_THREADS,
+  MUSIC_ANALYZER_VOICE_TIMEOUT_SECONDS,
 } from "./constants";
+import type { VoiceDetectorFlag } from "./voice-plan";
 
 export type CommandResult = {
   code: number;
@@ -36,7 +39,11 @@ const CHILD_ENV_ALLOW = new Set([
   "MUSIC_ANALYZER_PANNS_CHECKPOINT",
 ]);
 
-export function buildAnalyzeTrackArgs(wavPath: string, outputDir: string): string[] {
+export function buildAnalyzeTrackArgs(
+  wavPath: string,
+  outputDir: string,
+  voiceDetector: VoiceDetectorFlag = "legacy",
+): string[] {
   return [
     MUSIC_ANALYZER_SCRIPT,
     wavPath,
@@ -44,10 +51,17 @@ export function buildAnalyzeTrackArgs(wavPath: string, outputDir: string): strin
     outputDir,
     "--device",
     MUSIC_ANALYZER_DEVICE,
+    "--voice-detector",
+    voiceDetector,
   ];
 }
 
-export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string, checkpointDir?: string): NodeJS.ProcessEnv {
+export function analyzerChildEnv(
+  source: NodeJS.ProcessEnv,
+  pythonPath: string,
+  checkpointDir?: string,
+  options?: { voiceThreads?: boolean },
+): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     NODE_ENV: source.NODE_ENV ?? "production",
     PYTHONNOUSERSITE: "1",
@@ -62,6 +76,14 @@ export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string, 
   const venv = pythonPath.slice(0, pythonPath.lastIndexOf("/bin/python"));
   if (venv) env.VIRTUAL_ENV = venv;
   if (checkpointDir) env.MUSIC_ANALYZER_CHECKPOINT_DIR = checkpointDir;
+  if (options?.voiceThreads) {
+    const threads = String(MUSIC_ANALYZER_VOICE_THREADS);
+    env.MUSIC_ANALYZER_VOICE_TIMEOUT_SECONDS = String(MUSIC_ANALYZER_VOICE_TIMEOUT_SECONDS);
+    env.OMP_NUM_THREADS = threads;
+    env.MKL_NUM_THREADS = threads;
+    env.OPENBLAS_NUM_THREADS = threads;
+    env.NUMEXPR_NUM_THREADS = threads;
+  }
   for (const key of Object.keys(env)) {
     if (/candidate[_-]?a/i.test(key) || /instrument[_-]?strateg/i.test(key)) {
       delete env[key];
@@ -109,6 +131,7 @@ export function buildAnalyzerProvenance(input: {
   normalizedSource: string;
   outputFiles: string[];
   pythonPath: string;
+  voiceDetector?: VoiceDetectorFlag;
 }): Record<string, unknown> {
   return {
     runtime: "timeweb-vps-pm2",
@@ -119,7 +142,7 @@ export function buildAnalyzerProvenance(input: {
     analyzer_content_commit: input.content,
     invoke: [
       `${MUSIC_ANALYZER_VENV_DIR}/bin/python`,
-      ...buildAnalyzeTrackArgs("<wav>", "<dir>"),
+      ...buildAnalyzeTrackArgs("<wav>", "<dir>", input.voiceDetector ?? "legacy"),
     ],
     python: input.pythonPath.endsWith(`/${MUSIC_ANALYZER_VENV_DIR}/bin/python`)
       ? `${MUSIC_ANALYZER_VENV_DIR}/bin/python`
