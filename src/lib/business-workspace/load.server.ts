@@ -15,6 +15,7 @@ import {
 import { isEmailConfirmed, formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
 import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
+import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { GUEST_COFFEE_RIGHTS_URL } from "@/lib/business-app/guest-coffee/copy";
@@ -122,6 +123,9 @@ type PracticeRow = {
   product_kind: string | null;
   catalog_visibility: string | null;
   deleted_at: string | null;
+  cover_url?: string | null;
+  cover_image?: unknown;
+  updated_at?: string | null;
 };
 
 type AudioRow = {
@@ -135,6 +139,25 @@ type AudioRow = {
   active_music_delivery_asset_id: string | null;
 };
 
+/** Direction albums come from an RPC that has no cover columns. Public covers are read separately. */
+async function attachPracticeCovers(db: ServiceDb, practices: PracticeRow[]): Promise<PracticeRow[] | "error"> {
+  const missing = practices.filter((row) => !("cover_url" in row) && row.id);
+  if (missing.length === 0) return practices;
+  const covers = new Map<string, Pick<PracticeRow, "cover_url" | "cover_image" | "updated_at">>();
+  for (let index = 0; index < missing.length; index += ID_CHUNK) {
+    const chunk = missing.slice(index, index + ID_CHUNK).flatMap((row) => row.id ? [row.id] : []);
+    const page = await db.from("practices").select("id, cover_url, cover_image, updated_at").in("id", chunk);
+    if (page.error || !Array.isArray(page.data)) return "error";
+    for (const row of page.data as { id: string; cover_url: string | null; cover_image: unknown; updated_at: string | null }[]) {
+      covers.set(row.id, row);
+    }
+  }
+  return practices.map((row) => {
+    const cover = row.id ? covers.get(row.id) : undefined;
+    return cover ? { ...row, ...cover } : row;
+  });
+}
+
 async function candidatesFromPractices(
   db: ServiceDb,
   practices: PracticeRow[],
@@ -143,6 +166,9 @@ async function candidatesFromPractices(
   sources: ReturnType<typeof sourcesForSpace>,
   requireKnownAuthor: boolean,
 ): Promise<WorkspaceCatalogCandidate[] | "error"> {
+  const withCovers = await attachPracticeCovers(db, practices);
+  if (withCovers === "error") return "error";
+  practices = withCovers;
   const allowedAuthors = new Set(authorIds);
   const sourceByAuthor = new Map(sources.map((source) => [source.authorId, source]));
   const practiceById = new Map<string, PracticeRow>();
@@ -200,6 +226,11 @@ async function candidatesFromPractices(
       audioStatus: audio.status,
       audioPath: audio.audio_path,
       hasActiveDelivery: playableIds.has(audio.id) && !audio.audio_path?.trim(),
+      coverUrl: cabinetAlbumCoverUrl({
+        coverUrl: practice.cover_url,
+        coverImage: practice.cover_image,
+        updatedAt: practice.updated_at,
+      }),
     };
     if (!acceptWorkspaceCatalogSourceRow(row, allowedAuthors)) continue;
     sourceRows.push({ ...row, shelf: source?.shelf ?? "cafe" });
@@ -215,6 +246,7 @@ async function candidatesFromPractices(
     durationSeconds: row.durationSeconds,
     position: row.position,
     shelf: row.shelf,
+    coverUrl: row.coverUrl ?? null,
   }));
   return candidates;
 }
@@ -249,7 +281,7 @@ async function loadAuthorCuratedCandidates(
   );
   const practices = await selectPages<Omit<PracticeRow, "author_name">>((from, to) => db
     .from("practices")
-    .select("id, title, author_id, status, product_kind, catalog_visibility, deleted_at")
+    .select("id, title, author_id, status, product_kind, catalog_visibility, deleted_at, cover_url, cover_image, updated_at")
     .in("author_id", authorIds)
     .order("id", { ascending: true })
     .range(from, to));
@@ -280,6 +312,7 @@ function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack | null {
     authorName: row.authorName.trim() || null,
     albumTitle: row.albumTitle.trim() || null,
     shelf: row.shelf,
+    coverUrl: row.coverUrl ?? null,
   });
 }
 
@@ -312,7 +345,7 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
     const chunk = ids.slice(index, index + ID_CHUNK);
     const joined = await db
       .from("audio_items")
-      .select("id, title, duration_seconds, practices(title, author_id, authors!practices_author_id_fkey(name))")
+      .select("id, title, duration_seconds, practices(title, author_id, cover_url, cover_image, updated_at, authors!practices_author_id_fkey(name))")
       .in("id", chunk);
     if (joined.error || !Array.isArray(joined.data)) {
       const plain = await db.from("audio_items").select("id, title, duration_seconds").in("id", chunk);
@@ -330,10 +363,16 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
       practices: {
         title?: string | null;
         author_id?: string | null;
+        cover_url?: string | null;
+        cover_image?: unknown;
+        updated_at?: string | null;
         authors?: { name?: string | null } | { name?: string | null }[] | null;
       } | {
         title?: string | null;
         author_id?: string | null;
+        cover_url?: string | null;
+        cover_image?: unknown;
+        updated_at?: string | null;
         authors?: { name?: string | null } | { name?: string | null }[] | null;
       }[] | null;
     }[]) {
@@ -343,6 +382,11 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
         authorId: practice?.author_id ?? null,
         authorName: embeddedName(practice?.authors) || null,
         albumTitle: practice?.title?.trim() || null,
+        coverUrl: cabinetAlbumCoverUrl({
+          coverUrl: practice?.cover_url,
+          coverImage: practice?.cover_image,
+          updatedAt: practice?.updated_at,
+        }),
       });
       if (named) byId.set(row.id, named);
     }
