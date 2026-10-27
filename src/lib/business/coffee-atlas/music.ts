@@ -1,4 +1,9 @@
 import type { CoffeeAtlasShopSlug } from "./shops";
+import { selectInstrumentalForBusiness } from "../../music-analyzer-runs/vocal-eligibility.mjs";
+
+type BusinessVocalLookup = {
+  get(id: string): { value?: unknown; source?: unknown; status?: unknown } | null | undefined;
+};
 
 /**
  * Coffee shop → AudioLad catalogue tracks (music examples of the atlas).
@@ -86,6 +91,8 @@ export type CoffeeAtlasTrack = {
 export function resolveCoffeeAtlasTracks(
   refs: readonly CoffeeAtlasTrackRef[],
   published: readonly CoffeeAtlasCatalogProduct[],
+  /** Automatic instrumental selection. Omitted for slug-curated examples, which do not read vocal_role. */
+  vocalByProductId?: BusinessVocalLookup | null,
 ): CoffeeAtlasTrack[] {
   const resolved: CoffeeAtlasTrack[] = [];
   const seen = new Set<string>();
@@ -113,7 +120,8 @@ export function resolveCoffeeAtlasTracks(
     });
   }
 
-  return resolved;
+  if (vocalByProductId == null) return resolved;
+  return selectInstrumentalForBusiness(resolved, (track) => vocalByProductId.get(track.id) ?? null);
 }
 
 export type CoffeeAtlasMusicDeps = {

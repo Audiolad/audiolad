@@ -11,6 +11,7 @@ import {
   formatMusicAnalyzerReleaseUnavailableLog,
   type MusicAnalyzerReleaseComparison,
 } from "./worker-release";
+import { formatMusicAnalyzerVoiceLog, type MusicAnalyzerVoiceLog } from "./voice-plan";
 
 export type ClaimedMusicAnalyzerRun = {
   id: string;
@@ -21,6 +22,7 @@ export type ClaimedMusicAnalyzerRun = {
   mime_type: string;
   sha256: string;
   attempt_count: number;
+  version_number?: number | null;
 };
 
 export type MusicAnalyzerExecuteResult = {
@@ -34,6 +36,7 @@ export type MusicAnalyzerExecuteResult = {
   rawJson: Record<string, unknown>;
   normalizedJson: Record<string, unknown>;
   provenance: Record<string, unknown>;
+  voice?: MusicAnalyzerVoiceLog;
 };
 
 export type MusicAnalyzerWorkerPort = {
@@ -93,7 +96,18 @@ export function parseClaimedMusicAnalyzerRun(claimed: unknown): ClaimedMusicAnal
     mime_type: row.mime_type || "audio/wav",
     sha256: row.sha256,
     attempt_count: typeof row.attempt_count === "number" ? row.attempt_count : 0,
+    version_number: typeof row.version_number === "number" && Number.isInteger(row.version_number)
+      ? row.version_number
+      : null,
   };
+}
+
+function readVoiceLog(error: unknown): MusicAnalyzerVoiceLog | null {
+  if (!error || typeof error !== "object" || !("voice" in error)) return null;
+  const voice = (error as { voice?: Partial<MusicAnalyzerVoiceLog> }).voice;
+  if (!voice || (voice.mode !== "off" && voice.mode !== "canary" && voice.mode !== "on")) return null;
+  if (typeof voice.reason !== "string" || typeof voice.analysis_seconds !== "number") return null;
+  return voice as MusicAnalyzerVoiceLog;
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -286,6 +300,8 @@ export function createMusicAnalyzerWorker(
           logger.info(JSON.stringify({ event: "music_analyzer_abandoned", jobId: job.id }));
           return;
         }
+        const failedVoice = readVoiceLog(error);
+        if (failedVoice) logger.info(formatMusicAnalyzerVoiceLog(failedVoice));
         const persisted = await port.failJob(job, error);
         logger.error(JSON.stringify({
           event: "music_analyzer_run_failed",
@@ -300,6 +316,7 @@ export function createMusicAnalyzerWorker(
         logger.info(JSON.stringify({ event: "music_analyzer_abandoned", jobId: job.id }));
         return;
       }
+      if (result.voice) logger.info(formatMusicAnalyzerVoiceLog(result.voice));
       try {
         const completed = await port.completeJob(job, result);
         logger.info(JSON.stringify({

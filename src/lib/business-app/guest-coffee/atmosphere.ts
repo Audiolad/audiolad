@@ -32,6 +32,11 @@ import {
   type GuestCoffeeTrack,
 } from "./catalog";
 import { guestCoffeeProfileKey, guestCoffeeRecommendation, type GuestCoffeeRecommendationPlan } from "./recommend";
+import { isInstrumentalForBusiness } from "../../music-analyzer-runs/vocal-eligibility.mjs";
+
+type BusinessVocalLookup = {
+  get(audioItemId: string): { value?: unknown; source?: unknown; status?: unknown } | null | undefined;
+};
 
 export const GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES = 4;
 export const GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS = 12;
@@ -107,14 +112,19 @@ export function assembleGuestCoffeeAtmosphere(
   available: readonly GuestCoffeePlaylist[],
   profile: GuestCoffeeProfile,
   plan?: GuestCoffeeRecommendationPlan | null,
+  /** Automatic instrumental playlist. Omitted for the curated shelf, which does not read vocal_role. */
+  vocalByAudioItemId?: BusinessVocalLookup | null,
 ): GuestCoffeeAtmosphere | null {
   const { albums, soundFallback } = guestCoffeeRecommendation(available, profile, plan);
   if (albums.length === 0) return null;
   const directionFallback = soundFallback;
 
   const isLong = (t: GuestCoffeeTrack) => typeof t.durationSeconds === "number" && t.durationSeconds >= GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS;
-  const hasShort = albums.some((a) => a.tracks.some((t) => !isLong(t)));
-  const usable = (t: GuestCoffeeTrack) => !hasShort || !isLong(t);
+  // Absent map: every curated track stays. A map uses equality to instrumental, never "not vocal".
+  const allows = (t: GuestCoffeeTrack) =>
+    vocalByAudioItemId == null || isInstrumentalForBusiness(vocalByAudioItemId.get(t.audioItemId) ?? null);
+  const hasShort = albums.some((a) => a.tracks.some((t) => allows(t) && !isLong(t)));
+  const usable = (t: GuestCoffeeTrack) => allows(t) && (!hasShort || !isLong(t));
   // Sound-fitting albums first; closer ones only while the playlist still lacks tracks.
   const candidates = albums.filter((a) => a.tracks.some(usable));
   const chosen: typeof candidates = [];

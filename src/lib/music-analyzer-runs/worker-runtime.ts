@@ -3,12 +3,34 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { MUSIC_ANALYZER_LEASE_SECONDS, MUSIC_ANALYZER_MAX_ATTEMPTS, isPermanentMusicAnalyzerError } from "./constants";
 import { MusicAnalyzerAbortedError, MusicAnalyzerRunError, executePinnedAnalysis } from "./execute";
 import { resolveMusicAnalyzerPaths } from "./paths";
+import { resolveVoiceChoice } from "./voice-plan";
 import {
   parseClaimedMusicAnalyzerRun,
+  sleep,
   type ClaimedMusicAnalyzerRun,
   type MusicAnalyzerExecuteResult,
   type MusicAnalyzerWorkerPort,
 } from "./worker";
+
+async function countSealedVoiceInvocations(service: SupabaseClient): Promise<number | null> {
+  const { count, error } = await service
+    .from("music_analyzer_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "succeeded")
+    .contains("provenance", { voice: { invoked: true } });
+  if (error || typeof count !== "number") return null;
+  return count;
+}
+
+async function linkedPassport(service: SupabaseClient, runId: string): Promise<boolean | null> {
+  const { data, error } = await service
+    .from("music_passport_analysis_links")
+    .select("analyzer_run_id")
+    .eq("analyzer_run_id", runId)
+    .limit(1);
+  if (error) return null;
+  return Array.isArray(data) && data.length > 0;
+}
 
 function errorCode(error: unknown): string {
   if (error instanceof MusicAnalyzerRunError) return error.code;
@@ -62,6 +84,21 @@ export function createMusicAnalyzerWorkerPort(
       if (error || !data) throw new MusicAnalyzerRunError("source_unavailable");
       const bytes = new Uint8Array(await data.arrayBuffer());
       if (bytes.byteLength === 0) throw new MusicAnalyzerRunError("source_invalid");
+      const env = options.env ?? process.env;
+      const voice = await resolveVoiceChoice({
+        env,
+        versionNumber: typeof job.version_number === "number" ? job.version_number : null,
+        mimeType: job.mime_type,
+        runId: job.id,
+        lookup: {
+          passportLinked: (runId) => linkedPassport(service, runId),
+          countInvoked: () => countSealedVoiceInvocations(service),
+        },
+        wait: async (ms) => {
+          await sleep(ms, signal);
+          if (signal.aborted) throw new MusicAnalyzerAbortedError();
+        },
+      });
       return executePinnedAnalysis({
         bytes,
         filename: job.source_filename,
@@ -70,6 +107,8 @@ export function createMusicAnalyzerWorkerPort(
         pythonPath: paths.pythonPath,
         checkpointPath: paths.checkpointPath,
         signal,
+        env,
+        voice,
       });
     },
 

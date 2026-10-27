@@ -100,7 +100,10 @@ assert.equal(oldStored.styles.length, 1);
 assert.deepEqual(parseStoredStructuredFacts(oldStored), oldStored);
 
 assert.equal(collectAnalyzerDocuments({ "track.json": { analysis: { analyzer_version: "music-analyzer-0.1", taxonomy_version: "0.1" } } }).hints.analyzerVersion, "music-analyzer-0.1");
-const env = analyzerChildEnv({ NODE_ENV: "test", SUPABASE_SERVICE_ROLE_KEY: "do-not-pass", MUSIC_ANALYZER_CLAP_BACKEND: "hf" }, "/test/.venv-v03-clap/bin/python", "/test/models");
+const env = analyzerChildEnv({ NODE_ENV: "test", SUPABASE_SERVICE_ROLE_KEY: "do-not-pass", MUSIC_ANALYZER_CLAP_BACKEND: "hf",
+  MUSIC_ANALYZER_VOICE_PYTHON: "/test/.venv-v03-panns/bin/python", MUSIC_ANALYZER_PANNS_CHECKPOINT: "/test/panns/Cnn14_mAP=0.431.pth" }, "/test/.venv-v03-clap/bin/python", "/test/models");
+assert.equal(env.MUSIC_ANALYZER_VOICE_PYTHON, "/test/.venv-v03-panns/bin/python");
+assert.equal(env.MUSIC_ANALYZER_PANNS_CHECKPOINT, "/test/panns/Cnn14_mAP=0.431.pth");
 assert.equal(env.HF_HUB_OFFLINE, "1");
 assert.equal(env.TRANSFORMERS_OFFLINE, "1");
 assert.equal(env.MUSIC_ANALYZER_CHECKPOINT_DIR, "/test/models");
@@ -246,7 +249,7 @@ const realShapeHtml = renderPassport(savedShape);
 for (const [title, value] of [["Инструменты", "brushes"], ["Характер и настроение", "warm"], ["Характер звучания", "intimate"]]) {
   assert.match(realShapeHtml, new RegExp(`${title}</h3>[\\s\\S]*?${value}[\\s\\S]*?</section>`));
 }
-assert.match(realShapeHtml, /Вокал \/ речь<\/dt><dd[^>]*>не определено/);
+assert.match(realShapeHtml, /Вокал \/ речь<\/dt><dd[^>]*>Не определено/);
 assert.doesNotMatch(realShapeHtml, /смешанный/);
 const ownerCorrection = applyOverrides(safeShape, [{ id: "fixture", patch: { vocal_role: "instrumental" } }]);
 assert.match(renderPassport(savedShape, ownerCorrection), /Вокал \/ речь<\/dt><dd[^>]*>инструментал/);

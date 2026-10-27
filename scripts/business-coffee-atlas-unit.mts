@@ -100,6 +100,12 @@ const resolved = resolveCoffeeAtlasTracks(
 assert.equal(resolved.length, 1, "unpublished, duplicate and silent refs are skipped (no fake playback)");
 assert.equal(resolved[0].id, "a", "author slug must match too");
 assert.equal(resolved[0].label, "Днём");
+const vocalFeature = (source: string, value: string | null = "instrumental") => ({ value, source, status: "candidate" });
+const instrumental = vocalFeature("analyzer:vocal.detector:panns-voice:2");
+const legacyClap = vocalFeature("analyzer:vocal.scores:conservative-v2");
+assert.equal(resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" }], published, new Map([["a", instrumental]])).length, 1);
+assert.deepEqual(resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" }], published, new Map([["a", legacyClap]])), []);
+assert.deepEqual(resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" }], published, new Map([["a", null]])), []);
 assert.deepEqual(resolveCoffeeAtlasTracks(getCoffeeAtlasTrackRefs("caffe-florian"), []), []);
 assert.deepEqual(
   resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "silent" }], published),

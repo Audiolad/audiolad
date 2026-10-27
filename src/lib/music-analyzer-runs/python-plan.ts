@@ -1,4 +1,5 @@
 import {
+  MUSIC_ANALYZER_ACCEPTED_HEAD_PREFIXES,
   MUSIC_ANALYZER_CONTENT_COMMIT,
   MUSIC_ANALYZER_DEVICE,
   MUSIC_ANALYZER_FREEZE_BRANCH,
@@ -6,7 +7,10 @@ import {
   MUSIC_ANALYZER_INSTRUMENT_STRATEGY,
   MUSIC_ANALYZER_SCRIPT,
   MUSIC_ANALYZER_VENV_DIR,
+  MUSIC_ANALYZER_VOICE_THREADS,
+  MUSIC_ANALYZER_VOICE_TIMEOUT_SECONDS,
 } from "./constants";
+import type { VoiceDetectorFlag } from "./voice-plan";
 
 export type CommandResult = {
   code: number;
@@ -31,10 +35,17 @@ const CHILD_ENV_ALLOW = new Set([
   "TMP",
   "USER",
   "LOGNAME",
+  // Explicit local CPU detector paths; model inference stays offline.
+  "MUSIC_ANALYZER_VOICE_PYTHON",
+  "MUSIC_ANALYZER_PANNS_CHECKPOINT",
 ]);
 
-export function buildAnalyzeTrackArgs(wavPath: string, outputDir: string): string[] {
-  return [
+export function buildAnalyzeTrackArgs(
+  wavPath: string,
+  outputDir: string,
+  voiceDetector?: VoiceDetectorFlag,
+): string[] {
+  const args = [
     MUSIC_ANALYZER_SCRIPT,
     wavPath,
     "--output-dir",
@@ -42,9 +53,19 @@ export function buildAnalyzeTrackArgs(wavPath: string, outputDir: string): strin
     "--device",
     MUSIC_ANALYZER_DEVICE,
   ];
+  // Checkout 932c4ce rejects an unknown flag. Pass it only for a real PANNs run.
+  if (voiceDetector === "panns") {
+    args.push("--voice-detector", "panns");
+  }
+  return args;
 }
 
-export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string, checkpointDir?: string): NodeJS.ProcessEnv {
+export function analyzerChildEnv(
+  source: NodeJS.ProcessEnv,
+  pythonPath: string,
+  checkpointDir?: string,
+  options?: { voiceThreads?: boolean },
+): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     NODE_ENV: source.NODE_ENV ?? "production",
     PYTHONNOUSERSITE: "1",
@@ -59,6 +80,14 @@ export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string, 
   const venv = pythonPath.slice(0, pythonPath.lastIndexOf("/bin/python"));
   if (venv) env.VIRTUAL_ENV = venv;
   if (checkpointDir) env.MUSIC_ANALYZER_CHECKPOINT_DIR = checkpointDir;
+  if (options?.voiceThreads) {
+    const threads = String(MUSIC_ANALYZER_VOICE_THREADS);
+    env.MUSIC_ANALYZER_VOICE_TIMEOUT_SECONDS = String(MUSIC_ANALYZER_VOICE_TIMEOUT_SECONDS);
+    env.OMP_NUM_THREADS = threads;
+    env.MKL_NUM_THREADS = threads;
+    env.OPENBLAS_NUM_THREADS = threads;
+    env.NUMEXPR_NUM_THREADS = threads;
+  }
   for (const key of Object.keys(env)) {
     if (/candidate[_-]?a/i.test(key) || /instrument[_-]?strateg/i.test(key)) {
       delete env[key];
@@ -69,7 +98,8 @@ export function analyzerChildEnv(source: NodeJS.ProcessEnv, pythonPath: string, 
 
 export function assertFrozenHead(head: string): string {
   const trimmed = head.trim();
-  if (!trimmed.startsWith(MUSIC_ANALYZER_FREEZE_SNAPSHOT) || !/^[0-9a-f]{7,40}$/.test(trimmed)) {
+  const known = MUSIC_ANALYZER_ACCEPTED_HEAD_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+  if (!known || !/^[0-9a-f]{7,40}$/.test(trimmed)) {
     throw new Error("analyzer_commit_mismatch");
   }
   return trimmed;
@@ -106,6 +136,7 @@ export function buildAnalyzerProvenance(input: {
   normalizedSource: string;
   outputFiles: string[];
   pythonPath: string;
+  voiceDetector?: VoiceDetectorFlag;
 }): Record<string, unknown> {
   return {
     runtime: "timeweb-vps-pm2",
@@ -116,7 +147,11 @@ export function buildAnalyzerProvenance(input: {
     analyzer_content_commit: input.content,
     invoke: [
       `${MUSIC_ANALYZER_VENV_DIR}/bin/python`,
-      ...buildAnalyzeTrackArgs("<wav>", "<dir>"),
+      ...buildAnalyzeTrackArgs(
+        "<wav>",
+        "<dir>",
+        input.voiceDetector === "panns" ? "panns" : undefined,
+      ),
     ],
     python: input.pythonPath.endsWith(`/${MUSIC_ANALYZER_VENV_DIR}/bin/python`)
       ? `${MUSIC_ANALYZER_VENV_DIR}/bin/python`

@@ -90,6 +90,14 @@ assert.deepEqual(buildAnalyzeTrackArgs("/tmp/in.wav", "/tmp/out"), [
   "--device",
   "cpu",
 ]);
+assert.deepEqual(buildAnalyzeTrackArgs("/tmp/in.wav", "/tmp/out", "legacy"), [
+  "analyze_track.py",
+  "/tmp/in.wav",
+  "--output-dir",
+  "/tmp/out",
+  "--device",
+  "cpu",
+]);
 
 const childEnv = analyzerChildEnv({
   PATH: "/usr/bin",
@@ -116,7 +124,7 @@ assert.equal(collected.hints.promptVersion, null);
 assert.equal(collected.normalizedSource, "file:report.json");
 
 const provenance = buildAnalyzerProvenance({
-  head: `${MUSIC_ANALYZER_FREEZE_SNAPSHOT}${"a".repeat(33)}`,
+  head: `${MUSIC_ANALYZER_FREEZE_SNAPSHOT}${"a".repeat(40 - MUSIC_ANALYZER_FREEZE_SNAPSHOT.length)}`,
   content: `${MUSIC_ANALYZER_CONTENT_COMMIT}${"b".repeat(33)}`,
   checkpointFilename: "music_audioset_epoch_15_esc_90.14.pt",
   checkpointSha256: "abc",
@@ -136,7 +144,7 @@ assert.deepEqual(provenance.invoke, [
   "cpu",
 ]);
 
-const head = `${MUSIC_ANALYZER_FREEZE_SNAPSHOT}${"c".repeat(33)}`;
+const head = `${MUSIC_ANALYZER_FREEZE_SNAPSHOT}${"c".repeat(40 - MUSIC_ANALYZER_FREEZE_SNAPSHOT.length)}`;
 const content = `${MUSIC_ANALYZER_CONTENT_COMMIT}${"d".repeat(33)}`;
 const verified = await verifyAnalyzerCheckout("/opt/analyzer", async (command, args) => {
   assert.equal(command, "git");
@@ -762,8 +770,10 @@ assert.doesNotMatch(
   /\bMusicPassport\b|<MusicPassport|mode="product"|data-music-passport-mode/,
 );
 assert.doesNotMatch(read("src/components/author-dashboard/AuthorProductForm.tsx"), /components\/music-passport\/MusicPassport/);
-assert.equal(MUSIC_ANALYZER_FREEZE_SNAPSHOT, "932c4ce");
+assert.equal(MUSIC_ANALYZER_FREEZE_SNAPSHOT, "cc5b2828");
+assert.equal(MUSIC_ANALYZER_CONTENT_COMMIT, "3750f3b");
 assert.doesNotMatch(read("src/lib/music-analyzer-runs/export-run.ts"), /passport/);
-assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /932c4ce/);
+assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /cc5b2828/);
+assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /3750f3b/);
 
 console.log("music-analyzer-runs-unit: ok");
