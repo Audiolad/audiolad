@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test:school-graduates": "node --import tsx scripts/school-graduates-unit.tsx",
+    "test:school-graduates": "node --import tsx scripts/school-graduates-unit.tsx && node scripts/school-graduates-sql-unit.mjs",
     "test:business-ru-copy": "npx tsx scripts/business-ru-copy-unit.mts",
     "dev": "node scripts/lib/guard-dev.mjs && next dev",
     "build": "next build",

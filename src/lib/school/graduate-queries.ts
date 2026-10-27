@@ -13,9 +13,22 @@ export async function loadSchoolGraduateProducts() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) } },
   );
-  const graduates = await fetchAllPages<SchoolGraduate>((from, to) => supabase.from("school_graduates")
-    .select("author_id, cohort, enabled, position, product_1_id, product_2_id").eq("enabled", true)
-    .order("author_id").range(from, to));
+  const rows = await fetchAllPages<{
+    author_id: string;
+    position: number;
+    product_1_id: string | null;
+    product_2_id: string | null;
+  }>((from, to) => supabase.from("school_graduate_showcase")
+    .select("author_id, position, product_1_id, product_2_id")
+    .order("position").order("author_id").range(from, to));
+  const graduates: SchoolGraduate[] = rows.map((row) => ({
+    author_id: row.author_id,
+    cohort: "",
+    enabled: true,
+    position: row.position,
+    product_1_id: row.product_1_id,
+    product_2_id: row.product_2_id,
+  }));
   const productIds = graduates.flatMap(graduateProductIds);
   if (!productIds.length) return [];
   const products = [];

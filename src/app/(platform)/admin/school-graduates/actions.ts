@@ -2,12 +2,43 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { buildAuthorProductEditPath } from "@/lib/author-products/product-wizard-navigation";
 import { applyOrdinaryCatalogEligibility } from "@/lib/catalog/visibility-query";
-import { validateGraduateProductIds } from "@/lib/school/graduates";
+import { graduateText, validateGraduateProductIds } from "@/lib/school/graduates";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-export type GraduateActionState = { error?: string; errorHref?: string; success?: string };
+export type GraduateActionLink = { href: string; label: string };
+export type GraduateActionState = { error?: string; errorLinks?: GraduateActionLink[]; success?: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const publishedOnly = "В подборку можно выбрать только опубликованные и открытые в каталоге продукты этого автора.";
+const saveFailed = "Не удалось сохранить подборку. Проверьте публикацию продуктов и обновите страницу.";
+
+/** Step 4 of the product editor is where a draft is published. */
+function publicationLinks(
+  ids: string[],
+  titles: ReadonlyMap<string, string>,
+): GraduateActionLink[] {
+  return ids.map((id) => {
+    const title = titles.get(id)?.trim();
+    return {
+      href: buildAuthorProductEditPath(id, { step: 4, includeStep: true }),
+      label: title ? `Открыть публикацию «${graduateText(title)}»` : "Открыть публикацию продукта",
+    };
+  });
+}
+
+async function linksForProducts(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  ids: string[],
+): Promise<GraduateActionLink[]> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return [];
+  const { data } = await supabase.from("practices").select("id, title").in("id", unique);
+  const titles = new Map(
+    (data ?? []).map((row) => [String(row.id), typeof row.title === "string" ? row.title : ""]),
+  );
+  return publicationLinks(unique, titles);
+}
 
 export async function saveGraduateAction(_: GraduateActionState, form: FormData): Promise<GraduateActionState> {
   await requireAdminPermission("authors.manage");
@@ -42,13 +73,22 @@ export async function saveGraduateAction(_: GraduateActionState, form: FormData)
     if (changed && ids.length) {
       const { data, error } = await applyOrdinaryCatalogEligibility(supabase.from("practices").select("id"))
         .eq("author_id", authorId).in("id", ids).is("deleted_at", null);
-      if (error || data?.length !== ids.length) return { error: "В подборку можно выбрать только опубликованные и открытые в каталоге продукты этого автора." };
+      if (error || data?.length !== ids.length) {
+        const eligible = new Set((data ?? []).map((row) => String(row.id)));
+        const blocked = error || !data ? ids : ids.filter((id) => !eligible.has(id));
+        return { error: publishedOnly, errorLinks: await linksForProducts(supabase, blocked.length ? blocked : ids) };
+      }
     }
     const { data: saved, error } = await supabase.from("school_graduates").update({
       product_1_id: product1, product_2_id: product2,
       cohort, position, enabled: form.get("enabled") === "on",
     }).eq("author_id", authorId).select("author_id").maybeSingle();
-    if (error || !saved) return { error: "Не удалось сохранить подборку. Проверьте публикацию продуктов и обновите страницу.", errorHref: "/admin/product-moderation?status=published" };
+    if (error || !saved) {
+      return {
+        error: saveFailed,
+        errorLinks: await linksForProducts(supabase, [product1, product2].filter((id): id is string => Boolean(id))),
+      };
+    }
   } else {
     return { error: "Неизвестное действие." };
   }

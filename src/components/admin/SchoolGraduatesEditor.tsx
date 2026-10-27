@@ -41,7 +41,7 @@ function EditorForm({ graduate, authors, products }: { graduate?: SchoolGraduate
         </select></label>
         <button name="operation" value="add" disabled={pending || !authors.length} className={button}>Добавить выпускника</button>
       </>}
-      {state.error ? <p role="alert" className="text-sm text-red-700">{state.error}{state.errorHref ? <> <a href={state.errorHref} className="underline">Открыть продукты</a></> : null}</p> : null}
+      {state.error ? <div role="alert" className="text-sm text-red-700"><p>{state.error}</p>{state.errorLinks?.length ? <p className="mt-1 flex flex-col gap-1">{state.errorLinks.map((link) => <a key={link.href} href={link.href} className="underline">{link.label}</a>)}</p> : null}</div> : null}
       {state.success ? <p role="status" className="text-sm text-green-800">{state.success}</p> : null}
     </form>
   );

@@ -100,6 +100,8 @@ export type CatalogProduct = ProductCoverFields & {
   sortTimestamp: number;
   audioCount?: number;
   durationSeconds?: number | null;
+  /** practices.duration_minutes when audio item durations are missing. */
+  durationMinutes?: number | null;
   publishedAt?: string | null;
   gallery?: CatalogSlide[];
 };
@@ -521,6 +523,7 @@ export async function mapPracticeRowsToCatalogProducts(
           (audioSummary?.totalDurationSeconds ?? 0) > 0
             ? audioSummary?.totalDurationSeconds ?? null
             : null,
+        durationMinutes: practice.duration_minutes,
         publishedAt:
           effectivePublishedAt({
             status: practice.status,

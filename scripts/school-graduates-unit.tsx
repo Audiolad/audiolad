@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { selectGraduateProducts, validateGraduateProductIds, graduateText, type SchoolGraduate } from "../src/lib/school/graduates";
@@ -70,6 +70,10 @@ const supabase = createClient("http://127.0.0.1:1", "test-anon-key", {
 });
 const catalog = await getPublishedCatalogProducts(supabase, { productIds: rows.map(row => row.id), throwOnStorageError: true });
 assert.deepEqual(catalog.map(p => p.id), ["live"], "unpublished, hidden, future and deleted products must be excluded");
+assert.equal(catalog[0].durationSeconds ?? null, null, "audio duration is absent");
+assert.equal(catalog[0].durationMinutes, 5, "duration_minutes stays available as the card fallback");
+assert.equal(mapCatalogProductToListingItem(catalog[0]).duration_seconds, 300);
+assert.ok(renderToStaticMarkup(<GraduateProducts cards={[mapCatalogProductToListingItem(catalog[0])]} school />).includes("5 мин"));
 assert.ok(calls.find(url => url.pathname.endsWith("/practices"))?.searchParams.has("or"), "scheduled publication WHERE must remain present");
 const picked = graduate({ product_1_id: "live", product_2_id: "draft" });
 assert.deepEqual(selectGraduateProducts([picked], catalog).map(p => p.id), ["live"]);
@@ -83,11 +87,20 @@ assert.equal(await getPublishedCatalogProducts(supabase, { productIds: [] }).the
 
 const cards = products.map(mapCatalogProductToListingItem);
 assert.equal(renderToStaticMarkup(<GraduateProducts cards={[]} />), "");
+const minutesOnly = product("minutes");
+minutesOnly.durationSeconds = null;
+minutesOnly.durationMinutes = 8;
+assert.ok(renderToStaticMarkup(<GraduateProducts cards={[mapCatalogProductToListingItem(minutesOnly)]} />).includes("8 мин"));
 for (const school of [true, false]) {
   const html = renderToStaticMarkup(<GraduateProducts cards={cards} school={school} />);
   assert.ok(html.includes(school ? 'href="https://audiolad.ru/practice/a/p1"' : 'href="/practice/a/p1"'));
   assert.ok(html.includes("2 мин"));
-  assert.ok(html.includes("overflow-x-auto") && html.includes("snap-x") && html.includes("shrink-0"), "cards remain in one scrollable row");
+  if (school) {
+    assert.ok(html.includes("school-graduates") && html.includes("school-graduates__row") && html.includes("school-graduates__card"), "landing block uses the school section shell");
+    assert.ok(!html.includes("max-w-6xl"));
+  } else {
+    assert.ok(html.includes("overflow-x-auto") && html.includes("snap-x") && html.includes("shrink-0"), "cards remain in one scrollable row");
+  }
   assert.ok(!html.includes("grid-cols-"));
   const links = [...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
   assert.equal(links.length, cards.length);
@@ -99,8 +112,25 @@ const schoolPage = readFileSync("src/app/(platform)/school-site/page.tsx", "utf8
 assert.match(schoolPage, /<SchoolTestimonialsScreen \/>\s*<SchoolGraduateShowcase school \/>\s*<SchoolFaqScreen \/>/, "showcase must directly follow testimonials and precede FAQ");
 const catalogPage = readFileSync("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx", "utf8");
 assert.ok(!catalogPage.includes("SchoolGraduateShowcase"), "platform placement is not approved");
-const sql = readFileSync("supabase/migrations/20270106120000_school_graduates.sql", "utf8");
-assert.ok(sql.includes("ENABLE ROW LEVEL SECURITY") && sql.includes("USING (enabled)"));
+const migrationName = "supabase/migrations/20270130120000_school_graduates.sql";
+assert.equal(existsSync("supabase/migrations/20270106120000_school_graduates.sql"), false);
+const sql = readFileSync(migrationName, "utf8");
+assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
+assert.match(sql, /REVOKE ALL ON TABLE public\.school_graduates FROM PUBLIC, anon, authenticated/);
+assert.match(sql, /REVOKE EXECUTE ON FUNCTION public\.validate_school_graduate_selection\(\) FROM PUBLIC/);
+assert.match(sql, /school_graduate_showcase/);
+assert.doesNotMatch(sql, /GRANT SELECT ON public\.school_graduates TO anon/);
+assert.doesNotMatch(sql, /DROP |UPDATE public\.practices|UPDATE public\.authors/);
+const actions = readFileSync("src/app/(platform)/admin/school-graduates/actions.ts", "utf8");
+assert.match(actions, /buildAuthorProductEditPath/);
+assert.match(actions, /step: 4/);
+assert.match(actions, /только опубликованные/);
+assert.doesNotMatch(actions, /status=published/);
+const editor = readFileSync("src/components/admin/SchoolGraduatesEditor.tsx", "utf8");
+assert.match(editor, /errorLinks/);
+assert.doesNotMatch(editor, /errorHref/);
+const prDoc = readFileSync("docs/SCHOOL_GRADUATES_PR.md", "utf8");
+assert.doesNotMatch(prDoc, /REPORT\.md/);
 console.log("school-graduates: selection limit, ownership, order, canonical visibility, refresh, empty block and product links passed");
 
 }
