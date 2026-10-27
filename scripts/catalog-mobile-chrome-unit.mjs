@@ -196,8 +196,24 @@ assert.match(
 );
 assert.match(
   page,
+  /promos=\{promos\}/,
+  "catalog passes the managed promo into the product grid",
+);
+assert.doesNotMatch(
+  page,
+  /<CatalogPromoCarousel/,
+  "catalog page does not render the promo above the product grid",
+);
+const productGrid = read("src/components/products/CatalogProductGrid.tsx");
+assert.match(
+  productGrid,
   /CatalogPromoCarousel/,
-  "catalog reuses the managed promo below its sections",
+  "product grid renders the managed promo component",
+);
+assert.match(
+  read("src/app/globals.css"),
+  /\.catalog-product-grid__promo \{\s*grid-column:\s*1\s*\/\s*-1;/,
+  "promo row spans every column at every breakpoint",
 );
 
 assert.doesNotMatch(

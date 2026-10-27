@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
 import LivePublicContentSync from "@/components/public-content/LivePublicContentSync";
 import CatalogProductGridCard from "@/components/products/CatalogProductGridCard";
+import { catalogGridPromoInsertAfter, type CatalogPromo } from "@/lib/catalog/catalog-promo";
 import type { CatalogCard } from "@/lib/catalog/dto";
 import {
   CATALOG_LISTING_PAGE_SIZE,
@@ -51,6 +53,7 @@ type CatalogProductGridProps = {
   initialItems: CatalogCard[];
   initialNextCursor: string | null;
   query: Omit<CatalogListingQuery, "cursor">;
+  promos?: readonly CatalogPromo[];
   isAuthenticated?: boolean;
   signInReturnPath?: string;
   emptyState?: ReactNode;
@@ -60,6 +63,7 @@ export default function CatalogProductGrid({
   initialItems,
   initialNextCursor,
   query,
+  promos = [],
   isAuthenticated = false,
   signInReturnPath = "/catalog",
   emptyState = null,
@@ -417,25 +421,44 @@ export default function CatalogProductGrid({
     return () => observer.disconnect();
   }, [loadMore, nextCursor]);
 
+  const promoAfterIndex =
+    promos.length > 0 ? catalogGridPromoInsertAfter(items.length) : null;
+  const promoRow =
+    promoAfterIndex === null ? null : (
+      <li className="catalog-product-grid__promo" data-catalog-grid-promo>
+        <CatalogPromoCarousel promos={promos} />
+      </li>
+    );
+
   return (
     <>
       <LivePublicContentSync refresh={refreshPublicPage} />
       {items.length === 0 ? (
-        emptyState
+        <>
+          {promos.length > 0 ? (
+            <div data-catalog-grid-promo>
+              <CatalogPromoCarousel promos={promos} />
+            </div>
+          ) : null}
+          {emptyState}
+        </>
       ) : (
         <section
           className={`mt-5 ${platformBottomContentPaddingClass}`}
           aria-label="Каталог аудиопродуктов"
         >
           <ul data-catalog-product-grid className="catalog-product-grid">
-            {items.map((product) => (
-              <li key={product.publication_id} className="min-w-0">
-                <CatalogProductGridCard
-                  product={product}
-                  isAuthenticated={isAuthenticated}
-                  signInReturnPath={signInReturnPath}
-                />
-              </li>
+            {items.map((product, index) => (
+              <Fragment key={product.publication_id}>
+                <li className="min-w-0" data-catalog-grid-item>
+                  <CatalogProductGridCard
+                    product={product}
+                    isAuthenticated={isAuthenticated}
+                    signInReturnPath={signInReturnPath}
+                  />
+                </li>
+                {promoAfterIndex === index ? promoRow : null}
+              </Fragment>
             ))}
           </ul>
 

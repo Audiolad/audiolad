@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
 import { toCatalogPromos } from "@/lib/catalog/catalog-promo";
 import { loadManagedCatalogPromoSafe } from "@/lib/catalog/managed-promo";
 
@@ -153,8 +152,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         }}
       />
 
-      <CatalogPromoCarousel promos={promos} />
-
       {isSearchActive ? (
         <section className="mt-5" aria-labelledby="catalog-search-results-heading">
           <h2
@@ -191,6 +188,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
         initialItems={listing.items}
         initialNextCursor={listing.nextCursor}
         query={resolvedListingQuery}
+        promos={promos}
         isAuthenticated={Boolean(authUser)}
         signInReturnPath={signInReturnPath}
         emptyState={
