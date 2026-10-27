@@ -29,6 +29,7 @@ import {
   type GuestCoffeePlaylist,
   type GuestCoffeeProfile,
 } from "../src/lib/business-app/guest-coffee/catalog";
+import { cabinetAlbumCoverUrl, isCabinetPublicCoverUrl } from "../src/lib/business-app/album-cover";
 import { GUEST_COFFEE_ATMOSPHERE_COPY } from "../src/lib/business-app/guest-coffee/copy";
 
 const read = (p: string) => readFileSync(p, "utf8");
@@ -233,6 +234,10 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.match(studio, /disabled=\{!\(current && isPlaying\) && !canStart\}/);
   assert.match(studio, /data-testid="biz-atmosphere-tracks"/);
   assert.match(studio, /data-testid="biz-atmosphere-match"/);
+  assert.match(studio, /BusinessAtmosphereTrackButton/);
+  assert.match(studio, /coverUrl=\{album\?\.coverUrl \?\? null\}/);
+  assert.match(studio, /business-track-panel/);
+  assert.doesNotMatch(studio, /audio_path|createSignedUrl|object\/sign/);
   // Existing guest listening API and 30-minute meter only – no new endpoint, no payment.
   const endpoints = [...studio.matchAll(/fetch\("([^"]+)"/g)].map((m) => m[1]).sort();
   assert.deepEqual(endpoints, ["/api/business/guest/coffee/track-url", "/api/business/guest/coffee/usage"]);
@@ -245,6 +250,80 @@ assert.equal(guestCoffeeTrackClock(0), null);
   }
   // No DB migration in this step.
   assert.doesNotMatch(read("src/lib/business-app/guest-coffee/atmosphere.ts"), /supabase|from\(|rpc\(/);
+}
+
+// ---------------------------------------------------------------- public album covers only (no signed audio)
+{
+  const publicCover = "https://audiolad.ru/storage/v1/object/public/practice-covers/album/xs.webp";
+  assert.equal(cabinetAlbumCoverUrl({ coverUrl: publicCover }), publicCover);
+  assert.equal(isCabinetPublicCoverUrl(publicCover), true);
+  assert.equal(
+    cabinetAlbumCoverUrl({ coverUrl: "https://cdn.example/covers/album.webp" }),
+    "https://cdn.example/covers/album.webp",
+  );
+  const signed = "https://example.supabase.co/storage/v1/object/sign/practice-audio/track.mp3?token=secret";
+  assert.equal(cabinetAlbumCoverUrl({ coverUrl: signed }), null);
+  assert.equal(cabinetAlbumCoverUrl({ coverUrl: "https://audiolad.ru/storage/v1/object/public/practice-covers/a.mp3" }), null);
+  assert.equal(cabinetAlbumCoverUrl({ coverUrl: "data:image/png;base64,aaaa" }), null);
+  assert.equal(cabinetAlbumCoverUrl({ coverUrl: null }), null);
+  const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  try {
+    const fromManifest = cabinetAlbumCoverUrl({
+      coverUrl: "https://example.supabase.co/storage/v1/object/sign/practice-audio/secret.mp3?token=no",
+      coverImage: {
+        version: 1,
+        versionId: "v1",
+        profile: "product-cover",
+        sourceWidth: 800,
+        sourceHeight: 800,
+        variants: {
+          xs: { path: "practices/album/variants/v1/xs.webp", width: 48, height: 48, byteSize: 12, mimeType: "image/webp" },
+        },
+      },
+    });
+    assert.equal(
+      fromManifest,
+      "https://example.supabase.co/storage/v1/object/public/practice-covers/practices/album/variants/v1/xs.webp",
+    );
+    assert.doesNotMatch(fromManifest ?? "", /token=|practice-audio/);
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+  }
+  const savedUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  try {
+    const fallback = cabinetAlbumCoverUrl({
+      coverUrl: publicCover,
+      coverImage: {
+        version: 1,
+        versionId: "v1",
+        profile: "product-cover",
+        sourceWidth: 800,
+        sourceHeight: 800,
+        variants: {
+          xs: { path: "practices/album/variants/v1/xs.webp", width: 48, height: 48, byteSize: 12, mimeType: "image/webp" },
+        },
+      },
+    });
+    assert.equal(fallback, publicCover);
+  } finally {
+    if (savedUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = savedUrl;
+  }
+  const button = read("src/components/business-app/BusinessAtmosphereTrackButton.tsx");
+  const css = read("src/components/business-app/business-app.css");
+  assert.match(button, /loading="lazy"/);
+  assert.match(button, /width=\{46\}/);
+  assert.match(button, /playing \? "♪"/);
+  const coverRule = css.match(/\.business-atmosphere-track__cover \{[^}]*\}/)?.[0] ?? "";
+  assert.match(coverRule, /width: 46px/);
+  assert.match(coverRule, /height: 46px/);
+  assert.match(coverRule, /border-radius: 10px/);
+  assert.doesNotMatch(coverRule, /50%|999px/);
+  assert.match(css, /@media \(max-width: 639px\) \{[^}]*\.business-music-stage \{[^}]*margin-inline: -0\.7rem;/);
+  assert.match(css, /\.business-music-stage \.business-track-panel \{[^}]*padding-inline: 0\.45rem;/);
 }
 
 console.log("business-guest-atmosphere-unit: OK");

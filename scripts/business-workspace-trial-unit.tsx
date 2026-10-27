@@ -15,6 +15,7 @@ import BusinessAppShell from "../src/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSoundStudio";
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
+import BusinessAtmosphereTrackButton from "../src/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import { businessGiftRulesText } from "../src/lib/access-grants/copy";
@@ -674,6 +675,10 @@ assert.doesNotMatch(migrationSql, /REFERENCES\s+auth\.users/i);
 const loader = read("src/lib/business-workspace/load.server.ts");
 assert.match(loader, /selectWorkspaceTracks/);
 assert.match(loader, /resolve_business_track_eligibility/);
+assert.match(loader, /cover_url, cover_image, updated_at/);
+assert.match(loader, /cabinetAlbumCoverUrl/);
+assert.match(read("src/lib/business-workspace/model.ts"), /coverUrl\?: string \| null/);
+assert.doesNotMatch(read("src/lib/business-workspace/model.ts"), /audio_path|audioPath|signedUrl|createSignedUrl/);
 assert.match(loader, /sourcesForSpace/);
 assert.match(loader, /acceptWorkspaceCatalogSourceRow/);
 assert.match(loader, /WORKSPACE_RIGHTS_CACHE_MS/);
@@ -871,7 +876,7 @@ assert.doesNotMatch(rules, /—/);
   const groupedHtml = renderToStaticMarkup(<BusinessWorkspace model={model({
     tracks: [
       { audioItemId: TRACK, title: "Утро", durationSeconds: 180, authorId: JAZZ_RELAX_AUTHOR_ID, authorName: "Джаз Релакс", albumTitle: "Мягкий джаз", shelf: "cafe" },
-      { audioItemId: "267f8644-4ad1-4bea-9de0-d44f911ae009", title: "Сон", durationSeconds: 90, authorId: AURAFON_AUTHOR_ID, authorName: "Аурафон", albumTitle: "Ночь", shelf: "other" },
+      { audioItemId: "267f8644-4ad1-4bea-9de0-d44f911ae009", title: "Сон", durationSeconds: 90, authorId: AURAFON_AUTHOR_ID, authorName: "Аурафон", albumTitle: "Ночь", shelf: "other", coverUrl: "https://audiolad.ru/storage/v1/object/public/practice-covers/night/xs.webp" },
     ],
   })} />);
   assert.match(groupedHtml, /data-testid="biz-now-playing"/);
@@ -881,6 +886,41 @@ assert.doesNotMatch(rules, /—/);
   assert.match(groupedHtml, /data-testid="biz-now-queue"/);
   assert.match(groupedHtml, /Дальше в очереди/);
   assert.match(groupedHtml, /Аурафон/);
+  assert.match(groupedHtml, /business-atmosphere-track__cover/);
+  assert.match(groupedHtml, /loading="lazy"/);
+  assert.match(groupedHtml, /practice-covers\/night\/xs\.webp/);
+  assert.match(groupedHtml, /business-music-stage/);
+  assert.match(groupedHtml, /business-track-panel/);
+  assert.doesNotMatch(groupedHtml, /token=|practice-audio|object\/sign/);
+  const blocked = renderToStaticMarkup(
+    <BusinessAtmosphereTrackButton
+      title="Тишина"
+      subtitle="Альбом без обложки"
+      number={1}
+      coverUrl="https://example.supabase.co/storage/v1/object/sign/practice-audio/track.mp3?token=secret"
+      onClick={() => {}}
+    />,
+  );
+  assert.doesNotMatch(blocked, /<img/);
+  assert.match(blocked, /business-atmosphere-track__mark/);
+  assert.match(blocked, />1</);
+  const playing = renderToStaticMarkup(
+    <BusinessAtmosphereTrackButton
+      title="Строка за строкой"
+      subtitle="Джаз для работы · Джаз Релакс"
+      time="2:37"
+      number={5}
+      current
+      playing
+      coverUrl="https://audiolad.ru/storage/v1/object/public/practice-covers/jazz/xs.webp"
+      onClick={() => {}}
+    />,
+  );
+  assert.match(playing, /data-current="true"/);
+  assert.match(playing, /data-playing="true"/);
+  assert.match(playing, /♪/);
+  assert.match(playing, /loading="lazy"/);
+  assert.doesNotMatch(playing, /—/);
   assert.match(groupedHtml, /data-testid="biz-workspace-player"/);
   assert.doesNotMatch(groupedHtml, /Играть эту подборку/);
 

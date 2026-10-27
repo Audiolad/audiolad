@@ -22,7 +22,7 @@ export default async function BusinessMusicSection({ memberTools }: { memberTool
     peekGuestCoffeeUsage(),
   ]);
   return (
-    <div className="business-app-span-full mx-auto max-w-6xl space-y-4" data-testid="biz-music-section">
+    <div className="business-app-span-full business-music-stage mx-auto max-w-6xl space-y-4" data-testid="biz-music-section">
       <header>
         <p className="business-app-eyebrow">Музыка</p>
         <h1 className="mt-1 text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">{GUEST_COFFEE_COPY.title}</h1>
