@@ -676,7 +676,7 @@ assert.match(loader, /selectWorkspaceTracks/);
 assert.match(loader, /resolve_business_track_eligibility/);
 assert.match(loader, /sourcesForSpace/);
 assert.match(loader, /acceptWorkspaceCatalogSourceRow/);
-assert.match(loader, /WORKSPACE_RIGHTS_CACHE_MS/);
+assert.doesNotMatch(loader, /bag\.decisions|createTtlDecisionCache|from\("business_space_admissions"\)/);
 assert.match(loader, /"UNKNOWN"/);
 assert.doesNotMatch(loader, /guest-coffee\/catalog|GUEST_COFFEE_SHELF/);
 const signer = read("src/lib/business-workspace/sign.server.ts");

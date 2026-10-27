@@ -2241,3 +2241,15 @@ Full schema/RPC lifecycle, RLS, backup and manual rollback:
 - У anon и authenticated нет прав на таблицу. RLS включён и публичной политики нет, поэтому даже случайный GRANT не отдаёт строку. `REVOKE ALL` снят с PUBLIC, anon и authenticated до нужных GRANT; `REVOKE EXECUTE` закрывает обе функции от PUBLIC. Запись – service_role из Server Actions после `requireAdminPermission("authors.manage")`.
 - Публичное чтение – только `school_graduate_showcase`: включённые выпускники и id продуктов, которые сейчас опубликованы и listed. `cohort` и id выключенных, снятых или ещё не наступивших продуктов в представление не попадают.
 - Витрина заново читает эти id через существующий guest catalog loader, включая его фильтры видимости, публикации и тестовых фикстур. Статусы, имена, тексты, обложки и длительности в таблицу не копируются. Выбранные продукты дополнительно фильтруются по `deleted_at IS NULL` и текущему `authorId`.
+
+## Ручные допуски Business – ожидают отдельного применения
+
+Аддитивная миграция `20270131120000_business_manual_admissions.sql` создаёт
+`business_content_directions`, `business_content_categories`,
+`business_content_admissions`, `business_content_admission_audit`, RPC управления,
+резолвер наследования и выборку кандидатов. Общий `resolve_business_track_eligibility`
+сохраняет существующие правовые проверки и запреты треков, дополнительно требует
+положительного ручного итога альбома по категории заведения. Ни одного допуска
+для существующего контента миграция не создаёт. Поля, связи, права доступа,
+правила наследования и проверка описаны в `docs/business/manual-content-admissions.md`.
+Миграция из этой задачи не применяется к рабочим базам.
