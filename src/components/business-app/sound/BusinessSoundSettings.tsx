@@ -52,6 +52,7 @@ export default function BusinessSoundSettings({
   note,
   action,
   hint = GUEST_COFFEE_ATMOSPHERE_COPY.settingsHint,
+  showDaypart = true,
 }: {
   profile: GuestCoffeeProfile;
   onChange: <K extends keyof GuestCoffeeProfile>(key: K, value: GuestCoffeeProfile[K]) => void;
@@ -60,6 +61,8 @@ export default function BusinessSoundSettings({
   action?: ReactNode;
   /** Replaces the guest assemble hint. The guest studio keeps the default. */
   hint?: string;
+  /** The cabinet queue has its own time-of-day control. The guest studio keeps this one. */
+  showDaypart?: boolean;
 }) {
   return (
     <section className="business-app-card business-sound-settings" aria-labelledby="business-sound-settings-title" data-testid="biz-sound-settings">
@@ -68,7 +71,7 @@ export default function BusinessSoundSettings({
       </h2>
       <ChipGroup legend="Характер заведения" name="biz-sound-character" options={GUEST_COFFEE_CHARACTERS} value={profile.character} onChange={(id) => onChange("character", id)} />
       <ChipGroup legend="Тип звучания" name="biz-sound-direction" options={GUEST_COFFEE_DIRECTIONS} value={profile.direction} onChange={(id) => onChange("direction", id)} />
-      <ChipGroup legend="Время суток" name="biz-sound-daypart" options={GUEST_COFFEE_DAYPARTS} value={profile.daypart} onChange={(id) => onChange("daypart", id)} />
+      {showDaypart ? <ChipGroup legend="Время суток" name="biz-sound-daypart" options={GUEST_COFFEE_DAYPARTS} value={profile.daypart} onChange={(id) => onChange("daypart", id)} /> : null}
       <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{hint}</p>
       {action}
       {note ? <p className="text-sm text-[var(--biz-text-muted)]">{note}</p> : null}

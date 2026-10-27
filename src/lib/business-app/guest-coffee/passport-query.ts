@@ -44,10 +44,23 @@ export type GuestCoffeePassportClient = {
   };
 };
 
-export async function queryGuestCoffeePassportFeatures(
+export type GuestCoffeePassportBundle = {
+  versions: GuestCoffeePassportVersionRow[];
+  attributesByPassport: Map<string, GuestCoffeePassportAttributeRow[]>;
+  /** music_analyzer_runs.normalized_json, keyed by run id. */
+  normalizedByRun: Map<string, unknown>;
+  runIdFor: (version: GuestCoffeePassportVersionRow) => string | null;
+};
+
+/**
+ * Batched read of sealed passports and the analyzer result they were sealed from.
+ * Shared by the guest coffee plan and the cafe queue. The cafe queue reads energy
+ * from `normalizedByRun` (`analysis_features_v1`); this function does not rank.
+ */
+export async function loadGuestCoffeePassportBundle(
   client: GuestCoffeePassportClient,
   trackIds: readonly string[],
-): Promise<Map<string, GuestCoffeeSoundFeatures>> {
+): Promise<GuestCoffeePassportBundle> {
   const ids = [...new Set(trackIds)];
   const versionChunks = await Promise.all(
     chunkIds(ids).map(async (chunk) => {
@@ -109,10 +122,27 @@ export async function queryGuestCoffeePassportFeatures(
       }
     } catch { /* conservative sourceTagDecision fallback */ }
   }));
+  return {
+    versions,
+    attributesByPassport,
+    normalizedByRun: runs,
+    runIdFor: runForVersion,
+  };
+}
+
+export async function queryGuestCoffeePassportFeatures(
+  client: GuestCoffeePassportClient,
+  trackIds: readonly string[],
+): Promise<Map<string, GuestCoffeeSoundFeatures>> {
+  const bundle = await loadGuestCoffeePassportBundle(client, trackIds);
   const features = new Map<string, GuestCoffeeSoundFeatures>();
-  for (const version of versions) {
+  for (const version of bundle.versions) {
     if (features.has(version.audio_item_id)) continue; // one active version per track (unique index)
-    const f = guestCoffeeFeaturesFromPassport(version, attributesByPassport.get(version.id) ?? [], runs.get(runForVersion(version) ?? ""));
+    const f = guestCoffeeFeaturesFromPassport(
+      version,
+      bundle.attributesByPassport.get(version.id) ?? [],
+      bundle.normalizedByRun.get(bundle.runIdFor(version) ?? ""),
+    );
     if (f) features.set(version.audio_item_id, f);
   }
   return features;
