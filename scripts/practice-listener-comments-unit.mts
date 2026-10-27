@@ -2269,6 +2269,161 @@ async function testAuthorNoticeConsistency() {
   assert.doesNotMatch(subtitle, /truncate/);
 }
 
+async function testCombinedAuthorWorkspaces() {
+  const secondId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const otherAuthor = "66666666-6666-4666-8666-666666666666";
+  const oldestId = commentUuid("dddddddd", 1);
+  const middleId = commentUuid("dddddddd", 2);
+  const newestId = commentUuid("dddddddd", 3);
+  const comments = [
+    impressionRow(oldestId, isoSeconds(10), "Старый отзыв первого проекта"),
+    { ...impressionRow(middleId, isoSeconds(20), "Средний отзыв первого проекта"), practiceId },
+    {
+      ...impressionRow(newestId, isoSeconds(30), "Новый отзыв второго проекта"),
+      practiceId: secondId,
+    },
+  ];
+  const notices: CommentNoticeRow[] = comments.map((row, index) => ({
+    id: commentUuid("eeeeeeee", index + 1),
+    recipientUserId: authorUser,
+    commentId: row.id,
+    practiceId: row.practiceId,
+    kind: "new_impression",
+    readAt: null,
+    createdAt: row.createdAt,
+  }));
+  const store = createMemoryCommentStore(
+    state({
+      gates: [
+        gate({ title: "Тихая", productSlug: "tihaya", authorName: "Анна Светлая" }),
+        gate({
+          practiceId: secondId,
+          title: "Вечер",
+          productSlug: "vecher",
+          authorId: otherAuthor,
+          authorSlug: "aurafon",
+          authorName: "Аурафон",
+        }),
+      ],
+      memberships: [
+        { userId: authorUser, practiceId, authorId: gate().authorId },
+        { userId: authorUser, practiceId: secondId, authorId: otherAuthor },
+      ],
+      comments,
+      notices,
+    }),
+  );
+  const base = {
+    authorId: null as string | null,
+    cursor: null,
+    limit: 1,
+  };
+  const firstPage = await listAuthorFeedback(store, actor(authorUser), {
+    ...base,
+    sort: "new",
+    filter: "all",
+  });
+  assert.equal(firstPage.ok, true);
+  if (!firstPage.ok) return;
+  assert.equal(firstPage.comments.length, 1);
+  assert.equal(firstPage.comments[0]?.id, newestId);
+  assert.equal(firstPage.comments[0]?.authorName, "Аурафон");
+  assert.equal(firstPage.comments[0]?.practiceTitle, "Вечер");
+  assert.equal(firstPage.unreadCount, 3);
+  assert.ok(firstPage.nextCursor);
+  const secondPage = await listAuthorFeedback(store, actor(authorUser), {
+    ...base,
+    sort: "new",
+    filter: "all",
+    cursor: decodeCommentCursor(firstPage.nextCursor),
+  });
+  assert.equal(secondPage.ok && secondPage.comments[0]?.id, middleId);
+  if (secondPage.ok) {
+    assert.equal(secondPage.comments[0]?.authorName, "Анна Светлая");
+    assert.equal(secondPage.comments[0]?.practiceTitle, "Тихая");
+  }
+  const oldestFirst = await listAuthorFeedback(store, actor(authorUser), {
+    ...base,
+    sort: "old",
+    filter: "all",
+  });
+  assert.equal(oldestFirst.ok && oldestFirst.comments[0]?.id, oldestId);
+  const fresh = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: null,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "new",
+  });
+  assert.equal(fresh.ok && fresh.comments.length, 3);
+  const unansweredBefore = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: null,
+    sort: "old",
+    cursor: null,
+    limit: 10,
+    filter: "unanswered",
+  });
+  assert.equal(unansweredBefore.ok && unansweredBefore.comments.length, 3);
+  const reply = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: newestId,
+    body: "Спасибо за отзыв второго проекта",
+    clientRequestId: commentUuid("ffffffff", 1),
+    authorSlug: "aurafon",
+    productSlug: "vecher",
+  });
+  assert.equal(reply.ok, true);
+  const unanswered = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: null,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "unanswered",
+  });
+  assert.equal(unanswered.ok && unanswered.comments.length, 2);
+  if (unanswered.ok) {
+    assert.equal(
+      unanswered.comments.some((item) => item.id === newestId),
+      false,
+    );
+    assert.equal(unanswered.comments.some((item) => item.authorName === "Анна Светлая"), true);
+  }
+  const onlySecond = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: otherAuthor,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "all",
+  });
+  assert.equal(onlySecond.ok && onlySecond.comments.length, 1);
+  if (onlySecond.ok) {
+    assert.equal(onlySecond.comments[0]?.id, newestId);
+    assert.equal(onlySecond.unreadCount, 3);
+  }
+  const stranger = await listAuthorFeedback(store, actor(listener), {
+    authorId: otherAuthor,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "all",
+  });
+  assert.equal(stranger.ok, false);
+
+  const ui = read("src/components/author-dashboard/AuthorListenerFeedback.tsx");
+  assert.doesNotMatch(ui, /useState\(\s*authors\[0\]/);
+  assert.match(ui, /authors\.length > 1/);
+  assert.match(ui, /AUTHOR_COMMENTS_ALL_PROJECTS/);
+  assert.match(ui, /if \(authorId\) params\.set\("authorId", authorId\)/);
+  assert.match(ui, /data-author-comment-workspace=\{item\.authorName\}/);
+  assert.match(ui, /data-author-comment-product=\{item\.practiceTitle\}/);
+  assert.match(ui, /AUTHOR_COMMENTS_FILTER_ALL/);
+  assert.match(ui, /AUTHOR_COMMENTS_FILTER_NEW/);
+  assert.match(ui, /AUTHOR_COMMENTS_FILTER_UNANSWERED/);
+  const page = read("src/app/(platform)/author-dashboard/feedback/page.tsx");
+  assert.match(page, /AuthorListenerFeedback/);
+  assert.doesNotMatch(page, /authors\[0\]/);
+}
+
+await testCombinedAuthorWorkspaces();
 await testAuthorNoticeConsistency();
 await testAuthorCommentHistory();
 await testAvatars();

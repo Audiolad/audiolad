@@ -374,7 +374,9 @@ function FeedbackCard({
         {item.unread ? AUTHOR_COMMENTS_NEW_LABEL : "Комментарий"}
       </p>
       <p className="mt-1 text-sm font-semibold text-[#2b2144]">
-        {item.authorName} – {item.practiceTitle}
+        <span data-author-comment-workspace={item.authorName}>{item.authorName}</span>
+        {" – "}
+        <span data-author-comment-product={item.practiceTitle}>{item.practiceTitle}</span>
       </p>
       <a className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={item.practiceHref}>
         {AUTHOR_COMMENTS_OPEN}
