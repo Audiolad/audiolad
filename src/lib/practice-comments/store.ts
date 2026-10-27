@@ -26,9 +26,12 @@ export type FeedCommentRow = {
 export type PracticeContext = {
   id: string;
   title: string;
+  authorName: string;
   authorSlug: string;
   productSlug: string;
 };
+
+export type AuthorImpressionFilter = "all" | "new" | "unanswered";
 
 export type CommentStore = {
   getGateBySlug(authorSlug: string, productSlug: string): Promise<ListenerCommentPracticeGate | null>;
@@ -41,6 +44,22 @@ export type CommentStore = {
   isAuthorMember(userId: string, practiceId: string): Promise<boolean>;
   authorRecipientIds(practiceId: string): Promise<string[]>;
   listAuthorPracticeIds(userId: string, authorId: string | null): Promise<string[]>;
+  listAuthorImpressions(input: {
+    userId: string;
+    practiceIds: string[];
+    sort: CommentSort;
+    cursor: CommentCursor | null;
+    limit: number;
+    filter: AuthorImpressionFilter;
+  }): Promise<FeedCommentRow[]>;
+  countUnreadAuthorImpressions(userId: string, practiceIds: string[]): Promise<number>;
+  unreadNoticesForComments(
+    userId: string,
+    commentIds: string[],
+  ): Promise<Array<{ noticeId: string; commentId: string }>>;
+  markNoticesRead(userId: string, noticeIds: string[], readAt: string): Promise<number>;
+  markUnreadAuthorImpressions(userId: string, practiceIds: string[], readAt: string): Promise<number>;
+  markUnreadNoticeForComment(userId: string, commentId: string, readAt: string): Promise<boolean>;
   listFeed(input: {
     practiceId: string;
     viewerUserId: string | null;

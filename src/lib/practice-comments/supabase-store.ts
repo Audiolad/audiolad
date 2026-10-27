@@ -102,6 +102,72 @@ function cursorFilter(sort: CommentSort, cursor: CommentCursor): string {
   return `created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${id})`;
 }
 
+async function unreadPublishedCommentIds(
+  writer: SupabaseClient,
+  userId: string,
+  practiceIds: string[],
+): Promise<string[]> {
+  const { data, error } = await writer
+    .from("practice_listener_comment_notices")
+    .select("comment_id, practice_listener_comments!inner(status, kind, deleted_at)")
+    .eq("recipient_user_id", userId)
+    .in("practice_id", practiceIds)
+    .eq("kind", "new_impression")
+    .is("read_at", null)
+    .eq("practice_listener_comments.status", "published")
+    .eq("practice_listener_comments.kind", "impression")
+    .is("practice_listener_comments.deleted_at", null)
+    .limit(500);
+  throwIfUnavailable(error);
+  if (error) throw new Error("author_unread_ids_failed");
+  return (data ?? [])
+    .map((item) => (item as { comment_id?: string }).comment_id)
+    .filter((id): id is string => typeof id === "string");
+}
+
+async function unreadNoticeIds(
+  writer: SupabaseClient,
+  userId: string,
+  practiceIds: string[],
+): Promise<string[]> {
+  const { data, error } = await writer
+    .from("practice_listener_comment_notices")
+    .select("id, practice_listener_comments!inner(status, kind, deleted_at)")
+    .eq("recipient_user_id", userId)
+    .in("practice_id", practiceIds)
+    .eq("kind", "new_impression")
+    .is("read_at", null)
+    .eq("practice_listener_comments.status", "published")
+    .eq("practice_listener_comments.kind", "impression")
+    .is("practice_listener_comments.deleted_at", null)
+    .limit(500);
+  throwIfUnavailable(error);
+  if (error) throw new Error("author_unread_notice_ids_failed");
+  return (data ?? [])
+    .map((item) => (item as { id?: string }).id)
+    .filter((id): id is string => typeof id === "string");
+}
+
+async function publishedReplyParentIds(
+  writer: SupabaseClient,
+  practiceIds: string[],
+): Promise<string[]> {
+  const { data, error } = await writer
+    .from("practice_listener_comments")
+    .select("parent_id")
+    .in("practice_id", practiceIds)
+    .eq("kind", "author_reply")
+    .eq("status", "published")
+    .is("deleted_at", null)
+    .not("parent_id", "is", null)
+    .limit(2000);
+  throwIfUnavailable(error);
+  if (error) throw new Error("author_reply_parents_failed");
+  return (data ?? [])
+    .map((item) => (item as { parent_id?: string }).parent_id)
+    .filter((id): id is string => typeof id === "string");
+}
+
 export function createSupabaseCommentStore(input: {
   reader: SupabaseClient;
   writer: SupabaseClient;
@@ -133,12 +199,12 @@ export function createSupabaseCommentStore(input: {
     async getPracticeContext(practiceId) {
       const { data, error } = await reader
         .from("practices")
-        .select("id, title, slug, authors!practices_author_id_fkey(slug)")
+        .select("id, title, slug, authors!practices_author_id_fkey(slug, name)")
         .eq("id", practiceId)
         .maybeSingle();
       throwIfUnavailable(error);
       if (error || !data) return null;
-      const authors = (data as { authors?: { slug?: string } | { slug?: string }[] }).authors;
+      const authors = (data as { authors?: { slug?: string; name?: string } | { slug?: string; name?: string }[] }).authors;
       const author = Array.isArray(authors) ? authors[0] : authors;
       const authorSlug = author?.slug ?? "";
       const productSlug = (data as { slug?: string }).slug ?? "";
@@ -146,6 +212,7 @@ export function createSupabaseCommentStore(input: {
       return {
         id: practiceId,
         title: (data as { title?: string }).title ?? "Практика",
+        authorName: author?.name?.trim() || "Автор",
         authorSlug,
         productSlug,
       };
@@ -264,6 +331,119 @@ export function createSupabaseCommentStore(input: {
       return (practices ?? [])
         .map((row) => (row as { id?: string }).id)
         .filter((id): id is string => typeof id === "string");
+    },
+    async listAuthorImpressions(input) {
+      if (input.practiceIds.length === 0) return [];
+      let request = reader
+        .from("practice_listener_comment_feed")
+        .select("id, practice_id, parent_id, kind, body, public_name, avatar_url, status, created_at, edited_at, mine")
+        .in("practice_id", input.practiceIds)
+        .is("parent_id", null)
+        .eq("kind", "impression")
+        .eq("status", "published")
+        .order("created_at", { ascending: input.sort === "old" })
+        .order("id", { ascending: input.sort === "old" })
+        .limit(input.limit);
+      if (input.cursor) request = request.or(cursorFilter(input.sort, input.cursor));
+      if (input.filter === "new") {
+        const ids = await unreadPublishedCommentIds(writer, input.userId, input.practiceIds);
+        if (ids.length === 0) return [];
+        request = request.in("id", ids);
+      }
+      if (input.filter === "unanswered") {
+        const answered = await publishedReplyParentIds(writer, input.practiceIds);
+        if (answered.length > 0) request = request.not("id", "in", `(${answered.join(",")})`);
+      }
+      const { data, error } = await request;
+      throwIfUnavailable(error);
+      if (error) throw new Error("author_impression_list_failed");
+      return (data ?? []).map(mapFeed).filter((row): row is FeedCommentRow => row != null);
+    },
+    async countUnreadAuthorImpressions(userId, practiceIds) {
+      if (practiceIds.length === 0) return 0;
+      const { count, error } = await writer
+        .from("practice_listener_comment_notices")
+        .select("id, practice_listener_comments!inner(id)", { count: "exact", head: true })
+        .eq("recipient_user_id", userId)
+        .in("practice_id", practiceIds)
+        .eq("kind", "new_impression")
+        .is("read_at", null)
+        .eq("practice_listener_comments.status", "published")
+        .eq("practice_listener_comments.kind", "impression")
+        .is("practice_listener_comments.deleted_at", null);
+      throwIfUnavailable(error);
+      if (error) throw new Error("author_unread_count_failed");
+      return count ?? 0;
+    },
+    async unreadNoticesForComments(userId, commentIds) {
+      if (commentIds.length === 0) return [];
+      const { data, error } = await writer
+        .from("practice_listener_comment_notices")
+        .select("id, comment_id, practice_listener_comments!inner(status, kind, deleted_at)")
+        .eq("recipient_user_id", userId)
+        .in("comment_id", commentIds)
+        .eq("kind", "new_impression")
+        .is("read_at", null)
+        .eq("practice_listener_comments.status", "published")
+        .eq("practice_listener_comments.kind", "impression")
+        .is("practice_listener_comments.deleted_at", null);
+      throwIfUnavailable(error);
+      if (error) throw new Error("author_unread_notices_failed");
+      return (data ?? []).map((item) => {
+        const row = item as { id?: string; comment_id?: string };
+        return { noticeId: String(row.id), commentId: String(row.comment_id) };
+      });
+    },
+    async markNoticesRead(userId, noticeIds, readAt) {
+      if (noticeIds.length === 0) return 0;
+      const { data, error } = await writer
+        .from("practice_listener_comment_notices")
+        .update({ read_at: readAt })
+        .eq("recipient_user_id", userId)
+        .eq("kind", "new_impression")
+        .is("read_at", null)
+        .in("id", noticeIds)
+        .select("id");
+      throwIfUnavailable(error);
+      if (error) throw new Error("author_notice_read_failed");
+      return data?.length ?? 0;
+    },
+    async markUnreadAuthorImpressions(userId, practiceIds, readAt) {
+      if (practiceIds.length === 0) return 0;
+      const ids = await unreadNoticeIds(writer, userId, practiceIds);
+      if (ids.length === 0) return 0;
+      const { data, error } = await writer
+        .from("practice_listener_comment_notices")
+        .update({ read_at: readAt })
+        .eq("recipient_user_id", userId)
+        .in("id", ids)
+        .is("read_at", null)
+        .select("id");
+      throwIfUnavailable(error);
+      if (error) throw new Error("author_notice_read_all_failed");
+      return data?.length ?? 0;
+    },
+    async markUnreadNoticeForComment(userId, commentId, readAt) {
+      const { data: comment, error: commentError } = await writer
+        .from("practice_listener_comments")
+        .select("status, kind, deleted_at")
+        .eq("id", commentId)
+        .maybeSingle();
+      throwIfUnavailable(commentError);
+      if (commentError) throw new Error("author_notice_comment_failed");
+      const row = comment as { status?: string; kind?: string; deleted_at?: string | null } | null;
+      if (!row || row.status !== "published" || row.kind !== "impression" || row.deleted_at) return false;
+      const { data, error } = await writer
+        .from("practice_listener_comment_notices")
+        .update({ read_at: readAt })
+        .eq("recipient_user_id", userId)
+        .eq("comment_id", commentId)
+        .eq("kind", "new_impression")
+        .is("read_at", null)
+        .select("id");
+      throwIfUnavailable(error);
+      if (error) throw new Error("author_notice_read_comment_failed");
+      return (data?.length ?? 0) > 0;
     },
     async listFeed(query) {
       let request = reader

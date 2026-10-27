@@ -11,7 +11,7 @@ import {
   type CommentSort,
 } from "@/lib/practice-comments/pagination";
 import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
-import type { CommentStore, FeedCommentRow } from "@/lib/practice-comments/store";
+import type { AuthorImpressionFilter, CommentStore, FeedCommentRow } from "@/lib/practice-comments/store";
 import { isUniqueViolation } from "@/lib/practice-comments/store";
 import {
   commentFingerprint,
@@ -524,6 +524,18 @@ export async function reportComment(
   return { ok: true, duplicate: result === "duplicate" };
 }
 
+export function parseAuthorImpressionFilter(input: string | null): AuthorImpressionFilter | null {
+  if (input == null || input === "" || input === "all") return "all";
+  if (input === "new" || input === "unanswered") return input;
+  return null;
+}
+
+/**
+ * Cabinet history is every published listener impression on the account's
+ * products. Unread is a new_impression notice with no read_at. Hidden and
+ * deleted rows are absent, and an author reply is not a new comment.
+ * Opening the list marks the shown notices read; the rows stay in history.
+ */
 export async function listAuthorFeedback(
   store: CommentStore,
   actor: CommentActor,
@@ -532,6 +544,7 @@ export async function listAuthorFeedback(
     sort: CommentSort;
     cursor: CommentCursor | null;
     limit: number;
+    filter?: AuthorImpressionFilter;
   },
 ): Promise<
   | CommentFailure
@@ -540,6 +553,7 @@ export async function listAuthorFeedback(
       comments: Array<{
         id: string;
         practiceId: string;
+        authorName: string;
         practiceTitle: string;
         practiceHref: string;
         publicName: string;
@@ -552,45 +566,59 @@ export async function listAuthorFeedback(
         unread: boolean;
       }>;
       nextCursor: string | null;
+      unreadCount: number;
     }
 > {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   const practiceIds = await store.listAuthorPracticeIds(actor.userId, input.authorId);
   if (input.authorId && practiceIds.length === 0) return commentFailure(403, "forbidden");
-  const collected: FeedCommentRow[] = [];
-  for (const practiceId of practiceIds) {
-    const rows = await store.listFeed({
-      practiceId,
-      viewerUserId: actor.userId,
-      sort: input.sort,
-      cursor: input.cursor,
-      limit: input.limit + 1,
-    });
-    collected.push(...rows.filter((row) => row.status === "published" && row.kind === "impression"));
-  }
-  collected.sort((left, right) =>
-    left.createdAt < right.createdAt ? (input.sort === "old" ? -1 : 1) : left.createdAt > right.createdAt ? (input.sort === "old" ? 1 : -1) : 0,
+  const filter = input.filter ?? "all";
+  const rows = await store.listAuthorImpressions({
+    userId: actor.userId,
+    practiceIds,
+    sort: input.sort,
+    cursor: input.cursor,
+    limit: input.limit + 1,
+    filter,
+  });
+  const hasMore = rows.length > input.limit;
+  const page = rows.slice(0, input.limit);
+  const notices = await store.unreadNoticesForComments(
+    actor.userId,
+    page.map((row) => row.id),
   );
-  const page = collected.slice(0, input.limit);
-  const notices = await store.listNotices(actor.userId);
+  const noticeByComment = new Map(notices.map((notice) => [notice.commentId, notice.noticeId]));
+  const repliesByParent = new Map<string, FeedCommentRow>();
+  const parentsByPractice = new Map<string, string[]>();
+  for (const row of page) {
+    const ids = parentsByPractice.get(row.practiceId) ?? [];
+    ids.push(row.id);
+    parentsByPractice.set(row.practiceId, ids);
+  }
+  for (const [practiceId, parentIds] of parentsByPractice) {
+    const replies = await store.listReplies({
+      practiceId,
+      parentIds,
+      viewerUserId: actor.userId,
+    });
+    for (const reply of replies) {
+      if (reply.status === "published" && reply.parentId && !repliesByParent.has(reply.parentId)) {
+        repliesByParent.set(reply.parentId, reply);
+      }
+    }
+  }
   const comments = [];
   for (const row of page) {
     const context = await store.getPracticeContext(row.practiceId);
-    const replies = await store.listReplies({
-      practiceId: row.practiceId,
-      parentIds: [row.id],
-      viewerUserId: actor.userId,
-    });
-    const reply = replies.find((item) => item.status === "published") ?? null;
-    const notice = notices.find(
-      (item) => item.commentId === row.id && item.kind === "new_impression",
-    );
+    const reply = repliesByParent.get(row.id) ?? null;
+    const noticeId = noticeByComment.get(row.id) ?? null;
     comments.push({
       id: row.id,
       practiceId: row.practiceId,
-      practiceTitle: context?.title ?? "Практика",
+      authorName: context?.authorName ?? "Автор",
+      practiceTitle: context?.title ?? "Продукт",
       practiceHref: context
-        ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-impressions`
+        ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-comment-${row.id}`
         : "/catalog",
       publicName: row.publicName,
       avatarUrl: row.avatarUrl,
@@ -598,15 +626,34 @@ export async function listAuthorFeedback(
       createdAt: row.createdAt,
       editedAt: row.editedAt,
       reply: reply ? toReply(reply) : null,
-      noticeId: notice?.id ?? null,
-      unread: Boolean(notice && !notice.readAt),
+      noticeId,
+      unread: noticeId != null,
     });
   }
   const last = page[page.length - 1];
+  const ownedIds = input.authorId
+    ? await store.listAuthorPracticeIds(actor.userId, null)
+    : practiceIds;
   return {
     ok: true,
     comments,
-    nextCursor: collected.length > input.limit && last ? encodeCommentCursor(last) : null,
+    nextCursor: hasMore && last ? encodeCommentCursor(last) : null,
+    unreadCount: ownedIds.length === 0 ? 0 : await store.countUnreadAuthorImpressions(actor.userId, ownedIds),
+  };
+}
+
+export async function countUnreadAuthorImpressions(
+  store: CommentStore,
+  actor: CommentActor,
+): Promise<CommentFailure | { ok: true; unreadCount: number }> {
+  if (!actor.userId) return commentFailure(401, "unauthorized");
+  const practiceIds = await store.listAuthorPracticeIds(actor.userId, null);
+  return {
+    ok: true,
+    unreadCount:
+      practiceIds.length === 0
+        ? 0
+        : await store.countUnreadAuthorImpressions(actor.userId, practiceIds),
   };
 }
 
@@ -638,6 +685,44 @@ export async function markCommentNoticeRead(
   const ok = await store.markNoticeRead(actor.userId, noticeId, iso(clock.now()));
   if (!ok) return commentFailure(404, "not_found");
   return { ok: true as const };
+}
+
+const NOTICE_ID = /^[0-9a-f-]{36}$/i;
+
+/**
+ * Read state belongs to the signed-in account. Shown rows are marked when the
+ * cabinet list opens. «Отметить все прочитанными» clears every unread
+ * impression notice on this account's products. Opening one comment on the
+ * product page marks that notice. Hidden and deleted impressions are not marked
+ * and do not count.
+ */
+export async function markAuthorImpressionNotices(
+  store: CommentStore,
+  actor: CommentActor,
+  clock: CommentClock,
+  input: { noticeIds?: string[]; all?: boolean; commentId?: string | null },
+): Promise<CommentFailure | { ok: true; unreadCount: number }> {
+  if (!actor.userId) return commentFailure(401, "unauthorized");
+  const now = iso(clock.now());
+  const practiceIds = await store.listAuthorPracticeIds(actor.userId, null);
+  if (input.all) {
+    await store.markUnreadAuthorImpressions(actor.userId, practiceIds, now);
+  } else if (input.commentId && NOTICE_ID.test(input.commentId)) {
+    await store.markUnreadNoticeForComment(actor.userId, input.commentId, now);
+  } else if (input.noticeIds && input.noticeIds.length > 0) {
+    const ids = input.noticeIds.filter((id) => NOTICE_ID.test(id)).slice(0, 20);
+    if (ids.length === 0) return commentFailure(400, "invalid_notice");
+    await store.markNoticesRead(actor.userId, ids, now);
+  } else {
+    return commentFailure(400, "invalid_notice");
+  }
+  return {
+    ok: true,
+    unreadCount:
+      practiceIds.length === 0
+        ? 0
+        : await store.countUnreadAuthorImpressions(actor.userId, practiceIds),
+  };
 }
 
 export async function moderateComment(
