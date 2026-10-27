@@ -1,37 +1,29 @@
 ## Business track sound review (96a75b7b, pending owner apply)
 
-Migration `20270201120000_business_track_sound_reviews.sql` adds
-`business_track_sound_reviews` (one checked status: unchecked/approved/rejected)
-and append-only `business_track_sound_review_history`. Missing decisions are
-computed as unchecked; there is no backfill. The authenticated admin RPC checks
-both `admin_panel.access` and `author_products.moderate`; direct client writes
-are revoked. SELECT is protected by matching RLS policies. Reasons and reviewer
-UUIDs are internal. Manual changes and automatic resets are audited atomically.
-The audio item is locked before a decision to serialize review/replacement.
-Track UUIDs are retained without a catalogue FK, so normal catalogue deletion is
-not blocked and internal review evidence survives it.
+Migration `20270201120000_business_track_sound_reviews.sql` is applied after
+`20270131120000_business_manual_admissions.sql`. It adds
+`business_track_sound_reviews` (unchecked/approved/rejected) and append-only
+`business_track_sound_review_history`. Missing decisions stay unchecked; there
+is no backfill. The admin RPC checks `admin_panel.access` and
+`author_products.moderate`. Direct client writes are revoked. Reasons stay
+internal. Track UUIDs have no catalogue FK, so catalogue deletion is not blocked.
 
-Audio identity is the tuple of `audio_path`, `desired_music_master_asset_id`,
-and `active_music_delivery_asset_id`. A trigger updates only the new decision
-tables on replacement. It does not touch catalogue visibility or analyzer data.
-Immutable source paths/asset IDs are required; overwriting bytes at an identical
-legacy path is outside this identity contract. A delivery pointer change also
-requires review, conservatively including a new transcode of the same source.
+Audio identity is `audio_path` + `desired_music_master_asset_id` +
+`active_music_delivery_asset_id`. Replacement of any part resets the decision
+to unchecked. Analyzer writes do not. There is no
+`resolve_business_track_eligibility_before_sound`.
 
-The existing rights resolver is retained as
-`resolve_business_track_eligibility_before_sound` with no client/service grant.
-The public resolver calls it unchanged and can only restrict its decision.
-Playback requires current approval plus exact `business_space_admissions`
-membership for the location's space; unknown categories fail closed. New or
-restored programme items require the same sound/space admission. Existing
-programme rows are preserved and filtered on delivery.
-
-28d2b5bb's artist/album matrix is absent in this checkout. The adapter
-`business_sound_admitted_albums` / `business_sound_album_spaces` includes every published/listed music track from
-an album with at least one existing per-track space admission. The queue's
-shared view is also used by `admin_business_sound_queue`. When the matrix lands,
-update this view and `business_sound_track_allowed` together. An album
-sibling entering the queue does not automatically gain a playback admission.
+`resolve_business_track_eligibility` is the only playback gate. It calls
+`resolve_business_track_eligibility_v1`, keeps the eligibility-review overlay,
+and returns that result while `manual_content_gate` is false. When the gate is
+true it also requires `resolve_business_content_admission` for the location
+direction (album overrides artist; unreviewed is excluded) and a matching
+approved sound review. It never turns a non-eligible legal result into
+ELIGIBLE. `business_space_admissions` does not grant playback once the gate is
+on. The review queue view `business_sound_admitted_albums` lists direction keys
+for albums the content resolver allows. An approved album sibling is playable
+for that direction; sound stays per track. The programme-item guard is a no-op
+while the gate is off, so existing composition smoke keeps working.
 No migration was applied to any shared or production database by this task.
 
 ## Listener impressions (pending owner apply)
@@ -2288,8 +2280,10 @@ Full schema/RPC lifecycle, RLS, backup and manual rollback:
 `resolve_business_track_eligibility` оставляет нынешний правовой результат и
 запреты `business_track_eligibility_reviews`. После включения функция дополнительно
 требует положительного ручного итога альбома по категории заведения (явный альбом
-важнее артиста, непроверенное исключено). Анализатор и паспорт допуск не открывают.
+важнее артиста, непроверенное исключено), а следующая миграция
+`20270201120000_business_track_sound_reviews.sql` добавляет в ту же функцию
+требование звука «Допущен». Анализатор и паспорт допуск не открывают.
 Ни одного допуска для существующего контента миграция не создаёт. Поля, связи,
 права доступа, правила наследования и проверка описаны в
-`docs/business/manual-content-admissions.md`. Миграция из этой задачи не
-применяется к рабочим базам.
+`docs/business/manual-content-admissions.md`. Обе миграции к рабочим базам
+не применяются.

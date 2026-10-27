@@ -1,5 +1,4 @@
 import "server-only";
-import { soundAllowedTrackIds } from "@/lib/business/track-sound-review.server";
 
 import { loadCatalogPlaySession } from "@/lib/catalog/catalog-playback";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
@@ -75,19 +74,13 @@ async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
  */
 export async function loadGuestCoffeeShelf(): Promise<GuestCoffeePlaylist[]> {
   const now = Date.now();
-  if (!cache || now - cache.at >= CACHE_MS) {
-    const value = loadUncached().catch((error) => {
-      console.error("[business-guest-coffee] shelf unavailable", error instanceof Error ? error.name : "unknown");
-      return [] as GuestCoffeePlaylist[];
-    });
-    cache = { at: now, value };
-  }
-  const result = await cache.value;
+  if (cache && now - cache.at < CACHE_MS) return cache.value;
+  const value = loadUncached().catch((error) => {
+    console.error("[business-guest-coffee] shelf unavailable", error instanceof Error ? error.name : "unknown");
+    return [] as GuestCoffeePlaylist[];
+  });
+  cache = { at: now, value };
+  const result = await value;
   if (result.length === 0) cache = null;
-  // Refresh the manual gate even when public album metadata is cached.
-  try {
-    const allowed = await soundAllowedTrackIds(result.flatMap((album) => album.tracks.map((track) => track.audioItemId)), "cafe");
-    return result.map((album) => ({ ...album, tracks: album.tracks.filter((track) => allowed.has(track.audioItemId)) }))
-      .filter((album) => album.tracks.length > 0);
-  } catch { return []; }
+  return result;
 }

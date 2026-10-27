@@ -1,10 +1,11 @@
 """Fresh PostgreSQL under /tmp, private Unix socket only; no external DB/host."""
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parent.parent
-pg = Path('/usr/lib/postgresql/17/bin')
+pg = Path(os.environ.get('PG_BIN', '/usr/lib/postgresql/17/bin'))
 setup = """
 CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
 -- Match Supabase's permissive default grants: the migration must explicitly revoke them.
@@ -25,13 +26,16 @@ CREATE TABLE business_space_admissions(space_id text, audio_item_id uuid, PRIMAR
 CREATE TABLE business_locations(id uuid PRIMARY KEY, business_category text);
 CREATE TABLE business_programs(id uuid PRIMARY KEY, kind text);
 CREATE TABLE business_program_items(program_id uuid, audio_item_id uuid, excluded_at timestamptz);
-CREATE FUNCTION public.resolve_business_track_eligibility(p_audio_item_id uuid, p_location_id uuid,
+CREATE TABLE public.business_track_eligibility_reviews(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ audio_item_id uuid, decision text, created_at timestamptz DEFAULT now());
+CREATE FUNCTION public.resolve_business_track_eligibility_v1(p_audio_item_id uuid, p_location_id uuid,
  p_zone_id uuid DEFAULT NULL, p_use_type text DEFAULT 'business_background_playback', p_as_of timestamptz DEFAULT now())
  RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT jsonb_build_object('audio_item_id', p_audio_item_id,
  'decision', coalesce(nullif(current_setting('test.legal_decision', true), ''), 'ELIGIBLE'),
  'reason_codes', jsonb_build_array('LEGAL_STUB')) $$;
 GRANT SELECT ON audio_items, practices TO anon, authenticated;
 """
+admissions = (root / 'supabase/migrations/20270131120000_business_manual_admissions.sql').read_text()
 migration = (root / 'supabase/migrations/20270201120000_business_track_sound_reviews.sql').read_text()
 smoke = (root / 'supabase/tests/business_track_sound_reviews_smoke.sql').read_text()
 with tempfile.TemporaryDirectory(prefix='audiolad-sound-review-') as scratch:
@@ -48,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='audiolad-sound-review-') as scratch:
             raise SystemExit(1)
         # Restricted Codex sandboxes disallow even Unix sockets. Still execute all
         # SQL and RPC authorization tests; RLS visibility needs the socket mode.
-        texts = [setup, migration, migration, "SET test.single_user = 'on';", smoke]
+        texts = [setup, admissions, migration, migration, "SET test.single_user = 'on';", smoke]
         sql = '\n'.join(' '.join(line for line in text.splitlines() if not line.lstrip().startswith('--'))
                         for text in texts) + '\n'
         result = subprocess.run([str(pg / 'postgres'), '--single', '-D', str(data), 'postgres'],
@@ -57,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='audiolad-sound-review-') as scratch:
     else:
         try:
             result = subprocess.run([str(pg / 'psql'), '-X', '-h', scratch, '-p', '55496', '-d', 'postgres',
-                                     '-v', 'ON_ERROR_STOP=1'], input='\n'.join([setup, migration, migration, smoke]), text=True, capture_output=True)
+                                     '-v', 'ON_ERROR_STOP=1'], input='\n'.join([setup, admissions, migration, migration, smoke]), text=True, capture_output=True)
         finally:
             subprocess.run([str(pg / 'pg_ctl'), '-D', str(data), '-m', 'fast', '-w', 'stop'], check=True, capture_output=True)
         mode = 'private Unix socket: full RLS visibility tests'

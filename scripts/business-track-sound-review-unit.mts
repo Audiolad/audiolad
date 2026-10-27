@@ -49,10 +49,15 @@ assert.match(ui, /value=\{15\}/);
 assert.match(ui, /value=\{30\}/);
 assert.doesNotMatch(ui, /—/);
 for (const path of ['src/lib/business-workspace/sign.server.ts', 'src/lib/business-app/spa-pilot.ts']) {
-  assert.match(read(path), /hasCurrentSoundApproval\(db, row\)/);
+  assert.match(read(path), /resolve_business_track_eligibility/);
+  assert.match(read(path), /businessManualContentGateEnabled/);
 }
 const sql = read('supabase/migrations/20270201120000_business_track_sound_reviews.sql');
 assert.doesNotMatch(sql, /\b(?:DELETE FROM|DROP TABLE|UPDATE public\.(?:audio_items|practices))\b/i);
-assert.match(sql, /resolve_business_track_eligibility_before_sound\(p_audio_item_id/);
+assert.match(sql, /resolve_business_track_eligibility_v1\(p_audio_item_id/);
+assert.match(sql, /resolve_business_content_admission/);
+assert.match(sql, /business_manual_content_gate_enabled\(\)/);
+assert.match(sql, /BUSINESS_SOUND_REVIEW_REQUIRED/);
+assert.doesNotMatch(sql, /resolve_business_track_eligibility_before_sound|JOIN public\.business_space_admissions/);
 assert.doesNotMatch(sql, /notification|email_outbox|music_passport_analysis/);
 console.log('business-track-sound-review-unit: PASS (navigation, fail-closed batches, source identity, signed-source guards, UI fragment contract)');

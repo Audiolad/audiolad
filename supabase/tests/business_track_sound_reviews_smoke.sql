@@ -10,6 +10,18 @@ INSERT INTO audio_items(id, practice_id, title, duration_seconds, status, audio_
 INSERT INTO business_space_admissions VALUES
  ('cafe', 'cccccccc-cccc-4ccc-accc-cccccccccccc'), ('cafe', 'cccccccc-cccc-4ccc-accc-ccccccccccc3');
 INSERT INTO business_locations VALUES ('dddddddd-dddd-4ddd-addd-dddddddddddd', 'Кафе'), ('dddddddd-dddd-4ddd-addd-ddddddddddd2', 'Спа');
+SET test.uid = '11111111-1111-4111-a111-111111111111';
+INSERT INTO business_content_admissions(direction_key, practice_id, allowed, changed_by)
+ VALUES ('cafe', 'bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb', true, '11111111-1111-4111-a111-111111111111');
+DO $$ BEGIN
+  IF business_manual_content_gate_enabled() THEN RAISE EXCEPTION 'gate default'; END IF;
+  IF (resolve_business_track_eligibility('cccccccc-cccc-4ccc-accc-cccccccccccc','dddddddd-dddd-4ddd-addd-dddddddddddd')->>'decision') <> 'ELIGIBLE' THEN RAISE EXCEPTION 'gate off changed rights'; END IF;
+END $$;
+UPDATE public.business_runtime_flags SET enabled = true WHERE key = 'manual_content_gate';
+DO $$ BEGIN
+  IF (resolve_business_track_eligibility('cccccccc-cccc-4ccc-accc-cccccccccccc','dddddddd-dddd-4ddd-addd-dddddddddddd')->>'decision') <> 'INELIGIBLE' THEN RAISE EXCEPTION 'unchecked sound admitted'; END IF;
+  IF business_sound_track_allowed('cccccccc-cccc-4ccc-accc-cccccccccccc','cafe') THEN RAISE EXCEPTION 'space admission granted playback'; END IF;
+END $$;
 CREATE TEMP TABLE public_before AS SELECT to_jsonb(a) AS row FROM audio_items a;
 CREATE TEMP TABLE practices_before AS SELECT to_jsonb(p) AS row FROM practices p;
 INSERT INTO business_programs VALUES ('eeeeeeee-eeee-4eee-aeee-eeeeeeeeeeee', 'cafe');
@@ -94,7 +106,8 @@ DO $$ DECLARE identity text; BEGIN
   IF business_sound_track_allowed('cccccccc-cccc-4ccc-accc-cccccccccccc','cafe') THEN RAISE EXCEPTION 'stream reset missing'; END IF;
   SELECT business_sound_audio_identity(a) INTO identity FROM audio_items a WHERE id = 'cccccccc-cccc-4ccc-accc-ccccccccccc2';
   PERFORM admin_review_business_track_sound('cccccccc-cccc-4ccc-accc-ccccccccccc2','approved',NULL,identity);
-  IF business_sound_track_allowed('cccccccc-cccc-4ccc-accc-ccccccccccc2','cafe') THEN RAISE EXCEPTION 'album sibling admission bypass'; END IF;
+  IF NOT business_sound_track_allowed('cccccccc-cccc-4ccc-accc-ccccccccccc2','cafe') THEN RAISE EXCEPTION 'album admission did not cover approved sibling'; END IF;
+  IF business_sound_track_allowed('cccccccc-cccc-4ccc-accc-ccccccccccc2','spa') THEN RAISE EXCEPTION 'sibling crossed direction'; END IF;
 END $$;
 SET test.uid = '22222222-2222-4222-a222-222222222222';
 SET ROLE authenticated;

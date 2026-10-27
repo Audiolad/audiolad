@@ -50,13 +50,15 @@ RETURNS text LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$
     p_item.active_music_delivery_asset_id)::text
 $$;
 
--- Adapter for 28d2b5bb: existing data is a per-track whitelist, not an album/artist matrix.
--- An album enters the review queue if ANY of its tracks has a final space admission.
--- Playback still requires the exact track's admission to the requested space.
+-- Review queue follows the direction matrix. business_space_admissions does not grant access.
+-- An album is listed when its effective artist/album admission is allowed for a direction.
 CREATE OR REPLACE VIEW public.business_sound_admitted_albums AS
-  SELECT a.practice_id, array_agg(DISTINCT s.space_id ORDER BY s.space_id) AS spaces
-  FROM public.business_space_admissions s JOIN public.audio_items a ON a.id = s.audio_item_id
-  GROUP BY a.practice_id;
+  SELECT p.id AS practice_id, array_agg(DISTINCT d.key ORDER BY d.key) AS spaces
+  FROM public.practices p
+  JOIN public.business_content_directions d ON d.active
+  WHERE p.product_kind = 'music'
+    AND coalesce((public.resolve_business_content_admission(p.id, d.key)->>'allowed')::boolean, false)
+  GROUP BY p.id;
 REVOKE ALL ON public.business_sound_admitted_albums FROM PUBLIC, anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.business_sound_album_spaces(p_practice_id uuid)
@@ -65,14 +67,15 @@ RETURNS text[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg
     WHERE practice_id = p_practice_id), '{}'::text[])
 $$;
 
-CREATE OR REPLACE FUNCTION public.business_sound_track_allowed(p_audio_item_id uuid, p_space_id text)
+CREATE OR REPLACE FUNCTION public.business_sound_track_allowed(p_audio_item_id uuid, p_direction text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
-    SELECT 1 FROM public.audio_items a JOIN public.practices p ON p.id = a.practice_id
+    SELECT 1 FROM public.audio_items a
+    JOIN public.practices p ON p.id = a.practice_id
     JOIN public.business_track_sound_reviews r ON r.audio_item_id = a.id
-    JOIN public.business_space_admissions s ON s.audio_item_id = a.id AND s.space_id = p_space_id
     WHERE a.id = p_audio_item_id AND r.status = 'approved'
       AND r.audio_identity = public.business_sound_audio_identity(a)
+      AND coalesce((public.resolve_business_content_admission(p.id, p_direction)->>'allowed')::boolean, false)
       AND p.product_kind = 'music' AND p.status = 'published' AND p.deleted_at IS NULL
       AND p.catalog_visibility = 'listed' AND a.status = 'published'
   )
@@ -140,7 +143,9 @@ CREATE OR REPLACE FUNCTION public.business_sound_guard_program_item()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE space text;
 BEGIN
-  IF NEW.excluded_at IS NOT NULL THEN RETURN NEW; END IF;
+  IF NEW.excluded_at IS NOT NULL OR NOT public.business_manual_content_gate_enabled() THEN
+    RETURN NEW;
+  END IF;
   SELECT kind INTO space FROM public.business_programs WHERE id = NEW.program_id;
   IF NOT public.business_sound_track_allowed(NEW.audio_item_id, space) THEN
     RAISE EXCEPTION 'business_sound_review_required' USING ERRCODE = '23514';
@@ -152,30 +157,45 @@ CREATE OR REPLACE TRIGGER business_sound_program_item BEFORE INSERT OR UPDATE OF
   program_id, audio_item_id, excluded_at ON public.business_program_items
   FOR EACH ROW EXECUTE FUNCTION public.business_sound_guard_program_item();
 
--- Preserve every existing legal/contract gate verbatim behind a new sound-quality overlay.
-DO $$ BEGIN
-  IF to_regprocedure('public.resolve_business_track_eligibility_before_sound(uuid,uuid,uuid,text,timestamptz)') IS NULL THEN
-    ALTER FUNCTION public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz)
-      RENAME TO resolve_business_track_eligibility_before_sound;
-  END IF;
-END $$;
+-- One gate: rights, then direction admission, then an approved sound review.
+-- The manual gate defaults off, so this body matches the rights resolver until it is switched on.
 CREATE OR REPLACE FUNCTION public.resolve_business_track_eligibility(
   p_audio_item_id uuid, p_location_id uuid, p_zone_id uuid DEFAULT NULL,
   p_use_type text DEFAULT 'business_background_playback', p_as_of timestamptz DEFAULT now()
 ) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v jsonb; space text;
+DECLARE v jsonb; r record; v_direction text; v_admission jsonb; v_sound text;
 BEGIN
-  v := public.resolve_business_track_eligibility_before_sound(p_audio_item_id, p_location_id, p_zone_id, p_use_type, p_as_of);
-  SELECT CASE lower(btrim(business_category))
-    WHEN 'кафе' THEN 'cafe' WHEN 'кофейня' THEN 'cafe' WHEN 'кафе / кофейня' THEN 'cafe'
-    WHEN 'спа' THEN 'spa' WHEN 'магазин' THEN 'retail' WHEN 'салон красоты' THEN 'retail'
-    WHEN 'фитнес' THEN 'fitness' ELSE lower(btrim(business_category)) END
-    INTO space FROM public.business_locations WHERE id = p_location_id;
-  IF NOT public.business_sound_track_allowed(p_audio_item_id, space) THEN
-    v := v || jsonb_build_object('decision', 'INELIGIBLE', 'reason_codes',
-      coalesce(v->'reason_codes', '[]'::jsonb) || '"BUSINESS_SOUND_REVIEW_REQUIRED"'::jsonb);
+  v := public.resolve_business_track_eligibility_v1(p_audio_item_id, p_location_id, p_zone_id, p_use_type, p_as_of);
+  SELECT id, decision INTO r FROM public.business_track_eligibility_reviews
+    WHERE audio_item_id = p_audio_item_id
+      AND (coalesce(p_as_of, now()) >= now() OR created_at <= p_as_of)
+    ORDER BY created_at DESC, id DESC LIMIT 1;
+  IF FOUND AND r.decision IN ('blocked', 'proof_requested') THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || to_jsonb('BUSINESS_TRACK_ADMISSION_' || upper(r.decision)),
+      'business_track_review_id', r.id);
   END IF;
-  RETURN v;
+  IF NOT public.business_manual_content_gate_enabled() THEN
+    RETURN v;
+  END IF;
+  SELECT c.direction_key INTO v_direction FROM public.business_locations l
+    JOIN public.business_content_categories c ON c.category = lower(btrim(l.business_category))
+    WHERE l.id = p_location_id;
+  SELECT public.resolve_business_content_admission(ai.practice_id, v_direction) INTO v_admission
+    FROM public.audio_items ai WHERE ai.id = p_audio_item_id;
+  IF NOT coalesce((v_admission->>'allowed')::boolean, false) THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || '["MANUAL_DIRECTION_ADMISSION_REQUIRED"]'::jsonb);
+  END IF;
+  SELECT s.status INTO v_sound FROM public.business_track_sound_reviews s
+    JOIN public.audio_items a ON a.id = s.audio_item_id
+    WHERE s.audio_item_id = p_audio_item_id
+      AND s.audio_identity = public.business_sound_audio_identity(a);
+  IF v_sound IS DISTINCT FROM 'approved' THEN
+    v := v || jsonb_build_object('decision', 'INELIGIBLE',
+      'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || '["BUSINESS_SOUND_REVIEW_REQUIRED"]'::jsonb);
+  END IF;
+  RETURN v || jsonb_build_object('content_direction', v_direction, 'content_admission', v_admission);
 END;
 $$;
 
@@ -231,7 +251,6 @@ $$;
 REVOKE ALL ON FUNCTION public.business_sound_audio_identity(public.audio_items),
   public.business_sound_album_spaces(uuid), public.business_sound_track_allowed(uuid,text),
   public.business_sound_reset_replaced_audio(), public.business_sound_guard_program_item(), public.business_sound_allowed_tracks(uuid[],text),
-  public.resolve_business_track_eligibility_before_sound(uuid,uuid,uuid,text,timestamptz),
   public.resolve_business_track_eligibility(uuid,uuid,uuid,text,timestamptz),
   public.admin_review_business_track_sound(uuid,text,text,text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.admin_business_sound_queue(text,uuid,uuid,text,integer) FROM PUBLIC, anon, service_role;

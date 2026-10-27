@@ -27,35 +27,31 @@ production connection, issue changes or author notifications.
   outside its legal-decision cache. Workspace/SPA check the actual source again
   before signing. New/restored programme rows require sound/space admission;
   existing programme rows remain and are withheld by delivery checks.
-- Guest coffee and onboarding demonstration sources also pass the fresh sound
-  gate. Their existing free/preview access rules remain; these demos do not grant
-  commercial-use rights. Public AudioLad catalogue/signing APIs are unchanged.
+- Guest coffee and onboarding stay public catalogue examples. They are not
+  filtered by the sound or direction gate and do not grant commercial-use rights.
+  Public AudioLad catalogue/signing APIs are unchanged.
 
 ## Admission matrix integration
 
-The album/artist matrix from task 28d2b5bb does not exist in this checkout.
-`business_space_admissions(space_id,audio_item_id)` is the available final whitelist.
-`business_sound_admitted_albums` is the private adapter: any whitelist entry from
-an album admits the album's music tracks to the review queue. The exact track
-must still have a whitelist entry for the playback space. Approving a sibling
-does not invent an admission. Curated workspace author fallbacks cannot bypass
-this requirement. When the matrix arrives, update this adapter and
-`business_sound_track_allowed` together; no sound-review schema change is needed.
-
-Current legal resolver calls have a location, but no explicit direction argument.
-The overlay maps existing location categories to cafe/spa/retail/fitness; unknown
-categories fail closed. Workspace additionally checks its explicitly selected
-space; programme insertion checks `business_programs.kind`.
+Integrated with task 28d2b5bb on this branch. Playback uses one function,
+`resolve_business_track_eligibility`: legal resolver, then direction admission
+from `business_content_admissions` when `manual_content_gate` is on, then an
+approved sound review whose audio identity matches. `business_space_admissions`
+is not a grant while the gate is on. `business_sound_admitted_albums` lists
+direction keys for which the album's content admission is allowed. Sound stays
+per track, so an approved sibling of an admitted album is playable for that
+direction only. Guest coffee and onboarding stay public catalogue examples and
+are not filtered here. Passport ordering only reorders the cabinet list this
+function already marked ELIGIBLE.
 
 ## Migration and identity contract
 
-`supabase/migrations/20270201120000_business_track_sound_reviews.sql`:
-new decision/history tables, private adapter view, admin RPCs, restrictive Business
-resolver overlay, source replacement trigger and programme insertion guard.
-No deletion/backfill or catalogue record/visibility changes. Reapplication is tested.
-No existing rights implementation is discarded: it remains under
-`resolve_business_track_eligibility_before_sound`, callable only by the owning
-resolver. Apply only through the separately authorized deployment procedure.
+`supabase/migrations/20270201120000_business_track_sound_reviews.sql` replaces
+the public resolver in place. There is no
+`resolve_business_track_eligibility_before_sound`. The legal function remains
+`resolve_business_track_eligibility_v1`. Apply only through the separately
+authorized deployment procedure, after `20270131120000`, and leave
+`manual_content_gate` false until pilot admissions and track approvals exist.
 
 Identity = source path + desired master asset UUID + active delivery asset UUID.
 Existing immutable asset/path conventions must be preserved. Overwriting bytes
@@ -70,7 +66,7 @@ change; new manifests and signing requests withhold rejected/unchecked sources.
   plus fresh local PostgreSQL migration/smoke tests. No external DB connection.
 - SQL: migration applied twice; status constraint, RPC authorization, ACL/RLS policy
   definitions, filtered queue/defaults, legal UNKNOWN preserved, approved/rejected
-  playback, space mismatch, missing sibling admission, programme insertion guard,
+  playback, direction mismatch, album sibling covered after its own approval, programme insertion guard,
   audit, stale-save prevention, path/master/delivery replacement, analyzer survival,
   unchanged public catalogue rows, internal reason isolation.
 - Sandbox prohibits Unix sockets. The SQL runner falls back to single-user mode,
