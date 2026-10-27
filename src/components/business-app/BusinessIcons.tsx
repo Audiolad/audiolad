@@ -88,6 +88,15 @@ export function BizSettingsIcon({ active = false, className }: IconProps) {
   );
 }
 
+export function BizProfileIcon({ active = false, className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={`${iconBase} ${className ?? ""}`} aria-hidden focusable="false">
+      <circle {...stroke(active)} cx="12" cy="8" r="3.2" />
+      <path {...stroke(active)} d="M5.5 19.2a6.5 6.5 0 0 1 13 0" />
+    </svg>
+  );
+}
+
 export function BizHelpIcon({ active = false, className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" className={`${iconBase} ${className ?? ""}`} aria-hidden focusable="false">

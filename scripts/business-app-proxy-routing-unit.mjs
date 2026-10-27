@@ -109,6 +109,8 @@ assertAction("audiolad.ru", "/", "pass_through");
 assert.equal(resolveBusinessInternalPath("/"), BUSINESS_SITE_PATH);
 assert.equal(normalizeBusinessAppPathname("/business-app"), "/");
 assert.equal(normalizeBusinessAppPathname("/business-app/settings"), "/preferences");
+assert.equal(normalizeBusinessAppPathname("/business-app/profile"), "/profile");
+assert.equal(resolveBusinessInternalPath("/profile"), `${BUSINESS_SITE_PATH}/profile`);
 assert.equal(normalizeBusinessAppPathname("/music"), "/music");
 
 assert.deepEqual([...BUSINESS_POINT_STATES], ["healthy", "autonomous", "stopped"]);
@@ -117,15 +119,25 @@ assert.equal(isBusinessPointState("broken"), false);
 assert.equal(parseBusinessPointState("autonomous"), "autonomous");
 assert.equal(parseBusinessPointState("nope"), "healthy");
 
-assert.equal(BUSINESS_PRIMARY_NAV_ITEMS.length, 5);
-assert.equal(BUSINESS_SECONDARY_NAV_ITEMS.length, 5);
-assert.equal(BUSINESS_MOBILE_NAV_ITEMS.length, 6);
+assert.equal(BUSINESS_PRIMARY_NAV_ITEMS.length, 3);
+assert.equal(BUSINESS_SECONDARY_NAV_ITEMS.length, 2);
+assert.equal(BUSINESS_MOBILE_NAV_ITEMS.length, 5);
+assert.ok(BUSINESS_MOBILE_NAV_ITEMS.length <= 5, "mobile bottom nav has at most five buttons");
+assert.deepEqual(
+  BUSINESS_MOBILE_NAV_ITEMS.map((item) => item.title),
+  ["Главная", "Музыка", "Настройка", "Документы", "Профиль"],
+);
+assert.deepEqual(
+  [...BUSINESS_PRIMARY_NAV_ITEMS, ...BUSINESS_SECONDARY_NAV_ITEMS].map((item) => item.id),
+  BUSINESS_MOBILE_NAV_ITEMS.map((item) => item.id),
+);
 assert.equal(isBusinessNavItemActive("/", "/"), true);
 assert.equal(isBusinessNavItemActive("/music", "/"), false);
-assert.equal(
-  BUSINESS_SECONDARY_NAV_ITEMS.find((i) => i.id === "settings")?.href,
-  "/preferences",
-);
+assert.equal(BUSINESS_MOBILE_NAV_ITEMS.some((item) => item.id === "documents"), true);
+assert.equal(BUSINESS_MOBILE_NAV_ITEMS.some((item) => item.id === "settings"), true);
+assert.equal(BUSINESS_MOBILE_NAV_ITEMS.some((item) => item.id === "profile"), true);
+assert.equal(BUSINESS_MOBILE_NAV_ITEMS.some((item) => item.id === "help"), false);
+assert.equal(BUSINESS_PRIMARY_NAV_ITEMS.some((item) => item.id === "player"), false);
 
 assert.match(
   proxySource,

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { handleCabinetPlayerReport } from "@/lib/business-app/cabinet-player-report.server";
+import { isCabinetReportSource } from "@/lib/business-app/cabinet-player-report";
 import { loadSpaPilotContext } from "@/lib/business-app/spa-pilot";
 import { handleSpaReport, isSameOriginJsonRequest, spaReportHttpStatus } from "@/lib/business-app/spa-player-report";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +22,10 @@ export async function POST(request: Request) {
     body = JSON.parse(text);
   } catch {
     return NextResponse.json({ ok: false, reason: "invalid_request" }, { status: 400, headers: NO_STORE });
+  }
+  if (isCabinetReportSource(body)) {
+    const cabinet = await handleCabinetPlayerReport(body);
+    return NextResponse.json(cabinet, { status: spaReportHttpStatus(cabinet), headers: NO_STORE });
   }
   const result = await handleSpaReport(body, {
     loadPlayerId: async () => (await loadSpaPilotContext())?.playerId ?? null,

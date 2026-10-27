@@ -51,12 +51,15 @@ export default function BusinessSoundSettings({
   onChange,
   note,
   action,
+  hint = GUEST_COFFEE_ATMOSPHERE_COPY.settingsHint,
 }: {
   profile: GuestCoffeeProfile;
   onChange: <K extends keyof GuestCoffeeProfile>(key: K, value: GuestCoffeeProfile[K]) => void;
   note?: string;
   /** The «Собрать атмосферу» button (and its re-assemble prompt). */
   action?: ReactNode;
+  /** Replaces the guest assemble hint. The guest studio keeps the default. */
+  hint?: string;
 }) {
   return (
     <section className="business-app-card business-sound-settings" aria-labelledby="business-sound-settings-title" data-testid="biz-sound-settings">
@@ -66,7 +69,7 @@ export default function BusinessSoundSettings({
       <ChipGroup legend="Характер заведения" name="biz-sound-character" options={GUEST_COFFEE_CHARACTERS} value={profile.character} onChange={(id) => onChange("character", id)} />
       <ChipGroup legend="Тип звучания" name="biz-sound-direction" options={GUEST_COFFEE_DIRECTIONS} value={profile.direction} onChange={(id) => onChange("direction", id)} />
       <ChipGroup legend="Время суток" name="biz-sound-daypart" options={GUEST_COFFEE_DAYPARTS} value={profile.daypart} onChange={(id) => onChange("daypart", id)} />
-      <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{GUEST_COFFEE_ATMOSPHERE_COPY.settingsHint}</p>
+      <p className="mt-1 text-sm text-[var(--biz-text-muted)]">{hint}</p>
       {action}
       {note ? <p className="text-sm text-[var(--biz-text-muted)]">{note}</p> : null}
     </section>

@@ -469,6 +469,86 @@
   }
 }
 
+/* ba344b7f: one cabinet player, above the mobile nav and beside the desktop sidebar. */
+.business-cabinet-player {
+  position: fixed;
+  z-index: 35;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--biz-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.65rem 0.9rem 0.75rem;
+  background: var(--biz-surface);
+  border-top: 1px solid var(--biz-border);
+  box-shadow: var(--biz-shadow);
+}
+
+.business-cabinet-player__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--biz-surface-soft);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.business-cabinet-player__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--biz-accent);
+}
+
+.business-cabinet-player__time {
+  font-size: 0.85rem;
+  color: var(--biz-text-muted);
+}
+
+.business-now__title {
+  margin: 0.35rem 0 0;
+  font-family: var(--biz-font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--biz-text);
+}
+
+.business-now__byline {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--biz-text-muted);
+}
+
+.business-now__bar {
+  height: 8px;
+  margin-top: 0.85rem;
+  border-radius: 999px;
+  background: var(--biz-surface-soft);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.business-now__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--biz-accent);
+}
+
+.business-app-shell:has(.business-cabinet-player) .business-app-main {
+  padding-bottom: calc(var(--biz-bottom-nav-height) + 9rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 900px) {
+  .business-cabinet-player {
+    left: var(--biz-sidebar-width, var(--biz-sidebar-expanded));
+    bottom: 0;
+  }
+
+  .business-app-shell:has(.business-cabinet-player) .business-app-main {
+    padding-bottom: 9rem;
+  }
+}
+
 /* ---------------------------------------------------------------------------------------
    a8240527 – one cabinet for guest and owner: guest status strip, locked navigation items,
    Music section (sound settings + collections + Business player). Tokens only.

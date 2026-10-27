@@ -14,6 +14,7 @@ import {
   BizLocationsIcon,
   BizLockIcon,
   BizMusicIcon,
+  BizProfileIcon,
   BizSettingsIcon,
   BizStatsIcon,
   BizTeamIcon,
@@ -52,6 +53,7 @@ const ICONS: Record<BusinessNavIconKey, IconComp> = {
   team: BizTeamIcon,
   settings: BizSettingsIcon,
   help: BizHelpIcon,
+  profile: BizProfileIcon,
   more: BizHomeIcon,
 };
 

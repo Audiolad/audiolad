@@ -160,6 +160,7 @@ let liveResult = { data: [liveRow], error: null };
 let throwLive = false;
 const loader = load("../src/lib/business-app/load-owner-home-signals.ts", {
   "@/lib/business-app/owner-home-signals": signals,
+  "@/lib/business-workspace/display-title": load("../src/lib/business-workspace/display-title.ts", {}),
   "@/lib/supabase/server": { createClient: async () => ({
     rpc: async (name) => {
       if (name === "get_business_player_health") return { data: [], error: null };

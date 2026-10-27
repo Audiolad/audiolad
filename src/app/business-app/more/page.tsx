@@ -1,10 +1,5 @@
-import BusinessEmptySection from "@/components/business-app/BusinessEmptySection";
+import { redirect } from "next/navigation";
 
 export default function BusinessAppMorePage() {
-  return (
-    <BusinessEmptySection
-      title="Ещё"
-      description="Объявления, документы, команда, настройки и помощь будут здесь."
-    />
-  );
+  redirect("/");
 }

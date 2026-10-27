@@ -49,6 +49,18 @@ export function groupWorkspaceTracks(tracks: readonly WorkspaceTrack[]): Workspa
   return shelves;
 }
 
+/** 1-based position inside one shelf. Each shelf starts at 1. */
+export function workspaceShelfTrackNumber(shelf: WorkspaceShelfGroup, audioItemId: string): number {
+  let number = 0;
+  for (const album of shelf.albums) {
+    for (const row of album.tracks) {
+      number += 1;
+      if (row.track.audioItemId === audioItemId) return number;
+    }
+  }
+  return 0;
+}
+
 /**
  * Starting index from the demo sound type saved on this device.
  * The first curated author tagged with that sound wins. Unknown sounds start at 0.

@@ -126,6 +126,7 @@ assert.doesNotMatch(client, /reload\(|location\.href\s*=/);
 const reportRoute = readFileSync("src/app/api/business/player/report/route.ts", "utf8");
 assert.match(reportRoute, /loadSpaPilotContext\(\)\)\?\.playerId/);
 assert.match(reportRoute, /isSameOriginJsonRequest/);
+assert.match(reportRoute, /isCabinetReportSource/);
 assert.doesNotMatch(reportRoute, /service-role|createServiceRoleClient/);
 
 console.log("business-spa-stable-report-unit: OK");

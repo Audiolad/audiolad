@@ -33,20 +33,18 @@ for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, {
   assert.match(html, /Воспроизведение не подтверждено/);
   assert.match(html, /Название трека появится, когда плеер сообщит, что музыка играет./);
   assert.match(html, /Лицензия: нет подтверждённых данных/);
-  assert.match(html, /href="\/player"/);
+  assert.match(html, /href="\/music"/);
+  assert.match(html, /Открыть музыку/);
   assert.match(html, /href="\/help"[^>]*>Проверить работу музыки<\/a>/);
   assert.doesNotMatch(html, /Диагностика для поддержки/);
   assert.equal((html.match(/data-testid="owner-home-overall-status"/g) ?? []).length, 1);
   assert.match(html, /<details class="business-app-owner-signal-details"><summary[^>]*>Подробнее<\/summary><ul[^>]*>[\s\S]*?<li[^>]*><strong>[^<]+<\/strong>[\s\S]*?<li[^>]*><strong>Воспроизведение[\s\S]*?<\/ul><\/details>/);
   assert.doesNotMatch(html, /<details[^>]*open/);
   assert.doesNotMatch(html, /Реальный трек|real-cover|Музыка играет|data-tone="error"|Лицензия активна/);
-  for (const label of ["Атмосфера", "Следующая смена музыкального дня", "История звучания"]) {
-    assert.ok(html.indexOf(label) > html.indexOf("Сейчас звучит"));
+  for (const label of ["Атмосфера", "Следующая смена музыкального дня", "История звучания", "скоро"]) {
+    assert.equal(html.includes(label), false, label);
   }
-  assert.equal((html.match(/<section[^>]*aria-disabled="true"/g) ?? []).length, 3);
-  assert.equal((html.match(/<button[^>]*disabled=""[^>]*aria-disabled="true"/g) ?? []).length, 2);
-  assert.match(html, /<input[^>]*disabled=""[^>]*aria-disabled="true"/);
-  assert.ok(html.indexOf("Следующая смена") < html.indexOf("История звучания"));
+  assert.equal((html.match(/<section[^>]*aria-disabled="true"/g) ?? []).length, 0);
 }
 assert.match(render(null), /Нет данных о плеере/);
 assert.match(render(context.signals), /Плеер на связи/);

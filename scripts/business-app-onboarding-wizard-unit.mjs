@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   BUSINESS_ONBOARDING_ATMOSPHERES,
-  BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE,
   BUSINESS_ONBOARDING_STEPS,
   BUSINESS_ONBOARDING_TYPES,
   buildBusinessOnboardingPreviewSummary,
+  businessOnboardingAtmosphereSound,
   businessOnboardingStepIndex,
   canAdvanceBusinessOnboardingStep,
   getBusinessOnboardingAtmosphere,
@@ -20,6 +20,7 @@ import {
   suggestBusinessOnboardingNames,
   validateBusinessOnboardingConfirm,
 } from "../src/lib/business-app/onboarding-wizard.ts";
+import { sourcesForSpace } from "../src/lib/business-workspace/catalog-sources.ts";
 import {
   BUSINESS_PUBLIC_PATH_REWRITES,
   BUSINESS_SITE_PATH,
@@ -27,6 +28,12 @@ import {
 } from "../src/lib/business-app/host.ts";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy.ts";
 import { BUSINESS_HOSTNAME } from "../src/lib/business-app/host.ts";
+import {
+  authorizeOnboardingPreview,
+  onboardingPreviewAudioPath,
+  onboardingPreviewFragment,
+} from "../src/lib/business-app/onboarding-preview-access.ts";
+import { PREVIEW_DURATION_MAX_MS } from "../src/lib/listen/preview-window.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -90,7 +97,7 @@ assert.equal(preview.typeLabel, "Спа и отдых");
 assert.match(preview.atmosphereLabel, /Современный/);
 // Sergey 23.10.2026 21:21: the "no rights-confirmed tracks yet" box must not appear at all.
 assert.equal("rightsSafeDisclaimer" in preview, false);
-assert.equal(preview.noAudioNote, BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE);
+assert.equal("noAudioNote" in preview, false);
 {
   const wizardSrc = readFileSync(
     join(repoRoot, "src/components/business-app/BusinessOnboardingWizardPage.tsx"),
@@ -104,9 +111,81 @@ assert.equal(preview.noAudioNote, BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE);
     assert.doesNotMatch(src, /Пока таких треков в подборке нет/);
     assert.doesNotMatch(src, /подтверждённые права на каждый трек/);
     assert.doesNotMatch(src, /Музыка появится, когда права на треки будут подтверждены/);
+    assert.doesNotMatch(src, /Музыка здесь пока не играет/);
   }
+  assert.match(wizardSrc, /OnboardingPreviewPlayer/);
+  const previewPlayer = readFileSync(join(repoRoot, "src/components/business-app/OnboardingPreviewPlayer.tsx"), "utf8");
+  assert.match(previewPlayer, /data-testid="onboarding-preview-player"/);
+  assert.match(previewPlayer, /Слушать/);
+  assert.doesNotMatch(previewPlayer, /Музыка здесь пока не играет/);
 }
-assert.match(preview.noAudioNote, /Музыка здесь пока не играет/);
+for (const id of ["calm_premium", "modern_soft", "warm_lively"]) {
+  const sound = businessOnboardingAtmosphereSound(id);
+  assert.ok(sound, id);
+  assert.ok(sourcesForSpace("cafe").some((row) => row.sounds.includes(sound)), `${id} maps to a catalog source`);
+}
+assert.equal(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/api/business/onboarding/preview").action,
+  "pass_through",
+);
+assert.equal(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/api/business/onboarding/preview/audio").action,
+  "pass_through",
+);
+
+const plainListener = {
+  signedIn: true,
+  emailConfirmed: true,
+  liveTrialOrPaid: false,
+  hasActiveVenue: false,
+};
+assert.equal(authorizeOnboardingPreview(plainListener), "no_access", "a signed-in listener without business access is refused");
+assert.equal(
+  authorizeOnboardingPreview({ ...plainListener, hasActiveVenue: true }),
+  "no_access",
+  "a venue without a live trial or paid period is refused",
+);
+assert.equal(authorizeOnboardingPreview({ ...plainListener, signedIn: false, liveTrialOrPaid: true }), "no_access");
+assert.equal(authorizeOnboardingPreview({ ...plainListener, emailConfirmed: false, liveTrialOrPaid: true }), "no_access");
+assert.equal(authorizeOnboardingPreview({ ...plainListener, liveTrialOrPaid: true }), "allow", "live trial before a venue exists");
+assert.equal(authorizeOnboardingPreview({ ...plainListener, liveTrialOrPaid: true, hasActiveVenue: true }), "allow");
+
+const hour = onboardingPreviewFragment({ duration_seconds: 3600 });
+assert.equal(hour.startMs, 0);
+assert.equal(hour.endMs, 60_000, "a one-hour file is clipped to the first minute");
+assert.ok(hour.endMs - hour.startMs <= PREVIEW_DURATION_MAX_MS);
+const stretched = onboardingPreviewFragment({
+  duration_seconds: 3600,
+  preview_start_ms: 0,
+  preview_end_ms: 3_600_000,
+});
+assert.equal(stretched.endMs - stretched.startMs, 60_000, "an over-long window is not served whole");
+const configured = onboardingPreviewFragment({
+  duration_seconds: 3600,
+  preview_start_ms: 10_000,
+  preview_end_ms: 55_000,
+});
+assert.equal(configured.endMs - configured.startMs, 45_000);
+assert.ok(configured.endMs - configured.startMs <= PREVIEW_DURATION_MAX_MS);
+
+const clipPath = onboardingPreviewAudioPath("calm_premium");
+assert.equal(clipPath, "/api/business/onboarding/preview/audio?atmosphereId=calm_premium");
+assert.doesNotMatch(clipPath, /sign|token|storage/i);
+
+const previewRoute = readFileSync(join(repoRoot, "src/app/api/business/onboarding/preview/route.ts"), "utf8");
+const previewAudio = readFileSync(join(repoRoot, "src/app/api/business/onboarding/preview/audio/route.ts"), "utf8");
+const previewServer = readFileSync(join(repoRoot, "src/lib/business-app/onboarding-preview.server.ts"), "utf8");
+assert.match(previewRoute, /loadOnboardingPreviewGate/);
+assert.ok(previewRoute.indexOf("loadOnboardingPreviewGate") < previewRoute.indexOf("loadOnboardingPreviewTrack"));
+assert.match(previewRoute, /onboardingPreviewAudioPath/);
+assert.doesNotMatch(previewRoute, /signWorkspaceAudio|createSignedUrl|LISTEN_SIGNED_URL_TTL/);
+assert.match(previewAudio, /loadOnboardingPreviewGate/);
+assert.match(previewAudio, /loadOnboardingPreviewClip/);
+assert.doesNotMatch(previewAudio, /signWorkspaceAudio|createSignedUrl|LISTEN_SIGNED_URL_TTL/);
+assert.match(previewServer, /onboardingPreviewFragment/);
+assert.match(previewServer, /buildPreviewClipFromStorageSource/);
+assert.doesNotMatch(previewServer, /signWorkspaceAudio|LISTEN_SIGNED_URL_TTL/);
+assert.doesNotMatch(previewServer, /activateBusinessTrial/);
 
 const ok = validateBusinessOnboardingConfirm({
   organizationName: " Пилот ",
@@ -158,7 +237,7 @@ assert.match(page, /bootstrapBusinessOrganizationWithLocation/);
 assert.match(page, /Музыка для заведения за минуту/);
 assert.match(
   page,
-  /returnHref\s*\?\s*"Точка подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Точка готова\. Откройте плеер и проверьте подключение\."/,
+  /returnHref\s*\?\s*"Точка подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Точка готова\. Откройте музыку и нажмите «Играть»\."/,
 );
 assert.doesNotMatch(page, /лицензирован[аоы]/i);
 assert.doesNotMatch(page, /ELIGIBLE\s*=\s*true/);

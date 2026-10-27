@@ -1,10 +1,5 @@
-import BusinessEmptySection from "@/components/business-app/BusinessEmptySection";
+import { redirect } from "next/navigation";
 
 export default function BusinessAppTeamPage() {
-  return (
-    <BusinessEmptySection
-      title="Команда"
-      description="Доступ сотрудников появится позже."
-    />
-  );
+  redirect("/");
 }

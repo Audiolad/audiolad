@@ -8,6 +8,7 @@ export type BusinessNavIconKey =
   | "team"
   | "settings"
   | "help"
+  | "profile"
   | "more";
 
 export type BusinessNavItem = {
@@ -41,22 +42,6 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     requires: "everyone",
   },
   {
-    id: "player",
-    title: "Плеер",
-    href: "/player",
-    icon: "music",
-    available: true,
-    requires: "member",
-  },
-  {
-    id: "locations",
-    title: "Точки",
-    href: "/locations",
-    icon: "locations",
-    available: false,
-    requires: "member",
-  },
-  {
     id: "music",
     title: "Музыка",
     href: "/music",
@@ -65,71 +50,41 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     requires: "everyone",
     // a8240527: the permanent atlas URL (PDF) is the guest entry to this same section.
     guestHref: "/guest/coffee",
-    aliases: ["/guest/coffee"],
+    aliases: ["/guest/coffee", "/workspace", "/player"],
   },
   {
-    id: "stats",
-    title: "Статистика",
-    href: "/stats",
-    icon: "stats",
-    available: false,
+    id: "settings",
+    title: "Настройка",
+    href: "/preferences",
+    icon: "settings",
+    available: true,
     requires: "member",
   },
 ] as const;
 
 export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
   {
-    id: "announcements",
-    title: "Объявления",
-    href: "/announcements",
-    icon: "announcements",
-    available: false,
-    requires: "member",
-  },
-  {
     id: "documents",
-    title: "Документы и оплата",
+    title: "Документы",
     href: "/documents",
     icon: "documents",
-    available: false,
-    requires: "member",
-  },
-  {
-    id: "team",
-    title: "Команда",
-    href: "/team",
-    icon: "team",
-    available: false,
-    requires: "member",
-  },
-  {
-    id: "settings",
-    title: "Настройки",
-    href: "/preferences",
-    icon: "settings",
-    available: false,
-    requires: "member",
-  },
-  {
-    id: "help",
-    title: "Помощь",
-    href: "/help",
-    icon: "help",
     available: true,
-    requires: "everyone",
+    requires: "member",
+  },
+  {
+    id: "profile",
+    title: "Профиль",
+    href: "/profile",
+    icon: "profile",
+    available: true,
+    requires: "member",
   },
 ] as const;
 
+/** Exactly five buttons, in this order: home, music, sound settings, documents, profile. */
 export const BUSINESS_MOBILE_NAV_ITEMS: readonly BusinessNavItem[] = [
   ...BUSINESS_PRIMARY_NAV_ITEMS,
-  {
-    id: "more",
-    title: "Ещё",
-    href: "/more",
-    icon: "more",
-    available: false,
-    requires: "everyone",
-  },
+  ...BUSINESS_SECONDARY_NAV_ITEMS,
 ] as const;
 
 export const BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX = 232;

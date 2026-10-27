@@ -31,6 +31,7 @@ import {
   type WorkspaceCatalogSourceRow,
 } from "./candidates";
 import { sourcesForSpace } from "./catalog-sources";
+import { workspaceTrackWithDisplayTitle } from "./display-title";
 import { selectWorkspaceTracks, type SpaceAdmission, type TrackEligibility } from "./catalog";
 import {
   WORKSPACE_RIGHTS_CACHE_MS,
@@ -308,16 +309,16 @@ function isListedPractice(practice: PracticeRow): boolean {
     && practice.catalog_visibility === "listed";
 }
 
-function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack {
-  return {
+function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack | null {
+  return workspaceTrackWithDisplayTitle({
     audioItemId: row.audioItemId,
-    title: row.title.trim() || "Трек",
+    title: row.title.trim(),
     durationSeconds: row.durationSeconds,
     authorId: row.authorId,
     authorName: row.authorName.trim() || null,
     albumTitle: row.albumTitle.trim() || null,
     shelf: row.shelf,
-  };
+  });
 }
 
 function plainTrack(id: string, title: string | null, duration: number | null): WorkspaceTrack {
@@ -344,7 +345,8 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
       const plain = await db.from("audio_items").select("id, title, duration_seconds").in("id", chunk);
       if (plain.error || !Array.isArray(plain.data)) return null;
       for (const row of plain.data as { id: string; title: string | null; duration_seconds: number | null }[]) {
-        byId.set(row.id, plainTrack(row.id, row.title, row.duration_seconds));
+        const track = workspaceTrackWithDisplayTitle(plainTrack(row.id, row.title, row.duration_seconds));
+        if (track) byId.set(row.id, track);
       }
       continue;
     }
@@ -363,12 +365,13 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
       }[] | null;
     }[]) {
       const practice = one(row.practices);
-      byId.set(row.id, {
+      const named = workspaceTrackWithDisplayTitle({
         ...plainTrack(row.id, row.title, row.duration_seconds),
         authorId: practice?.author_id ?? null,
         authorName: embeddedName(practice?.authors) || null,
         albumTitle: practice?.title?.trim() || null,
       });
+      if (named) byId.set(row.id, named);
     }
   }
   return byId;
@@ -409,8 +412,13 @@ export async function loadWorkspaceCatalog(input: {
   } else {
     const curated = await loadCuratedCandidates(db, input.spaceId);
     if (curated === "error") return { tracks: [], unavailable: true };
-    admissions = curated.map((row) => ({ spaceId: input.spaceId, audioItemId: row.audioItemId }));
-    curatedById = new Map(curated.map((row) => [row.audioItemId, candidateTrack(row)]));
+    // Drop placeholder titles before the rights pool so «Аудио N» does not spend an RPC.
+    const named = curated.flatMap((row) => {
+      const track = candidateTrack(row);
+      return track ? [track] : [];
+    });
+    admissions = named.map((track) => ({ spaceId: input.spaceId, audioItemId: track.audioItemId }));
+    curatedById = new Map(named.map((track) => [track.audioItemId, track]));
   }
 
   const eligibility = await loadEligibility(db, input.locationId, admissions.map((row) => row.audioItemId));
@@ -432,7 +440,10 @@ export async function loadWorkspaceCatalog(input: {
   const meta = await loadAdmissionTracks(db, ids);
   if (!meta) return { tracks: [], unavailable: true };
   return {
-    tracks: ids.map((id) => meta.get(id) ?? plainTrack(id, null, null)),
+    tracks: ids.flatMap((id) => {
+      const track = meta.get(id);
+      return track ? [track] : [];
+    }),
     unavailable: false,
   };
 }

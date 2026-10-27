@@ -72,7 +72,7 @@ export default function BusinessSupportDiagnosticPage({
           <Field label="Лицензия" value="Нет подтверждённых данных" />
           <Field label="Количество плееров" value={String(diagnostics.players.length)} />
         </dl>
-        <p className="mt-3 text-sm text-[var(--biz-text-muted)]">{playback.detail} <Link href="/player" className="underline">Открыть плеер</Link></p>
+        <p className="mt-3 text-sm text-[var(--biz-text-muted)]">{playback.detail} <Link href="/music" className="underline">Открыть музыку</Link></p>
       </section>
 
       <section className="business-app-card" aria-labelledby="support-org-loc">
@@ -115,10 +115,10 @@ export default function BusinessSupportDiagnosticPage({
         {diagnostics.players.length === 0 ? (
           <p className="mt-3 text-[0.98rem] text-[var(--biz-text-muted)]">
             Нет данных о плеерах. Откройте{" "}
-            <Link href="/player" className="font-semibold text-[var(--biz-accent)]">
-              плеер
-            </Link>{" "}
-            точки, чтобы проверить подключение.
+            <Link href="/music" className="font-semibold text-[var(--biz-accent)]">
+              музыку
+            </Link>
+            , чтобы включить плеер точки.
           </p>
         ) : (
           <ul className="mt-3 flex flex-col gap-3">
@@ -235,8 +235,8 @@ export default function BusinessSupportDiagnosticPage({
         )}
         <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
           Здесь показана работа плеера. Сведения о правах доступны в <Link href="/documents" className="underline">документах</Link>. {" "}
-          <Link href="/player" className="font-semibold text-[var(--biz-accent)]">
-            Открыть плеер
+          <Link href="/music" className="font-semibold text-[var(--biz-accent)]">
+            Открыть музыку
           </Link>
         </p>
       </details>

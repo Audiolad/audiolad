@@ -71,12 +71,14 @@ assert.match(shell, /pathname === "\/workspace"/, "gift workspace hides the 30-m
 assert.match(shell, /<BusinessSidebar \/>[\s\S]*<BusinessBottomNav \/>/, "sidebar + bottom nav for everyone");
 assert.doesNotMatch(read("src/lib/business-app/host.ts"), /isBusinessGuestPathname/);
 const page = read("src/app/business-app/guest/coffee/page.tsx");
-assert.match(page, /export default BusinessAppMusicPage;/, "guest entry IS the cabinet's Music section");
+assert.match(page, /<BusinessMusicSection/, "guest entry keeps the demo studio");
+assert.doesNotMatch(page, /BusinessWorkspace/, "guest demo is not the member catalog");
 assert.doesNotMatch(page, /notFound\(/, "no login / allowlist gate: guests land straight in the cabinet");
 const musicSection = read("src/components/business-app/sound/BusinessMusicSection.tsx");
 assert.match(musicSection, /loadGuestCoffeeShelf/);
 assert.match(musicSection, /peekGuestCoffeeUsage/);
-assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessMusicSection/, "owner /music renders the same section");
+assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessWorkspace/, "owner /music is the cabinet player");
+assert.doesNotMatch(read("src/app/business-app/music/page.tsx"), /BusinessMusicSection/);
 
 // ---------------------------------------------------------------- curated shelf
 const keys = GUEST_COFFEE_SHELF.map((r) => `${r.authorSlug}/${r.productSlug}`);

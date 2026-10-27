@@ -148,7 +148,30 @@ const music = readFileSync(
   join(repoRoot, "src/app/business-app/music/page.tsx"),
   "utf8",
 );
-assert.match(music, /BusinessEligibilityProbePanel/);
+assert.match(music, /<BusinessWorkspace/);
 assert.doesNotMatch(music, /появятся позже/);
+
+// The owner rights check stays on Музыка, and only while playback is blocked
+// (no live trial/paid period, or a live period with an empty catalog / no venue).
+// The playing screen is the player and the queue.
+const workspace = readFileSync(
+  join(repoRoot, "src/components/business-app/workspace/BusinessWorkspace.tsx"),
+  "utf8",
+);
+assert.match(workspace, /import BusinessEligibilityProbePanel/);
+assert.match(
+  workspace,
+  /playbackBlocked\(model\) \? \(\s*<BusinessEligibilityProbePanel compact \/>/,
+);
+const blockedFn = workspace.slice(workspace.indexOf("function playbackBlocked"));
+assert.match(
+  blockedFn,
+  /return !workspacePlayerOpen\(model\) \|\| model\.tracks\.length === 0/,
+);
+const playing = workspace.slice(
+  workspace.indexOf("{open && current ? ("),
+  workspace.indexOf("function showEmpty"),
+);
+assert.doesNotMatch(playing, /BusinessEligibilityProbePanel/);
 
 console.log("business-app-eligibility-unit: ok");
