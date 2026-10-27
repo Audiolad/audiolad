@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentType } from "react";
 
+import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import {
   BizAnnouncementsIcon,
   BizCollapseIcon,
@@ -201,26 +202,8 @@ export default function BusinessSidebar() {
           : `${BUSINESS_SIDEBAR_EXPANDED_WIDTH_PX}px`,
       }}
     >
-      <div
-        className={`flex items-start gap-2 border-b border-[var(--biz-border)] px-3 py-4 ${
-          collapsed ? "justify-center" : ""
-        }`}
-      >
-        {!collapsed ? (
-          <div className="min-w-0 flex-1">
-            <p className="text-[1.05rem] font-bold leading-tight text-[var(--biz-text)]">
-              Аудиолад
-            </p>
-            <p className="text-sm font-medium text-[var(--biz-accent)]">Бизнес</p>
-          </div>
-        ) : (
-          <span
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--biz-accent-soft)] text-sm font-bold text-[var(--biz-accent)]"
-            aria-hidden
-          >
-            АБ
-          </span>
-        )}
+      <div className={`business-app-brandbar${collapsed ? " is-collapsed" : ""}`}>
+        <BusinessBrandLockup compact={collapsed} />
         <button
           type="button"
           className="business-app-focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[var(--biz-text-muted)] hover:bg-[var(--biz-surface-soft)]"

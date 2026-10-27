@@ -70,8 +70,8 @@ try {
   assert.equal(classic, fixture, "audiolad.ru head icons differ from main");
 
   const business = await fetchHead("business.audiolad.ru");
-  assert.match(business, /rel="manifest" href="\/business\/brand\/manifest\.webmanifest"/);
-  assert.match(business, /rel="apple-touch-icon" href="\/business\/brand\/apple-touch-icon\.png"/);
+  assert.match(business, /rel="manifest" href="\/business\/brand\/manifest\.webmanifest\?v=[^"]+"/);
+  assert.match(business, /rel="apple-touch-icon" href="\/business\/brand\/apple-touch-icon\.png\?v=[^"]+"/);
   assert.match(business, /content="АудиоЛад Бизнес"/);
   for (const href of business.matchAll(/href="([^"]+)"/g)) {
     assert.ok(href[1].startsWith("/business/brand/"), `business head leaks ${href[1]}`);
