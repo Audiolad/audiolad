@@ -2,10 +2,11 @@
  * Read-only view of a stored Music Analyzer result.
  * Numbers, labels, scores, and versions are taken from the JSON the Python
  * analyzer already wrote. This module does not estimate BPM, key, genre,
- * mood, or instruments.
+ * mood, or instruments. Upload format comes from original source metadata.
  */
 
 import { isWithheldTag, publicMusicAnalyzerFeatures, readFeatures, type FeatureSet } from "./features.mjs";
+import { originalAudioFormat } from "./audio-file";
 
 import { sourceTagDecision, type TagGroup } from "@/lib/music-passport/tag-withholding";
 
@@ -642,7 +643,7 @@ function technicalValue(nodes: Found[], keys: readonly string[]): Found | null {
   return shortest(technical.length > 0 ? technical : nodes.filter((node) => keys.includes(leaf(node.segments))));
 }
 
-function readTechnical(nodes: Found[]): {
+function readTechnical(nodes: Found[], source?: { filename?: string | null; mime?: string | null }): {
   rows: Array<{ label: string; value: string }>;
   sources: Pick<PassportSources, "duration" | "lufs" | "sampleRate" | "channels" | "format">;
 } {
@@ -650,7 +651,8 @@ function readTechnical(nodes: Found[]): {
   const lufs = technicalValue(nodes, ["lufs", "integrated_lufs", "loudness_lufs"]);
   const sampleRate = technicalValue(nodes, ["sample_rate", "sampleRate", "sampling_rate"]);
   const channels = technicalValue(nodes, ["channels", "channel_count", "channels_count", "n_channels"]);
-  const format = technicalValue(nodes, ["format", "audio_format", "container"]);
+  // Analyzer technical.format describes the decoded WAV, not the upload.
+  const format = originalAudioFormat(source ?? {});
   const durationText = formatQuantity(duration?.value);
   const durationName = duration ? leaf(duration.segments) : "";
   const durationUnit = durationName === "duration_ms"
@@ -664,14 +666,14 @@ function readTechnical(nodes: Found[]): {
       { label: "LUFS", value: formatQuantity(lufs?.value) ?? "—" },
       { label: "Частота дискретизации", value: formatQuantity(sampleRate?.value) ? `${formatQuantity(sampleRate?.value)} Гц` : "—" },
       { label: "Каналы", value: formatQuantity(channels?.value) ?? "—" },
-      { label: "Формат", value: cleanText(format?.value) ?? "—" },
+      { label: "Формат", value: format?.value ?? "—" },
     ],
     sources: {
       duration: duration?.path ?? null,
       lufs: lufs?.path ?? null,
       sampleRate: sampleRate?.path ?? null,
       channels: channels?.path ?? null,
-      format: format?.path ?? null,
+      format: format?.source ?? null,
     },
   };
 }
@@ -741,6 +743,7 @@ export function readMusicAnalyzerFeatures(normalized: unknown): FeatureSet | nul
 
 export function readMusicAnalyzerPassport(input: {
   normalized: unknown;
+  source?: { filename?: string | null; mime?: string | null };
   raw?: unknown;
   taxonomyVersion?: string | null;
   promptVersion?: string | null;
@@ -755,7 +758,7 @@ export function readMusicAnalyzerPassport(input: {
   const instruments = takeList(nodes, ["instruments", "instrument_top", "top_instruments", "instrument"], ["instrument", "instruments"], 10);
   const soundFound = findKeyed(nodes, ["sound_character", "soundCharacter", "sound_characters"]);
   const soundRows = soundFound ? orderRows(rowsFromValue(soundFound.value)) : groupedRows(nodes, ["sound_character", "sound"]);
-  const technical = readTechnical(nodes);
+  const technical = readTechnical(nodes, input.source);
   const taxonomyHit = findVersion(nodes, "taxonomy") ?? findVersion(collect(input.raw), "taxonomy");
   const promptHit = findVersion(nodes, "prompt") ?? findVersion(collect(input.raw), "prompt");
   const taxonomy = columnText(input.taxonomyVersion) ?? taxonomyHit?.text ?? null;

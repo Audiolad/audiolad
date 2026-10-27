@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { checkAnalyticsRateLimit } from "@/lib/analytics/sanitize";
+import { isPlatformOwner } from "@/lib/auth/platform-admin";
 import {
   getPlatformAccess,
   snapshotHasPermission,
@@ -63,7 +64,8 @@ export async function commentActor(request: Request): Promise<CommentActor> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return { userId: user?.id ?? null, isModerator: false };
+  const owner = user?.id ? await isPlatformOwner(supabase, user.id) : false;
+  return { userId: user?.id ?? null, isModerator: false, isPlatformOwner: owner };
 }
 
 export async function commentModerator(
@@ -83,7 +85,41 @@ export async function commentModerator(
   ) {
     return { ok: false, response: NextResponse.json({ error: "forbidden" }, { status: 403 }) };
   }
-  return { ok: true, actor: { userId: user.id, isModerator: true } };
+  const owner = await isPlatformOwner(supabase, user.id);
+  return { ok: true, actor: { userId: user.id, isModerator: true, isPlatformOwner: owner } };
+}
+
+/** Platform owner only. Authors, listeners and other admins are forbidden. */
+export async function commentPlatformOwner(
+  request: Request,
+): Promise<{ ok: true; actor: CommentActor } | { ok: false; response: NextResponse }> {
+  const supabase = await createClientFromRequest(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.id) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "unauthorized" },
+        { status: 401, headers: COMMENT_RESPONSE_HEADERS },
+      ),
+    };
+  }
+  const owner = await isPlatformOwner(supabase, user.id);
+  if (!owner) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "forbidden" },
+        { status: 403, headers: COMMENT_RESPONSE_HEADERS },
+      ),
+    };
+  }
+  return {
+    ok: true,
+    actor: { userId: user.id, isModerator: false, isPlatformOwner: true },
+  };
 }
 
 export async function commentStore(request: Request) {

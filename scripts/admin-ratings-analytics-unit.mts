@@ -25,6 +25,7 @@ import {
   parseAdminRatingsPeriod,
   simulateAdminRatingsRouteFromHelper,
   summarizeAdminRatings,
+  tallyListenerReviewCounts,
   throwIfAdminRatingsRpcFailed,
   type AdminEligibleFact,
   type AdminRatingEventFact,
@@ -32,7 +33,10 @@ import {
 } from "../src/lib/admin/analytics-ratings";
 import {
   buildAdminAnalyticsSearchParams,
+  listenerCommentsRatingsHrefFromSearch,
+  listenerCommentsRatingsHrefFromState,
   parseAdminAnalyticsUrlState,
+  resolveListenerCommentsQueue,
 } from "../src/lib/admin/analytics-url-state";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -468,6 +472,97 @@ function testUrlState() {
   assert.equal(built.get("ratingsTab"), "journal");
 }
 
+function testRatingsLiveOnListenerComments() {
+  const parsed = parseAdminAnalyticsUrlState(
+    new URLSearchParams(
+      "view=ratings&ratingsPeriod=7d&ratingsTab=journal&ratingsQ=сон&period=30d",
+    ),
+  );
+  const href = listenerCommentsRatingsHrefFromState(parsed);
+  assert.match(href, /^\/admin\/listener-comments\?/);
+  assert.match(href, /queue=ratings/);
+  assert.match(href, /ratingsPeriod=7d/);
+  assert.match(href, /ratingsTab=journal/);
+  assert.match(href, /ratingsQ=/);
+  assert.doesNotMatch(href, /[?&]view=/);
+  assert.doesNotMatch(href, /[?&]period=/);
+
+  const fromSearch = listenerCommentsRatingsHrefFromSearch({
+    view: "ratings",
+    ratingsPeriod: "30d",
+    ratingsTab: "listeners",
+    period: "7d",
+  });
+  assert.match(fromSearch, /queue=ratings/);
+  assert.match(fromSearch, /ratingsPeriod=30d/);
+  assert.match(fromSearch, /ratingsTab=listeners/);
+  assert.doesNotMatch(fromSearch, /[?&]period=/);
+
+  assert.equal(
+    resolveListenerCommentsQueue("ratings", {
+      canModerate: true,
+      canViewRatings: false,
+    }),
+    "reports",
+  );
+  assert.equal(
+    resolveListenerCommentsQueue("hidden", {
+      canModerate: false,
+      canViewRatings: true,
+    }),
+    "ratings",
+  );
+  assert.equal(
+    resolveListenerCommentsQueue(null, {
+      canModerate: false,
+      canViewRatings: true,
+    }),
+    "ratings",
+  );
+  assert.equal(
+    resolveListenerCommentsQueue("hidden", {
+      canModerate: true,
+      canViewRatings: true,
+    }),
+    "hidden",
+  );
+
+  const counts = tallyListenerReviewCounts([
+    { practice_id: "a" },
+    { practice_id: "a" },
+    { practice_id: "b" },
+    { practice_id: 1 },
+  ]);
+  assert.equal(counts.get("a"), 2);
+  assert.equal(counts.get("b"), 1);
+  assert.equal(counts.has("1"), false);
+
+  const page = read("src/app/(platform)/admin/listener-comments/page.tsx");
+  assert.match(page, /requireAnyAdminPermission/);
+  assert.match(page, /products\.moderate/);
+  assert.match(page, /analytics\.view/);
+  const commentsPanel = read("src/components/admin/AdminListenerCommentsPanel.tsx");
+  assert.match(commentsPanel, /data-admin-listener-comments-tab="ratings"/);
+  assert.match(commentsPanel, /AdminRatingsPanel/);
+  assert.match(commentsPanel, />\s*Оценки\s*</);
+  const copy = read("src/lib/practice-comments/copy.ts");
+  assert.match(copy, /всех опубликованных продуктах/);
+  assert.match(copy, /звёздные оценки/);
+  assert.doesNotMatch(copy, /—/);
+  const adminPage = read("src/app/(platform)/admin/page.tsx");
+  assert.match(adminPage, /listenerCommentsRatingsHrefFromSearch\(params\)/);
+  assert.match(adminPage, /params\.view === "ratings"/);
+  const ratingsPanel = read("src/components/admin/AdminRatingsPanel.tsx");
+  assert.match(ratingsPanel, />Отзывы</);
+  assert.match(ratingsPanel, /data-admin-ratings-review-count/);
+  const queries = read("src/lib/admin/analytics-ratings-queries.ts");
+  assert.match(queries, /practice_listener_comments/);
+  assert.match(queries, /tallyListenerReviewCounts/);
+  assert.doesNotMatch(queries, /CREATE TABLE|ALTER TABLE/);
+  const workbench = read("src/components/admin/AdminAnalyticsWorkbench.tsx");
+  assert.match(workbench, /listenerCommentsRatingsHrefFromState/);
+}
+
 function testSourceContracts() {
   const migration = read(
     "supabase/migrations/20260922120000_admin_ratings_analytics.sql",
@@ -585,6 +680,7 @@ testAuthorMultiPractice();
 testJournalOrderAndPagination();
 testDiagnosticsNeutralWording();
 testUrlState();
+testRatingsLiveOnListenerComments();
 testSourceContracts();
 testRpcFailureSemantics();
 

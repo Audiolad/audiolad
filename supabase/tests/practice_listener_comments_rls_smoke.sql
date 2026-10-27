@@ -31,11 +31,11 @@ BEGIN
   INSERT INTO public.authors (id, name, slug, avatar_url)
   VALUES (author_id, 'Анна Светлая', 'anna', workspace_avatar);
   INSERT INTO public.practices (
-    id, author_id, title, slug, status, product_kind, catalog_section, published_at
+    id, author_id, title, slug, status, product_kind, catalog_section, catalog_visibility, published_at
   ) VALUES
-    (practice, author_id, 'Тихая', 'tihaya', 'published', 'practice', 'meditations', now()),
-    (music, author_id, 'Трек', 'trek', 'published', 'music', 'music', now()),
-    (draft, author_id, 'Черновик', 'chernovik', 'draft', 'practice', 'meditations', NULL);
+    (practice, author_id, 'Тихая', 'tihaya', 'published', 'practice', 'meditations', 'listed', now()),
+    (music, author_id, 'Трек', 'trek', 'published', 'music', 'music', 'listed', now()),
+    (draft, author_id, 'Черновик', 'chernovik', 'draft', 'practice', 'meditations', 'listed', NULL);
   INSERT INTO public.author_members (author_id, user_id) VALUES (author_id, author_user);
 
   INSERT INTO public.profiles (id, full_name, avatar_url, avatar_path) VALUES

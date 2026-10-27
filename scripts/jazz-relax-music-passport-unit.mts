@@ -55,8 +55,10 @@ import {
 } from "../src/lib/music-passport/pilot-authors";
 import {
   assertJazzRelaxMusicPassport,
+  attachFrozenTrackPassports,
   JazzRelaxPassportError,
   jazzRelaxAnalysisStorageTarget,
+  jazzRelaxAnalyzerFilename,
   jazzRelaxPassportTrackBlock,
   resolveJazzRelaxAnalysisAudio,
 } from "../src/lib/music-passport/jazz-relax-pilot";
@@ -72,6 +74,27 @@ import {
 } from "../src/lib/music-passport/album-aggregate";
 
 const read = (path: string) => readFileSync(path, "utf8");
+
+// Product uploads may already be MP3 when queued; use the original M4A/AAC name.
+for (const format of ["mp3", "wav", "m4a", "aac"]) {
+  assert.equal(jazzRelaxAnalyzerFilename("streams/converted.mp3", `original.${format}`), `original.${format}`);
+  assert.ok(jazzRelaxAnalyzerFilename("streams/converted.mp3", `${"x".repeat(160)}.${format}`).endsWith(`.${format}`));
+  const views = attachFrozenTrackPassports([{
+    audioItemId: "format-track", title: "Display title without extension", state: "ready",
+    errorCode: null, passportVersionId: "format-passport", runId: "format-run", productPassport: null,
+  }], {
+    sources: [{ outcome: "succeeded", audio_item_id: "format-track",
+      track_passport_version_id: "format-passport", music_analyzer_run_id: "format-run",
+      analyzer_version: null, analyzer_git_commit: null }],
+  }, new Map([["format-run", {
+    id: "format-run", status: "succeeded", source_filename: "track.mp3", sha256: "a".repeat(64),
+    error_code: null, finished_at: null, analyzer_version: null, analyzer_git_commit: null,
+    normalized_json: { technical: { format: "wav" } },
+  }]]), [{
+    id: "format-track", original_file_name: `original.${format}`,
+  }]);
+  assert.equal(views[0]?.productPassport?.passport.technical.find(row => row.label === "Формат")?.value, format.toUpperCase());
+}
 
 assert.equal(JAZZ_RELAX_AUTHOR_ID, "0a847461-a429-4868-986a-59d7bf2fdb2b");
 assert.equal(AURAFON_AUTHOR_ID, "59c7e5b8-eae4-4394-82fb-b815a10be6c2");

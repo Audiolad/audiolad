@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
 
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { LISTENER_COMMENT_DEFAULT_PUBLIC_NAME } from "@/lib/practice-comments/copy";
+import {
+  LISTENER_COMMENT_DEFAULT_PUBLIC_NAME,
+  moderationActorLabel,
+} from "@/lib/practice-comments/copy";
 import {
   encodeCommentCursor,
   type CommentCursor,
   type CommentSort,
 } from "@/lib/practice-comments/pagination";
 import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
-import type { CommentStore, FeedCommentRow } from "@/lib/practice-comments/store";
+import type { AuthorImpressionFilter, CommentStore, FeedCommentRow } from "@/lib/practice-comments/store";
 import { isUniqueViolation } from "@/lib/practice-comments/store";
 import {
   commentFingerprint,
@@ -43,6 +46,8 @@ export const COMMENT_EDIT_WINDOW_MS = 10 * 60 * 1000;
 export type CommentActor = {
   userId: string | null;
   isModerator: boolean;
+  /** Platform owner only. Moderators, authors and listeners stay false. */
+  isPlatformOwner?: boolean;
 };
 
 export type CommentClock = {
@@ -157,21 +162,16 @@ export async function listPracticeComments(
         publicNameSuggestion: string;
         avatarUrl: string | null;
         hasOwnImpression: boolean;
+        canOwnerDelete: boolean;
       };
+      publishedCount: number;
     }
 > {
   const gate = await store.getGateBySlug(input.authorSlug, input.productSlug);
   if (!gate) return commentFailure(404, "not_found");
   const accepts = practiceAcceptsListenerComments({ ...gate, now: input.now });
   if (!accepts) {
-    return commentFailure(
-      gate.productKind === "music" || gate.productKind === "audio_post" || gate.catalogSection === "music"
-        ? 403
-        : 404,
-      gate.productKind === "music" || gate.productKind === "audio_post" || gate.catalogSection === "music"
-        ? "product_not_commentable"
-        : "not_found",
-    );
+    return commentFailure(404, "not_found");
   }
 
   const page = await store.listFeed({
@@ -207,7 +207,9 @@ export async function listPracticeComments(
       hasOwnImpression: actor.userId
         ? await store.hasOwnImpression(actor.userId, gate.practiceId)
         : false,
+      canOwnerDelete: actor.isPlatformOwner === true,
     },
+    publishedCount: await store.countPublishedImpressions(gate.practiceId),
   };
 }
 
@@ -234,11 +236,7 @@ export async function createImpression(
   const gate = await store.getGateBySlug(input.authorSlug, input.productSlug);
   if (!gate) return commentFailure(404, "not_found");
   if (!practiceAcceptsListenerComments({ ...gate, now: clock.now() })) {
-    const blockedKind =
-      gate.productKind === "music" ||
-      gate.productKind === "audio_post" ||
-      gate.catalogSection === "music";
-    return commentFailure(blockedKind ? 403 : 404, blockedKind ? "product_not_commentable" : "not_found");
+    return commentFailure(404, "not_found");
   }
   const body = parseCommentBody(input.body);
   if (!body.ok) return commentFailure(400, body.error);
@@ -400,12 +398,19 @@ export async function deleteOwnComment(
     const author = await store.isAuthorMember(actor.userId, row.practiceId);
     if (!author) return commentFailure(403, "forbidden");
   }
+  // The platform owner's own comment uses the same journaled transaction as
+  // deleting someone else's. A listener retracts their own row without that
+  // journal: returnCommentAsOwner will not restore it.
+  if (actor.isPlatformOwner === true) {
+    return deleteCommentAsOwner(store, actor, clock, commentId);
+  }
   const now = iso(clock.now());
   await store.updateComment(row.id, {
     status: "deleted",
     deletedAt: now,
     updatedAt: now,
   });
+  await store.clearCommentNotices(row.id);
   return { ok: true };
 }
 
@@ -413,7 +418,13 @@ export async function replyAsAuthor(
   store: CommentStore,
   actor: CommentActor,
   clock: CommentClock,
-  input: { commentId: string; body: unknown; clientRequestId: unknown },
+  input: {
+    commentId: string;
+    body: unknown;
+    clientRequestId: unknown;
+    authorSlug?: string | null;
+    productSlug?: string | null;
+  },
 ): Promise<CommentFailure | { ok: true; comment: PublicCommentDto; replayed: boolean }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   const parent = await store.getRaw(input.commentId);
@@ -423,6 +434,16 @@ export async function replyAsAuthor(
   if (parent.status !== "published") return commentFailure(403, "comment_hidden");
   const member = await store.isAuthorMember(actor.userId, parent.practiceId);
   if (!member) return commentFailure(403, "forbidden");
+  if (input.authorSlug != null || input.productSlug != null) {
+    const context = await store.getPracticeContext(parent.practiceId);
+    if (
+      !context ||
+      context.authorSlug !== input.authorSlug ||
+      context.productSlug !== input.productSlug
+    ) {
+      return commentFailure(400, "invalid_product");
+    }
+  }
   const body = parseCommentBody(input.body);
   if (!body.ok) return commentFailure(400, body.error);
   const requestId = parseClientRequestId(input.clientRequestId);
@@ -519,6 +540,20 @@ export async function reportComment(
   return { ok: true, duplicate: result === "duplicate" };
 }
 
+export function parseAuthorImpressionFilter(input: string | null): AuthorImpressionFilter | null {
+  if (input == null || input === "" || input === "all") return "all";
+  if (input === "new" || input === "unanswered") return input;
+  return null;
+}
+
+/**
+ * Cabinet history is every published listener impression on the account's
+ * products. Unread is a new_impression notice with no read_at. Hidden and
+ * deleted rows are absent, and an author reply is not a new comment.
+ * Opening the list does not mark notices. A row is marked when that item is
+ * viewed, when the author marks everything, or when that comment is opened
+ * on the product page. The rows stay in history.
+ */
 export async function listAuthorFeedback(
   store: CommentStore,
   actor: CommentActor,
@@ -527,6 +562,7 @@ export async function listAuthorFeedback(
     sort: CommentSort;
     cursor: CommentCursor | null;
     limit: number;
+    filter?: AuthorImpressionFilter;
   },
 ): Promise<
   | CommentFailure
@@ -535,6 +571,9 @@ export async function listAuthorFeedback(
       comments: Array<{
         id: string;
         practiceId: string;
+        authorName: string;
+        authorSlug: string;
+        productSlug: string;
         practiceTitle: string;
         practiceHref: string;
         publicName: string;
@@ -547,45 +586,54 @@ export async function listAuthorFeedback(
         unread: boolean;
       }>;
       nextCursor: string | null;
+      unreadCount: number;
     }
 > {
   if (!actor.userId) return commentFailure(401, "unauthorized");
-  const practiceIds = await store.listAuthorPracticeIds(actor.userId, input.authorId);
-  if (input.authorId && practiceIds.length === 0) return commentFailure(403, "forbidden");
-  const collected: FeedCommentRow[] = [];
-  for (const practiceId of practiceIds) {
-    const rows = await store.listFeed({
-      practiceId,
-      viewerUserId: actor.userId,
-      sort: input.sort,
-      cursor: input.cursor,
-      limit: input.limit + 1,
-    });
-    collected.push(...rows.filter((row) => row.status === "published" && row.kind === "impression"));
-  }
-  collected.sort((left, right) =>
-    left.createdAt < right.createdAt ? (input.sort === "old" ? -1 : 1) : left.createdAt > right.createdAt ? (input.sort === "old" ? 1 : -1) : 0,
+  const authorIds = await store.listAuthorWorkspaceIds(actor.userId, input.authorId);
+  if (input.authorId && authorIds.length === 0) return commentFailure(403, "forbidden");
+  const filter = input.filter ?? "all";
+  const rows = await store.listAuthorImpressions({
+    userId: actor.userId,
+    authorIds,
+    sort: input.sort,
+    cursor: input.cursor,
+    limit: input.limit + 1,
+    filter,
+  });
+  const hasMore = rows.length > input.limit;
+  const page = rows.slice(0, input.limit);
+  const notices = await store.unreadNoticesForComments(
+    actor.userId,
+    page.map((row) => row.id),
   );
-  const page = collected.slice(0, input.limit);
-  const notices = await store.listNotices(actor.userId);
+  const noticeByComment = new Map(notices.map((notice) => [notice.commentId, notice.noticeId]));
+  const repliesByParent = new Map<string, FeedCommentRow>();
+  const replies = await store.listRepliesForParents({
+    parentIds: page.map((row) => row.id),
+    viewerUserId: actor.userId,
+  });
+  for (const reply of replies) {
+    if (reply.status === "published" && reply.parentId && !repliesByParent.has(reply.parentId)) {
+      repliesByParent.set(reply.parentId, reply);
+    }
+  }
+  const contexts = await store.getPracticeContexts(page.map((row) => row.practiceId));
+  const contextById = new Map(contexts.map((context) => [context.id, context]));
   const comments = [];
   for (const row of page) {
-    const context = await store.getPracticeContext(row.practiceId);
-    const replies = await store.listReplies({
-      practiceId: row.practiceId,
-      parentIds: [row.id],
-      viewerUserId: actor.userId,
-    });
-    const reply = replies.find((item) => item.status === "published") ?? null;
-    const notice = notices.find(
-      (item) => item.commentId === row.id && item.kind === "new_impression",
-    );
+    const context = contextById.get(row.practiceId) ?? null;
+    const reply = repliesByParent.get(row.id) ?? null;
+    const noticeId = noticeByComment.get(row.id) ?? null;
     comments.push({
       id: row.id,
       practiceId: row.practiceId,
-      practiceTitle: context?.title ?? "Практика",
+      authorName: context?.authorName ?? "Автор",
+      authorSlug: context?.authorSlug ?? "",
+      productSlug: context?.productSlug ?? "",
+      practiceTitle: context?.title ?? "Продукт",
       practiceHref: context
-        ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-impressions`
+        ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-comment-${row.id}`
         : "/catalog",
       publicName: row.publicName,
       avatarUrl: row.avatarUrl,
@@ -593,15 +641,34 @@ export async function listAuthorFeedback(
       createdAt: row.createdAt,
       editedAt: row.editedAt,
       reply: reply ? toReply(reply) : null,
-      noticeId: notice?.id ?? null,
-      unread: Boolean(notice && !notice.readAt),
+      noticeId,
+      unread: noticeId != null,
     });
   }
   const last = page[page.length - 1];
+  const ownedIds = input.authorId
+    ? await store.listAuthorWorkspaceIds(actor.userId, null)
+    : authorIds;
   return {
     ok: true,
     comments,
-    nextCursor: collected.length > input.limit && last ? encodeCommentCursor(last) : null,
+    nextCursor: hasMore && last ? encodeCommentCursor(last) : null,
+    unreadCount: ownedIds.length === 0 ? 0 : await store.countUnreadAuthorImpressions(actor.userId, ownedIds),
+  };
+}
+
+export async function countUnreadAuthorImpressions(
+  store: CommentStore,
+  actor: CommentActor,
+): Promise<CommentFailure | { ok: true; unreadCount: number }> {
+  if (!actor.userId) return commentFailure(401, "unauthorized");
+  const authorIds = await store.listAuthorWorkspaceIds(actor.userId, null);
+  return {
+    ok: true,
+    unreadCount:
+      authorIds.length === 0
+        ? 0
+        : await store.countUnreadAuthorImpressions(actor.userId, authorIds),
   };
 }
 
@@ -633,6 +700,44 @@ export async function markCommentNoticeRead(
   const ok = await store.markNoticeRead(actor.userId, noticeId, iso(clock.now()));
   if (!ok) return commentFailure(404, "not_found");
   return { ok: true as const };
+}
+
+const NOTICE_ID = /^[0-9a-f-]{36}$/i;
+
+/**
+ * Read state belongs to the signed-in account. Viewing one cabinet row marks
+ * that notice. «Отметить все прочитанными» clears every unread impression
+ * notice on this account's products. Opening one comment on the product page
+ * marks that notice. Hidden and deleted impressions are not marked and do not
+ * count.
+ */
+export async function markAuthorImpressionNotices(
+  store: CommentStore,
+  actor: CommentActor,
+  clock: CommentClock,
+  input: { noticeIds?: string[]; all?: boolean; commentId?: string | null },
+): Promise<CommentFailure | { ok: true; unreadCount: number }> {
+  if (!actor.userId) return commentFailure(401, "unauthorized");
+  const now = iso(clock.now());
+  const authorIds = await store.listAuthorWorkspaceIds(actor.userId, null);
+  if (input.all) {
+    await store.markUnreadAuthorImpressions(actor.userId, authorIds, now);
+  } else if (input.commentId && NOTICE_ID.test(input.commentId)) {
+    await store.markUnreadNoticeForComment(actor.userId, input.commentId, now);
+  } else if (input.noticeIds && input.noticeIds.length > 0) {
+    const ids = input.noticeIds.filter((id) => NOTICE_ID.test(id));
+    if (ids.length === 0) return commentFailure(400, "invalid_notice");
+    await store.markNoticesRead(actor.userId, ids, now);
+  } else {
+    return commentFailure(400, "invalid_notice");
+  }
+  return {
+    ok: true,
+    unreadCount:
+      authorIds.length === 0
+        ? 0
+        : await store.countUnreadAuthorImpressions(actor.userId, authorIds),
+  };
 }
 
 export async function moderateComment(
@@ -671,10 +776,13 @@ export async function moderateComment(
 export async function listModerationQueue(
   store: CommentStore,
   actor: CommentActor,
-  input: { queue: "reports" | "hidden"; cursor: CommentCursor | null; limit: number },
+  input: { queue: "reports" | "hidden" | "deleted"; cursor: CommentCursor | null; limit: number },
 ) {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   if (!actor.isModerator) return commentFailure(403, "forbidden");
+  if (input.queue === "deleted" && actor.isPlatformOwner !== true) {
+    return commentFailure(403, "forbidden");
+  }
   const rows = await store.listModerationQueue({
     queue: input.queue,
     cursor: input.cursor,
@@ -686,22 +794,34 @@ export async function listModerationQueue(
     const context = await store.getPracticeContext(row.practiceId);
     const reports = await store.listReports(row.id);
     const journal = await store.listModerationEvents(row.id);
+    const labels = await store.actorLabels(journal.map((event) => event.actorUserId));
+    const lastDelete = [...journal].reverse().find((event) => event.action === "owner_delete");
+    const ownerReturnTo =
+      lastDelete?.reason === "previous:hidden"
+        ? "hidden"
+        : lastDelete?.reason === "previous:published"
+          ? "published"
+          : null;
     items.push({
       id: row.id,
       practiceTitle: context?.title ?? "Практика",
       publicName: row.publicName,
       body: row.body,
-      status: row.status === "hidden" ? "hidden" : "published",
+      status:
+        row.status === "hidden" ? "hidden" : row.status === "deleted" ? "deleted" : "published",
       kind: row.kind,
       createdAt: row.createdAt,
       reports: reports.map((report) => ({
         reason: report.reason,
         createdAt: report.createdAt,
       })),
+      ownerReturnTo: row.status === "deleted" ? ownerReturnTo : null,
       journal: journal.map((event) => ({
         action: event.action,
         reason: event.reason,
         createdAt: event.createdAt,
+        actorUserId: event.actorUserId,
+        actorLabel: labels[event.actorUserId] ?? moderationActorLabel({}),
       })),
     });
   }
@@ -710,5 +830,52 @@ export async function listModerationQueue(
     ok: true as const,
     items,
     nextCursor: rows.length > input.limit && last ? encodeCommentCursor(last) : null,
+    canOwnerDelete: actor.isPlatformOwner === true,
   };
+}
+
+/**
+ * Platform owner soft-delete. The row stays, with who and when in the journal.
+ * Hidden from every product page immediately. Star ratings are a different table
+ * and are not rewritten here. Comment counts are live queries of published rows.
+ */
+export async function deleteCommentAsOwner(
+  store: CommentStore,
+  actor: CommentActor,
+  clock: CommentClock,
+  commentId: string,
+): Promise<CommentFailure | { ok: true }> {
+  if (!actor.userId) return commentFailure(401, "unauthorized");
+  if (actor.isPlatformOwner !== true) return commentFailure(403, "forbidden");
+  const result = await store.applyOwnerModeration({
+    action: "owner_delete",
+    commentId,
+    actorUserId: actor.userId,
+    eventId: randomUUID(),
+    now: iso(clock.now()),
+  });
+  if (!result.ok) return commentFailure(404, "not_found");
+  return { ok: true };
+}
+
+/** Owner-only return of a soft-deleted comment to its previous status. */
+export async function returnCommentAsOwner(
+  store: CommentStore,
+  actor: CommentActor,
+  clock: CommentClock,
+  commentId: string,
+): Promise<CommentFailure | { ok: true }> {
+  if (!actor.userId) return commentFailure(401, "unauthorized");
+  if (actor.isPlatformOwner !== true) return commentFailure(403, "forbidden");
+  const result = await store.applyOwnerModeration({
+    action: "owner_return",
+    commentId,
+    actorUserId: actor.userId,
+    eventId: randomUUID(),
+    now: iso(clock.now()),
+  });
+  if (!result.ok) {
+    return commentFailure(404, result.error === "not_owner_deleted" ? "not_owner_deleted" : "not_found");
+  }
+  return { ok: true };
 }

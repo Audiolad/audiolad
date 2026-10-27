@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { isAudioPrepareInFlight, mapProductNormalizeJobToPrepareStatus } from "@/lib/author-products/audio-prepare-status";
 import { MUSIC_MASTERS_BUCKET } from "@/lib/author-products/music-master-upload-contract";
-import { PRACTICE_AUDIO_BUCKET } from "@/lib/author-products/product-audio-upload-contract";
+import { detectProductAudioSourceFormat, PRACTICE_AUDIO_BUCKET } from "@/lib/author-products/product-audio-upload-contract";
 import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "@/lib/music-analyzer-runs/passport";
 import {
   MUSIC_ANALYZER_MAX_UPLOAD_BYTES,
@@ -114,6 +114,7 @@ type LinkRow = {
 
 type RunRow = {
   id: string;
+  source_filename: string;
   status: "queued" | "processing" | "succeeded" | "failed";
   sha256: string;
   error_code: string | null;
@@ -162,10 +163,13 @@ function commitOrNull(value: string | null | undefined): string | null {
   return value;
 }
 
-function analyzerFilename(audioPath: string, originalName: string | null): string {
+export function jazzRelaxAnalyzerFilename(audioPath: string, originalName: string | null): string {
   const fromPath = audioPath.split("/").pop() ?? "";
-  const safe = safeAudioFilename(originalName?.trim() || fromPath || "track.mp3");
-  if (/\.(mp3|wav)$/i.test(safe)) return safe;
+  const name = originalName?.trim() || fromPath || "track.mp3";
+  const safe = safeAudioFilename(name);
+  // Keep the upload name even when the product audio has become an MP3.
+  const format = detectProductAudioSourceFormat(name);
+  if (format) return detectProductAudioSourceFormat(safe) === format ? safe : `${safe.slice(0, 115)}.${format}`;
   return audioPath.toLowerCase().endsWith(".wav") ? "track.wav" : "track.mp3";
 }
 
@@ -232,7 +236,7 @@ async function loadRuns(ids: string[]): Promise<Map<string, RunRow>> {
   await Promise.all(chunkIds([...new Set(ids)]).map(async (chunk) => {
     const { data, error } = await service()
       .from("music_analyzer_runs")
-      .select("id, status, sha256, error_code, finished_at, analyzer_version, analyzer_git_commit, normalized_json")
+      .select("id, status, source_filename, sha256, error_code, finished_at, analyzer_version, analyzer_git_commit, normalized_json")
       .in("id", chunk);
     if (error) throw new JazzRelaxPassportError("passport_storage_failed", 500);
     for (const row of data ?? []) map.set(row.id as string, row as RunRow);
@@ -614,7 +618,7 @@ async function enqueueTrack(input: {
 }): Promise<void> {
   const bytes = input.bytes ?? await downloadAnalysisAudio(input.source);
   const sha = sha256Hex(bytes);
-  const filename = analyzerFilename(
+  const filename = jazzRelaxAnalyzerFilename(
     input.source.path,
     input.track.original_file_name?.trim()
       || (input.source.kind === "music_master" ? input.source.originalFileName : null),
@@ -671,10 +675,11 @@ function bareTrack(
   return { ...input, productPassport: null };
 }
 
-function attachFrozenTrackPassports(
+export function attachFrozenTrackPassports(
   tracks: JazzRelaxPassportTrackView[],
-  draft: AlbumPassportDraft,
+  draft: Pick<AlbumPassportDraft, "sources">,
   runs: Map<string, RunRow>,
+  originalTracks: Array<Pick<AudioRow, "id" | "original_file_name">>,
 ): JazzRelaxPassportTrackView[] {
   return tracks.map((track) => {
     if (track.state !== "ready") return track;
@@ -684,7 +689,15 @@ function attachFrozenTrackPassports(
     if (!source || source.track_passport_version_id !== track.passportVersionId) return track;
     const run = source.music_analyzer_run_id ? runs.get(source.music_analyzer_run_id) : null;
     if (!run || run.status !== "succeeded") return track;
-    const passport = readMusicAnalyzerPassport({ normalized: run.normalized_json });
+    const original = originalTracks.find((item) => item.id === track.audioItemId);
+    const passport = readMusicAnalyzerPassport({
+      normalized: run.normalized_json,
+      source: {
+        filename: original?.original_file_name?.trim() || run.source_filename,
+        // Product audio may have been normalized to MP3 before enqueueing.
+        // Its MIME is not evidence of the original upload's format.
+      },
+    });
     return {
       ...track,
       productPassport: {
@@ -765,7 +778,7 @@ async function viewFor(practiceId: string): Promise<JazzRelaxPassportView> {
   const running = trackViews.some((track) => track.state === "queued" || track.state === "processing");
   const matched = running ? null : matchSettledAlbum(albums, trackViews);
   const projection = matched ? albumTagProjection(matched.draft, runs) : null;
-  const tracksForView = matched ? attachFrozenTrackPassports(trackViews, matched.draft, runs) : trackViews;
+  const tracksForView = matched ? attachFrozenTrackPassports(trackViews, matched.draft, runs, tracks) : trackViews;
   const album = matched
     ? readAlbumPassportDisplay({
       id: matched.row.id,

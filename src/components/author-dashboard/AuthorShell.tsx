@@ -54,7 +54,12 @@ export default function AuthorShell({
         <div className="min-w-0 flex-1 overflow-hidden px-1 text-center sm:justify-self-center">
           <h1 className="truncate text-[22px] font-semibold leading-tight">{title}</h1>
           {subtitle ? (
-            <p className="mt-1 truncate text-xs text-[#7d70a2]">{subtitle}</p>
+            <p
+              className="mt-1 whitespace-normal break-words text-xs leading-5 text-[#7d70a2]"
+              data-author-shell-subtitle="true"
+            >
+              {subtitle}
+            </p>
           ) : null}
         </div>
 

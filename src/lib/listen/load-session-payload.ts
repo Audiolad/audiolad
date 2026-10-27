@@ -351,6 +351,7 @@ export async function loadListenSessionPayload(
     const listenerImpressionHref = practiceAcceptsListenerComments({
       productKind: practiceRow.product_kind,
       catalogSection: practiceRow.catalog_section,
+      catalogVisibility: practiceRow.catalog_visibility,
       status: practiceRow.status,
       publishedAt: practiceRow.published_at,
       scheduledPublishAt: practiceRow.scheduled_publish_at,

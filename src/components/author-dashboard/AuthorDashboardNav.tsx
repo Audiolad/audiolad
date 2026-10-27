@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
+import AuthorUnreadCommentBadge from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
 import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
@@ -96,6 +97,19 @@ function AudioSprintIcon() {
         fill="#E0892A"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CommentsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M6 16.5 4 20l4.2-1.4A8 8 0 1 0 6 16.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinejoin="round"
       />
     </svg>
@@ -237,6 +251,7 @@ export default function AuthorDashboardNav({
     icon: typeof ProfileIcon;
     active: boolean;
     locked?: boolean;
+    comments?: boolean;
   }[] = [
     {
       href: `/author-dashboard${authorQuery}`,
@@ -289,10 +304,11 @@ export default function AuthorDashboardNav({
       active: pathname.startsWith("/author-dashboard/stats"),
     },
     {
-      href: `/author-dashboard/feedback${authorQuery}`,
-      label: "Отзывы",
-      icon: StatsIcon,
+      href: "/author-dashboard/feedback",
+      label: "Комментарии",
+      icon: CommentsIcon,
       active: pathname.startsWith("/author-dashboard/feedback"),
+      comments: true,
     },
     {
       href: `/author-dashboard/finance${authorQuery}`,
@@ -380,6 +396,7 @@ export default function AuthorDashboardNav({
             >
               <Icon />
               {item.label}
+              {item.comments ? <AuthorUnreadCommentBadge placement="nav" /> : null}
               {autumn ? (
                 <span className="hidden h-4 shrink-0 items-center rounded-full bg-[#25135c] px-1.5 text-[10px] font-semibold leading-none text-[#FFF8EA] sm:inline-flex">
                   до 18 октября

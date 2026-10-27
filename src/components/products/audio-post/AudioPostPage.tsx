@@ -12,6 +12,7 @@ import {
   PracticeProductCover,
   toPracticeHeartProduct,
 } from "@/components/products/practice-page/PracticePageParts";
+import PracticeComments from "@/components/products/practice-page/PracticeComments";
 import PracticeRatingStars from "@/components/products/practice-page/PracticeRatingStars";
 import type { PracticePageViewModel } from "@/components/products/practice-page/types";
 import {
@@ -82,6 +83,16 @@ function AudioPostTrailingSections({
             surface="product"
           />
         </div>
+      ) : null}
+
+      {viewModel.listenerCommentsEnabled ? (
+        <PracticeComments
+          authorSlug={viewModel.resolvedAuthorSlug}
+          productSlug={practice.slug}
+          practiceId={practice.id}
+          isAuthenticated={viewModel.isAuthenticated}
+          signInReturnPath={viewModel.practicePagePath}
+        />
       ) : null}
 
       <AudioPostRecommendation viewModel={viewModel} />

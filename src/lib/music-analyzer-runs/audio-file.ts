@@ -1,4 +1,23 @@
 import { MUSIC_ANALYZER_MAX_UPLOAD_BYTES } from "./constants";
+import { detectProductAudioSourceFormat } from "@/lib/author-products/product-audio-upload-contract";
+
+/** Original upload metadata only; never pass the temporary analysis filename. */
+export function originalAudioFormat(input: {
+  filename?: string | null;
+  mime?: string | null;
+}): { value: string; source: string } | null {
+  const format = detectProductAudioSourceFormat(input.filename ?? "");
+  if (format) return { value: format.toUpperCase(), source: "source.filename" };
+  const mime = input.mime?.split(";")[0]?.trim().toLowerCase() ?? "";
+  const formats: Record<string, string> = {
+    "audio/mpeg": "MP3", "audio/mp3": "MP3", "audio/x-mpeg": "MP3", "audio/x-mp3": "MP3",
+    "audio/wav": "WAV", "audio/x-wav": "WAV", "audio/wave": "WAV", "audio/vnd.wave": "WAV",
+    "audio/mp4": "M4A", "audio/x-m4a": "M4A", "audio/m4a": "M4A",
+    "audio/aac": "AAC", "audio/x-aac": "AAC",
+  };
+  const value = Object.prototype.hasOwnProperty.call(formats, mime) ? formats[mime] : null;
+  return value ? { value, source: "source.mime" } : null;
+}
 
 export type MusicAnalyzerMime = "audio/wav" | "audio/mpeg";
 

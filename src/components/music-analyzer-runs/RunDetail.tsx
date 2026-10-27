@@ -56,6 +56,7 @@ export function RunDetail({
 
   const other = siblings.filter((item) => item.id !== run.id);
   const passport = readMusicAnalyzerPassport({
+    source: { filename: run.sourceFilename, mime: run.mimeType },
     normalized: run.normalizedJson,
     raw: run.rawJson,
     taxonomyVersion: run.taxonomyVersion,

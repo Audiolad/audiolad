@@ -138,6 +138,19 @@ export function formatAdminAverageStars(average: number | null): string {
   });
 }
 
+/** Published listener impressions (text reviews), keyed by product id. */
+export function tallyListenerReviewCounts(
+  rows: ReadonlyArray<{ practice_id?: unknown }>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const id = row.practice_id;
+    if (typeof id !== "string" || id.length === 0) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export function adminEligibleConversion(
   ratedEligible: number,
   eligible: number,
@@ -704,6 +717,8 @@ export type AdminRatingsProductRow = {
   ratingCount: number;
   average: number | null;
   averageFormatted: string;
+  /** Published listener impressions. Null when the count could not be read. */
+  reviewCount: number | null;
   stars7d: number;
   count7d: number;
   stars30d: number;

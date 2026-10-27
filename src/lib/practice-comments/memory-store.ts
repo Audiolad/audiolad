@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { resolveListenerAvatarUrl, resolveViewerCommentAvatar } from "@/lib/practice-comments/avatar";
 import { compareComments, isAfterCursor } from "@/lib/practice-comments/pagination";
+import { moderationActorLabel } from "@/lib/practice-comments/copy";
 import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
 import { isListenerCommentFeedVisible } from "@/lib/practice-comments/visibility";
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
@@ -41,7 +42,54 @@ export type MemoryCommentState = {
   reports: CommentReportRow[];
   events: ModerationEventRow[];
   edits: CommentEditMark[];
+  profiles?: Record<string, { fullName?: string | null; email?: string | null }>;
 };
+
+function publishedImpression(state: MemoryCommentState, commentId: string): boolean {
+  const row = state.comments.find((item) => item.id === commentId);
+  return Boolean(row && row.kind === "impression" && row.status === "published" && !row.deletedAt);
+}
+
+function unreadCommentIds(state: MemoryCommentState, userId: string): Set<string> {
+  return new Set(
+    state.notices
+      .filter(
+        (notice) =>
+          notice.recipientUserId === userId &&
+          notice.kind === "new_impression" &&
+          notice.readAt == null &&
+          publishedImpression(state, notice.commentId),
+      )
+      .map((notice) => notice.commentId),
+  );
+}
+
+function practiceIdsForAuthors(
+  state: MemoryCommentState,
+  userId: string,
+  authorIds: string[],
+): Set<string> {
+  const allowed = new Set(authorIds);
+  return new Set(
+    state.memberships
+      .filter((member) => member.userId === userId && allowed.has(member.authorId))
+      .map((member) => member.practiceId),
+  );
+}
+
+function answeredParentIds(state: MemoryCommentState): Set<string> {
+  return new Set(
+    state.comments
+      .filter(
+        (row) =>
+          row.kind === "author_reply" &&
+          row.status === "published" &&
+          !row.deletedAt &&
+          row.parentId != null,
+      )
+      .map((row) => row.parentId as string),
+  );
+}
 
 export function createMemoryCommentStore(state: MemoryCommentState): CommentStore {
   const hiddenMeta = new Map<string, { hiddenBy: string | null; hiddenAt: string | null }>();
@@ -65,6 +113,7 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
         ? practiceAcceptsListenerComments({
             productKind: gate.productKind,
             catalogSection: gate.catalogSection,
+            catalogVisibility: gate.catalogVisibility,
             status: gate.status,
             publishedAt: gate.publishedAt,
             scheduledPublishAt: gate.scheduledPublishAt,
@@ -121,9 +170,19 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
       return {
         id: gate.practiceId,
         title: gate.title,
+        authorName: gate.authorName?.trim() || "Автор",
         authorSlug: gate.authorSlug,
         productSlug: gate.productSlug,
       };
+    },
+    async getPracticeContexts(practiceIds) {
+      const wanted = new Set(practiceIds);
+      const contexts = [];
+      for (const practiceId of wanted) {
+        const context = await this.getPracticeContext(practiceId);
+        if (context) contexts.push(context);
+      }
+      return contexts;
     },
     async suggestPublicName(userId) {
       return state.names[userId] ?? "Слушатель";
@@ -147,6 +206,15 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
           row.status !== "deleted",
       );
     },
+    async countPublishedImpressions(practiceId) {
+      return state.comments.filter(
+        (row) =>
+          row.practiceId === practiceId &&
+          row.kind === "impression" &&
+          row.status === "published" &&
+          !row.deletedAt,
+      ).length;
+    },
     async authorDisplayName(practiceId) {
       return state.authorNames[practiceId] ?? "Автор";
     },
@@ -160,13 +228,108 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
         .filter((member) => member.practiceId === practiceId)
         .map((member) => member.userId);
     },
-    async listAuthorPracticeIds(userId, authorId) {
-      return state.memberships
+    async listAuthorWorkspaceIds(userId, authorId) {
+      return [
+        ...new Set(
+          state.memberships
+            .filter(
+              (member) =>
+                member.userId === userId && (authorId == null || member.authorId === authorId),
+            )
+            .map((member) => member.authorId),
+        ),
+      ];
+    },
+    async listAuthorImpressions(input) {
+      const allowed = practiceIdsForAuthors(state, input.userId, input.authorIds);
+      const unread = unreadCommentIds(state, input.userId);
+      const answered = answeredParentIds(state);
+      return state.comments
         .filter(
-          (member) =>
-            member.userId === userId && (authorId == null || member.authorId === authorId),
+          (row) =>
+            allowed.has(row.practiceId) &&
+            row.kind === "impression" &&
+            row.status === "published" &&
+            !row.deletedAt &&
+            (input.filter !== "new" || unread.has(row.id)) &&
+            (input.filter !== "unanswered" || !answered.has(row.id)),
         )
-        .map((member) => member.practiceId);
+        .map((row) => toFeed(row, input.userId))
+        .filter((row): row is FeedCommentRow => row != null)
+        .filter((row) => (input.cursor ? isAfterCursor(input.sort, row, input.cursor) : true))
+        .sort((left, right) => compareComments(input.sort, left, right))
+        .slice(0, input.limit);
+    },
+    async countUnreadAuthorImpressions(userId, authorIds) {
+      const allowed = practiceIdsForAuthors(state, userId, authorIds);
+      const unread = unreadCommentIds(state, userId);
+      return state.comments.filter(
+        (row) =>
+          unread.has(row.id) &&
+          allowed.has(row.practiceId) &&
+          row.kind === "impression" &&
+          row.status === "published" &&
+          !row.deletedAt,
+      ).length;
+    },
+    async unreadNoticesForComments(userId, commentIds) {
+      const wanted = new Set(commentIds);
+      return state.notices
+        .filter(
+          (notice) =>
+            notice.recipientUserId === userId &&
+            notice.kind === "new_impression" &&
+            notice.readAt == null &&
+            wanted.has(notice.commentId) &&
+            publishedImpression(state, notice.commentId),
+        )
+        .map((notice) => ({ noticeId: notice.id, commentId: notice.commentId }));
+    },
+    async markNoticesRead(userId, noticeIds, readAt) {
+      const wanted = new Set(noticeIds);
+      let marked = 0;
+      for (const notice of state.notices) {
+        if (
+          notice.recipientUserId === userId &&
+          notice.kind === "new_impression" &&
+          notice.readAt == null &&
+          wanted.has(notice.id)
+        ) {
+          notice.readAt = readAt;
+          marked += 1;
+        }
+      }
+      return marked;
+    },
+    async markUnreadAuthorImpressions(userId, authorIds, readAt) {
+      const allowed = practiceIdsForAuthors(state, userId, authorIds);
+      let marked = 0;
+      for (const notice of state.notices) {
+        if (
+          notice.recipientUserId !== userId ||
+          notice.kind !== "new_impression" ||
+          notice.readAt != null ||
+          !allowed.has(notice.practiceId) ||
+          !publishedImpression(state, notice.commentId)
+        ) {
+          continue;
+        }
+        notice.readAt = readAt;
+        marked += 1;
+      }
+      return marked;
+    },
+    async markUnreadNoticeForComment(userId, commentId, readAt) {
+      const notice = state.notices.find(
+        (item) =>
+          item.recipientUserId === userId &&
+          item.commentId === commentId &&
+          item.kind === "new_impression" &&
+          item.readAt == null,
+      );
+      if (!notice || !publishedImpression(state, commentId)) return false;
+      notice.readAt = readAt;
+      return true;
     },
     async listFeed(input) {
       return state.comments
@@ -186,6 +349,15 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
             row.kind === "author_reply" &&
             row.parentId != null &&
             parents.has(row.parentId),
+        )
+        .map((row) => toFeed(row, input.viewerUserId))
+        .filter((row): row is FeedCommentRow => row != null);
+    },
+    async listRepliesForParents(input) {
+      const parents = new Set(input.parentIds);
+      return state.comments
+        .filter(
+          (row) => row.kind === "author_reply" && row.parentId != null && parents.has(row.parentId),
         )
         .map((row) => toFeed(row, input.viewerUserId))
         .filter((row): row is FeedCommentRow => row != null);
@@ -330,15 +502,22 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     async listNotices(userId) {
       return state.notices
         .filter((notice) => notice.recipientUserId === userId)
-        .map((notice) => {
-          const gate = gateFor(notice.practiceId);
+        .flatMap((notice) => {
           const comment = state.comments.find((row) => row.id === notice.commentId);
-          return {
-            ...notice,
-            practiceTitle: gate?.title ?? "Практика",
-            practiceHref: gate ? `/practice/${gate.authorSlug}/${gate.productSlug}#listener-impressions` : "/catalog",
-            preview: comment?.body.slice(0, 140) ?? "",
-          };
+          if (!comment || comment.status === "deleted" || comment.deletedAt || !comment.body) {
+            return [];
+          }
+          const gate = gateFor(notice.practiceId);
+          return [
+            {
+              ...notice,
+              practiceTitle: gate?.title ?? "Практика",
+              practiceHref: gate
+                ? `/practice/${gate.authorSlug}/${gate.productSlug}#listener-impressions`
+                : "/catalog",
+              preview: comment.body.slice(0, 140),
+            },
+          ];
         });
     },
     async markNoticeRead(userId, noticeId, readAt) {
@@ -372,8 +551,86 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     async listModerationEvents(commentId) {
       return state.events.filter((event) => event.commentId === commentId);
     },
+    async applyOwnerModeration(input) {
+      const row = state.comments.find((item) => item.id === input.commentId);
+      if (!row) return { ok: false as const, error: "not_found" as const };
+      if (input.action === "owner_delete") {
+        if (row.status === "deleted" || row.deletedAt) {
+          return { ok: false as const, error: "not_found" as const };
+        }
+        if (row.status !== "published" && row.status !== "hidden") {
+          return { ok: false as const, error: "not_found" as const };
+        }
+        const previous = row.status;
+        const event: ModerationEventRow = {
+          id: input.eventId,
+          commentId: row.id,
+          actorUserId: input.actorUserId,
+          action: "owner_delete",
+          reason: `previous:${previous}`,
+          createdAt: input.now,
+        };
+        row.status = "deleted";
+        row.deletedAt = input.now;
+        row.updatedAt = input.now;
+        state.events.push(event);
+        state.notices = state.notices.filter((notice) => notice.commentId !== row.id);
+        return { ok: true as const };
+      }
+      if (row.status !== "deleted" || !row.deletedAt) {
+        return { ok: false as const, error: "not_found" as const };
+      }
+      const lastDelete = [...state.events]
+        .reverse()
+        .find((event) => event.commentId === row.id && event.action === "owner_delete");
+      const eventAt = lastDelete ? Date.parse(lastDelete.createdAt) : Number.NaN;
+      const deletedAt = Date.parse(row.deletedAt);
+      if (
+        !lastDelete ||
+        !Number.isFinite(eventAt) ||
+        !Number.isFinite(deletedAt) ||
+        eventAt < deletedAt
+      ) {
+        return { ok: false as const, error: "not_owner_deleted" as const };
+      }
+      const previous =
+        lastDelete.reason === "previous:hidden"
+          ? "hidden"
+          : lastDelete.reason === "previous:published"
+            ? "published"
+            : null;
+      if (!previous) return { ok: false as const, error: "not_owner_deleted" as const };
+      const event: ModerationEventRow = {
+        id: input.eventId,
+        commentId: row.id,
+        actorUserId: input.actorUserId,
+        action: "owner_return",
+        reason: `status:${previous}`,
+        createdAt: input.now,
+      };
+      row.status = previous;
+      row.deletedAt = null;
+      row.updatedAt = input.now;
+      state.events.push(event);
+      return { ok: true as const, previousStatus: previous };
+    },
+    async clearCommentNotices(commentId) {
+      state.notices = state.notices.filter((notice) => notice.commentId !== commentId);
+    },
+    async actorLabels(userIds) {
+      const labels: Record<string, string> = {};
+      for (const userId of userIds) {
+        const profile = state.profiles?.[userId];
+        labels[userId] = moderationActorLabel({
+          fullName: profile?.fullName,
+          email: profile?.email,
+        });
+      }
+      return labels;
+    },
     async listModerationQueue(input) {
       const matched = state.comments.filter((row) => {
+        if (input.queue === "deleted") return row.status === "deleted";
         if (row.status === "deleted") return false;
         if (input.queue === "hidden") return row.status === "hidden";
         return (
