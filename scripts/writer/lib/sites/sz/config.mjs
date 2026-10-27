@@ -50,10 +50,13 @@ export const SZ = {
 const rangeMid = ([min, max]) => (min + max) / 2;
 export const SZ_BODY_PLAN = {
   target: [1100, 1300],
-  sectionsBefore: { count: 2, wordsEach: [260, 300] },
+  // One of the two sections is the example list (~80 words). The other is prose.
+  // Both at 260–300 would either pad the list back into a retelling or miss 1200.
+  sectionsBefore: { count: 2, wordsEach: [390, 450] },
+  exampleList: [70, 90],
   tableProse: [90, 110],
   stepsIntro: [50, 60],
-  stepText: [80, 100],
+  stepText: [100, 120],
   sectionsAfter: 0,
   specialistIntro: [50, 60],
   h2: 5,
@@ -63,14 +66,19 @@ export const SZ_BODY_PLAN = {
 };
 
 export function szBodyPlanBudget(plan = SZ_BODY_PLAN) {
-  const prose = (bound) => plan.sectionsBefore.count * plan.sectionsBefore.wordsEach[bound]
+  const proseSections = plan.exampleList ? Math.max(0, plan.sectionsBefore.count - 1) : plan.sectionsBefore.count;
+  const prose = (bound) => proseSections * plan.sectionsBefore.wordsEach[bound]
+    + (plan.exampleList?.[bound] ?? 0)
     + plan.tableProse[bound]
     + plan.stepsIntro[bound]
     + 3 * plan.stepText[bound]
     + plan.specialistIntro[bound];
   const low = prose(0) + plan.chromeWords;
   const high = prose(1) + plan.chromeWords;
-  const mid = plan.sectionsBefore.count * rangeMid(plan.sectionsBefore.wordsEach)
+  // Mid uses the same split as the bounds: one prose section plus the example list.
+  // Counting both sections at the prose midpoint would land near 1540 and miss the 1200 target.
+  const mid = proseSections * rangeMid(plan.sectionsBefore.wordsEach)
+    + (plan.exampleList ? rangeMid(plan.exampleList) : 0)
     + rangeMid(plan.tableProse)
     + rangeMid(plan.stepsIntro)
     + 3 * rangeMid(plan.stepText)

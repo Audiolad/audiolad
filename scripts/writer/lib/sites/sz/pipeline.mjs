@@ -19,7 +19,7 @@ import { applyPack, ruleConfig } from "./apply.mjs";
 import { assembleSzArticle, normalizeSzFields } from "./assemble.mjs";
 import { loadPack } from "./brief.mjs";
 import { reusedQuoteProblems } from "./pack-audit.mjs";
-import { diversifySharedFaqFields } from "./post.mjs";
+import { diversifySharedFaqFields, uniquifySharedChecklist } from "./post.mjs";
 import { checksMarkdown, compareSzChecks, runSzChecks } from "./checks.mjs";
 import { SZ } from "./config.mjs";
 import { loadSzContext } from "./context.mjs";
@@ -200,6 +200,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
     const schema = szArticleSchema();
     const items = [];
     const callIds = new Set();
+    const checklistUsed = new Set(env.unique?.checklist?.keys?.() ?? []);
     for (const brief of pack.articles) {
       state.articleSlug = brief.slug;
       const cfg = ruleConfig(brief, date, pool);
@@ -226,7 +227,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
       const repaired = repair.mode === "tiered"
-        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds, unique: env.unique })
+        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds, unique: env.unique, checklistUsed })
         : repairSzArticle({ brief, raw, build, messages, schema, repair, callRepair, state, args });
       const { result, errors, errorsBeforeRepair, repairSkipped } = repaired;
       writeJson(join(outDir, brief.slug, "fields.json"), result.fields);
@@ -240,7 +241,8 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
       });
       items.push({ brief, cfg, fields: result.fields, md: result.md, build, attempts: repaired.attempts ?? [] });
     }
-    if (diversifySharedFaqFields(items)) {
+    const checklistChanged = uniquifySharedChecklist(items, env.unique?.checklist);
+    if (diversifySharedFaqFields(items) || checklistChanged) {
       for (const item of items) {
         const rebuilt = item.build(item.fields);
         item.fields = rebuilt.fields;

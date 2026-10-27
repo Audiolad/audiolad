@@ -10,6 +10,7 @@ import { szDraftTokenBudget } from "./lib/sites/sz/metrics.mjs";
 import {
   briefForbiddenProblems,
   faqQuestionHints,
+  findPublishedQuote,
   packInstructionProblems,
   quotationsFromLibrary,
   reusedQuoteProblems,
@@ -68,6 +69,8 @@ for (const article of articles) {
 }
 
 const packFaqs = [...drafts.values()].flatMap((md) => faqQuestions(md));
+const checklistUsed = new Set(unique.checklist.keys());
+const processedBySlug = new Map();
 
 function gateOne(article, md) {
   const date = md.match(/^publishedAt: "([^"]+)"/m)?.[1] ?? "2026-10-27";
@@ -92,7 +95,8 @@ const after = [];
 const notes = [];
 for (const article of articles) {
   const raw = drafts.get(article.slug);
-  const processed = postProcessDraftMarkdown(raw, article, packFaqs);
+  const processed = postProcessDraftMarkdown(raw, article, packFaqs, { checklistUsed });
+  processedBySlug.set(article.slug, processed);
   before.push({ slug: article.slug, errors: gateOne(article, raw) });
   after.push({ slug: article.slug, errors: gateOne(article, processed.md), notes: processed.notes });
   notes.push({ slug: article.slug, notes: [...new Set(processed.notes)] });
@@ -101,7 +105,7 @@ for (const article of articles) {
 const packItems = (rows, source) => articles.map((article, index) => ({
   cfg: ruleConfig(article, "2026-10-27", pool),
   md: source === "after"
-    ? postProcessDraftMarkdown(drafts.get(article.slug), article, packFaqs).md
+    ? processedBySlug.get(article.slug).md
     : drafts.get(article.slug),
   errors: rows[index].errors,
 }));
@@ -172,6 +176,26 @@ function correctArticle(article, shared) {
   for (const field of ["facts", "commonMistakes", "sectionsHint", "extraInstructions"]) {
     if (Array.isArray(next[field])) next[field] = next[field].map((item) => (typeof item === "string" ? stem(item) : item));
   }
+  next.experts = (next.experts ?? []).map((expert) => {
+    const alreadyUsedIn = findPublishedQuote(expert.quote, quotations);
+    if (!alreadyUsedIn) return expert;
+    return {
+      ...expert,
+      quoteReuse: {
+        status: "needs-new-verbatim-quote",
+        alreadyUsedIn,
+        note: "Цитата уже напечатана на sergey-zoya.ru. sourceText равен самой цитате, в quote-library.json свободных записей нет, репозиторий Audiolad/sergey-zoya-site недоступен. Новую цитату не выдумывать: нужна дословная фраза из источника, которой нет ни в одной опубликованной статье.",
+      },
+    };
+  });
+  const pending = next.experts.filter((expert) => expert.quoteReuse).map((expert) => expert.name);
+  if (pending.length) {
+    next.quoteSupply = {
+      status: "blocked",
+      pendingExperts: pending,
+      note: "Платный прогон этой статьи нельзя начинать, пока у каждого эксперта из pendingExperts не будет новой дословной цитаты.",
+    };
+  }
   return next;
 }
 
@@ -229,6 +253,12 @@ const report = {
     forbidden: correctedAudit.forbidden.length,
     reusedQuotes: correctedAudit.reusedQuotes.length,
     leftover: correctedAudit.instructionProblems.slice(0, 12),
+    quoteSupply: correctedArticles.map((article) => ({
+      slug: article.slug,
+      status: article.quoteSupply?.status ?? "clear",
+      pendingExperts: article.quoteSupply?.pendingExperts ?? [],
+      usedIn: (article.experts ?? []).map((expert) => ({ name: expert.name, alreadyUsedIn: expert.quoteReuse?.alreadyUsedIn ?? null })),
+    })),
   },
   promptTokens: { min: Math.min(...promptTokens), max: Math.max(...promptTokens), values: Object.fromEntries(articles.map((article, index) => [article.slug, promptTokens[index]])) },
   budgets: budgets.map((budget, index) => ({

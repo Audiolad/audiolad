@@ -7,7 +7,7 @@ import {
   anchorHasBrackets, faqAnswerTypeMismatch, genericLinkAnchor, hasGluedLead, linkLeadResidue,
   danglingLeads, faqStanceMismatch, firstPersonNarration, linkAnchorMismatches, listPromiseMismatches, markdownLinks,
   paragraphSentenceCount, paragraphsTooClose, phraseInProse, sectionRetellsStory, statedListCount,
-  ungrammaticalLinks, words,
+  examplePhraseDefect, ungrammaticalLinks, words,
 } from "./rules.mjs";
 
 const LINK_FREE = /^(?:story|transition|storyEnding|invitation|question|practiceIntro|checklist|psychologyIntro|experts|specialist|faq|finalInvite|finalQuestion)(?:\.|\[|$)/;
@@ -114,6 +114,10 @@ export function draftFieldDefects(fields, article = {}) {
     add("draft-practice-name", "practiceIntro", `нужно дословное название «${practiceTitle}»`);
   }
   if (article.examplePhrases) {
+    const ready = (fields?.exampleCandidates ?? []).filter((phrase) => !examplePhraseDefect(phrase)).length;
+    if (ready >= article.examplePhrases.min && ready <= Math.max(article.examplePhrases.max, 16)) {
+      // Code installs the list. A prose retelling in the section is replaced, so it is not a draft defect.
+    } else {
     const titled = [...(fields?.sectionsBefore ?? []), ...(fields?.sectionsAfter ?? []), fields?.tableSection]
       .filter(Boolean)
       .filter((section) => /пример/iu.test(section.title ?? ""));
@@ -125,6 +129,7 @@ export function draftFieldDefects(fields, article = {}) {
     if (!titled.length) add("draft-example-count", "sections", `нет раздела с примерами фраз (${article.examplePhrases.min}–${article.examplePhrases.max})`);
     else if (listed < article.examplePhrases.min || listed > article.examplePhrases.max) {
       add("draft-example-count", "sections", `примеров ${listed}, нужно ${article.examplePhrases.min}–${article.examplePhrases.max}`);
+    }
     }
   }
   const steps = fields?.steps;

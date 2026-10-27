@@ -1722,10 +1722,11 @@ function annotateProtectedDiff(draftMd, result) {
  * A truncated cheap call is retried once with a larger cap and still counts as one try.
  * Protected paragraphs are compared with the draft: only a cut made by the repair is a fragment.
  */
-export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set(), unique = null }) {
+export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set(), unique = null, checklistUsed = null }) {
   const errorsOf = (result) => result.problems.filter((problem) => problem.severity === "error");
   const draftMd = build(raw).md;
   const gate = (value) => annotateProtectedDiff(draftMd, build(value));
+  const seenChecklist = checklistUsed ?? new Set(unique?.checklist?.keys?.() ?? []);
   const settle = (value) => {
     const deterministic = applyDeterministicSzFixes(value, {
       query: brief.query,
@@ -1735,6 +1736,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
       facts: brief.facts,
       practice: brief.practice,
       forbiddenPhrases: brief.forbiddenPhrases,
+      checklistUsed: seenChecklist,
     });
     const next = deterministic.fields;
     return { fields: next, result: gate(next), fixes: [...deterministic.fixes] };

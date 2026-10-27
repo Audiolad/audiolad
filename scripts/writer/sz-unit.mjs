@@ -34,7 +34,7 @@ import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repair
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
 import { briefForbiddenProblems, faqQuestionHints, findPublishedQuote, packInstructionProblems, quotationsFromLibrary, reusedQuoteProblems, sharedFaqHintProblems } from "./lib/sites/sz/pack-audit.mjs";
-import { assembleExampleSection, diversifySharedFaqFields, ensureBriefLinks, linkSentence, replaceGuaranteeStem, uniqueFaqQuestion } from "./lib/sites/sz/post.mjs";
+import { assembleExampleSection, diversifySharedFaqFields, ensureBriefLinks, installExampleCandidates, linkSentence, replaceGuaranteeStem, specializeBareExampleHeading, uniqueFaqQuestion, uniquifyChecklistItems } from "./lib/sites/sz/post.mjs";
 import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, englishLeftovers, examplePhraseDefect, examplePhraseStats, faqAnswerTypeMismatch, faqContradictsBody, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, listPromiseMismatches, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -1250,7 +1250,10 @@ test("prompt: main-body target is 1100–1300 and the section budgets sum inside
   assert.ok(text.includes("45–70"));
   assert.ok(text.includes("116–135"));
   assert.ok(text.includes("500–800"));
-  assert.ok(text.includes(`разделы sectionsBefore: 2 × ${SZ_BODY_PLAN.sectionsBefore.wordsEach[0]}–${SZ_BODY_PLAN.sectionsBefore.wordsEach[1]}`));
+  assert.ok(text.includes(`раздел без примеров: ${SZ_BODY_PLAN.sectionsBefore.wordsEach[0]}–${SZ_BODY_PLAN.sectionsBefore.wordsEach[1]}`));
+  assert.ok(text.includes(`список примеров: ${SZ_BODY_PLAN.exampleList[0]}–${SZ_BODY_PLAN.exampleList[1]}`));
+  assert.ok(text.includes("exampleCandidates"));
+  assert.ok(text.includes("единственное место сюжета"));
   assert.ok(text.includes(`каждый из трёх шагов: ${SZ_BODY_PLAN.stepText[0]}–${SZ_BODY_PLAN.stepText[1]}`));
   assert.ok(text.includes("три абзаца"));
   assert.ok(text.includes(`Гейт допускает ${SZ.limits.bodyH2[0]}–${SZ.limits.bodyH2[1]}`));
@@ -3737,6 +3740,43 @@ test("post: links, example list, guarantee stem and a duplicated FAQ are fixed w
     "",
   ].join("\n");
   assert.deepEqual(listPromiseMismatches(steps), []);
+  const candidates = enough.map((phrase, index) => (index === 0 ? `${phrase} сегодня утром` : phrase));
+  const host = structuredClone(raw);
+  host.exampleCandidates = [...candidates, "Я", "Я не спешу сегодня утром"];
+  host.sectionsBefore[0].title = "Примеры";
+  const named = specializeBareExampleHeading(host, "я в потоке изобилия");
+  assert.equal(named[0], "заголовок примеров уточнён запросом");
+  assert.equal(host.sectionsBefore[0].title, "Примеры: я в потоке изобилия");
+  const installed = installExampleCandidates(host, { min: 8, max: 12, query: "я в потоке изобилия" });
+  assert.match(installed.notes[0], /список примеров из кандидатов: 8/);
+  assert.match(host.sectionsBefore[0].paragraphs[0], /^- Я выбираю спокойный день сегодня утром/m);
+  assert.equal(host.sectionsBefore[0].paragraphs[0].includes("Вера"), false);
+  assert.equal(host.sectionsBefore[0].paragraphs[0].includes("не спешу"), false);
+  const kept = structuredClone(shortFields);
+  kept.exampleCandidates = enough.slice(0, 3);
+  kept.sectionsBefore[0].paragraphs = ["Вера снова берёт телефон и рассказывает сцену."];
+  const skipped = installExampleCandidates(kept, { min: 8, max: 12 });
+  assert.match(skipped.notes[0], /кандидатов примеров 3/);
+  assert.match(kept.sectionsBefore[0].paragraphs[0], /Вера/);
+  const used = new Set(["найдите тихое место."]);
+  const checklist = uniquifyChecklistItems(
+    ["Найдите тихое место.", "Наденьте наушники."],
+    { query: "медитация на деньги и успех", label: "Как войти в состояние потока", used },
+  );
+  assert.equal(checklist[0], "Найдите тихое место перед записью Как войти в состояние потока.");
+  assert.equal(checklist[0].includes("медитация на деньги и успех"), false);
+  assert.equal(checklist[1], "Наденьте наушники.");
+  assert.ok(words(checklist[0]) <= 12);
+  const blocked = uniquifyChecklistItems(
+    ["Найдите тихое место."],
+    { query: "медитация на деньги", label: "Медитация на деньги и изобилие", used: new Set(["найдите тихое место."]) },
+  );
+  assert.equal(blocked[0], "Найдите тихое место.");
+  const withCandidates = structuredClone(fields);
+  withCandidates.exampleCandidates = enough;
+  withCandidates.sectionsBefore = withCandidates.sectionsBefore.map((section) => ({ ...section, title: "План дня", paragraphs: ["Один абзац без списка."] }));
+  const defects = draftFieldDefects(withCandidates, { ...brief, examplePhrases: { min: 8, max: 12 } });
+  assert.equal(defects.some((hit) => hit.code === "draft-example-count"), false);
 });
 
 function bodyQueryCountOf(md, query) {

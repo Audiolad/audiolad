@@ -215,6 +215,119 @@ function sentencesWith(text, needles) {
   });
 }
 
+/**
+ * Bare «Примеры» collides inside a pack. The query makes the heading unique, unless the text
+ * already holds the gate maximum of that query: then the practice title is used, so query-count stays.
+ */
+export function exampleHeadingSuffix(brief, text) {
+  const query = String(brief?.query ?? "").trim();
+  const practice = String(brief?.practice?.title ?? "").trim();
+  const key = normalize(query);
+  const count = key ? normalize(text ?? "").split(key).length - 1 : 0;
+  const room = count < SZ.limits.mainQuery[1];
+  if (query && room) return query;
+  if (practice && (!key || !normalize(practice).includes(key))) return practice;
+  return query;
+}
+
+export function specializeBareExampleHeading(fields, query, practiceTitle = "") {
+  const suffix = exampleHeadingSuffix({ query, practice: { title: practiceTitle } }, JSON.stringify(fields ?? {}));
+  const notes = [];
+  if (!suffix) return notes;
+  for (const section of [...(fields?.sectionsBefore ?? []), ...(fields?.sectionsAfter ?? [])]) {
+    if (normalize(section?.title) !== "примеры") continue;
+    section.title = `Примеры: ${suffix}`;
+    notes.push(suffix === String(query ?? "").trim() ? "заголовок примеров уточнён запросом" : "заголовок примеров уточнён названием практики");
+  }
+  return notes;
+}
+
+/**
+ * 12 model candidates become the example list. Fewer than `min` valid lines leave the section alone:
+ * a short list would erase the query and the length the model did write.
+ */
+export function installExampleCandidates(fields, { min = 8, max = 12, query = "" } = {}) {
+  const raw = fields?.exampleCandidates;
+  if (!Array.isArray(raw) || !raw.length) return { fields, notes: [] };
+  const phrases = [];
+  for (const line of raw) pushPhrase(phrases, line);
+  const kept = phrases.slice(0, max);
+  if (kept.length < min) return { fields, notes: [`кандидатов примеров ${kept.length}, нужно ${min}`] };
+  const sections = [...(fields.sectionsBefore ?? []), ...(fields.sectionsAfter ?? [])];
+  let section = sections.find((item) => /пример/iu.test(item?.title ?? ""));
+  if (!section) {
+    const host = fields.sectionsBefore?.[0];
+    if (!host) return { fields, notes: [] };
+    host.title = query ? `Примеры: ${query}` : "Примеры фраз";
+    section = host;
+  }
+  section.paragraphs = [kept.map((phrase) => `- ${phrase}`).join("\n")];
+  return { fields, notes: [`список примеров из кандидатов: ${kept.length}`] };
+}
+
+export function checklistTail(label, item, maxWords = 12) {
+  const stem = String(item ?? "").trim().replace(/\.?\s*$/u, "");
+  const room = maxWords - words(stem) - 2;
+  if (room < 1) return "";
+  const parts = String(label ?? "").trim().split(/\s+/u).filter(Boolean);
+  return parts.slice(0, room).join(" ");
+}
+
+/**
+ * A checklist line that already exists on the site or earlier in the pack names the practice.
+ * The article query is not appended: the gate counts it in the whole text, and a sixth copy fails query-count.
+ */
+export function uniquifyChecklistItems(items, { label, query, used, maxWords = 12 } = {}) {
+  const seen = used ?? new Set();
+  const practice = String(label ?? "").trim();
+  const topic = String(query ?? "").trim();
+  const safeLabel = practice && (!topic || !normalize(practice).includes(normalize(topic))) ? practice : "";
+  const next = [];
+  for (const item of items ?? []) {
+    const text = String(item ?? "").trim();
+    if (!text) {
+      next.push(text);
+      continue;
+    }
+    if (!seen.has(normalize(text))) {
+      seen.add(normalize(text));
+      next.push(text);
+      continue;
+    }
+    const tail = checklistTail(safeLabel, text, maxWords);
+    const rewritten = tail ? `${text.replace(/\.?\s*$/u, "")} перед записью ${tail}.` : text;
+    if (rewritten === text || words(rewritten) > maxWords || seen.has(normalize(rewritten))) {
+      next.push(text);
+      continue;
+    }
+    seen.add(normalize(rewritten));
+    next.push(rewritten);
+  }
+  return next;
+}
+
+export function uniquifySharedChecklist(items, published) {
+  const used = new Set();
+  for (const key of published?.keys?.() ?? []) used.add(key);
+  let changed = 0;
+  for (const item of items ?? []) {
+    const list = item.fields?.checklist?.items;
+    if (!Array.isArray(list)) continue;
+    const next = uniquifyChecklistItems(list, {
+      query: item.brief?.query ?? item.query ?? "",
+      label: item.brief?.practice?.title ?? "",
+      used,
+    });
+    next.forEach((text, index) => {
+      if (text !== list[index]) {
+        list[index] = text;
+        changed += 1;
+      }
+    });
+  }
+  return changed;
+}
+
 export function assembleExampleSection(fields, { min = 8, max = 12, facts = [], keepTexts = [] } = {}) {
   if (!fields) return { fields, notes: [] };
   const phrases = harvestExamplePhrases(fields, facts).slice(0, max);
@@ -389,11 +502,27 @@ export function applyStructuralFixes(fields, options = {}) {
     next = linked.fields;
     notes.push(...linked.notes);
   }
+  notes.push(...specializeBareExampleHeading(next, options.query, options.practice?.title));
   if (options.examplePhrases) {
+    const installed = installExampleCandidates(next, { ...options.examplePhrases, query: options.query });
+    notes.push(...installed.notes);
     const keepTexts = (options.additionalQueries ?? []).map((item) => (typeof item === "string" ? item : item?.text)).filter(Boolean);
-    const built = assembleExampleSection(next, { ...options.examplePhrases, facts: options.facts ?? [], keepTexts });
+    const built = installed.notes.some((note) => note.startsWith("список примеров из кандидатов"))
+      ? { fields: next, notes: [] }
+      : assembleExampleSection(next, { ...options.examplePhrases, facts: options.facts ?? [], keepTexts });
     next = built.fields;
     notes.push(...built.notes);
+  }
+  if (Array.isArray(next.checklist?.items) && options.checklistUsed) {
+    const rewritten = uniquifyChecklistItems(next.checklist.items, {
+      query: options.query,
+      label: options.practice?.title,
+      used: options.checklistUsed,
+    });
+    if (rewritten.some((text, index) => text !== next.checklist.items[index])) {
+      next.checklist.items = rewritten;
+      notes.push("повтор пункта чек-листа уточнён запросом");
+    }
   }
   if (options.practice) {
     const titled = ensurePracticeTitle(next, options.practice);
@@ -462,7 +591,7 @@ function insertPracticeTitle(body, practice) {
  * The same structural fixes on an already assembled article, for the offline re-gate.
  * Blockquotes (expert quotes) are left byte for byte.
  */
-export function postProcessDraftMarkdown(md, brief, packFaqs = []) {
+export function postProcessDraftMarkdown(md, brief, packFaqs = [], options = {}) {
   const match = String(md).match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return { md, notes: [] };
   let fm = match[1];
@@ -503,12 +632,33 @@ export function postProcessDraftMarkdown(md, brief, packFaqs = []) {
   });
   body = insertPracticeTitle(body, brief.practice ?? {});
   if (body !== match[2]) notes.push("practice-name");
+  const exampleSuffix = exampleHeadingSuffix(brief, body);
+  if (exampleSuffix) {
+    const renamed = body.replace(/^## Примеры\s*$/m, `## Примеры: ${exampleSuffix}`);
+    if (renamed !== body) notes.push("example-heading");
+    body = renamed;
+  }
+  if (options.checklistUsed) {
+    const rewritten = uniquifyChecklistMarkdown(body, brief, options.checklistUsed);
+    if (rewritten !== body) notes.push("checklist");
+    body = rewritten;
+  }
   body = rewriteExampleSection(body, brief);
   notes.push("examples");
   body = rewriteBodyLinks(body, brief);
   notes.push("links");
   body = body.split("\n").map((line) => (/^\s*>/.test(line) || /^Источник:/.test(line) ? line : replaceGuaranteeStem(line, { phrases: brief.forbiddenPhrases }))).join("\n");
   return { md: `---\n${fm}\n---\n${body}`, notes };
+}
+
+function uniquifyChecklistMarkdown(body, brief, used) {
+  const block = body.match(/^:::checklist\n[\s\S]*?\n:::/m);
+  if (!block) return body;
+  const items = [...block[0].matchAll(/^ {2}text: (.+)$/gm)].map((item) => item[1]);
+  const next = uniquifyChecklistItems(items, { query: brief.query, label: brief.practice?.title, used });
+  let index = 0;
+  const replaced = block[0].replace(/^ {2}text: (.+)$/gm, () => `  text: ${next[index++]}`);
+  return body.replace(block[0], replaced);
 }
 
 function mainBodySlice(body) {
