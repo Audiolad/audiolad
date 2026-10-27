@@ -10,6 +10,12 @@ import { fileURLToPath } from "node:url";
 import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import {
+  AUTHOR_UNREAD_CARD_CLASS,
+  AUTHOR_UNREAD_CIRCLE_CLASS,
+  AUTHOR_UNREAD_PILL_CLASS,
+  AuthorUnreadCommentBadgeView,
+} from "../src/components/author-dashboard/AuthorUnreadCommentBadge";
 import * as ListenerCommentComposerModule from "../src/components/products/practice-page/ListenerCommentComposer";
 import * as ListenerImpressionAvatarModule from "../src/components/products/practice-page/ListenerImpressionAvatar";
 import {
@@ -2428,6 +2434,92 @@ async function testCombinedAuthorWorkspaces() {
   assert.doesNotMatch(page, /authors\[0\]/);
 }
 
+async function testOtherListenerUnreadBadge() {
+  const store = createMemoryCommentStore(state());
+  const pageQuery = {
+    authorId: null as string | null,
+    sort: "new" as const,
+    cursor: null,
+    limit: 10,
+  };
+  const own = await createImpression(store, actor(authorUser), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Свой отзыв автора на свой продукт",
+    publicName: "Анна",
+    clientRequestId: null,
+  });
+  assert.equal(own.ok, true);
+  const afterOwn = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(afterOwn.ok, true);
+  if (!afterOwn.ok) return;
+  assert.equal(afterOwn.comments.length, 1);
+  assert.equal(afterOwn.unreadCount, 0);
+  assert.equal(afterOwn.comments[0]?.unread, false);
+  assert.equal(afterOwn.comments[0]?.noticeId, null);
+
+  const foreign = await createImpression(store, actor(listener), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Отзыв другого слушателя на продукт",
+    publicName: "Мария",
+    clientRequestId: null,
+  });
+  assert.equal(foreign.ok, true);
+  if (!foreign.ok) return;
+  const unread = await countUnreadAuthorImpressions(store, actor(authorUser));
+  assert.equal(unread.ok && unread.unreadCount, 1);
+  const fresh = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "new" });
+  assert.equal(fresh.ok, true);
+  if (!fresh.ok) return;
+  assert.equal(fresh.comments.length, 1);
+  assert.equal(fresh.comments[0]?.id, foreign.comment.id);
+  assert.equal(fresh.comments[0]?.unread, true);
+  assert.equal(fresh.comments[0]?.publicName, "Мария");
+  assert.ok(fresh.comments[0]?.noticeId);
+  const history = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(history.ok, true);
+  if (!history.ok) return;
+  assert.equal(history.comments.length, 2);
+  assert.equal(history.unreadCount, 1);
+  assert.equal(
+    history.comments.find((item) => item.publicName === "Анна")?.unread,
+    false,
+  );
+
+  const quiet = renderToStaticMarkup(
+    createElement(AuthorUnreadCommentBadgeView, { count: 0, placement: "nav" }),
+  );
+  assert.equal(quiet, "");
+  const one = renderToStaticMarkup(
+    createElement(AuthorUnreadCommentBadgeView, { count: 1, placement: "nav" }),
+  );
+  assert.match(one, /data-author-unread-comments="1"/);
+  assert.match(one, />1</);
+  assert.match(one, new RegExp(AUTHOR_UNREAD_CIRCLE_CLASS.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  const two = renderToStaticMarkup(
+    createElement(AuthorUnreadCommentBadgeView, { count: 2, placement: "nav" }),
+  );
+  assert.match(two, /data-author-unread-comments="2"/);
+
+  const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
+  assert.match(nav, /useAuthorUnreadCommentCount/);
+  assert.match(nav, /AuthorUnreadCommentBadgeView/);
+  assert.match(nav, /data-author-comments-unread/);
+  assert.match(nav, /AUTHOR_UNREAD_PILL_CLASS/);
+  assert.match(read("src/components/author-dashboard/AuthorListenerFeedback.tsx"), /AUTHOR_UNREAD_CARD_CLASS/);
+  assert.match(read("src/components/author-dashboard/AuthorUnreadCommentBadge.tsx"), /bg-\[#c2410c\]/);
+  assert.match(read("src/components/author-dashboard/AuthorUnreadCommentBadge.tsx"), /bg-\[#fff3e0\]/);
+  assert.match(AUTHOR_UNREAD_PILL_CLASS, /bg-\[#fff3e0\]/);
+  assert.match(AUTHOR_UNREAD_CARD_CLASS, /bg-\[#fff3e0\]/);
+  assert.match(read("src/lib/practice-comments/service.ts"), /recipientUserId === actor\.userId/);
+  assert.doesNotMatch(
+    `${AUTHOR_UNREAD_PILL_CLASS} ${AUTHOR_UNREAD_CARD_CLASS} ${AUTHOR_UNREAD_CIRCLE_CLASS}`,
+    /—/,
+  );
+}
+
+await testOtherListenerUnreadBadge();
 await testCombinedAuthorWorkspaces();
 await testAuthorNoticeConsistency();
 await testAuthorCommentHistory();

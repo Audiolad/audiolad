@@ -5,7 +5,11 @@ import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import AuthorProjectSwitcher from "@/components/author-dashboard/AuthorProjectSwitcher";
-import AuthorUnreadCommentBadge from "@/components/author-dashboard/AuthorUnreadCommentBadge";
+import {
+  AUTHOR_UNREAD_PILL_CLASS,
+  AuthorUnreadCommentBadgeView,
+  useAuthorUnreadCommentCount,
+} from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import BusinessCommercialRequiredNotice from "@/components/author-dashboard/business/BusinessCommercialRequiredNotice";
 import { useAuthorSupportMode } from "@/components/author-support/AuthorSupportModeProvider";
 import { authorCanOpenBusiness, BUSINESS_LOCKED_NOTICE_ID } from "@/lib/author-dashboard/business-access";
@@ -197,7 +201,8 @@ function DocumentsIcon() {
 
 const AUTUMN_NAV_LABEL = "Осень звучит";
 
-function dashboardNavLinkClass(active: boolean, autumn: boolean) {
+function dashboardNavLinkClass(active: boolean, autumn: boolean, unread = false) {
+  if (!autumn && !active && unread) return AUTHOR_UNREAD_PILL_CLASS;
   if (!autumn) {
     return `inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
       active
@@ -234,6 +239,7 @@ export default function AuthorDashboardNav({
   accessStatus,
 }: AuthorDashboardNavProps) {
   const pathname = usePathname();
+  const unreadComments = useAuthorUnreadCommentCount();
   const [businessNoticeOpen, setBusinessNoticeOpen] = useState(false);
   const businessLocked = accessStatus !== undefined && !authorCanOpenBusiness(accessStatus);
   // On /author-dashboard/business the page itself renders the notice (same id), so it is always shown.
@@ -392,11 +398,16 @@ export default function AuthorDashboardNav({
             <Link
               key={item.href}
               href={item.href}
-              className={dashboardNavLinkClass(item.active, autumn)}
+              className={dashboardNavLinkClass(item.active, autumn, Boolean(item.comments) && unreadComments > 0)}
+              {...(item.comments
+                ? { "data-author-comments-unread": unreadComments > 0 ? "true" : "false" }
+                : {})}
             >
               <Icon />
               {item.label}
-              {item.comments ? <AuthorUnreadCommentBadge placement="nav" /> : null}
+              {item.comments ? (
+                <AuthorUnreadCommentBadgeView count={unreadComments} placement="nav" />
+              ) : null}
               {autumn ? (
                 <span className="hidden h-4 shrink-0 items-center rounded-full bg-[#25135c] px-1.5 text-[10px] font-semibold leading-none text-[#FFF8EA] sm:inline-flex">
                   до 18 октября
