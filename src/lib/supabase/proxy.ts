@@ -3,6 +3,7 @@ import {
   isAuthEntryRoute,
   isPrivateRoute,
 } from "@/lib/auth/routes";
+import { businessPrivateGuestRedirect } from "@/lib/business-app/proxy-policy";
 import {
   AUTHOR_SUPPORT_COOKIE_NAME,
   isAuthorSupportBlockedMutation,
@@ -210,12 +211,16 @@ async function updateSessionInner(
   if (!authenticatedUser && isPrivateRoute(pathname)) {
     const signInUrl = new URL("/auth/sign-in", request.url);
     signInUrl.searchParams.set("next", `${pathname}${search}`);
+    // Business host has no /auth/sign-in (that path 404s). Apex is unchanged.
+    const destination =
+      businessPrivateGuestRedirect(rewritePathname, pathname) ??
+      `${signInUrl.pathname}${signInUrl.search}`;
 
     return redirectWithSupabaseCookies(
       request,
       pendingCookies,
       pendingHeaders,
-      `${signInUrl.pathname}${signInUrl.search}`,
+      destination,
     );
   }
 

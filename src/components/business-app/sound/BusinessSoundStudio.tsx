@@ -8,7 +8,6 @@ import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAcce
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
-import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
 import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { BUSINESS_CONNECT_HREF, resolveBusinessAccess } from "@/lib/business-app/access";
 import {
@@ -390,16 +389,18 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           </h2>
           {showExhaustedPanel ? (
             <div className="business-app-card business-sound-limit" role="status" data-testid="biz-sound-exhausted">
-              <h3 className="text-[1.05rem] font-bold text-[var(--biz-text)]">
-                {liveAccess ? GUEST_COFFEE_COPY.exhaustedTrialTitle : GUEST_COFFEE_COPY.exhaustedTitle}
-              </h3>
-              <p className="mt-1 text-[var(--biz-text-muted)]">
-                {offerGift
-                  ? GUEST_COFFEE_COPY.exhaustedText
-                  : guest
-                    ? GUEST_COFFEE_COPY.exhaustedTrialText
-                    : GUEST_COFFEE_COPY.exhaustedMember}
-              </p>
+              {offerGift ? (
+                <p className="text-[1.05rem] font-bold text-[var(--biz-text)]">{GUEST_COFFEE_COPY.exhaustedBanner}</p>
+              ) : (
+                <>
+                  <h3 className="text-[1.05rem] font-bold text-[var(--biz-text)]">
+                    {liveAccess ? GUEST_COFFEE_COPY.exhaustedTrialTitle : GUEST_COFFEE_COPY.exhaustedTitle}
+                  </h3>
+                  <p className="mt-1 text-[var(--biz-text-muted)]">
+                    {guest ? GUEST_COFFEE_COPY.exhaustedTrialText : GUEST_COFFEE_COPY.exhaustedMember}
+                  </p>
+                </>
+              )}
               {guest && liveAccess ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-connect-cta">
@@ -409,8 +410,8 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               ) : null}
               {offerGift ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={BUSINESS_TRIAL_SIGN_UP_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-trial-cta">
-                    {BUSINESS_GIFT_CTA}
+                  <a href={BUSINESS_TRIAL_SIGN_UP_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-guest-register">
+                    {GUEST_COFFEE_COPY.exhaustedRegister}
                   </a>
                   <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring">
                     Подключить
