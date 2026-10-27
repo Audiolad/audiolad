@@ -14,10 +14,10 @@ export function testSteps(repoDir) {
 
 const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
-function exec(repoDir, command, { log = () => {}, timeoutMs = STEP_TIMEOUT_MS } = {}) {
+function exec(repoDir, command, { log = () => {}, timeoutMs = STEP_TIMEOUT_MS, env = {} } = {}) {
   const [bin, ...rest] = command.split(/\s+/);
   const started = Date.now();
-  const result = run(bin, rest, { cwd: repoDir, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" }, timeoutMs });
+  const result = run(bin, rest, { cwd: repoDir, env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1", ...env }, timeoutMs });
   const seconds = Math.round((Date.now() - started) / 1000);
   const timedOut = result.error?.code === "ETIMEDOUT" || result.signal === "SIGTERM";
   log(`  ${result.status === 0 ? "ok" : timedOut ? "TIMEOUT" : "FAIL"} ${seconds}s ${command}`);
@@ -29,7 +29,7 @@ function exec(repoDir, command, { log = () => {}, timeoutMs = STEP_TIMEOUT_MS } 
 export function runSzChecks(repoDir, { build = true, extraSteps = [], log, timeoutMs } = {}) {
   const options = { log, timeoutMs };
   const steps = [...new Set([...testSteps(repoDir), ...extraSteps])].map((command) => exec(repoDir, command, options));
-  const tsc = exec(repoDir, "npx tsc --noEmit", options);
+  const tsc = exec(repoDir, "npx tsc --noEmit", { ...options, env: { NODE_OPTIONS: "--max-old-space-size=8192" } });
   const next = build ? exec(repoDir, "npx next build", options) : null;
   return { steps, tsc, build: next };
 }

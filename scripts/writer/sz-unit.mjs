@@ -23,7 +23,7 @@ import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
 import { szCallFit, szDraftTokenBudget, szH2Count, szPackCost, szQuantityReport, szSpendAllowed } from "./lib/sites/sz/metrics.mjs";
-import { applyDeterministicSzFixes, articleDropsRequired, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
+import { applyDeterministicSzFixes, articleDropsRequired, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered as repairSzArticleTieredOptIn, repairSzPackDuplicates as repairSzPackDuplicatesOptIn, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -34,8 +34,21 @@ import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repair
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
 import { briefForbiddenProblems, faqQuestionHints, findPublishedQuote, packInstructionProblems, quotationsFromLibrary, reusedQuoteProblems, sharedFaqHintProblems } from "./lib/sites/sz/pack-audit.mjs";
-import { assembleExampleSection, diversifySharedFaqFields, ensureBriefLinks, installExampleCandidates, linkSentence, replaceGuaranteeStem, specializeBareExampleHeading, uniqueFaqQuestion, uniquifyChecklistItems } from "./lib/sites/sz/post.mjs";
+import { applyStructuralFixes, assembleExampleSection, diversifySharedFaqFields, ensureBriefLinks, installExampleCandidates, linkSentence, replaceGuaranteeStem, specializeBareExampleHeading, uniqueFaqQuestion, uniquifyChecklistItems } from "./lib/sites/sz/post.mjs";
 import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, englishLeftovers, examplePhraseDefect, examplePhraseStats, faqAnswerTypeMismatch, faqContradictsBody, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, listPromiseMismatches, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
+
+/** Existing paid-repair tests opt in. The production default stays off; pass args["paid-repair"] === false to assert that. */
+function withPaidRepair(options) {
+  const args = { ...(options.args ?? {}) };
+  if (args["no-repair"] || args.offline || args["paid-repair"] === false) return options;
+  return { ...options, args: { ...args, "paid-repair": true } };
+}
+function repairSzArticleTiered(options) {
+  return repairSzArticleTieredOptIn(withPaidRepair(options));
+}
+function repairSzPackDuplicates(options) {
+  return repairSzPackDuplicatesOptIn(withPaidRepair(options));
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -721,8 +734,11 @@ test("LESSONS.md: every bullet is a «Неверно → Верно» item, seed
 // ── hybrid repair: injected generation only, no subprocesses or network ──
 test("hybrid: strict repair options and unknown models fail before generate", () => {
   const limits = { model: SZ_DEFAULT_MODEL, maxTokens: 16000 };
-  assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "full" });
-  assert.deepEqual(szRepairOptions({ "repair-model": "openai/gpt-5.4-mini", "repair-max-tokens": "4000", "repair-mode": "targeted" }, limits), { model: "openai/gpt-5.4-mini", maxTokens: 4000, mode: "targeted" });
+  assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "none" });
+  assert.equal(szRepairOptions({ "repair-mode": "full" }, limits).mode, "none");
+  assert.equal(szRepairOptions({ "repair-mode": "targeted" }, limits).mode, "none");
+  assert.deepEqual(szRepairOptions({ "paid-repair": true, "repair-model": "openai/gpt-5.4-mini", "repair-max-tokens": "4000", "repair-mode": "targeted" }, limits), { model: "openai/gpt-5.4-mini", maxTokens: 4000, mode: "targeted" });
+  assert.throws(() => szRepairOptions({ "paid-repair": true }, limits), /paid-repair/);
   for (const bad of ["0", "32001", "1.5", "1e3", "NaN", "", "-1", "Infinity"]) assert.throws(() => szRepairOptions({ "repair-max-tokens": bad }, limits), /repair-max-tokens/);
   for (const token of ["1", "32000"]) assert.equal(szRepairOptions({ "repair-max-tokens": token }, limits).maxTokens, Number(token));
   assert.throws(() => szRepairOptions({ "repair-model": "unknown" }, limits), (error) => error.code === 1);
@@ -795,7 +811,7 @@ test("targeted: rejects lost experts before assembly; the gate rejects placehold
     let builds = 0;
     const result = repairSzArticle({
       brief, raw, build: (value) => { builds += 1; return hybridBuild(value); },
-      repair: { mode: "targeted" }, callRepair: () => patch, state,
+      repair: { mode: "targeted" }, callRepair: () => patch, state, args: { "paid-repair": true },
     });
     assert.equal(builds, 1);
     assert.deepEqual(result.result, hybridBuild(raw));
@@ -821,7 +837,7 @@ test("targeted: rejects lost experts before assembly; the gate rejects placehold
   let builds = 0;
   const fixed = repairSzArticle({
     brief, raw, build: (value) => { builds += 1; return hybridBuild(value); },
-    repair: { mode: "targeted" }, callRepair: () => ({ experts: structuredClone(valid) }), state,
+    repair: { mode: "targeted" }, callRepair: () => ({ experts: structuredClone(valid) }), state, args: { "paid-repair": true },
   });
   assert.equal(builds, 2);
   assert.deepEqual(fixed.errors, []);
@@ -942,10 +958,10 @@ test("hybrid calls: repair model/tokens, ledger, invalid patch, default full and
     };
     const model = "openai/gpt-5.4-mini";
     const base = { model, maxTokens: 800, maxRub: 45, outDir: root, runId: "test", state, schemaName: "s", generate };
-    const repair = szRepairOptions({ "repair-model": SZ_DEFAULT_MODEL, "repair-mode": "targeted", "repair-max-tokens": "4000" }, base);
+    const repair = szRepairOptions({ "paid-repair": true, "repair-model": SZ_DEFAULT_MODEL, "repair-mode": "targeted", "repair-max-tokens": "4000" }, base);
     const messages = buildSzMessages(brief, view.site);
     const callRepair = makeCaller({ ...base, ...repair });
-    const runRepair = (options = {}) => repairSzArticle({ brief, raw: hybridRaw(), build: hybridBuild, messages, repair, callRepair, state, ...options });
+    const runRepair = (options = {}) => repairSzArticle({ brief, raw: hybridRaw(), build: hybridBuild, messages, repair, callRepair, state, args: { "paid-repair": true }, ...options });
     const fixed = runRepair();
     assert.deepEqual(fixed.errors, []);
     assert.ok(fixed.errorsBeforeRepair.length > 0);
@@ -961,7 +977,12 @@ test("hybrid calls: repair model/tokens, ledger, invalid patch, default full and
     assert.match(state.warnings.at(-1), /невалидный/);
     answer = structuredClone(fields);
     const defaults = szRepairOptions({}, base);
-    const full = runRepair({ repair: defaults, callRepair: makeCaller(base) });
+    assert.equal(defaults.mode, "none");
+    const untouched = runRepair({ repair: defaults, args: { "paid-repair": false }, callRepair: () => { throw new Error("второй вызов"); } });
+    assert.ok(untouched.errors.length > 0);
+    assert.equal(untouched.repairSkipped, null);
+    const paidFull = szRepairOptions({ "paid-repair": true, "repair-mode": "full" }, base);
+    const full = runRepair({ repair: paidFull, callRepair: makeCaller(base) });
     assert.deepEqual(full.errors, []);
     assert.equal(requests.at(-1).model, model);
     assert.equal(requests.at(-1).max_tokens, 800);
@@ -1087,7 +1108,7 @@ await testAsync("branch: writer/sz-<pack> on origin stops the run before generat
     hybridPack.articles.push(second);
     const hybridBrief = join(root, "hybrid-pack.json");
     writeFileSync(hybridBrief, JSON.stringify(hybridPack));
-    const hybridArgs = (name) => ({ ...args(name), briefs: hybridBrief, "repair-model": SZ_DEFAULT_MODEL, "repair-max-tokens": "4000", "repair-mode": "targeted" });
+    const hybridArgs = (name) => ({ ...args(name), briefs: hybridBrief, "paid-repair": true, "repair-model": SZ_DEFAULT_MODEL, "repair-max-tokens": "4000", "repair-mode": "targeted" });
     let billed = 0.01;
     const generated = [];
     const fakeGenerate = (_run, call, requestFile) => {
@@ -1113,6 +1134,28 @@ await testAsync("branch: writer/sz-<pack> on origin stops the run before generat
     assert.ok(existsSync(join(root, "hybrid-exhausted/report.md")));
     await assert.rejects(runSzPipeline({ ...hybridArgs("hybrid-unknown"), "repair-model": "unknown" }, hybridLimits), (error) => error.code === 1);
     assert.equal(generated.length, 1);
+
+    const oneCalls = [];
+    const oneDraft = await runSzPipeline(
+      { ...args("one-draft"), "repair-mode": "tiered" },
+      {
+        ...limits,
+        maxRub: 30,
+        maxTokens: 100,
+        generate: (_run, call) => {
+          oneCalls.push(call);
+          return { meta: { ok: true, http: 200, cost_rub: 0.01 }, article: hybridRaw() };
+        },
+      },
+    );
+    assert.equal(oneCalls.length, 1, oneCalls.join(","));
+    assert.match(oneCalls[0], /-generate$/);
+    assert.equal(oneDraft.state.calls.length, 1);
+    assert.ok(oneDraft.state.calls.every((call) => String(call.name).endsWith("-generate")));
+    assert.equal(oneDraft.state.articles.length, 1);
+    assert.equal(oneDraft.state.articles[0].repairSkipped, "finisher");
+    assert.ok(oneDraft.state.articles[0].errors.length > 0);
+    assert.equal(oneDraft.code, 2);
 
   } finally {
     if (previousHome === undefined) delete process.env.HOME;
@@ -1408,15 +1451,15 @@ test("tiered: banned word is rewritten from the fragment, and a failed article k
 
 test("tiered defaults stay behind the flag; accepted-article cost includes failed spend", () => {
   const limits = { model: SZ_DEFAULT_MODEL, maxTokens: 16000 };
-  assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "full" });
-  const tier = szRepairOptions({ "repair-mode": "tiered", "tier-cheap-model": "openai/gpt-oss-120b", "tier-cheap-tries": "2", "tier-cheap-budget": "4", "tier-strong-budget": "6" }, limits);
+  assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "none" });
+  const tier = szRepairOptions({ "paid-repair": true, "repair-mode": "tiered", "tier-cheap-model": "openai/gpt-oss-120b", "tier-cheap-tries": "2", "tier-cheap-budget": "4", "tier-strong-budget": "6" }, limits);
   assert.equal(tier.mode, "tiered");
   assert.equal(tier.cheapModel, "openai/gpt-oss-120b");
   assert.equal(tier.strongModel, SZ_DEFAULT_MODEL);
   assert.equal(tier.cheapTries, 2);
   assert.equal(tier.cheapBudget, 4);
   assert.equal(tier.strongBudget, 6);
-  assert.throws(() => szRepairOptions({ "repair-mode": "tiered", "tier-strong-model": "unknown" }, limits), (error) => error.code === 1);
+  assert.throws(() => szRepairOptions({ "paid-repair": true, "repair-mode": "tiered", "tier-strong-model": "unknown" }, limits), (error) => error.code === 1);
   const pack = szPackCost([{ slug: "a", passed: true, costRub: 4.2 }, { slug: "b", passed: false, costRub: 19.25 }]);
   assert.deepEqual([pack.finished, pack.total, pack.finishedCostRub, pack.spentRub, pack.costPerAccepted], [1, 2, 4.2, 23.45, 23.45]);
   assert.equal(pack.costPerFinished, pack.costPerAccepted);
@@ -1462,7 +1505,7 @@ test("offline price harness compares cheap models and does not call the network"
   assert.ok(Math.abs(full.total - 62.342) < 0.001, full.total);
   const [oss, qwen, mini] = ["openai/gpt-oss-120b", "Qwen/Qwen3.6-35B-A3B", "openai/gpt-5.4-mini"].map((model) => estimateTieredArticle(prices, { draftModel: model, cheapModel: model, strongModel: "openai/gpt-5.5", ...TIERED_COST_PROFILE }));
   assert.ok(oss.total < 2 && qwen.total < mini.total && mini.total < 15);
-  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  const repair = szRepairOptions({ "paid-repair": true, "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
   assert.equal(TIERED_COST_PROFILE.strongOutputTokens, repair.strongMaxTokens);
   const strongCall = estimateCallRub(prices, "openai/gpt-5.5", TIERED_COST_PROFILE.strongPromptTokens, TIERED_COST_PROFILE.strongOutputTokens);
   assert.ok(strongCall <= repair.strongBudget, `${strongCall} > ${repair.strongBudget}`);
@@ -1544,7 +1587,7 @@ test("trim: a 172-character description is cut only at a sentence, and a danglin
 });
 
 test("tiered: default strong budget covers one fragment, and a skipped strong try does not drop later cheap fragments", () => {
-  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  const repair = szRepairOptions({ "paid-repair": true, "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
   assert.equal(repair.strongMaxTokens, 800);
   assert.equal(repair.strongBudget, 6);
   const short = structuredClone(fields);
@@ -2208,7 +2251,7 @@ test("tiered: a nine-word FAQ answer and a short total use fragment repair", () 
 });
 
 test("tiered: a short main body reaches a strong expansion when that fragment still fits", () => {
-  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  const repair = szRepairOptions({ "paid-repair": true, "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
   const raw = structuredClone(fields);
   const kept = raw.sectionsBefore[0].paragraphs.slice(0, 1);
   raw.sectionsBefore[0].paragraphs = kept;
@@ -2667,7 +2710,7 @@ test("tiered: a pathless or unaffordable strong error does not block the others"
 });
 
 test("tiered: strong reserve is the real fragment cap and is not dropped", () => {
-  const repair = szRepairOptions({ "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
+  const repair = szRepairOptions({ "paid-repair": true, "repair-mode": "tiered" }, { model: SZ_DEFAULT_MODEL, maxTokens: 16000 });
   assert.equal(repair.strongModel, SZ_DEFAULT_MODEL);
   assert.equal(repair.strongBudget, 6);
   assert.equal(repair.strongMaxTokens, 800);
@@ -3784,6 +3827,96 @@ function bodyQueryCountOf(md, query) {
   const nq = normalize(query);
   return nq ? normalize(body).split(nq).length - 1 : 0;
 }
+
+test("one draft: tiered repair does not call the model while gate errors remain", () => {
+  const raw = hybridRaw();
+  let calls = 0;
+  const state = { spentRub: 0, calls: [], warnings: [] };
+  const blocked = repairSzArticleTieredOptIn({
+    brief, raw, build: hybridBuild, repair: tierRepair(), state,
+    callTier: () => { calls += 1; return { description: fields.description }; },
+  });
+  assert.equal(calls, 0);
+  assert.equal(state.calls.length, 0);
+  assert.ok(blocked.errors.length > 0);
+  assert.equal(blocked.repairSkipped, "finisher");
+  const short = structuredClone(fields);
+  short.sectionsBefore[0].paragraphs.splice(2, 4);
+  const length = repairSzArticleTieredOptIn({
+    brief, raw: short, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return { paragraphs: fields.sectionsBefore[0].paragraphs.slice(0, 2) }; },
+  });
+  assert.equal(calls, 0);
+  assert.equal(length.repairSkipped, "finisher");
+  assert.ok(length.errors.some((error) => error.code === "body-length"), length.errors.map((error) => error.code).join(","));
+  const paid = repairSzArticleTieredOptIn({
+    brief, raw, build: hybridBuild, repair: tierRepair(), args: { "paid-repair": true },
+    state: { spentRub: 0, calls: [], warnings: [] },
+    callTier: () => { calls += 1; return { description: fields.description }; },
+  });
+  assert.equal(calls, 1);
+  assert.equal(paid.errors.length, 0);
+});
+
+test("example list keeps the extra query from affirmacii-na-izobilie-i-procvetanie", () => {
+  const pack = readJson(join(fixtures, "control-1415-corrected/affirmacii-na-izobilie-i-procvetanie.json"));
+  const article = pack.articles[0];
+  const phrase = article.additionalQueries[0].text;
+  assert.equal(phrase, "аффирмации на изобилие слушать");
+  assert.ok(article.examplePhrases);
+  const candidates = [
+    "Я выбираю спокойный день",
+    "Я остаюсь при своём решении сегодня",
+    "Я называю один следующий шаг",
+    "Я замечаю то, что уже есть",
+    "Я оставляю место для паузы",
+    "Я говорю о своём шаге спокойно",
+    "Я возвращаюсь к выбранной сфере",
+    "Я держу внимание на одном действии",
+  ];
+  const paragraphs = [
+    "Первый абзац говорит о паузе и не содержит дополнительный запрос.",
+    "Утро начинается спокойно. По утрам удобно включить аффирмации на изобилие слушать и оставить их фоном.",
+  ];
+  const host = {
+    exampleCandidates: candidates,
+    sectionsBefore: [{ title: "Примеры: аффирмации на изобилие и процветание", paragraphs: [...paragraphs] }],
+  };
+  const installed = installExampleCandidates(host, {
+    min: article.examplePhrases.min,
+    max: article.examplePhrases.max,
+    query: article.query,
+    keepTexts: [phrase],
+  });
+  assert.match(installed.notes[0], /список примеров из кандидатов: 8/);
+  const blob = host.sectionsBefore[0].paragraphs.join("\n");
+  assert.match(blob, /^- Я выбираю спокойный день/m);
+  assert.match(blob, /аффирмации на изобилие слушать/);
+  assert.equal(phraseInProse(blob, phrase), true);
+  const again = {
+    exampleCandidates: candidates,
+    sectionsBefore: [{ title: "План дня", paragraphs: [...paragraphs] }],
+  };
+  const structural = applyStructuralFixes(again, {
+    query: article.query,
+    examplePhrases: article.examplePhrases,
+    additionalQueries: article.additionalQueries,
+  });
+  const kept = structural.fields.sectionsBefore[0].paragraphs.join("\n");
+  assert.match(structural.notes.join(" "), /список примеров из кандидатов/);
+  assert.match(kept, /аффирмации на изобилие слушать/);
+  assert.equal(phraseInProse(kept, phrase), true);
+  const prompt = buildSzMessages({
+    ...brief,
+    query: article.query,
+    additionalQueries: article.additionalQueries.map((item) => item.text),
+    examplePhrases: article.examplePhrases,
+  }, view.site).map((message) => message.content).join("\n");
+  const slot = prompt.split("\n").find((line) => line.includes(`«${phrase}»`));
+  assert.ok(slot, phrase);
+  assert.match(slot, /sectionsBefore\[1\]/);
+  assert.doesNotMatch(slot, /sectionsBefore\[0\]/);
+});
 
 rmSync(site, { recursive: true, force: true });
 console.log(`writer sz-unit: ${count} tests ok`);

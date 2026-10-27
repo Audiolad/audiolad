@@ -1,6 +1,7 @@
-// Tiered repair (--repair-mode tiered only). Deterministic fixes, then one failing
-// fragment at a time on the cheap model, then GPT-5.5 for that fragment after N
-// misses. The full article is never the request. The full gate runs after each apply.
+// Tiered repair (--paid-repair --repair-mode tiered only). Deterministic fixes always run.
+// The model loop (cheap fragment, then GPT-5.5 after N misses, including a truncated retry)
+// runs only when args["paid-repair"] is set. The full article is never the request.
+// The full gate runs after each apply. Without the flag, remaining errors are for the finisher.
 import { BudgetError } from "../../call.mjs";
 import { estimatePromptTokens, worstCaseRub } from "../../cost.mjs";
 import { writerCallId } from "../../moscow.mjs";
@@ -228,6 +229,11 @@ export function fragmentBanned(value, brief) {
   return (brief?.forbiddenPhrases ?? []).some((phrase) => phrase && norm.includes(normalize(phrase)));
 }
 
+/** Paid Cloud.ru repair. Off unless the run passes `--paid-repair`. `--no-repair` and `--offline` still win. */
+export function modelRepairAllowed(args = {}) {
+  return args["paid-repair"] === true && !args.offline && !args["no-repair"];
+}
+
 /** Programmatic fixes. Returns the same fields when nothing was safe to change. */
 export function applyDeterministicSzFixes(fields, options = {}) {
   const query = options.query ?? "";
@@ -297,6 +303,7 @@ export function applyDeterministicSzFixes(fields, options = {}) {
     links,
     titles: options.titles,
     examplePhrases: options.examplePhrases,
+    additionalQueries: options.additionalQueries,
     facts: options.facts,
     practice: options.practice,
     query,
@@ -1750,7 +1757,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const cheapTries = new Map();
   const strongTries = new Map();
   const descriptionDrafts = new Map();
-  const allowModel = !args.offline && !args["no-repair"];
+  const allowModel = modelRepairAllowed(args);
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
     const failures = bindQualityPaths(fields, brief, locatePhraseFailures(fields, szQuantityReport(fields, errorsOf(result)).failures));
@@ -1882,7 +1889,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     result,
     errors,
     errorsBeforeRepair,
-    repairSkipped: errors.length ? errors.map((error) => `${error.field}: ${error.message}`).join("; ") : null,
+    repairSkipped: errors.length ? (allowModel ? errors.map((error) => `${error.field}: ${error.message}`).join("; ") : "finisher") : null,
     passed: errors.length === 0,
     deterministic: deterministic.fixes,
     attempts,
@@ -1911,7 +1918,7 @@ function cheapSpent(items, state, slug = null) {
 }
 
 export function repairSzPackDuplicates({ items, repair, callTier, state, args = {}, callIds = new Set() }) {
-  if (args.offline || args["no-repair"]) return;
+  if (!modelRepairAllowed(args)) return;
   const seen = new Set();
   const packCap = repair.cheapBudget * Math.max(items.length, 1);
   for (const item of items) {

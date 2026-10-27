@@ -245,8 +245,9 @@ export function specializeBareExampleHeading(fields, query, practiceTitle = "") 
 /**
  * 12 model candidates become the example list. Fewer than `min` valid lines leave the section alone:
  * a short list would erase the query and the length the model did write.
+ * `keepTexts` sentences (additional queries) stay after the list. A full list must not drop them.
  */
-export function installExampleCandidates(fields, { min = 8, max = 12, query = "" } = {}) {
+export function installExampleCandidates(fields, { min = 8, max = 12, query = "", keepTexts = [] } = {}) {
   const raw = fields?.exampleCandidates;
   if (!Array.isArray(raw) || !raw.length) return { fields, notes: [] };
   const phrases = [];
@@ -261,7 +262,8 @@ export function installExampleCandidates(fields, { min = 8, max = 12, query = ""
     host.title = query ? `Примеры: ${query}` : "Примеры фраз";
     section = host;
   }
-  section.paragraphs = [kept.map((phrase) => `- ${phrase}`).join("\n")];
+  const keptSentences = (section.paragraphs ?? []).flatMap((paragraph) => sentencesWith(paragraph, keepTexts));
+  section.paragraphs = [[...kept.map((phrase) => `- ${phrase}`), ...keptSentences].join("\n")];
   return { fields, notes: [`список примеров из кандидатов: ${kept.length}`] };
 }
 
@@ -504,9 +506,9 @@ export function applyStructuralFixes(fields, options = {}) {
   }
   notes.push(...specializeBareExampleHeading(next, options.query, options.practice?.title));
   if (options.examplePhrases) {
-    const installed = installExampleCandidates(next, { ...options.examplePhrases, query: options.query });
-    notes.push(...installed.notes);
     const keepTexts = (options.additionalQueries ?? []).map((item) => (typeof item === "string" ? item : item?.text)).filter(Boolean);
+    const installed = installExampleCandidates(next, { ...options.examplePhrases, query: options.query, keepTexts });
+    notes.push(...installed.notes);
     const built = installed.notes.some((note) => note.startsWith("список примеров из кандидатов"))
       ? { fields: next, notes: [] }
       : assembleExampleSection(next, { ...options.examplePhrases, facts: options.facts ?? [], keepTexts });

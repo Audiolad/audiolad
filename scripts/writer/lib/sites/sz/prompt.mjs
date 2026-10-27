@@ -83,14 +83,35 @@ const QUERY_SLOTS = [
   "одно предложение specialist.intro",
 ];
 
+function queryPhrase(phrase) {
+  if (typeof phrase === "string") return phrase.trim();
+  return String(phrase?.text ?? phrase?.query ?? "").trim();
+}
+
+/** When sectionsBefore[0] is the example list, no additional query is placed there: install replaces those paragraphs. */
+function querySlotsFor(article) {
+  if (!article.examplePhrases) return QUERY_SLOTS;
+  return [
+    "второе предложение второго абзаца sectionsBefore[1] (раздел-проза, не список примеров)",
+    "одно предложение paragraphsBefore таблицы",
+    "одно предложение текста первого шага",
+    "одно предложение текста второго шага",
+    "одно предложение текста третьего шага",
+    "одно предложение specialist.intro",
+  ];
+}
+
 function querySlotLines(article) {
   const forms = article.additionalQueryForms ?? {};
+  const slots = querySlotsFor(article);
   return (article.additionalQueries ?? []).map((phrase, index) => {
-    const where = QUERY_SLOTS[index] ?? `отдельное предложение основной части (слот ${index + 1})`;
-    const allowed = forms[phrase] ?? [];
+    const text = queryPhrase(phrase);
+    if (!text) return "";
+    const where = slots[index] ?? `отдельное предложение основной части вне раздела примеров (слот ${index + 1})`;
+    const allowed = forms[text] ?? forms[phrase] ?? [];
     const variant = allowed.length ? ` Допустима только форма из брифа: ${allowed.map((form) => `«${form}»`).join(", ")}.` : " Другой падеж и пересказ не подходят.";
-    return `- «${phrase}» – ${where}. Дословно, отдельным вхождением, не внутри слова и не текстом анкора.${variant}`;
-  }).join("\n");
+    return `- «${text}» – ${where}. Дословно, отдельным вхождением, не внутри слова и не текстом анкора.${variant}`;
+  }).filter(Boolean).join("\n");
 }
 
 export function buildSzMessages(article, site, { avoid, siblings = new Map() } = {}) {
@@ -146,7 +167,7 @@ export function buildSzMessages(article, site, { avoid, siblings = new Map() } =
     `- H2 в этой части: ${plan.h2} (ровно ${plan.sectionsBefore.count} раздела + таблица + «Три шага» + «Когда стоит обратиться к специалисту»). Гейт допускает ${L.bodyH2[0]}–${L.bodyH2[1]}. Семь и больше – ошибка.`,
     "ОБЯЗАТЕЛЬНЫЙ ПЛАН H2 (не заменяй пункт другим разделом):",
     article.examplePhrases
-      ? `- sectionsBefore[0].title начинается с «Примеры» и содержит запрос статьи, это не одно слово «Примеры». Внутри маркированный список из ${article.examplePhrases.min}–${article.examplePhrases.max} фраз. Этот H2 нельзя заменить разделом вроде «План дня». Каждая фраза – настоящее время, без «не» и без страха, не короче 3 слов.`
+      ? `- sectionsBefore[0].title начинается с «Примеры» и содержит запрос статьи, это не одно слово «Примеры». Внутри маркированный список из ${article.examplePhrases.min}–${article.examplePhrases.max} фраз. Этот H2 нельзя заменить разделом вроде «План дня». Каждая фраза – настоящее время, без «не» и без страха, не короче 3 слов. Дополнительный запрос в этот раздел не пиши: sectionsBefore[0] – только список, слот запроса – sectionsBefore[1] или другой слот ниже.`
       : "- sectionsBefore[0] следует идее брифа. Отдельный список примеров гейт не требует.",
     `- ПЛАН ОДНОГО ВЫЗОВА, сумма около ${Math.round(budget.mid)}: один раздел-проза ${plan.sectionsBefore.wordsEach[0]}–${plan.sectionsBefore.wordsEach[1]} слов; список примеров ${plan.exampleList[0]}–${plan.exampleList[1]}; проза таблицы ${plan.tableProse[0]}–${plan.tableProse[1]}; вступление шагов ${plan.stepsIntro[0]}–${plan.stepsIntro[1]}; каждый шаг ${plan.stepText[0]}–${plan.stepText[1]}; specialist.intro ${plan.specialistIntro[0]}–${plan.specialistIntro[1]}. Вместе со служебными ~${plan.chromeWords} словами это около 1200 и должно попасть в ${L.mainBody[0]}–${L.mainBody[1]} до отправки, без второго черновика.`,
     `- Вся статья с FAQ: ${L.total[0]}–${L.total[1]} слов.`,
@@ -155,7 +176,7 @@ export function buildSzMessages(article, site, { avoid, siblings = new Map() } =
     "ССЫЛКИ: только список «ОБЯЗАТЕЛЬНЫЕ ССЫЛКИ» выше, все slug из него, формат [анкор](/s/slug). По одной в разных разделах основной части. Не в историю и не в цитату. Не «Подробнее: [материал](/s/…)» и не две склейки в один абзац. Не «можно использовать и [анкор] через …»: ссылка стоит внутри грамматичной фразы.",
     article.additionalQueries?.length ? `ДОПОЛНИТЕЛЬНЫЕ ЗАПРОСЫ: все ${article.additionalQueries.length}. Каждый вплетён в обычное предложение о содержании, дословно, с пробелом или знаком препинания по краям, не внутри другого слова, не текстом анкора и не только в FAQ. Не вставляй мета-обороты «запрос «…»», «как в теме «…»» и «Вопрос: «…»». Пересказ и другая форма слова не считаются.${Object.keys(article.additionalQueryForms ?? {}).length ? " Форма из брифа – единственное допустимое отклонение." : ""} Ноль пропусков – иначе черновик не готов:\n${querySlotLines(article)}` : "",
     article.examplePhrases
-      ? `ПРИМЕРЫ ФРАЗ: поле exampleCandidates – ровно 12 отдельных строк, не абзац. Каждая – настоящее время, позитивная, не короче 3 слов, без «не», без имени героини. Сборка оставит от ${article.examplePhrases.min} до ${article.examplePhrases.max} годных и поставит их маркированным списком. Раздел: H2 со словом «примеры» и запросом, не голое «Примеры». В paragraphs этого раздела не пересказывай историю: список вставит код. Если годных строк меньше ${article.examplePhrases.min}, черновик не готов. Не пиши «Ниже – простые примеры» и «Вот примеры», если сразу после нет списка. Не оставляй английские заметки (Wait, TODO, must not include).`
+      ? `ПРИМЕРЫ ФРАЗ: поле exampleCandidates – ровно 12 отдельных строк, не абзац. Каждая – настоящее время, позитивная, не короче 3 слов, без «не», без имени героини. Сборка оставит от ${article.examplePhrases.min} до ${article.examplePhrases.max} годных и поставит их маркированным списком. Раздел: H2 со словом «примеры» и запросом, не голое «Примеры». В paragraphs этого раздела не пересказывай историю и не ставь дополнительный запрос: список вставит код. Если предложение с дополнительным запросом всё же окажется в абзаце этого раздела, сборка сохранит его рядом со списком. Если годных строк меньше ${article.examplePhrases.min}, черновик не готов. Не пиши «Ниже – простые примеры» и «Вот примеры», если сразу после нет списка. Не оставляй английские заметки (Wait, TODO, must not include).`
       : "ПРИМЕРЫ ФРАЗ: в брифе диапазон не задан, гейт список не считает. Поле exampleCandidates верни пустым массивом. Не добавляй отдельный H2 «примеры» только ради числа. Если примеры всё же есть, каждая фраза – настоящее время, позитивная, не короче 3 слов, без «не». Не оставляй английские заметки (Wait, TODO, must not include).",
     "",
     "СВЕРКА ПЕРЕД ОТПРАВКОЙ:",

@@ -48,7 +48,7 @@ mini ≈ 16,0 ₽. Оценка не знает, пройдёт ли модел�
 ```bash
 # 1. gpt-oss. Ожидание без сильного фрагмента ≈ 0,9 ₽, с одним ≈ 6,0 ₽. Потолок 12 ₽.
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model openai/gpt-oss-120b --repair-mode tiered \
+  --model openai/gpt-oss-120b --paid-repair --repair-mode tiered \
   --tier-cheap-model openai/gpt-oss-120b --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 4 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
@@ -56,7 +56,7 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 
 # 2. Qwen. Ожидание ≈ 8,8 ₽, с одним сильным фрагментом ≈ 13,9 ₽. Потолок 18 ₽.
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model Qwen/Qwen3.6-35B-A3B --repair-mode tiered \
+  --model Qwen/Qwen3.6-35B-A3B --paid-repair --repair-mode tiered \
   --tier-cheap-model Qwen/Qwen3.6-35B-A3B --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 6 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
@@ -64,7 +64,7 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 
 # 3. gpt-5.4-mini. Ожидание ≈ 10,8 ₽, с сильным фрагментом ≈ 16,0 ₽. Потолок 18 ₽.
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model openai/gpt-5.4-mini --repair-mode tiered \
+  --model openai/gpt-5.4-mini --paid-repair --repair-mode tiered \
   --tier-cheap-model openai/gpt-5.4-mini --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 8 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
@@ -79,8 +79,7 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 смотреть `стоимость готовой статьи` и `Цена одной готовой статьи`: туда не
 входят статьи, которые гейт не пропустил.
 
-Дефолты продакшена не меняются: без этих флагов `--site sz` по-прежнему
-`openai/gpt-5.5` и `--repair-mode full`.
+Без `--paid-repair` `--site sz` пишет один черновик моделью по умолчанию `openai/gpt-5.5` и repair не вызывает. Команды выше платные, поэтому в них есть `--paid-repair`.
 
 ## Повторный прогон одной статьи mini после правок 26.10
 
@@ -112,12 +111,11 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 
 ```bash
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model openai/gpt-5.4-mini --repair-mode tiered \
+  --model openai/gpt-5.4-mini --paid-repair --repair-mode tiered \
   --tier-cheap-model openai/gpt-5.4-mini --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 8 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
   --max-rub 12
 ```
 
-Дефолты продакшена и для этого прогона не меняются: без флагов `--site sz`
-по-прежнему `openai/gpt-5.5` и `--repair-mode full`.
+Без `--paid-repair` прогон sz делает один черновик и не вызывает repair. Модель по умолчанию для `--site sz` по-прежнему `openai/gpt-5.5`. Этот контрольный прогон платный, поэтому в команде стоят оба флага: `--paid-repair --repair-mode tiered`.
