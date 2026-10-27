@@ -172,6 +172,36 @@ for (const profile of all()) {
   assert.equal(guestCoffeeAtmosphereMeta(e), "10 треков · из 1 альбома");
 }
 
+// Automatic instrumental filter. The curated shelf omits the vocal map and is unchanged.
+{
+  const profile: GuestCoffeeProfile = { character: "cozy", direction: "jazz", daypart: "day" };
+  const album = (id: string, audioItemId: string): GuestCoffeePlaylist => ({
+    id, authorSlug: "jazz-relax", productSlug: id, title: id, authorName: null, href: "/x",
+    coverUrl: null, coverImage: null, updatedAt: null, format: null, direction: "jazz",
+    dayparts: ["day"], characters: ["cozy"],
+    tracks: [{ audioItemId, title: id, durationSeconds: 180 }],
+  });
+  const curated = assembleGuestCoffeeAtmosphere([album("vocal", "track-vocal"), album("v2", "track-v2")], profile);
+  assert.deepEqual(curated?.tracks.map((t) => t.audioItemId), ["track-vocal", "track-v2"]);
+  const vocalFeature = (value: string, source: string, status: string) => ({ value, source, status });
+  const guarded = assembleGuestCoffeeAtmosphere(
+    [album("vocal", "track-vocal"), album("v1", "track-v1"), album("v2", "track-v2"), album("manual", "track-manual")],
+    profile,
+    null,
+    new Map([
+      ["track-vocal", vocalFeature("vocal", "analyzer:vocal.detector:panns-voice:2", "candidate")],
+      ["track-v1", vocalFeature("instrumental", "analyzer:vocal.detector:panns-voice:1", "candidate")],
+      ["track-v2", vocalFeature("instrumental", "analyzer:vocal.detector:panns-voice:2", "candidate")],
+      ["track-manual", vocalFeature("instrumental", "manual:4", "manual")],
+    ]),
+  );
+  assert.deepEqual(guarded?.tracks.map((t) => t.audioItemId), ["track-v2", "track-manual"]);
+  const nature = assembleGuestCoffeeAtmosphere([album("nature", "track-nature")], profile, null, new Map([
+    ["track-nature", { value: null, source: "analyzer:vocal.detector:panns-voice:2", status: "unknown" }],
+  ]));
+  assert.equal(nature, null);
+}
+
 // ---------------------------------------------------------------- formatting
 assert.equal(guestCoffeeAtmosphereName({ character: "evening", direction: "melodic", daypart: "allday" }), "Вечерняя кофейня · Мелодичная музыка · Весь день");
 assert.deepEqual([1, 2, 5, 11, 21, 22, 112].map(guestCoffeeTracksWord), ["трек", "трека", "треков", "треков", "трек", "трека", "треков"]);

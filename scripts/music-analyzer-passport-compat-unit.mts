@@ -249,7 +249,7 @@ const realShapeHtml = renderPassport(savedShape);
 for (const [title, value] of [["Инструменты", "brushes"], ["Характер и настроение", "warm"], ["Характер звучания", "intimate"]]) {
   assert.match(realShapeHtml, new RegExp(`${title}</h3>[\\s\\S]*?${value}[\\s\\S]*?</section>`));
 }
-assert.match(realShapeHtml, /Вокал \/ речь<\/dt><dd[^>]*>не определено/);
+assert.match(realShapeHtml, /Вокал \/ речь<\/dt><dd[^>]*>Не определено/);
 assert.doesNotMatch(realShapeHtml, /смешанный/);
 const ownerCorrection = applyOverrides(safeShape, [{ id: "fixture", patch: { vocal_role: "instrumental" } }]);
 assert.match(renderPassport(savedShape, ownerCorrection), /Вокал \/ речь<\/dt><dd[^>]*>инструментал/);

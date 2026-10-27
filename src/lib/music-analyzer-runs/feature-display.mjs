@@ -1,4 +1,4 @@
-import { MUSIC_ANALYZER_ENERGY_PUBLIC } from "./features.mjs";
+import { MUSIC_ANALYZER_ENERGY_PUBLIC, VOCAL_UNKNOWN_LABEL } from "./features.mjs";
 
 /** @param {import('./features.mjs').FeatureSet} set */
 export function featureDisplayRows(set) {
@@ -10,9 +10,9 @@ export function featureDisplayRows(set) {
     const existingDynamics = key === "dynamic_spread_db" && f.dynamic_spread_db?.status !== "manual" && f.dynamics_db?.value != null;
     const item = existingDynamics ? f.dynamics_db : f[key];
     const displayLabel = existingDynamics ? "Динамика (P95–P5)" : label;
-    let value = "не определено";
+    let value = key === "vocal_role" ? VOCAL_UNKNOWN_LABEL : "не определено";
     if (typeof item?.value === "number") value = `${Number(item.value.toFixed(1))}${key === "energy_0_100" ? " / 100" : key === "rhythm_salience" ? " / 1" : key === "loudness_lufs" ? " LUFS" : key === "true_peak_dbtp" ? " dBTP" : key === "loudness_range_lu" ? " LU" : " дБ"}`;
-    else if (typeof item?.value === "string") value = words[item.value] ?? item.value;
+    else if (typeof item?.value === "string") value = key === "vocal_role" && item.value === "unknown" ? VOCAL_UNKNOWN_LABEL : (words[item.value] ?? item.value);
     if (key === "rhythm_salience" && (f.rhythm_state?.value === "uncertain" || f.tempo?.value?.rhythm === "uncertain")) value += " · ритм неопределён";
     return { key, label: displayLabel, value, status: item?.status === "manual" ? "ручная поправка" : item?.status === "candidate" ? "оценка" : item?.status === "measured" ? "измерено" : "нет данных",
       confidence: item?.confidence == null ? "уверенность не калибрована" : `уверенность ${Math.round(item.confidence * 100)}%`,

@@ -131,6 +131,12 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
     model_id: typeof record(n.analysis).embedding_model === "string" ? record(n.analysis).embedding_model : null, features };
 }
 
+const VOICE_RULES = new Set(["panns-voice:1", "panns-voice:2"]);
+const VOICE_MODEL = "Cnn14_mAP=0.431.pth";
+/** Shown when the detector withholds a label. The value itself stays null. */
+export const VOCAL_UNKNOWN_LABEL = "Не определено";
+export const VOCAL_NATURE_REASON = "Похоже на природный шум, не музыка: не инструментал.";
+
 /** CLAP averages are similarities, never probabilities. Fail closed on ties and
  * missing alternatives. These initial gates need listening calibration.
  * @param {Record<string, any>} n @param {string} version @returns {Feature}
@@ -138,15 +144,20 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
 function conservativeVocal(n, version) {
   // Versioned AudioSet evidence takes precedence over legacy CLAP similarities.
   // An attempted detector failure must remain unknown, never fall back to CLAP.
+  // v1 had no veto or nature rule: never accept "instrumental" from v1.
   const detector = record(record(n.vocal).detector);
   if (Object.hasOwn(record(n.vocal), "detector")) {
-    const valid = detector.rule === "panns-voice:1" && detector.status === "ok" && detector.model === "Cnn14_mAP=0.431.pth"
+    const rule = typeof detector.rule === "string" ? detector.rule : "";
+    const blocked = detector.reason === "non_music_nature" || detector.reason === "vocal_veto" || detector.non_music === true;
+    const valid = !blocked && VOICE_RULES.has(rule) && detector.status === "ok" && detector.model === VOICE_MODEL
       && detector.confidence_label === "medium" && Array.isArray(detector.windows) && detector.windows.length > 0
       && ["instrumental", "vocal", "spoken", "mixed"].includes(detector.type)
-      && record(n.vocal).type === detector.type;
-    return fact(valid ? detector.type : null, { source: "analyzer:vocal.detector:panns-voice:1", model_version: detector.model ?? version,
+      && record(n.vocal).type === detector.type
+      && !(rule === "panns-voice:1" && detector.type === "instrumental");
+    return fact(valid ? detector.type : null, { source: `analyzer:vocal.detector:${VOICE_RULES.has(rule) ? rule : "invalid"}`, model_version: detector.model ?? version,
       reason: valid ? "AudioSet, CPU: подтверждающие окна речи/пения. Пороги предварительные; это не калиброванная вероятность."
-        : "Детектор голоса не дал уверенного результата или недоступен." });
+        : detector.reason === "non_music_nature" ? VOCAL_NATURE_REASON
+          : "Детектор голоса не дал уверенного результата или недоступен." });
   }
   const scores = record(record(n.vocal).scores);
   const roles = ["instrumental", "vocal", "spoken_word", "mixed"];

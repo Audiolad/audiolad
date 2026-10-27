@@ -138,7 +138,7 @@ test("UI различает оценку, измерение и неизвест
   const internal = buildFeatures({}, { energy_0_100: 42 });
   assert.equal(publicMusicAnalyzerFeatures(internal).features.energy_0_100.value, 42);
   assert.equal(readFeatures({ analysis_features_v1: internal }).features.energy_0_100.value, 42);
-  assert.equal(rows.find(r => r.key === "vocal_role").value, "не определено");
+  assert.equal(rows.find(r => r.key === "vocal_role").value, "Не определено");
   assert.equal(rows.find(r => r.key === "loudness_lufs").status, "измерено");
 });
 
