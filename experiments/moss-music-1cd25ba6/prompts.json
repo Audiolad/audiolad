@@ -1,0 +1,44 @@
+{
+  "seed": 0,
+  "do_sample": false,
+  "temperature": 0,
+  "note": "Промпты на английском: карточка модели указывает языки en и zh. Ответы в отчёт переносятся как есть, таблица сравнения — на русском.",
+  "prompts": [
+    {
+      "id": "describe",
+      "title_ru": "Описание",
+      "max_new_tokens": 384,
+      "text": "Describe this music track. Cover style, mood, prominent instruments, whether a human voice is present, tempo, and energy. If there are no lyrics, say so. Do not invent a song title or lyrics."
+    },
+    {
+      "id": "voice",
+      "title_ru": "Голос",
+      "max_new_tokens": 96,
+      "text": "Is there a human voice, singing, or speech in this audio? The first line must be exactly one label: instrumental, vocal, or speech. instrumental = no human voice. vocal = singing or a singing-like human voice. speech = spoken words without singing. The second line must be: confidence: <number from 0 to 1>. Then one sentence of evidence. Do not transcribe lyrics."
+    },
+    {
+      "id": "mood",
+      "title_ru": "Настроение",
+      "max_new_tokens": 128,
+      "text": "What is the mood of this track? Give up to five short mood words, then one sentence. If the mood is ambiguous, say so."
+    },
+    {
+      "id": "instruments",
+      "title_ru": "Инструменты",
+      "max_new_tokens": 160,
+      "text": "List the prominent instruments you hear, most prominent first. If you are unsure about an instrument, mark it as unsure. Do not list a human voice as an instrument."
+    },
+    {
+      "id": "genre",
+      "title_ru": "Жанр",
+      "max_new_tokens": 128,
+      "text": "What are the genre and style of this track? Give up to three labels. Say explicitly whether the audio supports dark jazz, ambient, or spa / relaxation music. If evidence is weak, say the label is uncertain."
+    },
+    {
+      "id": "tempo_energy",
+      "title_ru": "Темп и энергия",
+      "max_new_tokens": 128,
+      "text": "Describe tempo and energy. If you estimate BPM, give one number and label it as an estimate. Describe energy as low, medium, or high relative to a calm instrumental track."
+    }
+  ]
+}
