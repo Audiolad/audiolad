@@ -29,7 +29,7 @@ function EditorForm({ graduate, authors, products }: { graduate?: SchoolGraduate
           </label>)}
         </div>
         <p className="text-sm text-[#796ba0]">Показываются по порядку: продукт 1, затем продукт 2. Для перестановки поменяйте выбор в слотах.</p>
-        <label className="flex min-h-11 items-center gap-3 text-sm"><input name="enabled" type="checkbox" defaultChecked={graduate.enabled} />Показывать выпускника</label>
+        <label className="flex min-h-11 items-center gap-3 text-sm"><input name="enabled" type="checkbox" defaultChecked={graduate.enabled} />Выпускник Школы аудиопрактик</label>
         <div className="flex flex-wrap gap-3">
           <button name="operation" value="save" disabled={pending} className={button}>Сохранить</button>
           <button name="operation" value="remove" disabled={pending} className={button}>Убрать из выпускников</button>
@@ -41,7 +41,7 @@ function EditorForm({ graduate, authors, products }: { graduate?: SchoolGraduate
         </select></label>
         <button name="operation" value="add" disabled={pending || !authors.length} className={button}>Добавить выпускника</button>
       </>}
-      {state.error ? <p role="alert" className="text-sm text-red-700">{state.error}</p> : null}
+      {state.error ? <p role="alert" className="text-sm text-red-700">{state.error}{state.errorHref ? <> <a href={state.errorHref} className="underline">Открыть продукты</a></> : null}</p> : null}
       {state.success ? <p role="status" className="text-sm text-green-800">{state.success}</p> : null}
     </form>
   );

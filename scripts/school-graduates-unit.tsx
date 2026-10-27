@@ -27,6 +27,8 @@ const products = [product("p1"), product("p2"), product("p3", "b")];
 assert.deepEqual(selectGraduateProducts([graduate({ product_1_id: "p2", product_2_id: "p1" })], products).map(p => p.id), ["p2", "p1"]);
 assert.deepEqual(selectGraduateProducts([graduate({ position: 2 }), graduate({ author_id: "b", position: 1, product_1_id: "p3", product_2_id: null })], products).map(p => p.id), ["p3", "p1", "p2"]);
 assert.equal(selectGraduateProducts([graduate({ enabled: false })], products).length, 0);
+assert.deepEqual(selectGraduateProducts([], products), [], "unmarked authors never appear");
+assert.deepEqual(selectGraduateProducts([graduate({ product_1_id: null, product_2_id: null })], products), [], "marking a graduate does not automatically pick products");
 assert.equal(selectGraduateProducts([graduate({ product_1_id: "p3", product_2_id: null })], products).length, 0, "reject another author's selection");
 assert.equal(selectGraduateProducts([graduate()], [products[0]]).length, 1, "missing/unpublished selections vanish without fallback products");
 assert.equal(graduateText("Текст — подназвание"), "Текст – подназвание");
@@ -85,10 +87,18 @@ for (const school of [true, false]) {
   const html = renderToStaticMarkup(<GraduateProducts cards={cards} school={school} />);
   assert.ok(html.includes(school ? 'href="https://audiolad.ru/practice/a/p1"' : 'href="/practice/a/p1"'));
   assert.ok(html.includes("2 мин"));
-  assert.ok(html.includes("grid-cols-1") && html.includes("sm:grid-cols-2") && html.includes("lg:grid-cols-3"));
+  assert.ok(html.includes("overflow-x-auto") && html.includes("snap-x") && html.includes("shrink-0"), "cards remain in one scrollable row");
+  assert.ok(!html.includes("grid-cols-"));
+  const links = [...html.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(links.length, cards.length);
+  assert.ok(links.every(href => school ? new URL(href).origin === "https://audiolad.ru" : href.startsWith("/practice/")));
   assert.ok(!html.includes("—"));
   if (school) writeFileSync("/tmp/03f7-graduate-products.html", html);
 }
+const schoolPage = readFileSync("src/app/(platform)/school-site/page.tsx", "utf8");
+assert.match(schoolPage, /<SchoolTestimonialsScreen \/>\s*<SchoolGraduateShowcase school \/>\s*<SchoolFaqScreen \/>/, "showcase must directly follow testimonials and precede FAQ");
+const catalogPage = readFileSync("src/app/(platform)/(listener)/(catalog)/catalog/page.tsx", "utf8");
+assert.ok(!catalogPage.includes("SchoolGraduateShowcase"), "platform placement is not approved");
 const sql = readFileSync("supabase/migrations/20270106120000_school_graduates.sql", "utf8");
 assert.ok(sql.includes("ENABLE ROW LEVEL SECURITY") && sql.includes("USING (enabled)"));
 console.log("school-graduates: selection limit, ownership, order, canonical visibility, refresh, empty block and product links passed");

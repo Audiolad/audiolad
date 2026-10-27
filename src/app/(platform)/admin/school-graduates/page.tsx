@@ -20,12 +20,12 @@ export default async function SchoolGraduatesPage() {
         .is("deleted_at", null).not("author_id", "is", null).not("slug", "is", null).order("id").range(from, to)),
     ]);
   } catch {
-    return <p role="alert" className="text-sm text-red-700">Не удалось загрузить выпускников. Проверьте применение миграции и обновите страницу.</p>;
+    return <p role="alert" className="text-sm text-red-700">Не удалось загрузить выпускников. Обновите страницу. Если ошибка повторяется, раздел ещё не готов к работе.</p>;
   }
   const [authors, graduates, products] = loaded;
   return <section aria-labelledby="graduates-admin-heading">
       <h2 id="graduates-admin-heading" className="text-xl font-semibold">Выпускники Школы аудиопрактик</h2>
-      <p className="mt-2 text-sm text-[#796ba0]">Состав подтверждается вручную. Выберите до двух опубликованных продуктов каждого автора. Новые выпускники добавляются с выключенным показом.</p>
+      <p className="mt-2 text-sm text-[#796ba0]">Добавьте существующего автора, отметьте галочкой «Выпускник Школы аудиопрактик» и вручную выберите до двух его опубликованных продуктов. Без галочки или выбранных продуктов автор на сайте не появится.</p>
       <SchoolGraduatesEditor graduates={graduates as SchoolGraduate[]} authors={authors.sort((a, b) => a.name.localeCompare(b.name, "ru"))}
         products={filterPublicPracticeRows(products).map(({ id, title, author_id }) => ({ id, title, author_id })).sort((a, b) => a.title.localeCompare(b.title, "ru"))} />
     </section>;

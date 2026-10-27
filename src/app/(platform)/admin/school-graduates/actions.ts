@@ -6,7 +6,7 @@ import { applyOrdinaryCatalogEligibility } from "@/lib/catalog/visibility-query"
 import { validateGraduateProductIds } from "@/lib/school/graduates";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-export type GraduateActionState = { error?: string; success?: string };
+export type GraduateActionState = { error?: string; errorHref?: string; success?: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function saveGraduateAction(_: GraduateActionState, form: FormData): Promise<GraduateActionState> {
@@ -48,12 +48,11 @@ export async function saveGraduateAction(_: GraduateActionState, form: FormData)
       product_1_id: product1, product_2_id: product2,
       cohort, position, enabled: form.get("enabled") === "on",
     }).eq("author_id", authorId).select("author_id").maybeSingle();
-    if (error || !saved) return { error: "Не удалось сохранить подборку. Проверьте публикацию продуктов и обновите страницу." };
+    if (error || !saved) return { error: "Не удалось сохранить подборку. Проверьте публикацию продуктов и обновите страницу.", errorHref: "/admin/product-moderation?status=published" };
   } else {
     return { error: "Неизвестное действие." };
   }
   revalidatePath("/admin/school-graduates");
   revalidatePath("/school-site");
-  revalidatePath("/catalog");
   return { success: "Сохранено." };
 }
