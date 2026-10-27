@@ -1,3 +1,4 @@
+import SchoolGraduateShowcase from "@/components/school-graduates/SchoolGraduateShowcase";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -233,6 +234,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           </section>
         }
       />
+      {!isListingFiltered && !isSearchActive ? <SchoolGraduateShowcase /> : null}
     </>
   );
 }

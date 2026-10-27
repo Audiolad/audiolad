@@ -1,3 +1,4 @@
+import SchoolGraduateShowcase from "@/components/school-graduates/SchoolGraduateShowcase";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -66,6 +67,7 @@ export default async function SchoolSitePage() {
         <SchoolBonusesScreen />
         <SchoolAfterGraduationScreen />
         <SchoolTestimonialsScreen />
+        <SchoolGraduateShowcase school />
         <SchoolFaqScreen />
         <SchoolFinalScreen />
       </main>
