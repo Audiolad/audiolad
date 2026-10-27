@@ -131,9 +131,13 @@ export function toCatalogPromos(value: unknown): CatalogPromo[] {
 /**
  * Wide school photo. The title is baked into the pixels, so the catalog
  * shows the file itself instead of a thumbnail plus a second heading.
- * The file is replaced separately. Layout follows the image's own ratio.
+ * The file is replaced separately and must be the picture edge to edge:
+ * layout follows that ratio with no padding, so a white mat in the file
+ * shows as bands above and below. A taller subtitle stays fully visible.
+ * `/images` is cached for 7 days, so the query is the cache key of this file.
  */
-export const CATALOG_PROMO_ARTWORK_PATH = "/images/catalog-promo/school-audiopraktik.webp";
+export const CATALOG_PROMO_ARTWORK_PATH =
+  "/images/catalog-promo/school-audiopraktik.webp?v=cc57991732df";
 
 export function isCatalogPromoArtwork(image: string): boolean {
   const path = image.trim().split(/[?#]/, 1)[0] ?? "";
