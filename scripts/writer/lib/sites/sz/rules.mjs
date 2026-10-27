@@ -460,8 +460,34 @@ export function protectedRemovalOk(original, stripped) {
 const RETELL_STOP = new Set(["ангел", "ангела", "ангелу", "ангеле", "хранитель", "хранителя", "хранителю", "молитва", "молитвы", "молитву", "молитве", "образ", "образа", "человек", "человека", "можно", "когда", "этот", "этой", "этого", "только", "после", "перед", "через", "чтобы", "который", "которая", "которые", "практика", "практике", "также", "будет", "были", "было", "очень", "просто", "потом", "тогда", "здесь", "свой", "свою", "свои"]);
 const RETELL_NAMES = new Set(["ангел", "ангела", "ангелу", "ангеле", "ангелом", "божий", "бога", "бог", "христос", "христа", "христов", "святый", "аминь", "господь", "господа", "крещении", "православного", "эзотерика", "ченнелинг", "молитвы", "хранителю", "молитва"]);
 
-function retellTokens(text) {
-  return paragraphTokens(text).filter((token) => token.length >= 5 && !RETELL_STOP.has(token));
+function topicStems(topic) {
+  return normalize(topic).split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 5);
+}
+
+/** Shared prefix of at least 5 letters: «аффирмация» and «аффирмации» are one topic word. */
+function sharesStem(word, stem) {
+  const left = String(word).replace(/[^\p{L}\p{N}]+/gu, "");
+  const right = String(stem).replace(/[^\p{L}\p{N}]+/gu, "");
+  const limit = Math.min(left.length, right.length);
+  let i = 0;
+  while (i < limit && left[i] === right[i]) i += 1;
+  return i >= 5;
+}
+
+function isTopicToken(token, stems) {
+  return stems.some((stem) => sharesStem(token, stem));
+}
+
+function retellTokens(text, banned = () => false) {
+  return paragraphTokens(text).filter((token) => token.length >= 5 && !RETELL_STOP.has(token) && !banned(token));
+}
+
+/** Tokens that occur only in the last paragraph – the topic bridge, not the plot. */
+function bridgeOnlyTokens(story) {
+  const parts = String(story ?? "").split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return new Set();
+  const plot = new Set(retellTokens(parts.slice(0, -1).join("\n\n")));
+  return new Set(retellTokens(parts.at(-1)).filter((token) => !plot.has(token)));
 }
 
 function retellShards(tokens) {
@@ -484,9 +510,9 @@ function retellSentences(text) {
   return String(text ?? "").split(/(?<=[.!?…])\s+/u).map((sentence) => sentence.trim()).filter((sentence) => /[\p{L}\p{N}]/u.test(sentence));
 }
 
-function retellOverlap(story, section) {
-  const left = retellTokens(story);
-  const right = retellTokens(section);
+function retellOverlap(story, section, banned = () => false) {
+  const left = retellTokens(story, banned);
+  const right = retellTokens(section, banned);
   const a = new Set(left);
   const b = new Set(right);
   if (a.size < 12 || b.size < 12) return false;
@@ -506,14 +532,19 @@ function retellOverlap(story, section) {
 
 /**
  * A later section retells the opening story: the same plot after the first sentence,
- * not a shared opening formula. The approved angel article stays under every threshold.
+ * not a shared opening and not the topic bridge. Overlap ignores the article query
+ * and words that appear only in the last story paragraph. A character or a
+ * plot detail still counts. The approved angel article stays under every threshold.
  */
-export function sectionRetellsStory(story, section) {
-  if (!retellOverlap(story, section)) return false;
+export function sectionRetellsStory(story, section, topic = "") {
+  const stems = topicStems(topic);
+  const bridgeOnly = bridgeOnlyTokens(story);
+  const banned = (token) => bridgeOnly.has(token) || isTopicToken(token, stems);
+  if (!retellOverlap(story, section, banned)) return false;
   const storyRest = retellSentences(story).slice(1).join(" ");
   const sectionRest = retellSentences(section).slice(1).join(" ");
   if (!storyRest.trim() || !sectionRest.trim()) return false;
-  return retellOverlap(storyRest, sectionRest);
+  return retellOverlap(storyRest, sectionRest, banned);
 }
 
 const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["два", 2], ["две", 2], ["три", 3], ["четыре", 4], ["пять", 5], ["шесть", 6], ["семь", 7], ["восемь", 8], ["девять", 9], ["десять", 10]];
@@ -822,13 +853,17 @@ const FAQ_NEGATION = /^(?:нет|нельзя|не стоит|не нужно)(?
 
 /**
  * A FAQ answer that opens with a refusal while the body already states the same
- * content words without that refusal. Ordinary answers that do not start with
- * «нет» / «нельзя» are left alone.
+ * claim without that refusal. Words of the article query are the topic, not the
+ * claim, so «аффирмация / удачу / деньги» do not count. Ordinary answers that
+ * do not start with «нет» / «нельзя» are left alone.
  */
-export function faqContradictsBody(question, answer, body) {
+export function faqContradictsBody(question, answer, body, topic = "") {
   const reply = String(answer ?? "").trim();
   if (!FAQ_NEGATION.test(reply)) return false;
-  const keys = normalize(question).split(/\s+/).filter((word) => word.length >= 5).slice(0, 6);
+  const stems = topicStems(topic);
+  const keys = normalize(question).split(/\s+/).filter((word) => word.length >= 5).slice(0, 6)
+    .map((word) => word.replace(/[^\p{L}\p{N}]+/gu, ""))
+    .filter((word) => word.length >= 5 && !isTopicToken(word, stems));
   if (keys.length < 2) return false;
   const need = Math.min(3, keys.length);
   return String(body ?? "").split(/(?<=[.!?…])\s+/u).some((sentence) => {
@@ -1515,7 +1550,7 @@ export function checkSzArticle(md, cfg, env) {
     const heading = normalize(title);
     if (heading.startsWith("три шага") || heading.startsWith("когда стоит обратиться")) continue;
     const prose = block.replace(/^## .+$/m, " ").replace(/^### .+$/gm, " ").replace(/^\|.*$/gm, " ");
-    if (sectionRetellsStory(story, prose)) add("story-retell", "sections", `раздел «${title}» пересказывает историю`);
+    if (sectionRetellsStory(story, prose, query)) add("story-retell", "sections", `раздел «${title}» пересказывает историю`);
   }
   if (!/^\|[^\n]+\|\n\|(?:\s*:?-+:?\s*\|)+$/m.test(mainBody)) add("table", "table", "нет сравнительной таблицы");
   const pSpecialist = pos(/^## Когда стоит обратиться к специалисту$/m, pExpert);
@@ -1552,7 +1587,7 @@ export function checkSzArticle(md, cfg, env) {
     if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
     if (faqAnswerTypeMismatch(q, a)) add("faq-answer-type", "faq", `ответ на «${q}» начинается как да/нет, а вопрос открытый`);
     if (faqStanceMismatch(q, a, cfg.faqHints)) add("faq-stance", "faq", `ответ на «${q}» противоречит позиции брифа «${(cfg.faqHints ?? []).find((hint) => normalize(q).includes(normalize(hint.match)))?.stance ?? ""}»`, "warn");
-    if (faqContradictsBody(q, a, mainBody)) add("faq-contradiction", "faq", `ответ на «${q}» отрицает то, что основная часть уже говорит`);
+    if (faqContradictsBody(q, a, mainBody, query)) add("faq-contradiction", "faq", `ответ на «${q}» отрицает то, что основная часть уже говорит`);
   }
   const faqText = faq.flat().join("\n");
 

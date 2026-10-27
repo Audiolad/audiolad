@@ -22,7 +22,7 @@ import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
-import { szH2Count, szPackCost, szQuantityReport, szSpendAllowed } from "./lib/sites/sz/metrics.mjs";
+import { szCallFit, szH2Count, szPackCost, szQuantityReport, szSpendAllowed } from "./lib/sites/sz/metrics.mjs";
 import { applyDeterministicSzFixes, articleDropsRequired, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
@@ -635,6 +635,22 @@ test("story-retell: a shared opening is not a plot retelling", () => {
   assert.equal(sectionRetellsStory(story, plot), true);
 });
 
+test("story-retell: a topic bridge is not Марина's plot, a real retell still is", () => {
+  const query = "аффирмации на деньги и изобилие";
+  const plot = [
+    "Марина открыла тетрадь и поставила галочки напротив коротких строк.",
+    "Сестра перечитала дневник и спросила про вечернюю запись.",
+    "Спокойствие заменило спешку, городской телефон лежал рядом, а разговор с братом подождал.",
+  ].join("\n\n");
+  const bridge = "Именно так и складывается тема – аффирмации на деньги и изобилие. Короткая фраза утром собирает внимание, намерение, повторение, привычку, богатство, достаток и спокойный ритм.";
+  const story = `${plot}\n\n${bridge}`;
+  const section = "Аффирмации на деньги и изобилие начинаются с короткой фразы. Утром внимание держит намерение, повторение поддерживает привычку, богатство и достаток звучат как спокойный ритм, а труд остаётся обычным делом.";
+  assert.equal(section.includes("Марина"), false);
+  assert.equal(sectionRetellsStory(story, section, query), false);
+  const retell = `${plot}\n\nМарина снова листает тетрадь и считает галочки.`;
+  assert.equal(sectionRetellsStory(story, retell, query), true);
+});
+
 test("gate: english notes, FAQ contradiction, example-phrase quality; en dash stays", () => {
   assert.deepEqual(englishLeftovers(assembled), []);
   assert.equal(errorsOf(checkSzArticle(assembled, cfg, env)).some((problem) => problem.code === "english-note" || problem.code === "faq-contradiction"), false);
@@ -647,6 +663,11 @@ test("gate: english notes, FAQ contradiction, example-phrase quality; en dash st
   const body = "Повторять короткую фразу можно спокойно и без спешки каждый день.";
   assert.equal(faqContradictsBody("Можно ли повторять короткую фразу?", "Можно повторять её спокойно.", body), false);
   assert.equal(faqContradictsBody("Можно ли повторять короткую фразу?", "Нельзя повторять короткую фразу вслух.", body), true);
+  const query = "аффирмации на удачу и деньги";
+  const topicBody = "Аффирмация на удачу и деньги начинается не с громкого обещания. Затем аффирмация на деньги богатство и удачу полезна как язык намерения.";
+  const faith = "Нужна ли сильная вера, чтобы аффирмация на удачу и деньги была полезной?";
+  assert.equal(faqContradictsBody(faith, "Нет, сильная вера не требуется.", topicBody, query), false);
+  assert.equal(faqContradictsBody("Можно ли повторять короткую фразу?", "Нельзя повторять короткую фразу вслух.", body, query), true);
   const dash = firstPara(assembled, "Пауза – короткая.");
   assert.equal(errorsOf(checkSzArticle(dash, cfg, env)).some((problem) => problem.code === "em-dash"), false);
 });
@@ -1396,11 +1417,32 @@ test("tiered defaults stay behind the flag; accepted-article cost includes faile
   assert.match(report, /стоимость готовой статьи: 4,200 ₽/);
   assert.match(report, /Готовых статей: 1\/2/);
   assert.match(report, /Цена одной принятой статьи: 23,450 ₽/);
-  assert.equal(szSpendAllowed({ spentRub: 0, articleSpentRub: 0, worst: 18 }), "ok");
+  assert.equal(szSpendAllowed({ spentRub: 0, articleSpentRub: 0, worst: 18 }), "article");
+  assert.equal(szSpendAllowed({ spentRub: 0, articleSpentRub: 0, worst: 12 }), "ok");
   assert.equal(szSpendAllowed({ spentRub: 8, articleSpentRub: 8, worst: 5 }), "article");
   assert.equal(szSpendAllowed({ spentRub: 110, articleSpentRub: 0, worst: 15 }), "run");
   assert.equal(SZ.articleRubCap, 12);
   assert.equal(SZ.runRubCap, 120);
+  const model = "openai/gpt-5.4-mini";
+  const promptTokens = estimatePromptTokens([{ role: "user", content: "я".repeat(53973) }], model);
+  assert.equal(promptTokens, 24734);
+  const uncut = worstCaseRub(model, promptTokens, 16000);
+  assert.ok(Math.abs(uncut - 17.786) < 0.001, uncut);
+  const first = szCallFit({ model, promptTokens, requestedTokens: 16000, spentRub: 0, articleSpentRub: 0 });
+  assert.equal(first.decision, "ok");
+  assert.ok(first.maxTokens >= 1 && first.maxTokens < 16000);
+  assert.ok(first.worst <= 12, first.worst);
+  const inputOnly = costRub(model, promptTokens, 0);
+  assert.equal(szCallFit({ model, promptTokens, requestedTokens: 16000, spentRub: 0, articleSpentRub: 0, articleCap: inputOnly }).maxTokens, 0);
+  assert.equal(szCallFit({ model, promptTokens, requestedTokens: 16000, spentRub: 119, articleSpentRub: 0 }).decision, "run");
+  let spent = 0;
+  for (let i = 0; i < 10; i += 1) {
+    const fit = szCallFit({ model, promptTokens, requestedTokens: 16000, spentRub: spent, articleSpentRub: 0 });
+    assert.equal(fit.decision, "ok", `статья ${i}`);
+    assert.ok(fit.worst <= 12 + 1e-9 && spent + fit.worst <= 120 + 1e-9, fit.worst);
+    spent += fit.worst;
+  }
+  assert.equal(szCallFit({ model, promptTokens, requestedTokens: 16000, spentRub: spent, articleSpentRub: 0 }).decision, "run");
 });
 
 test("offline price harness compares cheap models and does not call the network", () => {

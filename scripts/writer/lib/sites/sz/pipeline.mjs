@@ -9,8 +9,8 @@ import { join, resolve } from "node:path";
 
 import { BudgetError, makeCaller } from "../../call.mjs";
 import { writerCallId } from "../../moscow.mjs";
-import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, estimatePromptTokens, formatRub, parseMaxRub, parseMaxTokens, worstCaseRub } from "../../cost.mjs";
-import { szPackCost, szSpendAllowed } from "./metrics.mjs";
+import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, estimatePromptTokens, formatRub, parseMaxRub, parseMaxTokens } from "../../cost.mjs";
+import { szCallFit, szPackCost } from "./metrics.mjs";
 import { articleDropsRequired, repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "../../publish.mjs";
 import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } from "../../util.mjs";
@@ -135,28 +135,35 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   const state = { site: "sz", runId, model, repairModel: repair.model, repairMaxTokens: repair.maxTokens, repairMode: repair.mode, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [], warnings: [], articleSlug: "" };
   mkdirSync(outDir, { recursive: true });
   writeJson(join(outDir, "pack.json"), pack);
-  const guard = (callModel, callMaxTokens, rawName, messages) => {
+  const guard = (callModel, callMaxTokens, messages) => {
     const articleSpentRub = state.articleSlug
       ? state.calls.filter((call) => String(call.name).startsWith(`${state.articleSlug}-`)).reduce((sum, call) => sum + (call.costRub || 0), 0)
       : 0;
-    const worst = worstCaseRub(callModel, estimatePromptTokens(messages, callModel), callMaxTokens);
-    const decision = szSpendAllowed({ spentRub: state.spentRub, articleSpentRub, worst, articleCap: SZ.articleRubCap, runCap: SZ.runRubCap });
-    if (decision === "run") throw new BudgetError(`бюджет прогона: потрачено ${formatRub(state.spentRub)}, худший случай ${formatRub(worst)}, предел ${formatRub(SZ.runRubCap)}`);
-    if (decision === "article") throw new BudgetError(`бюджет статьи: потрачено ${formatRub(articleSpentRub)}, худший случай ${formatRub(worst)}, предел ${formatRub(SZ.articleRubCap)}`);
+    const fit = szCallFit({
+      model: callModel,
+      promptTokens: estimatePromptTokens(messages, callModel),
+      requestedTokens: callMaxTokens,
+      spentRub: state.spentRub,
+      articleSpentRub,
+      articleCap: SZ.articleRubCap,
+      runCap: SZ.runRubCap,
+    });
+    if (fit.decision === "run") throw new BudgetError(`бюджет прогона: потрачено ${formatRub(state.spentRub)}, худший случай ${formatRub(fit.worst)}, предел ${formatRub(SZ.runRubCap)}`);
+    if (fit.decision !== "ok") throw new BudgetError(`бюджет статьи: потрачено ${formatRub(articleSpentRub)}, худший случай ${formatRub(fit.worst)}, предел ${formatRub(SZ.articleRubCap)}`);
+    return fit.maxTokens;
   };
   const callWriter = (rawName, messages, schema) => {
-    guard(model, maxTokens, rawName, messages);
-    return makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate })(rawName, messages, schema);
+    const callMaxTokens = guard(model, maxTokens, messages);
+    return makeCaller({ model, maxTokens: callMaxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate })(rawName, messages, schema);
   };
   const callRepair = (rawName, messages, schema) => {
-    guard(repair.model, repair.maxTokens, rawName, messages);
-    return makeCaller({ model: repair.model, maxTokens: repair.maxTokens, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate })(rawName, messages, schema);
+    const callMaxTokens = guard(repair.model, repair.maxTokens, messages);
+    return makeCaller({ model: repair.model, maxTokens: callMaxTokens, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate })(rawName, messages, schema);
   };
   const callTier = repair.mode === "tiered" ? ((tier, name, messages, schema, options = {}) => {
     const configured = tier === "strong" ? repair.strongMaxTokens : repair.cheapMaxTokens;
-    const callMaxTokens = options.maxTokens ?? configured;
+    const callMaxTokens = guard(tier === "strong" ? repair.strongModel : repair.cheapModel, options.maxTokens ?? configured, messages);
     const callModel = tier === "strong" ? repair.strongModel : repair.cheapModel;
-    guard(callModel, callMaxTokens, name, messages);
     const caller = makeCaller({
       model: callModel,
       maxTokens: callMaxTokens,

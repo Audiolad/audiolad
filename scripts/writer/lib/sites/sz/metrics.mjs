@@ -1,5 +1,6 @@
 // Machine-readable quantitative failures. The gate stays in rules.mjs; this module
 // turns those errors (and the field breakdown a fragment repair needs) into rows.
+import { TARIFF, costRub, worstCaseRub } from "../../cost.mjs";
 import { SZ } from "./config.mjs";
 import { words } from "./rules.mjs";
 
@@ -97,9 +98,33 @@ export function szPackCost(articles = []) {
   };
 }
 
-/** Hard stop for the control run: 12 ₽ on one article, 120 ₽ on the run. The first call of an article is allowed. */
+/** Hard stop for the control run: 12 ₽ on one article, 120 ₽ on the run, including the first call. */
 export function szSpendAllowed({ spentRub = 0, articleSpentRub = 0, worst = 0, articleCap = 12, runCap = 120 } = {}) {
   if (spentRub >= runCap || spentRub + worst > runCap) return "run";
-  if (articleSpentRub >= articleCap || (articleSpentRub > 0 && articleSpentRub + worst > articleCap)) return "article";
+  if (articleSpentRub >= articleCap || articleSpentRub + worst > articleCap) return "article";
   return "ok";
+}
+
+/**
+ * Largest completion budget whose worst case still fits in `roomRub`.
+ * 0 means even one output token (or the prompt alone) does not fit.
+ */
+export function affordableMaxTokens(model, promptTokens, requested, roomRub) {
+  const requestedTokens = Math.max(0, Math.floor(Number(requested) || 0));
+  if (!(roomRub > 0) || requestedTokens < 1 || !TARIFF[model]) return 0;
+  const inputCost = costRub(model, promptTokens, 0);
+  if (inputCost > roomRub) return 0;
+  let tokens = Math.min(requestedTokens, Math.floor(((roomRub - inputCost) * 1e6) / TARIFF[model].outputPer1M));
+  while (tokens > 0 && worstCaseRub(model, promptTokens, tokens) > roomRub) tokens -= 1;
+  return tokens;
+}
+
+/** Cap one call, including the first, so its worst case fits the remaining article and run budgets. */
+export function szCallFit({ model, promptTokens = 0, requestedTokens = 0, spentRub = 0, articleSpentRub = 0, articleCap = 12, runCap = 120 } = {}) {
+  const room = Math.min(articleCap - articleSpentRub, runCap - spentRub);
+  const maxTokens = affordableMaxTokens(model, promptTokens, requestedTokens, room);
+  if (maxTokens >= 1) return { maxTokens, worst: worstCaseRub(model, promptTokens, maxTokens), decision: "ok" };
+  const worst = worstCaseRub(model, promptTokens, Math.max(1, Math.floor(Number(requestedTokens) || 1)));
+  const decision = szSpendAllowed({ spentRub, articleSpentRub, worst, articleCap, runCap });
+  return { maxTokens: 0, worst, decision: decision === "ok" ? "article" : decision };
 }
