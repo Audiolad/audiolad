@@ -9,9 +9,10 @@ import {
   BUSINESS_UNCONFIRMED_NOTE,
   businessGiftRulesText,
 } from "@/lib/access-grants/copy";
-import { businessWorkspaceHref, BUSINESS_TRIAL_SIGN_IN_HREF, BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
+import { businessOnboardingEntryHref, businessWorkspaceHref, BUSINESS_TRIAL_SIGN_IN_HREF, BUSINESS_TRIAL_RETURN_PATH } from "@/lib/access-grants/paths";
 import { isEmailConfirmed } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
 import { helpArticlePath } from "@/lib/help/paths";
 import { createClient } from "@/lib/supabase/server";
@@ -70,6 +71,18 @@ export default async function BusinessTrialReturnPage() {
         </p>
       </main>
     );
+  }
+
+  let needsVenue = false;
+  try {
+    const domain = await loadBusinessOwnerHomeContext();
+    needsVenue = domain.status === "authenticated" && !domain.organizationId;
+  } catch {
+    needsVenue = false;
+  }
+
+  if (needsVenue) {
+    redirect(businessOnboardingEntryHref("cafe"));
   }
 
   redirect(businessWorkspaceHref("cafe"));
