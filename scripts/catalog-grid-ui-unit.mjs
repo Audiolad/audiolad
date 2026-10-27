@@ -52,10 +52,10 @@ assert.match(
   /aspect-\[43\/24\]/,
   "desktop catalog section cards use the 1376x768 ratio",
 );
-assert.doesNotMatch(
+assert.match(
   page,
   /CatalogPromoCarousel/,
-  "catalog promo carousel is replaced by catalog sections",
+  "catalog reuses the managed promo below its sections",
 );
 assert.doesNotMatch(
   page,

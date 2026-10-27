@@ -4,6 +4,7 @@ export type CatalogPromo = {
   id: string;
   title: string;
   image: string;
+  caption?: string;
   href: string;
   alt: string;
   position: number;
@@ -59,4 +60,70 @@ export function listCatalogPromos(now: Date = new Date()): CatalogPromo[] {
   return CATALOG_PROMOS.filter((promo) => isCatalogPromoActive(promo, now)).sort(
     (left, right) => left.position - right.position,
   );
+}
+
+/** Only local assets or HTTPS images; links stay on Audiolad owned hosts. */
+export function isPromoImageUrl(value: string): boolean {
+  if (/^\/(?!\/)[^\\\s?#]+$/.test(value)) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+export function isPromoHref(value: string): boolean {
+  if (/^\/(?!\/)[^\\\s]*$/.test(value)) return true;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" && !url.username && !url.password && !url.port &&
+      (url.hostname === "audiolad.ru" || url.hostname.endsWith(".audiolad.ru"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export type ManagedCatalogPromo = {
+  id: "catalog";
+  enabled: boolean;
+  title: string;
+  caption: string;
+  image: string;
+  href: string;
+};
+
+export function parseManagedCatalogPromo(value: unknown): ManagedCatalogPromo | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  if (row.id !== "catalog" || typeof row.enabled !== "boolean") return null;
+  const fields = { title: 120, caption: 240, image: 2048, href: 2048 } as const;
+  for (const [key, limit] of Object.entries(fields)) {
+    if (typeof row[key] !== "string" || (row[key] as string).length > limit) return null;
+  }
+  const promo = {
+    id: "catalog" as const,
+    enabled: row.enabled,
+    title: (row.title as string).trim(),
+    caption: (row.caption as string).trim(),
+    image: (row.image as string).trim(),
+    href: (row.href as string).trim(),
+  };
+  if (!promo.title || !isPromoImageUrl(promo.image) || !isPromoHref(promo.href)) return null;
+  return promo;
+}
+
+export function toCatalogPromos(value: unknown): CatalogPromo[] {
+  const promo = parseManagedCatalogPromo(value);
+  return promo?.enabled ? [{
+    id: promo.id,
+    title: promo.title,
+    caption: promo.caption,
+    image: promo.image,
+    href: promo.href,
+    alt: "",
+    position: 1,
+  }] : [];
 }

@@ -77,7 +77,7 @@ export default function CatalogPromoCarousel({
 
   return (
     <section
-      className="catalog-promo mt-0 xl:mt-1.5"
+      className="catalog-promo mt-4"
       aria-label="Промо каталога"
       data-catalog-promo
     >
@@ -95,7 +95,19 @@ export default function CatalogPromoCarousel({
               data-catalog-promo-position={promo.position}
               className="block overflow-hidden rounded-[24px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              <span className="relative block aspect-[4.8/1] w-full overflow-hidden bg-[#efe6f8]">
+              {promo.caption !== undefined ? (
+                <span className="flex min-h-28 items-center gap-3 rounded-[24px] border border-[#e8def5] bg-[#faf6ff] p-4 sm:gap-6">
+                  {/* Editable HTTPS images do not require an optimizer host allowlist. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={promo.image} alt="" width={192} height={96}
+                    className="aspect-[2/1] h-auto w-24 shrink-0 rounded-xl object-contain sm:w-48" />
+                  <span className="min-w-0 break-words">
+                    <span className="block text-base font-semibold text-[#25135c] sm:text-xl">{promo.title}</span>
+                    {promo.caption ? <span className="mt-1 block text-sm text-[#796ba0]">{promo.caption}</span> : null}
+                    <span className="mt-2 block text-sm font-semibold text-[#7042c5]">Подробнее →</span>
+                  </span>
+                </span>
+              ) : <span className="relative block aspect-[4.8/1] w-full overflow-hidden bg-[#efe6f8]">
                 {promo.image.endsWith(".svg") ? (
                   // Local SVG slides stay image-only; next/image needs extra config for SVG.
                   // eslint-disable-next-line @next/next/no-img-element
@@ -113,7 +125,7 @@ export default function CatalogPromoCarousel({
                     className="object-contain"
                   />
                 )}
-              </span>
+              </span>}
             </Link>
           </li>
         ))}
