@@ -227,7 +227,7 @@ export async function executePinnedAnalysis(input: {
     let invoked = false;
     const runAnalyze = (flag: VoiceDetectorFlag) => spawnCaptured(
       input.pythonPath,
-      buildAnalyzeTrackArgs(wavPath, outputDir, flag),
+      buildAnalyzeTrackArgs(wavPath, outputDir, flag === "panns" ? "panns" : undefined),
       {
         cwd: input.root,
         env: analyzerChildEnv(childSource, input.pythonPath, dirname(input.checkpointPath), {

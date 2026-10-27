@@ -190,6 +190,23 @@ const off = await resolveVoiceChoice({
 assert.equal(off.reason, "mode_off");
 assert.equal(off.flag, "legacy");
 assert.equal(offLookups, 0);
+const productionArgsAt390ac5a4 = [
+  "analyze_track.py",
+  "/tmp/in.wav",
+  "--output-dir",
+  "/tmp/out",
+  "--device",
+  "cpu",
+];
+const argsForChoice = (voice: VoiceChoice) => buildAnalyzeTrackArgs(
+  "/tmp/in.wav",
+  "/tmp/out",
+  voice.flag === "panns" ? "panns" : undefined,
+);
+assert.deepEqual(argsForChoice(off), productionArgsAt390ac5a4);
+assert.deepEqual(buildAnalyzeTrackArgs("/tmp/in.wav", "/tmp/out", "legacy"), productionArgsAt390ac5a4);
+assert.equal(argsForChoice(off).includes("--voice-detector"), false);
+assert.deepEqual(argsForChoice(choice({ mode: "on" })).slice(-2), ["--voice-detector", "panns"]);
 
 let reanalysisCounts = 0;
 const reanalysis = await resolveVoiceChoice({

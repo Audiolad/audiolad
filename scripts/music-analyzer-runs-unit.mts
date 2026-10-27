@@ -89,8 +89,14 @@ assert.deepEqual(buildAnalyzeTrackArgs("/tmp/in.wav", "/tmp/out"), [
   "/tmp/out",
   "--device",
   "cpu",
-  "--voice-detector",
-  "legacy",
+]);
+assert.deepEqual(buildAnalyzeTrackArgs("/tmp/in.wav", "/tmp/out", "legacy"), [
+  "analyze_track.py",
+  "/tmp/in.wav",
+  "--output-dir",
+  "/tmp/out",
+  "--device",
+  "cpu",
 ]);
 
 const childEnv = analyzerChildEnv({
@@ -136,8 +142,6 @@ assert.deepEqual(provenance.invoke, [
   "<dir>",
   "--device",
   "cpu",
-  "--voice-detector",
-  "legacy",
 ]);
 
 const head = `${MUSIC_ANALYZER_FREEZE_SNAPSHOT}${"c".repeat(40 - MUSIC_ANALYZER_FREEZE_SNAPSHOT.length)}`;

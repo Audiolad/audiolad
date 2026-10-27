@@ -43,18 +43,21 @@ const CHILD_ENV_ALLOW = new Set([
 export function buildAnalyzeTrackArgs(
   wavPath: string,
   outputDir: string,
-  voiceDetector: VoiceDetectorFlag = "legacy",
+  voiceDetector?: VoiceDetectorFlag,
 ): string[] {
-  return [
+  const args = [
     MUSIC_ANALYZER_SCRIPT,
     wavPath,
     "--output-dir",
     outputDir,
     "--device",
     MUSIC_ANALYZER_DEVICE,
-    "--voice-detector",
-    voiceDetector,
   ];
+  // Checkout 932c4ce rejects an unknown flag. Pass it only for a real PANNs run.
+  if (voiceDetector === "panns") {
+    args.push("--voice-detector", "panns");
+  }
+  return args;
 }
 
 export function analyzerChildEnv(
@@ -144,7 +147,11 @@ export function buildAnalyzerProvenance(input: {
     analyzer_content_commit: input.content,
     invoke: [
       `${MUSIC_ANALYZER_VENV_DIR}/bin/python`,
-      ...buildAnalyzeTrackArgs("<wav>", "<dir>", input.voiceDetector ?? "legacy"),
+      ...buildAnalyzeTrackArgs(
+        "<wav>",
+        "<dir>",
+        input.voiceDetector === "panns" ? "panns" : undefined,
+      ),
     ],
     python: input.pythonPath.endsWith(`/${MUSIC_ANALYZER_VENV_DIR}/bin/python`)
       ? `${MUSIC_ANALYZER_VENV_DIR}/bin/python`
