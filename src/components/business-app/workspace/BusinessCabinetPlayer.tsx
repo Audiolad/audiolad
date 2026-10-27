@@ -121,6 +121,7 @@ export function BusinessCabinetPlayerProvider({
   const seekRef = useRef(initialPlayback.positionSec);
   const lastPostRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const barRef = useRef<HTMLElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
@@ -418,11 +419,27 @@ export function BusinessCabinetPlayerProvider({
     saveNote,
   };
 
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    const shell = bar?.closest(".business-app-shell");
+    if (!open || !bar || !(shell instanceof HTMLElement)) return;
+    const apply = () => {
+      shell.style.setProperty("--biz-cabinet-player-height", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      shell.style.removeProperty("--biz-cabinet-player-height");
+    };
+  }, [open, nowTitle, view.message, saveNote, playing, view.status]);
+
   return (
     <CabinetContext.Provider value={api}>
       {children}
       {open ? (
-        <section className="business-cabinet-player" aria-label="Плеер кабинета" data-testid="biz-workspace-player">
+        <section ref={barRef} className="business-cabinet-player" aria-label="Плеер кабинета" data-testid="biz-workspace-player">
           <div
             className="business-cabinet-player__bar"
             role="progressbar"

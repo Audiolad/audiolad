@@ -17,7 +17,10 @@ import {
   normalizeBusinessAppPathname,
   resolveBusinessInternalPath,
 } from "../src/lib/business-app/host.ts";
-import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy.ts";
+import {
+  businessPrivateGuestRedirect,
+  resolveBusinessProxyAction,
+} from "../src/lib/business-app/proxy-policy.ts";
 import {
   BUSINESS_POINT_STATES,
   isBusinessPointState,
@@ -32,6 +35,7 @@ import {
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const proxySource = readFileSync(join(repoRoot, "src/proxy.ts"), "utf8");
+const sessionProxy = readFileSync(join(repoRoot, "src/lib/supabase/proxy.ts"), "utf8");
 const bPage = readFileSync(
   join(repoRoot, "src/app/(platform)/b/page.tsx"),
   "utf8",
@@ -112,6 +116,24 @@ assert.equal(normalizeBusinessAppPathname("/business-app/settings"), "/preferenc
 assert.equal(normalizeBusinessAppPathname("/business-app/profile"), "/profile");
 assert.equal(resolveBusinessInternalPath("/profile"), `${BUSINESS_SITE_PATH}/profile`);
 assert.equal(normalizeBusinessAppPathname("/music"), "/music");
+
+// Guest /profile on the business host must not be sent to same-host /auth/sign-in (404).
+// Same guest entry as /music, /workspace and /player. Apex sign-in stays as it is.
+const profileGuest = businessPrivateGuestRedirect(`${BUSINESS_SITE_PATH}/profile`, "/profile");
+assert.equal(profileGuest, "/guest/coffee");
+assert.notEqual(profileGuest, "/auth/sign-in");
+assert.equal(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, profileGuest).action,
+  "rewrite_business_app",
+  "the guest entry itself must exist on the business host",
+);
+assert.equal(businessPrivateGuestRedirect(`${BUSINESS_SITE_PATH}/profile`, "/profile/edit"), "/guest/coffee");
+assert.equal(businessPrivateGuestRedirect(undefined, "/profile"), null, "audiolad.ru /profile still uses /auth/sign-in");
+assert.equal(businessPrivateGuestRedirect("/school-site", "/profile"), null);
+assert.equal(businessPrivateGuestRedirect(`${BUSINESS_SITE_PATH}/music`, "/music"), null, "/music is not a listener private route");
+assert.equal(businessPrivateGuestRedirect(`${BUSINESS_SITE_PATH}`, "/catalog"), null);
+assert.match(sessionProxy, /businessPrivateGuestRedirect\(rewritePathname, pathname\)/);
+assert.match(sessionProxy, /new URL\("\/auth\/sign-in", request\.url\)/, "apex sign-in redirect stays");
 
 assert.deepEqual([...BUSINESS_POINT_STATES], ["healthy", "autonomous", "stopped"]);
 assert.equal(isBusinessPointState("healthy"), true);

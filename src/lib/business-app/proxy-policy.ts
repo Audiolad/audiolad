@@ -1,4 +1,7 @@
+import { isPrivateRoute } from "@/lib/auth/routes";
+
 import {
+  BUSINESS_GUEST_COFFEE_PUBLIC_PATH,
   BUSINESS_PUBLIC_PATH_REWRITES,
   BUSINESS_SITE_PATH,
   isBusinessHostname,
@@ -92,6 +95,20 @@ export function resolveBusinessProxyAction(
   }
 
   return { action: "not_found" };
+}
+
+/**
+ * Guest on the business host who hit a listener-private URL (Профиль is /profile).
+ * /auth/sign-in does not exist on business.audiolad.ru. Send them to the same
+ * guest entry as /music, /workspace and /player. Null keeps the apex sign-in.
+ */
+export function businessPrivateGuestRedirect(
+  rewritePathname: string | undefined,
+  pathname: string,
+): string | null {
+  if (!rewritePathname || !isBusinessSitePath(rewritePathname)) return null;
+  if (!isPrivateRoute(pathname)) return null;
+  return BUSINESS_GUEST_COFFEE_PUBLIC_PATH;
 }
 
 /** Exported for tests — public paths the business host rewrites. */

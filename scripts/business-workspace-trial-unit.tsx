@@ -544,16 +544,25 @@ const playlists: GuestCoffeePlaylist[] = [{
   characters: ["cozy"],
   tracks: [{ audioItemId: "t1", title: "Трек", durationSeconds: 180 }],
 }];
-for (const limit of ["ok", "exhausted"] as const) {
-  const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit={limit}><main>page</main></BusinessAppShell>);
-  assert.match(html, /Получить 30 дней бесплатно/, `${limit}: gift CTA`);
-  assert.match(html, /data-testid="biz-connect"/, `${limit}: Подключить stays`);
-  assert.match(html, /30 дней в подарок/);
+{
+  const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="ok"><main>page</main></BusinessAppShell>);
+  assert.match(html, /Получить 30 дней бесплатно/, "gift CTA before the meter runs out");
+  assert.match(html, /data-testid="biz-connect"/);
+  assert.match(html, /30 дней в подарок – полный доступ ко всем функциям/);
+  assert.doesNotMatch(html, /30 минут/, "top banner does not mention the 30 minutes yet");
+}
+{
+  const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="exhausted"><main>page</main></BusinessAppShell>);
+  assert.match(html, /Гостевые 30 минут закончились/);
+  assert.match(html, /data-testid="biz-guest-register"/);
+  assert.match(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
+  assert.match(html, /data-testid="biz-connect"/, "Подключить stays");
 }
 {
   const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   assert.match(html, /data-testid="biz-sound-exhausted"/);
-  assert.match(html, /Получить 30 дней бесплатно/);
+  assert.match(html, /Зарегистрироваться/);
+  assert.match(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
   assert.match(html, /Подключить/);
 }
 {
@@ -567,6 +576,12 @@ assert.doesNotMatch(workspaceSource, /799/);
 assert.doesNotMatch(workspaceSource, /autoPlay|autoplay/);
 assert.doesNotMatch(workspaceSource, /—/);
 assert.doesNotMatch(workspaceSource, /email-hash|supabase-store/);
+assert.match(playerSource, /--biz-cabinet-player-height/, "the sticky bar reports its height");
+assert.match(
+  read("src/components/business-app/business-app.css"),
+  /padding-bottom:\s*calc\(var\(--biz-bottom-nav-height\) \+ var\(--biz-cabinet-player-height, 16rem\) \+ env\(safe-area-inset-bottom, 0px\)\)/,
+  "content clears the measured bar, the mobile nav and the safe area",
+);
 
 function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   return {

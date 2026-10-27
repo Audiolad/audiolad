@@ -58,7 +58,7 @@ for (const t of REQUIRED) resolve(t);
 
 // Every var(--biz-*) referenced by Business code is defined by the theme layer
 // (only runtime-set layout variables are exempt).
-const RUNTIME_VARS = new Set(["--biz-sidebar-width"]);
+const RUNTIME_VARS = new Set(["--biz-sidebar-width", "--biz-cabinet-player-height"]);
 const structural = tokenBlock(themeCss, ".business-app-root");
 const usedIn = [
   "src/components/business-app/business-app.css",

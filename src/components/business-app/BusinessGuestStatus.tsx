@@ -51,42 +51,52 @@ export function useBusinessGuestStatus(): GuestStatus {
   return useContext(GuestStatusContext);
 }
 
-export function guestLimitLine(limit: GuestCoffeeLimitState | null): string {
-  if (limit === "near_end") return GUEST_COFFEE_COPY.nearEndShort;
-  if (limit === "exhausted") return GUEST_COFFEE_COPY.exhaustedTitle;
-  if (limit === "unavailable") return GUEST_COFFEE_COPY.unavailable;
-  return GUEST_COFFEE_COPY.limitNote;
-}
-
-/** Strip at the top of every cabinet screen for a guest (desktop and mobile). */
+/**
+ * Strip at the top of every cabinet screen for a guest.
+ * Before the meter runs out it offers only the 30-day gift. The 30 minutes are
+ * named only in the exhausted banner, after the server limit is reached.
+ */
 export function BusinessGuestStatusBar() {
   const { limit, notice } = useBusinessGuestStatus();
+  const exhausted = limit === "exhausted";
   return (
     <section
       className="business-app-guest-bar"
-      aria-label="Гостевой режим"
+      aria-label={exhausted ? "Гостевое время закончилось" : "30 дней в подарок"}
       data-testid="biz-guest-status"
       data-limit={limit ?? "unknown"}
     >
       <div className="business-app-guest-bar__text">
-        <p>
-          <span className="business-app-guest-bar__badge">Гостевой режим</span>{" "}
-          <span data-testid="biz-guest-limit">{guestLimitLine(limit)}</span>
-        </p>
-        <p className="business-app-muted business-app-guest-bar__terms">{GUEST_COFFEE_TERMS}.</p>
-        {/* Always in the tree so screen readers announce the notice when a locked section is tapped. */}
-        <p className="business-app-guest-bar__notice" role="status" data-testid="biz-locked-notice">
-          {notice ?? ""}
-        </p>
+        {exhausted ? (
+          <p data-testid="biz-guest-exhausted">{GUEST_COFFEE_COPY.exhaustedBanner}</p>
+        ) : (
+          <p className="business-app-guest-bar__terms" data-testid="biz-guest-terms">{GUEST_COFFEE_TERMS}.</p>
+        )}
       </div>
+      {/* Present only after a locked section is tapped, so an empty line does not open a gap. */}
+      {notice ? (
+        <p className="business-app-guest-bar__notice" role="status" data-testid="biz-locked-notice">
+          {notice}
+        </p>
+      ) : null}
       <div className="business-app-guest-bar__actions">
-        <a
-          href={BUSINESS_TRIAL_SIGN_UP_HREF}
-          className="business-app-btn business-app-btn-primary business-app-focus-ring"
-          data-testid="biz-trial-cta"
-        >
-          {BUSINESS_GIFT_CTA}
-        </a>
+        {exhausted ? (
+          <a
+            href={BUSINESS_TRIAL_SIGN_UP_HREF}
+            className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            data-testid="biz-guest-register"
+          >
+            {GUEST_COFFEE_COPY.exhaustedRegister}
+          </a>
+        ) : (
+          <a
+            href={BUSINESS_TRIAL_SIGN_UP_HREF}
+            className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            data-testid="biz-trial-cta"
+          >
+            {BUSINESS_GIFT_CTA}
+          </a>
+        )}
         <Link
           href={BUSINESS_CONNECT_HREF}
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"

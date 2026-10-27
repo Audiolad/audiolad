@@ -13,21 +13,22 @@ export const GUEST_COFFEE_INQUIRY_EMAIL = BUSINESS_INQUIRY_EMAIL;
 
 /** "799 ₽" with a no-break space so the price never wraps. */
 export const GUEST_COFFEE_PRICE = COFFEE_ATLAS_OFFER.price.replace(/ /g, "\u00a0");
-export const GUEST_COFFEE_TERMS = `${BUSINESS_GIFT_TITLE}, затем ${GUEST_COFFEE_PRICE} в месяц`;
+/** Gift line, separate from the 30-minute guest preview. Trial opens the cabinet player with no minute cap. */
+export const GUEST_COFFEE_TERMS = `${BUSINESS_GIFT_TITLE} – полный доступ ко всем функциям, затем ${GUEST_COFFEE_PRICE} в месяц`;
 
 export const GUEST_COFFEE_COPY = {
   title: "Настройте звучание вашей кофейни",
   lead: "Выберите характер заведения, тип звучания и время суток, нажмите «Собрать атмосферу» – и слушайте готовую подборку прямо в кабинете АудиоЛад Бизнес.",
   /** Guest-only addition to the lead (members are already signed in). */
   leadGuest: "Без регистрации.",
-  limitNote: "В гостевом режиме доступно 30 минут прослушивания.",
   nearEnd:
     "Гостевое прослушивание скоро подойдёт к концу. Чтобы музыка звучала в кофейне без ограничений, подключите АудиоЛад Бизнес.",
-  nearEndShort: "Гостевое прослушивание скоро подойдёт к концу.",
   lastTrack: "Гостевое прослушивание подошло к концу – этот трек доиграет до конца.",
   exhaustedTitle: "Гостевое прослушивание завершено",
-  exhaustedText:
-    "Вы прослушали 30 минут музыки в гостевом режиме. Настройки и подборки остаются доступны для просмотра. Чтобы музыка звучала в кофейне каждый день, подключите АудиоЛад Бизнес.",
+  /** Shown only after the guest meter hits zero. The top banner does not mention the 30 minutes before that. */
+  exhaustedBanner:
+    "Гостевые 30 минут закончились. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом.",
+  exhaustedRegister: "Зарегистрироваться",
   exhaustedTrialTitle: "Знакомство с подборками завершено",
   exhaustedTrialText:
     "30 минут знакомства с подборками на этом устройстве использованы. Чтобы музыка звучала в заведении, подключите точку – бесплатный доступ у вас уже есть.",
