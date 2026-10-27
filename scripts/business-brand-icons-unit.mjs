@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   BUSINESS_BRAND_ICON_VERSION,
-  BUSINESS_BRAND_MARK_FILE,
+  BUSINESS_BRAND_MARK_PATH,
   BUSINESS_BRAND_MARK_SRC,
   BUSINESS_BRAND_METADATA,
   BUSINESS_BRAND_NAME,
@@ -207,12 +207,15 @@ assert.doesNotMatch(readme, /master-logo-icon\.png|espresso-on-cream/);
 assert.ok(existsSync(join(root, "docs/business/brand-icons/render_icons.py")));
 assert.ok(existsSync(join(root, "docs/business/brand-icons/leather-lotus-source.jpg")));
 
-const mark = readFileSync(pub(`/business/brand/${BUSINESS_BRAND_MARK_FILE}`));
+assert.equal(
+  BUSINESS_BRAND_MARK_PATH,
+  `/business/brand/mark-leather.webp?v=${BUSINESS_BRAND_ICON_VERSION}`,
+);
+assert.equal(BUSINESS_BRAND_MARK_SRC, BUSINESS_BRAND_MARK_PATH);
+const mark = readFileSync(pub(assetPath(BUSINESS_BRAND_MARK_PATH)));
 assert.ok(mark.length < 60 * 1024, `in-app mark is ${mark.length} bytes`);
 assert.equal(mark.toString("latin1", 0, 4), "RIFF");
 assert.equal(mark.toString("latin1", 8, 12), "WEBP");
-assert.ok(BUSINESS_BRAND_MARK_SRC.includes(BUSINESS_BRAND_MARK_FILE));
-assert.ok(BUSINESS_BRAND_MARK_SRC.includes(`v=${BUSINESS_BRAND_ICON_VERSION}`));
 for (const webp of ["icon-512.webp", "icon-192.webp", "icon-maskable-512.webp", "apple-touch-icon.webp"]) {
   const bytes = readFileSync(pub(`/business/brand/${webp}`));
   assert.equal(bytes.toString("latin1", 0, 4), "RIFF", webp);
@@ -225,7 +228,6 @@ const sidebar = readFileSync(join(root, "src/components/business-app/BusinessSid
 const shell = readFileSync(join(root, "src/components/business-app/BusinessAppShell.tsx"), "utf8");
 const css = readFileSync(join(root, "src/components/business-app/business-app.css"), "utf8");
 assert.equal(BUSINESS_BRAND_NAME, "АудиоЛад Бизнес");
-assert.equal(BUSINESS_BRAND_MARK_FILE, "mark-leather.webp");
 assert.match(lockup, /BUSINESS_BRAND_MARK_SRC/);
 assert.match(lockup, /BUSINESS_BRAND_NAME/);
 assert.match(lockup, /business-app-brand__mark/);

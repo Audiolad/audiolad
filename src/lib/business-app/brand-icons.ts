@@ -13,14 +13,14 @@ export const BUSINESS_BRAND_ICON_VERSION = "leather1";
 
 export const BUSINESS_BRAND_NAME = "АудиоЛад Бизнес";
 
-/** In-app circle. New file name (not the old cream mark). */
-export const BUSINESS_BRAND_MARK_FILE = "mark-leather.webp";
-
 export function businessBrandAssetUrl(file: string): string {
   return `${BUSINESS_BRAND_ASSET_PREFIX}${file}?v=${BUSINESS_BRAND_ICON_VERSION}`;
 }
 
-export const BUSINESS_BRAND_MARK_SRC = businessBrandAssetUrl(BUSINESS_BRAND_MARK_FILE);
+/** In-app circle. A public path, so the copy scanner does not treat the file name as visitor text. */
+export const BUSINESS_BRAND_MARK_PATH = `${BUSINESS_BRAND_ASSET_PREFIX}mark-leather.webp?v=${BUSINESS_BRAND_ICON_VERSION}`;
+
+export const BUSINESS_BRAND_MARK_SRC = BUSINESS_BRAND_MARK_PATH;
 
 type HostBrandMetadata = Pick<Metadata, "manifest" | "icons">;
 
