@@ -17,6 +17,33 @@ INSERT INTO public.business_content_categories(category, direction_key) VALUES
  ('restaurant','restaurant'), ('ресторан','restaurant'), ('рестораны','restaurant'),
  ('spa','spa'), ('спа','spa'), ('медитативный центр','spa');
 
+-- Default off: Business keeps today's playback until an admin turns the gate on.
+CREATE TABLE public.business_runtime_flags (
+  key text PRIMARY KEY CHECK (key ~ '^[a-z][a-z0-9_]{1,63}$'),
+  enabled boolean NOT NULL
+);
+INSERT INTO public.business_runtime_flags(key, enabled) VALUES ('manual_content_gate', false);
+
+CREATE FUNCTION public.business_manual_content_gate_enabled()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT coalesce((SELECT enabled FROM public.business_runtime_flags WHERE key = 'manual_content_gate'), false);
+$$;
+
+CREATE FUNCTION public.set_business_manual_content_gate(p_enabled boolean)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_next boolean := coalesce(p_enabled, false);
+BEGIN
+  IF NOT public.has_platform_permission(auth.uid(), 'admin_panel.access')
+    OR NOT public.has_platform_permission(auth.uid(), 'author_products.moderate') THEN
+    RAISE EXCEPTION 'Доступ запрещён' USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.business_runtime_flags SET enabled = v_next WHERE key = 'manual_content_gate';
+  INSERT INTO public.business_content_admission_audit(actor_id, entity, old_value, new_value)
+  VALUES (auth.uid(), 'business_runtime_flags', NULL,
+    jsonb_build_object('key', 'manual_content_gate', 'enabled', v_next));
+END;
+$$;
+
 CREATE TABLE public.business_content_admissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   direction_key text NOT NULL REFERENCES public.business_content_directions(key) ON DELETE RESTRICT,
@@ -185,6 +212,10 @@ BEGIN
       'reason_codes', coalesce(v->'reason_codes', '[]'::jsonb) || to_jsonb('BUSINESS_TRACK_ADMISSION_' || upper(r.decision)),
       'business_track_review_id', r.id);
   END IF;
+  -- Off: current rights result only. On: album/artist admission may only exclude.
+  IF NOT public.business_manual_content_gate_enabled() THEN
+    RETURN v;
+  END IF;
   SELECT c.direction_key INTO v_direction FROM public.business_locations l
     JOIN public.business_content_categories c ON c.category = lower(btrim(l.business_category))
     WHERE l.id = p_location_id;
@@ -198,15 +229,20 @@ BEGIN
 END;
 $$;
 
+ALTER TABLE public.business_runtime_flags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_content_directions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_content_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_content_admissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_content_admission_audit ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON public.business_content_directions, public.business_content_categories,
+REVOKE ALL ON public.business_runtime_flags, public.business_content_directions, public.business_content_categories,
  public.business_content_admissions, public.business_content_admission_audit FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON SEQUENCE public.business_content_admission_audit_id_seq FROM PUBLIC, anon, authenticated, service_role;
-GRANT SELECT ON public.business_content_directions, public.business_content_categories,
+GRANT SELECT ON public.business_runtime_flags, public.business_content_directions, public.business_content_categories,
  public.business_content_admissions, public.business_content_admission_audit TO service_role;
+REVOKE ALL ON FUNCTION public.business_manual_content_gate_enabled() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.business_manual_content_gate_enabled() TO service_role;
+REVOKE ALL ON FUNCTION public.set_business_manual_content_gate(boolean) FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.set_business_manual_content_gate(boolean) TO authenticated;
 REVOKE ALL ON FUNCTION public.audit_business_content_change() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.set_business_content_admissions(text,text,uuid[],boolean) FROM PUBLIC, anon, service_role;
 REVOKE ALL ON FUNCTION public.add_business_content_direction(text,text,text[]) FROM PUBLIC, anon, service_role;

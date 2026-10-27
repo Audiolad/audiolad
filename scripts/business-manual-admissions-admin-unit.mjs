@@ -26,15 +26,17 @@ mock("../src/lib/supabase/service-role.ts", { createServiceRoleClient: () => ({
     return query;
   },
   async rpc(name, params) {
+    if (name === "business_manual_content_gate_enabled") return { data: false, error: null };
     assert.equal(name, "list_business_content_admissions");
     search = params;
     return { data: [{ id: params.p_kind === "album" ? "album" : "artist", title: params.p_kind === "album" ? "Активный альбом" : "Ирина Ведянина", author_id: "artist", author_name: "Ирина Ведянина" }], error: null };
   },
 }) });
-mock("../src/app/(platform)/admin/business-admissions/actions.ts", { saveBusinessAdmissions: async () => {}, addBusinessDirection: async () => {} });
+mock("../src/app/(platform)/admin/business-admissions/actions.ts", { saveBusinessAdmissions: async () => {}, addBusinessDirection: async () => {}, setBusinessManualContentGate: async () => {} });
 const Page = require("../src/app/(platform)/admin/business-admissions/page.tsx").default;
 async function render(params) { return renderToStaticMarkup(await Page({ searchParams: Promise.resolve(params) })); }
 const artist = await render({ kind: "artist" });
+assert.match(artist, /Ручные ворота выключены/);
 assert.match(artist, /Разрешено – артист/);
 assert.match(artist, /Применить к выбранным/);
 const album = await render({ kind: "album", q: "Ирина", direction: "spa", decision: "denied", page: "2" });

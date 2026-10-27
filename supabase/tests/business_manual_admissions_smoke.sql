@@ -20,7 +20,10 @@ CREATE FUNCTION public.test_assert(ok boolean, label text) RETURNS void LANGUAGE
  BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'FAIL: %', label; END IF; END;
 $$;
 SELECT test_assert((SELECT count(*) = 0 FROM business_content_admissions), 'no seeded admissions');
+SELECT test_assert(NOT business_manual_content_gate_enabled(), 'manual gate defaults off');
 SELECT test_assert(resolve_business_content_admission('20000000-0000-0000-0000-000000000002','cafe')->>'source' = 'unreviewed','candidate is unreviewed');
+SELECT test_assert(resolve_business_track_eligibility('20000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000001')->>'decision' = 'ELIGIBLE','gate off keeps the current rights result');
+UPDATE public.business_runtime_flags SET enabled = true WHERE key = 'manual_content_gate';
 SELECT test_assert(resolve_business_track_eligibility('20000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000001')->>'decision' = 'INELIGIBLE','rights alone never open access');
 SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
 SET ROLE authenticated;

@@ -12,11 +12,17 @@
 используют существующие загрузчики продуктов и этим изменением не ограничиваются.
 
 Кабинет Business использует `src/lib/business-workspace/load.server.ts`.
-Раньше кандидаты брались из `business_space_admissions` либо списка UUID артистов.
-Теперь кандидаты поступают из `business_content_candidate_albums(location_id)`.
-UUID в `catalog-sources.ts` остаются подсказками отображения и источниками
-персонального onboarding-превью, права или коммерческий допуск они не открывают.
-Старая таблица `business_space_admissions` сохраняется, её записи не изменяются.
+Флаг `business_runtime_flags.manual_content_gate` по умолчанию выключен.
+Пока он выключен, кандидаты берутся как сейчас: `business_space_admissions`,
+а если записей нет – опубликованная музыка авторов из `catalog-sources.ts`.
+Включённый флаг берёт альбомы из `business_content_candidate_albums(location_id)`.
+В обоих случаях список кабинета – это треки, для которых
+`resolve_business_track_eligibility` вернул `ELIGIBLE`. Адаптер порядка
+(`currentCabinetAdmission` в кабинете кафе) может только переупорядочить этот
+список и не добавляет треки. UUID в `catalog-sources.ts` остаются подсказками
+отображения и источниками персонального onboarding-превью; при включённых
+воротах они допуск не открывают. Старая таблица `business_space_admissions`
+сохраняется, её записи не изменяются и при включённых воротах доступ не дают.
 
 Общая точка допуска к воспроизведению – `resolve_business_track_eligibility`.
 Её вызывают кабинет, выдача URL трека и `business_spa_program_manifest`, включая

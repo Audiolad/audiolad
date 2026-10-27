@@ -36,6 +36,19 @@ export async function saveBusinessAdmissions(form: FormData): Promise<void> {
   redirect(`${PATH}?${query}`);
 }
 
+export async function setBusinessManualContentGate(form: FormData): Promise<void> {
+  await requireAdminPermission("author_products.moderate");
+  const enabled = String(form.get("enabled")) === "true";
+  let failed = false;
+  try {
+    const db = await createClient();
+    const { error } = await db.rpc("set_business_manual_content_gate", { p_enabled: enabled });
+    failed = Boolean(error);
+  } catch { failed = true; }
+  revalidatePath(PATH);
+  redirect(`${PATH}?result=${failed ? "gate-error" : "saved"}`);
+}
+
 export async function addBusinessDirection(form: FormData): Promise<void> {
   await requireAdminPermission("author_products.moderate");
   let failed = false;

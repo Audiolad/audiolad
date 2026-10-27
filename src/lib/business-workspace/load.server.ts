@@ -14,6 +14,7 @@ import {
 } from "@/lib/access-grants/paths";
 import { isEmailConfirmed, formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
+import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { GUEST_COFFEE_RIGHTS_URL } from "@/lib/business-app/guest-coffee/copy";
@@ -134,19 +135,14 @@ type AudioRow = {
   active_music_delivery_asset_id: string | null;
 };
 
-async function loadCuratedCandidates(
+async function candidatesFromPractices(
   db: ServiceDb,
-  spaceId: BusinessSpaceId,
-  locationId: string | null,
+  practices: PracticeRow[],
+  authorIds: readonly string[],
+  nameByAuthor: ReadonlyMap<string | null, string>,
+  sources: ReturnType<typeof sourcesForSpace>,
+  requireKnownAuthor: boolean,
 ): Promise<WorkspaceCatalogCandidate[] | "error"> {
-  if (!locationId) return [];
-  const sources = sourcesForSpace(spaceId);
-  const practices = await selectPages<PracticeRow>((from, to) => db
-    .rpc("business_content_candidate_albums", { p_location_id: locationId }).range(from, to));
-  if (!practices) return "error";
-  const authorIds = [...new Set(practices.flatMap((row) => row.author_id ? [row.author_id] : []))].sort();
-  const nameByAuthor = new Map(practices.map((row) => [row.author_id, row.author_name?.trim() || ""]));
-
   const allowedAuthors = new Set(authorIds);
   const sourceByAuthor = new Map(sources.map((source) => [source.authorId, source]));
   const practiceById = new Map<string, PracticeRow>();
@@ -188,6 +184,7 @@ async function loadCuratedCandidates(
     const practice = audio.practice_id ? practiceById.get(audio.practice_id) : undefined;
     if (!practice?.author_id) continue;
     const source = sourceByAuthor.get(practice.author_id);
+    if (requireKnownAuthor && !source) continue;
     const row: WorkspaceCatalogSourceRow = {
       audioItemId: audio.id,
       authorId: practice.author_id,
@@ -222,6 +219,51 @@ async function loadCuratedCandidates(
   return candidates;
 }
 
+/** Gate on: albums the direction admission already allows. The eligibility function still decides each track. */
+async function loadDirectionCandidates(
+  db: ServiceDb,
+  spaceId: BusinessSpaceId,
+  locationId: string | null,
+): Promise<WorkspaceCatalogCandidate[] | "error"> {
+  if (!locationId) return [];
+  const practices = await selectPages<PracticeRow>((from, to) => db
+    .rpc("business_content_candidate_albums", { p_location_id: locationId }).range(from, to));
+  if (!practices) return "error";
+  const authorIds = [...new Set(practices.flatMap((row) => row.author_id ? [row.author_id] : []))].sort();
+  const nameByAuthor = new Map(practices.map((row) => [row.author_id, row.author_name?.trim() || ""]));
+  return candidatesFromPractices(db, practices, authorIds, nameByAuthor, sourcesForSpace(spaceId), false);
+}
+
+/** Gate off: published music of the curated authors, used only when the space has no per-track admissions. */
+async function loadAuthorCuratedCandidates(
+  db: ServiceDb,
+  spaceId: BusinessSpaceId,
+): Promise<WorkspaceCatalogCandidate[] | "error"> {
+  const sources = sourcesForSpace(spaceId);
+  if (sources.length === 0) return [];
+  const authorIds = sources.map((source) => source.authorId);
+  const authorNames = await db.from("authors").select("id, name").in("id", authorIds);
+  if (authorNames.error || !Array.isArray(authorNames.data)) return "error";
+  const nameByAuthor = new Map(
+    (authorNames.data as { id: string; name: string | null }[]).map((row) => [row.id, row.name?.trim() || ""]),
+  );
+  const practices = await selectPages<Omit<PracticeRow, "author_name">>((from, to) => db
+    .from("practices")
+    .select("id, title, author_id, status, product_kind, catalog_visibility, deleted_at")
+    .in("author_id", authorIds)
+    .order("id", { ascending: true })
+    .range(from, to));
+  if (!practices) return "error";
+  return candidatesFromPractices(
+    db,
+    practices.map((row) => ({ ...row, author_name: row.author_id ? nameByAuthor.get(row.author_id) ?? "" : "" })),
+    authorIds,
+    nameByAuthor,
+    sources,
+    true,
+  );
+}
+
 function isListedPractice(practice: PracticeRow): boolean {
   return practice.deleted_at == null
     && practice.status === "published"
@@ -241,6 +283,121 @@ function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack | null {
   });
 }
 
+function one<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function embeddedName(value: unknown): string {
+  const row = one(value as { name?: string | null } | { name?: string | null }[] | null);
+  const name = row && typeof row.name === "string" ? row.name.trim() : "";
+  return name;
+}
+
+function plainTrack(id: string, title: string | null, duration: number | null): WorkspaceTrack {
+  return {
+    audioItemId: id,
+    title: title?.trim() || "Трек",
+    durationSeconds: typeof duration === "number" ? duration : null,
+    authorId: null,
+    authorName: null,
+    albumTitle: null,
+    shelf: "cafe",
+  };
+}
+
+async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promise<Map<string, WorkspaceTrack> | null> {
+  const byId = new Map<string, WorkspaceTrack>();
+  for (let index = 0; index < ids.length; index += ID_CHUNK) {
+    const chunk = ids.slice(index, index + ID_CHUNK);
+    const joined = await db
+      .from("audio_items")
+      .select("id, title, duration_seconds, practices(title, author_id, authors!practices_author_id_fkey(name))")
+      .in("id", chunk);
+    if (joined.error || !Array.isArray(joined.data)) {
+      const plain = await db.from("audio_items").select("id, title, duration_seconds").in("id", chunk);
+      if (plain.error || !Array.isArray(plain.data)) return null;
+      for (const row of plain.data as { id: string; title: string | null; duration_seconds: number | null }[]) {
+        const track = workspaceTrackWithDisplayTitle(plainTrack(row.id, row.title, row.duration_seconds));
+        if (track) byId.set(row.id, track);
+      }
+      continue;
+    }
+    for (const row of joined.data as {
+      id: string;
+      title: string | null;
+      duration_seconds: number | null;
+      practices: {
+        title?: string | null;
+        author_id?: string | null;
+        authors?: { name?: string | null } | { name?: string | null }[] | null;
+      } | {
+        title?: string | null;
+        author_id?: string | null;
+        authors?: { name?: string | null } | { name?: string | null }[] | null;
+      }[] | null;
+    }[]) {
+      const practice = one(row.practices);
+      const named = workspaceTrackWithDisplayTitle({
+        ...plainTrack(row.id, row.title, row.duration_seconds),
+        authorId: practice?.author_id ?? null,
+        authorName: embeddedName(practice?.authors) || null,
+        albumTitle: practice?.title?.trim() || null,
+      });
+      if (named) byId.set(row.id, named);
+    }
+  }
+  return byId;
+}
+
+/**
+ * Pool the eligibility function is about to filter.
+ * Gate off keeps today's source: space admissions, or curated authors when that table is empty.
+ * Gate on reads direction-admitted albums. Either way, only ELIGIBLE tracks leave this module.
+ * A later passport ordering adapter may reorder that list and must not add a track.
+ */
+async function loadCandidateTracks(
+  db: ServiceDb,
+  spaceId: BusinessSpaceId,
+  locationId: string | null,
+): Promise<WorkspaceTrack[] | "error"> {
+  if (await businessManualContentGateEnabled(db)) {
+    const curated = await loadDirectionCandidates(db, spaceId, locationId);
+    if (curated === "error") return "error";
+    return curated.flatMap((row) => {
+      const track = candidateTrack(row);
+      return track ? [track] : [];
+    });
+  }
+
+  const admitted = await db
+    .from("business_space_admissions")
+    .select("space_id, audio_item_id")
+    .eq("space_id", spaceId);
+  if (admitted.error || !Array.isArray(admitted.data)) return "error";
+  const admissionIds: string[] = [];
+  const seen = new Set<string>();
+  for (const row of admitted.data as { space_id?: string; audio_item_id?: string }[]) {
+    if (row.space_id !== spaceId || typeof row.audio_item_id !== "string" || seen.has(row.audio_item_id)) continue;
+    seen.add(row.audio_item_id);
+    admissionIds.push(row.audio_item_id);
+  }
+  if (admissionIds.length > 0) {
+    const meta = await loadAdmissionTracks(db, admissionIds);
+    if (!meta) return "error";
+    return admissionIds.flatMap((id) => {
+      const track = meta.get(id);
+      return track ? [track] : [];
+    });
+  }
+  const curated = await loadAuthorCuratedCandidates(db, spaceId);
+  if (curated === "error") return "error";
+  return curated.flatMap((row) => {
+    const track = candidateTrack(row);
+    return track ? [track] : [];
+  });
+}
+
 export async function loadWorkspaceCatalog(input: {
   spaceId: BusinessSpaceId;
   locationId: string | null;
@@ -254,14 +411,8 @@ export async function loadWorkspaceCatalog(input: {
     return { tracks: [], unavailable: true };
   }
 
-  // Legacy per-track admissions and curated author UUIDs cannot open access.
-  // The shared manual resolver supplies candidates; the common rights engine checks each track.
-  const curated = await loadCuratedCandidates(db, input.spaceId, input.locationId);
-  if (curated === "error") return { tracks: [], unavailable: true };
-  const named = curated.flatMap((row) => {
-    const track = candidateTrack(row);
-    return track ? [track] : [];
-  });
+  const named = await loadCandidateTracks(db, input.spaceId, input.locationId);
+  if (named === "error") return { tracks: [], unavailable: true };
   const admissions: SpaceAdmission[] = named.map((track) => ({ spaceId: input.spaceId, audioItemId: track.audioItemId }));
   const curatedById = new Map(named.map((track) => [track.audioItemId, track]));
 

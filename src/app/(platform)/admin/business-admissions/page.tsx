@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { ADMISSION_SOURCE_LABELS, resolveManualAdmission } from "@/lib/business-admission/policy";
-import { addBusinessDirection, saveBusinessAdmissions } from "./actions";
+import { addBusinessDirection, saveBusinessAdmissions, setBusinessManualContentGate } from "./actions";
 import SelectPage from "./SelectPage";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +27,12 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
   let directions: Direction[] = [], decisions: Decision[] = [], rows: Row[] = [], audit: Audit[] = [];
   let unavailable = false;
   let hasMore = false;
+  let gateOn = false;
   try {
     const db = createServiceRoleClient();
+    const gate = await db.rpc("business_manual_content_gate_enabled");
+    if (gate.error) throw new Error("unavailable");
+    gateOn = gate.data === true;
     const [dirs, history] = await Promise.all([
       db.from("business_content_directions").select("key, name").eq("active", true).order("key"),
       db.from("business_content_admission_audit").select("id, actor_id, changed_at, entity, old_value, new_value").order("id", { ascending: false }).limit(20),
@@ -66,6 +70,13 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
   </>;
   return <div className="space-y-6 p-4">
     <h1 className="text-2xl font-semibold">Ручные допуски Business</h1>
+    <form action={setBusinessManualContentGate} className="flex flex-wrap items-center gap-3 rounded border p-3">
+      <p>{gateOn
+        ? "Ручные ворота включены – в эфир попадают только допущенные альбомы и артисты. Непроверенное скрыто."
+        : "Ручные ворота выключены – кабинет играет как сейчас. Включайте после пилотных допусков: непроверенное тогда исчезнет из эфира."}</p>
+      <input type="hidden" name="enabled" value={gateOn ? "false" : "true"} />
+      <button className="rounded border px-3 py-2" type="submit">{gateOn ? "Выключить ручные ворота" : "Включить ручные ворота"}</button>
+    </form>
     <p>Артист задаёт базовый допуск. Явное решение альбома имеет приоритет. Без ручного решения доступ закрыт.
       Музыкальный паспорт только предлагает характеристики.</p>
     <p>В таблице показан итог по музыкальной пригодности. Воспроизведение дополнительно требует действующих прав на каждый трек и заведение.

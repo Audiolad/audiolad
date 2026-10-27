@@ -2246,10 +2246,14 @@ Full schema/RPC lifecycle, RLS, backup and manual rollback:
 
 Аддитивная миграция `20270131120000_business_manual_admissions.sql` создаёт
 `business_content_directions`, `business_content_categories`,
-`business_content_admissions`, `business_content_admission_audit`, RPC управления,
-резолвер наследования и выборку кандидатов. Общий `resolve_business_track_eligibility`
-сохраняет существующие правовые проверки и запреты треков, дополнительно требует
-положительного ручного итога альбома по категории заведения. Ни одного допуска
-для существующего контента миграция не создаёт. Поля, связи, права доступа,
-правила наследования и проверка описаны в `docs/business/manual-content-admissions.md`.
-Миграция из этой задачи не применяется к рабочим базам.
+`business_content_admissions`, `business_content_admission_audit`,
+`business_runtime_flags`, RPC управления, резолвер наследования и выборку
+кандидатов. Флаг `manual_content_gate` записан как `false`: пока он выключен,
+`resolve_business_track_eligibility` оставляет нынешний правовой результат и
+запреты `business_track_eligibility_reviews`. После включения функция дополнительно
+требует положительного ручного итога альбома по категории заведения (явный альбом
+важнее артиста, непроверенное исключено). Анализатор и паспорт допуск не открывают.
+Ни одного допуска для существующего контента миграция не создаёт. Поля, связи,
+права доступа, правила наследования и проверка описаны в
+`docs/business/manual-content-admissions.md`. Миграция из этой задачи не
+применяется к рабочим базам.
