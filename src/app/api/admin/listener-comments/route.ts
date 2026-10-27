@@ -8,7 +8,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const page = parseCommentPageQuery(url.searchParams);
   if (!page) return Response.json({ error: "invalid_page" }, { status: 400 });
-  const queue = url.searchParams.get("queue") === "hidden" ? "hidden" : "reports";
+  const queueParam = url.searchParams.get("queue");
+  const queue =
+    queueParam === "hidden" ? "hidden" : queueParam === "deleted" ? "deleted" : "reports";
   return runCommentAction(async () =>
     listModerationQueue(await commentStore(request), moderator.actor, {
       queue,

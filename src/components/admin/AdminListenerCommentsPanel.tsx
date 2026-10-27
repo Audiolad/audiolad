@@ -6,27 +6,40 @@ import {
   ADMIN_LISTENER_COMMENTS_SUBTITLE,
   ADMIN_LISTENER_COMMENTS_TITLE,
   LISTENER_IMPRESSION_LOAD_MORE,
-  MODERATION_ACTION_LABELS,
+  moderationJournalActionLabel,
+  moderationJournalReasonLabel,
+  OWNER_COMMENT_DELETE_CONFIRM,
+  OWNER_COMMENT_DELETE_LABEL,
+  OWNER_COMMENT_DELETED_QUEUE,
+  OWNER_COMMENT_RETURN_LABEL,
+  ownerReturnConfirm,
   REPORT_REASON_LABELS,
 } from "@/lib/practice-comments/copy";
 
-type Queue = "reports" | "hidden";
+type Queue = "reports" | "hidden" | "deleted";
 
 type Item = {
   id: string;
   practiceTitle: string;
   publicName: string;
   body: string;
-  status: "published" | "hidden";
+  status: "published" | "hidden" | "deleted";
   kind: "impression" | "author_reply";
   createdAt: string;
   reports: Array<{ reason: keyof typeof REPORT_REASON_LABELS; createdAt: string }>;
-  journal: Array<{ action: string; reason: string | null; createdAt: string }>;
+  ownerReturnTo?: "published" | "hidden" | null;
+  journal: Array<{
+    action: string;
+    reason: string | null;
+    createdAt: string;
+    actorLabel?: string;
+  }>;
 };
 
 type Page = {
   items: Item[];
   nextCursor: string | null;
+  canOwnerDelete?: boolean;
 };
 
 function queueUrl(queue: Queue, cursor: string | null): string {
@@ -35,15 +48,9 @@ function queueUrl(queue: Queue, cursor: string | null): string {
   return `/api/admin/listener-comments?${params}`;
 }
 
-function journalText(value: string | null): string {
-  if (!value) return "без причины";
-  if (value in REPORT_REASON_LABELS) {
-    return REPORT_REASON_LABELS[value as keyof typeof REPORT_REASON_LABELS];
-  }
-  if (value in MODERATION_ACTION_LABELS) {
-    return MODERATION_ACTION_LABELS[value as keyof typeof MODERATION_ACTION_LABELS];
-  }
-  return value;
+function journalLine(event: Item["journal"][number]): string {
+  const actor = event.actorLabel?.trim() ? event.actorLabel : "Участник";
+  return `${moderationJournalActionLabel(event.action)} – ${moderationJournalReasonLabel(event.reason)} – ${actor}`;
 }
 
 export default function AdminListenerCommentsPanel() {
@@ -53,10 +60,14 @@ export default function AdminListenerCommentsPanel() {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [canOwnerDelete, setCanOwnerDelete] = useState(false);
 
   function applyPage(payload: Page, append: boolean) {
     setItems((current) => (append ? [...current, ...payload.items] : payload.items));
     setNextCursor(payload.nextCursor);
+    if (!append && typeof payload.canOwnerDelete === "boolean") {
+      setCanOwnerDelete(payload.canOwnerDelete);
+    }
     setError(false);
     setLoading(false);
   }
@@ -112,6 +123,33 @@ export default function AdminListenerCommentsPanel() {
     }
   }
 
+  async function ownerAction(
+    id: string,
+    action: "delete" | "return",
+    previous: "published" | "hidden" | null = null,
+  ) {
+    const confirmText =
+      action === "delete"
+        ? OWNER_COMMENT_DELETE_CONFIRM
+        : ownerReturnConfirm(previous === "hidden" ? "hidden" : "published");
+    if (!window.confirm(confirmText)) return;
+    setPendingId(id);
+    try {
+      const response = await fetch(`/api/admin/listener-comments/${id}/owner-${action}`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("action_failed");
+      const refreshed = await fetch(queueUrl(queue, null), { credentials: "same-origin" });
+      if (!refreshed.ok) throw new Error("load_failed");
+      applyPage((await refreshed.json()) as Page, false);
+    } catch {
+      setError(true);
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   return (
     <section aria-labelledby="admin-listener-comments-heading" data-admin-listener-comments="true">
       <h2 id="admin-listener-comments-heading" className="text-[21px] font-semibold">
@@ -125,6 +163,11 @@ export default function AdminListenerCommentsPanel() {
         <button type="button" className={tab(queue === "hidden")} onClick={() => selectQueue("hidden")}>
           Скрытые
         </button>
+        {canOwnerDelete ? (
+          <button type="button" className={tab(queue === "deleted")} onClick={() => selectQueue("deleted")}>
+            {OWNER_COMMENT_DELETED_QUEUE}
+          </button>
+        ) : null}
       </div>
       {error ? (
         <p className="mt-4 text-sm text-[#9a3d55]" data-admin-listener-comments-error="true">
@@ -173,7 +216,7 @@ export default function AdminListenerCommentsPanel() {
               <ul className="mt-2 space-y-1 text-xs text-[#6d628c]">
                 {item.journal.map((event, index) => (
                   <li key={`${item.id}-${index}`}>
-                    {journalText(event.action)} – {journalText(event.reason)} – {event.createdAt}
+                    {journalLine(event)} – {event.createdAt}
                   </li>
                 ))}
               </ul>
@@ -188,9 +231,33 @@ export default function AdminListenerCommentsPanel() {
                 >
                   Скрыть как спам
                 </button>
-              ) : (
+              ) : item.status === "hidden" ? (
                 <p className="text-sm text-[#6d628c]">Скрыто</p>
+              ) : (
+                <p className="text-sm text-[#6d628c]">Удалено</p>
               )}
+              {canOwnerDelete && item.status !== "deleted" ? (
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full border border-[#e4d7f4] px-4 text-sm font-semibold text-[#9a3d55] disabled:opacity-60"
+                  disabled={pendingId === item.id}
+                  data-owner-delete-comment="true"
+                  onClick={() => void ownerAction(item.id, "delete")}
+                >
+                  {OWNER_COMMENT_DELETE_LABEL}
+                </button>
+              ) : null}
+              {canOwnerDelete && item.status === "deleted" && item.ownerReturnTo ? (
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full border border-[#e4d7f4] px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+                  disabled={pendingId === item.id}
+                  data-owner-return-comment="true"
+                  onClick={() => void ownerAction(item.id, "return", item.ownerReturnTo)}
+                >
+                  {OWNER_COMMENT_RETURN_LABEL}
+                </button>
+              ) : null}
             </div>
           </li>
         ))}

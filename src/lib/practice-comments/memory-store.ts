@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { resolveListenerAvatarUrl, resolveViewerCommentAvatar } from "@/lib/practice-comments/avatar";
 import { compareComments, isAfterCursor } from "@/lib/practice-comments/pagination";
+import { moderationActorLabel } from "@/lib/practice-comments/copy";
 import { practiceAcceptsListenerComments } from "@/lib/practice-comments/policy";
 import { isListenerCommentFeedVisible } from "@/lib/practice-comments/visibility";
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
@@ -41,6 +42,7 @@ export type MemoryCommentState = {
   reports: CommentReportRow[];
   events: ModerationEventRow[];
   edits: CommentEditMark[];
+  profiles?: Record<string, { fullName?: string | null; email?: string | null }>;
 };
 
 export function createMemoryCommentStore(state: MemoryCommentState): CommentStore {
@@ -65,6 +67,7 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
         ? practiceAcceptsListenerComments({
             productKind: gate.productKind,
             catalogSection: gate.catalogSection,
+            catalogVisibility: gate.catalogVisibility,
             status: gate.status,
             publishedAt: gate.publishedAt,
             scheduledPublishAt: gate.scheduledPublishAt,
@@ -146,6 +149,15 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
           row.kind === "impression" &&
           row.status !== "deleted",
       );
+    },
+    async countPublishedImpressions(practiceId) {
+      return state.comments.filter(
+        (row) =>
+          row.practiceId === practiceId &&
+          row.kind === "impression" &&
+          row.status === "published" &&
+          !row.deletedAt,
+      ).length;
     },
     async authorDisplayName(practiceId) {
       return state.authorNames[practiceId] ?? "Автор";
@@ -330,15 +342,22 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     async listNotices(userId) {
       return state.notices
         .filter((notice) => notice.recipientUserId === userId)
-        .map((notice) => {
-          const gate = gateFor(notice.practiceId);
+        .flatMap((notice) => {
           const comment = state.comments.find((row) => row.id === notice.commentId);
-          return {
-            ...notice,
-            practiceTitle: gate?.title ?? "Практика",
-            practiceHref: gate ? `/practice/${gate.authorSlug}/${gate.productSlug}#listener-impressions` : "/catalog",
-            preview: comment?.body.slice(0, 140) ?? "",
-          };
+          if (!comment || comment.status === "deleted" || comment.deletedAt || !comment.body) {
+            return [];
+          }
+          const gate = gateFor(notice.practiceId);
+          return [
+            {
+              ...notice,
+              practiceTitle: gate?.title ?? "Практика",
+              practiceHref: gate
+                ? `/practice/${gate.authorSlug}/${gate.productSlug}#listener-impressions`
+                : "/catalog",
+              preview: comment.body.slice(0, 140),
+            },
+          ];
         });
     },
     async markNoticeRead(userId, noticeId, readAt) {
@@ -372,8 +391,86 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     async listModerationEvents(commentId) {
       return state.events.filter((event) => event.commentId === commentId);
     },
+    async applyOwnerModeration(input) {
+      const row = state.comments.find((item) => item.id === input.commentId);
+      if (!row) return { ok: false as const, error: "not_found" as const };
+      if (input.action === "owner_delete") {
+        if (row.status === "deleted" || row.deletedAt) {
+          return { ok: false as const, error: "not_found" as const };
+        }
+        if (row.status !== "published" && row.status !== "hidden") {
+          return { ok: false as const, error: "not_found" as const };
+        }
+        const previous = row.status;
+        const event: ModerationEventRow = {
+          id: input.eventId,
+          commentId: row.id,
+          actorUserId: input.actorUserId,
+          action: "owner_delete",
+          reason: `previous:${previous}`,
+          createdAt: input.now,
+        };
+        row.status = "deleted";
+        row.deletedAt = input.now;
+        row.updatedAt = input.now;
+        state.events.push(event);
+        state.notices = state.notices.filter((notice) => notice.commentId !== row.id);
+        return { ok: true as const };
+      }
+      if (row.status !== "deleted" || !row.deletedAt) {
+        return { ok: false as const, error: "not_found" as const };
+      }
+      const lastDelete = [...state.events]
+        .reverse()
+        .find((event) => event.commentId === row.id && event.action === "owner_delete");
+      const eventAt = lastDelete ? Date.parse(lastDelete.createdAt) : Number.NaN;
+      const deletedAt = Date.parse(row.deletedAt);
+      if (
+        !lastDelete ||
+        !Number.isFinite(eventAt) ||
+        !Number.isFinite(deletedAt) ||
+        eventAt < deletedAt
+      ) {
+        return { ok: false as const, error: "not_owner_deleted" as const };
+      }
+      const previous =
+        lastDelete.reason === "previous:hidden"
+          ? "hidden"
+          : lastDelete.reason === "previous:published"
+            ? "published"
+            : null;
+      if (!previous) return { ok: false as const, error: "not_owner_deleted" as const };
+      const event: ModerationEventRow = {
+        id: input.eventId,
+        commentId: row.id,
+        actorUserId: input.actorUserId,
+        action: "owner_return",
+        reason: `status:${previous}`,
+        createdAt: input.now,
+      };
+      row.status = previous;
+      row.deletedAt = null;
+      row.updatedAt = input.now;
+      state.events.push(event);
+      return { ok: true as const, previousStatus: previous };
+    },
+    async clearCommentNotices(commentId) {
+      state.notices = state.notices.filter((notice) => notice.commentId !== commentId);
+    },
+    async actorLabels(userIds) {
+      const labels: Record<string, string> = {};
+      for (const userId of userIds) {
+        const profile = state.profiles?.[userId];
+        labels[userId] = moderationActorLabel({
+          fullName: profile?.fullName,
+          email: profile?.email,
+        });
+      }
+      return labels;
+    },
     async listModerationQueue(input) {
       const matched = state.comments.filter((row) => {
+        if (input.queue === "deleted") return row.status === "deleted";
         if (row.status === "deleted") return false;
         if (input.queue === "hidden") return row.status === "hidden";
         return (

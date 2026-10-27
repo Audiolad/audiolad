@@ -22,7 +22,7 @@ function resolveAudioPostAfterHeroSectionOrder({
   hasFaq = false,
   hasAuthorRecommendations = false,
 } = {}) {
-  const order = ["thank-author", "next-step", "about"];
+  const order = ["thank-author", "impressions", "next-step", "about"];
   if (hasFaq) {
     order.push("faq");
   }
@@ -35,12 +35,12 @@ function resolveAudioPostAfterHeroSectionOrder({
 
 assert.deepEqual(
   resolveAudioPostAfterHeroSectionOrder(),
-  ["thank-author", "next-step", "about", "footer"],
+  ["thank-author", "impressions", "next-step", "about", "footer"],
   "FAQ and recommendations stay off when those datasets are empty",
 );
 assert.deepEqual(
   resolveAudioPostAfterHeroSectionOrder({ hasFaq: true }),
-  ["thank-author", "next-step", "about", "faq", "footer"],
+  ["thank-author", "impressions", "next-step", "about", "faq", "footer"],
 );
 assert.deepEqual(
   resolveAudioPostAfterHeroSectionOrder({
@@ -49,6 +49,7 @@ assert.deepEqual(
   }),
   [
     "thank-author",
+    "impressions",
     "next-step",
     "about",
     "faq",
@@ -58,7 +59,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   resolveAudioPostAfterHeroSectionOrder({ hasAuthorRecommendations: true }),
-  ["thank-author", "next-step", "about", "author-recommendations", "footer"],
+  ["thank-author", "impressions", "next-step", "about", "author-recommendations", "footer"],
   "recommendations stay available without inventing a FAQ block",
 );
 
@@ -128,6 +129,7 @@ const trailing = audioPostPage.slice(trailingStart, trailingEnd);
 
 const markers = [
   ["thank-author", "AuthorAppreciationPrototype"],
+  ["impressions", "PracticeComments"],
   ["next-step", "AudioPostRecommendation"],
   ["about", "ProductCopySections"],
   ["seo-faq-recommendations", "PracticeSeoContentSections"],
