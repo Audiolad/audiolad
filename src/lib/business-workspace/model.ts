@@ -1,10 +1,19 @@
 import type { SpaManifestItem } from "@/lib/business-app/spa-manifest";
 import type { BusinessSpaceId } from "./spaces";
 
+/** `other` is a separate group inside the cafe cabinet (Aurafon). */
+export const WORKSPACE_TRACK_SHELVES = ["cafe", "other"] as const;
+
+export type WorkspaceTrackShelf = (typeof WORKSPACE_TRACK_SHELVES)[number];
+
 export type WorkspaceTrack = {
   audioItemId: string;
   title: string;
   durationSeconds: number | null;
+  authorId: string | null;
+  authorName: string | null;
+  albumTitle: string | null;
+  shelf: WorkspaceTrackShelf;
 };
 
 export type WorkspacePlaybackSnapshot = {
@@ -38,6 +47,8 @@ export type WorkspacePageModel = {
   periodLabel: string;
   rules: string;
   tracks: WorkspaceTrack[];
+  /** Trial or paid cabinet with no venue: rights stay UNKNOWN until a point exists. */
+  needsVenue: boolean;
   playback: WorkspacePlaybackSnapshot | null;
   helpHref: string;
   rightsHref: string;
@@ -52,7 +63,10 @@ export function workspacePlayerOpen(model: Pick<WorkspacePageModel, "status" | "
 }
 
 /** The wire deadline is ISO; the SPA engine consumes Date instances. */
-export function workspaceItems(tracks: readonly WorkspaceTrack[], endsAt: string | null): SpaManifestItem[] {
+export function workspaceItems(
+  tracks: readonly Pick<WorkspaceTrack, "audioItemId" | "title" | "durationSeconds">[],
+  endsAt: string | null,
+): SpaManifestItem[] {
   return tracks.map((track, position) => ({
     position,
     audioItemId: track.audioItemId,

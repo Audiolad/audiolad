@@ -47,6 +47,11 @@ export const BUSINESS_WORKSPACE_AUTOPLAY_NOTE =
 export const BUSINESS_EMPTY_CATALOG_NOTE =
   "Подборка в этом направлении готовится – музыка появится здесь автоматически.";
 
+export const BUSINESS_CONNECT_VENUE_NOTE =
+  "Чтобы в кабинете играла музыка, подключите точку. Это занимает около минуты, карта не нужна.";
+
+export const BUSINESS_CONNECT_VENUE_CTA = "Подключить точку";
+
 export const BUSINESS_SUBSCRIPTION_NOTE =
   "Полный плеер закрыт. Подписка добровольная: онлайн-оформление ничего не списывает, пока оплата не подключена отдельно. Подборка и настройки кабинета сохранены.";
 

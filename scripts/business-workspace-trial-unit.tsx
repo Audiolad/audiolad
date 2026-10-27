@@ -9,11 +9,12 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { PathnameContext } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 
 import { getSafeNextPath } from "../src/lib/auth/routes";
-import { BUSINESS_TRIAL_RETURN_PATH, BUSINESS_TRIAL_SIGN_IN_HREF } from "../src/lib/access-grants/paths";
+import { BUSINESS_TRIAL_RETURN_PATH, BUSINESS_TRIAL_SIGN_IN_HREF, businessCabinetOnboardingPath, businessOnboardingEntryHref, safeBusinessWorkspaceReturn } from "../src/lib/access-grants/paths";
 import { signUpAction } from "../src/app/(platform)/auth/sign-up/actions";
 import BusinessAppShell from "../src/components/business-app/BusinessAppShell";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
 import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSoundStudio";
+import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import { businessGiftRulesText } from "../src/lib/access-grants/copy";
@@ -33,7 +34,16 @@ import { GUEST_COFFEE_LIMIT_SECONDS, guestCoffeeLimitState } from "../src/lib/bu
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import { SpaOnlinePlayer } from "../src/lib/business-app/spa-online-player";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
+import { AURAFON_AUTHOR_ID } from "../src/lib/authors/aurafon";
+import { CHILI_NA_VINILE_AUTHOR_ID } from "../src/lib/authors/chili-na-vinile";
+import { JAZZ_RELAX_AUTHOR_ID } from "../src/lib/authors/jazz-relax";
+import { KOFEYNIK_AUTHOR_ID } from "../src/lib/authors/kofeynik";
+import { GUEST_COFFEE_DIRECTIONS } from "../src/lib/business-app/guest-coffee/catalog";
+import { acceptWorkspaceCatalogSourceRow, orderWorkspaceCatalogRows, type WorkspaceCatalogSourceRow } from "../src/lib/business-workspace/candidates";
+import { LARA_LARINA_AUTHOR_ID, OLGA_NEVSKAYA_AUTHOR_ID, WORKSPACE_ATMOSPHERE_SOUNDS, sourcesForSpace } from "../src/lib/business-workspace/catalog-sources";
 import { selectWorkspaceTracks } from "../src/lib/business-workspace/catalog";
+import { WORKSPACE_RIGHTS_CACHE_MS, WORKSPACE_RIGHTS_CONCURRENCY, createTtlDecisionCache, mapPool } from "../src/lib/business-workspace/eligibility-cache";
+import { groupWorkspaceTracks, workspaceAtmosphereStartIndex, workspaceShelfTitle } from "../src/lib/business-workspace/shelves";
 import { workspaceItems, workspaceDeadlineDelay, workspacePlaybackAllowed, type WorkspacePageModel } from "../src/lib/business-workspace/model";
 import { handleWorkspaceState, handleWorkspaceTrackUrl } from "../src/lib/business-workspace/routes";
 
@@ -566,7 +576,8 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
     rules: businessGiftRulesText(),
-    tracks: [{ audioItemId: TRACK, title: "Утро", durationSeconds: 180 }],
+    tracks: [{ audioItemId: TRACK, title: "Утро", durationSeconds: 180, authorId: null, authorName: null, albumTitle: null, shelf: "cafe" }],
+    needsVenue: false,
     playback: { index: 0, positionSec: 0, volume: 0.8, updatedAt: start.toISOString() },
     helpHref: "/help/troubleshooting/email-not-received",
     rightsHref: "https://audiolad.ru/b/atlas-kofeen",
@@ -640,6 +651,10 @@ assert.doesNotMatch(migrationSql, /REFERENCES\s+auth\.users/i);
 const loader = read("src/lib/business-workspace/load.server.ts");
 assert.match(loader, /selectWorkspaceTracks/);
 assert.match(loader, /resolve_business_track_eligibility/);
+assert.match(loader, /sourcesForSpace/);
+assert.match(loader, /acceptWorkspaceCatalogSourceRow/);
+assert.match(loader, /WORKSPACE_RIGHTS_CACHE_MS/);
+assert.match(loader, /"UNKNOWN"/);
 assert.doesNotMatch(loader, /guest-coffee\/catalog|GUEST_COFFEE_SHELF/);
 const signer = read("src/lib/business-workspace/sign.server.ts");
 assert.doesNotMatch(signer, /guest-coffee\/catalog|GUEST_COFFEE_SHELF/);
@@ -650,6 +665,9 @@ for (const file of [
   "src/components/business-app/workspace/BusinessWorkspace.tsx",
   "src/app/(platform)/auth/business-return/page.tsx",
   "src/lib/business/plan.ts",
+  "src/lib/business-workspace/catalog-sources.ts",
+  "src/lib/business-workspace/shelves.ts",
+  "src/components/business-app/BusinessOnboardingWizardPage.tsx",
 ]) {
   const visible = read(file).split("\n").filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join("\n");
   assert.doesNotMatch(visible, /—/, `${file}: en dash only`);
@@ -660,6 +678,192 @@ assert.match(rules, /30 дней в подарок/);
 assert.match(rules, /не становится безлимитной/);
 assert.match(rules, /10800|3 часов|300 МБ|5 дорожек/);
 assert.doesNotMatch(rules, /—/);
+
+// ---------------------------------------------------------------- cafe cabinet: curated authors, rights gate, venue link
+{
+  const cafe = sourcesForSpace("cafe");
+  assert.deepEqual(cafe.map((source) => source.authorId), [
+    JAZZ_RELAX_AUTHOR_ID,
+    KOFEYNIK_AUTHOR_ID,
+    CHILI_NA_VINILE_AUTHOR_ID,
+    OLGA_NEVSKAYA_AUTHOR_ID,
+    LARA_LARINA_AUTHOR_ID,
+    AURAFON_AUTHOR_ID,
+  ]);
+  assert.equal(cafe.find((source) => source.authorId === AURAFON_AUTHOR_ID)?.shelf, "other");
+  assert.equal(sourcesForSpace("spa").length, 0);
+  assert.deepEqual([...WORKSPACE_ATMOSPHERE_SOUNDS].sort(), GUEST_COFFEE_DIRECTIONS.map((row) => row.id).sort());
+  assert.doesNotMatch(read("src/lib/business-workspace/catalog-sources.ts"), /\.eq\(["']name|\.eq\(["']slug/);
+
+  function sourceRow(patch: Partial<WorkspaceCatalogSourceRow>): WorkspaceCatalogSourceRow {
+    return {
+      audioItemId: TRACK,
+      authorId: JAZZ_RELAX_AUTHOR_ID,
+      authorName: "Автор",
+      albumTitle: "Альбом",
+      title: "Трек",
+      durationSeconds: 120,
+      position: 1,
+      practiceStatus: "published",
+      productKind: "music",
+      catalogVisibility: "listed",
+      deletedAt: null,
+      audioStatus: "published",
+      audioPath: "audio/track.mp3",
+      hasActiveDelivery: false,
+      ...patch,
+    };
+  }
+  const allowed = new Set([JAZZ_RELAX_AUTHOR_ID]);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({}), allowed), true);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ practiceStatus: "draft" }), allowed), false);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ audioStatus: "draft" }), allowed), false);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ catalogVisibility: "unlisted" }), allowed), false);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ productKind: "practice" }), allowed), false);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ deletedAt: "2026-01-01T00:00:00Z" }), allowed), false);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ audioPath: "  ", hasActiveDelivery: false }), allowed), false);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ audioPath: null, hasActiveDelivery: true }), allowed), true);
+  assert.equal(acceptWorkspaceCatalogSourceRow(sourceRow({ authorId: LARA_LARINA_AUTHOR_ID }), allowed), false);
+
+  const ordered = orderWorkspaceCatalogRows([
+    { authorId: KOFEYNIK_AUTHOR_ID, albumTitle: "Утро", position: 2, audioItemId: "b" },
+    { authorId: JAZZ_RELAX_AUTHOR_ID, albumTitle: "Вечер", position: 1, audioItemId: "a" },
+    { authorId: JAZZ_RELAX_AUTHOR_ID, albumTitle: "Вечер", position: 0, audioItemId: "c" },
+    { authorId: JAZZ_RELAX_AUTHOR_ID, albumTitle: "Вечер", position: 0, audioItemId: "c" },
+  ], [JAZZ_RELAX_AUTHOR_ID, KOFEYNIK_AUTHOR_ID]);
+  assert.deepEqual(ordered.map((row) => row.audioItemId), ["c", "a", "b"]);
+
+  const admissions = [
+    { spaceId: "cafe" as const, audioItemId: "a" },
+    { spaceId: "cafe" as const, audioItemId: "b" },
+  ];
+  assert.deepEqual(selectWorkspaceTracks({
+    spaceId: "cafe",
+    spaceEnabled: true,
+    admissions,
+    eligibility: [
+      { audioItemId: "a", decision: "ELIGIBLE" },
+      { audioItemId: "b", decision: "UNKNOWN" },
+    ],
+  }), ["a"], "fallback rows still drop UNKNOWN");
+  assert.deepEqual(selectWorkspaceTracks({
+    spaceId: "cafe",
+    spaceEnabled: true,
+    admissions,
+    eligibility: admissions.map((row) => ({ audioItemId: row.audioItemId, decision: "UNKNOWN" as const })),
+  }), [], "no venue means nothing plays");
+
+  const shelfTracks = [
+    { authorId: JAZZ_RELAX_AUTHOR_ID },
+    { authorId: KOFEYNIK_AUTHOR_ID },
+    { authorId: CHILI_NA_VINILE_AUTHOR_ID },
+    { authorId: OLGA_NEVSKAYA_AUTHOR_ID },
+    { authorId: LARA_LARINA_AUTHOR_ID },
+    { authorId: AURAFON_AUTHOR_ID },
+  ];
+  assert.equal(workspaceAtmosphereStartIndex(shelfTracks, "jazz"), 0);
+  assert.equal(workspaceAtmosphereStartIndex(shelfTracks, "rhythm"), 1);
+  assert.equal(workspaceAtmosphereStartIndex(shelfTracks, "calm"), 2);
+  assert.equal(workspaceAtmosphereStartIndex(shelfTracks, "melodic"), 3);
+  assert.equal(workspaceAtmosphereStartIndex(shelfTracks, "other"), 0);
+  assert.equal(workspaceShelfTitle({ authorName: "Аурафон", shelf: "other" }), "Аурафон – другая музыка");
+  assert.equal(workspaceShelfTitle({ authorName: "Джаз Релакс", shelf: "cafe" }), "Джаз Релакс");
+  assert.equal(workspaceShelfTitle({ authorName: "  ", shelf: "cafe" }), null);
+
+  const grouped = groupWorkspaceTracks([
+    { audioItemId: "1", title: "Первый", durationSeconds: 1, authorId: JAZZ_RELAX_AUTHOR_ID, authorName: "Джаз Релакс", albumTitle: "Вечер", shelf: "cafe" },
+    { audioItemId: "2", title: "Второй", durationSeconds: 1, authorId: JAZZ_RELAX_AUTHOR_ID, authorName: "Джаз Релакс", albumTitle: "Утро", shelf: "cafe" },
+    { audioItemId: "3", title: "Третий", durationSeconds: 1, authorId: AURAFON_AUTHOR_ID, authorName: "Аурафон", albumTitle: "Сон", shelf: "other" },
+  ]);
+  assert.equal(grouped[0]?.title, "Джаз Релакс");
+  assert.deepEqual(grouped[0]?.albums.map((album) => album.title), ["Вечер", "Утро"]);
+  assert.equal(grouped[1]?.title, "Аурафон – другая музыка");
+  assert.equal(grouped[1]?.firstIndex, 2);
+
+  let clock = 0;
+  const cache = createTtlDecisionCache<"ELIGIBLE" | "UNKNOWN">(WORKSPACE_RIGHTS_CACHE_MS, () => clock);
+  assert.equal(WORKSPACE_RIGHTS_CACHE_MS, 5 * 60 * 1000);
+  assert.ok(WORKSPACE_RIGHTS_CONCURRENCY >= 2);
+  cache.set("loc:track", "ELIGIBLE");
+  assert.equal(cache.get("loc:track"), "ELIGIBLE");
+  clock = WORKSPACE_RIGHTS_CACHE_MS;
+  assert.equal(cache.get("loc:track"), null);
+  let active = 0;
+  let maxActive = 0;
+  const pooled = await mapPool([1, 2, 3, 4], 2, async (value) => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    active -= 1;
+    return value * 2;
+  });
+  assert.deepEqual(pooled, [2, 4, 6, 8]);
+  assert.ok(maxActive <= 2 && maxActive >= 1);
+
+  assert.equal(safeBusinessWorkspaceReturn("/workspace?space=cafe"), "/workspace?space=cafe");
+  assert.equal(safeBusinessWorkspaceReturn("/workspace?space=cafe&next=https://evil.test"), "/workspace?space=cafe");
+  assert.equal(safeBusinessWorkspaceReturn("//evil.test"), null);
+  assert.equal(safeBusinessWorkspaceReturn("https://evil.test/workspace"), null);
+  assert.equal(safeBusinessWorkspaceReturn("/onboarding"), null);
+  assert.equal(safeBusinessWorkspaceReturn("/workspace?space=nope"), null);
+  assert.match(businessCabinetOnboardingPath("cafe"), /^\/onboarding\?type=cafe&next=/);
+  assert.match(businessOnboardingEntryHref("cafe"), /^https:\/\/business\.audiolad\.ru\/onboarding\?type=cafe&next=/);
+  const back = read("src/app/(platform)/auth/business-return/page.tsx");
+  assert.ok(back.indexOf("await activateBusinessTrial") < back.indexOf("await loadBusinessOwnerHomeContext"));
+  assert.match(back, /businessOnboardingEntryHref\("cafe"\)/);
+  assert.match(back, /!domain\.organizationId/);
+
+  const connect = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks: [],
+    needsVenue: true,
+    onboardingHref: businessCabinetOnboardingPath("cafe"),
+  })} />);
+  assert.match(connect, /data-testid="biz-workspace-connect-venue"/);
+  assert.match(connect, /Подключить точку/);
+  assert.match(connect, /href="\/onboarding\?type=cafe&amp;next=%2Fworkspace%3Fspace%3Dcafe"/);
+  assert.doesNotMatch(connect, /Подборка в этом направлении готовится/);
+
+  const groupedHtml = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks: [
+      { audioItemId: TRACK, title: "Утро", durationSeconds: 180, authorId: JAZZ_RELAX_AUTHOR_ID, authorName: "Джаз Релакс", albumTitle: "Мягкий джаз", shelf: "cafe" },
+      { audioItemId: "267f8644-4ad1-4bea-9de0-d44f911ae009", title: "Сон", durationSeconds: 90, authorId: AURAFON_AUTHOR_ID, authorName: "Аурафон", albumTitle: "Ночь", shelf: "other" },
+    ],
+  })} />);
+  assert.match(groupedHtml, /Джаз Релакс/);
+  assert.match(groupedHtml, /Мягкий джаз/);
+  assert.match(groupedHtml, /Аурафон – другая музыка/);
+  assert.match(groupedHtml, /Играть эту подборку/);
+
+  const withPoint: BusinessOwnerHomeContext = {
+    status: "authenticated",
+    owner: { userId: USER_A, firstName: "Анна" },
+    location: {
+      id: "11111111-1111-4111-8111-111111111111",
+      organizationId: "22222222-2222-4222-8222-222222222222",
+      name: "Утро",
+      businessCategory: "Кафе",
+      countryCode: "RU",
+      timezone: "Europe/Moscow",
+      status: "active",
+      defaultZoneId: null,
+    },
+    organizationName: "Кофейня",
+    organizationId: "22222222-2222-4222-8222-222222222222",
+    signals: null,
+  };
+  const cabinetLink = renderToStaticMarkup(
+    <AppRouterContext.Provider value={fakeRouter}>
+      <PathnameContext.Provider value="/onboarding">
+        <BusinessDomainProvider value={withPoint}>
+          <BusinessOnboardingWizardPage returnHref="/workspace?space=cafe" />
+        </BusinessDomainProvider>
+      </PathnameContext.Provider>
+    </AppRouterContext.Provider>,
+  );
+  assert.match(cabinetLink, /data-testid="onboarding-open-cabinet"/);
+  assert.match(cabinetLink, /href="\/workspace\?space=cafe"/);
+  assert.match(cabinetLink, /Открыть кабинет/);
+}
 
 console.log("business-workspace-trial-unit: ok");
 }
