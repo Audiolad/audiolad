@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import {
+  BUSINESS_CONNECT_VENUE_CTA,
+  BUSINESS_CONNECT_VENUE_NOTE,
   BUSINESS_EMPTY_CATALOG_NOTE,
   BUSINESS_GIFT_CTA,
   BUSINESS_GIFT_TITLE,
@@ -16,7 +18,9 @@ import {
   BUSINESS_WORKSPACE_AUTOPLAY_NOTE,
 } from "@/lib/access-grants/copy";
 import { ruDaysWord } from "@/lib/access-grants/policy";
+import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
+import { groupWorkspaceTracks, workspaceAtmosphereStartIndex } from "@/lib/business-workspace/shelves";
 import { workspacePlayerOpen, workspaceItems, workspaceDeadlineDelay, workspacePlaybackAllowed, type WorkspacePageModel } from "@/lib/business-workspace/model";
 import {
   clampWorkspacePlayback,
@@ -79,14 +83,36 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
   const [offerNoted, setOfferNoted] = useState(false);
 
   useEffect(() => {
-    const local = readLocal(model.spaceId, model.tracks.length);
-    const chosen = newerPlayback(local, model.playback ? clampWorkspacePlayback(model.playback, model.tracks.length) : null);
-    if (!chosen) return;
-    playbackRef.current = chosen;
-    seekRef.current = chosen.positionSec;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- local snapshot is read after mount so server HTML stays the hydration source
-    setPlayback(chosen);
-  }, [model.playback, model.spaceId, model.tracks.length]);
+    const count = model.tracks.length;
+    const local = readLocal(model.spaceId, count);
+    const server = model.playback ? clampWorkspacePlayback(model.playback, count) : null;
+    const chosen = newerPlayback(local, server);
+    if (chosen) {
+      playbackRef.current = chosen;
+      seekRef.current = chosen.positionSec;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- local snapshot is read after mount so server HTML stays the hydration source
+      setPlayback(chosen);
+      setView((prev) => ({ ...prev, index: chosen.index }));
+      return;
+    }
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY);
+    } catch {
+      stored = null;
+    }
+    if (!stored) return;
+    const index = workspaceAtmosphereStartIndex(model.tracks, parseBusinessSoundProfile(stored).direction);
+    if (index <= 0) return;
+    const next = clampWorkspacePlayback(
+      { index, positionSec: 0, volume: playbackRef.current.volume, updatedAt: playbackRef.current.updatedAt },
+      count,
+    );
+    playbackRef.current = next;
+    seekRef.current = 0;
+    setPlayback(next);
+    setView((prev) => ({ ...prev, index }));
+  }, [model.playback, model.spaceId, model.tracks]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -262,7 +288,15 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
     });
   };
 
+  const startAt = async (index: number) => {
+    if (!playbackStillOpen(model.endsAt)) return;
+    seekRef.current = 0;
+    await ctlRef.current?.playIndex(index);
+    remember({ index, positionSec: 0 }, true);
+  };
+
   const playing = view.status === "playing" || view.status === "loading";
+  const shelves = groupWorkspaceTracks(model.tracks);
 
   return (
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
@@ -332,7 +366,18 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
         </section>
       ) : null}
 
-      {showEmpty(model) ? (
+      {showEmpty(model) && model.needsVenue ? (
+        <section className="business-app-card space-y-3" data-testid="biz-workspace-connect">
+          <p>{BUSINESS_CONNECT_VENUE_NOTE}</p>
+          <p>
+            <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href={model.onboardingHref} data-testid="biz-workspace-connect-venue">
+              {BUSINESS_CONNECT_VENUE_CTA}
+            </a>
+          </p>
+        </section>
+      ) : null}
+
+      {showEmpty(model) && !model.needsVenue ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-empty">
           <p>{BUSINESS_EMPTY_CATALOG_NOTE}</p>
           <p className="flex flex-wrap gap-3">
@@ -345,24 +390,39 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
       {canPlay ? (
         <section className="business-app-card business-workspace-player" aria-label="Плеер кабинета" data-testid="biz-workspace-player">
           <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
-          <ol className="business-atmosphere-tracks" data-testid="biz-workspace-tracks">
-            {model.tracks.map((track, index) => (
-              <li key={track.audioItemId} data-current={view.index === index ? "true" : undefined}>
-                <button
-                  type="button"
-                  className="business-atmosphere-track business-app-focus-ring"
-                  onClick={() => {
-                    if (!workspacePlaybackAllowed(model.endsAt, Date.now())) return;
-                    seekRef.current = 0;
-                    void ctlRef.current?.playIndex(index).then(() => remember({ index, positionSec: 0 }, true));
-                  }}
-                >
-                  <span>{index + 1}</span>
-                  <span>{track.title}</span>
-                </button>
-              </li>
+          <div data-testid="biz-workspace-tracks">
+            {shelves.map((shelf) => (
+              <section key={shelf.key} className="mt-3 space-y-2">
+                {shelf.title ? (
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="text-[1.05rem] font-bold" data-testid="biz-workspace-shelf">{shelf.title}</h2>
+                    <button type="button" className="text-sm underline" onClick={() => startAt(shelf.firstIndex)}>
+                      Играть эту подборку
+                    </button>
+                  </div>
+                ) : null}
+                {shelf.albums.map((album) => (
+                  <div key={`${shelf.key}:${album.key}`}>
+                    {album.title ? <h3 className="text-sm font-semibold text-[var(--biz-text-muted)]" data-testid="biz-workspace-album">{album.title}</h3> : null}
+                    <ol className="business-atmosphere-tracks">
+                      {album.tracks.map(({ track, index }) => (
+                        <li key={track.audioItemId} data-current={view.index === index ? "true" : undefined}>
+                          <button
+                            type="button"
+                            className="business-atmosphere-track business-app-focus-ring"
+                            onClick={() => startAt(index)}
+                          >
+                            <span>{index + 1}</span>
+                            <span>{track.title}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </section>
             ))}
-          </ol>
+          </div>
           <BusinessPlayerControls
             testIdPrefix="biz-workspace"
             playing={view.status === "playing"}
@@ -391,4 +451,8 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
 
 function showEmpty(model: WorkspacePageModel): boolean {
   return workspacePlayerOpen(model) && model.tracks.length === 0;
+}
+
+function playbackStillOpen(endsAt: string | null): boolean {
+  return workspacePlaybackAllowed(endsAt, Date.now());
 }

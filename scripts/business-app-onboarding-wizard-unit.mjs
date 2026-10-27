@@ -156,7 +156,10 @@ const page = readFileSync(
 );
 assert.match(page, /bootstrapBusinessOrganizationWithLocation/);
 assert.match(page, /Музыка для заведения за минуту/);
-assert.match(page, /Точка готова\. Откройте плеер и проверьте подключение\.\n/);
+assert.match(
+  page,
+  /returnHref\s*\?\s*"Точка подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Точка готова\. Откройте плеер и проверьте подключение\."/,
+);
 assert.doesNotMatch(page, /лицензирован[аоы]/i);
 assert.doesNotMatch(page, /ELIGIBLE\s*=\s*true/);
 

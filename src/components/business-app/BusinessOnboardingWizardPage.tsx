@@ -30,9 +30,12 @@ import {
 
 export default function BusinessOnboardingWizardPage({
   initialTypeId = null,
+  returnHref = null,
 }: {
   /** a8240527: venue type preselected by the entry link (e.g. «Подключить» from the coffee guest entry). */
   initialTypeId?: string | null;
+  /** Same-host cabinet path after the point exists. Null keeps the previous finish links. */
+  returnHref?: string | null;
 } = {}) {
   const domain = useBusinessDomain();
   // Gift already live: show its end date instead of re-offering «30 дней в подарок, затем 799 ₽».
@@ -116,10 +119,22 @@ export default function BusinessOnboardingWizardPage({
           <p className="text-[var(--biz-text-muted)]">
             Мастер первой точки уже пройден. Откройте плеер или статус на главной.
           </p>
+          {returnHref ? (
+            <p className="text-[var(--biz-text)]">Кабинет с музыкой открывается по ссылке ниже.</p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
+            {returnHref ? (
+              <Link
+                href={returnHref}
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
+                data-testid="onboarding-open-cabinet"
+              >
+                Открыть кабинет
+              </Link>
+            ) : null}
             <Link
               href="/"
-              className="business-app-btn business-app-btn-primary business-app-focus-ring"
+              className={`business-app-btn business-app-focus-ring ${returnHref ? "business-app-btn-secondary" : "business-app-btn-primary"}`}
             >
               На главную
             </Link>
@@ -191,6 +206,7 @@ export default function BusinessOnboardingWizardPage({
       });
       setStep("done");
       router.refresh();
+      if (returnHref) router.push(returnHref);
     });
   }
 
@@ -391,7 +407,9 @@ export default function BusinessOnboardingWizardPage({
               Точка создана
             </h2>
             <p className="text-[var(--biz-text)]">
-              Точка готова. Откройте плеер и проверьте подключение.
+              {returnHref
+                ? "Точка подключена. Откройте кабинет и нажмите «Играть»."
+                : "Точка готова. Откройте плеер и проверьте подключение."}
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
@@ -401,9 +419,18 @@ export default function BusinessOnboardingWizardPage({
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2 pt-1">
+              {returnHref ? (
+                <Link
+                  href={returnHref}
+                  className="business-app-btn business-app-btn-primary business-app-focus-ring"
+                  data-testid="onboarding-open-cabinet"
+                >
+                  Открыть кабинет
+                </Link>
+              ) : null}
               <Link
                 href="/player"
-                className="business-app-btn business-app-btn-primary business-app-focus-ring"
+                className={`business-app-btn business-app-focus-ring ${returnHref ? "business-app-btn-secondary" : "business-app-btn-primary"}`}
               >
                 Открыть плеер
               </Link>
