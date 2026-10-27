@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { MusicPassport } from "../src/components/music-passport/MusicPassport";
+import { RunDetail } from "../src/components/music-analyzer-runs/RunDetail";
+import type { MusicAnalyzerRunClient } from "../src/lib/music-analyzer-runs/contract";
 import { readMusicAnalyzerPassport, readMusicAnalyzerStructuredFacts } from "../src/lib/music-analyzer-runs/passport";
 import {
   formatAnalyzedAtMoscow,
@@ -404,5 +406,27 @@ assert.doesNotMatch(preciseProduct, /932c4ce/);
 assert.match(preciseProduct, /data-passport-signal="label">Blues<\/span>[\s\S]*data-passport-signal="band">высокая/);
 assert.match(preciseProduct, /data-passport-quantity="secondary">0\.334/);
 assert.equal(precisePassport.instruments.length, 10);
+
+// Render the actual run page: the DSP JSON deliberately reports WAV for every original.
+for (const format of ["MP3", "WAV", "M4A", "AAC"]) {
+  const run: MusicAnalyzerRunClient = {
+    id: "format-regression", createdAt: "2026-10-02T00:00:00Z", startedAt: null,
+    finishedAt: "2026-10-02T00:01:00Z", status: "succeeded",
+    sourceFilename: `original.${format.toLowerCase()}`, mimeType: "audio/mpeg",
+    sha256: "a".repeat(64), byteSize: 12, versionNumber: 1,
+    analyzerVersion: "test", analyzerGitCommit: null, analyzerContentCommit: null,
+    modelCheckpoint: null, taxonomyVersion: null, promptVersion: null, device: "cpu",
+    rawJson: null, normalizedJson: { technical: { format: "wav" } },
+    provenance: null, errorCode: null, attemptCount: 1,
+  };
+  const markup = renderToStaticMarkup(<RunDetail initial={run} siblings={[]} />);
+  assert.match(markup, new RegExp(`Формат</span>\\s*<span[^>]*>${format}</span>`));
+  // Product mode must use the same original-format projection.
+  const product = renderToStaticMarkup(<MusicPassport mode="product"
+    passport={readMusicAnalyzerPassport({ normalized: run.normalizedJson, source: { filename: run.sourceFilename } })}
+    header={{ filename: run.sourceFilename, analyzedAt: run.finishedAt, analyzerVersion: null, statusLabel: "Готово", fileVersion: 1 }}
+    snapshot={{ version: null, commit: null }} provenance={provenance} />);
+  assert.match(product, new RegExp(`Формат</span>\\s*<span[^>]*>${format}</span>`));
+}
 
 console.log("music-passport-ui-unit: ok");

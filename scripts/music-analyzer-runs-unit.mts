@@ -23,6 +23,7 @@ import {
   audioLooksLikeWav,
   buildRunStoragePath,
   normalizeAudioMime,
+  originalAudioFormat,
   validateUploadDescriptor,
 } from "../src/lib/music-analyzer-runs/audio-file";
 import {
@@ -154,6 +155,34 @@ await assert.rejects(
 assert.equal(normalizeAudioMime("song.wav", ""), "audio/wav");
 assert.equal(normalizeAudioMime("song.mp3", "audio/mpeg"), "audio/mpeg");
 assert.equal(normalizeAudioMime("notes.txt", "text/plain"), null);
+// Upload policy remains WAV/MP3; display also supports product M4A/AAC originals.
+assert.equal(normalizeAudioMime("song.m4a", "audio/mp4"), null);
+for (const [filename, mime, expected] of [
+  ["Трек.MP3", "audio/mpeg", "MP3"],
+  ["song.WAV", "audio/x-wav", "WAV"],
+  ["song.M4A", "audio/mpeg", "M4A"], // product's intermediate MP3 MIME
+  ["song.aac", "application/octet-stream", "AAC"],
+  ["song.mp3", "audio/wav", "MP3"], // original filename wins over intermediate MIME
+  ["song", " Audio/MP4; codecs=mp4a.40.2", "M4A"],
+  ["", "audio/x-mp3", "MP3"],
+  ["song", "audio/vnd.wave", "WAV"],
+  ["song", "audio/x-aac", "AAC"],
+] as const) {
+  assert.equal(originalAudioFormat({ filename, mime })?.value, expected);
+  const normalized = { technical: { format: "wav", duration_s: 10, sample_rate: 44100, channels: 2 } };
+  const before = JSON.stringify(normalized);
+  const passport = readMusicAnalyzerPassport({ normalized, source: { filename, mime } });
+  assert.equal(passport.technical.find(row => row.label === "Формат")?.value, expected);
+  assert.equal(passport.sources.format, originalAudioFormat({ filename, mime })?.source);
+  assert.equal(passport.technical.find(row => row.label === "Частота дискретизации")?.value, "44100 Гц");
+  assert.equal(JSON.stringify(normalized), before, "stored analysis must not be mutated");
+}
+for (const source of [{}, { filename: "input.bin", mime: "application/octet-stream" }, { mime: "constructor" }]) {
+  assert.equal(originalAudioFormat(source), null);
+  const passport = readMusicAnalyzerPassport({ normalized: { technical: { format: "wav" } }, source });
+  assert.equal(passport.technical.find(row => row.label === "Формат")?.value, "—");
+  assert.equal(passport.sources.format, null, "never fall back to intermediate WAV");
+}
 const descriptor = validateUploadDescriptor({ filename: "a.wav", byteSize: 12, mime: "audio/wav" });
 assert.equal("mime" in descriptor ? descriptor.mime : null, "audio/wav");
 assert.equal(audioLooksLikeWav(Uint8Array.from([
@@ -507,7 +536,7 @@ assert.equal(goldPassport.technical.find((row) => row.label === "Длитель�
 assert.equal(goldPassport.technical.find((row) => row.label === "LUFS")?.value, "-15.1");
 assert.equal(goldPassport.technical.find((row) => row.label === "Частота дискретизации")?.value, "44100 Гц");
 assert.equal(goldPassport.technical.find((row) => row.label === "Каналы")?.value, "2");
-assert.equal(goldPassport.technical.find((row) => row.label === "Формат")?.value, "wav");
+assert.equal(goldPassport.technical.find((row) => row.label === "Формат")?.value, "—");
 assert.equal(goldPassport.taxonomy, "listening-v05");
 assert.equal(goldPassport.prompt, null);
 assert.equal(goldPassport.sources.bpmPublished, "technical.bpm");
@@ -581,7 +610,7 @@ assert.equal(goldPassport.sources.duration, "technical.duration_s");
 assert.equal(goldPassport.sources.lufs, "technical.lufs");
 assert.equal(goldPassport.sources.sampleRate, "technical.sample_rate");
 assert.equal(goldPassport.sources.channels, "technical.channels");
-assert.equal(goldPassport.sources.format, "technical.format");
+assert.equal(goldPassport.sources.format, null);
 assert.equal(goldPassport.sources.taxonomy, "taxonomy.version");
 assert.equal(goldPassport.sources.prompt, null);
 
