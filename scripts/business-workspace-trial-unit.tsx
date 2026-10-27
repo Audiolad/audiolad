@@ -795,6 +795,10 @@ assert.doesNotMatch(rules, /—/);
   assert.equal(displayWorkspaceTrackTitle({ title: "Трек 3", practiceTitle: "Ольга" }), "Ольга");
   assert.equal(displayWorkspaceTrackTitle({ title: "Аудио 10", albumTitle: "Аудио 2" }), null);
   assert.equal(displayWorkspaceTrackTitle({ title: "Трек" }), null);
+  assert.deepEqual(
+    BUSINESS_MOBILE_NAV_ITEMS.map((item) => item.title),
+    ["Главная", "Музыка", "Настройка", "Документы", "Профиль"],
+  );
   assert.ok(BUSINESS_MOBILE_NAV_ITEMS.length <= 5);
   const secret = "a".repeat(40);
   assert.equal(parseCabinetReportBody({ source: "cabinet", kind: "heartbeat", deviceSecret: secret })?.kind, "heartbeat");
@@ -855,10 +859,15 @@ assert.doesNotMatch(rules, /—/);
       { audioItemId: "267f8644-4ad1-4bea-9de0-d44f911ae009", title: "Сон", durationSeconds: 90, authorId: AURAFON_AUTHOR_ID, authorName: "Аурафон", albumTitle: "Ночь", shelf: "other" },
     ],
   })} />);
+  assert.match(groupedHtml, /data-testid="biz-now-playing"/);
+  assert.match(groupedHtml, /Сейчас играет/);
   assert.match(groupedHtml, /Джаз Релакс/);
   assert.match(groupedHtml, /Мягкий джаз/);
-  assert.match(groupedHtml, /Аурафон – другая музыка/);
-  assert.match(groupedHtml, /Играть эту подборку/);
+  assert.match(groupedHtml, /data-testid="biz-now-queue"/);
+  assert.match(groupedHtml, /Дальше в очереди/);
+  assert.match(groupedHtml, /Аурафон/);
+  assert.match(groupedHtml, /data-testid="biz-workspace-player"/);
+  assert.doesNotMatch(groupedHtml, /Играть эту подборку/);
 
   const withPoint: BusinessOwnerHomeContext = {
     status: "authenticated",

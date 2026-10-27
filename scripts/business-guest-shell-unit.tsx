@@ -80,7 +80,7 @@ const guestAccess = resolveBusinessAccess(anonymous);
 const memberAccess = resolveBusinessAccess(member);
 for (const item of all) assert.equal(isBusinessNavItemLocked(item, memberAccess), false, `${item.id}: member sees everything`);
 const lockedForGuest = [...new Set(all.filter((i) => isBusinessNavItemLocked(i, guestAccess)).map((i) => i.id))].sort();
-assert.deepEqual(lockedForGuest, ["documents"], "documents stay closed for a guest");
+assert.deepEqual(lockedForGuest, ["documents", "profile", "settings"], "documents, settings and profile stay closed for a guest");
 assert.ok(BUSINESS_MOBILE_NAV_ITEMS.length <= 5, "mobile bottom nav has at most five buttons");
 const music = BUSINESS_PRIMARY_NAV_ITEMS.find((i) => i.id === "music")!;
 assert.equal(businessNavHref(music, guestAccess), "/guest/coffee", "guest enters Music through the permanent atlas URL");
@@ -105,7 +105,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
 }
 {
   const g = shell(anonymous, "/guest/coffee");
-  assert.equal((g.match(/data-locked="true"/g) ?? []).length, 2, "documents locked in the sidebar and the bottom nav");
+  assert.equal((g.match(/data-locked="true"/g) ?? []).length, 6, "documents, settings and profile locked in the sidebar and the bottom nav");
   has(g, /доступно после подключения/);
   has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
@@ -114,12 +114,15 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /data-testid="biz-trial-cta"/, "gift CTA is on the guest bar before the limit");
   assert.ok(anchors(g, "/onboarding?type=cafe").some((t) => t.includes('data-testid="biz-connect"')), "Подключить → real onboarding");
   hasCurrentLink(g, "/guest/coffee", "Music is the current section");
-  hasNot(g, /href="\/(locations|stats|documents|team|preferences|player|announcements)"/, "no link into protected sections");
+  hasNot(g, /href="\/(locations|stats|documents|team|preferences|player|announcements|profile)"/, "no link into protected sections");
   const m = shell(member, "/guest/coffee");
   assert.equal((m.match(/data-locked="true"/g) ?? []).length, 0);
   hasNot(m, /biz-guest-status|доступно после подключения/);
   hasCurrentLink(m, "/music", "member Music current");
   has(m, /href="\/documents"/);
+  has(m, /href="\/preferences"/);
+  has(m, /href="\/profile"/);
+  hasNot(m, /href="\/help"/, "help stays off the cabinet nav");
   has(m, /Анна/);
 }
 

@@ -504,6 +504,36 @@
   color: var(--biz-text-muted);
 }
 
+.business-now__title {
+  margin: 0.35rem 0 0;
+  font-family: var(--biz-font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--biz-text);
+}
+
+.business-now__byline {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--biz-text-muted);
+}
+
+.business-now__bar {
+  height: 8px;
+  margin-top: 0.85rem;
+  border-radius: 999px;
+  background: var(--biz-surface-soft);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.business-now__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--biz-accent);
+}
+
 .business-app-shell:has(.business-cabinet-player) .business-app-main {
   padding-bottom: calc(var(--biz-bottom-nav-height) + 9rem + env(safe-area-inset-bottom, 0px));
 }

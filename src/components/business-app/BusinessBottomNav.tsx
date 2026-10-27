@@ -6,10 +6,11 @@ import type { ComponentType } from "react";
 
 import {
   BizDocumentsIcon,
-  BizHelpIcon,
   BizHomeIcon,
   BizLockIcon,
   BizMusicIcon,
+  BizProfileIcon,
+  BizSettingsIcon,
 } from "@/components/business-app/BusinessIcons";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
@@ -27,13 +28,14 @@ import {
 } from "@/lib/business-app/nav";
 
 const ICONS: Record<
-  Extract<BusinessNavIconKey, "home" | "music" | "documents" | "help">,
+  Extract<BusinessNavIconKey, "home" | "music" | "settings" | "documents" | "profile">,
   ComponentType<{ active?: boolean; className?: string }>
 > = {
   home: BizHomeIcon,
   music: BizMusicIcon,
+  settings: BizSettingsIcon,
   documents: BizDocumentsIcon,
-  help: BizHelpIcon,
+  profile: BizProfileIcon,
 };
 
 export default function BusinessBottomNav() {

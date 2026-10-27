@@ -8,6 +8,7 @@ export type BusinessNavIconKey =
   | "team"
   | "settings"
   | "help"
+  | "profile"
   | "more";
 
 export type BusinessNavItem = {
@@ -49,7 +50,15 @@ export const BUSINESS_PRIMARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     requires: "everyone",
     // a8240527: the permanent atlas URL (PDF) is the guest entry to this same section.
     guestHref: "/guest/coffee",
-    aliases: ["/guest/coffee", "/workspace"],
+    aliases: ["/guest/coffee", "/workspace", "/player"],
+  },
+  {
+    id: "settings",
+    title: "Настройка",
+    href: "/preferences",
+    icon: "settings",
+    available: true,
+    requires: "member",
   },
 ] as const;
 
@@ -63,16 +72,16 @@ export const BUSINESS_SECONDARY_NAV_ITEMS: readonly BusinessNavItem[] = [
     requires: "member",
   },
   {
-    id: "help",
-    title: "Помощь",
-    href: "/help",
-    icon: "help",
+    id: "profile",
+    title: "Профиль",
+    href: "/profile",
+    icon: "profile",
     available: true,
-    requires: "everyone",
+    requires: "member",
   },
 ] as const;
 
-/** Owner: at most five buttons. Home, music, documents, help. */
+/** Exactly five buttons, in this order: home, music, sound settings, documents, profile. */
 export const BUSINESS_MOBILE_NAV_ITEMS: readonly BusinessNavItem[] = [
   ...BUSINESS_PRIMARY_NAV_ITEMS,
   ...BUSINESS_SECONDARY_NAV_ITEMS,

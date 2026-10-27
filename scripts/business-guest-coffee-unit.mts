@@ -77,7 +77,7 @@ assert.doesNotMatch(page, /notFound\(/, "no login / allowlist gate: guests land 
 const musicSection = read("src/components/business-app/sound/BusinessMusicSection.tsx");
 assert.match(musicSection, /loadGuestCoffeeShelf/);
 assert.match(musicSection, /peekGuestCoffeeUsage/);
-assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessWorkspace/, "owner /music is the cabinet shelves");
+assert.match(read("src/app/business-app/music/page.tsx"), /<BusinessWorkspace/, "owner /music is the cabinet player");
 assert.doesNotMatch(read("src/app/business-app/music/page.tsx"), /BusinessMusicSection/);
 
 // ---------------------------------------------------------------- curated shelf

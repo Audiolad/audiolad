@@ -134,7 +134,10 @@ assert.doesNotMatch(pureSrc, /createClient|createServiceRoleClient/);
 assert.doesNotMatch(pureSrc, /ELIGIBLE|music_rights_grants/);
 
 const nav = readFileSync(join(repoRoot, "src/lib/business-app/nav.ts"), "utf8");
-assert.match(nav, /id: "help"[\s\S]*?available: true/);
+assert.doesNotMatch(nav, /id: "help"/, "help stays off the five-section cabinet nav");
+const profile = readFileSync(join(repoRoot, "src/app/business-app/profile/page.tsx"), "utf8");
+assert.match(profile, /href="\/help"/, "help stays reachable from the profile");
+assert.doesNotMatch(profile, /BusinessEmptySection/);
 
 const home = readFileSync(
   join(repoRoot, "src/components/business-app/BusinessHomePage.tsx"),

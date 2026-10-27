@@ -49,6 +49,9 @@ type CabinetPlayerApi = {
   next: () => Promise<void>;
   playIndex: (index: number) => Promise<void>;
   setVolume: (value: number) => void;
+  /** Scrub the current track. `ratio` is 0–1 of the known duration. */
+  seek: (ratio: number) => void;
+  volume: number;
   saveNote: string | null;
 };
 
@@ -386,14 +389,14 @@ export function BusinessCabinetPlayerProvider({
     remember({ volume: value }, false);
   }, [remember]);
 
-  const seek = (ratio: number) => {
+  const seek = useCallback((ratio: number) => {
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
-    const next = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
-    audio.currentTime = next;
-    setView((prev) => ({ ...prev, currentTime: next }));
-    remember({ positionSec: next }, false, true);
-  };
+    const nextTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
+    audio.currentTime = nextTime;
+    setView((prev) => ({ ...prev, currentTime: nextTime }));
+    remember({ positionSec: nextTime }, false, true);
+  }, [remember]);
 
   const track = model?.tracks[view.index] ?? model?.tracks[playback.index] ?? null;
   const author = track?.authorName?.trim() || "";
@@ -410,6 +413,8 @@ export function BusinessCabinetPlayerProvider({
     next,
     playIndex,
     setVolume,
+    seek,
+    volume: playback.volume,
     saveNote,
   };
 

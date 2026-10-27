@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useState } from "react";
 
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
+import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import {
   BusinessCabinetPlayerProvider,
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
+import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import {
   BUSINESS_CONNECT_VENUE_CTA,
   BUSINESS_CONNECT_VENUE_NOTE,
@@ -22,12 +24,12 @@ import {
   BUSINESS_WORKSPACE_AUTOPLAY_NOTE,
 } from "@/lib/access-grants/copy";
 import { ruDaysWord } from "@/lib/access-grants/policy";
-import { groupWorkspaceTracks, workspaceShelfTrackNumber } from "@/lib/business-workspace/shelves";
 import {
   workspaceDeadlineDelay,
   workspacePlaybackAllowed,
   workspacePlayerOpen,
   type WorkspacePageModel,
+  type WorkspaceTrack,
 } from "@/lib/business-workspace/model";
 
 export default function BusinessWorkspace({ model }: { model: WorkspacePageModel }) {
@@ -112,7 +114,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     });
   };
 
-  const shelves = groupWorkspaceTracks(model.tracks);
+  const current = model.tracks[currentIndex] ?? model.tracks[0] ?? null;
+  const author = current?.authorName?.trim() ?? "";
+  const album = current?.albumTitle?.trim() ?? "";
+  const duration = player.view.duration > 0 ? player.view.duration : (current?.durationSeconds ?? 0);
+  const ratio = duration > 0 ? Math.min(1, Math.max(0, player.view.currentTime / duration)) : 0;
+  const upcoming = current ? upcomingTracks(model.tracks, currentIndex) : [];
 
   return (
     <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
@@ -203,41 +210,77 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         </section>
       ) : null}
 
-      {open && model.tracks.length > 0 ? (
-        <section className="business-app-card" data-testid="biz-workspace-tracks">
-          <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
-          {shelves.map((shelf) => (
-            <section key={shelf.key} className="mt-3 space-y-2">
-              {shelf.title ? (
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-[1.05rem] font-bold" data-testid="biz-workspace-shelf">{shelf.title}</h2>
-                  <button type="button" className="text-sm underline" onClick={() => void playIndex(shelf.firstIndex)}>
-                    Играть эту подборку
-                  </button>
-                </div>
-              ) : null}
-              {shelf.albums.map((album) => (
-                <div key={`${shelf.key}:${album.key}`}>
-                  {album.title ? <h3 className="text-sm font-semibold text-[var(--biz-text-muted)]" data-testid="biz-workspace-album">{album.title}</h3> : null}
-                  <ol className="business-atmosphere-tracks">
-                    {album.tracks.map(({ track, index }) => (
-                      <li key={track.audioItemId} data-current={currentIndex === index ? "true" : undefined}>
-                        <button
-                          type="button"
-                          className="business-atmosphere-track business-app-focus-ring"
-                          onClick={() => void playIndex(index)}
-                        >
-                          <span>{workspaceShelfTrackNumber(shelf, track.audioItemId)}</span>
-                          <span>{track.title}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              ))}
-            </section>
-          ))}
-        </section>
+      {open && current ? (
+        <>
+          <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
+            <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
+            <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
+            {author ? <p className="business-now__byline" data-testid="biz-now-author">{author}</p> : null}
+            {album ? <p className="business-now__byline" data-testid="biz-now-album">{album}</p> : null}
+            <div
+              className="business-now__bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={Math.max(1, Math.round(duration))}
+              aria-valuenow={Math.round(player.view.currentTime)}
+              aria-label="Прогресс трека"
+              data-testid="biz-now-progress"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                if (rect.width <= 0) return;
+                player.seek((event.clientX - rect.left) / rect.width);
+              }}
+            >
+              <span style={{ width: `${ratio * 100}%` }} />
+            </div>
+            <p className="business-cabinet-player__time" data-testid="biz-now-time">
+              {formatPlaybackClock(player.view.currentTime)} / {formatPlaybackClock(duration)}
+            </p>
+            <BusinessPlayerControls
+              testIdPrefix="biz-now"
+              playing={player.view.status === "playing"}
+              loading={player.view.status === "loading"}
+              nowTitle={null}
+              onToggle={() => void player.toggle()}
+              onNext={() => void player.next()}
+              volume={player.volume}
+              onVolume={player.setVolume}
+            />
+            <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
+          </section>
+          <section className="business-app-card" data-testid="biz-now-queue" aria-label="Дальше в очереди">
+            <h2 className="text-[1.05rem] font-bold">Дальше в очереди</h2>
+            {upcoming.length === 0 ? (
+              <p className="mt-2 text-sm text-[var(--biz-text-muted)]">Дальше снова зазвучит эта композиция.</p>
+            ) : (
+              <ol className="business-atmosphere-tracks mt-2">
+                {upcoming.map(({ track, index, number }) => {
+                  const lineAuthor = track.authorName?.trim() ?? "";
+                  const lineAlbum = track.albumTitle?.trim() ?? "";
+                  const subtitle = [lineAuthor, lineAlbum].filter(Boolean).join(" – ");
+                  return (
+                    <li key={`${track.audioItemId}:${index}`}>
+                      <button
+                        type="button"
+                        className="business-atmosphere-track business-app-focus-ring"
+                        onClick={() => void playIndex(index)}
+                      >
+                        <span className="business-atmosphere-track__no">{number}</span>
+                        <span className="business-atmosphere-track__meta">
+                          <span className="business-atmosphere-track__title">{track.title}</span>
+                          {subtitle ? <span className="business-atmosphere-track__album">{subtitle}</span> : null}
+                        </span>
+                        {track.durationSeconds != null ? (
+                          <span className="business-atmosphere-track__time">{formatPlaybackClock(track.durationSeconds)}</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
+        </>
       ) : null}
     </div>
   );
@@ -245,4 +288,14 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
 function showEmpty(model: WorkspacePageModel): boolean {
   return workspacePlayerOpen(model) && model.tracks.length === 0;
+}
+
+/** Tracks that play after the current one, then the earlier ones, without repeating the current track. */
+function upcomingTracks(tracks: readonly WorkspaceTrack[], currentIndex: number): { track: WorkspaceTrack; index: number; number: number }[] {
+  if (tracks.length <= 1) return [];
+  const start = ((currentIndex % tracks.length) + tracks.length) % tracks.length;
+  return Array.from({ length: tracks.length - 1 }, (_, step) => {
+    const index = (start + 1 + step) % tracks.length;
+    return { track: tracks[index]!, index, number: step + 1 };
+  });
 }

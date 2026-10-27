@@ -15,8 +15,9 @@ export const metadata: Metadata = {
 };
 
 /**
- * The one music place in the cabinet: shelves by author and the venue player.
- * Guests keep the demo at /guest/coffee. This page does not load the catalog twice.
+ * The one music place in the cabinet: the venue player and the upcoming queue.
+ * /workspace and /player redirect here. Guests keep the demo at /guest/coffee.
+ * This page does not load the catalog twice.
  */
 export default async function BusinessAppMusicPage() {
   const supabase = await createClient();
