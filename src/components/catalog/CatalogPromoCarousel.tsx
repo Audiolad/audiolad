@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
-  CATALOG_PROMO_ARTWORK_HEIGHT,
-  CATALOG_PROMO_ARTWORK_WIDTH,
   isCatalogPromoArtwork,
   type CatalogPromo,
 } from "@/lib/catalog/catalog-promo";
@@ -109,8 +107,6 @@ export default function CatalogPromoCarousel({
                 <img
                   src={promo.image}
                   alt={promo.title}
-                  width={CATALOG_PROMO_ARTWORK_WIDTH}
-                  height={CATALOG_PROMO_ARTWORK_HEIGHT}
                   data-catalog-promo-artwork
                   className="catalog-promo-artwork"
                 />

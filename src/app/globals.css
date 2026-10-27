@@ -790,13 +790,12 @@ button.guest-home-slider__link,
   max-width: 100%;
 }
 
-/* Natural 2162×629 frame: the whole photo stays visible at every width. */
+/* Height follows the file. A replaced photo with a taller subtitle stays fully visible. */
 .catalog-promo-artwork {
   display: block;
   width: 100%;
   max-width: 100%;
   height: auto;
-  aspect-ratio: 2162 / 629;
   object-fit: contain;
   object-position: center;
   border-radius: 24px;
