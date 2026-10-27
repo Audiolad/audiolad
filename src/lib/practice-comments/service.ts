@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { buildPracticePublicPath } from "@/lib/products/paths";
-import { LISTENER_COMMENT_DEFAULT_PUBLIC_NAME } from "@/lib/practice-comments/copy";
+import {
+  LISTENER_COMMENT_DEFAULT_PUBLIC_NAME,
+  moderationActorLabel,
+} from "@/lib/practice-comments/copy";
 import {
   encodeCommentCursor,
   type CommentCursor,
@@ -395,12 +398,19 @@ export async function deleteOwnComment(
     const author = await store.isAuthorMember(actor.userId, row.practiceId);
     if (!author) return commentFailure(403, "forbidden");
   }
+  // The platform owner's own comment uses the same journaled transaction as
+  // deleting someone else's. A listener retracts their own row without that
+  // journal: returnCommentAsOwner will not restore it.
+  if (actor.isPlatformOwner === true) {
+    return deleteCommentAsOwner(store, actor, clock, commentId);
+  }
   const now = iso(clock.now());
   await store.updateComment(row.id, {
     status: "deleted",
     deletedAt: now,
     updatedAt: now,
   });
+  await store.clearCommentNotices(row.id);
   return { ok: true };
 }
 
@@ -684,6 +694,14 @@ export async function listModerationQueue(
     const context = await store.getPracticeContext(row.practiceId);
     const reports = await store.listReports(row.id);
     const journal = await store.listModerationEvents(row.id);
+    const labels = await store.actorLabels(journal.map((event) => event.actorUserId));
+    const lastDelete = [...journal].reverse().find((event) => event.action === "owner_delete");
+    const ownerReturnTo =
+      lastDelete?.reason === "previous:hidden"
+        ? "hidden"
+        : lastDelete?.reason === "previous:published"
+          ? "published"
+          : null;
     items.push({
       id: row.id,
       practiceTitle: context?.title ?? "Практика",
@@ -697,11 +715,13 @@ export async function listModerationQueue(
         reason: report.reason,
         createdAt: report.createdAt,
       })),
+      ownerReturnTo: row.status === "deleted" ? ownerReturnTo : null,
       journal: journal.map((event) => ({
         action: event.action,
         reason: event.reason,
         createdAt: event.createdAt,
         actorUserId: event.actorUserId,
+        actorLabel: labels[event.actorUserId] ?? moderationActorLabel({}),
       })),
     });
   }
@@ -727,22 +747,14 @@ export async function deleteCommentAsOwner(
 ): Promise<CommentFailure | { ok: true }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   if (actor.isPlatformOwner !== true) return commentFailure(403, "forbidden");
-  const row = await store.getRaw(commentId);
-  if (!row || row.status === "deleted") return commentFailure(404, "not_found");
-  const now = iso(clock.now());
-  await store.updateComment(row.id, {
-    status: "deleted",
-    deletedAt: now,
-    updatedAt: now,
-  });
-  await store.insertModerationEvent({
-    id: randomUUID(),
-    commentId: row.id,
-    actorUserId: actor.userId,
+  const result = await store.applyOwnerModeration({
     action: "owner_delete",
-    reason: `previous:${row.status}`,
-    createdAt: now,
+    commentId,
+    actorUserId: actor.userId,
+    eventId: randomUUID(),
+    now: iso(clock.now()),
   });
+  if (!result.ok) return commentFailure(404, "not_found");
   return { ok: true };
 }
 
@@ -755,24 +767,15 @@ export async function returnCommentAsOwner(
 ): Promise<CommentFailure | { ok: true }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   if (actor.isPlatformOwner !== true) return commentFailure(403, "forbidden");
-  const row = await store.getRaw(commentId);
-  if (!row || row.status !== "deleted") return commentFailure(404, "not_found");
-  const journal = await store.listModerationEvents(row.id);
-  const lastDelete = [...journal].reverse().find((event) => event.action === "owner_delete");
-  const previous = lastDelete?.reason === "previous:hidden" ? "hidden" : "published";
-  const now = iso(clock.now());
-  await store.updateComment(row.id, {
-    status: previous,
-    deletedAt: null,
-    updatedAt: now,
-  });
-  await store.insertModerationEvent({
-    id: randomUUID(),
-    commentId: row.id,
-    actorUserId: actor.userId,
+  const result = await store.applyOwnerModeration({
     action: "owner_return",
-    reason: `status:${previous}`,
-    createdAt: now,
+    commentId,
+    actorUserId: actor.userId,
+    eventId: randomUUID(),
+    now: iso(clock.now()),
   });
+  if (!result.ok) {
+    return commentFailure(404, result.error === "not_owner_deleted" ? "not_owner_deleted" : "not_found");
+  }
   return { ok: true };
 }

@@ -21,6 +21,8 @@ export type ListenerCommentPracticeGate = {
   publishedAt: string | null;
   scheduledPublishAt: string | null;
   deletedAt: string | null;
+  /** listed and unlisted are public pages. selected_users is a private allowlist. */
+  catalogVisibility: string | null;
 };
 
 /**
@@ -133,7 +135,8 @@ export const LISTENER_COMMENT_PUBLICATION_CLASSES = CATALOG_PUBLICATION_CLASSES;
 
 /**
  * Product type is not a gate. A published product of any kind accepts
- * impressions. The catalog shelf, including music and stories, is ignored.
+ * impressions when the page itself is public. The catalog shelf, including
+ * music and stories, is ignored. Private allowlist products are not.
  */
 export function isListenerCommentProductKind(input: {
   productKind: string | null | undefined;
@@ -144,10 +147,18 @@ export function isListenerCommentProductKind(input: {
   return true;
 }
 
+/** Direct-link and catalog pages. selected_users stays behind the allowlist. */
+export function isPublicCommentCatalogVisibility(
+  value: string | null | undefined,
+): boolean {
+  return value === "listed" || value === "unlisted";
+}
+
 export function practiceAcceptsListenerComments(
   input: {
     productKind: string | null | undefined;
     catalogSection: string | null | undefined;
+    catalogVisibility?: string | null;
     status: string | null | undefined;
     publishedAt?: string | null;
     scheduledPublishAt?: string | null;
@@ -156,6 +167,9 @@ export function practiceAcceptsListenerComments(
   },
 ): boolean {
   if (input.deletedAt) {
+    return false;
+  }
+  if (!isPublicCommentCatalogVisibility(input.catalogVisibility)) {
     return false;
   }
   if (!isListenerCommentProductKind(input)) {

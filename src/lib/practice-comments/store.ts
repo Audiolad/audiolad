@@ -114,6 +114,22 @@ export type CommentStore = {
   listReports(commentId: string): Promise<CommentReportRow[]>;
   insertModerationEvent(row: ModerationEventRow): Promise<void>;
   listModerationEvents(commentId: string): Promise<ModerationEventRow[]>;
+  /**
+   * Platform-owner soft delete or return. The comment update and the journal
+   * row commit together. A failed journal write leaves the comment unchanged.
+   */
+  applyOwnerModeration(input: {
+    action: "owner_delete" | "owner_return";
+    commentId: string;
+    actorUserId: string;
+    eventId: string;
+    now: string;
+  }): Promise<
+    | { ok: true; previousStatus?: "published" | "hidden" }
+    | { ok: false; error: "not_found" | "not_owner_deleted" }
+  >;
+  clearCommentNotices(commentId: string): Promise<void>;
+  actorLabels(userIds: string[]): Promise<Record<string, string>>;
   listModerationQueue(input: {
     queue: "reports" | "hidden" | "deleted";
     cursor: CommentCursor | null;

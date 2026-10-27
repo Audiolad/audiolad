@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS public.practices (
   deleted_at timestamptz,
   product_kind text,
   catalog_section text,
+  catalog_visibility text,
   published_at timestamptz,
   scheduled_publish_at timestamptz
 );

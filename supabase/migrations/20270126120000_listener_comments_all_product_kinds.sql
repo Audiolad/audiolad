@@ -1,6 +1,7 @@
--- Listener impressions on every published product.
+-- Listener impressions on every publicly readable published product.
 -- Replaces practice_accepts_listener_comments only, and widens the
 -- moderation journal so the platform owner can record a soft delete.
+-- catalog_visibility must be listed or unlisted. selected_users stays private.
 -- Does not INSERT, UPDATE, or DELETE any product or comment row.
 -- Does not touch practice_ratings. Star totals stay a separate table.
 --
@@ -27,6 +28,7 @@ AS $$
     WHERE p.id = p_practice_id
       AND p.deleted_at IS NULL
       AND p.status = 'published'
+      AND p.catalog_visibility IN ('listed', 'unlisted')
       AND (
         (p.published_at IS NOT NULL AND p.published_at <= now())
         OR p.scheduled_publish_at IS NULL
@@ -36,7 +38,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.practice_accepts_listener_comments(uuid) IS
-  'True for any publicly available product. Kind and catalog shelf are ignored. Drafts and deleted products are false.';
+  'True for a published product with catalog_visibility listed or unlisted. Private selected_users products, drafts, future schedules and ids that are not practices are false.';
 
 REVOKE ALL ON FUNCTION public.practice_accepts_listener_comments(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.practice_accepts_listener_comments(uuid) TO anon, authenticated, service_role;

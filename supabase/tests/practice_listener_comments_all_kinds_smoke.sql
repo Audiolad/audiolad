@@ -17,9 +17,9 @@ DECLARE
   cnt integer;
 BEGIN
   INSERT INTO public.practices (
-    id, author_id, title, slug, status, product_kind, catalog_section, published_at
+    id, author_id, title, slug, status, product_kind, catalog_section, catalog_visibility, published_at
   ) VALUES (
-    post, author_id, 'Дом', 'dom', 'published', 'audio_post', NULL, now()
+    post, author_id, 'Дом', 'dom', 'published', 'audio_post', NULL, 'unlisted', now()
   );
 
   INSERT INTO public.practice_listener_comments (
@@ -78,6 +78,67 @@ BEGIN
   IF cnt <> 1 THEN
     RAISE EXCEPTION 'owner delete must keep the row';
   END IF;
+END
+$$;
+
+-- Private products, a future schedule, and a uuid that is not a practice.
+DO $$
+DECLARE
+  listener uuid := '11111111-1111-4111-8111-111111111111';
+  author_id uuid := '55555555-5555-4555-8555-555555555555';
+  private_music uuid := 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1';
+  private_practice uuid := 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2';
+  private_music_comment uuid := 'b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1';
+  private_practice_comment uuid := 'b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2';
+  future_practice uuid := 'c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3';
+  future_comment uuid := 'd4d4d4d4-d4d4-4d4d-8d4d-d4d4d4d4d4d4';
+  not_a_practice uuid := 'e5e5e5e5-e5e5-4e5e-8e5e-e5e5e5e5e5e5';
+  cnt integer;
+  accepts boolean;
+BEGIN
+  INSERT INTO public.practices (
+    id, author_id, title, slug, status, product_kind, catalog_section, catalog_visibility, published_at, scheduled_publish_at
+  ) VALUES
+    (private_music, author_id, 'Закрытый трек', 'private-track', 'published', 'music', 'music', 'selected_users', now(), NULL),
+    (private_practice, author_id, 'Закрытая практика', 'private-practice', 'published', 'practice', 'meditations', 'selected_users', now(), NULL),
+    (future_practice, author_id, 'Позже', 'later', 'published', 'practice', 'meditations', 'listed', NULL, now() + interval '2 days');
+
+  INSERT INTO public.practice_listener_comments (
+    id, practice_id, user_id, kind, body, public_name, status, body_fingerprint, parent_id
+  ) VALUES
+    (private_music_comment, private_music, listener, 'impression', 'Тихий трек', 'Мария', 'published', 'тихий трек', NULL),
+    (private_practice_comment, private_practice, listener, 'impression', 'Тихая практика', 'Мария', 'published', 'тихая практика', NULL),
+    (future_comment, future_practice, listener, 'impression', 'Рано', 'Мария', 'published', 'рано', NULL);
+
+  IF public.practice_accepts_listener_comments(private_music) THEN
+    RAISE EXCEPTION 'selected_users music must not accept comments';
+  END IF;
+  IF public.practice_accepts_listener_comments(private_practice) THEN
+    RAISE EXCEPTION 'selected_users practice must not accept comments';
+  END IF;
+  IF public.practice_accepts_listener_comments(future_practice) THEN
+    RAISE EXCEPTION 'a future schedule must not accept comments';
+  END IF;
+  IF public.practice_accepts_listener_comments(not_a_practice) THEN
+    RAISE EXCEPTION 'a uuid that is not a practice must not accept comments';
+  END IF;
+  IF public.practice_accepts_listener_comments(NULL) THEN
+    RAISE EXCEPTION 'null must not accept comments';
+  END IF;
+
+  SELECT public.practice_accepts_listener_comments('abababab-abab-4aba-8aba-abababababab') INTO accepts;
+  IF accepts IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'published unlisted audio post must stay commentable';
+  END IF;
+
+  SET ROLE anon;
+  SELECT count(*) INTO cnt
+  FROM public.practice_listener_comment_feed
+  WHERE id IN (private_music_comment, private_practice_comment, future_comment);
+  IF cnt <> 0 THEN
+    RAISE EXCEPTION 'private and future impressions must be absent from the anon feed, got %', cnt;
+  END IF;
+  RESET ROLE;
 END
 $$;
 

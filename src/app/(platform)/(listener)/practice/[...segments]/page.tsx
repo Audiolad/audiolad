@@ -897,6 +897,7 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     listenerCommentsEnabled: practiceAcceptsListenerComments({
       productKind: practice.product_kind,
       catalogSection: practice.catalog_section,
+      catalogVisibility: practice.catalog_visibility,
       status: practice.status,
       publishedAt: practice.published_at,
       scheduledPublishAt: practice.scheduled_publish_at,

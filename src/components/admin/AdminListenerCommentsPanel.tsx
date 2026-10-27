@@ -6,14 +6,13 @@ import {
   ADMIN_LISTENER_COMMENTS_SUBTITLE,
   ADMIN_LISTENER_COMMENTS_TITLE,
   LISTENER_IMPRESSION_LOAD_MORE,
-  MODERATION_ACTION_LABELS,
+  moderationJournalActionLabel,
+  moderationJournalReasonLabel,
   OWNER_COMMENT_DELETE_CONFIRM,
   OWNER_COMMENT_DELETE_LABEL,
   OWNER_COMMENT_DELETED_QUEUE,
-  OWNER_COMMENT_RETURN_CONFIRM,
   OWNER_COMMENT_RETURN_LABEL,
-  OWNER_DELETE_JOURNAL,
-  OWNER_RETURN_JOURNAL,
+  ownerReturnConfirm,
   REPORT_REASON_LABELS,
 } from "@/lib/practice-comments/copy";
 
@@ -28,7 +27,13 @@ type Item = {
   kind: "impression" | "author_reply";
   createdAt: string;
   reports: Array<{ reason: keyof typeof REPORT_REASON_LABELS; createdAt: string }>;
-  journal: Array<{ action: string; reason: string | null; createdAt: string; actorUserId?: string }>;
+  ownerReturnTo?: "published" | "hidden" | null;
+  journal: Array<{
+    action: string;
+    reason: string | null;
+    createdAt: string;
+    actorLabel?: string;
+  }>;
 };
 
 type Page = {
@@ -43,17 +48,9 @@ function queueUrl(queue: Queue, cursor: string | null): string {
   return `/api/admin/listener-comments?${params}`;
 }
 
-function journalText(value: string | null): string {
-  if (!value) return "без причины";
-  if (value === "owner_delete") return OWNER_DELETE_JOURNAL;
-  if (value === "owner_return") return OWNER_RETURN_JOURNAL;
-  if (value in REPORT_REASON_LABELS) {
-    return REPORT_REASON_LABELS[value as keyof typeof REPORT_REASON_LABELS];
-  }
-  if (value in MODERATION_ACTION_LABELS) {
-    return MODERATION_ACTION_LABELS[value as keyof typeof MODERATION_ACTION_LABELS];
-  }
-  return value;
+function journalLine(event: Item["journal"][number]): string {
+  const actor = event.actorLabel?.trim() ? event.actorLabel : "Участник";
+  return `${moderationJournalActionLabel(event.action)} – ${moderationJournalReasonLabel(event.reason)} – ${actor}`;
 }
 
 export default function AdminListenerCommentsPanel() {
@@ -126,9 +123,15 @@ export default function AdminListenerCommentsPanel() {
     }
   }
 
-  async function ownerAction(id: string, action: "delete" | "return") {
+  async function ownerAction(
+    id: string,
+    action: "delete" | "return",
+    previous: "published" | "hidden" | null = null,
+  ) {
     const confirmText =
-      action === "delete" ? OWNER_COMMENT_DELETE_CONFIRM : OWNER_COMMENT_RETURN_CONFIRM;
+      action === "delete"
+        ? OWNER_COMMENT_DELETE_CONFIRM
+        : ownerReturnConfirm(previous === "hidden" ? "hidden" : "published");
     if (!window.confirm(confirmText)) return;
     setPendingId(id);
     try {
@@ -213,8 +216,7 @@ export default function AdminListenerCommentsPanel() {
               <ul className="mt-2 space-y-1 text-xs text-[#6d628c]">
                 {item.journal.map((event, index) => (
                   <li key={`${item.id}-${index}`}>
-                    {journalText(event.action)} – {journalText(event.reason)} – {event.createdAt}
-                    {event.actorUserId ? ` – ${event.actorUserId}` : ""}
+                    {journalLine(event)} – {event.createdAt}
                   </li>
                 ))}
               </ul>
@@ -245,13 +247,13 @@ export default function AdminListenerCommentsPanel() {
                   {OWNER_COMMENT_DELETE_LABEL}
                 </button>
               ) : null}
-              {canOwnerDelete && item.status === "deleted" ? (
+              {canOwnerDelete && item.status === "deleted" && item.ownerReturnTo ? (
                 <button
                   type="button"
                   className="min-h-11 rounded-full border border-[#e4d7f4] px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
                   disabled={pendingId === item.id}
                   data-owner-return-comment="true"
-                  onClick={() => void ownerAction(item.id, "return")}
+                  onClick={() => void ownerAction(item.id, "return", item.ownerReturnTo)}
                 >
                   {OWNER_COMMENT_RETURN_LABEL}
                 </button>

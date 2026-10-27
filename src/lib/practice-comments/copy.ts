@@ -99,6 +99,70 @@ export const OWNER_COMMENT_DELETE_CONFIRM = "Удалить отзыв?";
 
 export const OWNER_COMMENT_RETURN_CONFIRM = "Вернуть отзыв на страницу?";
 
+export const OWNER_COMMENT_RETURN_HIDDEN_CONFIRM =
+  "Вернуть отзыв в скрытые? На странице его не будет.";
+
+export const OWNER_DELETE_PREVIOUS_PUBLISHED = "Был опубликован";
+
+export const OWNER_DELETE_PREVIOUS_HIDDEN = "Был скрыт";
+
+export const OWNER_RETURN_STATUS_PUBLISHED = "Снова на странице";
+
+export const OWNER_RETURN_STATUS_HIDDEN = "Снова скрыт";
+
+export const MODERATION_ACTOR_FALLBACK = "Участник";
+
+const ACTOR_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function readableActorToken(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !ACTOR_UUID.test(trimmed) && !/token=/i.test(trimmed);
+}
+
+/** Name, otherwise the mailbox handle. Never a user id or a signed token. */
+export function moderationActorLabel(input: {
+  fullName?: string | null;
+  email?: string | null;
+}): string {
+  const name = input.fullName?.trim() ?? "";
+  if (readableActorToken(name)) return name;
+  const email = input.email?.trim() ?? "";
+  if (/token=/i.test(email)) return MODERATION_ACTOR_FALLBACK;
+  const handle = email.split("@")[0]?.trim() ?? "";
+  if (readableActorToken(handle)) return handle;
+  return MODERATION_ACTOR_FALLBACK;
+}
+
+export function moderationJournalActionLabel(action: string): string {
+  if (action === "owner_delete") return OWNER_DELETE_JOURNAL;
+  if (action === "owner_return") return OWNER_RETURN_JOURNAL;
+  if (action === "hide") return MODERATION_ACTION_LABELS.hide;
+  if (action === "report") return MODERATION_ACTION_LABELS.report;
+  return "Запись в журнале";
+}
+
+export function moderationJournalReasonLabel(reason: string | null): string {
+  if (!reason) return "без причины";
+  if (reason === "previous:published") return OWNER_DELETE_PREVIOUS_PUBLISHED;
+  if (reason === "previous:hidden") return OWNER_DELETE_PREVIOUS_HIDDEN;
+  if (reason === "status:published") return OWNER_RETURN_STATUS_PUBLISHED;
+  if (reason === "status:hidden") return OWNER_RETURN_STATUS_HIDDEN;
+  if (reason in REPORT_REASON_LABELS) {
+    return REPORT_REASON_LABELS[reason as keyof typeof REPORT_REASON_LABELS];
+  }
+  if (reason in MODERATION_ACTION_LABELS) {
+    return MODERATION_ACTION_LABELS[reason as keyof typeof MODERATION_ACTION_LABELS];
+  }
+  return "запись в журнале";
+}
+
+export function ownerReturnConfirm(previous: "published" | "hidden"): string {
+  return previous === "hidden"
+    ? OWNER_COMMENT_RETURN_HIDDEN_CONFIRM
+    : OWNER_COMMENT_RETURN_CONFIRM;
+}
+
 export const REPORT_REASON_LABELS = {
   spam: "Спам",
   insult: "Оскорбление",

@@ -109,6 +109,9 @@ function runScratch(bin) {
       readFileSync(join(root, "supabase/migrations/20270124150000_listener_comments_by_product_type.sql"), "utf8"),
       readFileSync(join(root, "supabase/migrations/20270126120000_listener_comments_all_product_kinds.sql"), "utf8"),
       readFileSync(join(root, "supabase/tests/practice_listener_comments_all_kinds_smoke.sql"), "utf8"),
+      readFileSync(join(root, "supabase/migrations/20270127120000_listener_comments_public_visibility_owner_tx.sql"), "utf8"),
+      readFileSync(join(root, "supabase/migrations/20270127120000_listener_comments_public_visibility_owner_tx.sql"), "utf8"),
+      readFileSync(join(root, "supabase/tests/practice_listener_comments_owner_tx_smoke.sql"), "utf8"),
     ].join("\n");
     const psql = existsSync(join(bin, "psql")) ? join(bin, "psql") : "psql";
     const out = execFileSync(
@@ -118,6 +121,7 @@ function runScratch(bin) {
     ).toString();
     assert.match(out, /practice_listener_comments_rls_smoke: PASS/);
     assert.match(out, /practice_listener_comments_all_kinds_smoke: PASS/);
+    assert.match(out, /practice_listener_comments_owner_tx_smoke: PASS/);
   } finally {
     if (started) {
       try {

@@ -30,6 +30,16 @@ A parallel burst cannot pass the same count. Those functions are executable
 only by `service_role`.
 Apply on production needs a separate decision from Sergey.
 
+`20270126120000_listener_comments_all_product_kinds.sql` opens comments on
+every published product kind, and only when `catalog_visibility` is `listed`
+or `unlisted`. `selected_users` stays off the anon feed.
+`20270127120000_listener_comments_public_visibility_owner_tx.sql` repeats that
+gate and adds `practice_listener_comment_owner_delete` /
+`practice_listener_comment_owner_return`. Those two functions are
+`service_role` only. Each one updates the comment and inserts the journal row
+in one transaction, and owner delete also removes notices for that comment.
+Neither file is applied by this change. Production apply still needs Sergey.
+
 ### Disable without deleting data
 
 Leave the tables in place. Do not deploy the listener-comment routes. The feed

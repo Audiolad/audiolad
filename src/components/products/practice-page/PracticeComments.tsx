@@ -595,12 +595,12 @@ function CommentCard({
             {LISTENER_IMPRESSION_EDIT}
           </button>
         ) : null}
-        {comment.mine ? (
+        {comment.mine && !canOwnerDelete ? (
           <button type="button" className={`${buttonClass} border border-[#e4d7f4] text-[#7042c5]`} disabled={pending} onClick={() => void remove()}>
             {LISTENER_IMPRESSION_DELETE}
           </button>
         ) : null}
-        {canOwnerDelete && !comment.mine ? (
+        {canOwnerDelete ? (
           <button
             type="button"
             className={`${buttonClass} border border-[#e4d7f4] text-[#9a3d55]`}

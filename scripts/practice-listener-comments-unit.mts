@@ -32,7 +32,10 @@ import {
   LISTENER_IMPRESSION_PRIVACY,
   LISTENER_IMPRESSION_SIGN_IN,
   LISTENER_IMPRESSION_SUBMIT,
+  moderationActorLabel,
+  moderationJournalReasonLabel,
   MODERATION_ACTION_LABELS,
+  ownerReturnConfirm,
   REPORT_REASON_LABELS,
 } from "../src/lib/practice-comments/copy";
 import {
@@ -96,6 +99,7 @@ function gate(overrides: Partial<ListenerCommentPracticeGate> = {}): ListenerCom
     publishedAt: "2026-01-01T00:00:00.000Z",
     scheduledPublishAt: null,
     deletedAt: null,
+    catalogVisibility: "listed",
     ...overrides,
   };
 }
@@ -327,6 +331,7 @@ async function testProductGatesAndRatingsIsolation() {
     practiceAcceptsListenerComments({
       productKind: "practice",
       catalogSection: null,
+      catalogVisibility: "listed",
       status: "published",
     }),
     true,
@@ -335,6 +340,7 @@ async function testProductGatesAndRatingsIsolation() {
     practiceAcceptsListenerComments({
       productKind: "practice",
       catalogSection: "music",
+      catalogVisibility: "unlisted",
       status: "published",
       publishedAt: "2026-08-16T00:00:00.000Z",
     }),
@@ -345,9 +351,33 @@ async function testProductGatesAndRatingsIsolation() {
     practiceAcceptsListenerComments({
       productKind: null,
       catalogSection: "music",
+      catalogVisibility: "listed",
       status: "published",
     }),
     true,
+  );
+  assert.equal(
+    practiceAcceptsListenerComments({
+      productKind: "music",
+      catalogSection: "music",
+      catalogVisibility: "selected_users",
+      status: "published",
+      publishedAt: "2026-01-01T00:00:00.000Z",
+    }),
+    false,
+    "a private product does not accept public comments",
+  );
+  assert.equal(
+    practiceAcceptsListenerComments({
+      productKind: "practice",
+      catalogSection: "meditations",
+      catalogVisibility: "listed",
+      status: "published",
+      publishedAt: null,
+      scheduledPublishAt: "2099-01-01T00:00:00.000Z",
+      now: new Date("2026-01-01T00:00:00.000Z"),
+    }),
+    false,
   );
   const shelfPractice = createMemoryCommentStore(
     state({
@@ -381,8 +411,27 @@ async function testProductGatesAndRatingsIsolation() {
   assert.doesNotMatch(allKindsSql, /product_kind/);
   assert.doesNotMatch(allKindsSql, /catalog_section/);
   assert.match(allKindsSql, /p\.status = 'published'/);
+  assert.match(allKindsSql, /catalog_visibility IN \('listed', 'unlisted'\)/);
   assert.match(allKindsSql, /owner_delete/);
   assert.match(allKindsSql, /owner_return/);
+  const privacySql = read(
+    "supabase/migrations/20270127120000_listener_comments_public_visibility_owner_tx.sql",
+  );
+  assert.match(privacySql, /catalog_visibility IN \('listed', 'unlisted'\)/);
+  assert.match(privacySql, /practice_listener_comment_owner_delete/);
+  assert.match(privacySql, /practice_listener_comment_owner_return/);
+  assert.match(privacySql, /DELETE FROM public\.practice_listener_comment_notices/);
+  assert.match(privacySql, /OWNER APPROVAL REQUIRED/);
+  assert.doesNotMatch(
+    privacySql,
+    /DELETE FROM public\.practices|DELETE FROM public\.practice_listener_comments|UPDATE public\.practices/,
+  );
+  const visibilitySmoke = read("supabase/tests/practice_listener_comments_all_kinds_smoke.sql");
+  assert.match(visibilitySmoke, /selected_users/);
+  assert.match(visibilitySmoke, /scheduled_publish_at/);
+  assert.match(visibilitySmoke, /not a practice/);
+  assert.match(read("scripts/lib/practice-listener-comments-stub.sql"), /catalog_visibility text/);
+  assert.match(read("supabase/tests/practice_listener_comments_owner_tx_smoke.sql"), /restore hidden/);
   assert.doesNotMatch(allKindsSql, /UPDATE public\.practices|INSERT INTO public\.practices|DELETE FROM/);
   assert.match(allKinds, /OWNER APPROVAL REQUIRED/);
 
@@ -1057,7 +1106,25 @@ async function testModeratorScopeAndQueueSource() {
   assert.equal(LISTENER_IMPRESSION_LOAD_MORE, "Показать ещё");
   assert.match(panel, /LISTENER_IMPRESSION_LOAD_MORE/);
   assert.match(panel, /nextCursor/);
-  assert.match(panel, /MODERATION_ACTION_LABELS/);
+  assert.match(panel, /moderationJournalActionLabel/);
+  assert.match(panel, /actorLabel/);
+  assert.doesNotMatch(panel, /actorUserId/);
+  assert.match(panel, /ownerReturnTo/);
+  assert.equal(moderationJournalReasonLabel("previous:published"), "Был опубликован");
+  assert.equal(moderationJournalReasonLabel("previous:hidden"), "Был скрыт");
+  assert.equal(moderationJournalReasonLabel("status:hidden"), "Снова скрыт");
+  assert.equal(ownerReturnConfirm("published"), "Вернуть отзыв на страницу?");
+  assert.equal(
+    ownerReturnConfirm("hidden"),
+    "Вернуть отзыв в скрытые? На странице его не будет.",
+  );
+  assert.equal(moderationActorLabel({ fullName: "Сергей", email: "owner@audiolad.ru" }), "Сергей");
+  assert.equal(
+    moderationActorLabel({ fullName: ownerUser, email: "sergey@audiolad.ru" }),
+    "sergey",
+  );
+  assert.equal(moderationActorLabel({ fullName: null, email: "a@b.ru?token=secret" }), "Участник");
+  assert.equal(MODERATION_ACTION_LABELS.hide, "Скрыт");
   assert.doesNotMatch(panel, /\/restore/);
   assert.doesNotMatch(panel, /\{event\.action\}/);
   const queueFn = read("src/lib/practice-comments/supabase-store.ts").slice(
@@ -1096,6 +1163,7 @@ async function testEveryProductSurfaceAndOwnerDelete() {
       practiceAcceptsListenerComments({
         productKind: surface.productKind,
         catalogSection: surface.catalogSection,
+        catalogVisibility: "listed",
         status: "published",
         publishedAt: "2026-01-01T00:00:00.000Z",
       }),
@@ -1283,9 +1351,195 @@ async function testEveryProductSurfaceAndOwnerDelete() {
   assert.equal(back.ok && back.publishedCount, 1);
   assert.equal(back.ok && back.comments[0]?.body, "Громкая музыка");
 
+  const hiddenSlug = "hidden-return";
+  let tick = Date.parse("2026-10-26T09:00:00.000Z");
+  const stepping = {
+    now: () => new Date(tick),
+    rateLimit: () => {
+      tick += 1000;
+      return true;
+    },
+  };
+  const hiddenState = state({
+    gates: [gate({ productSlug: hiddenSlug, title: "Тихий возврат" })],
+    profiles: { [ownerUser]: { fullName: "Сергей", email: "sergey@audiolad.ru" } },
+  });
+  const hiddenStore = createMemoryCommentStore(hiddenState);
+  const hiddenCreated = await createImpression(hiddenStore, actor(listener), stepping, {
+    authorSlug: "anna",
+    productSlug: hiddenSlug,
+    body: "Скрытый текст отзыва",
+    publicName: "Мария",
+    clientRequestId: null,
+  });
+  assert.equal(hiddenCreated.ok, true);
+  if (!hiddenCreated.ok) return;
+  assert.equal(hiddenState.notices.some((notice) => notice.commentId === hiddenCreated.comment.id), true);
+  const hiddenComment = await moderateComment(hiddenStore, actor(moderator, true, false), stepping, {
+    commentId: hiddenCreated.comment.id,
+    action: "hide",
+    reason: "spam",
+  });
+  assert.equal(hiddenComment.ok, true);
+  const hiddenRemoved = await deleteCommentAsOwner(
+    hiddenStore,
+    actor(ownerUser, false, true),
+    stepping,
+    hiddenCreated.comment.id,
+  );
+  assert.equal(hiddenRemoved.ok, true);
+  assert.equal(hiddenState.notices.some((notice) => notice.commentId === hiddenCreated.comment.id), false);
+  const hiddenDeletedQueue = await listModerationQueue(hiddenStore, actor(ownerUser, true, true), {
+    queue: "deleted",
+    cursor: null,
+    limit: 10,
+  });
+  if (hiddenDeletedQueue.ok) {
+    const item = hiddenDeletedQueue.items.find((row) => row.id === hiddenCreated.comment.id);
+    assert.equal(item?.ownerReturnTo, "hidden");
+    assert.equal(
+      item?.journal.some((event) => event.action === "owner_delete" && event.actorLabel === "Сергей"),
+      true,
+    );
+  } else {
+    assert.fail("hidden comment must appear in the deleted queue");
+  }
+  const hiddenReturned = await returnCommentAsOwner(
+    hiddenStore,
+    actor(ownerUser, false, true),
+    stepping,
+    hiddenCreated.comment.id,
+  );
+  assert.equal(hiddenReturned.ok, true);
+  const hiddenPublic = await listPracticeComments(hiddenStore, actor(other), {
+    authorSlug: "anna",
+    productSlug: hiddenSlug,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(hiddenPublic.ok && hiddenPublic.publishedCount, 0);
+  const hiddenQueue = await listModerationQueue(hiddenStore, actor(moderator, true, false), {
+    queue: "hidden",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(
+    hiddenQueue.ok && hiddenQueue.items.some((item) => item.id === hiddenCreated.comment.id),
+    true,
+  );
+
+  const listenerSlug = "listener-retract";
+  const listenerState = state({
+    gates: [gate({ productSlug: listenerSlug })],
+  });
+  const listenerStore = createMemoryCommentStore(listenerState);
+  const listenerCreated = await createImpression(listenerStore, actor(listener), stepping, {
+    authorSlug: "anna",
+    productSlug: listenerSlug,
+    body: "Свой отзыв слушателя",
+    publicName: "Мария",
+    clientRequestId: null,
+  });
+  assert.equal(listenerCreated.ok, true);
+  if (!listenerCreated.ok) return;
+  assert.equal(listenerState.notices.length > 0, true);
+  const listenerRemoved = await deleteOwnComment(listenerStore, actor(listener), stepping, listenerCreated.comment.id);
+  assert.equal(listenerRemoved.ok, true);
+  assert.equal(listenerState.notices.length, 0);
+  const listenerReturn = await returnCommentAsOwner(
+    listenerStore,
+    actor(ownerUser, false, true),
+    stepping,
+    listenerCreated.comment.id,
+  );
+  assert.equal(listenerReturn.ok, false);
+  if (!listenerReturn.ok) assert.equal(listenerReturn.error, "not_owner_deleted");
+
+  const ownerOwn = await createImpression(listenerStore, actor(ownerUser, false, true), stepping, {
+    authorSlug: "anna",
+    productSlug: listenerSlug,
+    body: "Отзыв владельца",
+    publicName: "Сергей",
+    clientRequestId: null,
+  });
+  assert.equal(ownerOwn.ok, true);
+  if (!ownerOwn.ok) return;
+  const ownerOwnRemoved = await deleteOwnComment(
+    listenerStore,
+    actor(ownerUser, false, true),
+    stepping,
+    ownerOwn.comment.id,
+  );
+  assert.equal(ownerOwnRemoved.ok, true);
+  const ownerOwnQueue = await listModerationQueue(listenerStore, actor(ownerUser, true, true), {
+    queue: "deleted",
+    cursor: null,
+    limit: 10,
+  });
+  assert.equal(
+    ownerOwnQueue.ok &&
+      ownerOwnQueue.items.some(
+        (item) =>
+          item.id === ownerOwn.comment.id &&
+          item.journal.some((event) => event.action === "owner_delete" && event.reason === "previous:published"),
+      ),
+    true,
+  );
+
+  const privateWrite = await createImpression(
+    createMemoryCommentStore(
+      state({
+        gates: [
+          gate({
+            productKind: "music",
+            catalogSection: "music",
+            catalogVisibility: "selected_users",
+            productSlug: "private-track",
+          }),
+        ],
+      }),
+    ),
+    actor(listener),
+    stepping,
+    {
+      authorSlug: "anna",
+      productSlug: "private-track",
+      body: "Закрытый продукт",
+      publicName: "Мария",
+      clientRequestId: null,
+    },
+  );
+  assert.equal(privateWrite.ok, false);
+  if (!privateWrite.ok) assert.equal(privateWrite.status, 404);
+
   const page = read("src/app/(platform)/(listener)/practice/[...segments]/page.tsx");
   assert.doesNotMatch(page, /listenerCommentsEnabled:\s*!isAudioPost/);
   assert.match(page, /listenerCommentsEnabled: practiceAcceptsListenerComments/);
+  assert.match(page, /catalogVisibility: practice\.catalog_visibility/);
+  assert.match(
+    read("src/lib/listen/load-session-payload.ts"),
+    /catalogVisibility: practiceRow\.catalog_visibility/,
+  );
+  assert.match(
+    read("src/lib/practice-comments/supabase-store.ts"),
+    /catalogVisibility: practice\.catalog_visibility \?\? null/,
+  );
+  const ownerService = read("src/lib/practice-comments/service.ts");
+  const ownerDeleteFn = ownerService.slice(
+    ownerService.indexOf("export async function deleteCommentAsOwner"),
+    ownerService.indexOf("export async function returnCommentAsOwner"),
+  );
+  assert.match(ownerDeleteFn, /applyOwnerModeration/);
+  assert.doesNotMatch(ownerDeleteFn, /updateComment\(/);
+  const ownerReturnFn = ownerService.slice(ownerService.indexOf("export async function returnCommentAsOwner"));
+  assert.match(ownerReturnFn, /applyOwnerModeration/);
+  assert.doesNotMatch(ownerReturnFn, /previous:hidden \? "hidden" : "published"/);
+  assert.match(read("src/lib/practice-comments/service.ts"), /isPlatformOwner === true/);
+  assert.doesNotMatch(
+    read("src/components/products/practice-page/PracticeComments.tsx"),
+    /canOwnerDelete && !comment\.mine/,
+  );
   assert.match(read("src/components/products/practice-page/PracticePageContent.tsx"), /<PracticeComments/);
   const audioPost = read("src/components/products/audio-post/AudioPostPage.tsx");
   assert.match(audioPost, /<PracticeComments/);

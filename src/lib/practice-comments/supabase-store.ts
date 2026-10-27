@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPracticeByAuthorAndSlug } from "@/lib/products/lookup";
 import { buildPracticePublicPath } from "@/lib/products/paths";
 import { resolveViewerCommentAvatar, sanitizePublicAvatarUrl } from "@/lib/practice-comments/avatar";
+import { loadModerationActorLabels } from "@/lib/practice-comments/actor-labels";
 import { LISTENER_COMMENT_AUTHOR_PUBLIC_NAME } from "@/lib/practice-comments/copy";
 import type { ListenerCommentPracticeGate } from "@/lib/practice-comments/policy";
 import type { CommentCursor, CommentSort } from "@/lib/practice-comments/pagination";
@@ -37,6 +38,7 @@ function isMissingRelation(error: { code?: string; message?: string } | null): b
   const message = error.message ?? "";
   return (
     error.code === "42P01" ||
+    error.code === "PGRST202" ||
     error.code === "PGRST205" ||
     /practice_listener_comment/.test(message) &&
       /(schema cache|does not exist|Could not find)/i.test(message)
@@ -125,6 +127,7 @@ export function createSupabaseCommentStore(input: {
         publishedAt: practice.published_at ?? null,
         scheduledPublishAt: practice.scheduled_publish_at ?? null,
         deletedAt: practice.deleted_at ?? null,
+        catalogVisibility: practice.catalog_visibility ?? null,
       } satisfies ListenerCommentPracticeGate;
     },
     async getPracticeContext(practiceId) {
@@ -523,24 +526,29 @@ export function createSupabaseCommentStore(input: {
           createdAt: text(row.created_at) ?? new Date(0).toISOString(),
         } satisfies CommentNoticeRow;
       });
-      return Promise.all(
-        notices.map(async (notice) => {
-          const context = await this.getPracticeContext(notice.practiceId);
-          const { data: comment } = await reader
-            .from("practice_listener_comment_feed")
-            .select("body")
-            .eq("id", notice.commentId)
-            .maybeSingle();
-          return {
-            ...notice,
-            practiceTitle: context?.title ?? "Практика",
-            practiceHref: context
-              ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-impressions`
-              : "/catalog",
-            preview: text((comment as { body?: string } | null)?.body)?.slice(0, 140) ?? "",
-          };
-        }),
-      );
+      const visible = [];
+      for (const notice of notices) {
+        const { data: comment, error: commentError } = await writer
+          .from("practice_listener_comments")
+          .select("body, status, deleted_at")
+          .eq("id", notice.commentId)
+          .maybeSingle();
+        throwIfUnavailable(commentError);
+        const row = comment as { body?: string; status?: string; deleted_at?: string | null } | null;
+        if (!row || row.status === "deleted" || row.deleted_at) continue;
+        const preview = text(row.body)?.slice(0, 140) ?? "";
+        if (!preview) continue;
+        const context = await this.getPracticeContext(notice.practiceId);
+        visible.push({
+          ...notice,
+          practiceTitle: context?.title ?? "Практика",
+          practiceHref: context
+            ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-impressions`
+            : "/catalog",
+          preview,
+        });
+      }
+      return visible;
     },
     async markNoticeRead(userId, noticeId, readAt) {
       const { data, error } = await writer
@@ -608,6 +616,41 @@ export function createSupabaseCommentStore(input: {
       });
       throwIfUnavailable(error);
       if (error) throw new Error("listener_comment_moderation_event_failed");
+    },
+    async applyOwnerModeration(input) {
+      const name =
+        input.action === "owner_delete"
+          ? "practice_listener_comment_owner_delete"
+          : "practice_listener_comment_owner_return";
+      const { data, error } = await writer.rpc(name, {
+        p_comment_id: input.commentId,
+        p_actor_user_id: input.actorUserId,
+        p_event_id: input.eventId,
+        p_now: input.now,
+      });
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_owner_moderation_failed");
+      const value = typeof data === "string" ? data : "";
+      if (value === "ok") return { ok: true as const };
+      if (value === "published" || value === "hidden") {
+        return { ok: true as const, previousStatus: value };
+      }
+      if (value === "not_owner_deleted") {
+        return { ok: false as const, error: "not_owner_deleted" as const };
+      }
+      if (value === "not_found") return { ok: false as const, error: "not_found" as const };
+      throw new Error("listener_comment_owner_moderation_failed");
+    },
+    async clearCommentNotices(commentId) {
+      const { error } = await writer
+        .from("practice_listener_comment_notices")
+        .delete()
+        .eq("comment_id", commentId);
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_notice_clear_failed");
+    },
+    async actorLabels(userIds) {
+      return loadModerationActorLabels(writer, userIds);
     },
     async listModerationEvents(commentId) {
       const { data, error } = await writer
