@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { publishAuthorUnreadCount } from "@/components/author-dashboard/AuthorUnreadCommentBadge";
+import {
+  AUTHOR_UNREAD_CARD_CLASS,
+  publishAuthorUnreadCount,
+} from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import { parsePracticePublicPath } from "@/lib/products/paths";
 import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import {
@@ -366,7 +369,7 @@ function FeedbackCard({
     <li
       ref={cardRef}
       className={`rounded-[22px] border px-4 py-4 ${
-        item.unread ? "border-[#7042c5] bg-[#f7f3fc]" : "border-[#eadff8] bg-white"
+        item.unread ? AUTHOR_UNREAD_CARD_CLASS : "border-[#eadff8] bg-white"
       }`}
       data-author-comment-unread={item.unread ? "true" : "false"}
     >

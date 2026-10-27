@@ -12,6 +12,17 @@ import {
 
 export const AUTHOR_UNREAD_EVENT = "author-unread-comments";
 
+/** Orange circle on the «Комментарии» pill and the cabinet entry. */
+export const AUTHOR_UNREAD_CIRCLE_CLASS =
+  "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#c2410c] px-1 text-[11px] font-bold leading-none text-white";
+
+/** Soft orange fill for the inactive «Комментарии» pill while something is unread. */
+export const AUTHOR_UNREAD_PILL_CLASS =
+  "inline-flex items-center gap-2 rounded-full border border-[#f0b56a] bg-[#fff3e0] px-4 py-2 text-sm font-semibold text-[#7042c5] transition-colors";
+
+/** Light orange card until the author has seen that comment. */
+export const AUTHOR_UNREAD_CARD_CLASS = "border-[#e8a04a] bg-[#fff3e0]";
+
 let cachedCount: { value: number; at: number } | null = null;
 let inflight: Promise<number> | null = null;
 
@@ -82,9 +93,7 @@ export function AuthorUnreadCommentBadgeView({
   const text = formatAdminNavBadgeCount(count);
   if (!text) return null;
   const className =
-    placement === "sidebar"
-      ? "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#9a3d55] px-1 text-[11px] font-bold leading-none text-white shadow-sm"
-      : "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#9a3d55] px-1 text-[11px] font-bold leading-none text-white";
+    placement === "sidebar" ? `${AUTHOR_UNREAD_CIRCLE_CLASS} shadow-sm` : AUTHOR_UNREAD_CIRCLE_CLASS;
   const label = `${AUTHOR_COMMENTS_BADGE_LABEL}: ${text}`;
   if (placement === "sidebar") {
     return (

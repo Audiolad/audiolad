@@ -310,6 +310,7 @@ export async function createImpression(
 
   const recipients = await store.authorRecipientIds(gate.practiceId);
   for (const recipientUserId of recipients) {
+    // A member's own impression stays in the history. It is not an unread notice.
     if (recipientUserId === actor.userId) continue;
     await notify(store, {
       recipientUserId,
