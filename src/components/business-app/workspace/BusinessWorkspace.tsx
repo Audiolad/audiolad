@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useState } from "react";
 
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
+import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import {
   BusinessCabinetPlayerProvider,
@@ -210,6 +211,10 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         </section>
       ) : null}
 
+      {playbackBlocked(model) ? (
+        <BusinessEligibilityProbePanel compact />
+      ) : null}
+
       {open && current ? (
         <>
           <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
@@ -288,6 +293,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
 function showEmpty(model: WorkspacePageModel): boolean {
   return workspacePlayerOpen(model) && model.tracks.length === 0;
+}
+
+/** Rights check stays on «Музыка» only while the player has nothing to play. */
+function playbackBlocked(model: WorkspacePageModel): boolean {
+  return !workspacePlayerOpen(model) || model.tracks.length === 0;
 }
 
 /** Tracks that play after the current one, then the earlier ones, without repeating the current track. */
