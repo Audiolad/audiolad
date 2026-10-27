@@ -635,6 +635,102 @@ export function buildAdminAnalyticsSearchParams(
   return params;
 }
 
+export const LISTENER_COMMENTS_ADMIN_PATH = "/admin/listener-comments";
+
+export type ListenerCommentsQueue = "reports" | "hidden" | "deleted" | "ratings";
+
+const RATINGS_QUERY_KEYS = [
+  "ratingsPeriod",
+  "ratingsTab",
+  "ratingsQ",
+  "ratingsProductsSort",
+  "ratingsProductsSortDir",
+  "ratingsAuthorsSort",
+  "ratingsAuthorsSortDir",
+  "ratingsEventKind",
+  "ratingsExcludedFilter",
+  "ratingsJournalPracticeId",
+  "ratingsJournalAuthorId",
+  "ratingsJournalOffset",
+] as const;
+
+export function parseListenerCommentsQueue(
+  value: string | null | undefined,
+): ListenerCommentsQueue | null {
+  if (
+    value === "reports" ||
+    value === "hidden" ||
+    value === "deleted" ||
+    value === "ratings"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+/** Complaints stay behind products.moderate. Ratings stay behind analytics.view. */
+export function resolveListenerCommentsQueue(
+  value: string | null | undefined,
+  access: { canModerate: boolean; canViewRatings: boolean },
+): ListenerCommentsQueue {
+  const parsed = parseListenerCommentsQueue(value);
+  if (parsed === "ratings") {
+    return access.canViewRatings ? "ratings" : "reports";
+  }
+  if (parsed && access.canModerate) return parsed;
+  if (!access.canModerate && access.canViewRatings) return "ratings";
+  return "reports";
+}
+
+function ratingsSearchParams(state: AdminAnalyticsUrlState): URLSearchParams {
+  const built = buildAdminAnalyticsSearchParams(state);
+  const next = new URLSearchParams();
+  for (const key of RATINGS_QUERY_KEYS) {
+    const value = built.get(key);
+    if (value) next.set(key, value);
+  }
+  return next;
+}
+
+/** Comments page URL. Ratings filters stay on the same keys as /admin?view=ratings. */
+export function buildListenerCommentsSearchParams(
+  queue: ListenerCommentsQueue,
+  state: AdminAnalyticsUrlState,
+): URLSearchParams {
+  const next = ratingsSearchParams(state);
+  if (queue !== "reports") next.set("queue", queue);
+  return next;
+}
+
+export function listenerCommentsRatingsHrefFromState(
+  state: AdminAnalyticsUrlState,
+): string {
+  const params = buildListenerCommentsSearchParams("ratings", state);
+  const query = params.toString();
+  return query
+    ? `${LISTENER_COMMENTS_ADMIN_PATH}?${query}`
+    : `${LISTENER_COMMENTS_ADMIN_PATH}?queue=ratings`;
+}
+
+/** Bookmark /admin?view=ratings keeps ratings* and opens the reviews tab. */
+export function listenerCommentsRatingsHrefFromSearch(search: object): string {
+  if (search instanceof URLSearchParams) {
+    return listenerCommentsRatingsHrefFromState(
+      parseAdminAnalyticsUrlState(search),
+    );
+  }
+  const record: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(search)) {
+    if (typeof value === "string") record[key] = value;
+    else if (Array.isArray(value) && typeof value[0] === "string") {
+      record[key] = value[0];
+    }
+  }
+  return listenerCommentsRatingsHrefFromState(
+    parseAdminAnalyticsUrlState(record),
+  );
+}
+
 export function topNToLimit(top: AdminAnalyticsTopN): number {
   if (top === "10") return 10;
   if (top === "25") return 25;
