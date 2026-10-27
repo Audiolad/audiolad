@@ -13,14 +13,15 @@ export const GUEST_COFFEE_INQUIRY_EMAIL = BUSINESS_INQUIRY_EMAIL;
 
 /** "799 ₽" with a no-break space so the price never wraps. */
 export const GUEST_COFFEE_PRICE = COFFEE_ATLAS_OFFER.price.replace(/ /g, "\u00a0");
-export const GUEST_COFFEE_TERMS = `${BUSINESS_GIFT_TITLE}, затем ${GUEST_COFFEE_PRICE} в месяц`;
+/** Gift line, separate from the 30-minute guest preview. Trial opens the cabinet player with no minute cap. */
+export const GUEST_COFFEE_TERMS = `${BUSINESS_GIFT_TITLE} – полный доступ ко всем функциям, затем ${GUEST_COFFEE_PRICE} в месяц`;
 
 export const GUEST_COFFEE_COPY = {
   title: "Настройте звучание вашей кофейни",
   lead: "Выберите характер заведения, тип звучания и время суток, нажмите «Собрать атмосферу» – и слушайте готовую подборку прямо в кабинете АудиоЛад Бизнес.",
   /** Guest-only addition to the lead (members are already signed in). */
   leadGuest: "Без регистрации.",
-  limitNote: "В гостевом режиме доступно 30 минут прослушивания.",
+  limitNote: "30 минут прослушивания без регистрации.",
   nearEnd:
     "Гостевое прослушивание скоро подойдёт к концу. Чтобы музыка звучала в кофейне без ограничений, подключите АудиоЛад Бизнес.",
   nearEndShort: "Гостевое прослушивание скоро подойдёт к концу.",

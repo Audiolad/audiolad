@@ -70,8 +70,8 @@ export function BusinessGuestStatusBar() {
     >
       <div className="business-app-guest-bar__text">
         <p>
-          <span className="business-app-guest-bar__badge">Гостевой режим</span>{" "}
-          <span data-testid="biz-guest-limit">{guestLimitLine(limit)}</span>
+          <span className="business-app-guest-bar__badge">Гостевой режим</span>
+          <span data-testid="biz-guest-limit"> – {guestLimitLine(limit)}</span>
         </p>
         <p className="business-app-muted business-app-guest-bar__terms">{GUEST_COFFEE_TERMS}.</p>
         {/* Always in the tree so screen readers announce the notice when a locked section is tapped. */}

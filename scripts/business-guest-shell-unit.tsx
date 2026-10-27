@@ -109,8 +109,31 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /доступно после подключения/);
   has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
-  has(g, /В гостевом режиме доступно 30 минут прослушивания/);
-  has(g, /30 дней в подарок, затем 799\u00a0₽ в месяц/);
+  has(g, /Гостевой режим/);
+  has(g, /30 минут прослушивания без регистрации/);
+  has(g, /30 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
+  const bottom = g.slice(g.indexOf('aria-label="Мобильная навигация"'), g.indexOf("</nav>", g.indexOf('aria-label="Мобильная навигация"')));
+  has(bottom, /business-app-bottom-nav__lock/, "lock badge sits on the mobile icon");
+  hasNot(bottom, /business-app-bottom-nav__label/, "mobile bar has no text labels");
+  hasNot(bottom, />\s*(Главная|Музыка|Настройка|Документы|Профиль)\s*</, "mobile names are not visible text");
+  for (const title of ["Главная", "Музыка"]) {
+    has(bottom, new RegExp(`aria-label="${title}"`), `${title} keeps an accessible name`);
+    has(bottom, new RegExp(`title="${title}"`), `${title} tooltip`);
+  }
+  for (const title of ["Настройка", "Документы", "Профиль"]) {
+    has(bottom, new RegExp(`aria-label="${title} – доступно после подключения"`));
+    has(bottom, new RegExp(`title="${title} – доступно после подключения"`));
+  }
+  has(bottom, /is-active/, "active tab is marked");
+  has(bottom, /aria-current="page"/);
+  hasNot(g, /M12 3\.5v2\.2/, "settings icon is no longer a sun");
+  has(bottom, /M19\.4 15a1\.65/, "mobile Настройка is a gear");
+  const aside = g.slice(g.indexOf("<aside"), g.indexOf("</aside>"));
+  has(aside, /Настройка/, "desktop sidebar keeps the text label");
+  has(aside, /M19\.4 15a1\.65/, "desktop sidebar uses the same gear");
+  const navCss = read("src/components/business-app/business-app.css");
+  assert.match(navCss, /\.business-app-bottom-nav__item \{[^}]*min-height:\s*48px/, "tap target is at least 44px");
+  assert.match(navCss, /\.business-app-bottom-nav__item\.is-active \{[^}]*color:\s*var\(--biz-accent\)/);
   has(g, /data-testid="biz-trial-cta"/, "gift CTA is on the guest bar before the limit");
   assert.ok(anchors(g, "/onboarding?type=cafe").some((t) => t.includes('data-testid="biz-connect"')), "Подключить → real onboarding");
   hasCurrentLink(g, "/guest/coffee", "Music is the current section");
