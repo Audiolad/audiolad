@@ -21,6 +21,7 @@ import {
   loadAdminOverviewSections,
 } from "@/lib/admin/overview-blocks";
 import { getAdminOverviewStats } from "@/lib/admin/queries";
+import { listenerCommentsRatingsHrefFromSearch } from "@/lib/admin/analytics-url-state";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function AdminOverviewPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    view?: string;
     period?: string;
     includeTest?: string;
     authorId?: string;
@@ -38,6 +40,15 @@ export default async function AdminOverviewPage({
   }>;
 }) {
   const session = await requireAdminPanelAccess();
+  const params = await searchParams;
+  const canViewAnalytics = snapshotHasPermission(
+    session.access,
+    "analytics.view",
+  );
+
+  if (params.view === "ratings" && canViewAnalytics) {
+    redirect(listenerCommentsRatingsHrefFromSearch(params));
+  }
 
   if (!snapshotHasPermission(session.access, "dashboard.view")) {
     const fallback = getFirstAllowedAdminPath(session.access);
@@ -47,11 +58,6 @@ export default async function AdminOverviewPage({
     await requireAdminPermission("dashboard.view");
   }
 
-  const canViewAnalytics = snapshotHasPermission(
-    session.access,
-    "analytics.view",
-  );
-  const params = await searchParams;
   const retryHref = adminOverviewRetryHref(params);
 
   const loaded = await loadAdminOverviewSections({
