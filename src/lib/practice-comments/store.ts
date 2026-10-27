@@ -36,6 +36,7 @@ export type CommentStore = {
   suggestPublicName(userId: string): Promise<string>;
   viewerAvatarUrl(userId: string): Promise<string | null>;
   hasOwnImpression(userId: string, practiceId: string): Promise<boolean>;
+  countPublishedImpressions(practiceId: string): Promise<number>;
   authorDisplayName(practiceId: string): Promise<string>;
   isAuthorMember(userId: string, practiceId: string): Promise<boolean>;
   authorRecipientIds(practiceId: string): Promise<string[]>;
@@ -114,7 +115,7 @@ export type CommentStore = {
   insertModerationEvent(row: ModerationEventRow): Promise<void>;
   listModerationEvents(commentId: string): Promise<ModerationEventRow[]>;
   listModerationQueue(input: {
-    queue: "reports" | "hidden";
+    queue: "reports" | "hidden" | "deleted";
     cursor: CommentCursor | null;
     limit: number;
   }): Promise<ListenerCommentRow[]>;

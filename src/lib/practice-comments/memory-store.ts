@@ -147,6 +147,15 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
           row.status !== "deleted",
       );
     },
+    async countPublishedImpressions(practiceId) {
+      return state.comments.filter(
+        (row) =>
+          row.practiceId === practiceId &&
+          row.kind === "impression" &&
+          row.status === "published" &&
+          !row.deletedAt,
+      ).length;
+    },
     async authorDisplayName(practiceId) {
       return state.authorNames[practiceId] ?? "Автор";
     },
@@ -374,6 +383,7 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
     },
     async listModerationQueue(input) {
       const matched = state.comments.filter((row) => {
+        if (input.queue === "deleted") return row.status === "deleted";
         if (row.status === "deleted") return false;
         if (input.queue === "hidden") return row.status === "hidden";
         return (

@@ -106,6 +106,9 @@ function runScratch(bin) {
       readFileSync(join(root, "scripts/lib/practice-listener-comments-stub.sql"), "utf8"),
       migration,
       readFileSync(join(root, "supabase/tests/practice_listener_comments_rls_smoke.sql"), "utf8"),
+      readFileSync(join(root, "supabase/migrations/20270124150000_listener_comments_by_product_type.sql"), "utf8"),
+      readFileSync(join(root, "supabase/migrations/20270126120000_listener_comments_all_product_kinds.sql"), "utf8"),
+      readFileSync(join(root, "supabase/tests/practice_listener_comments_all_kinds_smoke.sql"), "utf8"),
     ].join("\n");
     const psql = existsSync(join(bin, "psql")) ? join(bin, "psql") : "psql";
     const out = execFileSync(
@@ -114,6 +117,7 @@ function runScratch(bin) {
       { input: sql, stdio: ["pipe", "pipe", "inherit"] },
     ).toString();
     assert.match(out, /practice_listener_comments_rls_smoke: PASS/);
+    assert.match(out, /practice_listener_comments_all_kinds_smoke: PASS/);
   } finally {
     if (started) {
       try {

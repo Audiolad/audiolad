@@ -10,7 +10,7 @@ export const LISTENER_IMPRESSION_INVITE_ACTION = "Написать отзыв";
 export const LISTENER_IMPRESSION_INVITE_DISMISS = "Не сейчас";
 
 export const LISTENER_IMPRESSION_PRIVACY =
-  "Отзыв виден на странице практики другим слушателям и автору. Публикуется имя из поля. Его можно сократить перед публикацией. Почта не показывается. Поделитесь впечатлением от практики – тем, что хотите оставить на странице. Отзыв можно изменить или удалить. Это по желанию и ни на что не влияет.";
+  "Отзыв виден на странице продукта другим слушателям и автору. Публикуется имя из поля. Его можно сократить перед публикацией. Почта не показывается. Поделитесь впечатлением от прослушивания – тем, что хотите оставить на странице. Отзыв можно изменить или удалить. Это по желанию и ни на что не влияет.";
 
 export const LISTENER_IMPRESSION_EMPTY =
   "Пока нет отзывов. Если захотите, можно поделиться впечатлением.";
@@ -72,7 +72,7 @@ export const LISTENER_COMMENT_AUTHOR_PUBLIC_NAME = "Автор";
 export const AUTHOR_FEEDBACK_TITLE = "Отзывы слушателей";
 
 export const AUTHOR_FEEDBACK_SUBTITLE =
-  "Живые впечатления о ваших медитациях и аудиопрактиках. Звёзды считаются отдельно.";
+  "Живые впечатления о ваших аудиопродуктах. Звёзды считаются отдельно.";
 
 export const AUTHOR_FEEDBACK_EMPTY = "Новых отзывов пока нет.";
 
@@ -83,7 +83,21 @@ export const AUTHOR_FEEDBACK_MARK_READ = "Прочитано";
 export const ADMIN_LISTENER_COMMENTS_TITLE = "Отзывы слушателей";
 
 export const ADMIN_LISTENER_COMMENTS_SUBTITLE =
-  "Жалобы и скрытие отзывов о медитациях и аудиопрактиках. Это не модерация продуктов и не авторские заявки.";
+  "Жалобы, скрытие и удаление отзывов. Это не модерация продуктов и не авторские заявки.";
+
+export const OWNER_COMMENT_DELETE_LABEL = "Удалить";
+
+export const OWNER_COMMENT_RETURN_LABEL = "Вернуть";
+
+export const OWNER_COMMENT_DELETED_QUEUE = "Удалённые";
+
+export const OWNER_DELETE_JOURNAL = "Удалён владельцем";
+
+export const OWNER_RETURN_JOURNAL = "Возвращён";
+
+export const OWNER_COMMENT_DELETE_CONFIRM = "Удалить отзыв?";
+
+export const OWNER_COMMENT_RETURN_CONFIRM = "Вернуть отзыв на страницу?";
 
 export const REPORT_REASON_LABELS = {
   spam: "Спам",

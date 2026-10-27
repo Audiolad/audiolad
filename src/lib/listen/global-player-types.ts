@@ -77,8 +77,8 @@ export type CatalogGlobalPlayerSession = GlobalPlayerSessionBase & {
    */
   playbackNavigation?: "inline_only" | "fullscreen";
   /**
-   * Set only for a published meditation or audio practice.
-   * Points at the impressions section. Absent for music and audio posts.
+   * Set for any published product that accepts listener impressions.
+   * Points at the impressions section on the product page.
    */
   listenerImpressionHref?: string | null;
   /** Guest promo funnel: persist progress in localStorage instead of server. */

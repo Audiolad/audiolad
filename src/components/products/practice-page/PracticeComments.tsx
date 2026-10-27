@@ -23,6 +23,8 @@ import {
   LISTENER_IMPRESSION_HIDDEN,
   LISTENER_IMPRESSION_LOAD_MORE,
   LISTENER_IMPRESSION_PRIVACY,
+  OWNER_COMMENT_DELETE_CONFIRM,
+  OWNER_COMMENT_DELETE_LABEL,
   LISTENER_IMPRESSION_REPLY_ACTION,
   LISTENER_IMPRESSION_REPORT,
   LISTENER_IMPRESSION_RETRY,
@@ -46,7 +48,9 @@ type FeedResponse = {
     publicNameSuggestion: string;
     avatarUrl: string | null;
     hasOwnImpression: boolean;
+    canOwnerDelete: boolean;
   };
+  publishedCount: number;
 };
 
 const fieldClass =
@@ -93,6 +97,7 @@ export default function PracticeComments({
   const [comments, setComments] = useState<PublicCommentDto[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [viewer, setViewer] = useState<FeedResponse["viewer"] | null>(null);
+  const [publishedCount, setPublishedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [body, setBody] = useState("");
@@ -126,6 +131,7 @@ export default function PracticeComments({
     setComments((current) => (append ? [...current, ...payload.comments] : payload.comments));
     setCursor(payload.nextCursor);
     setViewer(payload.viewer);
+    if (!append) setPublishedCount(payload.publishedCount);
     setError(false);
     setLoading(false);
     if (!append && !suggestionApplied.current && payload.viewer.publicNameSuggestion) {
@@ -184,14 +190,22 @@ export default function PracticeComments({
         },
         body: JSON.stringify({ body, publicName, clientRequestId }),
       });
-      const payload = (await response.json()) as { error?: string; comment?: PublicCommentDto };
+      const payload = (await response.json()) as {
+        error?: string;
+        comment?: PublicCommentDto;
+        replayed?: boolean;
+      };
       if (!response.ok || !payload.comment) {
         setFormError(payload.error ?? "internal_error");
         return;
       }
       setBody("");
       setViewer((current) => (current ? { ...current, hasOwnImpression: true } : current));
-      setComments((current) => [payload.comment!, ...current.filter((item) => item.id !== payload.comment!.id)]);
+      const created = payload.comment;
+      if (!payload.replayed && created.status === "published") {
+        setPublishedCount((count) => count + 1);
+      }
+      setComments((current) => [created, ...current.filter((item) => item.id !== created.id)]);
     } catch {
       setFormError("internal_error");
     } finally {
@@ -205,6 +219,7 @@ export default function PracticeComments({
       className="mt-8 w-full min-w-0 max-w-full scroll-mt-24"
       aria-labelledby="listener-impressions-title"
       data-listener-comments="true"
+      data-listener-comments-count={publishedCount}
     >
       <h2 id="listener-impressions-title" className="text-[22px] font-semibold text-[#2b2144]">
         {LISTENER_IMPRESSIONS_TITLE}
@@ -306,6 +321,7 @@ export default function PracticeComments({
               authorSlug={authorSlug}
               productSlug={productSlug}
               canReply={Boolean(viewer?.canReply)}
+              canOwnerDelete={viewer?.canOwnerDelete === true}
               editing={editingId === comment.id}
               reporting={reportId === comment.id}
               onEdit={() => setEditingId(comment.id)}
@@ -317,6 +333,9 @@ export default function PracticeComments({
                     ? current.map((item) => (item.id === next.id ? next : item))
                     : current.filter((item) => item.id !== comment.id),
                 );
+                if (!next && comment.status === "published") {
+                  setPublishedCount((count) => Math.max(0, count - 1));
+                }
                 if (!next && comment.mine) {
                   setViewer((current) =>
                     current
@@ -390,6 +409,7 @@ function CommentCard({
   authorSlug,
   productSlug,
   canReply,
+  canOwnerDelete,
   editing,
   reporting,
   onEdit,
@@ -401,6 +421,7 @@ function CommentCard({
   authorSlug: string;
   productSlug: string;
   canReply: boolean;
+  canOwnerDelete: boolean;
   editing: boolean;
   reporting: boolean;
   onEdit: () => void;
@@ -450,6 +471,31 @@ function CommentCard({
         return;
       }
       onChanged(null);
+    } catch {
+      setMessage(messageFor("internal_error"));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function ownerRemove(commentId: string) {
+    if (pending || !window.confirm(OWNER_COMMENT_DELETE_CONFIRM)) return;
+    setPending(true);
+    try {
+      const response = await fetch(`/api/admin/listener-comments/${commentId}/owner-delete`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        setMessage(messageFor(payload.error));
+        return;
+      }
+      if (commentId === comment.id) {
+        onChanged(null);
+        return;
+      }
+      onChanged({ ...comment, reply: null });
     } catch {
       setMessage(messageFor("internal_error"));
     } finally {
@@ -554,7 +600,18 @@ function CommentCard({
             {LISTENER_IMPRESSION_DELETE}
           </button>
         ) : null}
-        {!comment.mine && comment.status === "published" ? (
+        {canOwnerDelete && !comment.mine ? (
+          <button
+            type="button"
+            className={`${buttonClass} border border-[#e4d7f4] text-[#9a3d55]`}
+            disabled={pending}
+            data-owner-delete-comment="true"
+            onClick={() => void ownerRemove(comment.id)}
+          >
+            {OWNER_COMMENT_DELETE_LABEL}
+          </button>
+        ) : null}
+        {!comment.mine && comment.status === "published" && !canOwnerDelete ? (
           <button type="button" className={`${buttonClass} border border-[#e4d7f4] text-[#7042c5]`} onClick={onReport}>
             {LISTENER_IMPRESSION_REPORT}
           </button>
@@ -586,6 +643,17 @@ function CommentCard({
             </p>
             <p className="mt-1 text-sm font-semibold">{comment.reply.publicName}</p>
             <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{comment.reply.body}</p>
+            {canOwnerDelete ? (
+              <button
+                type="button"
+                className={`${buttonClass} mt-2 border border-[#e4d7f4] text-[#9a3d55]`}
+                disabled={pending}
+                data-owner-delete-comment="true"
+                onClick={() => void ownerRemove(comment.reply!.id)}
+              >
+                {OWNER_COMMENT_DELETE_LABEL}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -617,6 +685,8 @@ function messageFor(error: string | undefined): string {
       return "Слишком много отправок подряд. Попробуйте чуть позже.";
     case "unauthorized":
       return "Войдите, чтобы оставить отзыв.";
+    case "forbidden":
+      return "Удалить чужой отзыв может только владелец платформы.";
     case "comments_unavailable":
       return "Отзывы временно недоступны.";
     default:

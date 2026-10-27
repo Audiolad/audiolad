@@ -894,16 +894,14 @@ export default async function PracticePage({ params, searchParams }: PageProps) 
     ratingsUiEnabled,
     ratingAggregate,
     guestRatingsCollect: ratingsUiEnabled && isGuestRatingsCollectEnabled(),
-    listenerCommentsEnabled:
-      !isAudioPost &&
-      practiceAcceptsListenerComments({
-        productKind: practice.product_kind,
-        catalogSection: practice.catalog_section,
-        status: practice.status,
-        publishedAt: practice.published_at,
-        scheduledPublishAt: practice.scheduled_publish_at,
-        deletedAt: practice.deleted_at,
-      }),
+    listenerCommentsEnabled: practiceAcceptsListenerComments({
+      productKind: practice.product_kind,
+      catalogSection: practice.catalog_section,
+      status: practice.status,
+      publishedAt: practice.published_at,
+      scheduledPublishAt: practice.scheduled_publish_at,
+      deletedAt: practice.deleted_at,
+    }),
     publishPreview:
       publishPreviewMode && !publishListenerViewMode
         ? {

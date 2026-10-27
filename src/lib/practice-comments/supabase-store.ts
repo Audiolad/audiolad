@@ -187,6 +187,18 @@ export function createSupabaseCommentStore(input: {
       if (error) throw new Error("listener_comment_own_lookup_failed");
       return (count ?? 0) > 0;
     },
+    async countPublishedImpressions(practiceId) {
+      const { count, error } = await writer
+        .from("practice_listener_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("practice_id", practiceId)
+        .eq("kind", "impression")
+        .eq("status", "published")
+        .is("deleted_at", null);
+      throwIfUnavailable(error);
+      if (error) throw new Error("listener_comment_count_failed");
+      return count ?? 0;
+    },
     async authorDisplayName(practiceId) {
       const { data } = await reader
         .from("practices")
@@ -607,7 +619,10 @@ export function createSupabaseCommentStore(input: {
       if (error) throw new Error("listener_comment_moderation_events_failed");
       return (data ?? []).map((item) => {
         const row = item as Record<string, unknown>;
-        const action = row.action === "hide" ? "hide" : "report";
+        const action =
+          row.action === "hide" || row.action === "owner_delete" || row.action === "owner_return"
+            ? row.action
+            : "report";
         return {
           id: String(row.id),
           commentId: String(row.comment_id),
@@ -631,12 +646,15 @@ export function createSupabaseCommentStore(input: {
       let request = writer
         .from("practice_listener_comments")
         .select(select)
-        .neq("status", "deleted")
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(query.limit);
       request =
-        query.queue === "hidden" ? request.eq("status", "hidden") : request.eq("status", "published");
+        query.queue === "deleted"
+          ? request.eq("status", "deleted")
+          : query.queue === "hidden"
+            ? request.eq("status", "hidden")
+            : request.eq("status", "published");
       if (query.cursor) request = request.or(cursorFilter("new", query.cursor));
       const { data, error } = await request;
       throwIfUnavailable(error);
