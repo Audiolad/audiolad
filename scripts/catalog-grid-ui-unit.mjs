@@ -54,8 +54,28 @@ assert.match(
 );
 assert.match(
   page,
+  /promos=\{promos\}/,
+  "catalog passes the managed promo into the product grid",
+);
+assert.doesNotMatch(
+  page,
+  /<CatalogPromoCarousel/,
+  "catalog page does not render the promo above the product grid",
+);
+assert.match(
+  grid,
   /CatalogPromoCarousel/,
-  "catalog reuses the managed promo below its sections",
+  "product grid renders the managed promo component",
+);
+assert.match(
+  grid,
+  /catalogGridPromoInsertAfter/,
+  "promo stays after the 12th card when later pages append",
+);
+assert.match(
+  css,
+  /\.catalog-product-grid__promo \{\s*grid-column:\s*1\s*\/\s*-1;\s*min-width:\s*0;/,
+  "promo row spans every column of the catalog grid",
 );
 assert.doesNotMatch(
   page,
