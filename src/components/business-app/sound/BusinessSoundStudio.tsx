@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
+import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
 import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
@@ -456,7 +457,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               </div>
             ) : (
               <article
-                className="business-app-card business-atmosphere"
+                className="business-app-card business-atmosphere business-track-panel"
                 data-testid="biz-atmosphere"
                 data-key={atmosphere.key}
                 data-stale={dirty ? "true" : undefined}
@@ -504,29 +505,24 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
                   {atmosphere.tracks.map((track, i) => {
                     const current = view.index === i && view.current?.audioItemId === track.audioItemId;
                     const clock = guestCoffeeTrackClock(track.durationSeconds);
+                    const album = playlists.find((playlist) => playlist.id === track.playlistId);
+                    const author = track.authorName ? ` · ${track.authorName}` : "";
                     return (
                       <li key={track.audioItemId}>
-                        <button
-                          type="button"
-                          className="business-atmosphere-track business-app-focus-ring"
-                          data-current={current ? "true" : undefined}
-                          aria-current={current ? "true" : undefined}
-                          onClick={() => void playAtmosphere(i)}
+                        <BusinessAtmosphereTrackButton
+                          title={track.title}
+                          subtitle={`${track.albumTitle}${author}`}
+                          time={clock}
+                          number={i + 1}
+                          current={current}
+                          playing={Boolean(current && isPlaying)}
                           disabled={!(current && isPlaying) && !canStart}
-                          data-testid="biz-atmosphere-track"
-                        >
-                          <span className="business-atmosphere-track__no" aria-hidden="true">
-                            {current && isPlaying ? "♪" : i + 1}
-                          </span>
-                          <span className="business-atmosphere-track__meta">
-                            <span className="business-atmosphere-track__title">{track.title}</span>
-                            <span className="business-atmosphere-track__album">
-                              {track.albumTitle}
-                              {track.authorName ? ` · ${track.authorName}` : ""}
-                            </span>
-                          </span>
-                          {clock ? <span className="business-atmosphere-track__time">{clock}</span> : null}
-                        </button>
+                          coverUrl={album?.coverUrl ?? null}
+                          coverImage={album?.coverImage}
+                          updatedAt={album?.updatedAt ?? null}
+                          onClick={() => void playAtmosphere(i)}
+                          testId="biz-atmosphere-track"
+                        />
                       </li>
                     );
                   })}

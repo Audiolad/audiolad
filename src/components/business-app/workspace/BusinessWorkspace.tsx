@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
+import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 import {
   BusinessCabinetPlayerProvider,
@@ -123,7 +124,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const upcoming = current ? upcomingTracks(model.tracks, currentIndex) : [];
 
   return (
-    <div className="business-app-span-full mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
+    <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
       <header>
         <p className="business-app-eyebrow">{BUSINESS_GIFT_TITLE}</p>
         <h1 className="mt-1 text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{model.spaceTitle}</h1>
@@ -253,7 +254,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             />
             <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
           </section>
-          <section className="business-app-card" data-testid="biz-now-queue" aria-label="Дальше в очереди">
+          <section className="business-app-card business-track-panel" data-testid="biz-now-queue" aria-label="Дальше в очереди">
             <h2 className="text-[1.05rem] font-bold">Дальше в очереди</h2>
             {upcoming.length === 0 ? (
               <p className="mt-2 text-sm text-[var(--biz-text-muted)]">Дальше снова зазвучит эта композиция.</p>
@@ -265,20 +266,14 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                   const subtitle = [lineAuthor, lineAlbum].filter(Boolean).join(" – ");
                   return (
                     <li key={`${track.audioItemId}:${index}`}>
-                      <button
-                        type="button"
-                        className="business-atmosphere-track business-app-focus-ring"
+                      <BusinessAtmosphereTrackButton
+                        title={track.title}
+                        subtitle={subtitle}
+                        time={track.durationSeconds != null ? formatPlaybackClock(track.durationSeconds) : null}
+                        number={number}
+                        coverUrl={track.coverUrl}
                         onClick={() => void playIndex(index)}
-                      >
-                        <span className="business-atmosphere-track__no">{number}</span>
-                        <span className="business-atmosphere-track__meta">
-                          <span className="business-atmosphere-track__title">{track.title}</span>
-                          {subtitle ? <span className="business-atmosphere-track__album">{subtitle}</span> : null}
-                        </span>
-                        {track.durationSeconds != null ? (
-                          <span className="business-atmosphere-track__time">{formatPlaybackClock(track.durationSeconds)}</span>
-                        ) : null}
-                      </button>
+                      />
                     </li>
                   );
                 })}

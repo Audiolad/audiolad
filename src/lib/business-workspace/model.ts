@@ -14,6 +14,8 @@ export type WorkspaceTrack = {
   authorName: string | null;
   albumTitle: string | null;
   shelf: WorkspaceTrackShelf;
+  /** Public album cover already shown in the catalog. Absent or null shows the placeholder. */
+  coverUrl?: string | null;
 };
 
 export type WorkspacePlaybackSnapshot = {
