@@ -1,4 +1,5 @@
 import {
+  MUSIC_ANALYZER_ACCEPTED_HEAD_PREFIXES,
   MUSIC_ANALYZER_CONTENT_COMMIT,
   MUSIC_ANALYZER_DEVICE,
   MUSIC_ANALYZER_FREEZE_BRANCH,
@@ -94,7 +95,8 @@ export function analyzerChildEnv(
 
 export function assertFrozenHead(head: string): string {
   const trimmed = head.trim();
-  if (!trimmed.startsWith(MUSIC_ANALYZER_FREEZE_SNAPSHOT) || !/^[0-9a-f]{7,40}$/.test(trimmed)) {
+  const known = MUSIC_ANALYZER_ACCEPTED_HEAD_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+  if (!known || !/^[0-9a-f]{7,40}$/.test(trimmed)) {
     throw new Error("analyzer_commit_mismatch");
   }
   return trimmed;

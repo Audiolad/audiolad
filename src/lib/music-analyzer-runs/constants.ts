@@ -18,6 +18,15 @@ export const MUSIC_ANALYZER_FREEZE_BRANCH = "cursor/benchmark-harness-v01" as co
 
 export const MUSIC_ANALYZER_FREEZE_SNAPSHOT = "cc5b2828" as const;
 
+/**
+ * Heads the worker may run while the host checkout catches up with the pin.
+ * Drop 932c4ce only after production HEAD is cc5b2828.
+ */
+export const MUSIC_ANALYZER_ACCEPTED_HEAD_PREFIXES = [
+  MUSIC_ANALYZER_FREEZE_SNAPSHOT,
+  "932c4ce",
+] as const;
+
 export const MUSIC_ANALYZER_CONTENT_COMMIT = "3750f3b" as const;
 
 export const MUSIC_ANALYZER_ROOT_DEFAULT = "/var/lib/audiolad/music-analyzer" as const;

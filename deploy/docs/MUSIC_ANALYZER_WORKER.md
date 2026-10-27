@@ -32,11 +32,11 @@ is passed. Environment variables that name Candidate A or an instrument
 strategy are removed before spawn. Musical fields are whatever JSON the
 script writes. Missing taxonomy or prompt version stays empty.
 
-4. The worker seals `raw_json`, `normalized_json`, and provenance only when
-   `git rev-parse HEAD` starts with `cc5b2828` and `3750f3b` is an ancestor.
+4. The worker seals `raw_json`, `normalized_json`, and provenance when
+   `git rev-parse HEAD` starts with `cc5b2828` or, until the checkout moves,
+   `932c4ce`, and `3750f3b` is an ancestor.
    The checkpoint file must be `music_audioset_epoch_15_esc_90.14.pt`.
-   Move the checkout to `cc5b2828` in the same deploy as this pin.
-   Voice detector rollout, env switch, and rollback: `deploy/docs/MUSIC_ANALYZER_VOICE_RU.md`.
+   Ordered rollout: `deploy/docs/MUSIC_ANALYZER_VOICE_RU.md`.
 
 ## Ops bootstrap (on the audiolad.ru VPS)
 
@@ -53,7 +53,8 @@ git -C /var/lib/audiolad/music-analyzer rev-parse HEAD
 git -C /var/lib/audiolad/music-analyzer merge-base --is-ancestor 3750f3b HEAD
 ```
 
-`HEAD` must start with `cc5b2828`. `3750f3b` must be an ancestor (analyzer
+`HEAD` must start with `cc5b2828` after the ordered rollout. Until that
+checkout, the app also accepts `932c4ce`. `3750f3b` must be an ancestor (analyzer
 content). Create the venv inside that checkout:
 
 ```bash

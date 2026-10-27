@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { buildFeatures } from "../src/lib/music-analyzer-runs/features.mjs";
@@ -37,10 +39,61 @@ assert.equal(
   assertFrozenHead("cc5b2828a3dbb81e16e23808dab1520a4cb1a7d0"),
   "cc5b2828a3dbb81e16e23808dab1520a4cb1a7d0",
 );
+assert.equal(
+  assertFrozenHead("932c4ce8325c537668195afce0a56fa68d40a08c"),
+  "932c4ce8325c537668195afce0a56fa68d40a08c",
+);
 assert.throws(
-  () => assertFrozenHead("932c4ce8325c537668195afce0a56fa68d40a08c"),
+  () => assertFrozenHead("a".repeat(40)),
   /analyzer_commit_mismatch/,
 );
+assert.throws(
+  () => assertFrozenHead(`${MUSIC_ANALYZER_CONTENT_COMMIT}${"b".repeat(33)}`),
+  /analyzer_commit_mismatch/,
+);
+
+const oldSeal = /^932c4ce[0-9a-f]{0,33}$/;
+const widenedSeal = /^(?:932c4ce|cc5b2828)[0-9a-f]{0,33}$/;
+for (let suffix = 0; suffix <= 33; suffix += 1) {
+  const historical = `932c4ce${"a".repeat(suffix)}`;
+  assert.equal(oldSeal.test(historical), true);
+  assert.equal(widenedSeal.test(historical), true, historical);
+}
+assert.equal(oldSeal.test("cc5b2828a3dbb81e16e23808dab1520a4cb1a7d0"), false);
+assert.equal(widenedSeal.test("cc5b2828a3dbb81e16e23808dab1520a4cb1a7d0"), true);
+assert.equal(widenedSeal.test("deadbeef"), false);
+assert.equal(widenedSeal.test(`932c4ce${"a".repeat(34)}`), false);
+
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const sealSql = readFileSync(
+  path.join(repoRoot, "supabase/migrations/20270128120000_music_analyzer_seal_head_prefixes.sql"),
+  "utf8",
+);
+const rollbackSql = readFileSync(
+  path.join(repoRoot, "docs/music-analyzer/ROLLBACK_music_analyzer_seal_head_prefixes.sql"),
+  "utf8",
+);
+const originalSql = readFileSync(
+  path.join(repoRoot, "supabase/migrations/20261217120000_music_analyzer_runs_v01.sql"),
+  "utf8",
+);
+assert.match(sealSql, /ADD CONSTRAINT music_analyzer_runs_phase_check/);
+assert.match(sealSql, /NOT VALID/);
+assert.match(sealSql, /VALIDATE CONSTRAINT music_analyzer_runs_phase_check/);
+assert.ok(sealSql.indexOf("NOT VALID") < sealSql.indexOf("VALIDATE CONSTRAINT"));
+assert.match(sealSql, /932c4ce\|cc5b2828/);
+assert.match(sealSql, /3750f3b/);
+assert.match(sealSql, /seal_prefix_widen_rejected_existing_row/);
+assert.doesNotMatch(sealSql, /DELETE\s+FROM/i);
+assert.doesNotMatch(sealSql, /TRUNCATE/i);
+assert.equal((sealSql.match(/\bUPDATE\b/g) ?? []).length, 1);
+assert.match(originalSql, /analyzer_git_commit ~ '\^932c4ce\[0-9a-f\]\{0,33\}\$'/);
+assert.doesNotMatch(originalSql, /cc5b2828/);
+assert.match(rollbackSql, /NOT VALID/);
+assert.match(rollbackSql, /VALIDATE CONSTRAINT music_analyzer_runs_phase_check/);
+assert.match(rollbackSql, /'\^932c4ce\[0-9a-f\]\{0,33\}\$'/);
+assert.doesNotMatch(rollbackSql, /cc5b2828\[0-9a-f\]/);
+assert.equal(rollbackSql.includes("supabase/migrations"), false);
 assert.equal(assertContentCommit(`${MUSIC_ANALYZER_CONTENT_COMMIT}${"a".repeat(33)}`).startsWith("3750f3b"), true);
 assert.throws(
   () => assertContentCommit("cc5b2828a3dbb81e16e23808dab1520a4cb1a7d0"),
