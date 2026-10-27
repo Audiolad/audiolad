@@ -7,6 +7,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { parseMaxRub } from "../../cost.mjs";
 import { readJson } from "../../util.mjs";
 import { SZ } from "./config.mjs";
+import { packInstructionProblems } from "./pack-audit.mjs";
 import { CONFLICTING_EXPERTS, defaultExpertPool, missingMix, rotationProblems } from "./experts.mjs";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -54,6 +55,7 @@ export function normalizePack(raw, { baseDir = process.cwd(), pool = defaultExpe
   const queries = out.map((item) => item.query);
   for (const query of new Set(queries)) need(queries.filter((q) => q === query).length === 1, `ключ «${query}» повторяется в пакете`, errors);
   errors.push(...rotationProblems(out));
+  errors.push(...packInstructionProblems(out));
   const quotes = out.flatMap((item) => item.experts.map((expert) => `${item.slug}:${quoteText(expert.quote)}`));
   const bare = quotes.map((q) => q.slice(q.indexOf(":") + 1));
   for (const [i, q] of bare.entries()) need(bare.indexOf(q) === i, `цитата повторяется в пакете: «${q.slice(0, 50)}…»`, errors);

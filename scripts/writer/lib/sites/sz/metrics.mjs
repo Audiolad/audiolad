@@ -119,6 +119,22 @@ export function affordableMaxTokens(model, promptTokens, requested, roomRub) {
   return tokens;
 }
 
+/**
+ * Output tokens left for the draft after the prompt, once the 12 ₽ article cap is applied.
+ * Russian JSON in the control drafts was about 3.1 tokens per word.
+ */
+export function szDraftTokenBudget({ model, promptTokens = 0, requestedTokens = 9000, articleCap = SZ.articleRubCap, runCap = SZ.runRubCap, tokensPerWord = 3.1 } = {}) {
+  const fit = szCallFit({ model, promptTokens, requestedTokens, articleCap, runCap });
+  const inputRub = costRub(model, promptTokens, 0);
+  return {
+    ...fit,
+    inputRub,
+    outputRub: costRub(model, 0, fit.maxTokens),
+    wordsAtBudget: Math.floor(fit.maxTokens / tokensPerWord),
+    tokensPerWord,
+  };
+}
+
 /** Cap one call, including the first, so its worst case fits the remaining article and run budgets. */
 export function szCallFit({ model, promptTokens = 0, requestedTokens = 0, spentRub = 0, articleSpentRub = 0, articleCap = 12, runCap = 120 } = {}) {
   const room = Math.min(articleCap - articleSpentRub, runCap - spentRub);

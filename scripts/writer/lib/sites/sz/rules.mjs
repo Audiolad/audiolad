@@ -739,6 +739,19 @@ export function listPromiseMismatches(markdown) {
     const heading = section.match(/^## (.+)$/m)?.[1];
     const h3 = (section.match(/^### /gm) || []).length;
     const blocks = section.split(/\n\n+/);
+    // «## Три шага» owns the count via its ###. An intro that repeats the same
+    // number is not a second list: prose between the steps used to look like 1 item.
+    if (heading && /^три шага\b/iu.test(heading) && h3 >= 2) {
+      for (let i = 0; i < blocks.length; i += 1) {
+        const block = blocks[i].trim();
+        if (!block || /^## /.test(block)) continue;
+        const count = followingListCount(blocks, i);
+        if (count < 1) continue;
+        const hit = promiseHit(block, count);
+        if (hit && hit.stated !== h3) hits.push(hit);
+      }
+      continue;
+    }
     if (heading && h3 < 2) {
       const headingIndex = blocks.findIndex((block) => /^## /.test(block.trim()));
       const count = headingIndex >= 0 ? followingListCount(blocks, headingIndex) : 0;
@@ -1093,6 +1106,27 @@ export function outgoingAddressProblems(text) {
 }
 
 export const quoteText = (text) => String(text).replace(/[«»"“”„]/g, "").replace(/[—–-]/g, "–").replace(/\s+/g, " ").trim();
+
+/** Same bans the article gate applies to visible text: promise stems, the brief's forbidden phrases, discomfort priming. */
+export function forbiddenLexiconHits(text, phrases = []) {
+  const raw = String(text ?? "");
+  const hits = [];
+  const promise = raw.match(PROMISE);
+  if (promise) hits.push({ kind: "promise", text: promise[0] });
+  const norm = normalize(raw);
+  const seen = new Set();
+  for (const phrase of phrases) {
+    const key = normalize(phrase);
+    if (!key || seen.has(key) || !norm.includes(key)) continue;
+    seen.add(key);
+    hits.push({ kind: "forbidden", text: String(phrase) });
+  }
+  for (const { name, re } of DISCOMFORT_PATTERNS) {
+    const hit = raw.match(re);
+    if (hit) hits.push({ kind: "discomfort", text: hit[0], name });
+  }
+  return hits;
+}
 // Assembler placeholder. A thesis of «а» or «главная мысль а» is the same failure as the exact phrase.
 export const EXPERT_PLACEHOLDER_THESIS = "главная мысль";
 const INVISIBLE = /[\u200B\u200C\u200D\uFEFF\u2060\u00AD]/g;

@@ -22,7 +22,7 @@ import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
-import { szCallFit, szH2Count, szPackCost, szQuantityReport, szSpendAllowed } from "./lib/sites/sz/metrics.mjs";
+import { szCallFit, szDraftTokenBudget, szH2Count, szPackCost, szQuantityReport, szSpendAllowed } from "./lib/sites/sz/metrics.mjs";
 import { applyDeterministicSzFixes, articleDropsRequired, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
@@ -33,7 +33,9 @@ import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } f
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, englishLeftovers, examplePhraseDefect, examplePhraseStats, faqAnswerTypeMismatch, faqContradictsBody, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
+import { briefForbiddenProblems, faqQuestionHints, findPublishedQuote, packInstructionProblems, quotationsFromLibrary, reusedQuoteProblems, sharedFaqHintProblems } from "./lib/sites/sz/pack-audit.mjs";
+import { assembleExampleSection, diversifySharedFaqFields, ensureBriefLinks, linkSentence, replaceGuaranteeStem, uniqueFaqQuestion } from "./lib/sites/sz/post.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, englishLeftovers, examplePhraseDefect, examplePhraseStats, faqAnswerTypeMismatch, faqContradictsBody, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, listPromiseMismatches, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -281,14 +283,14 @@ test("prompt: lessons, caution, siblings and tone sample reach the model", () =>
   assert.ok(linksAt >= 0 && linksAt < structureAt, "список ссылок до структуры");
   for (const slug of brief.links.contextual) assert.ok(text.slice(linksAt, structureAt).includes(`/s/${slug}`), slug);
   assert.match(text, /История и молитва остаются без ссылок/);
-  assert.match(text, /950–1100/);
+  assert.match(text, /1100–1300/);
   assert.match(text, /Обязательны все /);
   assert.match(text, /не отменяет список/);
   assert.match(text, /Число в заголовке равно числу пунктов/);
   assert.match(text, /один раз/);
   assert.match(text, /не повторяют концовку/);
-  assert.match(text, /около 1000/);
-  assert.match(text, /880–1400/);
+  assert.match(text, /около 1200/);
+  assert.match(text, /880–1600/);
   assert.match(text, /третье лицо/);
   assert.match(text, /настоящее время/);
   assert.match(text, /не короче 3 слов/);
@@ -1235,12 +1237,14 @@ test("both pipelines estimate prompt tokens with the model's own ratio", () => {
   }
 });
 
-test("prompt: main-body target is 950–1100 and the section budgets sum inside it", () => {
+test("prompt: main-body target is 1100–1300 and the section budgets sum inside it", () => {
   const budget = szBodyPlanBudget();
-  assert.ok(budget.low >= 950, `low ${budget.low}`);
-  assert.ok(budget.mid >= 950 && budget.mid <= 1100, `mid ${budget.mid}`);
+  assert.ok(budget.low >= 1100 && budget.low <= 1300, `low ${budget.low}`);
+  assert.ok(budget.mid >= 1100 && budget.mid <= 1300, `mid ${budget.mid}`);
+  assert.ok(budget.high <= 1600, `high ${budget.high}`);
   const text = buildSzMessages(brief, view.site).map((message) => message.content).join("\n");
-  assert.ok(text.includes("950–1100"));
+  assert.ok(text.includes("1100–1300"));
+  assert.ok(text.includes("около 1200"));
   assert.ok(text.includes("ровно 2 раздела"));
   assert.ok(text.includes("пустой массив"));
   assert.ok(text.includes("45–70"));
@@ -1640,7 +1644,7 @@ test("tiered call ids pass the Moscow run-id validator", () => {
   assert.match(sectionJob.key, /sectionsBefore\[\d+\]/);
   const stepFields = structuredClone(fields);
   for (const key of ["sectionsBefore", "sectionsAfter"]) {
-    for (const section of stepFields[key] ?? []) section.paragraphs = ["длинный абзац ".repeat(120)];
+    for (const section of stepFields[key] ?? []) section.paragraphs = ["длинный абзац ".repeat(200)];
   }
   stepFields.steps.items[0].text = "Короткий шаг без лишних подробностей.";
   const stepJob = buildSzFragment(brief, stepFields, bodyFailure);
@@ -2053,22 +2057,11 @@ test("tiered: missing internal links and a half-Cyrillic slug are fixed from the
   assert.ok(errorsOf(hybridBuild(stripped).problems).some((problem) => problem.code === "links-contextual"));
   const before = fieldStrings(stripped);
   let calls = 0;
-  const titles = { "ezoterika-i-tserkov": "Эзотерика и церковь", "psihologiya-i-ezoterika": "Эзотерика и психология", "chenneling-v-ezoterike": "Ченнелинг в эзотерике" };
   const linked = repairSzArticleTiered({
     brief, raw: stripped, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
-    callTier: (tier, name, messages) => {
-      calls += 1;
-      assert.equal(isWriterId(name), true, name);
-      const text = messages.map((message) => message.content).join("\n");
-      const slug = text.match(/ссылку на \/s\/([a-z0-9-]+)/)?.[1];
-      const host = text.split("АБЗАЦ:\n").at(-1).trim();
-      assert.ok(slug && host && !host.includes(fields.faq[0].question));
-      const link = `[${titles[slug]}](/s/${slug})`;
-      const woven = host.includes(".") ? host.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${host}`;
-      return { text: woven };
-    },
+    callTier: () => { calls += 1; return {}; },
   });
-  assert.ok(calls >= 2, String(calls));
+  assert.equal(calls, 0, linked.repairSkipped);
   const hrefs = [...linked.result.md.matchAll(/\]\(\/s\/([a-z0-9-]+)\)/g)].map((match) => match[1]);
   assert.ok(hrefs.length >= 2 && hrefs.length <= 5, hrefs.join(","));
   assert.ok(hrefs.every((slug) => brief.links.contextual.includes(slug)), hrefs.join(","));
@@ -2124,25 +2117,17 @@ test("tiered: one contextual slug is inserted once", () => {
   let calls = 0;
   const repaired = repairSzArticleTiered({
     brief: oneBrief, raw, build: hybridBuild, repair: tierRepair(), state: { spentRub: 0, calls: [], warnings: [] },
-    callTier: (tier, name, messages) => {
-      calls += 1;
-      const text = messages.map((message) => message.content).join("\n");
-      const paragraph = text.split("АБЗАЦ:\n").at(-1).trim();
-      if (calls === 1) return { text: `${paragraph} Подробнее: [материал](/s/ezoterika-i-tserkov).` };
-      const link = "[Эзотерика и церковь](/s/ezoterika-i-tserkov)";
-      const woven = paragraph.includes(".") ? paragraph.replace(/\.\s*/, ` в статье ${link}. `) : `В статье ${link} сказано то же самое. ${paragraph}`;
-      return { text: woven };
-    },
+    callTier: () => { calls += 1; return {}; },
   });
-  assert.equal(calls, 2);
+  assert.equal(calls, 0, repaired.repairSkipped);
   const hrefs = [...repaired.result.md.matchAll(/\]\(\/s\/ezoterika-i-tserkov\)/g)];
   assert.equal(hrefs.length, 1);
   assert.ok(!repaired.result.md.includes("[материал]"));
   const after = new Map(fieldStrings(repaired.result.fields));
   const changed = before.filter(([path, text]) => after.get(path) !== text).map(([path]) => path);
   assert.equal(changed.length, 1, changed.join(","));
-  assert.ok(after.get(changed[0]).includes("[Эзотерика и церковь](/s/ezoterika-i-tserkov)"));
-  assert.ok(!after.get(changed[0]).startsWith(before.find(([path]) => path === changed[0])[1]));
+  assert.ok(after.get(changed[0]).includes(linkSentence("разбор темы ezoterika-i-tserkov", "ezoterika-i-tserkov")));
+  assert.ok(after.get(changed[0]).startsWith(before.find(([path]) => path === changed[0])[1]));
   assert.deepEqual(repaired.result.fields.story, fields.story);
   const job = buildSzFragment(oneBrief, repaired.result.fields, { code: "links-contextual", field: "sections", message: "1 ссылок /s в тексте, нужно 2–5", actual: 1, min: 2, max: 5 });
   assert.equal(job, null);
@@ -2985,10 +2970,14 @@ test("tiered: a generic anchor is rewritten inside the sentence", () => {
       return { text: host.replace("[материал]", "[Эзотерика и психология]").replace("[здесь]", "[Ченнелинг в эзотерике]") };
     },
   });
-  assert.equal(calls, 1, repaired.repairSkipped);
-  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[2], original);
+  assert.equal(calls, 0, repaired.repairSkipped);
+  const rewritten = repaired.result.fields.sectionsBefore[2].paragraphs[2];
+  assert.match(rewritten, /\[разбор темы psihologiya-i-ezoterika\]\(\/s\/psihologiya-i-ezoterika\)/);
+  assert.match(rewritten, /\[разбор темы chenneling-v-ezoterike\]\(\/s\/chenneling-v-ezoterike\)/);
+  assert.equal(rewritten.includes("[материал]"), false);
+  assert.equal(rewritten.includes("[здесь]"), false);
   const keptSentence = original.split(/(?<=[.!?…])\s+/u)[0];
-  assert.equal(repaired.result.fields.sectionsBefore[2].paragraphs[2].split(/(?<=[.!?…])\s+/u)[0], keptSentence);
+  assert.equal(rewritten.split(/(?<=[.!?…])\s+/u)[0], keptSentence);
   assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "links-anchor"));
   assert.equal(repaired.passed, true, repaired.repairSkipped);
   const anchorJob = buildSzFragment(brief, raw, codes[0]);
@@ -3147,9 +3136,10 @@ test("tiered: every glued link suffix leaves the story and the prayer, and resid
   };
   const repair = (raw) => {
     let calls = 0;
+    const state = { spentRub: 0, calls: [], warnings: [] };
     const repaired = repairSzArticleTiered({
       brief, raw, build: hybridBuild, repair: tierRepair({ maxRounds: 6 }),
-      state: { spentRub: 0, calls: [], warnings: [] },
+      state,
       callTier: (tier, name, messages) => {
         calls += 1;
         assert.equal(tier, "cheap");
@@ -3648,6 +3638,105 @@ test("tiered: a heading count is aligned with its own list", () => {
   assert.deepEqual(repaired.result.fields.checklist.items, fields.checklist.items);
   assert.ok(!errorsOf(repaired.result.problems).some((problem) => problem.code === "count-mismatch"));
   assert.equal(repaired.passed, true, repaired.repairSkipped);
+});
+
+test("draft budget: 9000 output tokens still fit a 25k prompt inside 12 ₽", () => {
+  const model = "openai/gpt-5.4-mini";
+  const promptTokens = 24734;
+  const wide = szDraftTokenBudget({ model, promptTokens, requestedTokens: 16000 });
+  assert.equal(wide.maxTokens, 9454);
+  assert.ok(wide.worst <= 12);
+  const requested = szDraftTokenBudget({ model, promptTokens, requestedTokens: 9000 });
+  assert.equal(requested.maxTokens, 9000);
+  assert.ok(requested.worst <= 12);
+  assert.ok(requested.wordsAtBudget >= 2500);
+  const messages = buildSzMessages(brief, view.site);
+  const live = estimatePromptTokens(messages, model);
+  const liveFit = szDraftTokenBudget({ model, promptTokens: live, requestedTokens: 9000 });
+  assert.ok(live < 27458, `prompt ${live} tokens would cut the 9000 output cap`);
+  assert.equal(liveFit.maxTokens, 9000);
+  assert.ok(liveFit.wordsAtBudget >= 2500);
+});
+
+test("pack audit: shared FAQ hints and a forbidden stem fail before a paid call", () => {
+  const raw = structuredClone(readJson(join(fixtures, "pack-angel-replay.json")));
+  const second = structuredClone(raw.articles[0]);
+  second.slug = "angel-hranitel-dva";
+  second.query = "образ ангела";
+  second.title = "Образ ангела: как говорить о нём бережно и ясно";
+  second.experts = second.experts.map((expert) => ({ ...expert, quote: `${expert.quote} Вторая статья.` }));
+  const shared = "В FAQ спросить «Гарантирует ли такая практика доход?» и «Можно ли формулировать примеры своими словами?».";
+  raw.articles[0].extraInstructions = [shared];
+  raw.articles[0].forbiddenPhrases = [...(raw.articles[0].forbiddenPhrases ?? []), "гарантирует"];
+  second.extraInstructions = [shared];
+  second.forbiddenPhrases = ["гарантирует"];
+  raw.articles.push(second);
+  assert.throws(() => normalizePack(raw, { baseDir: fixtures, pool }), /подсказка FAQ|гарантирует/);
+  const hints = sharedFaqHintProblems(raw.articles);
+  assert.ok(hints.some((line) => line.includes("Гарантирует ли такая практика доход?")));
+  assert.ok(briefForbiddenProblems({ ...raw.articles[0], slug: raw.articles[0].slug }).some((line) => line.includes("promise") || line.includes("forbidden")));
+  const library = quotationsFromLibrary([{ quote: second.experts[0].quote, usedIn: "older-slug" }]);
+  assert.equal(findPublishedQuote(`«${second.experts[0].quote}»`, library), "older-slug");
+  const reused = reusedQuoteProblems([second], library);
+  assert.match(reused[0], /уже есть в статье older-slug/);
+  assert.equal(packInstructionProblems([raw.articles[0]]).length > 0, true);
+  assert.equal(faqQuestionHints(raw.articles[0]).length >= 2, true);
+});
+
+test("post: links, example list, guarantee stem and a duplicated FAQ are fixed without a model", () => {
+  assert.equal(replaceGuaranteeStem("Не гарантирует внешних событий"), "Не гарантирует внешних событий");
+  assert.equal(replaceGuaranteeStem("Гарантирует ли такая практика доход?"), "Обещает ли такая практика доход?");
+  assert.equal(replaceGuaranteeStem("Это не гарантирует доход.", { phrases: ["гарантирует"] }), "Это не обещает доход.");
+  assert.equal(replaceGuaranteeStem("Образ потока не описывает гарантированное движение денег.", { phrases: ["гарантированно"] }), "Образ потока не описывает обещанное движение денег.");
+  const raw = structuredClone(fields);
+  raw.sectionsBefore[0].title = "Примеры фраз на утро";
+  raw.sectionsBefore[0].paragraphs = ["Ниже примеры, и Вера снова берёт телефон."];
+  raw.tableSection.rows[0][1] = "Я выбираю спокойный день";
+  const shortFields = structuredClone(raw);
+  shortFields.tableSection.rows = [];
+  const short = assembleExampleSection(shortFields, { min: 8, max: 12, facts: ["Я остаюсь при своём решении сегодня", "Я называю один следующий шаг"] });
+  assert.match(short.fields.sectionsBefore[0].paragraphs[0], /Вера/);
+  const enough = [
+    "Я выбираю спокойный день",
+    "Я остаюсь при своём решении сегодня",
+    "Я называю один следующий шаг",
+    "Я замечаю то, что уже есть",
+    "Я оставляю место для паузы",
+    "Я говорю о своём шаге спокойно",
+    "Я возвращаюсь к выбранной сфере",
+    "Я держу внимание на одном действии",
+  ];
+  const built = assembleExampleSection(raw, { min: 8, max: 12, facts: enough, keepTexts: ["аффирмации на изобилие слушать"] });
+  assert.match(built.fields.sectionsBefore[0].paragraphs[0], /^- Я выбираю спокойный день/m);
+  assert.equal(built.fields.sectionsBefore[0].paragraphs[0].includes("Вера"), false);
+  const linked = ensureBriefLinks(structuredClone(fields), { contextual: ["ezoterika-i-tserkov"], anchors: [{ anchor: "эзотерика и церковь", slug: "ezoterika-i-tserkov", href: "/s/ezoterika-i-tserkov" }] });
+  const blob = JSON.stringify(linked.fields);
+  assert.equal(blob.split("/s/ezoterika-i-tserkov").length - 1, 1);
+  assert.match(blob, /\[эзотерика и церковь\]\(\/s\/ezoterika-i-tserkov\)/);
+  const question = "Гарантирует ли такая практика доход?";
+  const items = [
+    { brief: { query: "аффирмации на работу", forbiddenPhrases: ["гарантирует"] }, fields: { faq: [{ question, answer: "Нет, практика не гарантирует доход и не назначает сумму." }] } },
+    { brief: { query: "мантра изобилия", forbiddenPhrases: ["гарантирует"] }, fields: { faq: [{ question, answer: "Нет, практика не гарантирует доход и не назначает сумму." }] } },
+  ];
+  assert.equal(diversifySharedFaqFields(items) >= 2, true);
+  assert.notEqual(normalize(items[0].fields.faq[0].question), normalize(items[1].fields.faq[0].question));
+  assert.equal(items[0].fields.faq[0].answer.includes("гарантирует"), false);
+  assert.match(uniqueFaqQuestion(question, "аффирмации на работу", ["гарантирует"]), /в теме аффирмации на работу/);
+  const steps = [
+    "## Три шага к паузе",
+    "",
+    "Эти три шага помогают остановиться.",
+    "",
+    "Между ними есть пояснение.",
+    "",
+    "### Сделайте паузу",
+    "",
+    "### Назовите чувство",
+    "",
+    "### Выберите шаг",
+    "",
+  ].join("\n");
+  assert.deepEqual(listPromiseMismatches(steps), []);
 });
 
 function bodyQueryCountOf(md, query) {

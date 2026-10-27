@@ -18,6 +18,8 @@ import { DISCOMFORT_PATTERNS as BASE_DISCOMFORT } from "../../validate.mjs";
 import { applyPack, ruleConfig } from "./apply.mjs";
 import { assembleSzArticle, normalizeSzFields } from "./assemble.mjs";
 import { loadPack } from "./brief.mjs";
+import { reusedQuoteProblems } from "./pack-audit.mjs";
+import { diversifySharedFaqFields } from "./post.mjs";
 import { checksMarkdown, compareSzChecks, runSzChecks } from "./checks.mjs";
 import { SZ } from "./config.mjs";
 import { loadSzContext } from "./context.mjs";
@@ -44,6 +46,7 @@ export function packView(ctx, pack) {
     }
   }
   for (const slug of siblings.keys()) published.add(slug);
+  problems.push(...reusedQuoteProblems(pack.articles, ctx.unique?.quotations));
   const articles = new Map(ctx.articles);
   for (const [slug, title] of siblings) if (!articles.has(slug)) articles.set(slug, { slug, title, draft: false, listed: true, query: null });
   return { site: { ...ctx, articles }, published, siblings, problems };
@@ -236,6 +239,21 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         warnings: result.problems.filter((problem) => problem.severity !== "error"),
       });
       items.push({ brief, cfg, fields: result.fields, md: result.md, build, attempts: repaired.attempts ?? [] });
+    }
+    if (diversifySharedFaqFields(items)) {
+      for (const item of items) {
+        const rebuilt = item.build(item.fields);
+        item.fields = rebuilt.fields;
+        item.md = rebuilt.md;
+        const errors = rebuilt.problems.filter((problem) => problem.severity === "error");
+        const article = state.articles.find((entry) => entry.slug === item.brief.slug);
+        if (!article) continue;
+        article.errors = errors;
+        article.errorsAfterRepair = errors;
+        article.passed = errors.length === 0;
+        article.warnings = rebuilt.problems.filter((problem) => problem.severity !== "error");
+        article.finishedCostRub = article.passed ? article.costRub : null;
+      }
     }
     let packProblems = checkSzPack(items);
     if (repair.mode === "tiered" && packProblems.length) {

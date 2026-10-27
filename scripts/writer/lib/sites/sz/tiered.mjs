@@ -7,6 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
+import { applyStructuralFixes } from "./post.mjs";
 import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, examplePhraseDefect, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, phraseInProse, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
@@ -228,7 +229,9 @@ export function fragmentBanned(value, brief) {
 }
 
 /** Programmatic fixes. Returns the same fields when nothing was safe to change. */
-export function applyDeterministicSzFixes(fields, { query = "", links = null } = {}) {
+export function applyDeterministicSzFixes(fields, options = {}) {
+  const query = options.query ?? "";
+  const links = options.links ?? null;
   const fixes = [];
   let next = mapStrings(structuredClone(fields), (text) => {
     const glyphs = fixMixedHomoglyphs(text);
@@ -290,6 +293,17 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
     });
     if (slugFixes) fixes.push("полукириллический slug приведён к ссылке из брифа");
   }
+  const structural = applyStructuralFixes(next, {
+    links,
+    titles: options.titles,
+    examplePhrases: options.examplePhrases,
+    facts: options.facts,
+    practice: options.practice,
+    query,
+    forbiddenPhrases: options.forbiddenPhrases,
+  });
+  next = structural.fields;
+  fixes.push(...structural.notes);
   const removed = dropDuplicateParagraphs(next);
   if (removed) fixes.push(removed === 1 ? "повтор абзаца удалён" : `повторы абзацев удалены: ${removed}`);
   if (typeof next.checklist?.title === "string" && Array.isArray(next.checklist.items)) {
@@ -1713,7 +1727,15 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const draftMd = build(raw).md;
   const gate = (value) => annotateProtectedDiff(draftMd, build(value));
   const settle = (value) => {
-    const deterministic = applyDeterministicSzFixes(value, { query: brief.query, links: brief.links });
+    const deterministic = applyDeterministicSzFixes(value, {
+      query: brief.query,
+      links: brief.links,
+      examplePhrases: brief.examplePhrases,
+      additionalQueries: brief.additionalQueries,
+      facts: brief.facts,
+      practice: brief.practice,
+      forbiddenPhrases: brief.forbiddenPhrases,
+    });
     const next = deterministic.fields;
     return { fields: next, result: gate(next), fixes: [...deterministic.fixes] };
   };
