@@ -45,6 +45,52 @@ export type MemoryCommentState = {
   profiles?: Record<string, { fullName?: string | null; email?: string | null }>;
 };
 
+function publishedImpression(state: MemoryCommentState, commentId: string): boolean {
+  const row = state.comments.find((item) => item.id === commentId);
+  return Boolean(row && row.kind === "impression" && row.status === "published" && !row.deletedAt);
+}
+
+function unreadCommentIds(state: MemoryCommentState, userId: string): Set<string> {
+  return new Set(
+    state.notices
+      .filter(
+        (notice) =>
+          notice.recipientUserId === userId &&
+          notice.kind === "new_impression" &&
+          notice.readAt == null &&
+          publishedImpression(state, notice.commentId),
+      )
+      .map((notice) => notice.commentId),
+  );
+}
+
+function practiceIdsForAuthors(
+  state: MemoryCommentState,
+  userId: string,
+  authorIds: string[],
+): Set<string> {
+  const allowed = new Set(authorIds);
+  return new Set(
+    state.memberships
+      .filter((member) => member.userId === userId && allowed.has(member.authorId))
+      .map((member) => member.practiceId),
+  );
+}
+
+function answeredParentIds(state: MemoryCommentState): Set<string> {
+  return new Set(
+    state.comments
+      .filter(
+        (row) =>
+          row.kind === "author_reply" &&
+          row.status === "published" &&
+          !row.deletedAt &&
+          row.parentId != null,
+      )
+      .map((row) => row.parentId as string),
+  );
+}
+
 export function createMemoryCommentStore(state: MemoryCommentState): CommentStore {
   const hiddenMeta = new Map<string, { hiddenBy: string | null; hiddenAt: string | null }>();
 
@@ -124,9 +170,19 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
       return {
         id: gate.practiceId,
         title: gate.title,
+        authorName: gate.authorName?.trim() || "Автор",
         authorSlug: gate.authorSlug,
         productSlug: gate.productSlug,
       };
+    },
+    async getPracticeContexts(practiceIds) {
+      const wanted = new Set(practiceIds);
+      const contexts = [];
+      for (const practiceId of wanted) {
+        const context = await this.getPracticeContext(practiceId);
+        if (context) contexts.push(context);
+      }
+      return contexts;
     },
     async suggestPublicName(userId) {
       return state.names[userId] ?? "Слушатель";
@@ -172,13 +228,108 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
         .filter((member) => member.practiceId === practiceId)
         .map((member) => member.userId);
     },
-    async listAuthorPracticeIds(userId, authorId) {
-      return state.memberships
+    async listAuthorWorkspaceIds(userId, authorId) {
+      return [
+        ...new Set(
+          state.memberships
+            .filter(
+              (member) =>
+                member.userId === userId && (authorId == null || member.authorId === authorId),
+            )
+            .map((member) => member.authorId),
+        ),
+      ];
+    },
+    async listAuthorImpressions(input) {
+      const allowed = practiceIdsForAuthors(state, input.userId, input.authorIds);
+      const unread = unreadCommentIds(state, input.userId);
+      const answered = answeredParentIds(state);
+      return state.comments
         .filter(
-          (member) =>
-            member.userId === userId && (authorId == null || member.authorId === authorId),
+          (row) =>
+            allowed.has(row.practiceId) &&
+            row.kind === "impression" &&
+            row.status === "published" &&
+            !row.deletedAt &&
+            (input.filter !== "new" || unread.has(row.id)) &&
+            (input.filter !== "unanswered" || !answered.has(row.id)),
         )
-        .map((member) => member.practiceId);
+        .map((row) => toFeed(row, input.userId))
+        .filter((row): row is FeedCommentRow => row != null)
+        .filter((row) => (input.cursor ? isAfterCursor(input.sort, row, input.cursor) : true))
+        .sort((left, right) => compareComments(input.sort, left, right))
+        .slice(0, input.limit);
+    },
+    async countUnreadAuthorImpressions(userId, authorIds) {
+      const allowed = practiceIdsForAuthors(state, userId, authorIds);
+      const unread = unreadCommentIds(state, userId);
+      return state.comments.filter(
+        (row) =>
+          unread.has(row.id) &&
+          allowed.has(row.practiceId) &&
+          row.kind === "impression" &&
+          row.status === "published" &&
+          !row.deletedAt,
+      ).length;
+    },
+    async unreadNoticesForComments(userId, commentIds) {
+      const wanted = new Set(commentIds);
+      return state.notices
+        .filter(
+          (notice) =>
+            notice.recipientUserId === userId &&
+            notice.kind === "new_impression" &&
+            notice.readAt == null &&
+            wanted.has(notice.commentId) &&
+            publishedImpression(state, notice.commentId),
+        )
+        .map((notice) => ({ noticeId: notice.id, commentId: notice.commentId }));
+    },
+    async markNoticesRead(userId, noticeIds, readAt) {
+      const wanted = new Set(noticeIds);
+      let marked = 0;
+      for (const notice of state.notices) {
+        if (
+          notice.recipientUserId === userId &&
+          notice.kind === "new_impression" &&
+          notice.readAt == null &&
+          wanted.has(notice.id)
+        ) {
+          notice.readAt = readAt;
+          marked += 1;
+        }
+      }
+      return marked;
+    },
+    async markUnreadAuthorImpressions(userId, authorIds, readAt) {
+      const allowed = practiceIdsForAuthors(state, userId, authorIds);
+      let marked = 0;
+      for (const notice of state.notices) {
+        if (
+          notice.recipientUserId !== userId ||
+          notice.kind !== "new_impression" ||
+          notice.readAt != null ||
+          !allowed.has(notice.practiceId) ||
+          !publishedImpression(state, notice.commentId)
+        ) {
+          continue;
+        }
+        notice.readAt = readAt;
+        marked += 1;
+      }
+      return marked;
+    },
+    async markUnreadNoticeForComment(userId, commentId, readAt) {
+      const notice = state.notices.find(
+        (item) =>
+          item.recipientUserId === userId &&
+          item.commentId === commentId &&
+          item.kind === "new_impression" &&
+          item.readAt == null,
+      );
+      if (!notice || !publishedImpression(state, commentId)) return false;
+      notice.readAt = readAt;
+      return true;
     },
     async listFeed(input) {
       return state.comments
@@ -198,6 +349,15 @@ export function createMemoryCommentStore(state: MemoryCommentState): CommentStor
             row.kind === "author_reply" &&
             row.parentId != null &&
             parents.has(row.parentId),
+        )
+        .map((row) => toFeed(row, input.viewerUserId))
+        .filter((row): row is FeedCommentRow => row != null);
+    },
+    async listRepliesForParents(input) {
+      const parents = new Set(input.parentIds);
+      return state.comments
+        .filter(
+          (row) => row.kind === "author_reply" && row.parentId != null && parents.has(row.parentId),
         )
         .map((row) => toFeed(row, input.viewerUserId))
         .filter((row): row is FeedCommentRow => row != null);

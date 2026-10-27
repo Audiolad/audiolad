@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import AuthorUnreadCommentBadge from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import UserAvatar from "@/components/profile/UserAvatar";
 import type { ListenerShellData } from "@/lib/listener/shell-data";
 
@@ -88,14 +89,19 @@ export default function DesktopRightColumnTop({
       )}
 
       {shellData.showAuthorEntry ? (
-        <Link
-          href={shellData.authorCta.href}
-          className={entryButtonClassName}
-          title={shellData.authorCta.label}
-        >
-          <AuthorOutlineIcon />
-          <span className="truncate">{shellData.authorCta.label}</span>
-        </Link>
+        <div className="relative">
+          <Link
+            href={shellData.authorCta.href}
+            className={entryButtonClassName}
+            title={shellData.authorCta.label}
+          >
+            <AuthorOutlineIcon />
+            <span className="truncate">{shellData.authorCta.label}</span>
+          </Link>
+          {shellData.authorCta.label === "Кабинет автора" ? (
+            <AuthorUnreadCommentBadge placement="sidebar" />
+          ) : null}
+        </div>
       ) : null}
 
       {shellData.showAdminPanel ? (

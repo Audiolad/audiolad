@@ -25,6 +25,11 @@ import { isListenerCommentFeedVisible } from "../src/lib/practice-comments/visib
 
 import { resolveListenerCommentComposer } from "../src/lib/practice-comments/composer";
 import {
+  hashCommentId,
+  LISTENER_COMMENT_HASH_PAGE_CAP,
+  shouldLoadAnotherCommentPage,
+} from "../src/lib/practice-comments/deep-link";
+import {
   LISTENER_IMPRESSION_EMOJIS,
   LISTENER_IMPRESSION_INVITE,
   LISTENER_IMPRESSION_LOAD_MORE,
@@ -47,11 +52,13 @@ import {
   COMMENT_CREATE_LIMIT,
   COMMENT_EDIT_LIMIT,
   COMMENT_REPLY_LIMIT,
+  countUnreadAuthorImpressions,
   createImpression,
   deleteCommentAsOwner,
   deleteOwnComment,
   listAuthorFeedback,
   listListenerNotices,
+  markAuthorImpressionNotices,
   listModerationQueue,
   listPracticeComments,
   moderateComment,
@@ -60,7 +67,7 @@ import {
   returnCommentAsOwner,
   updateOwnComment,
 } from "../src/lib/practice-comments/service";
-import type { ListenerCommentRow } from "../src/lib/practice-comments/types";
+import type { CommentNoticeRow, ListenerCommentRow } from "../src/lib/practice-comments/types";
 import {
   commentFingerprint,
   deriveDefaultPublicName,
@@ -1931,6 +1938,499 @@ async function testAvatars() {
   assert.doesNotMatch(viewSelect, /AS user_id|email|full_name|avatar_path|surname/);
 }
 
+async function testAuthorCommentHistory() {
+  const secondId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const otherAuthor = "66666666-6666-4666-8666-666666666666";
+  const store = createMemoryCommentStore(
+    state({
+      gates: [
+        gate({ title: "Тихая", productSlug: "tihaya" }),
+        gate({
+          practiceId: secondId,
+          title: "Вторая",
+          productSlug: "vtoraya",
+          authorId: otherAuthor,
+        }),
+      ],
+      memberships: [
+        { userId: authorUser, practiceId, authorId: gate().authorId },
+        { userId: authorUser, practiceId: secondId, authorId: otherAuthor },
+      ],
+    }),
+  );
+  const first = await createImpression(store, actor(listener), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Первый отзыв на практику",
+    publicName: "Мария",
+    clientRequestId: null,
+  });
+  const second = await createImpression(store, actor(other), clock(), {
+    authorSlug: "anna",
+    productSlug: "vtoraya",
+    body: "Второй отзыв на практику",
+    publicName: "Илья",
+    clientRequestId: null,
+  });
+  assert.equal(first.ok && second.ok, true);
+  if (!first.ok || !second.ok) return;
+
+  const pageQuery = {
+    authorId: null as string | null,
+    sort: "new" as const,
+    cursor: null,
+    limit: 10,
+  };
+  const all = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(all.ok && all.comments.length, 2);
+  if (!all.ok) return;
+  assert.equal(all.unreadCount, 2);
+  assert.equal(all.comments.every((item) => item.unread && item.noticeId), true);
+  const labelled = all.comments.find((item) => item.id === first.comment.id);
+  assert.equal(labelled?.practiceTitle, "Тихая");
+  assert.equal(labelled?.authorName, "Анна Светлая");
+  assert.match(labelled?.practiceHref ?? "", new RegExp(`#listener-comment-${first.comment.id}$`));
+
+  const oneWorkspace = await listAuthorFeedback(store, actor(authorUser), {
+    ...pageQuery,
+    authorId: otherAuthor,
+    filter: "all",
+  });
+  assert.equal(oneWorkspace.ok && oneWorkspace.comments.length, 1);
+  if (oneWorkspace.ok) assert.equal(oneWorkspace.comments[0]?.id, second.comment.id);
+
+  const stranger = await listAuthorFeedback(store, actor(listener), {
+    ...pageQuery,
+    authorId: gate().authorId,
+    filter: "all",
+  });
+  assert.equal(stranger.ok, false);
+  if (!stranger.ok) assert.equal(stranger.status, 403);
+
+  const marked = await markAuthorImpressionNotices(store, actor(authorUser), clock(), {
+    noticeIds: all.comments.map((item) => item.noticeId).filter((id): id is string => id != null),
+  });
+  assert.equal(marked.ok && marked.unreadCount, 0);
+  const history = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(history.ok && history.comments.length, 2);
+  if (history.ok) assert.equal(history.comments.every((item) => item.unread === false), true);
+  const noNew = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "new" });
+  assert.equal(noNew.ok && noNew.comments.length, 0);
+
+  const reply = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: first.comment.id,
+    body: "Спасибо за первый отзыв",
+    clientRequestId: "77777777-7777-4777-8777-777777777772",
+  });
+  assert.equal(reply.ok, true);
+  const unanswered = await listAuthorFeedback(store, actor(authorUser), {
+    ...pageQuery,
+    filter: "unanswered",
+  });
+  assert.equal(unanswered.ok && unanswered.comments.length, 1);
+  if (unanswered.ok) assert.equal(unanswered.comments[0]?.id, second.comment.id);
+  const withReply = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  if (withReply.ok) {
+    assert.equal(
+      withReply.comments.find((item) => item.id === first.comment.id)?.reply?.body,
+      "Спасибо за первый отзыв",
+    );
+  }
+
+  const hidden = await moderateComment(store, actor(moderator, true, false), clock(), {
+    commentId: second.comment.id,
+    action: "hide",
+    reason: "spam",
+  });
+  assert.equal(hidden.ok, true);
+  const afterHide = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(afterHide.ok && afterHide.comments.some((item) => item.id === second.comment.id), false);
+  const unread = await countUnreadAuthorImpressions(store, actor(authorUser));
+  assert.equal(unread.ok && unread.unreadCount, 0);
+
+  const removed = await deleteOwnComment(store, actor(listener), clock(), first.comment.id);
+  assert.equal(removed.ok, true);
+  const afterDelete = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(afterDelete.ok && afterDelete.comments.length, 0);
+
+  const fresh = await createImpression(store, actor(other), clock(), {
+    authorSlug: "anna",
+    productSlug: "tihaya",
+    body: "Новый отзыв после удаления",
+    publicName: "Илья",
+    clientRequestId: null,
+  });
+  assert.equal(fresh.ok, true);
+  const cleared = await markAuthorImpressionNotices(store, actor(authorUser), clock(), { all: true });
+  assert.equal(cleared.ok && cleared.unreadCount, 0);
+  const stayed = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(stayed.ok && stayed.comments.length, 1);
+
+  const page = read("src/components/products/practice-page/PracticeComments.tsx");
+  assert.match(page, /id=\{`listener-comment-\$\{comment\.id\}`\}/);
+  assert.match(page, /hashCommentId/);
+  assert.match(read("src/lib/practice-comments/deep-link.ts"), /#listener-comment-/);
+  assert.match(page, /commentId/);
+  assert.match(read("src/lib/practice-comments/copy.ts"), /Комментарии/);
+  assert.doesNotMatch(read("src/components/author-dashboard/AuthorListenerFeedback.tsx"), /—/);
+}
+
+async function testAuthorNoticeConsistency() {
+  const comments: ListenerCommentRow[] = [];
+  const notices: CommentNoticeRow[] = [];
+  for (let index = 1; index <= 25; index += 1) {
+    const id = commentUuid("aaaaaaaa", index);
+    const createdAt = isoSeconds(index);
+    comments.push(impressionRow(id, createdAt, `Отзыв номер ${index} для истории`));
+    notices.push({
+      id: commentUuid("bbbbbbbb", index),
+      recipientUserId: authorUser,
+      commentId: id,
+      practiceId,
+      kind: "new_impression",
+      readAt: null,
+      createdAt,
+    });
+  }
+  const hiddenId = commentUuid("aaaaaaaa", 90);
+  comments.push(impressionRow(hiddenId, isoSeconds(90), "Скрытый отзыв не считается", "hidden"));
+  notices.push({
+    id: commentUuid("bbbbbbbb", 90),
+    recipientUserId: authorUser,
+    commentId: hiddenId,
+    practiceId,
+    kind: "new_impression",
+    readAt: null,
+    createdAt: isoSeconds(90),
+  });
+  const store = createMemoryCommentStore(state({ comments, notices }));
+  const pageQuery = {
+    authorId: null as string | null,
+    sort: "new" as const,
+    cursor: null,
+    limit: 30,
+  };
+  const listed = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "new" });
+  assert.equal(listed.ok, true);
+  if (!listed.ok) return;
+  assert.equal(listed.comments.length, 25);
+  assert.equal(listed.unreadCount, 25);
+  assert.equal(listed.comments.every((item) => item.unread && item.productSlug === "tihaya"), true);
+  assert.equal(listed.comments.every((item) => item.authorSlug === "anna"), true);
+  const counted = await countUnreadAuthorImpressions(store, actor(authorUser));
+  assert.equal(counted.ok && counted.unreadCount, listed.unreadCount);
+  const noticeIds = listed.comments
+    .map((item) => item.noticeId)
+    .filter((id): id is string => id != null);
+  assert.equal(noticeIds.length, 25);
+  const marked = await markAuthorImpressionNotices(store, actor(authorUser), clock(), { noticeIds });
+  assert.equal(marked.ok && marked.unreadCount, 0);
+  const afterShown = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "new" });
+  assert.equal(afterShown.ok && afterShown.comments.length, 0);
+  for (const notice of notices) notice.readAt = null;
+  const restored = await countUnreadAuthorImpressions(store, actor(authorUser));
+  assert.equal(restored.ok && restored.unreadCount, 25);
+  const cleared = await markAuthorImpressionNotices(store, actor(authorUser), clock(), { all: true });
+  assert.equal(cleared.ok && cleared.unreadCount, 0);
+  const history = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(history.ok && history.comments.length, 25);
+
+  const target = comments[0]!;
+  const wrongSlug = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: target.id,
+    body: "Спасибо за отзыв",
+    clientRequestId: commentUuid("cccccccc", 1),
+    authorSlug: "anna",
+    productSlug: "anna",
+  });
+  assert.equal(wrongSlug.ok, false);
+  if (!wrongSlug.ok) assert.equal(wrongSlug.status, 400);
+  const rightSlug = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: target.id,
+    body: "Спасибо за отзыв",
+    clientRequestId: commentUuid("cccccccc", 2),
+    authorSlug: "anna",
+    productSlug: "tihaya",
+  });
+  assert.equal(rightSlug.ok, true);
+  const unanswered = await listAuthorFeedback(store, actor(authorUser), {
+    ...pageQuery,
+    filter: "unanswered",
+  });
+  assert.equal(unanswered.ok && unanswered.comments.length, 24);
+  if (unanswered.ok) {
+    assert.equal(
+      unanswered.comments.some((item) => item.id === target.id),
+      false,
+    );
+  }
+
+  const later = comments[20]!;
+  assert.equal(hashCommentId(`#listener-comment-${later.id}`), later.id);
+  assert.equal(hashCommentId("#listener-impressions"), null);
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: later.id,
+      loadedIds: comments.slice(0, 10).map((item) => item.id),
+      nextCursor: "page-2",
+      previousCursor: null,
+      pagesRead: 1,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [target.id],
+      nextCursor: "page-2",
+      previousCursor: null,
+      pagesRead: 1,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [],
+      nextCursor: null,
+      previousCursor: null,
+      pagesRead: 1,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [],
+      nextCursor: "same",
+      previousCursor: "same",
+      pagesRead: 2,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [],
+      nextCursor: "next",
+      previousCursor: null,
+      pagesRead: LISTENER_COMMENT_HASH_PAGE_CAP,
+    }),
+    false,
+  );
+
+  const storeSource = read("src/lib/practice-comments/supabase-store.ts");
+  assert.doesNotMatch(storeSource, /\.limit\(500\)/);
+  assert.doesNotMatch(storeSource, /\.limit\(2000\)/);
+  assert.doesNotMatch(storeSource, /not\("id", "in"/);
+  assert.doesNotMatch(storeSource, /\.in\("practice_id", input/);
+  assert.match(storeSource, /practices\.author_id/);
+  assert.match(storeSource, /author_replies/);
+  assert.match(storeSource, /\.is\("author_replies", null\)/);
+  assert.match(storeSource, /\.range\(/);
+  assert.match(storeSource, /practice_listener_comment_notices!inner/);
+  const selectFn = storeSource.slice(
+    storeSource.indexOf("function impressionSelect"),
+    storeSource.indexOf("function unreadNoticeQuery"),
+  );
+  assert.doesNotMatch(selectFn, /user_id|email|full_name|surname/);
+
+  const service = read("src/lib/practice-comments/service.ts");
+  assert.doesNotMatch(service, /\.slice\(0,\s*20\)/);
+  const feedback = service.slice(
+    service.indexOf("export async function listAuthorFeedback"),
+    service.indexOf("export async function countUnreadAuthorImpressions"),
+  );
+  assert.match(feedback, /getPracticeContexts\(/);
+  assert.match(feedback, /listRepliesForParents\(/);
+  assert.doesNotMatch(feedback, /getPracticeContext\(/);
+  assert.doesNotMatch(feedback, /(?<!listRepliesForParents)listReplies\(/);
+
+  const page = read("src/components/products/practice-page/PracticeComments.tsx");
+  assert.match(page, /pagesRead/);
+  assert.match(page, /shouldLoadAnotherCommentPage/);
+  assert.match(page, /hashCommentId/);
+  const cabinet = read("src/components/author-dashboard/AuthorListenerFeedback.tsx");
+  assert.match(cabinet, /item\.productSlug/);
+  assert.match(cabinet, /IntersectionObserver/);
+  assert.doesNotMatch(cabinet, /practiceHref\.split\("\/"\)\[2\]/);
+  assert.doesNotMatch(cabinet, /items\.flatMap\(\(item\) => \(item\.unread/);
+  assert.doesNotMatch(cabinet, /—/);
+  const route = read(
+    "src/app/api/listen/product/[slug]/[productSlug]/comments/[commentId]/reply/route.ts",
+  );
+  assert.match(route, /authorSlug: slug/);
+  assert.match(route, /productSlug/);
+  const shell = read("src/components/listener/ListenerAppShell.tsx");
+  assert.match(shell, /data-author-cabinet-mobile/);
+  assert.match(shell, /xl:hidden/);
+  assert.match(read("src/components/profile/ProfileSections.tsx"), /AuthorUnreadCommentBadge/);
+  const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
+  assert.match(authorShell, /data-author-shell-subtitle/);
+  const subtitle = authorShell.slice(
+    authorShell.indexOf("data-author-shell-subtitle") - 180,
+    authorShell.indexOf("data-author-shell-subtitle"),
+  );
+  assert.doesNotMatch(subtitle, /truncate/);
+}
+
+async function testCombinedAuthorWorkspaces() {
+  const secondId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const otherAuthor = "66666666-6666-4666-8666-666666666666";
+  const oldestId = commentUuid("dddddddd", 1);
+  const middleId = commentUuid("dddddddd", 2);
+  const newestId = commentUuid("dddddddd", 3);
+  const comments = [
+    impressionRow(oldestId, isoSeconds(10), "Старый отзыв первого проекта"),
+    { ...impressionRow(middleId, isoSeconds(20), "Средний отзыв первого проекта"), practiceId },
+    {
+      ...impressionRow(newestId, isoSeconds(30), "Новый отзыв второго проекта"),
+      practiceId: secondId,
+    },
+  ];
+  const notices: CommentNoticeRow[] = comments.map((row, index) => ({
+    id: commentUuid("eeeeeeee", index + 1),
+    recipientUserId: authorUser,
+    commentId: row.id,
+    practiceId: row.practiceId,
+    kind: "new_impression",
+    readAt: null,
+    createdAt: row.createdAt,
+  }));
+  const store = createMemoryCommentStore(
+    state({
+      gates: [
+        gate({ title: "Тихая", productSlug: "tihaya", authorName: "Анна Светлая" }),
+        gate({
+          practiceId: secondId,
+          title: "Вечер",
+          productSlug: "vecher",
+          authorId: otherAuthor,
+          authorSlug: "aurafon",
+          authorName: "Аурафон",
+        }),
+      ],
+      memberships: [
+        { userId: authorUser, practiceId, authorId: gate().authorId },
+        { userId: authorUser, practiceId: secondId, authorId: otherAuthor },
+      ],
+      comments,
+      notices,
+    }),
+  );
+  const base = {
+    authorId: null as string | null,
+    cursor: null,
+    limit: 1,
+  };
+  const firstPage = await listAuthorFeedback(store, actor(authorUser), {
+    ...base,
+    sort: "new",
+    filter: "all",
+  });
+  assert.equal(firstPage.ok, true);
+  if (!firstPage.ok) return;
+  assert.equal(firstPage.comments.length, 1);
+  assert.equal(firstPage.comments[0]?.id, newestId);
+  assert.equal(firstPage.comments[0]?.authorName, "Аурафон");
+  assert.equal(firstPage.comments[0]?.practiceTitle, "Вечер");
+  assert.equal(firstPage.unreadCount, 3);
+  assert.ok(firstPage.nextCursor);
+  const secondPage = await listAuthorFeedback(store, actor(authorUser), {
+    ...base,
+    sort: "new",
+    filter: "all",
+    cursor: decodeCommentCursor(firstPage.nextCursor),
+  });
+  assert.equal(secondPage.ok && secondPage.comments[0]?.id, middleId);
+  if (secondPage.ok) {
+    assert.equal(secondPage.comments[0]?.authorName, "Анна Светлая");
+    assert.equal(secondPage.comments[0]?.practiceTitle, "Тихая");
+  }
+  const oldestFirst = await listAuthorFeedback(store, actor(authorUser), {
+    ...base,
+    sort: "old",
+    filter: "all",
+  });
+  assert.equal(oldestFirst.ok && oldestFirst.comments[0]?.id, oldestId);
+  const fresh = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: null,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "new",
+  });
+  assert.equal(fresh.ok && fresh.comments.length, 3);
+  const unansweredBefore = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: null,
+    sort: "old",
+    cursor: null,
+    limit: 10,
+    filter: "unanswered",
+  });
+  assert.equal(unansweredBefore.ok && unansweredBefore.comments.length, 3);
+  const reply = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: newestId,
+    body: "Спасибо за отзыв второго проекта",
+    clientRequestId: commentUuid("ffffffff", 1),
+    authorSlug: "aurafon",
+    productSlug: "vecher",
+  });
+  assert.equal(reply.ok, true);
+  const unanswered = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: null,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "unanswered",
+  });
+  assert.equal(unanswered.ok && unanswered.comments.length, 2);
+  if (unanswered.ok) {
+    assert.equal(
+      unanswered.comments.some((item) => item.id === newestId),
+      false,
+    );
+    assert.equal(unanswered.comments.some((item) => item.authorName === "Анна Светлая"), true);
+  }
+  const onlySecond = await listAuthorFeedback(store, actor(authorUser), {
+    authorId: otherAuthor,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "all",
+  });
+  assert.equal(onlySecond.ok && onlySecond.comments.length, 1);
+  if (onlySecond.ok) {
+    assert.equal(onlySecond.comments[0]?.id, newestId);
+    assert.equal(onlySecond.unreadCount, 3);
+  }
+  const stranger = await listAuthorFeedback(store, actor(listener), {
+    authorId: otherAuthor,
+    sort: "new",
+    cursor: null,
+    limit: 10,
+    filter: "all",
+  });
+  assert.equal(stranger.ok, false);
+
+  const ui = read("src/components/author-dashboard/AuthorListenerFeedback.tsx");
+  assert.doesNotMatch(ui, /useState\(\s*authors\[0\]/);
+  assert.match(ui, /authors\.length > 1/);
+  assert.match(ui, /AUTHOR_COMMENTS_ALL_PROJECTS/);
+  assert.match(ui, /if \(authorId\) params\.set\("authorId", authorId\)/);
+  assert.match(ui, /data-author-comment-workspace=\{item\.authorName\}/);
+  assert.match(ui, /data-author-comment-product=\{item\.practiceTitle\}/);
+  assert.match(ui, /AUTHOR_COMMENTS_FILTER_ALL/);
+  assert.match(ui, /AUTHOR_COMMENTS_FILTER_NEW/);
+  assert.match(ui, /AUTHOR_COMMENTS_FILTER_UNANSWERED/);
+  const page = read("src/app/(platform)/author-dashboard/feedback/page.tsx");
+  assert.match(page, /AuthorListenerFeedback/);
+  assert.doesNotMatch(page, /authors\[0\]/);
+}
+
+await testCombinedAuthorWorkspaces();
+await testAuthorNoticeConsistency();
+await testAuthorCommentHistory();
 await testAvatars();
 await testPrivacyAndXss();
 await testCreateListEditDelete();
