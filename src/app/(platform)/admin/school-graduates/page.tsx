@@ -20,7 +20,7 @@ export default async function SchoolGraduatesPage() {
         .is("deleted_at", null).not("author_id", "is", null).not("slug", "is", null).order("id").range(from, to)),
     ]);
   } catch {
-    return <p role="alert" className="text-sm text-red-700">Не удалось загрузить выпускников. Обновите страницу. Если ошибка повторяется, раздел ещё не готов к работе.</p>;
+    return <p role="alert" className="text-sm text-red-700">Не удалось загрузить выпускников. <a href="/admin/school-graduates" className="underline">Обновить страницу</a>. Если ошибка повторяется, раздел ещё не готов к работе.</p>;
   }
   const [authors, graduates, products] = loaded;
   return <section aria-labelledby="graduates-admin-heading">

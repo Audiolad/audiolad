@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminPermission } from "@/lib/admin/guard";
-import { buildAuthorProductEditPath } from "@/lib/author-products/product-wizard-navigation";
 import { applyOrdinaryCatalogEligibility } from "@/lib/catalog/visibility-query";
 import { graduateText, validateGraduateProductIds } from "@/lib/school/graduates";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -13,7 +12,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const publishedOnly = "В подборку можно выбрать только опубликованные и открытые в каталоге продукты этого автора.";
 const saveFailed = "Не удалось сохранить подборку. Проверьте публикацию продуктов и обновите страницу.";
 
-/** Step 4 of the product editor is where a draft is published. */
+/** Admin product page. The author editor 404s for a platform admin who is not a member. */
 function publicationLinks(
   ids: string[],
   titles: ReadonlyMap<string, string>,
@@ -21,7 +20,7 @@ function publicationLinks(
   return ids.map((id) => {
     const title = titles.get(id)?.trim();
     return {
-      href: buildAuthorProductEditPath(id, { step: 4, includeStep: true }),
+      href: `/admin/product-moderation/${id}`,
       label: title ? `Открыть публикацию «${graduateText(title)}»` : "Открыть публикацию продукта",
     };
   });
