@@ -22,8 +22,8 @@ import { normalizePack } from "./lib/sites/sz/brief.mjs";
 import { compareSzChecks } from "./lib/sites/sz/checks.mjs";
 import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./lib/sites/sz/config.mjs";
 import { TIERED_COST_PROFILE, estimateCallRub, estimateTieredArticle, loadModelPrices } from "./lib/sites/sz/estimate.mjs";
-import { szH2Count, szPackCost, szQuantityReport } from "./lib/sites/sz/metrics.mjs";
-import { applyDeterministicSzFixes, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
+import { szH2Count, szPackCost, szQuantityReport, szSpendAllowed } from "./lib/sites/sz/metrics.mjs";
+import { applyDeterministicSzFixes, articleDropsRequired, buildSzFragment, cheapTokenCap, fragmentBanned, fragmentDropsRequired, fragmentTruncated, latinizeSlug, lengthFragmentTokens, repairSzArticleTiered, repairSzPackDuplicates, retryTokenCap, tieredRepairCallName } from "./lib/sites/sz/tiered.mjs";
 import { collectExperts, loadSzContext } from "./lib/sites/sz/context.mjs";
 import {
   CONFLICTING_EXPERTS, EXPERT_BANS, KNOWN_CARDS, defaultExpertPool, expertCard, missingMix, parseExpertsMd, rankExperts, rotationAdvice, rotationProblems,
@@ -33,7 +33,7 @@ import { CORRECTIONS, LESSONS, LESSONS_FILE, parseCorrections, readReference } f
 import { SzStop, assertBranchFree, packView, resolveCards, runSzPipeline, repairSzArticle, szRepairOptions, szReportMarkdown } from "./lib/sites/sz/pipeline.mjs";
 import { draftFieldDefects, findControlDrafts } from "./lib/sites/sz/draft.mjs";
 import { applySzRepairPatch, buildSzMessages, buildSzRepairMessages, buildSzTargetedRepair, szArticleSchema, szRepairFields } from "./lib/sites/sz/prompt.mjs";
-import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, examplePhraseStats, faqAnswerTypeMismatch, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
+import { DISCOMFORT_PATTERNS, alignListCount, anchorHasBrackets, boltedPrepositionQuery, checkSzArticle, checkSzPack, danglingLeads, englishLeftovers, examplePhraseDefect, examplePhraseStats, faqAnswerTypeMismatch, faqContradictsBody, firstPersonNarration, genericLinkAnchor, gluedLeadBodyLength, isSpecialistQuestion, leadWordFragments, linkLeadResidue, markdownLinks, metaQueryLeftovers, normalize, oversizedParagraphs, paragraphsTooClose, phraseInProse, protectedRemovalOk, sectionRetellsStory, statedListCount, stepHeadingCount, words } from "./lib/sites/sz/rules.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "fixtures/sz");
@@ -289,6 +289,12 @@ test("prompt: lessons, caution, siblings and tone sample reach the model", () =>
   assert.match(text, /не повторяют концовку/);
   assert.match(text, /около 1000/);
   assert.match(text, /880–1400/);
+  assert.match(text, /третье лицо/);
+  assert.match(text, /настоящее время/);
+  assert.match(text, /не короче 3 слов/);
+  assert.match(text, /must not include/);
+  assert.match(text, /не противоречит основной части/);
+  assert.match(text, /Если в тексте сказано «N шагов»/);
   assert.match(text, /СВЕРКА ПЕРЕД ОТПРАВКОЙ/);
   assert.match(text, /не начинается с «Да» или «Нет»/);
 });
@@ -602,6 +608,49 @@ test("query-meta: service leftovers fail the gate, a woven sentence does not", (
   assert.equal(errorsOf(gateOf(() => {})).some((problem) => problem.code === "query-meta"), false);
 });
 
+test("links: brief, prompt and gate share one set of at most 5", () => {
+  const raw = clone();
+  const extra = ["slug-a", "slug-b", "slug-c", "slug-d"];
+  raw.articles[0].links.contextual = [...raw.articles[0].links.contextual, ...extra];
+  assert.ok(raw.articles[0].links.contextual.length > SZ.limits.contextualLinks[1]);
+  const packed = normalizePack(raw, { baseDir: fixtures, pool });
+  assert.equal(packed.articles[0].links.contextual.length, SZ.limits.contextualLinks[1]);
+  assert.deepEqual(packed.articles[0].links.contextual, raw.articles[0].links.contextual.slice(0, SZ.limits.contextualLinks[1]));
+  const localBrief = packed.articles[0];
+  const prompt = buildSzMessages(localBrief, view.site, { siblings: view.siblings }).map((message) => message.content).join("\n");
+  assert.match(prompt, new RegExp(`Обязательны все ${SZ.limits.contextualLinks[1]}`));
+  const localCfg = ruleConfig(localBrief, pack.publishedAt, pool);
+  const kept = checkSzArticle(assembled, localCfg, env).filter((problem) => problem.code === "links-contextual" || problem.code === "links-required");
+  assert.ok(kept.some((problem) => problem.code === "links-required"));
+  assert.equal(kept.find((problem) => problem.code === "links-contextual").min, SZ.limits.contextualLinks[1]);
+});
+
+test("story-retell: a shared opening is not a plot retelling", () => {
+  const story = [...fields.story, fields.transition].join("\n\n");
+  const opening = story.split(/(?<=[.!?…])\s+/u)[0];
+  let section = `${opening} Дальше речь о дыхании, паузе и короткой фразе, которую повторяют утром, без прежней сцены.`;
+  while (words(section) < 90) section = `${section} Пауза остаётся короткой, а фраза – своей.`;
+  assert.equal(sectionRetellsStory(story, section), false);
+  const plot = story.split(/(?<=[.!?…])\s+/u).slice(1).join(" ");
+  assert.equal(sectionRetellsStory(story, plot), true);
+});
+
+test("gate: english notes, FAQ contradiction, example-phrase quality; en dash stays", () => {
+  assert.deepEqual(englishLeftovers(assembled), []);
+  assert.equal(errorsOf(checkSzArticle(assembled, cfg, env)).some((problem) => problem.code === "english-note" || problem.code === "faq-contradiction"), false);
+  const noted = firstPara(assembled, "Wait must not include the service note.");
+  assert.ok(errorsOf(checkSzArticle(noted, cfg, env)).some((problem) => problem.code === "english-note"));
+  assert.equal(examplePhraseDefect("Я выбираю спокойный день"), "");
+  assert.equal(examplePhraseDefect("Деньги"), "короче 3 слов");
+  assert.match(examplePhraseDefect("Я получила много денег"), /прошедшее/);
+  assert.match(examplePhraseDefect("Я не боюсь этого дня"), /отрицание/);
+  const body = "Повторять короткую фразу можно спокойно и без спешки каждый день.";
+  assert.equal(faqContradictsBody("Можно ли повторять короткую фразу?", "Можно повторять её спокойно.", body), false);
+  assert.equal(faqContradictsBody("Можно ли повторять короткую фразу?", "Нельзя повторять короткую фразу вслух.", body), true);
+  const dash = firstPara(assembled, "Пауза – короткая.");
+  assert.equal(errorsOf(checkSzArticle(dash, cfg, env)).some((problem) => problem.code === "em-dash"), false);
+});
+
 test("repair: a fragment that drops a required query or link is rejected", () => {
   const phrase = "мощные аффирмации на деньги";
   const slug = brief.links.contextual[0];
@@ -614,6 +663,13 @@ test("repair: a fragment that drops a required query or link is rejected", () =>
   assert.equal(fragmentDropsRequired(before, { text: before }, localBrief), false);
   assert.equal(fragmentDropsRequired(before, { text: "В этом абзаце остаётся только порядок дня и короткая пауза без прежней фразы." }, localBrief), true);
   assert.equal(fragmentDropsRequired(before, { paragraphs: [`Здесь по-прежнему ${phrase} и [практика изобилия](/s/${slug}).`] }, localBrief), false);
+  const withExamples = {
+    ...fields,
+    query: brief.query,
+    sectionsBefore: [{ title: "Примеры фраз на утро", paragraphs: ["- Я выбираю спокойный день и короткую фразу.\n- Деньги приходят спокойно и вовремя каждый раз.\n".repeat(5)] }, ...fields.sectionsBefore.slice(1)],
+  };
+  assert.equal(articleDropsRequired(withExamples, withExamples, { ...localBrief, query: brief.query, examplePhrases: { min: 10, max: 10 } }), false);
+  assert.equal(articleDropsRequired(withExamples, { ...withExamples, sectionsBefore: fields.sectionsBefore }, { ...localBrief, query: brief.query, examplePhrases: { min: 10, max: 10 } }), true);
   const raw = structuredClone(fields);
   const story = [...raw.story, raw.transition].join("\n\n");
   const plot = story.replace(/[«»"“”„]/g, "").split(/\s+/).slice(0, 130).join(" ");
@@ -1322,7 +1378,7 @@ test("tiered: banned word is rewritten from the fragment, and a failed article k
   assert.match(stuck.repairSkipped, /оберег|summoning|finalInvite/);
 });
 
-test("tiered defaults stay behind the flag; finished-article cost excludes failures", () => {
+test("tiered defaults stay behind the flag; accepted-article cost includes failed spend", () => {
   const limits = { model: SZ_DEFAULT_MODEL, maxTokens: 16000 };
   assert.deepEqual(szRepairOptions({}, limits), { model: SZ_DEFAULT_MODEL, maxTokens: 16000, mode: "full" });
   const tier = szRepairOptions({ "repair-mode": "tiered", "tier-cheap-model": "openai/gpt-oss-120b", "tier-cheap-tries": "2", "tier-cheap-budget": "4", "tier-strong-budget": "6" }, limits);
@@ -1334,11 +1390,17 @@ test("tiered defaults stay behind the flag; finished-article cost excludes failu
   assert.equal(tier.strongBudget, 6);
   assert.throws(() => szRepairOptions({ "repair-mode": "tiered", "tier-strong-model": "unknown" }, limits), (error) => error.code === 1);
   const pack = szPackCost([{ slug: "a", passed: true, costRub: 4.2 }, { slug: "b", passed: false, costRub: 19.25 }]);
-  assert.deepEqual([pack.finished, pack.total, pack.finishedCostRub, pack.spentRub, pack.costPerFinished], [1, 2, 4.2, 23.45, 4.2]);
+  assert.deepEqual([pack.finished, pack.total, pack.finishedCostRub, pack.spentRub, pack.costPerAccepted], [1, 2, 4.2, 23.45, 23.45]);
+  assert.equal(pack.costPerFinished, pack.costPerAccepted);
   const report = szReportMarkdown({ calls: [], spentRub: 23.45, warnings: [], articles: [{ slug: "a", passed: true, costRub: 4.2, errorsBeforeRepair: [], errorsAfterRepair: [], repairSkipped: null }, { slug: "b", passed: false, costRub: 19.25, errorsBeforeRepair: [], errorsAfterRepair: [{ field: "description", message: "132" }], repairSkipped: "description: 132" }] });
   assert.match(report, /стоимость готовой статьи: 4,200 ₽/);
   assert.match(report, /Готовых статей: 1\/2/);
-  assert.match(report, /Цена одной готовой статьи: 4,200 ₽/);
+  assert.match(report, /Цена одной принятой статьи: 23,450 ₽/);
+  assert.equal(szSpendAllowed({ spentRub: 0, articleSpentRub: 0, worst: 18 }), "ok");
+  assert.equal(szSpendAllowed({ spentRub: 8, articleSpentRub: 8, worst: 5 }), "article");
+  assert.equal(szSpendAllowed({ spentRub: 110, articleSpentRub: 0, worst: 15 }), "run");
+  assert.equal(SZ.articleRubCap, 12);
+  assert.equal(SZ.runRubCap, 120);
 });
 
 test("offline price harness compares cheap models and does not call the network", () => {

@@ -131,9 +131,10 @@ function normalizeArticleBrief(raw, index, errors, baseDir, pool) {
   for (const [a, b] of CONFLICTING_EXPERTS) need(!(names.includes(a) && names.includes(b)), `${at}.experts: «${a}» и «${b}» спорят друг с другом – не ставить в одну статью (EXPERTS_RU.md, «Осторожно»)`, errors);
   const mix = missingMix(names, pool);
   need(mix.length === 0, `${at}.experts: в статье нужен хотя бы один ${mix.join(", ")} (Ж, М, РУ, ЗАР)`, errors);
-  const contextual = list(raw?.links?.contextual).map((item) => (typeof item === "string" ? item : String(item?.slug ?? ""))).map((item) => item.trim()).filter(Boolean);
+  const [linkMin, linkMax] = SZ.limits.contextualLinks;
+  const contextual = list(raw?.links?.contextual).map((item) => (typeof item === "string" ? item : String(item?.slug ?? ""))).map((item) => item.trim()).filter(Boolean).slice(0, linkMax);
   const readmore = list(raw?.links?.readmore).map(String);
-  need(contextual.length >= 2 && contextual.length <= 8, `${at}.links.contextual: 2–8 статей /s для ссылок в тексте (опубликованные или статьи этого пакета)`, errors);
+  need(contextual.length >= linkMin && contextual.length <= linkMax, `${at}.links.contextual: ${linkMin}–${linkMax} статей /s для ссылок в тексте (опубликованные или статьи этого пакета)`, errors);
   need(readmore.length === 3, `${at}.links.readmore: ровно 3 статьи для «Читайте также»`, errors);
   for (const target of [...contextual, ...readmore]) need(SLUG.test(target) && target !== slug, `${at}.links: плохой slug «${target}»`, errors);
   need(new Set(readmore).size === 3, `${at}.links.readmore: без повторов`, errors);

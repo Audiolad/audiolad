@@ -9,9 +9,9 @@ import { join, resolve } from "node:path";
 
 import { BudgetError, makeCaller } from "../../call.mjs";
 import { writerCallId } from "../../moscow.mjs";
-import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, formatRub, parseMaxRub, parseMaxTokens } from "../../cost.mjs";
-import { szPackCost } from "./metrics.mjs";
-import { repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
+import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, estimatePromptTokens, formatRub, parseMaxRub, parseMaxTokens, worstCaseRub } from "../../cost.mjs";
+import { szPackCost, szSpendAllowed } from "./metrics.mjs";
+import { articleDropsRequired, repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "../../publish.mjs";
 import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } from "../../util.mjs";
 import { DISCOMFORT_PATTERNS as BASE_DISCOMFORT } from "../../validate.mjs";
@@ -131,18 +131,35 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
   // Fail before any Cloud.ru spend (also in --dry-run / --offline): the push step would hit an
   // existing branch only after the whole budget is spent.
   assertBranchFree(repo, branch);
-  const budget = Math.min(maxRub, pack.maxRub ?? Infinity);
-  const state = { site: "sz", runId, model, repairModel: repair.model, repairMaxTokens: repair.maxTokens, repairMode: repair.mode, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [], warnings: [] };
+  const budget = Math.min(maxRub, pack.maxRub ?? Infinity, SZ.runRubCap);
+  const state = { site: "sz", runId, model, repairModel: repair.model, repairMaxTokens: repair.maxTokens, repairMode: repair.mode, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [], warnings: [], articleSlug: "" };
   mkdirSync(outDir, { recursive: true });
   writeJson(join(outDir, "pack.json"), pack);
-  const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate });
-
-  const callRepair = makeCaller({ model: repair.model, maxTokens: repair.maxTokens, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate });
+  const guard = (callModel, callMaxTokens, rawName, messages) => {
+    const articleSpentRub = state.articleSlug
+      ? state.calls.filter((call) => String(call.name).startsWith(`${state.articleSlug}-`)).reduce((sum, call) => sum + (call.costRub || 0), 0)
+      : 0;
+    const worst = worstCaseRub(callModel, estimatePromptTokens(messages, callModel), callMaxTokens);
+    const decision = szSpendAllowed({ spentRub: state.spentRub, articleSpentRub, worst, articleCap: SZ.articleRubCap, runCap: SZ.runRubCap });
+    if (decision === "run") throw new BudgetError(`бюджет прогона: потрачено ${formatRub(state.spentRub)}, худший случай ${formatRub(worst)}, предел ${formatRub(SZ.runRubCap)}`);
+    if (decision === "article") throw new BudgetError(`бюджет статьи: потрачено ${formatRub(articleSpentRub)}, худший случай ${formatRub(worst)}, предел ${formatRub(SZ.articleRubCap)}`);
+  };
+  const callWriter = (rawName, messages, schema) => {
+    guard(model, maxTokens, rawName, messages);
+    return makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_article", generate })(rawName, messages, schema);
+  };
+  const callRepair = (rawName, messages, schema) => {
+    guard(repair.model, repair.maxTokens, rawName, messages);
+    return makeCaller({ model: repair.model, maxTokens: repair.maxTokens, maxRub: budget, outDir, runId, state, schemaName: repair.mode === "targeted" ? "sergey_zoya_patch" : "sergey_zoya_article", generate })(rawName, messages, schema);
+  };
   const callTier = repair.mode === "tiered" ? ((tier, name, messages, schema, options = {}) => {
     const configured = tier === "strong" ? repair.strongMaxTokens : repair.cheapMaxTokens;
+    const callMaxTokens = options.maxTokens ?? configured;
+    const callModel = tier === "strong" ? repair.strongModel : repair.cheapModel;
+    guard(callModel, callMaxTokens, name, messages);
     const caller = makeCaller({
-      model: tier === "strong" ? repair.strongModel : repair.cheapModel,
-      maxTokens: options.maxTokens ?? configured,
+      model: callModel,
+      maxTokens: callMaxTokens,
       maxRub: budget, outDir, runId, state, schemaName: "sergey_zoya_fragment", generate,
     });
     return caller(name, messages, schema);
@@ -174,6 +191,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
     const items = [];
     const callIds = new Set();
     for (const brief of pack.articles) {
+      state.articleSlug = brief.slug;
       const cfg = ruleConfig(brief, date, pool);
       const avoid = [
         ...ctx.unique.headings.keys(),
@@ -350,7 +368,7 @@ export function szReportMarkdown(state) {
       `Готовых статей: ${pack.finished}/${pack.total}`,
       `Стоимость готовых: ${formatRub(pack.finishedCostRub)}`,
       `Всего по статьям: ${formatRub(pack.spentRub)}`,
-      pack.costPerFinished == null ? "Цена одной готовой статьи: нет готовых" : `Цена одной готовой статьи: ${formatRub(pack.costPerFinished)}`,
+      pack.costPerAccepted == null ? "Цена одной принятой статьи: нет принятых" : `Цена одной принятой статьи: ${formatRub(pack.costPerAccepted)} (все генерации и починки / принятые)`,
       "",
     );
   }
@@ -371,8 +389,15 @@ export function repairSzArticle({ brief, raw, build, messages, schema = szArticl
     try {
       const answer = callRepair(writerCallId(`${brief.slug}-repair`), target?.messages ?? buildSzRepairMessages(messages, raw, result.problems), target?.schema ?? schema);
       const rejection = target ? szRepairPatchRejection(raw, answer, target.schema, brief) : null;
-      const repaired = rejection ? null : target ? applySzRepairPatch(raw, answer, target.schema, brief) : answer;
-      if (repaired) {
+      const candidate = rejection ? null : target ? applySzRepairPatch(raw, answer, target.schema, brief) : answer;
+      const dropped = Boolean(candidate) && articleDropsRequired(raw, candidate, brief);
+      const repaired = dropped ? null : candidate;
+      if (dropped) {
+        repairSkipped = "rejected: обязательные элементы пропали";
+        const warning = `${brief.slug}: ${repairSkipped} – исходный вариант сохранён`;
+        state.warnings.push(warning);
+        log(warning);
+      } else if (repaired) {
         raw = repaired;
         result = build(raw);
         errors = result.problems.filter((problem) => problem.severity === "error");

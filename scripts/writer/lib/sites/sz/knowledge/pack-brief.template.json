@@ -14,7 +14,7 @@
       "faqHints": [
         { "match": "<фрагмент вопроса>", "stance": "нет" }
       ],
-      "examplePhrases": { "min": 8, "max": 12 },
+      "examplePhrases": { "min": 10, "max": 10 },
       "title": "<H1: запрос + уточнение, до 60 знаков для seoTitle>",
       "topic": "napravleniya-ezoteriki",
       "intent": "<что читатель хочет понять или сделать>",

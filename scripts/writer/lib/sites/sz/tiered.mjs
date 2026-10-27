@@ -7,7 +7,7 @@ import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
-import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, phraseInProse, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
+import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, examplePhraseDefect, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, phraseInProse, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
   "Ты – Зоя Петрова. Пиши по-русски, на «вы», тепло и ясно.",
@@ -606,6 +606,42 @@ function existingParagraphs(fields, replacing) {
   });
 }
 
+function examplePhrasesInFields(fields) {
+  const phrases = [];
+  let heading = false;
+  const sections = [...(fields?.sectionsBefore ?? []), ...(fields?.sectionsAfter ?? [])];
+  if (fields?.tableSection) sections.push(fields.tableSection);
+  for (const section of sections) {
+    if (!/пример/iu.test(section?.title ?? "")) continue;
+    heading = true;
+    const blobs = [...(section.paragraphs ?? []), ...(section.paragraphsBefore ?? []), ...(section.paragraphsAfter ?? [])];
+    for (const blob of blobs) {
+      for (const line of String(blob).split("\n")) {
+        const item = line.match(/^(?:[-*] |\d+\. )(.+)/);
+        if (item) phrases.push(item[1].trim());
+      }
+    }
+  }
+  return { heading, phrases };
+}
+
+/** True when the repaired article loses a mandatory link, query, anchor, query form or examples block the previous text had. */
+export function articleDropsRequired(before, after, brief) {
+  const sourceTexts = [];
+  const nextTexts = [];
+  collectText(before, sourceTexts);
+  collectText(after, nextTexts);
+  if (fragmentDropsRequired(sourceTexts.join("\n"), nextTexts.join("\n"), brief)) return true;
+  const query = String(brief?.query ?? "");
+  if (query && phraseInProse(sourceTexts.join("\n"), query) && !phraseInProse(nextTexts.join("\n"), query)) return true;
+  const had = examplePhrasesInFields(before);
+  const got = examplePhrasesInFields(after);
+  const floor = brief?.examplePhrases?.min ?? 10;
+  if (had.heading && had.phrases.length >= floor && (!got.heading || got.phrases.length < had.phrases.length)) return true;
+  if (had.phrases.length && had.phrases.every((phrase) => !examplePhraseDefect(phrase)) && got.phrases.some((phrase) => examplePhraseDefect(phrase))) return true;
+  return false;
+}
+
 /** True when the new fragment drops an extra query, required /s/ slug or brief anchor that the old text had. */
 export function fragmentDropsRequired(before, after, brief) {
   const source = String(before ?? "");
@@ -657,7 +693,9 @@ function fragment(brief, key, instructions, schema, apply, replacing = "") {
     apply: (current, answer) => {
       const value = coerceFragment(answer);
       if (repairOutputRejected(value, brief, current, replacing)) return null;
-      return apply(current, value);
+      const next = apply(current, value);
+      if (next && articleDropsRequired(current, next, brief)) return null;
+      return next;
     },
   };
 }

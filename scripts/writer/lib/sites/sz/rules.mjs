@@ -480,12 +480,11 @@ function properNames(text) {
   return found;
 }
 
-/**
- * A later section retells the opening story: many of the same content tokens,
- * the same word pairs (shards), or a named character plus a smaller overlap.
- * The approved angel article stays under every threshold.
- */
-export function sectionRetellsStory(story, section) {
+function retellSentences(text) {
+  return String(text ?? "").split(/(?<=[.!?…])\s+/u).map((sentence) => sentence.trim()).filter((sentence) => /[\p{L}\p{N}]/u.test(sentence));
+}
+
+function retellOverlap(story, section) {
   const left = retellTokens(story);
   const right = retellTokens(section);
   const a = new Set(left);
@@ -503,6 +502,18 @@ export function sectionRetellsStory(story, section) {
   if (sharedShards >= 5 && shardRatio >= 0.18) return true;
   if (names.length && shared.length >= 6 && ratio >= 0.15) return true;
   return false;
+}
+
+/**
+ * A later section retells the opening story: the same plot after the first sentence,
+ * not a shared opening formula. The approved angel article stays under every threshold.
+ */
+export function sectionRetellsStory(story, section) {
+  if (!retellOverlap(story, section)) return false;
+  const storyRest = retellSentences(story).slice(1).join(" ");
+  const sectionRest = retellSentences(section).slice(1).join(" ");
+  if (!storyRest.trim() || !sectionRest.trim()) return false;
+  return retellOverlap(storyRest, sectionRest);
 }
 
 const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["два", 2], ["две", 2], ["три", 3], ["четыре", 4], ["пять", 5], ["шесть", 6], ["семь", 7], ["восемь", 8], ["девять", 9], ["десять", 10]];
@@ -741,6 +752,29 @@ export function ungrammaticalLinks(text) {
   return hits;
 }
 
+const EXAMPLE_ITEM = /^(?:[-*] |\d+\. )(.+)$/gm;
+const EXAMPLE_PAST = new RegExp(String.raw`${NOT_WORD}(?:был[аои]?|стал[аои]?|сказал[аои]?|подумал[аои]?|произошл[аои]|случил[аои]сь|получил[аои]?)${WORD_END}`, "iu");
+const EXAMPLE_NEGATIVE = new RegExp(String.raw`${NOT_WORD}(?:не|нет|никогда|нельзя|страх|боюсь|боль|тревог\p{L}*|дискомфорт)${WORD_END}`, "iu");
+
+export function examplePhraseLines(markdown) {
+  const phrases = [];
+  for (const section of String(markdown ?? "").split(/(?=^## )/m)) {
+    const title = section.match(/^## (.+)$/m)?.[1] ?? "";
+    if (!/пример/iu.test(title)) continue;
+    for (const match of section.matchAll(EXAMPLE_ITEM)) phrases.push(match[1].trim());
+  }
+  return phrases;
+}
+
+/** A usable affirmation: at least 3 words, present (no past verb), no negative priming. */
+export function examplePhraseDefect(phrase) {
+  const text = String(phrase ?? "").trim();
+  if (words(text) < 3) return "короче 3 слов";
+  if (EXAMPLE_PAST.test(text)) return "прошедшее время";
+  if (EXAMPLE_NEGATIVE.test(text)) return "отрицание или тяжёлое слово";
+  return "";
+}
+
 export function examplePhraseStats(markdown) {
   let heading = false;
   let count = 0;
@@ -764,6 +798,44 @@ const META_QUESTION_LABEL = /(?:^|\n)[ \t]*Вопрос:[ \t]*«/g;
 export function metaQueryLeftovers(text) {
   const source = String(text ?? "");
   return [...source.matchAll(META_QUERY), ...source.matchAll(META_QUESTION_LABEL)].map((match) => match[0].trim());
+}
+
+const ENGLISH_NOTE = /\b(?:Wait|FIXME|TODO|NOTE)\b|\bmust\s+not\s+include\b/iu;
+const ENGLISH_RUN = /(?:^|[^\p{L}])([A-Za-z]{2,}(?:\s+[A-Za-z]{2,}){3,})/u;
+
+/** Editor notes and English sentences left in the prose. Tags, urls and slugs are ignored. */
+export function englishLeftovers(text) {
+  const source = String(text ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\]\([^)]*\)/g, " ")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/\/[A-Za-z0-9_./-]+/g, " ");
+  const hits = [];
+  const note = source.match(ENGLISH_NOTE);
+  if (note) hits.push(note[0]);
+  const run = source.match(ENGLISH_RUN);
+  if (run) hits.push(run[1]);
+  return hits;
+}
+
+const FAQ_NEGATION = /^(?:нет|нельзя|не стоит|не нужно)(?![\p{L}\p{N}])/iu;
+
+/**
+ * A FAQ answer that opens with a refusal while the body already states the same
+ * content words without that refusal. Ordinary answers that do not start with
+ * «нет» / «нельзя» are left alone.
+ */
+export function faqContradictsBody(question, answer, body) {
+  const reply = String(answer ?? "").trim();
+  if (!FAQ_NEGATION.test(reply)) return false;
+  const keys = normalize(question).split(/\s+/).filter((word) => word.length >= 5).slice(0, 6);
+  if (keys.length < 2) return false;
+  const need = Math.min(3, keys.length);
+  return String(body ?? "").split(/(?<=[.!?…])\s+/u).some((sentence) => {
+    if (FAQ_NEGATION.test(sentence.trim())) return false;
+    const hay = normalize(sentence);
+    return keys.filter((key) => hay.includes(key)).length >= need;
+  });
 }
 
 export function faqStanceMismatch(question, answer, hints) {
@@ -1480,16 +1552,23 @@ export function checkSzArticle(md, cfg, env) {
     if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
     if (faqAnswerTypeMismatch(q, a)) add("faq-answer-type", "faq", `ответ на «${q}» начинается как да/нет, а вопрос открытый`);
     if (faqStanceMismatch(q, a, cfg.faqHints)) add("faq-stance", "faq", `ответ на «${q}» противоречит позиции брифа «${(cfg.faqHints ?? []).find((hint) => normalize(q).includes(normalize(hint.match)))?.stance ?? ""}»`, "warn");
+    if (faqContradictsBody(q, a, mainBody)) add("faq-contradiction", "faq", `ответ на «${q}» отрицает то, что основная часть уже говорит`);
   }
   const faqText = faq.flat().join("\n");
 
   // ── links ──
   const proseBeforeFaq = body.slice(0, pFaq);
   const proseLinks = markdownLinks(proseBeforeFaq).filter((link) => link.slug);
-  if (proseLinks.length < L.contextualLinks[0] || proseLinks.length > L.contextualLinks[1]) add("links-contextual", "sections", `${proseLinks.length} ссылок /s в тексте, нужно ${L.contextualLinks[0]}–${L.contextualLinks[1]}`);
-  for (const slug of cfg.requiredSlugs ?? []) {
-    if (slug && !proseLinks.some((link) => link.slug === slug)) add("links-required", "sections", `нет обязательной ссылки /s/${slug} в тексте до FAQ`);
+  const requiredLinks = [...new Set((cfg.requiredSlugs ?? []).filter(Boolean))];
+  const linkMin = requiredLinks.length || L.contextualLinks[0];
+  const linkMax = L.contextualLinks[1];
+  const linkSlugs = proseLinks.map((link) => link.slug);
+  const missingLinks = requiredLinks.filter((slug) => !linkSlugs.includes(slug));
+  const extraLinks = [...new Set(linkSlugs.filter((slug) => requiredLinks.length && !requiredLinks.includes(slug)))];
+  if (linkSlugs.length < linkMin || linkSlugs.length > linkMax || missingLinks.length || extraLinks.length) {
+    problems.push({ code: "links-contextual", field: "sections", message: `${linkSlugs.length} ссылок /s в тексте, нужно ${linkMin}–${linkMax}`, severity: "error", actual: linkSlugs.length, min: linkMin, max: linkMax });
   }
+  for (const slug of missingLinks) add("links-required", "sections", `нет обязательной ссылки /s/${slug} в тексте до FAQ`);
   for (const item of linkAnchorMismatches(proseBeforeFaq, cfg.linkAnchors)) {
     const actual = item.found?.length ? item.found.join(", ") : "ссылки нет";
     add("links-map", "sections", `анкор «${item.anchor}» должен вести на ${item.href}, сейчас: ${actual}`);
@@ -1597,6 +1676,13 @@ export function checkSzArticle(md, cfg, env) {
     const { min, max } = cfg.examplePhrases;
     if (!examples.heading) add("example-count", "sections", `нет раздела H2 «примеры фраз» (${min}–${max} фраз)`);
     else if (examples.count < min || examples.count > max) add("example-count", "sections", `примеров фраз ${examples.count}, нужно ${min}–${max}`);
+    for (const phrase of examplePhraseLines(mainBody)) {
+      const defect = examplePhraseDefect(phrase);
+      if (defect) add("example-phrase", "sections", `фраза-пример «${phrase.slice(0, 60)}»: ${defect}`);
+    }
+  }
+  for (const hit of englishLeftovers(`${body}\n${faqText}`)) {
+    add("english-note", "sections", `английская заметка в тексте: «${hit.slice(0, 80)}»`);
   }
   for (const duplicated of duplicateParagraphs(body)) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
   for (const verbatim of cfg.verbatim ?? []) {

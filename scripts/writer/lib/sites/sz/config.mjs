@@ -32,8 +32,13 @@ export const SZ = {
     description: [140, 160],
     mainQuery: [2, 4],
     bodyH2: [4, 6],
+    // One rule for the brief, the draft prompt and the gate: a brief lists at most this
+    // many contextual links, and the gate requires exactly that set.
     contextualLinks: [2, 5],
   },
+  // Control run: 12 ₽ stops one article, 120 ₽ stops the run. Charged rubles, not a new model.
+  articleRubCap: 12,
+  runRubCap: 120,
 };
 
 // Trial 2026-10 (gpt-5.4-mini, paid pack, 0/3 passed): main body 683/809/786 vs gate 880.

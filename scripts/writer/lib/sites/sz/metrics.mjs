@@ -80,17 +80,26 @@ export function szQuantityReport(fields, problems = [], packProblems = []) {
   return { failures, sections, h2: szH2Count(fields) };
 }
 
-/** Cost of finished (gate-passing) articles. Failed articles stay in spentRub only. */
+/** Accepted-article price is every charged ruble (failed drafts included) divided by the number that passed. */
 export function szPackCost(articles = []) {
   const withCost = articles.filter((article) => typeof article.costRub === "number");
   const finished = withCost.filter((article) => article.passed);
   const finishedCostRub = finished.reduce((sum, article) => sum + article.costRub, 0);
   const spentRub = withCost.reduce((sum, article) => sum + article.costRub, 0);
+  const costPerAccepted = finished.length ? spentRub / finished.length : null;
   return {
     finished: finished.length,
     total: withCost.length,
     finishedCostRub,
     spentRub,
-    costPerFinished: finished.length ? finishedCostRub / finished.length : null,
+    costPerFinished: costPerAccepted,
+    costPerAccepted,
   };
+}
+
+/** Hard stop for the control run: 12 ₽ on one article, 120 ₽ on the run. The first call of an article is allowed. */
+export function szSpendAllowed({ spentRub = 0, articleSpentRub = 0, worst = 0, articleCap = 12, runCap = 120 } = {}) {
+  if (spentRub >= runCap || spentRub + worst > runCap) return "run";
+  if (articleSpentRub >= articleCap || (articleSpentRub > 0 && articleSpentRub + worst > articleCap)) return "article";
+  return "ok";
 }
