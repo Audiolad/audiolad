@@ -4,6 +4,7 @@
  *
  *   npx tsx scripts/writer/run.mjs --brief path/to/brief.json [--model openai/gpt-oss-120b]
  *        [--dry-run] [--no-repair] [--offline] [--article file.json] [--max-rub 3]
+ *        sz one draft is the default. A second Cloud.ru call needs --paid-repair and --repair-mode.
  *
  * Generation happens only on the Moscow host (Cloud.ru key never leaves it). The pipeline
  * validates, converts, runs checks, scans for secrets and opens a draft PR. It never merges
@@ -44,6 +45,7 @@ const { values: args } = parseArgs({
     "tier-cheap-budget": { type: "string" },
     "tier-strong-budget": { type: "string" },
     "no-repair": { type: "boolean", default: false },
+    "paid-repair": { type: "boolean", default: false },
     offline: { type: "boolean", default: false },
     article: { type: "string" },
     "max-rub": { type: "string", default: "3" },
@@ -78,7 +80,8 @@ if (args.help || (!args.brief && !szMode) || (szMode && !args.briefs && !args.br
   process.stdout.write([
     "Использование: npx tsx scripts/writer/run.mjs --brief brief.json [--model M] [--dry-run] [--no-repair] [--offline] [--article a.json] [--max-rub 3]",
     "  sergey-zoya.ru: --site sz --repo <клон sergey-zoya-site> --briefs pack.json [--experts EXPERTS_RU.md] [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 3]",
-    "                  [--repair-model M] [--repair-max-tokens N] [--repair-mode full|targeted|tiered]",
+    "                  По умолчанию один черновик: код правит структуру, гейт, остаток – в отчёт доводчику.",
+    "                  Второй вызов Cloud.ru только так: [--paid-repair] [--repair-model M] [--repair-max-tokens N] [--repair-mode full|targeted|tiered]",
     "                  [--tier-cheap-model M] [--tier-strong-model M] [--tier-cheap-tries N]",
     "                  [--tier-cheap-max-tokens N] [--tier-strong-max-tokens N]",
     "                  [--tier-cheap-budget RUB] [--tier-strong-budget RUB]",
@@ -88,7 +91,7 @@ if (args.help || (!args.brief && !szMode) || (szMode && !args.briefs && !args.br
   ].join("\n"));
   process.exit(args.help ? 0 : 1);
 }
-if (!szMode && ["repair-model", "repair-max-tokens", "repair-mode", "tier-cheap-model", "tier-strong-model", "tier-cheap-tries", "tier-cheap-max-tokens", "tier-strong-max-tokens", "tier-cheap-budget", "tier-strong-budget"].some((flag) => args[flag] !== undefined)) {
+if (!szMode && ["repair-model", "repair-max-tokens", "repair-mode", "paid-repair", "tier-cheap-model", "tier-strong-model", "tier-cheap-tries", "tier-cheap-max-tokens", "tier-strong-max-tokens", "tier-cheap-budget", "tier-strong-budget"].some((flag) => args[flag] !== undefined && args[flag] !== false)) {
   process.stderr.write("Флаги repair и tier доступны только для --site sz\n");
   process.exit(1);
 }

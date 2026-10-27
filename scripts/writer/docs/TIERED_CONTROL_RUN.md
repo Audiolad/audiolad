@@ -7,11 +7,13 @@
 
 Промпт разрешал 1–2 раздела по 2 абзаца около 60 слов плюс короткие шаги. Нижняя
 граница этих подсказок складывается примерно в 700 слов, а JSON-схема ограничивает
-только сверху. Гейт при этом требует 880–1400. Черновики 683 / 809 / 786 – это
+только сверху. Гейт при этом требовал 880–1400. Черновики 683 / 809 / 786 – это
 законченный короткий JSON, а не обрезка по `--max-tokens`: значения по умолчанию
-16000 хватает на статью около 1000 слов. Промпт теперь задаёт цель 950–1100
-(середина диапазонов разделов плюс служебный текст сборки ≈ 1066 слов) и ровно
-5 H2. Гейт не снижен.
+16000 хватает на статью около 1000 слов. Промежуточная цель 950–1100 не удержала
+gpt-5.4-mini: контрольные тела пакетов 14+15 сели в 521–763 слова при потолке
+выхода 9000 токенов, который в 12 ₽ ещё помещался. Сейчас промпт задаёт цель
+1100–1300 (середина около 1200) и около 5 H2 (гейт 4–6). Гейт принимает 880–1600. Разбор
+токенов – в `FACTORY_FIX_RU.md`.
 
 ## Профиль оценки одной статьи
 
@@ -46,7 +48,7 @@ mini ≈ 16,0 ₽. Оценка не знает, пройдёт ли модел�
 ```bash
 # 1. gpt-oss. Ожидание без сильного фрагмента ≈ 0,9 ₽, с одним ≈ 6,0 ₽. Потолок 12 ₽.
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model openai/gpt-oss-120b --repair-mode tiered \
+  --model openai/gpt-oss-120b --paid-repair --repair-mode tiered \
   --tier-cheap-model openai/gpt-oss-120b --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 4 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
@@ -54,7 +56,7 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 
 # 2. Qwen. Ожидание ≈ 8,8 ₽, с одним сильным фрагментом ≈ 13,9 ₽. Потолок 18 ₽.
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model Qwen/Qwen3.6-35B-A3B --repair-mode tiered \
+  --model Qwen/Qwen3.6-35B-A3B --paid-repair --repair-mode tiered \
   --tier-cheap-model Qwen/Qwen3.6-35B-A3B --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 6 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
@@ -62,7 +64,7 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 
 # 3. gpt-5.4-mini. Ожидание ≈ 10,8 ₽, с сильным фрагментом ≈ 16,0 ₽. Потолок 18 ₽.
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model openai/gpt-5.4-mini --repair-mode tiered \
+  --model openai/gpt-5.4-mini --paid-repair --repair-mode tiered \
   --tier-cheap-model openai/gpt-5.4-mini --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 8 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
@@ -77,8 +79,7 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 смотреть `стоимость готовой статьи` и `Цена одной готовой статьи`: туда не
 входят статьи, которые гейт не пропустил.
 
-Дефолты продакшена не меняются: без этих флагов `--site sz` по-прежнему
-`openai/gpt-5.5` и `--repair-mode full`.
+Без `--paid-repair` `--site sz` пишет один черновик моделью по умолчанию `openai/gpt-5.5` и repair не вызывает. Команды выше платные, поэтому в них есть `--paid-repair`.
 
 ## Повторный прогон одной статьи mini после правок 26.10
 
@@ -110,12 +111,11 @@ npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pac
 
 ```bash
 npx tsx scripts/writer/run.mjs --site sz --repo ../sergey-zoya-site --briefs pack-one.json \
-  --model openai/gpt-5.4-mini --repair-mode tiered \
+  --model openai/gpt-5.4-mini --paid-repair --repair-mode tiered \
   --tier-cheap-model openai/gpt-5.4-mini --tier-strong-model openai/gpt-5.5 \
   --tier-cheap-tries 2 --tier-cheap-budget 8 --tier-strong-budget 6 \
   --tier-strong-max-tokens 800 \
   --max-rub 12
 ```
 
-Дефолты продакшена и для этого прогона не меняются: без флагов `--site sz`
-по-прежнему `openai/gpt-5.5` и `--repair-mode full`.
+Без `--paid-repair` прогон sz делает один черновик и не вызывает repair. Модель по умолчанию для `--site sz` по-прежнему `openai/gpt-5.5`. Этот контрольный прогон платный, поэтому в команде стоят оба флага: `--paid-repair --repair-mode tiered`.

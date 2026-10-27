@@ -1,12 +1,14 @@
-// Tiered repair (--repair-mode tiered only). Deterministic fixes, then one failing
-// fragment at a time on the cheap model, then GPT-5.5 for that fragment after N
-// misses. The full article is never the request. The full gate runs after each apply.
+// Tiered repair (--paid-repair --repair-mode tiered only). Deterministic fixes always run.
+// The model loop (cheap fragment, then GPT-5.5 after N misses, including a truncated retry)
+// runs only when args["paid-repair"] is set. The full article is never the request.
+// The full gate runs after each apply. Without the flag, remaining errors are for the finisher.
 import { BudgetError } from "../../call.mjs";
 import { estimatePromptTokens, worstCaseRub } from "../../cost.mjs";
 import { writerCallId } from "../../moscow.mjs";
 import { SZ, SZ_BODY_PLAN } from "./config.mjs";
 import { normalizeSzFields } from "./assemble.mjs";
 import { szH2Count, szQuantityReport } from "./metrics.mjs";
+import { applyStructuralFixes } from "./post.mjs";
 import { DISCOMFORT_PATTERNS, MIXED_SCRIPT, PROMISE, SITE_DISCOMFORT, SUMMONING, alignListCount, allowedSiteAddress, anchorHasBrackets, danglingFragment, descriptionOpensWithQuotedQuery, examplePhraseDefect, faqAnswerTypeMismatch, fieldProseDefect, genericLinkAnchor, gluedLeadBodyLength, hasGluedLead, isSpecialistQuestion, markdownLinks, normalize, outgoingAddressProblems, paragraphTokens, paragraphsTooClose, phraseInProse, protectedDiffFragments, protectedRemovalOk, sectionRetellsStory, words } from "./rules.mjs";
 
 const FRAGMENT_SYSTEM = [
@@ -227,8 +229,15 @@ export function fragmentBanned(value, brief) {
   return (brief?.forbiddenPhrases ?? []).some((phrase) => phrase && norm.includes(normalize(phrase)));
 }
 
+/** Paid Cloud.ru repair. Off unless the run passes `--paid-repair`. `--no-repair` and `--offline` still win. */
+export function modelRepairAllowed(args = {}) {
+  return args["paid-repair"] === true && !args.offline && !args["no-repair"];
+}
+
 /** Programmatic fixes. Returns the same fields when nothing was safe to change. */
-export function applyDeterministicSzFixes(fields, { query = "", links = null } = {}) {
+export function applyDeterministicSzFixes(fields, options = {}) {
+  const query = options.query ?? "";
+  const links = options.links ?? null;
   const fixes = [];
   let next = mapStrings(structuredClone(fields), (text) => {
     const glyphs = fixMixedHomoglyphs(text);
@@ -290,6 +299,18 @@ export function applyDeterministicSzFixes(fields, { query = "", links = null } =
     });
     if (slugFixes) fixes.push("полукириллический slug приведён к ссылке из брифа");
   }
+  const structural = applyStructuralFixes(next, {
+    links,
+    titles: options.titles,
+    examplePhrases: options.examplePhrases,
+    additionalQueries: options.additionalQueries,
+    facts: options.facts,
+    practice: options.practice,
+    query,
+    forbiddenPhrases: options.forbiddenPhrases,
+  });
+  next = structural.fields;
+  fixes.push(...structural.notes);
   const removed = dropDuplicateParagraphs(next);
   if (removed) fixes.push(removed === 1 ? "повтор абзаца удалён" : `повторы абзацев удалены: ${removed}`);
   if (typeof next.checklist?.title === "string" && Array.isArray(next.checklist.items)) {
@@ -1708,12 +1729,22 @@ function annotateProtectedDiff(draftMd, result) {
  * A truncated cheap call is retried once with a larger cap and still counts as one try.
  * Protected paragraphs are compared with the draft: only a cut made by the repair is a fragment.
  */
-export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set(), unique = null }) {
+export function repairSzArticleTiered({ brief, raw, build, repair, callTier, state = { spentRub: 0, calls: [], warnings: [] }, args = {}, callIds = new Set(), unique = null, checklistUsed = null }) {
   const errorsOf = (result) => result.problems.filter((problem) => problem.severity === "error");
   const draftMd = build(raw).md;
   const gate = (value) => annotateProtectedDiff(draftMd, build(value));
+  const seenChecklist = checklistUsed ?? new Set(unique?.checklist?.keys?.() ?? []);
   const settle = (value) => {
-    const deterministic = applyDeterministicSzFixes(value, { query: brief.query, links: brief.links });
+    const deterministic = applyDeterministicSzFixes(value, {
+      query: brief.query,
+      links: brief.links,
+      examplePhrases: brief.examplePhrases,
+      additionalQueries: brief.additionalQueries,
+      facts: brief.facts,
+      practice: brief.practice,
+      forbiddenPhrases: brief.forbiddenPhrases,
+      checklistUsed: seenChecklist,
+    });
     const next = deterministic.fields;
     return { fields: next, result: gate(next), fixes: [...deterministic.fixes] };
   };
@@ -1726,7 +1757,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
   const cheapTries = new Map();
   const strongTries = new Map();
   const descriptionDrafts = new Map();
-  const allowModel = !args.offline && !args["no-repair"];
+  const allowModel = modelRepairAllowed(args);
   const maxRounds = repair.maxRounds ?? 12;
   for (let round = 0; round < maxRounds && allowModel && errorsOf(result).length; round += 1) {
     const failures = bindQualityPaths(fields, brief, locatePhraseFailures(fields, szQuantityReport(fields, errorsOf(result)).failures));
@@ -1858,7 +1889,7 @@ export function repairSzArticleTiered({ brief, raw, build, repair, callTier, sta
     result,
     errors,
     errorsBeforeRepair,
-    repairSkipped: errors.length ? errors.map((error) => `${error.field}: ${error.message}`).join("; ") : null,
+    repairSkipped: errors.length ? (allowModel ? errors.map((error) => `${error.field}: ${error.message}`).join("; ") : "finisher") : null,
     passed: errors.length === 0,
     deterministic: deterministic.fixes,
     attempts,
@@ -1887,7 +1918,7 @@ function cheapSpent(items, state, slug = null) {
 }
 
 export function repairSzPackDuplicates({ items, repair, callTier, state, args = {}, callIds = new Set() }) {
-  if (args.offline || args["no-repair"]) return;
+  if (!modelRepairAllowed(args)) return;
   const seen = new Set();
   const packCap = repair.cheapBudget * Math.max(items.length, 1);
   for (const item of items) {

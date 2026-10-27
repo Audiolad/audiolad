@@ -22,7 +22,8 @@ export const SZ = {
   topics: ["napravleniya-ezoteriki", "vera-i-nauka", "znaki-i-simvoly"],
   limits: {
     story: [200, 400],
-    mainBody: [880, 1400],
+    // Prompt asks for about 1200. The gate still accepts 880 and keeps a sane ceiling.
+    mainBody: [880, 1600],
     total: [1600, 2200],
     faqAnswer: [40, 80],
     faqCount: 5,
@@ -41,35 +42,43 @@ export const SZ = {
   runRubCap: 120,
 };
 
-// Trial 2026-10 (gpt-5.4-mini, paid pack, 0/3 passed): main body 683/809/786 vs gate 880.
-// The previous prompt allowed 1–2 sections of 2 paragraphs × ~60 words plus short steps.
-// That low end is ~700 words, and the JSON schema only has upper bounds, so a finished
-// short JSON still validates. Default --max-tokens 16000 fits ~1000 words; those drafts
-// were short on purpose, not cut off. The band below sits inside the gate with margin.
+// Control 14+15 (gpt-5.4-mini, --max-tokens 9000): bodies landed at 521–763 words.
+// A ~25k-token prompt fit into the 12 ₽ cap leaves ~9450 output tokens, enough for
+// well over 1200 Russian words, so the drafts were short because the prompt's old
+// midpoint sat near 1000 and the model undershot it. The band below aims at ~1200.
+// The gate still accepts 880–1600.
 const rangeMid = ([min, max]) => (min + max) / 2;
 export const SZ_BODY_PLAN = {
-  target: [950, 1100],
-  sectionsBefore: { count: 2, wordsEach: [220, 250] },
-  tableProse: [80, 100],
-  stepsIntro: [40, 56],
-  stepText: [70, 80],
+  target: [1100, 1300],
+  // One of the two sections is the example list (~80 words). The other is prose.
+  // Both at 260–300 would either pad the list back into a retelling or miss 1200.
+  sectionsBefore: { count: 2, wordsEach: [390, 450] },
+  exampleList: [70, 90],
+  tableProse: [90, 110],
+  stepsIntro: [50, 60],
+  stepText: [100, 120],
   sectionsAfter: 0,
-  specialistIntro: [46, 60],
+  specialistIntro: [50, 60],
   h2: 5,
   // Headings, table cells, specialist items, phones and disclaimer are inside the gate's
   // main-body count and are not part of the paragraph budgets above.
-  chromeWords: 180,
+  chromeWords: 160,
 };
 
 export function szBodyPlanBudget(plan = SZ_BODY_PLAN) {
-  const prose = (bound) => plan.sectionsBefore.count * plan.sectionsBefore.wordsEach[bound]
+  const proseSections = plan.exampleList ? Math.max(0, plan.sectionsBefore.count - 1) : plan.sectionsBefore.count;
+  const prose = (bound) => proseSections * plan.sectionsBefore.wordsEach[bound]
+    + (plan.exampleList?.[bound] ?? 0)
     + plan.tableProse[bound]
     + plan.stepsIntro[bound]
     + 3 * plan.stepText[bound]
     + plan.specialistIntro[bound];
   const low = prose(0) + plan.chromeWords;
   const high = prose(1) + plan.chromeWords;
-  const mid = plan.sectionsBefore.count * rangeMid(plan.sectionsBefore.wordsEach)
+  // Mid uses the same split as the bounds: one prose section plus the example list.
+  // Counting both sections at the prose midpoint would land near 1540 and miss the 1200 target.
+  const mid = proseSections * rangeMid(plan.sectionsBefore.wordsEach)
+    + (plan.exampleList ? rangeMid(plan.exampleList) : 0)
     + rangeMid(plan.tableProse)
     + rangeMid(plan.stepsIntro)
     + 3 * rangeMid(plan.stepText)

@@ -1,6 +1,7 @@
 // `--site sz`: a pack of up to 5 sergey-zoya.ru articles → ONE draft PR to Audiolad/sergey-zoya-site.
 // Flow: pack brief → clean worktree of the site's origin/main → per article: prompt (fields JSON)
-// → assemble fixed blocks → site rules → one repair → pack checks (rotation, uniqueness) →
+// → assemble fixed blocks → site rules → code-only fixes, then the gate. A second Cloud.ru
+// call happens only with --paid-repair and an explicit --repair-mode. Pack checks →
 // apply (articles, OG, story openings, canonical counter, stage gate, SEO report) → local site
 // checks vs clean-main baseline → commit → secret scan → draft PR. Never merges or deploys.
 import { fileURLToPath } from "node:url";
@@ -11,13 +12,15 @@ import { BudgetError, makeCaller } from "../../call.mjs";
 import { writerCallId } from "../../moscow.mjs";
 import { SUPPORTED_MODELS, SZ_DEFAULT_MODEL, estimatePromptTokens, formatRub, parseMaxRub, parseMaxTokens } from "../../cost.mjs";
 import { szCallFit, szPackCost } from "./metrics.mjs";
-import { articleDropsRequired, repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
+import { articleDropsRequired, modelRepairAllowed, repairSzArticleTiered, repairSzPackDuplicates } from "./tiered.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "../../publish.mjs";
 import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } from "../../util.mjs";
 import { DISCOMFORT_PATTERNS as BASE_DISCOMFORT } from "../../validate.mjs";
 import { applyPack, ruleConfig } from "./apply.mjs";
 import { assembleSzArticle, normalizeSzFields } from "./assemble.mjs";
 import { loadPack } from "./brief.mjs";
+import { reusedQuoteProblems } from "./pack-audit.mjs";
+import { diversifySharedFaqFields, uniquifySharedChecklist } from "./post.mjs";
 import { checksMarkdown, compareSzChecks, runSzChecks } from "./checks.mjs";
 import { SZ } from "./config.mjs";
 import { loadSzContext } from "./context.mjs";
@@ -44,6 +47,7 @@ export function packView(ctx, pack) {
     }
   }
   for (const slug of siblings.keys()) published.add(slug);
+  problems.push(...reusedQuoteProblems(pack.articles, ctx.unique?.quotations));
   const articles = new Map(ctx.articles);
   for (const [slug, title] of siblings) if (!articles.has(slug)) articles.set(slug, { slug, title, draft: false, listed: true, query: null });
   return { site: { ...ctx, articles }, published, siblings, problems };
@@ -197,6 +201,7 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
     const schema = szArticleSchema();
     const items = [];
     const callIds = new Set();
+    const checklistUsed = new Set(env.unique?.checklist?.keys?.() ?? []);
     for (const brief of pack.articles) {
       state.articleSlug = brief.slug;
       const cfg = ruleConfig(brief, date, pool);
@@ -222,8 +227,9 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         raw = callWriter(writerCallId(`${brief.slug}-generate`), messages, schema);
       }
       if (!raw) throw new SzStop(2, `${brief.slug}: Райтер не вернул JSON`);
-      const repaired = repair.mode === "tiered"
-        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds, unique: env.unique })
+      const structural = repair.mode === "none" || repair.mode === "tiered";
+      const repaired = structural
+        ? repairSzArticleTiered({ brief, raw, build, repair, callTier, state, args, callIds, unique: env.unique, checklistUsed })
         : repairSzArticle({ brief, raw, build, messages, schema, repair, callRepair, state, args });
       const { result, errors, errorsBeforeRepair, repairSkipped } = repaired;
       writeJson(join(outDir, brief.slug, "fields.json"), result.fields);
@@ -236,6 +242,22 @@ export async function runSzPipeline(args, { model, maxRub, maxTokens, generate }
         warnings: result.problems.filter((problem) => problem.severity !== "error"),
       });
       items.push({ brief, cfg, fields: result.fields, md: result.md, build, attempts: repaired.attempts ?? [] });
+    }
+    const checklistChanged = uniquifySharedChecklist(items, env.unique?.checklist);
+    if (diversifySharedFaqFields(items) || checklistChanged) {
+      for (const item of items) {
+        const rebuilt = item.build(item.fields);
+        item.fields = rebuilt.fields;
+        item.md = rebuilt.md;
+        const errors = rebuilt.problems.filter((problem) => problem.severity === "error");
+        const article = state.articles.find((entry) => entry.slug === item.brief.slug);
+        if (!article) continue;
+        article.errors = errors;
+        article.errorsAfterRepair = errors;
+        article.passed = errors.length === 0;
+        article.warnings = rebuilt.problems.filter((problem) => problem.severity !== "error");
+        article.finishedCostRub = article.passed ? article.costRub : null;
+      }
     }
     let packProblems = checkSzPack(items);
     if (repair.mode === "tiered" && packProblems.length) {
@@ -336,9 +358,12 @@ function parseTierTries(raw) {
 
 export function szRepairOptions(args, { model, maxTokens }) {
   const repairModel = args["repair-model"] ?? model;
-  const mode = args["repair-mode"] ?? "full";
-  if (!["full", "targeted", "tiered"].includes(mode)) throw new SzStop(1, "--repair-mode: full, targeted или tiered");
-  const candidates = mode === "tiered"
+  const requested = args["repair-mode"];
+  if (requested !== undefined && !["full", "targeted", "tiered"].includes(requested)) throw new SzStop(1, "--repair-mode: full, targeted или tiered");
+  const paid = args["paid-repair"] === true;
+  if (paid && !requested) throw new SzStop(1, "--paid-repair требует явный --repair-mode full, targeted или tiered");
+  const mode = paid ? requested : "none";
+  const candidates = requested === "tiered" || mode === "tiered"
     ? [model, args["tier-cheap-model"] ?? "openai/gpt-5.4-mini", args["tier-strong-model"] ?? SZ_DEFAULT_MODEL]
     : [model, repairModel];
   for (const candidate of candidates) {
@@ -391,7 +416,7 @@ export function repairSzArticle({ brief, raw, build, messages, schema = szArticl
   log(`${brief.slug}: ошибок ${errors.length}, предупреждений ${result.problems.length - errors.length}`);
   const errorsBeforeRepair = errors;
   let repairSkipped = null;
-  if (errors.length && !args.offline && !args["no-repair"]) {
+  if (errors.length && modelRepairAllowed(args) && (repair.mode === "full" || repair.mode === "targeted")) {
     const target = repair.mode === "targeted" ? buildSzTargetedRepair(brief, raw, result.problems) : null;
     try {
       const answer = callRepair(writerCallId(`${brief.slug}-repair`), target?.messages ?? buildSzRepairMessages(messages, raw, result.problems), target?.schema ?? schema);

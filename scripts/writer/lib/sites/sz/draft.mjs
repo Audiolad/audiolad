@@ -7,7 +7,7 @@ import {
   anchorHasBrackets, faqAnswerTypeMismatch, genericLinkAnchor, hasGluedLead, linkLeadResidue,
   danglingLeads, faqStanceMismatch, firstPersonNarration, linkAnchorMismatches, listPromiseMismatches, markdownLinks,
   paragraphSentenceCount, paragraphsTooClose, phraseInProse, sectionRetellsStory, statedListCount,
-  ungrammaticalLinks, words,
+  examplePhraseDefect, ungrammaticalLinks, words,
 } from "./rules.mjs";
 
 const LINK_FREE = /^(?:story|transition|storyEnding|invitation|question|practiceIntro|checklist|psychologyIntro|experts|specialist|faq|finalInvite|finalQuestion)(?:\.|\[|$)/;
@@ -41,7 +41,7 @@ function quotedBlock(text) {
  * Defects a draft can show before repair. Codes: draft-link-place, draft-link-glue,
  * draft-link-anchor, draft-link-residue, draft-link-missing, draft-retell, draft-duplicate,
  * draft-extra-query, draft-faq-type, draft-faq-stance, draft-steps-count, draft-body-short,
- * draft-body-target, draft-h2, draft-paragraph, draft-dangling, draft-link-map,
+ * draft-body-short, draft-h2, draft-paragraph, draft-dangling, draft-link-map,
  * draft-link-grammar, draft-story-pov, draft-practice-name, draft-example-count.
  * draft-dangling, draft-link-grammar, draft-faq-stance and a count that is not
  * «N шаг/шага/шагов» are hints for one cheap look. They do not fail the publish gate.
@@ -114,6 +114,10 @@ export function draftFieldDefects(fields, article = {}) {
     add("draft-practice-name", "practiceIntro", `нужно дословное название «${practiceTitle}»`);
   }
   if (article.examplePhrases) {
+    const ready = (fields?.exampleCandidates ?? []).filter((phrase) => !examplePhraseDefect(phrase)).length;
+    if (ready >= article.examplePhrases.min && ready <= Math.max(article.examplePhrases.max, 16)) {
+      // Code installs the list. A prose retelling in the section is replaced, so it is not a draft defect.
+    } else {
     const titled = [...(fields?.sectionsBefore ?? []), ...(fields?.sectionsAfter ?? []), fields?.tableSection]
       .filter(Boolean)
       .filter((section) => /пример/iu.test(section.title ?? ""));
@@ -126,6 +130,7 @@ export function draftFieldDefects(fields, article = {}) {
     else if (listed < article.examplePhrases.min || listed > article.examplePhrases.max) {
       add("draft-example-count", "sections", `примеров ${listed}, нужно ${article.examplePhrases.min}–${article.examplePhrases.max}`);
     }
+    }
   }
   const steps = fields?.steps;
   if (steps && statedListCount(steps.title) !== (steps.items ?? []).length) {
@@ -136,14 +141,14 @@ export function draftFieldDefects(fields, article = {}) {
     add("draft-steps-count", "checklist", `«${checklist.title}» не совпадает с ${(checklist.items ?? []).length} пунктами`);
   }
   const proseWords = words(bodyText(fields));
+  // The prompt asks for ~1200. This cheap check only flags a draft the gate itself would reject.
+  // A text already inside 880–1600 is not sent back to a paid repair just to chase the prompt midpoint.
   if (proseWords + SZ_BODY_PLAN.chromeWords < SZ.limits.mainBody[0]) {
-    add("draft-body-short", "sections", `основная часть около ${proseWords + SZ_BODY_PLAN.chromeWords} слов, цель ${SZ_BODY_PLAN.target[0]}–${SZ_BODY_PLAN.target[1]}`);
-  } else if (fields && proseWords + SZ_BODY_PLAN.chromeWords < SZ_BODY_PLAN.target[0]) {
-    add("draft-body-target", "sections", `основная часть около ${proseWords + SZ_BODY_PLAN.chromeWords} слов, черновик должен попасть в ${SZ_BODY_PLAN.target[0]}–${SZ_BODY_PLAN.target[1]}`);
+    add("draft-body-short", "sections", `основная часть около ${proseWords + SZ_BODY_PLAN.chromeWords} слов, гейт ${SZ.limits.mainBody[0]}–${SZ.limits.mainBody[1]} (промпт просит ${SZ_BODY_PLAN.target[0]}–${SZ_BODY_PLAN.target[1]})`);
   }
   // The prompt aims at 5. The gate allows 4–6, and the approved angel article uses 6.
   if (fields && (szH2Count(fields) < SZ.limits.bodyH2[0] || szH2Count(fields) > SZ.limits.bodyH2[1])) {
-    add("draft-h2", "sections", `H2 ${szH2Count(fields)}, нужно ${SZ_BODY_PLAN.h2} (гейт ${SZ.limits.bodyH2[0]}–${SZ.limits.bodyH2[1]})`);
+    add("draft-h2", "sections", `H2 ${szH2Count(fields)}, гейт ${SZ.limits.bodyH2[0]}–${SZ.limits.bodyH2[1]} (промпт целится в ${SZ_BODY_PLAN.h2})`);
   }
   return hits;
 }

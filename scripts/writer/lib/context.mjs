@@ -8,7 +8,7 @@ export const AUDIT_PATH = "docs/seo/operational/VERIFIED_AUDIT.json";
 export const REGISTRY_PATH = "src/lib/seo/articles/registry.ts";
 export const TYPES_PATH = "src/lib/seo/articles/types.ts";
 
-/** Loads the article registry of the given checkout through tsx (the runner is started via `npx tsx`). */
+/** Loads the article registry of the given checkout. The runner must be tsx: `node scripts/writer/writer-unit.mjs` re-invokes tsx, and `npm run writer` already uses it. */
 export async function loadContext(repoDir) {
   const registry = await import(pathToFileURL(join(repoDir, REGISTRY_PATH)).href);
   const articles = registry.listArticleDefinitions().map((article) => ({

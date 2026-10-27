@@ -23,8 +23,8 @@ export function runTests(repoDir) {
 
 export function runChecks(repoDir, changedFiles, baseline) {
   const results = [];
-  const env = { ...process.env, NODE_OPTIONS: "--max-old-space-size=4096" };
-  const tsc = run("node", ["--max-old-space-size=4096", "node_modules/typescript/bin/tsc", "--noEmit"], {
+  const env = { ...process.env, NODE_OPTIONS: "--max-old-space-size=8192" };
+  const tsc = run("node", ["--max-old-space-size=8192", "node_modules/typescript/bin/tsc", "--noEmit"], {
     cwd: repoDir,
     env,
     timeoutMs: 20 * 60 * 1000,
