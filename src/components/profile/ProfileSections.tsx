@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import AuthorUnreadCommentBadge from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import SignOutForm from "@/components/auth/SignOutForm";
 import PwaSettingsMenuItem from "@/components/pwa/PwaSettingsMenuItem";
 import { getProfileApplicationCopy } from "@/lib/profile/application-copy";
@@ -268,12 +269,15 @@ export function ProfileAuthorBlock({ section }: ProfileAuthorSectionProps) {
             </>
           )}
 
-          <Link
-            href={dashboardHref}
-            className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
-          >
-            Открыть кабинет автора
-          </Link>
+          <div className="relative mt-4">
+            <Link
+              href={dashboardHref}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-2.5 text-sm font-medium text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
+            >
+              Открыть кабинет автора
+            </Link>
+            <AuthorUnreadCommentBadge placement="sidebar" />
+          </div>
         </div>
       </section>
     );

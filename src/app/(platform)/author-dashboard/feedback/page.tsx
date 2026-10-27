@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import AuthorListenerFeedback from "@/components/author-dashboard/AuthorListenerFeedback";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
-import { AUTHOR_FEEDBACK_SUBTITLE, AUTHOR_FEEDBACK_TITLE } from "@/lib/practice-comments/copy";
+import { AUTHOR_COMMENTS_SUBTITLE, AUTHOR_COMMENTS_TITLE } from "@/lib/practice-comments/copy";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,7 +23,7 @@ export default async function AuthorFeedbackPage() {
   const authors = await listAuthorWorkspacesForUser(user.id);
   if (authors.length === 0) {
     return (
-      <AuthorShell title={AUTHOR_FEEDBACK_TITLE}>
+      <AuthorShell title={AUTHOR_COMMENTS_TITLE}>
         <div className="rounded-[24px] border border-[#eadff8] bg-white px-5 py-8 text-center">
           <p className="text-[18px] font-semibold">У вас пока нет доступа к кабинету автора.</p>
           <Link href="/profile" className="mt-6 inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-5 text-sm font-semibold text-white">
@@ -36,8 +36,8 @@ export default async function AuthorFeedbackPage() {
 
   return (
     <AuthorShell
-      title={AUTHOR_FEEDBACK_TITLE}
-      subtitle={AUTHOR_FEEDBACK_SUBTITLE}
+      title={AUTHOR_COMMENTS_TITLE}
+      subtitle={AUTHOR_COMMENTS_SUBTITLE}
       internalBackHref="/author-dashboard"
     >
       <Suspense fallback={<p className="text-sm text-[#7d70a2]">Загрузка…</p>}>

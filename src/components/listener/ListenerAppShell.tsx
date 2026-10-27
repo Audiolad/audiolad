@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 
 import BottomNav from "@/components/BottomNav";
+import AuthorUnreadCommentBadge from "@/components/author-dashboard/AuthorUnreadCommentBadge";
 import CatalogMobileFiltersSlot from "@/components/catalog/CatalogMobileFiltersSlot";
 import DesktopShellSearch from "@/components/listener/DesktopShellSearch";
 import DesktopShellWindowScrollGuard from "@/components/listener/DesktopShellWindowScrollGuard";
@@ -78,6 +80,19 @@ export function ListenerAppShell({
                 : "xl:pb-4",
             ].join(" ")}
           >
+            {config.showRightColumn && shellData.authorCta.label === "Кабинет автора" ? (
+              <div className="px-4 pt-3 xl:hidden" data-author-cabinet-mobile="true">
+                <div className="relative">
+                  <Link
+                    href={shellData.authorCta.href}
+                    className="inline-flex h-11 min-h-11 w-full items-center justify-center rounded-[14px] border border-[#e8ddf5] bg-[#faf7fd] px-3 text-sm font-semibold text-[#7042c5]"
+                  >
+                    {shellData.authorCta.label}
+                  </Link>
+                  <AuthorUnreadCommentBadge placement="sidebar" />
+                </div>
+              </div>
+            ) : null}
             <div className={centerContentClassName}>{children}</div>
           </div>
           {config.showDesktopPlayerBar ? <DesktopPlayerBar /> : null}

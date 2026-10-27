@@ -1,21 +1,34 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
+import { publishAuthorUnreadCount } from "@/components/author-dashboard/AuthorUnreadCommentBadge";
+import { parsePracticePublicPath } from "@/lib/products/paths";
 import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import {
-  AUTHOR_FEEDBACK_EMPTY,
-  AUTHOR_FEEDBACK_MARK_READ,
+  AUTHOR_COMMENTS_ALL_PROJECTS,
+  AUTHOR_COMMENTS_EMPTY,
+  AUTHOR_COMMENTS_FILTER_ALL,
+  AUTHOR_COMMENTS_FILTER_NEW,
+  AUTHOR_COMMENTS_FILTER_UNANSWERED,
+  AUTHOR_COMMENTS_MARK_ALL,
+  AUTHOR_COMMENTS_NEW_LABEL,
+  AUTHOR_COMMENTS_OPEN,
   AUTHOR_FEEDBACK_REPLY_PLACEHOLDER,
   LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL,
+  LISTENER_IMPRESSION_LOAD_MORE,
   LISTENER_IMPRESSION_SORT_NEW,
   LISTENER_IMPRESSION_SORT_OLD,
 } from "@/lib/practice-comments/copy";
+import type { AuthorImpressionFilter } from "@/lib/practice-comments/store";
 import type { PublicReplyDto } from "@/lib/practice-comments/types";
 
 type Item = {
   id: string;
   practiceId: string;
+  authorName: string;
+  authorSlug: string;
+  productSlug: string;
   practiceTitle: string;
   practiceHref: string;
   publicName: string;
@@ -29,40 +42,44 @@ type Item = {
 };
 
 type AuthorOption = { id: string; name: string; slug: string };
+type Filter = AuthorImpressionFilter;
 
 export default function AuthorListenerFeedback({
   authors,
 }: {
   authors: AuthorOption[];
 }) {
-  const [authorId, setAuthorId] = useState(authors[0]?.id ?? "");
+  const [authorId, setAuthorId] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<"new" | "old">("new");
   const [items, setItems] = useState<Item[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [markingAll, setMarkingAll] = useState(false);
 
   function applyPage(
-    payload: { comments: Item[]; nextCursor: string | null },
+    payload: { comments: Item[]; nextCursor: string | null; unreadCount?: number },
     append: boolean,
   ) {
     setItems((current) => (append ? [...current, ...payload.comments] : payload.comments));
     setCursor(payload.nextCursor);
     setError(false);
     setLoading(false);
+    if (typeof payload.unreadCount === "number" && !append) {
+      publishAuthorUnreadCount(payload.unreadCount);
+    }
   }
 
   useEffect(() => {
-    if (!authorId) return;
     const controller = new AbortController();
-    const params = new URLSearchParams({ authorId, sort, limit: "10" });
-    fetch(`/api/author/listener-comments?${params}`, {
+    fetch(listUrl(authorId, filter, sort, null), {
       credentials: "same-origin",
       signal: controller.signal,
     })
       .then(async (response) => {
         if (!response.ok) throw new Error("load_failed");
-        return (await response.json()) as { comments: Item[]; nextCursor: string | null };
+        return (await response.json()) as { comments: Item[]; nextCursor: string | null; unreadCount?: number };
       })
       .then((payload) => {
         if (controller.signal.aborted) return;
@@ -74,19 +91,49 @@ export default function AuthorListenerFeedback({
         setLoading(false);
       });
     return () => controller.abort();
-  }, [authorId, sort]);
+  }, [authorId, filter, sort]);
+
+  const markViewed = useCallback((id: string, unreadCount: number | null) => {
+    setItems((current) =>
+      current.map((row) => (row.id === id ? { ...row, unread: false } : row)),
+    );
+    if (typeof unreadCount === "number") publishAuthorUnreadCount(unreadCount);
+  }, []);
+
+  async function markAll() {
+    setMarkingAll(true);
+    try {
+      const response = await fetch("/api/author/listener-comments", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      const payload = (await response.json()) as { unreadCount?: number };
+      if (!response.ok) return;
+      setItems((current) => current.map((item) => ({ ...item, unread: false })));
+      publishAuthorUnreadCount(typeof payload.unreadCount === "number" ? payload.unreadCount : 0);
+    } finally {
+      setMarkingAll(false);
+    }
+  }
 
   return (
-    <div data-author-listener-feedback="true">
-      <div className="flex flex-wrap gap-2">
+    <div data-author-listener-feedback="true" data-author-comments="true">
+      <div className="flex flex-wrap items-center gap-2">
         {authors.length > 1 ? (
           <label className="text-sm text-[#5c4d82]">
             Проект
             <select
               className="ml-2 min-h-11 rounded-full border border-[#e4d7f4] bg-white px-3"
               value={authorId}
-              onChange={(event) => setAuthorId(event.target.value)}
+              data-author-comments-project="true"
+              onChange={(event) => {
+                setLoading(true);
+                setAuthorId(event.target.value);
+              }}
             >
+              <option value="">{AUTHOR_COMMENTS_ALL_PROJECTS}</option>
               {authors.map((author) => (
                 <option key={author.id} value={author.id}>
                   {author.name}
@@ -95,6 +142,18 @@ export default function AuthorListenerFeedback({
             </select>
           </label>
         ) : null}
+        <FilterButton active={filter === "all"} onClick={() => chooseFilter(setFilter, setLoading, "all")}>
+          {AUTHOR_COMMENTS_FILTER_ALL}
+        </FilterButton>
+        <FilterButton active={filter === "new"} onClick={() => chooseFilter(setFilter, setLoading, "new")}>
+          {AUTHOR_COMMENTS_FILTER_NEW}
+        </FilterButton>
+        <FilterButton
+          active={filter === "unanswered"}
+          onClick={() => chooseFilter(setFilter, setLoading, "unanswered")}
+        >
+          {AUTHOR_COMMENTS_FILTER_UNANSWERED}
+        </FilterButton>
         <button
           type="button"
           className={sortButton(sort === "new")}
@@ -115,18 +174,26 @@ export default function AuthorListenerFeedback({
         >
           {LISTENER_IMPRESSION_SORT_OLD}
         </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-full border border-[#e4d7f4] bg-white px-4 text-sm font-semibold text-[#7042c5] disabled:opacity-60"
+          data-author-comments-mark-all="true"
+          disabled={markingAll}
+          onClick={() => void markAll()}
+        >
+          {AUTHOR_COMMENTS_MARK_ALL}
+        </button>
       </div>
       {error ? (
         <div className="mt-4" data-author-feedback-error="true">
-          <p className="text-sm text-[#9a3d55]">Не удалось загрузить отзывы.</p>
+          <p className="text-sm text-[#9a3d55]">Не удалось загрузить комментарии.</p>
           <button
             type="button"
             className="mt-2 min-h-11 text-sm font-semibold text-[#7042c5]"
             onClick={() => {
               setLoading(true);
               setError(false);
-              const params = new URLSearchParams({ authorId, sort, limit: "10" });
-              void fetch(`/api/author/listener-comments?${params}`, { credentials: "same-origin" })
+              void fetch(listUrl(authorId, filter, sort, null), { credentials: "same-origin" })
                 .then(async (response) => {
                   if (!response.ok) throw new Error("load_failed");
                   return (await response.json()) as { comments: Item[]; nextCursor: string | null };
@@ -144,7 +211,7 @@ export default function AuthorListenerFeedback({
       ) : null}
       {!loading && !error && items.length === 0 ? (
         <p className="mt-4 text-sm text-[#6d628c]" data-author-feedback-empty="true">
-          {AUTHOR_FEEDBACK_EMPTY}
+          {AUTHOR_COMMENTS_EMPTY}
         </p>
       ) : null}
       <ul className="mt-4 space-y-3">
@@ -152,9 +219,8 @@ export default function AuthorListenerFeedback({
           <FeedbackCard
             key={item.id}
             item={item}
-            authorSlug={authors.find((author) => author.id === authorId)?.slug ?? ""}
-            productSlug={item.practiceHref.split("/")[3]?.split("#")[0] ?? ""}
             onUpdated={(next) => setItems((current) => current.map((row) => (row.id === next.id ? next : row)))}
+            onViewed={markViewed}
           />
         ))}
       </ul>
@@ -162,10 +228,10 @@ export default function AuthorListenerFeedback({
         <button
           type="button"
           className="mt-4 min-h-11 text-sm font-semibold text-[#7042c5]"
+          data-author-comments-more="true"
           onClick={() => {
             setLoading(true);
-            const params = new URLSearchParams({ authorId, sort, limit: "10", cursor });
-            void fetch(`/api/author/listener-comments?${params}`, { credentials: "same-origin" })
+            void fetch(listUrl(authorId, filter, sort, cursor), { credentials: "same-origin" })
               .then(async (response) => {
                 if (!response.ok) throw new Error("load_failed");
                 return (await response.json()) as { comments: Item[]; nextCursor: string | null };
@@ -177,7 +243,7 @@ export default function AuthorListenerFeedback({
               });
           }}
         >
-          Показать ещё
+          {LISTENER_IMPRESSION_LOAD_MORE}
         </button>
       ) : null}
       {loading ? <p className="mt-3 text-sm text-[#7d70a2]">Загрузка…</p> : null}
@@ -185,30 +251,88 @@ export default function AuthorListenerFeedback({
   );
 }
 
+function listUrl(authorId: string, filter: Filter, sort: "new" | "old", cursor: string | null): string {
+  const params = new URLSearchParams({ filter, sort, limit: "10" });
+  if (authorId) params.set("authorId", authorId);
+  if (cursor) params.set("cursor", cursor);
+  return `/api/author/listener-comments?${params}`;
+}
+
+function chooseFilter(
+  setFilter: (filter: Filter) => void,
+  setLoading: (loading: boolean) => void,
+  filter: Filter,
+) {
+  setLoading(true);
+  setFilter(filter);
+}
+
 function FeedbackCard({
   item,
-  authorSlug,
-  productSlug,
   onUpdated,
+  onViewed,
 }: {
   item: Item;
-  authorSlug: string;
-  productSlug: string;
   onUpdated: (item: Item) => void;
+  onViewed: (id: string, unreadCount: number | null) => void;
 }) {
   const [reply, setReply] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const cardRef = useRef<HTMLLIElement>(null);
+  const parsed = parsePracticePublicPath(item.practiceHref);
+  const slug = item.authorSlug || parsed?.authorSlug || "";
+  const product = item.productSlug || parsed?.productSlug || "";
+
+  useEffect(() => {
+    const node = cardRef.current;
+    const noticeId = item.noticeId;
+    if (!node || !item.unread || !noticeId) return;
+    let sent = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (sent || !entries.some((entry) => entry.isIntersecting)) return;
+        sent = true;
+        void fetch("/api/author/listener-comments", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ noticeIds: [noticeId] }),
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              sent = false;
+              return null;
+            }
+            return (await response.json()) as { unreadCount?: number };
+          })
+          .then((payload) => {
+            if (!payload) return;
+            observer.disconnect();
+            onViewed(
+              item.id,
+              typeof payload.unreadCount === "number" ? payload.unreadCount : null,
+            );
+          })
+          .catch(() => {
+            sent = false;
+          });
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [item.id, item.noticeId, item.unread, onViewed]);
 
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!authorSlug || !productSlug) return;
+    if (!slug || !product) return;
     setPending(true);
     setMessage(null);
     const clientRequestId = crypto.randomUUID();
     try {
       const response = await fetch(
-        `/api/listen/product/${encodeURIComponent(authorSlug)}/${encodeURIComponent(productSlug)}/comments/${item.id}/reply`,
+        `/api/listen/product/${encodeURIComponent(slug)}/${encodeURIComponent(product)}/comments/${item.id}/reply`,
         {
           method: "POST",
           credentials: "same-origin",
@@ -238,24 +362,24 @@ function FeedbackCard({
     }
   }
 
-  async function markRead() {
-    if (!item.noticeId) return;
-    await fetch("/api/author/listener-comments", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ noticeId: item.noticeId }),
-    });
-    onUpdated({ ...item, unread: false });
-  }
-
   return (
-    <li className="rounded-[22px] border border-[#eadff8] bg-white px-4 py-4">
+    <li
+      ref={cardRef}
+      className={`rounded-[22px] border px-4 py-4 ${
+        item.unread ? "border-[#7042c5] bg-[#f7f3fc]" : "border-[#eadff8] bg-white"
+      }`}
+      data-author-comment-unread={item.unread ? "true" : "false"}
+    >
       <p className="text-xs font-semibold uppercase tracking-wide text-[#7042c5]">
-        {item.unread ? "Новый отзыв" : "Отзыв"}
+        {item.unread ? AUTHOR_COMMENTS_NEW_LABEL : "Комментарий"}
       </p>
-      <a className="mt-1 block font-semibold text-[#2b2144] underline" href={item.practiceHref}>
-        {item.practiceTitle}
+      <p className="mt-1 text-sm font-semibold text-[#2b2144]">
+        <span data-author-comment-workspace={item.authorName}>{item.authorName}</span>
+        {" – "}
+        <span data-author-comment-product={item.practiceTitle}>{item.practiceTitle}</span>
+      </p>
+      <a className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-[#7042c5] underline" href={item.practiceHref}>
+        {AUTHOR_COMMENTS_OPEN}
       </a>
       <div className="mt-2 flex items-center gap-3">
         <ListenerImpressionAvatar name={item.publicName} url={item.avatarUrl} />
@@ -265,7 +389,7 @@ function FeedbackCard({
       </div>
       <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{item.body}</p>
       {item.reply ? (
-        <div className="mt-3 flex gap-3 rounded-[16px] bg-[#f7f3fc] px-3 py-3">
+        <div className="mt-3 flex gap-3 rounded-[16px] bg-[#f7f3fc] px-3 py-3" data-author-comment-reply="true">
           <ListenerImpressionAvatar name={item.reply.publicName} url={item.reply.avatarUrl} />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-[#7042c5]">{LISTENER_IMPRESSION_AUTHOR_REPLY_LABEL}</p>
@@ -291,13 +415,24 @@ function FeedbackCard({
           </button>
         </form>
       )}
-      {item.unread && item.noticeId ? (
-        <button type="button" className="mt-2 min-h-11 text-sm font-semibold text-[#7042c5]" onClick={() => void markRead()}>
-          {AUTHOR_FEEDBACK_MARK_READ}
-        </button>
-      ) : null}
       {message ? <p className="mt-2 text-sm text-[#9a3d55]">{message}</p> : null}
     </li>
+  );
+}
+
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button type="button" className={sortButton(active)} data-author-comments-filter={children} onClick={onClick}>
+      {children}
+    </button>
   );
 }
 

@@ -69,6 +69,31 @@ export const LISTENER_COMMENT_DEFAULT_PUBLIC_NAME = "Слушатель";
 
 export const LISTENER_COMMENT_AUTHOR_PUBLIC_NAME = "Автор";
 
+export const AUTHOR_COMMENTS_HREF = "/author-dashboard/feedback";
+
+export const AUTHOR_COMMENTS_TITLE = "Комментарии";
+
+export const AUTHOR_COMMENTS_SUBTITLE =
+  "Все комментарии слушателей к вашим продуктам. Новые подсвечены, прочитанные остаются в истории. Звёзды считаются отдельно.";
+
+export const AUTHOR_COMMENTS_EMPTY = "Пока нет комментариев.";
+
+export const AUTHOR_COMMENTS_FILTER_ALL = "Все";
+
+export const AUTHOR_COMMENTS_FILTER_NEW = "Новые";
+
+export const AUTHOR_COMMENTS_FILTER_UNANSWERED = "Без ответа";
+
+export const AUTHOR_COMMENTS_MARK_ALL = "Отметить все прочитанными";
+
+export const AUTHOR_COMMENTS_OPEN = "Открыть на странице";
+
+export const AUTHOR_COMMENTS_NEW_LABEL = "Новый";
+
+export const AUTHOR_COMMENTS_BADGE_LABEL = "Новые комментарии";
+
+export const AUTHOR_COMMENTS_ALL_PROJECTS = "Все проекты";
+
 export const AUTHOR_FEEDBACK_TITLE = "Отзывы слушателей";
 
 export const AUTHOR_FEEDBACK_SUBTITLE =
