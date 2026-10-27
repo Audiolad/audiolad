@@ -116,6 +116,9 @@ const help = readFileSync(
 assert.match(help, /loadBusinessSupportDiagnostics/);
 assert.match(help, /BusinessSupportDiagnosticPage/);
 assert.doesNotMatch(help, /BusinessEmptySection/);
+assert.doesNotMatch(help, /BusinessSidebar|business-app-bottom-nav|Документы и оплата|title: "Плеер"/, "help has no shell of its own");
+const helpLayout = readFileSync(join(repoRoot, "src/app/business-app/layout.tsx"), "utf8");
+assert.match(helpLayout, /<BusinessAppShell/, "help is a child of the one five-item cabinet shell");
 
 const loadSrc = readFileSync(
   join(repoRoot, "src/lib/business-app/load-support-diagnostics.ts"),
@@ -135,6 +138,7 @@ assert.doesNotMatch(pureSrc, /ELIGIBLE|music_rights_grants/);
 
 const nav = readFileSync(join(repoRoot, "src/lib/business-app/nav.ts"), "utf8");
 assert.doesNotMatch(nav, /id: "help"/, "help stays off the five-section cabinet nav");
+assert.doesNotMatch(nav, /Документы и оплата|title: "Плеер"|title: "Точки"|title: "Статистика"|title: "Объявления"|title: "Команда"|title: "Помощь"|title: "Настройки"/);
 const profile = readFileSync(join(repoRoot, "src/app/business-app/profile/page.tsx"), "utf8");
 assert.match(profile, /href="\/help"/, "help stays reachable from the profile");
 assert.doesNotMatch(profile, /BusinessEmptySection/);

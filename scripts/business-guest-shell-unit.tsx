@@ -109,9 +109,11 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   has(g, /доступно после подключения/);
   has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
-  has(g, /Гостевой режим/);
-  has(g, /30 минут прослушивания без регистрации/);
-  has(g, /30 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
+  const bar = g.slice(g.indexOf('data-testid="biz-guest-status"'), g.indexOf("</section>", g.indexOf('data-testid="biz-guest-status"')));
+  has(bar, /30 дней в подарок – полный доступ ко всем функциям, затем 799\u00a0₽ в месяц/);
+  has(bar, /Получить 30 дней бесплатно/);
+  hasNot(bar, /30 минут/, "the top banner does not mention the 30 minutes before they run out");
+  hasNot(bar, /Гостевой режим/);
   const bottom = g.slice(g.indexOf('aria-label="Мобильная навигация"'), g.indexOf("</nav>", g.indexOf('aria-label="Мобильная навигация"')));
   has(bottom, /business-app-bottom-nav__lock/, "lock badge sits on the mobile icon");
   hasNot(bottom, /business-app-bottom-nav__label/, "mobile bar has no text labels");
@@ -134,6 +136,8 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   const navCss = read("src/components/business-app/business-app.css");
   assert.match(navCss, /\.business-app-bottom-nav__item \{[^}]*min-height:\s*48px/, "tap target is at least 44px");
   assert.match(navCss, /\.business-app-bottom-nav__item\.is-active \{[^}]*color:\s*var\(--biz-accent\)/);
+  assert.match(navCss, /\.business-app-bottom-nav__icon > \.business-app-bottom-nav__lock \{[^}]*top:\s*-5px/, "lock is a corner badge, not a second full icon");
+  assert.match(navCss, /\.business-app-bottom-nav__icon > svg:not\(\.business-app-bottom-nav__lock\)/, "the section icon keeps its own size");
   has(g, /data-testid="biz-trial-cta"/, "gift CTA is on the guest bar before the limit");
   assert.ok(anchors(g, "/onboarding?type=cafe").some((t) => t.includes('data-testid="biz-connect"')), "Подключить → real onboarding");
   hasCurrentLink(g, "/guest/coffee", "Music is the current section");
@@ -153,10 +157,18 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
 {
   const at = (limit: "ok" | "near_end" | "exhausted" | "unavailable", path: string) =>
     wrap(anonymous, path, <BusinessAppShell initialGuestLimit={limit}><main>page</main></BusinessAppShell>);
-  has(at("exhausted", "/"), /data-limit="exhausted"[\s\S]*Гостевое прослушивание завершено/, "exhausted shown on Home");
+  const exhaustedHome = at("exhausted", "/");
+  has(exhaustedHome, /data-limit="exhausted"/, "exhausted shown on Home");
+  has(exhaustedHome, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом/);
+  has(exhaustedHome, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/);
+  has(exhaustedHome, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
+  hasNot(exhaustedHome, /30 минут прослушивания без регистрации/);
   has(at("exhausted", "/onboarding"), /data-limit="exhausted"/, "exhausted shown on onboarding");
-  has(at("near_end", "/"), /скоро подойдёт к концу/);
+  const near = at("near_end", "/");
+  has(near, /полный доступ ко всем функциям/);
+  hasNot(near, /30 минут/, "near the end the top banner still does not name the 30 minutes");
   has(at("unavailable", "/"), /data-limit="unavailable"/);
+  hasNot(at("ok", "/"), /30 минут/);
   const layout = read("src/app/business-app/layout.tsx");
   has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
   has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
@@ -189,8 +201,9 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
 {
   const g = wrap(anonymous, "/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   has(g, /data-testid="biz-sound-exhausted"/);
-  has(g, /Гостевое прослушивание завершено/);
-  has(g, /Получить 30 дней бесплатно/, "gift CTA stays after the 30-minute limit");
+  has(g, /Гостевые 30 минут закончились\. Зарегистрируйтесь – и получите 30 дней в подарок с полным доступом/);
+  has(g, /data-testid="biz-guest-register"[^>]*>Зарегистрироваться/, "register button after the meter");
+  has(g, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/, "register is a direct link");
   has(g, /href="\/onboarding\?type=cafe"/, "exhausted → real connect path");
   const m = wrap(member, "/music", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);
   hasNot(m, /href="\/onboarding/);
