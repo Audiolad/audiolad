@@ -9,6 +9,7 @@ import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limi
 
 import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 
+import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -63,6 +64,9 @@ function BusinessShellFrame({ children }: { children: ReactNode }) {
       <BusinessSidebar />
       <BusinessCabinetPlayerProvider>
         <div className="business-app-main">
+          <header className="business-app-topbar">
+            <BusinessBrandLockup testId="biz-brand-topbar" />
+          </header>
           {showGuestBar ? <BusinessGuestStatusBar /> : null}
           {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
           {children}
