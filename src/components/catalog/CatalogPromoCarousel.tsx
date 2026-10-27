@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
-  CATALOG_PROMO_ARTWORK_HEIGHT,
-  CATALOG_PROMO_ARTWORK_WIDTH,
   isCatalogPromoArtwork,
   type CatalogPromo,
 } from "@/lib/catalog/catalog-promo";
@@ -95,19 +93,20 @@ export default function CatalogPromoCarousel({
           <li key={promo.id} className="catalog-promo-carousel__item">
             <Link
               href={promo.href}
-              aria-label={promo.title}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${promo.title} (откроется в новой вкладке)`}
               data-catalog-promo-id={promo.id}
               data-catalog-promo-position={promo.position}
               className="block overflow-hidden rounded-[24px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
+              <span className="sr-only"> (откроется в новой вкладке)</span>
               {isCatalogPromoArtwork(promo.image) ? (
                 // The photo already contains the title. No second heading or caption.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={promo.image}
                   alt={promo.title}
-                  width={CATALOG_PROMO_ARTWORK_WIDTH}
-                  height={CATALOG_PROMO_ARTWORK_HEIGHT}
                   data-catalog-promo-artwork
                   className="catalog-promo-artwork"
                 />

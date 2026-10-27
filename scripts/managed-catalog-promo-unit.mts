@@ -86,6 +86,9 @@ assert.equal(render({ ...school, enabled: false }), "");
 assert.equal(render(null), "");
 const html = render(school);
 assert.match(html, /href="https:\/\/school\.audiolad\.ru\/"/);
+assert.match(html, /target="_blank"/);
+assert.match(html, /rel="noopener noreferrer"/);
+assert.match(html, /aria-label="Школа аудиопрактик \(откроется в новой вкладке\)"/);
 assert.match(html, /Школа аудиопрактик/);
 assert.match(html, /Научитесь создавать аудиопрактики/);
 assert.match(html, /alt=""/);
@@ -106,9 +109,12 @@ const artwork = render({
 assert.match(artwork, /data-catalog-promo-artwork/);
 assert.match(artwork, new RegExp(`src="${CATALOG_PROMO_ARTWORK_PATH}"`));
 assert.match(artwork, /alt="Школа аудиопрактик"/);
-assert.match(artwork, /aria-label="Школа аудиопрактик"/);
-assert.match(artwork, /width="2162"/);
-assert.match(artwork, /height="629"/);
+assert.match(artwork, /aria-label="Школа аудиопрактик \(откроется в новой вкладке\)"/);
+assert.match(artwork, /target="_blank"/);
+assert.match(artwork, /rel="noopener noreferrer"/);
+const artworkImg = artwork.match(/<img\b[^>]*data-catalog-promo-artwork[^>]*>/)?.[0] ?? "";
+assert.notEqual(artworkImg, "");
+assert.doesNotMatch(artworkImg, /\s(?:width|height)=/);
 assert.doesNotMatch(artwork, /Научитесь создавать аудиопрактики/);
 assert.doesNotMatch(artwork, /Подробнее/);
 assert.doesNotMatch(artwork, /object-cover|w-24|aspect-\[2\/1\]/);
@@ -116,11 +122,15 @@ assert.match(artwork, /href="https:\/\/school\.audiolad\.ru\/"/);
 const artworkCss = read("src/app/globals.css");
 assert.match(
   artworkCss,
-  /\.catalog-promo-artwork \{\s*display:\s*block;\s*width:\s*100%;\s*max-width:\s*100%;\s*height:\s*auto;\s*aspect-ratio:\s*2162\s*\/\s*629;\s*object-fit:\s*contain;/,
+  /\.catalog-promo-artwork \{\s*display:\s*block;\s*width:\s*100%;\s*max-width:\s*100%;\s*height:\s*auto;\s*object-fit:\s*contain;/,
 );
 assert.doesNotMatch(
   artworkCss,
   /\.catalog-promo-artwork \{[^}]*object-fit:\s*cover/,
+);
+assert.doesNotMatch(
+  artworkCss,
+  /\.catalog-promo-artwork \{[^}]*aspect-ratio/,
 );
 assert.match(gridSource, /promoAfterIndex === index/);
 assert.match(gridSource, /data-catalog-grid-item/);

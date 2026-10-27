@@ -131,11 +131,9 @@ export function toCatalogPromos(value: unknown): CatalogPromo[] {
 /**
  * Wide school photo. The title is baked into the pixels, so the catalog
  * shows the file itself instead of a thumbnail plus a second heading.
- * 2162×629, about 3.44:1. The file is added separately from this code.
+ * The file is replaced separately. Layout follows the image's own ratio.
  */
 export const CATALOG_PROMO_ARTWORK_PATH = "/images/catalog-promo/school-audiopraktik.webp";
-export const CATALOG_PROMO_ARTWORK_WIDTH = 2162;
-export const CATALOG_PROMO_ARTWORK_HEIGHT = 629;
 
 export function isCatalogPromoArtwork(image: string): boolean {
   const path = image.trim().split(/[?#]/, 1)[0] ?? "";
