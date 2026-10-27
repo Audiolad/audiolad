@@ -1,4 +1,5 @@
 import "server-only";
+import { hasCurrentSoundApproval, sameSoundAudioIdentity } from "@/lib/business/track-sound-review.server";
 
 import { resolveMusicListenSource, type MusicStreamCandidate } from "@/lib/listen/music-delivery";
 import { LISTEN_SIGNED_URL_TTL_SECONDS, normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -7,6 +8,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export async function signWorkspaceAudio(
   audioItemId: string,
   allowed: ReadonlySet<string>,
+  expectedAudioIdentity?: string,
 ): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
   if (!allowed.has(audioItemId)) return { ok: false, reason: "not_in_manifest" };
   let db: ReturnType<typeof createServiceRoleClient>;
@@ -18,10 +20,13 @@ export async function signWorkspaceAudio(
 
   const { data: row, error } = await db
     .from("audio_items")
-    .select("id, audio_path, active_music_delivery_asset_id")
+    .select("id, audio_path, desired_music_master_asset_id, active_music_delivery_asset_id")
     .eq("id", audioItemId)
     .maybeSingle();
   if (error || !row) return { ok: false, reason: "not_in_manifest" };
+  if (expectedAudioIdentity ? !sameSoundAudioIdentity(expectedAudioIdentity, row) : !await hasCurrentSoundApproval(db, row)) {
+    return { ok: false, reason: "audio_replaced_reload" };
+  }
 
   let activeStream: MusicStreamCandidate | null = null;
   const assetId = row.active_music_delivery_asset_id as string | null;

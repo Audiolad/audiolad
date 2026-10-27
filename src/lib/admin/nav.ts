@@ -86,6 +86,12 @@ export const ADMIN_NAV_ITEMS: readonly AdminNavItem[] = [
     match: (path) => path.startsWith("/admin/business-verification"),
   },
   {
+    href: "/admin/business-track-review",
+    label: "Бизнес: прослушивание треков",
+    requiredPermission: "author_products.moderate",
+    match: (path) => path.startsWith("/admin/business-track-review"),
+  },
+  {
     href: "/admin/school-graduates",
     label: "Выпускники Школы аудиопрактик",
     requiredPermission: "authors.manage",

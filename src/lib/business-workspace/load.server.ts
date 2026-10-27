@@ -1,4 +1,5 @@
 import "server-only";
+import { soundAllowedTrackIds } from "@/lib/business/track-sound-review.server";
 
 import { activateBusinessTrial, recordAccessActivity } from "@/lib/access-grants/apply";
 import {
@@ -421,6 +422,14 @@ export async function loadWorkspaceCatalog(input: {
     curatedById = new Map(named.map((track) => [track.audioItemId, track]));
   }
 
+  // Never use curated source lists as manual admissions. The sound gate requires
+  // the exact current space whitelist entry and the current approved audio version.
+  try {
+    const soundAllowed = await soundAllowedTrackIds(admissions.map((row) => row.audioItemId), input.spaceId, db);
+    admissions = admissions.filter((row) => soundAllowed.has(row.audioItemId));
+  } catch {
+    return { tracks: [], unavailable: true };
+  }
   const eligibility = await loadEligibility(db, input.locationId, admissions.map((row) => row.audioItemId));
   const ids = selectWorkspaceTracks({
     spaceId: input.spaceId,

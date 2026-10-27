@@ -1,4 +1,5 @@
 import "server-only";
+import { soundAllowedTrackIds } from "@/lib/business/track-sound-review.server";
 
 import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
@@ -87,7 +88,11 @@ async function findPreviewSource(atmosphereId: string): Promise<PreviewSource | 
     .eq("status", "published")
     .limit(12);
   if (trackError || !Array.isArray(tracks)) return null;
+  let soundAllowed: Set<string>;
+  try { soundAllowed = await soundAllowedTrackIds(tracks.map((track) => track.id as string), "cafe", db); }
+  catch { return null; }
   for (const track of tracks) {
+    if (!soundAllowed.has(track.id as string)) continue;
     const practice = practices.find((row) => row.id === track.practice_id);
     const author = practice?.authors as { name?: string | null } | { name?: string | null }[] | null;
     const authorName = (Array.isArray(author) ? author[0]?.name : author?.name)?.trim() || "";

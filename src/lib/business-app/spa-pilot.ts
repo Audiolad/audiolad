@@ -1,4 +1,5 @@
 import "server-only";
+import { hasCurrentSoundApproval } from "@/lib/business/track-sound-review.server";
 
 import { resolveMusicListenSource } from "@/lib/listen/music-delivery";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -168,10 +169,11 @@ export async function signSpaTrack(
   const db = createServiceRoleClient();
   const { data: row } = await db
     .from("audio_items")
-    .select("id, audio_path, active_music_delivery_asset_id")
+    .select("id, audio_path, desired_music_master_asset_id, active_music_delivery_asset_id")
     .eq("id", audioItemId)
     .maybeSingle();
   if (!row) throw new Error("business_spa_track_missing");
+  if (!await hasCurrentSoundApproval(db, row)) throw new Error("business_sound_review_required");
 
   let activeStream = null;
   if (row.active_music_delivery_asset_id) {
