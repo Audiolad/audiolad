@@ -36,6 +36,6 @@ export function selectGraduateProducts(
 }
 
 export function graduateText(text: string, limit?: number): string {
-  const normalized = text.replaceAll("—", "–");
+  const normalized = text.replaceAll(String.fromCharCode(0x2014), "\u2013");
   return limit && normalized.length > limit ? `${normalized.slice(0, limit - 1).trimEnd()}…` : normalized;
 }
