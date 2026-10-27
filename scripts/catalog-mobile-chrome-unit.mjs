@@ -194,10 +194,10 @@ assert.match(
   /aspect-\[43\/24\]/,
   "desktop catalog sections use the wide artwork",
 );
-assert.doesNotMatch(
+assert.match(
   page,
   /CatalogPromoCarousel/,
-  "catalog no longer mounts the promo carousel",
+  "catalog reuses the managed promo below its sections",
 );
 
 assert.doesNotMatch(

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import CatalogPromoCarousel from "@/components/catalog/CatalogPromoCarousel";
+import { toCatalogPromos } from "@/lib/catalog/catalog-promo";
+import { loadManagedCatalogPromoSafe } from "@/lib/catalog/managed-promo";
+
 import CatalogSectionCards from "@/components/catalog/CatalogSectionCards";
 import CatalogProductGrid from "@/components/products/CatalogProductGrid";
 import {
@@ -130,6 +134,10 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     sort: resolvedListingQuery.sort,
   });
 
+  const promos = !isSearchActive && !isListingFiltered
+    ? toCatalogPromos(await loadManagedCatalogPromoSafe(supabase))
+    : [];
+
   return (
     <>
       <h1 className="sr-only">Каталог</h1>
@@ -144,6 +152,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           sort: resolvedListingQuery.sort,
         }}
       />
+
+      <CatalogPromoCarousel promos={promos} />
 
       {isSearchActive ? (
         <section className="mt-5" aria-labelledby="catalog-search-results-heading">
