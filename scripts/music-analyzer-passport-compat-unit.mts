@@ -100,7 +100,10 @@ assert.equal(oldStored.styles.length, 1);
 assert.deepEqual(parseStoredStructuredFacts(oldStored), oldStored);
 
 assert.equal(collectAnalyzerDocuments({ "track.json": { analysis: { analyzer_version: "music-analyzer-0.1", taxonomy_version: "0.1" } } }).hints.analyzerVersion, "music-analyzer-0.1");
-const env = analyzerChildEnv({ NODE_ENV: "test", SUPABASE_SERVICE_ROLE_KEY: "do-not-pass", MUSIC_ANALYZER_CLAP_BACKEND: "hf" }, "/test/.venv-v03-clap/bin/python", "/test/models");
+const env = analyzerChildEnv({ NODE_ENV: "test", SUPABASE_SERVICE_ROLE_KEY: "do-not-pass", MUSIC_ANALYZER_CLAP_BACKEND: "hf",
+  MUSIC_ANALYZER_VOICE_PYTHON: "/test/.venv-v03-panns/bin/python", MUSIC_ANALYZER_PANNS_CHECKPOINT: "/test/panns/Cnn14_mAP=0.431.pth" }, "/test/.venv-v03-clap/bin/python", "/test/models");
+assert.equal(env.MUSIC_ANALYZER_VOICE_PYTHON, "/test/.venv-v03-panns/bin/python");
+assert.equal(env.MUSIC_ANALYZER_PANNS_CHECKPOINT, "/test/panns/Cnn14_mAP=0.431.pth");
 assert.equal(env.HF_HUB_OFFLINE, "1");
 assert.equal(env.TRANSFORMERS_OFFLINE, "1");
 assert.equal(env.MUSIC_ANALYZER_CHECKPOINT_DIR, "/test/models");

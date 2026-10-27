@@ -136,6 +136,18 @@ export function buildFeatures(normalized, local = {}, modelVersion = "unknown") 
  * @param {Record<string, any>} n @param {string} version @returns {Feature}
  */
 function conservativeVocal(n, version) {
+  // Versioned AudioSet evidence takes precedence over legacy CLAP similarities.
+  // An attempted detector failure must remain unknown, never fall back to CLAP.
+  const detector = record(record(n.vocal).detector);
+  if (Object.hasOwn(record(n.vocal), "detector")) {
+    const valid = detector.rule === "panns-voice:1" && detector.status === "ok" && detector.model === "Cnn14_mAP=0.431.pth"
+      && detector.confidence_label === "medium" && Array.isArray(detector.windows) && detector.windows.length > 0
+      && ["instrumental", "vocal", "spoken", "mixed"].includes(detector.type)
+      && record(n.vocal).type === detector.type;
+    return fact(valid ? detector.type : null, { source: "analyzer:vocal.detector:panns-voice:1", model_version: detector.model ?? version,
+      reason: valid ? "AudioSet, CPU: подтверждающие окна речи/пения. Пороги предварительные; это не калиброванная вероятность."
+        : "Детектор голоса не дал уверенного результата или недоступен." });
+  }
   const scores = record(record(n.vocal).scores);
   const roles = ["instrumental", "vocal", "spoken_word", "mixed"];
   const ranked = roles.map(role => ({ role, score: unit(record(scores[role]).average) }))

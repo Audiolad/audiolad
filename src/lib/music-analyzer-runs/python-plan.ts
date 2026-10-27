@@ -31,6 +31,9 @@ const CHILD_ENV_ALLOW = new Set([
   "TMP",
   "USER",
   "LOGNAME",
+  // Explicit local CPU detector paths; model inference stays offline.
+  "MUSIC_ANALYZER_VOICE_PYTHON",
+  "MUSIC_ANALYZER_PANNS_CHECKPOINT",
 ]);
 
 export function buildAnalyzeTrackArgs(wavPath: string, outputDir: string): string[] {
