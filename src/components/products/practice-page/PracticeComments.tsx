@@ -155,6 +155,25 @@ export default function PracticeComments({
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || comments.length === 0) return;
+    const prefix = "#listener-comment-";
+    const hash = window.location.hash;
+    if (!hash.startsWith(prefix)) return;
+    const commentId = hash.slice(prefix.length);
+    if (!comments.some((comment) => comment.id === commentId)) return;
+    const node = document.getElementById(`listener-comment-${commentId}`);
+    node?.scrollIntoView({ block: "center" });
+    node?.classList.add("ring-2", "ring-[#7042c5]");
+    if (!isAuthenticated && !browserAuthenticated) return;
+    void fetch("/api/author/listener-comments", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ commentId }),
+    }).catch(() => undefined);
+  }, [browserAuthenticated, comments, isAuthenticated]);
+
+  useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({ sort, limit: "10" });
     loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`, controller.signal)
@@ -558,7 +577,7 @@ function CommentCard({
   }
 
   return (
-    <article>
+    <article id={`listener-comment-${comment.id}`}>
       <header className="flex items-center gap-3">
         <ListenerImpressionAvatar name={comment.publicName} url={comment.avatarUrl} />
         <div className="min-w-0 flex-1">
