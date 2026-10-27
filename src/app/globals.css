@@ -790,7 +790,8 @@ button.guest-home-slider__link,
   max-width: 100%;
 }
 
-/* Height follows the file. A replaced photo with a taller subtitle stays fully visible. */
+/* Height follows the file. No padding and no background, so the picture meets the rounded edge.
+   A white mat in the pixels would show as bands. A taller subtitle stays fully visible. */
 .catalog-promo-artwork {
   display: block;
   width: 100%;
@@ -798,6 +799,10 @@ button.guest-home-slider__link,
   height: auto;
   object-fit: contain;
   object-position: center;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
   border-radius: 24px;
 }
 

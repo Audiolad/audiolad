@@ -124,6 +124,11 @@ assert.match(
   artworkCss,
   /\.catalog-promo-artwork \{\s*display:\s*block;\s*width:\s*100%;\s*max-width:\s*100%;\s*height:\s*auto;\s*object-fit:\s*contain;/,
 );
+assert.match(artworkCss, /\.catalog-promo-artwork \{[^}]*margin:\s*0;/);
+assert.match(artworkCss, /\.catalog-promo-artwork \{[^}]*padding:\s*0;/);
+assert.match(artworkCss, /\.catalog-promo-artwork \{[^}]*background:\s*transparent;/);
+assert.match(artwork, /bg-transparent/);
+assert.match(artwork, /\bp-0\b/);
 assert.doesNotMatch(
   artworkCss,
   /\.catalog-promo-artwork \{[^}]*object-fit:\s*cover/,
