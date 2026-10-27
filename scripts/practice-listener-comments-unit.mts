@@ -25,6 +25,11 @@ import { isListenerCommentFeedVisible } from "../src/lib/practice-comments/visib
 
 import { resolveListenerCommentComposer } from "../src/lib/practice-comments/composer";
 import {
+  hashCommentId,
+  LISTENER_COMMENT_HASH_PAGE_CAP,
+  shouldLoadAnotherCommentPage,
+} from "../src/lib/practice-comments/deep-link";
+import {
   LISTENER_IMPRESSION_EMOJIS,
   LISTENER_IMPRESSION_INVITE,
   LISTENER_IMPRESSION_LOAD_MORE,
@@ -63,7 +68,7 @@ import {
   returnCommentAsOwner,
   updateOwnComment,
 } from "../src/lib/practice-comments/service";
-import type { ListenerCommentRow } from "../src/lib/practice-comments/types";
+import type { CommentNoticeRow, ListenerCommentRow } from "../src/lib/practice-comments/types";
 import {
   commentFingerprint,
   deriveDefaultPublicName,
@@ -2058,12 +2063,213 @@ async function testAuthorCommentHistory() {
 
   const page = read("src/components/products/practice-page/PracticeComments.tsx");
   assert.match(page, /id=\{`listener-comment-\$\{comment\.id\}`\}/);
-  assert.match(page, /#listener-comment-/);
+  assert.match(page, /hashCommentId/);
+  assert.match(read("src/lib/practice-comments/deep-link.ts"), /#listener-comment-/);
   assert.match(page, /commentId/);
   assert.match(read("src/lib/practice-comments/copy.ts"), /Комментарии/);
   assert.doesNotMatch(read("src/components/author-dashboard/AuthorListenerFeedback.tsx"), /—/);
 }
 
+async function testAuthorNoticeConsistency() {
+  const comments: ListenerCommentRow[] = [];
+  const notices: CommentNoticeRow[] = [];
+  for (let index = 1; index <= 25; index += 1) {
+    const id = commentUuid("aaaaaaaa", index);
+    const createdAt = isoSeconds(index);
+    comments.push(impressionRow(id, createdAt, `Отзыв номер ${index} для истории`));
+    notices.push({
+      id: commentUuid("bbbbbbbb", index),
+      recipientUserId: authorUser,
+      commentId: id,
+      practiceId,
+      kind: "new_impression",
+      readAt: null,
+      createdAt,
+    });
+  }
+  const hiddenId = commentUuid("aaaaaaaa", 90);
+  comments.push(impressionRow(hiddenId, isoSeconds(90), "Скрытый отзыв не считается", "hidden"));
+  notices.push({
+    id: commentUuid("bbbbbbbb", 90),
+    recipientUserId: authorUser,
+    commentId: hiddenId,
+    practiceId,
+    kind: "new_impression",
+    readAt: null,
+    createdAt: isoSeconds(90),
+  });
+  const store = createMemoryCommentStore(state({ comments, notices }));
+  const pageQuery = {
+    authorId: null as string | null,
+    sort: "new" as const,
+    cursor: null,
+    limit: 30,
+  };
+  const listed = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "new" });
+  assert.equal(listed.ok, true);
+  if (!listed.ok) return;
+  assert.equal(listed.comments.length, 25);
+  assert.equal(listed.unreadCount, 25);
+  assert.equal(listed.comments.every((item) => item.unread && item.productSlug === "tihaya"), true);
+  assert.equal(listed.comments.every((item) => item.authorSlug === "anna"), true);
+  const counted = await countUnreadAuthorImpressions(store, actor(authorUser));
+  assert.equal(counted.ok && counted.unreadCount, listed.unreadCount);
+  const noticeIds = listed.comments
+    .map((item) => item.noticeId)
+    .filter((id): id is string => id != null);
+  assert.equal(noticeIds.length, 25);
+  const marked = await markAuthorImpressionNotices(store, actor(authorUser), clock(), { noticeIds });
+  assert.equal(marked.ok && marked.unreadCount, 0);
+  const afterShown = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "new" });
+  assert.equal(afterShown.ok && afterShown.comments.length, 0);
+  for (const notice of notices) notice.readAt = null;
+  const restored = await countUnreadAuthorImpressions(store, actor(authorUser));
+  assert.equal(restored.ok && restored.unreadCount, 25);
+  const cleared = await markAuthorImpressionNotices(store, actor(authorUser), clock(), { all: true });
+  assert.equal(cleared.ok && cleared.unreadCount, 0);
+  const history = await listAuthorFeedback(store, actor(authorUser), { ...pageQuery, filter: "all" });
+  assert.equal(history.ok && history.comments.length, 25);
+
+  const target = comments[0]!;
+  const wrongSlug = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: target.id,
+    body: "Спасибо за отзыв",
+    clientRequestId: commentUuid("cccccccc", 1),
+    authorSlug: "anna",
+    productSlug: "anna",
+  });
+  assert.equal(wrongSlug.ok, false);
+  if (!wrongSlug.ok) assert.equal(wrongSlug.status, 400);
+  const rightSlug = await replyAsAuthor(store, actor(authorUser), clock(), {
+    commentId: target.id,
+    body: "Спасибо за отзыв",
+    clientRequestId: commentUuid("cccccccc", 2),
+    authorSlug: "anna",
+    productSlug: "tihaya",
+  });
+  assert.equal(rightSlug.ok, true);
+  const unanswered = await listAuthorFeedback(store, actor(authorUser), {
+    ...pageQuery,
+    filter: "unanswered",
+  });
+  assert.equal(unanswered.ok && unanswered.comments.length, 24);
+  if (unanswered.ok) {
+    assert.equal(
+      unanswered.comments.some((item) => item.id === target.id),
+      false,
+    );
+  }
+
+  const later = comments[20]!;
+  assert.equal(hashCommentId(`#listener-comment-${later.id}`), later.id);
+  assert.equal(hashCommentId("#listener-impressions"), null);
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: later.id,
+      loadedIds: comments.slice(0, 10).map((item) => item.id),
+      nextCursor: "page-2",
+      previousCursor: null,
+      pagesRead: 1,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [target.id],
+      nextCursor: "page-2",
+      previousCursor: null,
+      pagesRead: 1,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [],
+      nextCursor: null,
+      previousCursor: null,
+      pagesRead: 1,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [],
+      nextCursor: "same",
+      previousCursor: "same",
+      pagesRead: 2,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldLoadAnotherCommentPage({
+      targetId: target.id,
+      loadedIds: [],
+      nextCursor: "next",
+      previousCursor: null,
+      pagesRead: LISTENER_COMMENT_HASH_PAGE_CAP,
+    }),
+    false,
+  );
+
+  const storeSource = read("src/lib/practice-comments/supabase-store.ts");
+  assert.doesNotMatch(storeSource, /\.limit\(500\)/);
+  assert.doesNotMatch(storeSource, /\.limit\(2000\)/);
+  assert.doesNotMatch(storeSource, /not\("id", "in"/);
+  assert.doesNotMatch(storeSource, /\.in\("practice_id", input/);
+  assert.match(storeSource, /practices\.author_id/);
+  assert.match(storeSource, /author_replies/);
+  assert.match(storeSource, /\.is\("author_replies", null\)/);
+  assert.match(storeSource, /\.range\(/);
+  assert.match(storeSource, /practice_listener_comment_notices!inner/);
+  const selectFn = storeSource.slice(
+    storeSource.indexOf("function impressionSelect"),
+    storeSource.indexOf("function unreadNoticeQuery"),
+  );
+  assert.doesNotMatch(selectFn, /user_id|email|full_name|surname/);
+
+  const service = read("src/lib/practice-comments/service.ts");
+  assert.doesNotMatch(service, /\.slice\(0,\s*20\)/);
+  const feedback = service.slice(
+    service.indexOf("export async function listAuthorFeedback"),
+    service.indexOf("export async function countUnreadAuthorImpressions"),
+  );
+  assert.match(feedback, /getPracticeContexts\(/);
+  assert.match(feedback, /listRepliesForParents\(/);
+  assert.doesNotMatch(feedback, /getPracticeContext\(/);
+  assert.doesNotMatch(feedback, /(?<!listRepliesForParents)listReplies\(/);
+
+  const page = read("src/components/products/practice-page/PracticeComments.tsx");
+  assert.match(page, /pagesRead/);
+  assert.match(page, /shouldLoadAnotherCommentPage/);
+  assert.match(page, /hashCommentId/);
+  const cabinet = read("src/components/author-dashboard/AuthorListenerFeedback.tsx");
+  assert.match(cabinet, /item\.productSlug/);
+  assert.match(cabinet, /IntersectionObserver/);
+  assert.doesNotMatch(cabinet, /practiceHref\.split\("\/"\)\[2\]/);
+  assert.doesNotMatch(cabinet, /items\.flatMap\(\(item\) => \(item\.unread/);
+  assert.doesNotMatch(cabinet, /—/);
+  const route = read(
+    "src/app/api/listen/product/[slug]/[productSlug]/comments/[commentId]/reply/route.ts",
+  );
+  assert.match(route, /authorSlug: slug/);
+  assert.match(route, /productSlug/);
+  const shell = read("src/components/listener/ListenerAppShell.tsx");
+  assert.match(shell, /data-author-cabinet-mobile/);
+  assert.match(shell, /xl:hidden/);
+  assert.match(read("src/components/profile/ProfileSections.tsx"), /AuthorUnreadCommentBadge/);
+  const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
+  assert.match(authorShell, /data-author-shell-subtitle/);
+  const subtitle = authorShell.slice(
+    authorShell.indexOf("data-author-shell-subtitle") - 180,
+    authorShell.indexOf("data-author-shell-subtitle"),
+  );
+  assert.doesNotMatch(subtitle, /truncate/);
+}
+
+await testAuthorNoticeConsistency();
 await testAuthorCommentHistory();
 await testAvatars();
 await testPrivacyAndXss();

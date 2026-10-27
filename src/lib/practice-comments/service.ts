@@ -418,7 +418,13 @@ export async function replyAsAuthor(
   store: CommentStore,
   actor: CommentActor,
   clock: CommentClock,
-  input: { commentId: string; body: unknown; clientRequestId: unknown },
+  input: {
+    commentId: string;
+    body: unknown;
+    clientRequestId: unknown;
+    authorSlug?: string | null;
+    productSlug?: string | null;
+  },
 ): Promise<CommentFailure | { ok: true; comment: PublicCommentDto; replayed: boolean }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   const parent = await store.getRaw(input.commentId);
@@ -428,6 +434,16 @@ export async function replyAsAuthor(
   if (parent.status !== "published") return commentFailure(403, "comment_hidden");
   const member = await store.isAuthorMember(actor.userId, parent.practiceId);
   if (!member) return commentFailure(403, "forbidden");
+  if (input.authorSlug != null || input.productSlug != null) {
+    const context = await store.getPracticeContext(parent.practiceId);
+    if (
+      !context ||
+      context.authorSlug !== input.authorSlug ||
+      context.productSlug !== input.productSlug
+    ) {
+      return commentFailure(400, "invalid_product");
+    }
+  }
   const body = parseCommentBody(input.body);
   if (!body.ok) return commentFailure(400, body.error);
   const requestId = parseClientRequestId(input.clientRequestId);
@@ -534,7 +550,9 @@ export function parseAuthorImpressionFilter(input: string | null): AuthorImpress
  * Cabinet history is every published listener impression on the account's
  * products. Unread is a new_impression notice with no read_at. Hidden and
  * deleted rows are absent, and an author reply is not a new comment.
- * Opening the list marks the shown notices read; the rows stay in history.
+ * Opening the list does not mark notices. A row is marked when that item is
+ * viewed, when the author marks everything, or when that comment is opened
+ * on the product page. The rows stay in history.
  */
 export async function listAuthorFeedback(
   store: CommentStore,
@@ -554,6 +572,8 @@ export async function listAuthorFeedback(
         id: string;
         practiceId: string;
         authorName: string;
+        authorSlug: string;
+        productSlug: string;
         practiceTitle: string;
         practiceHref: string;
         publicName: string;
@@ -570,12 +590,12 @@ export async function listAuthorFeedback(
     }
 > {
   if (!actor.userId) return commentFailure(401, "unauthorized");
-  const practiceIds = await store.listAuthorPracticeIds(actor.userId, input.authorId);
-  if (input.authorId && practiceIds.length === 0) return commentFailure(403, "forbidden");
+  const authorIds = await store.listAuthorWorkspaceIds(actor.userId, input.authorId);
+  if (input.authorId && authorIds.length === 0) return commentFailure(403, "forbidden");
   const filter = input.filter ?? "all";
   const rows = await store.listAuthorImpressions({
     userId: actor.userId,
-    practiceIds,
+    authorIds,
     sort: input.sort,
     cursor: input.cursor,
     limit: input.limit + 1,
@@ -589,33 +609,28 @@ export async function listAuthorFeedback(
   );
   const noticeByComment = new Map(notices.map((notice) => [notice.commentId, notice.noticeId]));
   const repliesByParent = new Map<string, FeedCommentRow>();
-  const parentsByPractice = new Map<string, string[]>();
-  for (const row of page) {
-    const ids = parentsByPractice.get(row.practiceId) ?? [];
-    ids.push(row.id);
-    parentsByPractice.set(row.practiceId, ids);
-  }
-  for (const [practiceId, parentIds] of parentsByPractice) {
-    const replies = await store.listReplies({
-      practiceId,
-      parentIds,
-      viewerUserId: actor.userId,
-    });
-    for (const reply of replies) {
-      if (reply.status === "published" && reply.parentId && !repliesByParent.has(reply.parentId)) {
-        repliesByParent.set(reply.parentId, reply);
-      }
+  const replies = await store.listRepliesForParents({
+    parentIds: page.map((row) => row.id),
+    viewerUserId: actor.userId,
+  });
+  for (const reply of replies) {
+    if (reply.status === "published" && reply.parentId && !repliesByParent.has(reply.parentId)) {
+      repliesByParent.set(reply.parentId, reply);
     }
   }
+  const contexts = await store.getPracticeContexts(page.map((row) => row.practiceId));
+  const contextById = new Map(contexts.map((context) => [context.id, context]));
   const comments = [];
   for (const row of page) {
-    const context = await store.getPracticeContext(row.practiceId);
+    const context = contextById.get(row.practiceId) ?? null;
     const reply = repliesByParent.get(row.id) ?? null;
     const noticeId = noticeByComment.get(row.id) ?? null;
     comments.push({
       id: row.id,
       practiceId: row.practiceId,
       authorName: context?.authorName ?? "Автор",
+      authorSlug: context?.authorSlug ?? "",
+      productSlug: context?.productSlug ?? "",
       practiceTitle: context?.title ?? "Продукт",
       practiceHref: context
         ? `${buildPracticePublicPath(context.authorSlug, context.productSlug)}#listener-comment-${row.id}`
@@ -632,8 +647,8 @@ export async function listAuthorFeedback(
   }
   const last = page[page.length - 1];
   const ownedIds = input.authorId
-    ? await store.listAuthorPracticeIds(actor.userId, null)
-    : practiceIds;
+    ? await store.listAuthorWorkspaceIds(actor.userId, null)
+    : authorIds;
   return {
     ok: true,
     comments,
@@ -647,13 +662,13 @@ export async function countUnreadAuthorImpressions(
   actor: CommentActor,
 ): Promise<CommentFailure | { ok: true; unreadCount: number }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
-  const practiceIds = await store.listAuthorPracticeIds(actor.userId, null);
+  const authorIds = await store.listAuthorWorkspaceIds(actor.userId, null);
   return {
     ok: true,
     unreadCount:
-      practiceIds.length === 0
+      authorIds.length === 0
         ? 0
-        : await store.countUnreadAuthorImpressions(actor.userId, practiceIds),
+        : await store.countUnreadAuthorImpressions(actor.userId, authorIds),
   };
 }
 
@@ -690,11 +705,11 @@ export async function markCommentNoticeRead(
 const NOTICE_ID = /^[0-9a-f-]{36}$/i;
 
 /**
- * Read state belongs to the signed-in account. Shown rows are marked when the
- * cabinet list opens. «Отметить все прочитанными» clears every unread
- * impression notice on this account's products. Opening one comment on the
- * product page marks that notice. Hidden and deleted impressions are not marked
- * and do not count.
+ * Read state belongs to the signed-in account. Viewing one cabinet row marks
+ * that notice. «Отметить все прочитанными» clears every unread impression
+ * notice on this account's products. Opening one comment on the product page
+ * marks that notice. Hidden and deleted impressions are not marked and do not
+ * count.
  */
 export async function markAuthorImpressionNotices(
   store: CommentStore,
@@ -704,13 +719,13 @@ export async function markAuthorImpressionNotices(
 ): Promise<CommentFailure | { ok: true; unreadCount: number }> {
   if (!actor.userId) return commentFailure(401, "unauthorized");
   const now = iso(clock.now());
-  const practiceIds = await store.listAuthorPracticeIds(actor.userId, null);
+  const authorIds = await store.listAuthorWorkspaceIds(actor.userId, null);
   if (input.all) {
-    await store.markUnreadAuthorImpressions(actor.userId, practiceIds, now);
+    await store.markUnreadAuthorImpressions(actor.userId, authorIds, now);
   } else if (input.commentId && NOTICE_ID.test(input.commentId)) {
     await store.markUnreadNoticeForComment(actor.userId, input.commentId, now);
   } else if (input.noticeIds && input.noticeIds.length > 0) {
-    const ids = input.noticeIds.filter((id) => NOTICE_ID.test(id)).slice(0, 20);
+    const ids = input.noticeIds.filter((id) => NOTICE_ID.test(id));
     if (ids.length === 0) return commentFailure(400, "invalid_notice");
     await store.markNoticesRead(actor.userId, ids, now);
   } else {
@@ -719,9 +734,9 @@ export async function markAuthorImpressionNotices(
   return {
     ok: true,
     unreadCount:
-      practiceIds.length === 0
+      authorIds.length === 0
         ? 0
-        : await store.countUnreadAuthorImpressions(actor.userId, practiceIds),
+        : await store.countUnreadAuthorImpressions(actor.userId, authorIds),
   };
 }
 

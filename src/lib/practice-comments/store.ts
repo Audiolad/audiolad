@@ -36,6 +36,7 @@ export type AuthorImpressionFilter = "all" | "new" | "unanswered";
 export type CommentStore = {
   getGateBySlug(authorSlug: string, productSlug: string): Promise<ListenerCommentPracticeGate | null>;
   getPracticeContext(practiceId: string): Promise<PracticeContext | null>;
+  getPracticeContexts(practiceIds: string[]): Promise<PracticeContext[]>;
   suggestPublicName(userId: string): Promise<string>;
   viewerAvatarUrl(userId: string): Promise<string | null>;
   hasOwnImpression(userId: string, practiceId: string): Promise<boolean>;
@@ -43,22 +44,22 @@ export type CommentStore = {
   authorDisplayName(practiceId: string): Promise<string>;
   isAuthorMember(userId: string, practiceId: string): Promise<boolean>;
   authorRecipientIds(practiceId: string): Promise<string[]>;
-  listAuthorPracticeIds(userId: string, authorId: string | null): Promise<string[]>;
+  listAuthorWorkspaceIds(userId: string, authorId: string | null): Promise<string[]>;
   listAuthorImpressions(input: {
     userId: string;
-    practiceIds: string[];
+    authorIds: string[];
     sort: CommentSort;
     cursor: CommentCursor | null;
     limit: number;
     filter: AuthorImpressionFilter;
   }): Promise<FeedCommentRow[]>;
-  countUnreadAuthorImpressions(userId: string, practiceIds: string[]): Promise<number>;
+  countUnreadAuthorImpressions(userId: string, authorIds: string[]): Promise<number>;
   unreadNoticesForComments(
     userId: string,
     commentIds: string[],
   ): Promise<Array<{ noticeId: string; commentId: string }>>;
   markNoticesRead(userId: string, noticeIds: string[], readAt: string): Promise<number>;
-  markUnreadAuthorImpressions(userId: string, practiceIds: string[], readAt: string): Promise<number>;
+  markUnreadAuthorImpressions(userId: string, authorIds: string[], readAt: string): Promise<number>;
   markUnreadNoticeForComment(userId: string, commentId: string, readAt: string): Promise<boolean>;
   listFeed(input: {
     practiceId: string;
@@ -69,6 +70,10 @@ export type CommentStore = {
   }): Promise<FeedCommentRow[]>;
   listReplies(input: {
     practiceId: string;
+    parentIds: string[];
+    viewerUserId: string | null;
+  }): Promise<FeedCommentRow[]>;
+  listRepliesForParents(input: {
     parentIds: string[];
     viewerUserId: string | null;
   }): Promise<FeedCommentRow[]>;

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { publishAuthorUnreadCount } from "@/components/author-dashboard/AuthorUnreadCommentBadge";
+import { parsePracticePublicPath } from "@/lib/products/paths";
 import ListenerImpressionAvatar from "@/components/products/practice-page/ListenerImpressionAvatar";
 import {
   AUTHOR_COMMENTS_ALL_PROJECTS,
@@ -26,6 +27,8 @@ type Item = {
   id: string;
   practiceId: string;
   authorName: string;
+  authorSlug: string;
+  productSlug: string;
   practiceTitle: string;
   practiceHref: string;
   publicName: string;
@@ -54,7 +57,6 @@ export default function AuthorListenerFeedback({
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
-  const markedKey = useRef("");
 
   function applyPage(
     payload: { comments: Item[]; nextCursor: string | null; unreadCount?: number },
@@ -91,29 +93,12 @@ export default function AuthorListenerFeedback({
     return () => controller.abort();
   }, [authorId, filter, sort]);
 
-  useEffect(() => {
-    const ids = items.flatMap((item) => (item.unread && item.noticeId ? [item.noticeId] : []));
-    if (ids.length === 0) return;
-    const key = ids.join(",");
-    if (markedKey.current === key) return;
-    markedKey.current = key;
-    void fetch("/api/author/listener-comments", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ noticeIds: ids }),
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as { unreadCount?: number };
-      })
-      .then((payload) => {
-        if (payload && typeof payload.unreadCount === "number") {
-          publishAuthorUnreadCount(payload.unreadCount);
-        }
-      })
-      .catch(() => undefined);
-  }, [items]);
+  const markViewed = useCallback((id: string, unreadCount: number | null) => {
+    setItems((current) =>
+      current.map((row) => (row.id === id ? { ...row, unread: false } : row)),
+    );
+    if (typeof unreadCount === "number") publishAuthorUnreadCount(unreadCount);
+  }, []);
 
   async function markAll() {
     setMarkingAll(true);
@@ -126,7 +111,6 @@ export default function AuthorListenerFeedback({
       });
       const payload = (await response.json()) as { unreadCount?: number };
       if (!response.ok) return;
-      markedKey.current = "all";
       setItems((current) => current.map((item) => ({ ...item, unread: false })));
       publishAuthorUnreadCount(typeof payload.unreadCount === "number" ? payload.unreadCount : 0);
     } finally {
@@ -235,9 +219,8 @@ export default function AuthorListenerFeedback({
           <FeedbackCard
             key={item.id}
             item={item}
-            authorSlug={authors.find((author) => author.name === item.authorName)?.slug ?? authors.find((author) => author.id === authorId)?.slug ?? ""}
-            productSlug={item.practiceHref.split("/")[2]?.split("#")[0] ?? ""}
             onUpdated={(next) => setItems((current) => current.map((row) => (row.id === next.id ? next : row)))}
+            onViewed={markViewed}
           />
         ))}
       </ul>
@@ -286,20 +269,60 @@ function chooseFilter(
 
 function FeedbackCard({
   item,
-  authorSlug,
-  productSlug,
   onUpdated,
+  onViewed,
 }: {
   item: Item;
-  authorSlug: string;
-  productSlug: string;
   onUpdated: (item: Item) => void;
+  onViewed: (id: string, unreadCount: number | null) => void;
 }) {
   const [reply, setReply] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const slug = authorSlug || productSlugFromHref(item.practiceHref).authorSlug;
-  const product = productSlug || productSlugFromHref(item.practiceHref).productSlug;
+  const cardRef = useRef<HTMLLIElement>(null);
+  const parsed = parsePracticePublicPath(item.practiceHref);
+  const slug = item.authorSlug || parsed?.authorSlug || "";
+  const product = item.productSlug || parsed?.productSlug || "";
+
+  useEffect(() => {
+    const node = cardRef.current;
+    const noticeId = item.noticeId;
+    if (!node || !item.unread || !noticeId) return;
+    let sent = false;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (sent || !entries.some((entry) => entry.isIntersecting)) return;
+        sent = true;
+        void fetch("/api/author/listener-comments", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ noticeIds: [noticeId] }),
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              sent = false;
+              return null;
+            }
+            return (await response.json()) as { unreadCount?: number };
+          })
+          .then((payload) => {
+            if (!payload) return;
+            observer.disconnect();
+            onViewed(
+              item.id,
+              typeof payload.unreadCount === "number" ? payload.unreadCount : null,
+            );
+          })
+          .catch(() => {
+            sent = false;
+          });
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [item.id, item.noticeId, item.unread, onViewed]);
 
   async function send(event: FormEvent) {
     event.preventDefault();
@@ -341,6 +364,7 @@ function FeedbackCard({
 
   return (
     <li
+      ref={cardRef}
       className={`rounded-[22px] border px-4 py-4 ${
         item.unread ? "border-[#7042c5] bg-[#f7f3fc]" : "border-[#eadff8] bg-white"
       }`}
@@ -392,11 +416,6 @@ function FeedbackCard({
       {message ? <p className="mt-2 text-sm text-[#9a3d55]">{message}</p> : null}
     </li>
   );
-}
-
-function productSlugFromHref(href: string): { authorSlug: string; productSlug: string } {
-  const parts = href.split("#")[0]?.split("/").filter(Boolean) ?? [];
-  return { authorSlug: parts[1] ?? "", productSlug: parts[2] ?? "" };
 }
 
 function FilterButton({

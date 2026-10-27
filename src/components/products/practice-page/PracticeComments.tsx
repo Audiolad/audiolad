@@ -11,6 +11,7 @@ import ListenerImpressionAvatar from "@/components/products/practice-page/Listen
 import ListenerImpressionInvite from "@/components/products/practice-page/ListenerImpressionInvite";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import { resolveListenerCommentComposer } from "@/lib/practice-comments/composer";
+import { hashCommentId, shouldLoadAnotherCommentPage } from "@/lib/practice-comments/deep-link";
 import { createClient } from "@/lib/supabase/client";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import {
@@ -107,7 +108,9 @@ export default function PracticeComments({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [browserAuthenticated, setBrowserAuthenticated] = useState(false);
+  const [reload, setReload] = useState(0);
   const suggestionApplied = useRef(false);
+  const markedHash = useRef("");
   const signInHref = buildAuthRouteHref("/auth/sign-in", signInReturnPath);
   const hasOwnImpression =
     viewer?.hasOwnImpression === true || comments.some((comment) => comment.mine);
@@ -127,13 +130,13 @@ export default function PracticeComments({
       session.practiceId === practiceId,
   );
 
-  function applyFeed(payload: FeedResponse, append: boolean) {
+  function applyFeed(payload: FeedResponse, append: boolean, settle = true) {
     setComments((current) => (append ? [...current, ...payload.comments] : payload.comments));
     setCursor(payload.nextCursor);
     setViewer(payload.viewer);
     if (!append) setPublishedCount(payload.publishedCount);
     setError(false);
-    setLoading(false);
+    if (settle) setLoading(false);
     if (!append && !suggestionApplied.current && payload.viewer.publicNameSuggestion) {
       suggestionApplied.current = true;
       setPublicName(payload.viewer.publicNameSuggestion);
@@ -155,16 +158,14 @@ export default function PracticeComments({
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || comments.length === 0) return;
-    const prefix = "#listener-comment-";
-    const hash = window.location.hash;
-    if (!hash.startsWith(prefix)) return;
-    const commentId = hash.slice(prefix.length);
-    if (!comments.some((comment) => comment.id === commentId)) return;
+    const commentId = hashCommentId(typeof window === "undefined" ? "" : window.location.hash);
+    if (!commentId || !comments.some((comment) => comment.id === commentId)) return;
     const node = document.getElementById(`listener-comment-${commentId}`);
     node?.scrollIntoView({ block: "center" });
     node?.classList.add("ring-2", "ring-[#7042c5]");
     if (!isAuthenticated && !browserAuthenticated) return;
+    if (markedHash.current === commentId) return;
+    markedHash.current = commentId;
     void fetch("/api/author/listener-comments", {
       method: "POST",
       credentials: "same-origin",
@@ -175,23 +176,51 @@ export default function PracticeComments({
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams({ sort, limit: "10" });
-    loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`, controller.signal)
-      .then(async (response) => {
-        if (!response.ok) throw new Error("load_failed");
-        return (await response.json()) as FeedResponse;
-      })
-      .then((payload) => {
-        if (controller.signal.aborted) return;
-        applyFeed(payload, false);
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setError(true);
-        setLoading(false);
-      });
+    const targetId = hashCommentId(typeof window === "undefined" ? "" : window.location.hash);
+    let previousCursor: string | null = null;
+    let cursor: string | null = null;
+    let append = false;
+    let pagesRead = 0;
+    const loadedIds: string[] = [];
+
+    const loadPage = (): Promise<void> => {
+      if (controller.signal.aborted) return Promise.resolve();
+      const params = new URLSearchParams({ sort, limit: "10" });
+      if (cursor) params.set("cursor", cursor);
+      return loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`, controller.signal)
+        .then(async (response) => {
+          if (!response.ok) throw new Error("load_failed");
+          return (await response.json()) as FeedResponse;
+        })
+        .then((payload) => {
+          if (controller.signal.aborted) return;
+          for (const comment of payload.comments) loadedIds.push(comment.id);
+          pagesRead += 1;
+          const nextCursor = payload.nextCursor;
+          const more = shouldLoadAnotherCommentPage({
+            targetId,
+            loadedIds,
+            nextCursor,
+            previousCursor,
+            pagesRead,
+          });
+          applyFeed(payload, append, !more);
+          if (!more) return;
+          append = true;
+          previousCursor = cursor;
+          cursor = nextCursor;
+          return loadPage();
+        });
+    };
+
+    void loadPage().catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setError(true);
+      setLoading(false);
+    });
     return () => controller.abort();
-  }, [authorSlug, productSlug, sort]);
+  }, [authorSlug, productSlug, reload, sort]);
 
   async function submitComment(event: FormEvent) {
     event.preventDefault();
@@ -305,17 +334,7 @@ export default function PracticeComments({
             onClick={() => {
               setLoading(true);
               setError(false);
-              const params = new URLSearchParams({ sort, limit: "10" });
-              void loadComments(`${commentsUrl(authorSlug, productSlug)}?${params}`)
-                .then(async (response) => {
-                  if (!response.ok) throw new Error("load_failed");
-                  return (await response.json()) as FeedResponse;
-                })
-                .then((payload) => applyFeed(payload, false))
-                .catch(() => {
-                  setError(true);
-                  setLoading(false);
-                });
+              setReload((current) => current + 1);
             }}
           >
             {LISTENER_IMPRESSION_RETRY}
