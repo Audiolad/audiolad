@@ -127,3 +127,34 @@ export function toCatalogPromos(value: unknown): CatalogPromo[] {
     position: 1,
   }] : [];
 }
+
+/**
+ * Wide school photo. The title is baked into the pixels, so the catalog
+ * shows the file itself instead of a thumbnail plus a second heading.
+ * The file is replaced separately. Layout follows the image's own ratio.
+ */
+export const CATALOG_PROMO_ARTWORK_PATH = "/images/catalog-promo/school-audiopraktik.webp";
+
+export function isCatalogPromoArtwork(image: string): boolean {
+  const path = image.trim().split(/[?#]/, 1)[0] ?? "";
+  return path.endsWith("/school-audiopraktik.webp");
+}
+
+/**
+ * Cards of the first catalog page before the single full-width promo row.
+ * Page size is 20, so card 12 is always on page 1 when the listing is that long.
+ */
+export const CATALOG_GRID_PROMO_AFTER_PRODUCTS = 12;
+
+/**
+ * 0-based product index after which the promo row is inserted.
+ * Shorter listings place it after the last card. Null when the grid is empty.
+ * The same index is used for every later page, so the row is not repeated.
+ */
+export function catalogGridPromoInsertAfter(productCount: number): number | null {
+  if (!Number.isInteger(productCount) || productCount <= 0) {
+    return null;
+  }
+
+  return Math.min(CATALOG_GRID_PROMO_AFTER_PRODUCTS, productCount) - 1;
+}

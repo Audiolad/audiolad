@@ -776,6 +776,31 @@ button.guest-home-slider__link,
   padding: 0;
 }
 
+/* Spans 2, 3, and 4 column breakpoints: one row after the 12th card. */
+.catalog-product-grid__promo {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.catalog-product-grid__promo > .catalog-promo {
+  margin-top: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Height follows the file. A replaced photo with a taller subtitle stays fully visible. */
+.catalog-promo-artwork {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 24px;
+}
+
 @media (max-width: 767px) {
   .listener-catalog-content .catalog-product-grid {
     gap: 0.375rem; /* 6px */

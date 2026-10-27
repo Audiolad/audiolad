@@ -100,6 +100,8 @@ export type CatalogProduct = ProductCoverFields & {
   sortTimestamp: number;
   audioCount?: number;
   durationSeconds?: number | null;
+  /** practices.duration_minutes when audio item durations are missing. */
+  durationMinutes?: number | null;
   publishedAt?: string | null;
   gallery?: CatalogSlide[];
 };
@@ -118,6 +120,8 @@ export type CatalogPriceViewer = {
 export type CatalogProductViewer = OrdinaryCatalogViewer & CatalogPriceViewer;
 
 export type CatalogQueryOptions = {
+  /** Restrict editorial selections without loading the entire catalog. */
+  productIds?: string[];
   topicKey?: string | null;
   catalogSection?: CatalogSection | null;
   /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
@@ -303,6 +307,7 @@ export async function getPublishedCatalogProducts(
   supabase: SupabaseClient,
   options?: CatalogQueryOptions,
 ): Promise<CatalogProduct[]> {
+  if (options?.productIds?.length === 0) return [];
   const topicKey = options?.topicKey?.trim().toLowerCase() || null;
   const viewer = options?.viewer ?? GUEST_ORDINARY_CATALOG_VIEWER;
   let practiceIdsForTopic: string[] | null = null;
@@ -355,6 +360,10 @@ export async function getPublishedCatalogProducts(
   )
     .not("slug", "is", null)
     .not("author_id", "is", null);
+
+  if (options?.productIds) {
+    query = query.in("id", options.productIds).is("deleted_at", null);
+  }
 
   if (options?.productKind) {
     query = query.eq("product_kind", options.productKind);
@@ -514,6 +523,7 @@ export async function mapPracticeRowsToCatalogProducts(
           (audioSummary?.totalDurationSeconds ?? 0) > 0
             ? audioSummary?.totalDurationSeconds ?? null
             : null,
+        durationMinutes: practice.duration_minutes,
         publishedAt:
           effectivePublishedAt({
             status: practice.status,

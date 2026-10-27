@@ -4,10 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import type { CatalogPromo } from "@/lib/catalog/catalog-promo";
+import {
+  isCatalogPromoArtwork,
+  type CatalogPromo,
+} from "@/lib/catalog/catalog-promo";
 
 type CatalogPromoCarouselProps = {
-  promos: CatalogPromo[];
+  promos: readonly CatalogPromo[];
 };
 
 export default function CatalogPromoCarousel({
@@ -90,12 +93,24 @@ export default function CatalogPromoCarousel({
           <li key={promo.id} className="catalog-promo-carousel__item">
             <Link
               href={promo.href}
-              aria-label={promo.title}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${promo.title} (откроется в новой вкладке)`}
               data-catalog-promo-id={promo.id}
               data-catalog-promo-position={promo.position}
               className="block overflow-hidden rounded-[24px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
             >
-              {promo.caption !== undefined ? (
+              <span className="sr-only"> (откроется в новой вкладке)</span>
+              {isCatalogPromoArtwork(promo.image) ? (
+                // The photo already contains the title. No second heading or caption.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={promo.image}
+                  alt={promo.title}
+                  data-catalog-promo-artwork
+                  className="catalog-promo-artwork"
+                />
+              ) : promo.caption !== undefined ? (
                 <span className="flex min-h-28 items-center gap-3 rounded-[24px] border border-[#e8def5] bg-[#faf6ff] p-4 sm:gap-6">
                   {/* Editable HTTPS images do not require an optimizer host allowlist. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
