@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
 import {
+  BizDocumentsIcon,
+  BizHelpIcon,
   BizHomeIcon,
-  BizLocationsIcon,
   BizLockIcon,
-  BizMoreIcon,
   BizMusicIcon,
-  BizStatsIcon,
 } from "@/components/business-app/BusinessIcons";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
@@ -28,14 +27,13 @@ import {
 } from "@/lib/business-app/nav";
 
 const ICONS: Record<
-  Extract<BusinessNavIconKey, "home" | "locations" | "music" | "stats" | "more">,
+  Extract<BusinessNavIconKey, "home" | "music" | "documents" | "help">,
   ComponentType<{ active?: boolean; className?: string }>
 > = {
   home: BizHomeIcon,
-  locations: BizLocationsIcon,
   music: BizMusicIcon,
-  stats: BizStatsIcon,
-  more: BizMoreIcon,
+  documents: BizDocumentsIcon,
+  help: BizHelpIcon,
 };
 
 export default function BusinessBottomNav() {

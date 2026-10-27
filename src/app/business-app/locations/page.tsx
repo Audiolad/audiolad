@@ -1,10 +1,5 @@
-import BusinessEmptySection from "@/components/business-app/BusinessEmptySection";
+import { redirect } from "next/navigation";
 
 export default function BusinessAppLocationsPage() {
-  return (
-    <BusinessEmptySection
-      title="Точки"
-      description="Здесь появится управление точками и залами."
-    />
-  );
+  redirect("/");
 }

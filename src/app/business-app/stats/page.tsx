@@ -1,10 +1,5 @@
-import BusinessEmptySection from "@/components/business-app/BusinessEmptySection";
+import { redirect } from "next/navigation";
 
 export default function BusinessAppStatsPage() {
-  return (
-    <BusinessEmptySection
-      title="Статистика"
-      description="Простые отчёты по прослушиванию появятся позже."
-    />
-  );
+  redirect("/");
 }

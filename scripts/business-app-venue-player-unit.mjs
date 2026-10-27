@@ -59,9 +59,14 @@ assert.equal(
   "not_found",
 );
 
-assert.ok(
-  BUSINESS_PRIMARY_NAV_ITEMS.some((i) => i.id === "player" && i.available),
-  "player nav available",
+assert.equal(
+  BUSINESS_PRIMARY_NAV_ITEMS.some((i) => i.id === "player"),
+  false,
+  "player is not a separate nav item",
+);
+assert.match(
+  readFileSync(join(repoRoot, "src/app/business-app/player/page.tsx"), "utf8"),
+  /redirect\("\/music"\)/,
 );
 
 assert.equal(existsSync(join(repoRoot, "src/app/business-app/player/page.tsx")), true);

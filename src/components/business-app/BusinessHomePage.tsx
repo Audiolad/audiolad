@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
@@ -83,10 +83,10 @@ function StatusBanner({
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <a
-          href="/player"
+          href="/music"
           className="business-app-btn business-app-btn-primary business-app-focus-ring"
         >
-          Открыть плеер
+          Открыть музыку
         </a>
         <Link
           href="/help"
@@ -95,15 +95,6 @@ function StatusBanner({
           Проверить работу музыки
         </Link>
       </div>
-    </section>
-  );
-}
-
-function ComingSoon({ title, children }: { title: string; children?: ReactNode }) {
-  return (
-    <section className="business-app-card business-app-owner-disabled" role="group" aria-disabled="true">
-      <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">{title} <span className="business-app-chip">скоро</span></h2>
-      {children}
     </section>
   );
 }
@@ -286,20 +277,6 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
               </p>
             )}
           </section>
-        </div>
-        <div className="business-app-home-stack">
-          <ComingSoon title="Атмосфера">
-            <p className="mt-3 text-[var(--biz-text-muted)]">Спокойнее – Энергичнее</p>
-            <input type="range" min="0" max="100" disabled aria-disabled="true" aria-label="Атмосфера – скоро" className="mt-2 w-full min-h-12" />
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Больше такого · скоро</button>
-              <button type="button" disabled aria-disabled="true" className="business-app-btn business-app-btn-secondary">Меньше такого · скоро</button>
-            </div>
-          </ComingSoon>
-          <ComingSoon title="Следующая смена музыкального дня">
-            <p className="mt-3 text-[var(--biz-text-muted)]">Расписание точки пока не подключено.</p>
-          </ComingSoon>
-          <ComingSoon title="История звучания" />
         </div>
       </div>
     </div>

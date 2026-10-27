@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 
 import {
   BUSINESS_ONBOARDING_ATMOSPHERES,
-  BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE,
   BUSINESS_ONBOARDING_STEPS,
   BUSINESS_ONBOARDING_TYPES,
   buildBusinessOnboardingPreviewSummary,
+  businessOnboardingAtmosphereSound,
   businessOnboardingStepIndex,
   canAdvanceBusinessOnboardingStep,
   getBusinessOnboardingAtmosphere,
@@ -20,6 +20,7 @@ import {
   suggestBusinessOnboardingNames,
   validateBusinessOnboardingConfirm,
 } from "../src/lib/business-app/onboarding-wizard.ts";
+import { sourcesForSpace } from "../src/lib/business-workspace/catalog-sources.ts";
 import {
   BUSINESS_PUBLIC_PATH_REWRITES,
   BUSINESS_SITE_PATH,
@@ -90,7 +91,7 @@ assert.equal(preview.typeLabel, "Спа и отдых");
 assert.match(preview.atmosphereLabel, /Современный/);
 // Sergey 23.10.2026 21:21: the "no rights-confirmed tracks yet" box must not appear at all.
 assert.equal("rightsSafeDisclaimer" in preview, false);
-assert.equal(preview.noAudioNote, BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE);
+assert.equal("noAudioNote" in preview, false);
 {
   const wizardSrc = readFileSync(
     join(repoRoot, "src/components/business-app/BusinessOnboardingWizardPage.tsx"),
@@ -104,9 +105,23 @@ assert.equal(preview.noAudioNote, BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE);
     assert.doesNotMatch(src, /Пока таких треков в подборке нет/);
     assert.doesNotMatch(src, /подтверждённые права на каждый трек/);
     assert.doesNotMatch(src, /Музыка появится, когда права на треки будут подтверждены/);
+    assert.doesNotMatch(src, /Музыка здесь пока не играет/);
   }
+  assert.match(wizardSrc, /OnboardingPreviewPlayer/);
+  const previewPlayer = readFileSync(join(repoRoot, "src/components/business-app/OnboardingPreviewPlayer.tsx"), "utf8");
+  assert.match(previewPlayer, /data-testid="onboarding-preview-player"/);
+  assert.match(previewPlayer, /Слушать/);
+  assert.doesNotMatch(previewPlayer, /Музыка здесь пока не играет/);
 }
-assert.match(preview.noAudioNote, /Музыка здесь пока не играет/);
+for (const id of ["calm_premium", "modern_soft", "warm_lively"]) {
+  const sound = businessOnboardingAtmosphereSound(id);
+  assert.ok(sound, id);
+  assert.ok(sourcesForSpace("cafe").some((row) => row.sounds.includes(sound)), `${id} maps to a catalog source`);
+}
+assert.equal(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/api/business/onboarding/preview").action,
+  "pass_through",
+);
 
 const ok = validateBusinessOnboardingConfirm({
   organizationName: " Пилот ",
@@ -158,7 +173,7 @@ assert.match(page, /bootstrapBusinessOrganizationWithLocation/);
 assert.match(page, /Музыка для заведения за минуту/);
 assert.match(
   page,
-  /returnHref\s*\?\s*"Точка подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Точка готова\. Откройте плеер и проверьте подключение\."/,
+  /returnHref\s*\?\s*"Точка подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Точка готова\. Откройте музыку и нажмите «Играть»\."/,
 );
 assert.doesNotMatch(page, /лицензирован[аоы]/i);
 assert.doesNotMatch(page, /ELIGIBLE\s*=\s*true/);

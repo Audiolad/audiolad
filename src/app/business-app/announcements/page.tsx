@@ -1,10 +1,5 @@
-import BusinessEmptySection from "@/components/business-app/BusinessEmptySection";
+import { redirect } from "next/navigation";
 
 export default function BusinessAppAnnouncementsPage() {
-  return (
-    <BusinessEmptySection
-      title="Объявления"
-      description="Короткие сообщения для гостей появятся позже."
-    />
-  );
+  redirect("/");
 }

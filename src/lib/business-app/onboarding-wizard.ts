@@ -102,8 +102,17 @@ export const BUSINESS_ONBOARDING_ATMOSPHERES: readonly BusinessOnboardingAtmosph
     },
   ] as const;
 
-export const BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE =
-  "На этом шаге можно прочитать описание будущей атмосферы. Музыка здесь пока не играет. Плеер станет доступен после подтверждения точки.";
+/** Catalog sound used to preview the atmosphere. Ids match workspace catalog sources. */
+export type BusinessOnboardingAtmosphereSound = "calm" | "jazz" | "rhythm";
+
+export function businessOnboardingAtmosphereSound(
+  id: string | null | undefined,
+): BusinessOnboardingAtmosphereSound | null {
+  if (id === "calm_premium") return "calm";
+  if (id === "modern_soft") return "jazz";
+  if (id === "warm_lively") return "rhythm";
+  return null;
+}
 
 export function isBusinessOnboardingStep(
   value: string,
@@ -218,7 +227,6 @@ export function buildBusinessOnboardingPreviewSummary(input: {
   atmosphereLabel: string;
   vibe: string;
   category: string;
-  noAudioNote: string;
 } {
   const type = getBusinessOnboardingType(input.typeId);
   const atmosphere = getBusinessOnboardingAtmosphere(input.atmosphereId);
@@ -227,7 +235,6 @@ export function buildBusinessOnboardingPreviewSummary(input: {
     atmosphereLabel: atmosphere?.label ?? "Атмосфера не выбрана",
     vibe: atmosphere?.vibe ?? "",
     category: type?.category ?? "",
-    noAudioNote: BUSINESS_ONBOARDING_PREVIEW_NO_AUDIO_NOTE,
   };
 }
 

@@ -80,7 +80,8 @@ const guestAccess = resolveBusinessAccess(anonymous);
 const memberAccess = resolveBusinessAccess(member);
 for (const item of all) assert.equal(isBusinessNavItemLocked(item, memberAccess), false, `${item.id}: member sees everything`);
 const lockedForGuest = [...new Set(all.filter((i) => isBusinessNavItemLocked(i, guestAccess)).map((i) => i.id))].sort();
-assert.deepEqual(lockedForGuest, ["announcements", "documents", "locations", "player", "settings", "stats", "team"], "venues / payments / documents / stats / team stay closed for a guest");
+assert.deepEqual(lockedForGuest, ["documents"], "documents stay closed for a guest");
+assert.ok(BUSINESS_MOBILE_NAV_ITEMS.length <= 5, "mobile bottom nav has at most five buttons");
 const music = BUSINESS_PRIMARY_NAV_ITEMS.find((i) => i.id === "music")!;
 assert.equal(businessNavHref(music, guestAccess), "/guest/coffee", "guest enters Music through the permanent atlas URL");
 assert.equal(businessNavHref(music, memberAccess), "/music");
@@ -104,9 +105,9 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
 }
 {
   const g = shell(anonymous, "/guest/coffee");
-  assert.equal((g.match(/data-locked="true"/g) ?? []).length, 10, "7 locked in the sidebar + 3 in the bottom nav");
+  assert.equal((g.match(/data-locked="true"/g) ?? []).length, 2, "documents locked in the sidebar and the bottom nav");
   has(g, /доступно после подключения/);
-  has(g, /aria-label="Точки – доступно после подключения"/);
+  has(g, /aria-label="Документы – доступно после подключения"/);
   has(g, /data-testid="biz-guest-status"/, "guest status inside the shell");
   has(g, /В гостевом режиме доступно 30 минут прослушивания/);
   has(g, /30 дней в подарок, затем 799\u00a0₽ в месяц/);
@@ -218,7 +219,7 @@ async function closedApis() {
   const trial: BusinessChromeAccess = { mode: "trial", endsAt: "2026-11-22T14:11:37.762Z" };
   const withAccess = (domain: BusinessOwnerHomeContext, pathname: string, customerAccess: BusinessChromeAccess | null) =>
     wrap(domain, pathname, <BusinessAppShell customerAccess={customerAccess}><main data-testid="page">page</main></BusinessAppShell>);
-  for (const path of ["/", "/music", "/onboarding", "/settings"]) {
+  for (const path of ["/", "/onboarding", "/settings"]) {
     const t = withAccess(signedInNoOrg, path, trial);
     hasNot(t, /biz-guest-status|Гостевой режим|Получить 30 дней бесплатно|799/, `${path}: no guest strip / gift offer / price once the gift is live`);
     has(t, /data-testid="biz-access-line"[^>]*>[\s\S]*Бесплатный доступ до 22 ноября 2026/, `${path}: calm access line with the Moscow end date`);
@@ -230,6 +231,7 @@ async function closedApis() {
   has(expired, /data-testid="biz-guest-status"/, "expired / no gift: guest strip and offer stay");
   has(withAccess(anonymous, "/", null), /data-testid="biz-guest-status"/, "anonymous guest still sees the strip");
   hasNot(withAccess(signedInNoOrg, "/workspace", trial), /biz-access-line|biz-guest-status/, "workspace shows its own period block");
+  hasNot(withAccess(signedInNoOrg, "/music", trial), /biz-access-line|biz-guest-status/, "music shows its own period block");
   hasNot(withAccess(member, "/", null), /biz-guest-status/, "member never sees the guest strip");
 
   // Onboarding and the listening limit must not re-offer the gift or show its price either.

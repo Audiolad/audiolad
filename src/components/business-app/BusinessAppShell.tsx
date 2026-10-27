@@ -10,6 +10,7 @@ import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limi
 import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
+import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/components/business-app/BusinessGuestStatus";
 import BusinessSidebar from "@/components/business-app/BusinessSidebar";
@@ -52,19 +53,22 @@ function BusinessShellFrame({ children }: { children: ReactNode }) {
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
+  const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);
-  const showGuestBar = access.level === "guest" && !workspace && !liveAccess;
-  const showAccessLine = liveAccess && !workspace;
+  const showGuestBar = access.level === "guest" && !cabinetMusic && !liveAccess;
+  const showAccessLine = liveAccess && !cabinetMusic;
 
   return (
     <div className="business-app-shell" data-access={access.level}>
       <BusinessSidebar />
-      <div className="business-app-main">
-        {showGuestBar ? <BusinessGuestStatusBar /> : null}
-        {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
-        {children}
-      </div>
-      <BusinessBottomNav />
+      <BusinessCabinetPlayerProvider>
+        <div className="business-app-main">
+          {showGuestBar ? <BusinessGuestStatusBar /> : null}
+          {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
+          {children}
+        </div>
+        <BusinessBottomNav />
+      </BusinessCabinetPlayerProvider>
     </div>
   );
 }

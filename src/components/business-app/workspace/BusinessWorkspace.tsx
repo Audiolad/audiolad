@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
-import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
+import {
+  BusinessCabinetPlayerProvider,
+  useCabinetPlayer,
+  useCabinetPlayerOptional,
+} from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import {
   BUSINESS_CONNECT_VENUE_CTA,
   BUSINESS_CONNECT_VENUE_NOTE,
@@ -18,192 +22,45 @@ import {
   BUSINESS_WORKSPACE_AUTOPLAY_NOTE,
 } from "@/lib/access-grants/copy";
 import { ruDaysWord } from "@/lib/access-grants/policy";
-import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
-import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
-import { groupWorkspaceTracks, workspaceAtmosphereStartIndex } from "@/lib/business-workspace/shelves";
-import { workspacePlayerOpen, workspaceItems, workspaceDeadlineDelay, workspacePlaybackAllowed, type WorkspacePageModel } from "@/lib/business-workspace/model";
+import { groupWorkspaceTracks, workspaceShelfTrackNumber } from "@/lib/business-workspace/shelves";
 import {
-  clampWorkspacePlayback,
-  newerPlayback,
-  playbackStorageKey,
-  type WorkspacePlayback,
-} from "@/lib/business-workspace/playback";
+  workspaceDeadlineDelay,
+  workspacePlaybackAllowed,
+  workspacePlayerOpen,
+  type WorkspacePageModel,
+} from "@/lib/business-workspace/model";
 
-type View = { status: OnlineStatus; title: string | null; message: string | null; index: number };
-
-const JSON_POST = {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  credentials: "same-origin" as const,
-  cache: "no-store" as const,
-};
-
-function readLocal(spaceId: string, trackCount: number): WorkspacePlayback | null {
-  try {
-    const raw = window.localStorage.getItem(playbackStorageKey(spaceId));
-    if (!raw) return null;
-    return clampWorkspacePlayback(JSON.parse(raw) as Partial<WorkspacePlayback>, trackCount);
-  } catch {
-    return null;
-  }
+export default function BusinessWorkspace({ model }: { model: WorkspacePageModel }) {
+  const parent = useCabinetPlayerOptional();
+  if (parent) return <BusinessWorkspaceView model={model} />;
+  return (
+    <BusinessCabinetPlayerProvider initialModel={model.tracks.length > 0 ? model : null}>
+      <BusinessWorkspaceView model={model} />
+    </BusinessCabinetPlayerProvider>
+  );
 }
 
-function writeLocal(spaceId: string, playback: WorkspacePlayback): void {
-  try {
-    window.localStorage.setItem(playbackStorageKey(spaceId), JSON.stringify(playback));
-  } catch {
-    // Private mode: the server copy is still posted when the network works.
-  }
-}
-
-export default function BusinessWorkspace({ model: initialModel }: { model: WorkspacePageModel }) {
+function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageModel }) {
+  const player = useCabinetPlayer();
+  const adopt = player.adopt;
+  const release = player.release;
+  const playIndex = player.playIndex;
+  const currentIndex = player.view.index;
   const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
   const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
   const open = workspacePlayerOpen(model);
-  const canPlay = open && model.tracks.length > 0;
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const ctlRef = useRef<Controller | null>(null);
-  const initialPlayback = clampWorkspacePlayback(model.playback, model.tracks.length);
-  const playbackRef = useRef<WorkspacePlayback>(initialPlayback);
-  const seekRef = useRef(initialPlayback.positionSec);
-  const lastPostRef = useRef(0);
-  const [playback, setPlayback] = useState(initialPlayback);
-  const [view, setView] = useState<View>({ status: "idle", title: null, message: null, index: initialPlayback.index });
-  // ba344b7f: the gift may have been issued by this very page load (after the layout peek ran);
-  // tell the shared shell so «Получить 30 дней бесплатно» does not return on client navigation.
   const reportChromeAccess = useReportBusinessChromeAccess();
   const reportedStatus = model.status;
   const reportedEndsAt = model.endsAt;
+  useLayoutEffect(() => {
+    if (model.tracks.length > 0) adopt(model);
+  }, [model, adopt]);
   useEffect(() => {
     if ((reportedStatus === "trial" || reportedStatus === "paid") && reportedEndsAt) {
       reportChromeAccess({ mode: reportedStatus, endsAt: reportedEndsAt });
     }
   }, [reportChromeAccess, reportedStatus, reportedEndsAt]);
-  const [saveNote, setSaveNote] = useState<string | null>(null);
   const [offerNoted, setOfferNoted] = useState(false);
-
-  useEffect(() => {
-    const count = model.tracks.length;
-    const local = readLocal(model.spaceId, count);
-    const server = model.playback ? clampWorkspacePlayback(model.playback, count) : null;
-    const chosen = newerPlayback(local, server);
-    if (chosen) {
-      playbackRef.current = chosen;
-      seekRef.current = chosen.positionSec;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- local snapshot is read after mount so server HTML stays the hydration source
-      setPlayback(chosen);
-      setView((prev) => ({ ...prev, index: chosen.index }));
-      return;
-    }
-    let stored: string | null = null;
-    try {
-      stored = window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY);
-    } catch {
-      stored = null;
-    }
-    if (!stored) return;
-    const index = workspaceAtmosphereStartIndex(model.tracks, parseBusinessSoundProfile(stored).direction);
-    if (index <= 0) return;
-    const next = clampWorkspacePlayback(
-      { index, positionSec: 0, volume: playbackRef.current.volume, updatedAt: playbackRef.current.updatedAt },
-      count,
-    );
-    playbackRef.current = next;
-    seekRef.current = 0;
-    setPlayback(next);
-    setView((prev) => ({ ...prev, index }));
-  }, [model.playback, model.spaceId, model.tracks]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !canPlay) return;
-    audio.volume = playback.volume;
-  }, [canPlay, playback.volume]);
-
-  const remember = (patch: Partial<WorkspacePlayback>, play: boolean, silent = false) => {
-    const next = clampWorkspacePlayback(
-      { ...playbackRef.current, ...patch, updatedAt: new Date().toISOString() },
-      model.tracks.length,
-    );
-    playbackRef.current = next;
-    if (!silent) setPlayback(next);
-    writeLocal(model.spaceId, next);
-    const now = Date.now();
-    if (!play && now - lastPostRef.current < 15_000) return;
-    lastPostRef.current = now;
-    const params = new URLSearchParams({ space: model.spaceId });
-    void fetch(`/api/business/workspace/state?${params.toString()}`, {
-      ...JSON_POST,
-      body: JSON.stringify({
-        kind: "playback",
-        index: next.index,
-        positionSec: next.positionSec,
-        volume: next.volume,
-        play,
-      }),
-    })
-      .then((res) => {
-        if (!res.ok) setSaveNote("Не удалось сохранить место на сервере. На этом устройстве оно сохранено.");
-        else setSaveNote(null);
-      })
-      .catch(() => {
-        setSaveNote("Нет соединения. Место в подборке сохранено на этом устройстве и отправится, когда связь вернётся.");
-      });
-  };
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !canPlay) return;
-    const ctl = new Controller(
-      {
-        audio,
-        sign: async (audioItemId) => {
-          try {
-            const params = new URLSearchParams({ space: model.spaceId });
-            const res = await fetch(`/api/business/workspace/track-url?${params.toString()}`, {
-              ...JSON_POST,
-              body: JSON.stringify({ audioItemId }),
-            });
-            const json = (await res.json()) as { ok?: boolean; data?: { url?: string }; reason?: string };
-            if (json.ok === true && typeof json.data?.url === "string") return { ok: true, data: { url: json.data.url } };
-            return { ok: false, reason: json.reason || "network" };
-          } catch {
-            return { ok: false, reason: "network" };
-          }
-        },
-        onChange: () => {
-          const current = ctlRef.current;
-          if (!current) return;
-          setView({
-            status: current.status,
-            title: current.current?.title ?? null,
-            message: current.message,
-            index: current.index,
-          });
-        },
-      },
-      workspaceItems(model.tracks, model.endsAt),
-    );
-    ctlRef.current = ctl;
-    const onTime = () => {
-      if (audio.paused) return;
-      remember({ index: ctl.index < 0 ? playbackRef.current.index : ctl.index, positionSec: audio.currentTime }, false, true);
-    };
-    const onEnded = () => void ctl.onEnded();
-    const onError = () => void ctl.onError();
-    audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("error", onError);
-    return () => {
-      audio.removeEventListener("timeupdate", onTime);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onError);
-      ctl.dispose();
-      ctlRef.current = null;
-    };
-    // remember is recreated each render; the controller must not restart on every tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canPlay, model.spaceId, model.tracks, model.endsAt]);
 
   useEffect(() => {
     if (!open) return;
@@ -217,9 +74,7 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
         return;
       }
       expired = true;
-      // Revoke buffered audio immediately, even if the state request is offline.
-      void ctlRef.current?.applyManifest(null);
-      audioRef.current?.pause();
+      release();
       setRefreshed({ source: initialModel, value: { ...model, status: "offer", daysLeft: 0, tracks: [] } });
       const params = new URLSearchParams({ space: model.spaceId });
       void fetch(`/api/business/workspace/state?${params.toString()}`, { credentials: "same-origin", cache: "no-store" })
@@ -227,7 +82,6 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
           if (!res.ok) return;
           const json = await res.json() as { ok?: boolean; model?: WorkspacePageModel };
           if (!json.ok || !json.model) return;
-          // Do not reopen an already-expired window if the client clock is ahead.
           const value = workspacePlayerOpen(json.model) && !workspacePlaybackAllowed(json.model.endsAt, Date.now())
             ? { ...json.model, status: "offer" as const, daysLeft: 0, tracks: [] }
             : json.model;
@@ -242,60 +96,22 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
       window.removeEventListener("focus", check);
       document.removeEventListener("visibilitychange", check);
     };
-  }, [open, model, initialModel]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || view.status !== "playing" || seekRef.current <= 0.5) return;
-    const target = seekRef.current;
-    seekRef.current = 0;
-    if (Number.isFinite(audio.duration) && target < audio.duration) audio.currentTime = target;
-  }, [view.status]);
-
-  const play = async () => {
-    const ctl = ctlRef.current;
-    if (!ctl || !workspacePlaybackAllowed(model.endsAt, Date.now())) return;
-    const index = playbackRef.current.index;
-    if (ctl.status === "playing" || ctl.status === "loading") {
-      await ctl.toggle();
-      remember({ index: ctl.index, positionSec: audioRef.current?.currentTime ?? 0 }, false);
-      return;
-    }
-    if (ctl.status === "paused" && ctl.current) {
-      await ctl.toggle();
-    } else {
-      await ctl.playIndex(index);
-    }
-    remember({ index: ctl.index < 0 ? index : ctl.index, positionSec: audioRef.current?.currentTime ?? playbackRef.current.positionSec }, true);
-  };
-
-  const next = async () => {
-    const ctl = ctlRef.current;
-    if (!ctl || !workspacePlaybackAllowed(model.endsAt, Date.now())) return;
-    seekRef.current = 0;
-    await ctl.next();
-    remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
-  };
+  }, [open, model, initialModel, release]);
 
   const offer = () => {
     setOfferNoted(true);
     const params = new URLSearchParams({ space: model.spaceId });
     void fetch(`/api/business/workspace/state?${params.toString()}`, {
-      ...JSON_POST,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
       body: JSON.stringify({ kind: "offer_click" }),
     }).catch(() => {
-      setSaveNote("Нет соединения. Кнопка подписки остаётся на этом экране, списание не начинается.");
+      /* The subscribe button stays on this screen. Nothing is charged. */
     });
   };
 
-  const startAt = async (index: number) => {
-    if (!playbackStillOpen(model.endsAt)) return;
-    seekRef.current = 0;
-    await ctlRef.current?.playIndex(index);
-    remember({ index, positionSec: 0 }, true);
-  };
-
-  const playing = view.status === "playing" || view.status === "loading";
   const shelves = groupWorkspaceTracks(model.tracks);
 
   return (
@@ -343,7 +159,7 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
       {model.status === "unavailable" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-unavailable">
           <p>{BUSINESS_STORE_UNAVAILABLE_NOTE}</p>
-          <a className="underline" href={`/workspace?space=${model.spaceId}`}>Перейти и повторить</a>
+          <a className="underline" href={`/music`}>Перейти и повторить</a>
         </section>
       ) : null}
 
@@ -387,72 +203,46 @@ export default function BusinessWorkspace({ model: initialModel }: { model: Work
         </section>
       ) : null}
 
-      {canPlay ? (
-        <section className="business-app-card business-workspace-player" aria-label="Плеер кабинета" data-testid="biz-workspace-player">
+      {open && model.tracks.length > 0 ? (
+        <section className="business-app-card" data-testid="biz-workspace-tracks">
           <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
-          <div data-testid="biz-workspace-tracks">
-            {shelves.map((shelf) => (
-              <section key={shelf.key} className="mt-3 space-y-2">
-                {shelf.title ? (
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 className="text-[1.05rem] font-bold" data-testid="biz-workspace-shelf">{shelf.title}</h2>
-                    <button type="button" className="text-sm underline" onClick={() => startAt(shelf.firstIndex)}>
-                      Играть эту подборку
-                    </button>
-                  </div>
-                ) : null}
-                {shelf.albums.map((album) => (
-                  <div key={`${shelf.key}:${album.key}`}>
-                    {album.title ? <h3 className="text-sm font-semibold text-[var(--biz-text-muted)]" data-testid="biz-workspace-album">{album.title}</h3> : null}
-                    <ol className="business-atmosphere-tracks">
-                      {album.tracks.map(({ track, index }) => (
-                        <li key={track.audioItemId} data-current={view.index === index ? "true" : undefined}>
-                          <button
-                            type="button"
-                            className="business-atmosphere-track business-app-focus-ring"
-                            onClick={() => startAt(index)}
-                          >
-                            <span>{index + 1}</span>
-                            <span>{track.title}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                ))}
-              </section>
-            ))}
-          </div>
-          <BusinessPlayerControls
-            testIdPrefix="biz-workspace"
-            playing={view.status === "playing"}
-            loading={view.status === "loading"}
-            nowTitle={view.title}
-            onToggle={() => void play()}
-            onNext={() => void next()}
-            pauseLabel="Стоп"
-            volume={playback.volume}
-            onVolume={(value) => remember({ volume: value }, false)}
-          />
-          {view.message ? (
-            <p className="business-app-alert mt-2" data-tone="warn" role="alert" data-testid="biz-workspace-player-message">
-              {view.message}
-            </p>
-          ) : null}
-          {saveNote ? <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-workspace-save-note">{saveNote}</p> : null}
-          {playing ? null : <p className="mt-2 text-sm text-[var(--biz-text-muted)]">Сейчас пауза. Подборка продолжается с сохранённого места после «Играть».</p>}
+          {shelves.map((shelf) => (
+            <section key={shelf.key} className="mt-3 space-y-2">
+              {shelf.title ? (
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-[1.05rem] font-bold" data-testid="biz-workspace-shelf">{shelf.title}</h2>
+                  <button type="button" className="text-sm underline" onClick={() => void playIndex(shelf.firstIndex)}>
+                    Играть эту подборку
+                  </button>
+                </div>
+              ) : null}
+              {shelf.albums.map((album) => (
+                <div key={`${shelf.key}:${album.key}`}>
+                  {album.title ? <h3 className="text-sm font-semibold text-[var(--biz-text-muted)]" data-testid="biz-workspace-album">{album.title}</h3> : null}
+                  <ol className="business-atmosphere-tracks">
+                    {album.tracks.map(({ track, index }) => (
+                      <li key={track.audioItemId} data-current={currentIndex === index ? "true" : undefined}>
+                        <button
+                          type="button"
+                          className="business-atmosphere-track business-app-focus-ring"
+                          onClick={() => void playIndex(index)}
+                        >
+                          <span>{workspaceShelfTrackNumber(shelf, track.audioItemId)}</span>
+                          <span>{track.title}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
+            </section>
+          ))}
         </section>
       ) : null}
-
-      {canPlay ? <audio ref={audioRef} preload="none" playsInline data-testid="biz-workspace-audio" /> : null}
     </div>
   );
 }
 
 function showEmpty(model: WorkspacePageModel): boolean {
   return workspacePlayerOpen(model) && model.tracks.length === 0;
-}
-
-function playbackStillOpen(endsAt: string | null): boolean {
-  return workspacePlaybackAllowed(endsAt, Date.now());
 }

@@ -43,7 +43,10 @@ import { acceptWorkspaceCatalogSourceRow, orderWorkspaceCatalogRows, type Worksp
 import { LARA_LARINA_AUTHOR_ID, OLGA_NEVSKAYA_AUTHOR_ID, WORKSPACE_ATMOSPHERE_SOUNDS, sourcesForSpace } from "../src/lib/business-workspace/catalog-sources";
 import { selectWorkspaceTracks } from "../src/lib/business-workspace/catalog";
 import { WORKSPACE_RIGHTS_CACHE_MS, WORKSPACE_RIGHTS_CONCURRENCY, createTtlDecisionCache, mapPool } from "../src/lib/business-workspace/eligibility-cache";
-import { groupWorkspaceTracks, workspaceAtmosphereStartIndex, workspaceShelfTitle } from "../src/lib/business-workspace/shelves";
+import { displayWorkspaceTrackTitle } from "../src/lib/business-workspace/display-title";
+import { cabinetByteaHex, cabinetDeviceClaimOpen, cabinetDeviceSecretHex, parseCabinetReportBody } from "../src/lib/business-app/cabinet-player-report";
+import { BUSINESS_MOBILE_NAV_ITEMS } from "../src/lib/business-app/nav";
+import { groupWorkspaceTracks, workspaceAtmosphereStartIndex, workspaceShelfTitle, workspaceShelfTrackNumber } from "../src/lib/business-workspace/shelves";
 import { workspaceItems, workspaceDeadlineDelay, workspacePlaybackAllowed, type WorkspacePageModel } from "../src/lib/business-workspace/model";
 import { handleWorkspaceState, handleWorkspaceTrackUrl } from "../src/lib/business-workspace/routes";
 
@@ -559,6 +562,7 @@ for (const limit of ["ok", "exhausted"] as const) {
 }
 
 const workspaceSource = read("src/components/business-app/workspace/BusinessWorkspace.tsx");
+const playerSource = read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx");
 assert.doesNotMatch(workspaceSource, /799/);
 assert.doesNotMatch(workspaceSource, /autoPlay|autoplay/);
 assert.doesNotMatch(workspaceSource, /—/);
@@ -591,10 +595,13 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({})} />);
   assert.match(html, /data-testid="biz-workspace-player"/);
+  assert.match(html, /data-testid="biz-workspace-progress"/);
+  assert.match(html, /data-testid="biz-workspace-time"/);
+  assert.match(html, /0:00/);
   assert.match(html, /Осталось 12 дней/);
   assert.match(html, /biz-workspace-until/);
   assert.match(html, />Играть</);
-  assert.match(workspaceSource, /pauseLabel="Стоп"/);
+  assert.doesNotMatch(workspaceSource, /pauseLabel="Стоп"/);
   assert.match(html, /data-testid="biz-workspace-volume"/);
   assert.match(html, /preload="none"/);
   assert.doesNotMatch(html, /autoplay/i);
@@ -620,7 +627,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
 
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({ status: "unavailable" })} />);
-  assert.match(html, /href="\/workspace\?space=cafe"[^>]*>Перейти и повторить/);
+  assert.match(html, /href="\/music"[^>]*>Перейти и повторить/);
   assert.doesNotMatch(html, /href="\/help"/);
   const back = read("src/app/(platform)/auth/business-return/page.tsx");
   assert.doesNotMatch(back, /href="\/help"/);
@@ -629,9 +636,10 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
   assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
   assert.ok(BUSINESS_TRIAL_SIGN_IN_HREF.includes("next=%2Fauth%2Fbusiness-return"));
-  assert.match(workspaceSource, /workspaceItems\(model.tracks, model.endsAt\)/);
+  assert.match(playerSource, /workspaceItems\(current\.tracks, current\.endsAt\)/);
   assert.match(workspaceSource, /setTimeout\(check, workspaceDeadlineDelay/);
-  assert.match(workspaceSource, /applyManifest\(null\)/);
+  assert.match(playerSource, /applyManifest\(null\)/);
+  assert.doesNotMatch(playerSource, /—/);
   assert.match(read("src/app/api/business/workspace/state/route.ts"), /export async function GET/);
 }
 
@@ -779,6 +787,24 @@ assert.doesNotMatch(rules, /—/);
   assert.deepEqual(grouped[0]?.albums.map((album) => album.title), ["Вечер", "Утро"]);
   assert.equal(grouped[1]?.title, "Аурафон – другая музыка");
   assert.equal(grouped[1]?.firstIndex, 2);
+  assert.equal(workspaceShelfTrackNumber(grouped[0]!, "1"), 1);
+  assert.equal(workspaceShelfTrackNumber(grouped[0]!, "2"), 2);
+  assert.equal(workspaceShelfTrackNumber(grouped[1]!, "3"), 1, "each shelf numbers from 1");
+  assert.equal(displayWorkspaceTrackTitle({ title: "Утро", albumTitle: "Джаз" }), "Утро");
+  assert.equal(displayWorkspaceTrackTitle({ title: "Аудио 8", albumTitle: "Джаз лаунж" }), "Джаз лаунж – 8");
+  assert.equal(displayWorkspaceTrackTitle({ title: "Трек 3", practiceTitle: "Ольга" }), "Ольга");
+  assert.equal(displayWorkspaceTrackTitle({ title: "Аудио 10", albumTitle: "Аудио 2" }), null);
+  assert.equal(displayWorkspaceTrackTitle({ title: "Трек" }), null);
+  assert.ok(BUSINESS_MOBILE_NAV_ITEMS.length <= 5);
+  const secret = "a".repeat(40);
+  assert.equal(parseCabinetReportBody({ source: "cabinet", kind: "heartbeat", deviceSecret: secret })?.kind, "heartbeat");
+  assert.equal(parseCabinetReportBody({ kind: "heartbeat", deviceSecret: secret }), null);
+  const hex = cabinetDeviceSecretHex(secret);
+  assert.equal(hex.length, 64);
+  assert.equal(cabinetByteaHex(`\\x${hex}`), hex);
+  assert.equal(cabinetDeviceClaimOpen(hex, hex, Date.now(), Date.now()), true);
+  assert.equal(cabinetDeviceClaimOpen("b".repeat(64), hex, Date.now(), Date.now()), false);
+  assert.equal(cabinetDeviceClaimOpen("b".repeat(64), hex, Date.now() - 6 * 60 * 1000, Date.now()), true);
 
   let clock = 0;
   const cache = createTtlDecisionCache<"ELIGIBLE" | "UNKNOWN">(WORKSPACE_RIGHTS_CACHE_MS, () => clock);

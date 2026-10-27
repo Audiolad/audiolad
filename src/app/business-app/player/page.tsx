@@ -1,5 +1,6 @@
-import VenuePlayerPage from "@/components/business-app/VenuePlayerPage";
+import { redirect } from "next/navigation";
 
+/** Old venue-player URL. The cabinet player is the music page. */
 export default function BusinessVenuePlayerRoutePage() {
-  return <VenuePlayerPage />;
+  redirect("/music");
 }

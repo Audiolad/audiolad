@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { bootstrapBusinessOrganizationWithLocation } from "@/app/business-app/actions";
+import OnboardingPreviewPlayer from "@/components/business-app/OnboardingPreviewPlayer";
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { businessAccessLine } from "@/lib/access-grants/access-line";
@@ -117,7 +118,7 @@ export default function BusinessOnboardingWizardPage({
         />
         <section className="business-app-card space-y-3">
           <p className="text-[var(--biz-text-muted)]">
-            Мастер первой точки уже пройден. Откройте плеер или статус на главной.
+            Мастер первой точки уже пройден. Откройте музыку или статус на главной.
           </p>
           {returnHref ? (
             <p className="text-[var(--biz-text)]">Кабинет с музыкой открывается по ссылке ниже.</p>
@@ -139,16 +140,10 @@ export default function BusinessOnboardingWizardPage({
               На главную
             </Link>
             <Link
-              href="/player"
-              className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-            >
-              Открыть плеер
-            </Link>
-            <Link
               href="/music"
               className="business-app-btn business-app-btn-secondary business-app-focus-ring"
             >
-              Музыка
+              Открыть музыку
             </Link>
           </div>
         </section>
@@ -333,9 +328,7 @@ export default function BusinessOnboardingWizardPage({
                 <p className="mt-2 text-[var(--biz-text-muted)]">{preview.vibe}</p>
               ) : null}
             </div>
-            <p className="rounded-xl border border-[var(--biz-yellow-border)] bg-[var(--biz-yellow-bg)] px-3 py-2 text-sm text-[var(--biz-text)]">
-              {preview.noAudioNote}
-            </p>
+            <OnboardingPreviewPlayer atmosphereId={atmosphereId} />
           </>
         ) : null}
 
@@ -409,7 +402,7 @@ export default function BusinessOnboardingWizardPage({
             <p className="text-[var(--biz-text)]">
               {returnHref
                 ? "Точка подключена. Откройте кабинет и нажмите «Играть»."
-                : "Точка готова. Откройте плеер и проверьте подключение."}
+                : "Точка готова. Откройте музыку и нажмите «Играть»."}
             </p>
             {created ? (
               <p className="text-sm text-[var(--biz-text-muted)]">
@@ -429,16 +422,10 @@ export default function BusinessOnboardingWizardPage({
                 </Link>
               ) : null}
               <Link
-                href="/player"
+                href="/music"
                 className={`business-app-btn business-app-focus-ring ${returnHref ? "business-app-btn-secondary" : "business-app-btn-primary"}`}
               >
-                Открыть плеер
-              </Link>
-              <Link
-                href="/music"
-                className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-              >
-                Музыка
+                Открыть музыку
               </Link>
               <Link
                 href="/"
