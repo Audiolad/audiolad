@@ -101,13 +101,22 @@ assert.equal(isCatalogPromoArtwork(CATALOG_PROMO_ARTWORK_PATH), true);
 assert.equal(isCatalogPromoArtwork(`${CATALOG_PROMO_ARTWORK_PATH}?v=2`), true);
 assert.equal(isCatalogPromoArtwork(school.image), false);
 assert.equal(isCatalogPromoArtwork("/images/catalog-promo/not-school-audiopraktik.webp"), false);
+const unversionedArtwork = "/images/catalog-promo/school-audiopraktik.webp";
+assert.equal(isCatalogPromoArtwork(unversionedArtwork), true);
+assert.notEqual(CATALOG_PROMO_ARTWORK_PATH, unversionedArtwork);
+assert.match(CATALOG_PROMO_ARTWORK_PATH, /\?v=cc57991732df$/);
+assert.equal(isPromoImageUrl(unversionedArtwork), true);
 const artwork = render({
   ...school,
-  image: CATALOG_PROMO_ARTWORK_PATH,
+  image: unversionedArtwork,
   caption: "Научитесь создавать аудиопрактики",
 });
 assert.match(artwork, /data-catalog-promo-artwork/);
-assert.match(artwork, new RegExp(`src="${CATALOG_PROMO_ARTWORK_PATH}"`));
+assert.ok(artwork.includes(`src="${CATALOG_PROMO_ARTWORK_PATH}"`));
+assert.equal(
+  (artwork.match(/src="\/images\/catalog-promo\/school-audiopraktik\.webp"/g) ?? []).length,
+  0,
+);
 assert.match(artwork, /alt="Школа аудиопрактик"/);
 assert.match(artwork, /aria-label="Школа аудиопрактик \(откроется в новой вкладке\)"/);
 assert.match(artwork, /target="_blank"/);

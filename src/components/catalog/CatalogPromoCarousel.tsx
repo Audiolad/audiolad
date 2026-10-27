@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  CATALOG_PROMO_ARTWORK_PATH,
   isCatalogPromoArtwork,
   type CatalogPromo,
 } from "@/lib/catalog/catalog-promo";
@@ -105,7 +106,7 @@ export default function CatalogPromoCarousel({
                 // The photo already contains the title. No second heading or caption.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={promo.image}
+                  src={CATALOG_PROMO_ARTWORK_PATH}
                   alt={promo.title}
                   data-catalog-promo-artwork
                   className="catalog-promo-artwork"
