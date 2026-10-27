@@ -121,11 +121,7 @@ export default function AdminListenerCommentsPanel({
   }
 
   useEffect(() => {
-    if (queue === "ratings") {
-      setLoading(false);
-      setError(false);
-      return;
-    }
+    if (queue === "ratings") return;
     const controller = new AbortController();
     fetch(queueUrl(queue, null), {
       credentials: "same-origin",
