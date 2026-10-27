@@ -80,7 +80,7 @@ export const AUTHOR_FEEDBACK_MARK_READ = "Прочитано";
 export const ADMIN_LISTENER_COMMENTS_TITLE = "Отзывы слушателей";
 
 export const ADMIN_LISTENER_COMMENTS_SUBTITLE =
-  "Жалобы, скрытие и удаление отзывов. Это не модерация продуктов и не авторские заявки.";
+  "Отзывы слушателей на всех опубликованных продуктах: жалобы, скрытие и удаление. Здесь же – звёздные оценки продуктов, авторов и слушателей. Это не модерация продуктов и не авторские заявки.";
 
 export const OWNER_COMMENT_DELETE_LABEL = "Удалить";
 
