@@ -10,6 +10,16 @@ export const WORKSPACE_PLAYBACK_STORAGE_KEY = "audiolad-business-workspace-playb
 /** First visit on a device, before this browser has stored a level. */
 export const WORKSPACE_DEFAULT_VOLUME = 0.5;
 
+/** One slider step; also one tap on «↓ Тише» / «Громче ↑» (5% of the 0..1 range). */
+export const WORKSPACE_VOLUME_STEP = 0.05;
+
+/** Next volume after one «Тише» (-1) or «Громче» (+1) tap: snapped to the step grid, clamped to 0..1. */
+export function stepWorkspaceVolume(current: number, direction: -1 | 1, step: number = WORKSPACE_VOLUME_STEP): number {
+  const base = Number.isFinite(current) ? Math.min(1, Math.max(0, current)) : WORKSPACE_DEFAULT_VOLUME;
+  const next = Math.round((base + direction * step) / step) * step;
+  return Math.min(1, Math.max(0, Math.round(next * 1000) / 1000));
+}
+
 export function clampWorkspacePlayback(
   input: Partial<WorkspacePlayback> | null | undefined,
   trackCount: number,

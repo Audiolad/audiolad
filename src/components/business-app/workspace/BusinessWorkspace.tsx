@@ -18,6 +18,7 @@ import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queu
 import type { CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
 import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
+import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
 import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
@@ -348,15 +349,31 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             </div>
             <div className="business-now__volume">
               <p className="business-now__volume-title" id="biz-now-volume-caption">Громкость</p>
-              <div className="business-now__volume-ends" aria-hidden="true">
-                <span>↓ Тише</span>
-                <span>Громче ↑</span>
+              <div className="business-now__volume-ends">
+                <button
+                  type="button"
+                  className="business-now__volume-step"
+                  aria-label="Тише"
+                  data-testid="biz-now-volume-down"
+                  onClick={() => player.setVolume(stepWorkspaceVolume(player.volume, -1))}
+                >
+                  ↓ Тише
+                </button>
+                <button
+                  type="button"
+                  className="business-now__volume-step"
+                  aria-label="Громче"
+                  data-testid="biz-now-volume-up"
+                  onClick={() => player.setVolume(stepWorkspaceVolume(player.volume, 1))}
+                >
+                  Громче ↑
+                </button>
               </div>
               <input
                 type="range"
                 min={0}
                 max={1}
-                step={0.05}
+                step={WORKSPACE_VOLUME_STEP}
                 value={player.volume}
                 onChange={(event) => player.setVolume(Number(event.target.value))}
                 data-testid="biz-now-volume"
