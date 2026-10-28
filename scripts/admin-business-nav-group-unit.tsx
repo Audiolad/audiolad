@@ -61,20 +61,32 @@ assert.match(review, /Прослушивание треков/);
 const admissions = onReview.match(/<a[^>]*data-nav-href="\/admin\/business-admissions"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
 assert.doesNotMatch(admissions, /aria-current="page"/);
 assert.match(onReview, /aria-label="АудиоЛад Бизнес"/);
+const nested = render("/admin/business-verification/case-1");
+assert.match(nested, /aria-label="АудиоЛад Бизнес"/);
+assert.match(nested, /data-nav-href="audiolad-business"[^>]*aria-current="true"/);
+assert.match(nested, /aria-current="page"/);
 assert.match(onReview, /<nav class="flex flex-wrap gap-2" aria-label="Панель управления"/);
 
 const elsewhere = render("/admin/product-moderation");
 const idleParent = elsewhere.match(/<a[^>]*data-nav-href="audiolad-business"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
 assert.doesNotMatch(idleParent, /aria-current/);
 assert.match(idleParent, /data-nav-badge="attention"[^>]*>3<\/span>/);
-assert.match(elsewhere, /Проверка правообладателей/);
-assert.match(elsewhere, /href="\/admin\/business-verification"/);
+assert.doesNotMatch(elsewhere, /Проверка правообладателей/);
+assert.doesNotMatch(elsewhere, /Прослушивание треков/);
+assert.doesNotMatch(elsewhere, /Допуски музыки/);
+assert.doesNotMatch(elsewhere, /aria-label="АудиоЛад Бизнес"/);
+assert.equal(elsewhere.match(/<nav /g)?.length, 1);
 
-const summed = render("/admin", 60, 50);
+const summed = render("/admin/business-admissions", 60, 50);
 const summedParent = summed.match(/<a[^>]*data-nav-href="audiolad-business"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
+assert.match(summedParent, /aria-current="true"/);
 assert.match(summedParent, />99\+<\/span>/);
 assert.match(summed, /data-nav-href="\/admin\/business-verification"[\s\S]*?>60<\/span>/);
 assert.match(summed, /data-nav-href="\/admin\/business-track-review"[\s\S]*?>50<\/span>/);
+const overview = render("/admin", 60, 50);
+assert.match(overview.match(/<a[^>]*data-nav-href="audiolad-business"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "", />99\+<\/span>/);
+assert.doesNotMatch(overview, /data-nav-href="\/admin\/business-verification"/);
+assert.doesNotMatch(overview, /data-nav-href="\/admin\/business-track-review"/);
 
 const plain = renderToStaticMarkup(createElement(AdminNavTabs, {
   items: [{ href: "/admin", label: "Обзор" }, { href: "/admin/tracks", label: "Треки" }],
