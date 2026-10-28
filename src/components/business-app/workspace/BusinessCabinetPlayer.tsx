@@ -511,6 +511,8 @@ export function BusinessCabinetPlayerProvider({
             onNext={() => void next()}
             volume={playback.volume}
             onVolume={setVolume}
+            appearance="round"
+            size="compact"
           />
           {view.message ? (
             <p className="business-app-alert" data-tone="warn" role="alert" data-testid="biz-workspace-player-message">

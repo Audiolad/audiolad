@@ -58,9 +58,7 @@ export default function BusinessPlayerSettings() {
         <CafeQueueControls
           mode={queue.prefs.daypartMode}
           effectiveDaypart={queue.effectiveDaypart}
-          energyOffset={queue.prefs.energyOffset}
           onDaypart={queue.setDaypartMode}
-          onOffset={queue.setEnergyOffset}
         />
       </section>
     </>

@@ -17,6 +17,7 @@ import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSo
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessAtmosphereTrackButton from "../src/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
+import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import { businessGiftRulesText } from "../src/lib/access-grants/copy";
 import { hashAccessEmail } from "../src/lib/access-grants/email-hash";
@@ -612,32 +613,56 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({})} />);
   assert.match(html, /data-testid="biz-workspace-player"/);
   assert.match(html, /data-testid="biz-cafe-queue"/);
-  assert.match(html, /data-testid="biz-cafe-calmer"/);
-  assert.match(html, /Спокойнее/);
-  assert.match(html, /Бодрее/);
-  assert.match(html, /Больше таких/);
-  assert.match(html, /Меньше таких/);
+  assert.match(html, /data-testid="biz-cafe-auto"/);
+  assert.match(html, />Авто</);
+  assert.match(html, /По часам устройства/);
+  assert.doesNotMatch(html, /Спокойнее|Бодрее|biz-cafe-calmer|biz-cafe-livelier/);
+  assert.match(html, /Больше такой музыки/);
+  assert.match(html, /Меньше такой музыки/);
+  assert.match(html, /cafe-queue__glyph/);
   assert.doesNotMatch(html, /—/);
+  assert.doesNotMatch(html, /Кафе, рестораны и отели/);
+  assert.doesNotMatch(html, /data-testid="biz-workspace-days"|data-testid="biz-workspace-rules"|30 дней в подарок/);
   assert.match(html, /data-testid="biz-workspace-progress"/);
   assert.match(html, /data-testid="biz-workspace-time"/);
   assert.match(html, /0:00/);
-  assert.match(html, /Осталось 12 дней/);
-  assert.match(html, /biz-workspace-until/);
-  assert.match(html, />Играть</);
+  assert.match(html, /aria-label="Играть"/);
+  assert.match(html, /business-play-btn--large/);
+  assert.match(html, /business-play-btn--compact/);
+  assert.match(html, /aria-label="Следующий"/);
+  assert.doesNotMatch(html, />Играть</);
+  assert.doesNotMatch(html, />Следующий</);
   assert.doesNotMatch(workspaceSource, /pauseLabel="Стоп"/);
+  assert.match(workspaceSource, /energyOffset: 0/);
+  assert.doesNotMatch(workspaceSource, /queue\.prefs\.energyOffset/);
+  assert.match(workspaceSource, /boundaryAudioItemId/);
   assert.match(html, /data-testid="biz-workspace-volume"/);
   assert.match(html, /preload="none"/);
   assert.doesNotMatch(html, /autoplay/i);
-  assert.match(html, /безлимитн/, "rules say Studio generation is not unlimited");
-  assert.match(html, /3 часов/);
+}
+{
+  const auto = renderToStaticMarkup(
+    <CafeQueueControls mode="auto" effectiveDaypart="morning" onDaypart={() => {}} />,
+  );
+  assert.match(auto, /Сейчас утро – по часам/);
+  assert.match(auto, /data-testid="biz-cafe-auto"[^>]*aria-pressed="true"/);
+  assert.match(auto, /data-testid="biz-cafe-daypart-morning"[^>]*aria-pressed="false"/);
+  const manual = renderToStaticMarkup(
+    <CafeQueueControls mode="evening" effectiveDaypart="morning" onDaypart={() => {}} />,
+  );
+  assert.match(manual, /Выбрано вручную/);
+  assert.match(manual, /data-testid="biz-cafe-daypart-evening"[^>]*aria-pressed="true"/);
+  assert.match(manual, /data-testid="biz-cafe-auto"[^>]*aria-pressed="false"/);
+  assert.doesNotMatch(auto + manual, /—/);
 }
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({ status: "offer", daysLeft: 0, tracks: [] })} />);
   assert.match(html, /data-testid="biz-workspace-offer"/);
-  assert.match(html, new RegExp(formatBusinessMonthlyPrice().replace(" ", "\\s")));
-  assert.match(html, /в месяц/);
+  assert.match(html, /Подарочный период закончился 12 марта 2026 г\., 10:00 МСК\. Полный плеер закрыт\./);
+  assert.match(html, /href="\/#dostup"/);
+  assert.match(html, /Условия и подписка/);
   assert.doesNotMatch(html, /data-testid="biz-workspace-player"/);
-  assert.match(html, /Деньги не списываются|ничего не списывает/);
+  assert.doesNotMatch(html, /Оформить подписку|Кафе, рестораны и отели/);
 }
 {
   const css = read("src/components/business-app/business-app.css");
@@ -899,6 +924,8 @@ assert.doesNotMatch(rules, /—/);
   assert.match(groupedHtml, /business-atmosphere-track__cover/);
   assert.match(groupedHtml, /loading="lazy"/);
   assert.match(groupedHtml, /practice-covers\/night\/xs\.webp/);
+  const queueHtml = groupedHtml.slice(groupedHtml.indexOf('data-testid="biz-now-queue"'));
+  assert.doesNotMatch(queueHtml, /business-atmosphere-track__mark/, "the up-next list has no restarting numbers");
   assert.match(groupedHtml, /business-music-stage/);
   assert.match(groupedHtml, /business-track-panel/);
   assert.doesNotMatch(groupedHtml, /token=|practice-audio|object\/sign/);

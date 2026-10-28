@@ -4,8 +4,12 @@ import { anonymousSupportDiagnostics, buildSupportDiagnostics } from "../src/lib
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomePage, { type BusinessHomePageProps } from "../src/components/business-app/BusinessHomePage";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
+import { businessGiftRulesText } from "../src/lib/access-grants/copy";
+import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "../src/lib/access-grants/policy";
+import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import { emptyBusinessOwnerHomeSignals } from "../src/lib/business-app/owner-home-signals";
 
@@ -91,4 +95,38 @@ for (const diagnostics of [anonymousSupportDiagnostics(), buildSupportDiagnostic
     assert.match(html, /Последний сигнал от плеера<\/dt><dd[^>]*>только что/);
   } else assert.match(html, /Нет данных о плеерах/);
 }
+assert.doesNotMatch(render(), /data-testid="biz-home-access"/, "no trial card without a live or ended period");
+const trialEnds = "2026-11-22T14:11:37.762Z";
+const trialDays = trialDaysLeft(new Date(trialEnds), new Date());
+const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string | null }) => renderToStaticMarkup(
+  <AppRouterContext.Provider value={fakeRouter}>
+    <BusinessDomainProvider value={context}>
+      <BusinessChromeAccessProvider value={access}>
+        <BusinessHomePage />
+      </BusinessChromeAccessProvider>
+    </BusinessDomainProvider>
+  </AppRouterContext.Provider>,
+);
+const trialHome = withAccess({ mode: "trial", endsAt: trialEnds });
+assert.match(trialHome, /data-testid="biz-home-access"/);
+assert.match(trialHome, /30 дней в подарок/);
+assert.match(trialHome, new RegExp(`Осталось ${trialDays} ${ruDaysWord(trialDays)}`));
+assert.ok(trialHome.includes(`до ${formatMoscowDateTime(new Date(trialEnds))}`));
+assert.ok(trialHome.includes(businessGiftRulesText()));
+assert.match(trialHome, /безлимитн/);
+assert.match(trialHome, /3 часов/);
+assert.doesNotMatch(trialHome, /—/);
+const paidHome = withAccess({ mode: "paid", endsAt: "2026-12-31T10:00:00.000Z" });
+assert.match(paidHome, /data-mode="paid"/);
+assert.ok(paidHome.includes(`Подписка до ${formatMoscowDateTime(new Date("2026-12-31T10:00:00.000Z"))}`));
+const endedHome = withAccess({ mode: "offer", endsAt: trialEnds });
+assert.match(endedHome, /id="dostup"/);
+assert.match(endedHome, /Подарочный период закончился/);
+assert.match(endedHome, new RegExp(formatBusinessMonthlyPrice().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(" ", "\\s")));
+assert.match(endedHome, /в месяц/);
+assert.match(endedHome, /ничего не списывает/);
+assert.match(endedHome, /data-testid="biz-home-subscribe"/);
+assert.match(endedHome, /Оформить подписку/);
+assert.ok(endedHome.includes(businessGiftRulesText()));
+assert.doesNotMatch(withAccess({ mode: "offer", endsAt: null }), /data-testid="biz-home-access"/, "no grant is not a finished trial");
 console.log("business-app-owner-home-render-unit: ok");
