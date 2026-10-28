@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
@@ -87,6 +88,46 @@ export async function POST(request: Request) {
       lastSeenAt: payload.last_seen_at ?? null,
       playerCode: payload.player_code ?? null,
     });
+  }
+
+  if (body.action === "enqueue") {
+    if (!isPointCommandId(body.id) || !isPointCommandType(body.type) || typeof body.locationId !== "string") {
+      return json({ ok: false, error: "Не удалось отправить команду." }, 400);
+    }
+    const { data, error } = await supabase.rpc("enqueue_business_point_command", {
+      p_id: body.id,
+      p_location_id: body.locationId,
+      p_type: body.type,
+    });
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      return json({ ok: false, error: "Не удалось отправить команду. Попробуйте ещё раз." });
+    }
+    return json({ ok: true, id: (data as { id?: string }).id ?? body.id });
+  }
+
+  if (body.action === "commands" || body.action === "ack") {
+    const jar = request.headers.get("cookie") ?? "";
+    const token = readCookie(jar, BUSINESS_POINT_COOKIE);
+    if (!isPointToken(token)) return json({ ok: false, reason: "no_access" });
+    if (body.action === "commands") {
+      const { data, error } = await supabase.rpc("list_business_point_commands", { p_token: token });
+      if (error || !Array.isArray(data)) return json({ ok: false, reason: "commands_failed" });
+      const commands = data.filter(
+        (row): row is { id: string; type: "pause" | "resume" | "next_track"; created_at: string } =>
+          !!row && isPointCommandId((row as { id?: unknown }).id) && isPointCommandType((row as { type?: unknown }).type),
+      );
+      return json({ ok: true, commands });
+    }
+    if (!isPointCommandId(body.id)) return json({ ok: false, reason: "invalid_request" }, 400);
+    const { data, error } = await supabase.rpc("ack_business_point_command", {
+      p_token: token,
+      p_command_id: body.id,
+      p_result: "applied",
+    });
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      return json({ ok: false, reason: "ack_failed" });
+    }
+    return json({ ok: true });
   }
 
   if (body.action === "report") {
