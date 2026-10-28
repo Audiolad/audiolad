@@ -71,6 +71,22 @@ export const BUSINESS_ONBOARDING_TYPES: readonly BusinessOnboardingTypeOption[] 
       defaultLocationName: "Торговый зал",
     },
     {
+      id: "fitness",
+      label: "Фитнес-клуб",
+      category: "Фитнес-клуб",
+      hint: "Ровный фон для тренировок.",
+      defaultOrgName: "Фитнес-клуб",
+      defaultLocationName: "Зал",
+    },
+    {
+      id: "barber",
+      label: "Барбершоп",
+      category: "Барбершоп",
+      hint: "Фон для стрижки, без резких переходов.",
+      defaultOrgName: "Барбершоп",
+      defaultLocationName: "Зал",
+    },
+    {
       id: "other",
       label: "Другой бизнес",
       category: "Другой бизнес",

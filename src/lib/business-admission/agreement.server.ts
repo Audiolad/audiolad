@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SoundReviewRow } from "@/lib/business/track-sound-review";
 import { restrictSoundQueueToAgreement } from "@/lib/business/track-sound-review";
 import { authorIdsWithVerifiedRights, filterAgreementSubjects, type AgreementDecision, type AgreementSubject } from "@/lib/business-admission/agreement-list";
+import type { SectorDecision } from "@/lib/business-admission/sectors";
 
 /** Same table and status as /admin/business-verification «Пример подтверждён». Restricted, rejected and revoked stay out. */
 export async function verifiedRightsAuthorIds(): Promise<Set<string>> {
@@ -32,6 +33,19 @@ export async function verifiedRightsAuthorIds(): Promise<Set<string>> {
   return authorIdsWithVerifiedRights(verifications, memberships);
 }
 
+export async function hiddenArtistIds(): Promise<Set<string>> {
+  const db = createServiceRoleClient();
+  const ids = new Set<string>();
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await db.from("business_admission_hidden_artists").select("author_id").range(from, from + 999);
+    if (error) throw new Error("hidden_unavailable");
+    const page = (data ?? []) as { author_id?: string }[];
+    for (const row of page) if (row.author_id) ids.add(row.author_id);
+    if (page.length < 1000) break;
+  }
+  return ids;
+}
+
 async function everyRow(load: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>) {
   const rows: Record<string, unknown>[] = [];
   for (let from = 0; from < 20000; from += 1000) {
@@ -52,12 +66,14 @@ export async function listAgreementAdmissionPage(input: {
   offset: number;
   limit: number;
   directions: readonly { key: string }[];
+  hiddenOnly?: boolean;
 }): Promise<{ rows: AgreementSubject[]; total: number; decisions: AgreementDecision[] }> {
   const db = createServiceRoleClient();
   const artists = (await everyRow((from, to) => db.from("authors").select("id, name").range(from, to))).map((row) => ({ id: String(row.id), name: String(row.name ?? "") }));
   const albums = (await everyRow((from, to) => db.from("practices").select("id, title, author_id").eq("product_kind", "music").is("deleted_at", null).range(from, to)))
     .map((row) => ({ id: String(row.id), title: String(row.title ?? ""), authorId: String(row.author_id ?? "") }));
   const accepted = await verifiedRightsAuthorIds();
+  const hidden = await hiddenArtistIds();
   const authorIds = [...accepted];
   const albumIds = albums.filter((album) => accepted.has(album.authorId)).map((album) => album.id);
   const decisions: AgreementDecision[] = [];
@@ -72,7 +88,7 @@ export async function listAgreementAdmissionPage(input: {
     decisions.push(...((data ?? []) as AgreementDecision[]));
   }
   const listed = filterAgreementSubjects({
-    ...input, artists, albums, acceptedAuthorIds: accepted, decisions,
+    ...input, artists, albums, acceptedAuthorIds: accepted, decisions, hiddenAuthorIds: hidden,
   });
   const visibleIds = new Set(listed.rows.flatMap((row) => [row.id, row.authorId]));
   return {
@@ -94,6 +110,80 @@ export async function admissionAuthorsAccepted(kind: "artist" | "album", ids: re
   return authorIds.every((id) => accepted.has(id));
 }
 
+export async function admissionAuthorsVisible(kind: "artist" | "album", ids: readonly string[]): Promise<boolean> {
+  if (!await admissionAuthorsAccepted(kind, ids)) return false;
+  const db = createServiceRoleClient();
+  let authorIds = [...ids];
+  if (kind === "album") {
+    const { data, error } = await db.from("practices").select("id, author_id").in("id", [...ids]);
+    if (error || !Array.isArray(data)) return false;
+    authorIds = (data as { author_id: string | null }[]).map((row) => row.author_id ?? "");
+  }
+  const hidden = await hiddenArtistIds();
+  return authorIds.every((id) => !hidden.has(id));
+}
+
+export type SectorAlbum = {
+  id: string;
+  title: string;
+  authorId: string;
+  authorName: string;
+  sectors: Record<string, SectorDecision>;
+  admitted: boolean;
+};
+
+/** Verified, visible artists. Includes albums that have no sector decision yet. */
+export async function listSectorAlbums(focusIds: readonly string[]): Promise<{
+  directions: { key: string; name: string }[];
+  albums: SectorAlbum[];
+}> {
+  const db = createServiceRoleClient();
+  const { data: directionRows, error: directionError } = await db.from("business_content_directions")
+    .select("key, name, sort_order").eq("active", true);
+  if (directionError) throw new Error("unavailable");
+  const directions = ((directionRows ?? []) as { key: string; name: string; sort_order?: number }[])
+    .slice()
+    .sort((left, right) => (left.sort_order ?? 100) - (right.sort_order ?? 100) || (left.key < right.key ? -1 : 1))
+    .map((row) => ({ key: row.key, name: row.name }));
+  const accepted = await verifiedRightsAuthorIds();
+  const hidden = await hiddenArtistIds();
+  const artists = (await everyRow((from, to) => db.from("authors").select("id, name").range(from, to)))
+    .map((row) => ({ id: String(row.id), name: String(row.name ?? "") }));
+  const names = new Map(artists.map((artist) => [artist.id, artist.name]));
+  const albums = (await everyRow((from, to) => db.from("practices").select("id, title, author_id").eq("product_kind", "music").is("deleted_at", null).range(from, to)))
+    .map((row) => ({ id: String(row.id), title: String(row.title ?? ""), authorId: String(row.author_id ?? "") }))
+    .filter((album) => accepted.has(album.authorId) && !hidden.has(album.authorId));
+  const decisions: AgreementDecision[] = [];
+  const authorIds = [...new Set(albums.map((album) => album.authorId))];
+  for (let index = 0; index < authorIds.length; index += 100) {
+    const { data, error } = await db.from("business_content_admissions").select("author_id, practice_id, direction_key, allowed").in("author_id", authorIds.slice(index, index + 100));
+    if (error) throw new Error("unavailable");
+    decisions.push(...((data ?? []) as AgreementDecision[]));
+  }
+  const albumIds = albums.map((album) => album.id);
+  for (let index = 0; index < albumIds.length; index += 100) {
+    const { data, error } = await db.from("business_content_admissions").select("author_id, practice_id, direction_key, allowed").in("practice_id", albumIds.slice(index, index + 100));
+    if (error) throw new Error("unavailable");
+    decisions.push(...((data ?? []) as AgreementDecision[]));
+  }
+  const focus = new Set(focusIds);
+  const listed = albums.map((album) => {
+    const sectors: Record<string, SectorDecision> = {};
+    for (const direction of directions) {
+      const artist = decisions.find((row) => row.author_id === album.authorId && row.direction_key === direction.key);
+      const own = decisions.find((row) => row.practice_id === album.id && row.direction_key === direction.key);
+      sectors[direction.key] = { artist: artist?.allowed ?? null, album: own?.allowed ?? null };
+    }
+    const admitted = directions.some((direction) => {
+      const state = sectors[direction.key];
+      return state.album === true || (state.album == null && state.artist === true);
+    });
+    return { id: album.id, title: album.title, authorId: album.authorId, authorName: names.get(album.authorId) ?? "", sectors, admitted };
+  }).filter((album) => focus.has(album.id) || !album.admitted);
+  listed.sort((left, right) => Number(left.admitted) - Number(right.admitted) || (left.title < right.title ? -1 : left.title > right.title ? 1 : left.id < right.id ? -1 : 1));
+  return { directions, albums: listed.slice(0, 80) };
+}
+
 export async function loadAgreementSoundQueue(
   db: SupabaseClient,
   filter: { status?: string; artist?: string; album?: string; space?: string; page?: number },
@@ -110,5 +200,6 @@ export async function loadAgreementSoundQueue(
     if (!payload.rows.length) break;
   }
   const accepted = await verifiedRightsAuthorIds();
-  return restrictSoundQueueToAgreement(rows, accepted, filter);
+  const hidden = await hiddenArtistIds();
+  return restrictSoundQueueToAgreement(rows, accepted, { ...filter, hiddenAuthorIds: hidden });
 }

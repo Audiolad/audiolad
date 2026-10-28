@@ -54,6 +54,8 @@ export function filterAgreementSubjects(input: {
   decision: string | null;
   directions: readonly { key: string }[];
   decisions: readonly AgreementDecision[];
+  hiddenAuthorIds?: ReadonlySet<string>;
+  hiddenOnly?: boolean;
   offset: number;
   limit: number;
 }): { rows: AgreementSubject[]; total: number } {
@@ -66,8 +68,11 @@ export function filterAgreementSubjects(input: {
       id: album.id, title: album.title, authorId: album.authorId, authorName: names.get(album.authorId) ?? "",
     }));
   const needle = input.query.toLowerCase();
+  const hidden = input.hiddenAuthorIds ?? new Set<string>();
   const directions = input.directions.filter((direction) => !input.direction || direction.key === input.direction);
   const matched = subjects.filter((subject) => {
+    const authorHidden = hidden.has(subject.authorId);
+    if (input.hiddenOnly ? !authorHidden : authorHidden) return false;
     if (!`${subject.title} ${subject.authorName}`.toLowerCase().includes(needle)) return false;
     if (!input.decision) return true;
     return directions.some((direction) => {

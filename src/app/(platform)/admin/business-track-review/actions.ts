@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { requireAdminPermission } from '@/lib/admin/guard';
 import { isSoundReviewStatus, type SoundReviewHistory, type SoundReviewRow } from '@/lib/business/track-sound-review';
 import { locateSoundReviewRow } from '@/lib/business/track-sound-preview.server';
@@ -14,7 +15,8 @@ import {
   saveSoundReviewBatch,
   type SoundReviewBulkScope,
 } from '@/lib/business/track-sound-bulk';
-import { verifiedRightsAuthorIds } from '@/lib/business-admission/agreement.server';
+import { admissionAuthorsVisible, hiddenArtistIds, listSectorAlbums, verifiedRightsAuthorIds } from '@/lib/business-admission/agreement.server';
+import { sectorNextValue } from '@/lib/business-admission/sectors';
 import { createClient } from '@/lib/supabase/server';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,6 +49,7 @@ export async function reviewBusinessTracksBulk(input: {
   }
   const db = await createClient();
   const verified = await verifiedRightsAuthorIds();
+  const hidden = await hiddenArtistIds();
   const review = async (row: SoundReviewRow) => {
     const { error } = await db.rpc('admin_review_business_track_sound', {
       p_audio_item_id: row.id, p_status: input.status, p_reason: input.reason, p_audio_identity: row.audio_identity,
@@ -67,6 +70,9 @@ export async function reviewBusinessTracksBulk(input: {
     if (rows.some((row) => !verified.has(row.artist_id))) {
       return { ok: false, saved: 0, failed: 0, message: 'В выборе есть треки без подтверждённых прав.' };
     }
+    if (rows.some((row) => hidden.has(row.artist_id))) {
+      return { ok: false, saved: 0, failed: 0, message: 'В выборе есть скрытые артисты.' };
+    }
     const saved = await saveSoundReviewBatch(rows, input.status, input.reason, review);
     const result = soundReviewBulkMessage(saved.saved, saved.failed + missing);
     if (result.saved > 0) revalidatePath('/admin/business-track-review');
@@ -84,11 +90,52 @@ export async function reviewBusinessTracksBulk(input: {
     return { rows: payload.rows, total: payload.total };
   }, filter.excludedIds);
   if (!collected.ok) return soundReviewBulkMessage(0, 0, collected.reason);
-  const allowedRows = collected.rows.filter((row) => verified.has(row.artist_id));
+  const allowedRows = collected.rows.filter((row) => verified.has(row.artist_id) && !hidden.has(row.artist_id));
   const saved = await saveSoundReviewBatch(allowedRows, input.status, input.reason, review);
   const result = soundReviewBulkMessage(saved.saved, saved.failed);
   if (result.saved > 0) revalidatePath('/admin/business-track-review');
   return result;
+}
+
+export async function saveAlbumSectors(form: FormData): Promise<void> {
+  await requireAdminPermission('author_products.moderate');
+  const ids = [...new Set(form.getAll('albumId').map(String))].filter((id) => UUID.test(id));
+  const checked = new Set(form.getAll('on').map(String));
+  const reset = String(form.get('reset') ?? '') === '1';
+  let failed = ids.length === 0 || ids.length > 200;
+  const writes = new Map<string, string[]>();
+  if (!failed) {
+    try {
+      if (!await admissionAuthorsVisible('album', ids)) failed = true;
+      else {
+        const board = await listSectorAlbums(ids);
+        for (const album of board.albums.filter((item) => ids.includes(item.id))) {
+          for (const direction of board.directions) {
+            const next = sectorNextValue(album.sectors[direction.key] ?? { artist: null, album: null }, checked.has(direction.key), reset);
+            if (next === undefined) continue;
+            const bucket = `${direction.key}\n${String(next)}`;
+            writes.set(bucket, [...(writes.get(bucket) ?? []), album.id]);
+          }
+        }
+        const db = await createClient();
+        for (const [bucket, albumIds] of writes) {
+          const [direction, allowed] = bucket.split('\n');
+          const { error } = await db.rpc('set_business_content_admissions', {
+            p_direction: direction, p_kind: 'album', p_ids: albumIds,
+            p_allowed: allowed === 'true' ? true : allowed === 'false' ? false : null,
+          });
+          if (error) failed = true;
+        }
+      }
+    } catch { failed = true; }
+  }
+  revalidatePath('/admin/business-track-review');
+  const query = new URLSearchParams({ sectors: failed ? 'error' : 'saved' });
+  for (const key of ['status', 'artist', 'album', 'space', 'page']) {
+    const value = form.get(key);
+    if (typeof value === 'string' && value) query.set(key, value);
+  }
+  redirect(`/admin/business-track-review?${query}`);
 }
 
 export async function previewBusinessTrack(id: string, audioIdentity: string) {

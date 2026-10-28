@@ -30,9 +30,10 @@ export type SoundReviewHistory = {
 export function restrictSoundQueueToAgreement(
   rows: readonly SoundReviewRow[],
   acceptedAuthorIds: ReadonlySet<string>,
-  filter: { status?: string; artist?: string; album?: string; space?: string; page?: number },
+  filter: { status?: string; artist?: string; album?: string; space?: string; page?: number; hiddenAuthorIds?: ReadonlySet<string> },
 ): SoundReviewQueue & { albumTotal: number | null; artistTotal: number | null } {
-  const qualified = rows.filter((row) => acceptedAuthorIds.has(row.artist_id));
+  const hidden = filter.hiddenAuthorIds ?? new Set<string>();
+  const qualified = rows.filter((row) => acceptedAuthorIds.has(row.artist_id) && !hidden.has(row.artist_id));
   const byName = (left: { name: string; id: string }, right: { name: string; id: string }) =>
     left.name < right.name ? -1 : left.name > right.name ? 1 : left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
   const artists = [...new Map(qualified.map((row) => [row.artist_id, { id: row.artist_id, name: row.artist }])).values()].sort(byName);

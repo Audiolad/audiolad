@@ -4,11 +4,11 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { BUSINESS_AGREEMENT_LIST_HINT } from "@/lib/business-admission/agreement-list";
 import { listAgreementAdmissionPage } from "@/lib/business-admission/agreement.server";
 import { ADMISSION_SOURCE_LABELS, resolveManualAdmission } from "@/lib/business-admission/policy";
-import { addBusinessDirection, saveBusinessAdmissions, setBusinessArtistSoundAuto, setBusinessManualContentGate } from "./actions";
+import { addBusinessDirection, saveBusinessAdmissions, setBusinessArtistAdmissionHidden, setBusinessArtistSoundAuto, setBusinessManualContentGate } from "./actions";
 import SelectPage from "./SelectPage";
 
 export const dynamic = "force-dynamic";
-type Direction = { key: string; name: string };
+type Direction = { key: string; name: string; sort_order?: number };
 type Decision = { author_id: string | null; practice_id: string | null; direction_key: string; allowed: boolean | null; changed_by: string; changed_at: string };
 type Row = { id: string; title: string; authorId: string | null; authorName: string };
 type Audit = { id: number; actor_id: string; changed_at: string; entity: string; old_value: Record<string, unknown> | null; new_value: Record<string, unknown> };
@@ -25,6 +25,7 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
   const q = value("q").slice(0, 120);
   const directionFilter = value("direction");
   const decisionFilter = value("decision");
+  const hiddenOnly = value("hidden") === "1";
   const page = Math.max(1, Math.min(100000, Number.parseInt(value("page"), 10) || 1));
   let directions: Direction[] = [], decisions: Decision[] = [], rows: Row[] = [], audit: Audit[] = [];
   let unavailable = false;
@@ -39,15 +40,15 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
     if (gate.error) throw new Error("unavailable");
     gateOn = gate.data === true;
     const [dirs, history] = await Promise.all([
-      db.from("business_content_directions").select("key, name").eq("active", true).order("key"),
+      db.from("business_content_directions").select("key, name, sort_order").eq("active", true).order("sort_order"),
       db.from("business_content_admission_audit").select("id, actor_id, changed_at, entity, old_value, new_value").order("id", { ascending: false }).limit(20),
     ]);
     if (dirs.error || history.error) throw new Error("unavailable");
-    directions = dirs.data as Direction[];
+    directions = (dirs.data as Direction[]).slice().sort((left, right) => (left.sort_order ?? 100) - (right.sort_order ?? 100) || (left.key < right.key ? -1 : 1));
     audit = history.data as Audit[];
     const listed = await listAgreementAdmissionPage({
       kind, query: q, direction: directionFilter || null, decision: decisionFilter || null,
-      offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, directions,
+      offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, directions, hiddenOnly,
     });
     listedTotal = listed.total;
     hasMore = listed.total > page * PAGE_SIZE;
@@ -63,11 +64,11 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
     ? directions.filter((d) => d.key === directionFilter) : directions;
   const find = (id: string | null, direction: string, artist: boolean) => decisions.find((d) =>
     (artist ? d.author_id === id : d.practice_id === id) && d.direction_key === direction);
-  const href = (nextPage: number) => `${PATH}?${new URLSearchParams({ kind, q, direction: directionFilter, decision: decisionFilter, page: String(nextPage) })}`;
+  const href = (nextPage: number) => `${PATH}?${new URLSearchParams({ kind, q, direction: directionFilter, decision: decisionFilter, hidden: hiddenOnly ? "1" : "", page: String(nextPage) })}`;
   const context = <>
     <input type="hidden" name="kind" value={kind} /><input type="hidden" name="q" value={q} />
     <input type="hidden" name="directionFilter" value={directionFilter} />
-    <input type="hidden" name="decision" value={decisionFilter} /><input type="hidden" name="page" value={page} />
+    <input type="hidden" name="decision" value={decisionFilter} /><input type="hidden" name="hidden" value={hiddenOnly ? "1" : ""} /><input type="hidden" name="page" value={page} />
   </>;
   return <div className="space-y-6 p-4">
     <h1 className="text-2xl font-semibold">Ручные допуски Business</h1>
@@ -82,8 +83,9 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
       Музыкальный паспорт только предлагает характеристики.</p>
     <p>В таблице показан итог по музыкальной пригодности. Воспроизведение дополнительно требует действующих прав на каждый трек и заведение.
       {" "}<Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link>.</p>
-    <nav className="flex gap-4"><Link className="underline" href={`${PATH}?kind=artist`} aria-current={kind === "artist" ? "page" : undefined}>Артисты</Link>
-      <Link className="underline" href={`${PATH}?kind=album`} aria-current={kind === "album" ? "page" : undefined}>Альбомы</Link></nav>
+    <nav className="flex gap-4"><Link className="underline" href={`${PATH}?kind=artist`} aria-current={kind === "artist" && !hiddenOnly ? "page" : undefined}>Артисты</Link>
+      <Link className="underline" href={`${PATH}?kind=album`} aria-current={kind === "album" ? "page" : undefined}>Альбомы</Link>
+      <Link className="underline" href={`${PATH}?kind=artist&hidden=1`} aria-current={hiddenOnly ? "page" : undefined}>Скрытые</Link></nav>
     {value("result") === "saved" && <p role="status">Изменения сохранены.</p>}
     {value("result").includes("error") && <p role="alert" className="text-red-700">Изменения не сохранены. Проверьте выбор записей, уникальность кода и категорий направления. Повторите попытку.</p>}
     {unavailable ? <p role="alert" className="text-red-700">Таблица недоступна. Проверьте применение миграции ручных допусков и повторите загрузку.</p> : <>
@@ -105,7 +107,9 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
       </form>
       <p>{BUSINESS_AGREEMENT_LIST_HINT} – {listedTotal}.{" "}
         <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>
-      {!listedTotal && <p>Пока нет авторов с подтверждёнными правами.{" "}
+      {hiddenOnly && <p>Скрытые артисты не попадают в таблицу допусков и в очередь прослушивания. Их решения сохраняются.</p>}
+      {hiddenOnly && !listedTotal && <p>Скрытых артистов нет.</p>}
+      {!listedTotal && !hiddenOnly && <p>Пока нет авторов с подтверждёнными правами.{" "}
         <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>}
       <div className="overflow-x-auto"><table className="w-full border-collapse text-sm"><caption className="text-left">{kind === "artist" ? "Артисты" : "Альбомы"} – страница {page}, записей: {rows.length}</caption><thead><tr><th><SelectPage key={href(page)} /></th><th className="text-left">{kind === "artist" ? "Артист" : "Альбом / артист"}</th>{kind === "artist" && <th>Автодопуск звучания</th>}{visibleDirections.map((d) => <th key={d.key}>{d.name}</th>)}</tr></thead>
         <tbody>{rows.map((r) => <tr key={r.id} className="border-t align-top"><td className="p-2"><input type="checkbox" form="bulk-admissions" name="ids" value={r.id} aria-label={`Выбрать ${r.title}`} /></td><td className="p-2">{r.title}{kind === "album" && <p className="text-neutral-500">{r.authorName}</p>}</td>
@@ -115,6 +119,9 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
               <button type="submit" className="underline">{soundAuto.get(r.id) ? "Выключить" : "Включить"}</button>
             </form>
             <p className="text-xs text-neutral-500">Явный статус «Не допущен» у трека важнее. Права и допуск направления не пропускаются.</p>
+            <form action={setBusinessArtistAdmissionHidden}>{context}<input type="hidden" name="authorId" value={r.id} /><input type="hidden" name="hide" value={hiddenOnly ? "false" : "true"} />
+              <button type="submit" className="underline">{hiddenOnly ? "Вернуть" : "Скрыть"}</button>
+            </form>
           </> : <p>Автодопуск недоступен, пока миграция не применена.</p>}</td>}
           {visibleDirections.map((d) => {
             const artist = find(kind === "artist" ? r.id : r.authorId, d.key, true);

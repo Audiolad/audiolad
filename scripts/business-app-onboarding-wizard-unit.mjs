@@ -83,6 +83,9 @@ assert.equal(
 const beauty = getBusinessOnboardingType("beauty");
 assert.ok(beauty);
 assert.equal(beauty.category, "Салон красоты");
+assert.equal(getBusinessOnboardingType("fitness")?.category, "Фитнес-клуб");
+assert.equal(getBusinessOnboardingType("barber")?.label, "Барбершоп");
+assert.equal(getBusinessOnboardingType("barber")?.category, "Барбершоп");
 assert.equal(getBusinessOnboardingAtmosphere("calm_premium")?.energyHint, "calm");
 
 const names = suggestBusinessOnboardingNames("cafe");
