@@ -33,3 +33,29 @@ export function joinMobileTopChromeClassNames(
 ): string {
   return parts.filter(Boolean).join(" ");
 }
+
+/**
+ * Listener routes whose layout mounts the fixed MobileTopChrome layer
+ * (catalog search, playlists catalog search, audiotheque chrome).
+ * Anything rendered in the shell above `children` on these routes ends up
+ * underneath the fixed layer: invisible, but still pushing the spacer and
+ * content down (an empty gap with a peeking rounded edge on mobile).
+ */
+export const MOBILE_TOP_CHROME_ROUTE_PREFIXES = [
+  "/catalog",
+  "/playlists/catalog",
+  "/my-practices",
+] as const;
+
+export function isMobileTopChromeRoute(
+  pathname: string | null | undefined,
+): boolean {
+  if (!pathname) {
+    return false;
+  }
+
+  const path = pathname.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  return MOBILE_TOP_CHROME_ROUTE_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}

@@ -371,6 +371,16 @@
   background: var(--biz-accent-hover);
 }
 
+/* Sergey 28.10.2026: the guest's main action («Получить 30 дней…») – the pine of the round play control. */
+.business-app-btn-cta {
+  background: var(--biz-play);
+  color: var(--biz-on-play);
+}
+
+.business-app-btn-cta:hover:not(:disabled) {
+  background: var(--biz-play-hover);
+}
+
 .business-app-btn-secondary {
   background: var(--biz-surface);
   border-color: var(--biz-border);
@@ -1665,6 +1675,38 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* «Слушать атмосферу»: round pine play control (as on the venue player) with the label beside it. */
+.business-atmosphere-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--biz-text);
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.business-atmosphere-play__circle {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.business-atmosphere-play:hover:not(:disabled) .business-atmosphere-play__circle {
+  background: var(--biz-play-hover);
+}
+
+.business-atmosphere-play:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .business-atmosphere-match {

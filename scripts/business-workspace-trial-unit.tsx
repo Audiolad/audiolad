@@ -557,7 +557,8 @@ const playlists: GuestCoffeePlaylist[] = [{
 {
   const html = wrap("/guest/coffee", <BusinessAppShell initialGuestLimit="ok"><main>page</main></BusinessAppShell>);
   assert.match(html, /Получить 30 дней бесплатно/, "gift CTA before the meter runs out");
-  assert.match(html, /data-testid="biz-connect"/);
+  assert.doesNotMatch(html, /data-testid="biz-connect"/, "guest banner: one action, no «Подключить»");
+  assert.match(html, /business-app-btn-cta[^"]*"[^>]*data-testid="biz-trial-cta"/, "gift CTA is green (pine)");
   assert.match(html, /30 дней в подарок – полный доступ ко всем функциям/);
   assert.doesNotMatch(html, /30 минут/, "top banner does not mention the 30 minutes yet");
 }
@@ -566,7 +567,8 @@ const playlists: GuestCoffeePlaylist[] = [{
   assert.match(html, /Гостевые 30 минут закончились/);
   assert.match(html, /data-testid="biz-guest-register"/);
   assert.match(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
-  assert.match(html, /data-testid="biz-connect"/, "Подключить stays");
+  assert.doesNotMatch(html, /data-testid="biz-connect"/, "exhausted banner: only «Зарегистрироваться»");
+  assert.match(html, /business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-register"/);
 }
 {
   const html = wrap("/guest/coffee", <BusinessSoundStudio playlists={playlists} initialLimit="exhausted" />);

@@ -7,6 +7,7 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
+import { PauseIcon, PlayIcon } from "@/components/business-app/BusinessPlayerControls";
 import GuestCoffeeGiftCta from "@/components/business-app/sound/GuestCoffeeGiftCta";
 import {
   AtmosphereAssembling,
@@ -505,15 +506,22 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
                 </h3>
                 <p className="business-app-muted text-sm" data-testid="biz-atmosphere-meta">{guestCoffeeAtmosphereMeta(atmosphere)}</p>
                 <div className="business-atmosphere__actions">
+                  {/* Sergey 28.10.2026: the round green play control of the venue player, label beside it. */}
                   <button
                     type="button"
-                    className="business-app-btn business-app-btn-primary business-app-focus-ring"
+                    className="business-atmosphere-play business-app-focus-ring"
                     onClick={() => void playAtmosphere()}
                     disabled={!playingAtmosphere && !canStart}
                     aria-pressed={playingAtmosphere}
+                    data-state={playingAtmosphere ? "pause" : "play"}
                     data-testid="biz-atmosphere-play"
                   >
-                    {playingAtmosphere ? (status === "loading" ? "…" : "Пауза") : C.play}
+                    <span className="business-play-btn business-atmosphere-play__circle" data-state={playingAtmosphere ? "pause" : "play"} aria-hidden="true">
+                      {playingAtmosphere ? <PauseIcon /> : <PlayIcon />}
+                    </span>
+                    <span className="business-atmosphere-play__label">
+                      {playingAtmosphere ? (status === "loading" ? "Загрузка…" : "Пауза") : C.play}
+                    </span>
                   </button>
                 </div>
                 <ul className="business-atmosphere-match" aria-label={C.matchTitle} data-testid="biz-atmosphere-match">
