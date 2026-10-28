@@ -21,7 +21,7 @@ mock("../src/lib/admin/guard.ts", { requireAdminPermission: async (permission) =
 } });
 mock("../src/lib/supabase/service-role.ts", { createServiceRoleClient: () => ({
   from(table) {
-    const query = { select() { return this; }, eq() { return this; }, order() { return this; }, limit() { return this; }, or() { return this; },
+    const query = { select() { return this; }, eq() { return this; }, in() { return this; }, order() { return this; }, limit() { return this; }, or() { return this; },
       then(resolve) { return Promise.resolve({ data: fixture[table], error: failed ? { message: "unavailable" } : null }).then(resolve); } };
     return query;
   },
@@ -32,12 +32,15 @@ mock("../src/lib/supabase/service-role.ts", { createServiceRoleClient: () => ({
     return { data: [{ id: params.p_kind === "album" ? "album" : "artist", title: params.p_kind === "album" ? "Активный альбом" : "Ирина Ведянина", author_id: "artist", author_name: "Ирина Ведянина" }], error: null };
   },
 }) });
-mock("../src/app/(platform)/admin/business-admissions/actions.ts", { saveBusinessAdmissions: async () => {}, addBusinessDirection: async () => {}, setBusinessManualContentGate: async () => {} });
+mock("../src/app/(platform)/admin/business-admissions/actions.ts", { saveBusinessAdmissions: async () => {}, addBusinessDirection: async () => {}, setBusinessManualContentGate: async () => {}, setBusinessArtistSoundAuto: async () => {} });
 const Page = require("../src/app/(platform)/admin/business-admissions/page.tsx").default;
 async function render(params) { return renderToStaticMarkup(await Page({ searchParams: Promise.resolve(params) })); }
 const artist = await render({ kind: "artist" });
 assert.match(artist, /Ручные ворота выключены/);
 assert.match(artist, /Разрешено – артист/);
+assert.match(artist, /Автодопуск звучания/);
+assert.match(artist, /Выключен/);
+assert.doesNotMatch(artist, /—/);
 assert.match(artist, /Применить к выбранным/);
 const album = await render({ kind: "album", q: "Ирина", direction: "spa", decision: "denied", page: "2" });
 assert.match(album, /Не допущено – альбом/);

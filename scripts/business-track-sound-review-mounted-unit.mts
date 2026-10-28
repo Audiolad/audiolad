@@ -9,10 +9,10 @@ import type { SoundReviewRow } from '../src/lib/business/track-sound-review';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const moduleLoader = createRequire(import.meta.url);
 const actionsPath = moduleLoader.resolve('../src/app/(platform)/admin/business-track-review/actions.ts');
-const saves: unknown[] = [];
+const saves: { id: string; status: string; reason: string; audioIdentity: string }[] = [];
 const bulks: unknown[] = [];
 const previews: string[] = [];
-let reviewImpl: (input: unknown) => Promise<{ ok: boolean; message: string }> = async (input) => {
+let reviewImpl: (input: { id: string; status: string; reason: string; audioIdentity: string }) => Promise<{ ok: boolean; message: string }> = async (input) => {
   saves.push(input);
   return { ok: true, message: 'Решение сохранено.' };
 };
@@ -20,7 +20,7 @@ moduleLoader.cache[actionsPath] = {
   id: actionsPath, filename: actionsPath, loaded: true,
   exports: {
     previewBusinessTrack: async (id: string) => { previews.push(id); return { ok: true, url: `https://audio.invalid/${id}` }; },
-    reviewBusinessTrack: async (input: unknown) => reviewImpl(input),
+    reviewBusinessTrack: async (input: { id: string; status: string; reason: string; audioIdentity: string }) => reviewImpl(input),
     reviewBusinessTracksBulk: async (input: unknown) => { bulks.push(input); return { ok: true, saved: 2, failed: 0, message: 'Сохранено: 2.' }; },
     businessTrackReviewHistory: async () => [{ id: 1, old_status: 'unchecked', new_status: 'rejected', changed_at: '2026-10-27T12:00:00Z', reason: 'Внутренняя причина', changed_by: 'admin', event: 'manual' }],
   },
@@ -100,7 +100,7 @@ assert.equal(playingStatus(), 'unchecked');
 assert.equal(previews.length, beforeFailure, 'thrown save does not advance');
 reviewImpl = async (input) => { saves.push(input); return { ok: true, message: 'Решение сохранено.' }; };
 await click('Допущен');
-assert.deepEqual(saves.at(-1), { id: 'b', status: 'approved', reason: 'Шипение', audioIdentity: rows[1].audio_identity });
+assert.deepEqual(saves.at(-1)!, { id: 'b', status: 'approved', reason: 'Шипение', audioIdentity: rows[1].audio_identity });
 assert.equal(rowStatus('Track b'), 'approved');
 audio = elements().find((el) => el.tagName === 'AUDIO')!;
 assert.equal(props(audio).src, 'https://audio.invalid/c');
@@ -111,7 +111,7 @@ const stayed = previews.length;
 const box = elements().find((el) => el.tagName === 'INPUT' && props(el).type === 'checkbox')!;
 await act(async () => (props(box).onChange as (event: unknown) => void)({ target: { checked: false } }));
 await click('Не проверен');
-assert.deepEqual(saves.at(-1), { id: 'c', status: 'unchecked', reason: '', audioIdentity: rows[2].audio_identity });
+assert.deepEqual(saves.at(-1)!, { id: 'c', status: 'unchecked', reason: '', audioIdentity: rows[2].audio_identity });
 assert.equal(previews.length, stayed, 'checkbox off does not load another track');
 assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c');
 assert.equal(playingStatus(), 'unchecked');
@@ -123,7 +123,7 @@ assert.equal(saves.length, 3, 'shortcut ignored while typing the reason');
 const shortcut = new Event('keydown', { bubbles: true });
 (shortcut as Event & { key: string }).key = '2';
 await act(async () => container.dispatchEvent(shortcut));
-assert.deepEqual(saves.at(-1), { id: 'c', status: 'rejected', reason: '', audioIdentity: rows[2].audio_identity });
+assert.deepEqual(saves.at(-1)!, { id: 'c', status: 'rejected', reason: '', audioIdentity: rows[2].audio_identity });
 assert.equal(rowStatus('Track c'), 'rejected');
 assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c', 'no further unchecked track, playback stays');
 const previousConfirm = window.confirm;

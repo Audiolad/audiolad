@@ -24,6 +24,8 @@ const rows = ['a', 'b', 'c'].map((id, i) => ({ id, status: i === 1 ? 'approved' 
 assert.equal(nextUnchecked(rows, 'a'), 'c');
 assert.equal(nextUnchecked(rows, 'c'), 'a');
 assert.equal(nextUnchecked(rows, null), 'a');
+const autoRows = rows.map((row) => row.id === 'c' ? { ...row, status: 'unchecked' as const, sound_auto: true } : row);
+assert.equal(nextUnchecked(autoRows, 'a'), null);
 const scope = { status: '', artist: '', album: 'album-1', space: '', total: 175, albumTotal: 40, artistTotal: 80 };
 assert.equal(soundReviewSelectionCount({ kind: 'filter', excludedIds: [] }, scope), 175);
 assert.equal(soundReviewSelectionCount({ kind: 'filter', excludedIds: ['x'] }, scope), 174);
