@@ -392,7 +392,7 @@ CREATE TABLE IF NOT EXISTS public.business_access_renewal_choices (
   period_end timestamptz NOT NULL,
   answer text NOT NULL,
   answered_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, period_end),
+  CONSTRAINT business_access_renewal_choices_pkey PRIMARY KEY (user_id, period_end),
   CONSTRAINT business_access_renewal_choices_answer_check
     CHECK (answer IN ('yes', 'no'))
 );
@@ -534,7 +534,8 @@ BEGIN
 
   INSERT INTO public.business_access_renewal_choices AS c (user_id, period_end, answer, answered_at)
   VALUES (v_user, v_end, v_answer, clock_timestamp())
-  ON CONFLICT (user_id, period_end) DO UPDATE
+  -- Named constraint: the OUT column period_end would make a column list ambiguous.
+  ON CONFLICT ON CONSTRAINT business_access_renewal_choices_pkey DO UPDATE
   SET answer = EXCLUDED.answer, answered_at = EXCLUDED.answered_at;
 
   -- Notes are history: append, never overwrite or delete.

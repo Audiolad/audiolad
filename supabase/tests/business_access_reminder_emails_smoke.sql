@@ -310,6 +310,9 @@ BEGIN
   -- A repeated «Нет» (with and without a note) appends, never deletes.
   PERFORM public.set_business_access_renewal_choice('no', 'Второй отзыв');
   PERFORM public.set_business_access_renewal_choice('no', NULL);
+  IF (SELECT r.answer FROM public.business_access_renewal_choice_for_caller() AS r) IS DISTINCT FROM 'no' THEN
+    RAISE EXCEPTION 'owner reads their own no through the RPC';
+  END IF;
   RESET ROLE;
   IF (SELECT count(*) FROM public.business_access_renewal_notes WHERE user_id = v_no) IS DISTINCT FROM 2 THEN
     RAISE EXCEPTION 'a repeated no must keep the note history';
