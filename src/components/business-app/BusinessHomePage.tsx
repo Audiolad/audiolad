@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
+import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
+import PointDeviceControls from "@/components/business-app/PointDeviceControls";
+import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
@@ -48,7 +51,15 @@ function StatusBanner({
       </li>
       <li data-tone={playback.tone}>
         <strong>{playback.title}</strong>
-        <p>{playback.detail}</p>
+        {playback.kind === "error" ? (
+          <p>
+            <Link href="/player" data-testid="biz-point-player-link">Откройте плеер точки</Link>
+            {" или "}
+            <Link href="/help" data-testid="biz-point-support-link">обратитесь в поддержку</Link>.
+          </p>
+        ) : (
+          <p>{playback.detail}</p>
+        )}
       </li>
     </>
   );
@@ -136,10 +147,14 @@ export type BusinessHomePageProps = {
   currentTrack?: { title: string; coverUrl?: string } | null;
   /** Part B only: no live server confirmation source is connected in Part A. */
   playbackConfirmation?: OwnerPlaybackSignalInput;
+  /** Owner permission for the venue device. Missing row stays allowed. */
+  pointCanEdit?: boolean;
 };
 
-export default function BusinessHomePage({ currentTrack, playbackConfirmation }: BusinessHomePageProps = {}) {
+export default function BusinessHomePage({ currentTrack, playbackConfirmation, pointCanEdit = true }: BusinessHomePageProps = {}) {
   const domain = useBusinessDomain();
+  const pointMode = usePointMode();
+  const { entry } = useBusinessEntry();
   const rawSignals =
     domain.status === "authenticated" ? domain.signals ?? null : null;
   const elapsedSeconds = useOwnerHomeElapsed(rawSignals);
@@ -252,7 +267,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
           </p>
         </header>
 
-      <BusinessHomeAccessCard />
+      {pointMode || entry === "venue" ? null : <BusinessHomeAccessCard />}
       <BusinessOwnerHomeLiveRefresh />
       <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">
@@ -280,6 +295,28 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
               </p>
             )}
           </section>
+          {pointMode ? <PointDeviceControls /> : null}
+          {!pointMode && entry === "person" && domain.location ? (
+            <>
+              <section className="business-app-card space-y-3" data-testid="biz-listen-local">
+                <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Слушать у себя</h2>
+                <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+                  Звучит только на этом телефоне и не меняет зал.
+                </p>
+                <a href="/music" className="business-app-btn business-app-btn-secondary business-app-focus-ring" data-testid="biz-listen-local-open">
+                  Слушать у себя
+                </a>
+              </section>
+              <VenueControlPanel
+                locationId={domain.location.id}
+                locationName={locationName || "Точка"}
+                pointCanEdit={pointCanEdit}
+              />
+            </>
+          ) : null}
+          {!pointMode && entry === "venue" && domain.location ? (
+            <VenueControlPanel locationId={domain.location.id} locationName={locationName || "Точка"} pointCanEdit={pointCanEdit} />
+          ) : null}
         </div>
       </div>
     </div>

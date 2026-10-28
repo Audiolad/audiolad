@@ -109,6 +109,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     feedbackTimers.current.push(hold);
   };
   useEffect(() => {
+    if (player.pointDevice) return;
     if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
     const ac = new AbortController();
     let cancelled = false;
@@ -169,6 +170,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       ac.abort();
     };
   }, [
+    player.pointDevice,
     open,
     queue.ready,
     queue.effectiveDaypart,
@@ -368,12 +370,14 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               loading={player.view.status === "loading"}
               nowTitle={null}
               onToggle={() => void player.toggle()}
+              previousDisabled={!player.canChangeMusic}
+              nextDisabled={!player.canChangeMusic}
               onPrevious={() => void player.previous()}
               onNext={() => void player.next()}
               appearance="round"
               size="large"
             />
-            <CafeTrackFeedback
+            {!player.pointDevice ? <CafeTrackFeedback
               phase={feedbackPhase}
               busyKind={feedbackBusyKind}
               onFeedback={(kind) => {
@@ -385,16 +389,16 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 setFeedbackBusyKind(kind);
                 queue.vote(current.audioItemId, kind);
               }}
-            />
+            /> : null}
           </section>
-          <section className="business-app-card">
+          {!player.pointDevice ? <section className="business-app-card">
             <CafeQueueControls
               mode={queue.prefs.daypartMode}
               effectiveDaypart={queue.effectiveDaypart}
               onDaypart={queue.setDaypartMode}
               hours={queue.hours}
             />
-          </section>
+          </section> : null}
           <section className="business-app-card business-track-panel" data-testid="biz-now-queue" aria-label="Дальше в очереди">
             <h2 className="text-[1.05rem] font-bold">Дальше в очереди</h2>
             {upcoming.length === 0 ? (
@@ -412,6 +416,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                         subtitle={subtitle}
                         time={track.durationSeconds != null ? formatPlaybackClock(track.durationSeconds) : null}
                         coverUrl={track.coverUrl}
+                        disabled={!player.canChangeMusic}
                         onClick={() => void playIndex(index)}
                       />
                     </li>

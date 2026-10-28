@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
 
 type LinkState = { linked: boolean; playerCode: string | null };
 
@@ -9,6 +11,12 @@ export default function PointPairingCard({ locationId }: { locationId: string })
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirm, setConfirm] = useState<"create" | "revoke" | null>(null);
+  const yesGuard = useRef(false);
+  const ask = (action: "create" | "revoke") => {
+    yesGuard.current = false;
+    setConfirm(action);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -71,6 +79,20 @@ export default function PointPairingCard({ locationId }: { locationId: string })
 
   return (
     <section className="business-app-card space-y-3" data-testid="biz-point-pairing">
+      {confirm ? (
+        <VenueConfirmDialog
+          text={confirm === "revoke" ? "Отключить устройство в зале?" : "Создать новый код подключения устройства?"}
+          onYes={() => {
+            if (yesGuard.current) return;
+            yesGuard.current = true;
+            const action = confirm;
+            setConfirm(null);
+            if (action === "revoke") revoke();
+            else createCode();
+          }}
+          onNo={() => setConfirm(null)}
+        />
+      ) : null}
       <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Устройство в зале</h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         Код действует 10 минут. Введите его на устройстве у колонки, на странице подключения.
@@ -93,18 +115,18 @@ export default function PointPairingCard({ locationId }: { locationId: string })
         <button
           type="button"
           className="business-app-btn business-app-btn-primary business-app-focus-ring"
-          onClick={createCode}
-          disabled={pending}
+          onClick={() => ask("create")}
+          disabled={pending || confirm !== null}
           data-testid="biz-point-create"
         >
-          Показать код
+          Получить код для устройства
         </button>
         {link?.linked ? (
           <button
             type="button"
             className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-            onClick={revoke}
-            disabled={pending}
+            onClick={() => ask("revoke")}
+            disabled={pending || confirm !== null}
             data-testid="biz-point-revoke"
           >
             Отключить устройство

@@ -15,6 +15,7 @@ import BusinessCabinetMiniBar from "@/components/business-app/workspace/Business
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
 import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
+import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -47,6 +48,8 @@ type View = {
 };
 
 type CabinetPlayerApi = {
+  pointDevice: boolean;
+  canChangeMusic: boolean;
   adopt: (model: WorkspacePageModel) => void;
   release: () => void;
   view: View;
@@ -149,6 +152,9 @@ export function BusinessCabinetPlayerProvider({
   const ctlRef = useRef<Controller | null>(null);
   const toggleRef = useRef<() => Promise<void>>(async () => {});
   const nextRef = useRef<() => Promise<void>>(async () => {});
+  const refreshPointSoundRef = useRef<() => void>(() => {});
+  const [pointCanEdit, setPointCanEdit] = useState(false);
+  const soundInstallRef = useRef<Promise<unknown> | null>(null);
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({
@@ -416,6 +422,7 @@ export function BusinessCabinetPlayerProvider({
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
+    if (soundInstallRef.current) await soundInstallRef.current;
     await ctl.next();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
@@ -433,6 +440,7 @@ export function BusinessCabinetPlayerProvider({
       const shown = playbackRef.current.index;
       if (shown >= 0 && shown < current.tracks.length) ctl.index = shown;
     }
+    if (soundInstallRef.current) await soundInstallRef.current;
     await ctl.previous();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
@@ -460,6 +468,7 @@ export function BusinessCabinetPlayerProvider({
         });
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
+        if (json.commands.length > 0) refreshPointSoundRef.current();
         for (const row of json.commands) {
           if (stop || !isPointCommandType(row.type)) continue;
           const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
@@ -600,6 +609,9 @@ export function BusinessCabinetPlayerProvider({
     direction: GuestCoffeeDirection;
     daypart: CafeDaypart;
     feedback: readonly CafeQueueFeedback[];
+    energyOffset?: number;
+    /** Leave the current track playing. The new order is used on the next advance. */
+    keepCurrent?: boolean;
   }): Promise<"applied" | "deferred" | "failed"> => {
     const current = modelRef.current;
     if (!current || current.tracks.length === 0) return "deferred";
@@ -613,7 +625,7 @@ export function BusinessCabinetPlayerProvider({
           character: input.character,
           direction: input.direction,
           daypart: input.daypart,
-          energyOffset: 0,
+          energyOffset: input.energyOffset ?? 0,
           feedback: input.feedback,
           boundaryAudioItemId: playingId,
         }),
@@ -628,12 +640,86 @@ export function BusinessCabinetPlayerProvider({
       if (rebuildGen.current !== gen) return "failed";
       const ctl = ctlRef.current;
       const playingNow = Boolean(ctl && (ctl.status === "playing" || ctl.status === "loading"));
-      applyAtmosphereQueue(indices, { play: playingNow });
+      if (input.keepCurrent) {
+        const order = pointKeepCurrentOrder(indices, ctl && ctl.index >= 0 ? ctl.index : playbackRef.current.index);
+        playOrderRef.current = order;
+        setQueueOrderState(order);
+        return "applied";
+      }
+      applyAtmosphereQueue(indices, { play: playingNow && !input.keepCurrent });
       return "applied";
     } catch {
       return "failed";
     }
   }, [applyAtmosphereQueue]);
+
+  useEffect(() => {
+    if (!canBeat) return;
+    const applySound = createPointSoundApplier();
+    let latest: PointSoundUpdate | null = null;
+    let stop = false;
+    let inFlight = false;
+    let refreshPending = false;
+    const take = (sound: PointSoundUpdate) => {
+      if (soundInstallRef.current) return;
+      const run = applySound(sound, (daypart) => rebuildFromProfile({
+        character: sound.character,
+        direction: sound.direction,
+        daypart,
+        feedback: [],
+        energyOffset: sound.energyOffset,
+        keepCurrent: true,
+      })).finally(() => {
+        if (soundInstallRef.current === run) soundInstallRef.current = null;
+      });
+      soundInstallRef.current = run;
+    };
+    const tick = async () => {
+      if (stop) return;
+      if (inFlight) {
+        refreshPending = true;
+        return;
+      }
+      inFlight = true;
+      try {
+        const res = await fetch("/api/business/point", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({ action: "sound" }),
+        });
+        const json: unknown = await res.json();
+        if (stop) return;
+        setPointCanEdit(pointMusicAllowed(json));
+        latest = pointSoundUpdate(json);
+      } catch {
+        /* Keep the last settings for clock transitions during a network failure. */
+      } finally {
+        inFlight = false;
+        if (!stop && latest) take(latest);
+        if (!stop && refreshPending) {
+          refreshPending = false;
+          void tick();
+        }
+      }
+    };
+    const refresh = () => { void tick(); };
+    refreshPointSoundRef.current = refresh;
+    window.addEventListener(POINT_SOUND_CHANGED_EVENT, refresh);
+    void tick();
+    const timer = window.setInterval(() => void tick(), 5_000);
+    const clockTimer = window.setInterval(() => {
+      if (!stop && latest && !soundInstallRef.current) take(latest);
+    }, 5_000);
+    return () => {
+      stop = true;
+      refreshPointSoundRef.current = () => {};
+      window.removeEventListener(POINT_SOUND_CHANGED_EVENT, refresh);
+      window.clearInterval(timer);
+      window.clearInterval(clockTimer);
+    };
+  }, [canBeat, rebuildFromProfile]);
 
   const dismissBar = useCallback(async () => {
     const ctl = ctlRef.current;
@@ -654,6 +740,8 @@ export function BusinessCabinetPlayerProvider({
   }, []);
 
   const seek = useCallback((ratio: number) => {
+    // Seek is local. The owner accepts a stale-permission window of ~5 s within
+    // the current track: this does not change the music. Commands refresh it sooner.
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
     const nextTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
@@ -668,22 +756,46 @@ export function BusinessCabinetPlayerProvider({
   const duration = view.duration > 0 ? view.duration : (track?.durationSeconds ?? 0);
   const playing = view.status === "playing" || view.status === "loading";
 
+  const authorizeMusicChange = async (): Promise<boolean> => {
+    if (!pointReports) return true;
+    try {
+      const res = await fetch("/api/business/point", {
+        ...JSON_POST,
+        body: JSON.stringify({ action: "music-change" }),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || json.ok !== true) {
+        setPointCanEdit(false);
+        if (json.error) setSaveNote(json.error);
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const deviceNext = async () => { if (await authorizeMusicChange()) await next(); };
+  const devicePrevious = async () => { if (await authorizeMusicChange()) await previous(); };
+  const devicePlayIndex = async (index: number) => { if (await authorizeMusicChange()) await playIndex(index); };
+
   const api: CabinetPlayerApi = {
+    pointDevice: pointReports,
+    canChangeMusic: !pointReports || pointCanEdit,
     adopt,
     release,
     view,
     toggle,
-    next,
-    previous,
-    playIndex,
+    next: deviceNext,
+    previous: devicePrevious,
+    playIndex: devicePlayIndex,
     setVolume,
-    seek,
+    seek: pointReports && !pointCanEdit ? () => {} : seek,
     volume: playback.volume,
     saveNote,
     queueOrder,
-    setQueueOrder,
-    applyAtmosphereQueue,
-    rebuildFromProfile,
+    setQueueOrder: pointReports ? () => {} : setQueueOrder,
+    applyAtmosphereQueue: pointReports ? () => {} : applyAtmosphereQueue,
+    rebuildFromProfile: pointReports ? async () => "deferred" : rebuildFromProfile,
     cancelAtmosphereRebuild,
   };
 
@@ -702,10 +814,11 @@ export function BusinessCabinetPlayerProvider({
           playing={playing}
           loading={view.status === "loading"}
           onToggle={() => void toggle()}
-          onNext={() => void next()}
+          onNext={() => void deviceNext()}
+          nextDisabled={pointReports && !pointCanEdit}
           onClose={() => void dismissBar()}
           onOpen={revealNowPlaying}
-          onSeek={seek}
+          onSeek={pointReports && !pointCanEdit ? undefined : seek}
           currentTime={view.currentTime}
           duration={duration}
           timeLabel={`${formatPlaybackClock(view.currentTime)} / ${formatPlaybackClock(duration)}`}

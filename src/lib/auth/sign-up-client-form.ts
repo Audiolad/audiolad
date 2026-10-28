@@ -85,6 +85,7 @@ export function evaluateSignUpClientFormState(
   values: SignUpClientFormValues,
   fieldErrors: SignUpClientFieldErrors = {},
   interaction: SignUpClientFormInteraction = {},
+  options: { lastNameOptional?: boolean } = {},
 ): SignUpClientFormState {
   const trimmedFirstName = values.firstName.trim();
   const trimmedLastName = values.lastName.trim();
@@ -105,13 +106,14 @@ export function evaluateSignUpClientFormState(
       showFirstNameValidation,
       SIGNUP_FIRST_NAME_REQUIRED_MESSAGE,
     );
-  const lastNameErrorMessage =
-    fieldErrors.lastName ??
-    liveNameErrorMessage(
-      trimmedLastName,
-      showLastNameValidation,
-      SIGNUP_LAST_NAME_REQUIRED_MESSAGE,
-    );
+  const lastNameErrorMessage = options.lastNameOptional
+    ? fieldErrors.lastName ?? null
+    : fieldErrors.lastName ??
+      liveNameErrorMessage(
+        trimmedLastName,
+        showLastNameValidation,
+        SIGNUP_LAST_NAME_REQUIRED_MESSAGE,
+      );
   const emailErrorMessage =
     fieldErrors.email ?? liveEmailErrorMessage(emailValidation);
   const passwordErrorMessage =
@@ -124,7 +126,7 @@ export function evaluateSignUpClientFormState(
 
   const isSubmitReady =
     trimmedFirstName.length > 0 &&
-    trimmedLastName.length > 0 &&
+    (options.lastNameOptional || trimmedLastName.length > 0) &&
     !fieldErrors.firstName &&
     !fieldErrors.lastName &&
     trimmedEmail.length > 0 &&
