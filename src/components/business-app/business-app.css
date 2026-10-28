@@ -296,9 +296,19 @@
   opacity: 0.6;
 }
 
+/* Shared row. The thin bar tightens it; the venue card centres the round controls. */
+.business-app-player-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 /* Round transport on the venue player. Pine, so it is not another brown button. */
 .business-play-btn,
-.business-next-btn {
+.business-next-btn,
+.business-prev-btn {
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
@@ -329,7 +339,8 @@
 }
 
 .business-play-btn svg,
-.business-next-btn svg {
+.business-next-btn svg,
+.business-prev-btn svg {
   width: 46%;
   height: 46%;
   display: block;
@@ -339,14 +350,16 @@
   transform: translateX(8%);
 }
 
-.business-next-btn {
+.business-next-btn,
+.business-prev-btn {
   border: 1px solid var(--biz-border-strong);
   background: var(--biz-surface);
   color: var(--biz-text);
   box-shadow: var(--biz-shadow);
 }
 
-.business-next-btn:hover:not(:disabled) {
+.business-next-btn:hover:not(:disabled),
+.business-prev-btn:hover:not(:disabled) {
   border-color: var(--biz-accent-border);
   background: var(--biz-accent-soft);
 }
@@ -361,8 +374,34 @@
   height: 2.75rem;
 }
 
+.business-transport--large .business-prev-btn {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.business-transport--compact .business-prev-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+/* Venue card: previous, the large play control, next. One centred row. */
+.business-transport.business-transport--center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 1.35rem;
+}
+
+.business-transport--center [data-testid$="-now"] {
+  flex: 1 0 100%;
+  text-align: center;
+}
+
 .business-play-btn:disabled,
-.business-next-btn:disabled {
+.business-next-btn:disabled,
+.business-prev-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -837,6 +876,22 @@
   display: block;
   height: 100%;
   background: var(--biz-accent);
+}
+
+/* Full-width volume directly under the progress line. */
+.business-now__volume {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.7rem;
+  color: var(--biz-text-muted);
+  font-size: 0.95rem;
+}
+
+.business-now__volume input[type="range"] {
+  display: block;
+  width: 100%;
+  margin: 0;
 }
 
 .business-app-shell:has(.business-cabinet-player) .business-app-main {

@@ -20,7 +20,7 @@ import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { peekAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
-import { cafeQueueIndices, cafeQueueNextIndex } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex } from "@/lib/business-app/cafe-queue/order";
 import type { CafeDaypart, CafeQueueFeedback } from "@/lib/business-app/cafe-queue/prefs";
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
@@ -53,6 +53,7 @@ type CabinetPlayerApi = {
   view: View;
   toggle: () => Promise<void>;
   next: () => Promise<void>;
+  previous: () => Promise<void>;
   playIndex: (index: number) => Promise<void>;
   setVolume: (value: number) => void;
   /** Scrub the current track. `ratio` is 0–1 of the known duration. */
@@ -304,6 +305,7 @@ export function BusinessCabinetPlayerProvider({
           }
         },
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
+        previousIndex: (currentIndex, length) => cafeQueuePreviousIndex(playOrderRef.current, currentIndex, length),
         onChange: () => {
           const current = ctlRef.current;
           if (!current) return;
@@ -419,6 +421,23 @@ export function BusinessCabinetPlayerProvider({
     evidenceRef.current.reset(0);
     if (soundInstallRef.current) await soundInstallRef.current;
     await ctl.next();
+    remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
+    reportPlayback();
+  }, [remember, reportPlayback]);
+
+  const previous = useCallback(async () => {
+    const ctl = ctlRef.current;
+    const current = modelRef.current;
+    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    setBarDismissed(false);
+    seekRef.current = 0;
+    evidenceRef.current.reset(0);
+    // Before the first play the controller index is still -1, while the card shows the saved track.
+    if (ctl.index < 0) {
+      const shown = playbackRef.current.index;
+      if (shown >= 0 && shown < current.tracks.length) ctl.index = shown;
+    }
+    await ctl.previous();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
   }, [remember, reportPlayback]);
@@ -716,6 +735,7 @@ export function BusinessCabinetPlayerProvider({
     view,
     toggle,
     next,
+    previous,
     playIndex,
     setVolume,
     seek,

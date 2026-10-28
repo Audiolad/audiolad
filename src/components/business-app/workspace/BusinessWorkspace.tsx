@@ -27,7 +27,6 @@ import {
   BUSINESS_GIFT_CTA,
   BUSINESS_STORE_UNAVAILABLE_NOTE,
   BUSINESS_UNCONFIRMED_NOTE,
-  BUSINESS_WORKSPACE_AUTOPLAY_NOTE,
 } from "@/lib/access-grants/copy";
 import {
   workspaceDeadlineDelay,
@@ -345,6 +344,21 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             >
               <span style={{ width: `${ratio * 100}%` }} />
             </div>
+            <label className="business-now__volume">
+              <span>Громкость</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={player.volume}
+                onChange={(event) => player.setVolume(Number(event.target.value))}
+                data-testid="biz-now-volume"
+                aria-valuemin={0}
+                aria-valuemax={1}
+                aria-valuenow={player.volume}
+              />
+            </label>
             <p className="business-cabinet-player__time" data-testid="biz-now-time">
               {formatPlaybackClock(player.view.currentTime)} / {formatPlaybackClock(duration)}
             </p>
@@ -354,9 +368,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               loading={player.view.status === "loading"}
               nowTitle={null}
               onToggle={() => void player.toggle()}
+              onPrevious={() => void player.previous()}
               onNext={() => void player.next()}
-              volume={player.volume}
-              onVolume={player.setVolume}
               appearance="round"
               size="large"
             />
@@ -373,7 +386,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 queue.vote(current.audioItemId, kind);
               }}
             />
-            <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
           </section>
           <section className="business-app-card">
             <CafeQueueControls
