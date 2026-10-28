@@ -14,9 +14,8 @@ import {
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
-import { effectiveCafeDaypart } from "@/lib/business-app/cafe-queue/prefs";
-import { isPointCommandType, pointCommandAction, type PointCommandType } from "@/lib/business-app/point-commands";
-import { pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
+import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
+import { pointDaypart, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -150,6 +149,8 @@ export function BusinessCabinetPlayerProvider({
   const ctlRef = useRef<Controller | null>(null);
   const toggleRef = useRef<() => Promise<void>>(async () => {});
   const nextRef = useRef<() => Promise<void>>(async () => {});
+  const pendingSoundRef = useRef<PointSoundUpdate | null>(null);
+  const soundInstallRef = useRef<Promise<unknown> | null>(null);
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({
@@ -416,6 +417,7 @@ export function BusinessCabinetPlayerProvider({
     setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
+    if (soundInstallRef.current) await soundInstallRef.current;
     await ctl.next();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
@@ -428,28 +430,11 @@ export function BusinessCabinetPlayerProvider({
 
   useEffect(() => {
     if (!canBeat) return;
-    const storageKey = "audiolad.point.applied-commands";
-    const load = (): Set<string> => {
-      try {
-        const raw = window.sessionStorage.getItem(storageKey);
-        const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-        return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []);
-      } catch {
-        return new Set();
-      }
-    };
-    const rememberId = (id: string, done: Set<string>) => {
-      done.add(id);
-      try {
-        window.sessionStorage.setItem(storageKey, JSON.stringify([...done].slice(-40)));
-      } catch {
-        /* storage blocked */
-      }
-    };
     let stop = false;
+    let inFlight = false;
     const tick = async () => {
-      if (stop) return;
-      let commands: { id: string; type: PointCommandType }[] = [];
+      if (stop || inFlight) return;
+      inFlight = true;
       try {
         const res = await fetch("/api/business/point", {
           method: "POST",
@@ -460,28 +445,16 @@ export function BusinessCabinetPlayerProvider({
         });
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
-        commands = json.commands.flatMap((row) =>
-          isPointCommandType(row.type) && typeof row.id === "string" ? [{ id: row.id, type: row.type }] : [],
-        );
-      } catch {
-        return;
-      }
-      const done = load();
-      for (const command of commands) {
-        if (stop) return;
-        if (!done.has(command.id)) {
-          const action = pointCommandAction(ctlRef.current?.status ?? "idle", command.type);
+        for (const row of json.commands) {
+          if (stop || !isPointCommandType(row.type)) continue;
+          const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
           if (action === "toggle") await toggleRef.current();
           if (action === "next") await nextRef.current();
-          rememberId(command.id, done);
         }
-        await fetch("/api/business/point", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          cache: "no-store",
-          body: JSON.stringify({ action: "ack", id: command.id }),
-        }).catch(() => undefined);
+      } catch {
+        /* the next poll retries; a claimed command is not returned again */
+      } finally {
+        inFlight = false;
       }
     };
     void tick();
@@ -613,6 +586,8 @@ export function BusinessCabinetPlayerProvider({
     daypart: CafeDaypart;
     feedback: readonly CafeQueueFeedback[];
     energyOffset?: number;
+    /** Leave the current track playing. The new order is used on the next advance. */
+    keepCurrent?: boolean;
   }): Promise<"applied" | "deferred" | "failed"> => {
     const current = modelRef.current;
     if (!current || current.tracks.length === 0) return "deferred";
@@ -641,7 +616,12 @@ export function BusinessCabinetPlayerProvider({
       if (rebuildGen.current !== gen) return "failed";
       const ctl = ctlRef.current;
       const playingNow = Boolean(ctl && (ctl.status === "playing" || ctl.status === "loading"));
-      applyAtmosphereQueue(indices, { play: playingNow });
+      if (input.keepCurrent && playingNow) {
+        playOrderRef.current = indices;
+        setQueueOrderState(indices);
+        return "applied";
+      }
+      applyAtmosphereQueue(indices, { play: playingNow && !input.keepCurrent });
       return "applied";
     } catch {
       return "failed";
@@ -651,28 +631,26 @@ export function BusinessCabinetPlayerProvider({
   useEffect(() => {
     if (!canBeat) return;
     let seenVersion = 0;
-    let pending: PointSoundUpdate | null = null;
     let stop = false;
     const apply = (sound: PointSoundUpdate) => {
-      const daypart = effectiveCafeDaypart(sound.daypartMode, new Date().getHours(), sound.hours) ?? "day";
-      void rebuildFromProfile({
+      pendingSoundRef.current = sound;
+      const run = rebuildFromProfile({
         character: sound.character,
         direction: sound.direction,
-        daypart,
+        daypart: pointDaypart(sound),
         feedback: [],
         energyOffset: sound.energyOffset,
+        keepCurrent: true,
+      }).finally(() => {
+        if (pendingSoundRef.current?.version === sound.version) pendingSoundRef.current = null;
+        if (soundInstallRef.current === run) soundInstallRef.current = null;
       });
+      soundInstallRef.current = run;
     };
     const take = (sound: PointSoundUpdate) => {
-      if (seenVersion === 0) {
-        seenVersion = sound.version;
-        return;
-      }
-      if (sound.version <= seenVersion) return;
+      if (seenVersion !== 0 && sound.version <= seenVersion) return;
       seenVersion = sound.version;
-      const status = ctlRef.current?.status;
-      if (status === "playing" || status === "loading") pending = sound;
-      else apply(sound);
+      apply(sound);
     };
     const tick = async () => {
       if (stop) return;
@@ -691,22 +669,13 @@ export function BusinessCabinetPlayerProvider({
         /* the next poll retries */
       }
     };
-    const onEnded = () => {
-      if (!pending) return;
-      const sound = pending;
-      pending = null;
-      apply(sound);
-    };
-    const audio = audioRef.current;
-    audio?.addEventListener("ended", onEnded);
     void tick();
     const timer = window.setInterval(() => void tick(), 5_000);
     return () => {
       stop = true;
-      audio?.removeEventListener("ended", onEnded);
       window.clearInterval(timer);
     };
-  }, [canBeat, open, rebuildFromProfile]);
+  }, [canBeat, rebuildFromProfile]);
 
   const dismissBar = useCallback(async () => {
     const ctl = ctlRef.current;

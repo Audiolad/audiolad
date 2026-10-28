@@ -50,11 +50,14 @@ export default function BusinessPlayerSettings({
   locationId = null,
   saved = null,
   pointDevice = false,
+  pointCanEdit = true,
 }: {
   locationId?: string | null;
   saved?: LocationSoundSettings | null;
   /** This browser is the paired device. It cannot write when the owner turned that off. */
   pointDevice?: boolean;
+  /** Server flag. Missing row stays allowed. */
+  pointCanEdit?: boolean;
 }) {
   const seeded = saved
     ? {
@@ -242,7 +245,7 @@ export default function BusinessPlayerSettings({
     </div>
   );
 
-  if (pointDevice && saved && !saved.pointCanEditSettings) {
+  if (pointDevice && (!pointCanEdit || (saved != null && !saved.pointCanEditSettings))) {
     return (
       <section className="business-app-card" data-testid="biz-point-sound-locked">
         <p className="text-sm leading-6 text-[var(--biz-text-muted)]">

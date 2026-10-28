@@ -1,5 +1,7 @@
-import { isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypartHours, type CafeDaypartMode, type CafeEnergyOffset } from "@/lib/business-app/cafe-queue/prefs";
+import { cafeDaypartAtMinute, isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypart, type CafeDaypartHours, type CafeDaypartMode, type CafeEnergyOffset } from "@/lib/business-app/cafe-queue/prefs";
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
+
+const fallbackZone = "Europe/Moscow";
 
 const CHARACTERS = new Set(["cozy", "city", "classic", "evening"]);
 const DIRECTIONS = new Set(["jazz", "calm", "rhythm", "melodic"]);
@@ -12,7 +14,38 @@ export type PointSoundUpdate = {
   daypartMode: CafeDaypartMode;
   energyOffset: CafeEnergyOffset;
   hours: CafeDaypartHours;
+  timezone: string;
 };
+
+/** Minute of the day in the venue's timezone. The device clock is not used. */
+export function venueMinuteOfDay(timezone: string, now = new Date()): number {
+  const zone = timezone.trim() || fallbackZone;
+  const read = (name: string): number | null => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: name,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(now);
+    const hour = Number(parts.find((part) => part.type === "hour")?.value);
+    const minute = Number(parts.find((part) => part.type === "minute")?.value);
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    return (((hour % 24) + 24) % 24) * 60 + minute;
+  };
+  try {
+    const minute = read(zone);
+    if (minute != null) return minute;
+  } catch {
+    /* unknown zone falls back */
+  }
+  return read(fallbackZone) ?? 12 * 60;
+}
+
+/** Auto mode follows the owner's windows in the venue timezone. */
+export function pointDaypart(sound: Pick<PointSoundUpdate, "daypartMode" | "hours" | "timezone">, now = new Date()): CafeDaypart {
+  if (sound.daypartMode !== "auto") return sound.daypartMode;
+  return cafeDaypartAtMinute(venueMinuteOfDay(sound.timezone, now), sound.hours);
+}
 
 function clock(value: unknown): string | null {
   return typeof value === "string" && /^\d{2}:\d{2}/.test(value) ? value.slice(0, 5) : null;
@@ -44,5 +77,6 @@ export function pointSoundUpdate(value: unknown): PointSoundUpdate | null {
     daypartMode,
     energyOffset: energy,
     hours,
+    timezone: typeof row.timezone === "string" && row.timezone.trim() ? row.timezone.trim() : fallbackZone,
   };
 }

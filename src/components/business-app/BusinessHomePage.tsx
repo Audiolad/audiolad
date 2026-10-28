@@ -52,7 +52,15 @@ function StatusBanner({
       </li>
       <li data-tone={playback.tone}>
         <strong>{playback.title}</strong>
-        <p>{playback.detail}</p>
+        {playback.kind === "error" ? (
+          <p>
+            <Link href="/player" data-testid="biz-point-player-link">Откройте плеер точки</Link>
+            {" или "}
+            <Link href="/help" data-testid="biz-point-support-link">обратитесь в поддержку</Link>.
+          </p>
+        ) : (
+          <p>{playback.detail}</p>
+        )}
       </li>
     </>
   );

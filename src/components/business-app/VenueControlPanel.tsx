@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import PointPairingCard from "@/components/business-app/PointPairingCard";
@@ -28,10 +28,16 @@ export default function VenueControlPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirm, setConfirm] = useState<{ text: string; run: () => void } | null>(null);
+  const yesGuard = useRef(false);
 
-  const ask = (text: string, run: () => void) => setConfirm({ text, run });
+  const ask = (text: string, run: () => void) => {
+    if (pending || confirm) return;
+    yesGuard.current = false;
+    setConfirm({ text, run });
+  };
 
   const send = (type: PointCommandType) => {
+    const commandId = crypto.randomUUID();
     ask(QUESTIONS[type], () => {
       setPending(true);
       setError(null);
@@ -39,7 +45,7 @@ export default function VenueControlPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ action: "enqueue", id: crypto.randomUUID(), locationId, type }),
+        body: JSON.stringify({ action: "enqueue", id: commandId, locationId, type }),
       })
         .then((res) => res.json())
         .then((json: { ok?: boolean; error?: string }) => {
@@ -70,8 +76,7 @@ export default function VenueControlPanel({
         .catch(() => setError("Не удалось сохранить разрешение. Попробуйте ещё раз."))
         .finally(() => setPending(false));
     };
-    if (!next) ask("Запретить устройству в зале менять музыку?", run);
-    else run();
+    ask(next ? "Разрешить устройству в зале менять музыку?" : "Запретить устройству в зале менять музыку?", run);
   };
 
   const saveName = () => {
@@ -105,13 +110,13 @@ export default function VenueControlPanel({
         Каждое действие спрашивает подтверждение и уходит в зал. Слушать у себя это не включает.
       </p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending} data-testid="biz-venue-pause" onClick={() => send("pause")}>
+        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null} data-testid="biz-venue-pause" onClick={() => send("pause")}>
           Пауза в зале
         </button>
-        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending} data-testid="biz-venue-resume" onClick={() => send("resume")}>
+        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null} data-testid="biz-venue-resume" onClick={() => send("resume")}>
           Продолжить в зале
         </button>
-        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending} data-testid="biz-venue-next" onClick={() => send("next_track")}>
+        <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null} data-testid="biz-venue-next" onClick={() => send("next_track")}>
           Следующий трек в зале
         </button>
       </div>
@@ -120,7 +125,7 @@ export default function VenueControlPanel({
           type="checkbox"
           className="mt-1"
           checked={allowed}
-          disabled={pending}
+          disabled={pending || confirm !== null}
           data-testid="biz-point-can-edit"
           onChange={(event) => saveFlag(event.target.checked)}
         />
@@ -136,7 +141,13 @@ export default function VenueControlPanel({
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || name.trim().length === 0} onClick={saveName} data-testid="biz-venue-rename">
+      <a href="/preferences" className="business-app-btn business-app-btn-secondary business-app-focus-ring" data-testid="biz-venue-atmosphere-link">
+        Изменить звучание
+      </a>
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+        В зале новое звучание начнётся со следующего трека. Перед записью кабинет спросит подтверждение.
+      </p>
+      <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null || name.trim().length === 0} onClick={saveName} data-testid="biz-venue-rename">
         Сохранить название
       </button>
       {error ? <p className="business-app-alert" data-tone="warn" role="alert">{error}</p> : null}
@@ -144,6 +155,8 @@ export default function VenueControlPanel({
         <VenueConfirmDialog
           text={confirm.text}
           onYes={() => {
+            if (yesGuard.current) return;
+            yesGuard.current = true;
             const run = confirm.run;
             setConfirm(null);
             run();

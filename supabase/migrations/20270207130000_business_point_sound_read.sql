@@ -12,6 +12,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_location uuid;
+  v_timezone text;
   v_row public.business_location_sound_settings%ROWTYPE;
 BEGIN
   IF p_token IS NULL OR btrim(p_token) !~ '^[0-9a-f]{64}$' THEN
@@ -24,6 +25,9 @@ BEGIN
   IF v_location IS NULL THEN
     RETURN jsonb_build_object('ok', false);
   END IF;
+  SELECT NULLIF(btrim(l.timezone), '') INTO v_timezone
+  FROM public.business_locations AS l
+  WHERE l.id = v_location;
 
   SELECT * INTO v_row
   FROM public.business_location_sound_settings
@@ -32,13 +36,16 @@ BEGIN
     RETURN jsonb_build_object(
       'ok', true,
       'found', false,
-      'point_can_edit_settings', true
+      'location_id', v_location,
+      'point_can_edit_settings', true,
+      'timezone', COALESCE(v_timezone, 'Europe/Moscow')
     );
   END IF;
 
   RETURN jsonb_build_object(
     'ok', true,
     'found', true,
+    'location_id', v_location,
     'character', v_row.character,
     'direction', v_row.direction,
     'daypart_mode', v_row.daypart_mode,
@@ -50,7 +57,8 @@ BEGIN
     'evening_start', to_char(v_row.evening_start, 'HH24:MI'),
     'evening_end', to_char(v_row.evening_end, 'HH24:MI'),
     'point_can_edit_settings', v_row.point_can_edit_settings,
-    'settings_version', v_row.settings_version
+    'settings_version', v_row.settings_version,
+    'timezone', COALESCE(v_timezone, 'Europe/Moscow')
   );
 END;
 $$;

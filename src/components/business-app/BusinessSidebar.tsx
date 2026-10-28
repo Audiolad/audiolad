@@ -225,7 +225,7 @@ export default function BusinessSidebar() {
       )}
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3" aria-label="Основное">
-        {BUSINESS_PRIMARY_NAV_ITEMS.filter((item) => !pointMode || item.id === "home" || item.id === "music").map((item) => (
+        {BUSINESS_PRIMARY_NAV_ITEMS.filter((item) => !pointMode || item.id === "home" || item.id === "music" || item.id === "settings").map((item) => (
           <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
         {pointMode ? null : (

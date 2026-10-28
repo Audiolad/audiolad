@@ -47,7 +47,7 @@ export default function BusinessBottomNav() {
   const pathname = normalizeBusinessAppPathname(usePathname() || "/");
   const pointMode = usePointMode();
   const items = pointMode
-    ? BUSINESS_MOBILE_NAV_ITEMS.filter((item) => item.id === "home" || item.id === "music")
+    ? BUSINESS_MOBILE_NAV_ITEMS.filter((item) => item.id === "home" || item.id === "music" || item.id === "settings")
     : BUSINESS_MOBILE_NAV_ITEMS;
   const access = resolveBusinessAccess(useBusinessDomain());
   const { showLocked } = useBusinessGuestStatus();

@@ -198,6 +198,50 @@ $$;
 REVOKE ALL ON FUNCTION public.list_business_point_commands(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.list_business_point_commands(text) TO anon, authenticated, service_role;
 
+-- Marks due commands as taken and returns only the rows this call took.
+-- A second poll or a second tab with the same cookie gets nothing for those rows.
+CREATE OR REPLACE FUNCTION public.claim_business_point_commands(p_token text)
+RETURNS TABLE (id uuid, type text, created_at timestamptz)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_location uuid;
+BEGIN
+  IF p_token IS NULL OR btrim(p_token) !~ '^[0-9a-f]{64}$' THEN
+    RETURN;
+  END IF;
+  SELECT s.location_id INTO v_location
+  FROM public.business_point_sessions AS s
+  WHERE s.token_hash = public.business_point_sha256(btrim(p_token))
+    AND s.revoked_at IS NULL;
+  IF v_location IS NULL THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  WITH due AS (
+    SELECT c.id
+    FROM public.business_point_commands AS c
+    WHERE c.location_id = v_location
+      AND c.acked_at IS NULL
+      AND c.expires_at > statement_timestamp()
+    ORDER BY c.created_at, c.id
+    FOR UPDATE SKIP LOCKED
+  )
+  UPDATE public.business_point_commands AS c
+  SET acked_at = statement_timestamp(), ack_result = 'applied'
+  FROM due
+  WHERE c.id = due.id
+    AND c.acked_at IS NULL
+  RETURNING c.id, c.type, c.created_at;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.claim_business_point_commands(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.claim_business_point_commands(text) TO anon, authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.ack_business_point_command(
   p_token text,
   p_command_id uuid,
@@ -268,6 +312,7 @@ COMMIT;
 
 -- Rollback after a backup and a separate decision. Does not touch playback rows.
 -- BEGIN;
+-- DROP FUNCTION IF EXISTS public.claim_business_point_commands(text);
 -- DROP FUNCTION IF EXISTS public.ack_business_point_command(text, uuid, text);
 -- DROP FUNCTION IF EXISTS public.list_business_point_commands(text);
 -- DROP FUNCTION IF EXISTS public.enqueue_business_point_command(uuid, uuid, text);
