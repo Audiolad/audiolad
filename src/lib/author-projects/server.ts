@@ -12,6 +12,7 @@ import {
   listAuthorWorkspacesForUser,
 } from "@/lib/author-products/auth";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
+import { assertNewAuthorWorkspaceNameAvailable } from "@/lib/author-names/lookup.server";
 import {
   canCreateOwnedAuthorProject,
   getAuthorProjectLimitReachedMessage,
@@ -228,6 +229,8 @@ export async function createAuthorProjectViaRpc(
   supabase: SupabaseClient,
   input: CreateAuthorProjectInput,
 ): Promise<CreateAuthorProjectResult> {
+  await assertNewAuthorWorkspaceNameAvailable(input.name);
+
   const { data, error } = await callAuthorUserRpc(
     supabase,
     "create_author_project",

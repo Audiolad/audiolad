@@ -39,6 +39,8 @@ import type {
   AuthorApplicationSubmittedContacts,
   BecomeAuthorAudience,
 } from "@/lib/author-applications/types";
+import { AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE } from "@/lib/author-names/public-name";
+import { useAuthorPublicNameAvailability } from "@/lib/author-names/use-author-public-name-availability";
 import {
   AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
   AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
@@ -197,6 +199,7 @@ function AuthorApplicationForm({
   contactsSectionRef,
   inviteLocked,
   preservedDisplayName,
+  serverDisplayName,
   onValuesChange,
   onSubmit,
   onInteractionStart,
@@ -209,6 +212,7 @@ function AuthorApplicationForm({
   contactsSectionRef: RefObject<HTMLDivElement | null>;
   inviteLocked: boolean;
   preservedDisplayName: string | null;
+  serverDisplayName?: string;
   onValuesChange: (next: AuthorApplicationFormValues) => void;
   onSubmit: () => void;
   onInteractionStart?: () => void;
@@ -235,8 +239,20 @@ function AuthorApplicationForm({
     values.displayName.trim().length > AUTHOR_APPLICATION_LIMITS.displayNameMax
       ? AUTHOR_PROJECT_NAME_TOO_LONG_ERROR
       : null;
+  const nameAvailability = useAuthorPublicNameAvailability({
+    name: values.displayName,
+    enabled: !updateContactsOnly && !displayNameLatinError,
+    scope: "application",
+  });
+  const serverDisplayNameError =
+    serverDisplayName === undefined || serverDisplayName === values.displayName
+      ? errors.displayName
+      : undefined;
   const displayNameError =
-    displayNameLatinError ?? displayNameLengthError ?? errors.displayName;
+    displayNameLatinError ??
+    displayNameLengthError ??
+    nameAvailability.message ??
+    serverDisplayNameError;
 
   return (
     <form
@@ -246,7 +262,9 @@ function AuthorApplicationForm({
         if (
           !updateContactsOnly &&
           (getAuthorProjectNameCyrillicError(values.displayName) ||
-            displayNameLengthError)
+            displayNameLengthError ||
+            nameAvailability.taken ||
+            serverDisplayNameError === AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE)
         ) {
           return;
         }
@@ -571,7 +589,13 @@ function AuthorApplicationForm({
 
       <button
         type="submit"
-        disabled={isPending || Boolean(displayNameLatinError)}
+        disabled={
+          isPending ||
+          Boolean(displayNameLatinError) ||
+          Boolean(displayNameLengthError) ||
+          nameAvailability.taken ||
+          serverDisplayNameError === AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE
+        }
         aria-busy={isPending}
         className="flex min-h-12 w-full items-center justify-center rounded-full bg-[#7042c5] px-5 py-3 text-[17px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5]"
       >
@@ -942,6 +966,7 @@ export default function AuthorApplicationPanel({
             contactsSectionRef={contactsSectionRef}
             inviteLocked={inviteLocked}
             preservedDisplayName={application?.display_name ?? null}
+            serverDisplayName={state.values?.displayName}
             onValuesChange={setFormValues}
             onSubmit={handleSubmit}
             onInteractionStart={trackAuthorApplicationStartedOnce}

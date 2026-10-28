@@ -5,6 +5,8 @@ import { useActionState, useState } from "react";
 
 import { createStudioWorkspace } from "@/app/(platform)/admin/authors/new/actions";
 import { CREATE_STUDIO_WORKSPACE_INITIAL_STATE } from "@/lib/admin/studio-author-workspace-form-state";
+import { AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE } from "@/lib/author-names/public-name";
+import { useAuthorPublicNameAvailability } from "@/lib/author-names/use-author-public-name-availability";
 import {
   AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
   AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
@@ -17,7 +19,17 @@ export default function CreateStudioWorkspaceForm() {
     CREATE_STUDIO_WORKSPACE_INITIAL_STATE,
   );
   const [name, setName] = useState("");
+  const [owner, setOwner] = useState("");
   const latinNameError = getAuthorProjectNameCyrillicError(name);
+  const nameAvailability = useAuthorPublicNameAvailability({
+    name,
+    enabled: !latinNameError,
+    scope: "studio",
+    owner,
+  });
+  const serverNameTaken = !state.ok && state.error === AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE;
+  const nameTaken = nameAvailability.taken || serverNameTaken;
+  const nameFieldError = latinNameError ?? (nameTaken ? AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE : null);
 
   return (
     <div className="space-y-5">
@@ -25,7 +37,7 @@ export default function CreateStudioWorkspaceForm() {
         action={action}
         className="space-y-5 rounded-[22px] border border-[#eadff8] bg-white p-5"
         onSubmit={(event) => {
-          if (getAuthorProjectNameCyrillicError(name)) {
+          if (getAuthorProjectNameCyrillicError(name) || nameTaken) {
             event.preventDefault();
           }
         }}
@@ -47,18 +59,18 @@ export default function CreateStudioWorkspaceForm() {
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
-            aria-invalid={Boolean(latinNameError)}
+            aria-invalid={Boolean(nameFieldError)}
             aria-describedby={
-              latinNameError ? "studio-name-hint studio-name-error" : "studio-name-hint"
+              nameFieldError ? "studio-name-hint studio-name-error" : "studio-name-hint"
             }
             className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#25135c]"
           />
           <span id="studio-name-hint" className="mt-1.5 block text-xs leading-5 text-[#796ba0]">
             {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
           </span>
-          {latinNameError ? (
+          {nameFieldError ? (
             <span id="studio-name-error" className="mt-1.5 block text-sm text-[#b34f63]" role="alert">
-              {latinNameError}
+              {nameFieldError}
             </span>
           ) : null}
         </label>
@@ -89,11 +101,13 @@ export default function CreateStudioWorkspaceForm() {
             type="text"
             autoCapitalize="none"
             spellCheck={false}
+            value={owner}
+            onChange={(event) => setOwner(event.target.value)}
             className="mt-2 w-full rounded-[18px] border border-[#eadff8] bg-[#faf6ff] px-4 py-3 text-sm text-[#25135c]"
           />
         </label>
 
-        {!state.ok && state.error ? (
+        {!state.ok && state.error && state.error !== AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE ? (
           <p className="rounded-[18px] border border-[#efc7cf] bg-[#fff8f9] px-4 py-3 text-sm text-[#b34f63]">
             {state.error}
           </p>
@@ -101,7 +115,7 @@ export default function CreateStudioWorkspaceForm() {
 
         <button
           type="submit"
-          disabled={pending || Boolean(latinNameError)}
+          disabled={pending || Boolean(latinNameError) || nameTaken}
           className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#7042c5] px-5 text-sm font-medium text-white disabled:opacity-60"
         >
           {pending ? "Создание…" : "Создать студию"}

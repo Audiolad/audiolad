@@ -8,6 +8,8 @@ import {
   AUTHOR_PROJECT_DESCRIPTION_MAX,
   AUTHOR_PROJECT_NAME_MAX,
 } from "@/lib/author-projects/constants";
+import { AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE } from "@/lib/author-names/public-name";
+import { useAuthorPublicNameAvailability } from "@/lib/author-names/use-author-public-name-availability";
 import {
   AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
   AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
@@ -27,6 +29,7 @@ export default function AuthorCreateProjectForm() {
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverNameTaken, setServerNameTaken] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
 
   const previewSlug = useMemo(() => {
@@ -37,13 +40,20 @@ export default function AuthorCreateProjectForm() {
   }, [name]);
   const slug = slugManual ?? previewSlug;
   const latinNameError = getAuthorProjectNameCyrillicError(name);
+  const nameAvailability = useAuthorPublicNameAvailability({
+    name,
+    enabled: !latinNameError,
+    scope: "project",
+  });
+  const nameTaken = nameAvailability.taken || serverNameTaken;
+  const nameFieldError = latinNameError ?? (nameTaken ? AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE : null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
 
     const nameError = validateAuthorProjectName(name);
-    if (nameError) {
+    if (nameError || nameTaken) {
       setError(nameError);
       return;
     }
@@ -77,6 +87,11 @@ export default function AuthorCreateProjectForm() {
       if (!response.ok) {
         if (payload.error === "author_project_limit_reached") {
           setOfferOpen(true);
+          return;
+        }
+
+        if (payload.error === "author_name_taken") {
+          setServerNameTaken(true);
           return;
         }
 
@@ -128,22 +143,23 @@ export default function AuthorCreateProjectForm() {
               maxLength={AUTHOR_PROJECT_NAME_MAX}
               onChange={(event) => {
                 setName(event.target.value);
+                setServerNameTaken(false);
                 setError(null);
               }}
               className="w-full rounded-[18px] border border-[#e4d7f4] px-4 py-3 outline-none focus:border-[#9a74d8]"
               placeholder={AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER}
-              aria-invalid={Boolean(latinNameError)}
+              aria-invalid={Boolean(nameFieldError)}
               aria-describedby={
-                latinNameError ? "project-name-hint project-name-error" : "project-name-hint"
+                nameFieldError ? "project-name-hint project-name-error" : "project-name-hint"
               }
               required
             />
             <span id="project-name-hint" className="mt-1.5 block text-xs leading-5 text-[#8a7daf]">
               {AUTHOR_PROJECT_NAME_CYRILLIC_HINT}
             </span>
-            {latinNameError ? (
+            {nameFieldError ? (
               <span id="project-name-error" className="mt-1.5 block text-sm text-[#9b3d3d]" role="alert">
-                {latinNameError}
+                {nameFieldError}
               </span>
             ) : null}
           </label>
@@ -191,7 +207,7 @@ export default function AuthorCreateProjectForm() {
 
         <button
           type="submit"
-          disabled={busy || Boolean(latinNameError)}
+          disabled={busy || Boolean(latinNameError) || nameTaken}
           className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#7042c5] px-6 text-sm font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60"
         >
           {busy ? "Создаём…" : "Создать проект"}
