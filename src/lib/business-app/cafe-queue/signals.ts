@@ -25,8 +25,10 @@ export type CafeTrackSignals = {
   /** Analyzer energy 0–100, or null when the result has none. */
   energy: number | null;
   loudnessLufs: number | null;
-  /** Tag basis for mood match. BPM and the passport energy slot are always null. */
+  /** Tag basis for mood match. The passport energy slot on `sound` stays null. */
   sound: GuestCoffeeSoundFeatures | null;
+  /** Reliable measured BPM, when the passport has one. Mood ranking does not read it. */
+  bpm?: number | null;
 };
 
 function finiteIn(value: unknown, min: number, max: number): number | null {
@@ -65,5 +67,6 @@ export function cafeSignalsFromPassport(
     energy: readCafeAnalyzerEnergy(normalized),
     loudnessLufs: readCafeLoudness(version?.structured_fields, normalized),
     sound,
+    bpm: parsed?.bpm ?? null,
   };
 }

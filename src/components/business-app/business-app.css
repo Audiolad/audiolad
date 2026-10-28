@@ -867,6 +867,26 @@
   margin-top: 0.85rem;
 }
 
+.cafe-now-feedback .business-atmosphere-bars {
+  height: 16px;
+}
+
+.cafe-queue__choice[data-state="confirmed"] {
+  background: var(--biz-green-bg);
+  color: var(--biz-green-ink);
+  border-color: var(--biz-green-border);
+}
+
+.cafe-queue__choice[data-state="error"] {
+  background: var(--biz-accent-soft);
+  color: var(--biz-text);
+  border-color: var(--biz-accent-border);
+}
+
+.cafe-queue__choice:disabled {
+  cursor: default;
+}
+
 .cafe-hours {
   display: grid;
   gap: 0.75rem;
