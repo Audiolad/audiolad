@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
+import CafeQueueControls from "@/components/business-app/workspace/CafeQueueControls";
+import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
   GUEST_COFFEE_DEFAULT_PROFILE,
   type GuestCoffeeProfile,
@@ -19,6 +21,7 @@ import {
  * Character and time of day are the other two stored axes of the same profile.
  */
 export default function BusinessPlayerSettings() {
+  const queue = useCafeQueuePreferences();
   const [profile, setProfile] = useState<GuestCoffeeProfile>(GUEST_COFFEE_DEFAULT_PROFILE);
 
   useEffect(() => {
@@ -43,10 +46,23 @@ export default function BusinessPlayerSettings() {
   };
 
   return (
-    <BusinessSoundSettings
-      profile={profile}
-      onChange={onChange}
-      hint="Тип звучания выбирает, с какой подборки начнётся плеер, если место в подборке ещё не сохранено. Характер заведения и время суток запоминаются на этом устройстве."
-    />
+    <>
+      <BusinessSoundSettings
+        profile={profile}
+        onChange={onChange}
+        showDaypart={false}
+        hint="Характер заведения и тип звучания учитываются в очереди. Время суток выбирается ниже, по часам этого устройства."
+      />
+      <section className="business-app-card space-y-3">
+        <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Очередь</h2>
+        <CafeQueueControls
+          mode={queue.prefs.daypartMode}
+          effectiveDaypart={queue.effectiveDaypart}
+          energyOffset={queue.prefs.energyOffset}
+          onDaypart={queue.setDaypartMode}
+          onOffset={queue.setEnergyOffset}
+        />
+      </section>
+    </>
   );
 }

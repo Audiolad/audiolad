@@ -614,6 +614,77 @@
   }
 }
 
+/* Cafe queue controls. Tokens only, so 360 and 390 wrap inside the column instead of overlapping. */
+.cafe-queue {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cafe-queue__group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.cafe-queue__legend {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  color: var(--biz-text);
+}
+
+.cafe-queue__chips,
+.cafe-queue__pair {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.cafe-queue__chips {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cafe-queue__pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cafe-queue__btn {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.45rem 0.4rem;
+  border: 1px solid var(--biz-border);
+  border-radius: var(--biz-radius-sm);
+  background: var(--biz-surface);
+  color: var(--biz-text);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.cafe-queue__btn[aria-pressed="true"] {
+  border-color: var(--biz-accent);
+  background: var(--biz-accent);
+  color: var(--biz-on-accent);
+}
+
+.cafe-queue__note {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--biz-text-muted);
+}
+
+.cafe-queue__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+}
+
 /* ---------------------------------------------------------------------------------------
    a8240527 – one cabinet for guest and owner: guest status strip, locked navigation items,
    Music section (sound settings + collections + Business player). Tokens only.

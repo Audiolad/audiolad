@@ -27,6 +27,11 @@ export type OnlineDeps = {
   audio: OnlineAudio;
   sign(audioItemId: string): Promise<OnlineSignResult>;
   onChange(): void;
+  /**
+   * Catalog index to play after `current`. Omitted: the next row, then the first.
+   * Used by the cafe queue so the manifest order can stay the catalog order.
+   */
+  nextIndex?(current: number, length: number): number;
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (t: unknown) => void;
@@ -205,7 +210,12 @@ export class SpaOnlinePlayer {
 
   next(): Promise<void> {
     if (this.items.length === 0) return Promise.resolve();
-    return this.playIndex(this.index < 0 || this.index >= this.items.length - 1 ? 0 : this.index + 1);
+    const fallback = this.index < 0 || this.index >= this.items.length - 1 ? 0 : this.index + 1;
+    const custom = this.d.nextIndex?.(this.index, this.items.length);
+    const target = typeof custom === "number" && Number.isInteger(custom) && custom >= 0 && custom < this.items.length
+      ? custom
+      : fallback;
+    return this.playIndex(target);
   }
 
   /** <audio> "ended": continue with the next track (program loops). */

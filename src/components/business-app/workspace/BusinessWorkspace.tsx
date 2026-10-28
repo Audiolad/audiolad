@@ -12,7 +12,10 @@ import {
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
+import { cafeQueueIndices, cafeUpcomingIndices } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
+import CafeQueueControls from "@/components/business-app/workspace/CafeQueueControls";
+import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
   BUSINESS_CONNECT_VENUE_CTA,
   BUSINESS_CONNECT_VENUE_NOTE,
@@ -49,7 +52,9 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const adopt = player.adopt;
   const release = player.release;
   const playIndex = player.playIndex;
+  const setQueueOrder = player.setQueueOrder;
   const currentIndex = player.view.index;
+  const queue = useCafeQueuePreferences();
   const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
   const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
   const open = workspacePlayerOpen(model);
@@ -64,6 +69,54 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       reportChromeAccess({ mode: reportedStatus, endsAt: reportedEndsAt });
     }
   }, [reportChromeAccess, reportedStatus, reportedEndsAt]);
+  const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
+  const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
+  useEffect(() => {
+    if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
+    const ac = new AbortController();
+    let cancelled = false;
+    const params = new URLSearchParams({ space: model.spaceId });
+    void fetch(`/api/business/workspace/queue?${params.toString()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: ac.signal,
+      body: JSON.stringify({
+        character: queue.profile.character,
+        direction: queue.profile.direction,
+        daypart: queue.effectiveDaypart,
+        energyOffset: queue.prefs.energyOffset,
+        feedback: queue.feedback,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = await res.json() as { ok?: boolean; order?: unknown };
+        if (cancelled || json.ok !== true || !Array.isArray(json.order)) return;
+        setQueueOrder(cafeQueueIndices(model.tracks, json.order));
+      })
+      .catch(() => {
+        /* Catalog order stays until the queue can be loaded. */
+      });
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
+  }, [
+    open,
+    queue.ready,
+    queue.effectiveDaypart,
+    queue.prefs.energyOffset,
+    queue.profile.character,
+    queue.profile.direction,
+    queue.feedback,
+    feedbackKey,
+    trackKey,
+    model.spaceId,
+    model.tracks,
+    setQueueOrder,
+  ]);
   const [offerNoted, setOfferNoted] = useState(false);
 
   useEffect(() => {
@@ -121,7 +174,9 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const album = current?.albumTitle?.trim() ?? "";
   const duration = player.view.duration > 0 ? player.view.duration : (current?.durationSeconds ?? 0);
   const ratio = duration > 0 ? Math.min(1, Math.max(0, player.view.currentTime / duration)) : 0;
-  const upcoming = current ? upcomingTracks(model.tracks, currentIndex) : [];
+  const playOrder = player.queueOrder ?? model.tracks.map((_, index) => index);
+  const upcoming = current ? upcomingTracks(model.tracks, currentIndex, playOrder) : [];
+  const feedbackKind = current ? queue.feedback.find((item) => item.audioItemId === current.audioItemId)?.kind ?? null : null;
 
   return (
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
@@ -218,6 +273,18 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
       {open && current ? (
         <>
+          <section className="business-app-card">
+            <CafeQueueControls
+              mode={queue.prefs.daypartMode}
+              effectiveDaypart={queue.effectiveDaypart}
+              energyOffset={queue.prefs.energyOffset}
+              onDaypart={queue.setDaypartMode}
+              onOffset={queue.setEnergyOffset}
+              audioItemId={current.audioItemId}
+              feedbackKind={feedbackKind}
+              onFeedback={(kind) => queue.vote(current.audioItemId, kind)}
+            />
+          </section>
           <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
             <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
             <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
@@ -296,11 +363,13 @@ function playbackBlocked(model: WorkspacePageModel): boolean {
 }
 
 /** Tracks that play after the current one, then the earlier ones, without repeating the current track. */
-function upcomingTracks(tracks: readonly WorkspaceTrack[], currentIndex: number): { track: WorkspaceTrack; index: number; number: number }[] {
-  if (tracks.length <= 1) return [];
-  const start = ((currentIndex % tracks.length) + tracks.length) % tracks.length;
-  return Array.from({ length: tracks.length - 1 }, (_, step) => {
-    const index = (start + 1 + step) % tracks.length;
-    return { track: tracks[index]!, index, number: step + 1 };
+function upcomingTracks(
+  tracks: readonly WorkspaceTrack[],
+  currentIndex: number,
+  order: readonly number[],
+): { track: WorkspaceTrack; index: number; number: number }[] {
+  return cafeUpcomingIndices(order, currentIndex).flatMap((index, step) => {
+    const track = tracks[index];
+    return track ? [{ track, index, number: step + 1 }] : [];
   });
 }

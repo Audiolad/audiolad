@@ -17,6 +17,7 @@ import { getCabinetDeviceSecret, postCabinetReport } from "@/lib/business-app/ca
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
+import { cafeQueueNextIndex } from "@/lib/business-app/cafe-queue/order";
 import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
 import {
   clampWorkspacePlayback,
@@ -53,6 +54,9 @@ type CabinetPlayerApi = {
   seek: (ratio: number) => void;
   volume: number;
   saveNote: string | null;
+  /** Catalog indices in play order. Null until the cafe queue answers: catalog order. */
+  queueOrder: readonly number[] | null;
+  setQueueOrder: (indices: readonly number[]) => void;
 };
 
 const CabinetContext = createContext<CabinetPlayerApi | null>(null);
@@ -133,8 +137,11 @@ export function BusinessCabinetPlayerProvider({
     duration: model?.tracks[initialPlayback.index]?.durationSeconds ?? 0,
   });
   const [saveNote, setSaveNote] = useState<string | null>(null);
+  const [queueOrder, setQueueOrderState] = useState<number[] | null>(null);
   const restoredKey = useRef<string | null>(null);
   const reportRef = useRef<() => void>(() => {});
+  const playOrderRef = useRef<number[] | null>(null);
+  const savedPlaceRef = useRef(false);
 
   const adopt = useCallback((next: WorkspacePageModel) => {
     if (next.tracks.length === 0) return;
@@ -142,17 +149,21 @@ export function BusinessCabinetPlayerProvider({
     setModel((prev) => (prev && modelKey(prev) === key ? prev : next));
     if (restoredKey.current === key) return;
     restoredKey.current = key;
+    playOrderRef.current = null;
+    setQueueOrderState(null);
     const count = next.tracks.length;
     const local = readLocal(next.spaceId, count);
     const server = next.playback ? clampWorkspacePlayback(next.playback, count) : null;
     const chosen = newerPlayback(local, server);
     if (chosen) {
+      savedPlaceRef.current = true;
       playbackRef.current = chosen;
       seekRef.current = chosen.positionSec;
       setPlayback(chosen);
       setView((prev) => ({ ...prev, index: chosen.index }));
       return;
     }
+    savedPlaceRef.current = false;
     let stored: string | null = null;
     try {
       stored = window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY);
@@ -261,6 +272,7 @@ export function BusinessCabinetPlayerProvider({
             return { ok: false, reason: "network" };
           }
         },
+        nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
         onChange: () => {
           const current = ctlRef.current;
           if (!current) return;
@@ -390,6 +402,35 @@ export function BusinessCabinetPlayerProvider({
     remember({ volume: value }, false);
   }, [remember]);
 
+  const setQueueOrder = useCallback((indices: readonly number[]) => {
+    const current = modelRef.current;
+    if (!current) return;
+    const seen = new Set<number>();
+    const unique: number[] = [];
+    for (const index of indices) {
+      if (!Number.isInteger(index) || index < 0 || index >= current.tracks.length || seen.has(index)) continue;
+      seen.add(index);
+      unique.push(index);
+    }
+    const prev = playOrderRef.current;
+    if (prev && prev.length === unique.length && prev.every((value, index) => value === unique[index])) return;
+    playOrderRef.current = unique;
+    setQueueOrderState(unique);
+    const ctl = ctlRef.current;
+    const idle = !ctl || ctl.status === "idle";
+    if (savedPlaceRef.current || !idle) return;
+    const start = unique[0] ?? 0;
+    if (start === playbackRef.current.index) return;
+    const restored = clampWorkspacePlayback(
+      { index: start, positionSec: 0, volume: playbackRef.current.volume, updatedAt: playbackRef.current.updatedAt },
+      current.tracks.length,
+    );
+    playbackRef.current = restored;
+    seekRef.current = 0;
+    setPlayback(restored);
+    setView((prevView) => ({ ...prevView, index: start }));
+  }, []);
+
   const seek = useCallback((ratio: number) => {
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
@@ -417,6 +458,8 @@ export function BusinessCabinetPlayerProvider({
     seek,
     volume: playback.volume,
     saveNote,
+    queueOrder,
+    setQueueOrder,
   };
 
   useLayoutEffect(() => {

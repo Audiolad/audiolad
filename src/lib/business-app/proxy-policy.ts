@@ -32,6 +32,7 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   // ba344b7f: workspace player. The gift gate and the rights filter run inside the handlers.
   "/api/business/workspace/track-url",
   "/api/business/workspace/state",
+  "/api/business/workspace/queue",
   // ba344b7f: one signed preview track on the wizard atmosphere step.
   "/api/business/onboarding/preview",
   "/api/business/onboarding/preview/audio",

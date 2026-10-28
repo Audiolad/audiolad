@@ -394,7 +394,7 @@ assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/workspace"
   action: "rewrite_business_app",
   pathname: "/business-app/workspace",
 });
-for (const api of ["/api/business/workspace/track-url", "/api/business/workspace/state"]) {
+for (const api of ["/api/business/workspace/track-url", "/api/business/workspace/state", "/api/business/workspace/queue"]) {
   assert.equal(resolveBusinessProxyAction("business.audiolad.ru", api).action, "pass_through", api);
 }
 
@@ -611,6 +611,13 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({})} />);
   assert.match(html, /data-testid="biz-workspace-player"/);
+  assert.match(html, /data-testid="biz-cafe-queue"/);
+  assert.match(html, /data-testid="biz-cafe-calmer"/);
+  assert.match(html, /Спокойнее/);
+  assert.match(html, /Бодрее/);
+  assert.match(html, /Больше таких/);
+  assert.match(html, /Меньше таких/);
+  assert.doesNotMatch(html, /—/);
   assert.match(html, /data-testid="biz-workspace-progress"/);
   assert.match(html, /data-testid="biz-workspace-time"/);
   assert.match(html, /0:00/);
