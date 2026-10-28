@@ -16,7 +16,10 @@ import {
   isBusinessSitePath,
   normalizeBusinessAppPathname,
   resolveBusinessInternalPath,
+  resolveVenueLicenceInternalPath,
+  venueLicencePublicUrl,
 } from "../src/lib/business-app/host.ts";
+import { VENUE_LICENCE_PUBLIC_KEY } from "../src/lib/business-app/venue-licence/flag.ts";
 import {
   businessPrivateGuestRedirect,
   resolveBusinessProxyAction,
@@ -202,6 +205,28 @@ assert.equal(
   existsSync(join(repoRoot, "src/app/business-app/page.tsx")),
   true,
   "business-app lives at src/app/business-app",
+);
+
+const venueId = "0123456789abcdef0123456789abcdef";
+const venueOn = { [VENUE_LICENCE_PUBLIC_KEY]: "1" };
+assert.equal(resolveVenueLicenceInternalPath(`/v/${venueId}`), `${BUSINESS_SITE_PATH}/v/${venueId}`);
+assert.equal(resolveVenueLicenceInternalPath("/v/short"), null);
+assert.equal(resolveVenueLicenceInternalPath(`/v/${venueId.toUpperCase()}`), null);
+assert.equal(venueLicencePublicUrl(venueId), `https://business.audiolad.ru/v/${venueId}`);
+assert.equal(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, `/v/${venueId}`, {}).action,
+  "not_found",
+  "venue licence route stays closed when the flag is off",
+);
+assert.deepEqual(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, `/v/${venueId}`, venueOn),
+  { action: "rewrite_business_app", pathname: `${BUSINESS_SITE_PATH}/v/${venueId}` },
+);
+assert.equal(resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/v/not-a-token", venueOn).action, "not_found");
+assert.equal(
+  resolveBusinessProxyAction("audiolad.ru", `${BUSINESS_SITE_PATH}/v/${venueId}`, venueOn).action,
+  "not_found",
+  "apex does not serve the business licence page",
 );
 
 console.log("business-app-proxy-routing-unit: ok");

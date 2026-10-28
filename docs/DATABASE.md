@@ -1761,6 +1761,12 @@ Owner всегда `auth.uid()`. Не создаёт Player, Subscription, Sonic
 
 Business App UI в A1 **не** подключается к этим таблицам (остаётся mock).
 
+### Публичный код лицензии точки
+
+Миграция `supabase/migrations/20270207120000_business_location_licence_public_id.sql` (задача 90d24628). Аддитивная, на рабочую базу сама не накатывается – нужно отдельное подтверждение владельца.
+
+Колонка `business_locations.licence_public_id`: 32 шестнадцатеричных символа, уникальная, не первичный ключ и не идентификатор владельца. Её адрес на хосте кабинета: `/v/<id>`. Существующие точки получают новый код, новые – из значения по умолчанию, в том числе через `create_business_organization_with_location`. Публичная страница читает название и адрес точки (`name`, `address_line1`, `address_line2`, `city`, `region`, `postal_code`) и, если они появятся, `venue_name` и `venue_address`. Срок – часы доступа владельца организации (подарок с подтверждения регистрации, оплата, трёхдневная отсрочка). Почта и идентификатор владельца на страницу не попадают. Пока флаг `AUDIOLAD_BUSINESS_VENUE_LICENCE_PUBLIC` не равен `1`, маршрут отвечает 404.
+
 ## Business Player Foundation (Zone → Player → Assignment → Heartbeat → Health)
 
 Миграция: `supabase/migrations/20261202120000_business_player_foundation.sql`.

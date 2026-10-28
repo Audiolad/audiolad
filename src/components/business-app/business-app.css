@@ -1582,3 +1582,51 @@
   padding: 0 0.25rem;
   font-size: 0.9rem;
 }
+
+/* 90d24628: public licence page. No cabinet chrome. Colours stay on --biz-* tokens. */
+.business-app-public {
+  min-height: 100dvh;
+  background: var(--biz-bg);
+  color: var(--biz-text);
+  font-family: "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+.venue-licence {
+  width: min(40rem, 100%);
+  margin: 0 auto;
+  padding: 1.5rem 1.1rem 3rem;
+}
+
+.venue-licence-mark {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 999px;
+  background: var(--biz-surface);
+  border: 1px solid var(--biz-border);
+  object-fit: cover;
+}
+
+.venue-licence-status.is-trial,
+.venue-licence-status.is-paid {
+  background: var(--biz-green-bg);
+  border-color: var(--biz-green-border);
+  color: var(--biz-green-ink);
+}
+
+.venue-licence-status.is-grace,
+.venue-licence-status.is-not_started {
+  background: var(--biz-yellow-bg);
+  border-color: var(--biz-yellow-border);
+  color: var(--biz-yellow-ink);
+}
+
+.venue-licence-status.is-expired {
+  background: var(--biz-red-bg);
+  border-color: var(--biz-red-border);
+  color: var(--biz-red-ink);
+}
+
+.venue-licence a {
+  color: var(--biz-accent);
+  font-weight: 600;
+}

@@ -9,6 +9,8 @@ import {
   resolveBusinessInternalPath,
 } from "./host";
 import { isBusinessBrandAssetPath } from "./brand-icons";
+import { isVenueLicencePublicEnabled } from "./venue-licence/flag";
+import { resolveVenueLicenceInternalPath } from "./host";
 
 /**
  * Public files the business host must still serve.
@@ -60,6 +62,7 @@ export type BusinessProxyAction =
 export function resolveBusinessProxyAction(
   hostname: string,
   pathname: string,
+  env: Record<string, string | undefined> = process.env,
 ): BusinessProxyAction {
   if (!isBusinessHostname(hostname) && isBusinessSitePath(pathname)) {
     return { action: "not_found" };
@@ -96,6 +99,14 @@ export function resolveBusinessProxyAction(
   const internal = resolveBusinessInternalPath(pathname);
   if (internal) {
     return { action: "rewrite_business_app", pathname: internal };
+  }
+
+  // /v/<public id> is the venue licence page. Off (the default) is a 404,
+  // including on the business host, until the flag is approved.
+  const venueLicence = resolveVenueLicenceInternalPath(pathname);
+  if (venueLicence) {
+    if (!isVenueLicencePublicEnabled(env)) return { action: "not_found" };
+    return { action: "rewrite_business_app", pathname: venueLicence };
   }
 
   return { action: "not_found" };

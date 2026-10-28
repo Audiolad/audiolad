@@ -69,6 +69,39 @@ export function resolveBusinessInternalPath(
   return BUSINESS_PUBLIC_PATH_REWRITES[publicPathname] ?? null;
 }
 
+/**
+ * Public licence page for one location (task 90d24628).
+ * The id is 32 hex chars from business_locations.licence_public_id, not the row uuid.
+ * The business host rewrites /v/<id> only while the feature flag is on.
+ */
+export const VENUE_LICENCE_PUBLIC_ID_PATTERN = "^[0-9a-f]{32}$";
+
+const VENUE_LICENCE_PUBLIC_PATH_RE = /^\/v\/([0-9a-f]{32})$/;
+
+export function isVenueLicencePublicId(value: string): boolean {
+  return new RegExp(VENUE_LICENCE_PUBLIC_ID_PATTERN).test(value);
+}
+
+export function venueLicencePublicPath(publicId: string): string {
+  return `/v/${publicId}`;
+}
+
+export function venueLicenceInternalPath(publicId: string): string {
+  return `${BUSINESS_SITE_PATH}/v/${publicId}`;
+}
+
+/** https://business.audiolad.ru/v/<id> – the address encoded in the venue sticker. */
+export function venueLicencePublicUrl(publicId: string): string {
+  return `${BUSINESS_ORIGIN}${venueLicencePublicPath(publicId)}`;
+}
+
+/** Null unless the pathname is exactly /v/<32 lowercase hex>. */
+export function resolveVenueLicenceInternalPath(pathname: string): string | null {
+  const match = VENUE_LICENCE_PUBLIC_PATH_RE.exec(pathname);
+  if (!match?.[1]) return null;
+  return venueLicenceInternalPath(match[1]);
+}
+
 /** Normalize usePathname() whether it returns public or internal path. */
 export function normalizeBusinessAppPathname(pathname: string): string {
   if (pathname === BUSINESS_SITE_PATH || pathname === "/") {
