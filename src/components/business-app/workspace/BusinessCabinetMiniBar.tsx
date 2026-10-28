@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef } from "react";
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
 
 /**
- * The thin cabinet player (#1031). The guest coffee page uses the same bar.
+ * The thin cabinet player. The guest coffee page uses the same bar.
  */
 export default function BusinessCabinetMiniBar({
   title,
