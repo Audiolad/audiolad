@@ -226,6 +226,9 @@ function BusinessPayError({ error }: { error: PayError }) {
       </p>
     );
   }
+  if (error.code === "venue_device") {
+    return <p role="alert" data-testid="biz-home-pay-error">На устройстве в зале оплату оформить нельзя.</p>;
+  }
   if (error.code === "support_mode_consent_forbidden") {
     return <p role="alert" data-testid="biz-home-pay-error">В режиме сопровождения оплату оформить нельзя.</p>;
   }

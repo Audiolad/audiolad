@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
 import { mapBusinessSubscriptionRpcError } from "@/lib/business/subscription-checkout";
 import { resolveIdempotencyKey } from "@/lib/orders/create-order-api";
 import { isPaymentsConfigured } from "@/lib/payments/is-configured";
@@ -24,6 +25,9 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (await businessPointSessionAlive()) {
+    return NextResponse.json({ error: "venue_device" }, { status: 403 });
   }
   if (authError) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });

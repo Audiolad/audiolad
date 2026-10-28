@@ -6,10 +6,16 @@ export type BusinessPayErrorCode =
   | "unauthorized"
   | "offer_acceptance_required"
   | "not_organization_owner"
+  | "venue_device"
   | "support_mode_consent_forbidden"
   | "payments_not_configured"
   | "invalid_request"
   | "internal_error";
+
+/** The payer is the owner account, and only from a browser that is not the hall device. */
+export function ownerCanPayFromThisBrowser(ownerRole: boolean, venueDevice: boolean): boolean {
+  return ownerRole && !venueDevice;
+}
 
 export function mapBusinessSubscriptionRpcError(message: string): {
   status: number;

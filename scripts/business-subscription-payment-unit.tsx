@@ -8,7 +8,7 @@ import { BusinessDomainProvider } from "../src/components/business-app/BusinessD
 import { gracePlaybackUntil, resolveCustomerAccess } from "../src/lib/access-grants/policy";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import { BUSINESS_GRACE_MS } from "../src/lib/business/plan";
-import { mapBusinessSubscriptionRpcError } from "../src/lib/business/subscription-checkout";
+import { mapBusinessSubscriptionRpcError, ownerCanPayFromThisBrowser } from "../src/lib/business/subscription-checkout";
 import { buildBusinessSubscriptionPaidHref, isBusinessSubscriptionCheckout } from "../src/lib/payments/checkout-result-cta";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 
@@ -48,6 +48,9 @@ assert.equal(offer.href, "/documents/b2b-terms");
 const owner = mapBusinessSubscriptionRpcError("not_organization_owner");
 assert.equal(owner.href, "/onboarding");
 assert.equal(mapBusinessSubscriptionRpcError("support_mode_consent_forbidden").href, null);
+assert.equal(ownerCanPayFromThisBrowser(true, false), true);
+assert.equal(ownerCanPayFromThisBrowser(true, true), false, "the hall device never pays");
+assert.equal(ownerCanPayFromThisBrowser(false, false), false);
 
 assert.equal(isBusinessSubscriptionCheckout("business_subscription"), true);
 assert.match(buildBusinessSubscriptionPaidHref(), /business\.audiolad\.ru\/#dostup$/);
@@ -99,5 +102,11 @@ assert.doesNotMatch(hidden, /data-testid="biz-home-pay"/, "a manager does not se
 
 assert.match(readFileSync("src/app/api/business/player/track-url/route.ts", "utf8"), /access\.mode === "offer"/);
 assert.match(readFileSync("src/lib/business-workspace/model.ts", "utf8"), /status === "grace"/);
+assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /ownerCanPayFromThisBrowser/);
+for (const route of ["src/app/api/business/subscription/checkout/route.ts", "src/app/api/business/subscription/accept/route.ts"]) {
+  const source = readFileSync(route, "utf8");
+  assert.match(source, /businessPointSessionAlive/);
+  assert.ok(source.indexOf("businessPointSessionAlive") < source.indexOf(".rpc("), route);
+}
 
 console.log("business-subscription-payment-unit: ok");

@@ -2,7 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 
 import { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home-signals";
+import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
+import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
 
 export { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 export type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
@@ -76,7 +78,10 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
 
   const memberships = membershipRows ?? [];
   const membership = memberships[0] ?? null;
-  const canPay = memberships.some((row) => row.role === "owner");
+  const canPay = ownerCanPayFromThisBrowser(
+    memberships.some((row) => row.role === "owner"),
+    await businessPointSessionAlive(),
+  );
   let offerAccepted = false;
   if (canPay) {
     const { data: acceptance } = await supabase.rpc("business_offer_acceptance_for_caller");

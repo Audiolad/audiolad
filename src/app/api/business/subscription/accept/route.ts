@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
 import { currentBusinessOfferEdition } from "@/lib/business/offer";
 import { mapBusinessSubscriptionRpcError } from "@/lib/business/subscription-checkout";
 import { isUnifiedAgreementEnabled } from "@/lib/author-terms/unified-agreement-flag";
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (await businessPointSessionAlive()) {
+    return NextResponse.json({ error: "venue_device" }, { status: 403 });
   }
 
   const edition = currentBusinessOfferEdition(isUnifiedAgreementEnabled());
