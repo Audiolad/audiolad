@@ -245,7 +245,8 @@ export default function BusinessPlayerSettings({
     </div>
   );
 
-  if (pointDevice && (!pointCanEdit || (saved != null && !saved.pointCanEditSettings))) {
+  const canEditPoint = player?.pointDevice ? player.canChangeMusic : pointCanEdit && saved?.pointCanEditSettings !== false;
+  if (pointDevice && !canEditPoint) {
     return (
       <section className="business-app-card" data-testid="biz-point-sound-locked">
         <p className="text-sm leading-6 text-[var(--biz-text-muted)]">

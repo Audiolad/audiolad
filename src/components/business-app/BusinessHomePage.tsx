@@ -6,7 +6,6 @@ import { useMemo } from "react";
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
-import PointPairingCard from "@/components/business-app/PointPairingCard";
 import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
@@ -316,7 +315,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
             </>
           ) : null}
           {!pointMode && entry === "venue" && domain.location ? (
-            <PointPairingCard locationId={domain.location.id} />
+            <VenueControlPanel locationId={domain.location.id} locationName={locationName || "Точка"} pointCanEdit={pointCanEdit} />
           ) : null}
         </div>
       </div>

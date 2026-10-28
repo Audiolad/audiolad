@@ -68,7 +68,7 @@ assert.match(homePage, /href="\/help"/);
 assert.match(homePage, /Откройте плеер точки/);
 const player = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
 assert.match(player, /keepCurrent: true/);
-assert.match(player, /pointDaypart/);
+assert.match(player, /createPointSoundApplier/);
 assert.doesNotMatch(player, /seenVersion = sound\.version;\s*return/);
 assert.match(player, /inFlight/);
 assert.doesNotMatch(panel, /владел/);

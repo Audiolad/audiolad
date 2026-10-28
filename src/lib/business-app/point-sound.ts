@@ -1,6 +1,8 @@
 import { cafeDaypartAtMinute, isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypart, type CafeDaypartHours, type CafeDaypartMode, type CafeEnergyOffset } from "@/lib/business-app/cafe-queue/prefs";
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 
+import type { LocationSoundDraft } from "@/lib/business-app/location-sound-settings";
+
 const fallbackZone = "Europe/Moscow";
 
 const CHARACTERS = new Set(["cozy", "city", "classic", "evening"]);
@@ -78,5 +80,69 @@ export function pointSoundUpdate(value: unknown): PointSoundUpdate | null {
     energyOffset: energy,
     hours,
     timezone: typeof row.timezone === "string" && row.timezone.trim() ? row.timezone.trim() : fallbackZone,
+  };
+}
+
+export const POINT_MUSIC_FORBIDDEN = "Менять музыку с устройства в заведении запрещено.";
+
+/** Missing settings default to ON, but an invalid/revoked session grants nothing. */
+export function pointMusicAllowed(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return row.ok === true && row.point_can_edit_settings !== false;
+}
+
+/** Validate JSON shapes before calling the typed window validator. */
+export function soundDraftFromBody(value: unknown): LocationSoundDraft | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const body = value as Record<string, unknown>;
+  const { character, direction, daypartMode, energyOffset: energy } = body;
+  if (character !== "cozy" && character !== "city" && character !== "classic" && character !== "evening") return null;
+  if (direction !== "jazz" && direction !== "calm" && direction !== "rhythm" && direction !== "melodic") return null;
+  if (daypartMode !== "auto" && !isCafeDaypart(daypartMode)) return null;
+  if (!isCafeEnergyOffset(energy)) return null;
+  if (!body.hours || typeof body.hours !== "object" || Array.isArray(body.hours)) return null;
+  const raw = body.hours as Record<string, unknown>;
+  for (const part of ["morning", "day", "evening"]) {
+    const window = raw[part];
+    if (!window || typeof window !== "object" || Array.isArray(window)) return null;
+    const row = window as Record<string, unknown>;
+    if (typeof row.start !== "string" || typeof row.end !== "string") return null;
+  }
+  const hours = body.hours as CafeDaypartHours;
+  if (validateCafeDaypartHours(hours)) return null;
+  return { character, direction, daypartMode, energyOffset: energy, hours };
+}
+
+/** Keep the current track at the boundary, so next starts the new order's first track. */
+export function pointKeepCurrentOrder(indices: readonly number[], currentIndex: number): number[] {
+  return [currentIndex, ...indices.filter((index) => index !== currentIndex)];
+}
+
+export type PointSoundApplyResult = "applied" | "deferred" | "failed";
+
+/** Retry the same version/daypart after failure or deferral; serialize installs. */
+export function createPointSoundApplier() {
+  let appliedKey: string | null = null;
+  let inFlight = false;
+  return async (
+    sound: PointSoundUpdate,
+    install: (daypart: CafeDaypart) => Promise<PointSoundApplyResult>,
+    now = new Date(),
+  ): Promise<PointSoundApplyResult> => {
+    const daypart = pointDaypart(sound, now);
+    const key = `${sound.version}:${daypart}`;
+    if (key === appliedKey) return "applied";
+    if (inFlight) return "deferred";
+    inFlight = true;
+    try {
+      const result = await install(daypart);
+      if (result === "applied") appliedKey = key;
+      return result;
+    } catch {
+      return "failed";
+    } finally {
+      inFlight = false;
+    }
   };
 }

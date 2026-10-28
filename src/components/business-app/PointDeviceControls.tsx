@@ -24,6 +24,7 @@ export default function PointDeviceControls() {
         <button
           type="button"
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+          disabled={!player?.canChangeMusic}
           data-testid="biz-point-next"
           onClick={() => void player?.next()}
         >

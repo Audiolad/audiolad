@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS, isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypartHours } from "@/lib/business-app/cafe-queue/prefs";
+import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS } from "@/lib/business-app/cafe-queue/prefs";
 import { GUEST_COFFEE_DEFAULT_PROFILE } from "@/lib/business-app/guest-coffee/catalog";
 import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } from "@/lib/business-app/location-sound-settings";
+import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, soundDraftFromBody } from "@/lib/business-app/point-sound";
 import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
     return json({ ok: true, id: (data as { id?: string }).id ?? body.id });
   }
 
-  if (body.action === "commands" || body.action === "ack" || body.action === "sound" || body.action === "sound-save") {
+  if (body.action === "commands" || body.action === "ack" || body.action === "sound" || body.action === "sound-save" || body.action === "music-change") {
     const jar = request.headers.get("cookie") ?? "";
     const token = readCookie(jar, BUSINESS_POINT_COOKIE);
     if (!isPointToken(token)) return json({ ok: false, reason: "no_access" });
@@ -160,6 +161,12 @@ export async function POST(request: Request) {
       const { data, error } = await supabase.rpc("get_business_point_sound_settings", { p_token: token });
       if (error || !data || (data as { ok?: boolean }).ok !== true) return json({ ok: false, reason: "sound_failed" });
       return json(data);
+    }
+    if (body.action === "music-change") {
+      const { data, error } = await supabase.rpc("get_business_point_sound_settings", { p_token: token });
+      if (error || !(data as { ok?: boolean } | null)?.ok) return json({ ok: false, reason: "no_access" }, 403);
+      if (!pointMusicAllowed(data)) return json({ ok: false, reason: "forbidden", error: POINT_MUSIC_FORBIDDEN }, 403);
+      return json({ ok: true });
     }
     if (body.action === "sound-save") {
       const draft = soundDraftFromBody(body);
@@ -173,7 +180,7 @@ export async function POST(request: Request) {
       // The flag defaults to on. Owner commands are still claimed when it is off.
       // The save RPC also checks the flag under lock in case it changes here.
       if (settings.point_can_edit_settings === false) {
-        return json({ ok: false, reason: "forbidden", error: "Менять музыку с устройства в заведении запрещено." }, 403);
+        return json({ ok: false, reason: "forbidden", error: POINT_MUSIC_FORBIDDEN }, 403);
       }
       const { data, error } = await supabase.rpc("save_business_point_sound_settings", {
         p_token: token,
@@ -189,6 +196,9 @@ export async function POST(request: Request) {
         p_evening_start: draft.hours.evening.start,
         p_evening_end: draft.hours.evening.end,
       });
+      if (error?.message?.includes("point_settings_locked")) {
+        return json({ ok: false, reason: "forbidden", error: POINT_MUSIC_FORBIDDEN }, 403);
+      }
       if (error || !(data as { ok?: boolean } | null)?.ok) {
         return json({ ok: false, error: "Не удалось сохранить звучание. Попробуйте ещё раз." });
       }
@@ -235,20 +245,6 @@ export async function POST(request: Request) {
   }
 
   return json({ ok: false, reason: "invalid_request" }, 400);
-}
-
-function soundDraftFromBody(body: Record<string, unknown>): LocationSoundDraft | null {
-  const character = body.character;
-  const direction = body.direction;
-  const daypartMode = body.daypartMode;
-  const energy = body.energyOffset;
-  if (character !== "cozy" && character !== "city" && character !== "classic" && character !== "evening") return null;
-  if (direction !== "jazz" && direction !== "calm" && direction !== "rhythm" && direction !== "melodic") return null;
-  if (daypartMode !== "auto" && !isCafeDaypart(daypartMode)) return null;
-  if (typeof energy !== "number" || !isCafeEnergyOffset(energy)) return null;
-  const hours = body.hours as CafeDaypartHours | undefined;
-  if (!hours || validateCafeDaypartHours(hours)) return null;
-  return { character, direction, daypartMode, energyOffset: energy, hours };
 }
 
 function readCookie(header: string, name: string): string | null {
