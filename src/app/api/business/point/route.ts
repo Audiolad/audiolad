@@ -165,6 +165,16 @@ export async function POST(request: Request) {
       const draft = soundDraftFromBody(body);
       const locationId = typeof body.locationId === "string" ? body.locationId : "";
       if (!draft || !locationId) return json({ ok: false, reason: "invalid_request" }, 400);
+      const { data: sound, error: soundError } = await supabase.rpc("get_business_point_sound_settings", { p_token: token });
+      const settings = sound as { ok?: boolean; location_id?: string; point_can_edit_settings?: boolean } | null;
+      if (soundError || settings?.ok !== true || settings.location_id !== locationId) {
+        return json({ ok: false, reason: "no_access" }, 403);
+      }
+      // The flag defaults to on. Owner commands are still claimed when it is off.
+      // The save RPC also checks the flag under lock in case it changes here.
+      if (settings.point_can_edit_settings === false) {
+        return json({ ok: false, reason: "forbidden", error: "Менять музыку с устройства в заведении запрещено." }, 403);
+      }
       const { data, error } = await supabase.rpc("save_business_point_sound_settings", {
         p_token: token,
         p_location_id: locationId,
