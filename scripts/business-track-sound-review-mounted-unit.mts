@@ -9,10 +9,11 @@ import type { SoundReviewRow } from '../src/lib/business/track-sound-review';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const moduleLoader = createRequire(import.meta.url);
 const actionsPath = moduleLoader.resolve('../src/app/(platform)/admin/business-track-review/actions.ts');
-const saves: { id: string; status: string; reason: string; audioIdentity: string }[] = [];
+type SavedDecision = { id: string; status: string; reason: string; audioIdentity: string };
+const saves: SavedDecision[] = [];
 const bulks: unknown[] = [];
 const previews: string[] = [];
-let reviewImpl: (input: { id: string; status: string; reason: string; audioIdentity: string }) => Promise<{ ok: boolean; message: string }> = async (input) => {
+let reviewImpl: (input: SavedDecision) => Promise<{ ok: boolean; message: string }> = async (input) => {
   saves.push(input);
   return { ok: true, message: 'Решение сохранено.' };
 };
@@ -20,7 +21,7 @@ moduleLoader.cache[actionsPath] = {
   id: actionsPath, filename: actionsPath, loaded: true,
   exports: {
     previewBusinessTrack: async (id: string) => { previews.push(id); return { ok: true, url: `https://audio.invalid/${id}` }; },
-    reviewBusinessTrack: async (input: { id: string; status: string; reason: string; audioIdentity: string }) => reviewImpl(input),
+    reviewBusinessTrack: async (input: SavedDecision) => reviewImpl(input),
     reviewBusinessTracksBulk: async (input: unknown) => { bulks.push(input); return { ok: true, saved: 2, failed: 0, message: 'Сохранено: 2.' }; },
     businessTrackReviewHistory: async () => [{ id: 1, old_status: 'unchecked', new_status: 'rejected', changed_at: '2026-10-27T12:00:00Z', reason: 'Внутренняя причина', changed_by: 'admin', event: 'manual' }],
   },
@@ -98,7 +99,7 @@ await click('Допущен');
 assert.match(text(container), /Решение не сохранено\. Повторите попытку\./);
 assert.equal(playingStatus(), 'unchecked');
 assert.equal(previews.length, beforeFailure, 'thrown save does not advance');
-reviewImpl = async (input) => { saves.push(input); return { ok: true, message: 'Решение сохранено.' }; };
+reviewImpl = async (input: SavedDecision) => { saves.push(input); return { ok: true, message: 'Решение сохранено.' }; };
 await click('Допущен');
 assert.deepEqual(saves.at(-1)!, { id: 'b', status: 'approved', reason: 'Шипение', audioIdentity: rows[1].audio_identity });
 assert.equal(rowStatus('Track b'), 'approved');
