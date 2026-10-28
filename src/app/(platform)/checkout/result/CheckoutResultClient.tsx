@@ -9,8 +9,11 @@ import {
   buildLibraryPurchasedHref,
   buildPaidAuthenticatedPrimaryHref,
   buildStudioMusicPaidHref,
+  businessCheckoutResultCard,
   isAuthorProjectCapacityCheckout,
+  isBusinessSubscriptionCheckout,
   isStudioMusicLicenseCheckout,
+  type BusinessCheckoutResultView,
 } from "@/lib/payments/checkout-result-cta";
 import {
   isTerminalCheckoutStatus,
@@ -91,6 +94,7 @@ export default function CheckoutResultClient() {
 
   const studioLicense = isStudioMusicLicenseCheckout(status?.orderKind);
   const capacityPurchase = isAuthorProjectCapacityCheckout(status?.orderKind);
+  const businessSubscription = isBusinessSubscriptionCheckout(status?.orderKind);
   const libraryHref = useMemo(
     () =>
       capacityPurchase
@@ -295,6 +299,22 @@ export default function CheckoutResultClient() {
     );
   }
 
+  if (businessSubscription && isBusinessCheckoutResultView(viewState)) {
+    const card = businessCheckoutResultCard(viewState, status?.authenticated === true);
+    return (
+      <ResultCard
+        title={card.title}
+        description={card.description}
+        actionHref={card.actionHref ?? undefined}
+        actionLabel={card.actionLabel}
+        onActionClick={card.actionHref ? undefined : restartPolling}
+        secondaryHref={card.secondaryHref ?? undefined}
+        secondaryLabel={card.secondaryLabel ?? undefined}
+        isLoading={viewState === "processing" && isPolling}
+      />
+    );
+  }
+
   if (viewState === "paid_authenticated") {
     if (capacityPurchase) {
       return (
@@ -427,6 +447,15 @@ function ResultCard({
       ) : null}
     </div>
   );
+}
+
+function isBusinessCheckoutResultView(view: ViewState): view is BusinessCheckoutResultView {
+  return view === "paid_authenticated"
+    || view === "paid_unauthenticated"
+    || view === "processing"
+    || view === "failed"
+    || view === "cancelled"
+    || view === "refunded";
 }
 
 function TerminalFailureCard({

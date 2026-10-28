@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
 import { loadSpaPilotContext, signSpaTrack } from "@/lib/business-app/spa-pilot";
 import { handleSpaTrackUrl, isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 
@@ -17,6 +18,10 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ ok: false, reason: "invalid_request" }, { status: 400, headers: NO_STORE });
+  }
+  const access = await peekBusinessChromeAccess();
+  if (access.mode === "offer") {
+    return NextResponse.json({ ok: false, reason: "no_access" }, { headers: NO_STORE });
   }
   const result = await handleSpaTrackUrl(body, {
     loadContext: loadSpaPilotContext,
