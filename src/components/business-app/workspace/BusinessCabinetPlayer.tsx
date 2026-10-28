@@ -14,7 +14,7 @@ import {
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
-import { isPointCommandType, pointCommandAction, type PointCommandType } from "@/lib/business-app/point-commands";
+import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -426,28 +426,11 @@ export function BusinessCabinetPlayerProvider({
 
   useEffect(() => {
     if (!canBeat) return;
-    const storageKey = "audiolad.point.applied-commands";
-    const load = (): Set<string> => {
-      try {
-        const raw = window.sessionStorage.getItem(storageKey);
-        const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-        return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []);
-      } catch {
-        return new Set();
-      }
-    };
-    const rememberId = (id: string, done: Set<string>) => {
-      done.add(id);
-      try {
-        window.sessionStorage.setItem(storageKey, JSON.stringify([...done].slice(-40)));
-      } catch {
-        /* storage blocked */
-      }
-    };
     let stop = false;
+    let inFlight = false;
     const tick = async () => {
-      if (stop) return;
-      let commands: { id: string; type: PointCommandType }[] = [];
+      if (stop || inFlight) return;
+      inFlight = true;
       try {
         const res = await fetch("/api/business/point", {
           method: "POST",
@@ -458,28 +441,16 @@ export function BusinessCabinetPlayerProvider({
         });
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
-        commands = json.commands.flatMap((row) =>
-          isPointCommandType(row.type) && typeof row.id === "string" ? [{ id: row.id, type: row.type }] : [],
-        );
-      } catch {
-        return;
-      }
-      const done = load();
-      for (const command of commands) {
-        if (stop) return;
-        if (!done.has(command.id)) {
-          const action = pointCommandAction(ctlRef.current?.status ?? "idle", command.type);
+        for (const row of json.commands) {
+          if (stop || !isPointCommandType(row.type)) continue;
+          const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
           if (action === "toggle") await toggleRef.current();
           if (action === "next") await nextRef.current();
-          rememberId(command.id, done);
         }
-        await fetch("/api/business/point", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "same-origin",
-          cache: "no-store",
-          body: JSON.stringify({ action: "ack", id: command.id }),
-        }).catch(() => undefined);
+      } catch {
+        /* the next poll retries; a claimed command is not returned again */
+      } finally {
+        inFlight = false;
       }
     };
     void tick();

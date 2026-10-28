@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     const token = readCookie(jar, BUSINESS_POINT_COOKIE);
     if (!isPointToken(token)) return json({ ok: false, reason: "no_access" });
     if (body.action === "commands") {
-      const { data, error } = await supabase.rpc("list_business_point_commands", { p_token: token });
+      const { data, error } = await supabase.rpc("claim_business_point_commands", { p_token: token });
       if (error || !Array.isArray(data)) return json({ ok: false, reason: "commands_failed" });
       const commands = data.filter(
         (row): row is { id: string; type: "pause" | "resume" | "next_track"; created_at: string } =>
