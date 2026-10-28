@@ -1,0 +1,487 @@
+.b2b-guide {
+  --guide-bg: #f6eee4;
+  --guide-surface: #fffaf3;
+  --guide-ink: #2c2018;
+  --guide-muted: #6f5b4c;
+  --guide-line: rgba(84, 56, 32, 0.16);
+  --guide-accent: #8e1f22;
+  --guide-accent-ink: #fff8ef;
+  --guide-gold: #c49b55;
+  --guide-deep: #22150d;
+  --guide-display: var(--font-guide-serif), "Iowan Old Style", Georgia, serif;
+  background: var(--guide-bg);
+  color: var(--guide-ink);
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+.b2b-guide a {
+  color: var(--guide-accent);
+  text-underline-offset: 0.18em;
+}
+
+.b2b-guide a:hover {
+  color: var(--guide-deep);
+}
+
+.guide-display {
+  font-family: var(--guide-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.guide-wrap {
+  width: min(880px, 100%);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.guide-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(246, 238, 228, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--guide-line);
+}
+
+.guide-header__bar,
+.guide-header__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.guide-header__bar {
+  min-height: 72px;
+}
+
+.guide-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--guide-ink);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.guide-brand small,
+.guide-kicker {
+  display: block;
+  color: var(--guide-muted);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.guide-header__nav {
+  gap: 14px;
+  font-size: 0.95rem;
+}
+
+.guide-header__nav a {
+  color: var(--guide-ink);
+  text-decoration: none;
+}
+
+.guide-hero {
+  position: relative;
+  min-height: 68vh;
+  display: grid;
+  align-items: end;
+  color: #fff8ef;
+}
+
+.guide-hero__media {
+  position: absolute;
+  inset: 0;
+}
+
+.guide-hero__media img {
+  object-fit: cover;
+}
+
+.guide-hero__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20, 12, 6, 0.12), rgba(20, 12, 6, 0.78));
+}
+
+.guide-hero__copy {
+  position: relative;
+  z-index: 1;
+  padding-top: 28vh;
+  padding-bottom: 48px;
+}
+
+.guide-hero h1 {
+  margin: 8px 0 16px;
+  font-size: clamp(2.1rem, 6vw, 4.2rem);
+  max-width: 16ch;
+}
+
+.guide-hero__lead,
+.guide-index__intro {
+  max-width: 62ch;
+  font-size: 1.12rem;
+  line-height: 1.6;
+}
+
+.guide-hero .guide-kicker,
+.guide-hero__caption {
+  color: #f0d7b0;
+}
+
+.guide-hero__caption {
+  font-size: 0.92rem;
+  max-width: 46ch;
+}
+
+.guide-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 22px;
+  color: var(--guide-muted);
+  font-size: 0.92rem;
+}
+
+.guide-prose,
+.guide-block p,
+.guide-faq p {
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.guide-prose {
+  max-width: 68ch;
+}
+
+.guide-h2 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  margin: 0 0 16px;
+}
+
+.guide-h3 {
+  font-size: 1.45rem;
+  margin: 22px 0 8px;
+}
+
+.guide-block {
+  padding: 28px 20px 8px;
+}
+
+.guide-figure {
+  margin: 28px 0;
+}
+
+.guide-figure img,
+.guide-expert__photo img {
+  width: 100%;
+  height: auto;
+  border-radius: 22px;
+}
+
+.guide-figure figcaption,
+.guide-expert__credit,
+.guide-offer__note,
+.guide-player__note,
+.guide-translation {
+  color: var(--guide-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.guide-question {
+  font-family: var(--guide-display);
+  font-size: 1.45rem;
+  margin-top: 0;
+}
+
+.guide-cups__tabs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.guide-cup {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  border: 1px solid var(--guide-line);
+  background: var(--guide-surface);
+  color: var(--guide-ink);
+  border-radius: 18px;
+  padding: 14px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.guide-cup.is-active {
+  background: var(--guide-accent);
+  color: var(--guide-accent-ink);
+  border-color: var(--guide-accent);
+}
+
+.guide-cup__mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(196, 155, 85, 0.28);
+  flex: none;
+}
+
+.guide-cups__panel {
+  margin-top: 14px;
+  background: var(--guide-surface);
+  border-radius: 22px;
+  padding: 20px 22px 8px;
+  border: 1px solid var(--guide-line);
+}
+
+.guide-band {
+  margin-top: 28px;
+  background: var(--guide-deep);
+  color: #f6ead7;
+  padding: 36px 0;
+}
+
+.guide-band a {
+  color: #f0d7b0;
+}
+
+.guide-listen {
+  display: grid;
+  gap: 22px;
+}
+
+.guide-player__row,
+.guide-player__empty {
+  background: #fffaf3;
+  color: var(--guide-ink);
+  border-radius: 22px;
+  padding: 16px;
+}
+
+.guide-player__row {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.guide-player__title {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.guide-player__play {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--guide-accent);
+  color: var(--guide-accent-ink);
+  display: grid;
+  place-items: center;
+}
+
+.guide-check {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.guide-check ul {
+  list-style: none;
+  padding: 0;
+}
+
+.guide-check li {
+  margin: 8px 0;
+}
+
+.guide-check label {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--guide-surface);
+  border-radius: 16px;
+  padding: 14px 16px;
+  line-height: 1.45;
+}
+
+.guide-check input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.2rem;
+  accent-color: var(--guide-accent);
+}
+
+.guide-experts {
+  display: grid;
+  gap: 22px;
+}
+
+.guide-expert {
+  display: grid;
+  gap: 16px;
+  background: var(--guide-surface);
+  border-radius: 22px;
+  padding: 16px;
+  border: 1px solid var(--guide-line);
+}
+
+.guide-quote {
+  margin: 12px 0;
+  padding-left: 14px;
+  border-left: 3px solid var(--guide-gold);
+}
+
+.guide-quote p {
+  font-family: var(--guide-display);
+  font-size: 1.2rem;
+  line-height: 1.45;
+}
+
+.guide-quote figcaption {
+  color: var(--guide-muted);
+  font-size: 0.92rem;
+}
+
+.guide-faq details {
+  background: var(--guide-surface);
+  border-radius: 16px;
+  padding: 12px 16px;
+  margin: 10px 0;
+}
+
+.guide-faq summary {
+  cursor: pointer;
+  font-weight: 680;
+}
+
+.guide-links {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.guide-links a {
+  display: block;
+  background: var(--guide-surface);
+  border-radius: 16px;
+  padding: 14px 16px;
+  text-decoration: none;
+  border: 1px solid var(--guide-line);
+}
+
+.guide-offer {
+  margin: 28px auto 12px;
+  background: #fffaf3;
+  border-radius: 22px;
+  padding: 22px 20px;
+  border: 1px solid var(--guide-line);
+}
+
+.guide-footer {
+  padding: 28px 0 48px;
+  color: var(--guide-muted);
+}
+
+.guide-index {
+  padding-top: 36px;
+  padding-bottom: 64px;
+}
+
+.guide-index h1 {
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  max-width: 12ch;
+}
+
+.guide-index__list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.guide-index__list a {
+  display: grid;
+  gap: 6px;
+  background: var(--guide-surface);
+  border-radius: 20px;
+  padding: 18px;
+  text-decoration: none;
+  color: var(--guide-ink);
+  border: 1px solid var(--guide-line);
+}
+
+.guide-index__list small {
+  color: var(--guide-muted);
+  line-height: 1.45;
+}
+
+.guide-cup:focus-visible,
+.guide-check input:focus-visible,
+.guide-faq summary:focus-visible,
+.b2b-guide a:focus-visible {
+  outline: 2px solid var(--guide-gold);
+  outline-offset: 3px;
+}
+
+@media (min-width: 720px) {
+  .guide-wrap {
+    padding: 0 32px;
+  }
+
+  .guide-cups__tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .guide-listen,
+  .guide-expert {
+    grid-template-columns: 220px 1fr;
+    align-items: start;
+  }
+
+  .guide-listen {
+    grid-template-columns: 1fr 1.1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .guide-header__bar {
+    flex-wrap: wrap;
+    min-height: 0;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .guide-header__nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .guide-hero {
+    min-height: 78vh;
+  }
+
+  .guide-player__row {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .guide-player__play {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
