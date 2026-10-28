@@ -315,7 +315,7 @@ export function BusinessCabinetPlayerProvider({
           }));
         },
       },
-      workspaceItems(current.tracks, current.endsAt),
+      workspaceItems(current.tracks, current.playbackUntil ?? current.endsAt),
     );
     ctlRef.current = ctl;
     const onTime = () => {
