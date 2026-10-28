@@ -81,6 +81,12 @@ export default function AdminNavTabs({ items, pathname }: AdminNavTabsProps) {
   }
 
   const grouped = groupAudioladBusinessNav(items);
+  const parent = grouped.primary.find((item) => item.navId === "audiolad-business");
+  const businessOpen = Boolean(
+    parent
+    && grouped.business
+    && isAdminNavPathActive({ href: parent.href, activePrefixes: parent.matchPrefixes }, pathname),
+  );
   const primary = (
     <nav className="flex flex-wrap gap-2" aria-label="Панель управления">
       {grouped.primary.map((item) => (
@@ -88,7 +94,7 @@ export default function AdminNavTabs({ items, pathname }: AdminNavTabsProps) {
       ))}
     </nav>
   );
-  if (!grouped.business) return primary;
+  if (!grouped.business || !businessOpen) return primary;
 
   return (
     <div className="space-y-2">
