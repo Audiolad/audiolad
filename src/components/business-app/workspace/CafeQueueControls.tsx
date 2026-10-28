@@ -77,21 +77,22 @@ export function CafeTrackFeedback({
   const busy = phase !== "idle";
   return (
     <div className="cafe-queue__pair cafe-now-feedback" data-testid="biz-cafe-feedback" data-phase={phase}>
-      {(["more", "less"] as const).map((kind) => {
+      {(["less", "more"] as const).map((kind) => {
         const active = busy && busyKind === kind;
         return (
           <button
             key={kind}
             type="button"
-            className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
+            className={`cafe-queue__btn cafe-queue__choice cafe-queue__choice--${kind} business-app-focus-ring`}
             data-testid={kind === "more" ? "biz-cafe-more" : "biz-cafe-less"}
             data-state={active ? phase : "idle"}
             aria-busy={active && phase === "working"}
             disabled={busy}
             onClick={() => onFeedback(kind)}
           >
-            {active ? <FeedbackMark phase={phase} /> : <CircleIcon sign={kind === "more" ? "plus" : "minus"} />}
-            <span>{feedbackText(kind, phase, active)}</span>
+            {kind === "less" ? (active ? <FeedbackMark phase={phase} /> : <CircleIcon sign="minus" />) : null}
+            <span className="cafe-queue__label">{feedbackText(kind, phase, active)}</span>
+            {kind === "more" ? (active ? <FeedbackMark phase={phase} /> : <CircleIcon sign="plus" />) : null}
           </button>
         );
       })}
