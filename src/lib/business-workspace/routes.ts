@@ -45,6 +45,8 @@ export type WorkspaceStateBody =
       positionSec: number;
       volume: number;
       play: boolean;
+      cause: unknown;
+      volumeOnly: boolean;
     }
   | { kind: "offer_click" };
 
@@ -53,7 +55,7 @@ export function parseWorkspaceStateBody(body: unknown): WorkspaceStateBody | nul
   const kind = (body as { kind?: unknown }).kind;
   if (kind === "offer_click") return { kind: "offer_click" };
   if (kind !== "playback") return null;
-  const row = body as { index?: unknown; positionSec?: unknown; volume?: unknown; play?: unknown };
+  const row = body as { index?: unknown; positionSec?: unknown; volume?: unknown; play?: unknown; cause?: unknown; volumeOnly?: unknown };
   if (typeof row.index !== "number" || typeof row.positionSec !== "number" || typeof row.volume !== "number") {
     return null;
   }
@@ -64,12 +66,15 @@ export function parseWorkspaceStateBody(body: unknown): WorkspaceStateBody | nul
     positionSec: row.positionSec,
     volume: row.volume,
     play: row.play === true,
+    cause: row.cause,
+    volumeOnly: row.volumeOnly === true,
   };
 }
 
 export type WorkspaceStateDeps = {
   userId: () => Promise<string | null>;
   playerOpen: () => Promise<boolean>;
+  playbackAllowed?: (input: Extract<WorkspaceStateBody, { kind: "playback" }>) => Promise<boolean>;
   savePlayback: (input: { index: number; positionSec: number; volume: number }) => Promise<void>;
   recordPlay: () => Promise<void>;
   recordOfferClick: () => Promise<void>;
@@ -89,6 +94,7 @@ export async function handleWorkspaceState(
   }
   const open = await deps.playerOpen();
   if (!open) return { ok: false, reason: "no_access" };
+  if (deps.playbackAllowed && !(await deps.playbackAllowed(parsed))) return { ok: false, reason: "forbidden" };
   await deps.savePlayback({
     index: parsed.index,
     positionSec: parsed.positionSec,
