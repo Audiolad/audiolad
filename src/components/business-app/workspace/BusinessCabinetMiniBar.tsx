@@ -15,6 +15,7 @@ export default function BusinessCabinetMiniBar({
   loading,
   onToggle,
   onNext,
+  nextDisabled,
   onClose,
   onOpen,
   onSeek,
@@ -41,6 +42,7 @@ export default function BusinessCabinetMiniBar({
   loading: boolean;
   onToggle: () => void;
   onNext: () => void;
+  nextDisabled?: boolean;
   onClose: () => void;
   onOpen?: () => void;
   onSeek?: (ratio: number) => void;
@@ -117,6 +119,7 @@ export default function BusinessCabinetMiniBar({
         nowTitle={null}
         onToggle={onToggle}
         onNext={onNext}
+        nextDisabled={nextDisabled}
         volume={volume}
         onVolume={onVolume}
         appearance="round"

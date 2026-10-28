@@ -1,0 +1,371 @@
+{
+  "version": 1,
+  "vertical": "coffee",
+  "experts": [
+    {
+      "id": "anna-tsfasman",
+      "name": "Анна Цфасман",
+      "nameOriginal": "Анна Цфасман",
+      "country": "Россия",
+      "countryCode": "RU",
+      "origin": "ru",
+      "gender": "woman",
+      "role": "Основательница сети кофеен",
+      "competence": "В интервью Радио Свобода от 6 января 2019 года она названа основателем и генеральным директором сети кофеен «Даблби».",
+      "competenceUrl": "https://www.svoboda.org/a/29693086.html",
+      "photo": {
+        "file": "/business/coffee-guides/experts/anna-tsfasman.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Anna_Tsfasman.jpg",
+        "license": "CC0",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "author": "Андрей Ильин",
+        "credit": "Фото: Андрей Ильин, «Бизнес-журнал», лицензия CC0",
+        "rightsNote": "Шаблон Business journal на Wikimedia Commons ссылается на разрешение правообладателя, тикет VRT 2014051310011179."
+      },
+      "quotes": [
+        {
+          "text": "Ну, кофе это не очень музыкальная история, хотя маркетологи иногда приходят с тем, что можно как-то это обыграть, потому что в кофе очень много нот, и когда мы описываем вкус кофе, чаще всего мы описываем его через ноты, которые мы улавливаем в аромате, во вкусе, послевкусии.",
+          "sourceTitle": "Быстрое движение. Анна Цфасман о двоюродном дедушке, бабушке Бэтмен, кофе и музыке",
+          "sourceUrl": "https://www.svoboda.org/a/29693086.html",
+          "sourceDate": "2019-01-06",
+          "context": "Елена Поляковская и Юрий Лебедев спросили, почему она занялась кофе и услышала ли в нём музыку. Это первое предложение ответа. Дальше в том же ответе она говорит о дегустационных нотах, об уютном напитке и о беседе."
+        },
+        {
+          "text": "Скорее это напиток, который помогает провести время в приятной беседе.",
+          "sourceTitle": "Быстрое движение. Анна Цфасман о двоюродном дедушке, бабушке Бэтмен, кофе и музыке",
+          "sourceUrl": "https://www.svoboda.org/a/29693086.html",
+          "sourceDate": "2019-01-06",
+          "context": "То же интервью и тот же ответ. Перед этой фразой она говорит, что бодрящая ассоциация отходит на второй план. Это не совет, какую музыку включить в зале."
+        }
+      ]
+    },
+    {
+      "id": "howard-schultz",
+      "name": "Говард Шульц",
+      "nameOriginal": "Howard Schultz",
+      "country": "США",
+      "countryCode": "US",
+      "origin": "foreign",
+      "gender": "man",
+      "role": "Предприниматель в кофейном бизнесе",
+      "competence": "10 мая 2018 года Atlantic Council представлял его как исполнительного председателя Starbucks. В стенограмме он рассказывает, как пришёл в компанию из шести кофеен и описывает итальянские бары как образец сообщества.",
+      "competenceUrl": "https://www.atlanticcouncil.org/commentary/transcript/the-role-and-responsibility-of-a-global-company-2/",
+      "photo": {
+        "file": "/business/coffee-guides/experts/howard-schultz.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Howard_Schultz_by_Gage_Skidmore.jpg",
+        "license": "CC BY-SA 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+        "author": "Gage Skidmore",
+        "credit": "Фото: Gage Skidmore, лицензия CC BY-SA 3.0",
+        "rightsNote": "Свободная лицензия на снимок. Портрет живого человека: авторские права и право на изображение – разные вещи, это отмечено для приёмки."
+      },
+      "quotes": [
+        {
+          "text": "So in 1983, I took my first trip as a young man to Italy. And like many people who have gone to Italy, I was captured with the Italian coffee bars and the romance and the theater of espresso. But what really caught my attention was the sense of community that existed inside of all of these coffee bars, and what I began to realize and label as this third place between home and work.",
+          "sourceTitle": "The role and responsibility of a global company",
+          "sourceUrl": "https://www.atlanticcouncil.org/commentary/transcript/the-role-and-responsibility-of-a-global-company-2/",
+          "sourceDate": "2018-05-10",
+          "context": "Дэвид Игнатиус спросил, как появилась идея. Шульц отвечает про поездку 1983 года. Он не называет плейлист и не рекомендует жанр."
+        }
+      ]
+    },
+    {
+      "id": "james-hoffmann",
+      "name": "Джеймс Хоффманн",
+      "nameOriginal": "James Hoffmann",
+      "country": "Великобритания",
+      "countryCode": "GB",
+      "origin": "foreign",
+      "gender": "man",
+      "role": "Бариста и автор книг о кофе",
+      "competence": "Sprudge в профиле 1 ноября 2021 года описывает его как чемпиона мира среди бариста 2007 года и сооснователя Square Mile Coffee Roasters.",
+      "competenceUrl": "https://sprudge.com/who-is-james-hoffmann-182200.html",
+      "photo": {
+        "file": "/business/coffee-guides/experts/james-hoffmann.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:James_Hoffmann_at_the_London_Coffee_Festival.jpg",
+        "license": "CC BY 2.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+        "author": "Bex Harrison",
+        "credit": "Фото: Bex Harrison, лицензия CC BY 2.0",
+        "rightsNote": ""
+      },
+      "quotes": [
+        {
+          "text": "I receive quite a few series of questions a day between my email, Patreon, and social media accounts.",
+          "sourceTitle": "Who is James Hoffmann?",
+          "sourceUrl": "https://sprudge.com/who-is-james-hoffmann-182200.html",
+          "sourceDate": "2021-11-01",
+          "context": "Речь о потоке вопросов от зрителей. Следующая цитата – следующее предложение того же ответа: на странице между ними стоит «says Hoffmann»."
+        },
+        {
+          "text": "I don’t have the capacity to respond to custom recommendation requests anymore, but if there’s a wider utility to the answer (rather than just scratching the mental itch of an individual) then I’ll try and be helpful if I can.",
+          "sourceTitle": "Who is James Hoffmann?",
+          "sourceUrl": "https://sprudge.com/who-is-james-hoffmann-182200.html",
+          "sourceDate": "2021-11-01",
+          "context": "Продолжение того же ответа. Это не высказывание о музыке в кофейне."
+        }
+      ]
+    },
+    {
+      "id": "tim-wendelboe",
+      "name": "Тим Вендельбо",
+      "nameOriginal": "Tim Wendelboe",
+      "country": "Норвегия",
+      "countryCode": "NO",
+      "origin": "foreign",
+      "gender": "man",
+      "role": "Обжарщик и владелец кофейни",
+      "competence": "Страница чемпионата мира среди бариста указывает его победителем 2004 года от Норвегии. Sprudge 20 марта 2017 года пишет, что он держит кофейню и обжарку в Осло.",
+      "competenceUrl": "https://sprudge.com/tim-wendelboe-talks-noma-mexico-la-marzocco-cafe-residency-117344.html",
+      "photo": {
+        "file": "/business/coffee-guides/experts/tim-wendelboe.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Tim_Wendelboe.jpg",
+        "license": "CC BY-SA 2.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+        "author": "Dennis Tang",
+        "credit": "Фото: Dennis Tang, лицензия CC BY-SA 2.0",
+        "rightsNote": "Длинное тире источника в сохранённой строке заменено на среднее «–». На пилотной странице цитата не выводится: в тексте Анна Цфасман и Говард Шульц."
+      },
+      "quotes": [
+        {
+          "text": "Their cafe is very different compared to ours – it’s huge, and that makes it difficult to replicate the atmosphere. But for drinks, we’re trying to do the drinks just as we do in Oslo.",
+          "sourceTitle": "Tim Wendelboe Talks Noma Mexico & La Marzocco Cafe Residency",
+          "sourceUrl": "https://sprudge.com/tim-wendelboe-talks-noma-mexico-la-marzocco-cafe-residency-117344.html",
+          "sourceDate": "2017-03-20",
+          "context": "Его спросили, должна ли резиденция в кафе La Marzocco в Сиэтле копировать осленскую кофейню. Речь об атмосфере зала, не о плейлисте. Интервью на сайте помечено как отредактированное и сокращённое."
+        }
+      ]
+    },
+    {
+      "id": "andrea-illy",
+      "name": "Андреа Илли",
+      "nameOriginal": "Andrea Illy",
+      "country": "Италия",
+      "countryCode": "IT",
+      "origin": "foreign",
+      "gender": "man",
+      "role": "Председатель кофейной компании",
+      "competence": "WBUR 3 ноября 2016 года называет его председателем illycaffè и внуком Франческо Илли, который в 1933 году развивал эспрессо-машину компании.",
+      "competenceUrl": "https://www.wbur.org/hereandnow/2016/11/03/illycaffe-ceo",
+      "photo": {
+        "file": "/business/coffee-guides/experts/andrea-illy.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Andrea_Illy_at_the_World_Economic_Forum_on_Europe_2011.jpg",
+        "license": "CC BY-SA 2.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+        "author": "World Economic Forum / Benedikt Loebell",
+        "credit": "Фото: World Economic Forum, Benedikt Loebell, лицензия CC BY-SA 2.0",
+        "rightsNote": ""
+      },
+      "quotes": [
+        {
+          "text": "When coffee used to be just a commodity and the quality was just so-so, people used to drink coffee for the caffeine kick in the morning. Today, it's different. Coffee became an experiential product. People are engaged because they love the flavor, they love the ritual of preparation, and so it's becoming a similar experience to wine.",
+          "sourceTitle": "Illycaffè CEO: Coffee Is No Longer Just A Commodity",
+          "sourceUrl": "https://www.wbur.org/hereandnow/2016/11/03/illycaffe-ceo",
+          "sourceDate": "2016-11-03",
+          "context": "Разговор о том, как в разных культурах пьют кофе. Он сравнивает опыт чашки с вином, а не с фоновой музыкой."
+        }
+      ]
+    },
+    {
+      "id": "nick-cho",
+      "name": "Ник Чо",
+      "nameOriginal": "Nick Cho",
+      "country": "США",
+      "countryCode": "US",
+      "origin": "foreign",
+      "gender": "man",
+      "role": "Владелец кофейни и бариста",
+      "competence": "The GW Hatchet 28 января 2008 года пишет о его кофейне Murky Coffee в Кларендоне. Английская Википедия, сверенная при отборе, указывает открытие Murky Coffee в Вашингтоне в 2002 году.",
+      "competenceUrl": "https://gwhatchet.com/2008/01/28/study-break-murky-coffee-clarendon/",
+      "photo": {
+        "file": "/business/coffee-guides/experts/nick-cho.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Nick_Cho_at_LAKFF_2026.jpg",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        "author": "Kevin Paul",
+        "credit": "Фото: Kevin Paul, лицензия CC BY 4.0",
+        "rightsNote": "На странице файла есть стандартное предупреждение Commons о правах на изображение личности. Авторские права на снимок свободные."
+      },
+      "quotes": [
+        {
+          "text": "It’s not really about the actual coffee; in fact I don’t even love coffee. I just use it as a tool to bring people together.",
+          "sourceTitle": "Study Break: Murky Coffee, Clarendon",
+          "sourceUrl": "https://gwhatchet.com/2008/01/28/study-break-murky-coffee-clarendon/",
+          "sourceDate": "2008-01-28",
+          "context": "Он говорит об идее Murky Coffee. Перед этим на странице: любовь к людям и желание собирать их вместе. Это не описание плейлиста. Та же статья передаёт, что атмосферу он называл communal solitude."
+        }
+      ]
+    },
+    {
+      "id": "petra-vesela",
+      "name": "Петра Дэвис Весела",
+      "nameOriginal": "Petra Davies Veselá",
+      "country": "Чехия",
+      "countryCode": "CZ",
+      "origin": "foreign",
+      "gender": "woman",
+      "role": "Бариста, основательница кофейни и автор",
+      "competence": "В интервью Kafe Story она рассказывает, что открыла кофейню, дважды выиграла национальный чемпионат бариста и представляла Чехию на чемпионате мира. Подпись к портрету на Commons называет её Mistr Kávy ČR 2005 и 2007.",
+      "competenceUrl": "https://www.kafestory.cz/2020/10/kavovy-zivot-petry-davies-vesele.html",
+      "photo": {
+        "file": "/business/coffee-guides/experts/petra-vesela.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Czech_barista_Petra_Vesel%C3%A1,_Mistr_K%C3%A1vy_%C4%8CR_2005,_2007_preparing_coffee_in_Brno,_Brno-City_District.jpg",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "author": "Frettie",
+        "credit": "Фото: Frettie, лицензия CC BY 3.0",
+        "rightsNote": "Файл на Commons также помечен GFDL. Для нас выбрана лицензия CC BY 3.0."
+      },
+      "quotes": [
+        {
+          "text": "Všechno to začalo kavárnou, kterou jsem otevřela, aniž bych měla jakékoliv zkušenosti s kávou, dokonce jsem ji ani nepila. Krátce po otevření mě známý přihlásil do baristické soutěže, kde jsem se toho spoustu naučila. Káva a její příprava mě uchvátila. Soutěž jsem poté 2x vyhrála a reprezentovala ČR na Mistrovství světa.",
+          "sourceTitle": "Kávový život Petry Davies Veselé",
+          "sourceUrl": "https://www.kafestory.cz/2020/10/kavovy-zivot-petry-davies-vesele.html",
+          "sourceDate": "2020-10-01",
+          "context": "Её попросили коротко рассказать свою историю. Четыре предложения идут подряд."
+        }
+      ]
+    },
+    {
+      "id": "patria-jafferies",
+      "name": "Патрия Джафферис",
+      "nameOriginal": "Patria Jafferies",
+      "country": "Австралия",
+      "countryCode": "AU",
+      "origin": "foreign",
+      "gender": "woman",
+      "role": "Соосновательница сети кофеен",
+      "competence": "The West Australian 5 января 2014 года называет её женщиной, которая сильнее других сформировала кофейную культуру Перта, и соосновательницей Dôme Coffees Australia: первая кофейня открылась в Коттесло в 1991 году.",
+      "competenceUrl": "https://thewest.com.au/news/australia/culture-on-cafe-queens-menu-ng-ya-363609",
+      "photo": {
+        "file": "/business/coffee-guides/experts/patria-jafferies.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Patria_Jefferies,_June_2015_(cropped).jpg",
+        "license": "CC BY 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        "author": "Samuel Wiki",
+        "credit": "Фото: Samuel Wiki, лицензия CC BY 4.0",
+        "rightsNote": "Имя в файле Commons написано Jefferies, в статье The West Australian – Jafferies. В реестре оставлено написание статьи."
+      },
+      "quotes": [
+        {
+          "text": "I think we changed the drinking habits and opened up opportunities for other traders to come in and compete with Dome, which is a helpful thing because people then either raise their benchmark or they go down a different avenue.",
+          "sourceTitle": "Culture on cafe queen's menu",
+          "sourceUrl": "https://thewest.com.au/news/australia/culture-on-cafe-queens-menu-ng-ya-363609",
+          "sourceDate": "2014-01-05",
+          "context": "Вопрос о том, что Dôme изменил в кофейном питье Перта. В цитате название звучит как Dome, без акцента."
+        }
+      ]
+    },
+    {
+      "id": "sunalini-menon",
+      "name": "Суналини Менон",
+      "nameOriginal": "Sunalini Menon",
+      "country": "Индия",
+      "countryCode": "IN",
+      "origin": "foreign",
+      "gender": "woman",
+      "role": "Дегустатор кофе и преподаватель",
+      "competence": "В интервью Sprudge Twenty от 20 августа 2024 года она пишет, что пришла в кофе в 1971 году в Coffee Board of India, а в 1996 году открыла первую в Индии лабораторию оценки качества.",
+      "competenceUrl": "https://sprudge.com/dr-sunalini-menon-the-sprudge-twenty-interview-251524.html",
+      "photo": {
+        "file": "/business/coffee-guides/experts/sunalini-menon.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Sunalini_IWCA_April_17,_2005.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "author": "Mmswallow",
+        "credit": "Фото: Mmswallow, лицензия CC BY-SA 4.0",
+        "rightsNote": "Снимок загружен автором как собственная работа. Подпись: признание на конференции SCAA в апреле 2005 года."
+      },
+      "quotes": [
+        {
+          "text": "I set up a coffee laboratory, which was the first of its kind in India, with the help of the farmers, where I could evaluate the quality aspects of coffees of all in the coffee value chain.",
+          "sourceTitle": "Dr. Sunalini Menon: The Sprudge Twenty Interview",
+          "sourceUrl": "https://sprudge.com/dr-sunalini-menon-the-sprudge-twenty-interview-251524.html",
+          "sourceDate": "2024-08-20",
+          "context": "Ответ на вопрос, сколько лет она в индустрии. Следующее предложение на странице – про фермера и обработку после сбора."
+        },
+        {
+          "text": "The lab has helped many cafes in their journey to serve a good cup of coffee to the consumer, which has become an important role in my coffee journey.",
+          "sourceTitle": "Dr. Sunalini Menon: The Sprudge Twenty Interview",
+          "sourceUrl": "https://sprudge.com/dr-sunalini-menon-the-sprudge-twenty-interview-251524.html",
+          "sourceDate": "2024-08-20",
+          "context": "Ответ о нынешней роли. Перед этим она пишет, что лаборатория делала смеси для первого кафе, с которого в Индии началась кафейная культура. Это не совет по музыке."
+        }
+      ]
+    },
+    {
+      "id": "sahar-hashemi",
+      "name": "Сахар Хашеми",
+      "nameOriginal": "Sahar Hashemi",
+      "country": "Великобритания",
+      "countryCode": "GB",
+      "origin": "foreign",
+      "gender": "woman",
+      "role": "Соосновательница сети кофеен",
+      "competence": "В материале Sage она рассказывает, как вместе с братом Бобби привезла в Лондон идею нью-йоркских кофеен. Startups.co.uk называет её соосновательницей Coffee Republic (1995) и Sahar Hashemi OBE.",
+      "competenceUrl": "https://www.sage.com/en-gb/blog/sound-advice-small-business-plan-sahar-hashemi/",
+      "photo": {
+        "file": "/business/coffee-guides/experts/sahar-hashemi.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Sahar_Hashemi,_Iclif_-_May_16,_2014.jpg",
+        "license": "CC BY 3.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "author": "Iclif Executive Education Centre at ASB",
+        "credit": "Фото: Iclif Executive Education Centre at ASB, лицензия CC BY 3.0",
+        "rightsNote": ""
+      },
+      "quotes": [
+        {
+          "text": "I came across this shop called New World Coffee. I saw these American style coffee bars for the first time, and I fell in love with it.",
+          "sourceTitle": "Write a small business plan that works",
+          "sourceUrl": "https://www.sage.com/en-gb/blog/sound-advice-small-business-plan-sahar-hashemi/",
+          "sourceDate": null,
+          "context": "Она описывает первое утро в Нью-Йорке и кофейню, из которой выросла идея Coffee Republic. Дата на странице Sage в проверенном фрагменте не стояла отдельной строкой."
+        },
+        {
+          "text": "I just wish we had those buzzy coffee bars I saw in New York to start my morning.",
+          "sourceTitle": "Write a small business plan that works",
+          "sourceUrl": "https://www.sage.com/en-gb/blog/sound-advice-small-business-plan-sahar-hashemi/",
+          "sourceDate": null,
+          "context": "Фраза, которую она, по её рассказу, сказала брату в Лондоне за ужином. Речь об ощущении зала, не о конкретном плейлисте."
+        }
+      ]
+    },
+    {
+      "id": "astrid-medina",
+      "name": "Астрид Медина",
+      "nameOriginal": "Astrid Medina",
+      "country": "Колумбия",
+      "countryCode": "CO",
+      "origin": "foreign",
+      "gender": "woman",
+      "role": "Кофейный фермер",
+      "competence": "El País 5 декабря 2024 года пишет, что её спешелти с фермы в Планадасе (Толима) получило Taza de la Excelencia в 2015 году с оценкой 90,2 и экспортируется в Японию, США и Европу.",
+      "competenceUrl": "https://elpais.com/america-colombia/branded/los-lideres-de-colombia/2024-12-05/astrid-medina-la-caficultora-que-dignifica-la-vida-y-respeta-la-tierra.html",
+      "photo": {
+        "file": "/business/coffee-guides/experts/astrid-medina.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Astrid_Medina.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "author": "Anamaolarte",
+        "credit": "Фото: Anamaolarte, лицензия CC BY-SA 4.0",
+        "rightsNote": "Подпись файла: Caficultora Colombiana, собственная работа автора, 2015-07-15."
+      },
+      "quotes": [
+        {
+          "text": "Seleccionamos lo mejor de lo mejor. Recolectamos menos granos, pero con mayor calidad, bajo temperaturas ideales y les hacemos un secado más largo, para que tengan mayor durabilidad cuando son exportados",
+          "sourceTitle": "Astrid Medina: la caficultora que dignifica la vida y respeta la tierra",
+          "sourceUrl": "https://elpais.com/america-colombia/branded/los-lideres-de-colombia/2024-12-05/astrid-medina-la-caficultora-que-dignifica-la-vida-y-respeta-la-tierra.html",
+          "sourceDate": "2024-12-05",
+          "context": "Она говорит о своём спешелти. Материал также рассказывает о насилии, которого коснулась её семья. В цитату это не входит и в статью не переносится."
+        },
+        {
+          "text": "Ha sido muy bonito, pero no cambio un árbol, el sonido del río y la tierra por una ciudad de cemento.",
+          "sourceTitle": "Astrid Medina: la caficultora que dignifica la vida y respeta la tierra",
+          "sourceUrl": "https://elpais.com/america-colombia/branded/los-lideres-de-colombia/2024-12-05/astrid-medina-la-caficultora-que-dignifica-la-vida-y-respeta-la-tierra.html",
+          "sourceDate": "2024-12-05",
+          "context": "Она объясняет, почему остаётся на земле после поездок на ярмарки. «Звук реки» здесь – звук хозяйства, не фонограмма кофейни."
+        }
+      ]
+    }
+  ]
+}

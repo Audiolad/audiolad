@@ -22,5 +22,5 @@ export function extractBusinessFirstName(input: {
     if (local) return local;
   }
 
-  return "владелец";
+  return "";
 }
