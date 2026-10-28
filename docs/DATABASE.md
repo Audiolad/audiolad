@@ -121,6 +121,28 @@ Validation: `npm run test:business-workspace-trial`.
 Details and rollback: `docs/business/access-grants.md`.
 Continuation: the owner applies the migration through the established process.
 
+## Business subscription payment (approved, not applied here)
+
+Migration `20270205120000_business_subscription_payment.sql` is additive.
+Sergey approved the payment tables on 2026-10-28. This change does not apply
+the migration and does not call Tochka.
+
+It allows `orders.order_kind = business_subscription` (no practice, no author
+snapshot, 79900 kopecks). `business_subscription_periods` stores one paid
+window per order. A repeated webhook does not move `paid_until` again.
+`business_offer_acceptances` stores one offer acceptance per account.
+RLS is on; `anon` and `authenticated` have no table privileges.
+The payer check is the organization owner account. A player credential cannot
+call the order or acceptance functions. A test payment does not move
+`paid_until`. Author accrual for this order kind is `skipped`
+(`platform_business_subscription`), so it does not enter the royalty review
+queue. The three extra days of music after the period ends are not stored
+in `paid_until`.
+
+Rollback notes are comments at the top of the migration. They are not executed.
+Smoke: `supabase/tests/business_subscription_payment_smoke.sql`, run by the
+migration compile after the file is applied.
+
 ## Guest practice ratings (pending owner apply)
 
 Migration `20270121120000_guest_practice_ratings.sql` is additive and is not

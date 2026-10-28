@@ -260,6 +260,13 @@ applyFile(
   "post-apply Wordstat jazz query seed smoke",
   resolve(root, "supabase/tests/seo_wordstat_jazz_queries_seed_smoke.sql"),
 );
+if (!pending.has("20270205120000")) {
+  throw new Error("business subscription payment migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply business subscription payment smoke",
+  resolve(root, "supabase/tests/business_subscription_payment_smoke.sql"),
+);
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);
