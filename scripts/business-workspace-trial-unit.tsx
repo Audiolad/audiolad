@@ -1090,6 +1090,8 @@ assert.doesNotMatch(rules, /—/);
     },
     organizationName: "Кофейня",
     organizationId: "22222222-2222-4222-8222-222222222222",
+    canPay: true,
+    offerAccepted: true,
     signals: null,
   };
   const cabinetLink = renderToStaticMarkup(
