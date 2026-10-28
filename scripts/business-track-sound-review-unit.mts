@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, type SoundReviewRow } from '../src/lib/business/track-sound-review';
+import { collectQueuedSoundReviews, saveSoundReviewBatch, soundReviewBulkConfirm, soundReviewSelectionCount } from '../src/lib/business/track-sound-bulk';
 import { hasCurrentSoundApproval, sameSoundAudioIdentity, soundAllowedTrackIds } from '../src/lib/business/track-sound-review.server';
 import { workspaceSignBlocked } from '../src/lib/business-workspace/sign-gate';
 import type { PlatformAccessSnapshot } from '../src/lib/auth/platform-access';
@@ -23,6 +24,28 @@ const rows = ['a', 'b', 'c'].map((id, i) => ({ id, status: i === 1 ? 'approved' 
 assert.equal(nextUnchecked(rows, 'a'), 'c');
 assert.equal(nextUnchecked(rows, 'c'), 'a');
 assert.equal(nextUnchecked(rows, null), 'a');
+const scope = { status: '', artist: '', album: 'album-1', space: '', total: 175, albumTotal: 40, artistTotal: 80 };
+assert.equal(soundReviewSelectionCount({ kind: 'filter', excludedIds: [] }, scope), 175);
+assert.equal(soundReviewSelectionCount({ kind: 'filter', excludedIds: ['x'] }, scope), 174);
+assert.equal(soundReviewSelectionCount({ kind: 'album', excludedIds: [] }, scope), 40);
+assert.equal(soundReviewSelectionCount({ kind: 'artist', excludedIds: ['x', 'y'] }, scope), 78);
+assert.equal(soundReviewSelectionCount({ kind: 'ids', ids: ['a'] }, scope), 1);
+assert.match(soundReviewBulkConfirm('Допущен', 175), /175 трекам/);
+assert.match(soundReviewBulkConfirm('Допущен', 1), /1 треку/);
+const sample = (id: string, status: 'unchecked' | 'approved' = 'unchecked', reason: string | null = null) => ({ id, status, reason, audio_identity: id }) as SoundReviewRow;
+const idA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+const idB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+const idC = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+const collected = await collectQueuedSoundReviews(async (page) => page === 0
+  ? { rows: [sample(idA), sample(idB, 'approved', 'уже')], total: 150 }
+  : page === 1 ? { rows: [sample(idC)], total: 150 } : { rows: [], total: 150 }, [idC]);
+assert.equal(collected.ok, true);
+if (collected.ok) assert.deepEqual(collected.rows.map((row) => row.id), [idA, idB]);
+const reviewed: string[] = [];
+const batch = await saveSoundReviewBatch(collected.ok ? collected.rows : [], 'approved', 'уже', async (row) => { reviewed.push(row.id); return false; });
+assert.deepEqual(reviewed, [idA]);
+assert.deepEqual(batch, { saved: 1, failed: 1 });
+assert.equal((await collectQueuedSoundReviews(async () => ({ rows: [], total: 501 }), [])).ok, false);
 assert.equal(nextUnchecked([], null), null);
 assert.equal(nextUnchecked([rows[0]], 'a'), null);
 

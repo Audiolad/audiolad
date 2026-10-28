@@ -17,13 +17,23 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
   const uuid = (value: string) => /^[0-9a-f-]{36}$/i.test(value) ? value : null;
   const page = Math.max(0, Math.min(100000, Number.parseInt(get('page'), 10) || 0));
   const space = BUSINESS_SPACES.some((s) => s.id === get('space')) ? get('space') : '';
+  const artist = uuid(get('artist'));
+  const album = uuid(get('album'));
   const db = await createClient();
-  const { data, error } = await db.rpc('admin_business_sound_queue', {
-    p_status: status || null, p_artist: uuid(get('artist')), p_album: uuid(get('album')),
-    p_space: space || null, p_page: page,
-  });
+  const [main, albumQueue, artistQueue] = await Promise.all([
+    db.rpc('admin_business_sound_queue', {
+      p_status: status || null, p_artist: artist, p_album: album, p_space: space || null, p_page: page,
+    }),
+    album ? db.rpc('admin_business_sound_queue', { p_album: album, p_page: 0 }) : Promise.resolve(null),
+    artist ? db.rpc('admin_business_sound_queue', { p_artist: artist, p_page: 0 }) : Promise.resolve(null),
+  ]);
+  const { data, error } = main;
   if (error || !data) return <p role="alert">Не удалось загрузить очередь. Проверьте применение миграции и обновите страницу.</p>;
   const queue = data as SoundReviewQueue;
+  const totalOf = (result: { data: unknown; error: unknown } | null) => {
+    const total = (result?.data as { total?: unknown } | null)?.total;
+    return result && !result.error && typeof total === 'number' ? total : null;
+  };
   const href = (target: number, unchecked = false) => {
     const query = new URLSearchParams({ status: unchecked ? 'unchecked' : status, artist: get('artist'), album: get('album'), space, page: String(target) });
     return `/admin/business-track-review?${query}`;
@@ -49,7 +59,10 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
       <button className="underline">Применить</button><Link href="/admin/business-track-review">Сбросить</Link>
     </form>
     <Link className="underline" href={href(0, true)}>Режим «Следующий непроверенный»</Link>
-    <ReviewQueue key={`${status}:${get('artist')}:${get('album')}:${space}:${page}`} rows={queue.rows} />
+    <ReviewQueue key={`${status}:${artist ?? ''}:${album ?? ''}:${space}`} rows={queue.rows} scope={{
+      status, artist: artist ?? '', album: album ?? '', space, total: queue.total,
+      albumTotal: totalOf(albumQueue), artistTotal: totalOf(artistQueue),
+    }} />
     <nav className="flex gap-4" aria-label="Страницы очереди">
       {page > 0 && <Link href={href(page - 1)}>Назад</Link>}
       <span>Страница {page + 1} · Треков: {queue.total}</span>

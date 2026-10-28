@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { SOUND_REVIEW_LABELS, SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, type SoundReviewHistory, type SoundReviewRow, type SoundReviewStatus } from '@/lib/business/track-sound-review';
-import { businessTrackReviewHistory, previewBusinessTrack, reviewBusinessTrack } from './actions';
+import { soundReviewBulkConfirm, soundReviewSelectionCount, type SoundReviewQueueScope, type SoundReviewSelection } from '@/lib/business/track-sound-bulk';
+import { businessTrackReviewHistory, previewBusinessTrack, reviewBusinessTrack, reviewBusinessTracksBulk } from './actions';
 
 const colors = { unchecked: 'text-neutral-600', approved: 'text-green-700', rejected: 'text-red-700' };
 const date = (value: string | null) => value ? new Date(value).toLocaleString('ru-RU') : '–';
@@ -24,7 +25,10 @@ function projectRows(rows: readonly SoundReviewRow[], saved: Record<string, Save
 function isTypingTarget(target: EventTarget | null) {
   if (!target || typeof target !== 'object' || !('tagName' in target)) return false;
   const tag = String((target as { tagName?: string }).tagName ?? '').toUpperCase();
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (target as { isContentEditable?: boolean }).isContentEditable === true;
+  if (tag === 'TEXTAREA' || tag === 'SELECT' || (target as { isContentEditable?: boolean }).isContentEditable === true) return true;
+  if (tag !== 'INPUT') return false;
+  const type = String((target as { type?: string }).type ?? 'text').toLowerCase();
+  return type !== 'checkbox' && type !== 'radio' && type !== 'button' && type !== 'submit';
 }
 
 function decisionClass(status: SoundReviewStatus, pressed: boolean) {
@@ -35,7 +39,10 @@ function decisionClass(status: SoundReviewStatus, pressed: boolean) {
   return `${base} border border-neutral-400 bg-white text-neutral-800 ${ring}`;
 }
 
-export default function ReviewQueue({ rows }: { rows: SoundReviewRow[] }) {
+export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; scope?: SoundReviewQueueScope }) {
+  const queueScope: SoundReviewQueueScope = scope ?? {
+    status: '', artist: '', album: '', space: '', total: rows.length, albumTotal: null, artistTotal: null,
+  };
   const router = useRouter();
   const [saved, setSaved] = useState<Record<string, SavedDecision>>({});
   const view = projectRows(rows, saved);
@@ -47,6 +54,10 @@ export default function ReviewQueue({ rows }: { rows: SoundReviewRow[] }) {
   const [fragment, setFragment] = useState(30);
   const [history, setHistory] = useState<{ id: string; entries: SoundReviewHistory[]; more: boolean } | null>(null);
   const [autoNext, setAutoNext] = useState(true);
+  const [selection, setSelection] = useState<SoundReviewSelection>({ kind: 'none' });
+  const [bulkStatus, setBulkStatus] = useState<SoundReviewStatus>('approved');
+  const [bulkReason, setBulkReason] = useState('');
+  const selectedCount = soundReviewSelectionCount(selection, queueScope);
   const [reason, setReason] = useState(view[0]?.reason ?? '');
   const [reasonKey, setReasonKey] = useState(view[0] ? `${view[0].id}:${view[0].audio_identity}` : '');
   const end = useRef(30);
@@ -121,11 +132,13 @@ export default function ReviewQueue({ rows }: { rows: SoundReviewRow[] }) {
   }
 
   const decideRef = useRef(decide);
-  decideRef.current = decide;
   const currentRef = useRef(current);
-  currentRef.current = current;
   const reasonRef = useRef(reason);
-  reasonRef.current = reason;
+  useEffect(() => {
+    decideRef.current = decide;
+    currentRef.current = current;
+    reasonRef.current = reason;
+  }, [decide, current, reason]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -141,6 +154,56 @@ export default function ReviewQueue({ rows }: { rows: SoundReviewRow[] }) {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
+  function rowChecked(id: string) {
+    if (selection.kind === 'ids') return selection.ids.includes(id);
+    if (selection.kind === 'none') return false;
+    return !selection.excludedIds.includes(id);
+  }
+  function toggleRow(id: string, checked: boolean) {
+    setSelection((current) => {
+      if (current.kind === 'none' || current.kind === 'ids') {
+        const ids = new Set(current.kind === 'ids' ? current.ids : []);
+        if (checked) ids.add(id);
+        else ids.delete(id);
+        return ids.size ? { kind: 'ids', ids: [...ids] } : { kind: 'none' };
+      }
+      const excludedIds = current.excludedIds.filter((item) => item !== id);
+      if (!checked) excludedIds.push(id);
+      return { ...current, excludedIds };
+    });
+  }
+  function applyBulk() {
+    if (!selectedCount || saving.current) return;
+    if (!window.confirm(soundReviewBulkConfirm(SOUND_REVIEW_LABELS[bulkStatus], selectedCount))) return;
+    const chosen = selection;
+    saving.current = true;
+    startTransition(async () => {
+      try {
+        const scope = chosen.kind === 'ids'
+          ? { kind: 'ids' as const, ids: chosen.ids }
+          : chosen.kind === 'album'
+            ? { kind: 'album' as const, albumId: queueScope.album, excludedIds: chosen.excludedIds }
+            : chosen.kind === 'artist'
+              ? { kind: 'artist' as const, artistId: queueScope.artist, excludedIds: chosen.excludedIds }
+              : chosen.kind === 'filter'
+                ? { kind: 'filter' as const, status: queueScope.status, artist: queueScope.artist, album: queueScope.album, space: queueScope.space, excludedIds: chosen.excludedIds }
+                : null;
+        if (!scope) return;
+        const result = await reviewBusinessTracksBulk({ scope, status: bulkStatus, reason: bulkReason });
+        say(result.message, !result.ok);
+        if (result.saved > 0) {
+          setSaved({});
+          setSelection({ kind: 'none' });
+          setHistory(null);
+          router.refresh();
+        }
+      } catch {
+        say('Решение не сохранено. Повторите попытку.', true);
+      } finally {
+        saving.current = false;
+      }
+    });
+  }
   function showHistory(id: string, more = false) {
     startTransition(async () => {
       try {
@@ -192,9 +255,21 @@ export default function ReviewQueue({ rows }: { rows: SoundReviewRow[] }) {
       <p className="text-sm text-neutral-600">Перемотайте к нужному месту. Плеер остановится через выбранные 15–30 с.</p>
       <p className="text-sm text-neutral-600">1 – допущен, 2 – не допущен, 3 – не проверен. При вводе причины клавиши не срабатывают.</p>
     </div>}
-    <div className="max-w-full overflow-x-auto"><table className="w-full text-sm">
-      <thead><tr className="text-left"><th>Артист</th><th>Альбом</th><th>Трек</th><th>Длительность</th><th>Статус / причина</th><th>Когда / кто</th><th>История</th></tr></thead>
+    <div className="flex max-w-full flex-wrap items-center gap-2 rounded border p-3">
+      <p>Выбрано: {selectedCount}</p>
+      <button type="button" className="underline" disabled={pending || queueScope.total === 0} onClick={() => setSelection({ kind: 'filter', excludedIds: [] })}>Выбрать все по этому фильтру</button>
+      {queueScope.album ? <button type="button" className="underline" disabled={pending || !queueScope.albumTotal} onClick={() => setSelection({ kind: 'album', excludedIds: [] })}>Выбрать весь альбом</button> : null}
+      {queueScope.artist ? <button type="button" className="underline" disabled={pending || !queueScope.artistTotal} onClick={() => setSelection({ kind: 'artist', excludedIds: [] })}>Выбрать всего артиста</button> : null}
+      <label>Статус <select aria-label="Статус для выбранных" value={bulkStatus} onChange={(event) => { if (isSoundReviewStatus(event.target.value)) setBulkStatus(event.target.value); }}>
+        {PLAYER_DECISIONS.map((status) => <option key={status} value={status}>{SOUND_REVIEW_LABELS[status]}</option>)}
+      </select></label>
+      <input aria-label="Причина для выбранных" placeholder="Причина (необязательно)" maxLength={2000} value={bulkReason} onChange={(event) => setBulkReason(event.target.value)} className="w-full max-w-full rounded border p-2 sm:w-auto" />
+      <button type="button" className="rounded border px-3 py-2" disabled={pending || selectedCount === 0} onClick={applyBulk}>Применить к выбранным</button>
+    </div>
+    <div className="max-w-full overflow-x-auto"><table className="w-full min-w-0 text-sm">
+      <thead><tr className="text-left"><th className="p-2"><input type="checkbox" aria-label="Выбрать все по этому фильтру" checked={selection.kind === 'filter' && selection.excludedIds.length === 0 && queueScope.total > 0} disabled={pending || queueScope.total === 0} onChange={(event) => setSelection(event.target.checked ? { kind: 'filter', excludedIds: [] } : { kind: 'none' })} /></th><th>Артист</th><th>Альбом</th><th>Трек</th><th>Длительность</th><th>Статус / причина</th><th>Когда / кто</th><th>История</th></tr></thead>
       <tbody>{view.map((row) => <tr key={`${row.id}:${row.status}:${row.reason ?? ''}:${row.audio_identity}`} className={row.id === current?.id ? 'bg-violet-50' : ''}>
+        <td className="p-2"><input type="checkbox" aria-label={`Выбрать ${row.title}`} checked={rowChecked(row.id)} disabled={pending} onChange={(event) => toggleRow(row.id, event.target.checked)} /></td>
         <td className="p-2">{row.artist}</td><td className="p-2">{row.album}</td>
         <td className="p-2"><button type="button" disabled={pending} className="text-left underline" onClick={() => listen(row)}>{row.title}</button></td>
         <td>{duration(row.duration_seconds)}</td>

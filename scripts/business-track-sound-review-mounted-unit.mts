@@ -10,6 +10,7 @@ import type { SoundReviewRow } from '../src/lib/business/track-sound-review';
 const moduleLoader = createRequire(import.meta.url);
 const actionsPath = moduleLoader.resolve('../src/app/(platform)/admin/business-track-review/actions.ts');
 const saves: unknown[] = [];
+const bulks: unknown[] = [];
 const previews: string[] = [];
 let reviewImpl: (input: unknown) => Promise<{ ok: boolean; message: string }> = async (input) => {
   saves.push(input);
@@ -20,6 +21,7 @@ moduleLoader.cache[actionsPath] = {
   exports: {
     previewBusinessTrack: async (id: string) => { previews.push(id); return { ok: true, url: `https://audio.invalid/${id}` }; },
     reviewBusinessTrack: async (input: unknown) => reviewImpl(input),
+    reviewBusinessTracksBulk: async (input: unknown) => { bulks.push(input); return { ok: true, saved: 2, failed: 0, message: 'Сохранено: 2.' }; },
     businessTrackReviewHistory: async () => [{ id: 1, old_status: 'unchecked', new_status: 'rejected', changed_at: '2026-10-27T12:00:00Z', reason: 'Внутренняя причина', changed_by: 'admin', event: 'manual' }],
   },
 } as NodeModule;
@@ -30,7 +32,9 @@ const rows: SoundReviewRow[] = ['a', 'b', 'c'].map((id) => ({ id, title: `Track 
 const container = document.createElement('div');
 document.body.appendChild(container);
 const root = createRoot(container);
-await act(async () => root.render(createElement(AppRouterContext.Provider, { value: router }, createElement(ReviewQueue, { rows }))));
+await act(async () => root.render(createElement(AppRouterContext.Provider, { value: router }, createElement(ReviewQueue, { rows, scope: {
+  status: 'unchecked', artist: '', album: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', space: '', total: 175, albumTotal: 40, artistTotal: null,
+} }))));
 function elements(node: Node = container): Element[] {
   return Array.from(node.childNodes).flatMap((child) => child.nodeType === 1 ? [child as Element, ...elements(child)] : []);
 }
@@ -44,7 +48,7 @@ function props(element: Element) {
 function button(label: string) { return elements().find((el) => el.tagName === 'BUTTON' && text(el) === label)!; }
 async function click(label: string) { await act(async () => (props(button(label)).onClick as () => void)()); }
 assert.equal(elements().filter((el) => el.tagName === 'SELECT' && props(el).name === 'status').length, 3);
-assert.equal(elements().filter((el) => el.tagName === 'INPUT' && props(el).type === 'checkbox').length, 1, 'only navigation toggle, no status checkboxes');
+assert.equal(elements().filter((el) => el.tagName === 'INPUT' && props(el).type === 'checkbox').length, 5, 'navigation toggle, select-all and one checkbox per row');
 await click('Прослушать');
 let audio = elements().find((el) => el.tagName === 'AUDIO')!;
 assert.equal(props(audio).src, 'https://audio.invalid/a');
@@ -122,5 +126,23 @@ await act(async () => container.dispatchEvent(shortcut));
 assert.deepEqual(saves.at(-1), { id: 'c', status: 'rejected', reason: '', audioIdentity: rows[2].audio_identity });
 assert.equal(rowStatus('Track c'), 'rejected');
 assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c', 'no further unchecked track, playback stays');
+const previousConfirm = window.confirm;
+window.confirm = () => false;
+await click('Выбрать все по этому фильтру');
+assert.match(text(container), /Выбрано: 175/);
+await click('Применить к выбранным');
+assert.equal(bulks.length, 0, 'cancelled confirm does not save');
+window.confirm = () => true;
+await click('Применить к выбранным');
+assert.deepEqual(bulks[0], { scope: { kind: 'filter', status: 'unchecked', artist: '', album: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', space: '', excludedIds: [] }, status: 'approved', reason: '' });
+assert.match(text(container), /Сохранено: 2/);
+await click('Выбрать весь альбом');
+assert.match(text(container), /Выбрано: 40/);
+const albumBox = elements().find((el) => el.tagName === 'INPUT' && props(el)['aria-label'] === 'Выбрать Track a')!;
+await act(async () => (props(albumBox).onChange as (event: unknown) => void)({ target: { checked: false } }));
+await click('Применить к выбранным');
+assert.deepEqual((bulks.at(-1) as { scope: { kind: string; excludedIds: string[] } }).scope.kind, 'album');
+assert.deepEqual((bulks.at(-1) as { scope: { excludedIds: string[] } }).scope.excludedIds, ['a']);
+window.confirm = previousConfirm;
 await act(async () => root.unmount());
 console.log('business-track-sound-review-mounted-unit: PASS (real React: statuses, stream switching, seek/fragment stop, save, history, player save-and-advance)');

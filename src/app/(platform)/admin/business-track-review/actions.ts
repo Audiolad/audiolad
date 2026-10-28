@@ -2,9 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireAdminPermission } from '@/lib/admin/guard';
-import { isSoundReviewStatus, type SoundReviewHistory } from '@/lib/business/track-sound-review';
+import { isSoundReviewStatus, type SoundReviewHistory, type SoundReviewRow } from '@/lib/business/track-sound-review';
 import { locateSoundReviewRow } from '@/lib/business/track-sound-preview.server';
 import { businessTrackPreviewHref } from '@/lib/business/track-sound-preview';
+import { isBusinessSpaceId } from '@/lib/business-workspace/spaces';
+import {
+  SOUND_REVIEW_BULK_LIMIT,
+  collectQueuedSoundReviews,
+  soundReviewBulkMessage,
+  soundReviewBulkScopeFilter,
+  saveSoundReviewBatch,
+  type SoundReviewBulkScope,
+} from '@/lib/business/track-sound-bulk';
 import { createClient } from '@/lib/supabase/server';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,6 +35,54 @@ export async function reviewBusinessTrack(input: {
     : 'Решение не сохранено. Обновите очередь и повторите попытку.' };
   revalidatePath('/admin/business-track-review');
   return { ok: true, message: 'Решение сохранено.' };
+}
+
+export async function reviewBusinessTracksBulk(input: {
+  scope: SoundReviewBulkScope; status: string; reason: string;
+}): Promise<{ ok: boolean; saved: number; failed: number; message: string }> {
+  await requireAdminPermission('author_products.moderate');
+  if (!input || typeof input.reason !== 'string' || input.reason.length > 2000 || !isSoundReviewStatus(input.status) || !input.scope) {
+    return soundReviewBulkMessage(0, 0, 'invalid');
+  }
+  const db = await createClient();
+  const review = async (row: SoundReviewRow) => {
+    const { error } = await db.rpc('admin_review_business_track_sound', {
+      p_audio_item_id: row.id, p_status: input.status, p_reason: input.reason, p_audio_identity: row.audio_identity,
+    });
+    return !error;
+  };
+  if (input.scope.kind === 'ids') {
+    const ids = [...new Set(input.scope.ids)].filter((id) => UUID.test(id));
+    if (!ids.length) return soundReviewBulkMessage(0, 0, 'empty');
+    if (ids.length > SOUND_REVIEW_BULK_LIMIT) return soundReviewBulkMessage(0, 0, 'too_many');
+    const rows: SoundReviewRow[] = [];
+    let missing = 0;
+    for (const id of ids) {
+      const row = await locateSoundReviewRow(db, id);
+      if (!row) missing += 1;
+      else rows.push(row);
+    }
+    const saved = await saveSoundReviewBatch(rows, input.status, input.reason, review);
+    const result = soundReviewBulkMessage(saved.saved, saved.failed + missing);
+    if (result.saved > 0) revalidatePath('/admin/business-track-review');
+    return result;
+  }
+  const filter = soundReviewBulkScopeFilter(input.scope);
+  if (!filter || (filter.p_space && !isBusinessSpaceId(filter.p_space))) return soundReviewBulkMessage(0, 0, 'invalid');
+  const collected = await collectQueuedSoundReviews(async (page) => {
+    const { data, error } = await db.rpc('admin_business_sound_queue', {
+      p_status: filter.p_status, p_artist: filter.p_artist, p_album: filter.p_album, p_space: filter.p_space, p_page: page,
+    });
+    if (error || !data) return null;
+    const payload = data as { rows?: SoundReviewRow[]; total?: number };
+    if (!Array.isArray(payload.rows) || typeof payload.total !== 'number') return null;
+    return { rows: payload.rows, total: payload.total };
+  }, filter.excludedIds);
+  if (!collected.ok) return soundReviewBulkMessage(0, 0, collected.reason);
+  const saved = await saveSoundReviewBatch(collected.rows, input.status, input.reason, review);
+  const result = soundReviewBulkMessage(saved.saved, saved.failed);
+  if (result.saved > 0) revalidatePath('/admin/business-track-review');
+  return result;
 }
 
 export async function previewBusinessTrack(id: string, audioIdentity: string) {
