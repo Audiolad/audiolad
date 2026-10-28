@@ -152,6 +152,9 @@ assert.equal(candidateRows.some((row) => row.query.toLocaleLowerCase("ru").inclu
 const visible = collectArticleText(MUZYKA_DLYA_KOFEYNI).join("\n");
 assert.equal(visible.includes("\u2014"), false, "visible article text uses an en dash, not an em dash");
 assert.equal(visible.includes("http://") || visible.includes("https://"), false);
+assert.equal(visible.includes("Лена"), false);
+assert.equal(visible.includes("Сначала реши, какой разговор ты хочешь"), false);
+assert.equal(visible.includes("Если кофейня уже ваша"), true);
 const visibleLower = visible.toLocaleLowerCase("ru");
 for (const phrase of [
   "музыка для кофеен",
@@ -280,6 +283,9 @@ assert.match(checklist, /type="checkbox"/);
 assert.match(track, /HomeProductPlayButton/);
 assert.match(track, /Оставить впечатление о треке/);
 assert.match(view, /data-coffee-guide="article"/);
+assert.match(view, /PracticeComments/);
+assert.match(view, /id="guide-comments"/);
+assert.equal(read("src/content/business/coffee-experts.registry.json").includes("\u2014"), false);
 assert.match(expertsView, /blockquote/);
 assert.equal(expertsView.includes("sourceUrl"), false);
 assert.equal(expertsView.includes("competenceUrl"), false);

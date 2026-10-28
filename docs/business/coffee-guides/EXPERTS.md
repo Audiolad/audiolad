@@ -27,7 +27,7 @@
 ### Другие страны, мужчины
 
 2. **Джеймс Хоффманн**, Великобритания, бариста и автор. Фото: Bex Harrison, CC BY 2.0. Цитаты: Sprudge, 1 ноября 2021, https://sprudge.com/who-is-james-hoffmann-182200.html
-3. **Тим Вендельбо**, Норвегия, обжарщик и владелец кофейни. Фото: Dennis Tang, CC BY-SA 2.0. Цитата про атмосферу зала: Sprudge, 20 марта 2017, https://sprudge.com/tim-wendelboe-talks-noma-mexico-la-marzocco-cafe-residency-117344.html . В источнике внутри цитаты стоит длинное тире, поэтому на публичную страницу она не выведена.
+3. **Тим Вендельбо**, Норвегия, обжарщик и владелец кофейни. Фото: Dennis Tang, CC BY-SA 2.0. Цитата про атмосферу зала: Sprudge, 20 марта 2017, https://sprudge.com/tim-wendelboe-talks-noma-mexico-la-marzocco-cafe-residency-117344.html . В строке реестра длинное тире источника заменено на среднее «–». На пилотной странице цитата не выводится.
 4. **Говард Шульц**, США. Фото: Gage Skidmore, CC BY-SA 3.0. Цитата про третье место: Atlantic Council, 10 мая 2018, https://www.atlanticcouncil.org/commentary/transcript/the-role-and-responsibility-of-a-global-company-2/
 5. **Андреа Илли**, Италия, председатель illycaffè. Фото: World Economic Forum / Benedikt Loebell, CC BY-SA 2.0. Цитата: WBUR, 3 ноября 2016, https://www.wbur.org/hereandnow/2016/11/03/illycaffe-ceo
 6. **Ник Чо**, США, владелец Murky Coffee. Фото: Kevin Paul, CC BY 4.0. На странице файла есть обычное предупреждение Commons о праве на изображение личности. Цитата: The GW Hatchet, 28 января 2008, https://gwhatchet.com/2008/01/28/study-break-murky-coffee-clarendon/

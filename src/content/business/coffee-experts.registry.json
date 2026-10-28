@@ -124,11 +124,11 @@
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
         "author": "Dennis Tang",
         "credit": "Фото: Dennis Tang, лицензия CC BY-SA 2.0",
-        "rightsNote": "В цитате на странице источника между ours и it стоит длинное тире. Цитата хранится дословно и на пилотной странице не показывается."
+        "rightsNote": "Длинное тире источника в сохранённой строке заменено на среднее «–». На пилотной странице цитата не выводится: в тексте Анна Цфасман и Говард Шульц."
       },
       "quotes": [
         {
-          "text": "Their cafe is very different compared to ours—it’s huge, and that makes it difficult to replicate the atmosphere. But for drinks, we’re trying to do the drinks just as we do in Oslo.",
+          "text": "Their cafe is very different compared to ours – it’s huge, and that makes it difficult to replicate the atmosphere. But for drinks, we’re trying to do the drinks just as we do in Oslo.",
           "sourceTitle": "Tim Wendelboe Talks Noma Mexico & La Marzocco Cafe Residency",
           "sourceUrl": "https://sprudge.com/tim-wendelboe-talks-noma-mexico-la-marzocco-cafe-residency-117344.html",
           "sourceDate": "2017-03-20",

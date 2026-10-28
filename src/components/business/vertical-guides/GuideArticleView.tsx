@@ -7,6 +7,8 @@ import { articlePath } from "@/lib/business/vertical-guides/registry";
 import type { VerticalGuideArticle } from "@/lib/business/vertical-guides/types";
 import { getVertical } from "@/lib/business/vertical-guides/verticals";
 
+import PracticeComments from "@/components/products/practice-page/PracticeComments";
+
 import GuideChecklist from "./GuideChecklist";
 import GuideExperts from "./GuideExperts";
 import GuideFourCups from "./GuideFourCups";
@@ -103,6 +105,19 @@ export default function GuideArticleView({ article, track }: GuideArticleViewPro
             </div>
             <GuideTrack track={track} trackPagePath={article.trackPagePath} />
           </div>
+        </section>
+
+        <section className="guide-wrap guide-block" id="guide-comments" aria-labelledby="listener-impressions-title">
+          <p>
+            Впечатление о треке «Джаз лаунж» оставляют здесь. Запись попадает в ту же ленту, что и на его странице в каталоге.
+          </p>
+          <PracticeComments
+            authorSlug={article.track.authorSlug}
+            productSlug={article.track.productSlug}
+            practiceId={track?.id ?? article.track.productSlug}
+            isAuthenticated={false}
+            signInReturnPath={path}
+          />
         </section>
 
         <section className="guide-wrap guide-block">
