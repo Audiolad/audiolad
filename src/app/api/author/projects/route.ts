@@ -12,6 +12,14 @@ import {
   createAuthorProjectViaRpc,
   getAuthorProjectsSummary,
 } from "@/lib/author-projects/server";
+import {
+  AuthorPublicNameCheckError,
+  AuthorPublicNameTakenError,
+} from "@/lib/author-names/lookup.server";
+import {
+  AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE,
+  AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE,
+} from "@/lib/author-names/public-name";
 import { AUTHOR_PROJECT_NAME_LATIN_ERROR } from "@/lib/author-projects/cyrillic-name";
 import {
   validateAuthorProjectName,
@@ -115,6 +123,23 @@ export async function POST(request: Request) {
     response.headers.append("Set-Cookie", buildAuthorProjectCookie(created.slug));
     return response;
   } catch (error) {
+    if (error instanceof AuthorPublicNameTakenError) {
+      return NextResponse.json(
+        { error: error.code, message: AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE },
+        { status: 409 },
+      );
+    }
+
+    if (error instanceof AuthorPublicNameCheckError) {
+      return NextResponse.json(
+        {
+          error: error.code,
+          message: AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE,
+        },
+        { status: 503 },
+      );
+    }
+
     if (
       error instanceof AuthorAccessError &&
       error.code === "author_project_limit_reached"

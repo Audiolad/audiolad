@@ -31,6 +31,15 @@ import {
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
 import { sendAuthorApplicationAdminAlertEmail } from "@/lib/email/send-author-application-admin-alert-email";
 import { sendAuthorApplicationSubmittedEmail } from "@/lib/email/send-author-application-submitted-email";
+import {
+  AuthorPublicNameCheckError,
+  AuthorPublicNameTakenError,
+  assertApplicationDisplayNameAvailable,
+} from "@/lib/author-names/lookup.server";
+import {
+  AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE,
+  AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE,
+} from "@/lib/author-names/public-name";
 import { bindManualPartnerCode } from "@/lib/author-partner/attribution";
 import { AUTHOR_PARTNER_ATTRIBUTION_COOKIE } from "@/lib/author-partner/constants";
 import {
@@ -165,6 +174,25 @@ export async function submitAuthorApplication(
       requireConsent: true,
       preservedDisplayName: existing?.display_name ?? null,
     });
+
+    if (!errors.displayName) {
+      try {
+        await assertApplicationDisplayNameAvailable({
+          name: values.displayName,
+          userId: user.id,
+          applicationId: existing?.id ?? null,
+        });
+      } catch (error) {
+        if (error instanceof AuthorPublicNameTakenError) {
+          errors.displayName = AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE;
+        } else {
+          if (!(error instanceof AuthorPublicNameCheckError)) {
+            console.error("author_public_name_check_failed", "application_submit");
+          }
+          errors.submit = AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE;
+        }
+      }
+    }
 
     if (hasAuthorApplicationFieldErrors(errors)) {
       return failureState(errors, values);

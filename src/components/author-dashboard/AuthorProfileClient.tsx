@@ -30,6 +30,8 @@ import {
   getAuthorContactTitleError,
   getAuthorContactUrlError,
 } from "@/lib/authors/contacts-validation";
+import { AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE } from "@/lib/author-names/public-name";
+import { useAuthorPublicNameAvailability } from "@/lib/author-names/use-author-public-name-availability";
 import {
   AUTHOR_PROJECT_NAME_CYRILLIC_HINT,
   AUTHOR_PROJECT_NAME_CYRILLIC_PLACEHOLDER,
@@ -91,6 +93,14 @@ export default function AuthorProfileClient({
 
   const [name, setName] = useState("");
   const [savedName, setSavedName] = useState("");
+  const [nameTakenFromServer, setNameTakenFromServer] = useState(false);
+  const nameAvailability = useAuthorPublicNameAvailability({
+    name,
+    enabled: Boolean(selectedAuthor) && !getAuthorProjectNameCyrillicError(name),
+    scope: "profile",
+    authorId: selectedAuthor?.id ?? null,
+    ownName: savedName,
+  });
   const [authorType, setAuthorType] = useState<AuthorType>("person");
   const [shortPositioning, setShortPositioning] = useState("");
   const [fullBio, setFullBio] = useState("");
@@ -216,6 +226,11 @@ export default function AuthorProfileClient({
       return;
     }
 
+    if (nameAvailability.taken || nameTakenFromServer) {
+      setSuccess(null);
+      return;
+    }
+
     if (
       name.trim() !== savedName.trim() &&
       name.trim().length > AUTHOR_PROJECT_NAME_MAX
@@ -282,6 +297,14 @@ export default function AuthorProfileClient({
           error?: string;
           message?: string;
         };
+        if (
+          payload.error === "author_name_taken" ||
+          payload.message === AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE
+        ) {
+          setNameTakenFromServer(true);
+          setError(null);
+          return;
+        }
         if (payload.error === "invalid_project_name" && payload.message) {
           throw new Error(payload.message);
         }
@@ -347,7 +370,11 @@ export default function AuthorProfileClient({
     name.trim().length > AUTHOR_PROJECT_NAME_MAX
       ? AUTHOR_PROJECT_NAME_TOO_LONG_ERROR
       : null;
-  const nameFieldError = nameLatinError ?? nameLengthError;
+  const nameTaken = nameAvailability.taken || nameTakenFromServer;
+  const nameFieldError =
+    nameLatinError ??
+    nameLengthError ??
+    (nameTaken ? AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE : null);
 
   if (!selectedAuthor) {
     return null;
@@ -374,7 +401,10 @@ export default function AuthorProfileClient({
               <input
                 type="text"
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setNameTakenFromServer(false);
+                }}
                 onInvalid={(event) => {
                   if (event.currentTarget.validity.tooLong) {
                     event.preventDefault();
@@ -638,7 +668,7 @@ export default function AuthorProfileClient({
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
-              disabled={saving || Boolean(nameLatinError)}
+              disabled={saving || Boolean(nameLatinError) || Boolean(nameLengthError) || nameTaken}
               className="inline-flex min-h-11 items-center rounded-full bg-[#7042c5] px-6 py-3 text-sm font-semibold text-white disabled:opacity-60"
             >
               {saving ? "Сохранение…" : "Сохранить"}

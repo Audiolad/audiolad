@@ -25,6 +25,15 @@ import {
   normalizeShortPositioning,
   normalizeTopicKeys,
 } from "@/lib/authors/validation";
+import {
+  AuthorPublicNameCheckError,
+  AuthorPublicNameTakenError,
+  assertAuthorWorkspaceRenameAvailable,
+} from "@/lib/author-names/lookup.server";
+import {
+  AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE,
+  AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE,
+} from "@/lib/author-names/public-name";
 import { getAuthorProjectNameChangeError } from "@/lib/author-projects/slug";
 import {
   AUTHOR_ASSETS_BUCKET,
@@ -127,6 +136,33 @@ export async function PATCH(request: Request) {
           { error: "invalid_project_name", message: nameChangeError },
           { status: 400 },
         );
+      }
+
+      try {
+        await assertAuthorWorkspaceRenameAvailable({
+          name,
+          currentName,
+          authorId,
+        });
+      } catch (error) {
+        if (error instanceof AuthorPublicNameTakenError) {
+          return NextResponse.json(
+            { error: error.code, message: AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE },
+            { status: 409 },
+          );
+        }
+
+        if (error instanceof AuthorPublicNameCheckError) {
+          return NextResponse.json(
+            {
+              error: error.code,
+              message: AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE,
+            },
+            { status: 503 },
+          );
+        }
+
+        throw error;
       }
 
       updates.name = name;
