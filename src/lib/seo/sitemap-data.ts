@@ -34,6 +34,7 @@ import {
   resolvePracticePublicLastModified,
 } from "@/lib/products/scheduled-publication";
 import { COFFEE_ATLAS_SITEMAP_PATHS } from "@/lib/business/coffee-atlas/sitemap";
+import { listVerticalGuideSitemapPaths } from "@/lib/business/vertical-guides/sitemap";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -48,6 +49,11 @@ export const STATIC_SITEMAP_PAGES: Array<{
   { path: "/b", changeFrequency: "weekly", priority: 0.8 },
   { path: "/b/prava", changeFrequency: "monthly", priority: 0.7 },
   ...COFFEE_ATLAS_SITEMAP_PATHS.map((path) => ({
+    path,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  })),
+  ...listVerticalGuideSitemapPaths().map((path) => ({
     path,
     changeFrequency: "monthly" as const,
     priority: 0.6,
