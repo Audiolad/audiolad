@@ -37,6 +37,9 @@ export async function handleCafeQueue(
   } catch {
     signals = new Map();
   }
-  const ordered = rankCafeQueue(pool, signals, request);
+  const boundaryAlbumKey = request.boundaryAudioItemId
+    ? pool.find((track) => track.audioItemId === request.boundaryAudioItemId)?.albumKey ?? null
+    : null;
+  const ordered = rankCafeQueue(pool, signals, { ...request, boundaryAlbumKey });
   return { ok: true, order: ordered.map((track) => track.audioItemId) };
 }

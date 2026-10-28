@@ -13,6 +13,8 @@
  * Tracks without a passport or without energy keep their relative order and are
  * appended after the ranked ones.
  * The same album is not placed twice in a row when another ranked track can split them.
+ * A numeric seed instead mixes the whole pool: better passport fits tend to come
+ * earlier, and the same album is kept apart around the loop when the counts allow it.
  */
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 import {
@@ -23,6 +25,7 @@ import type { GuestCoffeeSoundFeatures } from "@/lib/business-app/guest-coffee/p
 
 import type { CafeDaypart, CafeQueueFeedback } from "./prefs";
 import { CAFE_ENERGY_OFFSET_STEP } from "./prefs";
+import { weightedAlbumOrder } from "./shuffle";
 import type { CafeTrackSignals } from "./signals";
 
 /** Cafe targets on the analyzer's 0–100 energy scale. */
@@ -55,7 +58,14 @@ export type CafeQueueRanking = {
   daypart: CafeDaypart;
   energyOffset: number;
   feedback?: readonly CafeQueueFeedback[];
+  /** When set, the order is a seeded mix. Omit it for the stable score sort. */
+  seed?: number;
+  /** Album already playing when this playlist is rebuilt. Kept off the first slot when possible. */
+  boundaryAlbumKey?: string | null;
 };
+
+/** Tracks without a usable passport still enter the mix, behind a typical fit. */
+const UNRANKED_SCORE = 25;
 
 export function cafeAlbumKey(track: {
   audioItemId: string;
@@ -179,5 +189,12 @@ export function rankCafeQueue<T extends CafeQueueTrack>(
   });
 
   ranked.sort((left, right) => right.score - left.score || left.index - right.index);
-  return [...separateAlbums(ranked.map((row) => row.track)), ...fallback];
+  if (ranking.seed === undefined) {
+    return [...separateAlbums(ranked.map((row) => row.track)), ...fallback];
+  }
+  const mixed = [
+    ...ranked.map((row) => ({ track: row.track, albumKey: row.track.albumKey, score: row.score })),
+    ...fallback.map((track, index) => ({ track, albumKey: track.albumKey, score: UNRANKED_SCORE - index * 0.01 })),
+  ];
+  return weightedAlbumOrder(mixed, ranking.seed, ranking.boundaryAlbumKey).map((row) => row.track);
 }
