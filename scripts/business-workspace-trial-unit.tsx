@@ -637,10 +637,17 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, />Авто</);
   assert.match(html, /Авто: по часам – изменить/);
   assert.match(html, /href="\/preferences#dayparts"/);
+  const progressAt = html.indexOf('data-testid="biz-now-progress"');
+  const volumeAt = html.indexOf('data-testid="biz-now-volume"');
+  const prevAt = html.indexOf('data-testid="biz-now-prev"');
   const playAt = html.indexOf('data-testid="biz-now-play"');
+  const nextAt = html.indexOf('data-testid="biz-now-next"');
   const feedbackAt = html.indexOf('data-testid="biz-cafe-feedback"');
   const daypartAt = html.indexOf('data-testid="biz-cafe-queue"');
-  assert.ok(playAt >= 0 && feedbackAt > playAt && daypartAt > feedbackAt, "feedback sits under play, daypart is a later block");
+  assert.ok(
+    progressAt >= 0 && volumeAt > progressAt && prevAt > volumeAt && playAt > prevAt && nextAt > playAt && feedbackAt > nextAt && daypartAt > feedbackAt,
+    "volume sits under the progress line, then previous/play/next, then feedback, then daypart",
+  );
   assert.doesNotMatch(html, /Спокойнее|Бодрее|biz-cafe-calmer|biz-cafe-livelier/);
   assert.match(html, /Больше такой музыки/);
   assert.match(html, /Меньше такой музыки/);
@@ -651,8 +658,19 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, /data-testid="biz-workspace-progress"/);
   assert.match(html, /data-testid="biz-workspace-time"/);
   assert.match(html, /0:00/);
-  assert.match(html, /Музыка включается после нажатия на круглую кнопку\. Громкость и место в подборке сохраняются\./);
-  assert.match(html, /после нажатия на круглую кнопку/);
+  assert.doesNotMatch(html, /Музыка включается после нажатия на круглую кнопку/);
+  assert.doesNotMatch(html, /Громкость и место в подборке сохраняются/);
+  assert.doesNotMatch(workspaceSource, /BUSINESS_WORKSPACE_AUTOPLAY_NOTE/);
+  assert.match(html, /business-now__volume/);
+  assert.match(html, /aria-label="Предыдущий трек"/);
+  assert.match(html, /title="Предыдущий трек"/);
+  assert.match(html, /business-transport--center/);
+  assert.match(workspaceSource, /onPrevious/);
+  assert.match(playerSource, /cafeQueuePreviousIndex/);
+  assert.match(playerSource, /previousIndex/);
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-now__volume \{[^}]*width: 100%/);
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-now__volume input\[type="range"\] \{[^}]*width: 100%/);
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-transport\.business-transport--center \{[^}]*justify-content: center/);
   assert.doesNotMatch(html, /«Играть»/);
   assert.match(html, /aria-label="Играть"/);
   assert.match(html, /business-play-btn--large/);
