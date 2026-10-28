@@ -25,6 +25,18 @@ function make({ items = [item(1), item(2), item(3)], signFn, playFn, clock } = {
   return { p, audio, calls };
 }
 
+// previous steps back through the catalog and loops to the last track
+{
+  const { p } = make();
+  await p.playIndex(0);
+  await p.previous();
+  assert.equal(p.index, 2);
+  await p.previous();
+  assert.equal(p.index, 1);
+  await p.previous();
+  assert.equal(p.current.title, "T1");
+}
+
 // 1. Play starts the first track from a freshly signed URL.
 {
   const { p, audio, calls } = make();

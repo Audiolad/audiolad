@@ -24,6 +24,27 @@ export function cafeQueueNextIndex(
   return valid[(pos + 1) % valid.length]!;
 }
 
+/** Previous catalog index. A null order is the catalog itself, looping to the last row. */
+export function cafeQueuePreviousIndex(
+  order: readonly number[] | null,
+  current: number,
+  length: number,
+): number {
+  const sequential = length <= 0 ? 0 : current <= 0 || current >= length ? length - 1 : current - 1;
+  if (!order || order.length === 0 || length <= 0) return sequential;
+  const seen = new Set<number>();
+  const valid: number[] = [];
+  for (const index of order) {
+    if (!Number.isInteger(index) || index < 0 || index >= length || seen.has(index)) continue;
+    seen.add(index);
+    valid.push(index);
+  }
+  if (valid.length === 0) return sequential;
+  const pos = valid.indexOf(current);
+  if (pos < 0) return valid[valid.length - 1]!;
+  return valid[(pos - 1 + valid.length) % valid.length]!;
+}
+
 /**
  * Ids from the server become catalog indices.
  * Unknown ids are ignored. A catalog track the server left out stays out:
