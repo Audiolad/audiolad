@@ -5,9 +5,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomeAccessCard from "../src/components/business-app/BusinessHomeAccessCard";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
-import { gracePlaybackUntil, resolveCustomerAccess } from "../src/lib/access-grants/policy";
+import { BUSINESS_GRACE_PAYMENT_ANCHOR } from "../src/lib/access-grants/copy";
+import {
+  businessSubscriptionPeriodEnd,
+  businessSubscriptionPeriodStart,
+  gracePlaybackUntil,
+  resolveCustomerAccess,
+  trialDaysLeft,
+} from "../src/lib/access-grants/policy";
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
-import { BUSINESS_GRACE_MS } from "../src/lib/business/plan";
+import { BUSINESS_GIFT_DAYS, BUSINESS_GRACE_DAYS, BUSINESS_GRACE_MS } from "../src/lib/business/plan";
 import { mapBusinessSubscriptionRpcError, ownerCanPayFromThisBrowser } from "../src/lib/business/subscription-checkout";
 import { BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO } from "../src/lib/access-grants/copy";
 import { isBusinessCabinetReturnNext } from "../src/lib/access-grants/paths";
@@ -89,6 +96,11 @@ function card(domain: BusinessOwnerHomeContext, access: { mode: "grace" | "offer
 const graceHtml = card(ownerDomain, grace);
 assert.match(graceHtml, /data-mode="grace"/);
 assert.match(graceHtml, /Музыка играет ещё/);
+assert.match(graceHtml, /data-testid="biz-home-grace-renewal"/);
+assert.match(graceHtml, /Новые 30 дней считаются от конца прошлого срока – не от момента платежа/);
+assert.match(graceHtml, /Новый срок – до /);
+assert.match(graceHtml, /останется /);
+assert.equal(BUSINESS_GRACE_PAYMENT_ANCHOR.includes("—"), false);
 assert.match(graceHtml, /href="\/documents\/b2b-terms"/);
 assert.match(graceHtml, /data-testid="biz-home-accept"/);
 assert.doesNotMatch(graceHtml, /data-testid="biz-home-pay-button"/);
@@ -102,6 +114,7 @@ assert.doesNotMatch(accepted, /href="https:\/\/(?!business\.audiolad\.ru)/);
 
 const hidden = card(managerDomain, grace);
 assert.doesNotMatch(hidden, /data-testid="biz-home-pay"/, "a manager does not see payment");
+assert.doesNotMatch(hidden, /data-testid="biz-home-grace-renewal"/, "a manager does not see the renewal anchor");
 
 assert.match(readFileSync("src/app/api/business/player/track-url/route.ts", "utf8"), /access\.mode === "offer"/);
 assert.match(readFileSync("src/lib/business-workspace/model.ts", "utf8"), /status === "grace"/);
@@ -157,5 +170,103 @@ for (const route of ["src/app/api/business/subscription/checkout/route.ts", "src
   assert.match(source, /businessPointSessionAlive/);
   assert.ok(source.indexOf("businessPointSessionAlive") < source.indexOf(".rpc("), route);
 }
+
+const DAY = 86_400_000;
+const periodEndAt = new Date("2026-11-22T12:00:00.000Z");
+
+function period(paidAt: Date, trialEndsAt: string | null, paidUntil: string | null) {
+  const start = businessSubscriptionPeriodStart({ paidAt, trialEndsAt, paidUntil });
+  return { start, end: businessSubscriptionPeriodEnd(start) };
+}
+
+const beforeEnd = period(new Date(periodEndAt.getTime() - 10 * DAY), null, periodEndAt.toISOString());
+assert.equal(beforeEnd.start.toISOString(), periodEndAt.toISOString(), "pay before end extends from the end");
+assert.equal(beforeEnd.end.getTime() - beforeEnd.start.getTime(), BUSINESS_GIFT_DAYS * DAY);
+
+const day1 = new Date(periodEndAt.getTime() + 12 * 60 * 60 * 1000);
+const onDay1 = period(day1, null, periodEndAt.toISOString());
+assert.equal(onDay1.start.toISOString(), periodEndAt.toISOString(), "grace day 1 starts at the previous end");
+
+const day2 = new Date(periodEndAt.getTime() + 2 * DAY);
+const onDay2 = period(day2, null, periodEndAt.toISOString());
+assert.equal(onDay2.start.toISOString(), periodEndAt.toISOString(), "grace day 2 starts at the previous end");
+assert.equal(onDay2.end.getTime() - day2.getTime(), 28 * DAY, "two days into grace leaves 28 days");
+assert.equal(trialDaysLeft(onDay2.end, day2), 28);
+const duringDay2 = resolveCustomerAccess({
+  now: day2,
+  emailConfirmed: true,
+  grant: null,
+  paidUntil: periodEndAt.toISOString(),
+});
+assert.equal(duringDay2.mode, "grace");
+assert.equal(duringDay2.daysLeft, 1, "music days left on grace day 2 are the last grace day");
+const paidDay2 = resolveCustomerAccess({
+  now: day2,
+  emailConfirmed: true,
+  grant: null,
+  paidUntil: onDay2.end.toISOString(),
+});
+assert.equal(paidDay2.mode, "paid");
+assert.equal(paidDay2.daysLeft, 28, "after a grace-day-2 payment the cabinet counts 28 days");
+assert.equal(paidDay2.endsAt, onDay2.end.toISOString());
+
+const day3 = new Date(periodEndAt.getTime() + BUSINESS_GRACE_MS - 1000);
+const onDay3 = period(day3, null, periodEndAt.toISOString());
+assert.equal(onDay3.start.toISOString(), periodEndAt.toISOString(), "grace day 3 still starts at the previous end");
+assert.ok(day3.getTime() < periodEndAt.getTime() + BUSINESS_GRACE_MS);
+
+const afterGrace = new Date(periodEndAt.getTime() + BUSINESS_GRACE_MS);
+const afterGracePeriod = period(afterGrace, null, periodEndAt.toISOString());
+assert.equal(afterGracePeriod.start.toISOString(), afterGrace.toISOString(), "the exact grace end starts at payment");
+assert.equal(resolveCustomerAccess({
+  now: afterGrace,
+  emailConfirmed: true,
+  grant: null,
+  paidUntil: periodEndAt.toISOString(),
+}).mode, "offer");
+
+const laterAfter = period(new Date(periodEndAt.getTime() + 5 * DAY), null, periodEndAt.toISOString());
+assert.equal(laterAfter.start.getTime(), periodEndAt.getTime() + 5 * DAY);
+
+const trialGracePaidAt = new Date(periodEndAt.getTime() + DAY);
+const trialGrace = period(trialGracePaidAt, periodEndAt.toISOString(), null);
+assert.equal(trialGrace.start.toISOString(), periodEndAt.toISOString(), "trial end inside grace is the anchor");
+
+const olderPaid = new Date(periodEndAt.getTime() - 10 * DAY).toISOString();
+assert.equal(
+  period(trialGracePaidAt, periodEndAt.toISOString(), olderPaid).start.toISOString(),
+  periodEndAt.toISOString(),
+  "the later contractual end wins while its grace is open",
+);
+assert.equal(
+  period(new Date(periodEndAt.getTime() + 5 * DAY), periodEndAt.toISOString(), olderPaid).start.getTime(),
+  periodEndAt.getTime() + 5 * DAY,
+  "after the later end's grace, payment time wins",
+);
+
+const replayInput = { paidAt: day2, trialEndsAt: null, paidUntil: periodEndAt.toISOString() };
+assert.equal(
+  businessSubscriptionPeriodStart(replayInput).toISOString(),
+  businessSubscriptionPeriodStart(replayInput).toISOString(),
+);
+
+const migration = readFileSync(
+  "supabase/migrations/20270207150000_business_subscription_grace_base.sql",
+  "utf8",
+);
+assert.equal(BUSINESS_GRACE_DAYS, 3);
+assert.equal(BUSINESS_GIFT_DAYS, 30);
+assert.match(migration, new RegExp(`interval '${BUSINESS_GRACE_DAYS} days'`));
+assert.match(migration, /interval '30 days'/);
+assert.match(migration, /v_paid_at < v_contractual \+ interval '3 days'/);
+assert.match(migration, /CREATE OR REPLACE FUNCTION public\.apply_business_subscription_for_order/);
+assert.doesNotMatch(migration, /CREATE TABLE/);
+assert.doesNotMatch(migration, /—/);
+const previous = readFileSync(
+  "supabase/migrations/20270205130000_business_subscription_payment.sql",
+  "utf8",
+);
+assert.match(previous, /v_base := v_paid_at;/);
+assert.doesNotMatch(previous, /v_contractual/);
 
 console.log("business-subscription-payment-unit: ok");
