@@ -701,6 +701,8 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(playerSource, /previousIndex/);
   assert.match(read("src/components/business-app/business-app.css"), /\.business-now__volume \{[^}]*width: 100%/);
   assert.match(read("src/components/business-app/business-app.css"), /\.business-now__volume input\[type="range"\] \{[^}]*width: 100%/);
+  // «Громкость» belongs to the slider: clear space from the progress bar, no extra gap inside the group.
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-now__volume \{[^}]*gap: 0;[^}]*margin-top: 1\.5rem/);
   assert.match(read("src/components/business-app/business-app.css"), /\.business-transport\.business-transport--center \{[^}]*justify-content: center/);
   assert.doesNotMatch(html, /«Играть»/);
   assert.match(html, /aria-label="Играть"/);
