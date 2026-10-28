@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 
 import { AuthHostnameProvider } from "@/components/auth/AuthPresentation";
 import { getHostnameFromHeaders } from "@/lib/business-app/host";
-import "@/components/business-app/theme/business-theme.css";
 
 export const metadata: Metadata = {
   robots: {

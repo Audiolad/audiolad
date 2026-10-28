@@ -25,7 +25,6 @@ export function AuthFrame({ variant, children }: { variant: AuthVariant; childre
   return (
     <main
       className={variant === "business" ? styles.business : "min-h-screen bg-platform-surface text-[#25135c]"}
-      data-biz-theme={variant === "business" ? "jazz-coffee" : undefined}
     >
       {children}
     </main>

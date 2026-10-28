@@ -34,6 +34,23 @@ for (const input of [
   assert.equal(selectAuthVariant(input), "ordinary", JSON.stringify(input));
 }
 
+// Promo signup context converts its internal returnTo into next using this helper.
+for (const [returnTo, expected] of [
+  ["/auth/business-return", "business"],
+  ["/auth/business-cabinet", "business"],
+  ["/catalog", "ordinary"],
+] as const) {
+  const href = buildAuthRouteHref("/auth/sign-up", returnTo, {
+    intent: "save_practice",
+    practice: "example-practice",
+  });
+  const { searchParams } = new URL(href, "https://audiolad.ru");
+  assert.equal(searchParams.get("next"), returnTo);
+  assert.equal(searchParams.has("returnTo"), false);
+  assert.equal(searchParams.has("from"), false);
+  assert.equal(selectAuthVariant({ next: searchParams.get("next") }), expected, href);
+}
+
 // Actual funnel query parsing, not just direct function arguments.
 const params = new URLSearchParams("next=%2Fauth%2Fbusiness-return%3Fx%3D1");
 assert.equal(selectAuthVariant({ next: params.get("next") }), "business");

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const page = (route) => read(`src/app/(platform)/auth/${route}/page.tsx`);
@@ -60,7 +61,13 @@ assert.match(presentation, /"min-h-screen bg-platform-surface text-\[#25135c\]"/
 assert.match(presentation, /params\.get\("next"\), from: params\.get\("from"\), hostname/);
 const layout = read("src/app/(platform)/auth/layout.tsx");
 assert.match(layout, /getHostnameFromHeaders\(await headers\(\)\)/);
-assert.match(layout, /business-app\/theme\/business-theme\.css/);
+// Every auth route/layout must stay independent of the global Business theme.
+for (const entry of readdirSync(new URL("../src/app/(platform)/auth/", import.meta.url), { recursive: true, withFileTypes: true })) {
+  if (!entry.isFile()) continue;
+  const source = readFileSync(join(entry.parentPath ?? entry.path, entry.name), "utf8");
+  assert.doesNotMatch(source, /business-theme\.css/, entry.name);
+  assert.doesNotMatch(source, /data-biz-theme|var\(--biz-/, entry.name);
+}
 const resetLayout = read("src/app/(platform)/auth/reset-password/layout.tsx");
 assert.match(resetLayout, /if \(user && hasValidRecoveryIntent\(cookieStore, user.id\)\)/);
 assert.match(resetLayout, /<PasswordResetExpired \/>/);
@@ -68,11 +75,21 @@ const expired = read("src/components/auth/PasswordResetExpired.tsx");
 assert.match(expired, /<AuthFrame variant=\{variant\}>/);
 assert.match(expired, /buildAuthRouteHref\("\/auth\/forgot-password", searchParams\.get\("next"\), authVariantLinkParams\(variant\)\)/);
 const css = read("src/components/auth/business-auth.module.css");
-assert.match(css, /var\(--biz-cream\)/);
-assert.match(css, /var\(--biz-coffee\)/);
+assert.match(css, /var\(--auth-cream\)/);
+assert.match(css, /var\(--auth-coffee\)/);
 assert.match(css, /min-height: 44px/);
 assert.match(css, /width: 44px/);
-assert.doesNotMatch(css, /#[0-9a-f]{3,8}[;)]/i, "Business colours come from shared tokens");
+assert.doesNotMatch(presentation, /data-biz-theme|business-theme\.css/);
+assert.doesNotMatch(css, /@import|var\(--biz-/);
+// Local auth tokens must retain the source palette without loading its CSS.
+const themeCss = read("src/components/business-app/theme/business-theme.css");
+const localTokens = new Map([...css.matchAll(/--auth-([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2]]));
+for (const [, name] of css.matchAll(/var\(--auth-([a-z-]+)\)/g)) {
+  assert.ok(localTokens.has(name), name);
+  const sharedValue = themeCss.match(new RegExp(`--biz-${name}:\\s*([^;]+);`))?.[1];
+  assert.equal(localTokens.get(name), sharedValue, name);
+}
+assert.match(css, /\.business fieldset a:not\(\.brand\)\s*\{\s*display: inline;\s*min-height: 0;/);
 const pkg = JSON.parse(read("package.json"));
 assert.ok(pkg.scripts.test.endsWith(" && npm run test:business-auth-variant"));
 assert.match(pkg.scripts["test:business-auth-variant"], /business-auth-variant-unit\.mts/);

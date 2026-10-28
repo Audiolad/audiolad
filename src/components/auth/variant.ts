@@ -13,6 +13,7 @@ export function selectAuthVariant({
   from?: string | null;
   hostname?: string | null;
 }): AuthVariant {
+  // Auth URLs carry the return path only in next; promo returnTo is converted by buildAuthRouteHref.
   let decodedNext = next ?? "";
   try {
     decodedNext = decodeURIComponent(decodedNext);
