@@ -12,6 +12,8 @@ import {
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
+import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
+import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, CAFE_QUEUE_PREVIEW, ruTrackWord } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import CafeQueueControls, { CafeTrackFeedback } from "@/components/business-app/workspace/CafeQueueControls";
@@ -49,9 +51,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const release = player.release;
   const playIndex = player.playIndex;
   const setQueueOrder = player.setQueueOrder;
+  const applyAtmosphereQueue = player.applyAtmosphereQueue;
   const currentIndex = player.view.index;
   const queue = useCafeQueuePreferences();
   const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
+  const [failedNowCover, setFailedNowCover] = useState<string | null>(null);
   const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
   const open = workspacePlayerOpen(model);
   const reportChromeAccess = useReportBusinessChromeAccess();
@@ -68,10 +72,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
   const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
   const boundaryRef = useRef<string | null>(null);
+  const statusRef = useRef(player.view.status);
   useEffect(() => {
     const playing = model.tracks[currentIndex];
     boundaryRef.current = player.queueOrder && playing ? playing.audioItemId : null;
-  }, [player.queueOrder, model.tracks, currentIndex]);
+    statusRef.current = player.view.status;
+  }, [player.queueOrder, model.tracks, currentIndex, player.view.status]);
   useEffect(() => {
     if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
     const ac = new AbortController();
@@ -97,7 +103,19 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         if (!res.ok) return;
         const json = await res.json() as { ok?: boolean; order?: unknown };
         if (cancelled || json.ok !== true || !Array.isArray(json.order)) return;
-        setQueueOrder(cafeQueueIndices(model.tracks, json.order));
+        const indices = cafeQueueIndices(model.tracks, json.order);
+        const plan = atmospherePlaybackPlan({
+          tracks: model.tracks,
+          orderedIds: json.order,
+          restart: peekAtmosphereRestart(),
+          status: statusRef.current,
+        });
+        if (plan && indices.length > 0) {
+          takeAtmosphereRestart();
+          applyAtmosphereQueue(indices, { play: plan.play });
+          return;
+        }
+        setQueueOrder(indices);
       })
       .catch(() => {
         /* Catalog order stays until the queue can be loaded. */
@@ -118,6 +136,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     model.spaceId,
     model.tracks,
     setQueueOrder,
+    applyAtmosphereQueue,
   ]);
   useEffect(() => {
     if (!open) return;
@@ -158,6 +177,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const current = model.tracks[currentIndex] ?? model.tracks[0] ?? null;
   const author = current?.authorName?.trim() ?? "";
   const album = current?.albumTitle?.trim() ?? "";
+  const nowCover = current ? cabinetAlbumCoverUrl({ coverUrl: current.coverUrl }) : null;
   const duration = player.view.duration > 0 ? player.view.duration : (current?.durationSeconds ?? 0);
   const ratio = duration > 0 ? Math.min(1, Math.max(0, player.view.currentTime / duration)) : 0;
   const playOrder = player.queueOrder ?? model.tracks.map((_, index) => index);
@@ -246,9 +266,19 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         <>
           <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
             <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
-            <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
-            {author ? <p className="business-now__byline" data-testid="biz-now-author">{author}</p> : null}
-            {album ? <p className="business-now__byline" data-testid="biz-now-album">{album}</p> : null}
+            <div className="business-now__head">
+              <span className="business-now__cover" data-has-image={nowCover && failedNowCover !== nowCover ? "true" : "false"} data-testid="biz-now-cover">
+                {nowCover && failedNowCover !== nowCover ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- public catalog cover, same file as the bottom bar
+                  <img src={nowCover} alt="" width={80} height={80} onError={() => setFailedNowCover(nowCover)} />
+                ) : null}
+              </span>
+              <div className="business-now__meta">
+                <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
+                {author ? <p className="business-now__byline" data-testid="biz-now-author">{author}</p> : null}
+                {album ? <p className="business-now__byline" data-testid="biz-now-album">{album}</p> : null}
+              </div>
+            </div>
             <div
               className="business-now__bar"
               role="progressbar"
