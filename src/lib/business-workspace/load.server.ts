@@ -538,6 +538,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       endsAtLabel,
       endsAt: activation.access.endsAt,
       playbackUntil: activation.access.playbackUntil,
+      licenceStartsAt: activation.access.licenceStartsAt,
       tracks,
       needsVenue,
       playback: saved

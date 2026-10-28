@@ -48,6 +48,8 @@ export type WorkspacePageModel = {
   endsAt: string | null;
   /** When audio must stop. During grace this is later than endsAt. */
   playbackUntil: string | null;
+  /** Gift start. The public-performance licence uses this, not the payment time. */
+  licenceStartsAt?: string | null;
   priceLabel: string;
   periodLabel: string;
   rules: string;

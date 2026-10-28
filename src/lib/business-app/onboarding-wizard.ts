@@ -8,6 +8,8 @@
  * eligibility is decided per location by the player, never asserted by the wizard.
  */
 
+import { validateVenuePlace } from "@/lib/business-app/venue-place";
+
 export const BUSINESS_ONBOARDING_STEPS = [
   "type",
   "atmosphere",
@@ -192,6 +194,8 @@ export type BusinessOnboardingConfirmInput = {
   organizationName: string;
   locationName: string;
   businessCategory: string;
+  /** Street address of this point. The licence applies to this address. */
+  addressLine1: string;
   countryCode?: string;
   timezone?: string;
 };
@@ -204,18 +208,19 @@ export function validateBusinessOnboardingConfirm(
   input: BusinessOnboardingConfirmInput,
 ): BusinessOnboardingConfirmValidation {
   const organizationName = input.organizationName.trim();
-  const locationName = input.locationName.trim();
   const businessCategory = input.businessCategory.trim();
   const countryCode = (input.countryCode ?? "RU").trim().toUpperCase() || "RU";
   const timezone =
     (input.timezone ?? "Europe/Moscow").trim() || "Europe/Moscow";
+  const place = validateVenuePlace({
+    name: input.locationName,
+    addressLine1: input.addressLine1,
+  });
 
   if (organizationName.length < 1 || organizationName.length > 120) {
     return { ok: false, error: "Укажите название заведения: от 1 до 120 символов." };
   }
-  if (locationName.length < 1 || locationName.length > 120) {
-    return { ok: false, error: "Укажите название точки: от 1 до 120 символов." };
-  }
+  if (!place.ok) return place;
   if (businessCategory.length < 1 || businessCategory.length > 120) {
     return { ok: false, error: "Укажите тип заведения: от 1 до 120 символов." };
   }
@@ -227,8 +232,9 @@ export function validateBusinessOnboardingConfirm(
     ok: true,
     value: {
       organizationName,
-      locationName,
+      locationName: place.value.name,
       businessCategory,
+      addressLine1: place.value.addressLine1,
       countryCode,
       timezone,
     },

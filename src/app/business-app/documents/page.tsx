@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import BusinessVenueLicenceSection from "@/components/business-app/BusinessVenueLicenceSection";
+import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
+import { resolvePublicPerformanceLicence } from "@/lib/access-grants/public-performance-licence";
 import {
   CLIENT_DOCUMENT_EDITION_LABEL,
   CLIENT_DOCUMENT_REQUISITES,
@@ -9,6 +12,7 @@ import {
   formatVenueTime,
   formatVenueZoneRu,
 } from "@/lib/business-app/client-documents";
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadPlaybackReport } from "@/lib/business-app/load-playback-report";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +30,16 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
   const at = first(sp.at);
   const windowMinutes = first(sp.window);
   const result = await loadPlaybackReport({ at, windowMinutes });
+  const domain = await loadBusinessOwnerHomeContext();
+  const access = await peekBusinessChromeAccess();
+  const location = domain.status === "authenticated" ? domain.location : null;
+  const licence = resolvePublicPerformanceLicence({
+    mode: access.mode,
+    startsAt: access.startsAt,
+    endsAt: access.endsAt,
+    playbackUntil: access.graceEndsAt,
+    sectorLabel: location?.businessCategory,
+  });
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -75,6 +89,13 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           судебному акту на условиях раздела 4 порядка.
         </p>
       </section>
+
+      <BusinessVenueLicenceSection
+        licence={licence}
+        venueName={location?.name ?? null}
+        addressLine1={location?.addressLine1 ?? null}
+        canEdit={domain.status === "authenticated" && domain.canPay}
+      />
 
       <section className="business-app-card" data-testid="playback-report">
         <h2 className="text-[1.2rem] font-bold text-[var(--biz-text)]">

@@ -78,10 +78,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       reportChromeAccess({
         mode: reportedStatus,
         endsAt: reportedEndsAt,
+        ...(model.licenceStartsAt ? { startsAt: model.licenceStartsAt } : {}),
         ...(reportedStatus === "grace" && model.playbackUntil ? { graceEndsAt: model.playbackUntil } : {}),
       });
     }
-  }, [model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
+  }, [model.licenceStartsAt, model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
   const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
   const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
   const boundaryRef = useRef<string | null>(null);

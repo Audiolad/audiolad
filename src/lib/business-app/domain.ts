@@ -17,6 +17,8 @@ export type BusinessDomainLocation = {
   countryCode: string;
   timezone: string;
   status: string;
+  /** Street address of this point. Null until the owner fills it in. */
+  addressLine1: string | null;
   defaultZoneId: string | null;
 };
 
@@ -116,7 +118,7 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
   const { data: location, error: locationError } = await supabase
     .from("business_locations")
     .select(
-      "id, organization_id, name, business_category, country_code, timezone, status",
+      "id, organization_id, name, business_category, country_code, timezone, status, address_line1",
     )
     .eq("organization_id", organizationId)
     .eq("status", "active")
@@ -183,6 +185,9 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       countryCode: location.country_code,
       timezone: location.timezone,
       status: location.status,
+      addressLine1: typeof location.address_line1 === "string" && location.address_line1.trim()
+        ? location.address_line1.trim()
+        : null,
       defaultZoneId: zone?.id ?? null,
     },
     signals,

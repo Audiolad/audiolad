@@ -31,6 +31,12 @@ export type CustomerAccess = {
   daysLeft: number | null;
   /** Expired and paid rows stay in the store. */
   grantKept: boolean;
+  /**
+   * Start of the public-performance licence: access_grants.starts_at
+   * (registration / the 30-day gift). A later payment does not move it.
+   * Null when this account has no gift row.
+   */
+  licenceStartsAt: string | null;
 };
 
 export type TrialDecision =
@@ -144,8 +150,9 @@ export function resolveCustomerAccess(input: {
   paidUntil: string | null;
 }): CustomerAccess {
   const kept = Boolean(input.grant || input.paidUntil);
+  const licenceStartsAt = input.grant?.startsAt ?? null;
   if (!input.emailConfirmed) {
-    return { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: Boolean(input.grant) };
+    return { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: Boolean(input.grant), licenceStartsAt };
   }
   if (input.paidUntil && isPeriodActive(input.paidUntil, input.now)) {
     const ends = new Date(input.paidUntil);
@@ -156,6 +163,7 @@ export function resolveCustomerAccess(input: {
       playbackUntil: input.paidUntil,
       daysLeft: trialDaysLeft(ends, input.now),
       grantKept: Boolean(input.grant),
+      licenceStartsAt,
     };
   }
   if (input.grant && isPeriodActive(input.grant.endsAt, input.now)) {
@@ -167,6 +175,7 @@ export function resolveCustomerAccess(input: {
       playbackUntil: input.grant.endsAt,
       daysLeft: trialDaysLeft(ends, input.now),
       grantKept: true,
+      licenceStartsAt,
     };
   }
   const contractual = laterAccessInstant(input.grant?.endsAt ?? null, input.paidUntil);
@@ -179,6 +188,7 @@ export function resolveCustomerAccess(input: {
       playbackUntil,
       daysLeft: trialDaysLeft(new Date(playbackUntil), input.now),
       grantKept: kept,
+      licenceStartsAt,
     };
   }
   return {
@@ -188,6 +198,7 @@ export function resolveCustomerAccess(input: {
     playbackUntil: null,
     daysLeft: 0,
     grantKept: kept,
+    licenceStartsAt,
   };
 }
 

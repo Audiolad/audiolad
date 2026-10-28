@@ -17,6 +17,7 @@ export default function BusinessDomainBootstrapForm() {
         organizationName: String(formData.get("organizationName") ?? ""),
         locationName: String(formData.get("locationName") ?? ""),
         businessCategory: String(formData.get("businessCategory") ?? ""),
+        addressLine1: String(formData.get("addressLine1") ?? ""),
         countryCode: String(formData.get("countryCode") ?? "RU"),
         timezone: String(formData.get("timezone") ?? "Europe/Moscow"),
       });
@@ -54,6 +55,20 @@ export default function BusinessDomainBootstrapForm() {
           maxLength={120}
           className="mt-1 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-2 text-[var(--biz-text)]"
           placeholder="Салон на Арбате"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="addressLine1">
+          Адрес точки
+        </label>
+        <input
+          id="addressLine1"
+          name="addressLine1"
+          required
+          maxLength={200}
+          autoComplete="street-address"
+          className="mt-1 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-2 text-[var(--biz-text)]"
+          placeholder="Улица, дом"
         />
       </div>
       <div>

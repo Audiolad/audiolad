@@ -19,6 +19,12 @@ One module for tasks **ba344b7f** and **1e008ee8**. Do not add a second registra
 
 `business_space_admissions` is the whitelist seam for task **28d2b5bb**. This migration inserts no rows. The player also requires `resolve_business_track_eligibility` = `ELIGIBLE`. `UNKNOWN` is not playable. The guest free-album shelf is not used in the workspace.
 
+The public-performance licence for that permitted repertoire starts at `access_grants.starts_at` (registration, the 30-day gift), not at payment. Trial, a later paid period and the 3-day grace are the same licensed window. After grace the status is expired. The place is `business_locations.name` plus `address_line1` for that point. Wording shown in the cabinet is listed in `docs/business/licensing/TEXTS-USED.md`.
+
+## Venue address
+
+Columns `business_locations.name` and `business_locations.address_line1` already exist. Migration `supabase/migrations/20270206130000_business_location_venue_address.sql` is additive: a 6-argument overload of `create_business_organization_with_location` and `business_owner_set_location_venue`. It adds no column. It is not applied by this change. Apply it only after a separate owner confirmation, and deploy the app only after the migration, because onboarding and «Настройка» write the address through those functions.
+
 ## Return after email confirmation
 
 GoTrue allow-list URLs stay exact, without a query string. Sign-up does not set `emailRedirectTo`. The relative `next=/auth/business-return` is stored on the form, and `user_metadata.business_trial = "1"` is set only for that next path. The callback uses an explicit `next` when it is present, and otherwise the metadata flag.

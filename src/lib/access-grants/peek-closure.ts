@@ -70,13 +70,14 @@ export async function peekChromeAccessWith(
     ? stamps.reduce((max, value) => (Date.parse(value) > Date.parse(max) ? value : max))
     : null;
   const access = resolveCustomerAccess({ now, emailConfirmed: true, grant, paidUntil });
+  const startsAt = grant?.startsAt ?? null;
   if (access.mode === "grace" && access.endsAt && access.playbackUntil) {
-    return { mode: "grace", endsAt: access.endsAt, graceEndsAt: access.playbackUntil };
+    return { mode: "grace", endsAt: access.endsAt, graceEndsAt: access.playbackUntil, startsAt };
   }
   if (access.mode === "trial" || access.mode === "paid") {
-    return { mode: access.mode, endsAt: access.endsAt };
+    return { mode: access.mode, endsAt: access.endsAt, startsAt };
   }
   // An ended gift keeps its end instant so Главная can show the terms. It is not a live period.
-  if (access.mode === "offer" && access.endsAt) return { mode: "offer", endsAt: access.endsAt };
+  if (access.mode === "offer" && access.endsAt) return { mode: "offer", endsAt: access.endsAt, startsAt };
   return { ...BUSINESS_NO_ACCESS, mode: access.mode };
 }

@@ -1086,6 +1086,7 @@ assert.doesNotMatch(rules, /—/);
       countryCode: "RU",
       timezone: "Europe/Moscow",
       status: "active",
+      addressLine1: null,
       defaultZoneId: null,
     },
     organizationName: "Кофейня",
