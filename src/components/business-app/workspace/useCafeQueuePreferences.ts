@@ -29,6 +29,7 @@ import {
   type CafeEnergyOffset,
   type CafeQueueFeedback,
   type CafeQueueFeedbackKind,
+  type CafeQueuePrefs,
 } from "@/lib/business-app/cafe-queue/prefs";
 
 export type CafeQueuePreferenceSeed = {

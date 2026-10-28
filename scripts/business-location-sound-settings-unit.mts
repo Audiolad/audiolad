@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   locationSoundFromRow,
   locationSoundRpcArgs,
-} from "../src/lib/business-app/location-sound-settings.ts";
+} from "../src/lib/business-app/location-sound-settings";
 
 const row = locationSoundFromRow({
   location_id: "11111111-1111-4111-8111-111111111111",
