@@ -1,4 +1,4 @@
--- Disposable smoke for 20270205120000_business_subscription_payment.sql.
+-- Disposable smoke for 20270205130000_business_subscription_payment.sql.
 -- No Tochka HTTP. Rolls back.
 \set ON_ERROR_STOP on
 BEGIN;

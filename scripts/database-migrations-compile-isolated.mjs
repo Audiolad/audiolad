@@ -260,7 +260,7 @@ applyFile(
   "post-apply Wordstat jazz query seed smoke",
   resolve(root, "supabase/tests/seo_wordstat_jazz_queries_seed_smoke.sql"),
 );
-if (!pending.has("20270205120000")) {
+if (!pending.has("20270205130000")) {
   throw new Error("business subscription payment migration was not included in the disposable replay");
 }
 applyFile(

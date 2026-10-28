@@ -123,7 +123,7 @@ Continuation: the owner applies the migration through the established process.
 
 ## Business subscription payment (approved, not applied here)
 
-Migration `20270205120000_business_subscription_payment.sql` is additive.
+Migration `20270205130000_business_subscription_payment.sql` is additive.
 Sergey approved the payment tables on 2026-10-28. This change does not apply
 the migration and does not call Tochka.
 
