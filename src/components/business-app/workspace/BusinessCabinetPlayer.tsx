@@ -18,7 +18,10 @@ import { getCabinetDeviceSecret, postCabinetReport } from "@/lib/business-app/ca
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
-import { cafeQueueNextIndex } from "@/lib/business-app/cafe-queue/order";
+import { peekAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
+import { cafeQueueIndices, cafeQueueNextIndex } from "@/lib/business-app/cafe-queue/order";
+import type { CafeDaypart, CafeQueueFeedback } from "@/lib/business-app/cafe-queue/prefs";
+import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
 import {
   clampWorkspacePlayback,
@@ -58,6 +61,21 @@ type CabinetPlayerApi = {
   /** Catalog indices in play order. Null until the cafe queue answers: catalog order. */
   queueOrder: readonly number[] | null;
   setQueueOrder: (indices: readonly number[]) => void;
+  /** Jump to the first track of a queue just built by «Создать атмосферу». */
+  applyAtmosphereQueue: (indices: readonly number[], options: { play: boolean }) => void;
+  /**
+   * Rebuild the live queue for the stored sound profile.
+   * Applied: the catalog was reordered, and a playing track moved to the new first row.
+   * Deferred: this visit has no catalog yet, so the music page rebuilds on open.
+   * Failed: the queue did not answer. A newer call supersedes this one.
+   */
+  rebuildFromProfile: (input: {
+    character: GuestCoffeeCharacter;
+    direction: GuestCoffeeDirection;
+    daypart: CafeDaypart;
+    feedback: readonly CafeQueueFeedback[];
+  }) => Promise<"applied" | "deferred" | "failed">;
+  cancelAtmosphereRebuild: () => void;
 };
 
 const CabinetContext = createContext<CabinetPlayerApi | null>(null);
@@ -150,13 +168,18 @@ export function BusinessCabinetPlayerProvider({
   const reportRef = useRef<() => void>(() => {});
   const playOrderRef = useRef<number[] | null>(null);
   const savedPlaceRef = useRef(false);
+  const rebuildGen = useRef(0);
 
   const adopt = useCallback((next: WorkspacePageModel) => {
     if (next.tracks.length === 0) return;
     const key = modelKey(next);
+    modelRef.current = next;
     setModel((prev) => (prev && modelKey(prev) === key ? prev : next));
-    if (restoredKey.current === key) return;
+    const restart = peekAtmosphereRestart();
+    if (restart) savedPlaceRef.current = false;
+    if (restoredKey.current === key && !restart) return;
     restoredKey.current = key;
+    if (restart) return;
     playOrderRef.current = null;
     setQueueOrderState(null);
     const count = next.tracks.length;
@@ -443,6 +466,117 @@ export function BusinessCabinetPlayerProvider({
     setView((prevView) => ({ ...prevView, index: start }));
   }, []);
 
+  const applyAtmosphereQueue = useCallback((indices: readonly number[], options: { play: boolean }) => {
+    const current = modelRef.current;
+    if (!current) return;
+    const seen = new Set<number>();
+    const unique: number[] = [];
+    for (const index of indices) {
+      if (!Number.isInteger(index) || index < 0 || index >= current.tracks.length || seen.has(index)) continue;
+      seen.add(index);
+      unique.push(index);
+    }
+    if (unique.length === 0) return;
+    playOrderRef.current = unique;
+    setQueueOrderState(unique);
+    const start = unique[0] ?? 0;
+    savedPlaceRef.current = false;
+    const ctl = ctlRef.current;
+    const playingNow = options.play || ctl?.status === "playing" || ctl?.status === "loading";
+    if (playingNow && ctl && (ctl.index !== start || (ctl.status !== "playing" && ctl.status !== "loading"))) {
+      setBarDismissed(false);
+      seekRef.current = 0;
+      evidenceRef.current.reset(0);
+      void ctl.playIndex(start).then(() => {
+        remember({ index: start, positionSec: 0 }, true);
+        reportPlayback();
+      });
+      playbackRef.current = clampWorkspacePlayback(
+        { index: start, positionSec: 0, volume: playbackRef.current.volume, updatedAt: new Date().toISOString() },
+        current.tracks.length,
+      );
+      setPlayback(playbackRef.current);
+      setView((prevView) => ({
+        ...prevView,
+        index: start,
+        currentTime: 0,
+        duration: current.tracks[start]?.durationSeconds ?? prevView.duration,
+      }));
+      return;
+    }
+    if (playingNow && ctl) {
+      remember({ index: start, positionSec: 0 }, true);
+      return;
+    }
+    if (ctl && ctl.status !== "playing" && ctl.status !== "loading") {
+      ctl.index = start;
+      const audio = audioRef.current;
+      if (audio && audio.src) {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+      }
+    }
+    const restored = clampWorkspacePlayback(
+      { index: start, positionSec: 0, volume: playbackRef.current.volume, updatedAt: new Date().toISOString() },
+      current.tracks.length,
+    );
+    playbackRef.current = restored;
+    seekRef.current = 0;
+    setPlayback(restored);
+    setView((prevView) => ({
+      ...prevView,
+      index: start,
+      currentTime: 0,
+      duration: current.tracks[start]?.durationSeconds ?? prevView.duration,
+    }));
+    remember({ index: start, positionSec: 0 }, false);
+  }, [remember, reportPlayback]);
+
+  const cancelAtmosphereRebuild = useCallback(() => {
+    rebuildGen.current += 1;
+  }, []);
+
+  const rebuildFromProfile = useCallback(async (input: {
+    character: GuestCoffeeCharacter;
+    direction: GuestCoffeeDirection;
+    daypart: CafeDaypart;
+    feedback: readonly CafeQueueFeedback[];
+  }): Promise<"applied" | "deferred" | "failed"> => {
+    const current = modelRef.current;
+    if (!current || current.tracks.length === 0) return "deferred";
+    const gen = ++rebuildGen.current;
+    const playingId = current.tracks[playbackRef.current.index]?.audioItemId;
+    try {
+      const params = new URLSearchParams({ space: current.spaceId });
+      const res = await fetch(`/api/business/workspace/queue?${params.toString()}`, {
+        ...JSON_POST,
+        body: JSON.stringify({
+          character: input.character,
+          direction: input.direction,
+          daypart: input.daypart,
+          energyOffset: 0,
+          feedback: input.feedback,
+          boundaryAudioItemId: playingId,
+        }),
+      });
+      if (rebuildGen.current !== gen) return "failed";
+      if (!res.ok) return "failed";
+      const json = await res.json() as { ok?: boolean; order?: unknown };
+      if (rebuildGen.current !== gen) return "failed";
+      if (json.ok !== true || !Array.isArray(json.order)) return "failed";
+      const indices = cafeQueueIndices(current.tracks, json.order);
+      if (indices.length === 0) return "failed";
+      if (rebuildGen.current !== gen) return "failed";
+      const ctl = ctlRef.current;
+      const playingNow = Boolean(ctl && (ctl.status === "playing" || ctl.status === "loading"));
+      applyAtmosphereQueue(indices, { play: playingNow });
+      return "applied";
+    } catch {
+      return "failed";
+    }
+  }, [applyAtmosphereQueue]);
+
   const dismissBar = useCallback(async () => {
     const ctl = ctlRef.current;
     const audio = audioRef.current;
@@ -490,6 +624,9 @@ export function BusinessCabinetPlayerProvider({
     saveNote,
     queueOrder,
     setQueueOrder,
+    applyAtmosphereQueue,
+    rebuildFromProfile,
+    cancelAtmosphereRebuild,
   };
 
   useLayoutEffect(() => {
