@@ -13,6 +13,7 @@ import {
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
 import CafeDaypartHoursForm from "@/components/business-app/workspace/CafeDaypartHoursForm";
 import CafeQueueControls from "@/components/business-app/workspace/CafeQueueControls";
+import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
 import { useCabinetPlayerOptional } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
@@ -32,7 +33,8 @@ import {
   parseBusinessSoundProfile,
   serializeBusinessSoundProfile,
 } from "@/lib/business-app/sound-profile";
-import type { CafeDaypartHours, CafeDaypartMode } from "@/lib/business-app/cafe-queue/prefs";
+import { validateCafeDaypartHours, type CafeDaypartHours, type CafeDaypartMode } from "@/lib/business-app/cafe-queue/prefs";
+import { POINT_SOUND_CHANGED_EVENT } from "@/lib/business-app/point-sound";
 
 const SAVE_ERROR = "Не удалось сохранить звучание. Попробуйте ещё раз.";
 
@@ -43,12 +45,20 @@ const SAVE_ERROR = "Не удалось сохранить звучание. П�
  * character change the mood rank, and the clock daypart changes the energy
  * target. The same album is not placed twice in a row.
  */
+const VENUE_SOUND_CONFIRM = "Применить это звучание в зале со следующего трека?";
+
 export default function BusinessPlayerSettings({
   locationId = null,
   saved = null,
+  pointDevice = false,
+  pointCanEdit = true,
 }: {
   locationId?: string | null;
   saved?: LocationSoundSettings | null;
+  /** This browser is the paired device. It cannot write when the owner turned that off. */
+  pointDevice?: boolean;
+  /** Server flag. Missing row stays allowed. */
+  pointCanEdit?: boolean;
 }) {
   const seeded = saved
     ? {
@@ -61,6 +71,7 @@ export default function BusinessPlayerSettings({
   const player = useCabinetPlayerOptional();
   const [profile, setProfile] = useState<GuestCoffeeProfile>(seeded?.profile ?? GUEST_COFFEE_DEFAULT_PROFILE);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ text: string; run: () => void; cancel?: () => void } | null>(null);
   const [phase, setPhase] = useState<"idle" | "assembling" | "done">("idle");
   const [step, setStep] = useState(0);
   const [steps, setSteps] = useState<string[]>([]);
@@ -90,17 +101,34 @@ export default function BusinessPlayerSettings({
 
   const persist = async (nextProfile: GuestCoffeeProfile, daypartMode: CafeDaypartMode, hours: CafeDaypartHours) => {
     if (!locationId) return null;
+    const draft = locationSoundDraftFromParts(nextProfile, { ...queue.prefs, daypartMode }, hours);
     try {
+      if (pointDevice) {
+        const res = await fetch("/api/business/point", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ action: "sound-save", locationId, ...draft }),
+        });
+        const json = (await res.json()) as { ok?: boolean; error?: string };
+        window.dispatchEvent(new Event(POINT_SOUND_CHANGED_EVENT));
+        return json.ok === true ? null : json.error ?? SAVE_ERROR;
+      }
       const { saveLocationSoundSettings } = await import("@/app/business-app/sound-settings-actions");
-      const result = await saveLocationSoundSettings(
-        locationId,
-        locationSoundDraftFromParts(nextProfile, { ...queue.prefs, daypartMode }, hours),
-      );
+      const result = await saveLocationSoundSettings(locationId, draft);
       if (!result.ok) return result.error;
       return null;
     } catch {
       return SAVE_ERROR;
     }
+  };
+
+  const commitVenue = (run: () => void) => {
+    if (pointDevice || !locationId) {
+      run();
+      return;
+    }
+    setConfirm({ text: VENUE_SOUND_CONFIRM, run });
   };
 
   useEffect(() => {
@@ -119,22 +147,30 @@ export default function BusinessPlayerSettings({
 
   const onChange = <K extends keyof GuestCoffeeProfile>(key: K, value: GuestCoffeeProfile[K]) => {
     const next = { ...profile, [key]: value };
-    setProfile(next);
-    generation.current += 1;
-    player?.cancelAtmosphereRebuild();
-    clearAtmosphereRestart();
-    clearTimers();
-    setPhase("idle");
-    try {
-      window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
-    } catch {
-      /* private mode keeps the choice for this visit */
-    }
-    void persist(next, queue.prefs.daypartMode, queue.hours).then((error) => setSaveError(error));
+    commitVenue(() => {
+      setProfile(next);
+      generation.current += 1;
+      player?.cancelAtmosphereRebuild();
+      clearAtmosphereRestart();
+      clearTimers();
+      setPhase("idle");
+      try {
+        window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
+      } catch {
+        /* private mode keeps the choice for this visit */
+      }
+      void persist(next, queue.prefs.daypartMode, queue.hours).then((error) => setSaveError(error));
+    });
   };
 
   const createAtmosphere = () => {
     if (phase === "assembling" || !queue.effectiveDaypart) return;
+    commitVenue(() => startAtmosphere());
+  };
+
+  const startAtmosphere = () => {
+    const daypart = queue.effectiveDaypart;
+    if (!daypart) return;
     try {
       window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(profile));
     } catch {
@@ -159,13 +195,15 @@ export default function BusinessPlayerSettings({
       }
     }
     const playingNow = player?.view.status === "playing" || player?.view.status === "loading";
-    markAtmosphereRestart(playingNow);
-    const pending = player?.rebuildFromProfile({
-      character: profile.character,
-      direction: profile.direction,
-      daypart: queue.effectiveDaypart,
-      feedback: queue.feedback,
-    }) ?? Promise.resolve("deferred" as const);
+    if (!pointDevice) markAtmosphereRestart(playingNow);
+    const pending = pointDevice
+      ? Promise.resolve("deferred" as const)
+      : player?.rebuildFromProfile({
+          character: profile.character,
+          direction: profile.direction,
+          daypart,
+          feedback: queue.feedback,
+        }) ?? Promise.resolve("deferred" as const);
     timers.current.push(window.setTimeout(() => {
       void pending.then((result) => {
         if (!mounted.current || generation.current !== gen) return;
@@ -194,7 +232,9 @@ export default function BusinessPlayerSettings({
       {phase === "assembling" ? <AtmosphereAssembling step={step} steps={steps} /> : null}
       {phase === "done" ? (
         <div className="business-app-card business-atmosphere-assembling" role="status" data-testid="biz-atmosphere-created">
-          <p className="business-atmosphere-assembling__title">Атмосфера создана</p>
+          <p className="business-atmosphere-assembling__title">
+            {pointDevice ? "Новое звучание начнётся со следующего трека" : "Атмосфера создана"}
+          </p>
           <Link
             href="/music"
             className="business-app-btn business-app-btn-primary business-app-focus-ring business-atmosphere-assemble"
@@ -207,8 +247,33 @@ export default function BusinessPlayerSettings({
     </div>
   );
 
+  const canEditPoint = player?.pointDevice ? player.canChangeMusic : pointCanEdit && saved?.pointCanEditSettings !== false;
+  if (pointDevice && !canEditPoint) {
+    return (
+      <section className="business-app-card" data-testid="biz-point-sound-locked">
+        <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+          Музыку в зале меняет телефон. На этом устройстве выбор закрыт.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <>
+      {confirm ? (
+        <VenueConfirmDialog
+          text={confirm.text}
+          onYes={() => {
+            const run = confirm.run;
+            setConfirm(null);
+            run();
+          }}
+          onNo={() => {
+            confirm.cancel?.();
+            setConfirm(null);
+          }}
+        />
+      ) : null}
       <BusinessSoundSettings
         profile={profile}
         onChange={onChange}
@@ -225,8 +290,10 @@ export default function BusinessPlayerSettings({
           mode={queue.prefs.daypartMode}
           effectiveDaypart={queue.effectiveDaypart}
           onDaypart={(mode) => {
-            queue.setDaypartMode(mode);
-            void persist(profile, mode, queue.hours).then((error) => setSaveError(error));
+            commitVenue(() => {
+              queue.setDaypartMode(mode);
+              void persist(profile, mode, queue.hours).then((error) => setSaveError(error));
+            });
           }}
           hours={queue.hours}
         />
@@ -235,9 +302,20 @@ export default function BusinessPlayerSettings({
         <CafeDaypartHoursForm
           hours={queue.hours}
           onSave={async (next) => {
-            const invalid = queue.setDaypartHours(next);
+            const invalid = validateCafeDaypartHours(next);
             if (invalid) return invalid;
-            return persist(profile, queue.prefs.daypartMode, next);
+            const save = () => {
+              queue.setDaypartHours(next);
+              return persist(profile, queue.prefs.daypartMode, next);
+            };
+            if (pointDevice || !locationId) return save();
+            return new Promise((resolve) => {
+              setConfirm({
+                text: VENUE_SOUND_CONFIRM,
+                run: () => { void save().then(resolve); },
+                cancel: () => resolve(null),
+              });
+            });
           }}
         />
       </section>

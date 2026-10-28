@@ -19,3 +19,19 @@ export async function businessPointSessionAlive(): Promise<boolean> {
     return false;
   }
 }
+
+/** Atmosphere permission for this device. Missing row stays allowed. */
+export async function loadPointDevicePermission(): Promise<{ locationId: string; pointCanEdit: boolean } | null> {
+  const jar = await cookies();
+  const token = jar.get(BUSINESS_POINT_COOKIE)?.value;
+  if (!isPointToken(token)) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("get_business_point_sound_settings", { p_token: token });
+    const row = data as { ok?: boolean; location_id?: unknown; point_can_edit_settings?: unknown } | null;
+    if (error || !row || row.ok !== true || typeof row.location_id !== "string") return null;
+    return { locationId: row.location_id, pointCanEdit: row.point_can_edit_settings !== false };
+  } catch {
+    return null;
+  }
+}

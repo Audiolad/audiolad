@@ -428,7 +428,7 @@
     "test:business-domain-core": "node scripts/business-domain-core-sql-unit.mjs",
     "test:business-location-sound-settings": "node scripts/business-location-sound-settings-sql-unit.mjs && npx tsx scripts/business-location-sound-settings-unit.mts",
     "test:business-point-pairing": "node scripts/business-point-pairing-sql-unit.mjs && npx tsx scripts/business-point-pairing-unit.mts",
-    "test:business-point-commands": "node scripts/business-point-commands-sql-unit.mjs && npx tsx scripts/business-point-commands-unit.mts",
+    "test:business-point-commands": "node scripts/business-point-commands-sql-unit.mjs && npx tsx scripts/business-point-commands-unit.mts && node scripts/business-point-sound-sql-unit.mjs && npx tsx scripts/business-owner-point-ui-unit.mts && npx tsx scripts/business-point-sound-apply-unit.mts && node scripts/business-point-device-controls-unit.mjs",
     "test:business-player-foundation": "node scripts/business-player-foundation-sql-unit.mjs",
     "test:business-playback-attribution": "node scripts/business-playback-attribution-sql-unit.mjs",
     "test:business-rights-foundation": "node scripts/business-rights-foundation-sql-unit.mjs",

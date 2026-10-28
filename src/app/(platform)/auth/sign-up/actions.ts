@@ -144,7 +144,8 @@ export async function signUpAction(
   const lastName = input.lastName.trim();
   const password = input.password;
 
-  if (!firstName || !lastName) {
+  const businessTrial = isBusinessTrialNext(input.next);
+  if (!firstName || (!businessTrial && !lastName)) {
     return {
       ok: false,
       error: {
