@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 import BusinessMemberOnly from "@/components/business-app/BusinessMemberOnly";
 import BusinessSoundStudio from "@/components/business-app/sound/BusinessSoundStudio";
 import { loadGuestCoffeeShelf } from "@/lib/business-app/guest-coffee/load.server";
@@ -11,12 +9,11 @@ import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.serv
 /**
  * a8240527 – the Music section of the AudioLad Business cabinet. The SAME section is the
  * owner's /music and the guest's permanent entry https://business.audiolad.ru/guest/coffee;
- * both render inside the shared BusinessAppShell. memberTools are shown to organization
- * members only (their data is also gated on the server). The recommendation plan is built on
+ * both render inside the shared BusinessAppShell. The recommendation plan is built on
  * the server from the verified music passports (passport.server.ts); only ids, track positions
  * and yes / no matches reach the browser.
  */
-export default async function BusinessMusicSection({ memberTools }: { memberTools?: ReactNode }) {
+export default async function BusinessMusicSection() {
   const [{ playlists, plan }, used] = await Promise.all([
     loadGuestCoffeeShelf().then(async (shelf) => ({ playlists: shelf, plan: await loadGuestCoffeeRecommendationPlan(shelf) })),
     peekGuestCoffeeUsage(),
@@ -29,7 +26,6 @@ export default async function BusinessMusicSection({ memberTools }: { memberTool
         <p className="mt-1.5 max-w-3xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">{GUEST_COFFEE_COPY.lead}<BusinessMemberOnly guest={` ${GUEST_COFFEE_COPY.leadGuest}`} /></p>
       </header>
       <BusinessSoundStudio playlists={playlists} plan={plan} initialLimit={guestCoffeeLimitState(used)} />
-      {memberTools ? <BusinessMemberOnly>{memberTools}</BusinessMemberOnly> : null}
     </div>
   );
 }

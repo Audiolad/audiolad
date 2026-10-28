@@ -7,8 +7,9 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
-import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
+import GuestCoffeeGiftCta from "@/components/business-app/sound/GuestCoffeeGiftCta";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
+import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
 import { BUSINESS_CONNECT_HREF, resolveBusinessAccess } from "@/lib/business-app/access";
 import {
@@ -25,11 +26,12 @@ import {
   type GuestCoffeePlaylist,
   type GuestCoffeeProfile,
 } from "@/lib/business-app/guest-coffee/catalog";
+import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
+import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import {
   GUEST_COFFEE_ATLAS_URL,
   GUEST_COFFEE_ATMOSPHERE_COPY,
   GUEST_COFFEE_COPY,
-  GUEST_COFFEE_RIGHTS_URL,
 } from "@/lib/business-app/guest-coffee/copy";
 import {
   GUEST_COFFEE_REPORT_INTERVAL_MS,
@@ -137,6 +139,10 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   /** Assembling in progress: the step shown (0-based) and the steps' texts. */
   const [assembling, setAssembling] = useState<{ step: number; steps: string[] } | null>(null);
   const [view, setView] = useState<View>({ status: "idle", current: null, message: null, index: -1 });
+  const [barDismissed, setBarDismissed] = useState(false);
+  const [failedCover, setFailedCover] = useState<string | null>(null);
+  const [volume, setVolume] = useState(1);
+  const [clock, setClock] = useState({ current: 0, duration: 0 });
   const [limit, setLimit] = useState<GuestCoffeeLimitState>(initialLimit);
 
   useEffect(() => {
@@ -218,7 +224,13 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
       [],
     );
     ctlRef.current = ctl;
-    const onTime = () => meter.sample(audio.currentTime, !audio.paused && !audio.ended);
+    const onTime = () => {
+      meter.sample(audio.currentTime, !audio.paused && !audio.ended);
+      setClock({
+        current: audio.currentTime,
+        duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0,
+      });
+    };
     const onBreak = () => meter.reanchor();
     const onEnded = () => {
       meter.reanchor();
@@ -310,6 +322,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const playAtmosphere = async (fromIndex?: number) => {
     const ctl = ctlRef.current;
     if (!ctl || !atmosphere) return;
+    setBarDismissed(false);
     const loaded = ctl.items.length === atmosphere.tracks.length && ctl.items.every((it, i) => it.audioItemId === atmosphere.tracks[i].audioItemId);
     if (!loaded) await ctl.applyManifest(toItems(atmosphere));
     if (fromIndex === undefined) {
@@ -353,6 +366,45 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
   const C = GUEST_COFFEE_ATMOSPHERE_COPY;
   const assembleLabel = isAssembling ? C.assembling : atmosphere === null ? C.assemble : dirty ? C.reassemble : C.assembled;
   const playingAtmosphere = atmosphere !== null && isPlaying;
+  const guestTrack = atmosphere?.tracks.find((track) => track.audioItemId === view.current?.audioItemId) ?? null;
+  const guestAlbum = guestTrack ? playlists.find((playlist) => playlist.id === guestTrack.playlistId) : null;
+  const guestCoverRaw = guestAlbum
+    ? cabinetAlbumCoverUrl({ coverUrl: guestAlbum.coverUrl, coverImage: guestAlbum.coverImage, updatedAt: guestAlbum.updatedAt })
+    : null;
+  const guestCover = guestCoverRaw && failedCover !== guestCoverRaw ? guestCoverRaw : null;
+  const guestAuthor = guestTrack?.authorName?.trim() || "";
+  const guestBarTitle = guestTrack
+    ? (guestAuthor ? `${guestTrack.title} – ${guestAuthor}` : guestTrack.title)
+    : (view.current?.title ?? "Музыка");
+  const guestDuration = clock.duration > 0 ? clock.duration : (guestTrack?.durationSeconds ?? 0);
+  const showGuestBar = Boolean(atmosphere && view.current && !barDismissed && status !== "idle");
+
+  const setGuestVolume = (value: number) => {
+    setVolume(value);
+    const audio = audioRef.current;
+    if (audio) audio.volume = value;
+  };
+
+  const seekGuest = (ratio: number) => {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    audio.currentTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
+  };
+
+  const dismissGuestBar = async () => {
+    const ctl = ctlRef.current;
+    const audio = audioRef.current;
+    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
+      await ctl.toggle();
+    }
+    audio?.pause();
+    if (audio) {
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    setBarDismissed(true);
+    setClock({ current: 0, duration: 0 });
+  };
 
   const assembleButton = (
     <div className="business-atmosphere-action">
@@ -533,10 +585,6 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               </article>
             )}
           </div>
-          <p className="business-app-muted text-sm">{GUEST_COFFEE_COPY.shelfSource}</p>
-          <p className="business-app-muted text-sm">
-            {GUEST_COFFEE_COPY.evaluationOnly} <a className="underline" href={GUEST_COFFEE_RIGHTS_URL}>Как устроены права на музыку</a>
-          </p>
           {guest ? (
             <p className="text-sm">
               <a className="underline" href={GUEST_COFFEE_ATLAS_URL} data-testid="biz-back-to-atlas">
@@ -545,31 +593,49 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
           ) : null}
         </section>
       </div>
+      {atmosphere ? (
+        <p className="business-app-muted text-sm" data-testid="biz-atmosphere-label">Ваша атмосфера: {atmosphere.name}</p>
+      ) : null}
+      <GuestCoffeeGiftCta />
 
-      <section className="business-app-card business-sound-player" aria-label="Плеер АудиоЛад Бизнес" data-testid="biz-player" data-status={status} aria-live="polite">
-        {atmosphere && view.current ? (
-          <>
-            <p className="business-sound-player__list business-app-muted text-sm">{C.eyebrow}: {atmosphere.name}</p>
-            <BusinessPlayerControls
-              testIdPrefix="biz-player"
-              playing={status === "playing"}
-              loading={status === "loading"}
-              nowTitle={view.current.title}
-              onToggle={() => void ctlRef.current?.toggle()}
-              onNext={() => void ctlRef.current?.next()}
-              startDisabled={!canStart}
-              nextDisabled={!canStart}
-            />
-          </>
-        ) : (
-          <p className="business-app-muted">{atmosphere ? C.playerReady : C.playerIdle}</p>
-        )}
-        {playerMessage ? (
-          <p className="business-app-alert mt-2" data-tone="warn" role="alert">
-            {playerMessage}
-          </p>
-        ) : null}
-      </section>
+      {showGuestBar ? (
+        <BusinessCabinetMiniBar
+          title={guestBarTitle}
+          coverSrc={guestCover}
+          onCoverError={() => {
+            if (guestCover) setFailedCover(guestCover);
+          }}
+          playing={status === "playing"}
+          loading={status === "loading"}
+          onToggle={() => {
+            setBarDismissed(false);
+            void ctlRef.current?.toggle();
+          }}
+          onNext={() => {
+            setBarDismissed(false);
+            void ctlRef.current?.next();
+          }}
+          onClose={() => void dismissGuestBar()}
+          onOpen={() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          onSeek={seekGuest}
+          currentTime={clock.current}
+          duration={guestDuration}
+          timeLabel={`${formatPlaybackClock(clock.current)} / ${formatPlaybackClock(guestDuration)}`}
+          volume={volume}
+          onVolume={setGuestVolume}
+          message={playerMessage}
+          testId="biz-player"
+          progressTestId="biz-player-progress"
+          openTestId="biz-player-open"
+          closeTestId="biz-player-close"
+          controlsPrefix="biz-player"
+          ariaLabel="Плеер АудиоЛад Бизнес"
+        />
+      ) : (
+        <p className="business-app-muted text-sm" data-testid="biz-player" data-status={status}>
+          {atmosphere ? C.playerReady : C.playerIdle}
+        </p>
+      )}
 
       <audio ref={audioRef} preload="none" playsInline />
     </div>

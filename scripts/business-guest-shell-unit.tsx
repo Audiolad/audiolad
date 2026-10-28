@@ -194,7 +194,17 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   has(html, /Здесь появится ваша атмосфера/);
   hasNot(html, /data-testid="biz-atmosphere"[ >]/, "no playlist before the button is pressed");
   hasNot(html, /data-testid="biz-sound-listen"/, "no per-album live list any more");
-  has(html, /Это не каталог эфира/, "free albums are not presented as the B2B catalogue");
+  hasNot(html, /Это не каталог эфира|Гостевой режим – для оценки звучания|Как устроены права на музыку/, `${name}: guest disclaimer removed`);
+  if (name === "guest") {
+    has(html, /data-testid="biz-guest-gift-cta"/, "guest gift button");
+    has(html, /Получить 30 дней в подарок/);
+    has(html, /Со всеми функциями\. Далее /);
+    has(html, /799/);
+    has(html, /без привязки карты/);
+    has(html, /href="https:\/\/audiolad\.ru\/auth\/sign-up\?next=/);
+  } else {
+    hasNot(html, /data-testid="biz-guest-gift"/, "members do not see the guest gift");
+  }
   hasNot(html, /<dialog/);
   has(html, new RegExp(`data-access="${name === "guest" ? "guest" : "member"}"`));
 }

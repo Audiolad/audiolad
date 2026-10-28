@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
+import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { getCabinetDeviceSecret, postCabinetReport } from "@/lib/business-app/cabinet-player-client";
@@ -131,7 +131,6 @@ export function BusinessCabinetPlayerProvider({
   const seekRef = useRef(initialPlayback.positionSec);
   const lastPostRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const barRef = useRef<HTMLElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
@@ -474,7 +473,6 @@ export function BusinessCabinetPlayerProvider({
   const author = track?.authorName?.trim() || "";
   const nowTitle = track ? (author ? `${track.title} – ${author}` : track.title) : null;
   const duration = view.duration > 0 ? view.duration : (track?.durationSeconds ?? 0);
-  const ratio = duration > 0 ? Math.min(1, Math.max(0, view.currentTime / duration)) : 0;
   const playing = view.status === "playing" || view.status === "loading";
 
   const api: CabinetPlayerApi = {
@@ -492,85 +490,41 @@ export function BusinessCabinetPlayerProvider({
     setQueueOrder,
   };
 
-  useLayoutEffect(() => {
-    const bar = barRef.current;
-    const shell = bar?.closest(".business-app-shell");
-    if (!open || !bar || !(shell instanceof HTMLElement)) return;
-    const apply = () => {
-      shell.style.setProperty("--biz-cabinet-player-height", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
-    };
-    apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(bar);
-    return () => {
-      observer.disconnect();
-      shell.style.removeProperty("--biz-cabinet-player-height");
-    };
-  }, [open, barDismissed, nowTitle, view.message, saveNote, playing, view.status]);
-
   const coverSrc = track ? cabinetAlbumCoverUrl({ coverUrl: track.coverUrl }) : null;
 
   return (
     <CabinetContext.Provider value={api}>
       {children}
       {open && !barDismissed ? (
-        <section ref={barRef} className="business-cabinet-player" aria-label="Плеер кабинета" data-testid="biz-workspace-player">
-          <div
-            className="business-cabinet-player__bar"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={Math.max(1, Math.round(duration))}
-            aria-valuenow={Math.round(view.currentTime)}
-            aria-label="Прогресс трека"
-            data-testid="biz-workspace-progress"
-            onClick={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              if (rect.width <= 0) return;
-              seek((event.clientX - rect.left) / rect.width);
-            }}
-          >
-            <span style={{ width: `${ratio * 100}%` }} />
-          </div>
-          <button type="button" className="business-cabinet-player__open business-app-focus-ring" data-testid="biz-workspace-player-open" onClick={revealNowPlaying}>
-            <span className="business-cabinet-player__cover" data-has-image={coverSrc && failedCover !== coverSrc ? "true" : "false"}>
-              {coverSrc && failedCover !== coverSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element -- public catalog cover, same as the queue rows
-                <img src={coverSrc} alt="" width={40} height={40} onError={() => setFailedCover(coverSrc)} />
-              ) : null}
-            </span>
-            <span className="business-cabinet-player__title">{nowTitle ?? "Музыка"}</span>
-          </button>
-          <p className="business-cabinet-player__time" data-testid="biz-workspace-time">
-            {formatPlaybackClock(view.currentTime)} / {formatPlaybackClock(duration)}
-          </p>
-          <BusinessPlayerControls
-            testIdPrefix="biz-workspace"
-            playing={view.status === "playing"}
-            loading={view.status === "loading"}
-            nowTitle={null}
-            onToggle={() => void toggle()}
-            onNext={() => void next()}
-            volume={playback.volume}
-            onVolume={setVolume}
-            appearance="round"
-            size="compact"
-          />
-          <button
-            type="button"
-            className="business-cabinet-player__close business-app-focus-ring"
-            aria-label="Закрыть плеер"
-            data-testid="biz-workspace-player-close"
-            onClick={() => void dismissBar()}
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-          {view.message ? (
-            <p className="business-app-alert business-cabinet-player__note" data-tone="warn" role="alert" data-testid="biz-workspace-player-message">
-              {musicPlayerMessage(view.message)}
-            </p>
-          ) : null}
-          {saveNote ? <p className="text-sm text-[var(--biz-text-muted)] business-cabinet-player__note" data-testid="biz-workspace-save-note">{saveNote}</p> : null}
-        </section>
+        <BusinessCabinetMiniBar
+          title={nowTitle ?? "Музыка"}
+          coverSrc={coverSrc && failedCover !== coverSrc ? coverSrc : null}
+          onCoverError={() => {
+            if (coverSrc) setFailedCover(coverSrc);
+          }}
+          playing={playing}
+          loading={view.status === "loading"}
+          onToggle={() => void toggle()}
+          onNext={() => void next()}
+          onClose={() => void dismissBar()}
+          onOpen={revealNowPlaying}
+          onSeek={seek}
+          currentTime={view.currentTime}
+          duration={duration}
+          timeLabel={`${formatPlaybackClock(view.currentTime)} / ${formatPlaybackClock(duration)}`}
+          volume={playback.volume}
+          onVolume={setVolume}
+          message={view.message ? musicPlayerMessage(view.message) : null}
+          messageTestId="biz-workspace-player-message"
+          note={saveNote}
+          noteTestId="biz-workspace-save-note"
+          testId="biz-workspace-player"
+          progressTestId="biz-workspace-progress"
+          openTestId="biz-workspace-player-open"
+          closeTestId="biz-workspace-player-close"
+          controlsPrefix="biz-workspace"
+          ariaLabel="Плеер кабинета"
+        />
       ) : null}
       {open ? <audio ref={audioRef} preload="none" playsInline data-testid="biz-workspace-audio" /> : null}
     </CabinetContext.Provider>
