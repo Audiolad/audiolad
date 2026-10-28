@@ -214,6 +214,7 @@ assert.equal(guestCoffeeTrackClock(0), null);
 // ---------------------------------------------------------------- UI contract: an explicit step, no silent changes
 {
   const studio = read("src/components/business-app/sound/BusinessSoundStudio.tsx");
+  const assembling = read("src/components/business-app/sound/AtmosphereAssembling.tsx");
   const settings = read("src/components/business-app/sound/BusinessSoundSettings.tsx");
   const copy = read("src/lib/business-app/guest-coffee/copy.ts");
   assert.equal(GUEST_COFFEE_ATMOSPHERE_COPY.assemble, "Собрать атмосферу");
@@ -227,8 +228,9 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.match(studio, /const dirty = atmosphere !== null && atmosphere\.key !== currentKey/);
   assert.match(studio, /data-testid="biz-atmosphere-dirty"/, "changed settings prompt re-assembling");
   assert.match(studio, /data-testid="biz-atmosphere-stale"/, "the stale playlist says so itself");
-  assert.match(studio, /data-testid="biz-atmosphere-assembling"/, "visible assembling moment");
-  assert.match(studio, /prefers-reduced-motion/);
+  assert.match(studio, /<AtmosphereAssembling/, "the guest funnel renders the shared assembling card");
+  assert.match(assembling, /data-testid="biz-atmosphere-assembling"/, "visible assembling moment");
+  assert.match(assembling, /prefers-reduced-motion/);
   assert.match(studio, /data-testid="biz-atmosphere-play"/);
   // Blocked starts are disabled; only pausing the playing track stays possible (review asm1).
   assert.match(studio, /disabled=\{!\(current && isPlaying\) && !canStart\}/);
@@ -244,7 +246,7 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.doesNotMatch(studio, /checkout|payment|\/api\/payments/i);
   assert.match(settings, /\{action\}/, "the button sits in the settings card");
   assert.doesNotMatch(settings, /обновляются сразу/, "the old live-update promise is gone");
-  for (const [file, code] of [["studio", studio], ["settings", settings], ["copy", copy], ["atmosphere", read("src/lib/business-app/guest-coffee/atmosphere.ts")]] as const) {
+  for (const [file, code] of [["studio", studio], ["assembling", assembling], ["settings", settings], ["copy", copy], ["atmosphere", read("src/lib/business-app/guest-coffee/atmosphere.ts")]] as const) {
     const visible = code.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
     assert.doesNotMatch(visible, /—/, `${file}: en dashes only`);
   }

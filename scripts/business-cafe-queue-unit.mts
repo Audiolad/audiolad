@@ -211,6 +211,46 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
     "the same album does not play twice in a row",
   );
 
+  const jazzTrack = track("jazz-track", "album-jazz");
+  const calmTrack = track("calm-track", "album-calm");
+  const directionRows = {
+    "jazz-track": signals({
+      energy: 62,
+      sound: sound({ genres: ["jazz"], instruments: ["saxophone"] }),
+    }),
+    "calm-track": signals({
+      energy: 62,
+      sound: sound({ genres: ["ambient"], moods: ["calm", "relaxing"] }),
+    }),
+  };
+  assert.deepEqual(
+    order([calmTrack, jazzTrack], directionRows, { ...base, direction: "jazz" }),
+    ["jazz-track", "calm-track"],
+    "sound type jazz ranks the jazz passport first",
+  );
+  assert.deepEqual(
+    order([calmTrack, jazzTrack], directionRows, { ...base, direction: "calm" }),
+    ["calm-track", "jazz-track"],
+    "sound type calm ranks the calm passport first",
+  );
+  const cozyTrack = track("cozy-track", "album-cozy");
+  const cityTrack = track("city-track", "album-city");
+  const characterRows = {
+    "cozy-track": signals({
+      energy: 62,
+      sound: sound({ moods: ["happy", "warm", "tender"], instruments: ["acoustic guitar", "harp"] }),
+    }),
+    "city-track": signals({
+      energy: 62,
+      sound: sound({ moods: ["happy", "upbeat"], genres: ["electronic"] }),
+    }),
+  };
+  const cozyOrder = order([cityTrack, cozyTrack], characterRows, { ...base, character: "cozy", direction: "jazz" });
+  const cityOrder = order([cityTrack, cozyTrack], characterRows, { ...base, character: "city", direction: "jazz" });
+  assert.notDeepEqual(cozyOrder, cityOrder, "venue character changes which passport comes first");
+  assert.equal(cozyOrder[0], "cozy-track", "a cozy room leads with the warm passport");
+  assert.equal(cityOrder[0], "city-track", "a city room leads with the upbeat passport");
+
   const only = [sameA];
   assert.deepEqual(
     order(only, { a1: signals({ energy: 10 }), outside: signals({ energy: 62 }) }),

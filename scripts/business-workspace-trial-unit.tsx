@@ -706,7 +706,20 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(settings, /value="16:00"/);
   assert.match(settings, /value="20:00"/);
   assert.match(settings, /Вне трёх интервалов остаётся вечер/);
+  assert.match(settings, /data-testid="biz-create-atmosphere"/);
+  assert.match(settings, /Создать атмосферу/);
+  assert.doesNotMatch(settings, /Атмосфера создана/);
   assert.doesNotMatch(settings, /—/);
+  const settingsSource = read("src/components/business-app/BusinessPlayerSettings.tsx");
+  assert.match(settingsSource, /AtmosphereAssembling/);
+  assert.match(settingsSource, /rebuildFromProfile/);
+  assert.match(settingsSource, /Атмосфера создана/);
+  assert.match(settingsSource, /Перейти в плеер/);
+  assert.match(playerSource, /rebuildFromProfile/);
+  assert.match(playerSource, /playingNow/);
+  assert.match(playerSource, /playIndex\(start\)/);
+  assert.match(playerSource, /boundaryAudioItemId/);
+  assert.doesNotMatch(settingsSource, /—/);
 }
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({ status: "offer", daysLeft: 0, tracks: [] })} />);
@@ -969,6 +982,23 @@ assert.doesNotMatch(rules, /—/);
   })} />);
   assert.match(groupedHtml, /data-testid="biz-now-playing"/);
   assert.match(groupedHtml, /Сейчас играет/);
+  assert.match(groupedHtml, /data-testid="biz-now-cover"/);
+  assert.match(groupedHtml, /business-now__cover" data-has-image="false"/);
+  const nowCss = read("src/components/business-app/business-app.css");
+  assert.match(nowCss, /\.business-now__title \{[^}]*font-size: 1\.3rem/);
+  assert.match(nowCss, /-webkit-line-clamp: 2/);
+  assert.match(nowCss, /min-width: 900px\) \{\s*\.business-now__cover \{[^}]*width: 120px/);
+  assert.match(nowCss, /\.business-now__title \{\s*font-size: 1\.6rem/);
+  const covered = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks: [{ audioItemId: TRACK, title: "Тёплый вечер в Неаполе у моря и длинное название", durationSeconds: 180, authorId: null, authorName: "Кофейник", albumTitle: "Джаз", shelf: "cafe", coverUrl: "https://audiolad.ru/storage/v1/object/public/practice-covers/jazz/xs.webp" }],
+  })} />);
+  assert.match(covered, /business-now__cover" data-has-image="true" data-testid="biz-now-cover"/);
+  assert.match(covered, /practice-covers\/jazz\/xs\.webp/);
+  const denied = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks: [{ audioItemId: TRACK, title: "Без обложки", durationSeconds: 90, authorId: null, authorName: null, albumTitle: null, shelf: "cafe", coverUrl: "https://example.supabase.co/storage/v1/object/sign/practice-audio/track.mp3?token=secret" }],
+  })} />);
+  const nowCover = denied.slice(denied.indexOf('data-testid="biz-now-cover"'), denied.indexOf('data-testid="biz-now-progress"'));
+  assert.doesNotMatch(nowCover, /<img/);
   assert.match(groupedHtml, /Джаз Релакс/);
   assert.match(groupedHtml, /Мягкий джаз/);
   assert.match(groupedHtml, /data-testid="biz-now-queue"/);

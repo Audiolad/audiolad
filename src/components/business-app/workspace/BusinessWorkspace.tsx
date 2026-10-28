@@ -12,6 +12,7 @@ import {
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
+import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, CAFE_QUEUE_PREVIEW, ruTrackWord } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import CafeQueueControls, { CafeTrackFeedback } from "@/components/business-app/workspace/CafeQueueControls";
@@ -52,6 +53,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const currentIndex = player.view.index;
   const queue = useCafeQueuePreferences();
   const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
+  const [failedNowCover, setFailedNowCover] = useState<string | null>(null);
   const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
   const open = workspacePlayerOpen(model);
   const reportChromeAccess = useReportBusinessChromeAccess();
@@ -158,6 +160,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const current = model.tracks[currentIndex] ?? model.tracks[0] ?? null;
   const author = current?.authorName?.trim() ?? "";
   const album = current?.albumTitle?.trim() ?? "";
+  const nowCover = current ? cabinetAlbumCoverUrl({ coverUrl: current.coverUrl }) : null;
   const duration = player.view.duration > 0 ? player.view.duration : (current?.durationSeconds ?? 0);
   const ratio = duration > 0 ? Math.min(1, Math.max(0, player.view.currentTime / duration)) : 0;
   const playOrder = player.queueOrder ?? model.tracks.map((_, index) => index);
@@ -246,9 +249,19 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         <>
           <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
             <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
-            <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
-            {author ? <p className="business-now__byline" data-testid="biz-now-author">{author}</p> : null}
-            {album ? <p className="business-now__byline" data-testid="biz-now-album">{album}</p> : null}
+            <div className="business-now__head">
+              <span className="business-now__cover" data-has-image={nowCover && failedNowCover !== nowCover ? "true" : "false"} data-testid="biz-now-cover">
+                {nowCover && failedNowCover !== nowCover ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- public catalog cover, same file as the bottom bar
+                  <img src={nowCover} alt="" width={80} height={80} onError={() => setFailedNowCover(nowCover)} />
+                ) : null}
+              </span>
+              <div className="business-now__meta">
+                <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
+                {author ? <p className="business-now__byline" data-testid="biz-now-author">{author}</p> : null}
+                {album ? <p className="business-now__byline" data-testid="biz-now-album">{album}</p> : null}
+              </div>
+            </div>
             <div
               className="business-now__bar"
               role="progressbar"

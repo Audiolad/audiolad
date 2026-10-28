@@ -719,19 +719,66 @@
   white-space: nowrap;
 }
 
+.business-now__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+  min-width: 0;
+}
+
+.business-now__cover {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--biz-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--biz-cover);
+}
+
+.business-now__cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.business-now__meta {
+  min-width: 0;
+  flex: 1;
+}
+
 .business-now__title {
-  margin: 0.35rem 0 0;
+  margin: 0;
   font-family: var(--biz-font-display);
-  font-size: 1.7rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--biz-text);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .business-now__byline {
-  margin: 0;
-  font-size: 1.05rem;
+  margin: 0.15rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
   color: var(--biz-text-muted);
+}
+
+@media (min-width: 900px) {
+  .business-now__cover {
+    width: 120px;
+    height: 120px;
+  }
+
+  .business-now__title {
+    font-size: 1.6rem;
+  }
 }
 
 .business-now__bar {
