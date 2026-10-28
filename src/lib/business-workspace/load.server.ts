@@ -1,11 +1,7 @@
 import "server-only";
 
 import { activateBusinessTrial, recordAccessActivity } from "@/lib/access-grants/apply";
-import {
-  BUSINESS_GIFT_TITLE,
-  BUSINESS_STORE_UNAVAILABLE_NOTE,
-  businessGiftRulesText,
-} from "@/lib/access-grants/copy";
+import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import {
   BUSINESS_TRIAL_SIGN_IN_HREF,
   BUSINESS_TRIAL_SIGN_UP_HREF,
@@ -60,7 +56,6 @@ function baseModel(spaceId: BusinessSpaceId, spaceTitle: string, spaceEnabled: b
     playbackUntil: null,
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
-    rules: businessGiftRulesText(),
     tracks: [],
     needsVenue: false,
     playback: null,
@@ -504,7 +499,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
   try {
     store = createSupabaseAccessGrantStore();
   } catch {
-    return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+    return { ...model, status: "unavailable" };
   }
 
   try {
@@ -526,7 +521,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
         spaceEnabled: space.enabled,
       });
       if (catalog.unavailable) {
-        return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+        return { ...model, status: "unavailable" };
       }
       tracks = catalog.tracks;
     }
@@ -550,7 +545,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
         : null,
     };
   } catch {
-    return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+    return { ...model, status: "unavailable" };
   }
 }
 

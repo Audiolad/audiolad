@@ -21,7 +21,7 @@ import BusinessWorkspace from "../src/components/business-app/workspace/Business
 import { musicPlayerMessage } from "../src/components/business-app/workspace/BusinessCabinetPlayer";
 import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
-import { businessGiftRulesText } from "../src/lib/access-grants/copy";
+import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, businessGiftPriceNote } from "../src/lib/access-grants/copy";
 import { hashAccessEmail } from "../src/lib/access-grants/email-hash";
 import { createMemoryAccessGrantStore } from "../src/lib/access-grants/memory-store";
 import {
@@ -605,7 +605,6 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
     playbackUntil: addGiftPeriod(start).toISOString(),
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
-    rules: businessGiftRulesText(),
     tracks: [{ audioItemId: TRACK, title: "Утро", durationSeconds: 180, authorId: null, authorName: null, albumTitle: null, shelf: "cafe" }],
     needsVenue: false,
     playback: { index: 0, positionSec: 0, volume: 0.8, updatedAt: start.toISOString() },
@@ -832,11 +831,18 @@ for (const file of [
   assert.doesNotMatch(visible, /—/, `${file}: en dash only`);
 }
 
-const rules = businessGiftRulesText();
-assert.match(rules, /30 дней в подарок/);
-assert.match(rules, /не становится безлимитной/);
-assert.match(rules, /10800|3 часов|300 МБ|5 дорожек/);
-assert.doesNotMatch(rules, /—/);
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
+assert.match(BUSINESS_GIFT_CLOSING_NOTE, /После срока плеер закрыт до оплаты\./);
+assert.match(businessGiftPriceNote(), /за 30 дней, картой или по СБП\. Автосписания нет\./);
+const giftCopy = read("src/lib/access-grants/copy.ts");
+assert.doesNotMatch(giftCopy, /не становится безлимитной|Пределы Студии|Гостевой проект Студии|один раз на подтверждённый адрес|businessGiftRulesText/);
+assert.doesNotMatch(read("src/lib/business-workspace/model.ts"), /rules: string/);
+assert.doesNotMatch(loader, /businessGiftRulesText|rules:/);
+const pending = read("src/app/(platform)/auth/business-return/page.tsx");
+assert.match(pending, /BUSINESS_GIFT_CLOSING_NOTE/);
+assert.match(pending, /BUSINESS_GIFT_LICENSE_NOTE/);
+assert.match(pending, /businessGiftPriceNote\(\)/);
+assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|безлимит|Гостевой проект/);
 
 // ---------------------------------------------------------------- cafe cabinet: curated authors, rights gate, venue link
 {
