@@ -11,6 +11,8 @@ import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAcce
 import { BusinessRenewalController } from "@/components/business-app/BusinessRenewalPrompt";
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
+import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
+import { BusinessEntryProvider, BusinessPointModeProvider } from "@/components/business-app/BusinessPointMode";
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -46,7 +48,11 @@ export default function BusinessAppShell({
   return (
     <BusinessChromeAccessProvider value={customerAccess}>
       <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
-        <BusinessShellFrame pointReports={pointReports}>{children}</BusinessShellFrame>
+        <BusinessPointModeProvider value={pointReports}>
+          <BusinessEntryProvider>
+            <BusinessShellFrame pointReports={pointReports}>{children}</BusinessShellFrame>
+          </BusinessEntryProvider>
+        </BusinessPointModeProvider>
       </BusinessGuestStatusProvider>
     </BusinessChromeAccessProvider>
   );
@@ -71,6 +77,7 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
         <div className="business-app-main">
           <header className="business-app-topbar">
             <BusinessBrandLockup testId="biz-brand-topbar" />
+            <BusinessEntrySwitcher />
           </header>
           {showGuestBar ? <BusinessGuestStatusBar /> : null}
           {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}

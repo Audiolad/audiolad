@@ -20,7 +20,7 @@ assert.equal(
   extractBusinessFirstName({ email: "owner@example.com" }),
   "owner",
 );
-assert.equal(extractBusinessFirstName({}), "владелец");
+assert.equal(extractBusinessFirstName({}), "");
 
 const home = readFileSync(
   join(repoRoot, "src/components/business-app/BusinessHomePage.tsx"),
