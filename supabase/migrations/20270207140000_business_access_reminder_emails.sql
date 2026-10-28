@@ -116,6 +116,7 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+#variable_conflict use_column
 DECLARE
   v_limit integer := GREATEST(1, LEAST(COALESCE(p_limit, 25), 100));
   v_lease_seconds integer := GREATEST(30, LEAST(COALESCE(p_lease_seconds, 300), 900));

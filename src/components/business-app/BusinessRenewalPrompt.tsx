@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   BUSINESS_RENEWAL_CONFIRM_CANCEL,
@@ -120,6 +120,15 @@ async function saveRenewalChoice(answer: BusinessRenewalAnswer, note?: string): 
   return response.ok;
 }
 
+function subscribeRenewalHash(onStoreChange: () => void) {
+  window.addEventListener("hashchange", onStoreChange);
+  return () => window.removeEventListener("hashchange", onStoreChange);
+}
+
+function readRenewalHash(): BusinessRenewalAnswer | null {
+  return parseRenewalChoiceHash(window.location.hash);
+}
+
 export function BusinessRenewalController({
   surface,
   initialAnswer = null,
@@ -129,33 +138,46 @@ export function BusinessRenewalController({
   initialAnswer?: BusinessRenewalAnswer | null;
   onAnswer?: (answer: BusinessRenewalAnswer) => void;
 }) {
-  const [phase, setPhase] = useState<BusinessRenewalPhase>(initialAnswer === "no" ? "thanks" : "ask");
-  const onAnswerRef = useRef(onAnswer);
-  onAnswerRef.current = onAnswer;
+  const hashChoice = useSyncExternalStore(subscribeRenewalHash, readRenewalHash, () => null);
+  const [saved, setSaved] = useState<BusinessRenewalAnswer | null>(initialAnswer);
+  const [confirmDismissed, setConfirmDismissed] = useState(false);
+  const [wantsConfirm, setWantsConfirm] = useState(false);
+  const posted = useRef(false);
 
   useEffect(() => {
-    const fromHash = parseRenewalChoiceHash(window.location.hash);
-    if (!fromHash) return;
-    if (fromHash === "no" && surface === "device") {
-      setPhase("confirm");
-      return;
-    }
-    void saveRenewalChoice(fromHash).then((ok) => {
-      if (!ok) return;
-      onAnswerRef.current?.(fromHash);
-      setPhase(fromHash === "no" ? "thanks" : "ask");
+    if (!hashChoice || posted.current) return;
+    if (hashChoice === "no" && surface === "device") return;
+    posted.current = true;
+    const choice = hashChoice;
+    void saveRenewalChoice(choice).then((ok) => {
+      if (!ok) {
+        posted.current = false;
+        return;
+      }
+      onAnswer?.(choice);
+      setSaved(choice);
     });
-  }, [surface]);
+  }, [hashChoice, onAnswer, surface]);
+
+  const phase: BusinessRenewalPhase =
+    saved === "no"
+      ? "thanks"
+      : surface === "device" && !confirmDismissed && (wantsConfirm || hashChoice === "no")
+        ? "confirm"
+        : "ask";
 
   if (phase === "confirm") {
     return (
       <BusinessRenewalConfirm
-        onCancel={() => setPhase("ask")}
+        onCancel={() => {
+          setWantsConfirm(false);
+          setConfirmDismissed(true);
+        }}
         onYes={() => {
           void saveRenewalChoice("no").then((ok) => {
             if (!ok) return;
             onAnswer?.("no");
-            setPhase("thanks");
+            setSaved("no");
           });
         }}
       />
@@ -181,13 +203,13 @@ export function BusinessRenewalController({
       }}
       onNo={() => {
         if (surface === "device") {
-          setPhase("confirm");
+          setWantsConfirm(true);
           return;
         }
         void saveRenewalChoice("no").then((ok) => {
           if (!ok) return;
           onAnswer?.("no");
-          setPhase("thanks");
+          setSaved("no");
         });
       }}
     />
