@@ -16,7 +16,12 @@ import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 import { isVenueLicencePublicEnabled, VENUE_LICENCE_PUBLIC_KEY } from "../src/lib/business-app/venue-licence/flag";
 import { formatVenueAddress, formatVenueName, presentVenueLicence } from "../src/lib/business-app/venue-licence/present";
 import { QR_MATRIX_SIZE, qrMatrix } from "../src/lib/business-app/venue-licence/qr";
-import { sampleVenueLicence, VENUE_LICENCE_SAMPLE_IDS } from "../src/lib/business-app/venue-licence/samples";
+import {
+  sampleVenueLicence,
+  VENUE_LICENCE_SAMPLE_EMAIL_HASH,
+  VENUE_LICENCE_SAMPLE_IDS,
+  VENUE_LICENCE_SAMPLE_USER_ID,
+} from "../src/lib/business-app/venue-licence/samples";
 import { renderVenueStickerSvg, STICKER_BRAND, STICKER_HEADLINE, STICKER_SCOPE, stickerPageSizeMm } from "../src/lib/business-app/venue-licence/sticker";
 import { venueLicencePublicUrl } from "../src/lib/business-app/host";
 
@@ -36,16 +41,30 @@ assert.equal(
 );
 assert.equal(formatVenueAddress({ locationName: "Зал" }), null);
 
-const secret = "0123456789abcdef".repeat(4);
-const userId = "00000000-0000-4000-8000-000000000099";
+// The fixture grants really carry these values, so the leak check below can fail.
+const secret = VENUE_LICENCE_SAMPLE_EMAIL_HASH;
+const userId = VENUE_LICENCE_SAMPLE_USER_ID;
+assert.match(userId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+assert.match(secret, /^[0-9a-f]{64}$/);
+
+function leaks(view: unknown): string[] {
+  const raw = JSON.stringify(view);
+  const found: string[] = [];
+  if (raw.includes(secret)) found.push("email hash");
+  if (raw.includes(userId)) found.push("user id");
+  if (raw.includes("@")) found.push("email");
+  return found;
+}
+
+// The check itself must catch a leak of the fixture identity.
+assert.deepEqual(leaks({ owner: userId }), ["user id"]);
+assert.deepEqual(leaks({ hash: secret }), ["email hash"]);
+assert.deepEqual(leaks({ email: "owner@example.invalid" }), ["email"]);
 
 function viewOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
   const view = sampleVenueLicence(VENUE_LICENCE_SAMPLE_IDS[id]);
   assert.ok(view, id);
-  const raw = JSON.stringify(view);
-  assert.equal(raw.includes(secret), false, `${id} must not carry the email hash`);
-  assert.equal(raw.includes(userId), false, `${id} must not carry a user id`);
-  assert.equal(raw.includes("@"), false, `${id} must not carry an email`);
+  assert.deepEqual(leaks(view), [], `${id} must not carry the owner email, its hash or the user id`);
   return view;
 }
 
@@ -90,8 +109,9 @@ assert.equal(manual.status, "not_started");
 
 function htmlOf(id: keyof typeof VENUE_LICENCE_SAMPLE_IDS) {
   const html = renderToStaticMarkup(<VenueLicencePage view={viewOf(id)} />);
-  assert.equal(html.includes("—"), false, `${id} contains an em dash`);
-  assert.equal(html.includes(secret), false, id);
+  assert.equal(html.includes("\u2014"), false, `${id} contains an em dash`);
+  assert.equal(html.includes(secret), false, `${id} renders the email hash`);
+  assert.equal(html.includes(userId), false, `${id} renders the user id`);
   const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
   for (const href of hrefs) {
     assert.ok(
@@ -153,7 +173,7 @@ for (const svg of [square, tent]) {
   assert.ok(text.includes(STICKER_HEADLINE), "headline");
   assert.ok(text.includes(STICKER_SCOPE), "scope");
   assert.ok(text.includes(STICKER_BRAND), "brand");
-  assert.equal(svg.includes("—"), false);
+  assert.equal(svg.includes("\u2014"), false);
   assert.equal(svg.includes(url), false, "the URL is inside the QR, not printed");
   assert.ok((svg.match(/<rect /g) ?? []).length > 100, "QR modules are vector rects");
   const baselines = [...svg.matchAll(/<text x="[^"]+" y="([^"]+)"/g)].map((match) => Number(match[1]));

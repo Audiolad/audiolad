@@ -15,10 +15,14 @@ const PLACE: VenuePlaceFields = {
   addressLine1: "ул. Примерная, д. 1",
 };
 
+/** Fixture owner identity. Exported so tests can check it never reaches the public view. */
+export const VENUE_LICENCE_SAMPLE_EMAIL_HASH = "0123456789abcdef".repeat(4);
+export const VENUE_LICENCE_SAMPLE_USER_ID = "00000000-0000-4000-8000-000000000001";
+
 function grant(startsAt: string, endsAt: string): GrantRow {
   return {
-    emailHash: "0123456789abcdef".repeat(4),
-    userId: "00000000-0000-4000-8000-000000000001",
+    emailHash: VENUE_LICENCE_SAMPLE_EMAIL_HASH,
+    userId: VENUE_LICENCE_SAMPLE_USER_ID,
     kind: "business_new_client",
     startsAt,
     endsAt,
