@@ -20,12 +20,12 @@ export type SoundReviewHistory = {
   reason: string | null; changed_at: string; changed_by: string | null; event: string;
 };
 
-/** Drop workspaces whose account has not accepted the Business agreement, then apply the queue filters. */
+/** Drop workspaces whose owner is not verified, then apply the queue filters. */
 export function restrictSoundQueueToAgreement(
   rows: readonly SoundReviewRow[],
   acceptedAuthorIds: ReadonlySet<string>,
   filter: { status?: string; artist?: string; album?: string; space?: string; page?: number },
-): SoundReviewQueue {
+): SoundReviewQueue & { albumTotal: number | null; artistTotal: number | null } {
   const qualified = rows.filter((row) => acceptedAuthorIds.has(row.artist_id));
   const byName = (left: { name: string; id: string }, right: { name: string; id: string }) =>
     left.name < right.name ? -1 : left.name > right.name ? 1 : left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
@@ -39,7 +39,15 @@ export function restrictSoundQueueToAgreement(
   for (const row of scoped) counts[row.status] += 1;
   const matched = filter.status ? scoped.filter((row) => row.status === filter.status) : scoped;
   const page = Math.max(0, filter.page ?? 0);
-  return { rows: matched.slice(page * 100, page * 100 + 100), total: matched.length, counts, artists, albums };
+  return {
+    rows: matched.slice(page * 100, page * 100 + 100),
+    total: matched.length,
+    counts,
+    artists,
+    albums,
+    albumTotal: filter.album ? qualified.filter((row) => row.album_id === filter.album).length : null,
+    artistTotal: filter.artist ? qualified.filter((row) => row.artist_id === filter.artist).length : null,
+  };
 }
 
 /** Stable wraparound navigation within the current filtered page. */
