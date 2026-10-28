@@ -1,0 +1,20 @@
+[Unit]
+Description=Audiolad Business access reminder worker
+Documentation=file:/var/www/audiolad/deploy/docs/BUSINESS_ACCESS_REMINDERS.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/audiolad/run-business-access-reminders.sh
+Environment=DEPLOY_ROOT=/var/www/audiolad-deploy
+Environment=LOCK_FILE=/run/audiolad-business-access-reminders.lock
+Environment=LOG_FILE=/var/log/audiolad/business-access-reminders.log
+Environment=TIMEOUT_SECONDS=90
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=120
+SyslogIdentifier=audiolad-business-access-reminders
+StandardOutput=journal
+StandardError=journal

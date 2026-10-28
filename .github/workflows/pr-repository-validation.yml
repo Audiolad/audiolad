@@ -83,6 +83,7 @@ jobs:
           npm run test:platform-analytics-p2
           npm run test:seo-core-v1
           npm run test:seo-reservation-5d-reminder
+          npm run test:business-access-reminders
           npm run test:seo-analytics-phase1
           npm run test:admin-seo-reservation-release
           npm run test:supabase-fetch-all-pages
