@@ -57,8 +57,12 @@ export type VerticalGuideArticle = {
   seoTitle: string;
   description: string;
   primaryQuery: string;
-  /** Related phrases. Frequency stays null unless a committed SEO plan supplies it. */
-  relatedQueries: Array<{ phrase: string; frequency: null; note: string }>;
+  /**
+   * Related phrases. Frequency is a Wordstat monthly count from
+   * docs/business/coffee-guides/wordstat-candidates.csv, or null when the
+   * phrase is not in that file.
+   */
+  relatedQueries: Array<{ phrase: string; frequency: number | null; note: string }>;
   hero: GuideFigure;
   story: string[];
   leadIn: string;

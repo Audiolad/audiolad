@@ -69,6 +69,13 @@ export default function GuideArticleView({ article, track }: GuideArticleViewPro
           {article.story.map((paragraph) => (
             <p key={paragraph.slice(0, 24)}>{paragraph}</p>
           ))}
+        </div>
+
+        <section className="guide-wrap guide-block" aria-labelledby="guide-cups-title">
+          <GuideFourCups question={article.question} notes={article.cups} />
+        </section>
+
+        <div className="guide-wrap guide-prose">
           <figure className="guide-figure">
             <Image
               src="/business/atlas-kofeen/cafe-tortoni-hero.webp"
@@ -82,13 +89,6 @@ export default function GuideArticleView({ article, track }: GuideArticleViewPro
             </figcaption>
           </figure>
         </div>
-
-        <section className="guide-wrap guide-block" aria-labelledby="guide-cups-title">
-          <h2 id="guide-cups-title" className="guide-display guide-h2">
-            Четыре чашки
-          </h2>
-          <GuideFourCups cups={article.cups} question={article.question} />
-        </section>
 
         <section className="guide-band" id="listen" aria-labelledby="guide-listen-title">
           <div className="guide-wrap guide-listen">

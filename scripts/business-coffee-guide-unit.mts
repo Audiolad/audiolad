@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { COFFEE_ATLAS_SHOPS } from "../src/lib/business/coffee-atlas/shops";
 import { MUZYKA_DLYA_KOFEYNI } from "../src/lib/business/vertical-guides/articles/muzyka-dlya-kofeyni";
+import { FOUR_CUPS_MAX_HREF, FOUR_CUPS_SLIDES } from "../src/lib/business/vertical-guides/four-cups";
 import {
   assertCoffeeExpertRegistry,
   COFFEE_EXPERTS,
@@ -87,11 +88,87 @@ assert.deepEqual(MUZYKA_DLYA_KOFEYNI.track, {
   authorSlug: "jazz-relax",
   productSlug: "dzhaz-launzh",
 });
-assert.equal(MUZYKA_DLYA_KOFEYNI.relatedQueries.every((item) => item.frequency === null), true);
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (inQuotes) {
+      if (char === "\"") {
+        if (line[index + 1] === "\"") {
+          current += "\"";
+          index += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === "\"") {
+      inQuotes = true;
+    } else if (char === ",") {
+      cells.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current);
+  return cells;
+}
+
+const candidateCsv = read("docs/business/coffee-guides/wordstat-candidates.csv").trim().split("\n");
+assert.equal(candidateCsv[0], "priority,theme,query,monthly_frequency");
+assert.equal(candidateCsv.length - 1, 838, "candidate rows");
+const candidateRows = candidateCsv.slice(1).map((line) => {
+  const cells = parseCsvLine(line);
+  assert.equal(cells.length, 4, line);
+  const [priority, theme, query, frequency] = cells;
+  assert.ok(priority && theme && query);
+  assert.match(priority ?? "", /^P[1-4]$/);
+  return { priority, theme, query, frequency: Number(frequency) };
+});
+const frequencyOf = (query: string) => {
+  const row = candidateRows.find((item) => item.query === query);
+  assert.ok(row, query);
+  return row.frequency;
+};
+assert.equal(frequencyOf("музыка для кофеен"), 1829);
+assert.equal(frequencyOf("музыка для кофейни"), 1729);
+assert.equal(candidateRows.filter((row) => row.priority === "P1").length, 40);
+assert.equal(candidateRows.filter((row) => row.priority === "P2").length, 519);
+assert.equal(candidateRows.filter((row) => row.priority === "P3").length, 259);
+assert.equal(candidateRows.filter((row) => row.priority === "P4").length, 20);
+assert.equal(
+  candidateRows.filter((row) => row.priority === "P1").reduce((sum, row) => sum + row.frequency, 0),
+  7273,
+);
+for (const item of MUZYKA_DLYA_KOFEYNI.relatedQueries) {
+  assert.equal(item.frequency, frequencyOf(item.phrase), item.phrase);
+}
+assert.equal(candidateRows.some((row) => row.query.toLocaleLowerCase("ru").includes("отсеяно")), false);
 
 const visible = collectArticleText(MUZYKA_DLYA_KOFEYNI).join("\n");
 assert.equal(visible.includes("\u2014"), false, "visible article text uses an en dash, not an em dash");
 assert.equal(visible.includes("http://") || visible.includes("https://"), false);
+const visibleLower = visible.toLocaleLowerCase("ru");
+for (const phrase of [
+  "музыка для кофеен",
+  "фоновая",
+  "джаз",
+  "без слов",
+  "без авторских прав",
+  "плейлист",
+  "уютн",
+  "спокойн",
+  "утр",
+  "вечер",
+  "слушать онлайн",
+  "атмосферн",
+]) {
+  assert.equal(visibleLower.includes(phrase), true, phrase);
+}
 
 const hrefs = collectArticleHrefs(MUZYKA_DLYA_KOFEYNI);
 assert.ok(hrefs.length >= 8);
@@ -151,8 +228,53 @@ for (const source of [view, cups, checklist, expertsView, track]) {
   assert.equal(source.includes("https://"), false);
   assert.equal(source.includes("http://"), false);
 }
-assert.match(cups, /role="tablist"/);
+assert.match(cups, /aria-roledescription="carousel"/);
 assert.match(cups, /Четыре чашки/);
+assert.match(cups, /Предыдущий слайд/);
+assert.match(cups, /Следующий слайд/);
+assert.match(cups, /target="_blank"/);
+assert.match(cups, /rel="noopener noreferrer"/);
+assert.match(cups, /data-four-cups-max="true"/);
+assert.match(cups, /\/ \{count\}/);
+assert.doesNotMatch(cups, /role="tablist"/);
+const slideSource = read("src/lib/business/vertical-guides/four-cups.ts");
+assert.equal(slideSource.includes("\u2014"), false);
+assert.equal(slideSource.includes("http://"), false);
+assert.equal(slideSource.split("https://").length - 1, 1);
+assert.equal(FOUR_CUPS_MAX_HREF, "https://max-potok.ru/r/gqwvf");
+assert.equal(FOUR_CUPS_SLIDES.length, 7);
+for (const slide of FOUR_CUPS_SLIDES) {
+  assert.equal(slide.alt.includes("\u2014"), false, slide.src);
+  assert.ok(slide.alt.length > 20, slide.src);
+  assert.ok(existsSync(join(root, "public", slide.src)), slide.src);
+}
+assert.ok(existsSync(join(root, "public/school/messengers/max.png")));
+const seriesPlan = read("docs/business/coffee-guides/SERIES-PLAN.md");
+assert.equal(seriesPlan.includes("\u2014"), false);
+assert.match(seriesPlan, /3 558/);
+assert.match(seriesPlan, /1 829/);
+assert.match(seriesPlan, /1 729/);
+assert.match(seriesPlan, /838/);
+for (const slug of [
+  "otkrytie-kofeyni",
+  "biznes-plan-kofeyni",
+  "oborudovanie-dlya-kofeyni",
+  "postavshchiki-dlya-kofeyni",
+  "personal-kofeyni",
+  "arenda-kofeyni",
+  "formaty-kofeyni",
+  "tovary-dlya-kofeyni",
+  "uchet-i-dokumenty-kofeyni",
+  "logotip-kofeyni",
+  "menyu-kofeyni",
+  "interer-kofeyni",
+  "nazvanie-kofeyni",
+  "marketing-kofeyni",
+  "idei-kofeyni",
+]) {
+  assert.match(seriesPlan, new RegExp(`/b/coffee/${slug}`));
+  assert.equal(getVerticalArticle("coffee", slug), null, slug);
+}
 assert.match(checklist, /localStorage/);
 assert.match(checklist, /type="checkbox"/);
 assert.match(track, /HomeProductPlayButton/);
