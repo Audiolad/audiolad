@@ -199,17 +199,17 @@ export function deriveOwnerConnectivitySignal(input: {
   isClosedNow?: boolean;
 }): OwnerConnectivitySignal {
   if (input.isClosedNow === true) {
-    return { kind: "closed", tone: "neutral", title: "Точка закрыта", detail: "Связь с плеером сейчас не требуется." };
+    return { kind: "closed", tone: "neutral", title: "Кофейня закрыта", detail: "Связь с плеером сейчас не требуется." };
   }
   const seconds = input.secondsSinceHeartbeat;
   if (!input.playerCount || !["online", "stale", "offline"].includes(input.primaryHealthStatus ?? "") ||
     seconds == null || !Number.isFinite(seconds) || seconds < 0) {
-    return { kind: "no_data", tone: "neutral", title: "Нет данных о плеере", detail: "Кабинет пока не получил сигналов от плеера этой точки." };
+    return { kind: "no_data", tone: "neutral", title: "Нет данных о плеере", detail: "Кабинет пока не получил сигналов от плеера этой кофейни." };
   }
   if (seconds <= 300) {
     return { kind: "online", tone: "ok", title: "Плеер на связи", detail: "Связь с плеером не подтверждает, что музыка звучит сейчас." };
   }
-  return { kind: "offline", tone: "neutral", title: "Нет связи с плеером", detail: "Музыка на точке может продолжать играть." };
+  return { kind: "offline", tone: "neutral", title: "Нет связи с плеером", detail: "Музыка в кофейне может продолжать играть." };
 }
 
 export type OwnerPlaybackSignalInput = {
@@ -228,11 +228,11 @@ export type OwnerPlaybackSignal = {
 /** Periodic sound confirmation, independent of heartbeats, PoP and track length. */
 export function deriveOwnerPlaybackSignal(input: OwnerPlaybackSignalInput): OwnerPlaybackSignal {
   if (input.errorConfirmed === true) {
-    return { kind: "error", tone: "error", title: "Сбой воспроизведения подтверждён", detail: "Откройте плеер точки или обратитесь в поддержку." };
+    return { kind: "error", tone: "error", title: "Сбой воспроизведения подтверждён", detail: "Откройте плеер кофейни или обратитесь в поддержку." };
   }
   // Paused/stopped are reported states (caller passes only fresh ones), not sound confirmation.
   if (input.playbackState === "paused" || input.playbackState === "stopped") {
-    return { kind: input.playbackState, tone: "neutral", title: input.playbackState === "paused" ? "Воспроизведение на паузе" : "Воспроизведение остановлено", detail: "Плеер точки сообщил это состояние." };
+    return { kind: input.playbackState, tone: "neutral", title: input.playbackState === "paused" ? "Воспроизведение на паузе" : "Воспроизведение остановлено", detail: "Плеер кофейни сообщил это состояние." };
   }
   const confirmedMs = input.playbackConfirmedAt ? Date.parse(input.playbackConfirmedAt) : NaN;
   const ageMs = input.nowMs - confirmedMs;
@@ -240,10 +240,10 @@ export function deriveOwnerPlaybackSignal(input: OwnerPlaybackSignalInput): Owne
     return { kind: "unconfirmed", tone: "neutral", title: "Воспроизведение не подтверждено", detail: "Кабинет пока не получает подтверждений звука." };
   }
   if (ageMs > 300_000) {
-    return { kind: "stale", tone: "neutral", title: "Нет свежего подтверждения звука", detail: "Музыка на точке может продолжать играть." };
+    return { kind: "stale", tone: "neutral", title: "Нет свежего подтверждения звука", detail: "Музыка в кофейне может продолжать играть." };
   }
   if (input.playbackState === "playing") {
-    return { kind: "confirmed", tone: "ok", title: "Воспроизведение подтверждено", detail: "Получено свежее подтверждение от плеера точки." };
+    return { kind: "confirmed", tone: "ok", title: "Воспроизведение подтверждено", detail: "Получено свежее подтверждение от плеера кофейни." };
   }
   return { kind: "unconfirmed", tone: "neutral", title: "Воспроизведение не подтверждено", detail: "Кабинет пока не получает подтверждений звука." };
 }
