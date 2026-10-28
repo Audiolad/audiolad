@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { requireAdminPermission } from '@/lib/admin/guard';
 import { BUSINESS_SPACES } from '@/lib/business-workspace/spaces';
-import { isSoundReviewStatus, SOUND_REVIEW_LABELS, type SoundReviewQueue } from '@/lib/business/track-sound-review';
+import { loadAgreementSoundQueue } from '@/lib/business-admission/agreement.server';
+import { isSoundReviewStatus, SOUND_REVIEW_LABELS } from '@/lib/business/track-sound-review';
 import { createClient } from '@/lib/supabase/server';
 import ReviewQueue from './ReviewQueue';
 
@@ -18,12 +19,14 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
   const page = Math.max(0, Math.min(100000, Number.parseInt(get('page'), 10) || 0));
   const space = BUSINESS_SPACES.some((s) => s.id === get('space')) ? get('space') : '';
   const db = await createClient();
-  const { data, error } = await db.rpc('admin_business_sound_queue', {
-    p_status: status || null, p_artist: uuid(get('artist')), p_album: uuid(get('album')),
-    p_space: space || null, p_page: page,
-  });
-  if (error || !data) return <p role="alert">Не удалось загрузить очередь. Проверьте применение миграции и обновите страницу.</p>;
-  const queue = data as SoundReviewQueue;
+  const artist = uuid(get('artist')) ?? '';
+  const album = uuid(get('album')) ?? '';
+  let queue;
+  try {
+    queue = await loadAgreementSoundQueue(db, { status, artist, album, space, page });
+  } catch {
+    return <p role="alert">Не удалось загрузить очередь. Проверьте применение миграции и обновите страницу.</p>;
+  }
   const href = (target: number, unchecked = false) => {
     const query = new URLSearchParams({ status: unchecked ? 'unchecked' : status, artist: get('artist'), album: get('album'), space, page: String(target) });
     return `/admin/business-track-review?${query}`;
@@ -32,6 +35,9 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
     <h1 className="text-2xl font-semibold">Business – прослушивание треков</h1>
     <p>Решение о качестве звука. Коммерческие права проверяются отдельно. Причины доступны только администраторам.</p>
     <p>В очереди – опубликованные музыкальные треки альбомов с допуском хотя бы к одному пространству Business.</p>
+    <p>В очереди только треки авторов, принявших соглашение AudioLad Бизнес – {queue.total}</p>
+    {!queue.total && !status && !artist && !album && !space && <p>Пока нет авторов, принявших соглашение AudioLad Бизнес.{" "}
+      <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>}
     <p>Ожидают: {queue.counts.unchecked} · Допущено: {queue.counts.approved} · Отклонено: {queue.counts.rejected}</p>
     <form className="flex flex-wrap gap-3">
       <label>Статус <select name="status" defaultValue={status}><option value="">Все</option>
