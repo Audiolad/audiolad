@@ -6,10 +6,16 @@ export const SOUND_REVIEW_LABELS: Record<SoundReviewStatus, string> = {
 export function isSoundReviewStatus(value: unknown): value is SoundReviewStatus {
   return SOUND_REVIEW_STATUSES.includes(value as SoundReviewStatus);
 }
+export function soundReviewStatusLabel(row: { status: SoundReviewStatus; sound_auto?: boolean }) {
+  if (row.sound_auto && row.status !== 'rejected') return 'Допущен – автодопуск артиста';
+  return SOUND_REVIEW_LABELS[row.status];
+}
 export type SoundReviewRow = {
   id: string; title: string; artist_id: string; artist: string; album_id: string; album: string;
   duration_seconds: number | null; spaces: string[]; audio_identity: string;
   status: SoundReviewStatus; reason: string | null; reviewed_at: string | null; reviewed_by: string | null;
+  /** True when the artist's sound auto-admission covers this file. Explicit rejection clears it. */
+  sound_auto?: boolean;
 };
 export type SoundReviewQueue = {
   rows: SoundReviewRow[]; total: number; counts: Record<SoundReviewStatus, number>;
@@ -55,7 +61,7 @@ export function nextUnchecked(rows: readonly SoundReviewRow[], currentId: string
   const start = rows.findIndex((row) => row.id === currentId);
   for (let offset = 1; offset <= rows.length; offset++) {
     const row = rows[(start + offset) % rows.length];
-    if (row.status === 'unchecked' && row.id !== currentId) return row.id;
+    if (row.status === 'unchecked' && !row.sound_auto && row.id !== currentId) return row.id;
   }
   return null;
 }

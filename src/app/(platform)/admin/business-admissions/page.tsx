@@ -4,7 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { BUSINESS_AGREEMENT_LIST_HINT } from "@/lib/business-admission/agreement-list";
 import { listAgreementAdmissionPage } from "@/lib/business-admission/agreement.server";
 import { ADMISSION_SOURCE_LABELS, resolveManualAdmission } from "@/lib/business-admission/policy";
-import { addBusinessDirection, saveBusinessAdmissions, setBusinessManualContentGate } from "./actions";
+import { addBusinessDirection, saveBusinessAdmissions, setBusinessArtistSoundAuto, setBusinessManualContentGate } from "./actions";
 import SelectPage from "./SelectPage";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,8 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
   let hasMore = false;
   let listedTotal = 0;
   let gateOn = false;
+  const soundAuto = new Map<string, boolean>();
+  let soundAutoReady = true;
   try {
     const db = createServiceRoleClient();
     const gate = await db.rpc("business_manual_content_gate_enabled");
@@ -51,6 +53,11 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
     hasMore = listed.total > page * PAGE_SIZE;
     rows = listed.rows;
     decisions = listed.decisions as Decision[];
+    if (kind === "artist" && rows.length) {
+      const flags = await db.from("business_artist_sound_auto").select("author_id, enabled").in("author_id", rows.map((row) => row.id));
+      if (flags.error) soundAutoReady = false;
+      else for (const flag of (Array.isArray(flags.data) ? flags.data : []) as { author_id: string; enabled: boolean }[]) soundAuto.set(flag.author_id, flag.enabled === true);
+    }
   } catch { unavailable = true; }
   const visibleDirections = directions.some((d) => d.key === directionFilter)
     ? directions.filter((d) => d.key === directionFilter) : directions;
@@ -100,8 +107,15 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
         <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>
       {!listedTotal && <p>Пока нет авторов с подтверждёнными правами.{" "}
         <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>}
-      <div className="overflow-x-auto"><table className="w-full border-collapse text-sm"><caption className="text-left">{kind === "artist" ? "Артисты" : "Альбомы"} – страница {page}, записей: {rows.length}</caption><thead><tr><th><SelectPage key={href(page)} /></th><th className="text-left">{kind === "artist" ? "Артист" : "Альбом / артист"}</th>{visibleDirections.map((d) => <th key={d.key}>{d.name}</th>)}</tr></thead>
+      <div className="overflow-x-auto"><table className="w-full border-collapse text-sm"><caption className="text-left">{kind === "artist" ? "Артисты" : "Альбомы"} – страница {page}, записей: {rows.length}</caption><thead><tr><th><SelectPage key={href(page)} /></th><th className="text-left">{kind === "artist" ? "Артист" : "Альбом / артист"}</th>{kind === "artist" && <th>Автодопуск звучания</th>}{visibleDirections.map((d) => <th key={d.key}>{d.name}</th>)}</tr></thead>
         <tbody>{rows.map((r) => <tr key={r.id} className="border-t align-top"><td className="p-2"><input type="checkbox" form="bulk-admissions" name="ids" value={r.id} aria-label={`Выбрать ${r.title}`} /></td><td className="p-2">{r.title}{kind === "album" && <p className="text-neutral-500">{r.authorName}</p>}</td>
+          {kind === "artist" && <td className="min-w-40 space-y-2 p-2">{soundAutoReady ? <>
+            <p>{soundAuto.get(r.id) ? "Включён" : "Выключен"}</p>
+            <form action={setBusinessArtistSoundAuto}>{context}<input type="hidden" name="authorId" value={r.id} /><input type="hidden" name="enabled" value={soundAuto.get(r.id) ? "false" : "true"} />
+              <button type="submit" className="underline">{soundAuto.get(r.id) ? "Выключить" : "Включить"}</button>
+            </form>
+            <p className="text-xs text-neutral-500">Явный статус «Не допущен» у трека важнее. Права и допуск направления не пропускаются.</p>
+          </> : <p>Автодопуск недоступен, пока миграция не применена.</p>}</td>}
           {visibleDirections.map((d) => {
             const artist = find(kind === "artist" ? r.id : r.authorId, d.key, true);
             const album = kind === "album" ? find(r.id, d.key, false) : undefined;

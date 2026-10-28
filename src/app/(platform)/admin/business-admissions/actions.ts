@@ -42,6 +42,32 @@ export async function saveBusinessAdmissions(form: FormData): Promise<void> {
   redirect(`${PATH}?${query}`);
 }
 
+export async function setBusinessArtistSoundAuto(form: FormData): Promise<void> {
+  await requireAdminPermission("author_products.moderate");
+  const authorId = String(form.get("authorId") ?? "");
+  const enabled = String(form.get("enabled")) === "true";
+  let failed = !UUID.test(authorId);
+  if (!failed) {
+    try {
+      if (!await admissionAuthorsAccepted("artist", [authorId])) failed = true;
+    } catch { failed = true; }
+  }
+  if (!failed) {
+    try {
+      const db = await createClient();
+      const { error } = await db.rpc("set_business_artist_sound_auto", { p_author_id: authorId, p_enabled: enabled });
+      failed = Boolean(error);
+    } catch { failed = true; }
+  }
+  revalidatePath(PATH);
+  const query = new URLSearchParams({ kind: "artist", result: failed ? "auto-error" : "saved" });
+  for (const key of ["q", "directionFilter", "decision", "page"]) {
+    const value = form.get(key);
+    if (typeof value === "string" && value) query.set(key === "directionFilter" ? "direction" : key, value);
+  }
+  redirect(`${PATH}?${query}`);
+}
+
 export async function setBusinessManualContentGate(form: FormData): Promise<void> {
   await requireAdminPermission("author_products.moderate");
   const enabled = String(form.get("enabled")) === "true";

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { SOUND_REVIEW_LABELS, SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, type SoundReviewHistory, type SoundReviewRow, type SoundReviewStatus } from '@/lib/business/track-sound-review';
+import { SOUND_REVIEW_LABELS, SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, soundReviewStatusLabel, type SoundReviewHistory, type SoundReviewRow, type SoundReviewStatus } from '@/lib/business/track-sound-review';
 import { soundReviewBulkConfirm, soundReviewSelectionCount, type SoundReviewQueueScope, type SoundReviewSelection } from '@/lib/business/track-sound-bulk';
 import { businessTrackReviewHistory, previewBusinessTrack, reviewBusinessTrack, reviewBusinessTracksBulk } from './actions';
 
@@ -217,7 +217,7 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
     <p role={messageError ? 'alert' : 'status'} aria-live={messageError ? 'assertive' : 'polite'} className={messageError ? 'text-red-700' : ''}>{message}</p>
     {current && <div className="sticky top-0 z-10 max-w-full space-y-3 rounded border bg-white p-3">
       <p className="break-words"><b>{current.artist} · {current.title}</b> · {current.album}</p>
-      <p>Сейчас: <b data-sound-status={current.status} className={colors[current.status]}>{SOUND_REVIEW_LABELS[current.status]}</b></p>
+      <p>Сейчас: <b data-sound-status={current.sound_auto && current.status !== 'rejected' ? 'artist_auto' : current.status} className={colors[current.sound_auto && current.status !== 'rejected' ? 'approved' : current.status]}>{soundReviewStatusLabel(current)}</b></p>
       <div className="flex max-w-full flex-wrap gap-2">
         {PLAYER_DECISIONS.map((status) => <button
           key={status} type="button" disabled={pending} aria-pressed={current.status === status}
@@ -273,7 +273,7 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
         <td className="p-2">{row.artist}</td><td className="p-2">{row.album}</td>
         <td className="p-2"><button type="button" disabled={pending} className="text-left underline" onClick={() => listen(row)}>{row.title}</button></td>
         <td>{duration(row.duration_seconds)}</td>
-        <td className="p-2"><form className="flex max-w-full flex-wrap gap-2" action={(form) => {
+        <td className="p-2"><p className={colors[row.sound_auto && row.status !== 'rejected' ? 'approved' : row.status]}>{soundReviewStatusLabel(row)}</p><form className="flex max-w-full flex-wrap gap-2" action={(form) => {
           const status = String(form.get('status'));
           const reasonText = String(form.get('reason') ?? '');
           if (!isSoundReviewStatus(status)) {
