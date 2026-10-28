@@ -1,4 +1,9 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+
+import { AuthHostnameProvider } from "@/components/auth/AuthPresentation";
+import { getHostnameFromHeaders } from "@/lib/business-app/host";
+import "@/components/business-app/theme/business-theme.css";
 
 export const metadata: Metadata = {
   robots: {
@@ -7,10 +12,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  const hostname = getHostnameFromHeaders(await headers());
+  return <AuthHostnameProvider hostname={hostname}>{children}</AuthHostnameProvider>;
 }

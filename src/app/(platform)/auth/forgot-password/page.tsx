@@ -1,5 +1,7 @@
 "use client";
 
+import { AuthBrand, AuthFrame, useAuthVariant } from "@/components/auth/AuthPresentation";
+import { authVariantLinkParams } from "@/components/auth/variant";
 import BottomNav from "@/components/BottomNav";
 import { buildAuthRouteHref } from "@/lib/auth/routes";
 import {
@@ -10,6 +12,8 @@ import {
   PASSWORD_RECOVERY_RATE_LIMIT_MESSAGE,
   PASSWORD_RECOVERY_SPAM_HINT_MESSAGE,
 } from "@/lib/auth/recovery-messages";
+import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
+import { helpArticlePath } from "@/lib/help/paths";
 import { platformNavPaddingClass } from "@/lib/navigation/bottom-nav";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -20,6 +24,7 @@ import { requestPasswordRecoveryAction } from "./actions";
 const COOLDOWN_MS = 60_000;
 
 function ForgotPasswordForm() {
+  const variant = useAuthVariant();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -90,14 +95,12 @@ function ForgotPasswordForm() {
   const cooldownSeconds = Math.ceil(cooldownRemainingMs / 1000);
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <AuthFrame variant={variant}>
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
-          </Link>
+          <AuthBrand variant={variant} />
 
           <h1 className="mt-8 text-[30px] font-semibold">Восстановление пароля</h1>
 
@@ -133,6 +136,11 @@ function ForgotPasswordForm() {
               }`}
             >
               <p>{message}</p>
+              {variant === "business" ? (
+                <Link href={helpArticlePath(emailNotReceivedArticle)} className="font-semibold underline">
+                  Письмо не пришло
+                </Link>
+              ) : null}
               {!isError ? (
                 <p className="mt-3 text-[#3d8d65]/90">
                   {PASSWORD_RECOVERY_SPAM_HINT_MESSAGE}
@@ -159,16 +167,16 @@ function ForgotPasswordForm() {
 
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           <Link
-            href={buildAuthRouteHref("/auth/sign-in", searchParams.get("next"))}
+            href={buildAuthRouteHref("/auth/sign-in", searchParams.get("next"), authVariantLinkParams(variant))}
             className="font-semibold text-[#7042c5]"
           >
             Вернуться ко входу
           </Link>
         </p>
 
-        <BottomNav />
+        {variant === "ordinary" ? <BottomNav /> : null}
       </div>
-    </main>
+    </AuthFrame>
   );
 }
 

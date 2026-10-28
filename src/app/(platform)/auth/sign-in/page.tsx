@@ -1,5 +1,7 @@
 "use client";
 
+import { AuthBrand, AuthFrame, useAuthVariant } from "@/components/auth/AuthPresentation";
+import { authVariantLinkParams } from "@/components/auth/variant";
 import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { BUSINESS_REGISTERED_NOTE } from "@/lib/access-grants/copy";
@@ -26,6 +28,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 
 function SignInForm() {
+  const variant = useAuthVariant();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRegistered = searchParams.get("registered") === "1";
@@ -94,14 +97,12 @@ function SignInForm() {
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <AuthFrame variant={variant}>
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
-          </Link>
+          <AuthBrand variant={variant} />
 
           <h1 className="mt-8 text-[30px] font-semibold">Войти</h1>
 
@@ -167,6 +168,7 @@ function SignInForm() {
                 href={buildAuthRouteHref(
                   "/auth/forgot-password",
                   searchParams.get("next"),
+                  authVariantLinkParams(variant),
                 )}
                 className="font-medium text-[#7042c5]"
               >
@@ -199,16 +201,16 @@ function SignInForm() {
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           Нет аккаунта?{" "}
           <Link
-            href={buildAuthRouteHref("/auth/sign-up", searchParams.get("next"))}
+            href={buildAuthRouteHref("/auth/sign-up", searchParams.get("next"), authVariantLinkParams(variant))}
             className="font-semibold text-[#7042c5]"
           >
             Зарегистрироваться
           </Link>
         </p>
 
-        <BottomNav />
+        {variant === "ordinary" ? <BottomNav /> : null}
       </div>
-    </main>
+    </AuthFrame>
   );
 }
 
