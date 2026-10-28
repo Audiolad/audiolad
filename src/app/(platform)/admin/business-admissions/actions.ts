@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin/guard";
-import { admissionAuthorsAccepted } from "@/lib/business-admission/agreement.server";
+import { admissionAuthorsAccepted, admissionAuthorsVisible } from "@/lib/business-admission/agreement.server";
 import { createClient } from "@/lib/supabase/server";
 
 const PATH = "/admin/business-admissions";
@@ -19,7 +19,7 @@ export async function saveBusinessAdmissions(form: FormData): Promise<void> {
     || ids.length === 0 || ids.length > 200 || ids.some((id) => !UUID.test(id));
   if (!failed) {
     try {
-      if (!await admissionAuthorsAccepted(kind as "artist" | "album", ids)) failed = true;
+      if (!await admissionAuthorsVisible(kind as "artist" | "album", ids)) failed = true;
     } catch { failed = true; }
   }
   if (!failed) {
@@ -35,7 +35,7 @@ export async function saveBusinessAdmissions(form: FormData): Promise<void> {
   revalidatePath(PATH);
   const query = new URLSearchParams({ kind, result: failed ? "error" : "saved" });
   // Only known search parameters are carried back; no arbitrary redirect target.
-  for (const key of ["q", "directionFilter", "decision", "page"]) {
+  for (const key of ["q", "directionFilter", "decision", "page", "hidden"]) {
     const value = form.get(key);
     if (typeof value === "string" && value) query.set(key === "directionFilter" ? "direction" : key, value);
   }
@@ -49,7 +49,7 @@ export async function setBusinessArtistSoundAuto(form: FormData): Promise<void> 
   let failed = !UUID.test(authorId);
   if (!failed) {
     try {
-      if (!await admissionAuthorsAccepted("artist", [authorId])) failed = true;
+      if (!await admissionAuthorsVisible("artist", [authorId])) failed = true;
     } catch { failed = true; }
   }
   if (!failed) {
@@ -61,9 +61,36 @@ export async function setBusinessArtistSoundAuto(form: FormData): Promise<void> 
   }
   revalidatePath(PATH);
   const query = new URLSearchParams({ kind: "artist", result: failed ? "auto-error" : "saved" });
-  for (const key of ["q", "directionFilter", "decision", "page"]) {
+  for (const key of ["q", "directionFilter", "decision", "page", "hidden"]) {
     const value = form.get(key);
     if (typeof value === "string" && value) query.set(key === "directionFilter" ? "direction" : key, value);
+  }
+  redirect(`${PATH}?${query}`);
+}
+
+export async function setBusinessArtistAdmissionHidden(form: FormData): Promise<void> {
+  await requireAdminPermission("author_products.moderate");
+  const authorId = String(form.get("authorId") ?? "");
+  const hidden = String(form.get("hide")) === "true";
+  let failed = !UUID.test(authorId);
+  if (!failed) {
+    try {
+      if (!await admissionAuthorsAccepted("artist", [authorId])) failed = true;
+    } catch { failed = true; }
+  }
+  if (!failed) {
+    try {
+      const db = await createClient();
+      const { error } = await db.rpc("set_business_artist_admission_hidden", { p_author_id: authorId, p_hidden: hidden });
+      failed = Boolean(error);
+    } catch { failed = true; }
+  }
+  revalidatePath(PATH);
+  revalidatePath("/admin/business-track-review");
+  const query = new URLSearchParams({ kind: "artist", result: failed ? "error" : "saved" });
+  for (const key of ["q", "directionFilter", "decision", "page", "hidden"]) {
+    const carried = form.get(key);
+    if (typeof carried === "string" && carried) query.set(key === "directionFilter" ? "direction" : key, carried);
   }
   redirect(`${PATH}?${query}`);
 }

@@ -50,13 +50,15 @@ mock("../src/lib/supabase/service-role.ts", { createServiceRoleClient: () => ({
     throw new Error(`unexpected rpc ${name}`);
   },
 }) });
-mock("../src/app/(platform)/admin/business-admissions/actions.ts", { saveBusinessAdmissions: async () => {}, addBusinessDirection: async () => {}, setBusinessManualContentGate: async () => {}, setBusinessArtistSoundAuto: async () => {} });
+mock("../src/app/(platform)/admin/business-admissions/actions.ts", { saveBusinessAdmissions: async () => {}, addBusinessDirection: async () => {}, setBusinessManualContentGate: async () => {}, setBusinessArtistSoundAuto: async () => {}, setBusinessArtistAdmissionHidden: async () => {} });
 const Page = require("../src/app/(platform)/admin/business-admissions/page.tsx").default;
 async function render(params) { return renderToStaticMarkup(await Page({ searchParams: Promise.resolve(params) })); }
 const artist = await render({ kind: "artist" });
 assert.match(artist, /Ручные ворота выключены/);
 assert.match(artist, /Разрешено – артист/);
 assert.match(artist, /Автодопуск звучания/);
+assert.match(artist, /Скрыть/);
+assert.match(artist, /Скрытые/);
 assert.match(artist, /Выключен/);
 assert.doesNotMatch(artist, /—/);
 assert.match(artist, /Применить к выбранным/);
