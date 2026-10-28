@@ -34,6 +34,8 @@ import {
   AUTHOR_PUBLIC_NAME_CHECK_FAILED_MESSAGE,
   AUTHOR_PUBLIC_NAME_TAKEN_MESSAGE,
 } from "@/lib/author-names/public-name";
+import { APPLICATION_NAME_SYNC_FAILED_MESSAGE } from "@/lib/author-applications/screen-name";
+import { syncApprovedAuthorApplicationDisplayName } from "@/lib/author-applications/sync-approved-display-name.server";
 import { getAuthorProjectNameChangeError } from "@/lib/author-projects/slug";
 import {
   AUTHOR_ASSETS_BUCKET,
@@ -236,6 +238,20 @@ export async function PATCH(request: Request) {
 
         console.error("author_profile_update_error", updateError.message);
         return NextResponse.json({ error: "internal_error" }, { status: 500 });
+      }
+
+      if (typeof updates.name === "string") {
+        try {
+          await syncApprovedAuthorApplicationDisplayName(authorId, updates.name);
+        } catch {
+          return NextResponse.json(
+            {
+              error: "application_name_sync_failed",
+              message: APPLICATION_NAME_SYNC_FAILED_MESSAGE,
+            },
+            { status: 500 },
+          );
+        }
       }
     }
 

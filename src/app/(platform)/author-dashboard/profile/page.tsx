@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import AuthorProfileClient from "@/components/author-dashboard/AuthorProfileClient";
 import AuthorShell from "@/components/author-dashboard/AuthorShell";
 import { listAuthorWorkspacesForUser } from "@/lib/author-products/auth";
+import { hasPermission } from "@/lib/auth/platform-access";
 import { listActiveTopics } from "@/lib/topics/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,7 +27,10 @@ export default async function AuthorProfilePage() {
     redirect("/author-dashboard");
   }
 
-  const topicOptions = await listActiveTopics(supabase);
+  const [topicOptions, canSuggestAuthorSlug] = await Promise.all([
+    listActiveTopics(supabase),
+    hasPermission(supabase, user.id, "authors.manage"),
+  ]);
 
   return (
     <AuthorShell title="Страница автора" internalBackHref="/author-dashboard">
@@ -38,6 +42,7 @@ export default async function AuthorProfilePage() {
             title: topic.title,
             isActive: true,
           }))}
+          canSuggestAuthorSlug={canSuggestAuthorSlug}
         />
       </Suspense>
     </AuthorShell>

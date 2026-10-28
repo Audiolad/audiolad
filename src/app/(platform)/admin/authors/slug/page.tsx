@@ -5,8 +5,13 @@ import { requireAdminPermission } from "@/lib/admin/guard";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminChangeAuthorSlugPage() {
+export default async function AdminChangeAuthorSlugPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lookup?: string; slug?: string }>;
+}) {
   await requireAdminPermission("authors.manage");
+  const params = await searchParams;
 
   return (
     <section aria-labelledby="admin-change-author-slug-heading">
@@ -24,7 +29,10 @@ export default async function AdminChangeAuthorSlugPage() {
           Смена URL авторского пространства
         </h2>
       </div>
-      <ChangeAuthorSlugForm />
+      <ChangeAuthorSlugForm
+        initialLookup={params.lookup ?? ""}
+        initialSlug={params.slug ?? ""}
+      />
     </section>
   );
 }

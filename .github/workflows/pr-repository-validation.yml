@@ -135,6 +135,8 @@ jobs:
           npm run typecheck
           npm run test:author-project-cyrillic-name
           npm run test:author-public-name
+          npm run test:use-server-exports
+          npm run test:author-slug-admin
           npm run lint
 
       - name: Remove PR temporary stores
