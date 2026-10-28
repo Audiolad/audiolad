@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useReportBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import BusinessEligibilityProbePanel from "@/components/business-app/BusinessEligibilityProbePanel";
@@ -71,6 +71,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   }, [reportChromeAccess, reportedStatus, reportedEndsAt]);
   const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
   const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
+  const boundaryRef = useRef<string | null>(null);
+  useEffect(() => {
+    const playing = model.tracks[currentIndex];
+    boundaryRef.current = player.queueOrder && playing ? playing.audioItemId : null;
+  }, [player.queueOrder, model.tracks, currentIndex]);
   useEffect(() => {
     if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
     const ac = new AbortController();
@@ -88,6 +93,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         daypart: queue.effectiveDaypart,
         energyOffset: queue.prefs.energyOffset,
         feedback: queue.feedback,
+        boundaryAudioItemId: boundaryRef.current ?? undefined,
       }),
     })
       .then(async (res) => {

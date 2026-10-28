@@ -13,6 +13,11 @@ type SavedDecision = { id: string; status: string; reason: string; audioIdentity
 const saves: SavedDecision[] = [];
 const bulks: unknown[] = [];
 const previews: string[] = [];
+const playLog: string[] = [];
+(globalThis.HTMLElement.prototype as unknown as { play: (this: { src?: string }) => Promise<void> }).play = function play(this: { src?: string }) {
+  playLog.push(this.src ?? '');
+  return Promise.resolve();
+};
 let reviewImpl: (input: SavedDecision) => Promise<{ ok: boolean; message: string }> = async (input) => {
   saves.push(input);
   return { ok: true, message: 'Решение сохранено.' };
@@ -20,7 +25,11 @@ let reviewImpl: (input: SavedDecision) => Promise<{ ok: boolean; message: string
 moduleLoader.cache[actionsPath] = {
   id: actionsPath, filename: actionsPath, loaded: true,
   exports: {
-    previewBusinessTrack: async (id: string) => { previews.push(id); return { ok: true, url: `https://audio.invalid/${id}` }; },
+    previewBusinessTrack: async (id: string) => {
+      if (previews.length === 0) assert.ok(playLog.length > 0, 'play() runs inside the Прослушать click, before the preview resolves');
+      previews.push(id);
+      return { ok: true, url: `https://audio.invalid/${id}` };
+    },
     reviewBusinessTrack: async (input: SavedDecision) => reviewImpl(input),
     reviewBusinessTracksBulk: async (input: unknown) => { bulks.push(input); return { ok: true, saved: 2, failed: 0, message: 'Сохранено: 2.' }; },
     businessTrackReviewHistory: async () => [{ id: 1, old_status: 'unchecked', new_status: 'rejected', changed_at: '2026-10-27T12:00:00Z', reason: 'Внутренняя причина', changed_by: 'admin', event: 'manual' }],
@@ -84,8 +93,9 @@ function rowStatus(title: string) {
 function playingStatus() {
   return elements().find((el) => el.tagName === 'B' && props(el)['data-sound-status'])?.getAttribute('data-sound-status');
 }
-const playerReason = field('Причина текущего трека: Track b');
-await act(async () => (props(playerReason).onChange as (event: unknown) => void)({ target: { value: 'Шипение' } }));
+assert.equal(elements().some((el) => props(el)['aria-label'] === 'Причина текущего трека: Track b'), false);
+assert.doesNotMatch(text(container), /Перемотайте к нужному месту/);
+assert.doesNotMatch(text(container), /клавиши не срабатывают/);
 const beforeFailure = previews.length;
 reviewImpl = async () => ({ ok: false, message: 'Аудиофайл заменён. Обновите очередь и прослушайте новую версию.' });
 await click('Не допущен');
@@ -93,7 +103,7 @@ assert.match(text(container), /Аудиофайл заменён/);
 assert.equal(playingStatus(), 'unchecked');
 assert.equal(rowStatus('Track b'), 'unchecked');
 assert.equal(previews.length, beforeFailure, 'failed save does not load the next track');
-assert.equal(elements().some((el) => el.tagName === 'AUDIO'), false);
+assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src ?? null, null, 'failed save does not open the next track');
 reviewImpl = async () => { throw new Error('rpc down'); };
 await click('Допущен');
 assert.match(text(container), /Решение не сохранено\. Повторите попытку\./);
@@ -101,7 +111,7 @@ assert.equal(playingStatus(), 'unchecked');
 assert.equal(previews.length, beforeFailure, 'thrown save does not advance');
 reviewImpl = async (input: SavedDecision) => { saves.push(input); return { ok: true, message: 'Решение сохранено.' }; };
 await click('Допущен');
-assert.deepEqual(saves.at(-1), { id: 'b', status: 'approved', reason: 'Шипение', audioIdentity: rows[1].audio_identity });
+assert.deepEqual(saves.at(-1), { id: 'b', status: 'approved', reason: '', audioIdentity: rows[1].audio_identity });
 assert.equal(rowStatus('Track b'), 'approved');
 audio = elements().find((el) => el.tagName === 'AUDIO')!;
 assert.equal(props(audio).src, 'https://audio.invalid/c');
@@ -116,7 +126,7 @@ assert.deepEqual(saves.at(-1), { id: 'c', status: 'unchecked', reason: '', audio
 assert.equal(previews.length, stayed, 'checkbox off does not load another track');
 assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c');
 assert.equal(playingStatus(), 'unchecked');
-const reasonInput = field('Причина текущего трека: Track c');
+const reasonInput = field('Внутренняя причина: Track c');
 const ignored = new Event('keydown', { bubbles: true });
 (ignored as Event & { key: string }).key = '2';
 await act(async () => reasonInput.dispatchEvent(ignored));
@@ -125,6 +135,7 @@ const shortcut = new Event('keydown', { bubbles: true });
 (shortcut as Event & { key: string }).key = '2';
 await act(async () => container.dispatchEvent(shortcut));
 assert.deepEqual(saves.at(-1), { id: 'c', status: 'rejected', reason: '', audioIdentity: rows[2].audio_identity });
+assert.ok(playLog.some((src) => src.startsWith('https://audio.invalid/')), 'a preview url is started with play()');
 assert.equal(rowStatus('Track c'), 'rejected');
 assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c', 'no further unchecked track, playback stays');
 const previousConfirm = window.confirm;

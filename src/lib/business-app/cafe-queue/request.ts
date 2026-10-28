@@ -22,6 +22,8 @@ export function parseCafeQueueRequest(body: unknown): CafeQueueRequest | null {
     daypart?: unknown;
     energyOffset?: unknown;
     feedback?: unknown;
+    boundaryAudioItemId?: unknown;
+    seed?: unknown;
   };
   if (!isGuestCoffeeProfileValue(GUEST_COFFEE_CHARACTERS, row.character)) return null;
   if (!isGuestCoffeeProfileValue(GUEST_COFFEE_DIRECTIONS, row.direction)) return null;
@@ -39,11 +41,19 @@ export function parseCafeQueueRequest(body: unknown): CafeQueueRequest | null {
     feedback.push({ audioItemId: vote.audioItemId, kind: vote.kind });
     if (feedback.length > CAFE_QUEUE_FEEDBACK_LIMIT) return null;
   }
+  const boundary = typeof row.boundaryAudioItemId === "string" && AUDIO_ITEM_ID.test(row.boundaryAudioItemId)
+    ? row.boundaryAudioItemId
+    : undefined;
+  const seed = typeof row.seed === "number" && Number.isInteger(row.seed) && row.seed >= 0 && row.seed <= 0x7fffffff
+    ? row.seed
+    : undefined;
   return {
     character: row.character,
     direction: row.direction,
     daypart: row.daypart,
     energyOffset: row.energyOffset,
     feedback,
+    boundaryAudioItemId: boundary,
+    seed,
   };
 }
