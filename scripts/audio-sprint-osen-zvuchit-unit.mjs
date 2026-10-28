@@ -658,7 +658,7 @@ assert.match(editPage, /product\.practice\.product_kind/);
 assert.match(editPage, /audioSprintTitleLock/);
 assert.doesNotMatch(sprintLib, /seoAbout/);
 
-const { listAudioSprintForAuthor } = await import(
+const { listAudioSprintForAuthor, loadAudioSprintModerationQuery } = await import(
   "../src/lib/seo-queries/list-audio-sprint-queries.ts"
 );
 
@@ -985,5 +985,35 @@ await assertChunkFailure(
   "audio_sprint_reservations_load_failed",
 );
 await assertChunkFailure("practices", "id", "audio_sprint_products_load_failed");
+
+// Освобождённая тема остаётся в архиве, а будущие продукты не становятся
+// результатами спринта и не получают его ограничений.
+{
+  const seed = seedSprint(1);
+  const originalResolve = seed.resolve;
+  seed.resolve = (state) => {
+    const result = originalResolve(state);
+    if (state.table === "seo_sprint_queries") {
+      return { ...result, data: result.data.map((row) => ({
+        ...row, sprint_id: SPRINT_ID,
+        released_to_general_at: "2026-10-28T00:00:00Z",
+      })) };
+    }
+    return result;
+  };
+  const client = createSprintClient(seed);
+  const listing = await listAudioSprintForAuthor(
+    { slug: SPRINT_SLUG, authorId: CHUNK_AUTHOR }, client,
+  );
+  assert.equal(listing.queries.length, 1);
+  assert.equal(listing.queries[0].releasedToGeneralAt, "2026-10-28T00:00:00Z");
+  assert.equal(listing.queries[0].lifecycle, "available");
+  assert.equal(listing.queries[0].reservationId, null);
+  assert.equal(listing.queries[0].productId, null);
+  assert.equal(listing.queries[0].reservedByCurrentUser, false);
+  assert.deepEqual(await loadAudioSprintModerationQuery(client, seed.queryIds[0]), {
+    ok: true, queryText: null, authorGroup: null,
+  });
+}
 
 console.log("audio-sprint-osen-zvuchit-unit: ok");
