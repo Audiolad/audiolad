@@ -17,6 +17,7 @@ import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSo
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessAtmosphereTrackButton from "../src/components/business-app/BusinessAtmosphereTrackButton";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
+import { musicPlayerMessage } from "../src/components/business-app/workspace/BusinessCabinetPlayer";
 import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import { businessGiftRulesText } from "../src/lib/access-grants/copy";
@@ -626,12 +627,17 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, /data-testid="biz-workspace-progress"/);
   assert.match(html, /data-testid="biz-workspace-time"/);
   assert.match(html, /0:00/);
+  assert.match(html, /Музыка включается после нажатия на круглую кнопку\. Громкость и место в подборке сохраняются\./);
+  assert.match(html, /после нажатия на круглую кнопку/);
+  assert.doesNotMatch(html, /«Играть»/);
   assert.match(html, /aria-label="Играть"/);
   assert.match(html, /business-play-btn--large/);
   assert.match(html, /business-play-btn--compact/);
   assert.match(html, /aria-label="Следующий"/);
   assert.doesNotMatch(html, />Играть</);
   assert.doesNotMatch(html, />Следующий</);
+  assert.equal(musicPlayerMessage("Проверьте интернет и нажмите «Играть»."), "Проверьте интернет и нажмите круглую кнопку.");
+  assert.equal(musicPlayerMessage("Нажмите «Играть», чтобы продолжить."), "Нажмите круглую кнопку, чтобы продолжить.");
   assert.doesNotMatch(workspaceSource, /pauseLabel="Стоп"/);
   assert.match(workspaceSource, /energyOffset: 0/);
   assert.doesNotMatch(workspaceSource, /queue\.prefs\.energyOffset/);
@@ -959,6 +965,7 @@ assert.doesNotMatch(rules, /—/);
   assert.match(playing, /loading="lazy"/);
   assert.doesNotMatch(playing, /—/);
   assert.match(groupedHtml, /data-testid="biz-workspace-player"/);
+  assert.doesNotMatch(groupedHtml, /«Играть»/);
   assert.doesNotMatch(groupedHtml, /Играть эту подборку/);
 
   const withPoint: BusinessOwnerHomeContext = {

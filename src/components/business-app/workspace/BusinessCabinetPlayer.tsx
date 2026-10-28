@@ -71,6 +71,11 @@ export function useCabinetPlayer(): CabinetPlayerApi {
   return api;
 }
 
+/** Player errors still say «Играть» for the text button. The venue bar shows the round control. */
+export function musicPlayerMessage(message: string): string {
+  return message.replaceAll("«Играть»", "круглую кнопку");
+}
+
 const JSON_POST = {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -516,11 +521,11 @@ export function BusinessCabinetPlayerProvider({
           />
           {view.message ? (
             <p className="business-app-alert" data-tone="warn" role="alert" data-testid="biz-workspace-player-message">
-              {view.message}
+              {musicPlayerMessage(view.message)}
             </p>
           ) : null}
           {saveNote ? <p className="text-sm text-[var(--biz-text-muted)]" data-testid="biz-workspace-save-note">{saveNote}</p> : null}
-          {playing ? null : <p className="text-sm text-[var(--biz-text-muted)]">Сейчас пауза. Подборка продолжается с сохранённого места после «Играть».</p>}
+          {playing ? null : <p className="text-sm text-[var(--biz-text-muted)]">Сейчас пауза. Подборка продолжается с сохранённого места после нажатия на круглую кнопку.</p>}
         </section>
       ) : null}
       {open ? <audio ref={audioRef} preload="none" playsInline data-testid="biz-workspace-audio" /> : null}
