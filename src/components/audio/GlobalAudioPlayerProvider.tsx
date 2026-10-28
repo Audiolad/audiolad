@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -24,6 +25,7 @@ import {
   syncMediaSessionPositionState,
 } from "@/lib/audio/playback-recovery";
 import { ensureSharedAudioAudible } from "@/lib/audio/shared-audio-audibility";
+import { createPlayerEngineBridge } from "@/lib/audio/player-engine-bridge";
 import { createSharedAudioWarmupController } from "@/lib/audio/shared-audio-warmup";
 import { requestStopLocalAudioPlayers } from "@/lib/audio/local-audio-coordination";
 import {
@@ -246,6 +248,17 @@ async function playQueueAdvanceOnSharedAudio(
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 const PlayerEngineContext = createContext<PlayerEngineApi | null>(null);
+const PlayerEngineBridgeContext = createContext<ReturnType<
+  typeof createPlayerEngineBridge<PlayerEngineApi>
+> | null>(null);
+
+function subscribeToNoPlayerEngine() {
+  return () => {};
+}
+
+function readNoPlayerEngine(): PlayerEngineApi | null {
+  return null;
+}
 
 function GlobalPlayerEngine({
   session,
@@ -261,7 +274,6 @@ function GlobalPlayerEngine({
   onTracksExhausted,
   onRequestPreviousProduct,
   getRepeatMode,
-  children,
 }: {
   session: LoadSessionInput;
   sessionGeneration: number;
@@ -279,7 +291,6 @@ function GlobalPlayerEngine({
   ) => Promise<"advanced" | "completed" | "none">;
   onRequestPreviousProduct: () => Promise<boolean>;
   getRepeatMode: () => RepeatMode;
-  children: ReactNode;
 }) {
   const router = useRouter();
   const recoveryTimerRef = useRef<number | null>(null);
@@ -380,6 +391,8 @@ function GlobalPlayerEngine({
     };
   }, [requestAutoplayIntent, requestAutoplayIntentRef]);
 
+  // New object whenever the engine renders, so the listing bridge republishes time and flags.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot identity is the publish signal
   const playerContextValue = {
     ...playerControls,
     audioRef,
@@ -605,9 +618,31 @@ function GlobalPlayerEngine({
     session.practiceTitle,
   ]);
 
+  const engineBridge = useContext(PlayerEngineBridgeContext);
+  const engineOwnerIdRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (!engineBridge) {
+      return;
+    }
+
+    const ownerId = engineOwnerIdRef.current ?? engineBridge.claim();
+    engineOwnerIdRef.current = ownerId;
+    // Fresh object each engine render: listeners need the latest time and flags.
+    engineBridge.publish(playerContextValue, ownerId);
+  }, [engineBridge, playerContextValue]);
+
+  useLayoutEffect(() => {
+    const ownerId = engineOwnerIdRef.current;
+    return () => {
+      if (ownerId != null) {
+        engineBridge?.release(ownerId);
+      }
+    };
+  }, [engineBridge]);
+
   return (
     <PlayerEngineContext.Provider value={playerContextValue}>
-      {children}
       <GlobalPlaybackAnalytics
         session={session}
         engine={{
@@ -1824,37 +1859,48 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
     ],
   );
 
+  const [engineBridge] = useState(() =>
+    createPlayerEngineBridge<PlayerEngineApi>(),
+  );
+
   return (
     <SessionContext.Provider value={sessionValue}>
-      {/* Persistent media element — must not remount across queue products (iOS). */}
-      <audio
-        ref={persistentAudioRef}
-        preload="metadata"
-        playsInline
-        className="global-audio-element"
-      />
-      {session && !isWorkspaceDashboardPathname(pathname) ? (
-        <GlobalPlayerEngine
-          key={`${getGlobalPlayerSessionKey(session)}:${playbackInstanceId}`}
-          session={session}
-          sessionGeneration={sessionGeneration}
-          sessionGenerationRef={sessionGenerationRef}
-          stopEngineRef={stopEngineRef}
-          persistentAudioRef={persistentAudioRef}
-          handoffSourceRef={playbackHandoffRef}
-          requestAutoplayIntentRef={requestAutoplayIntentRef}
-          queueHasNext={queueHasNext}
-          queueHasPrevious={queueHasPrevious}
-          skipAutoplayUrlSync={Boolean(activeQueue)}
-          onTracksExhausted={onTracksExhausted}
-          onRequestPreviousProduct={onRequestPreviousProduct}
-          getRepeatMode={getRepeatMode}
-        >
-          {children}
-        </GlobalPlayerEngine>
-      ) : (
-        children
-      )}
+      <PlayerEngineBridgeContext.Provider value={engineBridge}>
+        {/* Persistent media element — must not remount across queue products (iOS). */}
+        <audio
+          ref={persistentAudioRef}
+          preload="metadata"
+          playsInline
+          className="global-audio-element"
+        data-playback-scroll="sibling"
+        />
+        {/*
+          Listing pages stay mounted across playback. Mobile scroll is the
+          document, so an engine remount already left it in place. Desktop
+          scroll is `.listener-app-shell__center-scroll` inside this tree —
+          putting it under the engine key recreated that node and jumped to
+          the top. The key still remounts the engine only.
+        */}
+        {children}
+        {session && !isWorkspaceDashboardPathname(pathname) ? (
+          <GlobalPlayerEngine
+            key={`${getGlobalPlayerSessionKey(session)}:${playbackInstanceId}`}
+            session={session}
+            sessionGeneration={sessionGeneration}
+            sessionGenerationRef={sessionGenerationRef}
+            stopEngineRef={stopEngineRef}
+            persistentAudioRef={persistentAudioRef}
+            handoffSourceRef={playbackHandoffRef}
+            requestAutoplayIntentRef={requestAutoplayIntentRef}
+            queueHasNext={queueHasNext}
+            queueHasPrevious={queueHasPrevious}
+            skipAutoplayUrlSync={Boolean(activeQueue)}
+            onTracksExhausted={onTracksExhausted}
+            onRequestPreviousProduct={onRequestPreviousProduct}
+            getRepeatMode={getRepeatMode}
+          />
+        ) : null}
+      </PlayerEngineBridgeContext.Provider>
     </SessionContext.Provider>
   );
 }
@@ -1882,7 +1928,15 @@ export function usePlayerEngine() {
 }
 
 export function useOptionalPlayerEngine() {
-  return useContext(PlayerEngineContext);
+  const contextual = useContext(PlayerEngineContext);
+  const bridge = useContext(PlayerEngineBridgeContext);
+  const bridged = useSyncExternalStore(
+    bridge ? bridge.subscribe : subscribeToNoPlayerEngine,
+    bridge ? bridge.getSnapshot : readNoPlayerEngine,
+    readNoPlayerEngine,
+  );
+
+  return contextual ?? bridged;
 }
 
 export function useGlobalAudioPlayerSession() {
