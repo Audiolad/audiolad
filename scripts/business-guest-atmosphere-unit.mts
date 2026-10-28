@@ -232,6 +232,16 @@ assert.equal(guestCoffeeTrackClock(0), null);
   assert.match(assembling, /data-testid="biz-atmosphere-assembling"/, "visible assembling moment");
   assert.match(assembling, /prefers-reduced-motion/);
   assert.match(studio, /data-testid="biz-atmosphere-play"/);
+  // Sergey 28.10.2026: round pine play control of the venue player, «Слушать атмосферу» beside it.
+  assert.match(studio, /className="business-play-btn business-atmosphere-play__circle"/);
+  assert.match(studio, /playingAtmosphere \? <PauseIcon \/> : <PlayIcon \/>/);
+  assert.match(studio, /business-atmosphere-play__label[\s\S]*?C\.play/);
+  {
+    const css = read("src/components/business-app/business-app.css");
+    assert.match(css, /\.business-app-btn-cta \{[^}]*background:\s*var\(--biz-play\)/, "green CTA reuses the play token");
+    assert.match(css, /\.business-atmosphere-play \{[^}]*min-height:\s*44px/, "44px+ tap target");
+    assert.match(css, /\.business-atmosphere-play__circle \{[^}]*width:\s*3\.5rem/);
+  }
   // Blocked starts are disabled; only pausing the playing track stays possible (review asm1).
   assert.match(studio, /disabled=\{!\(current && isPlaying\) && !canStart\}/);
   assert.match(studio, /data-testid="biz-atmosphere-tracks"/);

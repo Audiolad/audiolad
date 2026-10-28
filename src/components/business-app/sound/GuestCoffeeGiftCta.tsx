@@ -23,7 +23,7 @@ export default function GuestCoffeeGiftCta() {
     <div className="business-atmosphere-action" data-testid="biz-guest-gift">
       <a
         href={BUSINESS_TRIAL_SIGN_UP_HREF}
-        className="business-app-btn business-app-btn-primary business-app-focus-ring business-atmosphere-assemble"
+        className="business-app-btn business-app-btn-cta business-app-focus-ring business-atmosphere-assemble"
         data-testid="biz-guest-gift-cta"
       >
         {`Получить ${BUSINESS_GIFT_TITLE}`}
