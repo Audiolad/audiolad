@@ -13,11 +13,15 @@ import {
 } from "./business-layout";
 
 export const BUSINESS_ACCESS_REMINDER_TEMPLATE_KEY = "business_access_reminder";
-export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v2";
+export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v3";
 
 export const BUSINESS_ACCESS_REMINDER_BUTTON_LABEL = "Продлить доступ";
 
 const PRICE_LINE = `Продление – ${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`;
+
+/** Same sentence as BUSINESS_GRACE_PAYMENT_ANCHOR in the cabinet. */
+export const BUSINESS_GRACE_PAYMENT_ANCHOR =
+  "Новые 30 дней считаются от конца прошлого срока – не от момента платежа.";
 
 export const BUSINESS_ACCESS_REMINDER_SUBJECTS = {
   before_end: "Скоро закончится доступ к АудиоЛад Бизнес",
@@ -59,14 +63,14 @@ export function businessAccessReminderParagraphs(input: {
   if (input.kind === "grace_start") {
     return [
       hello,
-      `Срок доступа к АудиоЛад Бизнес закончился ${input.endsAtLabel}. Музыка в зале ещё играет – отсрочка составляет 3 дня, затем она остановится.`,
+      `Срок доступа к АудиоЛад Бизнес закончился ${input.endsAtLabel}. Музыка в зале ещё играет – отсрочка составляет 3 дня, затем она остановится. ${BUSINESS_GRACE_PAYMENT_ANCHOR}`,
       PRICE_LINE,
       closing,
     ];
   }
   return [
     hello,
-    `Это последний день отсрочки. Музыка в АудиоЛад Бизнес играет до ${input.graceEndsLabel}, затем плеер остановится. Кабинет и настройки сохранятся.`,
+    `Это последний день отсрочки. Музыка в АудиоЛад Бизнес играет до ${input.graceEndsLabel}, затем плеер остановится. Кабинет и настройки сохранятся. ${BUSINESS_GRACE_PAYMENT_ANCHOR}`,
     PRICE_LINE,
     closing,
   ];
