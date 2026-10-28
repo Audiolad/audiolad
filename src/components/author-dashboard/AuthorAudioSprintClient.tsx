@@ -267,14 +267,18 @@ export default function AuthorAudioSprintClient({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h2 className="text-lg font-semibold text-[#25135c]">{item.queryText}</h2>
                   <span className="rounded-full bg-[#f7f2ff] px-3 py-1 text-xs font-semibold text-[#7042c5]">
-                    {(own || item.reservedByCurrentUser) && item.lifecycle === "in_progress"
+                    {item.releasedToGeneralAt ? "В общей SEO-базе" : (own || item.reservedByCurrentUser) && item.lifecycle === "in_progress"
                       ? "Забронирован вами"
                       : item.lifecycle === "in_progress"
                         ? "Забронирован"
                         : lifecycleLabel(item.lifecycle)}
                   </span>
                 </div>
-                {own ? (
+                {item.releasedToGeneralAt ? (
+                  <Link href={`/author-dashboard/seo-opportunities?author=${encodeURIComponent(authorSlug)}`} className="mt-4 inline-block text-sm font-semibold text-[#7042c5]">
+                    Выбрать тему в общей SEO-базе
+                  </Link>
+                ) : own ? (
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     {until ? (
                       <span className="text-sm text-[#5f5484]">До {until}</span>

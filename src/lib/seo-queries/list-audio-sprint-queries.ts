@@ -25,6 +25,7 @@ type MembershipRow = {
   pool: string;
   queryText: string;
   normalizedQuery: string | null;
+  releasedToGeneralAt: string | null;
 };
 
 type ReservationRow = {
@@ -112,13 +113,13 @@ async function findEnabledSprintQueryText(
 ): Promise<AudioSprintTitleConstraintResult> {
   const { data: rows, error } = await supabase
     .from("seo_sprint_queries")
-    .select("pool, sprint_id, author_group")
+    .select("pool, sprint_id, author_group, released_to_general_at")
     .eq("query_id", queryId);
 
   if (error) return { ok: false };
 
-  const visible = (rows ?? []).filter((row) =>
-    isAudioSprintPoolVisible(readString(row.pool)),
+  const visible = (rows ?? []).filter(
+    (row) => !row.released_to_general_at && isAudioSprintPoolVisible(readString(row.pool)),
   );
   if (visible.length === 0) return NO_SPRINT_MATCH;
 
@@ -308,7 +309,7 @@ export async function listAudioSprintForAuthor(
 
   const { data: membershipRows, error: membershipError } = await supabase
     .from("seo_sprint_queries")
-    .select("query_id, author_group, pool")
+    .select("query_id, author_group, pool, released_to_general_at")
     .eq("sprint_id", sprint.id)
     .in("pool", audioSprintEnabledPools());
 
@@ -347,6 +348,7 @@ export async function listAudioSprintForAuthor(
       pool: readString(row.pool),
       queryText,
       normalizedQuery: readString(query?.normalized_query) || null,
+      releasedToGeneralAt: readString(row.released_to_general_at) || null,
     });
   }
 
@@ -414,8 +416,10 @@ export async function listAudioSprintForAuthor(
     ]),
   );
 
+  // Освобождаем только темы без истории выбора и продуктов. Последующая
+  // активность в общей базе не относится к результатам прошедшего спринта.
   const cards = joined.map((row) => {
-    const reservation = reservationByQuery.get(row.query_id);
+    const reservation = row.releasedToGeneralAt ? undefined : reservationByQuery.get(row.query_id);
     const product = reservation?.product_id
       ? productById.get(reservation.product_id)
       : undefined;
@@ -428,10 +432,11 @@ export async function listAudioSprintForAuthor(
     const lifecycle = lifecycleForSeoOpportunity({
       reservation,
       product,
-      publishedOccupancy: occupancyByQueryId.get(row.query_id) ?? null,
+      publishedOccupancy: row.releasedToGeneralAt ? null : occupancyByQueryId.get(row.query_id) ?? null,
     });
     return {
       id: row.query_id,
+      releasedToGeneralAt: row.releasedToGeneralAt,
       queryText: row.queryText,
       authorGroup: row.author_group as AudioSprintAuthorGroup,
       pool: row.pool as AudioSprintQueryCard["pool"],
