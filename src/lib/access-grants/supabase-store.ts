@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { WORKSPACE_DEFAULT_VOLUME } from "@/lib/business-workspace/playback";
 
 import { accessGrantEventIsUnique, isAccessGrantEventName, type AccessGrantEventName } from "./events";
 import type { GrantRow } from "./policy";
@@ -143,13 +144,13 @@ export function createSupabaseAccessGrantStore(): AccessGrantStore {
       if (!row) return null;
       const index = Number(row.track_index ?? 0);
       const positionSec = Number(row.position_seconds ?? 0);
-      const volume = Number(row.volume ?? 0.8);
+      const volume = Number(row.volume ?? WORKSPACE_DEFAULT_VOLUME);
       return {
         userId,
         spaceId,
         index: Number.isFinite(index) ? index : 0,
         positionSec: Number.isFinite(positionSec) ? positionSec : 0,
-        volume: Number.isFinite(volume) ? volume : 0.8,
+        volume: Number.isFinite(volume) ? volume : WORKSPACE_DEFAULT_VOLUME,
         updatedAt: typeof row.updated_at === "string" ? row.updated_at : new Date(0).toISOString(),
       };
     },

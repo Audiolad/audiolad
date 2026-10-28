@@ -7,7 +7,8 @@ export type WorkspacePlayback = {
 
 export const WORKSPACE_PLAYBACK_STORAGE_KEY = "audiolad-business-workspace-playback";
 
-const DEFAULT_VOLUME = 0.8;
+/** First visit on a device, before this browser has stored a level. */
+export const WORKSPACE_DEFAULT_VOLUME = 0.5;
 
 export function clampWorkspacePlayback(
   input: Partial<WorkspacePlayback> | null | undefined,
@@ -16,7 +17,7 @@ export function clampWorkspacePlayback(
   const volume =
     typeof input?.volume === "number" && Number.isFinite(input.volume)
       ? Math.min(1, Math.max(0, input.volume))
-      : DEFAULT_VOLUME;
+      : WORKSPACE_DEFAULT_VOLUME;
   const maxIndex = Math.max(0, trackCount - 1);
   const index =
     typeof input?.index === "number" && Number.isFinite(input.index)

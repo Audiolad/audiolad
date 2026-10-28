@@ -346,8 +346,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             >
               <span style={{ width: `${ratio * 100}%` }} />
             </div>
-            <label className="business-now__volume">
-              <span>Громкость</span>
+            <div className="business-now__volume">
+              <p className="business-now__volume-title" id="biz-now-volume-caption">Громкость</p>
+              <div className="business-now__volume-ends" aria-hidden="true">
+                <span>↓ Тише</span>
+                <span>Громче ↑</span>
+              </div>
               <input
                 type="range"
                 min={0}
@@ -356,11 +360,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 value={player.volume}
                 onChange={(event) => player.setVolume(Number(event.target.value))}
                 data-testid="biz-now-volume"
+                aria-labelledby="biz-now-volume-caption"
                 aria-valuemin={0}
                 aria-valuemax={1}
                 aria-valuenow={player.volume}
               />
-            </label>
+            </div>
             <p className="business-cabinet-player__time" data-testid="biz-now-time">
               {formatPlaybackClock(player.view.currentTime)} / {formatPlaybackClock(duration)}
             </p>

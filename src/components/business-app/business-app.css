@@ -881,17 +881,31 @@
 /* Full-width volume directly under the progress line. */
 .business-now__volume {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.2rem;
   width: 100%;
   margin-top: 0.7rem;
   color: var(--biz-text-muted);
   font-size: 0.95rem;
 }
 
+.business-now__volume-title {
+  margin: 0;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.business-now__volume-ends {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
 .business-now__volume input[type="range"] {
   display: block;
   width: 100%;
-  margin: 0;
+  margin: 0.15rem 0 0;
 }
 
 .business-app-shell:has(.business-cabinet-player) .business-app-main {
@@ -956,9 +970,31 @@
 .cafe-queue__choice {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  width: 100%;
   line-height: 1.15;
+}
+
+/* Icons sit on the outer edges: minus with «Тише», plus with «Громче». */
+.cafe-queue__choice.cafe-queue__choice--less {
+  justify-content: flex-start;
+}
+
+.cafe-queue__choice.cafe-queue__choice--more {
+  justify-content: flex-end;
+}
+
+.cafe-queue__choice--less .cafe-queue__label {
+  text-align: left;
+}
+
+.cafe-queue__choice--more .cafe-queue__label {
+  text-align: right;
+}
+
+.cafe-queue__label {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .cafe-now-feedback {
@@ -1031,8 +1067,8 @@
 
 .cafe-queue__glyph {
   flex: 0 0 auto;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.4rem;
+  height: 1.4rem;
 }
 
 .cafe-queue__pair {
