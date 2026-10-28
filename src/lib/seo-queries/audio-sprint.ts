@@ -72,6 +72,7 @@ export const AUDIO_SPRINT_GROUP_LABEL: Record<AudioSprintAuthorGroup, string> = 
 export type AudioSprintPool = "initial" | "reserve";
 
 export type AudioSprintQueryCard = {
+  releasedToGeneralAt?: string | null;
   id: string;
   queryText: string;
   authorGroup: AudioSprintAuthorGroup;
