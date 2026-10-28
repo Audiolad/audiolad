@@ -47,6 +47,7 @@ jobs:
           npm run test:business-guest-shell
           npm run test:business-ru-copy
           npm run test:business-workspace-trial
+          npm run test:business-access-reminders
           npm run test:business-guest-atmosphere
           npm run test:business-guest-passport
           npm run test:business-brand-icons

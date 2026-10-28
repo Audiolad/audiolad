@@ -5,6 +5,7 @@ import { loadBusinessOwnerHomeSignals } from "@/lib/business-app/load-owner-home
 import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
 import type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
 import { ownerCanPayFromThisBrowser } from "@/lib/business/subscription-checkout";
+import type { BusinessRenewalAnswer } from "@/lib/business/renewal-choice";
 
 export { extractBusinessFirstName } from "@/lib/business-app/domain-identity";
 export type { BusinessOwnerHomeSignals } from "@/lib/business-app/owner-home-signals";
@@ -37,6 +38,10 @@ export type BusinessOwnerHomeContext =
       canPay: boolean;
       /** Account-level B2B offer. One acceptance covers every point. */
       offerAccepted: boolean;
+      /** This browser is the paired hall device. */
+      venueDevice?: boolean;
+      /** «Нет» for the current contractual end. Null when unset or not loaded. */
+      renewalAnswer?: BusinessRenewalAnswer | null;
       /** Real player health / last-play projection for Owner Home chrome (P1-05). */
       signals: BusinessOwnerHomeSignals | null;
     };
@@ -78,10 +83,20 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
 
   const memberships = membershipRows ?? [];
   const membership = memberships[0] ?? null;
+  const venueDevice = await businessPointSessionAlive();
   const canPay = ownerCanPayFromThisBrowser(
     memberships.some((row) => row.role === "owner"),
-    await businessPointSessionAlive(),
+    venueDevice,
   );
+  let renewalAnswer: BusinessRenewalAnswer | null = null;
+  const { data: renewalRow, error: renewalError } = await supabase.rpc(
+    "business_access_renewal_choice_for_caller",
+  );
+  if (!renewalError) {
+    const row = Array.isArray(renewalRow) ? renewalRow[0] : renewalRow;
+    const answer = row && typeof row === "object" ? (row as { answer?: unknown }).answer : null;
+    if (answer === "yes" || answer === "no") renewalAnswer = answer;
+  }
   let offerAccepted = false;
   if (canPay) {
     const { data: acceptance } = await supabase.rpc("business_offer_acceptance_for_caller");
@@ -97,6 +112,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       organizationId: null,
       canPay,
       offerAccepted,
+      venueDevice,
+      renewalAnswer,
       signals: null,
     };
   }
@@ -144,6 +161,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       organizationId,
       canPay,
       offerAccepted,
+      venueDevice,
+      renewalAnswer,
       signals,
     };
   }
@@ -175,6 +194,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     organizationId,
     canPay,
     offerAccepted,
+    venueDevice,
+    renewalAnswer,
     location: {
       id: location.id,
       organizationId: location.organization_id,

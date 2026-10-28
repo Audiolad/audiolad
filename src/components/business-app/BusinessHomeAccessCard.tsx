@@ -14,6 +14,8 @@ import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-gr
 import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import type { BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
+import { BusinessRenewalController } from "@/components/business-app/BusinessRenewalPrompt";
+import { renewalQuestionVisible } from "@/lib/business/renewal-choice";
 
 type PayError = { code: BusinessPayErrorCode; href: string | null };
 
@@ -36,12 +38,22 @@ export default function BusinessHomeAccessCard() {
   const [accepted, setAccepted] = useState(domain.status === "authenticated" && domain.offerAccepted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PayError | null>(null);
+  const [declined, setDeclined] = useState(domain.status === "authenticated" && domain.renewalAnswer === "no");
+  const showQuestion = canPay && !(domain.status === "authenticated" && domain.venueDevice);
 
   if ((access.mode !== "trial" && access.mode !== "paid" && access.mode !== "grace" && access.mode !== "offer") || !access.endsAt) {
     return null;
   }
 
   const label = formatMoscowDateTime(new Date(access.endsAt));
+  // «Нет» hides the payment plate; the answer stays changeable even outside the question window.
+  const question = showQuestion && (declined || renewalQuestionVisible(access, new Date())) ? (
+    <BusinessRenewalController
+      surface="owner"
+      initialAnswer={domain.status === "authenticated" ? domain.renewalAnswer ?? null : null}
+      onAnswer={(answer) => setDeclined(answer === "no")}
+    />
+  ) : null;
   const pay = (
     <BusinessPayControls
       canPay={canPay}
@@ -116,7 +128,8 @@ export default function BusinessHomeAccessCard() {
         <p data-testid="biz-home-grace">
           Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {label}.
         </p>
-        {pay}
+        {declined ? null : pay}
+        {question}
       </section>
     );
   }
@@ -125,7 +138,8 @@ export default function BusinessHomeAccessCard() {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="paid">
         <p data-testid="biz-home-paid-until">Подписка до {label}</p>
-        {pay}
+        {declined ? null : pay}
+        {question}
       </section>
     );
   }
@@ -133,10 +147,11 @@ export default function BusinessHomeAccessCard() {
   if (access.mode === "offer") {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="offer">
-        <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Подписка {formatBusinessMonthlyPrice()} за 30 дней</h2>
+        {declined ? null : <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Подписка {formatBusinessMonthlyPrice()} за 30 дней</h2>}
         <p data-testid="biz-home-ended">Подарочный период закончился {label}.</p>
-        <p>{BUSINESS_SUBSCRIPTION_NOTE}</p>
-        {pay}
+        {declined ? null : <p>{BUSINESS_SUBSCRIPTION_NOTE}</p>}
+        {declined ? null : pay}
+        {question}
       </section>
     );
   }
@@ -150,7 +165,8 @@ export default function BusinessHomeAccessCard() {
         <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-home-until">до {label}</span>
       </p>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{businessGiftRulesText()}</p>
-      {pay}
+      {declined ? null : pay}
+      {question}
     </section>
   );
 }

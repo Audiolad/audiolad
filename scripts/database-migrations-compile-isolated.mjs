@@ -267,6 +267,13 @@ applyFile(
   "post-apply business subscription payment smoke",
   resolve(root, "supabase/tests/business_subscription_payment_smoke.sql"),
 );
+if (!pending.has("20270207140000")) {
+  throw new Error("business access reminder migration was not included in the disposable replay");
+}
+applyFile(
+  "post-apply business access reminder smoke",
+  resolve(root, "supabase/tests/business_access_reminder_emails_smoke.sql"),
+);
 const latestVersion = migrations.versions.at(-1);
 if (!latestVersion) throw new Error("no local migrations found");
 process.stdout.write(`REAL SQL COMPILE: passed through ${latestVersion} (${pending.size} incremental migrations)\n`);

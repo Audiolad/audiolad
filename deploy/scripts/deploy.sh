@@ -149,6 +149,35 @@ assert_seo_reservation_5d_reminder_release_tree() {
   return "$missing"
 }
 
+assert_business_access_reminders_release_tree() {
+  local release_dir="$1"
+  local missing=0
+  local required_files=(
+    "$release_dir/deploy/systemd/audiolad-business-access-reminders.service"
+    "$release_dir/deploy/systemd/audiolad-business-access-reminders.timer"
+    "$release_dir/deploy/logrotate/audiolad-business-access-reminders"
+    "$release_dir/deploy/docs/BUSINESS_ACCESS_REMINDERS.md"
+  )
+  local required_scripts=(
+    "$release_dir/deploy/scripts/ensure-business-access-reminders.sh"
+    "$release_dir/deploy/scripts/run-business-access-reminders.sh"
+  )
+  local path
+  for path in "${required_files[@]}"; do
+    if [[ ! -f "$path" ]]; then
+      log_error "business_access_reminders_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  for path in "${required_scripts[@]}"; do
+    if [[ ! -f "$path" || ! -x "$path" ]]; then
+      log_error "business_access_reminders_artifact_missing path=${path}"
+      missing=1
+    fi
+  done
+  return "$missing"
+}
+
 assert_author_sale_email_outbox_release_tree() {
   local release_dir="$1"
   local missing=0
@@ -340,6 +369,11 @@ main() {
   if ! assert_seo_reservation_5d_reminder_release_tree "$RELEASE_DIR"; then
     log_error "seo_reservation_5d_reminder_artifact_missing"
     send_deploy_alert "deploy_failed" "SEO reservation 5d reminder deploy artifact missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! assert_business_access_reminders_release_tree "$RELEASE_DIR"; then
+    log_error "business_access_reminders_artifact_missing"
+    send_deploy_alert "deploy_failed" "Business access reminder deploy artifact missing for $RELEASE_NAME"
     exit 1
   fi
   if ! assert_music_transcode_worker_release_tree "$RELEASE_DIR"; then
@@ -653,6 +687,20 @@ main() {
     send_deploy_alert "deploy_failed" "SEO reservation 5d reminder timer ensure failed for $RELEASE_NAME"
     # Cutover already completed: fail the deploy result without rolling back a
     # healthy web release, matching the application email outbox ensure convention.
+    exit 1
+  fi
+  BUSINESS_ACCESS_REMINDERS_ENSURE="$RELEASE_DIR/deploy/scripts/ensure-business-access-reminders.sh"
+  if [[ ! -x "$BUSINESS_ACCESS_REMINDERS_ENSURE" ]]; then
+    log_error "business_access_reminders_ensure_missing"
+    send_deploy_alert "deploy_failed" "Business access reminder ensure missing for $RELEASE_NAME"
+    exit 1
+  fi
+  if ! DEPLOY_TREE="$RELEASE_DIR/deploy" "$BUSINESS_ACCESS_REMINDERS_ENSURE"; then
+    log_error "business_access_reminders_ensure_failed"
+    send_deploy_alert "deploy_failed" "Business access reminder timer ensure failed for $RELEASE_NAME"
+    # Cutover already completed: fail the deploy result without rolling back a
+    # healthy web release. The timer is enabled only with
+    # BUSINESS_ACCESS_REMINDERS_TIMER_ENABLE=1 (separate approval); by default units are installed only.
     exit 1
   fi
   if [[ ! -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then

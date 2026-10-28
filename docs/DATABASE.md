@@ -1,3 +1,22 @@
+## Business access reminder letters (pending owner apply)
+
+Migration `20270207140000_business_access_reminder_emails.sql` is additive and
+is not applied by the change that adds it. It creates
+`business_access_reminder_sends` and the claim / complete / fail functions.
+One service letter per owner, contractual end and kind
+(`before_end`, `grace_start`, `grace_last`). A later `paid_until` is a new
+period. `access_grants` and `access_paid_periods` are unchanged, and the
+3-day grace is still not stored. RLS is on; `anon` and `authenticated` have
+no table privileges. Claim skips `service_notifications = false`, a live suppression of
+`all` / `all_non_critical`, and an account «Нет» for that contractual end.
+Marketing unsubscribe does not block these letters. `business_access_renewal_choices`
+is readable by the owning account. The optional improvement note is in
+`business_access_renewal_notes` and is readable only with `admin_panel.access`.
+A new `paid_until` deletes that «Нет». Payment fulfillment is unchanged.
+
+No migration was applied to any shared or production database by this task.
+The systemd timer is installed only by an approved production deploy.
+
 ## Business track sound review (96a75b7b, pending owner apply)
 
 Migration `20270201120000_business_track_sound_reviews.sql` is applied after
