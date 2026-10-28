@@ -46,7 +46,8 @@ function PauseIcon() {
 function NextIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M4.8 5.2v13.6l9.2-6.8-9.2-6.8zm10.2 0h3.4v13.6h-3.4z" fill="currentColor" />
+      <path d="M4.2 4.6v14.8l11.2-7.4L4.2 4.6z" fill="currentColor" />
+      <path d="M17 4.6h3.2v14.8H17z" fill="currentColor" />
     </svg>
   );
 }
@@ -89,7 +90,8 @@ export default function BusinessPlayerControls({
         data-testid={`${testIdPrefix}-next`}
         onClick={onNext}
         disabled={nextDisabled}
-        aria-label={round ? "Следующий" : undefined}
+        aria-label={round ? "Следующий трек" : undefined}
+        title={round ? "Следующий трек" : undefined}
         className={round
           ? "business-next-btn business-app-focus-ring"
           : "business-app-btn business-app-btn-secondary business-app-focus-ring"}

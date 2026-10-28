@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
+import CafeDaypartHoursForm from "@/components/business-app/workspace/CafeDaypartHoursForm";
 import CafeQueueControls from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
@@ -59,7 +60,11 @@ export default function BusinessPlayerSettings() {
           mode={queue.prefs.daypartMode}
           effectiveDaypart={queue.effectiveDaypart}
           onDaypart={queue.setDaypartMode}
+          hours={queue.hours}
         />
+      </section>
+      <section className="business-app-card space-y-3">
+        <CafeDaypartHoursForm hours={queue.hours} onSave={queue.setDaypartHours} />
       </section>
     </>
   );

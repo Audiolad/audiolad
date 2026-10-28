@@ -16,6 +16,7 @@ import { BusinessDomainProvider } from "../src/components/business-app/BusinessD
 import BusinessSoundStudio from "../src/components/business-app/sound/BusinessSoundStudio";
 import BusinessOnboardingWizardPage from "../src/components/business-app/BusinessOnboardingWizardPage";
 import BusinessAtmosphereTrackButton from "../src/components/business-app/BusinessAtmosphereTrackButton";
+import BusinessPlayerSettings from "../src/components/business-app/BusinessPlayerSettings";
 import BusinessWorkspace from "../src/components/business-app/workspace/BusinessWorkspace";
 import { musicPlayerMessage } from "../src/components/business-app/workspace/BusinessCabinetPlayer";
 import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
@@ -616,7 +617,12 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, /data-testid="biz-cafe-queue"/);
   assert.match(html, /data-testid="biz-cafe-auto"/);
   assert.match(html, />Авто</);
-  assert.match(html, /По часам устройства/);
+  assert.match(html, /Авто: по часам – изменить/);
+  assert.match(html, /href="\/preferences#dayparts"/);
+  const playAt = html.indexOf('data-testid="biz-now-play"');
+  const feedbackAt = html.indexOf('data-testid="biz-cafe-feedback"');
+  const daypartAt = html.indexOf('data-testid="biz-cafe-queue"');
+  assert.ok(playAt >= 0 && feedbackAt > playAt && daypartAt > feedbackAt, "feedback sits under play, daypart is a later block");
   assert.doesNotMatch(html, /Спокойнее|Бодрее|biz-cafe-calmer|biz-cafe-livelier/);
   assert.match(html, /Больше такой музыки/);
   assert.match(html, /Меньше такой музыки/);
@@ -633,7 +639,10 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, /aria-label="Играть"/);
   assert.match(html, /business-play-btn--large/);
   assert.match(html, /business-play-btn--compact/);
-  assert.match(html, /aria-label="Следующий"/);
+  assert.match(html, /aria-label="Следующий трек"/);
+  assert.match(html, /title="Следующий трек"/);
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-transport--large \.business-next-btn \{[^}]*width: 3\.5rem/);
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-transport--compact \.business-next-btn \{[^}]*width: 2\.75rem/);
   assert.doesNotMatch(html, />Играть</);
   assert.doesNotMatch(html, />Следующий</);
   assert.equal(musicPlayerMessage("Проверьте интернет и нажмите «Играть»."), "Проверьте интернет и нажмите круглую кнопку.");
@@ -650,16 +659,43 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   const auto = renderToStaticMarkup(
     <CafeQueueControls mode="auto" effectiveDaypart="morning" onDaypart={() => {}} />,
   );
-  assert.match(auto, /Сейчас утро – по часам/);
+  assert.match(auto, /Авто: сейчас утро \(07:00–11:00\) – изменить/);
+  assert.match(auto, /href="\/preferences#dayparts"/);
   assert.match(auto, /data-testid="biz-cafe-auto"[^>]*aria-pressed="true"/);
   assert.match(auto, /data-testid="biz-cafe-daypart-morning"[^>]*aria-pressed="false"/);
   const manual = renderToStaticMarkup(
     <CafeQueueControls mode="evening" effectiveDaypart="morning" onDaypart={() => {}} />,
   );
-  assert.match(manual, /Выбрано вручную/);
+  assert.match(manual, /Выбрано вручную – изменить/);
   assert.match(manual, /data-testid="biz-cafe-daypart-evening"[^>]*aria-pressed="true"/);
   assert.match(manual, /data-testid="biz-cafe-auto"[^>]*aria-pressed="false"/);
   assert.doesNotMatch(auto + manual, /—/);
+}
+{
+  const tracks = Array.from({ length: 8 }, (_, index) => ({
+    audioItemId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    title: `Трек ${index + 1}`,
+    durationSeconds: 120,
+    authorId: null,
+    authorName: null,
+    albumTitle: null,
+    shelf: "cafe" as const,
+  }));
+  const many = renderToStaticMarkup(<BusinessWorkspace model={model({ tracks })} />);
+  const queueHtml = many.slice(many.indexOf('data-testid="biz-now-queue"'));
+  assert.equal((queueHtml.match(/business-atmosphere-track /g) ?? []).length, 3, "only three upcoming rows");
+  assert.match(queueHtml, /и ещё 4 трека/);
+  assert.doesNotMatch(renderToStaticMarkup(<BusinessWorkspace model={model({})} />), /и ещё/);
+}
+{
+  const settings = renderToStaticMarkup(<BusinessPlayerSettings />);
+  assert.match(settings, /id="dayparts"/);
+  assert.match(settings, /value="07:00"/);
+  assert.match(settings, /value="11:00"/);
+  assert.match(settings, /value="16:00"/);
+  assert.match(settings, /value="20:00"/);
+  assert.match(settings, /Вне трёх интервалов остаётся вечер/);
+  assert.doesNotMatch(settings, /—/);
 }
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({ status: "offer", daysLeft: 0, tracks: [] })} />);

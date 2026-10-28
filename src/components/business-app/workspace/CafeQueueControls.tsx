@@ -1,6 +1,14 @@
 "use client";
 
-import type { CafeDaypart, CafeDaypartMode, CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
+import Link from "next/link";
+
+import {
+  CAFE_DAYPART_HOURS_DEFAULT,
+  type CafeDaypart,
+  type CafeDaypartHours,
+  type CafeDaypartMode,
+  type CafeQueueFeedbackKind,
+} from "@/lib/business-app/cafe-queue/prefs";
 
 function CircleIcon({ sign }: { sign: "plus" | "minus" }) {
   return (
@@ -21,26 +29,60 @@ const DAYPARTS: readonly { id: CafeDaypart; label: string; hint: string }[] = [
   { id: "evening", label: "Вечер", hint: "вечер" },
 ];
 
-function daypartHint(mode: CafeDaypartMode, effective: CafeDaypart | null): string {
-  if (mode !== "auto") return "Выбрано вручную";
+export const CAFE_DAYPART_SETTINGS_HREF = "/preferences#dayparts";
+
+function daypartHint(mode: CafeDaypartMode, effective: CafeDaypart | null, hours: CafeDaypartHours): string {
+  if (mode !== "auto") return "Выбрано вручную – изменить";
   const part = DAYPARTS.find((item) => item.id === effective);
-  return part ? `Сейчас ${part.hint} – по часам` : "По часам устройства";
+  if (!part) return "Авто: по часам – изменить";
+  const window = hours[part.id];
+  return `Авто: сейчас ${part.hint} (${window.start}–${window.end}) – изменить`;
+}
+
+/** Votes for the track that is playing now. Lives in the now-playing card, not in the daypart block. */
+export function CafeTrackFeedback({
+  feedbackKind,
+  onFeedback,
+}: {
+  feedbackKind: CafeQueueFeedbackKind | null;
+  onFeedback: (kind: CafeQueueFeedbackKind) => void;
+}) {
+  return (
+    <div className="cafe-queue__pair cafe-now-feedback" data-testid="biz-cafe-feedback">
+      <button
+        type="button"
+        className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
+        data-testid="biz-cafe-more"
+        aria-pressed={feedbackKind === "more"}
+        onClick={() => onFeedback("more")}
+      >
+        <CircleIcon sign="plus" />
+        <span>Больше такой музыки</span>
+      </button>
+      <button
+        type="button"
+        className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
+        data-testid="biz-cafe-less"
+        aria-pressed={feedbackKind === "less"}
+        onClick={() => onFeedback("less")}
+      >
+        <CircleIcon sign="minus" />
+        <span>Меньше такой музыки</span>
+      </button>
+    </div>
+  );
 }
 
 export default function CafeQueueControls({
   mode,
   effectiveDaypart,
   onDaypart,
-  audioItemId = null,
-  feedbackKind = null,
-  onFeedback,
+  hours = CAFE_DAYPART_HOURS_DEFAULT,
 }: {
   mode: CafeDaypartMode;
   effectiveDaypart: CafeDaypart | null;
   onDaypart: (mode: CafeDaypartMode) => void;
-  audioItemId?: string | null;
-  feedbackKind?: CafeQueueFeedbackKind | null;
-  onFeedback?: (kind: CafeQueueFeedbackKind) => void;
+  hours?: CafeDaypartHours;
 }) {
   return (
     <section className="cafe-queue" data-testid="biz-cafe-queue" aria-label="Очередь по времени суток">
@@ -69,32 +111,12 @@ export default function CafeQueueControls({
             </button>
           ))}
         </div>
-        <p className="cafe-queue__note" data-testid="biz-cafe-daypart-hint">{daypartHint(mode, effectiveDaypart)}</p>
+        <p className="cafe-queue__note">
+          <Link href={CAFE_DAYPART_SETTINGS_HREF} className="cafe-queue__link" data-testid="biz-cafe-daypart-hint">
+            {daypartHint(mode, effectiveDaypart, hours)}
+          </Link>
+        </p>
       </fieldset>
-      {audioItemId && onFeedback ? (
-        <div className="cafe-queue__pair" data-testid="biz-cafe-feedback">
-          <button
-            type="button"
-            className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
-            data-testid="biz-cafe-more"
-            aria-pressed={feedbackKind === "more"}
-            onClick={() => onFeedback("more")}
-          >
-            <CircleIcon sign="plus" />
-            <span>Больше такой музыки</span>
-          </button>
-          <button
-            type="button"
-            className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
-            data-testid="biz-cafe-less"
-            aria-pressed={feedbackKind === "less"}
-            onClick={() => onFeedback("less")}
-          >
-            <CircleIcon sign="minus" />
-            <span>Меньше такой музыки</span>
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -12,9 +12,9 @@ import {
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
-import { cafeQueueIndices, cafeUpcomingIndices } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, CAFE_QUEUE_PREVIEW, ruTrackWord } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
-import CafeQueueControls from "@/components/business-app/workspace/CafeQueueControls";
+import CafeQueueControls, { CafeTrackFeedback } from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
   BUSINESS_CONNECT_VENUE_CTA,
@@ -244,16 +244,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
       {open && current ? (
         <>
-          <section className="business-app-card">
-            <CafeQueueControls
-              mode={queue.prefs.daypartMode}
-              effectiveDaypart={queue.effectiveDaypart}
-              onDaypart={queue.setDaypartMode}
-              audioItemId={current.audioItemId}
-              feedbackKind={feedbackKind}
-              onFeedback={(kind) => queue.vote(current.audioItemId, kind)}
-            />
-          </section>
           <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
             <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
             <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
@@ -290,7 +280,19 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               appearance="round"
               size="large"
             />
+            <CafeTrackFeedback
+              feedbackKind={feedbackKind}
+              onFeedback={(kind) => queue.vote(current.audioItemId, kind)}
+            />
             <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
+          </section>
+          <section className="business-app-card">
+            <CafeQueueControls
+              mode={queue.prefs.daypartMode}
+              effectiveDaypart={queue.effectiveDaypart}
+              onDaypart={queue.setDaypartMode}
+              hours={queue.hours}
+            />
           </section>
           <section className="business-app-card business-track-panel" data-testid="biz-now-queue" aria-label="Дальше в очереди">
             <h2 className="text-[1.05rem] font-bold">Дальше в очереди</h2>
@@ -298,7 +300,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               <p className="mt-2 text-sm text-[var(--biz-text-muted)]">Дальше снова зазвучит эта композиция.</p>
             ) : (
               <ol className="business-atmosphere-tracks mt-2">
-                {upcoming.map(({ track, index }) => {
+                {upcoming.slice(0, CAFE_QUEUE_PREVIEW).map(({ track, index }) => {
                   const lineAuthor = track.authorName?.trim() ?? "";
                   const lineAlbum = track.albumTitle?.trim() ?? "";
                   const subtitle = [lineAuthor, lineAlbum].filter(Boolean).join(" – ");
@@ -316,6 +318,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 })}
               </ol>
             )}
+            {cafeUpcomingMoreCount(upcoming.length) > 0 ? (
+              <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-now-more">
+                и ещё {cafeUpcomingMoreCount(upcoming.length)} {ruTrackWord(cafeUpcomingMoreCount(upcoming.length))}
+              </p>
+            ) : null}
           </section>
         </>
       ) : null}

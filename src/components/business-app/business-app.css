@@ -297,9 +297,10 @@
 }
 
 .business-next-btn {
-  border: 1px solid var(--biz-border);
+  border: 1px solid var(--biz-border-strong);
   background: var(--biz-surface);
   color: var(--biz-text);
+  box-shadow: var(--biz-shadow);
 }
 
 .business-next-btn:hover:not(:disabled) {
@@ -308,13 +309,13 @@
 }
 
 .business-transport--large .business-next-btn {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3.5rem;
+  height: 3.5rem;
 }
 
 .business-transport--compact .business-next-btn {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
 }
 
 .business-play-btn:disabled,
@@ -726,6 +727,54 @@
   justify-content: center;
   gap: 0.35rem;
   line-height: 1.15;
+}
+
+.cafe-now-feedback {
+  margin-top: 0.85rem;
+}
+
+.cafe-hours {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cafe-hours__grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.cafe-hours__row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cafe-hours__row label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.cafe-hours__edge {
+  color: var(--biz-text-muted);
+  font-size: 0.85rem;
+}
+
+.cafe-hours__row input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .cafe-hours__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .cafe-hours__row strong {
+    grid-column: 1 / -1;
+  }
 }
 
 .cafe-queue__glyph {
