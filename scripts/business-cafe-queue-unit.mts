@@ -6,11 +6,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { handleCafeQueue } from "../src/lib/business-app/cafe-queue/handle";
-import { cafeQueueIndices, cafeQueueNextIndex } from "../src/lib/business-app/cafe-queue/order";
+import { cafeQueueIndices, cafeQueueNextIndex, cafeUpcomingMoreCount, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
 import { currentCabinetAdmission, restrictCafePool } from "../src/lib/business-app/cafe-queue/pool";
 import {
+  cafeDaypartAtMinute,
   cafeDaypartFromHour,
   parseCafeQueuePrefs,
+  validateCafeDaypartHours,
+  CAFE_DAYPART_HOURS_DEFAULT,
   voteCafeFeedback,
 } from "../src/lib/business-app/cafe-queue/prefs";
 import { cafeEnergyTarget, rankCafeQueue, type CafeQueueRanking, type CafeQueueTrack } from "../src/lib/business-app/cafe-queue/rank";
@@ -57,12 +60,36 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
 
 // ---------------------------------------------------------------- daypart, offset, loudness, mood
 {
-  assert.equal(cafeDaypartFromHour(4), "evening");
-  assert.equal(cafeDaypartFromHour(5), "morning");
-  assert.equal(cafeDaypartFromHour(11), "morning");
-  assert.equal(cafeDaypartFromHour(12), "day");
-  assert.equal(cafeDaypartFromHour(17), "day");
-  assert.equal(cafeDaypartFromHour(18), "evening");
+  assert.equal(cafeDaypartFromHour(4), "evening", "before 07:00 stays evening, the old night");
+  assert.equal(cafeDaypartFromHour(6), "evening");
+  assert.equal(cafeDaypartFromHour(7), "morning");
+  assert.equal(cafeDaypartFromHour(10), "morning");
+  assert.equal(cafeDaypartFromHour(11), "day");
+  assert.equal(cafeDaypartFromHour(15), "day");
+  assert.equal(cafeDaypartFromHour(16), "evening");
+  assert.equal(cafeDaypartFromHour(19), "evening");
+  assert.equal(cafeDaypartFromHour(20), "evening", "from 20:00 the night stays evening");
+  assert.equal(cafeDaypartAtMinute(10 * 60 + 59), "morning");
+  assert.equal(cafeDaypartAtMinute(11 * 60), "day");
+  assert.equal(validateCafeDaypartHours(CAFE_DAYPART_HOURS_DEFAULT), null);
+  assert.match(validateCafeDaypartHours({ ...CAFE_DAYPART_HOURS_DEFAULT, morning: { start: "12:00", end: "11:00" } }) ?? "", /раньше конца/);
+  assert.match(validateCafeDaypartHours({
+    morning: { start: "07:00", end: "12:00" },
+    day: { start: "11:00", end: "16:00" },
+    evening: { start: "16:00", end: "20:00" },
+  }) ?? "", /не должны пересекаться/);
+  assert.match(validateCafeDaypartHours({
+    morning: { start: "07:00", end: "10:00" },
+    day: { start: "11:00", end: "16:00" },
+    evening: { start: "16:00", end: "20:00" },
+  }) ?? "", /идти подряд/);
+  assert.equal(ruTrackWord(1), "трек");
+  assert.equal(ruTrackWord(2), "трека");
+  assert.equal(ruTrackWord(5), "треков");
+  assert.equal(ruTrackWord(11), "треков");
+  assert.equal(ruTrackWord(21), "трек");
+  assert.equal(cafeUpcomingMoreCount(7), 4);
+  assert.equal(cafeUpcomingMoreCount(3), 0);
   assert.equal(cafeEnergyTarget("morning", 0), 40);
   assert.equal(cafeEnergyTarget("day", 0), 62);
   assert.equal(cafeEnergyTarget("evening", 0), 28);

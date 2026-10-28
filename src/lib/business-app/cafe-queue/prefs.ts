@@ -36,23 +36,122 @@ export const CAFE_QUEUE_DEFAULT_PREFS: CafeQueuePrefs = {
   energyOffset: 0,
 };
 
+/** Device storage, one row per venue. No database column exists for these boundaries. */
+export const CAFE_DAYPART_HOURS_KEY = "audiolad-business-cafe-daypart-hours";
+
+export type CafeClock = string;
+
+export type CafeDaypartWindow = { start: CafeClock; end: CafeClock };
+
+export type CafeDaypartHours = Record<CafeDaypart, CafeDaypartWindow>;
+
+/** Morning, day and evening touch. Hours outside this block stay evening (the old night). */
+export const CAFE_DAYPART_HOURS_DEFAULT: CafeDaypartHours = {
+  morning: { start: "07:00", end: "11:00" },
+  day: { start: "11:00", end: "16:00" },
+  evening: { start: "16:00", end: "20:00" },
+};
+
+const CLOCK = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+export function cafeDaypartHoursKey(locationId: string | null | undefined): string {
+  return locationId ? `${CAFE_DAYPART_HOURS_KEY}:${locationId}` : CAFE_DAYPART_HOURS_KEY;
+}
+
+export function parseClockMinutes(value: string): number | null {
+  const match = CLOCK.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+export function validateCafeDaypartHours(hours: CafeDaypartHours): string | null {
+  const rows = [
+    ["Утро", hours.morning],
+    ["День", hours.day],
+    ["Вечер", hours.evening],
+  ] as const;
+  const parsed: { label: string; start: number; end: number }[] = [];
+  for (const [label, window] of rows) {
+    const start = parseClockMinutes(window.start);
+    const end = parseClockMinutes(window.end);
+    if (start === null || end === null) return `${label}: укажите время в виде ЧЧ:ММ.`;
+    if (start >= end) return `${label}: начало должно быть раньше конца.`;
+    parsed.push({ label, start, end });
+  }
+  if (parsed[0]!.end > parsed[1]!.start || parsed[1]!.end > parsed[2]!.start) {
+    return "Интервалы не должны пересекаться.";
+  }
+  if (parsed[0]!.end !== parsed[1]!.start || parsed[1]!.end !== parsed[2]!.start) {
+    return "Интервалы должны идти подряд: конец утра совпадает с началом дня, конец дня – с началом вечера.";
+  }
+  return null;
+}
+
+export function parseCafeDaypartHours(raw: string | null | undefined): CafeDaypartHours {
+  if (!raw) return CAFE_DAYPART_HOURS_DEFAULT;
+  try {
+    const value = JSON.parse(raw) as Partial<Record<CafeDaypart, CafeDaypartWindow>>;
+    const hours: CafeDaypartHours = {
+      morning: { start: String(value.morning?.start ?? ""), end: String(value.morning?.end ?? "") },
+      day: { start: String(value.day?.start ?? ""), end: String(value.day?.end ?? "") },
+      evening: { start: String(value.evening?.start ?? ""), end: String(value.evening?.end ?? "") },
+    };
+    return validateCafeDaypartHours(hours) === null ? hours : CAFE_DAYPART_HOURS_DEFAULT;
+  } catch {
+    return CAFE_DAYPART_HOURS_DEFAULT;
+  }
+}
+
+export function serializeCafeDaypartHours(hours: CafeDaypartHours): string {
+  return JSON.stringify(hours);
+}
+
+/** Inside a window the part is that window. Outside the block, evening (historical night). */
+export function cafeDaypartAtMinute(minuteOfDay: number, hours: CafeDaypartHours = CAFE_DAYPART_HOURS_DEFAULT): CafeDaypart {
+  if (!Number.isFinite(minuteOfDay)) return "day";
+  const minute = ((Math.floor(minuteOfDay) % 1440) + 1440) % 1440;
+  const windows = [hours.morning, hours.day, hours.evening].map((window) => ({
+    start: parseClockMinutes(window.start),
+    end: parseClockMinutes(window.end),
+  }));
+  const parts: CafeDaypart[] = ["morning", "day", "evening"];
+  for (let index = 0; index < parts.length; index += 1) {
+    const window = windows[index];
+    if (window?.start === null || window?.end === null || window.start >= window.end) continue;
+    if (minute >= window.start && minute < window.end) return parts[index]!;
+  }
+  return "evening";
+}
+
 const AUDIO_ITEM_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const CAFE_QUEUE_FEEDBACK_LIMIT = 24;
 
-/** 05:00–11:59 morning, 12:00–17:59 day, 18:00–04:59 evening. */
-export function cafeDaypartFromHour(hour: number): CafeDaypart {
+/** Whole hour on the device clock, using the venue windows. 11:00 is already day. */
+export function cafeDaypartFromHour(hour: number, hours: CafeDaypartHours = CAFE_DAYPART_HOURS_DEFAULT): CafeDaypart {
   if (!Number.isFinite(hour)) return "day";
   const wrapped = ((Math.floor(hour) % 24) + 24) % 24;
-  if (wrapped >= 5 && wrapped < 12) return "morning";
-  if (wrapped >= 12 && wrapped < 18) return "day";
-  return "evening";
+  return cafeDaypartAtMinute(wrapped * 60, hours);
 }
 
-export function effectiveCafeDaypart(mode: CafeDaypartMode, hour: number | null): CafeDaypart | null {
+export function effectiveCafeDaypart(
+  mode: CafeDaypartMode,
+  hour: number | null,
+  hours: CafeDaypartHours = CAFE_DAYPART_HOURS_DEFAULT,
+): CafeDaypart | null {
   if (mode !== "auto") return mode;
   if (hour === null || !Number.isFinite(hour)) return null;
-  return cafeDaypartFromHour(hour);
+  return cafeDaypartFromHour(hour, hours);
+}
+
+export function effectiveCafeDaypartAt(
+  mode: CafeDaypartMode,
+  minuteOfDay: number | null,
+  hours: CafeDaypartHours = CAFE_DAYPART_HOURS_DEFAULT,
+): CafeDaypart | null {
+  if (mode !== "auto") return mode;
+  if (minuteOfDay === null || !Number.isFinite(minuteOfDay)) return null;
+  return cafeDaypartAtMinute(minuteOfDay, hours);
 }
 
 export function isCafeDaypart(value: unknown): value is CafeDaypart {

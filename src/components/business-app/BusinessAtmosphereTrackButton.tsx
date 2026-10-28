@@ -8,7 +8,8 @@ type Props = {
   title: string;
   subtitle?: string | null;
   time?: string | null;
-  number: number;
+  /** Queue position. Omitted on the venue "up next" list, which does not number rows. */
+  number?: number | null;
   current?: boolean;
   playing?: boolean;
   disabled?: boolean;
@@ -21,8 +22,8 @@ type Props = {
 
 /**
  * One track row for the cabinet music lists (guest atmosphere and the signed-in queue).
- * The thumbnail is the album cover already shown in the public catalog. The number, or ♪
- * while this row is playing, sits on the thumbnail so the playing state stays visible.
+ * The thumbnail is the album cover already shown in the public catalog. A number, when
+ * this list uses one, or ♪ while this row is playing, sits on the thumbnail.
  */
 export default function BusinessAtmosphereTrackButton({
   title,
@@ -41,6 +42,7 @@ export default function BusinessAtmosphereTrackButton({
   const [failed, setFailed] = useState(false);
   const src = cabinetAlbumCoverUrl({ coverUrl, coverImage, updatedAt });
   const showImage = Boolean(src) && !failed;
+  const mark = playing ? "♪" : number ?? null;
 
   return (
     <button
@@ -72,7 +74,7 @@ export default function BusinessAtmosphereTrackButton({
             onError={() => setFailed(true)}
           />
         ) : null}
-        <span className="business-atmosphere-track__mark">{playing ? "♪" : number}</span>
+        {mark != null ? <span className="business-atmosphere-track__mark">{mark}</span> : null}
       </span>
       <span className="business-atmosphere-track__meta">
         <span className="business-atmosphere-track__title">{title}</span>

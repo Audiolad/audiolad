@@ -109,6 +109,8 @@ const PAIRS: Array<[string, string]> = [
   ["--biz-text-muted", "--biz-green-bg"], ["--biz-text-muted", "--biz-red-bg"],
   ["--biz-eyebrow", "--biz-bg"], ["--biz-eyebrow", "--biz-surface"],
   ["--biz-on-accent", "--biz-accent"], ["--biz-on-accent", "--biz-accent-hover"],
+  ["--biz-on-play", "--biz-play"], ["--biz-on-play", "--biz-play-hover"],
+  ["--biz-play", "--biz-bg"], ["--biz-play", "--biz-surface"],
   ["--biz-accent", "--biz-surface"], ["--biz-accent", "--biz-bg"], ["--biz-accent", "--biz-accent-soft"],
   ["--biz-tooltip-text", "--biz-tooltip-bg"],
   ["--biz-green-ink", "--biz-green-bg"], ["--biz-green", "--biz-surface"],
@@ -133,6 +135,8 @@ for (const t of ["--biz-accent", "--biz-accent-hover", "--biz-highlight", "--biz
   const h = hue(resolve(t));
   assert.ok(h >= 15 && h <= 50, `${t} hue ${h.toFixed(0)}° is not warm`);
 }
+const playHue = hue(resolve("--biz-play"));
+assert.ok(playHue < 15 || playHue > 50, `play control hue ${playHue.toFixed(0)}° must not reuse the coffee brown`);
 assert.doesNotMatch(themeCss, /#7042c5|#6d5bd0|#f4edfb|#f7f4fb/i, "old lavender/violet palette is gone");
 
 // 5. Continuity with the public atlas (/b/atlas-kofeen) on base colours.

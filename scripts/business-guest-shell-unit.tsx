@@ -23,7 +23,7 @@ import {
   isBusinessNavItemLocked,
   resolveBusinessAccess,
 } from "../src/lib/business-app/access";
-import { BUSINESS_NO_ACCESS, effectiveChromeAccess, type BusinessChromeAccess } from "../src/lib/access-grants/access-line";
+import { BUSINESS_NO_ACCESS, effectiveChromeAccess, hasLiveBusinessAccess, type BusinessChromeAccess } from "../src/lib/access-grants/access-line";
 import { peekChromeAccessWith, type PeekReader } from "../src/lib/access-grants/peek-closure";
 import type { GrantRow } from "../src/lib/access-grants/policy";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
@@ -336,7 +336,9 @@ void (async () => {
   assert.notEqual(stranger.mode, "trial", "unrelated account: no gift");
   assert.equal(stranger.endsAt, null);
   const over = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-22T14:11:37Z"));
-  assert.ok(over.mode !== "trial" && over.endsAt === null, "gift over at its exact end instant");
+  assert.equal(over.mode, "offer", "gift over at its exact end instant is not a live trial");
+  assert.equal(over.endsAt, "2026-11-22T14:11:37Z", "Главная still receives the end instant");
+  assert.equal(hasLiveBusinessAccess(over), false, "an ended gift does not keep the calm access line");
   const paid = await peekChromeAccessWith(reader(["2026-12-31T10:00:00Z"]), { userId: "C", emailHash: "Y" }, new Date("2026-12-01T00:00:00Z"));
   assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z" }, "paid period after the gift");
   assert.ok(reads.length > 0);

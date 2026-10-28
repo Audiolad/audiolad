@@ -253,6 +253,77 @@
   opacity: 0.6;
 }
 
+/* Round transport on the venue player. Pine, so it is not another brown button. */
+.business-play-btn,
+.business-next-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+.business-play-btn {
+  border: 0;
+  background: var(--biz-play);
+  color: var(--biz-on-play);
+  box-shadow: var(--biz-shadow-strong);
+}
+
+.business-play-btn:hover:not(:disabled) {
+  background: var(--biz-play-hover);
+}
+
+.business-play-btn--large {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.business-play-btn--compact {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.business-play-btn svg,
+.business-next-btn svg {
+  width: 46%;
+  height: 46%;
+  display: block;
+}
+
+.business-play-btn[data-state="play"] svg {
+  transform: translateX(8%);
+}
+
+.business-next-btn {
+  border: 1px solid var(--biz-border-strong);
+  background: var(--biz-surface);
+  color: var(--biz-text);
+  box-shadow: var(--biz-shadow);
+}
+
+.business-next-btn:hover:not(:disabled) {
+  border-color: var(--biz-accent-border);
+  background: var(--biz-accent-soft);
+}
+
+.business-transport--large .business-next-btn {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.business-transport--compact .business-next-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.business-play-btn:disabled,
+.business-next-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .business-app-slider {
   width: 100%;
   accent-color: var(--biz-accent);
@@ -641,7 +712,75 @@
 }
 
 .cafe-queue__chips {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cafe-queue__chips .cafe-queue__btn {
+  padding-inline: 0.15rem;
+  font-size: 0.88rem;
+  overflow-wrap: normal;
+}
+
+.cafe-queue__choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  line-height: 1.15;
+}
+
+.cafe-now-feedback {
+  margin-top: 0.85rem;
+}
+
+.cafe-hours {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cafe-hours__grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.cafe-hours__row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cafe-hours__row label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.cafe-hours__edge {
+  color: var(--biz-text-muted);
+  font-size: 0.85rem;
+}
+
+.cafe-hours__row input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .cafe-hours__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .cafe-hours__row strong {
+    grid-column: 1 / -1;
+  }
+}
+
+.cafe-queue__glyph {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 .cafe-queue__pair {

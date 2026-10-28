@@ -57,6 +57,10 @@
   --biz-on-accent: #fff8ef;
   --biz-highlight: var(--biz-brass);
   --biz-focus: var(--biz-coffee);
+  /* Round play control: deep pine, not the coffee-brown of the other buttons. */
+  --biz-play: #145e48;
+  --biz-play-hover: #0e4a38;
+  --biz-on-play: #fff8ef;
   --biz-tooltip-bg: var(--biz-espresso);
   --biz-tooltip-text: #fff8ef;
 

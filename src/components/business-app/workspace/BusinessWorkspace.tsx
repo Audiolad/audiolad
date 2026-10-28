@@ -12,23 +12,19 @@ import {
   useCabinetPlayer,
   useCabinetPlayerOptional,
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
-import { cafeQueueIndices, cafeUpcomingIndices } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, CAFE_QUEUE_PREVIEW, ruTrackWord } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
-import CafeQueueControls from "@/components/business-app/workspace/CafeQueueControls";
+import CafeQueueControls, { CafeTrackFeedback } from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
   BUSINESS_CONNECT_VENUE_CTA,
   BUSINESS_CONNECT_VENUE_NOTE,
   BUSINESS_EMPTY_CATALOG_NOTE,
   BUSINESS_GIFT_CTA,
-  BUSINESS_GIFT_TITLE,
-  BUSINESS_SPACE_CLOSED_NOTE,
   BUSINESS_STORE_UNAVAILABLE_NOTE,
-  BUSINESS_SUBSCRIPTION_NOTE,
   BUSINESS_UNCONFIRMED_NOTE,
   BUSINESS_WORKSPACE_AUTOPLAY_NOTE,
 } from "@/lib/access-grants/copy";
-import { ruDaysWord } from "@/lib/access-grants/policy";
 import {
   workspaceDeadlineDelay,
   workspacePlaybackAllowed,
@@ -91,7 +87,8 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
         character: queue.profile.character,
         direction: queue.profile.direction,
         daypart: queue.effectiveDaypart,
-        energyOffset: queue.prefs.energyOffset,
+        // Calm/lively is no longer offered. A stored offset stays on the device and is not applied.
+        energyOffset: 0,
         feedback: queue.feedback,
         boundaryAudioItemId: boundaryRef.current ?? undefined,
       }),
@@ -113,7 +110,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     open,
     queue.ready,
     queue.effectiveDaypart,
-    queue.prefs.energyOffset,
     queue.profile.character,
     queue.profile.direction,
     queue.feedback,
@@ -123,8 +119,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     model.tracks,
     setQueueOrder,
   ]);
-  const [offerNoted, setOfferNoted] = useState(false);
-
   useEffect(() => {
     if (!open) return;
     let timer: ReturnType<typeof setTimeout>;
@@ -161,20 +155,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     };
   }, [open, model, initialModel, release]);
 
-  const offer = () => {
-    setOfferNoted(true);
-    const params = new URLSearchParams({ space: model.spaceId });
-    void fetch(`/api/business/workspace/state?${params.toString()}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "same-origin",
-      cache: "no-store",
-      body: JSON.stringify({ kind: "offer_click" }),
-    }).catch(() => {
-      /* The subscribe button stays on this screen. Nothing is charged. */
-    });
-  };
-
   const current = model.tracks[currentIndex] ?? model.tracks[0] ?? null;
   const author = current?.authorName?.trim() ?? "";
   const album = current?.albumTitle?.trim() ?? "";
@@ -186,22 +166,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
   return (
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
-      <header>
-        <p className="business-app-eyebrow">{BUSINESS_GIFT_TITLE}</p>
-        <h1 className="mt-1 text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">{model.spaceTitle}</h1>
-        {model.status === "trial" && model.daysLeft !== null ? (
-          <p className="mt-2 text-[1.15rem] font-bold text-[var(--biz-text)]" data-testid="biz-workspace-days">
-            Осталось {model.daysLeft} {ruDaysWord(model.daysLeft)}
-            {model.endsAtLabel ? <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-workspace-until">до {model.endsAtLabel}</span> : null}
-          </p>
-        ) : null}
-        {model.status === "paid" && model.endsAtLabel ? (
-          <p className="mt-2 text-[var(--biz-text-muted)]" data-testid="biz-workspace-paid-until">Подписка до {model.endsAtLabel}</p>
-        ) : null}
-      </header>
-
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-workspace-rules">{model.rules}</p>
-
       {model.status === "anonymous" ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-anonymous">
           <p>Чтобы открыть кабинет, подтвердите почту по письму. Карта не нужна.</p>
@@ -235,20 +199,21 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
       {!model.spaceEnabled ? (
         <section className="business-app-card space-y-3" data-testid="biz-workspace-closed-space">
-          <p>{BUSINESS_SPACE_CLOSED_NOTE}</p>
-          <Link className="underline" href={model.cafeHref}>Перейти и открыть «Кафе, рестораны и отели»</Link>
+          <p>Это направление пока закрыто.</p>
+          <Link className="underline" href={model.cafeHref}>Открыть музыку</Link>
         </section>
       ) : null}
 
       {model.status === "offer" ? (
-        <section className="business-app-card space-y-3" data-testid="biz-workspace-offer">
-          <h2 className="text-[1.15rem] font-bold">Подписка {model.priceLabel} {model.periodLabel}</h2>
-          {model.endsAtLabel ? <p data-testid="biz-workspace-ended">Подарочный период закончился {model.endsAtLabel}.</p> : null}
-          <p>{BUSINESS_SUBSCRIPTION_NOTE}</p>
-          <button type="button" className="business-app-btn business-app-btn-primary business-app-focus-ring" onClick={offer} data-testid="biz-workspace-subscribe">
-            Оформить подписку
-          </button>
-          {offerNoted ? <p data-testid="biz-workspace-offer-noted">Запрос отмечен. Деньги не списываются.</p> : null}
+        <section className="business-app-card space-y-2" data-testid="biz-workspace-offer">
+          <p>
+            {model.endsAtLabel
+              ? `Подарочный период закончился ${model.endsAtLabel}. Полный плеер закрыт.`
+              : "Подарочный период закончился. Полный плеер закрыт."}
+          </p>
+          <p>
+            <Link className="underline" href="/#dostup" data-testid="biz-workspace-terms">Условия и подписка</Link>
+          </p>
         </section>
       ) : null}
 
@@ -279,18 +244,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
 
       {open && current ? (
         <>
-          <section className="business-app-card">
-            <CafeQueueControls
-              mode={queue.prefs.daypartMode}
-              effectiveDaypart={queue.effectiveDaypart}
-              energyOffset={queue.prefs.energyOffset}
-              onDaypart={queue.setDaypartMode}
-              onOffset={queue.setEnergyOffset}
-              audioItemId={current.audioItemId}
-              feedbackKind={feedbackKind}
-              onFeedback={(kind) => queue.vote(current.audioItemId, kind)}
-            />
-          </section>
           <section className="business-app-card" data-testid="biz-now-playing" aria-label="Сейчас играет">
             <h2 className="text-[1.05rem] font-bold">Сейчас играет</h2>
             <p className="business-now__title" data-testid="biz-now-title">{current.title}</p>
@@ -324,8 +277,22 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               onNext={() => void player.next()}
               volume={player.volume}
               onVolume={player.setVolume}
+              appearance="round"
+              size="large"
+            />
+            <CafeTrackFeedback
+              feedbackKind={feedbackKind}
+              onFeedback={(kind) => queue.vote(current.audioItemId, kind)}
             />
             <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
+          </section>
+          <section className="business-app-card">
+            <CafeQueueControls
+              mode={queue.prefs.daypartMode}
+              effectiveDaypart={queue.effectiveDaypart}
+              onDaypart={queue.setDaypartMode}
+              hours={queue.hours}
+            />
           </section>
           <section className="business-app-card business-track-panel" data-testid="biz-now-queue" aria-label="Дальше в очереди">
             <h2 className="text-[1.05rem] font-bold">Дальше в очереди</h2>
@@ -333,7 +300,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               <p className="mt-2 text-sm text-[var(--biz-text-muted)]">Дальше снова зазвучит эта композиция.</p>
             ) : (
               <ol className="business-atmosphere-tracks mt-2">
-                {upcoming.map(({ track, index, number }) => {
+                {upcoming.slice(0, CAFE_QUEUE_PREVIEW).map(({ track, index }) => {
                   const lineAuthor = track.authorName?.trim() ?? "";
                   const lineAlbum = track.albumTitle?.trim() ?? "";
                   const subtitle = [lineAuthor, lineAlbum].filter(Boolean).join(" – ");
@@ -343,7 +310,6 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                         title={track.title}
                         subtitle={subtitle}
                         time={track.durationSeconds != null ? formatPlaybackClock(track.durationSeconds) : null}
-                        number={number}
                         coverUrl={track.coverUrl}
                         onClick={() => void playIndex(index)}
                       />
@@ -352,6 +318,11 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 })}
               </ol>
             )}
+            {cafeUpcomingMoreCount(upcoming.length) > 0 ? (
+              <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-now-more">
+                и ещё {cafeUpcomingMoreCount(upcoming.length)} {ruTrackWord(cafeUpcomingMoreCount(upcoming.length))}
+              </p>
+            ) : null}
           </section>
         </>
       ) : null}
@@ -373,9 +344,9 @@ function upcomingTracks(
   tracks: readonly WorkspaceTrack[],
   currentIndex: number,
   order: readonly number[],
-): { track: WorkspaceTrack; index: number; number: number }[] {
-  return cafeUpcomingIndices(order, currentIndex).flatMap((index, step) => {
+): { track: WorkspaceTrack; index: number }[] {
+  return cafeUpcomingIndices(order, currentIndex).flatMap((index) => {
     const track = tracks[index];
-    return track ? [{ track, index, number: step + 1 }] : [];
+    return track ? [{ track, index }] : [];
   });
 }

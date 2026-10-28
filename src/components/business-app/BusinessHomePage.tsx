@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
+import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
@@ -215,6 +216,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
             {subtitle}
           </p>
         </header>
+        <BusinessHomeAccessCard />
         <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
           <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
             Первая точка
@@ -245,11 +247,12 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation }:
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">
           {greeting}
         </h1>
-        <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
-          {subtitle}
-        </p>
-      </header>
+          <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
+            {subtitle}
+          </p>
+        </header>
 
+      <BusinessHomeAccessCard />
       <BusinessOwnerHomeLiveRefresh />
       <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">

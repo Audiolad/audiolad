@@ -46,6 +46,28 @@ export function cafeQueueIndices(
   return order;
 }
 
+/** How many upcoming rows the venue player lists before «и ещё N». */
+export const CAFE_QUEUE_PREVIEW = 3;
+
+/** 1 трек, 2 трека, 5 треков, 21 трек. */
+export function ruTrackWord(count: number): string {
+  const n = Math.abs(Math.trunc(count)) % 100;
+  const last = n % 10;
+  if (n > 10 && n < 20) return "треков";
+  if (last === 1) return "трек";
+  if (last >= 2 && last <= 4) return "трека";
+  return "треков";
+}
+
+/**
+ * Tracks still in the finite pool after the preview rows.
+ * The current track is not in `upcomingLength` (the loop lists every other pool track once).
+ */
+export function cafeUpcomingMoreCount(upcomingLength: number, shown = CAFE_QUEUE_PREVIEW): number {
+  if (!Number.isInteger(upcomingLength) || upcomingLength <= shown) return 0;
+  return upcomingLength - shown;
+}
+
 /** Tracks after the current one, then the earlier ones, following `order`. */
 export function cafeUpcomingIndices(order: readonly number[], currentIndex: number): number[] {
   if (order.length <= 1) return [];
