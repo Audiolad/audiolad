@@ -86,6 +86,8 @@
     "test:music-analyzer-features": "node scripts/music-analyzer-features-unit.mjs && node scripts/music-analyzer-voice-unit.mjs && npx tsx scripts/music-analyzer-passport-compat-unit.mts && npx tsx scripts/music-analyzer-withheld-legacy-unit.mts",
     "test:music-analyzer-migration:isolated": "python3 scripts/music-analyzer-migration-isolated.py",
     "test:studio-author-provisioning": "node scripts/studio-author-provisioning-unit.mjs",
+    "test:use-server-exports": "node scripts/use-server-exports-unit.mjs",
+    "test:author-slug-admin": "npx tsx scripts/author-slug-admin-unit.mjs",
     "test:playlists-stage1": "npx tsx scripts/playlists-stage1-validation-smoke.mjs",
     "test:playlists-stage2": "npx tsx scripts/playlists-stage2-validation-smoke.mjs && npm run test:playlist-items-sortable",
     "test:playlist-items-sortable": "npx tsx scripts/playlist-items-sortable-unit.mjs && npx tsx scripts/playlists-pr4-validation-smoke.mjs && npx tsx scripts/playlist-editorial-composition-list-unit.mts",

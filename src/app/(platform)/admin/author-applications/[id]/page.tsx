@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import AuthorApplicationReviewForm from "@/components/admin/AuthorApplicationReviewForm";
 import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
+import { authorApplicationScreenName } from "@/lib/author-applications/screen-name";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { getAdminAuthorApplication } from "@/lib/admin/queries";
 import { snapshotHasPermission } from "@/lib/auth/platform-access";
@@ -36,6 +37,12 @@ export default async function AdminAuthorApplicationDetailPage({
     notFound();
   }
 
+  const publicName = authorApplicationScreenName({
+    status: application.status,
+    displayName: application.display_name,
+    authorName: application.linkedAuthor?.name,
+  });
+
   return (
     <section aria-labelledby="admin-application-detail-heading">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -50,7 +57,7 @@ export default async function AdminAuthorApplicationDetailPage({
             id="admin-application-detail-heading"
             className="mt-2 text-[21px] font-semibold"
           >
-            {application.display_name}
+            {publicName}
           </h2>
           <p className="mt-1 text-sm text-[#796ba0]">
             Статус: {getAdminApplicationStatusLabel(application.status)}

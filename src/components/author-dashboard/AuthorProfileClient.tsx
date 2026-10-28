@@ -20,6 +20,8 @@ import type { AuthorProfileDetail } from "@/lib/authors/profile";
 import { getDisplayFormat } from "@/lib/author-products/format";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import { buildAuthorPublicPath } from "@/lib/products/paths";
+import { slugifyAuthorProjectName } from "@/lib/author-projects/slug";
+import { APPLICATION_NAME_SYNC_FAILED_MESSAGE } from "@/lib/author-applications/screen-name";
 import type { AuthorWorkspace } from "@/lib/author-products/types";
 import {
   getDefaultBannerPosition,
@@ -73,11 +75,13 @@ type PublishedProductOption = {
 type AuthorProfileClientProps = {
   authors: AuthorWorkspace[];
   topicOptions: TopicSelectorOption[];
+  canSuggestAuthorSlug?: boolean;
 };
 
 export default function AuthorProfileClient({
   authors,
   topicOptions,
+  canSuggestAuthorSlug = false,
 }: AuthorProfileClientProps) {
   const searchParams = useSearchParams();
 
@@ -117,6 +121,10 @@ export default function AuthorProfileClient({
     PublishedProductOption[]
   >([]);
   const [profileSlug, setProfileSlug] = useState("");
+  const [slugSuggestion, setSlugSuggestion] = useState<{
+    lookup: string;
+    slug: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!selectedAuthor) {
@@ -275,6 +283,9 @@ export default function AuthorProfileClient({
     setSaving(true);
     setError(null);
     setSuccess(null);
+    setSlugSuggestion(null);
+    const nameBeforeSave = savedName;
+    const slugBeforeSave = profileSlug;
 
     try {
       const response = await fetch("/api/author/profile", {
@@ -308,6 +319,12 @@ export default function AuthorProfileClient({
         if (payload.error === "invalid_project_name" && payload.message) {
           throw new Error(payload.message);
         }
+        if (
+          payload.error === "application_name_sync_failed" &&
+          payload.message === APPLICATION_NAME_SYNC_FAILED_MESSAGE
+        ) {
+          throw new Error(payload.message);
+        }
         throw new Error(payload.error ?? "save_failed");
       }
 
@@ -327,12 +344,24 @@ export default function AuthorProfileClient({
       setSavedContacts(nextContacts);
       setPublishedProducts(payload.publishedProducts ?? []);
       setProfileSlug(payload.profile.slug);
+      const suggestedSlug = slugifyAuthorProjectName(payload.profile.name);
+      if (
+        canSuggestAuthorSlug &&
+        nameBeforeSave.trim() !== payload.profile.name.trim() &&
+        suggestedSlug !== (payload.profile.slug || slugBeforeSave)
+      ) {
+        setSlugSuggestion({
+          lookup: payload.profile.slug || slugBeforeSave,
+          slug: suggestedSlug,
+        });
+      }
       setSuccess("Изменения сохранены.");
     } catch (saveError) {
       setError(
         saveError instanceof Error &&
         (saveError.message === AUTHOR_PROJECT_NAME_LATIN_ERROR ||
-          saveError.message === AUTHOR_PROJECT_NAME_TOO_LONG_ERROR)
+          saveError.message === AUTHOR_PROJECT_NAME_TOO_LONG_ERROR ||
+          saveError.message === APPLICATION_NAME_SYNC_FAILED_MESSAGE)
           ? saveError.message
           : saveError instanceof Error && saveError.message === "featured_product_forbidden"
           ? "Можно добавлять только собственные опубликованные продукты."
@@ -654,9 +683,21 @@ export default function AuthorProfileClient({
           ) : null}
 
           {success ? (
-            <p className="rounded-[18px] border border-[#c8ead8] bg-[#f3fbf7] px-4 py-3 text-sm text-[#2f7a55]">
-              {success}
-            </p>
+            <div className="rounded-[18px] border border-[#c8ead8] bg-[#f3fbf7] px-4 py-3 text-sm text-[#2f7a55]">
+              <p>{success}</p>
+              {slugSuggestion ? (
+                <p className="mt-2">
+                  Название изменилось – адрес страницы можно привести к{" "}
+                  <code>{slugSuggestion.slug}</code>.{" "}
+                  <Link
+                    href={`/admin/authors/slug?lookup=${encodeURIComponent(slugSuggestion.lookup)}&slug=${encodeURIComponent(slugSuggestion.slug)}`}
+                    className="font-medium underline"
+                  >
+                    Сменить slug
+                  </Link>
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           <p className="text-sm leading-6 text-[#7d70a2]">

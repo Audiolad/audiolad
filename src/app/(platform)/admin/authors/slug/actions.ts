@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_rethrow } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { requireAdminPermission } from "@/lib/admin/guard";
@@ -18,19 +19,12 @@ import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/ho
 import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
 import { createClient } from "@/lib/supabase/server";
 
-export type ChangeAuthorSlugAdminState = {
-  ok: boolean;
-  step?: "preview" | "done";
-  message?: string;
-  error?: string;
-  authorId?: string;
-  authorName?: string;
-  previousSlug?: string;
-  slug?: string;
-};
-
-export const CHANGE_AUTHOR_SLUG_ADMIN_INITIAL_STATE: ChangeAuthorSlugAdminState =
-  { ok: false };
+import {
+  AUTHOR_SLUG_CONFIRM_ERROR,
+  AUTHOR_SLUG_PREVIEW_ERROR,
+  authorSlugUpdatedMessage,
+  type ChangeAuthorSlugAdminState,
+} from "./state";
 
 function parseAuthorLookup(raw: string): {
   kind: "uuid" | "slug";
@@ -106,100 +100,112 @@ export async function previewAuthorSlugChangeAsAdmin(
   _previous: ChangeAuthorSlugAdminState,
   formData: FormData,
 ): Promise<ChangeAuthorSlugAdminState> {
-  await requireAdminPermission("authors.manage");
+  try {
+    await requireAdminPermission("authors.manage");
 
-  const lookupRaw = String(formData.get("author_lookup") ?? "");
-  const slugRaw = String(formData.get("slug") ?? "");
-  const normalized = normalizeAuthorSpaceSlugInput(slugRaw);
+    const lookupRaw = String(formData.get("author_lookup") ?? "");
+    const slugRaw = String(formData.get("slug") ?? "");
+    const normalized = normalizeAuthorSpaceSlugInput(slugRaw);
 
-  if (!normalized) {
-    return { ok: false, error: "Некорректный новый slug." };
+    if (!normalized) {
+      return { ok: false, error: "Некорректный новый slug." };
+    }
+
+    const author = await resolveAuthor(lookupRaw);
+    if (!author.ok) {
+      return { ok: false, error: author.error };
+    }
+
+    return {
+      ok: true,
+      step: "preview",
+      authorId: author.id,
+      authorName: author.name,
+      previousSlug: author.slug,
+      slug: normalized,
+      message: `Было «${author.slug}» – станет «${normalized}» (${author.name}).`,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("author_slug_preview_failed");
+    return { ok: false, error: AUTHOR_SLUG_PREVIEW_ERROR };
   }
-
-  const author = await resolveAuthor(lookupRaw);
-  if (!author.ok) {
-    return { ok: false, error: author.error };
-  }
-
-  return {
-    ok: true,
-    step: "preview",
-    authorId: author.id,
-    authorName: author.name,
-    previousSlug: author.slug,
-    slug: normalized,
-    message: `Было «${author.slug}» → Станет «${normalized}» (${author.name}).`,
-  };
 }
 
 export async function confirmAuthorSlugChangeAsAdmin(
   _previous: ChangeAuthorSlugAdminState,
   formData: FormData,
 ): Promise<ChangeAuthorSlugAdminState> {
-  await requireAdminPermission("authors.manage");
+  try {
+    await requireAdminPermission("authors.manage");
 
-  const authorId = String(formData.get("author_id") ?? "").trim();
-  const previousSlug = String(formData.get("previous_slug") ?? "").trim();
-  const confirmed = String(formData.get("confirm") ?? "") === "yes";
-  const slugRaw = String(formData.get("slug") ?? "");
-  const normalized = normalizeAuthorSpaceSlugInput(slugRaw);
+    const authorId = String(formData.get("author_id") ?? "").trim();
+    const previousSlug = String(formData.get("previous_slug") ?? "").trim();
+    const confirmed = String(formData.get("confirm") ?? "") === "yes";
+    const slugRaw = String(formData.get("slug") ?? "");
+    const normalized = normalizeAuthorSpaceSlugInput(slugRaw);
 
-  if (!confirmed) {
-    return { ok: false, error: "Подтвердите смену slug." };
-  }
-  if (!authorId || !normalized) {
-    return { ok: false, error: "Некорректные данные подтверждения." };
-  }
+    if (!confirmed) {
+      return { ok: false, error: "Подтвердите смену slug." };
+    }
+    if (!authorId || !normalized) {
+      return { ok: false, error: "Некорректные данные подтверждения." };
+    }
 
-  const supabase = await createClient();
-  const result = await changeAuthorSlug(supabase, authorId, normalized);
+    const supabase = await createClient();
+    const result = await changeAuthorSlug(supabase, authorId, normalized);
 
-  if (!result.ok) {
-    return {
-      ok: false,
-      step: "preview",
-      authorId,
-      previousSlug: previousSlug || undefined,
-      slug: normalized,
-      error: humanizeAuthorSpaceEligibility({
-        allowed: false,
-        code: result.code,
-      }),
-    };
-  }
+    if (!result.ok) {
+      return {
+        ok: false,
+        step: "preview",
+        authorId,
+        previousSlug: previousSlug || undefined,
+        slug: normalized,
+        error: humanizeAuthorSpaceEligibility({
+          allowed: false,
+          code: result.code,
+        }),
+      };
+    }
 
-  const payload = result.result;
-  revalidatePath(buildAuthorPublicPath(payload.slug));
-  if (!payload.noop && payload.previousSlug !== payload.slug) {
-    revalidatePath(buildAuthorPublicPath(payload.previousSlug));
-  }
-  revalidatePath("/authors");
-  revalidatePath("/sitemap.xml");
-  revalidatePath("/admin/authors/slug");
+    const payload = result.result;
+    revalidatePath(buildAuthorPublicPath(payload.slug));
+    if (!payload.noop && payload.previousSlug !== payload.slug) {
+      revalidatePath(buildAuthorPublicPath(payload.previousSlug));
+    }
+    revalidatePath("/authors");
+    revalidatePath("/sitemap.xml");
+    revalidatePath("/admin/authors/slug");
 
-  if (!payload.noop) {
-    scheduleIndexNowNotification(
-      [
+    if (!payload.noop) {
+      scheduleIndexNowNotification(
+        [
+          buildAuthorCanonicalUrl(payload.slug),
+          buildAuthorCanonicalUrl(payload.previousSlug),
+        ],
+        INDEXNOW_REASONS.author_profile_updated,
+      );
+      scheduleYandexRecrawlNotification(
         buildAuthorCanonicalUrl(payload.slug),
-        buildAuthorCanonicalUrl(payload.previousSlug),
-      ],
-      INDEXNOW_REASONS.author_profile_updated,
-    );
-    scheduleYandexRecrawlNotification(
-      buildAuthorCanonicalUrl(payload.slug),
-      YANDEX_RECRAWL_REASONS.author_profile_updated,
-      { entityType: "author", entityId: authorId },
-    );
-  }
+        YANDEX_RECRAWL_REASONS.author_profile_updated,
+        { entityType: "author", entityId: authorId },
+      );
+    }
 
-  return {
-    ok: true,
-    step: "done",
-    message: payload.noop
-      ? "Slug уже актуален — изменений нет."
-      : `Slug обновлён: ${payload.previousSlug} → ${payload.slug}. Старый адрес будет 308-редиректить на новый.`,
-    previousSlug: payload.previousSlug,
-    slug: payload.slug,
-    authorId: payload.authorId,
-  };
+    return {
+      ok: true,
+      step: "done",
+      message: payload.noop
+        ? "Slug уже актуален – изменений нет."
+        : authorSlugUpdatedMessage(payload.previousSlug, payload.slug),
+      previousSlug: payload.previousSlug,
+      slug: payload.slug,
+      authorId: payload.authorId,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("author_slug_confirm_failed");
+    return { ok: false, error: AUTHOR_SLUG_CONFIRM_ERROR };
+  }
 }

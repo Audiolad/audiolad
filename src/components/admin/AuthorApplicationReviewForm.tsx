@@ -20,6 +20,7 @@ import {
 } from "@/app/(platform)/admin/author-applications/actions";
 import { getAdminApplicationStatusLabel } from "@/lib/admin/application-status";
 import { getAuthorAccessStatusLabel } from "@/lib/authors/access";
+import { authorApplicationScreenName } from "@/lib/author-applications/screen-name";
 import type { AdminAuthorApplicationDetail } from "@/lib/author-applications/types";
 
 type AuthorApplicationReviewFormProps = {
@@ -294,7 +295,14 @@ export default function AuthorApplicationReviewForm({
         <h2 className="text-lg font-semibold text-[#25135c]">Данные заявки</h2>
 
         <div className="mt-4 space-y-4">
-          <InfoRow label="Имя" value={application.display_name} />
+          <InfoRow
+            label="Имя"
+            value={authorApplicationScreenName({
+              status: application.status,
+              displayName: application.display_name,
+              authorName: application.linkedAuthor?.name,
+            })}
+          />
           <InfoRow
             label="Электронная почта"
             value={contactEmail || application.userEmail || "—"}

@@ -8,6 +8,7 @@ import {
   AUTHOR_APPLICATION_COLUMNS,
   formatApplicationContactSummary,
 } from "@/lib/author-applications/queries";
+import { authorApplicationScreenName } from "@/lib/author-applications/screen-name";
 import { loadUserDeletionDependencies } from "@/lib/admin/user-deletion";
 import { evaluateUserDeletionEligibility } from "@/lib/admin/user-deletion-policy";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -201,7 +202,7 @@ export async function listAdminAuthorApplications(input?: {
   let query = service
     .from("author_applications")
     .select(
-      "id, display_name, contact_email, contact_details, direction, about, status, submitted_at, created_at",
+      "id, display_name, author_id, contact_email, contact_details, direction, about, status, submitted_at, created_at",
     )
     .order("submitted_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -216,9 +217,38 @@ export async function listAdminAuthorApplications(input?: {
     throw new Error("admin_applications_list_failed");
   }
 
-  return (data ?? []).map((row) => ({
+  const rows = data ?? [];
+  const authorIds = [
+    ...new Set(
+      rows
+        .filter((row) => row.status === "approved" && typeof row.author_id === "string")
+        .map((row) => row.author_id as string),
+    ),
+  ];
+  const authorNames = new Map<string, string>();
+  if (authorIds.length > 0) {
+    const { data: authors, error: authorsError } = await service
+      .from("authors")
+      .select("id, name")
+      .in("id", authorIds);
+    if (authorsError) {
+      throw new Error("admin_applications_list_failed");
+    }
+    for (const author of authors ?? []) {
+      if (typeof author.id === "string" && typeof author.name === "string") {
+        authorNames.set(author.id, author.name);
+      }
+    }
+  }
+
+  return rows.map((row) => ({
     id: row.id,
-    displayName: row.display_name,
+    displayName: authorApplicationScreenName({
+      status: row.status,
+      displayName: row.display_name,
+      authorName:
+        typeof row.author_id === "string" ? authorNames.get(row.author_id) : null,
+    }),
     contactEmail: row.contact_email,
     contactDetails: row.contact_details,
     contactSummary: formatApplicationContactSummary({
