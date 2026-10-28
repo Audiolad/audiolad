@@ -57,6 +57,7 @@ jobs:
           npm run test:business-app-client-documents
           npm run test:business-app-onboarding-wizard
           npm run test:business-domain-core
+          npm run test:business-location-sound-settings
           npm run test:business-player-foundation
           npm run test:business-playback-attribution
           npm run test:business-rights-foundation

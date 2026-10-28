@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { GUEST_COFFEE_DEFAULT_PROFILE, type GuestCoffeeProfile } from "@/lib/business-app/guest-coffee/catalog";
 import {
   BUSINESS_SOUND_PROFILE_STORAGE_KEY,
   parseBusinessSoundProfile,
+  serializeBusinessSoundProfile,
 } from "@/lib/business-app/sound-profile";
 import {
   CAFE_DAYPART_HOURS_DEFAULT,
@@ -30,42 +31,75 @@ import {
   type CafeQueueFeedbackKind,
 } from "@/lib/business-app/cafe-queue/prefs";
 
-export function useCafeQueuePreferences() {
+export type CafeQueuePreferenceSeed = {
+  profile?: GuestCoffeeProfile;
+  prefs?: CafeQueuePrefs;
+  hours?: CafeDaypartHours;
+};
+
+export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
   const domain = useBusinessDomain();
   const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
-  const [prefs, setPrefs] = useState(CAFE_QUEUE_DEFAULT_PREFS);
+  const [prefs, setPrefs] = useState(seed?.prefs ?? CAFE_QUEUE_DEFAULT_PREFS);
   const [feedback, setFeedback] = useState<CafeQueueFeedback[]>([]);
-  const [profile, setProfile] = useState<GuestCoffeeProfile>(GUEST_COFFEE_DEFAULT_PROFILE);
-  const [hours, setHours] = useState<CafeDaypartHours>(CAFE_DAYPART_HOURS_DEFAULT);
+  const [profile, setProfile] = useState(seed?.profile ?? GUEST_COFFEE_DEFAULT_PROFILE);
+  const [hours, setHours] = useState(seed?.hours ?? CAFE_DAYPART_HOURS_DEFAULT);
   const [minuteOfDay, setMinuteOfDay] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
+  const seedRef = useRef(seed);
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- one-time read of device queue prefs after hydration */
-    try {
-      setPrefs(parseCafeQueuePrefs(window.localStorage.getItem(CAFE_QUEUE_PREFS_KEY)));
-    } catch {
-      setPrefs(CAFE_QUEUE_DEFAULT_PREFS);
-    }
-    try {
-      setFeedback(parseCafeQueueFeedback(window.sessionStorage.getItem(CAFE_QUEUE_FEEDBACK_KEY)));
-    } catch {
-      setFeedback([]);
-    }
-    try {
-      setProfile(parseBusinessSoundProfile(window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
-    } catch {
-      setProfile(GUEST_COFFEE_DEFAULT_PROFILE);
+    const seeded = seedRef.current;
+    if (seeded?.prefs || seeded?.hours || seeded?.profile) {
+      if (seeded.prefs) {
+        setPrefs(seeded.prefs);
+        try {
+          window.localStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(seeded.prefs));
+        } catch {
+          /* private mode keeps the server choice for this visit */
+        }
+      }
+      if (seeded.hours) {
+        setHours(seeded.hours);
+        try {
+          window.localStorage.setItem(cafeDaypartHoursKey(locationId), serializeCafeDaypartHours(seeded.hours));
+        } catch {
+          /* private mode keeps the server windows for this visit */
+        }
+      }
+      if (seeded.profile) {
+        setProfile(seeded.profile);
+        try {
+          window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(seeded.profile));
+        } catch {
+          /* private mode keeps the server profile for this visit */
+        }
+      }
+    } else {
+      try {
+        setPrefs(parseCafeQueuePrefs(window.localStorage.getItem(CAFE_QUEUE_PREFS_KEY)));
+      } catch {
+        setPrefs(CAFE_QUEUE_DEFAULT_PREFS);
+      }
+      try {
+        setFeedback(parseCafeQueueFeedback(window.sessionStorage.getItem(CAFE_QUEUE_FEEDBACK_KEY)));
+      } catch {
+        setFeedback([]);
+      }
+      try {
+        setProfile(parseBusinessSoundProfile(window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
+      } catch {
+        setProfile(GUEST_COFFEE_DEFAULT_PROFILE);
+      }
+      try {
+        setHours(parseCafeDaypartHours(window.localStorage.getItem(cafeDaypartHoursKey(locationId))));
+      } catch {
+        setHours(CAFE_DAYPART_HOURS_DEFAULT);
+      }
     }
     const now = new Date();
     setMinuteOfDay(now.getHours() * 60 + now.getMinutes());
-    try {
-      setHours(parseCafeDaypartHours(window.localStorage.getItem(cafeDaypartHoursKey(locationId))));
-    } catch {
-      setHours(CAFE_DAYPART_HOURS_DEFAULT);
-    }
     setReady(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       const clock = new Date();
