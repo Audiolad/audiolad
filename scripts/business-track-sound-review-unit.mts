@@ -185,6 +185,8 @@ assert.match(route, /BUSINESS_TRACK_PREVIEW_SOURCE_TTL_SECONDS/);
 assert.doesNotMatch(route, /LISTEN_SIGNED_URL_TTL_SECONDS|signWorkspaceAudio/);
 assert.doesNotMatch(read('src/app/(platform)/admin/business-track-review/actions.ts'), /signWorkspaceAudio/);
 assert.match(read('src/app/(platform)/admin/business-track-review/actions.ts'), /businessTrackPreviewHref/);
+assert.match(read('src/app/(platform)/admin/business-track-review/actions.ts'), /verifiedRightsAuthorIds/);
+assert.match(read('src/app/(platform)/admin/business-track-review/page.tsx'), /loadAgreementSoundQueue/);
 const sql = read('supabase/migrations/20270201120000_business_track_sound_reviews.sql');
 assert.doesNotMatch(sql, /\b(?:DELETE FROM|DROP TABLE|UPDATE public\.(?:audio_items|practices))\b/i);
 assert.match(sql, /resolve_business_track_eligibility_v1\(p_audio_item_id/);
