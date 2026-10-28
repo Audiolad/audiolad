@@ -96,8 +96,9 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
         <select name="allowed" aria-label="Массовое решение" defaultValue="inherit" className="border p-2"><option value="inherit">{kind === "album" ? "Наследовать от артиста" : "Снять решение"}</option><option value="true">Разрешить</option><option value="false">Запретить</option></select>
         <button type="submit" className="rounded border px-3 py-2">Применить к выбранным</button>
       </form>
-      <p>{BUSINESS_AGREEMENT_LIST_HINT} – {listedTotal}</p>
-      {!listedTotal && <p>Пока нет авторов, принявших соглашение AudioLad Бизнес.{" "}
+      <p>{BUSINESS_AGREEMENT_LIST_HINT} – {listedTotal}.{" "}
+        <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>
+      {!listedTotal && <p>Пока нет авторов с подтверждёнными правами.{" "}
         <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>}
       <div className="overflow-x-auto"><table className="w-full border-collapse text-sm"><caption className="text-left">{kind === "artist" ? "Артисты" : "Альбомы"} – страница {page}, записей: {rows.length}</caption><thead><tr><th><SelectPage key={href(page)} /></th><th className="text-left">{kind === "artist" ? "Артист" : "Альбом / артист"}</th>{visibleDirections.map((d) => <th key={d.key}>{d.name}</th>)}</tr></thead>
         <tbody>{rows.map((r) => <tr key={r.id} className="border-t align-top"><td className="p-2"><input type="checkbox" form="bulk-admissions" name="ids" value={r.id} aria-label={`Выбрать ${r.title}`} /></td><td className="p-2">{r.title}{kind === "album" && <p className="text-neutral-500">{r.authorName}</p>}</td>
