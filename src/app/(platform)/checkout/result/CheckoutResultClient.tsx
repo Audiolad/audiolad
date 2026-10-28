@@ -9,9 +9,11 @@ import {
   buildLibraryPurchasedHref,
   buildPaidAuthenticatedPrimaryHref,
   buildStudioMusicPaidHref,
+  businessCheckoutResultCard,
   isAuthorProjectCapacityCheckout,
   isBusinessSubscriptionCheckout,
   isStudioMusicLicenseCheckout,
+  type BusinessCheckoutResultView,
 } from "@/lib/payments/checkout-result-cta";
 import {
   isTerminalCheckoutStatus,
@@ -297,6 +299,22 @@ export default function CheckoutResultClient() {
     );
   }
 
+  if (businessSubscription && isBusinessCheckoutResultView(viewState)) {
+    const card = businessCheckoutResultCard(viewState, status?.authenticated === true);
+    return (
+      <ResultCard
+        title={card.title}
+        description={card.description}
+        actionHref={card.actionHref ?? undefined}
+        actionLabel={card.actionLabel}
+        onActionClick={card.actionHref ? undefined : restartPolling}
+        secondaryHref={card.secondaryHref ?? undefined}
+        secondaryLabel={card.secondaryLabel ?? undefined}
+        isLoading={viewState === "processing" && isPolling}
+      />
+    );
+  }
+
   if (viewState === "paid_authenticated") {
     if (capacityPurchase) {
       return (
@@ -307,16 +325,6 @@ export default function CheckoutResultClient() {
           actionLabel="Создать новый проект"
           secondaryHref="/author-dashboard"
           secondaryLabel="В кабинет автора"
-        />
-      );
-    }
-    if (businessSubscription) {
-      return (
-        <ResultCard
-          title="Оплата прошла. Доступ открыт."
-          description="30 дней кабинета АудиоЛад Бизнес. Автосписания нет."
-          actionHref={listenHref}
-          actionLabel="Вернуться в кабинет"
         />
       );
     }
@@ -439,6 +447,15 @@ function ResultCard({
       ) : null}
     </div>
   );
+}
+
+function isBusinessCheckoutResultView(view: ViewState): view is BusinessCheckoutResultView {
+  return view === "paid_authenticated"
+    || view === "paid_unauthenticated"
+    || view === "processing"
+    || view === "failed"
+    || view === "cancelled"
+    || view === "refunded";
 }
 
 function TerminalFailureCard({

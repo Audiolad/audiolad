@@ -9,11 +9,19 @@ import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
  */
 export const BUSINESS_TRIAL_RETURN_PATH = "/auth/business-return";
 
+/** After a business payment, sign-in lands here and this page opens the cabinet. */
+export const BUSINESS_CABINET_RETURN_PATH = "/auth/business-cabinet";
+
 export const BUSINESS_WORKSPACE_PUBLIC_PATH = "/workspace";
 
 export function isBusinessTrialNext(next: string | null | undefined): boolean {
   const path = (next ?? "").trim().split(/[?#]/)[0];
   return path === BUSINESS_TRIAL_RETURN_PATH;
+}
+
+export function isBusinessCabinetReturnNext(next: string | null | undefined): boolean {
+  const path = (next ?? "").trim().split(/[?#]/)[0];
+  return path === BUSINESS_CABINET_RETURN_PATH;
 }
 
 export const BUSINESS_TRIAL_SIGN_UP_HREF = `${PRODUCTION_APP_ORIGIN}/auth/sign-up?next=${encodeURIComponent(BUSINESS_TRIAL_RETURN_PATH)}`;

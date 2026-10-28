@@ -21,6 +21,9 @@ export const BUSINESS_SIGN_UP_INTRO =
 export const BUSINESS_SIGN_IN_INTRO =
   "Войдите, чтобы открыть кабинет АудиоЛад Бизнес. 30 дней в подарок даются один раз на адрес: повторная регистрация период не обновляет.";
 
+export const BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO =
+  "Войдите, чтобы вернуться в кабинет АудиоЛад Бизнес.";
+
 export const BUSINESS_REGISTERED_NOTE =
   "Регистрация прошла успешно. Подтвердите адрес по письму и войдите: кабинет откроется с периодом «30 дней в подарок».";
 

@@ -9,7 +9,10 @@ import { gracePlaybackUntil, resolveCustomerAccess } from "../src/lib/access-gra
 import { resolveBusinessProxyAction } from "../src/lib/business-app/proxy-policy";
 import { BUSINESS_GRACE_MS } from "../src/lib/business/plan";
 import { mapBusinessSubscriptionRpcError, ownerCanPayFromThisBrowser } from "../src/lib/business/subscription-checkout";
-import { buildBusinessSubscriptionPaidHref, isBusinessSubscriptionCheckout } from "../src/lib/payments/checkout-result-cta";
+import { BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO } from "../src/lib/access-grants/copy";
+import { isBusinessCabinetReturnNext } from "../src/lib/access-grants/paths";
+import { resolveSignInIntroCopy } from "../src/lib/auth/buy-sign-in";
+import { businessCheckoutResultCard, buildBusinessSubscriptionPaidHref, buildBusinessSubscriptionSignInHref, isBusinessSubscriptionCheckout, type BusinessCheckoutResultView } from "../src/lib/payments/checkout-result-cta";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
 
 const END = "2026-11-22T14:11:37.000Z";
@@ -102,6 +105,52 @@ assert.doesNotMatch(hidden, /data-testid="biz-home-pay"/, "a manager does not se
 
 assert.match(readFileSync("src/app/api/business/player/track-url/route.ts", "utf8"), /access\.mode === "offer"/);
 assert.match(readFileSync("src/lib/business-workspace/model.ts", "utf8"), /status === "grace"/);
+
+const cabinet = "https://business.audiolad.ru/#dostup";
+const signIn = buildBusinessSubscriptionSignInHref();
+assert.equal(signIn, "/auth/sign-in?next=%2Fauth%2Fbusiness-cabinet");
+assert.equal(isBusinessCabinetReturnNext("/auth/business-cabinet"), true);
+assert.equal(resolveSignInIntroCopy("/auth/business-cabinet"), BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO);
+assert.doesNotMatch(BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO, /Аудиотек|практик/i);
+
+const views: BusinessCheckoutResultView[] = [
+  "paid_authenticated",
+  "paid_unauthenticated",
+  "processing",
+  "failed",
+  "cancelled",
+  "refunded",
+];
+for (const view of views) {
+  for (const authenticated of view === "paid_authenticated" ? [true] : [true, false]) {
+    const card = businessCheckoutResultCard(view, authenticated);
+    const blob = `${card.title} ${card.description} ${card.actionLabel} ${card.secondaryLabel ?? ""}`;
+    assert.doesNotMatch(blob, /Аудиотек|практик|каталог/i, `${view} ${authenticated}`);
+    assert.doesNotMatch(blob, /—/, view);
+    const hrefs = [card.actionHref, card.secondaryHref].filter((href): href is string => Boolean(href));
+    assert.ok(hrefs.length > 0, view);
+    const expectsSignIn = view === "paid_unauthenticated" || !authenticated;
+    if (expectsSignIn) {
+      assert.ok(hrefs.includes(signIn), `${view} unsigned`);
+      assert.match(blob, /Войти и вернуться в кабинет/);
+    } else if (view === "processing") {
+      assert.equal(card.actionHref, null);
+      assert.equal(card.secondaryHref, cabinet);
+      assert.equal(card.secondaryLabel, "Вернуться в кабинет");
+    } else {
+      assert.equal(card.actionHref, cabinet);
+      assert.equal(card.actionLabel, "Вернуться в кабинет");
+    }
+  }
+}
+
+const catalogClient = readFileSync("src/app/(platform)/checkout/result/CheckoutResultClient.tsx", "utf8");
+assert.match(catalogClient, /Перейти в каталог/);
+assert.match(catalogClient, /практика автоматически появится в вашей Аудиотеке/);
+assert.match(catalogClient, /Практика добавлена в ваш аккаунт/);
+const returnPage = readFileSync("src/app/(platform)/auth/business-cabinet/page.tsx", "utf8");
+assert.match(returnPage, /buildBusinessSubscriptionPaidHref/);
+assert.doesNotMatch(returnPage, /activateBusinessTrial/);
 assert.match(readFileSync("src/lib/business-app/domain.ts", "utf8"), /ownerCanPayFromThisBrowser/);
 for (const route of ["src/app/api/business/subscription/checkout/route.ts", "src/app/api/business/subscription/accept/route.ts"]) {
   const source = readFileSync(route, "utf8");
