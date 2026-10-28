@@ -59,6 +59,7 @@ jobs:
           npm run test:business-domain-core
           npm run test:business-location-sound-settings
           npm run test:business-point-pairing
+          npm run test:business-point-commands
           npm run test:business-player-foundation
           npm run test:business-playback-attribution
           npm run test:business-rights-foundation

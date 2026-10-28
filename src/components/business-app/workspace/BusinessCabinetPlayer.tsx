@@ -14,11 +14,12 @@ import {
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
+import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
 import { peekAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
-import { cafeQueueIndices, cafeQueueNextIndex } from "@/lib/business-app/cafe-queue/order";
+import { cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex } from "@/lib/business-app/cafe-queue/order";
 import type { CafeDaypart, CafeQueueFeedback } from "@/lib/business-app/cafe-queue/prefs";
 import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile } from "@/lib/business-app/sound-profile";
@@ -51,6 +52,7 @@ type CabinetPlayerApi = {
   view: View;
   toggle: () => Promise<void>;
   next: () => Promise<void>;
+  previous: () => Promise<void>;
   playIndex: (index: number) => Promise<void>;
   setVolume: (value: number) => void;
   /** Scrub the current track. `ratio` is 0–1 of the known duration. */
@@ -145,6 +147,8 @@ export function BusinessCabinetPlayerProvider({
   const lastPostRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
+  const toggleRef = useRef<() => Promise<void>>(async () => {});
+  const nextRef = useRef<() => Promise<void>>(async () => {});
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({
@@ -298,6 +302,7 @@ export function BusinessCabinetPlayerProvider({
           }
         },
         nextIndex: (currentIndex, length) => cafeQueueNextIndex(playOrderRef.current, currentIndex, length),
+        previousIndex: (currentIndex, length) => cafeQueuePreviousIndex(playOrderRef.current, currentIndex, length),
         onChange: () => {
           const current = ctlRef.current;
           if (!current) return;
@@ -415,6 +420,65 @@ export function BusinessCabinetPlayerProvider({
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
   }, [remember, reportPlayback]);
+
+  const previous = useCallback(async () => {
+    const ctl = ctlRef.current;
+    const current = modelRef.current;
+    if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    setBarDismissed(false);
+    seekRef.current = 0;
+    evidenceRef.current.reset(0);
+    // Before the first play the controller index is still -1, while the card shows the saved track.
+    if (ctl.index < 0) {
+      const shown = playbackRef.current.index;
+      if (shown >= 0 && shown < current.tracks.length) ctl.index = shown;
+    }
+    await ctl.previous();
+    remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
+    reportPlayback();
+  }, [remember, reportPlayback]);
+
+  useEffect(() => {
+    toggleRef.current = toggle;
+    nextRef.current = next;
+  }, [toggle, next]);
+
+  useEffect(() => {
+    if (!canBeat) return;
+    let stop = false;
+    let inFlight = false;
+    const tick = async () => {
+      if (stop || inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fetch("/api/business/point", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({ action: "commands" }),
+        });
+        const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
+        if (!json.ok || !Array.isArray(json.commands)) return;
+        for (const row of json.commands) {
+          if (stop || !isPointCommandType(row.type)) continue;
+          const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
+          if (action === "toggle") await toggleRef.current();
+          if (action === "next") await nextRef.current();
+        }
+      } catch {
+        /* the next poll retries; a claimed command is not returned again */
+      } finally {
+        inFlight = false;
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 5_000);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [canBeat]);
 
   const playIndex = useCallback(async (index: number) => {
     const current = modelRef.current;
@@ -610,6 +674,7 @@ export function BusinessCabinetPlayerProvider({
     view,
     toggle,
     next,
+    previous,
     playIndex,
     setVolume,
     seek,

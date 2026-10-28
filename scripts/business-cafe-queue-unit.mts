@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { handleCafeQueue } from "../src/lib/business-app/cafe-queue/handle";
-import { cafeAheadIndices, cafeQueueIndices, cafeQueueNextIndex, cafeUniqueAhead, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
+import { cafeAheadIndices, cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex, cafeUniqueAhead, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
 import { currentCabinetAdmission, restrictCafePool } from "../src/lib/business-app/cafe-queue/pool";
 import {
   cafeDaypartAtMinute,
@@ -525,6 +525,12 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
   assert.deepEqual(cafeQueueNextIndex([2, 0, 1], 2, 3), 0);
   assert.deepEqual(cafeQueueNextIndex([2, 0, 1], 1, 3), 2);
   assert.equal(cafeQueueNextIndex(null, 2, 3), 0);
+  assert.equal(cafeQueuePreviousIndex([2, 0, 1], 2, 3), 1, "the track before the first queue row is the last");
+  assert.equal(cafeQueuePreviousIndex([2, 0, 1], 0, 3), 2);
+  assert.equal(cafeQueuePreviousIndex([2, 0, 1], 1, 3), 0);
+  assert.equal(cafeQueuePreviousIndex(null, 0, 3), 2);
+  assert.equal(cafeQueuePreviousIndex(null, 2, 3), 1);
+  assert.equal(cafeQueuePreviousIndex([2, 0, 1], -1, 3), 1);
   assert.deepEqual(parseCafeQueuePrefs('{"daypartMode":"evening","energyOffset":-15}'), { daypartMode: "evening", energyOffset: -15 });
   assert.deepEqual(parseCafeQueuePrefs('{"daypartMode":"allday","energyOffset":30}'), { daypartMode: "auto", energyOffset: 0 });
   const id = "11111111-1111-4111-8111-111111111111";
@@ -564,10 +570,15 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
       sign: async () => ({ ok: true, data: { url: "https://audiolad.ru/s/ok" } }),
       onChange() {},
       nextIndex: (current, length) => cafeQueueNextIndex(order, current, length),
+      previousIndex: (current, length) => cafeQueuePreviousIndex(order, current, length),
     },
     items,
   );
   await ctl.playIndex(2);
+  await ctl.previous();
+  assert.equal(ctl.index, 1, "previous follows the queue backwards");
+  await ctl.next();
+  assert.equal(ctl.index, 2);
   await ctl.next();
   assert.equal(ctl.index, 0);
   await ctl.next();

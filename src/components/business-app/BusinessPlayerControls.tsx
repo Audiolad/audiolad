@@ -14,9 +14,12 @@ type Props = {
   nowTitle: string | null;
   onToggle: () => void;
   onNext: () => void;
+  /** Previous track. The venue card passes it; the thin bar and the text player omit it. */
+  onPrevious?: () => void;
   /** Starting playback is not allowed (pausing always is). */
   startDisabled?: boolean;
   nextDisabled?: boolean;
+  previousDisabled?: boolean;
   /** Accessible name while audio is playing. The guest player keeps «Пауза». */
   pauseLabel?: string;
   volume?: number;
@@ -43,6 +46,15 @@ function PauseIcon() {
   );
 }
 
+function PrevIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3.8 4.6h3.2v14.8H3.8z" fill="currentColor" />
+      <path d="M19.8 4.6v14.8L8.6 12 19.8 4.6z" fill="currentColor" />
+    </svg>
+  );
+}
+
 function NextIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -59,8 +71,10 @@ export default function BusinessPlayerControls({
   nowTitle,
   onToggle,
   onNext,
+  onPrevious,
   startDisabled = false,
   nextDisabled = false,
+  previousDisabled = false,
   pauseLabel = "Пауза",
   volume,
   onVolume,
@@ -70,8 +84,25 @@ export default function BusinessPlayerControls({
   const active = playing || loading;
   const playLabel = active ? pauseLabel : "Играть";
   const round = appearance === "round";
+  const centered = round && Boolean(onPrevious);
+  const status = loading ? "Загрузка…" : nowTitle;
   return (
-    <div className={`mt-4 flex flex-wrap items-center gap-3 business-app-player-controls${round ? ` business-transport business-transport--${size}` : ""}`}>
+    <div className={`mt-4 flex flex-wrap items-center gap-3 business-app-player-controls${round ? ` business-transport business-transport--${size}` : ""}${centered ? " business-transport--center" : ""}`}>
+      {onPrevious ? (
+        <button
+          type="button"
+          data-testid={`${testIdPrefix}-prev`}
+          onClick={onPrevious}
+          disabled={previousDisabled}
+          aria-label={round ? "Предыдущий трек" : undefined}
+          title={round ? "Предыдущий трек" : undefined}
+          className={round
+            ? "business-prev-btn business-app-focus-ring"
+            : "business-app-btn business-app-btn-secondary business-app-focus-ring"}
+        >
+          {round ? <PrevIcon /> : "Предыдущий"}
+        </button>
+      ) : null}
       <button
         type="button"
         data-testid={`${testIdPrefix}-play`}
@@ -115,9 +146,11 @@ export default function BusinessPlayerControls({
           />
         </label>
       ) : null}
-      <span className="business-app-muted" data-testid={`${testIdPrefix}-now`}>
-        {loading ? "Загрузка…" : nowTitle ?? ""}
-      </span>
+      {status ? (
+        <span className="business-app-muted" data-testid={`${testIdPrefix}-now`}>
+          {status}
+        </span>
+      ) : null}
     </div>
   );
 }
