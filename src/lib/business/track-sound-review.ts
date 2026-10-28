@@ -58,6 +58,19 @@ export function restrictSoundQueueToAgreement(
   };
 }
 
+/**
+ * Albums that anchor the «Секторы альбомов» table. With any filter active – albums of all matched rows;
+ * without filters – albums of the current page only, as before.
+ */
+export function sectorFocusAlbumIds(
+  queue: { rows: readonly { album_id: string }[]; matchedAlbumIds: readonly string[] },
+  filter: SectorAlbumFilter,
+): string[] {
+  return filter.status || filter.artist || filter.album || filter.space
+    ? [...queue.matchedAlbumIds]
+    : [...new Set(queue.rows.map((row) => row.album_id))];
+}
+
 export type SectorAlbumFilter = { status?: string; artist?: string; album?: string; space?: string };
 
 /**

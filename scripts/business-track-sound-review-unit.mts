@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, restrictSoundQueueToAgreement, selectSectorAlbums, type SoundReviewRow } from '../src/lib/business/track-sound-review';
+import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, restrictSoundQueueToAgreement, sectorFocusAlbumIds, selectSectorAlbums, type SoundReviewRow } from '../src/lib/business/track-sound-review';
 import { collectQueuedSoundReviews, saveSoundReviewBatch, soundReviewBulkConfirm, soundReviewSelectionCount } from '../src/lib/business/track-sound-bulk';
 import { hasCurrentSoundApproval, sameSoundAudioIdentity, soundAllowedTrackIds } from '../src/lib/business/track-sound-review.server';
 import { workspaceSignBlocked } from '../src/lib/business-workspace/sign-gate';
@@ -80,6 +80,24 @@ const manyRows = Array.from({ length: 150 }, (_, i) => ({ ...queueRows[0], id: `
 const pageOne = restrictSoundQueueToAgreement(manyRows, new Set(['jazz']), { artist: 'jazz', page: 0 });
 assert.deepEqual(pageOne.rows.map((row) => row.album_id).includes('al2'), false);
 assert.deepEqual(pageOne.matchedAlbumIds, ['al', 'al2']);
+// No filters: the table follows the current page (150 real queue rows, pages 0 and 1 differ).
+const pagedRows = Array.from({ length: 150 }, (_, i) => ({ ...queueRows[0], id: `p${String(i).padStart(3, '0')}`, album_id: `album-${Math.floor(i / 50)}`, album: `Альбом ${Math.floor(i / 50)}` }));
+const sectorBoard = (pageIndex: number, filter: { status?: string; artist?: string; album?: string; space?: string }) => {
+  const queue = restrictSoundQueueToAgreement(pagedRows, new Set(['jazz']), { ...filter, page: pageIndex });
+  // Albums come from the queue rows themselves, all admitted, author = row artist.
+  const board = [...new Map(pagedRows.map((row) => [row.album_id, { id: row.album_id, authorId: row.artist_id, admitted: true }])).values()];
+  return selectSectorAlbums(board, sectorFocusAlbumIds(queue, filter), filter).map((album) => album.id);
+};
+const unfilteredPage0 = sectorBoard(0, {});
+const unfilteredPage1 = sectorBoard(1, {});
+assert.deepEqual(unfilteredPage0, ['album-0', 'album-1']);
+assert.deepEqual(unfilteredPage1, ['album-2']);
+assert.notDeepEqual(unfilteredPage0, unfilteredPage1);
+// With a filter the table covers all matched rows on every page.
+assert.deepEqual(sectorBoard(0, { artist: 'jazz' }), ['album-0', 'album-1', 'album-2']);
+assert.deepEqual(sectorBoard(1, { artist: 'jazz' }), ['album-0', 'album-1', 'album-2']);
+assert.deepEqual(sectorBoard(0, { artist: 'med' }), []);
+assert.match(readFileSync(new URL('../src/app/(platform)/admin/business-track-review/page.tsx', import.meta.url), 'utf8'), /listSectorAlbums\(sectorFocusAlbumIds\(queue, /);
 assert.equal(nextUnchecked([], null), null);
 assert.equal(nextUnchecked([rows[0]], 'a'), null);
 
