@@ -44,9 +44,6 @@ export function businessGiftRulesText(): string {
   ].join(" ");
 }
 
-export const BUSINESS_WORKSPACE_AUTOPLAY_NOTE =
-  "Музыка включается после нажатия на круглую кнопку. Громкость и место в подборке сохраняются.";
-
 export const BUSINESS_EMPTY_CATALOG_NOTE =
   "Подборка в этом направлении готовится – музыка появится здесь автоматически.";
 
