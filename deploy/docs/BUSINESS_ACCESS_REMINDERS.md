@@ -10,7 +10,7 @@ does not apply the migration and does not enable the timer by itself.
 
 ## Migration
 
-`supabase/migrations/20270207120000_business_access_reminder_emails.sql`
+`supabase/migrations/20270207140000_business_access_reminder_emails.sql`
 
 Additive table `business_access_reminder_sends` plus claim, complete and fail
 functions. No change to `access_grants`, `access_paid_periods` or `paid_until`.

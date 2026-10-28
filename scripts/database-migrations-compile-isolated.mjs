@@ -267,7 +267,7 @@ applyFile(
   "post-apply business subscription payment smoke",
   resolve(root, "supabase/tests/business_subscription_payment_smoke.sql"),
 );
-if (!pending.has("20270207120000")) {
+if (!pending.has("20270207140000")) {
   throw new Error("business access reminder migration was not included in the disposable replay");
 }
 applyFile(

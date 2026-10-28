@@ -23,7 +23,7 @@ import { BUSINESS_GRACE_DAYS, formatBusinessMonthlyPrice } from "@/lib/business/
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MIGRATION = readFileSync(
-  join(ROOT, "supabase/migrations/20270207120000_business_access_reminder_emails.sql"),
+  join(ROOT, "supabase/migrations/20270207140000_business_access_reminder_emails.sql"),
   "utf8",
 );
 

@@ -1,4 +1,4 @@
--- Disposable smoke for 20270207120000_business_access_reminder_emails.sql.
+-- Disposable smoke for 20270207140000_business_access_reminder_emails.sql.
 -- No SMTP. Rolls back.
 \set ON_ERROR_STOP on
 BEGIN;

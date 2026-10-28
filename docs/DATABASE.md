@@ -1,6 +1,6 @@
 ## Business access reminder letters (pending owner apply)
 
-Migration `20270207120000_business_access_reminder_emails.sql` is additive and
+Migration `20270207140000_business_access_reminder_emails.sql` is additive and
 is not applied by the change that adds it. It creates
 `business_access_reminder_sends` and the claim / complete / fail functions.
 One service letter per owner, contractual end and kind
