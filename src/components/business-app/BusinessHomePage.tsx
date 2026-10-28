@@ -53,7 +53,7 @@ function StatusBanner({
         <strong>{playback.title}</strong>
         {playback.kind === "error" ? (
           <p>
-            <Link href="/player" data-testid="biz-point-player-link">Откройте плеер точки</Link>
+            <Link href="/player" data-testid="biz-point-player-link">Откройте плеер кофейни</Link>
             {" или "}
             <Link href="/help" data-testid="biz-point-support-link">обратитесь в поддержку</Link>.
           </p>
@@ -82,12 +82,12 @@ function StatusBanner({
         <strong data-testid="owner-home-overall-status">{overall.title}</strong>
         <details className="business-app-owner-signal-details">
           <summary className="business-app-focus-ring">Подробнее</summary>
-          <ul className="business-app-owner-signals" aria-label="Сигналы точки">
+          <ul className="business-app-owner-signals" aria-label="Сигналы кофейни">
             {signalItems}
           </ul>
         </details>
       </div>
-      <ul className="business-app-owner-signals business-app-owner-desktop-signals mt-4" aria-label="Сигналы точки">
+      <ul className="business-app-owner-signals business-app-owner-desktop-signals mt-4" aria-label="Сигналы кофейни">
         {signalItems}
       </ul>
       <p className="mt-4 text-sm text-[var(--biz-text-muted)]">
@@ -173,7 +173,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
   );
   const subtitle =
     domain.status === "anonymous"
-      ? "Войдите, чтобы управлять точкой."
+      ? "Войдите, чтобы управлять кофейней."
       : domain.status === "authenticated" && !domain.location
         ? "Подключите своё заведение – это займёт минуту."
         : buildBusinessGreetingSubtitle();
@@ -193,12 +193,12 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
             Аудиолад Бизнес
           </h1>
           <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
-            Войдите в аккаунт, чтобы подключить точку и увидеть реальный статус.
+            Войдите в аккаунт, чтобы подключить кофейню и увидеть реальный статус.
           </p>
         </header>
         <section className="business-app-card max-w-xl">
           <p className="text-[1.05rem] text-[var(--biz-text)]">
-            Здесь появится статус вашей точки: плеер, что звучит сейчас, документы. Пока вы в
+            Здесь появится статус вашей кофейни: плеер, что звучит сейчас, документы. Пока вы в
             гостевом режиме – настройте звучание и послушайте подборки в разделе «Музыка».
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -234,10 +234,10 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
         <BusinessHomeAccessCard />
         <section className="business-app-card max-w-xl" aria-labelledby="bootstrap-title">
           <h2 id="bootstrap-title" className="text-[1.25rem] font-bold text-[var(--biz-text)]">
-            Первая точка
+            Первая кофейня
           </h2>
           <p className="mt-2 text-[var(--biz-text-muted)]">
-            Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия создадим точку. Всё в одном кабинете.
+            Ответьте на пару вопросов о заведении – мы подберём музыку и после вашего согласия подключим кофейню. Всё в одном кабинете.
           </p>
           <Link
             href="/onboarding"
@@ -271,7 +271,7 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
       <BusinessOwnerHomeLiveRefresh />
       <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">
-          <StatusBanner locationName={locationName || "Точка"} signals={signals} playback={playback} />
+          <StatusBanner locationName={locationName || "Кофейня"} signals={signals} playback={playback} />
           <section className="business-app-card" aria-labelledby="playback-data-title">
             <h2 id="playback-data-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
               Сейчас звучит
@@ -309,13 +309,13 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
               </section>
               <VenueControlPanel
                 locationId={domain.location.id}
-                locationName={locationName || "Точка"}
+                locationName={locationName || "Кофейня"}
                 pointCanEdit={pointCanEdit}
               />
             </>
           ) : null}
           {!pointMode && entry === "venue" && domain.location ? (
-            <VenueControlPanel locationId={domain.location.id} locationName={locationName || "Точка"} pointCanEdit={pointCanEdit} />
+            <VenueControlPanel locationId={domain.location.id} locationName={locationName || "Кофейня"} pointCanEdit={pointCanEdit} />
           ) : null}
         </div>
       </div>

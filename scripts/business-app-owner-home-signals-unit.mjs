@@ -200,7 +200,7 @@ for (const seconds of [null, NaN, Infinity, -1]) {
 }
 assert.equal(copy({ primaryHealthStatus: "never_seen", secondsSinceHeartbeat: 1 }).title, "Нет данных о плеере");
 assert.equal(copy({ primaryHealthStatus: "unknown", secondsSinceHeartbeat: 1 }).title, "Нет данных о плеере");
-assert.equal(buildBusinessHomeStatusCopy(base, true).title, "Точка закрыта");
+assert.equal(buildBusinessHomeStatusCopy(base, true).title, "Кофейня закрыта");
 assert.equal(buildBusinessHomeStatusCopy(base, true).tone, "neutral");
 assert.equal(buildBusinessHomeStatusCopy(base, false).kind, "online");
 
