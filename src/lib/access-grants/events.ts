@@ -43,7 +43,7 @@ export type AccessActivityAction = "visit" | "play" | "offer_click" | "renewal";
  */
 export function eventsForAccessAction(input: {
   action: AccessActivityAction;
-  mode: "trial" | "paid" | "offer" | "none";
+  mode: "trial" | "paid" | "grace" | "offer" | "none";
   calendarDayIndex: number | null;
   recorded: readonly AccessGrantEventName[];
 }): AccessGrantEventName[] {

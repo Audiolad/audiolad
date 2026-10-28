@@ -57,6 +57,7 @@ function baseModel(spaceId: BusinessSpaceId, spaceTitle: string, spaceEnabled: b
     daysLeft: null,
     endsAtLabel: null,
     endsAt: null,
+    playbackUntil: null,
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
     rules: businessGiftRulesText(),
@@ -536,6 +537,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
       daysLeft: activation.access.daysLeft,
       endsAtLabel,
       endsAt: activation.access.endsAt,
+      playbackUntil: activation.access.playbackUntil,
       tracks,
       needsVenue,
       playback: saved
