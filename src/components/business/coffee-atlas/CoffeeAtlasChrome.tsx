@@ -96,10 +96,8 @@ export function CoffeeAtlasOffer({ headingId }: { headingId: string }) {
             {COFFEE_ATLAS_OFFER.title}
           </h2>
           <ul className="atlas-offer__points">
-            <li>
-              <strong>{COFFEE_ATLAS_OFFER.price}</strong> {COFFEE_ATLAS_OFFER.period}
-            </li>
             <li>{COFFEE_ATLAS_OFFER.trial}</li>
+            <li>{COFFEE_ATLAS_OFFER.afterTrial}</li>
             <li>
               <Link href={COFFEE_ATLAS_OFFER.rightsHref}>{COFFEE_ATLAS_OFFER.rights}</Link>
             </li>
