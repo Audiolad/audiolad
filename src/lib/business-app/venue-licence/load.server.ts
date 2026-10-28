@@ -1,6 +1,9 @@
 import "server-only";
 
-import { BUSINESS_NEW_CLIENT_GRANT_KIND, type GrantRow } from "@/lib/access-grants/policy";
+import type { GrantRow } from "@/lib/access-grants/policy";
+import { hashAccessEmail } from "@/lib/access-grants/email-hash";
+import { peekAccessPeriodsWith } from "@/lib/access-grants/peek-closure";
+import { createPeekReader } from "@/lib/access-grants/peek-reader.server";
 import { isVenueLicencePublicId } from "@/lib/business-app/host";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -70,35 +73,12 @@ export async function loadVenueLicenceView(publicId: string, now: Date = new Dat
   let paidUntil: string | null = null;
   let paidPeriod: PaidWindow | null = null;
   if (ownerId) {
-    const { data: grants, error: grantError } = await db
-      .from("access_grants")
-      .select("email_hash, user_id, kind, starts_at, ends_at")
-      .eq("user_id", ownerId)
-      .eq("kind", BUSINESS_NEW_CLIENT_GRANT_KIND)
-      .limit(1);
-    if (grantError) throw new Error("venue_licence_unavailable");
-    const row = grants?.[0];
-    if (row && asString(row.starts_at) && asString(row.ends_at) && asString(row.user_id) && asString(row.email_hash)) {
-      grant = {
-        emailHash: row.email_hash,
-        userId: row.user_id,
-        kind: BUSINESS_NEW_CLIENT_GRANT_KIND,
-        startsAt: row.starts_at,
-        endsAt: row.ends_at,
-      };
-    }
-
-    const { data: paidRows, error: paidError } = await db
-      .from("access_paid_periods")
-      .select("paid_until")
-      .eq("user_id", ownerId)
-      .eq("kind", BUSINESS_NEW_CLIENT_GRANT_KIND);
-    if (paidError) throw new Error("venue_licence_unavailable");
-    for (const paid of paidRows ?? []) {
-      const stamp = asString(paid.paid_until);
-      if (!stamp) continue;
-      if (!paidUntil || Date.parse(stamp) > Date.parse(paidUntil)) paidUntil = stamp;
-    }
+    const { data: owner, error: authError } = await db.auth.admin.getUserById(ownerId);
+    if (authError || !owner.user) throw new Error("venue_licence_unavailable");
+    ({ grant, paidUntil } = await peekAccessPeriodsWith(createPeekReader(db), {
+      userId: ownerId,
+      emailHash: hashAccessEmail(owner.user.email),
+    }));
 
     const { data: periods, error: periodError } = await db
       .from("business_subscription_periods")

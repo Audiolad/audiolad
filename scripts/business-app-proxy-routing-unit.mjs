@@ -18,6 +18,7 @@ import {
   resolveBusinessInternalPath,
   resolveVenueLicenceInternalPath,
   venueLicencePublicUrl,
+  venueLicenceInternalPath,
 } from "../src/lib/business-app/host.ts";
 import { VENUE_LICENCE_PUBLIC_KEY } from "../src/lib/business-app/venue-licence/flag.ts";
 import {
@@ -209,22 +210,36 @@ assert.equal(
 
 const venueId = "0123456789abcdef0123456789abcdef";
 const venueOn = { [VENUE_LICENCE_PUBLIC_KEY]: "1" };
-assert.equal(resolveVenueLicenceInternalPath(`/v/${venueId}`), `${BUSINESS_SITE_PATH}/v/${venueId}`);
+assert.equal(resolveVenueLicenceInternalPath(`/v/${venueId}`), venueLicenceInternalPath(venueId));
 assert.equal(resolveVenueLicenceInternalPath("/v/short"), null);
 assert.equal(resolveVenueLicenceInternalPath(`/v/${venueId.toUpperCase()}`), null);
 assert.equal(venueLicencePublicUrl(venueId), `https://business.audiolad.ru/v/${venueId}`);
-assert.equal(
-  resolveBusinessProxyAction(BUSINESS_HOSTNAME, `/v/${venueId}`, {}).action,
-  "not_found",
-  "venue licence route stays closed when the flag is off",
+for (const value of [undefined, "0", "true", "false", "", "01", " 1", "anything"]) {
+  const env = { [VENUE_LICENCE_PUBLIC_KEY]: value };
+  for (const host of [BUSINESS_HOSTNAME, "audiolad.ru", "www.audiolad.ru", "other.example"]) {
+    for (const path of [`/v/${venueId}`, venueLicenceInternalPath(venueId), `${BUSINESS_SITE_PATH}/v/${venueId}`]) {
+      assert.deepEqual(resolveBusinessProxyAction(host, path, env), { action: "not_found" }, `${host}${path} flag=${value}`);
+    }
+  }
+}
+assert.equal(venueLicenceInternalPath(venueId), `/business-venue-licence/v/${venueId}`);
+assert.deepEqual(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, venueLicenceInternalPath(venueId), venueOn),
+  { action: "pass_through" },
+  "rewritten licence path passes through with the flag on",
+);
+assert.deepEqual(
+  resolveBusinessProxyAction(BUSINESS_HOSTNAME, `${BUSINESS_SITE_PATH}/v/${venueId}`, venueOn),
+  { action: "not_found" },
+  "former cabinet route is retired",
 );
 assert.deepEqual(
   resolveBusinessProxyAction(BUSINESS_HOSTNAME, `/v/${venueId}`, venueOn),
-  { action: "rewrite_business_app", pathname: `${BUSINESS_SITE_PATH}/v/${venueId}` },
+  { action: "rewrite_business_app", pathname: venueLicenceInternalPath(venueId) },
 );
 assert.equal(resolveBusinessProxyAction(BUSINESS_HOSTNAME, "/v/not-a-token", venueOn).action, "not_found");
 assert.equal(
-  resolveBusinessProxyAction("audiolad.ru", `${BUSINESS_SITE_PATH}/v/${venueId}`, venueOn).action,
+  resolveBusinessProxyAction("audiolad.ru", venueLicenceInternalPath(venueId), venueOn).action,
   "not_found",
   "apex does not serve the business licence page",
 );

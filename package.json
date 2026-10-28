@@ -275,6 +275,7 @@
     "test:business-brand-icons": "npx tsx scripts/business-brand-icons-unit.mjs && npm run test:business-app-theme",
     "test:business-app-theme": "npx tsx scripts/business-app-theme-unit.mts",
     "test:host-brand-head-render": "node scripts/host-brand-head-render.mjs",
+    "test:business-venue-licence": "npx tsx scripts/business-venue-licence-unit.tsx && node scripts/business-venue-licence-isolation-unit.mjs && npx tsx scripts/business-venue-licence-access-unit.mts",
     "test:business-app-proxy-routing": "npx tsx scripts/business-app-proxy-routing-unit.mjs",
     "test:mini-app-audio-post-parity": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/mini-app-audio-post-parity-unit.mjs",
     "test:vk-mini-app": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/vk-mini-app-unit.mjs && npm run test:mini-app-audio-post-parity && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/vk-appreciation-route-unit.mjs && NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/mini-app-gallery-unit.mjs && npm run test:mini-app-home-footer",

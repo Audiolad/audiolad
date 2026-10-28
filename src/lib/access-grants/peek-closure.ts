@@ -58,17 +58,26 @@ export function earliestGrant(rows: GrantRow[]): GrantRow | null {
   return sorted[0] ?? null;
 }
 
-export async function peekChromeAccessWith(
+/** Raw periods shared by the cabinet chrome and the public licence presenter. */
+export async function peekAccessPeriodsWith(
   reader: PeekReader,
   start: { userId: string; emailHash: string | null },
-  now: Date,
-): Promise<BusinessChromeAccess> {
+): Promise<{ grant: GrantRow | null; paidUntil: string | null }> {
   const closure = await identityClosure(reader, start);
   const grant = earliestGrant(await reader.grants(closure.userIds, closure.emailHashes));
   const stamps = await reader.paidStamps(start.emailHash, start.userId);
   const paidUntil = stamps.length
     ? stamps.reduce((max, value) => (Date.parse(value) > Date.parse(max) ? value : max))
     : null;
+  return { grant, paidUntil };
+}
+
+export async function peekChromeAccessWith(
+  reader: PeekReader,
+  start: { userId: string; emailHash: string | null },
+  now: Date,
+): Promise<BusinessChromeAccess> {
+  const { grant, paidUntil } = await peekAccessPeriodsWith(reader, start);
   const access = resolveCustomerAccess({ now, emailConfirmed: true, grant, paidUntil });
   if (access.mode === "grace" && access.endsAt && access.playbackUntil) {
     return { mode: "grace", endsAt: access.endsAt, graceEndsAt: access.playbackUntil };

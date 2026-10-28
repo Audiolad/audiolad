@@ -161,6 +161,17 @@ for (const svg of [square, tent]) {
   assert.ok(Math.max(...baselines) < limit, `text stays inside the trim, last ${Math.max(...baselines)}`);
 }
 
+// Exercise the logo branch: every namespace prefix in an element/attribute must be declared.
+for (const format of ["square80", "a6"] as const) {
+  const svg = renderVenueStickerSvg({ publicUrl: url, format, logoHref: "data:image/svg+xml;base64,PHN2Zy8+" });
+  assert.match(svg, /<image href="data:image\/svg\+xml;base64,PHN2Zy8\+"/);
+  assert.doesNotMatch(svg, /xlink:href/);
+  const declared = new Set(["xml", "xmlns", ...[...svg.matchAll(/xmlns:([\w-]+)=/g)].map((m) => m[1])]);
+  for (const match of svg.matchAll(/(?:<\/?|\s)([\w-]+):[\w-]+(?=[\s=>])/g)) {
+    assert.ok(declared.has(match[1]), `undeclared XML prefix ${match[1]}`);
+  }
+}
+
 const matrix = qrMatrix(url);
 assert.equal(matrix.length, QR_MATRIX_SIZE);
 assert.equal(matrix[0].length, QR_MATRIX_SIZE);
@@ -173,20 +184,6 @@ function SIZE_EDGE(modules: boolean[][]): number {
 
 const anonymous: BusinessOwnerHomeContext = { status: "anonymous" };
 const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
-const bare = renderToStaticMarkup(
-  <AppRouterContext.Provider value={fakeRouter}>
-    <PathnameContext.Provider value="/business-app/v/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">
-      <BusinessDomainProvider value={anonymous}>
-        <BusinessAppShell><p>card</p></BusinessAppShell>
-      </BusinessDomainProvider>
-    </PathnameContext.Provider>
-  </AppRouterContext.Provider>,
-);
-assert.match(bare, /data-testid="venue-licence-frame"/);
-assert.match(bare, /card/);
-assert.doesNotMatch(bare, /business-app-sidebar/);
-assert.doesNotMatch(bare, /business-app-bottom-nav/);
-
 const home = renderToStaticMarkup(
   <AppRouterContext.Provider value={fakeRouter}>
     <PathnameContext.Provider value="/business-app">
@@ -199,7 +196,7 @@ const home = renderToStaticMarkup(
 assert.match(home, /business-app-sidebar/);
 assert.doesNotMatch(home, /venue-licence-frame/);
 
-const pageSource = readFileSync("src/app/business-app/v/[publicId]/page.tsx", "utf8");
+const pageSource = readFileSync("src/app/(venue-licence)/business-venue-licence/v/[publicId]/page.tsx", "utf8");
 assert.match(pageSource, /isVenueLicencePublicEnabled\(\)/);
 assert.match(pageSource, /notFound\(\)/);
 const migration = readFileSync("supabase/migrations/20270207170000_business_location_licence_public_id.sql", "utf8");

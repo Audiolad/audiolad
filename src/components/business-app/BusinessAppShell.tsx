@@ -56,10 +56,6 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
   const access = resolveBusinessAccess(useBusinessDomain());
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
-  // Public licence page: no cabinet sidebar, player or guest strip.
-  if (pathname === "/v" || pathname.startsWith("/v/")) {
-    return <div className="business-app-public" data-testid="venue-licence-frame">{children}</div>;
-  }
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
   const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);

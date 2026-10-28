@@ -143,7 +143,7 @@ export function renderVenueStickerSvg(input: {
   if (input.logoHref) {
     const logoX = center - logo / 2;
     chunks.push(
-      `<image href="${escapeXml(input.logoHref)}" xlink:href="${escapeXml(input.logoHref)}" x="${logoX}" y="${y}" width="${logo}" height="${logo}" preserveAspectRatio="xMidYMid slice"/>`,
+      `<image href="${escapeXml(input.logoHref)}" x="${logoX}" y="${y}" width="${logo}" height="${logo}" preserveAspectRatio="xMidYMid slice"/>`,
     );
   }
   y += logo + (input.format === "a6" ? 6 : 3.4);

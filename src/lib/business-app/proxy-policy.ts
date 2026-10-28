@@ -6,11 +6,12 @@ import {
   BUSINESS_SITE_PATH,
   isBusinessHostname,
   isBusinessSitePath,
+  isVenueLicenceInternalPath,
+  resolveVenueLicenceInternalPath,
   resolveBusinessInternalPath,
 } from "./host";
 import { isBusinessBrandAssetPath } from "./brand-icons";
 import { isVenueLicencePublicEnabled } from "./venue-licence/flag";
-import { resolveVenueLicenceInternalPath } from "./host";
 
 /**
  * Public files the business host must still serve.
@@ -64,6 +65,20 @@ export function resolveBusinessProxyAction(
   pathname: string,
   env: Record<string, string | undefined> = process.env,
 ): BusinessProxyAction {
+  // Gate both entry points before ANY host or internal-path pass-through.
+  const venueLicence = resolveVenueLicenceInternalPath(pathname);
+  const internalLicence = isVenueLicenceInternalPath(pathname);
+  if ((venueLicence || internalLicence) && !isVenueLicencePublicEnabled(env)) {
+    return { action: "not_found" };
+  }
+  // The former cabinet route must never be used again.
+  if (pathname === `${BUSINESS_SITE_PATH}/v` || pathname.startsWith(`${BUSINESS_SITE_PATH}/v/`)) {
+    return { action: "not_found" };
+  }
+  if (internalLicence) {
+    return { action: isBusinessHostname(hostname) ? "pass_through" : "not_found" };
+  }
+
   if (!isBusinessHostname(hostname) && isBusinessSitePath(pathname)) {
     return { action: "not_found" };
   }
@@ -103,9 +118,7 @@ export function resolveBusinessProxyAction(
 
   // /v/<public id> is the venue licence page. Off (the default) is a 404,
   // including on the business host, until the flag is approved.
-  const venueLicence = resolveVenueLicenceInternalPath(pathname);
   if (venueLicence) {
-    if (!isVenueLicencePublicEnabled(env)) return { action: "not_found" };
     return { action: "rewrite_business_app", pathname: venueLicence };
   }
 

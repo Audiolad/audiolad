@@ -74,6 +74,12 @@ export function resolveBusinessInternalPath(
  * The id is 32 hex chars from business_locations.licence_public_id, not the row uuid.
  * The business host rewrites /v/<id> only while the feature flag is on.
  */
+export const VENUE_LICENCE_INTERNAL_PATH = "/business-venue-licence";
+
+export function isVenueLicenceInternalPath(pathname: string): boolean {
+  return pathname === VENUE_LICENCE_INTERNAL_PATH || pathname.startsWith(`${VENUE_LICENCE_INTERNAL_PATH}/`);
+}
+
 export const VENUE_LICENCE_PUBLIC_ID_PATTERN = "^[0-9a-f]{32}$";
 
 const VENUE_LICENCE_PUBLIC_PATH_RE = /^\/v\/([0-9a-f]{32})$/;
@@ -87,7 +93,7 @@ export function venueLicencePublicPath(publicId: string): string {
 }
 
 export function venueLicenceInternalPath(publicId: string): string {
-  return `${BUSINESS_SITE_PATH}/v/${publicId}`;
+  return `${VENUE_LICENCE_INTERNAL_PATH}/v/${publicId}`;
 }
 
 /** https://business.audiolad.ru/v/<id> – the address encoded in the venue sticker. */
