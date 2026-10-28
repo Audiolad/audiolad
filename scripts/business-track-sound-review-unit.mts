@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, restrictSoundQueueToAgreement, type SoundReviewRow } from '../src/lib/business/track-sound-review';
+import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, restrictSoundQueueToAgreement, selectSectorAlbums, type SoundReviewRow } from '../src/lib/business/track-sound-review';
 import { collectQueuedSoundReviews, saveSoundReviewBatch, soundReviewBulkConfirm, soundReviewSelectionCount } from '../src/lib/business/track-sound-bulk';
 import { hasCurrentSoundApproval, sameSoundAudioIdentity, soundAllowedTrackIds } from '../src/lib/business/track-sound-review.server';
 import { workspaceSignBlocked } from '../src/lib/business-workspace/sign-gate';
@@ -57,6 +57,29 @@ assert.deepEqual(restricted.rows.map((row) => row.id), ['t1']);
 assert.equal(restricted.total, 1);
 assert.equal(restricted.counts.approved, 0);
 assert.deepEqual(restricted.artists.map((artist) => artist.id), ['jazz']);
+assert.deepEqual(restricted.matchedAlbumIds, ['al']);
+// «Секторы альбомов» follows the page filters (Кофейник filter must not show an Аурафон album).
+const coffee = 'kofeinik';
+const aura = 'aurafon';
+const sectorAlbums = [
+  { id: 'k1', authorId: coffee, admitted: true },
+  { id: 'k2', authorId: coffee, admitted: true },
+  { id: 'k3', authorId: coffee, admitted: false },
+  { id: 'a1', authorId: aura, admitted: false },
+  { id: 'a2', authorId: aura, admitted: true },
+];
+const pick = (matched: string[], filter: Parameters<typeof selectSectorAlbums>[2]) => selectSectorAlbums(sectorAlbums, matched, filter).map((album) => album.id);
+assert.deepEqual(pick(['k1', 'a2'], {}), ['k1', 'k3', 'a1', 'a2']);
+assert.deepEqual(pick(['k1', 'k2'], { artist: coffee }), ['k1', 'k2', 'k3']);
+assert.deepEqual(pick(['k1', 'k2', 'a2'], { artist: coffee }), ['k1', 'k2', 'k3']);
+assert.deepEqual(pick(['k2'], { album: 'k2' }), ['k2']);
+assert.deepEqual(pick(['k1'], { artist: coffee, album: 'a1' }), []);
+assert.deepEqual(pick(['k2'], { artist: coffee, space: 'cafe' }), ['k2']);
+assert.deepEqual(pick(['k1', 'a2'], { status: 'unchecked' }), ['k1', 'a2']);
+const manyRows = Array.from({ length: 150 }, (_, i) => ({ ...queueRows[0], id: `m${i}`, album_id: i < 120 ? 'al' : 'al2', album: i < 120 ? 'Вечер' : 'Утро' }));
+const pageOne = restrictSoundQueueToAgreement(manyRows, new Set(['jazz']), { artist: 'jazz', page: 0 });
+assert.deepEqual(pageOne.rows.map((row) => row.album_id).includes('al2'), false);
+assert.deepEqual(pageOne.matchedAlbumIds, ['al', 'al2']);
 assert.equal(nextUnchecked([], null), null);
 assert.equal(nextUnchecked([rows[0]], 'a'), null);
 

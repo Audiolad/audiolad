@@ -26,7 +26,7 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
   let sectors: Awaited<ReturnType<typeof listSectorAlbums>> = { directions: [], albums: [] };
   try {
     queue = await loadAgreementSoundQueue(db, { status, artist, album, space, page });
-    sectors = await listSectorAlbums(queue.rows.map((row) => row.album_id));
+    sectors = await listSectorAlbums(queue.matchedAlbumIds, { status, artist, album, space });
   } catch {
     return <p role="alert">Не удалось загрузить очередь. Проверьте применение миграции и обновите страницу.</p>;
   }
