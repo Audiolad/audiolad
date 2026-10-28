@@ -129,7 +129,7 @@ export default function VenueControlPanel({
       <label className="block text-sm text-[var(--biz-text)]">
         <span className="font-medium">Название точки</span>
         <input
-          className="mt-2 w-full rounded-xl border border-[var(--biz-border)] bg-white px-3 py-3"
+          className="mt-2 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-3"
           value={name}
           maxLength={120}
           data-testid="biz-venue-name"
