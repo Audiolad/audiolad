@@ -1,5 +1,7 @@
 "use client";
 
+import { AuthBrand, AuthFrame, useAuthVariant } from "@/components/auth/AuthPresentation";
+import { authVariantLinkParams } from "@/components/auth/variant";
 import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {
@@ -12,6 +14,7 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_TOO_SHORT_MESSAGE,
   SIGNUP_EMAIL_LABEL,
+  SIGNUP_EXISTING_ACCOUNT_MESSAGE,
   SIGNUP_PASSWORD_HINT,
   SIGNUP_PASSWORD_LABEL,
   validateEmailForRegistrationClient,
@@ -21,6 +24,8 @@ import {
   evaluateSignUpClientFormState,
   type SignUpClientField,
 } from "@/lib/auth/sign-up-client-form";
+import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
+import { helpArticlePath } from "@/lib/help/paths";
 import { BUSINESS_SIGN_UP_INTRO } from "@/lib/access-grants/copy";
 import { isBusinessTrialNext } from "@/lib/access-grants/paths";
 import {
@@ -45,6 +50,7 @@ function fieldErrorId(field: SignUpFieldError["field"]): string {
 }
 
 function SignUpForm() {
+  const variant = useAuthVariant();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [firstName, setFirstName] = useState("");
@@ -251,19 +257,17 @@ function SignUpForm() {
     }
 
     router.replace(
-      buildAuthRouteHref("/auth/sign-in", nextParam, { registered: "1" }),
+      buildAuthRouteHref("/auth/sign-in", nextParam, { ...authVariantLinkParams(variant), registered: "1" }),
     );
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <AuthFrame variant={variant}>
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
-          </Link>
+          <AuthBrand variant={variant} />
 
           <h1 className="mt-8 text-[30px] font-semibold">Создать аккаунт</h1>
 
@@ -412,6 +416,19 @@ function SignUpForm() {
                 className="mt-2 text-sm leading-6 text-[#b34f63]"
               >
                 {formState.emailErrorMessage}
+                {variant === "business" && fieldErrors.email === SIGNUP_EXISTING_ACCOUNT_MESSAGE ? (
+                  <span className="mt-2 flex flex-wrap gap-x-3">
+                    <Link href={buildAuthRouteHref("/auth/sign-in", nextParam, authVariantLinkParams(variant))} className="font-semibold underline">
+                      Войти
+                    </Link>
+                    <Link href={buildAuthRouteHref("/auth/forgot-password", nextParam, authVariantLinkParams(variant))} className="font-semibold underline">
+                      Восстановить пароль
+                    </Link>
+                    <Link href={helpArticlePath(emailNotReceivedArticle)} className="font-semibold underline">
+                      Письмо не пришло
+                    </Link>
+                  </span>
+                ) : null}
               </p>
             ) : null}
           </label>
@@ -546,16 +563,16 @@ function SignUpForm() {
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           Уже есть аккаунт?{" "}
           <Link
-            href={buildAuthRouteHref("/auth/sign-in", nextParam)}
+            href={buildAuthRouteHref("/auth/sign-in", nextParam, authVariantLinkParams(variant))}
             className="font-semibold text-[#7042c5]"
           >
             Войти
           </Link>
         </p>
 
-        <BottomNav />
+        {variant === "ordinary" ? <BottomNav /> : null}
       </div>
-    </main>
+    </AuthFrame>
   );
 }
 

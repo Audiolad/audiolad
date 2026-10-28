@@ -1,5 +1,7 @@
 "use client";
 
+import { AuthBrand, AuthFrame, useAuthVariant } from "@/components/auth/AuthPresentation";
+import { authVariantLinkParams } from "@/components/auth/variant";
 import BottomNav from "@/components/BottomNav";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {
@@ -20,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { resetPasswordAction } from "./actions";
 
 function ResetPasswordForm() {
+  const variant = useAuthVariant();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
@@ -96,26 +99,24 @@ function ResetPasswordForm() {
 
   if (!sessionChecked) {
     return (
-      <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <AuthFrame variant={variant}>
         <div
           className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
         >
           <p className="text-center text-sm text-[#7d70a2]">Проверяем ссылку…</p>
         </div>
-      </main>
+      </AuthFrame>
     );
   }
 
   if (!hasSession) {
     return (
-      <main className="min-h-screen bg-platform-surface text-[#25135c]">
+      <AuthFrame variant={variant}>
         <div
           className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
         >
           <header className="text-center">
-            <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-              АудиоЛад
-            </Link>
+            <AuthBrand variant={variant} />
 
             <h1 className="mt-8 text-[30px] font-semibold">Смена пароля</h1>
           </header>
@@ -132,6 +133,7 @@ function ResetPasswordForm() {
               href={buildAuthRouteHref(
                 "/auth/forgot-password",
                 searchParams.get("next"),
+                authVariantLinkParams(variant),
               )}
               className="font-semibold text-[#7042c5]"
             >
@@ -139,21 +141,19 @@ function ResetPasswordForm() {
             </Link>
           </p>
 
-          <BottomNav />
+          {variant === "ordinary" ? <BottomNav /> : null}
         </div>
-      </main>
+      </AuthFrame>
     );
   }
 
   return (
-    <main className="min-h-screen bg-platform-surface text-[#25135c]">
+    <AuthFrame variant={variant}>
       <div
         className={`mx-auto min-h-screen w-full max-w-[430px] bg-platform-surface px-5 pt-8 ${platformNavPaddingClass}`}
       >
         <header className="text-center">
-          <Link href="/" className="text-[30px] font-semibold text-[#7042c5]">
-            АудиоЛад
-          </Link>
+          <AuthBrand variant={variant} />
 
           <h1 className="mt-8 text-[30px] font-semibold">Создайте новый пароль</h1>
 
@@ -232,16 +232,16 @@ function ResetPasswordForm() {
 
         <p className="mt-6 text-center text-sm text-[#7d70a2]">
           <Link
-            href={buildAuthRouteHref("/auth/sign-in", searchParams.get("next"))}
+            href={buildAuthRouteHref("/auth/sign-in", searchParams.get("next"), authVariantLinkParams(variant))}
             className="font-semibold text-[#7042c5]"
           >
             Вернуться ко входу
           </Link>
         </p>
 
-        <BottomNav />
+        {variant === "ordinary" ? <BottomNav /> : null}
       </div>
-    </main>
+    </AuthFrame>
   );
 }
 

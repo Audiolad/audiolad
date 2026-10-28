@@ -1,0 +1,168 @@
+/* Override presentation only, scoped to the Business frame. Form markup is shared. */
+.business {
+  /* Jazz & Coffee values copied from src/components/business-app/theme/business-theme.css.
+     Keep in sync with that source of truth; auth never loads the global theme. */
+  --auth-cream: #f7f1e8;
+  --auth-espresso: #2b1d14;
+  --auth-milk: #fffaf3;
+  --auth-border-strong: #cdb69a;
+  --auth-coffee: #6f4326;
+  --auth-text-muted: #6b5848;
+  --auth-red: #a3372c;
+  --auth-sand: #f2e8da;
+  --auth-on-accent: #fff8ef;
+  --auth-coffee-deep: #573219;
+  --auth-sand-deep: #e5d6c1;
+  --auth-red-ink: #7f2a21;
+  --auth-red-bg: #fbe8e3;
+  --auth-red-border: #efc2b8;
+  --auth-green-ink: #1f4d31;
+  --auth-green-bg: #e8f1e3;
+  --auth-green-border: #c5dbbd;
+  color-scheme: light;
+
+  min-height: 100vh;
+  background: var(--auth-cream);
+  color: var(--auth-espresso);
+  padding: 24px 12px;
+  overflow-wrap: anywhere;
+}
+
+.business > div {
+  min-height: auto;
+  background: var(--auth-milk);
+  border: 1px solid var(--auth-border-strong);
+  border-radius: 24px;
+  padding: 28px 20px 32px;
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--auth-espresso) 8%, transparent);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--auth-espresso);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.brand img {
+  border-radius: 50%;
+}
+
+.business [class~="text-[#7042c5]"],
+.business a {
+  color: var(--auth-coffee);
+}
+
+.business [class~="text-[#7d70a2]"],
+.business [class~="text-[#8a7ca9]"],
+.business [class~="text-[#4c3d78]"] {
+  color: var(--auth-text-muted);
+}
+
+.business input:not([type="checkbox"]) {
+  min-height: 52px;
+  min-width: 0;
+  background: var(--auth-milk);
+  border-color: var(--auth-border-strong);
+  color: var(--auth-espresso);
+}
+
+.business input::placeholder {
+  color: var(--auth-text-muted);
+}
+
+.business input:focus {
+  border-color: var(--auth-coffee);
+}
+
+.business input[aria-invalid="true"] {
+  border-color: var(--auth-red);
+}
+
+.business input[type="checkbox"] {
+  accent-color: var(--auth-coffee);
+}
+
+.business fieldset {
+  background: var(--auth-sand);
+  border-color: var(--auth-border-strong);
+}
+
+.business fieldset label {
+  min-height: 44px;
+}
+
+.business a:not(.brand) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Consent text and punctuation must wrap as a single inline flow. */
+.business fieldset a:not(.brand) {
+  display: inline;
+  min-height: 0;
+}
+
+.business button[type="button"] {
+  width: 44px;
+  height: 44px;
+  color: var(--auth-coffee);
+}
+
+.business button:focus-visible,
+.business input:focus-visible,
+.business a:focus-visible {
+  outline: 2px solid var(--auth-coffee);
+  outline-offset: 3px;
+}
+
+.business button[type="submit"] {
+  min-height: 52px;
+  background: var(--auth-coffee);
+  color: var(--auth-on-accent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--auth-coffee) 20%, transparent);
+}
+
+.business button[type="submit"]:hover {
+  background: var(--auth-coffee-deep);
+}
+
+.business button[type="submit"]:disabled {
+  background: var(--auth-sand-deep);
+  color: var(--auth-text-muted);
+  box-shadow: none;
+}
+
+.business [class~="text-[#b34f63]"] {
+  color: var(--auth-red-ink);
+}
+
+.business [class~="bg-[#fff8f9]"] {
+  background: var(--auth-red-bg);
+  border-color: var(--auth-red-border);
+}
+
+.business [class~="text-[#3d8d65]/90"] {
+  color: var(--auth-green-ink);
+}
+
+.business [class~="bg-[#f3fbf6]"] {
+  background: var(--auth-green-bg);
+  border-color: var(--auth-green-border);
+  color: var(--auth-green-ink);
+}
+
+@media (min-width: 768px) {
+  .business {
+    padding: 48px 24px;
+  }
+
+  .business > div {
+    padding: 32px;
+  }
+}
