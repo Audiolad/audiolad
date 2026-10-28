@@ -71,6 +71,7 @@ function SignUpForm() {
   const formRef = useRef<HTMLFormElement>(null);
 
   const nextParam = searchParams.get("next");
+  const businessTrial = isBusinessTrialNext(nextParam);
 
   function trackSignupStartedOnce() {
     if (signupStartedRef.current) {
@@ -96,6 +97,7 @@ function SignUpForm() {
     { firstName, lastName, email, password, legalConsent },
     fieldErrors,
     { firstNameTouched, lastNameTouched, submitAttempted },
+    { lastNameOptional: businessTrial },
   );
 
   function clearFieldError(field: SignUpClientField) {
@@ -328,7 +330,7 @@ function SignUpForm() {
           </label>
 
           <label className="block">
-            <span className="text-sm font-medium">Фамилия</span>
+            <span className="text-sm font-medium">{businessTrial ? "Фамилия – необязательно" : "Фамилия"}</span>
 
             <input
               type="text"
@@ -342,7 +344,7 @@ function SignUpForm() {
                 setLastName(event.currentTarget.value);
                 clearFieldError("lastName");
               }}
-              required
+              required={!businessTrial}
               autoComplete="family-name"
               placeholder="Ваша фамилия"
               aria-invalid={formState.lastNameFieldInvalid}

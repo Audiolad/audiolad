@@ -21,7 +21,9 @@ export function buildBusinessGreeting(
         : part === "evening"
           ? "Добрый вечер"
           : "Доброй ночи";
-  return `${prefix}, ${firstName}!`;
+  const name = firstName.trim();
+  if (!name) return `${prefix}!`;
+  return `${prefix}, ${name}!`;
 }
 
 export function buildBusinessGreetingSubtitle(): string {
