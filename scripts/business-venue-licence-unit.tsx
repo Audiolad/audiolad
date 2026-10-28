@@ -202,7 +202,7 @@ assert.doesNotMatch(home, /venue-licence-frame/);
 const pageSource = readFileSync("src/app/business-app/v/[publicId]/page.tsx", "utf8");
 assert.match(pageSource, /isVenueLicencePublicEnabled\(\)/);
 assert.match(pageSource, /notFound\(\)/);
-const migration = readFileSync("supabase/migrations/20270207120000_business_location_licence_public_id.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20270207170000_business_location_licence_public_id.sql", "utf8");
 assert.match(migration, /ADD COLUMN IF NOT EXISTS licence_public_id/);
 assert.match(migration, /licence_public_id ~ '\^\[0-9a-f\]\{32\}\$'/);
 assert.doesNotMatch(migration, /DROP TABLE/i);
