@@ -12,6 +12,11 @@ export type BusinessChromeAccess = {
   endsAt: string | null;
   /** ISO instant when music stops. Set only while mode is grace. */
   graceEndsAt?: string | null;
+  /**
+   * ISO start of the gift (registration). The public-performance licence
+   * uses this instant. A payment does not replace it.
+   */
+  startsAt?: string | null;
 };
 
 export const BUSINESS_NO_ACCESS: BusinessChromeAccess = { mode: "none", endsAt: null };

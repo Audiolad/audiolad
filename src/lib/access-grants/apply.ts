@@ -28,7 +28,7 @@ export async function activateBusinessTrial(
   if (!emailHash) {
     return {
       decision: "invalid_email",
-      access: { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: false },
+      access: { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: false, licenceStartsAt: null },
       grant: null,
       emailHash: null,
     };
@@ -129,7 +129,7 @@ export async function recordPaidRenewal(
   const kind = input.kind ?? BUSINESS_NEW_CLIENT_GRANT_KIND;
   const emailHash = hashAccessEmail(input.email);
   if (!emailHash) {
-    return { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: false };
+    return { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: false, licenceStartsAt: null };
   }
   await store.upsertPaid({
     emailHash,

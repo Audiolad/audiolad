@@ -194,10 +194,13 @@ const ok = validateBusinessOnboardingConfirm({
   organizationName: " Пилот ",
   locationName: " Точка 1 ",
   businessCategory: "Салон красоты",
+  addressLine1: " ул. Примерная, 1 ",
 });
 assert.equal(ok.ok, true);
 if (ok.ok) {
   assert.equal(ok.value.organizationName, "Пилот");
+  assert.equal(ok.value.locationName, "Точка 1");
+  assert.equal(ok.value.addressLine1, "ул. Примерная, 1");
   assert.equal(ok.value.countryCode, "RU");
   assert.equal(ok.value.timezone, "Europe/Moscow");
 }
@@ -206,8 +209,17 @@ const bad = validateBusinessOnboardingConfirm({
   organizationName: "",
   locationName: "x",
   businessCategory: "y",
+  addressLine1: "ул. Примерная, 1",
 });
 assert.equal(bad.ok, false);
+
+const missingAddress = validateBusinessOnboardingConfirm({
+  organizationName: "Пилот",
+  locationName: "Точка 1",
+  businessCategory: "Кафе",
+  addressLine1: "  ",
+});
+assert.equal(missingAddress.ok, false);
 
 assert.equal(
   resolveBusinessInternalPath("/onboarding"),

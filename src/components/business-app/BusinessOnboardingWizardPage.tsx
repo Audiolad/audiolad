@@ -9,6 +9,7 @@ import OnboardingPreviewPlayer from "@/components/business-app/OnboardingPreview
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { businessAccessLine } from "@/lib/access-grants/access-line";
+import { BUSINESS_LICENCE_PLACE_RULE, BUSINESS_LICENCE_TRIAL_RULE, BUSINESS_VENUE_ADDRESS_LINK } from "@/lib/business-app/licensing-copy";
 import {
   GUEST_COFFEE_COPY,
   GUEST_COFFEE_INQUIRY_EMAIL,
@@ -53,6 +54,7 @@ export default function BusinessOnboardingWizardPage({
   );
   const [organizationName, setOrganizationName] = useState("");
   const [locationName, setLocationName] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
   const [namesTouched, setNamesTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -120,6 +122,15 @@ export default function BusinessOnboardingWizardPage({
           <p className="text-[var(--biz-text-muted)]">
             Мастер первой точки уже пройден. Откройте музыку или статус на главной.
           </p>
+          {domain.location.addressLine1 ? (
+            <p className="text-sm text-[var(--biz-text)]" data-testid="onboarding-venue-place">
+              {domain.location.name} – {domain.location.addressLine1}
+            </p>
+          ) : (
+            <p className="text-sm text-[var(--biz-text-muted)]" data-testid="onboarding-venue-missing">
+              <Link href="/preferences#venue">{BUSINESS_VENUE_ADDRESS_LINK}</Link>
+            </p>
+          )}
           {returnHref ? (
             <p className="text-[var(--biz-text)]">Кабинет с музыкой открывается по ссылке ниже.</p>
           ) : null}
@@ -178,6 +189,7 @@ export default function BusinessOnboardingWizardPage({
       organizationName: organizationName || suggested.organizationName,
       locationName: locationName || suggested.locationName,
       businessCategory: type?.category ?? suggested.businessCategory,
+      addressLine1,
       countryCode: "RU",
       timezone: "Europe/Moscow",
     });
@@ -221,6 +233,12 @@ export default function BusinessOnboardingWizardPage({
             {GUEST_COFFEE_TERMS}. {GUEST_COFFEE_COPY.connectNote}
           </p>
         )
+      ) : null}
+
+      {step !== "done" ? (
+        <p className="mb-4 text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="onboarding-licence-note">
+          {BUSINESS_LICENCE_TRIAL_RULE} {BUSINESS_LICENCE_PLACE_RULE}
+        </p>
       ) : null}
 
       <div
@@ -365,7 +383,7 @@ export default function BusinessOnboardingWizardPage({
                   className="block text-sm font-medium text-[var(--biz-text)]"
                   htmlFor="onboarding-loc"
                 >
-                  Точка
+                  Название точки
                 </label>
                 <input
                   id="onboarding-loc"
@@ -375,6 +393,24 @@ export default function BusinessOnboardingWizardPage({
                     setLocationName(e.target.value);
                   }}
                   maxLength={120}
+                  className="mt-1 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-2 text-[var(--biz-text)]"
+                />
+              </div>
+              <div>
+                <label
+                  className="block text-sm font-medium text-[var(--biz-text)]"
+                  htmlFor="onboarding-address"
+                >
+                  Адрес точки
+                </label>
+                <input
+                  id="onboarding-address"
+                  value={addressLine1}
+                  onChange={(e) => setAddressLine1(e.target.value)}
+                  maxLength={200}
+                  required
+                  autoComplete="street-address"
+                  data-testid="onboarding-address"
                   className="mt-1 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-2 text-[var(--biz-text)]"
                 />
               </div>

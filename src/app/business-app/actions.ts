@@ -8,7 +8,9 @@ import {
   parseBusinessEligibilityPayload,
   type BusinessEligibilityProbeRow,
 } from "@/lib/business-app/eligibility";
+import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
 import { BUSINESS_SITE_PATH } from "@/lib/business-app/host";
+import { validateVenuePlace } from "@/lib/business-app/venue-place";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -16,10 +18,23 @@ export type BootstrapBusinessDomainResult =
   | { ok: true; organizationId: string; locationId: string; zoneId: string }
   | { ok: false; error: string };
 
+function venueRpcMessage(error: { message?: string } | null): string {
+  const message = error?.message ?? "";
+  if (message.includes("invalid_location_address")) return "Укажите адрес точки: от 1 до 200 символов.";
+  if (message.includes("invalid_location_name") || message.includes("invalid_organization_name")) {
+    return "Проверьте название точки.";
+  }
+  if (message.includes("not_organization_owner")) return "Изменить название и адрес может владелец аккаунта.";
+  if (message.includes("support_mode_consent_forbidden")) return "В режиме сопровождения адрес изменить нельзя.";
+  if (message.includes("venue_device")) return "На устройстве в зале адрес изменить нельзя.";
+  return "Не удалось сохранить точку. Попробуйте ещё раз.";
+}
+
 export async function bootstrapBusinessOrganizationWithLocation(input: {
   organizationName: string;
   locationName: string;
   businessCategory: string;
+  addressLine1: string;
   countryCode?: string;
   timezone?: string;
 }): Promise<BootstrapBusinessDomainResult> {
@@ -34,20 +49,23 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
 
   const countryCode = (input.countryCode ?? "RU").trim().toUpperCase();
   const timezone = (input.timezone ?? "Europe/Moscow").trim();
+  const place = validateVenuePlace({ name: input.locationName, addressLine1: input.addressLine1 });
+  if (!place.ok) return { ok: false, error: place.error };
 
   const { data, error } = await supabase.rpc(
     "create_business_organization_with_location",
     {
       p_organization_name: input.organizationName.trim(),
-      p_location_name: input.locationName.trim(),
+      p_location_name: place.value.name,
       p_business_category: input.businessCategory.trim(),
       p_country_code: countryCode,
       p_timezone: timezone,
+      p_address_line1: place.value.addressLine1,
     },
   );
 
   if (error) {
-    return { ok: false, error: "Не удалось подключить заведение. Попробуйте ещё раз." };
+    return { ok: false, error: venueRpcMessage(error) };
   }
 
   const payload = data as {
@@ -69,12 +87,44 @@ export async function bootstrapBusinessOrganizationWithLocation(input: {
   revalidatePath(BUSINESS_SITE_PATH);
   revalidatePath(`${BUSINESS_SITE_PATH}/locations`);
 
+  revalidatePath(`${BUSINESS_SITE_PATH}/settings`);
+  revalidatePath(`${BUSINESS_SITE_PATH}/documents`);
+
   return {
     ok: true,
     organizationId: payload.organization_id,
     locationId: payload.location_id,
     zoneId: payload.zone_id,
   };
+}
+
+export async function saveBusinessLocationVenue(input: {
+  locationId: string;
+  name: string;
+  addressLine1: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const place = validateVenuePlace({ name: input.name, addressLine1: input.addressLine1 });
+  if (!place.ok) return place;
+  if (await businessPointSessionAlive()) {
+    return { ok: false, error: "На устройстве в зале адрес изменить нельзя." };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Вход не подтверждён. Попробуйте ещё раз." };
+
+  const { error } = await supabase.rpc("business_owner_set_location_venue", {
+    p_location_id: input.locationId,
+    p_name: place.value.name,
+    p_address_line1: place.value.addressLine1,
+  });
+  if (error) return { ok: false, error: venueRpcMessage(error) };
+
+  revalidatePath(BUSINESS_SITE_PATH);
+  revalidatePath(`${BUSINESS_SITE_PATH}/settings`);
+  revalidatePath(`${BUSINESS_SITE_PATH}/documents`);
+  return { ok: true };
 }
 
 export type ProvisionVenuePlayerResult =

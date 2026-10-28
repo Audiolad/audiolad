@@ -56,7 +56,7 @@ const member: BusinessOwnerHomeContext = {
   status: "authenticated",
   owner: { userId: "u1", firstName: "Анна" },
   organizationId: "org", organizationName: "Кофейня",
-  location: { id: "loc", organizationId: "org", name: "Зал", businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
+  location: { id: "loc", organizationId: "org", name: "Зал", businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", addressLine1: null, defaultZoneId: null },
   canPay: true,
   offerAccepted: true,
   signals: null,
@@ -344,7 +344,7 @@ void (async () => {
   });
   const now = new Date("2026-10-23T15:00:00Z");
   const c = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, now);
-  assert.deepEqual(c, { mode: "trial", endsAt: "2026-11-22T14:11:37Z" }, "chain A–X–B–Y–C: C sees the live gift");
+  assert.deepEqual(c, { mode: "trial", endsAt: "2026-11-22T14:11:37Z", startsAt: "2026-10-23T14:11:37Z" }, "chain A–X–B–Y–C: C sees the live gift");
   const stranger = await peekChromeAccessWith(reader(), { userId: "D", emailHash: "Z" }, now);
   assert.notEqual(stranger.mode, "trial", "unrelated account: no gift");
   assert.equal(stranger.endsAt, null);
@@ -356,7 +356,7 @@ void (async () => {
   assert.equal(stopped.mode, "offer", "after 3 days the player is closed");
   assert.equal(hasLiveBusinessAccess(stopped), false, "an ended gift does not keep the calm access line");
   const paid = await peekChromeAccessWith(reader(["2026-12-31T10:00:00Z"]), { userId: "C", emailHash: "Y" }, new Date("2026-12-01T00:00:00Z"));
-  assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z" }, "paid period after the gift");
+  assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z", startsAt: "2026-10-23T14:11:37Z" }, "paid period keeps the gift start");
   assert.ok(reads.length > 0);
   console.log("business-guest-shell-unit: peek closure OK");
 })().catch((error) => {
