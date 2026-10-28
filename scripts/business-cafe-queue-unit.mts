@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { handleCafeQueue } from "../src/lib/business-app/cafe-queue/handle";
-import { cafeAheadIndices, cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex, cafeUniqueAhead, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
+import { cafeAheadIndices, cafeQueueIndices, cafeQueueNextIndex, cafeQueuePreviousIndex, cafeUniqueAhead, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
 import { currentCabinetAdmission, restrictCafePool } from "../src/lib/business-app/cafe-queue/pool";
 import {
   cafeDaypartAtMinute,
@@ -585,6 +585,41 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
   assert.equal(ctl.index, 1);
   await ctl.onEnded();
   assert.equal(ctl.index, 2);
+}
+
+// ---------------------------------------------------------------- «Дальше в очереди» follows the button's action
+{
+  const titles = [
+    { audioItemId: "voted", title: "Утро у окна" },
+    { audioItemId: "close", title: "Тихий зал" },
+    { audioItemId: "neutral", title: "Полдень" },
+    { audioItemId: "far", title: "Ночной драйв" },
+  ];
+  const closeSound = sound({ genres: ["jazz"], moods: ["calm"], instruments: ["piano"] });
+  const farSound = sound({ genres: ["rock"], moods: ["aggressive"], instruments: ["guitar"] });
+  const pool = titles.map((item) => track(item.audioItemId, `album-${item.audioItemId}`));
+  const rows = {
+    voted: signals({ energy: 62, sound: closeSound, bpm: 92 }),
+    close: signals({ energy: 40, sound: closeSound, bpm: 96 }),
+    neutral: signals({ energy: null, hasPassport: false, sound: null }),
+    far: signals({ energy: 90, sound: farSound, bpm: 140 }),
+  };
+  const upcoming = (kind: "more" | "less" | null) => {
+    const ranked = rankCafeQueue(pool, new Map(Object.entries(rows)), {
+      ...base,
+      feedback: kind ? [{ audioItemId: "voted", kind }] : [],
+    });
+    const order = ranked.map((item) => titles.findIndex((row) => row.audioItemId === item.audioItemId));
+    const ahead = cafeUniqueAhead(titles, order, 0);
+    const preview = (ahead.length > 0 ? ahead : cafeUpcomingIndices(order, 0)).slice(0, 3);
+    return preview.map((index) => titles[index]!.title);
+  };
+  const before = upcoming(null);
+  const afterMore = upcoming("more");
+  const afterLess = upcoming("less");
+  assert.deepEqual(before, ["Тихий зал", "Ночной драйв", "Полдень"], "before a vote the closer energy leads, then the distant track");
+  assert.deepEqual(afterMore, ["Тихий зал", "Полдень", "Ночной драйв"], "Больше lifts the closest track above the distant one");
+  assert.deepEqual(afterLess, ["Ночной драйв", "Полдень", "Тихий зал"], "Меньше sends the closest track to the bottom");
 }
 
 console.log("business-cafe-queue-unit: ok");
