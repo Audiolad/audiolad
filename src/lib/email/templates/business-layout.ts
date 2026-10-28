@@ -125,6 +125,18 @@ export function renderBusinessEmailButton(href: string, label: string): string {
                 </table>`;
 }
 
+export function renderBusinessEmailChoiceLinks(
+  links: readonly { href: string; label: string }[],
+): string {
+  const items = links
+    .map((link) => {
+      const href = assertBusinessUrl(link.href);
+      return `<a href="${escapeHtml(href)}" target="_blank" style="color: ${BUSINESS_EMAIL_COLORS.accent}; font-weight: 700; text-decoration: underline;">${escapeHtml(link.label)}</a>`;
+    })
+    .join(`<span style="color: ${BUSINESS_EMAIL_COLORS.muted};"> · </span>`);
+  return `<p class="biz-email-choices" style="margin: 0 0 16px; font-family: ${FONT}; font-size: 17px; line-height: 1.55; color: ${BUSINESS_EMAIL_COLORS.text};">${items}</p>`;
+}
+
 export function renderBusinessEmailCta(href: string, label: string): string {
   const absoluteHref = assertBusinessUrl(href);
   return [

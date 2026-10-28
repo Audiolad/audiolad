@@ -88,11 +88,23 @@ BEGIN
   INSERT INTO public.access_paid_periods (email_hash, user_id, kind, paid_until)
   VALUES (repeat('2', 64), v_extended, 'business_new_client', v_now + interval '40 days');
 
-  INSERT INTO public.email_contacts (user_id, email, normalized_email, contact_type, source)
-  VALUES (v_opt, 'opt-out@example.test', 'opt-out@example.test', 'registered_user', 'signup')
-  RETURNING id INTO v_contact;
+  -- Auth insert already syncs a contact and default preferences. Reuse that row.
+  SELECT c.id INTO v_contact
+  FROM public.email_contacts AS c
+  WHERE c.user_id = v_opt
+    AND c.status = 'active'
+  ORDER BY c.created_at
+  LIMIT 1;
+  IF v_contact IS NULL THEN
+    INSERT INTO public.email_contacts (user_id, email, normalized_email, contact_type, source)
+    VALUES (v_opt, 'opt-out@example.test', 'opt-out@example.test', 'registered_user', 'signup')
+    RETURNING id INTO v_contact;
+  END IF;
   INSERT INTO public.email_preferences (contact_id, user_id, service_notifications)
-  VALUES (v_contact, v_opt, false);
+  VALUES (v_contact, v_opt, false)
+  ON CONFLICT (user_id) DO UPDATE
+  SET service_notifications = false,
+      contact_id = EXCLUDED.contact_id;
 
   INSERT INTO public.email_suppressions (normalized_email, reason, scope, source) VALUES
     ('marketing-ok@example.test', 'unsubscribe', 'marketing', 'user_unsubscribe'),
@@ -186,6 +198,71 @@ BEGIN
   END IF;
 
   RAISE NOTICE 'business_access_reminder_emails_smoke: ok';
+END $$;
+
+DO $$
+DECLARE
+  v_yes uuid := gen_random_uuid();
+  v_no uuid := gen_random_uuid();
+  v_now timestamptz := clock_timestamp();
+  v_end timestamptz := clock_timestamp() + interval '2 days';
+  v_paid timestamptz := clock_timestamp() + interval '3 days';
+  v_count integer;
+  v_kind text;
+  v_seen timestamptz;
+BEGIN
+  INSERT INTO auth.users (id, email, email_confirmed_at) VALUES
+    (v_yes, 'renew-yes@example.test', v_now),
+    (v_no, 'renew-no@example.test', v_now);
+  INSERT INTO public.access_grants (email_hash, user_id, kind, starts_at, ends_at, source) VALUES
+    (repeat('4', 64), v_yes, 'business_new_client', v_end - interval '30 days', v_end, 'trial'),
+    (repeat('5', 64), v_no, 'business_new_client', v_end - interval '30 days', v_end, 'trial');
+  INSERT INTO public.business_access_renewal_choices (user_id, period_end, answer) VALUES
+    (v_yes, v_end, 'yes'),
+    (v_no, v_end, 'no');
+  INSERT INTO public.business_access_renewal_notes (user_id, period_end, improvement_note)
+  VALUES (v_no, v_end, 'Больше тихих вечеров');
+
+  CREATE TEMP TABLE renewal_claimed ON COMMIT DROP AS
+  SELECT * FROM public.claim_business_access_reminders(50, 300);
+  IF EXISTS (SELECT 1 FROM renewal_claimed WHERE user_id = v_no) THEN
+    RAISE EXCEPTION 'a no must stop later letters for this period';
+  END IF;
+  SELECT count(*) INTO v_count FROM renewal_claimed WHERE user_id = v_yes;
+  IF v_count IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'a yes must leave the letter in the queue, got %', v_count;
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', v_no::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  SET LOCAL ROLE authenticated;
+  IF (SELECT count(*) FROM public.business_access_renewal_choices WHERE user_id = v_no) IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'owner must see their own answer';
+  END IF;
+  IF (SELECT count(*) FROM public.business_access_renewal_choices WHERE user_id = v_yes) IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'owner must not see another account answer';
+  END IF;
+  IF (SELECT count(*) FROM public.business_access_renewal_notes) IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'the improvement note is not visible to the owner';
+  END IF;
+  RESET ROLE;
+
+  INSERT INTO public.access_paid_periods (email_hash, user_id, kind, paid_until)
+  VALUES (repeat('5', 64), v_no, 'business_new_client', v_paid);
+  IF EXISTS (
+    SELECT 1 FROM public.business_access_renewal_choices
+    WHERE user_id = v_no AND answer = 'no'
+  ) THEN
+    RAISE EXCEPTION 'payment must clear the no';
+  END IF;
+  SELECT c.reminder_kind, c.period_end INTO v_kind, v_seen
+  FROM public.claim_business_access_reminders(50, 300) AS c
+  WHERE c.user_id = v_no;
+  IF v_kind IS DISTINCT FROM 'before_end' OR v_seen IS DISTINCT FROM v_paid THEN
+    RAISE EXCEPTION 'after payment the new period can be reminded';
+  END IF;
+
+  RAISE NOTICE 'business_access_renewal_choice_smoke: ok';
 END $$;
 
 ROLLBACK;

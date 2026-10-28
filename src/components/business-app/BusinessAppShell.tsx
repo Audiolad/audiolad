@@ -8,6 +8,7 @@ import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 
 import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
+import { BusinessRenewalController } from "@/components/business-app/BusinessRenewalPrompt";
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
@@ -53,7 +54,8 @@ export default function BusinessAppShell({
 
 /** Reads the chrome access from context, so a live period reported by /workspace applies at once. */
 function BusinessShellFrame({ children, pointReports }: { children: ReactNode; pointReports: boolean }) {
-  const access = resolveBusinessAccess(useBusinessDomain());
+  const domain = useBusinessDomain();
+  const access = resolveBusinessAccess(domain);
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
@@ -72,6 +74,14 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
           </header>
           {showGuestBar ? <BusinessGuestStatusBar /> : null}
           {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
+          {pointReports && (chromeAccess.mode === "trial" || chromeAccess.mode === "paid" || chromeAccess.mode === "grace") ? (
+            <section className="business-app-card mb-5 space-y-3" data-testid="biz-point-access-banner" aria-label="Доступ точки">
+              <BusinessRenewalController
+                surface="device"
+                initialAnswer={domain.status === "authenticated" ? domain.renewalAnswer ?? null : null}
+              />
+            </section>
+          ) : null}
           {children}
         </div>
         <BusinessBottomNav />

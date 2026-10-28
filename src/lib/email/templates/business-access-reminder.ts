@@ -4,16 +4,24 @@ import {
   type BusinessAccessReminderKind,
 } from "@/lib/business/access-reminders";
 import { BUSINESS_GRACE_MS, formatBusinessMonthlyPrice } from "@/lib/business/plan";
+import {
+  BUSINESS_RENEWAL_NO_LABEL,
+  BUSINESS_RENEWAL_NO_URL,
+  BUSINESS_RENEWAL_QUESTION,
+  BUSINESS_RENEWAL_YES_LABEL,
+  BUSINESS_RENEWAL_YES_URL,
+} from "@/lib/business/renewal-choice";
 
 import {
   BUSINESS_EMAIL_SENDER_NAME,
+  renderBusinessEmailChoiceLinks,
   renderBusinessEmailCta,
   renderBusinessEmailParagraph,
   renderBusinessEmailShell,
 } from "./business-layout";
 
 export const BUSINESS_ACCESS_REMINDER_TEMPLATE_KEY = "business_access_reminder";
-export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v2";
+export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v3";
 
 export const BUSINESS_ACCESS_REMINDER_BUTTON_LABEL = "Продлить доступ";
 
@@ -88,6 +96,10 @@ export function renderBusinessAccessReminderEmailText(input: {
     "",
     `${BUSINESS_ACCESS_REMINDER_BUTTON_LABEL}: ${BUSINESS_ACCESS_REMINDER_CABINET_URL}`,
     "",
+    BUSINESS_RENEWAL_QUESTION,
+    `${BUSINESS_RENEWAL_YES_LABEL}: ${BUSINESS_RENEWAL_YES_URL}`,
+    `${BUSINESS_RENEWAL_NO_LABEL}: ${BUSINESS_RENEWAL_NO_URL}`,
+    "",
     closing,
   ].join("\n");
 }
@@ -108,6 +120,11 @@ export function renderBusinessAccessReminderEmailHtml(input: {
       BUSINESS_ACCESS_REMINDER_CABINET_URL,
       BUSINESS_ACCESS_REMINDER_BUTTON_LABEL,
     ),
+    renderBusinessEmailParagraph(BUSINESS_RENEWAL_QUESTION, "8px 0 8px"),
+    renderBusinessEmailChoiceLinks([
+      { href: BUSINESS_RENEWAL_YES_URL, label: BUSINESS_RENEWAL_YES_LABEL },
+      { href: BUSINESS_RENEWAL_NO_URL, label: BUSINESS_RENEWAL_NO_LABEL },
+    ]),
     renderBusinessEmailParagraph(closing, "16px 0 0"),
   ].join("");
 

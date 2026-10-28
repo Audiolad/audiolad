@@ -14,6 +14,15 @@ import {
 } from "@/lib/email/templates/business-access-reminder";
 import { BUSINESS_EMAIL_COLORS, BUSINESS_EMAIL_SENDER_NAME } from "@/lib/email/templates/business-layout";
 import {
+  BUSINESS_RENEWAL_IMPROVEMENT_QUESTION,
+  BUSINESS_RENEWAL_NO_URL,
+  BUSINESS_RENEWAL_QUESTION,
+  BUSINESS_RENEWAL_YES_URL,
+  parseRenewalChoiceHash,
+  renewalAnswerBlocksReminders,
+  renewalDeclineApplies,
+} from "@/lib/business/renewal-choice";
+import {
   BUSINESS_ACCESS_REMINDER_CABINET_URL,
   BUSINESS_ACCESS_REMINDER_LEAD_DAYS,
   businessAccessReminderDedupeKey,
@@ -120,6 +129,10 @@ for (const kind of ["before_end", "grace_start", "grace_last"] as const) {
   assert.equal(html.includes("#6633cc"), false, "purple AudioLad button must not be used");
   assert.equal(html.includes("#5e2ca5"), false);
   assert.match(text, /Команда АудиоЛад Бизнес/);
+  assert.ok(text.includes(BUSINESS_RENEWAL_QUESTION));
+  assert.ok(text.includes(BUSINESS_RENEWAL_YES_URL));
+  assert.ok(text.includes(BUSINESS_RENEWAL_NO_URL));
+  assert.equal(/не понрав|жалко|отказ/i.test(text + html), false);
 }
 
 assert.match(
@@ -154,6 +167,36 @@ const PURPLE_SHELL = readFileSync(join(ROOT, "src/lib/email/templates/brand-layo
 assert.equal(REMINDER_SOURCE.includes("brand-layout"), false);
 assert.match(REMINDER_SOURCE, /business-layout/);
 assert.match(PURPLE_SHELL, /#6633cc/, "regular AudioLad letters stay on the purple shell");
+assert.equal(MIGRATION.includes("apply_business_subscription_for_order"), false);
+assert.match(MIGRATION, /answer = 'no'/);
+assert.match(MIGRATION, /clear_business_renewal_decline_on_payment/);
+assert.match(MIGRATION, /business_access_renewal_notes_admin_select/);
+
+assert.equal(renewalAnswerBlocksReminders("no"), true);
+assert.equal(renewalAnswerBlocksReminders("yes"), false);
+assert.equal(renewalAnswerBlocksReminders(null), false);
+assert.equal(
+  renewalDeclineApplies({
+    answer: "no",
+    answeredPeriodEnd: "2026-11-22T12:00:00.000Z",
+    contractualEnd: "2026-11-22T12:00:00.000Z",
+  }),
+  true,
+);
+assert.equal(
+  renewalDeclineApplies({
+    answer: "no",
+    answeredPeriodEnd: "2026-11-22T12:00:00.000Z",
+    contractualEnd: "2026-12-22T12:00:00.000Z",
+  }),
+  false,
+  "a later paid end clears the decline",
+);
+assert.equal(parseRenewalChoiceHash("#prodlenie?otvet=da"), "yes");
+assert.equal(parseRenewalChoiceHash("#prodlenie?otvet=net"), "no");
+assert.equal(parseRenewalChoiceHash("#dostup"), null);
+assert.equal(BUSINESS_RENEWAL_IMPROVEMENT_QUESTION.includes("не понрав"), false);
+assert.equal(BUSINESS_RENEWAL_QUESTION, "Планируете дальше пользоваться сервисом?");
 
 type ClaimRow = {
   send_id: string;
