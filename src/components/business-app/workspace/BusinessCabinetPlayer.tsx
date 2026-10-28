@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import BusinessPlayerControls from "@/components/business-app/BusinessPlayerControls";
+import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { getCabinetDeviceSecret, postCabinetReport } from "@/lib/business-app/cabinet-player-client";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
@@ -142,6 +143,8 @@ export function BusinessCabinetPlayerProvider({
     duration: model?.tracks[initialPlayback.index]?.durationSeconds ?? 0,
   });
   const [saveNote, setSaveNote] = useState<string | null>(null);
+  const [barDismissed, setBarDismissed] = useState(false);
+  const [failedCover, setFailedCover] = useState<string | null>(null);
   const [queueOrder, setQueueOrderState] = useState<number[] | null>(null);
   const restoredKey = useRef<string | null>(null);
   const reportRef = useRef<() => void>(() => {});
@@ -371,6 +374,8 @@ export function BusinessCabinetPlayerProvider({
     const current = modelRef.current;
     if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
     const index = playbackRef.current.index;
+    const starting = ctl.status !== "playing" && ctl.status !== "loading";
+    if (starting) setBarDismissed(false);
     if (ctl.status === "playing" || ctl.status === "loading") {
       await ctl.toggle();
     } else if (ctl.status === "paused" && ctl.current) {
@@ -386,6 +391,7 @@ export function BusinessCabinetPlayerProvider({
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
     await ctl.next();
@@ -396,6 +402,7 @@ export function BusinessCabinetPlayerProvider({
   const playIndex = useCallback(async (index: number) => {
     const current = modelRef.current;
     if (!current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
+    setBarDismissed(false);
     seekRef.current = 0;
     evidenceRef.current.reset(0);
     await ctlRef.current?.playIndex(index);
@@ -434,6 +441,24 @@ export function BusinessCabinetPlayerProvider({
     seekRef.current = 0;
     setPlayback(restored);
     setView((prevView) => ({ ...prevView, index: start }));
+  }, []);
+
+  const dismissBar = useCallback(async () => {
+    const ctl = ctlRef.current;
+    const audio = audioRef.current;
+    if (ctl && (ctl.status === "playing" || ctl.status === "loading")) {
+      await ctl.toggle();
+    }
+    audio?.pause();
+    if (audio) {
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    setBarDismissed(true);
+  }, []);
+
+  const revealNowPlaying = useCallback(() => {
+    document.querySelector("[data-testid='biz-now-playing']")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   const seek = useCallback((ratio: number) => {
@@ -481,12 +506,14 @@ export function BusinessCabinetPlayerProvider({
       observer.disconnect();
       shell.style.removeProperty("--biz-cabinet-player-height");
     };
-  }, [open, nowTitle, view.message, saveNote, playing, view.status]);
+  }, [open, barDismissed, nowTitle, view.message, saveNote, playing, view.status]);
+
+  const coverSrc = track ? cabinetAlbumCoverUrl({ coverUrl: track.coverUrl }) : null;
 
   return (
     <CabinetContext.Provider value={api}>
       {children}
-      {open ? (
+      {open && !barDismissed ? (
         <section ref={barRef} className="business-cabinet-player" aria-label="Плеер кабинета" data-testid="biz-workspace-player">
           <div
             className="business-cabinet-player__bar"
@@ -504,6 +531,15 @@ export function BusinessCabinetPlayerProvider({
           >
             <span style={{ width: `${ratio * 100}%` }} />
           </div>
+          <button type="button" className="business-cabinet-player__open business-app-focus-ring" data-testid="biz-workspace-player-open" onClick={revealNowPlaying}>
+            <span className="business-cabinet-player__cover" data-has-image={coverSrc && failedCover !== coverSrc ? "true" : "false"}>
+              {coverSrc && failedCover !== coverSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element -- public catalog cover, same as the queue rows
+                <img src={coverSrc} alt="" width={40} height={40} onError={() => setFailedCover(coverSrc)} />
+              ) : null}
+            </span>
+            <span className="business-cabinet-player__title">{nowTitle ?? "Музыка"}</span>
+          </button>
           <p className="business-cabinet-player__time" data-testid="biz-workspace-time">
             {formatPlaybackClock(view.currentTime)} / {formatPlaybackClock(duration)}
           </p>
@@ -511,7 +547,7 @@ export function BusinessCabinetPlayerProvider({
             testIdPrefix="biz-workspace"
             playing={view.status === "playing"}
             loading={view.status === "loading"}
-            nowTitle={nowTitle}
+            nowTitle={null}
             onToggle={() => void toggle()}
             onNext={() => void next()}
             volume={playback.volume}
@@ -519,13 +555,21 @@ export function BusinessCabinetPlayerProvider({
             appearance="round"
             size="compact"
           />
+          <button
+            type="button"
+            className="business-cabinet-player__close business-app-focus-ring"
+            aria-label="Закрыть плеер"
+            data-testid="biz-workspace-player-close"
+            onClick={() => void dismissBar()}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
           {view.message ? (
-            <p className="business-app-alert" data-tone="warn" role="alert" data-testid="biz-workspace-player-message">
+            <p className="business-app-alert business-cabinet-player__note" data-tone="warn" role="alert" data-testid="biz-workspace-player-message">
               {musicPlayerMessage(view.message)}
             </p>
           ) : null}
-          {saveNote ? <p className="text-sm text-[var(--biz-text-muted)]" data-testid="biz-workspace-save-note">{saveNote}</p> : null}
-          {playing ? null : <p className="text-sm text-[var(--biz-text-muted)]">Сейчас пауза. Подборка продолжается с сохранённого места после нажатия на круглую кнопку.</p>}
+          {saveNote ? <p className="text-sm text-[var(--biz-text-muted)] business-cabinet-player__note" data-testid="biz-workspace-save-note">{saveNote}</p> : null}
         </section>
       ) : null}
       {open ? <audio ref={audioRef} preload="none" playsInline data-testid="biz-workspace-audio" /> : null}

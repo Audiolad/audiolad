@@ -583,7 +583,7 @@ assert.doesNotMatch(workspaceSource, /email-hash|supabase-store/);
 assert.match(playerSource, /--biz-cabinet-player-height/, "the sticky bar reports its height");
 assert.match(
   read("src/components/business-app/business-app.css"),
-  /padding-bottom:\s*calc\(var\(--biz-bottom-nav-height\) \+ var\(--biz-cabinet-player-height, 16rem\) \+ env\(safe-area-inset-bottom, 0px\)\)/,
+  /padding-bottom:\s*calc\(var\(--biz-bottom-nav-height\) \+ var\(--biz-cabinet-player-height, 4rem\) \+ env\(safe-area-inset-bottom, 0px\)\)/,
   "content clears the measured bar, the mobile nav and the safe area",
 );
 
@@ -614,6 +614,17 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({})} />);
   assert.match(html, /data-testid="biz-workspace-player"/);
+  assert.match(html, /aria-label="Закрыть плеер"/);
+  assert.match(html, /data-testid="biz-workspace-player-open"/);
+  assert.match(html, /business-cabinet-player__cover/);
+  assert.doesNotMatch(playerSource, /Сейчас пауза/);
+  assert.match(playerSource, /setBarDismissed\(false\)/);
+  assert.match(playerSource, /setBarDismissed\(true\)/);
+  assert.match(
+    read("src/components/business-app/business-app.css"),
+    /\.business-cabinet-player__time,\s*\.business-cabinet-player \.business-workspace-volume,\s*\.business-cabinet-player__note \{\s*display: none;/,
+  );
+  assert.match(read("src/components/business-app/business-app.css"), /\.business-cabinet-player \{\s*[^}]*height: 60px/);
   assert.match(html, /data-testid="biz-cafe-queue"/);
   assert.match(html, /data-testid="biz-cafe-auto"/);
   assert.match(html, />Авто</);
