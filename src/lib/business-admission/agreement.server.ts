@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { SoundReviewQueue, SoundReviewRow } from "@/lib/business/track-sound-review";
+import type { SoundReviewRow } from "@/lib/business/track-sound-review";
 import { restrictSoundQueueToAgreement } from "@/lib/business/track-sound-review";
 import { authorIdsWithVerifiedRights, filterAgreementSubjects, type AgreementDecision, type AgreementSubject } from "@/lib/business-admission/agreement-list";
 
@@ -97,7 +97,7 @@ export async function admissionAuthorsAccepted(kind: "artist" | "album", ids: re
 export async function loadAgreementSoundQueue(
   db: SupabaseClient,
   filter: { status?: string; artist?: string; album?: string; space?: string; page?: number },
-): Promise<SoundReviewQueue> {
+): Promise<ReturnType<typeof restrictSoundQueueToAgreement>> {
   const rows: SoundReviewRow[] = [];
   let reported = Number.POSITIVE_INFINITY;
   for (let page = 0; page < 1000 && rows.length < reported; page += 1) {
