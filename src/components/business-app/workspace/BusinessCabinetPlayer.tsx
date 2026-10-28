@@ -14,6 +14,7 @@ import {
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
+import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -146,6 +147,8 @@ export function BusinessCabinetPlayerProvider({
   const lastPostRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
+  const toggleRef = useRef<() => Promise<void>>(async () => {});
+  const nextRef = useRef<() => Promise<void>>(async () => {});
   const evidenceRef = useRef(new SpaLiveEvidence());
   const [playback, setPlayback] = useState(initialPlayback);
   const [view, setView] = useState<View>({
@@ -434,6 +437,48 @@ export function BusinessCabinetPlayerProvider({
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
   }, [remember, reportPlayback]);
+
+  useEffect(() => {
+    toggleRef.current = toggle;
+    nextRef.current = next;
+  }, [toggle, next]);
+
+  useEffect(() => {
+    if (!canBeat) return;
+    let stop = false;
+    let inFlight = false;
+    const tick = async () => {
+      if (stop || inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fetch("/api/business/point", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({ action: "commands" }),
+        });
+        const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
+        if (!json.ok || !Array.isArray(json.commands)) return;
+        for (const row of json.commands) {
+          if (stop || !isPointCommandType(row.type)) continue;
+          const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
+          if (action === "toggle") await toggleRef.current();
+          if (action === "next") await nextRef.current();
+        }
+      } catch {
+        /* the next poll retries; a claimed command is not returned again */
+      } finally {
+        inFlight = false;
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 5_000);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, [canBeat]);
 
   const playIndex = useCallback(async (index: number) => {
     const current = modelRef.current;
