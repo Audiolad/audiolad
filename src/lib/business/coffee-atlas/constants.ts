@@ -42,7 +42,9 @@ export const COFFEE_ATLAS_OFFER = {
   price: formatBusinessMonthlyPrice(),
   period: BUSINESS_PLAN_PERIOD_LABEL,
   trial: BUSINESS_GIFT_TITLE,
-  rights: "Лицензионная музыка с соблюдением прав авторов",
+  /** Checklist line after the gift. The digits stay the plan price. */
+  afterTrial: `Далее ${formatBusinessMonthlyPrice()} ${BUSINESS_PLAN_PERIOD_LABEL}`,
+  rights: "Лицензионная музыка с соблюдением прав",
   rightsHref: `${BUSINESS_LANDING_PATH}/prava`,
 } as const;
 
