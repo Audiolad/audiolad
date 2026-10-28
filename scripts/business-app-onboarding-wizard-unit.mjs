@@ -240,7 +240,7 @@ assert.match(page, /bootstrapBusinessOrganizationWithLocation/);
 assert.match(page, /Музыка для заведения за минуту/);
 assert.match(
   page,
-  /returnHref\s*\?\s*"Точка подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Точка готова\. Откройте музыку и нажмите «Играть»\."/,
+  /returnHref\s*\?\s*"Кофейня подключена\. Откройте кабинет и нажмите «Играть»\."\s*:\s*"Кофейня готова\. Откройте музыку и нажмите «Играть»\."/,
 );
 assert.doesNotMatch(page, /лицензирован[аоы]/i);
 assert.doesNotMatch(page, /ELIGIBLE\s*=\s*true/);

@@ -305,7 +305,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
           <p>{BUSINESS_EMPTY_CATALOG_NOTE}</p>
           <p className="flex flex-wrap gap-3">
             <a className="underline" href={model.rightsHref}>Как устроены права на музыку</a>
-            <Link className="underline" href={model.onboardingHref}>Перейти и подключить точку</Link>
+            <Link className="underline" href={model.onboardingHref}>Перейти и подключить кофейню</Link>
           </p>
         </section>
       ) : null}

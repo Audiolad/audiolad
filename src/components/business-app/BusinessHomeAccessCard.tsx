@@ -222,7 +222,7 @@ function BusinessPayError({ error }: { error: PayError }) {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
         Оплатить может владелец аккаунта.{" "}
-        <Link href={error.href || BUSINESS_ONBOARDING_HREF}>Подключить точку</Link>.
+        <Link href={error.href || BUSINESS_ONBOARDING_HREF}>Подключить кофейню</Link>.
       </p>
     );
   }

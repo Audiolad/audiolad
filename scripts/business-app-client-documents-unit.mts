@@ -42,9 +42,9 @@ assert.equal(venueLocalToUtc("bad", "Europe/Moscow"), null);
 assert.equal(venueLocalToUtc("2026-13-01T00:00", "Europe/Moscow"), null);
 assert.equal(clampWindowMinutes("999"), 180);
 assert.equal(clampWindowMinutes("x"), 30);
-assert.equal(formatVenueZoneRu("2026-10-16T12:00:00.500Z", "Europe/Moscow"), "часовой пояс точки, всемирное время +03:00");
-assert.equal(formatVenueZoneRu("2026-10-16T12:00:00Z", "Asia/Kolkata"), "часовой пояс точки, всемирное время +05:30");
-assert.equal(formatVenueZoneRu("2026-10-16T12:00:00Z", "America/New_York"), "часовой пояс точки, всемирное время −04:00");
+assert.equal(formatVenueZoneRu("2026-10-16T12:00:00.500Z", "Europe/Moscow"), "часовой пояс кофейни, всемирное время +03:00");
+assert.equal(formatVenueZoneRu("2026-10-16T12:00:00Z", "Asia/Kolkata"), "часовой пояс кофейни, всемирное время +05:30");
+assert.equal(formatVenueZoneRu("2026-10-16T12:00:00Z", "America/New_York"), "часовой пояс кофейни, всемирное время −04:00");
 
 // Report grouping.
 const at = new Date("2026-10-16T12:00:00Z");

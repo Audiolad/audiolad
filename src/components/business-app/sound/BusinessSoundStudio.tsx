@@ -445,7 +445,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
               {guest && liveAccess ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link href={BUSINESS_CONNECT_HREF} className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-connect-cta">
-                    Подключить точку
+                    Подключить кофейню
                   </Link>
                 </div>
               ) : null}

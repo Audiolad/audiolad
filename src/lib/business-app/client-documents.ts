@@ -28,7 +28,7 @@ export const CLIENT_DOCUMENTS: readonly ClientDocumentEntry[] = [
     versionDate: "2026-10-18",
     status: "approved",
     summary:
-      "Документ точки: лицензия на музыку АудиоЛад в вашем заведении (только через плеер АудиоЛад).",
+      "Документ кофейни: лицензия на музыку АудиоЛад в вашем заведении (только через плеер АудиоЛад).",
   },
   {
     id: "b2b-terms",
@@ -158,7 +158,7 @@ export function venueLocalToUtc(local: unknown, timeZone: string): Date | null {
   return new Date(guess);
 }
 
-/** Russian-only label of the venue time zone: «часовой пояс точки, всемирное время +03:00» (no Latin IANA id in the UI). */
+/** Russian-only label of the venue time zone: «часовой пояс кофейни, всемирное время +03:00» (no Latin IANA id in the UI). */
 export function formatVenueZoneRu(iso: string, timeZone: string): string {
   const tz = isValidTimeZone(timeZone) ? timeZone : "Europe/Moscow";
   const at = new Date(iso);
@@ -172,7 +172,7 @@ export function formatVenueZoneRu(iso: string, timeZone: string): string {
   const abs = Math.abs(offMin);
   const hh = String(Math.floor(abs / 60)).padStart(2, "0");
   const mm = String(abs % 60).padStart(2, "0");
-  return `часовой пояс точки, всемирное время ${sign}${hh}:${mm}`;
+  return `часовой пояс кофейни, всемирное время ${sign}${hh}:${mm}`;
 }
 
 export function formatVenueTime(iso: string, timeZone: string): string {

@@ -27,7 +27,7 @@ export default function BusinessPointJoinPage() {
       .then((res) => res.json())
       .then((json: { ok?: boolean; locationName?: string; error?: string }) => {
         if (json.ok === true) {
-          setName(json.locationName || "Точка");
+          setName(json.locationName || "Кофейня");
           window.history.replaceState(null, "", window.location.pathname);
         } else setError(json.error ?? "Код не подошёл. Запросите новый.");
       })

@@ -132,7 +132,7 @@ export default function VenueControlPanel({
         Управление кофейней
       </h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Каждое действие спрашивает подтверждение и уходит в зал. Слушать у себя это не включает.
+        Пауза, продолжение, следующий трек и отправка атмосферы спрашивают подтверждение и уходят в кофейню. Слушать у себя это не включает.
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null} data-testid="biz-venue-pause" onClick={() => send("pause")}>
