@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix='audiolad-sectors-') as tmp:
                    check=True, capture_output=True)
     files = ['scripts/lib/business-manual-admissions-stub.sql',
              'supabase/migrations/20270131120000_business_manual_admissions.sql',
-             'supabase/migrations/20270203120000_business_four_sectors_hide_artists.sql',
+             'supabase/migrations/20270204120000_business_four_sectors_hide_artists.sql',
              'supabase/tests/business_four_sectors_smoke.sql']
     sql = '\n'.join(' '.join(line for line in (root / file).read_text().splitlines()
                              if not line.lstrip().startswith('--')) for file in files) + '\n'

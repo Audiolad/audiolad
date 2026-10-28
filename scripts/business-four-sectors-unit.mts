@@ -39,7 +39,7 @@ const row = (id: string, artist: string): SoundReviewRow => ({
 const queue = restrictSoundQueueToAgreement([row("a", "jazz"), row("b", "hide")], new Set(["jazz", "hide"]), { hiddenAuthorIds: hidden });
 assert.deepEqual(queue.rows.map((item) => item.id), ["a"]);
 
-const migration = readFileSync(new URL("../supabase/migrations/20270203120000_business_four_sectors_hide_artists.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../supabase/migrations/20270204120000_business_four_sectors_hide_artists.sql", import.meta.url), "utf8");
 for (const key of ["cafe", "spa", "retail", "fitness"]) assert.equal(BUSINESS_SPACE_IDS.includes(key as typeof BUSINESS_SPACE_IDS[number]), true);
 assert.match(migration, /Кафе, кофейни, рестораны/);
 assert.match(migration, /Спа и массаж/);
