@@ -89,57 +89,28 @@
 }
 
 .guide-hero {
-  position: relative;
-  min-height: 68vh;
-  display: grid;
-  align-items: end;
-  color: #fff8ef;
-}
-
-.guide-hero__media {
-  position: absolute;
-  inset: 0;
-}
-
-.guide-hero__media img {
-  object-fit: cover;
-}
-
-.guide-hero__media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(20, 12, 6, 0.12), rgba(20, 12, 6, 0.78));
-}
-
-.guide-hero__copy {
-  position: relative;
-  z-index: 1;
-  padding-top: 28vh;
-  padding-bottom: 48px;
+  padding: clamp(28px, 5vw, 56px) 0 24px;
+  background: var(--guide-bg);
+  color: #4a2c1a;
 }
 
 .guide-hero h1 {
-  margin: 8px 0 16px;
-  font-size: clamp(2.1rem, 6vw, 4.2rem);
-  max-width: 16ch;
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  overflow-wrap: break-word;
 }
 
-.guide-hero__lead,
+.guide-byline {
+  margin: 12px 0 0;
+  color: var(--guide-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
 .guide-index__intro {
   max-width: 62ch;
   font-size: 1.12rem;
   line-height: 1.6;
-}
-
-.guide-hero .guide-kicker,
-.guide-hero__caption {
-  color: #f0d7b0;
-}
-
-.guide-hero__caption {
-  font-size: 0.92rem;
-  max-width: 46ch;
 }
 
 .guide-crumbs {
@@ -160,6 +131,23 @@
 
 .guide-prose {
   max-width: 68ch;
+}
+
+/* Prose column shares the left edge of the title and other blocks. */
+.guide-wrap.guide-prose {
+  max-width: none;
+}
+
+.guide-wrap.guide-prose > * {
+  max-width: 68ch;
+}
+
+.guide-prose p {
+  margin: 0 0 1em;
+}
+
+.guide-prose p:last-child {
+  margin-bottom: 0;
 }
 
 .guide-h2 {
@@ -207,7 +195,7 @@
 
 .guide-cups {
   max-width: 680px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .guide-cups__frame {
@@ -570,10 +558,6 @@
   .guide-header__nav {
     width: 100%;
     justify-content: flex-start;
-  }
-
-  .guide-hero {
-    min-height: 78vh;
   }
 
   .guide-player__row {

@@ -89,6 +89,7 @@ export type B2BVertical = {
   path: string;
   title: string;
   kicker: string;
+  byline?: string;
   intro: string;
   /** Venue landing reserved by the business page, when one exists. */
   reservedVenuePath: string | null;

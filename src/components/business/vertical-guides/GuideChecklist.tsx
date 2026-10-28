@@ -10,17 +10,29 @@ type GuideChecklistProps = {
   items: readonly GuideChecklistItem[];
 };
 
+const memory = new Map<string, string>();
+const failedWrites = new Set<string>();
 const listeners = new Set<() => void>();
-
-function notifyChecklist() {
-  for (const listener of listeners) {
-    listener();
-  }
-}
 
 function subscribeChecklist(listener: () => void) {
   listeners.add(listener);
-  const onStorage = () => listener();
+  const onStorage = (event: StorageEvent) => {
+    try {
+      if (event.storageArea !== window.localStorage) {
+        return;
+      }
+    } catch {
+      return;
+    }
+    if (event.key === null) {
+      memory.clear();
+      failedWrites.clear();
+    } else {
+      memory.set(event.key, event.newValue ?? "");
+      failedWrites.delete(event.key);
+    }
+    listener();
+  };
   window.addEventListener("storage", onStorage);
   return () => {
     listeners.delete(listener);
@@ -29,10 +41,13 @@ function subscribeChecklist(listener: () => void) {
 }
 
 function readRaw(storageKey: string): string {
+  if (failedWrites.has(storageKey)) {
+    return memory.get(storageKey) ?? "";
+  }
   try {
     return window.localStorage.getItem(storageKey) ?? "";
   } catch {
-    return "";
+    return memory.get(storageKey) ?? "";
   }
 }
 
@@ -52,22 +67,22 @@ function parseChecked(raw: string, ids: readonly string[]): string[] {
 }
 
 export default function GuideChecklist({ title, storageKey, items }: GuideChecklistProps) {
-  const ids = items.map((item) => item.id);
-  const raw = useSyncExternalStore(
-    subscribeChecklist,
-    () => readRaw(storageKey),
-    () => "",
-  );
-  const checked = parseChecked(raw, ids);
+  const raw = useSyncExternalStore(subscribeChecklist, () => readRaw(storageKey), () => "");
+  const checked = parseChecked(raw, items.map((item) => item.id));
 
   function toggle(id: string) {
     const next = checked.includes(id) ? checked.filter((item) => item !== id) : [...checked, id];
+    const nextRaw = JSON.stringify(next);
+    memory.set(storageKey, nextRaw);
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(next));
+      window.localStorage.setItem(storageKey, nextRaw);
+      failedWrites.delete(storageKey);
     } catch {
-      // Private mode can refuse storage. The tick still shows for this visit via a no-op store write below.
+      failedWrites.add(storageKey);
     }
-    notifyChecklist();
+    for (const listener of listeners) {
+      listener();
+    }
   }
 
   return (

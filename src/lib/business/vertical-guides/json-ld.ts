@@ -46,8 +46,8 @@ export function buildVerticalArticleJsonLd(article: VerticalGuideArticle): JsonL
       image: [`${origin.replace(/\/$/, "")}${article.hero.src}`],
       author: {
         "@type": "Organization",
-        name: `${SITE_BRAND} Бизнес`,
-        url: `${origin.replace(/\/$/, "")}/b`,
+        name: vertical?.byline ?? SITE_BRAND,
+        url: `${origin.replace(/\/$/, "")}${vertical?.path ?? "/b"}`,
       },
       publisher: {
         "@type": "Organization",

@@ -43,20 +43,6 @@ export default function GuideArticleView({ article, track }: GuideArticleViewPro
       </header>
 
       <main id="content">
-        <section className="guide-hero" aria-labelledby="guide-title">
-          <div className="guide-hero__media">
-            <Image src={article.hero.src} alt={article.hero.alt} fill priority sizes="100vw" />
-          </div>
-          <div className="guide-wrap guide-hero__copy">
-            <p className="guide-kicker">Пилот раздела</p>
-            <h1 id="guide-title" className="guide-display">
-              {article.title}
-            </h1>
-            <p className="guide-hero__lead">{article.leadIn}</p>
-            <p className="guide-hero__caption">{article.hero.caption}</p>
-          </div>
-        </section>
-
         <nav className="guide-wrap guide-crumbs" aria-label="Навигация по странице">
           <Link href="/">Главная</Link>
           <span aria-hidden="true">/</span>
@@ -67,10 +53,20 @@ export default function GuideArticleView({ article, track }: GuideArticleViewPro
           <span>{article.title}</span>
         </nav>
 
+        <section className="guide-hero" aria-labelledby="guide-title">
+          <div className="guide-wrap">
+            <h1 id="guide-title" className="guide-display">
+              {article.title}
+            </h1>
+            {vertical?.byline && <p className="guide-byline">{vertical.byline}</p>}
+          </div>
+        </section>
+
         <div className="guide-wrap guide-prose">
           {article.story.map((paragraph) => (
             <p key={paragraph.slice(0, 24)}>{paragraph}</p>
           ))}
+          <p>{article.leadIn}</p>
         </div>
 
         <section className="guide-wrap guide-block" aria-labelledby="guide-cups-title">
@@ -210,7 +206,7 @@ export default function GuideArticleView({ article, track }: GuideArticleViewPro
       <footer className="guide-footer">
         <div className="guide-wrap">
           <p>
-            Материал пилота, адрес {path}. АудиоЛад не связан с кофейнями атласа. Их названия принадлежат владельцам.
+            Адрес материала: {path}. АудиоЛад не связан с кофейнями атласа. Их названия принадлежат владельцам.
           </p>
         </div>
       </footer>

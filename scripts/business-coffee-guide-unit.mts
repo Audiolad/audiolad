@@ -150,11 +150,40 @@ for (const item of MUZYKA_DLYA_KOFEYNI.relatedQueries) {
 assert.equal(candidateRows.some((row) => row.query.toLocaleLowerCase("ru").includes("отсеяно")), false);
 
 const visible = collectArticleText(MUZYKA_DLYA_KOFEYNI).join("\n");
+assert.doesNotMatch(visible, /пилот/i, "article visible text has no pilot wording");
+for (const vertical of B2B_VERTICALS) {
+  assert.doesNotMatch(
+    [vertical.title, vertical.kicker, vertical.intro].join("\n"),
+    /пилот/i,
+    "vertical visible text has no pilot wording",
+  );
+}
 assert.equal(visible.includes("\u2014"), false, "visible article text uses an en dash, not an em dash");
 assert.equal(visible.includes("http://") || visible.includes("https://"), false);
 assert.equal(visible.includes("Лена"), false);
 assert.equal(visible.includes("Сначала реши, какой разговор ты хочешь"), false);
-assert.equal(visible.includes("Если кофейня уже ваша"), true);
+const story = MUZYKA_DLYA_KOFEYNI.story.join("\n");
+assert.equal(story.includes("\u2014"), false, "story uses only en dashes");
+assert.match(story, /^– /m, "story contains en-dash direct speech");
+assert.ok(MUZYKA_DLYA_KOFEYNI.story.length >= 6 && MUZYKA_DLYA_KOFEYNI.story.length <= 10);
+const storyWords = story.split(/\s+/).length;
+assert.ok(storyWords >= 150 && storyWords <= 300, "story length");
+assert.equal(new Set(MUZYKA_DLYA_KOFEYNI.story.map((paragraph) => paragraph.slice(0, 24))).size, MUZYKA_DLYA_KOFEYNI.story.length, "story paragraph keys are unique");
+const storyNames = new Set(story.toLocaleLowerCase("ru").match(/[\p{L}]+/gu));
+for (const expert of COFFEE_EXPERTS) {
+  for (const name of [expert.name, expert.nameOriginal]) {
+    for (const part of name.split(/\s+/)) {
+      assert.equal(storyNames.has(part.toLocaleLowerCase("ru")), false, name);
+    }
+  }
+}
+const coffeeVertical = B2B_VERTICALS.find((vertical) => vertical.id === "coffee");
+assert.ok(coffeeVertical?.byline);
+assert.equal(coffeeVertical.byline, "АудиоЛад Кофейни");
+assert.doesNotMatch(coffeeVertical.byline, /Редакция/i);
+for (const vertical of B2B_VERTICALS.filter((item) => item.status === "planned")) {
+  assert.equal(vertical.byline, undefined);
+}
 const visibleLower = visible.toLocaleLowerCase("ru");
 for (const phrase of [
   "музыка для кофеен",
@@ -208,12 +237,20 @@ assert.deepEqual(
   ["anna-tsfasman", "howard-schultz"],
 );
 
-const jsonLd = JSON.stringify(buildVerticalArticleJsonLd(MUZYKA_DLYA_KOFEYNI));
+const structuredData = buildVerticalArticleJsonLd(MUZYKA_DLYA_KOFEYNI);
+const jsonLd = JSON.stringify(structuredData);
+const articleNode = (structuredData["@graph"] as Array<Record<string, unknown>>).find((node) => node["@type"] === "Article");
+assert.deepEqual(articleNode?.author, {
+  "@type": "Organization",
+  name: "АудиоЛад Кофейни",
+  url: (articleNode?.url as string).replace(/\/muzyka-dlya-kofeyni$/, ""),
+});
 assert.match(jsonLd, /"@type":"Article"/);
 assert.match(jsonLd, /"@type":"FAQPage"/);
 assert.match(jsonLd, /"@type":"BreadcrumbList"/);
 assert.match(jsonLd, /Музыка для кофейни: как подобрать фон и создать атмосферу/);
 assert.equal(jsonLd.includes("\u2014"), false);
+assert.doesNotMatch(jsonLd, /пилот/i);
 
 assert.deepEqual(listVerticalGuideSitemapPaths(), [
   "/b/coffee",
@@ -222,6 +259,27 @@ assert.deepEqual(listVerticalGuideSitemapPaths(), [
 assert.match(read("src/lib/seo/sitemap-data.ts"), /listVerticalGuideSitemapPaths/);
 
 const view = read("src/components/business/vertical-guides/GuideArticleView.tsx");
+assert.doesNotMatch(view, /пилот/i);
+assert.doesNotMatch(view, /article\.hero\./, "hero data is reserved for metadata, not the article header");
+const hero = view.match(/<section className="guide-hero"[\s\S]*?<\/section>/)?.[0];
+assert.ok(hero, "article has a title section");
+assert.match(hero, /aria-labelledby="guide-title"/);
+assert.match(hero, /<h1 id="guide-title" className="guide-display">\s*\{article\.title\}\s*<\/h1>/);
+assert.doesNotMatch(hero, /<Image|article\.leadIn/);
+assert.match(hero, /<\/h1>\s*\{vertical\?\.byline && <p className="guide-byline">\{vertical\.byline\}<\/p>\}/);
+assert.match(read("src/lib/business/vertical-guides/verticals.ts"), /byline: "АудиоЛад Кофейни"/);
+assert.ok(view.indexOf('className="guide-wrap guide-crumbs"') < view.indexOf(hero));
+assert.match(
+  view,
+  /<\/section>\s*<div className="guide-wrap guide-prose">\s*\{article\.story\.map\([\s\S]*?\)\)\}\s*<p>\{article\.leadIn\}<\/p>/,
+  "story paragraphs immediately follow the title, then leadIn as normal prose",
+);
+assert.match(view, /Адрес материала: \{path\}\./);
+const css = read("src/components/business/vertical-guides/guide.css");
+assert.doesNotMatch(css, /\.guide-hero__/);
+assert.match(css, /\.guide-hero\s*\{[^}]*background: var\(--guide-bg\);[^}]*color: #4a2c1a;/);
+assert.match(css, /\.guide-hero h1\s*\{[^}]*font-size: clamp\(2rem, 6vw, 3\.6rem\);/);
+assert.match(css, /\.guide-byline\s*\{[^}]*color: var\(--guide-muted\);[^}]*font-size: 0\.88rem;/);
 const cups = read("src/components/business/vertical-guides/GuideFourCups.tsx");
 const checklist = read("src/components/business/vertical-guides/GuideChecklist.tsx");
 const expertsView = read("src/components/business/vertical-guides/GuideExperts.tsx");
