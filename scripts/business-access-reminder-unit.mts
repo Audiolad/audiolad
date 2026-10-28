@@ -7,6 +7,7 @@ import { processBusinessAccessReminders } from "@/lib/email/process-business-acc
 import {
   BUSINESS_ACCESS_REMINDER_BUTTON_LABEL,
   BUSINESS_ACCESS_REMINDER_SUBJECTS,
+  BUSINESS_GRACE_PAYMENT_ANCHOR,
   businessAccessReminderParagraphs,
   businessAccessReminderSubject,
   renderBusinessAccessReminderEmailHtml,
@@ -133,6 +134,20 @@ assert.match(
 assert.match(
   businessAccessReminderParagraphs({ kind: "grace_last", ...labels }).join("\n"),
   /играет до 25 ноября 2026 г\., 15:00 МСК/,
+);
+assert.equal(BUSINESS_GRACE_PAYMENT_ANCHOR.includes("—"), false);
+assert.match(
+  businessAccessReminderParagraphs({ kind: "grace_start", ...labels }).join("\n"),
+  /Новые 30 дней считаются от конца прошлого срока – не от момента платежа/,
+);
+assert.match(
+  businessAccessReminderParagraphs({ kind: "grace_last", ...labels }).join("\n"),
+  /Новые 30 дней считаются от конца прошлого срока – не от момента платежа/,
+);
+assert.doesNotMatch(
+  businessAccessReminderParagraphs({ kind: "before_end", ...labels }).join("\n"),
+  /не от момента платежа/,
+  "before the end the 30 days are still added after the current end",
 );
 
 assert.match(MIGRATION, /business_access_service/);
