@@ -15,8 +15,7 @@ import BusinessCabinetMiniBar from "@/components/business-app/workspace/Business
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
 import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
-import type { PointPlaybackCause } from "@/lib/business-app/point-playback-guard";
-import { POINT_MUSIC_FORBIDDEN, POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
+import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -149,9 +148,6 @@ export function BusinessCabinetPlayerProvider({
   const playbackRef = useRef<WorkspacePlayback>(initialPlayback);
   const seekRef = useRef(initialPlayback.positionSec);
   const lastPostRef = useRef(0);
-  const transitionRef = useRef(false);
-  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
-  const progressBlockedRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctlRef = useRef<Controller | null>(null);
   const toggleRef = useRef<() => Promise<void>>(async () => {});
@@ -229,7 +225,7 @@ export function BusinessCabinetPlayerProvider({
     restoredKey.current = null;
   }, []);
 
-  const remember = useCallback((patch: Partial<WorkspacePlayback>, play: boolean, silent = false, cause: PointPlaybackCause = "manual") => {
+  const remember = useCallback((patch: Partial<WorkspacePlayback>, play: boolean, silent = false) => {
     const current = modelRef.current;
     if (!current) return;
     const next = clampWorkspacePlayback(
@@ -240,41 +236,26 @@ export function BusinessCabinetPlayerProvider({
     if (!silent) setPlayback(next);
     writeLocal(current.spaceId, next);
     const now = Date.now();
-    const volumeOnly = patch.volume !== undefined && patch.index === undefined && patch.positionSec === undefined;
-    if (!play && now - lastPostRef.current < 15_000 && (cause === "progress" || !pointReports)) return;
-    if (cause === "progress" && !volumeOnly && progressBlockedRef.current) return;
+    if (!play && now - lastPostRef.current < 15_000) return;
     lastPostRef.current = now;
     const params = new URLSearchParams({ space: current.spaceId });
-    saveChainRef.current = saveChainRef.current.then(async () => {
-      if (cause === "progress" && !volumeOnly && progressBlockedRef.current) return;
-      const res = await fetch(`/api/business/workspace/state?${params.toString()}`, {
-        ...JSON_POST,
-        body: JSON.stringify({
-          kind: "playback",
-          index: next.index,
-          positionSec: next.positionSec,
-          volume: next.volume,
-          play,
-          cause,
-          volumeOnly,
-        }),
-      });
-      if (res.status === 403) {
-        const json = await res.json() as { error?: string };
-        if (json.error === POINT_MUSIC_FORBIDDEN) {
-          setPointCanEdit(false);
-          progressBlockedRef.current = true;
-          setSaveNote(POINT_MUSIC_FORBIDDEN);
-          return; // Do not retry a rejected position through periodic progress saves.
-        }
-      }
-      if (res.ok && !volumeOnly) progressBlockedRef.current = false;
-      setSaveNote(res.ok ? null : "Не удалось сохранить место на сервере. На этом устройстве оно сохранено.");
+    void fetch(`/api/business/workspace/state?${params.toString()}`, {
+      ...JSON_POST,
+      body: JSON.stringify({
+        kind: "playback",
+        index: next.index,
+        positionSec: next.positionSec,
+        volume: next.volume,
+        play,
+      }),
     })
+      .then((res) => {
+        setSaveNote(res.ok ? null : "Не удалось сохранить место на сервере. На этом устройстве оно сохранено.");
+      })
       .catch(() => {
         setSaveNote("Нет соединения. Место в подборке сохранено на этом устройстве и отправится, когда связь вернётся.");
       });
-  }, [pointReports]);
+  }, []);
 
   const canBeat = pointReports;
   const reportPlayback = useCallback(() => {
@@ -349,28 +330,15 @@ export function BusinessCabinetPlayerProvider({
         currentTime: audio.currentTime,
         duration: Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : prev.duration,
       }));
-      if (audio.paused || transitionRef.current || seekRef.current > 0.5) return;
-      remember({ index: ctl.index < 0 ? playbackRef.current.index : ctl.index, positionSec: audio.currentTime }, false, true, "progress");
+      if (audio.paused) return;
+      remember({ index: ctl.index < 0 ? playbackRef.current.index : ctl.index, positionSec: audio.currentTime }, false, true);
     };
     const sendReport = () => reportRef.current();
     const onPlaying = () => {
       evidenceRef.current.onPlaying(audio.currentTime);
       sendReport();
     };
-    const onEnded = () => {
-      if (ctl.status !== "playing") return;
-      transitionRef.current = true;
-      void (async () => {
-        try {
-          if (soundInstallRef.current) await soundInstallRef.current;
-          await ctl.onEnded();
-          remember({ index: ctl.index, positionSec: 0 }, true, false, "advance");
-          sendReport();
-        } finally {
-          transitionRef.current = false;
-        }
-      })();
-    };
+    const onEnded = () => void ctl.onEnded();
     const onError = () => void ctl.onError();
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("playing", onPlaying);
@@ -434,7 +402,6 @@ export function BusinessCabinetPlayerProvider({
     const current = modelRef.current;
     if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
     const index = playbackRef.current.index;
-    const resumePosition = !ctl.current && seekRef.current > 0.5 ? seekRef.current : null;
     const starting = ctl.status !== "playing" && ctl.status !== "loading";
     if (starting) setBarDismissed(false);
     if (ctl.status === "playing" || ctl.status === "loading") {
@@ -444,11 +411,11 @@ export function BusinessCabinetPlayerProvider({
     } else {
       await ctl.playIndex(index);
     }
-    remember({ index: ctl.index < 0 ? index : ctl.index, positionSec: resumePosition ?? audioRef.current?.currentTime ?? 0 }, ctl.status === "playing", false, "progress");
+    remember({ index: ctl.index < 0 ? index : ctl.index, positionSec: audioRef.current?.currentTime ?? 0 }, ctl.status === "playing");
     reportPlayback();
   }, [remember, reportPlayback]);
 
-  const next = useCallback(async (cause: PointPlaybackCause = "owner") => {
+  const next = useCallback(async () => {
     const ctl = ctlRef.current;
     const current = modelRef.current;
     if (!ctl || !current || !workspacePlaybackAllowed(current.endsAt, Date.now())) return;
@@ -456,13 +423,8 @@ export function BusinessCabinetPlayerProvider({
     seekRef.current = 0;
     evidenceRef.current.reset(0);
     if (soundInstallRef.current) await soundInstallRef.current;
-    transitionRef.current = true;
-    try {
-      await ctl.next();
-      remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true, false, cause);
-    } finally {
-      transitionRef.current = false;
-    }
+    await ctl.next();
+    remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
   }, [remember, reportPlayback]);
 
@@ -539,7 +501,7 @@ export function BusinessCabinetPlayerProvider({
   }, [remember, reportPlayback]);
 
   const setVolume = useCallback((value: number) => {
-    remember({ volume: value }, false, false, "progress");
+    remember({ volume: value }, false);
   }, [remember]);
 
   const setQueueOrder = useCallback((indices: readonly number[]) => {
@@ -730,7 +692,6 @@ export function BusinessCabinetPlayerProvider({
         const json: unknown = await res.json();
         if (stop) return;
         setPointCanEdit(pointMusicAllowed(json));
-        if (pointMusicAllowed(json)) progressBlockedRef.current = false;
         latest = pointSoundUpdate(json);
       } catch {
         /* Keep the last settings for clock transitions during a network failure. */
@@ -779,7 +740,8 @@ export function BusinessCabinetPlayerProvider({
   }, []);
 
   const seek = useCallback((ratio: number) => {
-    // The server also checks permission and rejects a stale-permission seek save.
+    // Seek is local. The owner accepts a stale-permission window of ~5 s within
+    // the current track: this does not change the music. Commands refresh it sooner.
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
     const nextTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));
@@ -812,7 +774,7 @@ export function BusinessCabinetPlayerProvider({
       return false;
     }
   };
-  const deviceNext = async () => { if (await authorizeMusicChange()) await next("manual"); };
+  const deviceNext = async () => { if (await authorizeMusicChange()) await next(); };
   const devicePrevious = async () => { if (await authorizeMusicChange()) await previous(); };
   const devicePlayIndex = async (index: number) => { if (await authorizeMusicChange()) await playIndex(index); };
 
