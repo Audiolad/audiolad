@@ -14,9 +14,11 @@ import {
 } from "@/components/business-app/workspace/BusinessCabinetPlayer";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { atmospherePlaybackPlan, peekAtmosphereRestart, takeAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
-import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, CAFE_QUEUE_PREVIEW, ruTrackWord } from "@/lib/business-app/cafe-queue/order";
+import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queue/feedback-phase";
+import type { CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
+import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
-import CafeQueueControls, { CafeTrackFeedback } from "@/components/business-app/workspace/CafeQueueControls";
+import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
   BUSINESS_CONNECT_VENUE_CTA,
@@ -56,6 +58,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const queue = useCafeQueuePreferences();
   const [refreshed, setRefreshed] = useState<{ source: WorkspacePageModel; value: WorkspacePageModel } | null>(null);
   const [failedNowCover, setFailedNowCover] = useState<string | null>(null);
+  const [feedbackPhase, setFeedbackPhase] = useState<CafeFeedbackPhase>("idle");
+  const [feedbackBusyKind, setFeedbackBusyKind] = useState<CafeQueueFeedbackKind | null>(null);
+  const feedbackTicket = useRef(0);
+  const feedbackStarted = useRef(0);
+  const feedbackPending = useRef(false);
+  const feedbackTimers = useRef<number[]>([]);
   const model = refreshed?.source === initialModel ? refreshed.value : initialModel;
   const open = workspacePlayerOpen(model);
   const reportChromeAccess = useReportBusinessChromeAccess();
@@ -78,10 +86,31 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     boundaryRef.current = player.queueOrder && playing ? playing.audioItemId : null;
     statusRef.current = player.view.status;
   }, [player.queueOrder, model.tracks, currentIndex, player.view.status]);
+  useEffect(() => () => {
+    for (const timer of feedbackTimers.current) window.clearTimeout(timer);
+  }, []);
+  const settleFeedback = (ticket: number, started: number, ok: boolean) => {
+    if (ticket === 0 || ticket !== feedbackTicket.current) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const hold = window.setTimeout(() => {
+      if (ticket !== feedbackTicket.current) return;
+      setFeedbackPhase(ok ? "confirmed" : "error");
+      const back = window.setTimeout(() => {
+        if (ticket !== feedbackTicket.current) return;
+        setFeedbackPhase("idle");
+        setFeedbackBusyKind(null);
+      }, FEEDBACK_RESULT_MS);
+      feedbackTimers.current.push(back);
+    }, feedbackHoldMs(Date.now() - started, reduced));
+    feedbackTimers.current.push(hold);
+  };
   useEffect(() => {
     if (!open || !queue.ready || !queue.effectiveDaypart || model.tracks.length === 0) return;
     const ac = new AbortController();
     let cancelled = false;
+    const ticket = feedbackTicket.current;
+    const started = feedbackStarted.current;
+    const pending = feedbackPending.current;
     const params = new URLSearchParams({ space: model.spaceId });
     void fetch(`/api/business/workspace/queue?${params.toString()}`, {
       method: "POST",
@@ -100,25 +129,36 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
       }),
     })
       .then(async (res) => {
-        if (!res.ok) return;
-        const json = await res.json() as { ok?: boolean; order?: unknown };
-        if (cancelled || json.ok !== true || !Array.isArray(json.order)) return;
-        const indices = cafeQueueIndices(model.tracks, json.order);
-        const plan = atmospherePlaybackPlan({
-          tracks: model.tracks,
-          orderedIds: json.order,
-          restart: peekAtmosphereRestart(),
-          status: statusRef.current,
-        });
-        if (plan && indices.length > 0) {
-          takeAtmosphereRestart();
-          applyAtmosphereQueue(indices, { play: plan.play });
-          return;
+        let ok = false;
+        if (res.ok) {
+          const json = await res.json() as { ok?: boolean; order?: unknown };
+          if (!cancelled && json.ok === true && Array.isArray(json.order)) {
+            const indices = cafeQueueIndices(model.tracks, json.order);
+            const plan = atmospherePlaybackPlan({
+              tracks: model.tracks,
+              orderedIds: json.order,
+              restart: peekAtmosphereRestart(),
+              status: statusRef.current,
+            });
+            if (plan && indices.length > 0) {
+              takeAtmosphereRestart();
+              applyAtmosphereQueue(indices, { play: plan.play });
+            } else if (!cancelled) {
+              setQueueOrder(indices);
+            }
+            ok = indices.length > 0;
+          }
         }
-        setQueueOrder(indices);
+        if (!cancelled && pending) {
+          feedbackPending.current = false;
+          settleFeedback(ticket, started, ok);
+        }
       })
       .catch(() => {
-        /* Catalog order stays until the queue can be loaded. */
+        if (!cancelled && pending) {
+          feedbackPending.current = false;
+          settleFeedback(ticket, started, false);
+        }
       });
     return () => {
       cancelled = true;
@@ -181,8 +221,12 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
   const duration = player.view.duration > 0 ? player.view.duration : (current?.durationSeconds ?? 0);
   const ratio = duration > 0 ? Math.min(1, Math.max(0, player.view.currentTime / duration)) : 0;
   const playOrder = player.queueOrder ?? model.tracks.map((_, index) => index);
-  const upcoming = current ? upcomingTracks(model.tracks, currentIndex, playOrder) : [];
-  const feedbackKind = current ? queue.feedback.find((item) => item.audioItemId === current.audioItemId)?.kind ?? null : null;
+  const ahead = current ? cafeUniqueAhead(model.tracks, playOrder, currentIndex) : [];
+  const previewOrder = ahead.length > 0 || !current
+    ? ahead
+    : cafeUpcomingIndices(playOrder, currentIndex);
+  const upcoming = queueRows(model.tracks, previewOrder);
+  const moreLabel = cafeUpcomingMoreLabel(cafeUpcomingMoreCount(ahead.length));
 
   return (
     <div className="business-app-span-full business-music-stage mx-auto max-w-3xl space-y-4" data-testid="biz-workspace" data-space={model.spaceId} data-status={model.status}>
@@ -311,8 +355,17 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
               size="large"
             />
             <CafeTrackFeedback
-              feedbackKind={feedbackKind}
-              onFeedback={(kind) => queue.vote(current.audioItemId, kind)}
+              phase={feedbackPhase}
+              busyKind={feedbackBusyKind}
+              onFeedback={(kind) => {
+                if (feedbackPhase !== "idle") return;
+                feedbackPending.current = true;
+                feedbackTicket.current += 1;
+                feedbackStarted.current = Date.now();
+                setFeedbackPhase("working");
+                setFeedbackBusyKind(kind);
+                queue.vote(current.audioItemId, kind);
+              }}
             />
             <p className="text-sm text-[var(--biz-text-muted)]">{BUSINESS_WORKSPACE_AUTOPLAY_NOTE}</p>
           </section>
@@ -348,9 +401,9 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
                 })}
               </ol>
             )}
-            {cafeUpcomingMoreCount(upcoming.length) > 0 ? (
+            {moreLabel ? (
               <p className="mt-2 text-sm text-[var(--biz-text-muted)]" data-testid="biz-now-more">
-                и ещё {cafeUpcomingMoreCount(upcoming.length)} {ruTrackWord(cafeUpcomingMoreCount(upcoming.length))}
+                {moreLabel}
               </p>
             ) : null}
           </section>
@@ -369,13 +422,12 @@ function playbackBlocked(model: WorkspacePageModel): boolean {
   return !workspacePlayerOpen(model) || model.tracks.length === 0;
 }
 
-/** Tracks that play after the current one, then the earlier ones, without repeating the current track. */
-function upcomingTracks(
+/** Rows for the queue list. Indices that no longer point at a track are skipped. */
+function queueRows(
   tracks: readonly WorkspaceTrack[],
-  currentIndex: number,
-  order: readonly number[],
+  indices: readonly number[],
 ): { track: WorkspaceTrack; index: number }[] {
-  return cafeUpcomingIndices(order, currentIndex).flatMap((index) => {
+  return indices.flatMap((index) => {
     const track = tracks[index];
     return track ? [{ track, index }] : [];
   });

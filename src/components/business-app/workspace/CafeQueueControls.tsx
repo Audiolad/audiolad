@@ -39,36 +39,62 @@ function daypartHint(mode: CafeDaypartMode, effective: CafeDaypart | null, hours
   return `Авто: сейчас ${part.hint} (${window.start}–${window.end}) – изменить`;
 }
 
+export type CafeFeedbackPhase = "idle" | "working" | "confirmed" | "error";
+
+function FeedbackMark({ phase }: { phase: CafeFeedbackPhase }) {
+  if (phase === "working") {
+    return (
+      <span className="business-atmosphere-bars" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+        <span />
+      </span>
+    );
+  }
+  if (phase === "confirmed") return <span aria-hidden="true">✓</span>;
+  return null;
+}
+
+function feedbackText(kind: CafeQueueFeedbackKind, phase: CafeFeedbackPhase, busy: boolean): string {
+  if (!busy) return kind === "more" ? "Больше такой музыки" : "Меньше такой музыки";
+  if (phase === "working") return "Собираем…";
+  if (phase === "confirmed") return "Атмосфера перестроена";
+  return "Не удалось";
+}
+
 /** Votes for the track that is playing now. Lives in the now-playing card, not in the daypart block. */
 export function CafeTrackFeedback({
-  feedbackKind,
+  phase = "idle",
+  busyKind = null,
   onFeedback,
 }: {
-  feedbackKind: CafeQueueFeedbackKind | null;
+  phase?: CafeFeedbackPhase;
+  busyKind?: CafeQueueFeedbackKind | null;
   onFeedback: (kind: CafeQueueFeedbackKind) => void;
 }) {
+  const busy = phase !== "idle";
   return (
-    <div className="cafe-queue__pair cafe-now-feedback" data-testid="biz-cafe-feedback">
-      <button
-        type="button"
-        className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
-        data-testid="biz-cafe-more"
-        aria-pressed={feedbackKind === "more"}
-        onClick={() => onFeedback("more")}
-      >
-        <CircleIcon sign="plus" />
-        <span>Больше такой музыки</span>
-      </button>
-      <button
-        type="button"
-        className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
-        data-testid="biz-cafe-less"
-        aria-pressed={feedbackKind === "less"}
-        onClick={() => onFeedback("less")}
-      >
-        <CircleIcon sign="minus" />
-        <span>Меньше такой музыки</span>
-      </button>
+    <div className="cafe-queue__pair cafe-now-feedback" data-testid="biz-cafe-feedback" data-phase={phase}>
+      {(["more", "less"] as const).map((kind) => {
+        const active = busy && busyKind === kind;
+        return (
+          <button
+            key={kind}
+            type="button"
+            className="cafe-queue__btn cafe-queue__choice business-app-focus-ring"
+            data-testid={kind === "more" ? "biz-cafe-more" : "biz-cafe-less"}
+            data-state={active ? phase : "idle"}
+            aria-busy={active && phase === "working"}
+            disabled={busy}
+            onClick={() => onFeedback(kind)}
+          >
+            {active ? <FeedbackMark phase={phase} /> : <CircleIcon sign={kind === "more" ? "plus" : "minus"} />}
+            <span>{feedbackText(kind, phase, active)}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

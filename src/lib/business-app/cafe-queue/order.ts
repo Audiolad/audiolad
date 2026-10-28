@@ -60,12 +60,62 @@ export function ruTrackWord(count: number): string {
 }
 
 /**
- * Tracks still in the finite pool after the preview rows.
- * The current track is not in `upcomingLength` (the loop lists every other pool track once).
+ * How many of `ahead` stay hidden after the preview rows.
+ * `ahead` is the unique tracks still in front of the playhead, not the loop back to the start.
  */
-export function cafeUpcomingMoreCount(upcomingLength: number, shown = CAFE_QUEUE_PREVIEW): number {
-  if (!Number.isInteger(upcomingLength) || upcomingLength <= shown) return 0;
-  return upcomingLength - shown;
+export function cafeUpcomingMoreCount(ahead: number, shown = CAFE_QUEUE_PREVIEW): number {
+  if (!Number.isInteger(ahead) || ahead <= shown) return 0;
+  return ahead - shown;
+}
+
+/** «и ещё 1 трек без повторов», «и ещё 3 трека без повторов». Hidden when nothing unique remains. */
+export function cafeUpcomingMoreLabel(count: number): string | null {
+  if (!Number.isInteger(count) || count <= 0) return null;
+  return `и ещё ${count} ${ruTrackWord(count)} без повторов`;
+}
+
+/**
+ * Catalog indices strictly after the playhead in this pass of the built queue.
+ * Indices before the playhead are left out: the player loops, and those tracks would play again.
+ */
+export function cafeAheadIndices(order: readonly number[], currentIndex: number): number[] {
+  if (order.length === 0) return [];
+  const pos = order.indexOf(currentIndex);
+  const ahead = pos < 0 ? order : order.slice(pos + 1);
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const index of ahead) {
+    if (!Number.isInteger(index) || index === currentIndex || seen.has(index)) continue;
+    seen.add(index);
+    out.push(index);
+  }
+  return out;
+}
+
+/**
+ * One row per audio id still ahead. A later copy of a track already heard, or already counted, is a repeat.
+ */
+export function cafeUniqueAhead(
+  tracks: readonly { audioItemId: string }[],
+  order: readonly number[],
+  currentIndex: number,
+): number[] {
+  const heard = new Set<string>();
+  const pos = order.indexOf(currentIndex);
+  const prefix = pos < 0 ? [] : order.slice(0, pos + 1);
+  for (const index of prefix) {
+    const id = tracks[index]?.audioItemId;
+    if (id) heard.add(id);
+  }
+  const seen = new Set<string>();
+  const out: number[] = [];
+  for (const index of cafeAheadIndices(order, currentIndex)) {
+    const id = tracks[index]?.audioItemId;
+    if (!id || heard.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(index);
+  }
+  return out;
 }
 
 /** Tracks after the current one, then the earlier ones, following `order`. */

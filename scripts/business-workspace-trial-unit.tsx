@@ -696,8 +696,26 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   const many = renderToStaticMarkup(<BusinessWorkspace model={model({ tracks })} />);
   const queueHtml = many.slice(many.indexOf('data-testid="biz-now-queue"'));
   assert.equal((queueHtml.match(/business-atmosphere-track /g) ?? []).length, 3, "only three upcoming rows");
-  assert.match(queueHtml, /и ещё 4 трека/);
+  assert.match(queueHtml, /и ещё 4 трека без повторов/);
+  assert.match(many, /data-phase="idle"/);
+  assert.match(many, /Больше такой музыки/);
+  assert.match(read("src/components/business-app/workspace/CafeQueueControls.tsx"), /Атмосфера перестроена/);
+  assert.match(read("src/components/business-app/workspace/CafeQueueControls.tsx"), /business-atmosphere-bars/);
+  assert.match(workspaceSource, /prefers-reduced-motion/);
+  assert.match(workspaceSource, /feedbackPhase !== "idle"/);
   assert.doesNotMatch(renderToStaticMarkup(<BusinessWorkspace model={model({})} />), /и ещё/);
+  const later = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks,
+    playback: { index: 1, positionSec: 12, volume: 0.8, updatedAt: start.toISOString() },
+  })} />);
+  const laterQueue = later.slice(later.indexOf('data-testid="biz-now-queue"'));
+  assert.match(laterQueue, /и ещё 3 трека без повторов/, "the saved place shortens the unique remainder");
+  const nearEnd = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks,
+    playback: { index: 7, positionSec: 0, volume: 0.8, updatedAt: start.toISOString() },
+  })} />);
+  assert.doesNotMatch(nearEnd.slice(nearEnd.indexOf('data-testid="biz-now-queue"')), /и ещё/, "nothing unique remains on the last track");
+  assert.match(nearEnd, /Трек 1/, "after the last track the loop shows the start again");
 }
 {
   const settings = renderToStaticMarkup(<BusinessPlayerSettings />);
