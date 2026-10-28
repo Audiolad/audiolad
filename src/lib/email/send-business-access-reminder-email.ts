@@ -5,6 +5,7 @@ import { getSenderIdentity } from "@/lib/email/sender-identities";
 import { getSmtpConfigFromEnv } from "@/lib/email/smtp-config";
 import {
   businessAccessReminderEndsLabel,
+  businessAccessReminderGraceDaysLeft,
   businessAccessReminderGraceEndsLabel,
   businessAccessReminderSubject,
   renderBusinessAccessReminderEmailHtml,
@@ -17,6 +18,8 @@ export type SendBusinessAccessReminderEmailInput = {
   kind: BusinessAccessReminderKind;
   periodEnd: string;
   sendId: string;
+  /** Send time for the real grace days left (tests). */
+  now?: Date;
 };
 
 export type SendBusinessAccessReminderEmailResult =
@@ -51,7 +54,9 @@ export async function sendBusinessAccessReminderEmail(
     return { ok: false, code: "smtp_not_configured" };
   }
 
-  const templateInput = { kind: input.kind, endsAtLabel, graceEndsLabel };
+  const graceDaysLeft =
+    businessAccessReminderGraceDaysLeft(input.periodEnd, input.now ?? new Date()) ?? undefined;
+  const templateInput = { kind: input.kind, endsAtLabel, graceEndsLabel, graceDaysLeft };
   const subject = businessAccessReminderSubject(input.kind);
   const html = renderBusinessAccessReminderEmailHtml(templateInput);
   const text = renderBusinessAccessReminderEmailText(templateInput);

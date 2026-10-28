@@ -699,7 +699,8 @@ main() {
     log_error "business_access_reminders_ensure_failed"
     send_deploy_alert "deploy_failed" "Business access reminder timer ensure failed for $RELEASE_NAME"
     # Cutover already completed: fail the deploy result without rolling back a
-    # healthy web release. Enabling this timer is what starts the service letters.
+    # healthy web release. The timer is enabled only with
+    # BUSINESS_ACCESS_REMINDERS_TIMER_ENABLE=1 (separate approval); by default units are installed only.
     exit 1
   fi
   if [[ ! -x "$SCRIPT_DIR/ensure-author-appreciation-getcourse-reconcile.sh" ]]; then

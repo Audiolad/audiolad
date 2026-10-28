@@ -10,9 +10,11 @@ import {
   BUSINESS_RENEWAL_IMPROVEMENT_QUESTION,
   BUSINESS_RENEWAL_IMPROVEMENT_SEND,
   BUSINESS_RENEWAL_NO_LABEL,
+  BUSINESS_RENEWAL_NOTE_ERROR,
   BUSINESS_RENEWAL_NOTE_MAX,
   BUSINESS_RENEWAL_NOTE_SENT,
   BUSINESS_RENEWAL_QUESTION,
+  BUSINESS_RENEWAL_RETRY_LABEL,
   BUSINESS_RENEWAL_THANKS_DEVICE,
   BUSINESS_RENEWAL_THANKS_OWNER,
   BUSINESS_RENEWAL_THANKS_YES,
@@ -96,11 +98,13 @@ export function BusinessRenewalThanks({
   onChange,
 }: {
   surface: "owner" | "device";
-  onNote: (note: string) => void;
+  /** Resolves true once the note is saved; false shows an error with a retry. */
+  onNote: (note: string) => Promise<boolean>;
   onChange?: () => void;
 }) {
   const [note, setNote] = useState("");
-  const [sent, setSent] = useState(false);
+  const [noteState, setNoteState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const sent = noteState === "sent";
   return (
     <div className="space-y-3" data-testid="biz-renewal-thanks">
       <p className="text-[1.05rem] text-[var(--biz-text)]">
@@ -122,19 +126,27 @@ export function BusinessRenewalThanks({
               onChange={(event) => setNote(event.target.value)}
             />
           </label>
+          {noteState === "error" ? (
+            <p className="text-sm text-[var(--biz-text)]" role="alert" data-testid="biz-renewal-feedback-error">
+              {BUSINESS_RENEWAL_NOTE_ERROR}
+            </p>
+          ) : null}
           <button
             type="button"
             className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-            disabled={!normalizeRenewalNote(note)}
+            disabled={!normalizeRenewalNote(note) || noteState === "sending"}
             onClick={() => {
               const next = normalizeRenewalNote(note);
               if (!next) return;
-              onNote(next);
-              setSent(true);
+              setNoteState("sending");
+              void onNote(next).then(
+                (ok) => setNoteState(ok ? "sent" : "error"),
+                () => setNoteState("error"),
+              );
             }}
-            data-testid="biz-renewal-feedback-send"
+            data-testid={noteState === "error" ? "biz-renewal-feedback-retry" : "biz-renewal-feedback-send"}
           >
-            {BUSINESS_RENEWAL_IMPROVEMENT_SEND}
+            {noteState === "error" ? BUSINESS_RENEWAL_RETRY_LABEL : BUSINESS_RENEWAL_IMPROVEMENT_SEND}
           </button>
         </>
       )}
@@ -228,9 +240,7 @@ export function BusinessRenewalController({
     return (
       <BusinessRenewalThanks
         surface={surface}
-        onNote={(note) => {
-          void saveRenewalChoice("no", note);
-        }}
+        onNote={(note) => saveRenewalChoice("no", note)}
         onChange={startEditing}
       />
     );

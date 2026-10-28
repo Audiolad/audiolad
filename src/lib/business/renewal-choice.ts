@@ -27,6 +27,8 @@ export const BUSINESS_RENEWAL_THANKS_YES = "Спасибо за ответ.";
 export const BUSINESS_RENEWAL_CHANGE_LABEL = "Изменить ответ";
 
 export const BUSINESS_RENEWAL_NOTE_SENT = "Спасибо, мы прочитаем.";
+export const BUSINESS_RENEWAL_NOTE_ERROR = "Не удалось отправить. Текст остался здесь.";
+export const BUSINESS_RENEWAL_RETRY_LABEL = "Попробовать ещё раз";
 
 export const BUSINESS_RENEWAL_IMPROVEMENT_QUESTION =
   "Что нам улучшить, чтобы вам понравилось и вы вернулись?";

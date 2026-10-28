@@ -35,9 +35,28 @@ export const BUSINESS_EMAIL_SENDER_NAME = BUSINESS_BRAND_NAME;
 
 const FONT = "Arial, Helvetica, sans-serif";
 
+export const BUSINESS_EMAIL_HOST = "business.audiolad.ru";
+
+/** Exact https://business.audiolad.ru host: no lookalike suffix, userinfo or port. */
+export function isBusinessEmailUrl(href: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return false;
+  }
+  return (
+    url.protocol === "https:" &&
+    url.hostname === BUSINESS_EMAIL_HOST &&
+    url.port === "" &&
+    url.username === "" &&
+    url.password === ""
+  );
+}
+
 function assertBusinessUrl(href: string): string {
   const trimmed = href.trim();
-  if (!trimmed.startsWith("https://business.audiolad.ru")) {
+  if (!isBusinessEmailUrl(trimmed)) {
     throw new Error("business_email_link_must_stay_on_business_host");
   }
   return trimmed;

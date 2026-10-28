@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Install and enable the AudioLad Business access reminder timer from the candidate
-# release. Missing units or a failed enable must fail the caller deploy.
+# Install the AudioLad Business access reminder units from the candidate release.
+# The timer is NOT enabled by default: a deploy only installs units and reloads systemd.
+# Enabling (which starts the service letters) is a separate approved step:
+#   BUSINESS_ACCESS_REMINDERS_TIMER_ENABLE=1 deploy/scripts/ensure-business-access-reminders.sh
+# A timer that an operator already enabled is left as is (never disabled here).
+# Missing units or a failed (requested) enable must fail the caller deploy.
 # Does not restart PM2 / Nginx / Docker and does not send mail itself.
-# The timer stays idle until this script runs on an approved production deploy.
 set -Eeuo pipefail
 
 if [[ -n "${DEPLOY_TREE:-}" && -d "$DEPLOY_TREE" ]]; then
@@ -25,6 +28,7 @@ LOGROTATE_DIR="${LOGROTATE_DIR:-/etc/logrotate.d}"
 LOG_DIR="${LOG_DIR:-/var/log/audiolad}"
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"
 SKIP_SYSTEMCTL="${SKIP_SYSTEMCTL:-0}"
+TIMER_ENABLE="${BUSINESS_ACCESS_REMINDERS_TIMER_ENABLE:-0}"
 
 log() {
   printf '[%s] %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$*"
@@ -69,6 +73,16 @@ if ! command -v "$SYSTEMCTL" >/dev/null 2>&1; then
 fi
 
 as_root "$SYSTEMCTL" daemon-reload
+
+if [[ "$TIMER_ENABLE" != "1" ]]; then
+  if as_root "$SYSTEMCTL" is-enabled "$TIMER_UNIT" >/dev/null 2>&1; then
+    log "business_access_reminders_installed timer_enable_flag=0 timer_state=enabled_earlier unit=${TIMER_UNIT}"
+  else
+    log "business_access_reminders_installed timer_enable_flag=0 timer_state=not_enabled unit=${TIMER_UNIT}"
+  fi
+  exit 0
+fi
+
 if ! as_root "$SYSTEMCTL" enable --now "$TIMER_UNIT"; then
   log "ERROR timer enable failed unit=${TIMER_UNIT}"
   exit 1

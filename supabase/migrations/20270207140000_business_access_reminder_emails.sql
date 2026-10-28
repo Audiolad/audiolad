@@ -31,6 +31,8 @@ BEGIN;
 --  10. DROP FUNCTION IF EXISTS public.complete_business_access_reminder(uuid, uuid);
 --  11. DROP FUNCTION IF EXISTS public.fail_business_access_reminder(uuid, uuid, boolean);
 --  12. DROP FUNCTION IF EXISTS public.business_access_reminder_kind(timestamptz, timestamptz);
+--      DROP FUNCTION IF EXISTS public.business_access_reminder_last_send_day(timestamptz);
+--      DROP FUNCTION IF EXISTS public.business_access_reminder_send_window_open(timestamptz);
 --  13. DROP TABLE IF EXISTS public.business_access_reminder_sends;
 -- Do not drop access_grants, access_paid_periods, email_preferences or email_suppressions.
 -- ---------------------------------------------------------------------------
@@ -64,6 +66,41 @@ ALTER TABLE public.business_access_reminder_sends ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.business_access_reminder_sends FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.business_access_reminder_sends TO service_role;
 
+CREATE OR REPLACE FUNCTION public.business_access_reminder_last_send_day(
+  p_period_end timestamptz
+)
+RETURNS date
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  -- The Moscow day whose 10:00–20:00 window carries the last-day letter.
+  -- If the grace ends before 11:00 MSK, that day's window is too late, so the previous day.
+  SELECT CASE
+    WHEN p_period_end IS NULL THEN NULL
+    WHEN (timezone('Europe/Moscow', p_period_end + interval '3 days'))::time < time '11:00'
+      THEN (timezone('Europe/Moscow', p_period_end + interval '3 days'))::date - 1
+    ELSE (timezone('Europe/Moscow', p_period_end + interval '3 days'))::date
+  END;
+$$;
+
+COMMENT ON FUNCTION public.business_access_reminder_last_send_day(timestamptz) IS
+  'audiolad:business-access-reminder; Moscow day of the grace_last letter. Twin of businessAccessReminderLastSendDay.';
+
+CREATE OR REPLACE FUNCTION public.business_access_reminder_send_window_open(p_now timestamptz)
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT p_now IS NOT NULL
+    AND (timezone('Europe/Moscow', p_now))::time >= time '10:00'
+    AND (timezone('Europe/Moscow', p_now))::time < time '20:00';
+$$;
+
+COMMENT ON FUNCTION public.business_access_reminder_send_window_open(timestamptz) IS
+  'audiolad:business-access-reminder; letters only 10:00-20:00 Europe/Moscow. Twin of businessAccessReminderSendWindowOpen.';
+
 CREATE OR REPLACE FUNCTION public.business_access_reminder_kind(
   p_period_end timestamptz,
   p_now timestamptz
@@ -84,21 +121,21 @@ AS $$
     WHEN p_now >= p_period_end
       AND p_now < p_period_end + interval '3 days'
       AND (timezone('Europe/Moscow', p_now))::date
-        = (timezone('Europe/Moscow', p_period_end + interval '3 days' - interval '1 millisecond'))::date
+        = public.business_access_reminder_last_send_day(p_period_end)
       THEN 'grace_last'
     WHEN p_now >= p_period_end
       AND p_now < p_period_end + interval '3 days'
       AND (timezone('Europe/Moscow', p_now))::date
         >= (timezone('Europe/Moscow', p_period_end))::date
       AND (timezone('Europe/Moscow', p_now))::date
-        < (timezone('Europe/Moscow', p_period_end + interval '3 days' - interval '1 millisecond'))::date
+        < public.business_access_reminder_last_send_day(p_period_end)
       THEN 'grace_start'
     ELSE NULL
   END;
 $$;
 
 COMMENT ON FUNCTION public.business_access_reminder_kind(timestamptz, timestamptz) IS
-  'audiolad:business-access-reminder; Moscow calendar windows. before_end is 1-3 days before the end day. grace_last is the last grace day. grace_start is the rest of the 3-day grace. Twin of src/lib/business/access-reminders.ts.';
+  'audiolad:business-access-reminder; Moscow calendar windows. before_end is 1-3 days before the end day. grace_last is business_access_reminder_last_send_day (the previous day when the grace ends before 11:00 MSK). grace_start is the rest of the 3-day grace. Twin of src/lib/business/access-reminders.ts.';
 
 CREATE OR REPLACE FUNCTION public.claim_business_access_reminders(
   p_limit integer DEFAULT 25,
@@ -122,6 +159,10 @@ DECLARE
   v_lease_seconds integer := GREATEST(30, LEAST(COALESCE(p_lease_seconds, 300), 900));
   v_now timestamptz := clock_timestamp();
 BEGIN
+  -- No letters at night: only 10:00-20:00 Europe/Moscow.
+  IF NOT public.business_access_reminder_send_window_open(v_now) THEN
+    RETURN;
+  END IF;
   RETURN QUERY
   WITH grant_ends AS (
     SELECT g.user_id, g.ends_at, g.email_hash
@@ -329,11 +370,15 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.business_access_reminder_kind(timestamptz, timestamptz) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_access_reminder_last_send_day(timestamptz) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.business_access_reminder_send_window_open(timestamptz) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.claim_business_access_reminders(integer, integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.complete_business_access_reminder(uuid, uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.fail_business_access_reminder(uuid, uuid, boolean) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.business_access_reminder_kind(timestamptz, timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION public.business_access_reminder_last_send_day(timestamptz) TO service_role;
+GRANT EXECUTE ON FUNCTION public.business_access_reminder_send_window_open(timestamptz) TO service_role;
 GRANT EXECUTE ON FUNCTION public.claim_business_access_reminders(integer, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.complete_business_access_reminder(uuid, uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.fail_business_access_reminder(uuid, uuid, boolean) TO service_role;
@@ -356,21 +401,20 @@ COMMENT ON TABLE public.business_access_renewal_choices IS
   'audiolad:business-access-reminder; one yes/no per account and contractual end. A no stops later letters for that end. No FK to auth.users.';
 
 CREATE TABLE IF NOT EXISTS public.business_access_renewal_notes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   period_end timestamptz NOT NULL,
   improvement_note text NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, period_end),
-  CONSTRAINT business_access_renewal_notes_choice_fk
-    FOREIGN KEY (user_id, period_end)
-    REFERENCES public.business_access_renewal_choices (user_id, period_end)
-    ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT business_access_renewal_notes_length_check
     CHECK (char_length(improvement_note) BETWEEN 1 AND 400)
 );
 
+CREATE INDEX IF NOT EXISTS business_access_renewal_notes_user_period_idx
+  ON public.business_access_renewal_notes (user_id, period_end, created_at DESC);
+
 COMMENT ON TABLE public.business_access_renewal_notes IS
-  'audiolad:business-access-reminder; optional improvement note. Admins only.';
+  'audiolad:business-access-reminder; append-only history of improvement notes. Admins only. Not deleted by a payment or a new answer; no FK to choices.';
 
 ALTER TABLE public.business_access_renewal_choices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_access_renewal_notes ENABLE ROW LEVEL SECURITY;
@@ -493,14 +537,10 @@ BEGIN
   ON CONFLICT (user_id, period_end) DO UPDATE
   SET answer = EXCLUDED.answer, answered_at = EXCLUDED.answered_at;
 
-  IF v_note IS NULL THEN
-    DELETE FROM public.business_access_renewal_notes AS n
-    WHERE n.user_id = v_user AND n.period_end = v_end;
-  ELSE
-    INSERT INTO public.business_access_renewal_notes AS n (user_id, period_end, improvement_note, updated_at)
-    VALUES (v_user, v_end, v_note, clock_timestamp())
-    ON CONFLICT (user_id, period_end) DO UPDATE
-    SET improvement_note = EXCLUDED.improvement_note, updated_at = EXCLUDED.updated_at;
+  -- Notes are history: append, never overwrite or delete.
+  IF v_note IS NOT NULL THEN
+    INSERT INTO public.business_access_renewal_notes (user_id, period_end, improvement_note, created_at)
+    VALUES (v_user, v_end, v_note, clock_timestamp());
   END IF;
 
   RETURN QUERY SELECT v_answer, v_end;
@@ -526,11 +566,22 @@ BEGIN
     RAISE EXCEPTION 'admin_required' USING ERRCODE = '42501';
   END IF;
   RETURN QUERY
-  SELECT c.user_id, c.period_end, c.answer, n.improvement_note, c.answered_at
-  FROM public.business_access_renewal_choices AS c
-  LEFT JOIN public.business_access_renewal_notes AS n
-    ON n.user_id = c.user_id AND n.period_end = c.period_end
-  ORDER BY c.answered_at DESC;
+  -- Every note (kept after payment), plus current answers without a note.
+  SELECT x.user_id, x.period_end, x.answer, x.improvement_note, x.answered_at
+  FROM (
+    SELECT n.user_id, n.period_end, c.answer, n.improvement_note, n.created_at AS answered_at
+    FROM public.business_access_renewal_notes AS n
+    LEFT JOIN public.business_access_renewal_choices AS c
+      ON c.user_id = n.user_id AND c.period_end = n.period_end
+    UNION ALL
+    SELECT c.user_id, c.period_end, c.answer, NULL::text, c.answered_at
+    FROM public.business_access_renewal_choices AS c
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.business_access_renewal_notes AS n
+      WHERE n.user_id = c.user_id AND n.period_end = c.period_end
+    )
+  ) AS x
+  ORDER BY x.answered_at DESC;
 END;
 $$;
 

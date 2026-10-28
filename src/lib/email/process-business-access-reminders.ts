@@ -1,5 +1,6 @@
 import {
   BUSINESS_ACCESS_REMINDER_KINDS,
+  businessAccessReminderSendWindowOpen,
   type BusinessAccessReminderKind,
 } from "@/lib/business/access-reminders";
 
@@ -79,7 +80,13 @@ export async function processBusinessAccessReminders(options?: {
   leaseSeconds?: number;
   supabase?: BusinessAccessReminderRpcClient;
   send?: BusinessAccessReminderSender;
+  /** Clock for the 10:00–20:00 MSK window (tests). The SQL claim checks it too. */
+  now?: Date;
 }): Promise<ProcessBusinessAccessRemindersResult> {
+  if (!businessAccessReminderSendWindowOpen(options?.now ?? new Date())) {
+    console.log(JSON.stringify({ event: "business_access_reminder_window_closed" }));
+    return { claimed: 0, sent: 0, skipped: 0, failed: 0 };
+  }
   const supabase = options?.supabase ?? (await defaultSupabase());
   const { data, error } = await supabase.rpc("claim_business_access_reminders", {
     p_limit: options?.limit ?? 25,

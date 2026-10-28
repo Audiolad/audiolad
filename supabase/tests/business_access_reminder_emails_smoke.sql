@@ -5,6 +5,67 @@ BEGIN;
 
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
 
+-- Night window and last-day letter on fixed instants (Europe/Moscow is UTC+3).
+DO $$
+DECLARE
+  v_end timestamptz;
+BEGIN
+  IF public.business_access_reminder_send_window_open('2026-11-10 09:59:59+03')
+     OR NOT public.business_access_reminder_send_window_open('2026-11-10 10:00:00+03')
+     OR NOT public.business_access_reminder_send_window_open('2026-11-10 19:59:59+03')
+     OR public.business_access_reminder_send_window_open('2026-11-10 20:00:00+03')
+     OR public.business_access_reminder_send_window_open('2026-11-10 03:00:00+03') THEN
+    RAISE EXCEPTION 'window: letters only 10:00-20:00 MSK';
+  END IF;
+
+  -- Grace ends 00:30 MSK: the last-day letter goes in the previous day's window.
+  v_end := '2026-11-10 00:30:00+03';
+  IF public.business_access_reminder_last_send_day(v_end) IS DISTINCT FROM date '2026-11-12' THEN
+    RAISE EXCEPTION 'last day: grace ending 00:30 must send on the previous day';
+  END IF;
+  IF public.business_access_reminder_kind(v_end, '2026-11-12 12:00:00+03') IS DISTINCT FROM 'grace_last'
+     OR public.business_access_reminder_kind(v_end, '2026-11-11 12:00:00+03') IS DISTINCT FROM 'grace_start'
+     OR public.business_access_reminder_kind(v_end, '2026-11-10 12:00:00+03') IS DISTINCT FROM 'grace_start'
+     OR public.business_access_reminder_kind(v_end, '2026-11-13 00:10:00+03') IS NOT NULL
+     OR public.business_access_reminder_kind(v_end, '2026-11-09 12:00:00+03') IS DISTINCT FROM 'before_end' THEN
+    RAISE EXCEPTION 'last day: kinds around a 00:30 end';
+  END IF;
+  -- Grace ends 10:30 MSK: that morning is too late, previous day.
+  IF public.business_access_reminder_last_send_day('2026-11-10 10:30:00+03') IS DISTINCT FROM date '2026-11-12' THEN
+    RAISE EXCEPTION 'last day: grace ending 10:30 must send on the previous day';
+  END IF;
+  -- Grace ends 15:00 MSK: the same day's window.
+  v_end := '2026-11-10 15:00:00+03';
+  IF public.business_access_reminder_last_send_day(v_end) IS DISTINCT FROM date '2026-11-13'
+     OR public.business_access_reminder_kind(v_end, '2026-11-13 12:00:00+03') IS DISTINCT FROM 'grace_last'
+     OR public.business_access_reminder_kind(v_end, '2026-11-12 12:00:00+03') IS DISTINCT FROM 'grace_start' THEN
+    RAISE EXCEPTION 'last day: grace ending 15:00 sends the same day';
+  END IF;
+  RAISE NOTICE 'business_access_reminder_window_smoke: ok';
+END $$;
+
+-- Closed window: claim returns nothing. The rest of the smoke runs with the window open
+-- (the function is replaced only inside this rolled-back transaction).
+CREATE OR REPLACE FUNCTION public.business_access_reminder_send_window_open(p_now timestamptz)
+RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$ SELECT false $$;
+
+DO $$
+DECLARE
+  v_user uuid := gen_random_uuid();
+  v_end timestamptz := clock_timestamp() + interval '2 days';
+BEGIN
+  INSERT INTO auth.users (id, email, email_confirmed_at) VALUES (v_user, 'window-closed@example.test', clock_timestamp());
+  INSERT INTO public.access_grants (email_hash, user_id, kind, starts_at, ends_at, source) VALUES
+    (repeat('7', 64), v_user, 'business_new_client', v_end - interval '30 days', v_end, 'trial');
+  IF EXISTS (SELECT 1 FROM public.claim_business_access_reminders(50, 300)) THEN
+    RAISE EXCEPTION 'window: claim must return nothing outside 10:00-20:00 MSK';
+  END IF;
+  DELETE FROM public.access_grants WHERE user_id = v_user;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.business_access_reminder_send_window_open(p_now timestamptz)
+RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$ SELECT true $$;
+
 DO $$
 DECLARE
   v_before uuid := gen_random_uuid();
@@ -246,7 +307,13 @@ BEGIN
   IF (SELECT count(*) FROM public.business_access_renewal_notes) IS DISTINCT FROM 0 THEN
     RAISE EXCEPTION 'the improvement note is not visible to the owner';
   END IF;
+  -- A repeated «Нет» (with and without a note) appends, never deletes.
+  PERFORM public.set_business_access_renewal_choice('no', 'Второй отзыв');
+  PERFORM public.set_business_access_renewal_choice('no', NULL);
   RESET ROLE;
+  IF (SELECT count(*) FROM public.business_access_renewal_notes WHERE user_id = v_no) IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'a repeated no must keep the note history';
+  END IF;
 
   INSERT INTO public.access_paid_periods (email_hash, user_id, kind, paid_until)
   VALUES (repeat('5', 64), v_no, 'business_new_client', v_paid);
@@ -255,6 +322,9 @@ BEGIN
     WHERE user_id = v_no AND answer = 'no'
   ) THEN
     RAISE EXCEPTION 'payment must clear the no';
+  END IF;
+  IF (SELECT count(*) FROM public.business_access_renewal_notes WHERE user_id = v_no) IS DISTINCT FROM 2 THEN
+    RAISE EXCEPTION 'payment must keep the improvement notes';
   END IF;
   SELECT c.reminder_kind, c.period_end INTO v_kind, v_seen
   FROM public.claim_business_access_reminders(50, 300) AS c

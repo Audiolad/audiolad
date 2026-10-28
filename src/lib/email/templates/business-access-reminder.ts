@@ -1,4 +1,4 @@
-import { formatMoscowDateTime } from "@/lib/access-grants/policy";
+import { formatMoscowDateTime, ruDaysWord } from "@/lib/access-grants/policy";
 import {
   BUSINESS_ACCESS_REMINDER_CABINET_URL,
   type BusinessAccessReminderKind,
@@ -21,7 +21,7 @@ import {
 } from "./business-layout";
 
 export const BUSINESS_ACCESS_REMINDER_TEMPLATE_KEY = "business_access_reminder";
-export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v4";
+export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v5";
 
 export const BUSINESS_ACCESS_REMINDER_BUTTON_LABEL = "Продлить доступ";
 
@@ -29,8 +29,8 @@ const PRICE_LINE = `Продление – ${formatBusinessMonthlyPrice()} за 
 
 export const BUSINESS_ACCESS_REMINDER_SUBJECTS = {
   before_end: "АудиоЛад Бизнес – срок доступа подходит к концу",
-  grace_start: "АудиоЛад Бизнес – музыка играет ещё 3 дня",
-  grace_last: "АудиоЛад Бизнес – сегодня последний день отсрочки",
+  grace_start: "АудиоЛад Бизнес – началась отсрочка",
+  grace_last: "АудиоЛад Бизнес – последний день отсрочки",
 } as const satisfies Record<BusinessAccessReminderKind, string>;
 
 export function businessAccessReminderSubject(kind: BusinessAccessReminderKind): string {
@@ -49,10 +49,31 @@ export function businessAccessReminderGraceEndsLabel(periodEndIso: string): stri
   return formatMoscowDateTime(new Date(endMs + BUSINESS_GRACE_MS));
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Whole days of grace left at send time, rounded to the nearest day (min 1).
+ * An on-time grace_start says 3; a letter sent a day late says 2.
+ * The exact end time is always printed next to it.
+ */
+export function businessAccessReminderGraceDaysLeft(periodEndIso: string, now: Date): number | null {
+  const endMs = Date.parse(periodEndIso);
+  if (!Number.isFinite(endMs)) return null;
+  const left = endMs + BUSINESS_GRACE_MS - now.getTime();
+  if (left <= 0) return 0;
+  return Math.max(1, Math.round(left / DAY_MS));
+}
+
+export function businessAccessReminderGraceDaysPhrase(days: number): string {
+  return `${days} ${ruDaysWord(days)}`;
+}
+
 export function businessAccessReminderParagraphs(input: {
   kind: BusinessAccessReminderKind;
   endsAtLabel: string;
   graceEndsLabel: string;
+  /** Real grace days left at send time; defaults to the full 3. */
+  graceDaysLeft?: number;
 }): string[] {
   const hello = "Здравствуйте!";
   const closing = `Команда ${BUSINESS_EMAIL_SENDER_NAME}`;
@@ -67,14 +88,14 @@ export function businessAccessReminderParagraphs(input: {
   if (input.kind === "grace_start") {
     return [
       hello,
-      `Срок доступа к АудиоЛад Бизнес закончился ${input.endsAtLabel}. Музыка в зале играет ещё 3 дня – до ${input.graceEndsLabel}.`,
+      `Срок доступа к АудиоЛад Бизнес закончился ${input.endsAtLabel}. Музыка в зале играет ещё ${businessAccessReminderGraceDaysPhrase(Math.max(1, input.graceDaysLeft ?? 3))} – до ${input.graceEndsLabel}.`,
       PRICE_LINE,
       closing,
     ];
   }
   return [
     hello,
-    `Сегодня последний день отсрочки: музыка в АудиоЛад Бизнес играет до ${input.graceEndsLabel}. Кабинет и настройки сохранятся.`,
+    `Последний день отсрочки: музыка в АудиоЛад Бизнес играет до ${input.graceEndsLabel}. Кабинет и настройки сохранятся.`,
     PRICE_LINE,
     closing,
   ];
@@ -84,6 +105,7 @@ export function renderBusinessAccessReminderEmailText(input: {
   kind: BusinessAccessReminderKind;
   endsAtLabel: string;
   graceEndsLabel: string;
+  graceDaysLeft?: number;
 }): string {
   const paragraphs = businessAccessReminderParagraphs(input);
   const [hello, body, price, closing] = paragraphs;
@@ -108,6 +130,7 @@ export function renderBusinessAccessReminderEmailHtml(input: {
   kind: BusinessAccessReminderKind;
   endsAtLabel: string;
   graceEndsLabel: string;
+  graceDaysLeft?: number;
 }): string {
   const paragraphs = businessAccessReminderParagraphs(input);
   const [hello, body, price, closing] = paragraphs;
