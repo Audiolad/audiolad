@@ -10,18 +10,23 @@ import type { SoundReviewRow } from '../src/lib/business/track-sound-review';
 const moduleLoader = createRequire(import.meta.url);
 const actionsPath = moduleLoader.resolve('../src/app/(platform)/admin/business-track-review/actions.ts');
 const saves: unknown[] = [];
+const previews: string[] = [];
+let reviewImpl: (input: unknown) => Promise<{ ok: boolean; message: string }> = async (input) => {
+  saves.push(input);
+  return { ok: true, message: 'Решение сохранено.' };
+};
 moduleLoader.cache[actionsPath] = {
   id: actionsPath, filename: actionsPath, loaded: true,
   exports: {
-    previewBusinessTrack: async (id: string) => ({ ok: true, url: `https://audio.invalid/${id}` }),
-    reviewBusinessTrack: async (input: unknown) => { saves.push(input); return { ok: true, message: 'Решение сохранено.' }; },
+    previewBusinessTrack: async (id: string) => { previews.push(id); return { ok: true, url: `https://audio.invalid/${id}` }; },
+    reviewBusinessTrack: async (input: unknown) => reviewImpl(input),
     businessTrackReviewHistory: async () => [{ id: 1, old_status: 'unchecked', new_status: 'rejected', changed_at: '2026-10-27T12:00:00Z', reason: 'Внутренняя причина', changed_by: 'admin', event: 'manual' }],
   },
 } as NodeModule;
 const { default: ReviewQueue } = await import('../src/app/(platform)/admin/business-track-review/ReviewQueue');
 const router = { bfcacheId: '', back() {}, forward() {}, refresh() {}, push() {}, replace() {}, prefetch: async () => {} };
-const rows: SoundReviewRow[] = ['a', 'b'].map((id) => ({ id, title: `Track ${id}`, artist: 'Artist', artist_id: 'artist', album: 'Album', album_id: 'album',
-  duration_seconds: 120, spaces: ['cafe'], status: 'unchecked', reason: null, reviewed_at: null, reviewed_by: null, audio_identity: '["file.mp3",null,null]' }));
+const rows: SoundReviewRow[] = ['a', 'b', 'c'].map((id) => ({ id, title: `Track ${id}`, artist: 'Artist', artist_id: 'artist', album: 'Album', album_id: 'album',
+  duration_seconds: 120, spaces: ['cafe'], status: 'unchecked', reason: null, reviewed_at: null, reviewed_by: null, audio_identity: `["${id}.mp3",null,null]` }));
 const container = document.createElement('div');
 document.body.appendChild(container);
 const root = createRoot(container);
@@ -38,7 +43,7 @@ function props(element: Element) {
 }
 function button(label: string) { return elements().find((el) => el.tagName === 'BUTTON' && text(el) === label)!; }
 async function click(label: string) { await act(async () => (props(button(label)).onClick as () => void)()); }
-assert.equal(elements().filter((el) => el.tagName === 'SELECT' && props(el).name === 'status').length, 2);
+assert.equal(elements().filter((el) => el.tagName === 'SELECT' && props(el).name === 'status').length, 3);
 assert.equal(elements().filter((el) => el.tagName === 'INPUT' && props(el).type === 'checkbox').length, 1, 'only navigation toggle, no status checkboxes');
 await click('Прослушать');
 let audio = elements().find((el) => el.tagName === 'AUDIO')!;
@@ -63,5 +68,59 @@ assert.deepEqual(saves, [{ id: 'a', status: 'rejected', reason: 'Шум', audioI
 assert.match(text(container), /Решение сохранено/);
 await click('История');
 assert.match(text(container), /Внутренняя причина/);
+
+function field(label: string) {
+  return elements().find((el) => el.tagName === 'INPUT' && props(el)['aria-label'] === label)!;
+}
+function rowStatus(title: string) {
+  const select = elements().find((el) => el.tagName === 'SELECT' && props(el)['aria-label'] === `Статус: ${title}`)!;
+  return props(select).defaultValue;
+}
+function playingStatus() {
+  return elements().find((el) => el.tagName === 'B' && props(el)['data-sound-status'])?.getAttribute('data-sound-status');
+}
+const playerReason = field('Причина текущего трека: Track b');
+await act(async () => (props(playerReason).onChange as (event: unknown) => void)({ target: { value: 'Шипение' } }));
+const beforeFailure = previews.length;
+reviewImpl = async () => ({ ok: false, message: 'Аудиофайл заменён. Обновите очередь и прослушайте новую версию.' });
+await click('Не допущен');
+assert.match(text(container), /Аудиофайл заменён/);
+assert.equal(playingStatus(), 'unchecked');
+assert.equal(rowStatus('Track b'), 'unchecked');
+assert.equal(previews.length, beforeFailure, 'failed save does not load the next track');
+assert.equal(elements().some((el) => el.tagName === 'AUDIO'), false);
+reviewImpl = async () => { throw new Error('rpc down'); };
+await click('Допущен');
+assert.match(text(container), /Решение не сохранено\. Повторите попытку\./);
+assert.equal(playingStatus(), 'unchecked');
+assert.equal(previews.length, beforeFailure, 'thrown save does not advance');
+reviewImpl = async (input) => { saves.push(input); return { ok: true, message: 'Решение сохранено.' }; };
+await click('Допущен');
+assert.deepEqual(saves.at(-1), { id: 'b', status: 'approved', reason: 'Шипение', audioIdentity: rows[1].audio_identity });
+assert.equal(rowStatus('Track b'), 'approved');
+audio = elements().find((el) => el.tagName === 'AUDIO')!;
+assert.equal(props(audio).src, 'https://audio.invalid/c');
+assert.equal(props(audio).autoPlay, true);
+assert.equal(playingStatus(), 'unchecked');
+assert.match(text(container), /Решение сохранено/);
+const stayed = previews.length;
+const box = elements().find((el) => el.tagName === 'INPUT' && props(el).type === 'checkbox')!;
+await act(async () => (props(box).onChange as (event: unknown) => void)({ target: { checked: false } }));
+await click('Не проверен');
+assert.deepEqual(saves.at(-1), { id: 'c', status: 'unchecked', reason: '', audioIdentity: rows[2].audio_identity });
+assert.equal(previews.length, stayed, 'checkbox off does not load another track');
+assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c');
+assert.equal(playingStatus(), 'unchecked');
+const reasonInput = field('Причина текущего трека: Track c');
+const ignored = new Event('keydown', { bubbles: true });
+(ignored as Event & { key: string }).key = '2';
+await act(async () => reasonInput.dispatchEvent(ignored));
+assert.equal(saves.length, 3, 'shortcut ignored while typing the reason');
+const shortcut = new Event('keydown', { bubbles: true });
+(shortcut as Event & { key: string }).key = '2';
+await act(async () => container.dispatchEvent(shortcut));
+assert.deepEqual(saves.at(-1), { id: 'c', status: 'rejected', reason: '', audioIdentity: rows[2].audio_identity });
+assert.equal(rowStatus('Track c'), 'rejected');
+assert.equal(props(elements().find((el) => el.tagName === 'AUDIO')!).src, 'https://audio.invalid/c', 'no further unchecked track, playback stays');
 await act(async () => root.unmount());
-console.log('business-track-sound-review-mounted-unit: PASS (real React: statuses, stream switching, seek/fragment stop, save, history)');
+console.log('business-track-sound-review-mounted-unit: PASS (real React: statuses, stream switching, seek/fragment stop, save, history, player save-and-advance)');
