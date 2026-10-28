@@ -92,4 +92,22 @@ const shell = readFileSync(new URL("../src/components/business-app/BusinessAppSh
 assert.match(shell, /BusinessEntrySwitcher/);
 assert.doesNotMatch(shell, /href="\/settings"/);
 
+const switcher = readFileSync(new URL("../src/components/business-app/BusinessEntrySwitcher.tsx", import.meta.url), "utf8");
+assert.match(switcher, /aria-haspopup="listbox"/);
+assert.match(switcher, /aria-expanded=\{open\}/);
+assert.match(switcher, /role="listbox"/);
+assert.match(switcher, /role="option"/);
+assert.match(switcher, /aria-selected=\{option\.selected\}/);
+assert.match(switcher, /case "Escape"/);
+assert.match(switcher, /addEventListener\("pointerdown"/);
+assert.match(switcher, /setEntry\("person"\)/);
+assert.match(switcher, /if \(!point\) setEntry\("venue"\)/);
+assert.match(switcher, /Войдите со своего телефона/);
+assert.doesNotMatch(switcher, /business-sound-chip/);
+assert.doesNotMatch(switcher, /\u2014/);
+const bizCss = readFileSync(new URL("../src/components/business-app/business-app.css", import.meta.url), "utf8");
+assert.match(bizCss, /\.business-entry-switcher__value \{[^}]*text-overflow: ellipsis/);
+assert.match(bizCss, /\.business-entry-switcher__option-label \{[^}]*white-space: normal/);
+assert.match(bizCss, /\.business-entry-switcher__menu \{[^}]*max-width: min\(20rem, calc\(100vw - 1\.5rem\)\)/);
+
 console.log("business-owner-point-ui-unit: ok");
