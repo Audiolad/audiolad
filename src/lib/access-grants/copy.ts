@@ -12,6 +12,10 @@ import { BUSINESS_PLAN_PERIOD_LABEL } from "@/lib/business/plan";
 /** Unified phrase for the landing, registration and cabinet (task 1e008ee8). */
 export const BUSINESS_GIFT_TITLE = "30 дней в подарок";
 
+/** Owner wording, 2026-10-28: the 30 gift days include the venue's music rights and licence. */
+export const BUSINESS_GIFT_LICENSE_NOTE =
+  "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.";
+
 /** Guest demo CTA (task ba344b7f). Visible before and after the 30-minute limit. */
 export const BUSINESS_GIFT_CTA = "Получить 30 дней бесплатно";
 

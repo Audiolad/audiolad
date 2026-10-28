@@ -6,9 +6,13 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
+import BusinessVenueLicenceSection from "../src/components/business-app/BusinessVenueLicenceSection";
+import { BUSINESS_GIFT_LICENSE_NOTE } from "../src/lib/access-grants/copy";
+import { peekChromeAccessWith, type PeekReader } from "../src/lib/access-grants/peek-closure";
+import { resolveBusinessInternalPath } from "../src/lib/business-app/host";
 import BusinessHomeAccessCard from "../src/components/business-app/BusinessHomeAccessCard";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
-import { resolveCustomerAccess } from "../src/lib/access-grants/policy";
+import { formatMoscowDateTime, resolveCustomerAccess } from "../src/lib/access-grants/policy";
 import { resolvePublicPerformanceLicence } from "../src/lib/access-grants/public-performance-licence";
 import {
   BUSINESS_LICENCE_ACCESS_RULE,
@@ -148,10 +152,10 @@ const norm = (value: string) => value.replace(/\*\*/g, "").replace(/[.;]+$/u, ""
 const plainTerms = norm(terms);
 for (const quote of quotes) {
   assert.equal(plainTerms.includes(norm(quote)), true, quote);
-  assert.doesNotMatch(quote, /—|https?:/);
+  assert.doesNotMatch(quote, /\u2014|https?:/);
 }
 
-const migration = readFileSync("supabase/migrations/20270206130000_business_location_venue_address.sql", "utf8");
+const migration = readFileSync("supabase/migrations/20270207160000_business_location_venue_address.sql", "utf8");
 assert.match(migration, /business_owner_set_location_venue/);
 assert.match(migration, /address_line1/);
 assert.doesNotMatch(migration, /ADD COLUMN/i);
@@ -186,12 +190,17 @@ const withAddress = renderToStaticMarkup(
     </BusinessChromeAccessProvider>
   </BusinessDomainProvider>,
 );
-assert.match(withAddress, /data-testid="biz-home-licence"/);
-assert.match(withAddress, /Пробный и пилотный доступ/);
+const expectedGiftNote = "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.";
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, expectedGiftNote);
+assert.equal((withAddress.match(/data-testid="biz-home-license"/g) ?? []).length, 1);
+assert.ok(withAddress.includes(`data-testid="biz-home-license">${expectedGiftNote}</p>`));
+assert.match(withAddress, /data-testid="biz-home-rules">[^<]*<\/p><p[^>]*data-testid="biz-home-license"/);
+assert.doesNotMatch(withAddress, /biz-home-licence|безвозмездная лицензия|лицензионное вознаграждение/);
+assert.doesNotMatch(readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8"), /businessLicenceCardLine/);
 assert.match(withAddress, /data-testid="biz-home-venue"/);
 assert.match(withAddress, /Кофейня – ул\. Примерная, 1/);
 assert.doesNotMatch(withAddress, /biz-home-venue-missing/);
-assert.doesNotMatch(withAddress, /—/);
+assert.doesNotMatch(withAddress, /\u2014/);
 
 const missing = renderToStaticMarkup(
   <BusinessDomainProvider value={{ ...domain, location: { ...domain.location!, addressLine1: null } }}>
@@ -204,4 +213,68 @@ assert.match(missing, /data-testid="biz-home-venue-missing"/);
 assert.match(missing, /href="\/preferences#venue"/);
 assert.match(missing, /Указать адрес/);
 
-console.log("business-public-performance-licence-unit: ok");
+for (const mode of ["paid", "grace", "offer"] as const) {
+  const html = renderToStaticMarkup(
+    <BusinessDomainProvider value={domain}>
+      <BusinessChromeAccessProvider value={{ mode, endsAt: GIFT_END, startsAt: GIFT_START, graceEndsAt: PAID_UNTIL }}>
+        <BusinessHomeAccessCard />
+      </BusinessChromeAccessProvider>
+    </BusinessDomainProvider>,
+  );
+  assert.doesNotMatch(html, /biz-home-licen[cs]e|безвозмездная лицензия|лицензионное вознаграждение/);
+  assert.match(html, /Кофейня – ул\. Примерная, 1/);
+}
+const noPoint = renderToStaticMarkup(
+  <BusinessDomainProvider value={{ ...domain, location: null }}>
+    <BusinessChromeAccessProvider value={{ mode: "trial", endsAt: GIFT_END, startsAt: GIFT_START }}>
+      <BusinessHomeAccessCard />
+    </BusinessChromeAccessProvider>
+  </BusinessDomainProvider>,
+);
+assert.match(noPoint, /Укажите адрес точки\./);
+assert.match(noPoint, /href="\/onboarding"/);
+
+const documents = readFileSync("src/app/business-app/documents/page.tsx", "utf8");
+assert.match(documents, /<Link href="\/documents#licence"[^>]*>\s*Лицензия точки\s*<\/Link>/);
+assert.match(documents, /startsAt: access\.startsAt/);
+assert.match(documents, /venueName=\{location\?\.name/);
+assert.match(documents, /addressLine1=\{location\?\.addressLine1/);
+const licenceHtml = renderToStaticMarkup(
+  <BusinessVenueLicenceSection licence={paidLicence} venueName="Кофейня" addressLine1="ул. Примерная, 1" canEdit />,
+);
+assert.match(licenceHtml, /<section id="licence"/);
+assert.match(licenceHtml, /Лицензия точки/);
+assert.match(licenceHtml, /Кофейня – ул\. Примерная, 1/);
+assert.ok(licenceHtml.includes(`С ${formatMoscowDateTime(new Date(GIFT_START))}`));
+assert.doesNotMatch(licenceHtml, /\u2014|https?:/);
+assert.equal(resolveBusinessInternalPath("/preferences"), "/business-app/settings");
+assert.match(readFileSync("src/app/business-app/settings/page.tsx", "utf8"), /<BusinessVenuePlaceForm/);
+assert.match(readFileSync("src/components/business-app/BusinessVenuePlaceForm.tsx", "utf8"), /id="venue"/);
+const bootstrap = readFileSync("src/components/business-app/BusinessDomainBootstrapForm.tsx", "utf8");
+assert.match(bootstrap, /name="addressLine1"\s+required/);
+assert.match(bootstrap, /addressLine1: String\(formData\.get\("addressLine1"\)/);
+const wizard = readFileSync("src/components/business-app/BusinessOnboardingWizardPage.tsx", "utf8");
+assert.match(wizard, /id="onboarding-address"[\s\S]*?value=\{addressLine1\}/);
+assert.match(wizard, /validateBusinessOnboardingConfirm\(\{[\s\S]*?addressLine1/);
+const actions = readFileSync("src/app/business-app/actions.ts", "utf8");
+assert.match(actions, /p_location_name: place\.value\.name/);
+assert.match(actions, /p_address_line1: place\.value\.addressLine1/);
+assert.match(migration, /SET address_line1 = v_address/);
+assert.match(readFileSync("src/lib/access-grants/peek.server.ts", "utf8"), /startsAt: row\.starts_at/);
+assert.match(readFileSync("src/lib/business-workspace/load.server.ts", "utf8"), /licenceStartsAt: activation\.access\.licenceStartsAt/);
+
+void (async () => {
+  const reader: PeekReader = {
+    async edges() { return []; },
+    async grants() { return [grant]; },
+    async paidStamps() { return [PAID_UNTIL]; },
+  };
+  const chrome = await peekChromeAccessWith(reader, { userId: grant.userId, emailHash: grant.emailHash }, new Date("2026-12-01T00:00:00Z"));
+  assert.equal(chrome.mode, "paid");
+  assert.equal(chrome.startsAt, GIFT_START, "chrome preserves registration start after payment");
+  assert.equal(chrome.endsAt, PAID_UNTIL);
+  console.log("business-public-performance-licence-unit: ok");
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -47,7 +47,7 @@ export function businessLicenceStatusLabel(status: keyof typeof STATUS_LABEL): s
   return STATUS_LABEL[status];
 }
 
-/** One short line on the access card. Wording is the matching sentence from пункт 4. */
+/** Documents status line. Wording is the matching sentence from пункт 4. */
 export function businessLicenceCardLine(status: keyof typeof STATUS_LABEL): string {
   if (status === "paid") return BUSINESS_LICENCE_PAID_RULE;
   if (status === "grace") return BUSINESS_LICENCE_ACCESS_RULE;

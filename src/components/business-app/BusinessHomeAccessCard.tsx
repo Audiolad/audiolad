@@ -7,17 +7,15 @@ import { useBusinessChromeAccess } from "@/components/business-app/BusinessAcces
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   BUSINESS_GIFT_TITLE,
+  BUSINESS_GIFT_LICENSE_NOTE,
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftRulesText,
 } from "@/lib/access-grants/copy";
-import type { BusinessChromeAccess } from "@/lib/access-grants/access-line";
-import { resolvePublicPerformanceLicence } from "@/lib/access-grants/public-performance-licence";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import {
   BUSINESS_VENUE_ADDRESS_LINK,
   BUSINESS_VENUE_ADDRESS_MISSING,
   BUSINESS_VENUE_ADDRESS_PROMPT,
-  businessLicenceCardLine,
 } from "@/lib/business-app/licensing-copy";
 import { venuePlaceLine } from "@/lib/business-app/venue-place";
 import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
@@ -51,7 +49,7 @@ export default function BusinessHomeAccessCard() {
   }
 
   const label = formatMoscowDateTime(new Date(access.endsAt));
-  const licenceLines = <BusinessAccessLicenceLines access={access} />;
+  const venueLines = <BusinessAccessVenueLines />;
   const pay = (
     <BusinessPayControls
       canPay={canPay}
@@ -126,7 +124,7 @@ export default function BusinessHomeAccessCard() {
         <p data-testid="biz-home-grace">
           Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {label}.
         </p>
-        {licenceLines}
+        {venueLines}
         {pay}
       </section>
     );
@@ -136,7 +134,7 @@ export default function BusinessHomeAccessCard() {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="paid">
         <p data-testid="biz-home-paid-until">Подписка до {label}</p>
-        {licenceLines}
+        {venueLines}
         {pay}
       </section>
     );
@@ -148,7 +146,7 @@ export default function BusinessHomeAccessCard() {
         <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Подписка {formatBusinessMonthlyPrice()} за 30 дней</h2>
         <p data-testid="biz-home-ended">Подарочный период закончился {label}.</p>
         <p>{BUSINESS_SUBSCRIPTION_NOTE}</p>
-        {licenceLines}
+        {venueLines}
         {pay}
       </section>
     );
@@ -163,32 +161,21 @@ export default function BusinessHomeAccessCard() {
         <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-home-until">до {label}</span>
       </p>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{businessGiftRulesText()}</p>
-      {licenceLines}
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-license">{BUSINESS_GIFT_LICENSE_NOTE}</p>
+      {venueLines}
       {pay}
     </section>
   );
 }
 
-function BusinessAccessLicenceLines({ access }: { access: BusinessChromeAccess }) {
+function BusinessAccessVenueLines() {
   const domain = useBusinessDomain();
   const location = domain.status === "authenticated" ? domain.location : null;
-  const licence = resolvePublicPerformanceLicence({
-    mode: access.mode,
-    startsAt: access.startsAt,
-    endsAt: access.endsAt,
-    playbackUntil: access.graceEndsAt,
-    sectorLabel: location?.businessCategory,
-  });
   const place = venuePlaceLine(location?.name, location?.addressLine1);
   const canEdit = domain.status === "authenticated" && domain.canPay;
   const addressHref = location ? "/preferences#venue" : "/onboarding";
   return (
-    <div className="space-y-2" data-testid="biz-home-licence-block">
-      {licence ? (
-        <p className="text-sm leading-6 text-[var(--biz-text)]" data-testid="biz-home-licence">
-          {businessLicenceCardLine(licence.status)}
-        </p>
-      ) : null}
+    <div className="space-y-2" data-testid="biz-home-venue-block">
       {place ? (
         <p className="text-sm leading-6 text-[var(--biz-text)]" data-testid="biz-home-venue">{place}</p>
       ) : canEdit || !location ? (

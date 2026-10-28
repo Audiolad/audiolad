@@ -55,6 +55,11 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           Правообладатели треков указываются по данным реестра прав сервиса в отчёте «Что играло в заведении».
         </p>
         <ul className="mt-4 flex flex-col gap-3">
+          <li>
+            <Link href="/documents#licence" className="block rounded-lg border border-[var(--biz-border)] p-3 font-semibold text-[var(--biz-text)] hover:border-[var(--biz-accent)]">
+              Лицензия точки
+            </Link>
+          </li>
           {CLIENT_DOCUMENTS.map((doc) => (
             <li key={doc.id} data-doc-id={doc.id}>
               <a

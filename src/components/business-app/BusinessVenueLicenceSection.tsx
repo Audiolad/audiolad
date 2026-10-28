@@ -38,7 +38,7 @@ export default function BusinessVenueLicenceSection({
   const end = moscowLabel(licence?.endsAt ?? null);
   const addressHref = venueName ? "/preferences#venue" : "/onboarding";
   return (
-    <section className="business-app-card" data-testid="venue-licence-section" aria-labelledby="venue-licence-title">
+    <section id="licence" className="business-app-card" data-testid="venue-licence-section" aria-labelledby="venue-licence-title">
       <h2 id="venue-licence-title" className="text-[1.2rem] font-bold text-[var(--biz-text)]">
         Лицензия точки
       </h2>

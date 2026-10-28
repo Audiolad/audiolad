@@ -23,7 +23,7 @@ The public-performance licence for that permitted repertoire starts at `access_g
 
 ## Venue address
 
-Columns `business_locations.name` and `business_locations.address_line1` already exist. Migration `supabase/migrations/20270206130000_business_location_venue_address.sql` is additive: a 6-argument overload of `create_business_organization_with_location` and `business_owner_set_location_venue`. It adds no column. It is not applied by this change. Apply it only after a separate owner confirmation, and deploy the app only after the migration, because onboarding and «Настройка» write the address through those functions.
+Columns `business_locations.name` and `business_locations.address_line1` already exist. Migration `supabase/migrations/20270207160000_business_location_venue_address.sql` is additive: a 6-argument overload of `create_business_organization_with_location` and `business_owner_set_location_venue`. It adds no column. It is not applied by this change. Apply it only after a separate owner confirmation, and deploy the app only after the migration, because onboarding and «Настройка» write the address through those functions.
 
 ## Return after email confirmation
 
