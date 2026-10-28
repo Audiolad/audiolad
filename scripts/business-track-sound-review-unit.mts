@@ -95,6 +95,12 @@ assert.match(ui, /onSeeked/);
 assert.match(ui, /currentTime >= end.current/);
 assert.match(ui, /value=\{15\}/);
 assert.match(ui, /value=\{30\}/);
+assert.match(ui, /\.play\(\)/);
+assert.match(ui, /startsWith\('data:'\)/);
+assert.doesNotMatch(ui, /startsWith\('http'\)/);
+assert.doesNotMatch(ui, /Перемотайте к нужному месту/);
+assert.doesNotMatch(ui, /клавиши не срабатывают/);
+assert.doesNotMatch(ui, /Причина текущего трека/);
 assert.doesNotMatch(ui, /—/);
 for (const path of ['src/lib/business-workspace/sign.server.ts', 'src/lib/business-app/spa-pilot.ts']) {
   assert.match(read(path), /resolve_business_track_eligibility/);

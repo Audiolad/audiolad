@@ -6,6 +6,9 @@ import { SOUND_REVIEW_LABELS, SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUn
 import { soundReviewBulkConfirm, soundReviewSelectionCount, type SoundReviewQueueScope, type SoundReviewSelection } from '@/lib/business/track-sound-bulk';
 import { businessTrackReviewHistory, previewBusinessTrack, reviewBusinessTrack, reviewBusinessTracksBulk } from './actions';
 
+/** One silent sample. play() on it runs inside the click, before the preview URL exists. */
+const REVIEW_PLAYER_PRIME = 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA';
+
 const colors = { unchecked: 'text-neutral-600', approved: 'text-green-700', rejected: 'text-red-700' };
 const date = (value: string | null) => value ? new Date(value).toLocaleString('ru-RU') : '–';
 const duration = (seconds: number | null) => seconds == null ? '–' : `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
@@ -31,9 +34,17 @@ function isTypingTarget(target: EventTarget | null) {
   return type !== 'checkbox' && type !== 'radio' && type !== 'button' && type !== 'submit';
 }
 
+function gesturePlay(audio: HTMLAudioElement | null, url?: string) {
+  if (!audio || typeof audio.play !== 'function') return;
+  if (url) audio.src = url;
+  else if (!audio.src) audio.src = REVIEW_PLAYER_PRIME;
+  const pending = audio.play();
+  if (pending && typeof pending.catch === 'function') void pending.catch(() => {});
+}
+
 function decisionClass(status: SoundReviewStatus, pressed: boolean) {
-  const base = 'min-h-11 min-w-[8.75rem] max-w-full flex-1 rounded-md px-4 py-3 text-base font-semibold disabled:opacity-60 sm:flex-none sm:px-8';
-  const ring = pressed ? 'ring-2 ring-offset-2 ring-[#25135c]' : '';
+  const base = 'inline-flex h-8 items-center rounded-md px-2.5 text-sm font-semibold disabled:opacity-60';
+  const ring = pressed ? 'ring-2 ring-offset-1 ring-[#25135c]' : '';
   if (status === 'approved') return `${base} bg-green-700 text-white ${ring}`;
   if (status === 'rejected') return `${base} border border-red-700 bg-white text-red-700 ${ring}`;
   return `${base} border border-neutral-400 bg-white text-neutral-800 ${ring}`;
@@ -58,36 +69,51 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
   const [bulkStatus, setBulkStatus] = useState<SoundReviewStatus>('approved');
   const [bulkReason, setBulkReason] = useState('');
   const selectedCount = soundReviewSelectionCount(selection, queueScope);
-  const [reason, setReason] = useState(view[0]?.reason ?? '');
-  const [reasonKey, setReasonKey] = useState(view[0] ? `${view[0].id}:${view[0].audio_identity}` : '');
   const end = useRef(30);
   const request = useRef(0);
   const saving = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const readyRef = useRef(new Map<string, string>());
   const current = view.find((row) => row.id === active) ?? view[0];
-  const trackKey = current ? `${current.id}:${current.audio_identity}` : '';
-  if (reasonKey !== trackKey) {
-    setReasonKey(trackKey);
-    setReason(current?.reason ?? '');
-  }
+  const audible = Boolean(current && source && source.url && !source.url.startsWith('data:') && source.id === current.id && source.identity === current.audio_identity);
 
   function say(text: string, error = false) {
     setMessage(text);
     setMessageError(error);
   }
 
-  function listen(row: SoundReviewRow, note = '') {
+  function listen(row: SoundReviewRow, note = '', gesture = false) {
     setActive(row.id);
-    setSource(null);
-    say('Получаем ссылку для прослушивания…');
+    const key = `${row.id}:${row.audio_identity}`;
     const token = ++request.current;
+    const cached = readyRef.current.get(key);
+    const audio = audioRef.current;
+    if (cached) {
+      gesturePlay(audio, cached);
+      setSource({ id: row.id, identity: row.audio_identity, url: cached });
+      say(note);
+      return;
+    }
+    // The signed URL arrives after this click. play() has to start in the gesture itself.
+    if (gesture) {
+      gesturePlay(audio);
+      setSource({ id: row.id, identity: row.audio_identity, url: REVIEW_PLAYER_PRIME });
+    }
+    say(note || 'Получаем ссылку для прослушивания…');
     startTransition(async () => {
       try {
         const result = await previewBusinessTrack(row.id, row.audio_identity);
         if (token !== request.current) return;
         if (result.ok) {
+          readyRef.current.set(key, result.url);
+          gesturePlay(audioRef.current, result.url);
           setSource({ id: row.id, identity: row.audio_identity, url: result.url });
           say(note);
-        } else say('Аудио недоступно или заменено. Обновите очередь и повторите попытку.', true);
+        } else {
+          if (typeof audioRef.current?.pause === 'function') audioRef.current.pause();
+          setSource(null);
+          say('Аудио недоступно или заменено. Обновите очередь и повторите попытку.', true);
+        }
       } catch { say('Не удалось начать прослушивание. Повторите попытку.', true); }
     });
   }
@@ -99,18 +125,18 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
     return projectRows(rows, nextSaved);
   }
 
-  function decide(row: SoundReviewRow, status: SoundReviewStatus, reasonText: string) {
+  function decide(row: SoundReviewRow, status: SoundReviewStatus) {
     if (saving.current) return;
     saving.current = true;
     const identity = row.audio_identity;
     startTransition(async () => {
       try {
-        const result = await reviewBusinessTrack({ id: row.id, status, reason: reasonText, audioIdentity: identity });
+        const result = await reviewBusinessTrack({ id: row.id, status, reason: '', audioIdentity: identity });
         if (!result.ok) {
           say(result.message, true);
           return;
         }
-        const projected = remember(row, status, reasonText);
+        const projected = remember(row, status, '');
         setHistory((open) => open?.id === row.id ? null : open);
         router.refresh();
         if (!autoNext) {
@@ -133,12 +159,10 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
 
   const decideRef = useRef(decide);
   const currentRef = useRef(current);
-  const reasonRef = useRef(reason);
   useEffect(() => {
     decideRef.current = decide;
     currentRef.current = current;
-    reasonRef.current = reason;
-  }, [decide, current, reason]);
+  }, [decide, current]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -148,7 +172,7 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
       const row = currentRef.current;
       if (!status || !row) return;
       event.preventDefault();
-      decideRef.current(row, status, reasonRef.current);
+      decideRef.current(row, status);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -222,38 +246,37 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
         {PLAYER_DECISIONS.map((status) => <button
           key={status} type="button" disabled={pending} aria-pressed={current.status === status}
           className={decisionClass(status, current.status === status)}
-          onClick={() => decide(current, status, reason)}
+          onClick={() => decide(current, status)}
         >{SOUND_REVIEW_LABELS[status]}</button>)}
       </div>
-      <input
-        aria-label={`Причина текущего трека: ${current.title}`}
-        placeholder="Причина (необязательно)"
-        maxLength={2000}
-        value={reason}
-        onChange={(event) => setReason(event.target.value)}
-        className="w-full max-w-full rounded border p-2"
-      />
       <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-2">
         <label>Фрагмент <select value={fragment} onChange={(e) => setFragment(Number(e.target.value))}>
           <option value={15}>15 с</option><option value={30}>30 с</option>
         </select></label>
-        <button type="button" disabled={pending} className="underline" onClick={() => listen(current)}>Прослушать</button>
+        <button type="button" disabled={pending} aria-label="Прослушать" className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#25135c] px-3 text-sm font-semibold text-white disabled:opacity-60" onClick={() => listen(current, '', true)}><svg aria-hidden="true" viewBox="0 0 12 12" className="h-3 w-3 fill-current"><path d="M2.2 1.1v9.8L10.8 6 2.2 1.1z" /></svg>Прослушать</button>
         <button type="button" disabled={pending || !nextUnchecked(view, current.id)} className="underline" onClick={() => {
           const next = view.find((row) => row.id === nextUnchecked(view, current.id));
-          if (next) listen(next);
+          if (next) listen(next, '', true);
         }}>Следующий непроверенный</button>
         <label className="max-w-full"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} /> Перейти к следующему после решения</label>
       </div>
-      {source?.id === current.id && source.identity === current.audio_identity && <audio
-        key={`${source.id}:${source.identity}:${source.url}`} src={source.url} controls autoPlay preload="metadata"
-        controlsList="nodownload" aria-label={`Прослушивание: ${current.title}`} className="w-full max-w-full"
+      <audio
+        ref={audioRef}
+        src={source?.id === current.id && source.identity === current.audio_identity ? source.url : undefined}
+        controls={audible}
+        autoPlay={audible}
+        preload="metadata"
+        controlsList="nodownload"
+        aria-label={`Прослушивание: ${current.title}`}
+        className={audible ? 'w-full max-w-full' : 'sr-only'}
         onPlay={(e) => { end.current = e.currentTarget.currentTime + fragment; }}
         onSeeked={(e) => { end.current = e.currentTarget.currentTime + fragment; }}
         onTimeUpdate={(e) => { if (e.currentTarget.currentTime >= end.current) e.currentTarget.pause(); }}
-        onError={() => say('Ссылка истекла или аудио недоступно. Нажмите «Прослушать» ещё раз.', true)}
-      />}
-      <p className="text-sm text-neutral-600">Перемотайте к нужному месту. Плеер остановится через выбранные 15–30 с.</p>
-      <p className="text-sm text-neutral-600">1 – допущен, 2 – не допущен, 3 – не проверен. При вводе причины клавиши не срабатывают.</p>
+        onError={() => {
+          if ((audioRef.current?.src ?? '').startsWith('data:')) return;
+          say('Ссылка истекла или аудио недоступно. Нажмите «Прослушать» ещё раз.', true);
+        }}
+      />
     </div>}
     <div className="flex max-w-full flex-wrap items-center gap-2 rounded border p-3">
       <p>Выбрано: {selectedCount}</p>
@@ -271,7 +294,7 @@ export default function ReviewQueue({ rows, scope }: { rows: SoundReviewRow[]; s
       <tbody>{view.map((row) => <tr key={`${row.id}:${row.status}:${row.reason ?? ''}:${row.audio_identity}`} className={row.id === current?.id ? 'bg-violet-50' : ''}>
         <td className="p-2"><input type="checkbox" aria-label={`Выбрать ${row.title}`} checked={rowChecked(row.id)} disabled={pending} onChange={(event) => toggleRow(row.id, event.target.checked)} /></td>
         <td className="p-2">{row.artist}</td><td className="p-2">{row.album}</td>
-        <td className="p-2"><button type="button" disabled={pending} className="text-left underline" onClick={() => listen(row)}>{row.title}</button></td>
+        <td className="p-2"><button type="button" disabled={pending} className="text-left underline" onClick={() => listen(row, '', true)}>{row.title}</button></td>
         <td>{duration(row.duration_seconds)}</td>
         <td className="p-2"><p className={colors[row.sound_auto && row.status !== 'rejected' ? 'approved' : row.status]}>{soundReviewStatusLabel(row)}</p><form className="flex max-w-full flex-wrap gap-2" action={(form) => {
           const status = String(form.get('status'));
