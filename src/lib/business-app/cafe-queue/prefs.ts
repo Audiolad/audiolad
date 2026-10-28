@@ -122,4 +122,7 @@ export type CafeQueueRequest = {
   daypart: CafeDaypart;
   energyOffset: CafeEnergyOffset;
   feedback: CafeQueueFeedback[];
+  /** Track playing when the playlist is rebuilt. Its album stays off the new first slot. */
+  boundaryAudioItemId?: string;
+  seed?: number;
 };

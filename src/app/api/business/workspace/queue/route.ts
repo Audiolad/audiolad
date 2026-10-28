@@ -21,6 +21,9 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, reason: "invalid_request" }, { status: 400, headers: NO_STORE });
   }
+  if (body && typeof body === "object" && !Array.isArray(body) && !("seed" in body)) {
+    body = { ...body, seed: Math.floor(Math.random() * 0x7fffffff) };
+  }
   const actor = await loadWorkspaceActor(new URL(request.url).searchParams.get("space"));
   const result = await handleCafeQueue(body, {
     access: async () => (actor.ok && actor.playerOpen ? "open" : "closed"),
