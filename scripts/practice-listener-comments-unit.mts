@@ -2268,8 +2268,11 @@ async function testAuthorNoticeConsistency() {
   assert.match(route, /authorSlug: slug/);
   assert.match(route, /productSlug/);
   const shell = read("src/components/listener/ListenerAppShell.tsx");
-  assert.match(shell, /data-author-cabinet-mobile/);
-  assert.match(shell, /xl:hidden/);
+  assert.match(shell, /<MobileAuthorCabinetLink\b/);
+  const mobileAuthorCabinet = read("src/components/listener/MobileAuthorCabinetLink.tsx");
+  assert.match(mobileAuthorCabinet, /data-author-cabinet-mobile/);
+  assert.match(mobileAuthorCabinet, /xl:hidden/);
+  assert.match(mobileAuthorCabinet, /AuthorUnreadCommentBadge/);
   assert.match(read("src/components/profile/ProfileSections.tsx"), /AuthorUnreadCommentBadge/);
   const authorShell = read("src/components/author-dashboard/AuthorShell.tsx");
   assert.match(authorShell, /data-author-shell-subtitle/);

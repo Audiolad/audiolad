@@ -363,7 +363,7 @@
     "test:desktop-catalog-shell-navigation": "npx tsx scripts/desktop-catalog-shell-navigation-unit.mts",
     "test:desktop-catalog-shell-navigation:browser": "node scripts/desktop-catalog-shell-navigation-browser.mjs",
     "test:catalog-mobile-chrome": "node scripts/catalog-mobile-chrome-unit.mjs && node scripts/catalog-mobile-filters-unit.mjs && npx tsx scripts/catalog-topic-filter-unit.mjs && npx tsx scripts/mobile-top-chrome-unit.mts && npx tsx scripts/sheet-scroll-lock-unit.mts && npm run test:desktop-catalog-shell-navigation",
-    "test:mobile-top-chrome": "npx tsx scripts/mobile-top-chrome-unit.mts && npx tsx scripts/sheet-scroll-lock-unit.mts && node scripts/catalog-mobile-chrome-unit.mjs && node scripts/catalog-mobile-filters-unit.mjs && npx tsx scripts/playlist-catalog-search-chrome-unit.mts && npx tsx scripts/library-audioteka-ui-unit.mts && npm run test:desktop-catalog-shell-navigation",
+    "test:mobile-top-chrome": "npx tsx scripts/mobile-top-chrome-unit.mts && npx tsx scripts/sheet-scroll-lock-unit.mts && node scripts/catalog-mobile-chrome-unit.mjs && node scripts/catalog-mobile-filters-unit.mjs && npx tsx scripts/playlist-catalog-search-chrome-unit.mts && npx tsx scripts/library-audioteka-ui-unit.mts && npm run test:desktop-catalog-shell-navigation && npm run test:mobile-author-cabinet-top-chrome",
     "test:mobile-top-chrome-smoke": "node scripts/mobile-top-chrome-smoke.mjs",
     "test:mobile-bottom-safe-spacing": "node scripts/mobile-bottom-safe-spacing-unit.mjs",
     "test:supabase-auth-cookie": "npx tsx scripts/supabase-auth-cookie-unit.mjs",
@@ -460,7 +460,8 @@
     "test:business-app-client-documents": "npx tsx scripts/business-app-client-documents-unit.mts && npx tsx scripts/business-public-documents-text-unit.mts",
     "test:unified-agreement": "node scripts/unified-agreement-sql-unit.mjs && npx tsx scripts/unified-agreement-unit.mjs && npx tsx scripts/author-terms-account-level-unit.mts && npx tsx scripts/author-terms-edition-21-unit.mts",
     "test:managed-catalog-promo": "node --import tsx scripts/managed-catalog-promo-unit.mts && node scripts/catalog-grid-ui-unit.mjs && node scripts/catalog-mobile-chrome-unit.mjs",
-    "test:practice-listener-comments": "npx tsx scripts/practice-listener-comments-unit.mts && node scripts/practice-listener-comments-sql-unit.mjs"
+    "test:practice-listener-comments": "npx tsx scripts/practice-listener-comments-unit.mts && node scripts/practice-listener-comments-sql-unit.mjs",
+    "test:mobile-author-cabinet-top-chrome": "npx tsx scripts/mobile-author-cabinet-top-chrome-unit.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
