@@ -715,9 +715,14 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(settingsSource, /rebuildFromProfile/);
   assert.match(settingsSource, /Атмосфера создана/);
   assert.match(settingsSource, /Перейти в плеер/);
+  assert.match(settingsSource, /markAtmosphereRestart/);
   assert.match(playerSource, /rebuildFromProfile/);
+  assert.match(playerSource, /applyAtmosphereQueue/);
+  assert.match(playerSource, /peekAtmosphereRestart/);
   assert.match(playerSource, /playingNow/);
   assert.match(playerSource, /playIndex\(start\)/);
+  assert.match(workspaceSource, /atmospherePlaybackPlan/);
+  assert.match(workspaceSource, /takeAtmosphereRestart/);
   assert.match(playerSource, /boundaryAudioItemId/);
   assert.doesNotMatch(settingsSource, /—/);
 }

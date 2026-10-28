@@ -16,6 +16,14 @@ import {
   CAFE_DAYPART_HOURS_DEFAULT,
   voteCafeFeedback,
 } from "../src/lib/business-app/cafe-queue/prefs";
+import {
+  atmospherePlaybackPlan,
+  atmosphereQueueStart,
+  markAtmosphereRestart,
+  parseAtmosphereRestart,
+  peekAtmosphereRestart,
+  takeAtmosphereRestart,
+} from "../src/lib/business-app/cafe-queue/atmosphere-restart";
 import { cafeEnergyTarget, rankCafeQueue, type CafeQueueRanking, type CafeQueueTrack } from "../src/lib/business-app/cafe-queue/rank";
 import { parseCafeQueueRequest } from "../src/lib/business-app/cafe-queue/request";
 import { cafeSignalsFromPassport, type CafeTrackSignals } from "../src/lib/business-app/cafe-queue/signals";
@@ -250,6 +258,50 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
   assert.notDeepEqual(cozyOrder, cityOrder, "venue character changes which passport comes first");
   assert.equal(cozyOrder[0], "cozy-track", "a cozy room leads with the warm passport");
   assert.equal(cityOrder[0], "city-track", "a city room leads with the upbeat passport");
+
+  const catalog = [
+    { audioItemId: "saved" },
+    { audioItemId: "first-of-new" },
+    { audioItemId: "later" },
+  ];
+  const newOrder = ["missing", "first-of-new", "later", "saved"];
+  assert.equal(atmosphereQueueStart(catalog, newOrder), 1, "the new queue starts at its first real track, not the saved one");
+  assert.equal(atmospherePlaybackPlan({
+    tracks: catalog,
+    orderedIds: newOrder,
+    restart: null,
+    status: "playing",
+  }), null, "an ordinary queue refresh keeps the saved place");
+  assert.deepEqual(atmospherePlaybackPlan({
+    tracks: catalog,
+    orderedIds: newOrder,
+    restart: { playing: false },
+    status: "idle",
+  }), { index: 1, play: false }, "after «Создать атмосферу» the music page shows the new first track");
+  assert.deepEqual(atmospherePlaybackPlan({
+    tracks: catalog,
+    orderedIds: newOrder,
+    restart: { playing: true },
+    status: "paused",
+  }), { index: 1, play: true }, "music that was already playing starts that new first track");
+  assert.deepEqual(atmospherePlaybackPlan({
+    tracks: catalog,
+    orderedIds: newOrder,
+    restart: { playing: false },
+    status: "playing",
+  }), { index: 1, play: true }, "a still-playing bar also switches");
+  const memory = new Map<string, string>();
+  const store = {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => { memory.set(key, value); },
+    removeItem: (key: string) => { memory.delete(key); },
+  };
+  markAtmosphereRestart(true, store);
+  assert.deepEqual(peekAtmosphereRestart(store), { playing: true });
+  assert.deepEqual(takeAtmosphereRestart(store), { playing: true });
+  assert.equal(peekAtmosphereRestart(store), null, "the handoff is used once");
+  assert.equal(parseAtmosphereRestart("nope"), null);
+  assert.equal(parseAtmosphereRestart("{\"playing\":1}"), null);
 
   const only = [sameA];
   assert.deepEqual(

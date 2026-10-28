@@ -20,6 +20,7 @@ import {
   GUEST_COFFEE_DIRECTIONS,
   type GuestCoffeeProfile,
 } from "@/lib/business-app/guest-coffee/catalog";
+import { clearAtmosphereRestart, markAtmosphereRestart } from "@/lib/business-app/cafe-queue/atmosphere-restart";
 import {
   BUSINESS_SOUND_PROFILE_STORAGE_KEY,
   parseBusinessSoundProfile,
@@ -73,6 +74,7 @@ export default function BusinessPlayerSettings() {
     setProfile(next);
     generation.current += 1;
     player?.cancelAtmosphereRebuild();
+    clearAtmosphereRestart();
     clearTimers();
     setPhase("idle");
     try {
@@ -106,6 +108,8 @@ export default function BusinessPlayerSettings() {
         }, stepMs * i));
       }
     }
+    const playingNow = player?.view.status === "playing" || player?.view.status === "loading";
+    markAtmosphereRestart(playingNow);
     const pending = player?.rebuildFromProfile({
       character: profile.character,
       direction: profile.direction,
@@ -115,7 +119,12 @@ export default function BusinessPlayerSettings() {
     timers.current.push(window.setTimeout(() => {
       void pending.then((result) => {
         if (!mounted.current || generation.current !== gen) return;
-        setPhase(result === "failed" ? "idle" : "done");
+        if (result === "failed") {
+          clearAtmosphereRestart();
+          setPhase("idle");
+          return;
+        }
+        setPhase("done");
       });
     }, total));
   };
