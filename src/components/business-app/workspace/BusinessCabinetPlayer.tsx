@@ -437,6 +437,7 @@ export function BusinessCabinetPlayerProvider({
       const shown = playbackRef.current.index;
       if (shown >= 0 && shown < current.tracks.length) ctl.index = shown;
     }
+    if (soundInstallRef.current) await soundInstallRef.current;
     await ctl.previous();
     remember({ index: ctl.index < 0 ? 0 : ctl.index, positionSec: 0 }, true);
     reportPlayback();
