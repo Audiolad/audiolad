@@ -6,9 +6,10 @@ import { useState } from "react";
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
+  BUSINESS_GIFT_CLOSING_NOTE,
+  BUSINESS_GIFT_LICENSE_NOTE,
   BUSINESS_GIFT_TITLE,
   BUSINESS_SUBSCRIPTION_NOTE,
-  businessGiftRulesText,
 } from "@/lib/access-grants/copy";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
@@ -149,7 +150,11 @@ export default function BusinessHomeAccessCard() {
         Осталось {days} {ruDaysWord(days)}
         <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-home-until">до {label}</span>
       </p>
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{businessGiftRulesText()}</p>
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{BUSINESS_GIFT_CLOSING_NOTE}</p>
+      {/* Licensing during the 30 gift days. Shown only after BUSINESS_GIFT_LICENSE_NOTE is filled. */}
+      {BUSINESS_GIFT_LICENSE_NOTE ? (
+        <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-license">{BUSINESS_GIFT_LICENSE_NOTE}</p>
+      ) : null}
       {pay}
     </section>
   );

@@ -44,6 +44,16 @@ export function businessGiftRulesText(): string {
   ].join(" ");
 }
 
+/** One short line on the cabinet home card while the gift is still running. */
+export const BUSINESS_GIFT_CLOSING_NOTE =
+  "После срока плеер закрыт до оплаты.";
+
+/**
+ * Reserved line on the cabinet home card: music licensing during the 30 gift days.
+ * Empty until the owner sends the exact wording. Do not invent a claim here.
+ */
+export const BUSINESS_GIFT_LICENSE_NOTE = "";
+
 export const BUSINESS_WORKSPACE_AUTOPLAY_NOTE =
   "Музыка включается после нажатия на круглую кнопку. Громкость и место в подборке сохраняются.";
 

@@ -7,7 +7,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomePage, { type BusinessHomePageProps } from "../src/components/business-app/BusinessHomePage";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
-import { businessGiftRulesText } from "../src/lib/access-grants/copy";
+import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE } from "../src/lib/access-grants/copy";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "../src/lib/access-grants/policy";
 import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
@@ -114,13 +114,27 @@ assert.match(trialHome, /data-testid="biz-home-access"/);
 assert.match(trialHome, /30 дней в подарок/);
 assert.match(trialHome, new RegExp(`Осталось ${trialDays} ${ruDaysWord(trialDays)}`));
 assert.ok(trialHome.includes(`до ${formatMoscowDateTime(new Date(trialEnds))}`));
-assert.ok(trialHome.includes(businessGiftRulesText()));
-assert.match(businessGiftRulesText(), /после нажатия на круглую кнопку/);
-assert.doesNotMatch(businessGiftRulesText(), /«Играть»/);
-assert.doesNotMatch(trialHome, /«Играть»/);
-assert.match(trialHome, /безлимитн/);
-assert.match(trialHome, /3 часов/);
-assert.doesNotMatch(trialHome, /—/);
+const trialCard = trialHome.slice(trialHome.indexOf('data-testid="biz-home-access"'), trialHome.indexOf("business-app-home-grid"));
+assert.ok(trialCard.includes(BUSINESS_GIFT_CLOSING_NOTE));
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "");
+assert.match(readFileSync("src/components/business-app/BusinessHomeAccessCard.tsx", "utf8"), /data-testid="biz-home-license"/);
+assert.doesNotMatch(trialCard, /data-testid="biz-home-license"/);
+assert.doesNotMatch(trialCard, /«Играть»/);
+assert.match(trialCard, /799 ₽ за 30 дней, картой или по СБП\. Автосписания нет\./);
+assert.match(trialCard, /data-testid="biz-home-pay-button"/);
+for (const gone of [
+  "один раз на подтверждённый адрес",
+  "без карты и без автосписания",
+  "Генерация музыки",
+  "безлимит",
+  "Пределы Студии",
+  "Гостевой проект",
+  "круглую кнопку",
+  "лиценз",
+]) {
+  assert.doesNotMatch(trialCard, new RegExp(gone, "i"), gone);
+}
+assert.doesNotMatch(trialCard, /—/);
 const paidHome = withAccess({ mode: "paid", endsAt: "2026-12-31T10:00:00.000Z" });
 assert.match(paidHome, /data-mode="paid"/);
 assert.ok(paidHome.includes(`Подписка до ${formatMoscowDateTime(new Date("2026-12-31T10:00:00.000Z"))}`));
