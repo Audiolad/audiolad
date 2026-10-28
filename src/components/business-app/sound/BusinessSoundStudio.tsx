@@ -8,6 +8,13 @@ import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAcce
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import BusinessAtmosphereTrackButton from "@/components/business-app/BusinessAtmosphereTrackButton";
 import GuestCoffeeGiftCta from "@/components/business-app/sound/GuestCoffeeGiftCta";
+import {
+  AtmosphereAssembling,
+  ATMOSPHERE_REDUCED_MOTION_MS,
+  ATMOSPHERE_STEP_MS,
+  atmosphereAssemblingSteps,
+  prefersReducedAtmosphereMotion,
+} from "@/components/business-app/sound/AtmosphereAssembling";
 import BusinessSoundSettings from "@/components/business-app/sound/BusinessSoundSettings";
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
@@ -74,10 +81,6 @@ type View = { status: OnlineStatus; current: SpaManifestItem | null; message: st
 
 const JSON_POST = { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", cache: "no-store" } as const;
 
-/** Visible assembling moment: one step per line, short but noticeable. */
-const ATMOSPHERE_STEP_MS = 520;
-const ATMOSPHERE_REDUCED_MOTION_MS = 450;
-
 function toItems(atmosphere: GuestCoffeeAtmosphere): SpaManifestItem[] {
   return atmosphere.tracks.map((t, position) => ({
     position,
@@ -102,23 +105,6 @@ function readStoredProfile(): GuestCoffeeProfile {
   } catch {
     return GUEST_COFFEE_DEFAULT_PROFILE;
   }
-}
-
-function prefersReducedMotion(): boolean {
-  try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
-}
-
-function assemblingSteps(profile: GuestCoffeeProfile): string[] {
-  const direction = GUEST_COFFEE_DIRECTIONS.find((d) => d.id === profile.direction)?.label ?? "";
-  return [
-    `Подбираем треки по звучанию «${direction}»…`,
-    "Сверяем время суток и характер заведения…",
-    "Сводим треки в одну подборку…",
-  ];
 }
 
 export default function BusinessSoundStudio({ playlists, plan = null, initialLimit }: Props) {
@@ -294,8 +280,9 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
     if (!canAssemble) return;
     // Computed right away (pure); revealed after the short assembling moment.
     const next = assembleGuestCoffeeAtmosphere(playlists, profile, plan);
-    const steps = assemblingSteps(profile);
-    const reduced = prefersReducedMotion();
+    const directionLabel = GUEST_COFFEE_DIRECTIONS.find((d) => d.id === profile.direction)?.label ?? "";
+    const steps = atmosphereAssemblingSteps(directionLabel);
+    const reduced = prefersReducedAtmosphereMotion();
     setAssembling({ step: 0, steps });
     // Mobile: the result sits below the settings – bring the assembling moment into view.
     window.requestAnimationFrame(() => revealResult(reduced));
@@ -485,23 +472,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
                 {GUEST_COFFEE_COPY.emptyShelf}
               </p>
             ) : assembling ? (
-              <div className="business-app-card business-atmosphere-assembling" role="status" data-testid="biz-atmosphere-assembling">
-                <span className="business-atmosphere-bars" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                </span>
-                <p className="business-atmosphere-assembling__title">{C.assemblingTitle}</p>
-                <ol className="business-atmosphere-steps">
-                  {assembling.steps.map((text, i) => (
-                    <li key={text} data-state={i < assembling.step ? "done" : i === assembling.step ? "active" : "next"}>
-                      {text}
-                    </li>
-                  ))}
-                </ol>
-              </div>
+              <AtmosphereAssembling step={assembling.step} steps={assembling.steps} />
             ) : atmosphere === null ? (
               <div className="business-app-card business-atmosphere-empty" data-testid="biz-atmosphere-empty">
                 <p className="business-atmosphere-empty__title">{C.emptyTitle}</p>
