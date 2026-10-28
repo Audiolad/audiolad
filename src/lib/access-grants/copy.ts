@@ -31,9 +31,6 @@ export function businessGiftPriceNote(): string {
   return `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`;
 }
 
-export const BUSINESS_WORKSPACE_AUTOPLAY_NOTE =
-  "Музыка включается после нажатия на круглую кнопку. Громкость и место в подборке сохраняются.";
-
 export const BUSINESS_EMPTY_CATALOG_NOTE =
   "Подборка в этом направлении готовится – музыка появится здесь автоматически.";
 
