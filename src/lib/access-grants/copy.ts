@@ -58,6 +58,14 @@ export const BUSINESS_CONNECT_VENUE_CTA = "Подключить точку";
 export const BUSINESS_SUBSCRIPTION_NOTE =
   "Музыка остановлена. Кабинет и настройки сохранены. Оплата – 30 дней, картой или по СБП, без автосписания.";
 
+/**
+ * Shown while music is still inside the 3-day grace.
+ * The reminder letters use the same grace length (BUSINESS_GRACE_DAYS) and
+ * the same sentence: the new 30 days start at the previous end, not at payment.
+ */
+export const BUSINESS_GRACE_PAYMENT_ANCHOR =
+  "Новые 30 дней считаются от конца прошлого срока – не от момента платежа.";
+
 export const BUSINESS_UNCONFIRMED_NOTE =
   "Сначала подтвердите адрес по письму. Пока письмо не подтверждено, 30 дней в подарок не начинаются и полный плеер закрыт.";
 

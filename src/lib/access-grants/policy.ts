@@ -137,6 +137,32 @@ export function gracePlaybackUntil(endsAtIso: string): string {
   return new Date(Date.parse(endsAtIso) + BUSINESS_GRACE_MS).toISOString();
 }
 
+/**
+ * Where the next paid 30×24h window starts.
+ * The contractual end is the later of the free-trial end and paid_until.
+ * A payment before that end, or during the 3×24h grace after it, starts at
+ * that end. A payment at or after end + BUSINESS_GRACE_MS (music already
+ * stopped) starts at paidAt. Twin of apply_business_subscription_for_order.
+ * The grace test matches isInsideGrace: paidAt < end + BUSINESS_GRACE_MS.
+ */
+export function businessSubscriptionPeriodStart(input: {
+  paidAt: Date;
+  trialEndsAt: string | null;
+  paidUntil: string | null;
+}): Date {
+  const contractual = laterAccessInstant(input.trialEndsAt, input.paidUntil);
+  const contractualMs = contractual ? Date.parse(contractual) : Number.NaN;
+  if (Number.isFinite(contractualMs) && input.paidAt.getTime() < contractualMs + BUSINESS_GRACE_MS) {
+    return new Date(contractualMs);
+  }
+  return input.paidAt;
+}
+
+/** End of the paid window that starts at periodStart. Same 30×24h as the gift. */
+export function businessSubscriptionPeriodEnd(periodStart: Date): Date {
+  return new Date(periodStart.getTime() + BUSINESS_GIFT_MS);
+}
+
 export function resolveCustomerAccess(input: {
   now: Date;
   emailConfirmed: boolean;

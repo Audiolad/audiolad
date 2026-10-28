@@ -139,9 +139,20 @@ call the order or acceptance functions. A test payment does not move
 queue. The three extra days of music after the period ends are not stored
 in `paid_until`.
 
-Rollback notes are comments at the top of the migration. They are not executed.
-Smoke: `supabase/tests/business_subscription_payment_smoke.sql`, run by the
-migration compile after the file is applied.
+`20270207150000_business_subscription_grace_base.sql` replaces only
+`apply_business_subscription_for_order`. The contractual end is the later of
+the free-trial `ends_at` and `paid_until`. A payment before that end, or
+during the following 3×24h, starts the next 30×24h at that end. A payment at
+or after that exact grace instant (music already stopped) starts at `paid_at`.
+The 3×24h length is `BUSINESS_GRACE_DAYS` in `src/lib/business/plan.ts`, the
+same window the cabinet and the access reminder letters use. One row per
+order remains: a replay does not extend `paid_until`. This file is not applied
+here and does not call Tochka.
+
+Rollback notes are comments at the top of each migration. They are not executed.
+Smoke: `supabase/tests/business_subscription_payment_smoke.sql` and
+`supabase/tests/business_subscription_grace_base_smoke.sql`, run by the
+migration compile after the files are applied.
 
 ## Guest practice ratings (pending owner apply)
 

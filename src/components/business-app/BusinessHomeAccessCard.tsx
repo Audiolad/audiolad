@@ -7,10 +7,17 @@ import { useBusinessChromeAccess } from "@/components/business-app/BusinessAcces
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
   BUSINESS_GIFT_TITLE,
+  BUSINESS_GRACE_PAYMENT_ANCHOR,
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftRulesText,
 } from "@/lib/access-grants/copy";
-import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
+import {
+  businessSubscriptionPeriodEnd,
+  businessSubscriptionPeriodStart,
+  formatMoscowDateTime,
+  ruDaysWord,
+  trialDaysLeft,
+} from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import type { BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
@@ -109,13 +116,28 @@ export default function BusinessHomeAccessCard() {
   );
 
   if (access.mode === "grace" && access.graceEndsAt) {
-    const days = trialDaysLeft(new Date(access.graceEndsAt), new Date());
+    const now = new Date();
+    const days = trialDaysLeft(new Date(access.graceEndsAt), now);
+    const renewalEnd = businessSubscriptionPeriodEnd(
+      businessSubscriptionPeriodStart({
+        paidAt: now,
+        trialEndsAt: access.endsAt,
+        paidUntil: null,
+      }),
+    );
+    const renewalDays = trialDaysLeft(renewalEnd, now);
+    const renewalLabel = formatMoscowDateTime(renewalEnd);
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="grace">
         <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Срок закончился</h2>
         <p data-testid="biz-home-grace">
           Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {label}.
         </p>
+        {canPay ? (
+          <p data-testid="biz-home-grace-renewal">
+            {BUSINESS_GRACE_PAYMENT_ANCHOR} Новый срок – до {renewalLabel}, останется {renewalDays} {ruDaysWord(renewalDays)}.
+          </p>
+        ) : null}
         {pay}
       </section>
     );
