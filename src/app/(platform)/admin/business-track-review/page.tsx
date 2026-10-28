@@ -35,8 +35,9 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
     <h1 className="text-2xl font-semibold">Business – прослушивание треков</h1>
     <p>Решение о качестве звука. Коммерческие права проверяются отдельно. Причины доступны только администраторам.</p>
     <p>В очереди – опубликованные музыкальные треки альбомов с допуском хотя бы к одному пространству Business.</p>
-    <p>В очереди только треки авторов, принявших соглашение AudioLad Бизнес – {queue.total}</p>
-    {!queue.total && !status && !artist && !album && !space && <p>Пока нет авторов, принявших соглашение AudioLad Бизнес.{" "}
+    <p>В очереди только треки авторов с подтверждёнными правами – {queue.total}.{" "}
+      <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>
+    {!queue.total && !status && !artist && !album && !space && <p>Пока нет авторов с подтверждёнными правами.{" "}
       <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>}
     <p>Ожидают: {queue.counts.unchecked} · Допущено: {queue.counts.approved} · Отклонено: {queue.counts.rejected}</p>
     <form className="flex flex-wrap gap-3">

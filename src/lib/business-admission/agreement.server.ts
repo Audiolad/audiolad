@@ -3,26 +3,33 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SoundReviewQueue, SoundReviewRow } from "@/lib/business/track-sound-review";
 import { restrictSoundQueueToAgreement } from "@/lib/business/track-sound-review";
-import { filterAgreementSubjects, type AgreementDecision, type AgreementSubject } from "@/lib/business-admission/agreement-list";
+import { authorIdsWithVerifiedRights, filterAgreementSubjects, type AgreementDecision, type AgreementSubject } from "@/lib/business-admission/agreement-list";
 
-const CHUNK = 25;
-
-/** Account-level Business agreement, the same function the catalogue sync uses. Fail closed. */
-export async function businessAgreementAuthorIds(authorIds: readonly string[]): Promise<Set<string>> {
-  const unique = [...new Set(authorIds.filter((id) => id))];
-  const accepted = new Set<string>();
-  if (!unique.length) return accepted;
+/** Same table and status as /admin/business-verification «Пример подтверждён». Restricted, rejected and revoked stay out. */
+export async function verifiedRightsAuthorIds(): Promise<Set<string>> {
   const db = createServiceRoleClient();
-  for (let index = 0; index < unique.length; index += CHUNK) {
-    const chunk = unique.slice(index, index + CHUNK);
-    const results = await Promise.all(chunk.map(async (id) => {
-      const { data, error } = await db.rpc("author_has_business_agreement", { p_author_id: id });
-      if (error) throw new Error("agreement_unavailable");
-      return data === true ? id : null;
-    }));
-    for (const id of results) if (id) accepted.add(id);
+  const verifications: { owner_user_id: string; status: string }[] = [];
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await db.from("business_rightsholder_verifications")
+      .select("owner_user_id, status").eq("status", "verified").range(from, from + 999);
+    if (error) throw new Error("verification_unavailable");
+    const page = (data ?? []) as { owner_user_id?: string; status?: string }[];
+    for (const row of page) {
+      if (row.status === "verified" && row.owner_user_id) verifications.push({ owner_user_id: row.owner_user_id, status: row.status });
+    }
+    if (page.length < 1000) break;
   }
-  return accepted;
+  const owners = [...new Set(verifications.map((row) => row.owner_user_id))];
+  const memberships: { user_id: string; author_id: string; role: string }[] = [];
+  for (let index = 0; index < owners.length; index += 100) {
+    const { data, error } = await db.from("author_members").select("user_id, author_id, role")
+      .in("user_id", owners.slice(index, index + 100)).eq("role", "owner");
+    if (error) throw new Error("verification_unavailable");
+    for (const row of (data ?? []) as { user_id?: string; author_id?: string; role?: string }[]) {
+      if (row.user_id && row.author_id && row.role) memberships.push({ user_id: row.user_id, author_id: row.author_id, role: row.role });
+    }
+  }
+  return authorIdsWithVerifiedRights(verifications, memberships);
 }
 
 async function everyRow(load: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>) {
@@ -50,7 +57,7 @@ export async function listAgreementAdmissionPage(input: {
   const artists = (await everyRow((from, to) => db.from("authors").select("id, name").range(from, to))).map((row) => ({ id: String(row.id), name: String(row.name ?? "") }));
   const albums = (await everyRow((from, to) => db.from("practices").select("id, title, author_id").eq("product_kind", "music").is("deleted_at", null).range(from, to)))
     .map((row) => ({ id: String(row.id), title: String(row.title ?? ""), authorId: String(row.author_id ?? "") }));
-  const accepted = await businessAgreementAuthorIds(input.kind === "artist" ? artists.map((row) => row.id) : albums.map((row) => row.authorId));
+  const accepted = await verifiedRightsAuthorIds();
   const authorIds = [...accepted];
   const albumIds = albums.filter((album) => accepted.has(album.authorId)).map((album) => album.id);
   const decisions: AgreementDecision[] = [];
@@ -83,7 +90,7 @@ export async function admissionAuthorsAccepted(kind: "artist" | "album", ids: re
     if (error || !Array.isArray(data) || data.length !== ids.length) return false;
     authorIds = (data as { author_id: string | null }[]).map((row) => row.author_id ?? "");
   }
-  const accepted = await businessAgreementAuthorIds(authorIds);
+  const accepted = await verifiedRightsAuthorIds();
   return authorIds.every((id) => accepted.has(id));
 }
 
@@ -102,6 +109,6 @@ export async function loadAgreementSoundQueue(
     rows.push(...payload.rows);
     if (!payload.rows.length) break;
   }
-  const accepted = await businessAgreementAuthorIds(rows.map((row) => row.artist_id));
+  const accepted = await verifiedRightsAuthorIds();
   return restrictSoundQueueToAgreement(rows, accepted, filter);
 }

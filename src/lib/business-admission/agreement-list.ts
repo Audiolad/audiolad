@@ -1,6 +1,19 @@
-/** Read-side filter. Acceptance itself stays in author_has_business_agreement. */
+/** Read-side filter. The source of truth is a verified rightsholder check, not the agreement acceptance. */
 
-export const BUSINESS_AGREEMENT_LIST_HINT = "В списке только авторы, принявшие соглашение AudioLad Бизнес";
+export const BUSINESS_AGREEMENT_LIST_HINT = "В списке только авторы с подтверждёнными правами";
+
+/** Account-level: status verified on business_rightsholder_verifications covers every workspace that user owns. */
+export function authorIdsWithVerifiedRights(
+  verifications: readonly { owner_user_id: string; status: string }[],
+  memberships: readonly { user_id: string; author_id: string; role: string }[],
+): Set<string> {
+  const owners = new Set(verifications.filter((row) => row.status === "verified").map((row) => row.owner_user_id));
+  const authorIds = new Set<string>();
+  for (const member of memberships) {
+    if (member.role === "owner" && member.author_id && owners.has(member.user_id)) authorIds.add(member.author_id);
+  }
+  return authorIds;
+}
 
 export type AgreementSubject = {
   id: string;
