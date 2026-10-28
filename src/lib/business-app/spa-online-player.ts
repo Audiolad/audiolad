@@ -32,6 +32,8 @@ export type OnlineDeps = {
    * Used by the cafe queue so the manifest order can stay the catalog order.
    */
   nextIndex?(current: number, length: number): number;
+  /** Catalog index to play before `current`. Omitted: the previous row, then the last. */
+  previousIndex?(current: number, length: number): number;
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (t: unknown) => void;
@@ -212,6 +214,16 @@ export class SpaOnlinePlayer {
     if (this.items.length === 0) return Promise.resolve();
     const fallback = this.index < 0 || this.index >= this.items.length - 1 ? 0 : this.index + 1;
     const custom = this.d.nextIndex?.(this.index, this.items.length);
+    const target = typeof custom === "number" && Number.isInteger(custom) && custom >= 0 && custom < this.items.length
+      ? custom
+      : fallback;
+    return this.playIndex(target);
+  }
+
+  previous(): Promise<void> {
+    if (this.items.length === 0) return Promise.resolve();
+    const fallback = this.index <= 0 ? this.items.length - 1 : this.index - 1;
+    const custom = this.d.previousIndex?.(this.index, this.items.length);
     const target = typeof custom === "number" && Number.isInteger(custom) && custom >= 0 && custom < this.items.length
       ? custom
       : fallback;
