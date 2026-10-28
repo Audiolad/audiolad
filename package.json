@@ -425,6 +425,7 @@
     "test:max-catalog-sections": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-catalog-sections-server-unit.mjs && node scripts/max-catalog-sections-unit.mjs",
     "test:max-catalog-topics": "NODE_OPTIONS='--require ./scripts/cjs-stub-server-only.cjs' npx tsx scripts/max-catalog-topics-server-unit.mjs && node scripts/max-catalog-topics-unit.mjs",
     "test:business-domain-core": "node scripts/business-domain-core-sql-unit.mjs",
+    "test:business-location-sound-settings": "node scripts/business-location-sound-settings-sql-unit.mjs && npx tsx scripts/business-location-sound-settings-unit.mts",
     "test:business-player-foundation": "node scripts/business-player-foundation-sql-unit.mjs",
     "test:business-playback-attribution": "node scripts/business-playback-attribution-sql-unit.mjs",
     "test:business-rights-foundation": "node scripts/business-rights-foundation-sql-unit.mjs",
