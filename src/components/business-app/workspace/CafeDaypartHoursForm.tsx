@@ -83,7 +83,7 @@ export default function CafeDaypartHoursForm({
         ))}
       </div>
       {error ? <p className="business-app-alert" data-tone="warn" role="alert" data-testid="biz-daypart-error">{error}</p> : null}
-      {saved ? <p className="text-sm text-[var(--biz-text-muted)]" data-testid="biz-daypart-saved">Границы сохранены для этой точки.</p> : null}
+      {saved ? <p className="text-sm text-[var(--biz-text-muted)]" data-testid="biz-daypart-saved">Границы сохранены для этой кофейни.</p> : null}
       <button type="submit" className="business-app-btn business-app-btn-primary business-app-focus-ring" data-testid="biz-daypart-save">
         Сохранить часы
       </button>

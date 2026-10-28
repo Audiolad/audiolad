@@ -540,6 +540,30 @@
   outline-offset: 1px;
 }
 
+/* «Да / Отмена» before a venue change: above the page, the cabinet player and the bottom menu. */
+.business-venue-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1.25rem calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+  background: color-mix(in srgb, var(--biz-text) 45%, transparent);
+}
+
+/* Atmosphere picker under «Изменить звучание»: scrolled into view below the top bar. */
+.business-venue-sound {
+  scroll-margin-top: 6rem;
+  border-top: 1px solid var(--biz-border);
+  padding-top: 1rem;
+}
+
+.business-venue-confirm__card {
+  width: min(26rem, 100%);
+  box-shadow: var(--biz-shadow-strong);
+}
+
 .business-app-alert {
   border-radius: var(--biz-radius-sm);
   border: 1px solid var(--biz-neutral-border);

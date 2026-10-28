@@ -74,11 +74,11 @@ assert.match(panel, /Запретить устройству в зале мен�
 assert.match(panel, /Разрешить устройству в зале менять музыку\?/);
 assert.match(panel, /commandId/);
 assert.match(panel, /Изменить звучание/);
-assert.match(panel, /href="\/preferences"/);
+assert.match(panel, /VENUE_SOUND_HREF = "\/preferences\?sound=open"/);
 const homePage = readFileSync(new URL("../src/components/business-app/BusinessHomePage.tsx", import.meta.url), "utf8");
 assert.match(homePage, /href="\/player"/);
 assert.match(homePage, /href="\/help"/);
-assert.match(homePage, /Откройте плеер точки/);
+assert.match(homePage, /Откройте плеер кофейни/);
 const player = readFileSync(new URL("../src/components/business-app/workspace/BusinessCabinetPlayer.tsx", import.meta.url), "utf8");
 assert.match(player, /keepCurrent: true/);
 assert.match(player, /createPointSoundApplier/);

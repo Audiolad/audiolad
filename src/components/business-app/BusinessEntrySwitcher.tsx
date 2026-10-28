@@ -53,7 +53,7 @@ export default function BusinessEntrySwitcher() {
   if (domain.status !== "authenticated" || !domain.location) return null;
 
   const person = domain.owner.firstName.trim();
-  const venue = domain.location.name.trim() || "Точка";
+  const venue = domain.location.name.trim() || "Кофейня";
   const personOn = !point && entry === "person";
   const venueOn = point || entry === "venue";
 
