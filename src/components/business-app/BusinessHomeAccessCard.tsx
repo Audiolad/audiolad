@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
@@ -15,6 +15,7 @@ import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } f
 import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import type { BusinessPayErrorCode } from "@/lib/business/subscription-checkout";
 import { BusinessRenewalController } from "@/components/business-app/BusinessRenewalPrompt";
+import { renewalQuestionVisible } from "@/lib/business/renewal-choice";
 
 type PayError = { code: BusinessPayErrorCode; href: string | null };
 
@@ -45,7 +46,8 @@ export default function BusinessHomeAccessCard() {
   }
 
   const label = formatMoscowDateTime(new Date(access.endsAt));
-  const question = showQuestion ? (
+  // «Нет» hides the payment plate; the answer stays changeable even outside the question window.
+  const question = showQuestion && (declined || renewalQuestionVisible(access, new Date())) ? (
     <BusinessRenewalController
       surface="owner"
       initialAnswer={domain.status === "authenticated" ? domain.renewalAnswer ?? null : null}
@@ -58,7 +60,6 @@ export default function BusinessHomeAccessCard() {
       accepted={accepted}
       busy={busy}
       error={error}
-      quiet={declined}
       onAccept={async () => {
         setBusy(true);
         setError(null);
@@ -127,7 +128,7 @@ export default function BusinessHomeAccessCard() {
         <p data-testid="biz-home-grace">
           Музыка играет ещё {days} {ruDaysWord(days)}, затем остановится. Конец срока был {label}.
         </p>
-        {declined ? <QuietPay>{pay}</QuietPay> : pay}
+        {declined ? null : pay}
         {question}
       </section>
     );
@@ -137,7 +138,7 @@ export default function BusinessHomeAccessCard() {
     return (
       <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="paid">
         <p data-testid="biz-home-paid-until">Подписка до {label}</p>
-        {declined ? <QuietPay>{pay}</QuietPay> : pay}
+        {declined ? null : pay}
         {question}
       </section>
     );
@@ -149,7 +150,7 @@ export default function BusinessHomeAccessCard() {
         {declined ? null : <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Подписка {formatBusinessMonthlyPrice()} за 30 дней</h2>}
         <p data-testid="biz-home-ended">Подарочный период закончился {label}.</p>
         {declined ? null : <p>{BUSINESS_SUBSCRIPTION_NOTE}</p>}
-        {declined ? <QuietPay>{pay}</QuietPay> : pay}
+        {declined ? null : pay}
         {question}
       </section>
     );
@@ -164,18 +165,9 @@ export default function BusinessHomeAccessCard() {
         <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-home-until">до {label}</span>
       </p>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{businessGiftRulesText()}</p>
-      {declined ? <QuietPay>{pay}</QuietPay> : pay}
+      {declined ? null : pay}
       {question}
     </section>
-  );
-}
-
-function QuietPay({ children }: { children: ReactNode }) {
-  return (
-    <div className="space-y-2" data-testid="biz-home-access-quiet">
-      <h2 className="text-[1.05rem] font-bold text-[var(--biz-text)]">Доступ</h2>
-      {children}
-    </div>
   );
 }
 
@@ -184,7 +176,6 @@ function BusinessPayControls({
   accepted,
   busy,
   error,
-  quiet = false,
   onAccept,
   onPay,
 }: {
@@ -192,18 +183,15 @@ function BusinessPayControls({
   accepted: boolean;
   busy: boolean;
   error: PayError | null;
-  quiet?: boolean;
   onAccept: () => void;
   onPay: () => void;
 }) {
   if (!canPay) return null;
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
-      {quiet ? null : (
-        <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-          {formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.
-        </p>
-      )}
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+        {formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.
+      </p>
       {accepted ? (
         <button
           type="button"

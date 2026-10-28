@@ -21,16 +21,16 @@ import {
 } from "./business-layout";
 
 export const BUSINESS_ACCESS_REMINDER_TEMPLATE_KEY = "business_access_reminder";
-export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v3";
+export const BUSINESS_ACCESS_REMINDER_TEMPLATE_VERSION = "business-access-reminder-v4";
 
 export const BUSINESS_ACCESS_REMINDER_BUTTON_LABEL = "Продлить доступ";
 
 const PRICE_LINE = `Продление – ${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`;
 
 export const BUSINESS_ACCESS_REMINDER_SUBJECTS = {
-  before_end: "Скоро закончится доступ к АудиоЛад Бизнес",
-  grace_start: "Доступ закончился – музыка ещё играет 3 дня",
-  grace_last: "Последний день, когда музыка ещё играет",
+  before_end: "АудиоЛад Бизнес – срок доступа подходит к концу",
+  grace_start: "АудиоЛад Бизнес – музыка играет ещё 3 дня",
+  grace_last: "АудиоЛад Бизнес – сегодня последний день отсрочки",
 } as const satisfies Record<BusinessAccessReminderKind, string>;
 
 export function businessAccessReminderSubject(kind: BusinessAccessReminderKind): string {
@@ -59,7 +59,7 @@ export function businessAccessReminderParagraphs(input: {
   if (input.kind === "before_end") {
     return [
       hello,
-      `Доступ к музыке в АудиоЛад Бизнес действует до ${input.endsAtLabel}. Скоро он закончится – пусть зал не останется без музыки.`,
+      `Доступ к музыке в АудиоЛад Бизнес действует до ${input.endsAtLabel}. Продлить можно заранее – музыка продолжит играть без перерыва.`,
       PRICE_LINE,
       closing,
     ];
@@ -67,14 +67,14 @@ export function businessAccessReminderParagraphs(input: {
   if (input.kind === "grace_start") {
     return [
       hello,
-      `Срок доступа к АудиоЛад Бизнес закончился ${input.endsAtLabel}. Музыка в зале ещё играет – отсрочка составляет 3 дня, затем она остановится.`,
+      `Срок доступа к АудиоЛад Бизнес закончился ${input.endsAtLabel}. Музыка в зале играет ещё 3 дня – до ${input.graceEndsLabel}.`,
       PRICE_LINE,
       closing,
     ];
   }
   return [
     hello,
-    `Это последний день отсрочки. Музыка в АудиоЛад Бизнес играет до ${input.graceEndsLabel}, затем плеер остановится. Кабинет и настройки сохранятся.`,
+    `Сегодня последний день отсрочки: музыка в АудиоЛад Бизнес играет до ${input.graceEndsLabel}. Кабинет и настройки сохранятся.`,
     PRICE_LINE,
     closing,
   ];

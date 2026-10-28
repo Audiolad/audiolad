@@ -204,6 +204,7 @@ DO $$
 DECLARE
   v_yes uuid := gen_random_uuid();
   v_no uuid := gen_random_uuid();
+  v_shared uuid := gen_random_uuid();
   v_now timestamptz := clock_timestamp();
   v_end timestamptz := clock_timestamp() + interval '2 days';
   v_paid timestamptz := clock_timestamp() + interval '3 days';
@@ -260,6 +261,20 @@ BEGIN
   WHERE c.user_id = v_no;
   IF v_kind IS DISTINCT FROM 'before_end' OR v_seen IS DISTINCT FROM v_paid THEN
     RAISE EXCEPTION 'after payment the new period can be reminded';
+  END IF;
+
+  -- A payment recorded under another account with the same paid email also clears «Нет».
+  INSERT INTO auth.users (id, email, email_confirmed_at) VALUES (v_shared, 'renew-shared@example.test', v_now);
+  INSERT INTO public.access_grants (email_hash, user_id, kind, starts_at, ends_at, source) VALUES
+    (repeat('6', 64), v_shared, 'business_new_client', v_end - interval '30 days', v_end, 'trial');
+  INSERT INTO public.business_access_renewal_choices (user_id, period_end, answer) VALUES (v_shared, v_end, 'no');
+  INSERT INTO public.access_paid_periods (email_hash, user_id, kind, paid_until)
+  VALUES (repeat('6', 64), v_yes, 'business_new_client', v_paid);
+  IF EXISTS (
+    SELECT 1 FROM public.business_access_renewal_choices
+    WHERE user_id = v_shared AND answer = 'no'
+  ) THEN
+    RAISE EXCEPTION 'payment on the same email must clear the no';
   END IF;
 
   RAISE NOTICE 'business_access_renewal_choice_smoke: ok';

@@ -21,6 +21,7 @@ import {
   parseRenewalChoiceHash,
   renewalAnswerBlocksReminders,
   renewalDeclineApplies,
+  renewalQuestionVisible,
 } from "@/lib/business/renewal-choice";
 import {
   BUSINESS_ACCESS_REMINDER_CABINET_URL,
@@ -195,6 +196,21 @@ assert.equal(
 assert.equal(parseRenewalChoiceHash("#prodlenie?otvet=da"), "yes");
 assert.equal(parseRenewalChoiceHash("#prodlenie?otvet=net"), "no");
 assert.equal(parseRenewalChoiceHash("#dostup"), null);
+
+{
+  const end = "2026-11-10T12:00:00.000Z";
+  assert.equal(renewalQuestionVisible({ mode: "trial", endsAt: end }, new Date("2026-11-01T12:00:00.000Z")), false);
+  assert.equal(renewalQuestionVisible({ mode: "trial", endsAt: end }, new Date("2026-11-06T20:30:00.000Z")), false);
+  assert.equal(renewalQuestionVisible({ mode: "paid", endsAt: end }, new Date("2026-11-06T21:30:00.000Z")), true);
+  assert.equal(renewalQuestionVisible({ mode: "paid", endsAt: end }, new Date("2026-11-10T11:00:00.000Z")), true);
+  assert.equal(renewalQuestionVisible({ mode: "grace", endsAt: end }, new Date("2026-11-12T09:00:00.000Z")), true);
+  assert.equal(renewalQuestionVisible({ mode: "offer", endsAt: end }, new Date("2026-11-20T09:00:00.000Z")), true);
+  assert.equal(renewalQuestionVisible({ mode: "none", endsAt: end }, new Date("2026-11-08T09:00:00.000Z")), false);
+}
+assert.match(MIGRATION, /g\.email_hash = NEW\.email_hash/);
+for (const subject of Object.values(BUSINESS_ACCESS_REMINDER_SUBJECTS)) {
+  assert.doesNotMatch(subject, /—|-/);
+}
 assert.equal(BUSINESS_RENEWAL_IMPROVEMENT_QUESTION.includes("не понрав"), false);
 assert.equal(BUSINESS_RENEWAL_QUESTION, "Планируете дальше пользоваться сервисом?");
 

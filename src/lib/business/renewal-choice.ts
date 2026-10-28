@@ -1,5 +1,10 @@
 /** Account-level answer to «Планируете дальше пользоваться сервисом?». */
 
+import {
+  BUSINESS_ACCESS_REMINDER_LEAD_DAYS,
+  moscowCalendarDaysBetween,
+} from "@/lib/business/access-reminders";
+
 export const BUSINESS_RENEWAL_QUESTION = "Планируете дальше пользоваться сервисом?";
 
 export const BUSINESS_RENEWAL_YES_LABEL = "Да";
@@ -13,9 +18,15 @@ export const BUSINESS_RENEWAL_CONFIRM_YES = "Да";
 export const BUSINESS_RENEWAL_CONFIRM_CANCEL = "Отмена";
 
 export const BUSINESS_RENEWAL_THANKS_OWNER =
-  "Спасибо. Если захотите продолжить – оплата останется в разделе «Доступ».";
+  "Спасибо за ответ. Писем о продлении за этот срок больше не будет.";
 
-export const BUSINESS_RENEWAL_THANKS_DEVICE = "Спасибо.";
+export const BUSINESS_RENEWAL_THANKS_DEVICE = "Спасибо за ответ.";
+
+export const BUSINESS_RENEWAL_THANKS_YES = "Спасибо за ответ.";
+
+export const BUSINESS_RENEWAL_CHANGE_LABEL = "Изменить ответ";
+
+export const BUSINESS_RENEWAL_NOTE_SENT = "Спасибо, мы прочитаем.";
 
 export const BUSINESS_RENEWAL_IMPROVEMENT_QUESTION =
   "Что нам улучшить, чтобы вам понравилось и вы вернулись?";
@@ -47,6 +58,23 @@ export function renewalDeclineApplies(input: {
   const answered = Date.parse(input.answeredPeriodEnd);
   const current = Date.parse(input.contractualEnd);
   return Number.isFinite(answered) && answered === current;
+}
+
+/**
+ * The question is shown from 3 Moscow calendar days before the contractual end, through the
+ * 3-day grace, and after a gift ended without payment («offer»). Earlier it would only distract.
+ */
+export function renewalQuestionVisible(
+  access: { mode: string; endsAt: string | null | undefined },
+  now: Date,
+): boolean {
+  if (access.mode === "grace" || access.mode === "offer") return true;
+  if (access.mode !== "trial" && access.mode !== "paid") return false;
+  if (!access.endsAt) return false;
+  const endMs = Date.parse(access.endsAt);
+  if (!Number.isFinite(endMs)) return false;
+  if (now.getTime() >= endMs) return true;
+  return moscowCalendarDaysBetween(now, new Date(endMs)) <= BUSINESS_ACCESS_REMINDER_LEAD_DAYS;
 }
 
 export function parseRenewalChoiceHash(hash: string): BusinessRenewalAnswer | null {

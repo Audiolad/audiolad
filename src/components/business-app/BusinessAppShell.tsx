@@ -9,6 +9,7 @@ import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limi
 
 import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { BusinessRenewalController } from "@/components/business-app/BusinessRenewalPrompt";
+import { renewalQuestionVisible } from "@/lib/business/renewal-choice";
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
@@ -81,7 +82,10 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
           </header>
           {showGuestBar ? <BusinessGuestStatusBar /> : null}
           {showAccessLine ? <BusinessAccessLine access={chromeAccess} /> : null}
-          {pointReports && (chromeAccess.mode === "trial" || chromeAccess.mode === "paid" || chromeAccess.mode === "grace") ? (
+          {pointReports &&
+          (chromeAccess.mode === "trial" || chromeAccess.mode === "paid" || chromeAccess.mode === "grace") &&
+          ((domain.status === "authenticated" && domain.renewalAnswer === "no") ||
+            renewalQuestionVisible(chromeAccess, new Date())) ? (
             <section className="business-app-card mb-5 space-y-3" data-testid="biz-point-access-banner" aria-label="Доступ точки">
               <BusinessRenewalController
                 surface="device"

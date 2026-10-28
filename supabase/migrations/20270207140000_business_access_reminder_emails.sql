@@ -541,10 +541,16 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  DELETE FROM public.business_access_renewal_choices
-  WHERE user_id = NEW.user_id
-    AND answer = 'no'
-    AND period_end <= NEW.paid_until;
+  -- A payment clears «Нет» for the payer and for any account sharing the paid email.
+  DELETE FROM public.business_access_renewal_choices c
+  WHERE c.answer = 'no'
+    AND c.period_end <= NEW.paid_until
+    AND (
+      c.user_id = NEW.user_id
+      OR c.user_id IN (
+        SELECT g.user_id FROM public.access_grants g WHERE g.email_hash = NEW.email_hash
+      )
+    );
   RETURN NEW;
 END;
 $$;
