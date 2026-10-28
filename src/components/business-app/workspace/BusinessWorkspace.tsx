@@ -32,6 +32,7 @@ import {
 import {
   workspaceDeadlineDelay,
   workspacePlaybackAllowed,
+  workspacePlaybackDeadline,
   workspacePlayerOpen,
   type WorkspacePageModel,
   type WorkspaceTrack,
@@ -73,10 +74,14 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     if (model.tracks.length > 0) adopt(model);
   }, [model, adopt]);
   useEffect(() => {
-    if ((reportedStatus === "trial" || reportedStatus === "paid") && reportedEndsAt) {
-      reportChromeAccess({ mode: reportedStatus, endsAt: reportedEndsAt });
+    if ((reportedStatus === "trial" || reportedStatus === "paid" || reportedStatus === "grace") && reportedEndsAt) {
+      reportChromeAccess({
+        mode: reportedStatus,
+        endsAt: reportedEndsAt,
+        ...(reportedStatus === "grace" && model.playbackUntil ? { graceEndsAt: model.playbackUntil } : {}),
+      });
     }
-  }, [reportChromeAccess, reportedStatus, reportedEndsAt]);
+  }, [model.playbackUntil, reportChromeAccess, reportedStatus, reportedEndsAt]);
   const trackKey = model.tracks.map((track) => track.audioItemId).join(",");
   const feedbackKey = queue.feedback.map((item) => `${item.audioItemId}:${item.kind}`).join(",");
   const boundaryRef = useRef<string | null>(null);
@@ -184,9 +189,10 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
     let expired = false;
     const check = () => {
       if (expired) return;
-      if (workspacePlaybackAllowed(model.endsAt, Date.now())) {
+      const deadline = workspacePlaybackDeadline(model);
+      if (workspacePlaybackAllowed(deadline, Date.now())) {
         clearTimeout(timer);
-        timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
+        timer = setTimeout(check, workspaceDeadlineDelay(deadline, Date.now()));
         return;
       }
       expired = true;
@@ -198,13 +204,13 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
           if (!res.ok) return;
           const json = await res.json() as { ok?: boolean; model?: WorkspacePageModel };
           if (!json.ok || !json.model) return;
-          const value = workspacePlayerOpen(json.model) && !workspacePlaybackAllowed(json.model.endsAt, Date.now())
+          const value = workspacePlayerOpen(json.model) && !workspacePlaybackAllowed(workspacePlaybackDeadline(json.model), Date.now())
             ? { ...json.model, status: "offer" as const, daysLeft: 0, tracks: [] }
             : json.model;
           setRefreshed({ source: initialModel, value });
         }).catch(() => { /* The local offer stays closed until access can be refreshed. */ });
     };
-    timer = setTimeout(check, workspaceDeadlineDelay(model.endsAt, Date.now()));
+    timer = setTimeout(check, workspaceDeadlineDelay(workspacePlaybackDeadline(model), Date.now()));
     window.addEventListener("focus", check);
     document.addEventListener("visibilitychange", check);
     return () => {

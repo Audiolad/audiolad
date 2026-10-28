@@ -10,6 +10,7 @@ import {
   buildPaidAuthenticatedPrimaryHref,
   buildStudioMusicPaidHref,
   isAuthorProjectCapacityCheckout,
+  isBusinessSubscriptionCheckout,
   isStudioMusicLicenseCheckout,
 } from "@/lib/payments/checkout-result-cta";
 import {
@@ -91,6 +92,7 @@ export default function CheckoutResultClient() {
 
   const studioLicense = isStudioMusicLicenseCheckout(status?.orderKind);
   const capacityPurchase = isAuthorProjectCapacityCheckout(status?.orderKind);
+  const businessSubscription = isBusinessSubscriptionCheckout(status?.orderKind);
   const libraryHref = useMemo(
     () =>
       capacityPurchase
@@ -305,6 +307,16 @@ export default function CheckoutResultClient() {
           actionLabel="Создать новый проект"
           secondaryHref="/author-dashboard"
           secondaryLabel="В кабинет автора"
+        />
+      );
+    }
+    if (businessSubscription) {
+      return (
+        <ResultCard
+          title="Оплата прошла. Доступ открыт."
+          description="30 дней кабинета АудиоЛад Бизнес. Автосписания нет."
+          actionHref={listenHref}
+          actionLabel="Вернуться в кабинет"
         />
       );
     }

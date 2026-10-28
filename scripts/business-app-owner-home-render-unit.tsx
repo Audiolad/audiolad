@@ -18,6 +18,8 @@ const context: Extract<BusinessOwnerHomeContext, { status: "authenticated" }> = 
   owner: { userId: "owner", firstName: "Анна" },
   organizationId: "org", organizationName: "Организация",
   location: { id: "loc", organizationId: "org", name: "Тестовая точка", businessCategory: "spa", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
+  canPay: true,
+  offerAccepted: true,
   signals: { ...emptyBusinessOwnerHomeSignals(), playerCount: 1, primaryHealthStatus: "online", secondsSinceHeartbeat: 30 },
 };
 const render = (signals = context.signals, props: BusinessHomePageProps = {}) => renderToStaticMarkup(
@@ -126,10 +128,10 @@ const endedHome = withAccess({ mode: "offer", endsAt: trialEnds });
 assert.match(endedHome, /id="dostup"/);
 assert.match(endedHome, /Подарочный период закончился/);
 assert.match(endedHome, new RegExp(formatBusinessMonthlyPrice().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(" ", "\\s")));
-assert.match(endedHome, /в месяц/);
-assert.match(endedHome, /ничего не списывает/);
-assert.match(endedHome, /data-testid="biz-home-subscribe"/);
-assert.match(endedHome, /Оформить подписку/);
-assert.ok(endedHome.includes(businessGiftRulesText()));
+assert.match(endedHome, /за 30 дней/);
+assert.match(endedHome, /без автосписания/);
+assert.match(endedHome, /data-testid="biz-home-pay-button"/);
+assert.match(endedHome, /Оплатить/);
+assert.doesNotMatch(endedHome, /—/);
 assert.doesNotMatch(withAccess({ mode: "offer", endsAt: null }), /data-testid="biz-home-access"/, "no grant is not a finished trial");
 console.log("business-app-owner-home-render-unit: ok");

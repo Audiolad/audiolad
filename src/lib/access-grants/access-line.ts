@@ -8,15 +8,21 @@ import type { CustomerAccessMode } from "./policy";
 
 export type BusinessChromeAccess = {
   mode: CustomerAccessMode;
-  /** ISO end of the live period (gift or paid); null when there is none. */
+  /** ISO end of the gift or paid period. Grace does not move it. */
   endsAt: string | null;
+  /** ISO instant when music stops. Set only while mode is grace. */
+  graceEndsAt?: string | null;
 };
 
 export const BUSINESS_NO_ACCESS: BusinessChromeAccess = { mode: "none", endsAt: null };
 
 /** Live gift or paid period: the cabinet must not offer the gift again. */
 export function hasLiveBusinessAccess(access: BusinessChromeAccess | null | undefined): boolean {
-  return Boolean(access && (access.mode === "trial" || access.mode === "paid") && access.endsAt);
+  return Boolean(
+    access &&
+      (access.mode === "trial" || access.mode === "paid" || access.mode === "grace") &&
+      access.endsAt,
+  );
 }
 
 /** «22 ноября 2026» in Moscow time. */
@@ -52,6 +58,10 @@ export function effectiveChromeAccess(
 
 export function businessAccessLine(access: BusinessChromeAccess | null | undefined): string | null {
   if (!access || !hasLiveBusinessAccess(access) || !access.endsAt) return null;
+  if (access.mode === "grace" && access.graceEndsAt) {
+    const day = formatMoscowDay(access.graceEndsAt);
+    return day ? `Музыка играет до ${day}` : null;
+  }
   const day = formatMoscowDay(access.endsAt);
   if (!day) return null;
   return access.mode === "paid" ? `Подписка действует до ${day}` : `Бесплатный доступ до ${day}`;

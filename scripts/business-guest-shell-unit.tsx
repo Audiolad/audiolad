@@ -306,7 +306,8 @@ async function closedApis() {
   assert.deepEqual(effectiveChromeAccess(null, null), BUSINESS_NO_ACCESS);
   const workspaceSource = readFileSync("src/components/business-app/workspace/BusinessWorkspace.tsx", "utf8");
   assert.match(workspaceSource, /useReportBusinessChromeAccess\(\)/, "workspace reports its live period to the shell");
-  assert.match(workspaceSource, /reportChromeAccess\(\{ mode: reportedStatus, endsAt: reportedEndsAt \}\)/);
+  assert.match(workspaceSource, /reportedStatus === "grace"/);
+  assert.match(workspaceSource, /graceEndsAt: model\.playbackUntil/);
   const shellSource = readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8");
   assert.match(shellSource, /const chromeAccess = useBusinessChromeAccess\(\);/, "shell strip decision reads the (reportable) context");
 }
@@ -346,9 +347,12 @@ void (async () => {
   assert.notEqual(stranger.mode, "trial", "unrelated account: no gift");
   assert.equal(stranger.endsAt, null);
   const over = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-22T14:11:37Z"));
-  assert.equal(over.mode, "offer", "gift over at its exact end instant is not a live trial");
-  assert.equal(over.endsAt, "2026-11-22T14:11:37Z", "Главная still receives the end instant");
-  assert.equal(hasLiveBusinessAccess(over), false, "an ended gift does not keep the calm access line");
+  assert.equal(over.mode, "grace", "at the gift end music still plays for 3 days");
+  assert.equal(over.endsAt, "2026-11-22T14:11:37Z", "Главная still receives the period end");
+  assert.equal(hasLiveBusinessAccess(over), true, "grace keeps the cabinet line");
+  const stopped = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-25T14:11:37Z"));
+  assert.equal(stopped.mode, "offer", "after 3 days the player is closed");
+  assert.equal(hasLiveBusinessAccess(stopped), false, "an ended gift does not keep the calm access line");
   const paid = await peekChromeAccessWith(reader(["2026-12-31T10:00:00Z"]), { userId: "C", emailHash: "Y" }, new Date("2026-12-01T00:00:00Z"));
   assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z" }, "paid period after the gift");
   assert.ok(reads.length > 0);

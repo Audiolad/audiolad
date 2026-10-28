@@ -31,6 +31,10 @@ export type BusinessOwnerHomeContext =
       location: BusinessDomainLocation | null;
       organizationName: string | null;
       organizationId: string | null;
+      /** True only for an organization owner. A manager and a venue device cannot pay. */
+      canPay: boolean;
+      /** Account-level B2B offer. One acceptance covers every point. */
+      offerAccepted: boolean;
       /** Real player health / last-play projection for Owner Home chrome (P1-05). */
       signals: BusinessOwnerHomeSignals | null;
     };
@@ -58,18 +62,25 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     email: user.email ?? null,
   });
 
-  const { data: membership, error: membershipError } = await supabase
+  const { data: membershipRows, error: membershipError } = await supabase
     .from("business_organization_members")
-    .select("organization_id, role")
+    .select("organization_id, role, created_at")
     .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
 
   if (membershipError) {
     throw new Error(
       `business_domain_membership_read_failed:${membershipError.message}`,
     );
+  }
+
+  const memberships = membershipRows ?? [];
+  const membership = memberships[0] ?? null;
+  const canPay = memberships.some((row) => row.role === "owner");
+  let offerAccepted = false;
+  if (canPay) {
+    const { data: acceptance } = await supabase.rpc("business_offer_acceptance_for_caller");
+    offerAccepted = Array.isArray(acceptance) && acceptance.length > 0;
   }
 
   if (!membership?.organization_id) {
@@ -79,6 +90,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       location: null,
       organizationName: null,
       organizationId: null,
+      canPay,
+      offerAccepted,
       signals: null,
     };
   }
@@ -124,6 +137,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
       location: null,
       organizationName: org?.name ?? null,
       organizationId,
+      canPay,
+      offerAccepted,
       signals,
     };
   }
@@ -153,6 +168,8 @@ export async function loadBusinessOwnerHomeContext(): Promise<BusinessOwnerHomeC
     owner: { userId: user.id, firstName },
     organizationName: org?.name ?? null,
     organizationId,
+    canPay,
+    offerAccepted,
     location: {
       id: location.id,
       organizationId: location.organization_id,
