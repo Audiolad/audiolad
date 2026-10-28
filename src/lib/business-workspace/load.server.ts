@@ -14,6 +14,7 @@ import {
 } from "@/lib/access-grants/paths";
 import { isEmailConfirmed, formatMoscowDateTime } from "@/lib/access-grants/policy";
 import { createSupabaseAccessGrantStore } from "@/lib/access-grants/supabase-store";
+import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
@@ -35,11 +36,8 @@ import { sourcesForSpace } from "./catalog-sources";
 import { workspaceTrackWithDisplayTitle } from "./display-title";
 import { selectWorkspaceTracks, type SpaceAdmission, type TrackEligibility } from "./catalog";
 import {
-  WORKSPACE_RIGHTS_CACHE_MS,
   WORKSPACE_RIGHTS_CONCURRENCY,
-  createTtlDecisionCache,
   mapPool,
-  type TtlDecisionCache,
 } from "./eligibility-cache";
 import { workspacePlayerOpen, type WorkspacePageModel, type WorkspaceTrack } from "./model";
 import { resolveBusinessSpace, type BusinessSpaceId } from "./spaces";
@@ -49,24 +47,6 @@ const PAGE_SIZE = 500;
 const ID_CHUNK = 80;
 
 type ServiceDb = ReturnType<typeof createServiceRoleClient>;
-
-type CatalogCache = {
-  decisions: TtlDecisionCache<BusinessEligibilityDecision>;
-  inflight: Map<string, Promise<BusinessEligibilityDecision>>;
-  curated: { key: string; at: number; rows: WorkspaceCatalogCandidate[] } | null;
-};
-
-function catalogCache(): CatalogCache {
-  const holder = globalThis as typeof globalThis & { __audioladWorkspaceCatalog?: CatalogCache };
-  if (!holder.__audioladWorkspaceCatalog) {
-    holder.__audioladWorkspaceCatalog = {
-      decisions: createTtlDecisionCache(WORKSPACE_RIGHTS_CACHE_MS),
-      inflight: new Map(),
-      curated: null,
-    };
-  }
-  return holder.__audioladWorkspaceCatalog;
-}
 
 function baseModel(spaceId: BusinessSpaceId, spaceTitle: string, spaceEnabled: boolean): WorkspacePageModel {
   return {
@@ -92,17 +72,6 @@ function baseModel(spaceId: BusinessSpaceId, spaceTitle: string, spaceEnabled: b
   };
 }
 
-function one<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
-function embeddedName(value: unknown): string {
-  const row = one(value as { name?: string | null } | { name?: string | null }[] | null);
-  const name = row && typeof row.name === "string" ? row.name.trim() : "";
-  return name;
-}
-
 async function selectPages<T>(
   run: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
 ): Promise<T[] | null> {
@@ -120,59 +89,28 @@ async function resolveDecision(
   db: ServiceDb,
   locationId: string,
   audioItemId: string,
-): Promise<{ decision: BusinessEligibilityDecision; cache: boolean }> {
+): Promise<BusinessEligibilityDecision> {
   const { data, error } = await db.rpc("resolve_business_track_eligibility", {
     p_audio_item_id: audioItemId,
     p_location_id: locationId,
     p_zone_id: null,
     p_use_type: "business_background_playback",
   });
-  if (error) return { decision: "UNKNOWN", cache: false };
+  if (error) return "UNKNOWN";
   const parsed = parseBusinessEligibilityPayload(data, audioItemId);
-  if (!parsed) return { decision: "UNKNOWN", cache: false };
-  return { decision: parsed.decision, cache: true };
+  if (!parsed) return "UNKNOWN";
+  return parsed.decision;
 }
 
-/**
- * No venue: every track is UNKNOWN and the rights RPC is not called (it cannot
- * return ELIGIBLE without a location). With a venue, decisions are cached for
- * five minutes and cold misses run with a small pool. A single batch RPC would
- * need a migration, so this stays on the existing function.
- */
+/** Fresh decisions on every request: a manual revocation must not wait for a TTL. */
 async function loadEligibility(
   db: ServiceDb,
   locationId: string | null,
   audioItemIds: readonly string[],
 ): Promise<TrackEligibility[]> {
-  if (!locationId) {
-    return audioItemIds.map((audioItemId) => ({ audioItemId, decision: "UNKNOWN" }));
-  }
-  const bag = catalogCache();
-  const missing: string[] = [];
-  const known = new Map<string, BusinessEligibilityDecision>();
-  for (const audioItemId of audioItemIds) {
-    const hit = bag.decisions.get(`${locationId}:${audioItemId}`);
-    if (hit) known.set(audioItemId, hit);
-    else missing.push(audioItemId);
-  }
-  const fresh = await mapPool(missing, WORKSPACE_RIGHTS_CONCURRENCY, async (audioItemId) => {
-    const key = `${locationId}:${audioItemId}`;
-    const again = bag.decisions.get(key);
-    if (again) return { audioItemId, decision: again };
-    const pending = bag.inflight.get(key);
-    if (pending) return { audioItemId, decision: await pending };
-    const promise = resolveDecision(db, locationId, audioItemId).then((result) => {
-      bag.inflight.delete(key);
-      if (result.cache) bag.decisions.set(key, result.decision);
-      return result.decision;
-    });
-    bag.inflight.set(key, promise);
-    return { audioItemId, decision: await promise };
-  });
-  for (const row of fresh) known.set(row.audioItemId, row.decision);
-  return audioItemIds.map((audioItemId) => ({
-    audioItemId,
-    decision: known.get(audioItemId) ?? "UNKNOWN",
+  if (!locationId) return audioItemIds.map((audioItemId) => ({ audioItemId, decision: "UNKNOWN" }));
+  return mapPool(audioItemIds, WORKSPACE_RIGHTS_CONCURRENCY, async (audioItemId) => ({
+    audioItemId, decision: await resolveDecision(db, locationId, audioItemId),
   }));
 }
 
@@ -180,13 +118,14 @@ type PracticeRow = {
   id: string;
   title: string | null;
   author_id: string | null;
+  author_name: string | null;
   status: string | null;
   product_kind: string | null;
   catalog_visibility: string | null;
   deleted_at: string | null;
-  cover_url: string | null;
-  cover_image: unknown;
-  updated_at: string | null;
+  cover_url?: string | null;
+  cover_image?: unknown;
+  updated_at?: string | null;
 };
 
 type AudioRow = {
@@ -200,34 +139,36 @@ type AudioRow = {
   active_music_delivery_asset_id: string | null;
 };
 
-async function loadCuratedCandidates(
-  db: ServiceDb,
-  spaceId: BusinessSpaceId,
-): Promise<WorkspaceCatalogCandidate[] | "error"> {
-  const sources = sourcesForSpace(spaceId);
-  if (sources.length === 0) return [];
-  const authorIds = sources.map((source) => source.authorId);
-  const cacheKey = `${spaceId}:${authorIds.join(",")}`;
-  const bag = catalogCache();
-  const now = Date.now();
-  if (bag.curated && bag.curated.key === cacheKey && now - bag.curated.at < WORKSPACE_RIGHTS_CACHE_MS) {
-    return bag.curated.rows;
+/** Direction albums come from an RPC that has no cover columns. Public covers are read separately. */
+async function attachPracticeCovers(db: ServiceDb, practices: PracticeRow[]): Promise<PracticeRow[] | "error"> {
+  const missing = practices.filter((row) => !("cover_url" in row) && row.id);
+  if (missing.length === 0) return practices;
+  const covers = new Map<string, Pick<PracticeRow, "cover_url" | "cover_image" | "updated_at">>();
+  for (let index = 0; index < missing.length; index += ID_CHUNK) {
+    const chunk = missing.slice(index, index + ID_CHUNK).flatMap((row) => row.id ? [row.id] : []);
+    const page = await db.from("practices").select("id, cover_url, cover_image, updated_at").in("id", chunk);
+    if (page.error || !Array.isArray(page.data)) return "error";
+    for (const row of page.data as { id: string; cover_url: string | null; cover_image: unknown; updated_at: string | null }[]) {
+      covers.set(row.id, row);
+    }
   }
+  return practices.map((row) => {
+    const cover = row.id ? covers.get(row.id) : undefined;
+    return cover ? { ...row, ...cover } : row;
+  });
+}
 
-  const authorNames = await db.from("authors").select("id, name").in("id", authorIds);
-  if (authorNames.error || !Array.isArray(authorNames.data)) return "error";
-  const nameByAuthor = new Map(
-    (authorNames.data as { id: string; name: string | null }[]).map((row) => [row.id, row.name?.trim() || ""]),
-  );
-
-  const practices = await selectPages<PracticeRow>((from, to) => db
-    .from("practices")
-    .select("id, title, author_id, status, product_kind, catalog_visibility, deleted_at, cover_url, cover_image, updated_at")
-    .in("author_id", authorIds)
-    .order("id", { ascending: true })
-    .range(from, to));
-  if (!practices) return "error";
-
+async function candidatesFromPractices(
+  db: ServiceDb,
+  practices: PracticeRow[],
+  authorIds: readonly string[],
+  nameByAuthor: ReadonlyMap<string | null, string>,
+  sources: ReturnType<typeof sourcesForSpace>,
+  requireKnownAuthor: boolean,
+): Promise<WorkspaceCatalogCandidate[] | "error"> {
+  const withCovers = await attachPracticeCovers(db, practices);
+  if (withCovers === "error") return "error";
+  practices = withCovers;
   const allowedAuthors = new Set(authorIds);
   const sourceByAuthor = new Map(sources.map((source) => [source.authorId, source]));
   const practiceById = new Map<string, PracticeRow>();
@@ -238,7 +179,6 @@ async function loadCuratedCandidates(
   }
   const practiceIds = [...practiceById.keys()];
   if (practiceIds.length === 0) {
-    bag.curated = { key: cacheKey, at: now, rows: [] };
     return [];
   }
 
@@ -270,7 +210,7 @@ async function loadCuratedCandidates(
     const practice = audio.practice_id ? practiceById.get(audio.practice_id) : undefined;
     if (!practice?.author_id) continue;
     const source = sourceByAuthor.get(practice.author_id);
-    if (!source) continue;
+    if (requireKnownAuthor && !source) continue;
     const row: WorkspaceCatalogSourceRow = {
       audioItemId: audio.id,
       authorId: practice.author_id,
@@ -293,7 +233,7 @@ async function loadCuratedCandidates(
       }),
     };
     if (!acceptWorkspaceCatalogSourceRow(row, allowedAuthors)) continue;
-    sourceRows.push({ ...row, shelf: source.shelf });
+    sourceRows.push({ ...row, shelf: source?.shelf ?? "cafe" });
   }
 
   const ordered = orderWorkspaceCatalogRows(sourceRows, authorIds);
@@ -308,8 +248,52 @@ async function loadCuratedCandidates(
     shelf: row.shelf,
     coverUrl: row.coverUrl ?? null,
   }));
-  bag.curated = { key: cacheKey, at: now, rows: candidates };
   return candidates;
+}
+
+/** Gate on: albums the direction admission already allows. The eligibility function still decides each track. */
+async function loadDirectionCandidates(
+  db: ServiceDb,
+  spaceId: BusinessSpaceId,
+  locationId: string | null,
+): Promise<WorkspaceCatalogCandidate[] | "error"> {
+  if (!locationId) return [];
+  const practices = await selectPages<PracticeRow>((from, to) => db
+    .rpc("business_content_candidate_albums", { p_location_id: locationId }).range(from, to));
+  if (!practices) return "error";
+  const authorIds = [...new Set(practices.flatMap((row) => row.author_id ? [row.author_id] : []))].sort();
+  const nameByAuthor = new Map(practices.map((row) => [row.author_id, row.author_name?.trim() || ""]));
+  return candidatesFromPractices(db, practices, authorIds, nameByAuthor, sourcesForSpace(spaceId), false);
+}
+
+/** Gate off: published music of the curated authors, used only when the space has no per-track admissions. */
+async function loadAuthorCuratedCandidates(
+  db: ServiceDb,
+  spaceId: BusinessSpaceId,
+): Promise<WorkspaceCatalogCandidate[] | "error"> {
+  const sources = sourcesForSpace(spaceId);
+  if (sources.length === 0) return [];
+  const authorIds = sources.map((source) => source.authorId);
+  const authorNames = await db.from("authors").select("id, name").in("id", authorIds);
+  if (authorNames.error || !Array.isArray(authorNames.data)) return "error";
+  const nameByAuthor = new Map(
+    (authorNames.data as { id: string; name: string | null }[]).map((row) => [row.id, row.name?.trim() || ""]),
+  );
+  const practices = await selectPages<Omit<PracticeRow, "author_name">>((from, to) => db
+    .from("practices")
+    .select("id, title, author_id, status, product_kind, catalog_visibility, deleted_at, cover_url, cover_image, updated_at")
+    .in("author_id", authorIds)
+    .order("id", { ascending: true })
+    .range(from, to));
+  if (!practices) return "error";
+  return candidatesFromPractices(
+    db,
+    practices.map((row) => ({ ...row, author_name: row.author_id ? nameByAuthor.get(row.author_id) ?? "" : "" })),
+    authorIds,
+    nameByAuthor,
+    sources,
+    true,
+  );
 }
 
 function isListedPractice(practice: PracticeRow): boolean {
@@ -330,6 +314,17 @@ function candidateTrack(row: WorkspaceCatalogCandidate): WorkspaceTrack | null {
     shelf: row.shelf,
     coverUrl: row.coverUrl ?? null,
   });
+}
+
+function one<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function embeddedName(value: unknown): string {
+  const row = one(value as { name?: string | null } | { name?: string | null }[] | null);
+  const name = row && typeof row.name === "string" ? row.name.trim() : "";
+  return name;
 }
 
 function plainTrack(id: string, title: string | null, duration: number | null): WorkspaceTrack {
@@ -399,6 +394,54 @@ async function loadAdmissionTracks(db: ServiceDb, ids: readonly string[]): Promi
   return byId;
 }
 
+/**
+ * Pool the eligibility function is about to filter.
+ * Gate off keeps today's source: space admissions, or curated authors when that table is empty.
+ * Gate on reads direction-admitted albums. Either way, only ELIGIBLE tracks leave this module.
+ * A later passport ordering adapter may reorder that list and must not add a track.
+ */
+async function loadCandidateTracks(
+  db: ServiceDb,
+  spaceId: BusinessSpaceId,
+  locationId: string | null,
+): Promise<WorkspaceTrack[] | "error"> {
+  if (await businessManualContentGateEnabled(db)) {
+    const curated = await loadDirectionCandidates(db, spaceId, locationId);
+    if (curated === "error") return "error";
+    return curated.flatMap((row) => {
+      const track = candidateTrack(row);
+      return track ? [track] : [];
+    });
+  }
+
+  const admitted = await db
+    .from("business_space_admissions")
+    .select("space_id, audio_item_id")
+    .eq("space_id", spaceId);
+  if (admitted.error || !Array.isArray(admitted.data)) return "error";
+  const admissionIds: string[] = [];
+  const seen = new Set<string>();
+  for (const row of admitted.data as { space_id?: string; audio_item_id?: string }[]) {
+    if (row.space_id !== spaceId || typeof row.audio_item_id !== "string" || seen.has(row.audio_item_id)) continue;
+    seen.add(row.audio_item_id);
+    admissionIds.push(row.audio_item_id);
+  }
+  if (admissionIds.length > 0) {
+    const meta = await loadAdmissionTracks(db, admissionIds);
+    if (!meta) return "error";
+    return admissionIds.flatMap((id) => {
+      const track = meta.get(id);
+      return track ? [track] : [];
+    });
+  }
+  const curated = await loadAuthorCuratedCandidates(db, spaceId);
+  if (curated === "error") return "error";
+  return curated.flatMap((row) => {
+    const track = candidateTrack(row);
+    return track ? [track] : [];
+  });
+}
+
 export async function loadWorkspaceCatalog(input: {
   spaceId: BusinessSpaceId;
   locationId: string | null;
@@ -412,37 +455,12 @@ export async function loadWorkspaceCatalog(input: {
     return { tracks: [], unavailable: true };
   }
 
-  const admitted = await db
-    .from("business_space_admissions")
-    .select("space_id, audio_item_id")
-    .eq("space_id", input.spaceId);
-  if (admitted.error || !Array.isArray(admitted.data)) return { tracks: [], unavailable: true };
+  const named = await loadCandidateTracks(db, input.spaceId, input.locationId);
+  if (named === "error") return { tracks: [], unavailable: true };
+  const admissions: SpaceAdmission[] = named.map((track) => ({ spaceId: input.spaceId, audioItemId: track.audioItemId }));
+  const curatedById = new Map(named.map((track) => [track.audioItemId, track]));
 
-  const admissionIds: string[] = [];
-  const seenAdmissions = new Set<string>();
-  for (const row of admitted.data as { space_id?: string; audio_item_id?: string }[]) {
-    if (row.space_id !== input.spaceId || typeof row.audio_item_id !== "string") continue;
-    if (seenAdmissions.has(row.audio_item_id)) continue;
-    seenAdmissions.add(row.audio_item_id);
-    admissionIds.push(row.audio_item_id);
-  }
-
-  let admissions: SpaceAdmission[];
-  let curatedById: Map<string, WorkspaceTrack> | null = null;
-  if (admissionIds.length > 0) {
-    admissions = admissionIds.map((audioItemId) => ({ spaceId: input.spaceId, audioItemId }));
-  } else {
-    const curated = await loadCuratedCandidates(db, input.spaceId);
-    if (curated === "error") return { tracks: [], unavailable: true };
-    // Drop placeholder titles before the rights pool so «Аудио N» does not spend an RPC.
-    const named = curated.flatMap((row) => {
-      const track = candidateTrack(row);
-      return track ? [track] : [];
-    });
-    admissions = named.map((track) => ({ spaceId: input.spaceId, audioItemId: track.audioItemId }));
-    curatedById = new Map(named.map((track) => [track.audioItemId, track]));
-  }
-
+  // The eligibility function is the only playback gate, including sound review once the manual gate is on.
   const eligibility = await loadEligibility(db, input.locationId, admissions.map((row) => row.audioItemId));
   const ids = selectWorkspaceTracks({
     spaceId: input.spaceId,
@@ -452,18 +470,9 @@ export async function loadWorkspaceCatalog(input: {
   });
   if (ids.length === 0) return { tracks: [], unavailable: false };
 
-  if (curatedById) {
-    return {
-      tracks: ids.map((id) => curatedById.get(id)).filter((track): track is WorkspaceTrack => Boolean(track)),
-      unavailable: false,
-    };
-  }
-
-  const meta = await loadAdmissionTracks(db, ids);
-  if (!meta) return { tracks: [], unavailable: true };
   return {
     tracks: ids.flatMap((id) => {
-      const track = meta.get(id);
+      const track = curatedById.get(id);
       return track ? [track] : [];
     }),
     unavailable: false,

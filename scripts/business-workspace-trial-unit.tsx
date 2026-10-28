@@ -681,7 +681,10 @@ assert.match(read("src/lib/business-workspace/model.ts"), /coverUrl\?: string \|
 assert.doesNotMatch(read("src/lib/business-workspace/model.ts"), /audio_path|audioPath|signedUrl|createSignedUrl/);
 assert.match(loader, /sourcesForSpace/);
 assert.match(loader, /acceptWorkspaceCatalogSourceRow/);
-assert.match(loader, /WORKSPACE_RIGHTS_CACHE_MS/);
+assert.match(loader, /businessManualContentGateEnabled/);
+assert.match(loader, /business_content_candidate_albums/);
+assert.match(loader, /from\("business_space_admissions"\)/);
+assert.doesNotMatch(loader, /bag\.decisions|createTtlDecisionCache/);
 assert.match(loader, /"UNKNOWN"/);
 assert.doesNotMatch(loader, /guest-coffee\/catalog|GUEST_COFFEE_SHELF/);
 const signer = read("src/lib/business-workspace/sign.server.ts");

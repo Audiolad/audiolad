@@ -7,27 +7,10 @@ import type { WorkspaceTrackShelf } from "./model";
 import type { BusinessSpaceId } from "./spaces";
 
 /**
- * Curated workspace music used only when `business_space_admissions` has no rows
- * for the space (task ba344b7f, first playable cafe cabinet).
- *
- * Lookup is `authors.id` only. Slugs and display names are comments, never a query key.
- * Four ids already live in `src/lib/authors/*`. The other two were taken from the
- * public author page `authorId` (the same `authors.id`) on 2026-10-27:
- * ol-ga and lara-larina. There is no UUID constant for them elsewhere in the repo.
- *
- * How to add an author:
- * 1. Copy `authors.id` (the author page `authorId`). Do not match by name or slug.
- * 2. Append a row: `spaces` that should include the author, `shelf` (`cafe`, or
- *    `other` for a separate group such as Aurafon), and `sounds`.
- * 3. `sounds` only picks the starting shelf from the demo profile on this device.
- *    It does not hide the other authors. Ids match the guest sound types
- *    (jazz, calm, rhythm, melodic). An empty list is never a starting shelf.
- * 4. The loader still keeps published, listed, non-deleted music practices and
- *    published tracks with playable audio, then `resolve_business_track_eligibility`.
- *    Anything other than ELIGIBLE is dropped. No database write is required.
- *
- * First release: the coffee projects plus Aurafon as its own group. Other
- * business-cleared authors stay out until a row is added here.
+ * Presentation hints and personal onboarding-preview sources only.
+ * These UUIDs never grant Business playback. The workspace loads all published
+ * music, then the common SQL engine requires manual artist/album admission
+ * for the venue category AND active legal eligibility.
  */
 
 /** authors.id for slug ol-ga. */
@@ -59,7 +42,7 @@ export const WORKSPACE_CATALOG_SOURCES: readonly WorkspaceCatalogSource[] = [
   { authorId: OLGA_NEVSKAYA_AUTHOR_ID, spaces: ["cafe"], shelf: "cafe", sounds: ["melodic"] },
   // lara-larina. In the catalog; the starting shelf for melodic is the earlier row.
   { authorId: LARA_LARINA_AUTHOR_ID, spaces: ["cafe"], shelf: "cafe", sounds: [] },
-  // aurafon, separate group so it stays reachable from the cafe cabinet.
+  // aurafon presentation hint; cafe playback still requires explicit manual approval.
   { authorId: AURAFON_AUTHOR_ID, spaces: ["cafe"], shelf: "other", sounds: [] },
 ];
 

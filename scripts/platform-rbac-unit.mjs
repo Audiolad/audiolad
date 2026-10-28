@@ -299,8 +299,17 @@ assert.doesNotMatch(
 );
 
 const playlistApi = read("src/app/api/playlists/route.ts");
-assert.match(playlistApi, /playlists\.create_editorial/);
+// Creation now delegates to the direction-aware permission helper.
+assert.match(playlistApi, /const canCreate = await canUserCreateEditorialInDirection\(/);
+const playlistAccess = read("src/lib/playlists/playlist-access.ts");
+const createDirectionAccess = playlistAccess.slice(playlistAccess.indexOf("export async function canUserCreateEditorialInDirection("),
+  playlistAccess.indexOf("export async function canUserEditEditorialPlaylist("));
+assert.match(createDirectionAccess, /hasPermission\(supabase, userId, "playlists\.manage"\)/);
+assert.match(createDirectionAccess, /return isDirectionEditor\(supabase, userId, directionId\)/);
 assert.doesNotMatch(playlistApi, /products\.moderate/);
+assert.ok(getVisibleAdminNavItems(accessForRoles(["admin"])).some((item) => item.href === "/admin/business-track-review"));
+assert.equal(getVisibleAdminNavItems(accessForRoles(["editor"])).some((item) => item.href === "/admin/business-track-review"), false);
+assert.match(read("src/app/(platform)/admin/business-track-review/actions.ts"), /requireAdminPermission\('author_products\.moderate'\)/);
 assert.ok(
   rolesGrantPermission(["admin"], "playlists.manage"),
   "admin can manage platform playlists",

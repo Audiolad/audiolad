@@ -5,8 +5,8 @@ import type { BusinessSpaceId } from "./spaces";
 /**
  * Server-side catalog gate (task ba344b7f).
  * A track is playable only when the space is enabled, the track is admitted for that
- * space (task 28d2b5bb writes business_space_admissions; this module does not),
- * AND the rights engine says ELIGIBLE. UNKNOWN is not a bypass.
+ * space candidate pool AND the common engine says ELIGIBLE after both manual
+ * artist/album admission and rights checks. UNKNOWN is not a bypass.
  */
 
 export type SpaceAdmission = {

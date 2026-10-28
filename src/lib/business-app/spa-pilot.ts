@@ -1,4 +1,6 @@
 import "server-only";
+import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
+import { parseBusinessEligibilityPayload } from "@/lib/business-app/eligibility";
 
 import { resolveMusicListenSource } from "@/lib/listen/music-delivery";
 import { normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -166,6 +168,16 @@ export async function signSpaTrack(
   if (ttl <= 0) throw new Error("business_spa_track_expired");
 
   const db = createServiceRoleClient();
+  if (await businessManualContentGateEnabled(db)) {
+    const decision = await db.rpc("resolve_business_track_eligibility", {
+      p_audio_item_id: audioItemId,
+      p_location_id: ctx.locationId,
+      p_zone_id: ctx.zoneId,
+      p_use_type: "business_background_playback",
+    });
+    const parsed = decision.error ? null : parseBusinessEligibilityPayload(decision.data, audioItemId);
+    if (!parsed || parsed.decision !== "ELIGIBLE") throw new Error("business_sound_review_required");
+  }
   const { data: row } = await db
     .from("audio_items")
     .select("id, audio_path, active_music_delivery_asset_id")
