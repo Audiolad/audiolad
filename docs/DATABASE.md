@@ -18,7 +18,10 @@ to unchecked. Analyzer writes do not. There is no
 and returns that result while `manual_content_gate` is false. When the gate is
 true it also requires `resolve_business_content_admission` for the location
 direction (album overrides artist; unreviewed is excluded) and a matching
-approved sound review. It never turns a non-eligible legal result into
+approved sound review, or an artist sound auto-admission
+(`business_artist_sound_auto`, migration `20270202120000`) when the track has
+no explicit matching «Не допущен». Auto-admission does not skip rights or
+direction admission and inserts no artists. It never turns a non-eligible legal result into
 ELIGIBLE. `business_space_admissions` does not grant playback once the gate is
 on. The review queue view `business_sound_admitted_albums` lists direction keys
 for albums the content resolver allows. An approved album sibling is playable

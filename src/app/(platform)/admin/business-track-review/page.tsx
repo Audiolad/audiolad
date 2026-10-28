@@ -18,9 +18,9 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
   const uuid = (value: string) => /^[0-9a-f-]{36}$/i.test(value) ? value : null;
   const page = Math.max(0, Math.min(100000, Number.parseInt(get('page'), 10) || 0));
   const space = BUSINESS_SPACES.some((s) => s.id === get('space')) ? get('space') : '';
-  const db = await createClient();
   const artist = uuid(get('artist')) ?? '';
   const album = uuid(get('album')) ?? '';
+  const db = await createClient();
   let queue;
   try {
     queue = await loadAgreementSoundQueue(db, { status, artist, album, space, page });
@@ -56,7 +56,10 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
       <button className="underline">Применить</button><Link href="/admin/business-track-review">Сбросить</Link>
     </form>
     <Link className="underline" href={href(0, true)}>Режим «Следующий непроверенный»</Link>
-    <ReviewQueue key={`${status}:${get('artist')}:${get('album')}:${space}:${page}`} rows={queue.rows} />
+    <ReviewQueue key={`${status}:${artist}:${album}:${space}`} rows={queue.rows} scope={{
+      status, artist, album, space, total: queue.total,
+      albumTotal: queue.albumTotal, artistTotal: queue.artistTotal,
+    }} />
     <nav className="flex gap-4" aria-label="Страницы очереди">
       {page > 0 && <Link href={href(page - 1)}>Назад</Link>}
       <span>Страница {page + 1} · Треков: {queue.total}</span>

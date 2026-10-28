@@ -37,7 +37,9 @@ GRANT SELECT ON audio_items, practices TO anon, authenticated;
 """
 admissions = (root / 'supabase/migrations/20270131120000_business_manual_admissions.sql').read_text()
 migration = (root / 'supabase/migrations/20270201120000_business_track_sound_reviews.sql').read_text()
+auto = (root / 'supabase/migrations/20270202120000_business_artist_sound_auto.sql').read_text()
 smoke = (root / 'supabase/tests/business_track_sound_reviews_smoke.sql').read_text()
+auto_smoke = (root / 'supabase/tests/business_artist_sound_auto_smoke.sql').read_text()
 with tempfile.TemporaryDirectory(prefix='audiolad-sound-review-') as scratch:
     data = Path(scratch) / 'data'
     subprocess.run([str(pg / 'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'],
@@ -52,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix='audiolad-sound-review-') as scratch:
             raise SystemExit(1)
         # Restricted Codex sandboxes disallow even Unix sockets. Still execute all
         # SQL and RPC authorization tests; RLS visibility needs the socket mode.
-        texts = [setup, admissions, migration, migration, "SET test.single_user = 'on';", smoke]
+        texts = [setup, admissions, migration, migration, auto, auto, "SET test.single_user = 'on';", smoke, auto_smoke]
         sql = '\n'.join(' '.join(line for line in text.splitlines() if not line.lstrip().startswith('--'))
                         for text in texts) + '\n'
         result = subprocess.run([str(pg / 'postgres'), '--single', '-D', str(data), 'postgres'],
@@ -61,11 +63,11 @@ with tempfile.TemporaryDirectory(prefix='audiolad-sound-review-') as scratch:
     else:
         try:
             result = subprocess.run([str(pg / 'psql'), '-X', '-h', scratch, '-p', '55496', '-d', 'postgres',
-                                     '-v', 'ON_ERROR_STOP=1'], input='\n'.join([setup, admissions, migration, migration, smoke]), text=True, capture_output=True)
+                                     '-v', 'ON_ERROR_STOP=1'], input='\n'.join([setup, admissions, migration, migration, auto, auto, smoke, auto_smoke]), text=True, capture_output=True)
         finally:
             subprocess.run([str(pg / 'pg_ctl'), '-D', str(data), '-m', 'fast', '-w', 'stop'], check=True, capture_output=True)
         mode = 'private Unix socket: full RLS visibility tests'
-    if result.returncode or 'ERROR:' in result.stderr or 'SOUND_REVIEW_OK' not in result.stdout:
+    if result.returncode or 'ERROR:' in result.stderr or 'SOUND_REVIEW_OK' not in result.stdout or 'ARTIST_SOUND_AUTO_OK' not in result.stdout:
         print(result.stdout, result.stderr)
         raise SystemExit(1)
     print(f'PASS ({mode}): migration twice, RBAC, audit, queue, gates, replacement, reanalysis, public catalogue.')
