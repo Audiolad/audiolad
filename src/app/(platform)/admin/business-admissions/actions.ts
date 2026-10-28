@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminPermission } from "@/lib/admin/guard";
+import { admissionAuthorsAccepted } from "@/lib/business-admission/agreement.server";
 import { createClient } from "@/lib/supabase/server";
 
 const PATH = "/admin/business-admissions";
@@ -16,6 +17,11 @@ export async function saveBusinessAdmissions(form: FormData): Promise<void> {
   const ids = [...new Set(form.getAll("ids").map(String))];
   let failed = !["artist", "album"].includes(kind) || !["true", "false", "inherit"].includes(value)
     || ids.length === 0 || ids.length > 200 || ids.some((id) => !UUID.test(id));
+  if (!failed) {
+    try {
+      if (!await admissionAuthorsAccepted(kind as "artist" | "album", ids)) failed = true;
+    } catch { failed = true; }
+  }
   if (!failed) {
     try {
       const db = await createClient();
@@ -41,6 +47,11 @@ export async function setBusinessArtistSoundAuto(form: FormData): Promise<void> 
   const authorId = String(form.get("authorId") ?? "");
   const enabled = String(form.get("enabled")) === "true";
   let failed = !UUID.test(authorId);
+  if (!failed) {
+    try {
+      if (!await admissionAuthorsAccepted("artist", [authorId])) failed = true;
+    } catch { failed = true; }
+  }
   if (!failed) {
     try {
       const db = await createClient();

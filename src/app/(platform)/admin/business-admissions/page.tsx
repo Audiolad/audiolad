@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireAdminPermission } from "@/lib/admin/guard";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { BUSINESS_AGREEMENT_LIST_HINT } from "@/lib/business-admission/agreement-list";
+import { listAgreementAdmissionPage } from "@/lib/business-admission/agreement.server";
 import { ADMISSION_SOURCE_LABELS, resolveManualAdmission } from "@/lib/business-admission/policy";
 import { addBusinessDirection, saveBusinessAdmissions, setBusinessArtistSoundAuto, setBusinessManualContentGate } from "./actions";
 import SelectPage from "./SelectPage";
@@ -27,6 +29,7 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
   let directions: Direction[] = [], decisions: Decision[] = [], rows: Row[] = [], audit: Audit[] = [];
   let unavailable = false;
   let hasMore = false;
+  let listedTotal = 0;
   let gateOn = false;
   const soundAuto = new Map<string, boolean>();
   let soundAutoReady = true;
@@ -42,23 +45,14 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
     if (dirs.error || history.error) throw new Error("unavailable");
     directions = dirs.data as Direction[];
     audit = history.data as Audit[];
-    // Search and effective-decision filtering happen in SQL before pagination.
-    const result = await db.rpc("list_business_content_admissions", {
-      p_kind: kind, p_query: q, p_direction: directionFilter || null,
-      p_decision: decisionFilter || null, p_offset: (page - 1) * PAGE_SIZE, p_limit: PAGE_SIZE + 1,
+    const listed = await listAgreementAdmissionPage({
+      kind, query: q, direction: directionFilter || null, decision: decisionFilter || null,
+      offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, directions,
     });
-    if (result.error) throw new Error("unavailable");
-    const listed = result.data as { id: string; title: string; author_id: string | null; author_name: string }[];
-    hasMore = listed.length > PAGE_SIZE;
-    rows = listed.slice(0, PAGE_SIZE).map((r) => ({ id: r.id, title: r.title, authorId: r.author_id, authorName: r.author_name }));
-    const ids = [...new Set(rows.flatMap((r) => [r.id, ...(r.authorId ? [r.authorId] : [])]))];
-    if (ids.length) {
-      // UUIDs come from the database, never from a raw search string.
-      const data = await db.from("business_content_admissions").select("author_id, practice_id, direction_key, allowed, changed_by, changed_at")
-        .or(`author_id.in.(${ids.join(",")}),practice_id.in.(${ids.join(",")})`);
-      if (data.error) throw new Error("unavailable");
-      decisions = data.data as Decision[];
-    }
+    listedTotal = listed.total;
+    hasMore = listed.total > page * PAGE_SIZE;
+    rows = listed.rows;
+    decisions = listed.decisions as Decision[];
     if (kind === "artist" && rows.length) {
       const flags = await db.from("business_artist_sound_auto").select("author_id, enabled").in("author_id", rows.map((row) => row.id));
       if (flags.error) soundAutoReady = false;
@@ -109,6 +103,10 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
         <select name="allowed" aria-label="Массовое решение" defaultValue="inherit" className="border p-2"><option value="inherit">{kind === "album" ? "Наследовать от артиста" : "Снять решение"}</option><option value="true">Разрешить</option><option value="false">Запретить</option></select>
         <button type="submit" className="rounded border px-3 py-2">Применить к выбранным</button>
       </form>
+      <p>{BUSINESS_AGREEMENT_LIST_HINT} – {listedTotal}.{" "}
+        <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>
+      {!listedTotal && <p>Пока нет авторов с подтверждёнными правами.{" "}
+        <Link className="underline" href="/admin/business-verification">Проверка правообладателей и лицензий</Link></p>}
       <div className="overflow-x-auto"><table className="w-full border-collapse text-sm"><caption className="text-left">{kind === "artist" ? "Артисты" : "Альбомы"} – страница {page}, записей: {rows.length}</caption><thead><tr><th><SelectPage key={href(page)} /></th><th className="text-left">{kind === "artist" ? "Артист" : "Альбом / артист"}</th>{kind === "artist" && <th>Автодопуск звучания</th>}{visibleDirections.map((d) => <th key={d.key}>{d.name}</th>)}</tr></thead>
         <tbody>{rows.map((r) => <tr key={r.id} className="border-t align-top"><td className="p-2"><input type="checkbox" form="bulk-admissions" name="ids" value={r.id} aria-label={`Выбрать ${r.title}`} /></td><td className="p-2">{r.title}{kind === "album" && <p className="text-neutral-500">{r.authorName}</p>}</td>
           {kind === "artist" && <td className="min-w-40 space-y-2 p-2">{soundAutoReady ? <>
@@ -133,7 +131,7 @@ export default async function BusinessAdmissionsPage({ searchParams }: {
               {changed && <p className="break-all text-xs text-neutral-500">{new Date(changed.changed_at).toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })} · {changed.changed_by}</p>}
             </td>;
           })}</tr>)}</tbody></table></div>
-      {!rows.length && <p>Записи не найдены.</p>}
+      {listedTotal > 0 && !rows.length && <p>На этой странице записей нет.</p>}
       <nav className="flex gap-4">{page > 1 && <Link className="underline" href={href(page - 1)}>Назад</Link>}{hasMore && <Link className="underline" href={href(page + 1)}>Далее</Link>}</nav>
       <details className="rounded border p-3"><summary>Добавить направление</summary><form action={addBusinessDirection} className="mt-3 flex flex-wrap gap-3">
         <input required name="key" pattern="[a-z][a-z0-9_]{1,63}" placeholder="Код: hotels" aria-label="Код направления" className="border p-2" />

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, type SoundReviewRow } from '../src/lib/business/track-sound-review';
+import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, restrictSoundQueueToAgreement, type SoundReviewRow } from '../src/lib/business/track-sound-review';
 import { collectQueuedSoundReviews, saveSoundReviewBatch, soundReviewBulkConfirm, soundReviewSelectionCount } from '../src/lib/business/track-sound-bulk';
 import { hasCurrentSoundApproval, sameSoundAudioIdentity, soundAllowedTrackIds } from '../src/lib/business/track-sound-review.server';
 import { workspaceSignBlocked } from '../src/lib/business-workspace/sign-gate';
@@ -48,6 +48,15 @@ const batch = await saveSoundReviewBatch(collected.ok ? collected.rows : [], 'ap
 assert.deepEqual(reviewed, [idA]);
 assert.deepEqual(batch, { saved: 1, failed: 1 });
 assert.equal((await collectQueuedSoundReviews(async () => ({ rows: [], total: 501 }), [])).ok, false);
+const queueRows = [
+  { id: 't1', title: 'One', artist_id: 'jazz', artist: 'Джаз Релакс', album_id: 'al', album: 'Вечер', duration_seconds: 1, spaces: ['cafe'], audio_identity: '[]', status: 'unchecked' as const, reason: null, reviewed_at: null, reviewed_by: null },
+  { id: 't2', title: 'Two', artist_id: 'med', artist: 'Медитация', album_id: 'am', album: 'Тишина', duration_seconds: 1, spaces: ['cafe'], audio_identity: '[]', status: 'approved' as const, reason: null, reviewed_at: null, reviewed_by: null },
+];
+const restricted = restrictSoundQueueToAgreement(queueRows, new Set(['jazz']), { page: 0 });
+assert.deepEqual(restricted.rows.map((row) => row.id), ['t1']);
+assert.equal(restricted.total, 1);
+assert.equal(restricted.counts.approved, 0);
+assert.deepEqual(restricted.artists.map((artist) => artist.id), ['jazz']);
 assert.equal(nextUnchecked([], null), null);
 assert.equal(nextUnchecked([rows[0]], 'a'), null);
 
@@ -178,6 +187,8 @@ assert.match(route, /BUSINESS_TRACK_PREVIEW_SOURCE_TTL_SECONDS/);
 assert.doesNotMatch(route, /LISTEN_SIGNED_URL_TTL_SECONDS|signWorkspaceAudio/);
 assert.doesNotMatch(read('src/app/(platform)/admin/business-track-review/actions.ts'), /signWorkspaceAudio/);
 assert.match(read('src/app/(platform)/admin/business-track-review/actions.ts'), /businessTrackPreviewHref/);
+assert.match(read('src/app/(platform)/admin/business-track-review/actions.ts'), /verifiedRightsAuthorIds/);
+assert.match(read('src/app/(platform)/admin/business-track-review/page.tsx'), /loadAgreementSoundQueue/);
 const sql = read('supabase/migrations/20270201120000_business_track_sound_reviews.sql');
 assert.doesNotMatch(sql, /\b(?:DELETE FROM|DROP TABLE|UPDATE public\.(?:audio_items|practices))\b/i);
 assert.match(sql, /resolve_business_track_eligibility_v1\(p_audio_item_id/);

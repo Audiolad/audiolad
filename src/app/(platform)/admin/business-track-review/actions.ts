@@ -14,6 +14,7 @@ import {
   saveSoundReviewBatch,
   type SoundReviewBulkScope,
 } from '@/lib/business/track-sound-bulk';
+import { verifiedRightsAuthorIds } from '@/lib/business-admission/agreement.server';
 import { createClient } from '@/lib/supabase/server';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,6 +46,7 @@ export async function reviewBusinessTracksBulk(input: {
     return soundReviewBulkMessage(0, 0, 'invalid');
   }
   const db = await createClient();
+  const verified = await verifiedRightsAuthorIds();
   const review = async (row: SoundReviewRow) => {
     const { error } = await db.rpc('admin_review_business_track_sound', {
       p_audio_item_id: row.id, p_status: input.status, p_reason: input.reason, p_audio_identity: row.audio_identity,
@@ -61,6 +63,9 @@ export async function reviewBusinessTracksBulk(input: {
       const row = await locateSoundReviewRow(db, id);
       if (!row) missing += 1;
       else rows.push(row);
+    }
+    if (rows.some((row) => !verified.has(row.artist_id))) {
+      return { ok: false, saved: 0, failed: 0, message: 'В выборе есть треки без подтверждённых прав.' };
     }
     const saved = await saveSoundReviewBatch(rows, input.status, input.reason, review);
     const result = soundReviewBulkMessage(saved.saved, saved.failed + missing);
@@ -79,7 +84,8 @@ export async function reviewBusinessTracksBulk(input: {
     return { rows: payload.rows, total: payload.total };
   }, filter.excludedIds);
   if (!collected.ok) return soundReviewBulkMessage(0, 0, collected.reason);
-  const saved = await saveSoundReviewBatch(collected.rows, input.status, input.reason, review);
+  const allowedRows = collected.rows.filter((row) => verified.has(row.artist_id));
+  const saved = await saveSoundReviewBatch(allowedRows, input.status, input.reason, review);
   const result = soundReviewBulkMessage(saved.saved, saved.failed);
   if (result.saved > 0) revalidatePath('/admin/business-track-review');
   return result;
