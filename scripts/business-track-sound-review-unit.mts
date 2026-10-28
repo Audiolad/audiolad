@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, type SoundReviewRow } from '../src/lib/business/track-sound-review';
+import { SOUND_REVIEW_STATUSES, isSoundReviewStatus, nextUnchecked, restrictSoundQueueToAgreement, type SoundReviewRow } from '../src/lib/business/track-sound-review';
 import { collectQueuedSoundReviews, saveSoundReviewBatch, soundReviewBulkConfirm, soundReviewSelectionCount } from '../src/lib/business/track-sound-bulk';
 import { hasCurrentSoundApproval, sameSoundAudioIdentity, soundAllowedTrackIds } from '../src/lib/business/track-sound-review.server';
 import { workspaceSignBlocked } from '../src/lib/business-workspace/sign-gate';
@@ -46,6 +46,15 @@ const batch = await saveSoundReviewBatch(collected.ok ? collected.rows : [], 'ap
 assert.deepEqual(reviewed, [idA]);
 assert.deepEqual(batch, { saved: 1, failed: 1 });
 assert.equal((await collectQueuedSoundReviews(async () => ({ rows: [], total: 501 }), [])).ok, false);
+const queueRows = [
+  { id: 't1', title: 'One', artist_id: 'jazz', artist: 'Джаз Релакс', album_id: 'al', album: 'Вечер', duration_seconds: 1, spaces: ['cafe'], audio_identity: '[]', status: 'unchecked' as const, reason: null, reviewed_at: null, reviewed_by: null },
+  { id: 't2', title: 'Two', artist_id: 'med', artist: 'Медитация', album_id: 'am', album: 'Тишина', duration_seconds: 1, spaces: ['cafe'], audio_identity: '[]', status: 'approved' as const, reason: null, reviewed_at: null, reviewed_by: null },
+];
+const restricted = restrictSoundQueueToAgreement(queueRows, new Set(['jazz']), { page: 0 });
+assert.deepEqual(restricted.rows.map((row) => row.id), ['t1']);
+assert.equal(restricted.total, 1);
+assert.equal(restricted.counts.approved, 0);
+assert.deepEqual(restricted.artists.map((artist) => artist.id), ['jazz']);
 assert.equal(nextUnchecked([], null), null);
 assert.equal(nextUnchecked([rows[0]], 'a'), null);
 

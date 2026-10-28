@@ -11,6 +11,8 @@
 Отдельную сущность альбома создавать не требуется. Публичный и SEO-каталог
 используют существующие загрузчики продуктов и этим изменением не ограничиваются.
 
+Списки `/admin/business-admissions` и очередь `/admin/business-track-review` показывают только рабочие пространства владельцев, у которых `business_rightsholder_verifications.status` равен `verified` («Пример подтверждён» на `/admin/business-verification`). Отклонённое, отозванное и ограниченное подтверждение список не открывает. Строки допусков остальных аккаунтов не удаляются.
+
 Кабинет Business использует `src/lib/business-workspace/load.server.ts`.
 Флаг `business_runtime_flags.manual_content_gate` по умолчанию выключен.
 Пока он выключен, кандидаты берутся как сейчас: `business_space_admissions`,
