@@ -44,17 +44,46 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/**
+ * useSyncExternalStore calls getSnapshot twice per render and requires the
+ * same reference. A fresh object here loops (React #185). The PWA error
+ * boundary then swaps the page tree and recreates the desktop catalog
+ * scroller, so Play jumps the grid to the top. Mobile document scroll
+ * survives that swap; this cache keeps the boundary from firing at all.
+ */
+let deviceStateSnapshotKey: string | null | undefined;
+let deviceStateSnapshot: PwaDeviceLocalState = PWA_DEFAULT_DEVICE_STATE;
+
+function rememberDeviceState(
+  raw: string | null,
+  state: PwaDeviceLocalState,
+): PwaDeviceLocalState {
+  deviceStateSnapshotKey = raw;
+  deviceStateSnapshot = state;
+  return state;
+}
+
 export function readPwaDeviceState(): PwaDeviceLocalState {
   if (typeof window === "undefined") {
     return PWA_DEFAULT_DEVICE_STATE;
   }
 
-  const parsed = readJson<PwaDeviceLocalState>(
-    window.localStorage.getItem(PWA_LOCAL_STORAGE_KEYS.deviceState),
-  );
+  let raw: string | null = null;
+
+  try {
+    raw = window.localStorage.getItem(PWA_LOCAL_STORAGE_KEYS.deviceState);
+  } catch {
+    raw = null;
+  }
+
+  if (deviceStateSnapshotKey === raw) {
+    return deviceStateSnapshot;
+  }
+
+  const parsed = readJson<PwaDeviceLocalState>(raw);
 
   if (!parsed || typeof parsed !== "object") {
-    return PWA_DEFAULT_DEVICE_STATE;
+    return rememberDeviceState(raw, PWA_DEFAULT_DEVICE_STATE);
   }
 
   const status = PWA_INSTALL_STATES.includes(parsed.status as PwaInstallState)
@@ -67,7 +96,7 @@ export function readPwaDeviceState(): PwaDeviceLocalState {
       ? (parsed.installPlatform as PwaPlatform)
       : null;
 
-  return {
+  return rememberDeviceState(raw, {
     status,
     dismissedUntil:
       typeof parsed.dismissedUntil === "number" ? parsed.dismissedUntil : null,
@@ -82,7 +111,7 @@ export function readPwaDeviceState(): PwaDeviceLocalState {
       typeof parsed.promptAcceptedAt === "number"
         ? parsed.promptAcceptedAt
         : null,
-  };
+  });
 }
 
 export function writePwaDeviceState(state: PwaDeviceLocalState): void {
