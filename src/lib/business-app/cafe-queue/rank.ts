@@ -9,9 +9,12 @@
  *   + mood-tag match (guest-coffee affinities, no BPM and no voice)
  *   + loudness sanity.
  * Calm / lively shifts that target by ±15.
- * "More / less like this" nudges the session by tag overlap and energy proximity.
+ * "More / less like this" reorders by passport similarity to the voted track:
+ * more brings the closest tracks forward, less sends them backward.
+ * A track without a passport stays neutral. Tempo counts only when both
+ * passports have a reliable BPM.
  * Tracks without a passport or without energy keep their relative order and are
- * appended after the ranked ones.
+ * appended after the ranked ones, until a vote reorders the whole pool.
  * The same album is not placed twice in a row when another ranked track can split them.
  * A numeric seed instead mixes the whole pool: better passport fits tend to come
  * earlier, and the same album is kept apart around the loop when the counts allow it.
@@ -25,7 +28,7 @@ import type { GuestCoffeeSoundFeatures } from "@/lib/business-app/guest-coffee/p
 
 import type { CafeDaypart, CafeQueueFeedback } from "./prefs";
 import { CAFE_ENERGY_OFFSET_STEP } from "./prefs";
-import { weightedAlbumOrder } from "./shuffle";
+import { mulberry32, weightedAlbumOrder } from "./shuffle";
 import type { CafeTrackSignals } from "./signals";
 
 /** Cafe targets on the analyzer's 0–100 energy scale. */
@@ -44,8 +47,8 @@ const MOOD_WEIGHT = 0.3;
 const LOUDNESS_WEIGHT = 0.08;
 /** Guest-coffee affinity at a full fit: 10 + 4 + 2. */
 const MOOD_SCALE = 16;
-const FEEDBACK_POINTS = 36;
-const FEEDBACK_CAP = 72;
+/** Similarity scores inside one band are shuffled, not frozen in score order. */
+const SIMILARITY_BAND = 0.05;
 
 export type CafeQueueTrack = {
   audioItemId: string;
@@ -91,31 +94,115 @@ function loudnessSanity(lufs: number | null): number {
   return Math.max(0, 100 - distance * 8);
 }
 
-function tagSet(sound: GuestCoffeeSoundFeatures | null): Set<string> {
-  if (!sound) return new Set();
-  const labels = [
-    ...sound.genres,
-    ...sound.styles,
-    ...sound.moods,
-    ...sound.instruments,
-    ...sound.character,
-  ].map((item) => item.label);
-  return new Set(labels);
+function weightedOverlap(
+  left: readonly { label: string; weight: number }[],
+  right: readonly { label: string; weight: number }[],
+): number | null {
+  if (left.length === 0 || right.length === 0) return null;
+  const rightWeights = new Map(right.map((item) => [item.label, item.weight]));
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  for (const item of left) leftNorm += item.weight * item.weight;
+  for (const item of right) rightNorm += item.weight * item.weight;
+  for (const item of left) {
+    const weight = rightWeights.get(item.label);
+    if (weight) dot += item.weight * weight;
+  }
+  const scale = Math.sqrt(leftNorm) * Math.sqrt(rightNorm);
+  return scale > 0 ? dot / scale : 0;
 }
 
-function tagOverlap(left: Set<string>, right: Set<string>): number {
-  if (left.size === 0 || right.size === 0) return 0;
-  let shared = 0;
-  for (const label of left) if (right.has(label)) shared += 1;
-  const union = left.size + right.size - shared;
-  return union > 0 ? shared / union : 0;
+function unitCloseness(left: number | null | undefined, right: number | null | undefined, span: number): number | null {
+  if (left == null || right == null || span <= 0) return null;
+  return 1 - Math.min(span, Math.abs(left - right)) / span;
 }
 
-function similarity(left: CafeTrackSignals, right: CafeTrackSignals): number {
-  const tags = tagOverlap(tagSet(left.sound), tagSet(right.sound));
-  if (left.energy === null || right.energy === null) return tags;
-  const proximity = 1 - Math.abs(left.energy - right.energy) / 100;
-  return 0.7 * tags + 0.3 * proximity;
+/**
+ * 0–1 match of one track to the voted track.
+ * Genre, mood, instrumentation, style and character use the passport label weights.
+ * Energy and BPM count only when both tracks have them. No passport is neutral (0.5).
+ */
+export function passportSimilarity(
+  reference: CafeTrackSignals | undefined,
+  candidate: CafeTrackSignals | undefined,
+): number {
+  const left = reference?.hasPassport ? reference.sound : null;
+  const right = candidate?.hasPassport ? candidate.sound : null;
+  if (!left || !right) return 0.5;
+  const parts: { weight: number; score: number }[] = [];
+  const labels: { weight: number; left: typeof left.genres; right: typeof right.genres }[] = [
+    { weight: 0.26, left: left.genres, right: right.genres },
+    { weight: 0.24, left: left.moods, right: right.moods },
+    { weight: 0.2, left: left.instruments, right: right.instruments },
+    { weight: 0.12, left: left.styles, right: right.styles },
+    { weight: 0.08, left: left.character, right: right.character },
+  ];
+  for (const part of labels) {
+    const score = weightedOverlap(part.left, part.right);
+    if (score !== null) parts.push({ weight: part.weight, score });
+  }
+  const energy = unitCloseness(reference?.energy, candidate?.energy, 100);
+  if (energy !== null) parts.push({ weight: 0.07, score: energy });
+  const tempo = unitCloseness(reference?.bpm, candidate?.bpm, 80);
+  if (tempo !== null) parts.push({ weight: 0.03, score: tempo });
+  if (parts.length === 0) return 0.5;
+  const weight = parts.reduce((sum, part) => sum + part.weight, 0);
+  return parts.reduce((sum, part) => sum + part.weight * part.score, 0) / weight;
+}
+
+function voteSeed(audioItemId: string, kind: string, seed: number | undefined): number {
+  if (seed !== undefined) return seed;
+  let hash = 2166136261;
+  const text = `${kind}|${audioItemId}`;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Move tracks that sound like the voted one.
+ * More: closest first. Less: closest last. The voted track is scored like any other
+ * (it matches itself). Tracks without a passport stay in the neutral band.
+ * The same album is still split, and nothing is added or removed.
+ */
+export function applyPassportFeedback<T extends CafeQueueTrack>(
+  pool: readonly T[],
+  signals: ReadonlyMap<string, CafeTrackSignals>,
+  feedback: readonly CafeQueueFeedback[],
+  seed?: number,
+): T[] {
+  const vote = [...feedback].reverse().find((item) => pool.some((track) => track.audioItemId === item.audioItemId));
+  if (!vote) return [...pool];
+  const reference = signals.get(vote.audioItemId);
+  const scored = pool.map((track, index) => {
+    const similarity = passportSimilarity(reference, signals.get(track.audioItemId));
+    const directed = vote.kind === "more" ? similarity : 1 - similarity;
+    return { track, index, directed };
+  });
+  const rng = mulberry32(voteSeed(vote.audioItemId, vote.kind, seed));
+  const bands = new Map<number, typeof scored>();
+  for (const row of scored) {
+    const band = Math.round(row.directed / SIMILARITY_BAND);
+    const group = bands.get(band) ?? [];
+    group.push(row);
+    bands.set(band, group);
+  }
+  const ordered: T[] = [];
+  for (const band of [...bands.keys()].sort((left, right) => right - left)) {
+    const group = bands.get(band)!;
+    group.sort((left, right) => right.directed - left.directed || left.index - right.index);
+    for (let index = group.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(rng() * (index + 1));
+      const current = group[index]!;
+      group[index] = group[swap]!;
+      group[swap] = current;
+    }
+    ordered.push(...group.map((row) => row.track));
+  }
+  return separateAlbums(ordered);
 }
 
 function moodScore(
@@ -158,7 +245,6 @@ export function rankCafeQueue<T extends CafeQueueTrack>(
 ): T[] {
   const target = cafeEnergyTarget(ranking.daypart, ranking.energyOffset);
   const feedback = ranking.feedback ?? [];
-  const byId = new Map(pool.map((track) => [track.audioItemId, track]));
   const signalById = new Map<string, CafeTrackSignals>();
   for (const track of pool) {
     const row = signals.get(track.audioItemId);
@@ -173,28 +259,22 @@ export function rankCafeQueue<T extends CafeQueueTrack>(
       fallback.push(track);
       return;
     }
-    let score = ENERGY_WEIGHT * (100 - Math.abs(row.energy! - target))
+    const score = ENERGY_WEIGHT * (100 - Math.abs(row.energy! - target))
       + MOOD_WEIGHT * moodScore(row.sound!, ranking)
       + LOUDNESS_WEIGHT * loudnessSanity(row.loudnessLufs);
-    let nudge = 0;
-    for (const vote of feedback) {
-      const reference = signalById.get(vote.audioItemId);
-      const voted = byId.get(vote.audioItemId);
-      if (!reference || !voted) continue;
-      const weight = similarity(reference, row);
-      nudge += vote.kind === "more" ? FEEDBACK_POINTS * weight : -FEEDBACK_POINTS * weight;
-    }
-    score += Math.max(-FEEDBACK_CAP, Math.min(FEEDBACK_CAP, nudge));
     ranked.push({ track, index, score });
   });
 
   ranked.sort((left, right) => right.score - left.score || left.index - right.index);
-  if (ranking.seed === undefined) {
-    return [...separateAlbums(ranked.map((row) => row.track)), ...fallback];
-  }
-  const mixed = [
-    ...ranked.map((row) => ({ track: row.track, albumKey: row.track.albumKey, score: row.score })),
-    ...fallback.map((track, index) => ({ track, albumKey: track.albumKey, score: UNRANKED_SCORE - index * 0.01 })),
-  ];
-  return weightedAlbumOrder(mixed, ranking.seed, ranking.boundaryAlbumKey).map((row) => row.track);
+  const base = ranking.seed === undefined
+    ? [...separateAlbums(ranked.map((row) => row.track)), ...fallback]
+    : weightedAlbumOrder(
+      [
+        ...ranked.map((row) => ({ track: row.track, albumKey: row.track.albumKey, score: row.score })),
+        ...fallback.map((track, index) => ({ track, albumKey: track.albumKey, score: UNRANKED_SCORE - index * 0.01 })),
+      ],
+      ranking.seed,
+      ranking.boundaryAlbumKey,
+    ).map((row) => row.track);
+  return applyPassportFeedback(base, signals, feedback, ranking.seed);
 }

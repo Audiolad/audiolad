@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { handleCafeQueue } from "../src/lib/business-app/cafe-queue/handle";
-import { cafeQueueIndices, cafeQueueNextIndex, cafeUpcomingMoreCount, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
+import { cafeAheadIndices, cafeQueueIndices, cafeQueueNextIndex, cafeUniqueAhead, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, ruTrackWord } from "../src/lib/business-app/cafe-queue/order";
 import { currentCabinetAdmission, restrictCafePool } from "../src/lib/business-app/cafe-queue/pool";
 import {
   cafeDaypartAtMinute,
@@ -24,7 +24,8 @@ import {
   peekAtmosphereRestart,
   takeAtmosphereRestart,
 } from "../src/lib/business-app/cafe-queue/atmosphere-restart";
-import { cafeEnergyTarget, rankCafeQueue, type CafeQueueRanking, type CafeQueueTrack } from "../src/lib/business-app/cafe-queue/rank";
+import { feedbackHoldMs } from "../src/lib/business-app/cafe-queue/feedback-phase";
+import { cafeEnergyTarget, passportSimilarity, rankCafeQueue, type CafeQueueRanking, type CafeQueueTrack } from "../src/lib/business-app/cafe-queue/rank";
 import { parseCafeQueueRequest } from "../src/lib/business-app/cafe-queue/request";
 import { cafeSignalsFromPassport, type CafeTrackSignals } from "../src/lib/business-app/cafe-queue/signals";
 import type { GuestCoffeePassportVersionRow } from "../src/lib/business-app/guest-coffee/passport-features";
@@ -53,6 +54,7 @@ function signals(patch: Partial<CafeTrackSignals> & Pick<CafeTrackSignals, "ener
     energy: patch.energy,
     loudnessLufs: patch.loudnessLufs ?? -14,
     sound: patch.sound === undefined ? sound({ genres: ["jazz"], moods: ["calm"] }) : patch.sound,
+    bpm: patch.bpm ?? null,
   };
 }
 
@@ -98,6 +100,34 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
   assert.equal(ruTrackWord(21), "трек");
   assert.equal(cafeUpcomingMoreCount(7), 4);
   assert.equal(cafeUpcomingMoreCount(3), 0);
+  assert.equal(cafeUpcomingMoreLabel(1), "и ещё 1 трек без повторов");
+  assert.equal(cafeUpcomingMoreLabel(3), "и ещё 3 трека без повторов");
+  assert.equal(cafeUpcomingMoreLabel(5), "и ещё 5 треков без повторов");
+  assert.equal(cafeUpcomingMoreLabel(11), "и ещё 11 треков без повторов");
+  assert.equal(cafeUpcomingMoreLabel(21), "и ещё 21 трек без повторов");
+  assert.equal(cafeUpcomingMoreLabel(22), "и ещё 22 трека без повторов");
+  assert.equal(cafeUpcomingMoreLabel(257), "и ещё 257 треков без повторов");
+  assert.equal(cafeUpcomingMoreLabel(0), null);
+  {
+    const order = Array.from({ length: 261 }, (_, index) => index);
+    const tracks = order.map((index) => ({ audioItemId: `id-${index}` }));
+    const moreAt = (index: number) => cafeUpcomingMoreCount(cafeUniqueAhead(tracks, order, index).length);
+    assert.equal(moreAt(0), 257, "at the start, three shown and 257 unique tracks remain");
+    assert.equal(moreAt(1), 256, "the next track leaves one fewer unique track");
+    assert.equal(moreAt(2), 255);
+    assert.equal(moreAt(256), 1, "four unique tracks left: three shown and one more");
+    assert.equal(moreAt(257), 0, "three unique tracks left are all shown");
+    assert.equal(moreAt(260), 0, "the last track has no unique remainder");
+    assert.deepEqual(cafeAheadIndices(order, 260), []);
+    const repeated = [
+      { audioItemId: "heard" },
+      { audioItemId: "fresh" },
+      { audioItemId: "heard" },
+      { audioItemId: "fresh" },
+      { audioItemId: "new" },
+    ];
+    assert.deepEqual(cafeUniqueAhead(repeated, [0, 1, 2, 3, 4], 0), [1, 4], "a copy of a heard track is not counted again");
+  }
   assert.equal(cafeEnergyTarget("morning", 0), 40);
   assert.equal(cafeEnergyTarget("day", 0), 62);
   assert.equal(cafeEnergyTarget("evening", 0), 28);
@@ -184,6 +214,49 @@ function order(pool: CafeQueueTrack[], rows: Record<string, CafeTrackSignals>, r
     ["other", "similar"],
     "Меньше таких pushes the current sound back",
   );
+  const closeSound = sound({ genres: ["jazz"], moods: ["calm"], instruments: ["piano"] });
+  const farSound = sound({ genres: ["rock"], moods: ["aggressive"], instruments: ["guitar"] });
+  const voted = signals({ energy: 48, sound: closeSound, bpm: 92 });
+  const close = signals({ energy: 50, sound: closeSound, bpm: 96 });
+  const far = signals({ energy: 88, sound: farSound, bpm: 140 });
+  const neutral = signals({ energy: null, hasPassport: false, sound: null });
+  assert.ok(passportSimilarity(voted, close) > passportSimilarity(voted, far), "a matching passport scores above a distant one");
+  assert.equal(passportSimilarity(voted, neutral), 0.5, "no passport is neutral");
+  assert.ok(passportSimilarity(voted, voted) > passportSimilarity(voted, close), "a track matches itself most closely");
+  const votedTrack = track("voted", "album-v");
+  const closeTrack = track("close", "album-c");
+  const farTrack = track("far", "album-f");
+  const neutralTrack = track("neutral", "album-n");
+  const taste = {
+    voted,
+    close,
+    far,
+    neutral,
+  };
+  const tastePool = [farTrack, neutralTrack, closeTrack, votedTrack];
+  const moreOrder = order(tastePool, taste, { ...base, feedback: [{ audioItemId: "voted", kind: "more" }] });
+  assert.deepEqual(moreOrder, ["voted", "close", "neutral", "far"], "Больше puts the closest passports first");
+  const lessOrder = order(tastePool, taste, { ...base, feedback: [{ audioItemId: "voted", kind: "less" }] });
+  assert.equal(lessOrder[0], "far", "Меньше brings a distant passport forward");
+  assert.equal(lessOrder[lessOrder.length - 1], "voted", "Меньше leaves the voted track at the back");
+  assert.ok(lessOrder.indexOf("close") > lessOrder.indexOf("neutral"), "Меньше keeps a close passport behind a neutral one");
+  const sameAlbumA = track("same-a", "album-same");
+  const sameAlbumB = track("same-b", "album-same");
+  const splitter = track("split", "album-split");
+  const albumOrder = order(
+    [sameAlbumA, sameAlbumB, splitter],
+    { "same-a": voted, "same-b": close, split: far },
+    { ...base, feedback: [{ audioItemId: "same-a", kind: "more" }] },
+  );
+  assert.equal(albumOrder.length, 3);
+  assert.notEqual(
+    albumOrder[0]?.startsWith("same") && albumOrder[1]?.startsWith("same"),
+    true,
+    "the same album is still not adjacent",
+  );
+  assert.equal(feedbackHoldMs(200, false), 1000);
+  assert.equal(feedbackHoldMs(2000, false), 0);
+  assert.equal(feedbackHoldMs(0, true), 450);
 
   const missing = track("missing", "album-m");
   const later = track("later", "album-l");
