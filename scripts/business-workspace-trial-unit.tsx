@@ -22,6 +22,7 @@ import { musicPlayerMessage } from "../src/components/business-app/workspace/Bus
 import CafeQueueControls from "../src/components/business-app/workspace/CafeQueueControls";
 import { activateBusinessTrial, recordAccessActivity, recordPaidRenewal } from "../src/lib/access-grants/apply";
 import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, businessGiftPriceNote } from "../src/lib/access-grants/copy";
+import { assertNoForbiddenGiftText } from "./business-gift-copy-guard";
 import { hashAccessEmail } from "../src/lib/access-grants/email-hash";
 import { createMemoryAccessGrantStore } from "../src/lib/access-grants/memory-store";
 import {
@@ -583,7 +584,7 @@ const workspaceSource = read("src/components/business-app/workspace/BusinessWork
 const playerSource = read("src/components/business-app/workspace/BusinessCabinetPlayer.tsx");
 assert.doesNotMatch(workspaceSource, /799/);
 assert.doesNotMatch(workspaceSource, /autoPlay|autoplay/);
-assert.doesNotMatch(workspaceSource, /—/);
+assert.doesNotMatch(workspaceSource, /\u2014/);
 assert.doesNotMatch(workspaceSource, /email-hash|supabase-store/);
 assert.match(playerSource, /BusinessCabinetMiniBar/, "the cabinet renders the shared thin bar");
 assert.match(read("src/components/business-app/workspace/BusinessCabinetMiniBar.tsx"), /--biz-cabinet-player-height/, "the sticky bar reports its height");
@@ -651,7 +652,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(html, /Больше такой музыки/);
   assert.match(html, /Меньше такой музыки/);
   assert.match(html, /cafe-queue__glyph/);
-  assert.doesNotMatch(html, /—/);
+  assert.doesNotMatch(html, /\u2014/);
   assert.doesNotMatch(html, /Кафе, рестораны и отели/);
   assert.doesNotMatch(html, /data-testid="biz-workspace-days"|data-testid="biz-workspace-rules"|30 дней в подарок/);
   assert.match(html, /data-testid="biz-workspace-progress"/);
@@ -704,7 +705,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(manual, /Выбрано вручную – изменить/);
   assert.match(manual, /data-testid="biz-cafe-daypart-evening"[^>]*aria-pressed="true"/);
   assert.match(manual, /data-testid="biz-cafe-auto"[^>]*aria-pressed="false"/);
-  assert.doesNotMatch(auto + manual, /—/);
+  assert.doesNotMatch(auto + manual, /\u2014/);
 }
 {
   const tracks = Array.from({ length: 8 }, (_, index) => ({
@@ -751,7 +752,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(settings, /data-testid="biz-create-atmosphere"/);
   assert.match(settings, /Создать атмосферу/);
   assert.doesNotMatch(settings, /Атмосфера создана/);
-  assert.doesNotMatch(settings, /—/);
+  assert.doesNotMatch(settings, /\u2014/);
   const settingsSource = read("src/components/business-app/BusinessPlayerSettings.tsx");
   assert.match(settingsSource, /AtmosphereAssembling/);
   assert.match(settingsSource, /rebuildFromProfile/);
@@ -766,7 +767,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(workspaceSource, /atmospherePlaybackPlan/);
   assert.match(workspaceSource, /takeAtmosphereRestart/);
   assert.match(playerSource, /boundaryAudioItemId/);
-  assert.doesNotMatch(settingsSource, /—/);
+  assert.doesNotMatch(settingsSource, /\u2014/);
 }
 {
   const html = renderToStaticMarkup(<BusinessWorkspace model={model({ status: "offer", daysLeft: 0, tracks: [] })} />);
@@ -800,7 +801,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.match(playerSource, /workspaceItems\(current\.tracks, current\.playbackUntil \?\? current\.endsAt\)/);
   assert.match(workspaceSource, /setTimeout\(check, workspaceDeadlineDelay/);
   assert.match(playerSource, /applyManifest\(null\)/);
-  assert.doesNotMatch(playerSource, /—/);
+  assert.doesNotMatch(playerSource, /\u2014/);
   assert.match(read("src/app/api/business/workspace/state/route.ts"), /export async function GET/);
 }
 
@@ -846,12 +847,21 @@ for (const file of [
   "src/components/business-app/BusinessOnboardingWizardPage.tsx",
 ]) {
   const visible = read(file).split("\n").filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join("\n");
-  assert.doesNotMatch(visible, /—/, `${file}: en dash only`);
+  assert.doesNotMatch(visible, /\u2014/, `${file}: en dash only`);
 }
 
 assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
-assert.match(BUSINESS_GIFT_CLOSING_NOTE, /После срока плеер закрыт до оплаты\./);
-assert.match(businessGiftPriceNote(), /за 30 дней, картой или по СБП\. Автосписания нет\./);
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
+assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
+assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
+assert.equal(businessGiftPriceNote().replace(/\s/gu, " "), "799 ₽ за 30 дней, картой или по СБП. Автосписания нет.");
+for (const [name, text] of [
+  ["closing note", BUSINESS_GIFT_CLOSING_NOTE],
+  ["licence note", BUSINESS_GIFT_LICENSE_NOTE],
+  ["price note", businessGiftPriceNote()],
+] as const) {
+  assertNoForbiddenGiftText(text, name, [["gift title", /30 дней в подарок/]]);
+}
 const giftCopy = read("src/lib/access-grants/copy.ts");
 assert.doesNotMatch(giftCopy, /не становится безлимитной|Пределы Студии|Гостевой проект Студии|один раз на подтверждённый адрес|businessGiftRulesText/);
 assert.doesNotMatch(read("src/lib/business-workspace/model.ts"), /rules: string/);
@@ -861,6 +871,14 @@ assert.match(pending, /BUSINESS_GIFT_CLOSING_NOTE/);
 assert.match(pending, /BUSINESS_GIFT_LICENSE_NOTE/);
 assert.match(pending, /businessGiftPriceNote\(\)/);
 assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|безлимит|Гостевой проект/);
+{
+  // Visible copy only (comments stripped): no Studio limits, MB or hours on the copy module, the card or the confirmation screen.
+  const stripComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assertNoForbiddenGiftText(stripComments(giftCopy), "copy.ts");
+  assertNoForbiddenGiftText(stripComments(pending), "business-return page");
+  const card = stripComments(read("src/components/business-app/BusinessHomeAccessCard.tsx"));
+  assertNoForbiddenGiftText(card, "BusinessHomeAccessCard", [["gift title", /BUSINESS_GIFT_TITLE|30 дней в подарок/]]);
+}
 
 // ---------------------------------------------------------------- cafe cabinet: curated authors, rights gate, venue link
 {
@@ -1094,7 +1112,7 @@ assert.doesNotMatch(pending, /businessGiftRulesText|Пределы Студии|
   assert.match(playing, /data-playing="true"/);
   assert.match(playing, /♪/);
   assert.match(playing, /loading="lazy"/);
-  assert.doesNotMatch(playing, /—/);
+  assert.doesNotMatch(playing, /\u2014/);
   assert.match(groupedHtml, /data-testid="biz-workspace-player"/);
   assert.doesNotMatch(groupedHtml, /«Играть»/);
   assert.doesNotMatch(groupedHtml, /Играть эту подборку/);

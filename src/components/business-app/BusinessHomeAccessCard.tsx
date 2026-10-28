@@ -8,7 +8,6 @@ import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvi
 import {
   BUSINESS_GIFT_CLOSING_NOTE,
   BUSINESS_GIFT_LICENSE_NOTE,
-  BUSINESS_GIFT_TITLE,
   BUSINESS_SUBSCRIPTION_NOTE,
   businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
@@ -146,8 +145,7 @@ export default function BusinessHomeAccessCard() {
   const days = trialDaysLeft(new Date(access.endsAt), new Date());
   return (
     <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="trial">
-      <p className="business-app-eyebrow">{BUSINESS_GIFT_TITLE}</p>
-      <p className="mt-2 text-[1.15rem] font-bold text-[var(--biz-text)]" data-testid="biz-home-days">
+      <p className="text-[1.15rem] font-bold text-[var(--biz-text)]" data-testid="biz-home-days">
         Осталось {days} {ruDaysWord(days)}
         <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-home-until">до {label}</span>
       </p>
