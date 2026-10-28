@@ -12,9 +12,22 @@ does not apply the migration and does not enable the timer by itself.
 
 `supabase/migrations/20270207140000_business_access_reminder_emails.sql`
 
-Additive table `business_access_reminder_sends` plus claim, complete and fail
-functions. No change to `access_grants`, `access_paid_periods` or `paid_until`.
-The 3-day grace stays computed, not stored.
+Additive tables `business_access_reminder_sends`, `business_access_renewal_choices`
+and `business_access_renewal_notes`, plus claim, complete, fail and renewal-choice
+functions. No column or data change to `access_grants`, `access_paid_periods` or
+`paid_until`. One additive trigger `business_access_renewal_clear_no` on
+`access_paid_periods` deletes an «Нет» answer when a payment covers that period
+(for the payer and for accounts with the same paid email). The 3-day grace stays
+computed, not stored.
+
+## «Планируете дальше пользоваться сервисом?»
+
+Shown in each letter (Да / Нет links to `#prodlenie?otvet=da|net`), on the owner
+card on Главная and on the venue device, from 3 Moscow days before the end through
+the grace (and on the card after an ended gift). «Нет» stops the remaining letters
+for that period and hides the payment plate; the owner can change the answer.
+An optional note «Что нам улучшить, чтобы вам понравилось и вы вернулись?» is
+readable only with `admin_panel.access`. A payment clears «Нет».
 
 Rollback comments are at the top of the migration and are not executed.
 
