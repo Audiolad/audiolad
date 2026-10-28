@@ -1,4 +1,4 @@
-import { BUSINESS_GIFT_MS } from "@/lib/business/plan";
+import { BUSINESS_GIFT_MS, BUSINESS_GRACE_MS } from "@/lib/business/plan";
 
 import type { AccessGrantEventName } from "./events";
 
@@ -18,13 +18,16 @@ export type GrantRow = {
   endsAt: string;
 };
 
-export type CustomerAccessMode = "none" | "trial" | "paid" | "offer";
+export type CustomerAccessMode = "none" | "trial" | "paid" | "grace" | "offer";
 
 export type CustomerAccess = {
   mode: CustomerAccessMode;
-  /** Full workspace player. Closed for anonymous, unconfirmed, expired and unpaid. */
+  /** Full workspace player. Open during trial, paid time and the 3-day grace. Closed after grace. */
   player: boolean;
+  /** End of the gift or paid period. Grace does not move this instant. */
   endsAt: string | null;
+  /** When the server must stop audio. Equals endsAt while the period is live, and endsAt plus 3 days during grace. */
+  playbackUntil: string | null;
   daysLeft: number | null;
   /** Expired and paid rows stay in the store. */
   grantKept: boolean;
@@ -106,7 +109,7 @@ export function decideTrialActivation(input: {
   paidUntil: string | null;
 }): TrialDecision {
   if (!input.emailConfirmed) return { type: "unconfirmed" };
-  if (input.paidUntil && isPeriodActive(input.paidUntil, input.now)) {
+  if (input.paidUntil && isInsideGrace(input.paidUntil, input.now)) {
     return { type: "paid_kept", paidUntil: input.paidUntil };
   }
   if (input.existing) return { type: "existing", grant: input.existing };
@@ -118,14 +121,31 @@ export function decideTrialActivation(input: {
   };
 }
 
+export function laterAccessInstant(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return Date.parse(a) >= Date.parse(b) ? a : b;
+}
+
+/** True from the start of a period until 3 days after its end. The end instant itself is already grace. */
+export function isInsideGrace(endsAtIso: string, now: Date): boolean {
+  const ends = Date.parse(endsAtIso);
+  return Number.isFinite(ends) && now.getTime() < ends + BUSINESS_GRACE_MS;
+}
+
+export function gracePlaybackUntil(endsAtIso: string): string {
+  return new Date(Date.parse(endsAtIso) + BUSINESS_GRACE_MS).toISOString();
+}
+
 export function resolveCustomerAccess(input: {
   now: Date;
   emailConfirmed: boolean;
   grant: GrantRow | null;
   paidUntil: string | null;
 }): CustomerAccess {
+  const kept = Boolean(input.grant || input.paidUntil);
   if (!input.emailConfirmed) {
-    return { mode: "none", player: false, endsAt: null, daysLeft: null, grantKept: Boolean(input.grant) };
+    return { mode: "none", player: false, endsAt: null, playbackUntil: null, daysLeft: null, grantKept: Boolean(input.grant) };
   }
   if (input.paidUntil && isPeriodActive(input.paidUntil, input.now)) {
     const ends = new Date(input.paidUntil);
@@ -133,6 +153,7 @@ export function resolveCustomerAccess(input: {
       mode: "paid",
       player: true,
       endsAt: input.paidUntil,
+      playbackUntil: input.paidUntil,
       daysLeft: trialDaysLeft(ends, input.now),
       grantKept: Boolean(input.grant),
     };
@@ -143,16 +164,30 @@ export function resolveCustomerAccess(input: {
       mode: "trial",
       player: true,
       endsAt: input.grant.endsAt,
+      playbackUntil: input.grant.endsAt,
       daysLeft: trialDaysLeft(ends, input.now),
       grantKept: true,
+    };
+  }
+  const contractual = laterAccessInstant(input.grant?.endsAt ?? null, input.paidUntil);
+  if (contractual && isInsideGrace(contractual, input.now)) {
+    const playbackUntil = gracePlaybackUntil(contractual);
+    return {
+      mode: "grace",
+      player: true,
+      endsAt: contractual,
+      playbackUntil,
+      daysLeft: trialDaysLeft(new Date(playbackUntil), input.now),
+      grantKept: kept,
     };
   }
   return {
     mode: "offer",
     player: false,
-    endsAt: input.grant?.endsAt ?? input.paidUntil,
+    endsAt: contractual,
+    playbackUntil: null,
     daysLeft: 0,
-    grantKept: Boolean(input.grant || input.paidUntil),
+    grantKept: kept,
   };
 }
 

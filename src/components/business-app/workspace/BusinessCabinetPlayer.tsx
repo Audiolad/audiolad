@@ -13,8 +13,7 @@ import {
 
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
-import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
-import { getCabinetDeviceSecret, postCabinetReport } from "@/lib/business-app/cabinet-player-client";
+import { postPointReport } from "@/lib/business-app/cabinet-player-client";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -124,20 +123,16 @@ function writeLocal(spaceId: string, playback: WorkspacePlayback): void {
   }
 }
 
-function deviceSecret(): string {
-  const storage = typeof window === "undefined" ? null : window.sessionStorage;
-  const random = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()));
-  return getCabinetDeviceSecret(storage, random);
-}
-
 export function BusinessCabinetPlayerProvider({
   initialModel = null,
+  pointReports = false,
   children,
 }: {
   initialModel?: WorkspacePageModel | null;
+  /** Only the paired venue device writes heartbeat and now playing. */
+  pointReports?: boolean;
   children: ReactNode;
 }) {
-  const domain = useBusinessDomain();
   const [model, setModel] = useState<WorkspacePageModel | null>(initialModel);
   const modelRef = useRef(model);
   useLayoutEffect(() => {
@@ -252,7 +247,7 @@ export function BusinessCabinetPlayerProvider({
       });
   }, []);
 
-  const canBeat = domain.status === "authenticated" && Boolean(domain.location);
+  const canBeat = pointReports;
   const reportPlayback = useCallback(() => {
     if (!canBeat) return;
     const audio = audioRef.current;
@@ -261,7 +256,7 @@ export function BusinessCabinetPlayerProvider({
     const state = deriveSpaPlaybackState(ctl.status, { paused: audio.paused, ended: audio.ended }, Boolean(ctl.current));
     const report = evidenceRef.current.report(state, ctl.current?.audioItemId ?? null, Date.now());
     sendSpaLiveReport(
-      (live) => postCabinetReport({ kind: "playback", deviceSecret: deviceSecret(), report: live }),
+      (live) => postPointReport({ kind: "playback", report: live }),
       report,
     );
   }, [canBeat]);
@@ -272,7 +267,7 @@ export function BusinessCabinetPlayerProvider({
   useEffect(() => {
     if (!canBeat) return;
     const beat = () => {
-      void postCabinetReport({ kind: "heartbeat", deviceSecret: deviceSecret() });
+      void postPointReport({ kind: "heartbeat" });
     };
     beat();
     const timer = window.setInterval(beat, 30_000);
@@ -314,7 +309,7 @@ export function BusinessCabinetPlayerProvider({
           }));
         },
       },
-      workspaceItems(current.tracks, current.endsAt),
+      workspaceItems(current.tracks, current.playbackUntil ?? current.endsAt),
     );
     ctlRef.current = ctl;
     const onTime = () => {

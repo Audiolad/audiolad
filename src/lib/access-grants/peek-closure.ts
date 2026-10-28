@@ -70,6 +70,9 @@ export async function peekChromeAccessWith(
     ? stamps.reduce((max, value) => (Date.parse(value) > Date.parse(max) ? value : max))
     : null;
   const access = resolveCustomerAccess({ now, emailConfirmed: true, grant, paidUntil });
+  if (access.mode === "grace" && access.endsAt && access.playbackUntil) {
+    return { mode: "grace", endsAt: access.endsAt, graceEndsAt: access.playbackUntil };
+  }
   if (access.mode === "trial" || access.mode === "paid") {
     return { mode: access.mode, endsAt: access.endsAt };
   }

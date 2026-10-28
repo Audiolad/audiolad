@@ -50,13 +50,15 @@ const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward()
 
 const anonymous: BusinessOwnerHomeContext = { status: "anonymous" };
 const signedInNoOrg: BusinessOwnerHomeContext = {
-  status: "authenticated", owner: { userId: "u0", firstName: "Ира" }, location: null, organizationName: null, organizationId: null, signals: null,
+  status: "authenticated", owner: { userId: "u0", firstName: "Ира" }, location: null, organizationName: null, organizationId: null, canPay: false, offerAccepted: false, signals: null,
 };
 const member: BusinessOwnerHomeContext = {
   status: "authenticated",
   owner: { userId: "u1", firstName: "Анна" },
   organizationId: "org", organizationName: "Кофейня",
   location: { id: "loc", organizationId: "org", name: "Зал", businessCategory: "Кафе", countryCode: "RU", timezone: "Europe/Moscow", status: "active", defaultZoneId: null },
+  canPay: true,
+  offerAccepted: true,
   signals: null,
 };
 
@@ -172,7 +174,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   const layout = read("src/app/business-app/layout.tsx");
   has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
   has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
-  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\}>/);
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\}>/);
   const peek = read("src/lib/access-grants/peek.server.ts") + read("src/lib/access-grants/peek-closure.ts");
   hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }
@@ -306,7 +308,8 @@ async function closedApis() {
   assert.deepEqual(effectiveChromeAccess(null, null), BUSINESS_NO_ACCESS);
   const workspaceSource = readFileSync("src/components/business-app/workspace/BusinessWorkspace.tsx", "utf8");
   assert.match(workspaceSource, /useReportBusinessChromeAccess\(\)/, "workspace reports its live period to the shell");
-  assert.match(workspaceSource, /reportChromeAccess\(\{ mode: reportedStatus, endsAt: reportedEndsAt \}\)/);
+  assert.match(workspaceSource, /reportedStatus === "grace"/);
+  assert.match(workspaceSource, /graceEndsAt: model\.playbackUntil/);
   const shellSource = readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8");
   assert.match(shellSource, /const chromeAccess = useBusinessChromeAccess\(\);/, "shell strip decision reads the (reportable) context");
 }
@@ -346,9 +349,12 @@ void (async () => {
   assert.notEqual(stranger.mode, "trial", "unrelated account: no gift");
   assert.equal(stranger.endsAt, null);
   const over = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-22T14:11:37Z"));
-  assert.equal(over.mode, "offer", "gift over at its exact end instant is not a live trial");
-  assert.equal(over.endsAt, "2026-11-22T14:11:37Z", "Главная still receives the end instant");
-  assert.equal(hasLiveBusinessAccess(over), false, "an ended gift does not keep the calm access line");
+  assert.equal(over.mode, "grace", "at the gift end music still plays for 3 days");
+  assert.equal(over.endsAt, "2026-11-22T14:11:37Z", "Главная still receives the period end");
+  assert.equal(hasLiveBusinessAccess(over), true, "grace keeps the cabinet line");
+  const stopped = await peekChromeAccessWith(reader(), { userId: "C", emailHash: "Y" }, new Date("2026-11-25T14:11:37Z"));
+  assert.equal(stopped.mode, "offer", "after 3 days the player is closed");
+  assert.equal(hasLiveBusinessAccess(stopped), false, "an ended gift does not keep the calm access line");
   const paid = await peekChromeAccessWith(reader(["2026-12-31T10:00:00Z"]), { userId: "C", emailHash: "Y" }, new Date("2026-12-01T00:00:00Z"));
   assert.deepEqual(paid, { mode: "paid", endsAt: "2026-12-31T10:00:00Z" }, "paid period after the gift");
   assert.ok(reads.length > 0);

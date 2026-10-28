@@ -31,6 +31,7 @@ export type WorkspacePageStatus =
   | "unavailable"
   | "trial"
   | "paid"
+  | "grace"
   | "offer";
 
 /**
@@ -45,6 +46,8 @@ export type WorkspacePageModel = {
   daysLeft: number | null;
   endsAtLabel: string | null;
   endsAt: string | null;
+  /** When audio must stop. During grace this is later than endsAt. */
+  playbackUntil: string | null;
   priceLabel: string;
   periodLabel: string;
   rules: string;
@@ -61,7 +64,11 @@ export type WorkspacePageModel = {
 };
 
 export function workspacePlayerOpen(model: Pick<WorkspacePageModel, "status" | "spaceEnabled">): boolean {
-  return model.spaceEnabled && (model.status === "trial" || model.status === "paid");
+  return model.spaceEnabled && (model.status === "trial" || model.status === "paid" || model.status === "grace");
+}
+
+export function workspacePlaybackDeadline(model: { endsAt: string | null; playbackUntil?: string | null }): string | null {
+  return model.playbackUntil ?? model.endsAt;
 }
 
 /** The wire deadline is ISO; the SPA engine consumes Date instances. */

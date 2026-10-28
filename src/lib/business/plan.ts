@@ -12,6 +12,11 @@ export const BUSINESS_GIFT_DAYS = 30;
 
 export const BUSINESS_GIFT_MS = BUSINESS_GIFT_DAYS * 24 * 60 * 60 * 1000;
 
+/** Music keeps playing this long after the gift or paid_until, then stops. Not added to paid_until. */
+export const BUSINESS_GRACE_DAYS = 3;
+
+export const BUSINESS_GRACE_MS = BUSINESS_GRACE_DAYS * 24 * 60 * 60 * 1000;
+
 /** "799 ₽" with a normal space. Callers that must not wrap the price replace it with nbsp. */
 export function formatBusinessMonthlyPrice(
   rub: number = BUSINESS_PLAN_MONTHLY_PRICE_RUB,

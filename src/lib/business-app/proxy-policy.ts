@@ -33,9 +33,12 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/workspace/track-url",
   "/api/business/workspace/state",
   "/api/business/workspace/queue",
+  "/api/business/subscription/accept",
+  "/api/business/subscription/checkout",
   // ba344b7f: one signed preview track on the wizard atmosphere step.
   "/api/business/onboarding/preview",
   "/api/business/onboarding/preview/audio",
+  "/api/business/point",
 ] as const;
 
 /**

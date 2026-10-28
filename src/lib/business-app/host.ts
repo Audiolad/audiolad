@@ -54,6 +54,7 @@ export const BUSINESS_PUBLIC_PATH_REWRITES: Readonly<Record<string, string>> = {
   "/profile": `${BUSINESS_SITE_PATH}/profile`,
   "/help": `${BUSINESS_SITE_PATH}/help`,
   "/onboarding": `${BUSINESS_SITE_PATH}/onboarding`,
+  "/point": `${BUSINESS_SITE_PATH}/point`,
   "/player": `${BUSINESS_SITE_PATH}/player`,
   "/spa": `${BUSINESS_SITE_PATH}/spa`,
   // ba344b7f: one workspace for every business_space. Cafe is the enabled direction.

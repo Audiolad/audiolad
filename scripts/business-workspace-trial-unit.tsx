@@ -185,7 +185,12 @@ async function main() {
     await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: day30, action: "visit" }),
     ["activity_day_30"],
   );
-  const expiredAt = new Date(Date.parse(issued.grant!.endsAt) + 1000);
+  const graceAt = new Date(Date.parse(issued.grant!.endsAt) + 1000);
+  const duringGrace = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: graceAt });
+  assert.equal(duringGrace.access.mode, "grace");
+  assert.equal(duringGrace.access.player, true, "music keeps playing for 3 days after the gift");
+  assert.deepEqual(await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: graceAt, action: "visit" }), []);
+  const expiredAt = new Date(Date.parse(issued.grant!.endsAt) + 3 * DAY + 1000);
   const offer = await recordAccessActivity(store, { userId: USER_A, email: EMAIL, now: expiredAt, action: "visit" });
   assert.deepEqual(offer, ["subscription_offer_shown"]);
   const closed = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: expiredAt });
@@ -220,10 +225,10 @@ async function main() {
   const first = await activateBusinessTrial(store, { userId: USER_A, email: EMAIL, now: start });
   const inherited = await activateBusinessTrial(store, { userId: USER_B, email: EMAIL, now: new Date(start.getTime() + DAY) });
   assert.equal(inherited.grant?.endsAt, first.grant?.endsAt);
-  const changed = await activateBusinessTrial(store, { userId: USER_B, email: "changed@example.test", now: new Date(start.getTime() + 31 * DAY) });
+  const changed = await activateBusinessTrial(store, { userId: USER_B, email: "changed@example.test", now: new Date(start.getTime() + 34 * DAY) });
   assert.equal(changed.grant?.endsAt, first.grant?.endsAt);
   assert.equal(changed.access.mode, "offer", "inheriting then changing email cannot restart an expired gift");
-  const registeredAgain = await activateBusinessTrial(store, { userId: "33333333-4444-4555-8666-777777777777", email: "changed@example.test", now: new Date(start.getTime() + 32 * DAY) });
+  const registeredAgain = await activateBusinessTrial(store, { userId: "33333333-4444-4555-8666-777777777777", email: "changed@example.test", now: new Date(start.getTime() + 35 * DAY) });
   assert.equal(registeredAgain.access.mode, "offer", "the changed email is also consumed");
   assert.equal(store.grants.length, 1);
 }
@@ -234,13 +239,13 @@ for (const reverse of [false, true]) {
   const collided = await activateBusinessTrial(store, {
     userId: reverse ? USER_A : USER_B,
     email: reverse ? "second@example.test" : EMAIL,
-    now: new Date(start.getTime() + 31 * DAY),
+    now: new Date(start.getTime() + 34 * DAY),
   });
   assert.equal(collided.access.mode, "offer", "an expired original wins over a live later grant");
   assert.equal(collided.grant?.endsAt, original.grant?.endsAt);
   assert.notEqual(other.grant?.endsAt, original.grant?.endsAt);
   for (const [userId, email] of [[USER_A, EMAIL], [USER_B, "second@example.test"]]) {
-    const again = await activateBusinessTrial(store, { userId, email, now: new Date(start.getTime() + 32 * DAY) });
+    const again = await activateBusinessTrial(store, { userId, email, now: new Date(start.getTime() + 35 * DAY) });
     assert.equal(again.grant?.endsAt, original.grant?.endsAt, "both original identities keep the earliest window");
     assert.equal(again.access.player, false);
   }
@@ -597,6 +602,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
     daysLeft: 12,
     endsAtLabel: "12 марта 2026 г., 10:00 МСК",
     endsAt: addGiftPeriod(start).toISOString(),
+    playbackUntil: addGiftPeriod(start).toISOString(),
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
     rules: businessGiftRulesText(),
@@ -696,8 +702,26 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   const many = renderToStaticMarkup(<BusinessWorkspace model={model({ tracks })} />);
   const queueHtml = many.slice(many.indexOf('data-testid="biz-now-queue"'));
   assert.equal((queueHtml.match(/business-atmosphere-track /g) ?? []).length, 3, "only three upcoming rows");
-  assert.match(queueHtml, /и ещё 4 трека/);
+  assert.match(queueHtml, /и ещё 4 трека без повторов/);
+  assert.match(many, /data-phase="idle"/);
+  assert.match(many, /Больше такой музыки/);
+  assert.match(read("src/components/business-app/workspace/CafeQueueControls.tsx"), /Атмосфера перестроена/);
+  assert.match(read("src/components/business-app/workspace/CafeQueueControls.tsx"), /business-atmosphere-bars/);
+  assert.match(workspaceSource, /prefers-reduced-motion/);
+  assert.match(workspaceSource, /feedbackPhase !== "idle"/);
   assert.doesNotMatch(renderToStaticMarkup(<BusinessWorkspace model={model({})} />), /и ещё/);
+  const later = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks,
+    playback: { index: 1, positionSec: 12, volume: 0.8, updatedAt: start.toISOString() },
+  })} />);
+  const laterQueue = later.slice(later.indexOf('data-testid="biz-now-queue"'));
+  assert.match(laterQueue, /и ещё 3 трека без повторов/, "the saved place shortens the unique remainder");
+  const nearEnd = renderToStaticMarkup(<BusinessWorkspace model={model({
+    tracks,
+    playback: { index: 7, positionSec: 0, volume: 0.8, updatedAt: start.toISOString() },
+  })} />);
+  assert.doesNotMatch(nearEnd.slice(nearEnd.indexOf('data-testid="biz-now-queue"')), /и ещё/, "nothing unique remains on the last track");
+  assert.match(nearEnd, /Трек 1/, "after the last track the loop shows the start again");
 }
 {
   const settings = renderToStaticMarkup(<BusinessPlayerSettings />);
@@ -756,7 +780,7 @@ function model(patch: Partial<WorkspacePageModel>): WorkspacePageModel {
   assert.doesNotMatch(landing, /href="#listen"[^>]*>\s*\{BUSINESS_TRIAL_FREE\}/);
   assert.match(landing, /href=\{BUSINESS_TRIAL_SIGN_IN_HREF\}>\s*Уже есть аккаунт – войти/);
   assert.ok(BUSINESS_TRIAL_SIGN_IN_HREF.includes("next=%2Fauth%2Fbusiness-return"));
-  assert.match(playerSource, /workspaceItems\(current\.tracks, current\.endsAt\)/);
+  assert.match(playerSource, /workspaceItems\(current\.tracks, current\.playbackUntil \?\? current\.endsAt\)/);
   assert.match(workspaceSource, /setTimeout\(check, workspaceDeadlineDelay/);
   assert.match(playerSource, /applyManifest\(null\)/);
   assert.doesNotMatch(playerSource, /—/);
@@ -1066,6 +1090,8 @@ assert.doesNotMatch(rules, /—/);
     },
     organizationName: "Кофейня",
     organizationId: "22222222-2222-4222-8222-222222222222",
+    canPay: true,
+    offerAccepted: true,
     signals: null,
   };
   const cabinetLink = renderToStaticMarkup(

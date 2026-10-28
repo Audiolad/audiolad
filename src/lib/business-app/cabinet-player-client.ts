@@ -40,6 +40,23 @@ export function getCabinetDeviceSecret(
  * Same stable URL as the /spa player, with source "cabinet".
  * The route writes the venue player tables; it does not call the spa allowlist RPCs.
  */
+export async function postPointReport(
+  payload: { kind: "heartbeat" } | { kind: "playback"; report: SpaLiveReport },
+  f: Fetch = fetch,
+): Promise<Result> {
+  try {
+    const res = await f("/api/business/point", {
+      ...JSON_POST,
+      body: JSON.stringify({ action: "report", ...payload }),
+    });
+    const json = (await res.json().catch(() => null)) as Result | null;
+    if (json && typeof json === "object" && "ok" in json) return json;
+    return { ok: false, reason: "report_failed" };
+  } catch {
+    return { ok: false, reason: "report_failed" };
+  }
+}
+
 export async function postCabinetReport(payload: CabinetReportPayload, f: Fetch = fetch): Promise<Result> {
   try {
     const res = await f("/api/business/player/report", {
