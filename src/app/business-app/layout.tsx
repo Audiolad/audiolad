@@ -11,6 +11,7 @@ import { hasLiveBusinessAccess } from "@/lib/access-grants/access-line";
 import { peekBusinessChromeAccess } from "@/lib/access-grants/peek.server";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
+import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
 import { guestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 import { peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 import {
@@ -42,6 +43,7 @@ export default async function BusinessAppLayout({
   }
 
   const domain = await loadBusinessOwnerHomeContext();
+  const pointReports = await businessPointSessionAlive();
   // ba344b7f: live gift / paid state (read-only) – such a visitor never sees the guest strip.
   const customerAccess = domain.status === "authenticated" ? await peekBusinessChromeAccess() : null;
   // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).
@@ -53,7 +55,7 @@ export default async function BusinessAppLayout({
   return (
     <div className="business-app-root" data-biz-theme={theme}>
       <BusinessDomainProvider value={domain}>
-        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess}>{children}</BusinessAppShell>
+        <BusinessAppShell initialGuestLimit={initialGuestLimit} customerAccess={customerAccess} pointReports={pointReports}>{children}</BusinessAppShell>
       </BusinessDomainProvider>
     </div>
   );

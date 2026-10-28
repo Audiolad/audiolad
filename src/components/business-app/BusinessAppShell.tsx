@@ -32,24 +32,27 @@ export default function BusinessAppShell({
   children,
   initialGuestLimit = null,
   customerAccess = null,
+  pointReports = false,
 }: {
   children: ReactNode;
   /** Read-only gift / paid state from the layout; null for anonymous visitors. */
   customerAccess?: BusinessChromeAccess | null;
   /** Server listening-limit state for a guest (layout peek); null for members. */
   initialGuestLimit?: GuestCoffeeLimitState | null;
+  /** This browser is the paired venue device and may report now playing. */
+  pointReports?: boolean;
 }) {
   return (
     <BusinessChromeAccessProvider value={customerAccess}>
       <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
-        <BusinessShellFrame>{children}</BusinessShellFrame>
+        <BusinessShellFrame pointReports={pointReports}>{children}</BusinessShellFrame>
       </BusinessGuestStatusProvider>
     </BusinessChromeAccessProvider>
   );
 }
 
 /** Reads the chrome access from context, so a live period reported by /workspace applies at once. */
-function BusinessShellFrame({ children }: { children: ReactNode }) {
+function BusinessShellFrame({ children, pointReports }: { children: ReactNode; pointReports: boolean }) {
   const access = resolveBusinessAccess(useBusinessDomain());
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
@@ -62,7 +65,7 @@ function BusinessShellFrame({ children }: { children: ReactNode }) {
   return (
     <div className="business-app-shell" data-access={access.level}>
       <BusinessSidebar />
-      <BusinessCabinetPlayerProvider>
+      <BusinessCabinetPlayerProvider pointReports={pointReports}>
         <div className="business-app-main">
           <header className="business-app-topbar">
             <BusinessBrandLockup testId="biz-brand-topbar" />

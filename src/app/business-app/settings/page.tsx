@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import BusinessPlayerSettings from "@/components/business-app/BusinessPlayerSettings";
+import PointPairingCard from "@/components/business-app/PointPairingCard";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
@@ -23,6 +24,7 @@ export default async function BusinessAppSettingsPage() {
         <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)]">Настройка</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--biz-text-muted)]">Звучание плеера в этом кабинете.</p>
       </header>
+      {locationId ? <PointPairingCard locationId={locationId} /> : null}
       <BusinessPlayerSettings locationId={locationId} saved={saved} />
     </div>
   );
