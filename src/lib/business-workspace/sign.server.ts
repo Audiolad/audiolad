@@ -1,4 +1,7 @@
 import "server-only";
+import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.server";
+import { parseBusinessEligibilityPayload } from "@/lib/business-app/eligibility";
+import { workspaceSignBlocked } from "@/lib/business-workspace/sign-gate";
 
 import { resolveMusicListenSource, type MusicStreamCandidate } from "@/lib/listen/music-delivery";
 import { LISTEN_SIGNED_URL_TTL_SECONDS, normalizeStorageSignedUrl } from "@/lib/listen/signed-url";
@@ -7,6 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 export async function signWorkspaceAudio(
   audioItemId: string,
   allowed: ReadonlySet<string>,
+  locationId?: string | null,
 ): Promise<{ ok: true; url: string } | { ok: false; reason: string }> {
   if (!allowed.has(audioItemId)) return { ok: false, reason: "not_in_manifest" };
   let db: ReturnType<typeof createServiceRoleClient>;
@@ -18,10 +22,22 @@ export async function signWorkspaceAudio(
 
   const { data: row, error } = await db
     .from("audio_items")
-    .select("id, audio_path, active_music_delivery_asset_id")
+    .select("id, audio_path, desired_music_master_asset_id, active_music_delivery_asset_id")
     .eq("id", audioItemId)
     .maybeSingle();
   if (error || !row) return { ok: false, reason: "not_in_manifest" };
+  if (locationId && await businessManualContentGateEnabled(db)) {
+    const decision = await db.rpc("resolve_business_track_eligibility", {
+      p_audio_item_id: audioItemId,
+      p_location_id: locationId,
+      p_zone_id: null,
+      p_use_type: "business_background_playback",
+    });
+    const parsed = decision.error ? null : parseBusinessEligibilityPayload(decision.data, audioItemId);
+    if (workspaceSignBlocked({ gateOn: true, locationId, decision: parsed?.decision ?? null })) {
+      return { ok: false, reason: "audio_replaced_reload" };
+    }
+  }
 
   let activeStream: MusicStreamCandidate | null = null;
   const assetId = row.active_music_delivery_asset_id as string | null;

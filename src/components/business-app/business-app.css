@@ -1117,12 +1117,12 @@
 
 .business-atmosphere-track {
   display: grid;
-  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.6rem;
   width: 100%;
-  min-height: 48px;
-  padding: 0.4rem 0.5rem;
+  min-height: 46px;
+  padding: 0.35rem 0.45rem;
   border: 1px solid transparent;
   border-radius: var(--biz-radius-sm);
   background: transparent;
@@ -1145,15 +1145,55 @@
   background: var(--biz-accent-soft);
 }
 
-.business-atmosphere-track__no {
-  text-align: center;
+.business-atmosphere-track__cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--biz-cover);
+  box-shadow: inset 0 0 0 1px var(--biz-border);
+  color: var(--biz-on-accent);
+  font-size: 0.95rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--biz-text-muted);
+  line-height: 1;
 }
 
-.business-atmosphere-track[data-current="true"] .business-atmosphere-track__no {
-  color: var(--biz-accent);
-  font-weight: 700;
+.business-atmosphere-track__cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.business-atmosphere-track__mark {
+  position: relative;
+  z-index: 1;
+}
+
+.business-atmosphere-track__cover[data-has-image="true"] .business-atmosphere-track__mark {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 0.15rem;
+  border-radius: 6px;
+  background: var(--biz-surface-glass);
+  color: var(--biz-text);
+  font-size: 0.68rem;
+  line-height: 16px;
+  text-align: center;
+}
+
+.business-atmosphere-track__cover[data-has-image="true"][data-playing="true"] .business-atmosphere-track__mark {
+  background: var(--biz-accent);
+  color: var(--biz-on-accent);
 }
 
 .business-atmosphere-track__meta {
@@ -1180,6 +1220,24 @@
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
   color: var(--biz-text-muted);
+  white-space: nowrap;
+}
+
+/* Phone: the music working area sits closer to the screen, and the track list
+   drops the wide inner inset so subtitles keep room beside the 46px cover. */
+@media (max-width: 639px) {
+  .business-music-stage {
+    margin-inline: -0.7rem;
+  }
+
+  .business-music-stage .business-track-panel {
+    padding-inline: 0.45rem;
+  }
+
+  .business-music-stage .business-atmosphere-track {
+    gap: 0.45rem;
+    padding-inline: 0.1rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

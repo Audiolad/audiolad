@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test:business-track-sound-review": "node --require ./scripts/cjs-stub-server-only.cjs --import tsx scripts/business-track-sound-review-unit.mts && node --require ./scripts/cjs-stub-server-only.cjs --import ./scripts/author-business-tab-test-register.mjs --import tsx scripts/business-track-sound-review-mounted-unit.mts && python3 scripts/business-track-sound-review-isolated.py",
+    "test:business-manual-admissions": "node --import tsx scripts/business-manual-admissions-unit.mts && node --import tsx scripts/business-manual-admissions-admin-unit.mjs && python3 scripts/business-manual-admissions-isolated.py",
     "test:school-graduates": "node --import tsx scripts/school-graduates-unit.tsx && node scripts/school-graduates-sql-unit.mjs",
     "test:business-ru-copy": "npx tsx scripts/business-ru-copy-unit.mts",
     "dev": "node scripts/lib/guard-dev.mjs && next dev",
