@@ -30,8 +30,11 @@
 
 ## Что изменено
 
-1. Аддитивная миграция `20270202120000_seo_sprint_general_release.sql`: nullable
+1. Аддитивная миграция `20270203120000_seo_sprint_general_release.sql`: nullable
    `seo_sprint_queries.released_to_general_at`. Автоматического переноса данных нет.
+   Timestamp сдвинут с `20270202120000`: его заняла
+   `20270202120000_business_artist_sound_auto.sql` на main (`bad7db15`).
+   Текст SQL не менялся.
 2. `scripts/sql/audio-sprint-general-audit.sql`: общая read-only классификация,
    используется также при apply. Проверяются оба пула, все статусы броней,
    продукты по FK, нормализованному тексту и ссылке брони, в том числе черновики
@@ -182,7 +185,7 @@ scripts/audio-sprint-general-release-unit.mjs`. Обычный запуск SQL-
 `scripts/audio-sprint-general-release.mjs`,
 `scripts/audio-sprint-general-release-unit.mjs`,
 `scripts/sql/audio-sprint-general-audit.sql`,
-`supabase/migrations/20270202120000_seo_sprint_general_release.sql`,
+`supabase/migrations/20270203120000_seo_sprint_general_release.sql`,
 `src/lib/seo-queries/audio-sprint.ts`,
 `src/lib/seo-queries/list-audio-sprint-queries.ts`,
 `src/components/author-dashboard/AuthorAudioSprintClient.tsx`.

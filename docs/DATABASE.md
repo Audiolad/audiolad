@@ -2293,8 +2293,10 @@ Full schema/RPC lifecycle, RLS, backup and manual rollback:
 
 ## Освобождение тем «Осень звучит» (2a3f80bf, подготовлено, не применено)
 
-Миграция `20270202120000_seo_sprint_general_release.sql` добавляет nullable
-`seo_sprint_queries.released_to_general_at`. NULL сохраняет прежнее поведение.
+Миграция `20270203120000_seo_sprint_general_release.sql` добавляет nullable
+`seo_sprint_queries.released_to_general_at`. Версия стоит после
+`20270202120000_business_artist_sound_auto.sql`, чтобы не делить timestamp.
+NULL сохраняет прежнее поведение.
 Отметка снимает операционные ограничения спринта, сохраняя строку членства,
 название, группу, пул и дату включения. Архив показывает отметку общей базы;
 последующие брони и продукты такой темы не считаются результатами спринта.

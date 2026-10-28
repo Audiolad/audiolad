@@ -56,7 +56,7 @@ INSERT INTO seo_queries SELECT ('00000000-0000-4000-8000-' || lpad(n::text,12,'0
 INSERT INTO seo_sprint_queries SELECT '${id(100)}', id, CASE WHEN query_text = 'Тема 9' THEN 'reserve' ELSE 'initial' END, 'voice', query_text FROM seo_queries;`);
 // Аудит работает и перед установкой новой колонки.
 assert.equal(JSON.parse(run(buildSql())).considered, 14);
-run(readFileSync(new URL('../supabase/migrations/20270202120000_seo_sprint_general_release.sql', import.meta.url), 'utf8'));
+run(readFileSync(new URL('../supabase/migrations/20270203120000_seo_sprint_general_release.sql', import.meta.url), 'utf8'));
 run(`INSERT INTO seo_query_reservations VALUES
 ('${id(201)}','${id(2)}','${id(101)}',null,'active',now()+interval '1 day',null),
 ('${id(202)}','${id(3)}','${id(101)}',null,'active',now()-interval '1 day',null),
