@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { SpaOnlinePlayer } from "../src/lib/business-app/spa-online-player";
 import type { SpaManifestItem } from "../src/lib/business-app/spa-manifest";
-import { CAFE_DAYPART_HOURS_DEFAULT } from "../src/lib/business-app/cafe-queue/prefs";
+import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS } from "../src/lib/business-app/cafe-queue/prefs";
+import { GUEST_COFFEE_DEFAULT_PROFILE } from "../src/lib/business-app/guest-coffee/catalog";
 import { cafeQueueNextIndex } from "../src/lib/business-app/cafe-queue/order";
-import { createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, POINT_MUSIC_FORBIDDEN, soundDraftFromBody, type PointSoundUpdate } from "../src/lib/business-app/point-sound";
+import { createPointSoundApplier, pointDaypart, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, POINT_MUSIC_FORBIDDEN, soundDraftFromBody, type PointSoundUpdate } from "../src/lib/business-app/point-sound";
 
 // 1: absent settings default ON; OFF and invalid sessions grant no manual music change.
 assert.equal(pointMusicAllowed({ ok: true, found: false }), true);
@@ -86,6 +87,60 @@ const sound: PointSoundUpdate = {
 const morning = new Date("2026-10-28T07:59:59Z"); // 10:59 Moscow
 const day = new Date("2026-10-28T08:00:00Z");
 const evening = new Date("2026-10-28T13:00:00Z");
+
+// An authorized point with no saved atmosphere builds its first queue too.
+// Version 0 cannot collide with the first saved profile (version 1).
+const defaultSound = pointSoundUpdate({ ok: true, found: false });
+assert.ok(defaultSound);
+assert.deepEqual(defaultSound, {
+  version: 0, pointCanEdit: true,
+  character: GUEST_COFFEE_DEFAULT_PROFILE.character,
+  direction: GUEST_COFFEE_DEFAULT_PROFILE.direction,
+  daypartMode: CAFE_QUEUE_DEFAULT_PREFS.daypartMode,
+  energyOffset: CAFE_QUEUE_DEFAULT_PREFS.energyOffset,
+  hours: CAFE_DAYPART_HOURS_DEFAULT, timezone: "Europe/Moscow",
+});
+const nullSettings = {
+  ok: true, found: true, character: null, direction: null, daypart_mode: null,
+  energy_offset: null, settings_version: null, morning_start: null, morning_end: null,
+  day_start: null, day_end: null, evening_start: null, evening_end: null, timezone: null,
+};
+assert.deepEqual(pointSoundUpdate(nullSettings), defaultSound);
+assert.deepEqual(pointSoundUpdate({ ...nullSettings, settings_version: 1 }), { ...defaultSound, version: 1 });
+assert.deepEqual(pointSoundUpdate({
+  ok: true, found: true, character: "city", direction: "rhythm", daypart_mode: "evening",
+  energy_offset: 15, settings_version: 7, morning_start: "07:00", morning_end: "11:00",
+  day_start: "11:00", day_end: "16:00", evening_start: "16:00", evening_end: "20:00",
+  timezone: "Asia/Yekaterinburg", point_can_edit_settings: false,
+}), {
+  ...defaultSound, character: "city", direction: "rhythm", daypartMode: "evening",
+  energyOffset: 15, version: 7, timezone: "Asia/Yekaterinburg", pointCanEdit: false,
+});
+assert.equal(pointSoundUpdate({ ok: true, found: false, point_can_edit_settings: false })?.pointCanEdit, false);
+for (const invalid of [null, [], {}, { ok: false, found: false }, { ok: false, found: true },
+  { ok: true }, { ok: true, found: true }, { ...nullSettings, ok: false },
+  { ...nullSettings, character: "invalid" }, { ...nullSettings, direction: "invalid" },
+  { ...nullSettings, daypart_mode: "invalid" }, { ...nullSettings, energy_offset: 16 },
+  { ...nullSettings, settings_version: -1 }, { ...nullSettings, settings_version: 0 },
+  { ...nullSettings, day_start: "25:00" },
+]) assert.equal(pointSoundUpdate(invalid), null);
+const defaultApply = createPointSoundApplier();
+const defaultPeriods: string[] = [];
+const buildDefaultQueue = async (period: string) => { defaultPeriods.push(period); return "applied" as const; };
+await defaultApply(defaultSound, buildDefaultQueue, morning);
+await defaultApply(defaultSound, buildDefaultQueue, morning);
+await defaultApply(defaultSound, buildDefaultQueue, day);
+await defaultApply(defaultSound, buildDefaultQueue, new Date("2026-10-28T12:59:59Z"));
+await defaultApply(defaultSound, buildDefaultQueue, evening);
+assert.deepEqual(defaultPeriods, ["morning", "day", "evening"], "initial queue and Moscow 11:00/16:00 transitions");
+await defaultApply({ ...defaultSound, version: 1 }, buildDefaultQueue, evening);
+assert.equal(defaultPeriods.length, 4, "the first saved version still applies");
+const otherZone = pointSoundUpdate({ ok: true, found: false, timezone: "Asia/Yekaterinburg" });
+assert.ok(otherZone);
+assert.equal(pointDaypart(otherZone, new Date("2026-10-28T05:59:59Z")), "morning");
+assert.equal(pointDaypart(otherZone, new Date("2026-10-28T06:00:00Z")), "day");
+assert.equal(pointDaypart(otherZone, new Date("2026-10-28T10:59:59Z")), "day");
+assert.equal(pointDaypart(otherZone, new Date("2026-10-28T11:00:00Z")), "evening");
 
 // 5: a deferred/failed version is retried; only applied suppresses another install.
 const apply = createPointSoundApplier();

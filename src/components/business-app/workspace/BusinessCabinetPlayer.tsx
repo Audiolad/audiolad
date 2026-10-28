@@ -15,7 +15,7 @@ import BusinessCabinetMiniBar from "@/components/business-app/workspace/Business
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
 import { isPointCommandType, pointCommandAction } from "@/lib/business-app/point-commands";
-import { createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
+import { POINT_SOUND_CHANGED_EVENT, createPointSoundApplier, pointKeepCurrentOrder, pointMusicAllowed, pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -152,6 +152,7 @@ export function BusinessCabinetPlayerProvider({
   const ctlRef = useRef<Controller | null>(null);
   const toggleRef = useRef<() => Promise<void>>(async () => {});
   const nextRef = useRef<() => Promise<void>>(async () => {});
+  const refreshPointSoundRef = useRef<() => void>(() => {});
   const [pointCanEdit, setPointCanEdit] = useState(false);
   const soundInstallRef = useRef<Promise<unknown> | null>(null);
   const evidenceRef = useRef(new SpaLiveEvidence());
@@ -467,6 +468,7 @@ export function BusinessCabinetPlayerProvider({
         });
         const json = (await res.json()) as { ok?: boolean; commands?: { id?: unknown; type?: unknown }[] };
         if (!json.ok || !Array.isArray(json.commands)) return;
+        if (json.commands.length > 0) refreshPointSoundRef.current();
         for (const row of json.commands) {
           if (stop || !isPointCommandType(row.type)) continue;
           const action = pointCommandAction(ctlRef.current?.status ?? "idle", row.type);
@@ -657,6 +659,7 @@ export function BusinessCabinetPlayerProvider({
     let latest: PointSoundUpdate | null = null;
     let stop = false;
     let inFlight = false;
+    let refreshPending = false;
     const take = (sound: PointSoundUpdate) => {
       if (soundInstallRef.current) return;
       const run = applySound(sound, (daypart) => rebuildFromProfile({
@@ -672,7 +675,11 @@ export function BusinessCabinetPlayerProvider({
       soundInstallRef.current = run;
     };
     const tick = async () => {
-      if (stop || inFlight) return;
+      if (stop) return;
+      if (inFlight) {
+        refreshPending = true;
+        return;
+      }
       inFlight = true;
       try {
         const res = await fetch("/api/business/point", {
@@ -685,15 +692,21 @@ export function BusinessCabinetPlayerProvider({
         const json: unknown = await res.json();
         if (stop) return;
         setPointCanEdit(pointMusicAllowed(json));
-        const sound = pointSoundUpdate(json);
-        if (sound) latest = sound;
+        latest = pointSoundUpdate(json);
       } catch {
         /* Keep the last settings for clock transitions during a network failure. */
       } finally {
         inFlight = false;
         if (!stop && latest) take(latest);
+        if (!stop && refreshPending) {
+          refreshPending = false;
+          void tick();
+        }
       }
     };
+    const refresh = () => { void tick(); };
+    refreshPointSoundRef.current = refresh;
+    window.addEventListener(POINT_SOUND_CHANGED_EVENT, refresh);
     void tick();
     const timer = window.setInterval(() => void tick(), 5_000);
     const clockTimer = window.setInterval(() => {
@@ -701,6 +714,8 @@ export function BusinessCabinetPlayerProvider({
     }, 5_000);
     return () => {
       stop = true;
+      refreshPointSoundRef.current = () => {};
+      window.removeEventListener(POINT_SOUND_CHANGED_EVENT, refresh);
       window.clearInterval(timer);
       window.clearInterval(clockTimer);
     };
@@ -725,6 +740,8 @@ export function BusinessCabinetPlayerProvider({
   }, []);
 
   const seek = useCallback((ratio: number) => {
+    // Seek is local. The owner accepts a stale-permission window of ~5 s within
+    // the current track: this does not change the music. Commands refresh it sooner.
     const audio = audioRef.current;
     if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
     const nextTime = Math.min(audio.duration, Math.max(0, ratio * audio.duration));

@@ -45,7 +45,20 @@ const sound = pointSoundUpdate({
 });
 assert.equal(sound?.version, 2);
 assert.equal(sound?.timezone, "Europe/Moscow");
-assert.equal(pointSoundUpdate({ ok: true, found: false }), null);
+assert.deepEqual(pointSoundUpdate({ ok: true, found: false }), {
+  version: 0,
+  pointCanEdit: true,
+  character: "cozy",
+  direction: "jazz",
+  daypartMode: "auto",
+  energyOffset: 0,
+  hours: {
+    morning: { start: "07:00", end: "11:00" },
+    day: { start: "11:00", end: "16:00" },
+    evening: { start: "16:00", end: "20:00" },
+  },
+  timezone: "Europe/Moscow",
+});
 const at = new Date("2026-10-28T06:00:00Z");
 assert.equal(pointDaypart({ daypartMode: "auto", hours: CAFE_DAYPART_HOURS_DEFAULT, timezone: "Europe/Moscow" }, at), "morning");
 assert.equal(cafeDaypartAtMinute(venueMinuteOfDay("UTC", at), CAFE_DAYPART_HOURS_DEFAULT), "evening");

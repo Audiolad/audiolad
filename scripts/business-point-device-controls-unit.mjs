@@ -13,12 +13,25 @@ assert.match(route, /body.action === "music-change"[\s\S]*?pointMusicAllowed\(da
 assert.match(read("src/components/business-app/PointDeviceControls.tsx"), /disabled={!player\?\.canChangeMusic}/);
 assert.match(read("src/components/business-app/workspace/BusinessWorkspace.tsx"), /previousDisabled={!player.canChangeMusic}/);
 assert.match(player, /nextDisabled={pointReports && !pointCanEdit}/);
+// Local seek stays disabled at OFF. A claimed owner command immediately refreshes
+// sound/permission without waiting for the next poll or gating owner execution.
+assert.match(player, /seek: pointReports && !pointCanEdit \? \(\) => {} : seek/);
+assert.match(player, /onSeek={pointReports && !pointCanEdit \? undefined : seek}/);
+assert.match(player, /if \(json.commands.length > 0\) refreshPointSoundRef.current\(\);\s*for \(const row of json.commands\)/);
+assert.match(player, /refreshPointSoundRef.current = refresh/);
+assert.match(player, /const refresh = \(\) => { void tick\(\); }/);
+assert.match(player, /if \(inFlight\) {\s*refreshPending = true;\s*return;/);
+assert.match(player, /if \(!stop && refreshPending\) {\s*refreshPending = false;\s*void tick\(\);/);
+assert.match(player, /setPointCanEdit\(pointMusicAllowed\(json\)\)/);
+assert.match(player, /window.addEventListener\(POINT_SOUND_CHANGED_EVENT, refresh\)/);
+assert.match(player, /window.removeEventListener\(POINT_SOUND_CHANGED_EVENT, refresh\)/);
 // 2: confirmations are the only callers of the mutating pairing actions.
 const pairing = read("src/components/business-app/PointPairingCard.tsx");
 assert.match(pairing, /onClick={\(\) => ask\("revoke"\)}/);
 assert.match(pairing, /onNo={\(\) => setConfirm\(null\)}/);
 assert.match(pairing, /if \(action === "revoke"\) revoke\(\)/);
 const settings = read("src/components/business-app/BusinessPlayerSettings.tsx");
+assert.match(settings, /const json = \(await res.json\(\)\)[^\n]+\n\s*window.dispatchEvent\(new Event\(POINT_SOUND_CHANGED_EVENT\)\)/);
 assert.match(settings, /setConfirm\({ text: VENUE_SOUND_CONFIRM, run }\)/);
 assert.match(settings, /commitVenue\(\(\) =>/);
 assert.match(settings, /cancel: \(\) => resolve\(null\)/);
@@ -34,4 +47,7 @@ assert.match(player, /createPointSoundApplier\(\)/);
 assert.match(player, /const clockTimer = window.setInterval/);
 assert.match(player, /window.clearInterval\(clockTimer\)/);
 assert.doesNotMatch(player, /seenVersion/);
+// The default parsed profile follows the very same live queue path as saved sound.
+assert.match(player, /latest = pointSoundUpdate\(json\)/);
+assert.match(player, /applySound\(sound, \(daypart\) => rebuildFromProfile\({[\s\S]*?keepCurrent: true/);
 console.log("business-point-device-controls-unit: ok");

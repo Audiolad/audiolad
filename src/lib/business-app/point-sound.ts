@@ -1,5 +1,5 @@
-import { cafeDaypartAtMinute, isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypart, type CafeDaypartHours, type CafeDaypartMode, type CafeEnergyOffset } from "@/lib/business-app/cafe-queue/prefs";
-import type { GuestCoffeeCharacter, GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
+import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS, cafeDaypartAtMinute, isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypart, type CafeDaypartHours, type CafeDaypartMode, type CafeEnergyOffset } from "@/lib/business-app/cafe-queue/prefs";
+import { GUEST_COFFEE_DEFAULT_PROFILE, type GuestCoffeeCharacter, type GuestCoffeeDirection } from "@/lib/business-app/guest-coffee/catalog";
 
 import type { LocationSoundDraft } from "@/lib/business-app/location-sound-settings";
 
@@ -53,18 +53,39 @@ function clock(value: unknown): string | null {
   return typeof value === "string" && /^\d{2}:\d{2}/.test(value) ? value.slice(0, 5) : null;
 }
 
-/** Atmosphere the paired device may apply. A missing row is not a change. */
+export const POINT_SOUND_CHANGED_EVENT = "audiolad-point-sound-changed";
+
+/** An authorized point without saved settings still needs an Auto queue. */
 export function pointSoundUpdate(value: unknown): PointSoundUpdate | null {
-  if (!value || typeof value !== "object") return null;
-  const row = value as Record<string, unknown>;
-  if (row.ok !== true || row.found !== true) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  if (raw.ok !== true || (raw.found !== true && raw.found !== false)) return null;
+  const defaults = {
+    character: GUEST_COFFEE_DEFAULT_PROFILE.character,
+    direction: GUEST_COFFEE_DEFAULT_PROFILE.direction,
+    daypart_mode: CAFE_QUEUE_DEFAULT_PREFS.daypartMode,
+    energy_offset: CAFE_QUEUE_DEFAULT_PREFS.energyOffset,
+    morning_start: CAFE_DAYPART_HOURS_DEFAULT.morning.start,
+    morning_end: CAFE_DAYPART_HOURS_DEFAULT.morning.end,
+    day_start: CAFE_DAYPART_HOURS_DEFAULT.day.start,
+    day_end: CAFE_DAYPART_HOURS_DEFAULT.day.end,
+    evening_start: CAFE_DAYPART_HOURS_DEFAULT.evening.start,
+    evening_end: CAFE_DAYPART_HOURS_DEFAULT.evening.end,
+    settings_version: 0, // Unsaved profile; saved versions start at 1.
+  };
+  const row: Record<string, unknown> = { ...raw };
+  for (const [key, fallback] of Object.entries(defaults)) {
+    if (raw.found === true && !(key in raw)) return null;
+    if (raw.found === false || row[key] == null) row[key] = fallback;
+  }
   if (!CHARACTERS.has(String(row.character)) || !DIRECTIONS.has(String(row.direction))) return null;
   const daypartMode = row.daypart_mode;
   if (daypartMode !== "auto" && !isCafeDaypart(daypartMode)) return null;
   const energy = typeof row.energy_offset === "number" ? row.energy_offset : Number(row.energy_offset);
   if (!isCafeEnergyOffset(energy)) return null;
   const version = typeof row.settings_version === "number" ? row.settings_version : Number(row.settings_version);
-  if (!Number.isInteger(version) || version < 1) return null;
+  const minVersion = raw.found === false || raw.settings_version == null ? 0 : 1;
+  if (!Number.isInteger(version) || version < minVersion) return null;
   const hours: CafeDaypartHours = {
     morning: { start: clock(row.morning_start) ?? "", end: clock(row.morning_end) ?? "" },
     day: { start: clock(row.day_start) ?? "", end: clock(row.day_end) ?? "" },

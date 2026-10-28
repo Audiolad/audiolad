@@ -34,6 +34,7 @@ import {
   serializeBusinessSoundProfile,
 } from "@/lib/business-app/sound-profile";
 import { validateCafeDaypartHours, type CafeDaypartHours, type CafeDaypartMode } from "@/lib/business-app/cafe-queue/prefs";
+import { POINT_SOUND_CHANGED_EVENT } from "@/lib/business-app/point-sound";
 
 const SAVE_ERROR = "Не удалось сохранить звучание. Попробуйте ещё раз.";
 
@@ -110,6 +111,7 @@ export default function BusinessPlayerSettings({
           body: JSON.stringify({ action: "sound-save", locationId, ...draft }),
         });
         const json = (await res.json()) as { ok?: boolean; error?: string };
+        window.dispatchEvent(new Event(POINT_SOUND_CHANGED_EVENT));
         return json.ok === true ? null : json.error ?? SAVE_ERROR;
       }
       const { saveLocationSoundSettings } = await import("@/app/business-app/sound-settings-actions");
