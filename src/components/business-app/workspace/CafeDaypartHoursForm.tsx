@@ -19,7 +19,7 @@ export default function CafeDaypartHoursForm({
   onSave,
 }: {
   hours: CafeDaypartHours;
-  onSave: (next: CafeDaypartHours) => string | null;
+  onSave: (next: CafeDaypartHours) => string | null | Promise<string | null>;
 }) {
   const [draft, setDraft] = useState(hours);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +41,10 @@ export default function CafeDaypartHoursForm({
       data-testid="biz-daypart-hours"
       onSubmit={(event) => {
         event.preventDefault();
-        const message = onSave(draft);
-        setError(message);
-        setSaved(message === null);
+        void Promise.resolve(onSave(draft)).then((message) => {
+          setError(message);
+          setSaved(message === null);
+        });
       }}
     >
       <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Часы суток</h2>

@@ -194,7 +194,7 @@ assert.match(cabinet, /keepalive/, "pending seconds are flushed when the page is
 assert.doesNotMatch(cabinet, /<dialog|showModal/);
 assert.match(cabinet, /href=\{BUSINESS_CONNECT_HREF\}/);
 assert.match(read("src/lib/business-app/access.ts"), /BUSINESS_CONNECT_HREF = "\/onboarding\?type=cafe"/);
-assert.match(cabinet, /BusinessPlayerControls/, "shared Business player controls");
+assert.match(read("src/components/business-app/workspace/BusinessCabinetMiniBar.tsx"), /BusinessPlayerControls/, "guest bar reuses the cabinet transport");
 assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
 
 // ---------------------------------------------------------------- identity
@@ -403,8 +403,11 @@ for (const file of [
   // Honest conversion state: no online trial activation / payment exists yet.
   assert.match(copy, /Оплата и автосписания пока не подключены – ничего не списывается/);
   assert.doesNotMatch(cabinet + read("src/components/business-app/BusinessGuestStatus.tsx"), /checkout|payment|\/api\/payments|tochka|prodamus/i, "no payment wiring in this stage");
-  // Free public albums are evaluation listening, not the licensed airplay catalogue.
-  assert.match(copy, /Это не каталог эфира/);
+  // The guest coffee page no longer prints the free-album / rights disclaimer.
+  assert.doesNotMatch(copy, /Это не каталог эфира|Гостевой режим – для оценки звучания/);
+  assert.doesNotMatch(cabinet, /shelfSource|evaluationOnly|Как устроены права на музыку/);
+  assert.match(cabinet, /BusinessCabinetMiniBar/);
+  assert.doesNotMatch(read("src/app/business-app/guest/coffee/page.tsx"), /Какие треки можно включать|BusinessEligibilityProbePanel/);
 }
 
 // ---------------------------------------------------------------- shared Jazz & Coffee theme (21546de4)

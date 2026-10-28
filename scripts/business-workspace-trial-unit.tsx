@@ -580,7 +580,8 @@ assert.doesNotMatch(workspaceSource, /799/);
 assert.doesNotMatch(workspaceSource, /autoPlay|autoplay/);
 assert.doesNotMatch(workspaceSource, /—/);
 assert.doesNotMatch(workspaceSource, /email-hash|supabase-store/);
-assert.match(playerSource, /--biz-cabinet-player-height/, "the sticky bar reports its height");
+assert.match(playerSource, /BusinessCabinetMiniBar/, "the cabinet renders the shared thin bar");
+assert.match(read("src/components/business-app/workspace/BusinessCabinetMiniBar.tsx"), /--biz-cabinet-player-height/, "the sticky bar reports its height");
 assert.match(
   read("src/components/business-app/business-app.css"),
   /padding-bottom:\s*calc\(var\(--biz-bottom-nav-height\) \+ var\(--biz-cabinet-player-height, 4rem\) \+ env\(safe-area-inset-bottom, 0px\)\)/,
