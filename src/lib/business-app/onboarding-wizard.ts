@@ -90,7 +90,7 @@ export const BUSINESS_ONBOARDING_TYPES: readonly BusinessOnboardingTypeOption[] 
       id: "other",
       label: "Другой бизнес",
       category: "Другой бизнес",
-      hint: "Укажем категорию и настроим точку.",
+      hint: "Укажем категорию и настроим заведение.",
       defaultOrgName: "Заведение",
       defaultLocationName: "Точка 1",
     },
@@ -214,7 +214,7 @@ export function validateBusinessOnboardingConfirm(
     return { ok: false, error: "Укажите название заведения: от 1 до 120 символов." };
   }
   if (locationName.length < 1 || locationName.length > 120) {
-    return { ok: false, error: "Укажите название точки: от 1 до 120 символов." };
+    return { ok: false, error: "Укажите название кофейни: от 1 до 120 символов." };
   }
   if (businessCategory.length < 1 || businessCategory.length > 120) {
     return { ok: false, error: "Укажите тип заведения: от 1 до 120 символов." };

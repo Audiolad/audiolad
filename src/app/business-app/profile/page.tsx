@@ -31,7 +31,7 @@ export default async function BusinessProfilePage() {
 
       {domain.status === "anonymous" ? (
         <section className="business-app-card space-y-3">
-          <p>Войдите в аккаунт, чтобы видеть точку и документы.</p>
+          <p>Войдите в аккаунт, чтобы видеть кофейню и документы.</p>
           <div className="flex flex-wrap gap-2">
             <a className="business-app-btn business-app-btn-primary business-app-focus-ring" href="https://audiolad.ru/auth/sign-in">
               Войти
@@ -63,7 +63,7 @@ export default async function BusinessProfilePage() {
             {domain.location ? (
               <>
                 <div>
-                  <dt className="text-[var(--biz-text-muted)]">Точка</dt>
+                  <dt className="text-[var(--biz-text-muted)]">Кофейня</dt>
                   <dd className="font-semibold text-[var(--biz-text)]">{domain.location.name}</dd>
                 </div>
                 {domain.location.businessCategory ? (
@@ -81,15 +81,15 @@ export default async function BusinessProfilePage() {
               </>
             ) : (
               <div>
-                <dt className="text-[var(--biz-text-muted)]">Точка</dt>
-                <dd className="font-semibold text-[var(--biz-text)]">Точка ещё не подключена.</dd>
+                <dt className="text-[var(--biz-text-muted)]">Кофейня</dt>
+                <dd className="font-semibold text-[var(--biz-text)]">Кофейня ещё не подключена.</dd>
               </div>
             )}
           </dl>
           {domain.location ? null : (
             <p>
               <Link className="business-app-btn business-app-btn-primary business-app-focus-ring" href="/onboarding">
-                Подключить точку
+                Подключить кофейню
               </Link>
             </p>
           )}

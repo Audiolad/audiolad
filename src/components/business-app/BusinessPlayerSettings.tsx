@@ -54,7 +54,7 @@ const VENUE_SENT = "Отправлено. В кофейне новое звуч�
 function PointSoundLockedHow() {
   return (
     <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-point-sound-locked-how">
-      Включить можно на телефоне владельца: <a href="/preferences" className="underline">«Настройка» – «Управление кофейней»</a>, галочка «Разрешить менять музыку с устройства в заведении».
+      Это включается на телефоне владельца, не на этом устройстве: «Настройка» – «Управление кофейней», галочка «Разрешить менять музыку с устройства в заведении».
     </p>
   );
 }

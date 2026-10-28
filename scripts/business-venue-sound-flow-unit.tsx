@@ -54,6 +54,8 @@ const at = (html: string, testid: string) => {
   assert.match(closed, /Управление кофейней/);
   assert.match(closed, /Название кофейни/);
   assert.doesNotMatch(closed, /точк/i);
+  assert.match(closed, /Пауза, продолжение, следующий трек и отправка атмосферы спрашивают подтверждение и уходят в кофейню\. Слушать у себя это не включает\./);
+  assert.doesNotMatch(closed, /Каждое действие/);
   assert.doesNotMatch(closed, /—/);
   assert.doesNotMatch(closed, /data-testid="slot"/, "picker stays closed until the owner asks");
   assert.match(closed, /data-testid="biz-venue-atmosphere-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*data-testid="biz-venue-atmosphere-toggle"/);
@@ -100,7 +102,9 @@ const at = (html: string, testid: string) => {
 
   const locked = inRouter(<BusinessPlayerSettings locationId="loc-1" pointDevice pointCanEdit={false} />);
   assert.match(locked, /data-testid="biz-point-sound-locked"/);
-  assert.match(locked, /href="\/preferences"/);
+  // The venue device cannot open the owner controls: no link to the locked /preferences page here.
+  assert.doesNotMatch(locked, /<a [^>]*href=/);
+  assert.match(locked, /на телефоне владельца, не на этом устройстве/);
   assert.match(locked, /«Настройка» – «Управление кофейней»/);
   assert.match(locked, /Разрешить менять музыку с устройства в заведении/);
   assert.doesNotMatch(locked, /—/);

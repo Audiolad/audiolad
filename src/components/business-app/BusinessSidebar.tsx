@@ -191,7 +191,7 @@ export default function BusinessSidebar() {
     domain.status === "authenticated" && domain.location
       ? domain.location.name
       : domain.status === "authenticated"
-        ? "Точка ещё не создана"
+        ? "Кофейня ещё не создана"
         : "Гостевой режим";
   const ownerInitial = ownerFirstName.slice(0, 1).toUpperCase() || "А";
 
