@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { CAFE_DAYPART_HOURS_DEFAULT, CAFE_QUEUE_DEFAULT_PREFS, isCafeDaypart, isCafeEnergyOffset, validateCafeDaypartHours, type CafeDaypartHours } from "@/lib/business-app/cafe-queue/prefs";
+import { GUEST_COFFEE_DEFAULT_PROFILE } from "@/lib/business-app/guest-coffee/catalog";
+import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } from "@/lib/business-app/location-sound-settings";
 import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
@@ -90,6 +93,50 @@ export async function POST(request: Request) {
     });
   }
 
+  if (body.action === "permission") {
+    const locationId = typeof body.locationId === "string" ? body.locationId : "";
+    if (typeof body.allowed !== "boolean" || !locationId) {
+      return json({ ok: false, error: "Не удалось сохранить разрешение." }, 400);
+    }
+    const { data: row } = await supabase
+      .from("business_location_sound_settings")
+      .select("location_id, character, direction, daypart_mode, energy_offset, morning_start, morning_end, day_start, day_end, evening_start, evening_end, point_can_edit_settings, settings_version")
+      .eq("location_id", locationId)
+      .maybeSingle();
+    const parsed = locationSoundFromRow(row as Record<string, unknown> | null);
+    const draft: LocationSoundDraft = parsed ?? {
+      character: GUEST_COFFEE_DEFAULT_PROFILE.character,
+      direction: GUEST_COFFEE_DEFAULT_PROFILE.direction,
+      daypartMode: CAFE_QUEUE_DEFAULT_PREFS.daypartMode,
+      energyOffset: CAFE_QUEUE_DEFAULT_PREFS.energyOffset,
+      hours: CAFE_DAYPART_HOURS_DEFAULT,
+    };
+    const { data, error } = await supabase.rpc(
+      "save_business_location_sound_settings",
+      locationSoundRpcArgs(locationId, draft, body.allowed),
+    );
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      return json({ ok: false, error: "Не удалось сохранить разрешение. Попробуйте ещё раз." });
+    }
+    return json({ ok: true });
+  }
+
+  if (body.action === "rename") {
+    const locationId = typeof body.locationId === "string" ? body.locationId : "";
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!locationId || name.length < 1 || name.length > 120) {
+      return json({ ok: false, error: "Не удалось сохранить название." }, 400);
+    }
+    const { data, error } = await supabase.rpc("rename_business_location", {
+      p_location_id: locationId,
+      p_name: name,
+    });
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      return json({ ok: false, error: "Не удалось сохранить название. Попробуйте ещё раз." });
+    }
+    return json({ ok: true });
+  }
+
   if (body.action === "enqueue") {
     if (!isPointCommandId(body.id) || !isPointCommandType(body.type) || typeof body.locationId !== "string") {
       return json({ ok: false, error: "Не удалось отправить команду." }, 400);
@@ -105,10 +152,38 @@ export async function POST(request: Request) {
     return json({ ok: true, id: (data as { id?: string }).id ?? body.id });
   }
 
-  if (body.action === "commands" || body.action === "ack") {
+  if (body.action === "commands" || body.action === "ack" || body.action === "sound" || body.action === "sound-save") {
     const jar = request.headers.get("cookie") ?? "";
     const token = readCookie(jar, BUSINESS_POINT_COOKIE);
     if (!isPointToken(token)) return json({ ok: false, reason: "no_access" });
+    if (body.action === "sound") {
+      const { data, error } = await supabase.rpc("get_business_point_sound_settings", { p_token: token });
+      if (error || !data || (data as { ok?: boolean }).ok !== true) return json({ ok: false, reason: "sound_failed" });
+      return json(data);
+    }
+    if (body.action === "sound-save") {
+      const draft = soundDraftFromBody(body);
+      const locationId = typeof body.locationId === "string" ? body.locationId : "";
+      if (!draft || !locationId) return json({ ok: false, reason: "invalid_request" }, 400);
+      const { data, error } = await supabase.rpc("save_business_point_sound_settings", {
+        p_token: token,
+        p_location_id: locationId,
+        p_character: draft.character,
+        p_direction: draft.direction,
+        p_daypart_mode: draft.daypartMode,
+        p_energy_offset: draft.energyOffset,
+        p_morning_start: draft.hours.morning.start,
+        p_morning_end: draft.hours.morning.end,
+        p_day_start: draft.hours.day.start,
+        p_day_end: draft.hours.day.end,
+        p_evening_start: draft.hours.evening.start,
+        p_evening_end: draft.hours.evening.end,
+      });
+      if (error || !(data as { ok?: boolean } | null)?.ok) {
+        return json({ ok: false, error: "Не удалось сохранить звучание. Попробуйте ещё раз." });
+      }
+      return json({ ok: true });
+    }
     if (body.action === "commands") {
       const { data, error } = await supabase.rpc("list_business_point_commands", { p_token: token });
       if (error || !Array.isArray(data)) return json({ ok: false, reason: "commands_failed" });
@@ -150,6 +225,20 @@ export async function POST(request: Request) {
   }
 
   return json({ ok: false, reason: "invalid_request" }, 400);
+}
+
+function soundDraftFromBody(body: Record<string, unknown>): LocationSoundDraft | null {
+  const character = body.character;
+  const direction = body.direction;
+  const daypartMode = body.daypartMode;
+  const energy = body.energyOffset;
+  if (character !== "cozy" && character !== "city" && character !== "classic" && character !== "evening") return null;
+  if (direction !== "jazz" && direction !== "calm" && direction !== "rhythm" && direction !== "melodic") return null;
+  if (daypartMode !== "auto" && !isCafeDaypart(daypartMode)) return null;
+  if (typeof energy !== "number" || !isCafeEnergyOffset(energy)) return null;
+  const hours = body.hours as CafeDaypartHours | undefined;
+  if (!hours || validateCafeDaypartHours(hours)) return null;
+  return { character, direction, daypartMode, energyOffset: energy, hours };
 }
 
 function readCookie(header: string, name: string): string | null {

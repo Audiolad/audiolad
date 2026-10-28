@@ -14,7 +14,9 @@ import {
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
+import { effectiveCafeDaypart } from "@/lib/business-app/cafe-queue/prefs";
 import { isPointCommandType, pointCommandAction, type PointCommandType } from "@/lib/business-app/point-commands";
+import { pointSoundUpdate, type PointSoundUpdate } from "@/lib/business-app/point-sound";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
 import { SpaOnlinePlayer as Controller, type OnlineStatus } from "@/lib/business-app/spa-online-player";
 import { deriveSpaPlaybackState, sendSpaLiveReport, SpaLiveEvidence } from "@/lib/business-app/spa-live-report";
@@ -610,6 +612,7 @@ export function BusinessCabinetPlayerProvider({
     direction: GuestCoffeeDirection;
     daypart: CafeDaypart;
     feedback: readonly CafeQueueFeedback[];
+    energyOffset?: number;
   }): Promise<"applied" | "deferred" | "failed"> => {
     const current = modelRef.current;
     if (!current || current.tracks.length === 0) return "deferred";
@@ -623,7 +626,7 @@ export function BusinessCabinetPlayerProvider({
           character: input.character,
           direction: input.direction,
           daypart: input.daypart,
-          energyOffset: 0,
+          energyOffset: input.energyOffset ?? 0,
           feedback: input.feedback,
           boundaryAudioItemId: playingId,
         }),
@@ -644,6 +647,66 @@ export function BusinessCabinetPlayerProvider({
       return "failed";
     }
   }, [applyAtmosphereQueue]);
+
+  useEffect(() => {
+    if (!canBeat) return;
+    let seenVersion = 0;
+    let pending: PointSoundUpdate | null = null;
+    let stop = false;
+    const apply = (sound: PointSoundUpdate) => {
+      const daypart = effectiveCafeDaypart(sound.daypartMode, new Date().getHours(), sound.hours) ?? "day";
+      void rebuildFromProfile({
+        character: sound.character,
+        direction: sound.direction,
+        daypart,
+        feedback: [],
+        energyOffset: sound.energyOffset,
+      });
+    };
+    const take = (sound: PointSoundUpdate) => {
+      if (seenVersion === 0) {
+        seenVersion = sound.version;
+        return;
+      }
+      if (sound.version <= seenVersion) return;
+      seenVersion = sound.version;
+      const status = ctlRef.current?.status;
+      if (status === "playing" || status === "loading") pending = sound;
+      else apply(sound);
+    };
+    const tick = async () => {
+      if (stop) return;
+      try {
+        const res = await fetch("/api/business/point", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          cache: "no-store",
+          body: JSON.stringify({ action: "sound" }),
+        });
+        const json: unknown = await res.json();
+        const sound = pointSoundUpdate(json);
+        if (sound) take(sound);
+      } catch {
+        /* the next poll retries */
+      }
+    };
+    const onEnded = () => {
+      if (!pending) return;
+      const sound = pending;
+      pending = null;
+      apply(sound);
+    };
+    const audio = audioRef.current;
+    audio?.addEventListener("ended", onEnded);
+    void tick();
+    const timer = window.setInterval(() => void tick(), 5_000);
+    return () => {
+      stop = true;
+      audio?.removeEventListener("ended", onEnded);
+      window.clearInterval(timer);
+    };
+  }, [canBeat, open, rebuildFromProfile]);
 
   const dismissBar = useCallback(async () => {
     const ctl = ctlRef.current;

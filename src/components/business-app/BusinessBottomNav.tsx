@@ -13,6 +13,7 @@ import {
   BizSettingsIcon,
 } from "@/components/business-app/BusinessIcons";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
+import { usePointMode } from "@/components/business-app/BusinessPointMode";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
 import {
   BUSINESS_LOCKED_LABEL,
@@ -44,12 +45,16 @@ const ICONS: Record<
  */
 export default function BusinessBottomNav() {
   const pathname = normalizeBusinessAppPathname(usePathname() || "/");
+  const pointMode = usePointMode();
+  const items = pointMode
+    ? BUSINESS_MOBILE_NAV_ITEMS.filter((item) => item.id === "home" || item.id === "music")
+    : BUSINESS_MOBILE_NAV_ITEMS;
   const access = resolveBusinessAccess(useBusinessDomain());
   const { showLocked } = useBusinessGuestStatus();
 
   return (
     <nav className="business-app-bottom-nav" aria-label="Мобильная навигация">
-      {BUSINESS_MOBILE_NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = isBusinessNavItemCurrent(pathname, item);
         const locked = isBusinessNavItemLocked(item, access);
         const Icon = ICONS[item.icon as keyof typeof ICONS];

@@ -97,7 +97,7 @@ export default function PointPairingCard({ locationId }: { locationId: string })
           disabled={pending}
           data-testid="biz-point-create"
         >
-          Показать код
+          Получить код для устройства
         </button>
         {link?.linked ? (
           <button

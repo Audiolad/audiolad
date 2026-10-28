@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ComponentType } from "react";
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
+import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
+import { usePointMode } from "@/components/business-app/BusinessPointMode";
 import {
   BizAnnouncementsIcon,
   BizCollapseIcon,
@@ -181,6 +183,7 @@ export default function BusinessSidebar() {
   }, [collapsed]);
 
   const domain = useBusinessDomain();
+  const pointMode = usePointMode();
   const access = resolveBusinessAccess(domain);
   const ownerFirstName =
     domain.status === "authenticated" ? domain.owner.firstName : "Гость";
@@ -215,16 +218,24 @@ export default function BusinessSidebar() {
         </button>
       </div>
 
+      {collapsed ? null : (
+        <div className="px-3 pt-3">
+          <BusinessEntrySwitcher />
+        </div>
+      )}
+
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3" aria-label="Основное">
-        {BUSINESS_PRIMARY_NAV_ITEMS.map((item) => (
+        {BUSINESS_PRIMARY_NAV_ITEMS.filter((item) => !pointMode || item.id === "home" || item.id === "music").map((item) => (
           <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
+        {pointMode ? null : (
         <div
           className="my-2 border-t border-[var(--biz-border)]"
           role="separator"
           aria-hidden
         />
-        {BUSINESS_SECONDARY_NAV_ITEMS.map((item) => (
+        )}
+        {BUSINESS_SECONDARY_NAV_ITEMS.filter(() => !pointMode).map((item) => (
           <NavLink key={item.id} item={item} collapsed={collapsed} access={access} />
         ))}
       </nav>

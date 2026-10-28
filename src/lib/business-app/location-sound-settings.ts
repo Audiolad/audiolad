@@ -95,8 +95,12 @@ export function locationSoundPrefs(settings: LocationSoundDraft): CafeQueuePrefs
   return { daypartMode: settings.daypartMode, energyOffset: settings.energyOffset };
 }
 
-/** Atmosphere save. Omits the permission flag so a sound edit cannot flip it. */
-export function locationSoundRpcArgs(locationId: string, draft: LocationSoundDraft): Record<string, unknown> {
+/** Atmosphere save. A missing flag leaves the permission unchanged. */
+export function locationSoundRpcArgs(
+  locationId: string,
+  draft: LocationSoundDraft,
+  pointCanEditSettings: boolean | null = null,
+): Record<string, unknown> {
   return {
     p_location_id: locationId,
     p_character: draft.character,
@@ -109,7 +113,7 @@ export function locationSoundRpcArgs(locationId: string, draft: LocationSoundDra
     p_day_end: draft.hours.day.end,
     p_evening_start: draft.hours.evening.start,
     p_evening_end: draft.hours.evening.end,
-    p_point_can_edit_settings: null,
+    p_point_can_edit_settings: pointCanEditSettings,
   };
 }
 
