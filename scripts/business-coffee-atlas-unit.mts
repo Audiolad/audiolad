@@ -193,8 +193,10 @@ assert.equal(COFFEE_ATLAS_CTA_HREF, "https://business.audiolad.ru/guest/coffee")
 
 // --- offer on every page ---
 assert.equal(COFFEE_ATLAS_OFFER.price, "799 ₽");
-assert.match(COFFEE_ATLAS_OFFER.trial, /30 дней в подарок/);
-assert.match(COFFEE_ATLAS_OFFER.rights, /Лицензионная музыка/);
+assert.equal(COFFEE_ATLAS_OFFER.trial, "30 дней в подарок");
+assert.equal(COFFEE_ATLAS_OFFER.afterTrial, "Далее 799 ₽ в месяц");
+assert.equal(COFFEE_ATLAS_OFFER.rights, "Лицензионная музыка с соблюдением прав");
+assert.doesNotMatch(COFFEE_ATLAS_OFFER.rights, /авторов/);
 const overview = read("src/components/business/coffee-atlas/CoffeeAtlasOverview.tsx");
 const shopView = read("src/components/business/coffee-atlas/CoffeeAtlasShopView.tsx");
 for (const [name, source] of [["overview", overview], ["shop", shopView]] as const) {
@@ -204,6 +206,12 @@ for (const [name, source] of [["overview", overview], ["shop", shopView]] as con
 }
 assert.match(shopView, /previous\.slug[\s\S]*next\.slug/, "back / next navigation");
 const chrome = read("src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx");
+assert.match(
+  chrome,
+  /COFFEE_ATLAS_OFFER\.trial[\s\S]*COFFEE_ATLAS_OFFER\.afterTrial[\s\S]*COFFEE_ATLAS_OFFER\.rightsHref[\s\S]*COFFEE_ATLAS_OFFER\.rights/,
+  "offer checklist order: gift, then price, then the rights link",
+);
+assert.doesNotMatch(chrome, /прав авторов/);
 
 // --- PDF: exactly ONE control, in the header; page bodies have no PDF buttons ---
 assert.equal(COFFEE_ATLAS_PDF_PATH, "/business/atlas-kofeen/atlas-10-kofeen-mira.pdf");
