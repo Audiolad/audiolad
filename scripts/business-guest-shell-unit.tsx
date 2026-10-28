@@ -141,7 +141,9 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   assert.match(navCss, /\.business-app-bottom-nav__icon > \.business-app-bottom-nav__lock \{[^}]*top:\s*-5px/, "lock is a corner badge, not a second full icon");
   assert.match(navCss, /\.business-app-bottom-nav__icon > svg:not\(\.business-app-bottom-nav__lock\)/, "the section icon keeps its own size");
   has(g, /data-testid="biz-trial-cta"/, "gift CTA is on the guest bar before the limit");
-  assert.ok(anchors(g, "/onboarding?type=cafe").some((t) => t.includes('data-testid="biz-connect"')), "Подключить → real onboarding");
+  // Sergey 28.10.2026: the guest banner has one action – the green gift CTA, no «Подключить».
+  hasNot(g, /data-testid="biz-connect"/, "no secondary «Подключить» on the guest banner");
+  has(g, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-trial-cta"/, "gift CTA is green (pine)");
   hasCurrentLink(g, "/guest/coffee", "Music is the current section");
   hasNot(g, /href="\/(locations|stats|documents|team|preferences|player|announcements|profile)"/, "no link into protected sections");
   const m = shell(member, "/guest/coffee");
@@ -199,6 +201,7 @@ for (const [name, domain] of [["guest", anonymous], ["member", member]] as const
   hasNot(html, /Это не каталог эфира|Гостевой режим – для оценки звучания|Как устроены права на музыку/, `${name}: guest disclaimer removed`);
   if (name === "guest") {
     has(html, /data-testid="biz-guest-gift-cta"/, "guest gift button");
+    has(html, /class="business-app-btn business-app-btn-cta[^"]*"[^>]*data-testid="biz-guest-gift-cta"/, "guest gift button is green (pine)");
     has(html, /Получить 30 дней в подарок/);
     has(html, /Со всеми функциями\. Далее /);
     has(html, /799/);

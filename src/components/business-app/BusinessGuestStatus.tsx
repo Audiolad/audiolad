@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import { BUSINESS_GIFT_CTA } from "@/lib/access-grants/copy";
 import { BUSINESS_TRIAL_SIGN_UP_HREF } from "@/lib/access-grants/paths";
-import { BUSINESS_CONNECT_HREF, businessLockedNotice } from "@/lib/business-app/access";
+import { businessLockedNotice } from "@/lib/business-app/access";
 import { GUEST_COFFEE_COPY, GUEST_COFFEE_TERMS } from "@/lib/business-app/guest-coffee/copy";
 import type { GuestCoffeeLimitState } from "@/lib/business-app/guest-coffee/limit";
 
@@ -55,6 +54,7 @@ export function useBusinessGuestStatus(): GuestStatus {
  * Strip at the top of every cabinet screen for a guest.
  * Before the meter runs out it offers only the 30-day gift. The 30 minutes are
  * named only in the exhausted banner, after the server limit is reached.
+ * Sergey 28.10.2026: one green action only – no secondary «Подключить» on the guest banner.
  */
 export function BusinessGuestStatusBar() {
   const { limit, notice } = useBusinessGuestStatus();
@@ -83,7 +83,7 @@ export function BusinessGuestStatusBar() {
         {exhausted ? (
           <a
             href={BUSINESS_TRIAL_SIGN_UP_HREF}
-            className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            className="business-app-btn business-app-btn-cta business-app-focus-ring"
             data-testid="biz-guest-register"
           >
             {GUEST_COFFEE_COPY.exhaustedRegister}
@@ -91,19 +91,12 @@ export function BusinessGuestStatusBar() {
         ) : (
           <a
             href={BUSINESS_TRIAL_SIGN_UP_HREF}
-            className="business-app-btn business-app-btn-primary business-app-focus-ring"
+            className="business-app-btn business-app-btn-cta business-app-focus-ring"
             data-testid="biz-trial-cta"
           >
             {BUSINESS_GIFT_CTA}
           </a>
         )}
-        <Link
-          href={BUSINESS_CONNECT_HREF}
-          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
-          data-testid="biz-connect"
-        >
-          Подключить
-        </Link>
       </div>
     </section>
   );

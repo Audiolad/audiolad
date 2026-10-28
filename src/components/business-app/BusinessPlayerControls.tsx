@@ -32,7 +32,7 @@ type Props = {
   size?: "large" | "compact";
 };
 
-function PlayIcon() {
+export function PlayIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M8.2 5.1v13.8l11.4-6.9L8.2 5.1z" fill="currentColor" />
@@ -40,7 +40,7 @@ function PlayIcon() {
   );
 }
 
-function PauseIcon() {
+export function PauseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M6.4 4.8h3.7v14.4H6.4zm7.5 0h3.7v14.4h-3.7z" fill="currentColor" />
