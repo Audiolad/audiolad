@@ -507,7 +507,7 @@ async function loadPointDeviceWorkspacePage(
       spaceEnabled: space.enabled,
     });
     if (catalog.unavailable) {
-      return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+      return { ...model, status: "unavailable" };
     }
     tracks = catalog.tracks;
   }
