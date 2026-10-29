@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
+import ts from "typescript";
+
 import { StorageClient } from "@supabase/storage-js";
 
 import { collectAnalyzerDocuments } from "../src/lib/music-analyzer-runs/analyze-output";
@@ -776,4 +778,65 @@ assert.doesNotMatch(read("src/lib/music-analyzer-runs/export-run.ts"), /passport
 assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /cc5b2828/);
 assert.match(read("src/lib/music-analyzer-runs/constants.ts"), /3750f3b/);
 
-console.log("music-analyzer-runs-unit: ok");
+// Execute the actual enqueue callers against controlled ports. Reused row IDs
+// intentionally differ from requested IDs, as they do when RPC dedupe succeeds.
+function loadCaller<T>(file: string, mocks: Record<string, unknown>): T {
+  const exports = {};
+  new Function("require", "exports", ts.transpileModule(read(file), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText)(() => mocks, exports);
+  return exports as T;
+}
+const reusedRow = { id: "reused-run", sha256: "a".repeat(64), status: "processing" };
+const enqueueInput = { id: "new-run", createdBy: "requester", sourceFilename: "test.mp3", sha256: reusedRow.sha256, byteSize: 1, mimeType: "audio/mpeg", storagePath: "runs/new-run/test.mp3" };
+const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
+const enqueueRepository = loadCaller<typeof import("../src/lib/music-analyzer-runs/repository")>("src/lib/music-analyzer-runs/repository.ts", {
+  createServiceRoleClient: () => ({ rpc: async (name: string, args: Record<string, unknown>) => {
+    rpcCalls.push({ name, args }); return { data: reusedRow, error: null };
+  } }),
+});
+assert.equal(await enqueueRepository.enqueueMusicAnalyzerRun({ ...enqueueInput, deduplicate: true }), reusedRow);
+assert.equal(rpcCalls[0].name, "enqueue_music_analyzer_run_deduplicated");
+assert.equal(rpcCalls[0].args.p_created_by, "requester");
+assert.equal(rpcCalls[0].args.p_sha256, reusedRow.sha256);
+await enqueueRepository.enqueueMusicAnalyzerRun(enqueueInput);
+assert.equal(rpcCalls[1].name, "enqueue_music_analyzer_run", "default retains legacy RPC");
+
+const callerInputs: Array<Record<string, unknown>> = [];
+const enqueueMock = async (input: Record<string, unknown>) => { callerInputs.push(input); return reusedRow; };
+const previousSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+try {
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "unit-test-only";
+  const uploads = loadCaller<typeof import("../src/lib/music-analyzer-runs/uploads")>("src/lib/music-analyzer-runs/uploads.ts", {
+    openUploadTicket: () => ({ userId: "requester", runId: "new-run", storagePath: enqueueInput.storagePath, byteSize: 1, filename: "test.mp3", mime: "audio/mpeg" }),
+    getMusicAnalyzerRun: async () => null,
+    downloadMusicAnalyzerObject: async () => new Uint8Array([1]),
+    sha256Hex: () => reusedRow.sha256,
+    enqueueMusicAnalyzerRun: enqueueMock,
+    removeMusicAnalyzerObject: () => { throw new Error("successful dedupe must not enter error cleanup"); },
+  });
+  assert.equal(await uploads.completeMusicAnalyzerUpload({ userId: "requester", ticket: "test" }), reusedRow);
+  assert.equal(callerInputs[0].deduplicate, true, "upload opts into dedupe");
+} finally {
+  if (previousSecret === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  else process.env.SUPABASE_SERVICE_ROLE_KEY = previousSecret;
+}
+const reanalysisRoute = loadCaller<{ POST(request: Request): Promise<Response> }>("src/app/api/music-analyzer/runs/reanalyze/route.ts", {
+  requireMusicLabApiAccess: async () => ({ ok: true, actor: { userId: "requester" } }),
+  musicLabJson: (body: unknown, status = 200) => Response.json(body, { status }),
+  record: (value: unknown) => value,
+  reanalysisSelection: () => ["source"],
+  reanalysisId: () => "new-run",
+  getMusicAnalyzerRun: async (id: string) => id === "source" ? { ...enqueueInput, id, status: "succeeded", source_filename: "test.mp3", storage_path: "source-path" } : null,
+  buildRunStoragePath: () => enqueueInput.storagePath,
+  copyMusicAnalyzerObject: async () => {},
+  enqueueMusicAnalyzerRun: enqueueMock,
+  toClientRun: (row: unknown) => row,
+});
+const dedupeResponse = await reanalysisRoute.POST(new Request("http://localhost/reanalyze", {
+  method: "POST", headers: { origin: "http://localhost" }, body: JSON.stringify({ requestId: "request" }),
+}));
+assert.equal(dedupeResponse.status, 200);
+assert.deepEqual(await dedupeResponse.json(), { ok: true, results: [{ sourceId: "source", run: reusedRow }] });
+assert.equal(callerInputs[1].deduplicate, true, "admin reanalysis opts into dedupe");
+console.log("music-analyzer-runs-unit: ok (including opt-in callers and reused run responses)");

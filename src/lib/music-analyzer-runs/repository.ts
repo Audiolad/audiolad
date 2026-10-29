@@ -94,8 +94,10 @@ export async function enqueueMusicAnalyzerRun(input: {
   byteSize: number;
   mimeType: string;
   storagePath: string;
+  // Opt in only for callers that consume the returned ID (which may be reused).
+  deduplicate?: boolean;
 }): Promise<MusicAnalyzerRunRow> {
-  const { data, error } = await client().rpc("enqueue_music_analyzer_run", {
+  const { data, error } = await client().rpc(input.deduplicate ? "enqueue_music_analyzer_run_deduplicated" : "enqueue_music_analyzer_run", {
     p_id: input.id,
     p_created_by: input.createdBy,
     p_source_filename: input.sourceFilename,

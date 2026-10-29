@@ -83,6 +83,7 @@ export async function completeMusicAnalyzerUpload(input: {
   }
   try {
     return await enqueueMusicAnalyzerRun({
+      deduplicate: true,
       id: intent.runId,
       createdBy: input.userId,
       sourceFilename: intent.filename,
