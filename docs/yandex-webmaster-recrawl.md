@@ -107,8 +107,36 @@ Queue outcomes:
 Yandex is enqueued for listed product publish, admin approve-and-publish,
 scheduled first go-live, SEO/content/slug edits, unlisted→listed, public
 playlist publish/update, and public author page updates. IndexNow still sends
-immediately and is enqueued only when that send fails. `/listens` and SEO
-articles stay unwired. The migration does not resend older URLs.
+immediately and is enqueued only when that send fails. The migration does not
+resend older URLs. `/listens/<slug>` pages are static and go out with the
+article deploy step below.
+
+Editorial articles (`/articles/<slug>`, the standalone neuromusic guides,
+`/b/coffee/<slug>`) and indexable `/listens/<slug>` pages are static files and
+go live with a deploy. After cutover `deploy/scripts/deploy.sh` runs
+`scripts/enqueue-article-recrawl.mts` in the new release (under
+`timeout -k 10s 120s`). It compares the content fingerprints with the previous
+release's `.article-recrawl-manifest.json` and queues new pages
+(`article_published`) and changed definitions (`article_updated`) for both
+`yandex` and `indexnow`; this worker delivers them. Rules:
+
+- the manifest only advances for URLs that both engines accepted. Before
+  enqueueing it is written with every planned URL left at its previous
+  fingerprint (or absent if new), and rewritten after enqueueing. A failed
+  enqueue, missing Supabase env, a crash or a timeout leaves those URLs
+  planned again on the next deploy
+- exit code 2 = some URLs were not queued; deploy.sh logs
+  `article_recrawl_enqueue_failed exit_code=<n>` and never fails or rolls back
+  the deploy (124/137 = timeout)
+- no previous manifest (first deploy with this step, or a rollback to an older
+  release) → only seeds the manifest, nothing is resent
+- redeploying the same content queues nothing; a pending row for the same URL
+  is refreshed, not duplicated
+- at most 20 edited pages are queued per deploy; the rest are deferred
+  (`updates_deferred`), keep their old manifest entry and go out on later
+  deploys, 20 at a time. New pages are always queued
+- standalone guides keep their body copy in TSX views, so only new pages and
+  metadata changes are detected for them
 
 Log lines start with an ISO timestamp. If Yandex has no successful delivery for
 more than 24 hours while rows are pending, the worker logs
