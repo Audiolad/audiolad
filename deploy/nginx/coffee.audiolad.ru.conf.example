@@ -1,28 +1,45 @@
 # EXAMPLE ONLY. Sergey must approve DNS, certificate issuance and nginx changes.
-# Same upstream as business; verify the existing upstream before using this file.
-# Enable the 443 block only after issuing the certificate via the existing ACME process.
+# Mirrors the production business.audiolad.ru server block (same upstream, static overlay,
+# buffers and headers). Verify against the live business block before use: `nginx -T`.
+# Certificate: a SEPARATE cert for coffee.audiolad.ru (do not re-issue/expand the shared
+# business certificate). Enable the 443 block only after issuing it via the existing ACME
+# process (certbot --nginx -d coffee.audiolad.ru, or webroot on the 80 block).
 server {
     listen 80;
+    listen [::]:80;
     server_name coffee.audiolad.ru;
     # Preserve the existing ACME HTTP challenge location here if required.
-    location / { return 308 https://coffee.audiolad.ru$request_uri; }
+    location / { return 301 https://$host$request_uri; }
 }
 server {
-    listen 443 ssl;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name coffee.audiolad.ru;
+
     ssl_certificate /etc/letsencrypt/live/coffee.audiolad.ru/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/coffee.audiolad.ru/privkey.pem;
-    client_max_body_size 55m;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    client_max_body_size 4m;
+    proxy_buffer_size 64k;
+    proxy_buffers 16 64k;
+    proxy_busy_buffers_size 128k;
+    large_client_header_buffers 8 32k;
+
+    # Same /_next/static overlay as business (old + new build chunks during a cutover).
+    include /etc/nginx/snippets/audiolad-next-static-overlay.conf;
+
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://audiolad_next;
         proxy_http_version 1.1;
-        proxy_set_header Host coffee.audiolad.ru;
-        proxy_set_header X-Forwarded-Host coffee.audiolad.ru;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_read_timeout 300s;
+        proxy_cache_bypass $http_upgrade;
     }
 }

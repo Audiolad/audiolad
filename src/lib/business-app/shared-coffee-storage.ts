@@ -1,6 +1,11 @@
 /** Only sound choices cross hosts. Auth, point credentials and playback leases never do. */
 import { getSupabaseCookieOptions, parseCookieHeader, serialize } from "@/lib/supabase/cookie-domain";
 import { coffeeHostEnabled } from "./host";
+import {
+  CAFE_DAYPART_HOURS_KEY, CAFE_QUEUE_PREFS_KEY, parseCafeDaypartHours, parseCafeQueuePrefs,
+  serializeCafeDaypartHours, serializeCafeQueuePrefs,
+} from "./cafe-queue/prefs";
+import { BUSINESS_SOUND_PROFILE_STORAGE_KEY, parseBusinessSoundProfile, serializeBusinessSoundProfile } from "./sound-profile";
 
 const PREFIX = "al-coffee-pref-";
 export function sharedCoffeeStorageKey(key: string): boolean {
@@ -8,6 +13,22 @@ export function sharedCoffeeStorageKey(key: string): boolean {
     key === "audiolad-business-cafe-queue-prefs" ||
     key === "audiolad-business-cafe-daypart-hours" ||
     /^audiolad-business-cafe-daypart-hours:[a-f0-9-]{36}$/i.test(key);
+}
+
+const MAX_SHARED_VALUE = 3000;
+
+/**
+ * parse → serialize through the owner parser: unknown fields (and anything else that is not a
+ * setting) never reach the domain cookie or come back from it. Null = not shareable.
+ */
+export function normalizeSharedCoffeeValue(key: string, raw: string): string | null {
+  let value: string | null = null;
+  if (key === BUSINESS_SOUND_PROFILE_STORAGE_KEY) value = serializeBusinessSoundProfile(parseBusinessSoundProfile(raw));
+  else if (key === CAFE_QUEUE_PREFS_KEY) value = serializeCafeQueuePrefs(parseCafeQueuePrefs(raw));
+  else if (key === CAFE_DAYPART_HOURS_KEY || key.startsWith(`${CAFE_DAYPART_HOURS_KEY}:`)) {
+    value = serializeCafeDaypartHours(parseCafeDaypartHours(raw));
+  }
+  return value !== null && encodeURIComponent(value).length < MAX_SHARED_VALUE ? value : null;
 }
 
 function shared(key: string): boolean {
@@ -22,8 +43,9 @@ function cookieName(key: string): string {
 export const coffeeStorage = {
   getItem(key: string): string | null {
     if (shared(key)) {
-      const value = parseCookieHeader(document.cookie).find((c) => c.name === cookieName(key))?.value;
-      if (value !== undefined) {
+      const cookie = parseCookieHeader(document.cookie).find((c) => c.name === cookieName(key))?.value;
+      const value = cookie === undefined ? null : normalizeSharedCoffeeValue(key, cookie);
+      if (value !== null) {
         try { window.localStorage.setItem(key, value); } catch { /* shared cookie still works */ }
         return value;
       }
@@ -33,8 +55,9 @@ export const coffeeStorage = {
     return legacy;
   },
   setItem(key: string, value: string): void {
-    if (shared(key) && encodeURIComponent(value).length < 3000) {
-      document.cookie = serialize(cookieName(key), value, {
+    const normalized = shared(key) ? normalizeSharedCoffeeValue(key, value) : null;
+    if (normalized !== null) {
+      document.cookie = serialize(cookieName(key), normalized, {
         ...getSupabaseCookieOptions(window.location.hostname),
         sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60,
       });

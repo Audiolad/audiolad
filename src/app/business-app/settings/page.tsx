@@ -5,10 +5,10 @@ import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { businessPointSessionAlive, loadPointDevicePermission } from "@/lib/business-app/point-session.server";
-import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
+import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 
 export const metadata: Metadata = {
-  ...buildBusinessAppMetadata(),
+  ...buildBusinessAppPageMetadata(),
   title: "Настройка – АудиоЛад Бизнес",
   robots: { index: false, follow: false },
 };

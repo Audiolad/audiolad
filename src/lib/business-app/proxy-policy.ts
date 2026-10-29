@@ -45,6 +45,17 @@ export const BUSINESS_ALLOWED_API_PATHS = [
 ] as const;
 
 /**
+ * Business APIs never served on the coffee host: the /spa pilot player loads SPA programs
+ * (loadSpaPilotContext). Coffee is the coffee cabinet only; business keeps them unchanged.
+ * `/api/business/player/report` stays reachable for the cabinet player (`source: "cabinet"`);
+ * its SPA branch refuses the coffee host inside the handler.
+ */
+export const COFFEE_BLOCKED_API_PATHS = [
+  "/api/business/player/track-url",
+  "/api/business/player/manifest",
+] as const;
+
+/**
  * Business host routing policy (pure, unit-tested).
  *
  * - Any non-business host `/business-app` → 404 (no indexable duplicate).
@@ -86,6 +97,11 @@ export function resolveBusinessProxyAction(
 
   if (pathname === "/robots.txt") {
     return { action: "pass_through" };
+  }
+
+  if (hostname === COFFEE_HOSTNAME &&
+      (COFFEE_BLOCKED_API_PATHS as readonly string[]).includes(pathname)) {
+    return { action: "not_found" };
   }
 
   if ((BUSINESS_ALLOWED_API_PATHS as readonly string[]).includes(pathname)) {

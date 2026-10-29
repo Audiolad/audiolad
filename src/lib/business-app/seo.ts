@@ -26,6 +26,17 @@ export function buildBusinessAppMetadata(hostname?: string): Metadata {
   };
 }
 
+/**
+ * Page-level metadata without `alternates`: the page inherits the host-aware canonical of
+ * business-app/layout.tsx (coffee → coffee, otherwise business). A page-level `alternates`
+ * would replace it with the business origin on coffee.
+ */
+export function buildBusinessAppPageMetadata(): Metadata {
+  const { alternates: _hostAwareInLayout, ...rest } = buildBusinessAppMetadata();
+  void _hostAwareInLayout;
+  return rest;
+}
+
 export function buildBusinessAppRobotsRoute(): MetadataRoute.Robots {
   return {
     rules: {

@@ -100,6 +100,22 @@ Business сохраняет свои маршруты, интерфейс и п�
   на coffee. Проверить сертификат без отключения TLS verification.
 - Не выводить cookie, токены, персональные данные и env значения в smoke-отчёт.
 
+## Исправления по review PR #1073
+
+- `migrateCoffeeGuestCookie` дописывает свои cookie raw-строками `Set-Cookie`, не через
+  `response.cookies.set`: иначе Next пересериализует cookie и теряет raw-строки
+  `updateSession` (host-only expiry + маркер `al-auth-scope`) – получался 307-цикл на
+  `/coffee-handoff` у пользователей с legacy host-only cookie. При флаге OFF функция
+  ответ не трогает, этот дефект OFF не затрагивал.
+- На coffee 404 для `/api/business/player/manifest` и `/track-url` (/spa pilot);
+  `/api/business/player/report` остаётся для cabinet-плеера, SPA-ветка на coffee – 404.
+- Флаг OFF: отдельный matcher для host coffee отправляет в proxy и статику
+  (`robots.txt`, `sw.js`, manifest, картинки) – 404; при ON – без изменений.
+- `/music`, `/profile`, `/preferences` наследуют host-aware canonical из layout.
+- Общие cookie настроек нормализуются parse → serialize при записи и чтении.
+- Пример nginx повторяет боевой block business (upstream, overlay статики, буферы),
+  сертификат отдельный.
+
 ## Откат – только согласованный release
 
 После OK Сергея собрать и выпустить вариант с флагом OFF (или предыдущий release).

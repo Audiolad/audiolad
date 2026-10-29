@@ -2,6 +2,7 @@ import {
   getHostnameFromHeaders,
   normalizeHostname,
 } from "@/lib/school/host";
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 
 /** Business B2B subdomain (no www). Code-only host isolation; Nginx/DNS wiring is a later infra step. */
 export const BUSINESS_HOSTNAME = "business.audiolad.ru";
@@ -31,6 +32,11 @@ export const BUSINESS_GUEST_COFFEE_URL = `${BUSINESS_ORIGIN}${BUSINESS_GUEST_COF
 export const BUSINESS_GUEST_COFFEE_INTERNAL_PATH = `${BUSINESS_SITE_PATH}/guest/coffee`;
 
 export { normalizeHostname, getHostnameFromHeaders };
+
+/** Coffee host request (flag ON only). Real `Host` wins over X-Forwarded-Host. */
+export function isCoffeeHostRequest(headers: { get(name: string): string | null }): boolean {
+  return coffeeHostEnabled() && hostnameFromHeaders(headers) === COFFEE_HOSTNAME;
+}
 
 export function isBusinessHostname(hostname: string): boolean {
   return hostname === BUSINESS_HOSTNAME || (coffeeHostEnabled() && hostname === COFFEE_HOSTNAME);
