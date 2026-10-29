@@ -1,5 +1,8 @@
 import "server-only";
 
+import { detectProductAudioSourceFormat } from "@/lib/author-products/product-audio-upload-contract";
+import { assertValidProductSourceFile } from "@/lib/product-audio-normalize/ffmpeg";
+
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 
@@ -156,7 +159,7 @@ async function materializeMusicMaster(storagePath: string): Promise<string> {
   if (!response.ok || !response.body) {
     throw new MusicMasterUploadError("upload_not_complete", 409);
   }
-  const tempPath = studioAudioTempPath("audio/wav");
+  const tempPath = studioAudioTempPath(storagePath.endsWith(".ogg") ? "audio/ogg" : "audio/wav");
   try {
     await writeStreamToTempFile(response.body, tempPath);
     return tempPath;
@@ -192,7 +195,7 @@ export async function startMusicMasterDirectUpload(input: {
   if (validation) throw new MusicMasterUploadError(validation, 400);
 
   const assetId = randomUUID();
-  const storagePath = buildMusicMasterStoragePath(input.practiceId, input.audioId, assetId);
+  const storagePath = buildMusicMasterStoragePath(input.practiceId, input.audioId, assetId, detectProductAudioSourceFormat(input.fileName) === "ogg" ? "ogg" : "wav");
   let uploadGeneration: number;
   try {
     uploadGeneration = await claimMusicTrackUploadGeneration({
@@ -210,7 +213,7 @@ export async function startMusicMasterDirectUpload(input: {
     storage_bucket: MUSIC_MASTERS_BUCKET,
     storage_path: storagePath,
     original_file_name: input.fileName,
-    accepted_mime_type: input.mimeType || "application/octet-stream",
+    accepted_mime_type: detectProductAudioSourceFormat(input.fileName) === "ogg" ? "audio/ogg" : input.mimeType || "application/octet-stream",
     lifecycle_state: "uploading",
     upload_generation: uploadGeneration,
   });
@@ -268,11 +271,16 @@ export async function finalizeMusicMasterDirectUpload(input: {
       if ((await stat(tempPath)).size !== objectSize) {
         throw new MusicMasterUploadError("upload_not_complete", 409);
       }
+      if (input.uploadPath.endsWith(".ogg")) {
+        await assertValidProductSourceFile(tempPath, "ogg").catch(() => {
+          throw new MusicMasterUploadError("invalid_file_type", 400);
+        });
+      }
       media = await inspectAudioMediaFile(tempPath);
     } finally {
       await removeTempFile(tempPath);
     }
-    if (!isVerifiedMusicMasterMedia(media)) {
+    if (!media?.durationSeconds || (!input.uploadPath.endsWith(".ogg") && !isVerifiedMusicMasterMedia(media))) {
       throw new MusicMasterUploadError("invalid_file_type", 400);
     }
 

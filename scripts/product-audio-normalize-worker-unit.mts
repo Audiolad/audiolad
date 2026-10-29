@@ -506,4 +506,7 @@ async function runOnce(port: ProductNormalizeWorkerPort) {
   assert.deepEqual(cleaned[0], []);
 }
 
+
+assert.equal(parseClaimedProductNormalizeJob(baseJob({ source_format: "ogg", source_original_filename: "voice.opus" }))?.source_format, "ogg");
+
 console.log("product-audio-normalize-worker-unit: ok");

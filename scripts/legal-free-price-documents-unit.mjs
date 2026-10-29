@@ -27,7 +27,14 @@ assert.ok(
     "о продаже цифровых аудиопродуктов и предоставлении доступа к авторским аудиоматериалам на сайте «АудиоЛад»",
   ),
 );
-assert.ok(offer.includes("Последнее обновление: 13 сентября 2026 года"));
+assert.ok(offer.includes("Последнее обновление: 29 октября 2026 года"));
+// ИП registration address (changed 2026-10-29): public legal pages show only the current address.
+// Author Terms 1.2 (approved-content.ts) is a hash-locked historical edition and keeps its original text.
+for (const legalPage of ["requisites", "offer", "privacy", "consent", "payment-and-refund"]) {
+  const src = read(`src/app/(platform)/${legalPage}/page.tsx`);
+  assert.ok(src.includes("355035, г. Ставрополь, ул. Дачная, д. 36"), `${legalPage}: current ИП address`);
+  assert.ok(!src.includes("355045") && !src.includes("45 Параллель"), `${legalPage}: no previous ИП address`);
+}
 assert.ok(
   offer.includes(
     "заключении договора в отношении цифровых аудиопродуктов и",

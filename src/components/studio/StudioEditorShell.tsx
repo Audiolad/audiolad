@@ -2850,7 +2850,7 @@ export default function StudioEditorShell({
           <input
             ref={addAudioInputRef}
             type="file"
-            accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac"
+            accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
             className="sr-only"
             onChange={(event) => {
               const slotId = event.currentTarget.dataset.slotId;
@@ -2906,7 +2906,7 @@ export default function StudioEditorShell({
           <input
             ref={replaceAudioInputRef}
             type="file"
-            accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac"
+            accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
             className="sr-only"
             onChange={(event) => {
               const trackId = event.currentTarget.dataset.trackId;

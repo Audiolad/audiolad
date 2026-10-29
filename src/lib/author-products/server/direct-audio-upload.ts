@@ -12,6 +12,7 @@ import {
   buildVersionedProductAudioPath,
   buildVersionedProductAudioSourcePath,
   canAbandonProductAudioUploadPath,
+  canonicalProductAudioUploadMime,
   detectProductAudioSourceFormat,
   isOwnedVersionedProductAudioPath,
   isOwnedVersionedProductAudioSourcePath,
@@ -610,7 +611,7 @@ async function finalizeOrdinarySourceNormalize(input: {
   uploadPath: string;
   fileName: string;
   fileSize: number;
-  sourceFormat: "m4a" | "aac" | "wav";
+  sourceFormat: "m4a" | "aac" | "wav" | "ogg";
   productKind: string | null | undefined;
   audioItem: OwnedAudioItem;
   supabase: SupabaseClient;
@@ -628,11 +629,7 @@ async function finalizeOrdinarySourceNormalize(input: {
 
   const validation = validateProductAudioSourceDescriptor({
     name: input.fileName,
-    type: input.sourceFormat === "wav"
-      ? "audio/wav"
-      : input.sourceFormat === "m4a"
-        ? "audio/mp4"
-        : "audio/aac",
+    type: canonicalProductAudioUploadMime(input.sourceFormat),
     size: input.fileSize,
   });
   if (validation === "invalid_file_type") {

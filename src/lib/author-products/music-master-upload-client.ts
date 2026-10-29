@@ -1,3 +1,5 @@
+import { detectProductAudioSourceFormat, canonicalProductAudioUploadMime } from "./product-audio-upload-contract";
+
 import {
   MUSIC_MASTERS_BUCKET,
   MUSIC_MASTER_TOO_LARGE_MESSAGE,
@@ -142,16 +144,19 @@ export async function uploadMusicMasterDirect(input: {
     return { ok: false, error: started?.error, message: started?.message, status: start.status };
   }
 
+  const uploadMime = canonicalProductAudioUploadMime(
+    detectProductAudioSourceFormat(input.file.name) === "ogg" ? "ogg" : "wav",
+  );
   try {
     const { error: uploadError } = await createClient().storage
       .from(MUSIC_MASTERS_BUCKET)
       .uploadToSignedUrl(
         started.signedUpload.path,
         started.signedUpload.token,
-        fileForSignedAuthorAudioUpload(input.file, input.file.name, "audio/wav"),
+        fileForSignedAuthorAudioUpload(input.file, input.file.name, uploadMime),
         // storage-js uses the File/Blob type for multipart uploads. Keep the
-        // option too, but the wrapped File is what guarantees canonical WAV.
-        { contentType: "audio/wav", upsert: false },
+        // option too, but the wrapped File is what guarantees the canonical source MIME.
+        { contentType: uploadMime, upsert: false },
       );
     if (uploadError) {
       const storageError = classifyAuthorSignedUploadError(uploadError);

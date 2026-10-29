@@ -15,7 +15,12 @@ export const CATALOG_LISTING_PAGE_SIZE = 20;
 export const CATALOG_LISTING_MAX_LIMIT = 50;
 
 export const CATALOG_ACCESS_FILTERS = ["all", "free", "paid"] as const;
-export const CATALOG_CLASS_FILTERS = ["all", ...CATALOG_PUBLICATION_CLASSES] as const;
+export const CATALOG_CLASS_FILTERS = [
+  "all",
+  ...CATALOG_PUBLICATION_CLASSES,
+  "stories",
+  "education",
+] as const;
 
 /** @deprecated Use CATALOG_CLASS_FILTERS. Kept for URL/query aliases. */
 export const CATALOG_KIND_FILTERS = CATALOG_CLASS_FILTERS;
@@ -93,8 +98,8 @@ export function parseCatalogClassFilter(
 ): CatalogClassFilter {
   const normalized = value?.trim().toLowerCase() ?? "";
 
-  if (normalized === "all") {
-    return "all";
+  if (normalized === "all" || normalized === "stories" || normalized === "education") {
+    return normalized;
   }
 
   if (isPublicationClass(normalized)) {

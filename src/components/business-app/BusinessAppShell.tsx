@@ -59,13 +59,13 @@ export default function BusinessAppShell({
 
 /** Reads the chrome access from context, so a live period reported by /workspace applies at once. */
 function BusinessShellFrame({ children, pointReports }: { children: ReactNode; pointReports: boolean }) {
-  const access = resolveBusinessAccess(useBusinessDomain());
+  const access = resolveBusinessAccess(useBusinessDomain(), pointReports);
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
   const cabinetMusic = workspace || pathname === "/music" || pathname.startsWith("/music/");
   const liveAccess = hasLiveBusinessAccess(chromeAccess);
-  const showGuestBar = access.level === "guest" && !cabinetMusic && !liveAccess;
+  const showGuestBar = access.level === "guest" && !access.pointDevice && !cabinetMusic && !liveAccess;
   const showAccessLine = liveAccess && !cabinetMusic;
 
   return (

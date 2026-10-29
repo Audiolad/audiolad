@@ -1,11 +1,7 @@
 import "server-only";
 
 import { activateBusinessTrial, recordAccessActivity } from "@/lib/access-grants/apply";
-import {
-  BUSINESS_GIFT_TITLE,
-  BUSINESS_STORE_UNAVAILABLE_NOTE,
-  businessGiftRulesText,
-} from "@/lib/access-grants/copy";
+import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
 import {
   BUSINESS_TRIAL_SIGN_IN_HREF,
   BUSINESS_TRIAL_SIGN_UP_HREF,
@@ -18,6 +14,8 @@ import { businessManualContentGateEnabled } from "@/lib/business-admission/gate.
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { parseBusinessEligibilityPayload, type BusinessEligibilityDecision } from "@/lib/business-app/eligibility";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
+import { pointDeviceWorkspaceAccess, type PointDeviceVenue } from "@/lib/business-app/point-device";
+import { loadPointDeviceAccess, loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
 import { GUEST_COFFEE_RIGHTS_URL } from "@/lib/business-app/guest-coffee/copy";
 import { emailNotReceivedArticle } from "@/lib/help/articles/troubleshooting/email-not-received";
 import { helpArticlePath } from "@/lib/help/paths";
@@ -60,7 +58,6 @@ function baseModel(spaceId: BusinessSpaceId, spaceTitle: string, spaceEnabled: b
     playbackUntil: null,
     priceLabel: formatBusinessMonthlyPrice(),
     periodLabel: BUSINESS_PLAN_PERIOD_LABEL,
-    rules: businessGiftRulesText(),
     tracks: [],
     needsVenue: false,
     playback: null,
@@ -490,9 +487,49 @@ export async function loadWorkspaceAllowedIds(input: {
   return catalog.tracks.map((track) => track.audioItemId);
 }
 
+/**
+ * Player of the venue this browser is paired with (`al-point`). Plays under the venue owner's
+ * gift or paid period, with the venue's eligibility. No gift is issued, no playback is saved
+ * under the signed-in account and no trial analytics are recorded for the device.
+ */
+async function loadPointDeviceWorkspacePage(
+  venue: PointDeviceVenue,
+  space: ReturnType<typeof resolveBusinessSpace>,
+  model: WorkspacePageModel,
+): Promise<WorkspacePageModel> {
+  const access = pointDeviceWorkspaceAccess(await loadPointDeviceAccess(venue));
+  const endsAtLabel = access.endsAt ? formatMoscowDateTime(new Date(access.endsAt)) : null;
+  let tracks: WorkspaceTrack[] = [];
+  if (workspacePlayerOpen({ status: access.status, spaceEnabled: space.enabled })) {
+    const catalog = await loadWorkspaceCatalog({
+      spaceId: space.id,
+      locationId: venue.locationId,
+      spaceEnabled: space.enabled,
+    });
+    if (catalog.unavailable) {
+      return { ...model, status: "unavailable" };
+    }
+    tracks = catalog.tracks;
+  }
+  return {
+    ...model,
+    status: access.status,
+    endsAtLabel,
+    endsAt: access.endsAt,
+    playbackUntil: access.playbackUntil,
+    tracks,
+    needsVenue: false,
+    playback: null,
+  };
+}
+
 export async function loadWorkspacePage(spaceParam: string | null): Promise<WorkspacePageModel> {
   const space = resolveBusinessSpace(spaceParam);
   const model = baseModel(space.id, space.title, space.enabled);
+  // The paired device session comes first: the account signed in on this browser does not
+  // decide which venue plays here (and must never turn it into the guest preview).
+  const pointVenue = await loadPointDeviceVenue();
+  if (pointVenue) return loadPointDeviceWorkspacePage(pointVenue, space, model);
   const supabase = await createClient();
   const {
     data: { user },
@@ -504,7 +541,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
   try {
     store = createSupabaseAccessGrantStore();
   } catch {
-    return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+    return { ...model, status: "unavailable" };
   }
 
   try {
@@ -526,7 +563,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
         spaceEnabled: space.enabled,
       });
       if (catalog.unavailable) {
-        return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+        return { ...model, status: "unavailable" };
       }
       tracks = catalog.tracks;
     }
@@ -550,7 +587,7 @@ export async function loadWorkspacePage(spaceParam: string | null): Promise<Work
         : null,
     };
   } catch {
-    return { ...model, status: "unavailable", rules: `${BUSINESS_STORE_UNAVAILABLE_NOTE} ${model.rules}` };
+    return { ...model, status: "unavailable" };
   }
 }
 
@@ -558,16 +595,43 @@ export type WorkspaceActor =
   | { ok: false; reason: "no_access" | "unavailable" }
   | {
       ok: true;
+      device: false;
       userId: string;
       email: string;
       playerOpen: boolean;
       locationId: string | null;
       space: ReturnType<typeof resolveBusinessSpace>;
+    }
+  | {
+      /** Paired venue device: the venue's location and the venue owner's access, no account. */
+      ok: true;
+      device: true;
+      userId: null;
+      email: null;
+      playerOpen: boolean;
+      locationId: string;
+      space: ReturnType<typeof resolveBusinessSpace>;
     };
 
-/** Session + gift/paid gate for workspace APIs. Does not trust ids from the request body. */
+/**
+ * Session + gift/paid gate for workspace APIs. Does not trust ids from the request body.
+ * A live paired device session (`al-point`) wins over the signed-in account, like the player page.
+ */
 export async function loadWorkspaceActor(spaceParam: string | null): Promise<WorkspaceActor> {
   const space = resolveBusinessSpace(spaceParam);
+  const pointVenue = await loadPointDeviceVenue();
+  if (pointVenue) {
+    const access = pointDeviceWorkspaceAccess(await loadPointDeviceAccess(pointVenue));
+    return {
+      ok: true,
+      device: true,
+      userId: null,
+      email: null,
+      playerOpen: workspacePlayerOpen({ status: access.status, spaceEnabled: space.enabled }),
+      locationId: pointVenue.locationId,
+      space,
+    };
+  }
   const supabase = await createClient();
   const {
     data: { user },
@@ -582,7 +646,7 @@ export async function loadWorkspaceActor(spaceParam: string | null): Promise<Wor
       status: activation.access.mode === "none" ? "unavailable" : activation.access.mode,
       spaceEnabled: space.enabled,
     });
-    return { ok: true, userId: user.id, email: user.email, playerOpen, locationId, space };
+    return { ok: true, device: false, userId: user.id, email: user.email, playerOpen, locationId, space };
   } catch {
     return { ok: false, reason: "unavailable" };
   }

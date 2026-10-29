@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { POINT_DEVICE_PLAYER_PATH } from "@/lib/business-app/point-device";
 import { BUSINESS_POINT_CODE_LENGTH, normalizePointCode, pointCodeInput } from "@/lib/business-app/point-session";
 
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice?: Promise<unknown> };
@@ -70,8 +71,12 @@ export default function BusinessPointJoinPage() {
     })
       .then((res) => res.json())
       .then((json: { ok?: boolean; locationName?: string; error?: string }) => {
-        if (json.ok === true) setName(json.locationName || "Кофейня");
-        else {
+        if (json.ok === true) {
+          setName(json.locationName || "Кофейня");
+          // The device opens its venue player at once (full load, so the layout sees the new
+          // device session), whatever account is signed in on this browser.
+          window.location.assign(POINT_DEVICE_PLAYER_PATH);
+        } else {
           setError(json.error ?? WRONG);
           setCode("");
         }
@@ -95,8 +100,15 @@ export default function BusinessPointJoinPage() {
       <section className="business-app-card mx-auto max-w-xl space-y-3" data-testid="biz-point-ready">
         <h1 className="text-[1.75rem] font-bold text-[var(--biz-text)]">{name}</h1>
         <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-          Это устройство подключено. Что играет в зале, видно на телефоне того, кто настраивает музыку.
+          Это устройство подключено. Открываем плеер зала. Что играет в зале, видно на телефоне того, кто настраивает музыку.
         </p>
+        <a
+          href={POINT_DEVICE_PLAYER_PATH}
+          className="business-app-btn business-app-btn-primary business-app-focus-ring"
+          data-testid="biz-point-open-player"
+        >
+          Открыть плеер
+        </a>
         <AddToHomeHint />
       </section>
     );

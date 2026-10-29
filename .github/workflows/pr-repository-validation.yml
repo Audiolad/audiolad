@@ -69,6 +69,7 @@ jobs:
           npm run test:history-listen-audio
           npm run test:supabase-cookie-domain
           npm run test:database-migrations:ci
+          npm run test:ogg-audio-upload
           npm run test:studio-render-worker-env
           npm run test:production-pr-safety
           npm run test:production-deploy-gha
@@ -117,6 +118,7 @@ jobs:
           npm run test:business-app-onboarding-wizard
           npm run test:music-lab
           npm run test:music-analyzer-runs
+          npm run test:music-analyzer-queue
           npm run test:music-analyzer-features
           npm run test:jazz-relax-music-passport
           npm run test:music-passport-backfill
@@ -126,6 +128,7 @@ jobs:
           npm run test:admin-overview-incident
           npm run test:company-control-cycle-evidence
           npm run test:admin-mailings
+          npm run test:catalog-type-filter
           npm run test:catalog-return
           npm run test:mobile-author-cabinet-top-chrome
           npm run test:admin-nav-author-space

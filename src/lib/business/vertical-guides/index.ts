@@ -7,7 +7,6 @@ export {
 } from "./experts";
 export type { CoffeeExpert, ExpertQuote } from "./experts";
 export { buildVerticalArticleJsonLd } from "./json-ld";
-export { loadGuideTrack } from "./load-track";
 export {
   buildVerticalArticleMetadata,
   buildVerticalIndexMetadata,
@@ -22,7 +21,16 @@ export {
   listVerticalArticles,
 } from "./registry";
 export { listVerticalGuideSitemapPaths } from "./sitemap";
-export type { B2BVertical, TextPart, VerticalGuideArticle } from "./types";
+export type {
+  B2BVertical,
+  GuideExpertSlot,
+  GuideParagraph,
+  GuideSection,
+  GuideSteps,
+  GuideTable,
+  TextPart,
+  VerticalGuideArticle,
+} from "./types";
 export {
   B2B_VERTICALS,
   getVertical,

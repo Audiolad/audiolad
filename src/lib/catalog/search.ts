@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { catalogTypeQueryFilter } from "@/lib/catalog/type-filter";
+import type { CatalogClassFilter } from "@/lib/catalog/listing-contract";
 import type { CatalogSection } from "@/lib/catalog/catalog-sections";
 
 import {
@@ -35,6 +37,7 @@ const CATALOG_PRACTICE_SEARCH_SELECT = `
   format,
   product_kind,
   publication_class,
+  catalog_section,
   duration_minutes,
   price,
   is_free,
@@ -130,6 +133,7 @@ type CatalogPracticeSearchRow = {
   format: string | null;
   product_kind?: string | null;
   publication_class?: string | null;
+  catalog_section?: CatalogSection | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -173,6 +177,7 @@ async function loadPracticesMatchingFields(
   catalogSection: CatalogSection | null,
   limit: number,
   viewer: OrdinaryCatalogViewer,
+  catalogType: CatalogClassFilter,
 ): Promise<CatalogPracticeSearchRow[]> {
   let query = applyOrdinaryCatalogEligibility(
     supabase.from("practices").select(CATALOG_PRACTICE_SEARCH_SELECT),
@@ -181,6 +186,11 @@ async function loadPracticesMatchingFields(
     .not("slug", "is", null)
     .not("author_id", "is", null)
     .or(buildPracticeFieldsOrIlikeFilter(pattern));
+
+  const typeFilter = catalogTypeQueryFilter(catalogType);
+  if (typeFilter) {
+    query = query.or(typeFilter);
+  }
 
   if (catalogSection) {
     query = query.eq("catalog_section", catalogSection);
@@ -206,6 +216,7 @@ async function loadPracticesMatchingAuthors(
   catalogSection: CatalogSection | null,
   limit: number,
   viewer: OrdinaryCatalogViewer,
+  catalogType: CatalogClassFilter,
 ): Promise<CatalogPracticeSearchRow[]> {
   if (authorIds.length === 0) {
     return [];
@@ -218,6 +229,11 @@ async function loadPracticesMatchingAuthors(
     .not("slug", "is", null)
     .not("author_id", "is", null)
     .in("author_id", authorIds);
+
+  const typeFilter = catalogTypeQueryFilter(catalogType);
+  if (typeFilter) {
+    query = query.or(typeFilter);
+  }
 
   if (catalogSection) {
     query = query.eq("catalog_section", catalogSection);
@@ -240,6 +256,7 @@ export type CatalogProductSearchOptions = {
   query: string;
   topicKey?: string | null;
   catalogSection?: CatalogSection | null;
+  catalogType?: CatalogClassFilter;
   limit?: number;
   viewer?: CatalogProductViewer;
 };
@@ -289,6 +306,7 @@ export async function searchPublishedCatalogProducts(
       catalogSection,
       resultLimit,
       viewer,
+      options.catalogType ?? "all",
     ),
     loadMatchingAuthorIds(supabase, ilikePattern),
   ]);
@@ -300,6 +318,7 @@ export async function searchPublishedCatalogProducts(
     catalogSection,
     resultLimit,
     viewer,
+    options.catalogType ?? "all",
   );
 
   const mergedRows = dedupePracticeRowsById([

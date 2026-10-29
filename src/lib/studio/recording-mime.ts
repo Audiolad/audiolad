@@ -1,3 +1,5 @@
+import { PRODUCT_OGG_MIME_TYPES } from "@/lib/author-products/product-audio-upload-contract";
+
 export const STUDIO_RECORDER_MIME_CANDIDATES = [
   "audio/webm;codecs=opus",
   "audio/webm",
@@ -31,6 +33,7 @@ export function isStudioPersistableRecordingMimeType(value: string): boolean {
 }
 
 const STUDIO_UPLOAD_MIME_ALIASES: Record<string, string> = {
+  ...Object.fromEntries(PRODUCT_OGG_MIME_TYPES.map((mime) => [mime, "audio/ogg"])),
   "audio/mp3": "audio/mpeg",
   "audio/x-mp3": "audio/mpeg",
   "audio/x-mpeg": "audio/mpeg",
@@ -40,6 +43,9 @@ const STUDIO_UPLOAD_MIME_ALIASES: Record<string, string> = {
 };
 
 const STUDIO_UPLOAD_EXTENSION_MIME_TYPES: Record<string, string> = {
+  ".ogg": "audio/ogg",
+  ".oga": "audio/ogg",
+  ".opus": "audio/ogg",
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".m4a": "audio/mp4",

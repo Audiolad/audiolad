@@ -74,8 +74,8 @@ assert.match(finalizeBlock, /throw new MusicMasterUploadError\("invalid_file_typ
 assert.doesNotMatch(finalizeBlock, /\.from\("audio_items"\)\s*\.update/);
 assert.doesNotMatch(finalizeBlock, /audio_path:/);
 assert.match(client, new RegExp(`from\\(MUSIC_MASTERS_BUCKET\\)`));
-assert.match(client, /contentType: "audio\/wav"/);
-assert.match(client, /fileForSignedAuthorAudioUpload\(input\.file, input\.file\.name, "audio\/wav"\)/);
+assert.match(client, /contentType: uploadMime/);
+assert.match(client, /fileForSignedAuthorAudioUpload\(input\.file, input\.file\.name, uploadMime\)/);
 assert.doesNotMatch(client, /contentType: input\.file\.type/);
 assert.match(client, /upsert: false/);
 assert.match(form, /MUSIC_DELIVERY_REPLACE_LABEL/);
@@ -121,5 +121,14 @@ try {
 } finally {
   await rm(fixtureDirectory, { recursive: true, force: true });
 }
+
+
+for (const extension of ["ogg", "oga", "opus"]) {
+  assert.equal(validateMusicMasterDescriptor({ name: `music.${extension}`, type: "audio/ogg", size: 2048 }), null);
+}
+assert.equal(validateMusicMasterDescriptor({ name: "music.ogg", type: "audio/mpeg", size: 2048 }), "invalid_file_type");
+
+const oggMasterPath = buildMusicMasterStoragePath(practiceId, audioId, assetId, "ogg");
+assert.equal(isOwnedMusicMasterStoragePath(oggMasterPath, practiceId, audioId, assetId), true);
 
 console.log("music-wav-master-foundation-unit: ok");

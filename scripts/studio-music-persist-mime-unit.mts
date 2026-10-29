@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { canonicalizeStudioUploadMimeType } from "../src/lib/studio/recording-mime";
 import { validateStudioLocalFile } from "../src/lib/studio/local-file-validation";
 import {
-  StudioApiError,
   validateStudioUpload,
 } from "../src/lib/studio/server/validation";
 
@@ -30,14 +29,22 @@ for (const [name, type, expected] of cases) {
   assert.equal(validateStudioLocalFile({ name, type, size: 1 }), null);
 }
 
-assert.throws(
-  () => validateStudioUpload({ name: "voice.ogg", type: "audio/ogg", size: 1 } as File),
-  (error: unknown) =>
-    error instanceof StudioApiError && error.code === "unsupported_mime_type",
-);
+for (const name of ["voice.ogg", "voice.oga", "voice.opus"]) {
+  for (const type of ["audio/ogg", "audio/opus", "application/ogg", "video/ogg", "audio/x-opus+ogg", "audio/vorbis", "audio/x-vorbis+ogg", "", "application/octet-stream"]) {
+    assert.equal(canonicalizeStudioUploadMimeType({ name, type }), "audio/ogg");
+    const upload = validateStudioUpload({ name, type, size: 1 });
+    assert.equal(upload.mimeType, "audio/ogg");
+    assert.equal(upload.filename, "voice.ogg");
+    assert.equal(validateStudioLocalFile({ name, type, size: 1 }), null);
+  }
+}
 assert.equal(
   canonicalizeStudioUploadMimeType({ name: "voice.ogg", type: "audio/ogg" }),
   "audio/ogg",
 );
+
+
+assert.throws(() => validateStudioUpload({ name: "fake.ogg", type: "audio/mpeg", size: 10 }));
+assert.notEqual(validateStudioLocalFile({ name: "fake.ogg", type: "audio/mpeg", size: 10 }), null);
 
 console.log("studio music persist mime checks passed");

@@ -169,6 +169,7 @@ export function jazzRelaxAnalyzerFilename(audioPath: string, originalName: strin
   const safe = safeAudioFilename(name);
   // Keep the upload name even when the product audio has become an MP3.
   const format = detectProductAudioSourceFormat(name);
+  if (format === "ogg") return `${safe.replace(/\.(ogg|oga|opus)$/i, "").slice(0, 115)}.ogg`;
   if (format) return detectProductAudioSourceFormat(safe) === format ? safe : `${safe.slice(0, 115)}.${format}`;
   return audioPath.toLowerCase().endsWith(".wav") ? "track.wav" : "track.mp3";
 }
@@ -618,12 +619,18 @@ async function enqueueTrack(input: {
 }): Promise<void> {
   const bytes = input.bytes ?? await downloadAnalysisAudio(input.source);
   const sha = sha256Hex(bytes);
-  const filename = jazzRelaxAnalyzerFilename(
+  const sourceFilename = jazzRelaxAnalyzerFilename(
     input.source.path,
-    input.track.original_file_name?.trim()
-      || (input.source.kind === "music_master" ? input.source.originalFileName : null),
+    (input.source.kind === "music_master" ? input.source.originalFileName : null)
+      || input.track.original_file_name?.trim() || null,
   );
-  const mime = filename.toLowerCase().endsWith(".wav") ? "audio/wav" : "audio/mpeg";
+  // Product delivery is MP3 even when original_file_name still ends in OGG.
+  // Verified Ogg masters can go directly to the analyzer's existing PCM decode.
+  const isOggMaster = input.source.kind === "music_master" && input.source.path.toLowerCase().endsWith(".ogg");
+  const filename = isOggMaster
+    ? `${sourceFilename.replace(/\.[^.]*$/, "").slice(0, 115)}.ogg`
+    : sourceFilename.replace(/\.ogg$/i, ".mp3");
+  const mime = isOggMaster ? "audio/ogg" : filename.toLowerCase().endsWith(".wav") ? "audio/wav" : "audio/mpeg";
   const runId = randomUUID();
   const storagePath = buildRunStoragePath(runId, filename);
   const uploaded = await service()

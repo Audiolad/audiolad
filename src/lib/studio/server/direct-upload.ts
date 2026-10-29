@@ -1,5 +1,7 @@
 import "server-only";
 
+import { assertValidProductSourceFile } from "@/lib/product-audio-normalize/ffmpeg";
+
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 
@@ -169,7 +171,11 @@ async function inspectUploadedAudio(input: {
     if (fileStat.size !== object.size) {
       throw new StudioApiError("upload_not_complete", 409);
     }
-    const durationSeconds = await probeStudioAudioFile(tempPath);
+    const durationSeconds = input.mimeType === "audio/ogg"
+      ? await assertValidProductSourceFile(tempPath, "ogg").then((probe) => probe.durationSeconds).catch(() => {
+          throw new StudioApiError("unsupported_mime_type", 422);
+        })
+      : await probeStudioAudioFile(tempPath);
     if (durationSeconds == null) {
       throw new StudioApiError("invalid_audio_duration", 422);
     }

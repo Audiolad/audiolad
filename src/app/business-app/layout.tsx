@@ -50,7 +50,7 @@ export default async function BusinessAppLayout({
   const customerAccess = domain.status === "authenticated" ? await peekBusinessChromeAccess() : null;
   // a8240527: the guest strip shows the server listening limit on every screen (read-only peek).
   const initialGuestLimit =
-    resolveBusinessAccess(domain).level === "guest" && !hasLiveBusinessAccess(customerAccess)
+    !pointReports && resolveBusinessAccess(domain).level === "guest" && !hasLiveBusinessAccess(customerAccess)
       ? guestCoffeeLimitState(await peekGuestCoffeeUsage())
       : null;
 

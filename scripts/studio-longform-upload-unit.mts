@@ -18,6 +18,7 @@ import {
   StudioLocalValidationError,
   createStudioLocalDurationError,
   formatStudioLocalIngestError,
+  STUDIO_OGG_OPEN_FAILED_MESSAGE,
   validateStudioLocalDuration,
   validateStudioLocalFile,
 } from "../src/lib/studio/local-file-validation";
@@ -73,6 +74,20 @@ assert.equal(
   formatStudioLocalIngestError(new Error(STUDIO_AUDIO_TOO_LONG_MESSAGE)),
   STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
 );
+assert.equal(
+  formatStudioLocalIngestError(new Error("media_metadata_error"), { name: "voice.ogg" }),
+  STUDIO_OGG_OPEN_FAILED_MESSAGE,
+);
+assert.equal(
+  formatStudioLocalIngestError(new Error("media_metadata_error"), [{ name: "a.mp3" }, { name: "b.OPUS" }]),
+  STUDIO_OGG_OPEN_FAILED_MESSAGE,
+);
+assert.equal(
+  formatStudioLocalIngestError(new Error("media_metadata_error"), [{ name: "a.mp3" }]),
+  STUDIO_MEDIA_OPEN_FAILED_MESSAGE,
+);
+assert.equal(formatStudioLocalIngestError(clientTooLong, { name: "voice.ogg" }), STUDIO_AUDIO_TOO_LONG_MESSAGE);
+assert.doesNotMatch(STUDIO_OGG_OPEN_FAILED_MESSAGE, /\u2014/);
 assert.ok(isStudioDurationAllowed(1));
 assert.equal(isStudioDurationAllowed(10801), false);
 assert.equal(isStudioAssetSizeAllowed(MAX_STUDIO_ASSET_BYTES), true);

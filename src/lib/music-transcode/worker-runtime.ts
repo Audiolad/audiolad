@@ -323,7 +323,7 @@ export async function executeClaimedMusicTranscodeJob(
   const workspace = join(tmpdir(), `audiolad-music-transcode-${randomUUID()}`);
   try {
     await mkdir(workspace, { recursive: true });
-    const masterPath = join(workspace, "master.wav");
+    const masterPath = join(workspace, master.storage_path.endsWith(".ogg") ? "master.ogg" : "master.wav");
     const outputPath = join(workspace, "mp3-256.mp3");
     const { data: blob, error: downloadError } = await service.storage
       .from(MUSIC_MASTERS_BUCKET)
