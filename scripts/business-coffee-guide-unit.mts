@@ -315,12 +315,15 @@ assert.ok(view.indexOf('className="guide-wrap guide-crumbs"') < view.indexOf(her
 const order = [
   "article.intro.map",
   "<GuideFourCups",
-  "<GuideSections sections={article.partOne}",
+  "<GuideSections sections={[article.partOne[0]]}",
   "<GuideAtlasHeroBanner",
+  "<GuideSections sections={[article.partOne[1]]}",
   "<GuideTable",
+  "<GuideSections sections={[article.partTwo[0]]}",
   "<GuideExpertCard slot={article.expertOne}",
-  "<GuideSections sections={article.partTwo}",
+  "<GuideSections sections={[article.partTwo[1]]}",
   "<GuideAtlasCardsBanner",
+  "<GuideSections sections={[article.partTwo[2]]}",
   "<GuideExpertCard slot={article.expertTwo}",
   "<GuideSteps",
   "<GuideChecklist",
@@ -471,6 +474,26 @@ const pageHtml = renderToStaticMarkup(createElement(GuideArticleView, { article:
 assert.equal(pageHtml.includes("guide-expert__initials"), false);
 assert.equal(pageHtml.includes("Оригинал"), false, "no English original under a translation");
 assert.ok(pageHtml.includes("dmitry-kotov.webp"));
+
+// Every clickable link in the article body and inserts opens in a new tab; header, crumbs and footer do not.
+const mainHtml = pageHtml.slice(pageHtml.indexOf('<main id="content">'), pageHtml.indexOf("</main>"));
+const bodyHtml = mainHtml.slice(mainHtml.indexOf("</nav>") + "</nav>".length);
+const bodyLinks = [...bodyHtml.matchAll(/<a\s[^>]*>/g)].map((match) => match[0]);
+assert.ok(bodyLinks.length >= 5, `expected body links, got ${bodyLinks.length}`);
+for (const tag of bodyLinks) {
+  assert.ok(/\starget="_blank"/.test(tag), `body link must open in a new tab: ${tag}`);
+  assert.ok(/\srel="noopener(?: noreferrer)?"/.test(tag), `body link needs rel="noopener": ${tag}`);
+}
+for (const required of ['data-guide-banner="atlas-hero"', 'data-guide-banner="atlas-cards"', 'data-max-placement="final"']) {
+  assert.ok(bodyLinks.some((tag) => tag.includes(required)), `new-tab link missing: ${required}`);
+}
+const chromeHtml = pageHtml.slice(0, pageHtml.indexOf("</nav>", pageHtml.indexOf('<main id="content">'))) + pageHtml.slice(pageHtml.indexOf("</main>"));
+assert.equal(/<a\s[^>]*target="_blank"/.test(chromeHtml), false, "header, crumbs and footer stay in the same tab");
+assert.ok(pageHtml.includes("sunalini-menon.webp"));
+// Mobile tables: every cell carries its column name for the stacked-card layout.
+for (const column of ARTICLE.table.columns) {
+  assert.ok(pageHtml.includes(`data-label="${column}"`), `table cell label missing: ${column}`);
+}
 const pageText = pageHtml
   .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ")
   .replace(/<[^>]+>/g, " ")

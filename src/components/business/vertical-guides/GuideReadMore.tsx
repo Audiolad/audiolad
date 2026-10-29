@@ -12,7 +12,9 @@ export default function GuideReadMore({ links }: { links: readonly GuideLink[] }
       <ul className="guide-links">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href}>{link.label}</Link>
+            <Link href={link.href} target="_blank" rel="noopener">
+              {link.label}
+            </Link>
           </li>
         ))}
       </ul>
