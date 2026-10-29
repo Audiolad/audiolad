@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import BusinessHomeAccessCard from "@/components/business-app/BusinessHomeAccessCard";
 import { useBusinessEntry, usePointMode } from "@/components/business-app/BusinessPointMode";
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
+import { POINT_PAIRING_ANCHOR_ID } from "@/components/business-app/PointPairingCard";
 import VenueControlPanel from "@/components/business-app/VenueControlPanel";
 import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
@@ -272,6 +273,21 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
       <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">
           <StatusBanner locationName={locationName || "Кофейня"} signals={signals} playback={playback} />
+          {!pointMode && domain.location ? (
+            <section className="business-app-card space-y-3" data-testid="biz-home-device-cta">
+              <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Устройство у колонки</h2>
+              <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+                Планшет, компьютер или телефон в кофейне. Получите код и отправьте ссылку на устройство – в мессенджер, по почте или через код для камеры.
+              </p>
+              <a
+                href={`#${POINT_PAIRING_ANCHOR_ID}`}
+                className="business-app-btn business-app-btn-primary business-app-focus-ring"
+                data-testid="biz-home-device-connect"
+              >
+                Подключить устройство в зале
+              </a>
+            </section>
+          ) : null}
           <section className="business-app-card" aria-labelledby="playback-data-title">
             <h2 id="playback-data-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
               Сейчас звучит
