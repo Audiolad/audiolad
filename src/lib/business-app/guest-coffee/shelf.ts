@@ -22,7 +22,7 @@ import {
 } from "./catalog";
 
 /** AudioLad Business direction of the guest coffee funnel. */
-export const GUEST_COFFEE_BUSINESS_DIRECTION = "cafe";
+export const GUEST_COFFEE_BUSINESS_DIRECTION_KEY = "cafe";
 
 export type GuestCoffeeCatalogProduct = {
   id: string;

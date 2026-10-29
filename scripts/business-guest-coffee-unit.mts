@@ -459,8 +459,8 @@ for (const file of [
   assert.match(loader, /is_free === true && row\.status === "published" && row\.catalog_visibility === "listed"/);
   assert.match(route, /isStillFree: isGuestCoffeePlaylistStillFree/, "uncached re-check right before signing");
   assert.match(route, /isStillAdmitted: isGuestCoffeeTrackStillAdmitted/, "uncached admission re-check right before signing");
-  assert.match(loader, /soundAllowedTrackIds\(\[audioItemId\], GUEST_COFFEE_BUSINESS_DIRECTION\)/);
-  assert.match(loader, /admittedTrackIds: \(ids\) => soundAllowedTrackIds\(ids, GUEST_COFFEE_BUSINESS_DIRECTION\)/);
+  assert.match(loader, /soundAllowedTrackIds\(\[audioItemId\], GUEST_COFFEE_BUSINESS_DIRECTION_KEY\)/);
+  assert.match(loader, /admittedTrackIds: \(ids\) => soundAllowedTrackIds\(ids, GUEST_COFFEE_BUSINESS_DIRECTION_KEY\)/);
   assert.match(loader, /\.from\("business_content_admissions"\)[\s\S]*?\.eq\("allowed", true\)/);
   assert.match(route, /issueLease: \(trackSeconds\) => issueGuestCoffeeLease\(request, trackSeconds\)/);
   assert.match(route, /peekUsage: peekGuestCoffeeUsage/);

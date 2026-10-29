@@ -7,7 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@supabase/supabase-js";
 
 import type { GuestCoffeePlaylist } from "./catalog";
-import { GUEST_COFFEE_BUSINESS_DIRECTION, buildGuestCoffeeShelf, guestCoffeeShelfArtistCount } from "./shelf";
+import { GUEST_COFFEE_BUSINESS_DIRECTION_KEY, buildGuestCoffeeShelf, guestCoffeeShelfArtistCount } from "./shelf";
 
 const CACHE_MS = 5 * 60 * 1000;
 let cache: { at: number; value: Promise<GuestCoffeePlaylist[]> } | null = null;
@@ -53,7 +53,7 @@ export async function isGuestCoffeePlaylistStillFree(playlist: GuestCoffeePlayli
  */
 export async function isGuestCoffeeTrackStillAdmitted(audioItemId: string): Promise<boolean> {
   try {
-    return (await soundAllowedTrackIds([audioItemId], GUEST_COFFEE_BUSINESS_DIRECTION)).has(audioItemId);
+    return (await soundAllowedTrackIds([audioItemId], GUEST_COFFEE_BUSINESS_DIRECTION_KEY)).has(audioItemId);
   } catch {
     return false;
   }
@@ -66,7 +66,7 @@ async function loadCafeAdmissions(): Promise<{ authorIds: Set<string>; practiceI
   const { data, error } = await createServiceRoleClient()
     .from("business_content_admissions")
     .select("author_id, practice_id")
-    .eq("direction_key", GUEST_COFFEE_BUSINESS_DIRECTION)
+    .eq("direction_key", GUEST_COFFEE_BUSINESS_DIRECTION_KEY)
     .eq("allowed", true);
   if (error || !Array.isArray(data)) throw new Error("guest_coffee_admissions_unavailable");
   const rows = data as AdmissionRow[];
@@ -81,7 +81,7 @@ async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
   const shelf = await buildGuestCoffeeShelf({
     loadPublishedProducts: () => getPublishedCatalogProducts(supabase, { productKind: "music" }),
     loadAdmissions: loadCafeAdmissions,
-    admittedTrackIds: (ids) => soundAllowedTrackIds(ids, GUEST_COFFEE_BUSINESS_DIRECTION),
+    admittedTrackIds: (ids) => soundAllowedTrackIds(ids, GUEST_COFFEE_BUSINESS_DIRECTION_KEY),
     loadFullTracks: async ({ authorSlug, productSlug }) => {
       // Same loader as /api/catalog/play, as an anonymous guest (userId null).
       const loaded = await loadCatalogPlaySession(supabase, authorSlug, productSlug, null);
