@@ -57,7 +57,7 @@ export default function RequisitesPage() {
             </RequisiteItem>
 
             <RequisiteItem label="Адрес регистрации ИП">
-              355045, г. Ставрополь, ул. 45 Параллель, д. 73, кв. 45
+              355035, г. Ставрополь, ул. Дачная, д. 36
             </RequisiteItem>
 
             <RequisiteItem label="Расчётный счёт">
