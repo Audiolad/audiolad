@@ -7,7 +7,8 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { BusinessChromeAccessProvider } from "../src/components/business-app/BusinessAccessLine";
 import BusinessHomePage, { type BusinessHomePageProps } from "../src/components/business-app/BusinessHomePage";
 import { BusinessDomainProvider } from "../src/components/business-app/BusinessDomainProvider";
-import { businessGiftRulesText } from "../src/lib/access-grants/copy";
+import { BUSINESS_GIFT_CLOSING_NOTE, BUSINESS_GIFT_LICENSE_NOTE, BUSINESS_GIFT_TITLE, businessGiftPriceNote } from "../src/lib/access-grants/copy";
+import { assertNoForbiddenGiftText, visibleLines } from "./business-gift-copy-guard";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "../src/lib/access-grants/policy";
 import { formatBusinessMonthlyPrice } from "../src/lib/business/plan";
 import type { BusinessOwnerHomeContext } from "../src/lib/business-app/domain";
@@ -111,16 +112,32 @@ const withAccess = (access: { mode: "trial" | "paid" | "offer"; endsAt: string |
 );
 const trialHome = withAccess({ mode: "trial", endsAt: trialEnds });
 assert.match(trialHome, /data-testid="biz-home-access"/);
-assert.match(trialHome, /30 дней в подарок/);
+assert.equal(BUSINESS_GIFT_TITLE, "30 дней в подарок");
 assert.match(trialHome, new RegExp(`Осталось ${trialDays} ${ruDaysWord(trialDays)}`));
-assert.ok(trialHome.includes(`до ${formatMoscowDateTime(new Date(trialEnds))}`));
-assert.ok(trialHome.includes(businessGiftRulesText()));
-assert.match(businessGiftRulesText(), /после нажатия на круглую кнопку/);
-assert.doesNotMatch(businessGiftRulesText(), /«Играть»/);
-assert.doesNotMatch(trialHome, /«Играть»/);
-assert.match(trialHome, /безлимитн/);
-assert.match(trialHome, /3 часов/);
-assert.doesNotMatch(trialHome, /—/);
+const trialCardStart = trialHome.lastIndexOf("<section", trialHome.indexOf('data-testid="biz-home-access"'));
+const trialCard = trialHome.slice(trialCardStart, trialHome.indexOf("</section>", trialCardStart) + "</section>".length);
+assert.ok(trialCardStart >= 0 && trialCard.startsWith("<section") && !trialCard.slice(1).includes("<section"));
+assert.equal(BUSINESS_GIFT_CLOSING_NOTE, "После срока плеер закрыт до оплаты.");
+assert.equal(BUSINESS_GIFT_LICENSE_NOTE, "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.");
+assert.equal(businessGiftPriceNote(), `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`);
+assert.match(formatBusinessMonthlyPrice(), /^799\s₽$/u);
+// The gift card shows exactly these lines, in this order, and nothing else.
+assert.deepEqual(visibleLines(trialCard), [
+  `Осталось ${trialDays} ${ruDaysWord(trialDays)}`,
+  `до ${formatMoscowDateTime(new Date(trialEnds))}`,
+  "После срока плеер закрыт до оплаты.",
+  "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.",
+  `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`,
+  "Оплатить",
+]);
+assert.equal(trialCard.split('data-testid="biz-home-license"').length, 2, "licence note once");
+assert.equal(trialCard.split(BUSINESS_GIFT_LICENSE_NOTE).length, 2, "licence text once");
+assert.match(trialCard, /data-testid="biz-home-pay-button"/);
+assertNoForbiddenGiftText(visibleLines(trialCard).join("\n"), "trial card", [
+  ["gift title", /30 дней в подарок/],
+  ["old rules", /один раз на подтверждённый адрес|без карты и без автосписания|Генерация музыки|Пределы|Гостевой проект|круглую кнопку|«Играть»/i],
+]);
+assertNoForbiddenGiftText(trialCard, "trial card markup", [["gift title", /30 дней в подарок/]]);
 const paidHome = withAccess({ mode: "paid", endsAt: "2026-12-31T10:00:00.000Z" });
 assert.match(paidHome, /data-mode="paid"/);
 assert.ok(paidHome.includes(`Подписка до ${formatMoscowDateTime(new Date("2026-12-31T10:00:00.000Z"))}`));
@@ -132,6 +149,6 @@ assert.match(endedHome, /за 30 дней/);
 assert.match(endedHome, /без автосписания/);
 assert.match(endedHome, /data-testid="biz-home-pay-button"/);
 assert.match(endedHome, /Оплатить/);
-assert.doesNotMatch(endedHome, /—/);
+assert.doesNotMatch(endedHome, /\u2014/);
 assert.doesNotMatch(withAccess({ mode: "offer", endsAt: null }), /data-testid="biz-home-access"/, "no grant is not a finished trial");
 console.log("business-app-owner-home-render-unit: ok");
