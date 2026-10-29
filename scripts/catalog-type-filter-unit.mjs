@@ -21,6 +21,15 @@ const rows = [
   { id: "book", product_kind: "practice", publication_class: "audiobook", is_free: true },
   { id: "legacy-book", product_kind: "practice", format: "Аудиокнига", is_free: true },
   { id: "education", product_kind: "practice", catalog_section: "education", format: "Лекция", is_free: true },
+  { id: "education-podcast", product_kind: "practice", publication_class: "practice", catalog_section: "education", format: "Прогноз", is_free: true },
+  // Practice-class rows in the music section / with music or sound formats → «Музыка».
+  { id: "sound", product_kind: "practice", publication_class: "practice", catalog_section: "music", format: "Звук", is_free: true },
+  { id: "music-section-practice", product_kind: "practice", publication_class: "practice", catalog_section: "music", format: "Аудиопрактика", is_free: true },
+  { id: "music-section-paid", product_kind: "practice", publication_class: "practice", catalog_section: "music", format: "Медитация", is_free: false },
+  { id: "practice-music-format", product_kind: "practice", publication_class: "practice", catalog_section: "music", format: "Музыка", is_free: true },
+  { id: "legacy-sound", product_kind: "practice", format: "Звук", is_free: true },
+  { id: "music-section-post", product_kind: "practice", publication_class: "practice", catalog_section: "music", format: "Аудиопост", is_free: true },
+  { id: "music-section-course", product_kind: "practice", publication_class: "course", catalog_section: "music", is_free: true },
 ];
 
 const ids = (type, free = false) => rows
@@ -29,9 +38,20 @@ const ids = (type, free = false) => rows
 assert.deepEqual(ids("practice"), ["gift", "energy", "meditation"]);
 assert.deepEqual(ids("practice", true), ["gift", "energy"]);
 assert.deepEqual(ids("stories"), ["story", "legacy-story", "custom-story"]);
-assert.deepEqual(ids("post"), ["post", "legacy-post", "explicit-post"]);
-assert.deepEqual(ids("release"), ["music"]);
-assert.deepEqual(ids("course"), ["course"]);
+assert.deepEqual(ids("post"), ["post", "legacy-post", "explicit-post", "music-section-post"]);
+assert.deepEqual(ids("release"), ["music", "sound", "music-section-practice", "music-section-paid", "practice-music-format", "legacy-sound"]);
+assert.deepEqual(ids("release", true), ["music", "sound", "music-section-practice", "practice-music-format", "legacy-sound"]);
+assert.deepEqual(ids("course"), ["course", "music-section-course"]);
+// Education-section practice rows have no type chip and stay only under «Все».
+for (const type of ["practice", "stories", "post", "release", "course", "audiobook"]) {
+  assert.equal(ids(type).includes("education-podcast"), false, `education-podcast not in ${type}`);
+}
+// Each row is in at most one type chip.
+for (const row of rows) {
+  const types = ["practice", "stories", "post", "release", "course", "audiobook"]
+    .filter((type) => matchesCatalogProductType(row, type));
+  assert.ok(types.length <= 1, `${row.id} in ${types.join(",")}`);
+}
 assert.deepEqual(ids("audiobook"), ["book"]);
 assert.equal(catalogTypeQueryFilter("all"), null);
 

@@ -28,18 +28,29 @@ const publicationClass = (value: string, kind: string): Predicate => or(
 const practiceClass = publicationClass("practice", "practice");
 const postFormat = or(eq("format", "Аудиопост"), eq("format", "Аудиоэфир"));
 const story = or(eq("catalog_section", "stories"), eq("format", "Аудиоистория"));
+const storyOrPostFormats = ["Аудиоистория", "Аудиопост", "Аудиоэфир"];
+// Practice-class rows placed in the music section, or labelled as music/sound
+// (white noise, water sounds, frequencies), are listed under «Музыка».
+const musicFormats = ["Музыка", "Звук"];
 
 // Practice formats include custom author labels. Known non-practice
 // formats/sections are excluded even on legacy publication_class=practice rows.
 const nonPracticeFormats = [
   "Аудиоистория", "Аудиопост", "Аудиоэфир", "Аудиокурс", "Аудиокнига",
-  "Лекция", "Музыка", "Музыкальный трек", "Музыкальный альбом", "Медитативная музыка",
+  "Лекция", "Музыка", "Звук", "Музыкальный трек", "Музыкальный альбом", "Медитативная музыка",
 ];
 
 function notValues(field: keyof CatalogTypeRow, values: string[]): Predicate {
   // Represent NOT IN with nullable-safe predicates in the same tree used below.
   return and(...values.map((value) => ({ field, value, negate: true })));
 }
+
+const practiceMusic = (): Predicate => and(
+  practiceClass,
+  or(eq("catalog_section", "music"), ...musicFormats.map((value) => eq("format", value))),
+  notValues("catalog_section", ["stories"]),
+  notValues("format", storyOrPostFormats),
+);
 
 function typePredicate(filter: CatalogClassFilter): Predicate | null {
   switch (filter) {
@@ -51,7 +62,7 @@ function typePredicate(filter: CatalogClassFilter): Predicate | null {
     );
     case "stories": return and(practiceClass, story, notValues("format", ["Аудиопост", "Аудиоэфир"]));
     case "post": return or(publicationClass("post", "audio_post"), and(practiceClass, postFormat));
-    case "release": return publicationClass("release", "music");
+    case "release": return or(publicationClass("release", "music"), practiceMusic());
     case "course": return eq("publication_class", "course");
     case "audiobook": return eq("publication_class", "audiobook");
   }
