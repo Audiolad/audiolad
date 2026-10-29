@@ -31,4 +31,30 @@ assert(migration.includes("point_can_edit_settings") === false || migration.incl
 assert(migration.split("COMMIT;")[0].includes("DROP TABLE") === false, "no drop before commit");
 assert(!/https?:\/\//.test(migration), "no links");
 
+const next = readFileSync(join(repoRoot, "supabase/migrations", "20270208120000_business_point_pairing_4digit.sql"), "utf8");
+assert(next.includes("ADD COLUMN IF NOT EXISTS retired_at"), "4digit: retired_at");
+assert(next.includes("WHERE consumed_at IS NULL AND retired_at IS NULL"), "4digit: unique among open codes");
+assert(next.includes("CREATE TABLE IF NOT EXISTS public.business_point_pairing_failures"), "4digit: failures table");
+assert(next.includes("c_client_limit constant integer := 5"), "4digit: 5 per client");
+assert(next.includes("c_global_limit constant integer := 30"), "4digit: global burn");
+assert(next.includes("c_client_window constant interval := interval '10 minutes'"), "4digit: 10 minute client window");
+assert(next.includes("c_global_window constant interval := interval '20 minutes'"), "4digit: global window equals TTL");
+assert(next.includes("'^[0-9]{4}$'"), "4digit: format");
+assert(next.includes("% 10000"), "4digit: 0000-9999");
+assert(next.includes("gen_random_uuid()"), "4digit: CSPRNG");
+assert(!/random\(\)/.test(next), "4digit: no random()");
+assert(next.includes("v_expires timestamptz := statement_timestamp() + interval '20 minutes'"), "4digit: 20 minute TTL");
+assert(next.includes("GRANT EXECUTE ON FUNCTION public.redeem_business_point_pairing(text, text) TO service_role"), "4digit: server redeem");
+assert(!/GRANT EXECUTE ON FUNCTION public\.redeem_business_point_pairing\(text, text\) TO[^;]*anon/.test(next), "4digit: no anon redeem");
+assert(next.includes("REVOKE EXECUTE ON FUNCTION public.consume_business_point_pairing(text) FROM PUBLIC, anon, authenticated"), "4digit: old consume closed");
+assert(next.split("COMMIT;")[0].includes("DROP TABLE") === false, "4digit: no drop before commit");
+assert(!/https?:\/\//.test(next), "4digit: no links");
+
+assert(next.includes("pg_advisory_xact_lock(hashtext('audiolad:business-point-create:' || p_location_id::text))"), "4digit: create locked per кофейня");
+assert(next.includes("'burned', v_global_failures >= c_global_limit"), "4digit: burn reported");
+const rollback = next.slice(next.lastIndexOf("COMMIT;", next.indexOf("-- Rollback")));
+assert(rollback.includes("expires_at = least(expires_at, now())"), "4digit: rollback expires open codes");
+assert(!/^-- DROP INDEX/m.test(rollback), "4digit: rollback keeps the partial index");
+assert(!/^-- .*ADD CONSTRAINT/m.test(rollback), "4digit: rollback does not restore UNIQUE");
+
 console.log("business-point-pairing-sql-unit: ok");

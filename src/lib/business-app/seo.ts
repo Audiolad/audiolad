@@ -5,7 +5,7 @@ import { BUSINESS_ORIGIN } from "./host";
 export const BUSINESS_APP_SEO_TITLE = "Аудиолад Бизнес";
 
 export const BUSINESS_APP_SEO_DESCRIPTION =
-  "Кабинет владельца точки Аудиолад Бизнес";
+  "Кабинет владельца кофейни Аудиолад Бизнес";
 
 /** Private B2B app — never index. */
 export function buildBusinessAppMetadata(): Metadata {

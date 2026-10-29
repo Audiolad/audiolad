@@ -1,7 +1,8 @@
 /**
  * Author product audio SOURCE input contract (non-music).
  * Delivery remains canonical MP3 at audio_items.audio_path in practice-audio.
- * Live author UI accepts MP3, WAV, M4A and AAC. Delivery remains MP3.
+ * Live author UI accepts MP3, WAV, M4A, AAC and OGG (Opus/Vorbis).
+ * OGA/Opus filename and MIME aliases are stored as .ogg / audio/ogg. Delivery remains MP3.
  */
 
 export const PRACTICE_AUDIO_BUCKET = "practice-audio";
@@ -15,14 +16,14 @@ export const PRODUCT_AUDIO_TOO_LARGE_MESSAGE =
   "Размер аудиофайла не должен превышать 300 МБ.";
 
 export const PRODUCT_AUDIO_WRONG_TYPE_MESSAGE =
-  "Загрузите аудиофайл в формате MP3, WAV, M4A или AAC.";
+  "Загрузите аудиофайл в формате MP3, WAV, M4A, AAC или OGG (Opus/Vorbis).";
 
-export const PRODUCT_AUDIO_SIZE_HINT = `MP3, WAV, M4A, AAC · до ${PRODUCT_AUDIO_MAX_MB} МБ`;
+export const PRODUCT_AUDIO_SIZE_HINT = `MP3, WAV, M4A, AAC, OGG · до ${PRODUCT_AUDIO_MAX_MB} МБ`;
 
 export const PRODUCT_AUDIO_FILE_ACCEPT =
-  ".mp3,.MP3,.wav,.WAV,.m4a,.M4A,.aac,.AAC,audio/mpeg,audio/mp3,audio/x-mpeg,audio/x-mp3,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/mp4,audio/x-m4a,audio/m4a,audio/aac,audio/x-aac";
+  ".mp3,.MP3,.wav,.WAV,.m4a,.M4A,.aac,.AAC,.ogg,.OGG,.oga,.OGA,.opus,.OPUS,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg,audio/mpeg,audio/mp3,audio/x-mpeg,audio/x-mp3,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/mp4,audio/x-m4a,audio/m4a,audio/aac,audio/x-aac";
 
-export type ProductAudioSourceFormat = "mp3" | "wav" | "m4a" | "aac";
+export type ProductAudioSourceFormat = "mp3" | "wav" | "m4a" | "aac" | "ogg";
 
 export const PRODUCT_AUDIO_DELIVERY_BITRATE_KBPS = 192;
 export const PRODUCT_AUDIO_DELIVERY_BITRATE = "192k";
@@ -65,11 +66,18 @@ export const PRODUCT_AUDIO_SIGNED_UPLOAD_MIME_BY_FORMAT: Record<
   wav: "audio/wav",
   m4a: "audio/mp4",
   aac: "audio/aac",
+  ogg: "audio/ogg",
 };
 
 const MP3_MIME_SET = new Set<string>(ALLOWED_PRODUCT_MP3_MIME_TYPES);
 const WAV_MIME_SET = new Set<string>(ALLOWED_PRODUCT_WAV_MIME_TYPES);
 const M4A_MIME_SET = new Set<string>(ALLOWED_PRODUCT_M4A_MIME_TYPES);
+export const PRODUCT_OGG_MIME_TYPES = [
+  "audio/ogg", "audio/opus", "application/ogg", "video/ogg",
+  "audio/x-opus+ogg", "audio/vorbis", "audio/x-vorbis+ogg",
+] as const;
+const OGG_MIME_SET = new Set<string>([...PRODUCT_OGG_MIME_TYPES, "application/octet-stream"]);
+
 const AAC_MIME_SET = new Set<string>(ALLOWED_PRODUCT_AAC_MIME_TYPES);
 
 const UUID_PATTERN =
@@ -81,7 +89,7 @@ const VERSIONED_PRODUCT_AUDIO_PATH = new RegExp(
 );
 
 const VERSIONED_PRODUCT_AUDIO_SOURCE_PATH = new RegExp(
-  `^practices/(${UUID_PATTERN})/audio-sources/(${UUID_PATTERN})-(${UUID_PATTERN})\\.(m4a|aac|wav)$`,
+  `^practices/(${UUID_PATTERN})/audio-sources/(${UUID_PATTERN})-(${UUID_PATTERN})\\.(m4a|aac|wav|ogg)$`,
   "i",
 );
 
@@ -108,6 +116,7 @@ export function detectProductAudioSourceFormat(
   if (ext === ".mp3") return "mp3";
   if (ext === ".wav") return "wav";
   if (ext === ".m4a") return "m4a";
+  if ([".ogg", ".oga", ".opus"].includes(ext)) return "ogg";
   if (ext === ".aac") return "aac";
   return null;
 }
@@ -135,6 +144,7 @@ function mimeAllowedForFormat(
 ): boolean {
   const normalized = (mime ?? "").trim().toLowerCase();
   if (!normalized) return true;
+  if (format === "ogg") return OGG_MIME_SET.has(normalized);
   if (format === "mp3") return MP3_MIME_SET.has(normalized);
   if (format === "wav") return WAV_MIME_SET.has(normalized);
   if (format === "m4a") return M4A_MIME_SET.has(normalized);
@@ -170,7 +180,7 @@ export function validateProductMp3Descriptor(
   return null;
 }
 
-/** Server-side source descriptor (MP3 | WAV | M4A | AAC). */
+/** Server-side source descriptor (MP3 | WAV | M4A | AAC | OGG). */
 export function validateProductAudioSourceDescriptor(
   file: ProductAudioDescriptor,
   maxBytes: number = MAX_PRODUCT_AUDIO_BYTES,
@@ -254,7 +264,7 @@ export function parseProductAudioSourcePath(uploadPath: string): {
   const match = VERSIONED_PRODUCT_AUDIO_SOURCE_PATH.exec(uploadPath.trim());
   if (!match) return null;
   const format = match[4].toLowerCase();
-  if (format !== "m4a" && format !== "aac" && format !== "wav") return null;
+  if (format !== "m4a" && format !== "aac" && format !== "wav" && format !== "ogg") return null;
   return {
     practiceId: match[1],
     audioId: match[2],

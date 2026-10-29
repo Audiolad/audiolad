@@ -6,9 +6,10 @@ import { useState } from "react";
 import { useBusinessChromeAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import {
-  BUSINESS_GIFT_TITLE,
+  BUSINESS_GIFT_CLOSING_NOTE,
+  BUSINESS_GIFT_LICENSE_NOTE,
   BUSINESS_SUBSCRIPTION_NOTE,
-  businessGiftRulesText,
+  businessGiftPriceNote,
 } from "@/lib/access-grants/copy";
 import { formatMoscowDateTime, ruDaysWord, trialDaysLeft } from "@/lib/access-grants/policy";
 import { BUSINESS_OFFER_HREF, BUSINESS_OFFER_TITLE, BUSINESS_ONBOARDING_HREF } from "@/lib/business/offer";
@@ -144,12 +145,12 @@ export default function BusinessHomeAccessCard() {
   const days = trialDaysLeft(new Date(access.endsAt), new Date());
   return (
     <section className="business-app-card mb-5 space-y-3" id="dostup" data-testid="biz-home-access" data-mode="trial">
-      <p className="business-app-eyebrow">{BUSINESS_GIFT_TITLE}</p>
-      <p className="mt-2 text-[1.15rem] font-bold text-[var(--biz-text)]" data-testid="biz-home-days">
+      <p className="text-[1.15rem] font-bold text-[var(--biz-text)]" data-testid="biz-home-days">
         Осталось {days} {ruDaysWord(days)}
         <span className="mt-1 block text-base font-normal text-[var(--biz-text-muted)]" data-testid="biz-home-until">до {label}</span>
       </p>
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{businessGiftRulesText()}</p>
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-rules">{BUSINESS_GIFT_CLOSING_NOTE}</p>
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]" data-testid="biz-home-license">{BUSINESS_GIFT_LICENSE_NOTE}</p>
       {pay}
     </section>
   );
@@ -174,7 +175,7 @@ function BusinessPayControls({
   return (
     <div className="space-y-3" data-testid="biz-home-pay">
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        {formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.
+        {businessGiftPriceNote()}
       </p>
       {accepted ? (
         <button
@@ -222,7 +223,7 @@ function BusinessPayError({ error }: { error: PayError }) {
     return (
       <p role="alert" data-testid="biz-home-pay-error">
         Оплатить может владелец аккаунта.{" "}
-        <Link href={error.href || BUSINESS_ONBOARDING_HREF}>Подключить точку</Link>.
+        <Link href={error.href || BUSINESS_ONBOARDING_HREF}>Подключить кофейню</Link>.
       </p>
     );
   }

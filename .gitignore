@@ -56,3 +56,8 @@ similarity_ear_key.json
 *.tsbuildinfo
 next-env.d.ts
 /tmp/
+
+# Deploy-time article recrawl manifest (written into release dirs)
+/.article-recrawl-manifest.json
+/.article-recrawl-manifest.json.prev
+/.article-recrawl-manifest.json.tmp-*

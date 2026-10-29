@@ -32,7 +32,10 @@ assert.match(helpText, /продолжать редактировать альб
 assert.match(helpText, /Статус подготовки и готовый результат/);
 assert.match(helpText, /не гарантирует/);
 assert.doesNotMatch(helpText, /вы получите|гарантированн/i);
-assert.match(helpText, /не показывается слушателям/);
+const visibility = JAZZ_RELAX_PASSPORT_HELP_SECTIONS.find((s) => s.heading === "Кто видит паспорт");
+assert.ok(visibility, "help keeps the «Кто видит паспорт» section");
+assert.deepEqual(visibility.paragraphs, ["Этот паспорт видите только вы как автор музыки."]);
+assert.doesNotMatch(helpText, /не показывается слушателям|Пока альбом не опубликован|Внешнее использование возможно/);
 
 const closed = renderToStaticMarkup(createElement(JazzRelaxPassportHelp));
 assert.match(closed, /data-passport-help-link="true"/);

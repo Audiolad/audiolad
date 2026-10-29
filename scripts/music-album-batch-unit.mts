@@ -331,4 +331,8 @@ assert.match(productsSource, /musicAlbumSkipsDefaultAudioItem/);
 assert.doesNotMatch(productsSource, /Трек 1/);
 assert.match(deleteRouteSource, /musicDraftMayDeleteLastTrack/);
 
+
+assert.equal(deriveAlbumTrackTitle("01 - Morning.oga"), "Morning");
+assert.equal(planMusicAlbumBatch([named("01 - Morning.opus", "video/ogg")]).accepted.length, 1);
+
 console.log("music-album-batch-unit: ok");

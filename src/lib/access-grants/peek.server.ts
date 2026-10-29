@@ -23,9 +23,25 @@ export async function peekBusinessChromeAccess(now: Date = new Date()): Promise<
       data: { user },
     } = await supabase.auth.getUser();
     if (!user || !isEmailConfirmed(user)) return BUSINESS_NO_ACCESS;
+    return await peekBusinessAccessFor({ userId: user.id, emailHash: hashAccessEmail(user.email) ?? null }, now);
+  } catch {
+    return BUSINESS_NO_ACCESS;
+  }
+}
+
+/**
+ * Same READ-ONLY peek for a given account (service role). Used by the paired venue device, which
+ * plays under the venue owner's gift / paid period without being signed in as the owner.
+ * Never issues a gift, never writes. Any failure is «no access».
+ */
+export async function peekBusinessAccessFor(
+  start: { userId: string; emailHash: string | null },
+  now: Date = new Date(),
+): Promise<BusinessChromeAccess> {
+  try {
     const reader = createPeekReader(createServiceRoleClient());
 
-    return await peekChromeAccessWith(reader, { userId: user.id, emailHash: hashAccessEmail(user.email) ?? null }, now);
+    return await peekChromeAccessWith(reader, start, now);
   } catch {
     return BUSINESS_NO_ACCESS;
   }

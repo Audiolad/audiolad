@@ -11,7 +11,7 @@ export type ClaimedProductNormalizeJob = {
   practice_id: string;
   audio_item_id: string;
   source_storage_path: string;
-  source_format: "m4a" | "aac" | "wav";
+  source_format: "m4a" | "aac" | "wav" | "ogg";
   source_original_filename: string;
   source_file_size_bytes: number;
   target_storage_path: string;
@@ -112,7 +112,8 @@ export function parseClaimedProductNormalizeJob(
     typeof row.source_storage_path !== "string" ||
     (row.source_format !== "m4a" &&
       row.source_format !== "aac" &&
-      row.source_format !== "wav") ||
+      row.source_format !== "wav" &&
+      row.source_format !== "ogg") ||
     typeof row.source_original_filename !== "string" ||
     typeof row.target_storage_path !== "string" ||
     typeof row.lease_token !== "string" ||

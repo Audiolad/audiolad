@@ -255,6 +255,30 @@ on_exit() {
 
 trap on_exit EXIT
 
+enqueue_article_recrawl() {
+  local release_dir="$1"
+  local previous_dir="${2:-}"
+  local script="scripts/enqueue-article-recrawl.mts"
+  if [[ ! -f "$release_dir/$script" || ! -x "$release_dir/node_modules/.bin/tsx" ]]; then
+    log_warn "article_recrawl_enqueue_skipped reason=script_or_tsx_missing"
+    return 0
+  fi
+  local args=(--release-dir "$release_dir")
+  if [[ -n "$previous_dir" && -d "$previous_dir" ]]; then
+    args+=(--previous-dir "$previous_dir")
+  fi
+  # Exit 2 = some URLs not queued (retried by the next deploy), 124/137 = timeout.
+  local rc=0
+  (cd "$release_dir" && NODE_ENV=production timeout -k "${ARTICLE_RECRAWL_KILL_AFTER:-10s}" "${ARTICLE_RECRAWL_TIMEOUT:-120s}" \
+    nice -n 10 node_modules/.bin/tsx "$script" "${args[@]}") || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    log_info "article_recrawl_enqueue_done"
+  else
+    log_warn "article_recrawl_enqueue_failed exit_code=${rc} non_blocking=1"
+  fi
+  return 0
+}
+
 main() {
   require_command git
   require_command npm
@@ -617,6 +641,11 @@ main() {
     # Cutover already completed: do not roll back the web process.
     exit 1
   fi
+
+  # Articles are static files, so they go live here. Queue new and changed
+  # article URLs for the recrawl worker (Yandex Webmaster + IndexNow).
+  # Best effort: a failure is logged and never fails or rolls back the deploy.
+  enqueue_article_recrawl "$RELEASE_DIR" "$old_current"
 
   rm -f "$RELEASE_DIR/.deploy-inflight"
   unset CANDIDATE_RELEASE_DIR

@@ -80,7 +80,7 @@ import {
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
-import { isMusicPassportPilotAuthor } from "@/lib/music-passport/pilot-authors";
+import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
 import {
   describeJazzRelaxPassportActivity,
   type JazzRelaxPassportView,
@@ -1426,7 +1426,8 @@ export default function AuthorProductForm({
     productKind: form.productKind,
     publicationClass: form.publicationClass,
   });
-  const jazzRelaxMusicPassport = musicProductWizard && isMusicPassportPilotAuthor(form.authorId);
+  const jazzRelaxMusicPassport = musicProductWizard
+    && isMusicPassportAvailable({ productKind: form.productKind });
   const practiceProductWizard = isPracticeProductWizardEnabled({
     publicationClass: form.publicationClass,
   });
@@ -3224,7 +3225,7 @@ export default function AuthorProductForm({
       if (!ensured) {
         failUpload(
           kind === "master"
-            ? "Не удалось загрузить WAV-мастер."
+            ? "Не удалось загрузить исходное аудио."
             : "Не удалось загрузить аудио.",
         );
         return;
@@ -3319,7 +3320,7 @@ export default function AuthorProductForm({
       if (!controller.signal.aborted) {
         failUpload(
           kind === "master"
-            ? "Не удалось загрузить WAV-мастер."
+            ? "Не удалось загрузить исходное аудио."
             : "Не удалось загрузить аудио.",
         );
       }
@@ -3554,7 +3555,7 @@ export default function AuthorProductForm({
         setAudioUploadErrors((current) => ({
           ...current,
           [audioId]: isMusicMaster
-            ? "Не удалось загрузить WAV-мастер."
+            ? "Не удалось загрузить исходное аудио."
             : "Не удалось загрузить аудио.",
         }));
         return;
@@ -3608,7 +3609,7 @@ export default function AuthorProductForm({
       setAudioUploadErrors((current) => ({
         ...current,
         [audioId]: isMusicMaster
-          ? "Не удалось загрузить WAV-мастер."
+          ? "Не удалось загрузить исходное аудио."
           : "Не удалось загрузить аудио.",
       }));
     } finally {
@@ -5502,7 +5503,7 @@ export default function AuthorProductForm({
               Добавить треки альбома
             </p>
             <p className="mt-2 text-sm text-[#5f5484]">
-              Перетащите сюда WAV или MP3
+              Перетащите сюда WAV, MP3 или OGG
             </p>
             <p className="my-2 text-sm text-[#7d70a2]">или</p>
             <button
@@ -5522,7 +5523,7 @@ export default function AuthorProductForm({
               ref={albumFileInputRef}
               type="file"
               multiple
-              accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
+              accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
               className="hidden"
               disabled={
                 busy ||
@@ -5846,7 +5847,7 @@ export default function AuthorProductForm({
                           : MUSIC_DELIVERY_REPLACE_LABEL}
                         <input
                           type="file"
-                          accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3"
+                          accept="audio/wav,audio/x-wav,audio/wave,.wav,audio/mpeg,.mp3,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
                           className="hidden"
                           disabled={
                             uploadingAudioId === audioItem.id ||

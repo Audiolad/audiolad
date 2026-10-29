@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import type { NextConfig } from "next";
 
+import { buildVerticalGuideRedirects } from "./src/lib/business/vertical-guides/legacy-redirects";
 import { resolveCdnAssetPrefix } from "./src/lib/cdn-asset-prefix";
 import { buildEmbedFrameAncestorsPolicy } from "./src/lib/embed/frame-policy";
 import { buildVkFrameAncestorsPolicy } from "./src/lib/vk/frame-policy";
@@ -124,6 +125,10 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  async redirects() {
+    // Retired vertical guide URLs (301, see legacy-redirects.ts).
+    return buildVerticalGuideRedirects();
   },
   async rewrites() {
     // beforeFiles: afterFiles rewrite to ?key=:key did not apply for /{key}.txt

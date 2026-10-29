@@ -1,6 +1,8 @@
 export const AUTHOR_BANNER_IMAGE_CONFIG = {
   type: "author-banner" as const,
-  recommendedAspectRatio: 3 / 1,
+  recommendedAspectRatio: 4 / 1,
+  recommendedWidth: 2400,
+  recommendedHeight: 600,
   minWidth: 1200,
   minHeight: 400,
   maxFileSize: 3 * 1024 * 1024,
@@ -8,12 +10,12 @@ export const AUTHOR_BANNER_IMAGE_CONFIG = {
 };
 
 export const AUTHOR_BANNER_UPLOAD_HINT =
-  "Свой баннер можно загрузить позже. Рекомендуемое соотношение – около 3:1, минимальный размер – 1200 × 400 пикселей. JPG, PNG или WebP до 3 МБ.";
+  "Свой баннер можно загрузить позже. Рекомендуемое соотношение – 4:1, например 2400 × 600 пикселей, минимальный размер – 1200 × 400 пикселей. На телефоне края баннера обрезаются, поэтому важное держите в центре. JPG, PNG или WebP до 3 МБ.";
 
 export const AUTHOR_BANNER_ERROR_MESSAGES = {
   unsupportedFormat: "Загрузите баннер в формате JPG, PNG или WebP.",
   fileTooLarge: "Размер баннера не должен превышать 3 МБ.",
-  tooSmall: "Минимальный размер баннера — 1200 × 400 пикселей.",
+  tooSmall: "Минимальный размер баннера – 1200 × 400 пикселей.",
   readFailed:
     "Не удалось прочитать изображение. Проверьте файл и попробуйте снова.",
   saveFailed: "Не удалось сохранить баннер. Попробуйте ещё раз.",

@@ -18,6 +18,7 @@ import { FEEDBACK_RESULT_MS, feedbackHoldMs } from "@/lib/business-app/cafe-queu
 import type { CafeQueueFeedbackKind } from "@/lib/business-app/cafe-queue/prefs";
 import { cafeQueueIndices, cafeUpcomingIndices, cafeUpcomingMoreCount, cafeUpcomingMoreLabel, cafeUniqueAhead, CAFE_QUEUE_PREVIEW } from "@/lib/business-app/cafe-queue/order";
 import { formatPlaybackClock } from "@/lib/business-app/playback-clock";
+import { stepWorkspaceVolume, WORKSPACE_VOLUME_STEP } from "@/lib/business-workspace/playback";
 import CafeQueueControls, { CafeTrackFeedback, type CafeFeedbackPhase } from "@/components/business-app/workspace/CafeQueueControls";
 import { useCafeQueuePreferences } from "@/components/business-app/workspace/useCafeQueuePreferences";
 import {
@@ -304,7 +305,7 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
           <p>{BUSINESS_EMPTY_CATALOG_NOTE}</p>
           <p className="flex flex-wrap gap-3">
             <a className="underline" href={model.rightsHref}>Как устроены права на музыку</a>
-            <Link className="underline" href={model.onboardingHref}>Перейти и подключить точку</Link>
+            <Link className="underline" href={model.onboardingHref}>Перейти и подключить кофейню</Link>
           </p>
         </section>
       ) : null}
@@ -346,21 +347,42 @@ function BusinessWorkspaceView({ model: initialModel }: { model: WorkspacePageMo
             >
               <span style={{ width: `${ratio * 100}%` }} />
             </div>
-            <label className="business-now__volume">
-              <span>Громкость</span>
+            <div className="business-now__volume">
+              <p className="business-now__volume-title" id="biz-now-volume-caption">Громкость</p>
+              <div className="business-now__volume-ends">
+                <button
+                  type="button"
+                  className="business-now__volume-step"
+                  aria-label="Тише"
+                  data-testid="biz-now-volume-down"
+                  onClick={() => player.setVolume(stepWorkspaceVolume(player.volume, -1))}
+                >
+                  ↓ Тише
+                </button>
+                <button
+                  type="button"
+                  className="business-now__volume-step"
+                  aria-label="Громче"
+                  data-testid="biz-now-volume-up"
+                  onClick={() => player.setVolume(stepWorkspaceVolume(player.volume, 1))}
+                >
+                  Громче ↑
+                </button>
+              </div>
               <input
                 type="range"
                 min={0}
                 max={1}
-                step={0.05}
+                step={WORKSPACE_VOLUME_STEP}
                 value={player.volume}
                 onChange={(event) => player.setVolume(Number(event.target.value))}
                 data-testid="biz-now-volume"
+                aria-labelledby="biz-now-volume-caption"
                 aria-valuemin={0}
                 aria-valuemax={1}
                 aria-valuenow={player.volume}
               />
-            </label>
+            </div>
             <p className="business-cabinet-player__time" data-testid="biz-now-time">
               {formatPlaybackClock(player.view.currentTime)} / {formatPlaybackClock(duration)}
             </p>

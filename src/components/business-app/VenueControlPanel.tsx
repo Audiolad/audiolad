@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import PointPairingCard from "@/components/business-app/PointPairingCard";
 import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
+
+/** Settings page with the atmosphere picker opened under «Изменить звучание». */
+const VENUE_SOUND_HREF = "/preferences?sound=open";
 
 const QUESTIONS: Record<PointCommandType, string> = {
   pause: "Поставить музыку в зале на паузу?",
@@ -17,10 +20,15 @@ export default function VenueControlPanel({
   locationId,
   locationName,
   pointCanEdit,
+  soundSlot = null,
+  soundInitiallyOpen = false,
 }: {
   locationId: string;
   locationName: string;
   pointCanEdit: boolean;
+  /** Atmosphere picker. It opens right under «Изменить звучание». Without it the button links to the settings page. */
+  soundSlot?: ReactNode;
+  soundInitiallyOpen?: boolean;
 }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(pointCanEdit);
@@ -29,6 +37,23 @@ export default function VenueControlPanel({
   const [pending, setPending] = useState(false);
   const [confirm, setConfirm] = useState<{ text: string; run: () => void } | null>(null);
   const yesGuard = useRef(false);
+  const [soundOpen, setSoundOpen] = useState(soundInitiallyOpen);
+  const soundRef = useRef<HTMLDivElement>(null);
+  const scrollSound = useRef(soundInitiallyOpen);
+
+  useEffect(() => {
+    if (!soundOpen || !scrollSound.current) return;
+    scrollSound.current = false;
+    const node = soundRef.current;
+    if (!node) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  }, [soundOpen]);
+
+  const toggleSound = () => {
+    scrollSound.current = !soundOpen;
+    setSoundOpen((open) => !open);
+  };
 
   const ask = (text: string, run: () => void) => {
     if (pending || confirm) return;
@@ -82,7 +107,7 @@ export default function VenueControlPanel({
   const saveName = () => {
     const next = name.trim();
     if (!next) return;
-    ask("Сохранить новое название точки?", () => {
+    ask("Сохранить новое название кофейни?", () => {
       setPending(true);
       setError(null);
       void fetch("/api/business/point", {
@@ -104,10 +129,10 @@ export default function VenueControlPanel({
   return (
     <section className="business-app-card space-y-4" data-testid="biz-venue-control" aria-labelledby="venue-control-title">
       <h2 id="venue-control-title" className="text-[1.15rem] font-bold text-[var(--biz-text)]">
-        Управление точкой
+        Управление кофейней
       </h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Каждое действие спрашивает подтверждение и уходит в зал. Слушать у себя это не включает.
+        Пауза, продолжение, следующий трек и отправка атмосферы спрашивают подтверждение и уходят в кофейню. Слушать у себя это не включает.
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null} data-testid="biz-venue-pause" onClick={() => send("pause")}>
@@ -132,7 +157,7 @@ export default function VenueControlPanel({
         <span>Разрешить менять музыку с устройства в заведении</span>
       </label>
       <label className="block text-sm text-[var(--biz-text)]">
-        <span className="font-medium">Название точки</span>
+        <span className="font-medium">Название кофейни</span>
         <input
           className="mt-2 w-full rounded-xl border border-[var(--biz-border)] bg-[var(--biz-surface)] px-3 py-3"
           value={name}
@@ -141,15 +166,33 @@ export default function VenueControlPanel({
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <a href="/preferences" className="business-app-btn business-app-btn-secondary business-app-focus-ring" data-testid="biz-venue-atmosphere-link">
-        Изменить звучание
-      </a>
-      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        В зале новое звучание начнётся со следующего трека. Перед записью кабинет спросит подтверждение.
-      </p>
       <button type="button" className="business-app-btn business-app-btn-secondary business-app-focus-ring" disabled={pending || confirm !== null || name.trim().length === 0} onClick={saveName} data-testid="biz-venue-rename">
         Сохранить название
       </button>
+      <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
+        В зале новое звучание начнётся со следующего трека. Перед отправкой кабинет спросит подтверждение.
+      </p>
+      {soundSlot ? (
+        <button
+          type="button"
+          className="business-app-btn business-app-btn-secondary business-app-focus-ring"
+          aria-expanded={soundOpen}
+          aria-controls="venue-sound-panel"
+          data-testid="biz-venue-atmosphere-toggle"
+          onClick={toggleSound}
+        >
+          Изменить звучание
+        </button>
+      ) : (
+        <a href={VENUE_SOUND_HREF} className="business-app-btn business-app-btn-secondary business-app-focus-ring" data-testid="biz-venue-atmosphere-link">
+          Изменить звучание
+        </a>
+      )}
+      {soundSlot && soundOpen ? (
+        <div id="venue-sound-panel" ref={soundRef} className="business-venue-sound space-y-4" data-testid="biz-venue-sound-panel">
+          {soundSlot}
+        </div>
+      ) : null}
       {error ? <p className="business-app-alert" data-tone="warn" role="alert">{error}</p> : null}
       {confirm ? (
         <VenueConfirmDialog

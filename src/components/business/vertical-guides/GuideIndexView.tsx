@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { COFFEE_ATLAS_PATH } from "@/lib/business/coffee-atlas/constants";
+
 import { articlePath, listVerticalArticles } from "@/lib/business/vertical-guides/registry";
 import type { B2BVertical } from "@/lib/business/vertical-guides/types";
 
@@ -10,16 +12,12 @@ export default function GuideIndexView({ vertical }: { vertical: B2BVertical }) 
     <div className="b2b-guide" data-coffee-guide="index">
       <header className="guide-header">
         <div className="guide-wrap guide-header__bar">
-          <Link href="/b" className="guide-brand">
+          <Link href={vertical.path} className="guide-brand">
             <span aria-hidden="true">☕</span>
-            <span>
-              АудиоЛад Бизнес
-              <small>{vertical.kicker}</small>
-            </span>
+            <span>{vertical.title}</span>
           </Link>
           <nav className="guide-header__nav" aria-label="Раздел">
-            <Link href="/b/atlas-kofeen">Атлас кофеен</Link>
-            <Link href="/b">На главную бизнеса</Link>
+            <Link href={COFFEE_ATLAS_PATH}>Атлас: 10 удивительных кофеен мира</Link>
           </nav>
         </div>
       </header>

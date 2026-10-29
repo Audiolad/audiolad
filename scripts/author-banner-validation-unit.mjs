@@ -111,8 +111,28 @@ function testBannerConfigContract() {
     "banner max file size",
   );
   assert(
-    AUTHOR_BANNER_IMAGE_CONFIG.recommendedAspectRatio === 3,
-    "banner recommended aspect ratio is 3:1",
+    AUTHOR_BANNER_IMAGE_CONFIG.recommendedAspectRatio === 4,
+    "banner recommended aspect ratio is 4:1",
+  );
+  assert(
+    AUTHOR_BANNER_IMAGE_CONFIG.recommendedWidth /
+      AUTHOR_BANNER_IMAGE_CONFIG.recommendedHeight ===
+      AUTHOR_BANNER_IMAGE_CONFIG.recommendedAspectRatio,
+    "recommended banner size matches recommended ratio",
+  );
+  assert(
+    AUTHOR_BANNER_IMAGE_CONFIG.recommendedWidth >=
+      AUTHOR_BANNER_IMAGE_CONFIG.minWidth &&
+      AUTHOR_BANNER_IMAGE_CONFIG.recommendedHeight >=
+        AUTHOR_BANNER_IMAGE_CONFIG.minHeight,
+    "recommended banner size passes validation",
+  );
+  assert(
+    validateAuthorBannerDimensions(
+      AUTHOR_BANNER_IMAGE_CONFIG.recommendedWidth,
+      AUTHOR_BANNER_IMAGE_CONFIG.recommendedHeight,
+    ) === null,
+    "recommended banner size is accepted",
   );
 }
 
@@ -123,13 +143,25 @@ function testBannerHintAndMessages() {
   );
   assert(
     /рекомендуемое соотношение/i.test(AUTHOR_BANNER_UPLOAD_HINT) &&
-      AUTHOR_BANNER_UPLOAD_HINT.includes("3:1"),
+      AUTHOR_BANNER_UPLOAD_HINT.includes("4:1") &&
+      !AUTHOR_BANNER_UPLOAD_HINT.includes("3:1"),
     "banner upload hint mentions recommended aspect ratio",
   );
   assert(
     AUTHOR_BANNER_UPLOAD_HINT.includes("1200 × 400"),
     "banner upload hint mentions minimum size",
   );
+  assert(
+    AUTHOR_BANNER_UPLOAD_HINT.includes("2400 × 600") &&
+      AUTHOR_BANNER_UPLOAD_HINT.includes("в центре"),
+    "banner upload hint mentions recommended size and centre-safe crop",
+  );
+  for (const text of [
+    AUTHOR_BANNER_UPLOAD_HINT,
+    ...Object.values(AUTHOR_BANNER_ERROR_MESSAGES),
+  ]) {
+    assert(!text.includes("\u2014"), `no em dash in banner copy: ${text}`);
+  }
   assert(
     AUTHOR_BANNER_ERROR_MESSAGES.tooSmall.includes("баннера"),
     "banner size error mentions banner",
@@ -209,6 +241,37 @@ function testAuthorProfileBannerPreview() {
   assert(
     authorBanner.includes("uploadHint"),
     "banner block uses shared upload hint",
+  );
+
+  const frame = readFileSync(
+    resolve(ROOT, "src/lib/authors/banner-frame.ts"),
+    "utf8",
+  );
+  const publicHeader = readFileSync(
+    resolve(ROOT, "src/components/authors/AuthorPublicHeader.tsx"),
+    "utf8",
+  );
+  const editor = readFileSync(
+    resolve(ROOT, "src/components/author-dashboard/BannerPositionEditorModal.tsx"),
+    "utf8",
+  );
+  assert(
+    /AUTHOR_BANNER_PUBLIC_FRAME_CLASS =\s*"aspect-\[11\/4\] lg:aspect-\[4\/1\]/.test(frame) &&
+      /AUTHOR_BANNER_PREVIEW_FRAME_CLASS =\s*"aspect-\[11\/4\] lg:aspect-\[4\/1\]/.test(frame),
+    "public banner and dashboard preview share 11:4 mobile / 4:1 desktop frame",
+  );
+  assert(
+    publicHeader.includes("AUTHOR_BANNER_PUBLIC_FRAME_CLASS") &&
+      !publicHeader.includes("h-32 sm:h-40 xl:h-48"),
+    "public header uses shared banner frame",
+  );
+  assert(
+    authorBanner.includes("AUTHOR_BANNER_PREVIEW_FRAME_CLASS"),
+    "dashboard preview uses shared banner frame",
+  );
+  assert(
+    editor.includes("AUTHOR_BANNER_EDITOR_FRAME_CLASS"),
+    "position editor uses shared banner frame",
   );
 }
 

@@ -59,7 +59,7 @@ export async function loadPlaybackReport(params: {
     .maybeSingle();
   if (!location?.id) return { kind: "no_location" };
 
-  const locationName = String(location.name ?? "Точка");
+  const locationName = String(location.name ?? "Кофейня");
   const timezone = isValidTimeZone(location.timezone)
     ? (location.timezone as string)
     : "Europe/Moscow";

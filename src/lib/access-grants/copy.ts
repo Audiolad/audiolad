@@ -1,13 +1,4 @@
-import { STUDIO_GUEST_MAX_PROJECTS } from "@/lib/studio/guest-constants";
-import {
-  MAX_STUDIO_ASSET_BYTES,
-  MAX_STUDIO_AUDIO_DURATION_SECONDS,
-  MAX_STUDIO_PROJECT_BYTES,
-  MAX_STUDIO_PROJECT_TIMELINE_SECONDS,
-  MAX_STUDIO_TRACKS,
-} from "@/lib/studio/limits";
-
-import { BUSINESS_PLAN_PERIOD_LABEL } from "@/lib/business/plan";
+import { formatBusinessMonthlyPrice } from "@/lib/business/plan";
 
 /** Unified phrase for the landing, registration and cabinet (task 1e008ee8). */
 export const BUSINESS_GIFT_TITLE = "30 дней в подарок";
@@ -27,30 +18,26 @@ export const BUSINESS_PAYMENT_RETURN_SIGN_IN_INTRO =
 export const BUSINESS_REGISTERED_NOTE =
   "Регистрация прошла успешно. Подтвердите адрес по письму и войдите: кабинет откроется с периодом «30 дней в подарок».";
 
-const mb = (bytes: number) => Math.round(bytes / (1024 * 1024));
-const hours = (seconds: number) => Math.round(seconds / 3600);
+/** One short line on the gift card while the 30 days are still running. */
+export const BUSINESS_GIFT_CLOSING_NOTE =
+  "После срока плеер закрыт до оплаты.";
 
-/**
- * The gift is the business music workspace, not unlimited Studio AI.
- * Numbers come from the existing Studio limits.
- */
-export function businessGiftRulesText(): string {
-  return [
-    `${BUSINESS_GIFT_TITLE}: один раз на подтверждённый адрес, без карты и без автосписания.`,
-    "После даты окончания полный плеер закрывается, вход и данные кабинета остаются.",
-    `Дальше подписка добровольная, ${BUSINESS_PLAN_PERIOD_LABEL}. Если её не оформлять, списаний нет.`,
-    `Генерация музыки в Студии в подарок не входит и не становится безлимитной. Пределы Студии: дорожка до ${hours(MAX_STUDIO_AUDIO_DURATION_SECONDS)} часов и ${mb(MAX_STUDIO_ASSET_BYTES)} МБ, проект до ${hours(MAX_STUDIO_PROJECT_TIMELINE_SECONDS)} часов, ${MAX_STUDIO_TRACKS} дорожек и ${mb(MAX_STUDIO_PROJECT_BYTES)} МБ. Гостевой проект Студии – не больше ${STUDIO_GUEST_MAX_PROJECTS}.`,
-    "Музыка в кабинете начинается только после нажатия на круглую кнопку.",
-  ].join(" ");
+/** Owner wording, 2026-10-28: the 30 gift days include the venue's music rights and licence. */
+export const BUSINESS_GIFT_LICENSE_NOTE =
+  "В 30 подарочных дней входят все права и лицензия на музыку для вашего заведения.";
+
+/** Same price line on the cabinet home card and the email-confirmation screen. */
+export function businessGiftPriceNote(): string {
+  return `${formatBusinessMonthlyPrice()} за 30 дней, картой или по СБП. Автосписания нет.`;
 }
 
 export const BUSINESS_EMPTY_CATALOG_NOTE =
   "Подборка в этом направлении готовится – музыка появится здесь автоматически.";
 
 export const BUSINESS_CONNECT_VENUE_NOTE =
-  "Чтобы в кабинете играла музыка, подключите точку. Это занимает около минуты, карта не нужна.";
+  "Чтобы в кабинете играла музыка, подключите кофейню. Это занимает около минуты, карта не нужна.";
 
-export const BUSINESS_CONNECT_VENUE_CTA = "Подключить точку";
+export const BUSINESS_CONNECT_VENUE_CTA = "Подключить кофейню";
 
 export const BUSINESS_SUBSCRIPTION_NOTE =
   "Музыка остановлена. Кабинет и настройки сохранены. Оплата – 30 дней, картой или по СБП, без автосписания.";

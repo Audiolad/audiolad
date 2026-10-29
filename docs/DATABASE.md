@@ -1763,7 +1763,7 @@ Business App UI в A1 **не** подключается к этим таблиц
 
 ### Публичный код лицензии точки
 
-Миграция `supabase/migrations/20270207170000_business_location_licence_public_id.sql` (задача 90d24628). Аддитивная, на рабочую базу сама не накатывается – нужно отдельное подтверждение владельца.
+Миграция `supabase/migrations/20270210170000_business_location_licence_public_id.sql` (задача 90d24628). Аддитивная, на рабочую базу сама не накатывается – нужно отдельное подтверждение владельца.
 
 Колонка `business_locations.licence_public_id`: 32 шестнадцатеричных символа, уникальная, не первичный ключ и не идентификатор владельца. Её адрес на хосте кабинета: `/v/<id>`. Существующие точки получают новый код, новые – из значения по умолчанию, в том числе через `create_business_organization_with_location`. Публичная страница читает название и адрес точки (`name`, `address_line1`, `address_line2`, `city`, `region`, `postal_code`) и, если они появятся, `venue_name` и `venue_address`. Срок – часы доступа владельца организации (подарок с подтверждения регистрации, оплата, трёхдневная отсрочка). Почта и идентификатор владельца на страницу не попадают. Пока флаг `AUDIOLAD_BUSINESS_VENUE_LICENCE_PUBLIC` не равен `1`, маршрут отвечает 404.
 
@@ -1932,6 +1932,10 @@ RLS включён, политик для `anon` / `authenticated` нет: до�
 Очередь: `queued` → `processing` → `succeeded` | `failed`. Повтор того же `sha256` вставляет новую строку с следующим `version_number`. Успешная и неуспешная строка закрыта триггером: нет UPDATE и нет DELETE. `raw_json` и `normalized_json` появляются только при печати успешного прогона. Успех требует git-коммит с префиксом `932c4ce`, content-коммит с префиксом `3750f3b`, `device = cpu` и provenance `candidate_a=false`, `instrument_strategy=checkout_default`. Миграция `supabase/migrations/20270128120000_music_analyzer_seal_head_prefixes.sql` расширяет CHECK `music_analyzer_runs_phase_check` и `complete_music_analyzer_run`: успешный git-коммит может начинаться с `932c4ce` или `cc5b2828`, content-коммит по-прежнему с `3750f3b`. Перед заменой ограничения файл только читает строки и прерывается, если какая-то из них не проходит новую формулу. Затем ограничение добавляется как `NOT VALID` и подтверждается `VALIDATE CONSTRAINT`. Файл не переписывает и не удаляет строки. Откат лежит в `docs/music-analyzer/ROLLBACK_music_analyzer_seal_head_prefixes.sql` и миграцией не является. На production эта миграция применяется только обычным деплоем.
 
 RLS включён. `anon` / `authenticated` не имеют прав. `service_role` только `SELECT` и RPC (`enqueue`, `claim`, `renew`, `complete`, `fail`, `release`, `recover`). Роль owner/admin проверяет приложение.
+
+Queue scheduling migration: `20270208130000_music_analyzer_queue_guards.sql` adds nullable `last_claimed_at` to runs and replaces the claim RPC. Each call takes one job (`v_jobs_per_author_turn = 1`) from the least recently served `created_by`, using the maximum `last_claimed_at` (falling back to existing `started_at`) across that author's runs. Never-served authors come first; `created_at, id` break ties and preserve single-author FIFO. Claims, including retries, record service time; first `started_at`, lease validation, attempt limits and row locking stay intact. No in-memory scheduling state or worker deployment change is required.
+
+The same migration adds service-role-only `enqueue_music_analyzer_run_deduplicated` with the same seven arguments and row return shape as the original enqueue RPC. It acquires the existing SHA advisory transaction lock, returns the earliest active (`queued` / `processing`) row matching `(sha256, created_by)`, or delegates insertion/versioning to the original RPC. The active row is locked during reuse so a terminal transition cannot race that decision. Terminal rows allow another enqueue. This is a distinct RPC name: no defaulted-argument overload, signature drop/replacement, unique index, duplicate cleanup, or changes to existing enqueue permissions. Applying the migration again is safe. Analyzer upload completion and admin reanalysis explicitly opt in through `enqueueMusicAnalyzerRun({ deduplicate: true, ... })` and return the actual RPC row. The frozen passport/jazz-relax direct caller retains the original RPC and always-insert behavior. Dedupe is requester/SHA scoped, not product-track scoped; uploaded/copied objects that become redundant are retained for retry safety and need a separate storage-retention policy.
 
 На production миграция попадает вместе с обычным деплоем, не отдельной ручной командой с ноутбука. Пока деплой не выполнен, таблицы на сервере нет.
 
@@ -2342,3 +2346,33 @@ apply: `scripts/audio-sprint-general-release.mjs`. Скрипт применяе
 анализа нет. Единственный каталог остаётся `seo_queries` с уникальным
 `normalized_query`. До публикации нового кода требуется отдельно согласованное
 применение схемы. Инструкции и ограничения: `docs/ai-company/task-2a3f80bf.md`.
+
+### Ogg source uploads (owner request 29.10.2026)
+
+Forward migration: `20270209120000_ogg_audio_upload.sql`, after the latest
+existing migration `20270208130000_music_analyzer_queue_guards.sql`.
+It has been prepared in the repository, not applied to a database.
+
+- Idempotently append canonical `audio/ogg` to non-NULL bucket MIME arrays for
+  `practice-audio`, `studio-draft-assets`, `music-masters`, `music-analyzer-runs`.
+  Existing MIME values, privacy and size limits remain intact (product, Studio
+  and music master source limits are 300 MiB).
+- Replace normalize job format/path CHECKs with the existing M4A/AAC/WAV values
+  plus `ogg`. Replace the same-signature enqueue function with its existing
+  locking/supersession/cleanup implementation plus the Ogg format gate.
+  Execution remains service_role-only.
+- Extend `music_analyzer_runs_mime_check` with `audio/ogg`, preserving all four
+  existing values. Verified music masters reach the analyzer's existing
+  ffmpeg-to-PCM decoding path. Studio asset/source and music asset tables do
+  not have a MIME enumeration or WAV-only storage path CHECK to widen.
+
+Filename aliases `.oga` and `.opus` become `.ogg` in source storage. Browser
+MIME aliases, including `video/ogg`, become `audio/ogg`. Actual Ogg media must
+have a positive duration, no video streams, and only Opus/Vorbis audio streams;
+FLAC-in-Ogg is rejected. Ordinary products are delivered through their existing
+normalize worker as MP3 at `audio_items.audio_path`. Music uses its existing
+master/transcode/stream activation pipeline and MP3 delivery.
+
+The migration plan expectation lists and normalize SQL contract checks cover
+this forward migration. Application requires the migration and updated workers
+before accepting these uploads. No production operation was performed.

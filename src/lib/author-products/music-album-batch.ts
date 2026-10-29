@@ -16,7 +16,7 @@ import {
 
 export const MAX_MUSIC_ALBUM_BATCH_FILES = 30;
 
-const AUDIO_EXTENSION = /\.(wav|mp3)$/i;
+const AUDIO_EXTENSION = /\.(wav|mp3|ogg|oga|opus)$/i;
 const LEADING_TRACK_NUMBER = /^(\d{1,2})\s*[-–—._]\s*(\S.*)$/;
 
 export type AlbumBatchFile = {

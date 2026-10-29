@@ -120,3 +120,20 @@ assert(/processing/.test(wav));
 assert(/desired_product_audio_normalize_job_id = NULL/.test(wav));
 assert(!/activate_music_direct_mp3_delivery/.test(wav), "music activate stays on music migration");
 console.log("product-audio-normalize-sql-unit: wav race hardening ok");
+
+const ogg = readFileSync(join(repoRoot, "supabase/migrations/20270209120000_ogg_audio_upload.sql"), "utf8");
+assert(/array_append\(allowed_mime_types, 'audio\/ogg'\)/.test(ogg));
+assert(/allowed_mime_types IS NOT NULL/.test(ogg));
+assert(/NOT \('audio\/ogg' = ANY\(allowed_mime_types\)\)/.test(ogg));
+assert(!/SET\s+file_size_limit|allowed_mime_types\s*=\s*ARRAY\[/.test(ogg));
+for (const bucket of ["practice-audio", "studio-draft-assets", "music-masters", "music-analyzer-runs"]) {
+  assert(ogg.includes(`'${bucket}'`), `Ogg MIME missing from ${bucket}`);
+}
+assert(ogg.includes("source_format IN ('m4a', 'aac', 'wav', 'ogg')"));
+assert(ogg.includes("p_source_format NOT IN ('m4a', 'aac', 'wav', 'ogg')"));
+assert(ogg.includes("(m4a|aac|wav|ogg)"));
+assert(ogg.includes("CHECK (mime_type IN ('audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg'))"));
+// Retain the exact enqueue body, changing only its source format allowlist.
+const oldBody = wav.slice(wav.indexOf("CREATE OR REPLACE FUNCTION public.enqueue_product_audio_normalize_job("), wav.indexOf("CREATE OR REPLACE FUNCTION public.activate_product_direct_mp3_delivery("));
+assert(ogg.includes(oldBody.replace("('m4a', 'aac', 'wav')", "('m4a', 'aac', 'wav', 'ogg')")), "enqueue supersession/locking must remain unchanged");
+console.log("product-audio-normalize-sql-unit: Ogg forward migration ok");

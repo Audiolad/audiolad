@@ -3,16 +3,12 @@
 import Image from "next/image";
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 
-import {
-  FOUR_CUPS_MAX_HREF,
-  FOUR_CUPS_MAX_LABEL,
-  FOUR_CUPS_SLIDES,
-} from "@/lib/business/vertical-guides/four-cups";
-import type { GuideCup } from "@/lib/business/vertical-guides/types";
+import { FOUR_CUPS_SLIDES } from "@/lib/business/vertical-guides/four-cups";
+
+import GuideMaxButton from "./GuideMaxButton";
 
 type GuideFourCupsProps = {
   question: string;
-  notes?: readonly GuideCup[];
 };
 
 function nearestIndex(scroller: HTMLDivElement): number {
@@ -30,7 +26,7 @@ function nearestIndex(scroller: HTMLDivElement): number {
   return closest;
 }
 
-export default function GuideFourCups({ question, notes }: GuideFourCupsProps) {
+export default function GuideFourCups({ question }: GuideFourCupsProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const count = FOUR_CUPS_SLIDES.length;
@@ -154,30 +150,7 @@ export default function GuideFourCups({ question, notes }: GuideFourCupsProps) {
           Слайд {index + 1} из {count}
         </span>
       </p>
-      <a
-        className="guide-cups__max"
-        href={FOUR_CUPS_MAX_HREF}
-        target="_blank"
-        rel="noopener noreferrer"
-        data-four-cups-max="true"
-      >
-        <span className="guide-cups__max-icon" aria-hidden="true">
-          <Image src="/school/messengers/max.png" alt="" width={36} height={36} />
-        </span>
-        <span>{FOUR_CUPS_MAX_LABEL}</span>
-      </a>
-      {notes && notes.length > 0 ? (
-        <div className="guide-cups__notes">
-          <h3 className="guide-display guide-h3">Четыре опоры фона</h3>
-          <ul>
-            {notes.map((note) => (
-              <li key={note.id}>
-                <strong>{note.title}.</strong> {note.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <GuideMaxButton placement="slider" />
     </div>
   );
 }

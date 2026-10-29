@@ -1,10 +1,17 @@
+/**
+ * Data model of a B2B vertical guide article (reference: «Кофе в зёрнах для кофейни»).
+ *
+ * The page renders these slots in a fixed order (docs/business/coffee-guides/TEMPLATE.md):
+ * header → H1 + intro → «Четыре чашки» slider → partOne[0] → atlas cover banner →
+ * partOne[1] → table → partTwo[0] → expertOne → partTwo[1] → «10 кофеен» banner →
+ * partTwo[2] → expertTwo → steps → checklist → FAQ → final cups block → «Читайте также».
+ * Text and inserts alternate: never two text sections in a row. A new article only fills
+ * this data; it never adds its own markup.
+ */
 export type TextPart = string | { href: string; label: string };
 
-export type GuideCup = {
-  id: string;
-  title: string;
-  text: string;
-};
+/** One paragraph made of plain text and internal links. */
+export type GuideParagraph = TextPart[];
 
 export type GuideChecklistItem = {
   id: string;
@@ -15,23 +22,63 @@ export type GuideExpertSlot = {
   expertId: string;
   /** Index into the registry quotes. The page prints that quote verbatim. */
   quoteIndex: number;
-  /** Editorial bridge. Must not repeat the quote as if the expert had said something else. */
-  bridge: string;
-  /** Optional second verbatim quote from the same answer, with its own bridge. */
-  secondQuoteIndex?: number;
-  secondBridge?: string;
-  /** Editorial translation of an original-language quote. Never marked as the speaker's words. */
+  /** Short heading of the thought, written by the editor (not a quote). */
+  heading: string;
+  /** Editorial text before the quote. Must not put words into the expert's mouth. */
+  lead: GuideParagraph[];
+  /**
+   * Faithful Russian translation of a quote in another language. When present the page
+   * shows the translation in the quote block, labels it as a translation and prints the
+   * original verbatim under it.
+   */
   translation?: string;
+  /** Editorial explanation after the quote: what it means for a coffee shop. */
+  after: GuideParagraph[];
 };
 
 export type GuideSection = {
   id: string;
   heading: string;
-  paragraphs: TextPart[][];
+  paragraphs: GuideParagraph[];
   subsections?: Array<{
     heading: string;
-    paragraphs: TextPart[][];
+    paragraphs: GuideParagraph[];
   }>;
+};
+
+export type GuideTable = {
+  id: string;
+  heading: string;
+  intro: GuideParagraph[];
+  /** Screen-reader caption of the table. */
+  caption: string;
+  columns: string[];
+  /** Every row has exactly `columns.length` cells. */
+  rows: string[][];
+  after: GuideParagraph[];
+};
+
+export type GuideStep = {
+  title: string;
+  text: string;
+};
+
+export type GuideSteps = {
+  id: string;
+  heading: string;
+  intro: string;
+  items: readonly [GuideStep, GuideStep, GuideStep];
+};
+
+export type GuideChecklist = {
+  title: string;
+  /** localStorage key; unique per article. */
+  storageKey: string;
+  items: GuideChecklistItem[];
+  /** Short caption under the list. */
+  note: string;
+  /** Caption shown when every item is ticked. */
+  doneNote: string;
 };
 
 export type GuideFaqItem = {
@@ -63,21 +110,26 @@ export type VerticalGuideArticle = {
    * phrase is not in that file.
    */
   relatedQueries: Array<{ phrase: string; frequency: number | null; note: string }>;
+  /** Social preview and JSON-LD image. Not rendered in the article header. */
   hero: GuideFigure;
-  story: string[];
-  leadIn: string;
+  /** Paragraphs right under the H1. */
+  intro: string[];
+  /** Heading above the «Четыре чашки» slider. */
   question: string;
-  cups: readonly [GuideCup, GuideCup, GuideCup, GuideCup];
-  playerLead: TextPart[];
-  track: { authorSlug: string; productSlug: string };
-  trackPagePath: string;
-  checklistTitle: string;
-  checklistStorageKey: string;
-  checklist: GuideChecklistItem[];
-  experts: readonly [GuideExpertSlot, GuideExpertSlot];
-  sections: GuideSection[];
+  /** [0] before the atlas cover banner, [1] before the table. */
+  partOne: [GuideSection, GuideSection];
+  table: GuideTable;
+  expertOne: GuideExpertSlot;
+  /** [0] before expertOne, [1] before the «10 кофеен» banner, [2] before expertTwo. */
+  partTwo: [GuideSection, GuideSection, GuideSection];
+  expertTwo: GuideExpertSlot;
+  steps: GuideSteps;
+  checklist: GuideChecklist;
   faq: GuideFaqItem[];
-  further: GuideLink[];
+  /** Bold lead-in question above the single four-cups picture at the bottom. */
+  finalQuestion: string;
+  /** Internal links only. */
+  readMore: GuideLink[];
 };
 
 export type VerticalStatus = "active" | "planned";

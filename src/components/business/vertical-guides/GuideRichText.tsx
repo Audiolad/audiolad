@@ -9,7 +9,7 @@ export function GuideRichText({ parts }: { parts: readonly TextPart[] }) {
         typeof part === "string" ? (
           <span key={index}>{part}</span>
         ) : (
-          <Link key={part.href + part.label} href={part.href}>
+          <Link key={part.href + part.label} href={part.href} target="_blank" rel="noopener">
             {part.label}
           </Link>
         ),

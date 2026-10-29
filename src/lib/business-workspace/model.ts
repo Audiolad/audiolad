@@ -50,7 +50,6 @@ export type WorkspacePageModel = {
   playbackUntil: string | null;
   priceLabel: string;
   periodLabel: string;
-  rules: string;
   tracks: WorkspaceTrack[];
   /** Trial or paid cabinet with no venue: rights stay UNKNOWN until a point exists. */
   needsVenue: boolean;

@@ -26,7 +26,6 @@ export function buildVerticalArticleJsonLd(article: VerticalGuideArticle): JsonL
   const breadcrumbs = buildBreadcrumbListJsonLd(
     [
       { name: "Главная", path: "/" },
-      { name: "АудиоЛад Бизнес", path: "/b" },
       { name: vertical?.title ?? article.title, path: vertical?.path ?? "/b" },
       { name: article.title, path },
     ],

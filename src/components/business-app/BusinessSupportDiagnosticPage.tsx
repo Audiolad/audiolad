@@ -37,7 +37,7 @@ function countryLabelRu(code: string | null | undefined): string {
 
 function timezoneLabelRu(zone: string | null | undefined): string {
   if (!zone) return "–";
-  return zone === "Europe/Moscow" ? "Московское время" : "Местное время точки";
+  return zone === "Europe/Moscow" ? "Московское время" : "Местное время кофейни";
 }
 
 export default function BusinessSupportDiagnosticPage({
@@ -80,7 +80,7 @@ export default function BusinessSupportDiagnosticPage({
           id="support-org-loc"
           className="text-[1.1rem] font-bold text-[var(--biz-text)]"
         >
-          Заведение и точка
+          Заведение и кофейня
         </h2>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <Field
@@ -92,11 +92,11 @@ export default function BusinessSupportDiagnosticPage({
             value={diagnostics.organizationId ?? "–"}
             mono
           />
-          <Field label="Точка" value={location?.name ?? "–"} />
-          <Field label="Код точки" value={location?.id ?? "–"} mono />
+          <Field label="Кофейня" value={location?.name ?? "–"} />
+          <Field label="Код кофейни" value={location?.id ?? "–"} mono />
           <Field label="Страна" value={countryLabelRu(location?.countryCode)} />
           <Field label="Часовой пояс" value={timezoneLabelRu(location?.timezone)} />
-          <Field label="Статус точки" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
+          <Field label="Статус кофейни" value={location?.status === "active" ? "Активна" : "Нет подтверждённых данных"} />
           <Field
             label="Основной зал"
             value={location?.defaultZoneId ?? "–"}
@@ -118,7 +118,7 @@ export default function BusinessSupportDiagnosticPage({
             <Link href="/music" className="font-semibold text-[var(--biz-accent)]">
               музыку
             </Link>
-            , чтобы включить плеер точки.
+            , чтобы включить плеер кофейни.
           </p>
         ) : (
           <ul className="mt-3 flex flex-col gap-3">
