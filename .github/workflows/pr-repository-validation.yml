@@ -73,6 +73,7 @@ jobs:
           npm run test:production-pr-safety
           npm run test:production-deploy-gha
           npm run test:deployment-bridge
+          npm run test:article-recrawl
           npm run test:author-product-price-input
           npm run test:author-payout-profiles
           npm run test:author-payout-profiles-save
@@ -119,6 +120,7 @@ jobs:
           npm run test:music-analyzer-queue
           npm run test:music-analyzer-features
           npm run test:jazz-relax-music-passport
+          npm run test:music-passport-backfill
           npm run test:scheduled-publication
           npm run test:live-public-content-sync
           npm run test:ai-company-dashboard
