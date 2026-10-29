@@ -33,7 +33,7 @@ assert.doesNotMatch(allCopy, /без\s+(РАО|ВОИС)/i);
 assert.doesNotMatch(page, /BusinessEmptySection/);
 assert.match(page, /CLIENT_DOCUMENT_EDITION_LABEL/);
 assert.match(page, /CLIENT_DOCUMENT_REQUISITES/);
-assert.doesNotMatch(allCopy + CLIENT_DOCUMENT_REQUISITES, /черновик|юрист|паспорт|355045|Ставрополь/i);
+assert.doesNotMatch(allCopy + CLIENT_DOCUMENT_REQUISITES, /черновик|юрист|паспорт|355045|355035|Ставрополь|Дачная/i);
 
 // Timezone conversion.
 assert.equal(venueLocalToUtc("2026-10-16T15:00", "Europe/Moscow")?.toISOString(), "2026-10-16T12:00:00.000Z");
@@ -144,7 +144,7 @@ console.log("business-app-client-documents-unit OK");
     // r6.1 (Sergey 18.10.2026 13:17): en dashes only, never the em dash, in the full document text.
     assert.doesNotMatch(src.markdown, /\u2014/, `${d.id}: no em dash`);
     assert.match(src.markdown, /\u2013/, `${d.id}: en dashes present`);
-    assert.doesNotMatch(src.markdown, /Черновик, требует проверки юриста|паспорт\s*\[|ОГРНИП \[ \]|355045|Ставрополь/);
+    assert.doesNotMatch(src.markdown, /Черновик, требует проверки юриста|паспорт\s*\[|ОГРНИП \[ \]|355045|355035|Ставрополь|Дачная/);
     assert.match(src.markdown, /ИНН 507305817690/);
     assert.match(src.markdown, /ОГРНИП 316505300063237/);
     assert.doesNotMatch(src.markdown, /без\s+(РАО|ВОИС)/i);
