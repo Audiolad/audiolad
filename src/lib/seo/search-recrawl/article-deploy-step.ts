@@ -7,6 +7,7 @@
  * confirmed paths advanced. A crash or timeout at any point therefore leaves
  * a manifest that makes the next deploy plan the same URLs again.
  */
+import { randomBytes } from "node:crypto";
 import { closeSync, copyFileSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -63,7 +64,8 @@ function readManifest(dir: string | null): ArticleRecrawlManifest | null {
 
 function writeManifest(dir: string, manifest: ArticleRecrawlManifest): void {
   const target = path.join(dir, ARTICLE_RECRAWL_MANIFEST_FILE);
-  const temporary = `${target}.tmp-${process.pid}`;
+  // Random suffix keeps "wx" from colliding with a same-PID leftover temp.
+  const temporary = `${target}.tmp-${process.pid}-${randomBytes(6).toString("hex")}`;
   const fd = openSync(temporary, "wx");
   try {
     try {
@@ -73,11 +75,23 @@ function writeManifest(dir: string, manifest: ArticleRecrawlManifest): void {
       closeSync(fd);
     }
     try {
+      // After a normal run .prev holds the conservative pre-enqueue manifest from
+      // earlier in this same run (release dir starts empty), not the previous deploy's file.
       copyFileSync(target, `${target}.prev`);
     } catch {
       // First run or backup failure: publishing the manifest must still proceed.
     }
     renameSync(temporary, target);
+    try {
+      const dirFd = openSync(dir, "r");
+      try {
+        fsyncSync(dirFd);
+      } finally {
+        closeSync(dirFd);
+      }
+    } catch {
+      // Best-effort: directory fsync is not supported on every filesystem.
+    }
   } finally {
     try {
       rmSync(temporary, { force: true });
