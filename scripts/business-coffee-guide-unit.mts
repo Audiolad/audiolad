@@ -506,6 +506,12 @@ for (const tag of articleLinks) {
 }
 const headerAtlas = articleLinks.find((tag) => tag.includes('data-guide-header-link="atlas"'));
 assert.ok(headerAtlas && headerAtlas.includes('href="/b/atlas-kofeen"') && headerAtlas.includes('target="_blank"'), "top-strip atlas link opens in a new tab");
+// The rubric page /b/coffee has its own copy of the top strip: its atlas link opens in a new tab too,
+// and the rubric title is not squeezed by a ch limit.
+const indexViewSource = read("src/components/business/vertical-guides/GuideIndexView.tsx");
+assert.match(indexViewSource, /<Link href=\{COFFEE_ATLAS_PATH\} target="_blank" rel="noopener"/, "rubric top-strip atlas link opens in a new tab");
+const guideCss = read("src/components/business/vertical-guides/guide.css");
+assert.equal(/\.guide-index h1 \{[^}]*max-width:\s*\d/.test(guideCss), false, "rubric H1 has no max-width limit");
 assert.ok(pageHtml.includes("sunalini-menon.webp"));
 // Mobile tables: every cell carries its column name for the stacked-card layout.
 for (const column of ARTICLE.table.columns) {
