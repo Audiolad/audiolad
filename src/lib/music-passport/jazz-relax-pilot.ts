@@ -41,7 +41,7 @@ import {
   type JazzRelaxPassportTrackView,
   type JazzRelaxPassportView,
 } from "@/lib/music-passport/jazz-relax-status";
-import { isMusicPassportPilotAuthor } from "@/lib/music-passport/pilot-authors";
+import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
 
 export class JazzRelaxPassportError extends Error {
   constructor(
@@ -57,7 +57,7 @@ export function assertJazzRelaxMusicPassport(input: {
   authorId: string | null | undefined;
   productKind: string | null | undefined;
 }): void {
-  if (!isMusicPassportPilotAuthor(input.authorId) || input.productKind?.trim() !== "music") {
+  if (!isMusicPassportAvailable(input)) {
     throw new JazzRelaxPassportError("jazz_relax_passport_forbidden", 403);
   }
 }
@@ -1099,7 +1099,7 @@ export async function jazzRelaxAlbumFactsForDescription(input: {
   facts: string | null;
   alreadyBound: boolean;
 }> {
-  if (!isMusicPassportPilotAuthor(input.authorId) || input.productKind?.trim() !== "music") {
+  if (!isMusicPassportAvailable(input)) {
     return { albumPassportVersionId: null, facts: null, alreadyBound: false };
   }
   const { data: practice, error } = await service()

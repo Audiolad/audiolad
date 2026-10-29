@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -49,10 +50,7 @@ import {
   selectJazzRelaxPassportEnqueue,
   type JazzRelaxPassportTrackView,
 } from "../src/lib/music-passport/jazz-relax-status";
-import {
-  isMusicPassportPilotAuthor,
-  MUSIC_PASSPORT_PILOT_AUTHOR_IDS,
-} from "../src/lib/music-passport/pilot-authors";
+import { isMusicPassportAvailable } from "../src/lib/music-passport/availability";
 import {
   assertJazzRelaxMusicPassport,
   attachFrozenTrackPassports,
@@ -132,7 +130,7 @@ assert.match(
 assert.match(read("src/lib/music-passport/jazz-relax-pilot.ts"), /if \(!versionId\) \{[\s\S]*?facts: null/);
 assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Продолжить без музыкального паспорта/);
 
-// --- Music passport pilot allowlist: Jazz Relax, Aurafon, Чили на виниле, Кофейник (25.10.2026) -----
+// --- Author id helpers stay (other features use them); passport gate is music-only (29.10.2026) -----
 {
   assert.equal(CHILI_NA_VINILE_AUTHOR_ID, "3a10c97d-cf97-4a00-8f14-76d70b02d906");
   assert.equal(CHILI_NA_VINILE_AUTHOR_SLUG, "chili-na-vinile");
@@ -160,53 +158,46 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /Продолжить б
       assert.equal(predicate(other), false);
     }
   }
-  assert.deepEqual([...MUSIC_PASSPORT_PILOT_AUTHOR_IDS], [
+  // 29.10.2026 (Sergey): passport on by default for every music product of every author.
+  assert.equal(existsSync(join(process.cwd(), "src/lib/music-passport/pilot-authors.ts")), false);
+  assert.equal(isMusicPassportAvailable({ productKind: "music" }), true);
+  assert.equal(isMusicPassportAvailable({ productKind: "  music  " }), true);
+  for (const productKind of ["practice", "audio_post", "audiobook", "Music", "", "   ", null, undefined]) {
+    assert.equal(isMusicPassportAvailable({ productKind }), false);
+  }
+  const anyAuthors = [
     JAZZ_RELAX_AUTHOR_ID,
     AURAFON_AUTHOR_ID,
     CHILI_NA_VINILE_AUTHOR_ID,
     KOFEYNIK_AUTHOR_ID,
-  ]);
-  assert.equal(isMusicPassportPilotAuthor(JAZZ_RELAX_AUTHOR_ID), true);
-  assert.equal(isMusicPassportPilotAuthor(AURAFON_AUTHOR_ID), true);
-  assert.equal(isMusicPassportPilotAuthor(`  ${AURAFON_AUTHOR_ID}  `), true);
-  for (const authorId of [CHILI_NA_VINILE_AUTHOR_ID, KOFEYNIK_AUTHOR_ID]) {
-    assert.equal(isMusicPassportPilotAuthor(authorId), true);
-    assert.equal(isMusicPassportPilotAuthor(`  ${authorId}  `), true);
-    assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId, productKind: "music" }));
-  }
-  for (const other of [
     "11111111-1111-1111-1111-111111111111",
-    "aurafon",
-    "jazz-relax",
-    CHILI_NA_VINILE_AUTHOR_SLUG,
-    KOFEYNIK_AUTHOR_SLUG,
-    "Чили на виниле",
-    "Кофейник",
-    "Аурафон",
-    "",
-    "   ",
+    "22222222-2222-4222-8222-222222222222",
     null,
     undefined,
-  ]) {
-    assert.equal(isMusicPassportPilotAuthor(other), false);
+  ];
+  for (const authorId of anyAuthors) {
+    assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId, productKind: "music" }));
+    for (const productKind of ["practice", "audio_post", null, undefined, ""]) {
+      assert.throws(
+        () => assertJazzRelaxMusicPassport({ authorId, productKind }),
+        (error: unknown) => error instanceof JazzRelaxPassportError && error.status === 403,
+      );
+    }
   }
-  assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId: JAZZ_RELAX_AUTHOR_ID, productKind: "music" }));
-  assert.doesNotThrow(() => assertJazzRelaxMusicPassport({ authorId: AURAFON_AUTHOR_ID, productKind: "music" }));
-  for (const input of [
-    { authorId: AURAFON_AUTHOR_ID, productKind: "practice" },
-    { authorId: AURAFON_AUTHOR_ID, productKind: null },
-    { authorId: "11111111-1111-1111-1111-111111111111", productKind: "music" },
-    { authorId: null, productKind: "music" },
-  ]) {
-    assert.throws(
-      () => assertJazzRelaxMusicPassport(input),
-      (error: unknown) => error instanceof JazzRelaxPassportError && error.status === 403,
-    );
-  }
-  assert.match(form, /musicProductWizard && isMusicPassportPilotAuthor\(form\.authorId\)/);
-  assert.doesNotMatch(form, /isJazzRelaxAuthor/);
+  assert.match(
+    form,
+    /const jazzRelaxMusicPassport = musicProductWizard\s*&& isMusicPassportAvailable\(\{ productKind: form\.productKind \}\)/,
+  );
+  assert.doesNotMatch(form, /isJazzRelaxAuthor|isMusicPassportPilotAuthor|pilot-authors/);
   const pilotGateSource = read("src/lib/music-passport/jazz-relax-pilot.ts");
-  assert.equal(pilotGateSource.match(/!isMusicPassportPilotAuthor\(input\.authorId\)/g)?.length, 2);
+  assert.equal(pilotGateSource.match(/!isMusicPassportAvailable\(input\)/g)?.length, 2);
+  assert.doesNotMatch(pilotGateSource, /isMusicPassportPilotAuthor|pilot-authors|AUTHOR_ID/);
+  const availabilitySource = read("src/lib/music-passport/availability.ts");
+  assert.doesNotMatch(availabilitySource, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+  assert.doesNotMatch(availabilitySource, /—/);
+  const routeSource = read("src/app/api/author/products/[id]/music-passport/route.ts");
+  assert.match(routeSource, /Музыкальный паспорт доступен только для музыкальных продуктов\./);
+  assert.doesNotMatch(routeSource, /только для этого проекта/);
   assert.doesNotMatch(pilotGateSource, /isJazzRelaxAuthor/);
 }
 
