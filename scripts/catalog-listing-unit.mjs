@@ -577,6 +577,17 @@ assert(parseCatalogListingQuery({ kind: "stories" }).class === "stories", "legac
 assert(buildCatalogListingApiUrl({ class: "stories", access: "free" }) === "/api/catalog?access=free&class=stories", "stories API URL");
 assert(buildCatalogHref({ class: "stories", access: "free" }) === "/catalog?access=free&class=stories", "stories href");
 assert(countCatalogFilterGroups({ topicKeys: [], access: "free", class: "stories" }) === 2, "stories counted as a type group");
+const educationItems = [
+  candidate({ id: "edu-practice", isFree: true, price: 0, publicationClass: "practice", format: "Прогноз", catalogSection: "education" }),
+  candidate({ id: "edu-course", publicationClass: "course", catalogSection: "education" }),
+  candidate({ id: "sound", isFree: true, price: 0, publicationClass: "practice", format: "Звук", catalogSection: "music" }),
+];
+assert(filterCatalogListingItems(educationItems, { class: "education", access: "free" }).map((item) => item.publication_id).join() === "edu-practice", "education chip: education-section practices only");
+assert(filterCatalogListingItems(educationItems, { class: "release", access: "free" }).map((item) => item.publication_id).join() === "sound", "music chip includes practice sounds");
+assert(parseCatalogClassFilter("education") === "education", "education URL parses");
+assert(parseCatalogListingQuery({ class: "education" }).class === "education", "education query parses");
+assert(buildCatalogListingApiUrl({ class: "education", access: "free" }) === "/api/catalog?access=free&class=education", "education API URL");
+assert(buildCatalogHref({ class: "education" }) === "/catalog?class=education", "education href");
 
 const regressionPageItems = sortCatalogListingItems(filterCatalogListingItems(
   [...typeRegressionItems, ...pageItems], { access: "all", class: "practice" },
