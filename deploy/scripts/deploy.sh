@@ -267,11 +267,14 @@ enqueue_article_recrawl() {
   if [[ -n "$previous_dir" && -d "$previous_dir" ]]; then
     args+=(--previous-dir "$previous_dir")
   fi
-  if (cd "$release_dir" && NODE_ENV=production timeout "${ARTICLE_RECRAWL_TIMEOUT_SECONDS:-120}" \
-    nice -n 10 node_modules/.bin/tsx "$script" "${args[@]}"); then
+  # Exit 2 = some URLs not queued (retried by the next deploy), 124/137 = timeout.
+  local rc=0
+  (cd "$release_dir" && NODE_ENV=production timeout -k "${ARTICLE_RECRAWL_KILL_AFTER:-10s}" "${ARTICLE_RECRAWL_TIMEOUT:-120s}" \
+    nice -n 10 node_modules/.bin/tsx "$script" "${args[@]}") || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
     log_info "article_recrawl_enqueue_done"
   else
-    log_warn "article_recrawl_enqueue_failed non_blocking=1"
+    log_warn "article_recrawl_enqueue_failed exit_code=${rc} non_blocking=1"
   fi
   return 0
 }

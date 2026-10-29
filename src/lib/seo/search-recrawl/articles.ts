@@ -16,6 +16,8 @@ import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
 import { buildArticlePath } from "@/lib/seo/articles/paths";
 import { listArticleDefinitions } from "@/lib/seo/articles/registry";
 import { listStandaloneArticleDefinitions } from "@/lib/seo/articles/standalone";
+import { buildListenPagePath } from "@/lib/seo/listens/paths";
+import { listIndexableListenPageDefinitions } from "@/lib/seo/listens/registry";
 import { articlePath, listVerticalArticles } from "@/lib/business/vertical-guides/registry";
 import { listActiveVerticals } from "@/lib/business/vertical-guides/verticals";
 
@@ -24,8 +26,9 @@ export const ARTICLE_RECRAWL_MANIFEST_VERSION = 1;
 export const ARTICLE_RECRAWL_ENTITY_TYPE = "article";
 
 /**
- * Upper bound for edited articles in one deploy. A refactor that touches
- * every article definition must not spend the whole Yandex recrawl quota.
+ * Upper bound for edited articles queued by one deploy. A refactor that
+ * touches every article definition must not spend the whole Yandex recrawl
+ * quota at once. The rest are deferred to later deploys, not dropped.
  * New articles are always queued.
  */
 export const ARTICLE_RECRAWL_MAX_UPDATES_PER_DEPLOY = 20;
@@ -38,7 +41,7 @@ export const ARTICLE_RECRAWL_REASONS = {
 export type ArticleRecrawlReason =
   (typeof ARTICLE_RECRAWL_REASONS)[keyof typeof ARTICLE_RECRAWL_REASONS];
 
-export type ArticleRecrawlKind = "article" | "standalone" | "vertical_guide";
+export type ArticleRecrawlKind = "article" | "standalone" | "vertical_guide" | "listen";
 
 export type ArticleRecrawlEntry = {
   path: string;
@@ -62,8 +65,10 @@ export type ArticleRecrawlPlan =
   | {
       state: "diff";
       total: number;
+      /** Queued by this deploy. */
       changes: ArticleRecrawlChange[];
-      skippedUpdates: number;
+      /** Edits over the per-deploy cap, left for a later deploy. */
+      deferred: ArticleRecrawlChange[];
     };
 
 export function fingerprintArticleContent(value: unknown): string {
@@ -72,6 +77,7 @@ export function fingerprintArticleContent(value: unknown): string {
 
 type ArticleRecrawlSources = {
   articles?: ReadonlyArray<{ slug: string }>;
+  listens?: ReadonlyArray<{ slug: string; indexable?: boolean }>;
   standalone?: ReadonlyArray<{ path: string; indexable?: boolean }>;
   verticalGuides?: ReadonlyArray<{ path: string; content: unknown }>;
 };
@@ -93,6 +99,7 @@ export function listArticleRecrawlEntries(
   const articles = sources.articles ?? listArticleDefinitions();
   const standalone = sources.standalone ?? listStandaloneArticleDefinitions();
   const verticalGuides = sources.verticalGuides ?? defaultVerticalGuides();
+  const listens = sources.listens ?? listIndexableListenPageDefinitions();
   const byPath = new Map<string, ArticleRecrawlEntry>();
 
   for (const article of articles) {
@@ -109,6 +116,14 @@ export function listArticleRecrawlEntries(
       kind: "standalone",
       fingerprint: fingerprintArticleContent(article),
     });
+  }
+
+  for (const page of listens) {
+    if (page.indexable === false) {
+      continue;
+    }
+    const path = buildListenPagePath(page.slug);
+    byPath.set(path, { path, kind: "listen", fingerprint: fingerprintArticleContent(page) });
   }
 
   for (const guide of verticalGuides) {
@@ -196,12 +211,37 @@ export function planArticleRecrawl(
     (before === undefined ? published : updated).push(change);
   }
 
-  const keepUpdates = updated.length > maxUpdates ? [] : updated;
+  const limit = Math.max(0, maxUpdates);
 
   return {
     state: "diff",
     total: current.length,
-    changes: [...published, ...keepUpdates],
-    skippedUpdates: updated.length - keepUpdates.length,
+    changes: [...published, ...updated.slice(0, limit)],
+    deferred: updated.slice(limit),
   };
+}
+
+/**
+ * Manifest to store in the new release. A path that was not confirmed as
+ * queued (enqueue failed, env missing, deferred by the cap, or not tried yet)
+ * keeps its previous fingerprint, or stays out when it is new, so the next
+ * deploy plans it again.
+ */
+export function buildNextArticleRecrawlManifest(
+  previous: ArticleRecrawlManifest | null,
+  current: ReadonlyArray<ArticleRecrawlEntry>,
+  pending: ReadonlySet<string>,
+): ArticleRecrawlManifest {
+  const entries: Record<string, string> = {};
+  for (const entry of current) {
+    if (!pending.has(entry.path)) {
+      entries[entry.path] = entry.fingerprint;
+      continue;
+    }
+    const before = previous?.entries[entry.path];
+    if (before !== undefined) {
+      entries[entry.path] = before;
+    }
+  }
+  return { version: ARTICLE_RECRAWL_MANIFEST_VERSION, entries };
 }
