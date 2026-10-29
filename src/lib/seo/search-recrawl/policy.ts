@@ -1,8 +1,20 @@
 export const SEARCH_RECRAWL_INTERVAL_MS = 5 * 60 * 1000;
 export const SEARCH_RECRAWL_BATCH_LIMIT = 20;
-export const SEARCH_RECRAWL_MAX_ATTEMPTS = 20;
+/**
+ * Yandex Webmaster sometimes answers POST /recrawl/queue with 504 for hours
+ * while GET hosts/quota still work (seen on 2026-10-28 and 2026-10-29). A
+ * failed POST does not spend quota, so retry at most hourly: a new article or
+ * product reaches Yandex within about an hour after Yandex recovers, not up to
+ * six hours later.
+ *
+ * MAX_ATTEMPTS keeps the dead-letter window at about four days with the
+ * one-hour cap (5+10+20+40 min, then hourly), close to the old 20 x 6h window.
+ */
+export const SEARCH_RECRAWL_MAX_ATTEMPTS = 100;
 export const SEARCH_RECRAWL_BACKOFF_BASE_MS = 5 * 60 * 1000;
-export const SEARCH_RECRAWL_BACKOFF_CAP_MS = 6 * 60 * 60 * 1000;
+export const SEARCH_RECRAWL_BACKOFF_CAP_MS = 60 * 60 * 1000;
+/** Minimum time a transient failure keeps retrying before it goes dead. */
+export const SEARCH_RECRAWL_MIN_RETRY_WINDOW_MS = 72 * 60 * 60 * 1000;
 export const SEARCH_RECRAWL_QUOTA_DELAY_MS = 24 * 60 * 60 * 1000;
 export const YANDEX_STALE_SUCCESS_MS = 24 * 60 * 60 * 1000;
 

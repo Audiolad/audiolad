@@ -22,6 +22,7 @@ import {
   SEARCH_RECRAWL_BACKOFF_CAP_MS,
   SEARCH_RECRAWL_BATCH_LIMIT,
   SEARCH_RECRAWL_MAX_ATTEMPTS,
+  SEARCH_RECRAWL_MIN_RETRY_WINDOW_MS,
   SEARCH_RECRAWL_QUOTA_DELAY_MS,
   shouldAlertYandexStale,
   yandexSendBudget,
@@ -109,6 +110,30 @@ assert.equal(recrawlBackoffMs(1), SEARCH_RECRAWL_BACKOFF_BASE_MS);
 assert.equal(recrawlBackoffMs(2), 10 * 60 * 1000);
 assert.equal(recrawlBackoffMs(3), 20 * 60 * 1000);
 assert.equal(recrawlBackoffMs(20), SEARCH_RECRAWL_BACKOFF_CAP_MS);
+// Yandex 504 outages: retry at least hourly so a queued article goes out
+// soon after Yandex recovers.
+assert.equal(SEARCH_RECRAWL_BACKOFF_CAP_MS, 60 * 60 * 1000);
+assert.equal(recrawlBackoffMs(5), SEARCH_RECRAWL_BACKOFF_CAP_MS);
+assert.equal(recrawlBackoffMs(SEARCH_RECRAWL_MAX_ATTEMPTS), SEARCH_RECRAWL_BACKOFF_CAP_MS);
+{
+  // A transient 5xx keeps retrying for at least three days before dead.
+  let windowMs = 0;
+  for (let attempt = 1; attempt < SEARCH_RECRAWL_MAX_ATTEMPTS; attempt += 1) {
+    const step = disposeYandexAttempt({
+      status: "failed",
+      errorCode: "http_error",
+      httpStatus: 504,
+      attemptsAfter: attempt,
+    });
+    assert.equal(step.action, "retry", `attempt ${attempt} must retry`);
+    assert.ok(step.delayMs <= SEARCH_RECRAWL_BACKOFF_CAP_MS);
+    windowMs += step.delayMs;
+  }
+  assert.ok(
+    windowMs >= SEARCH_RECRAWL_MIN_RETRY_WINDOW_MS,
+    `retry window ${windowMs}ms is shorter than ${SEARCH_RECRAWL_MIN_RETRY_WINDOW_MS}ms`,
+  );
+}
 assert.equal(
   disposeYandexAttempt({
     status: "already_queued",
