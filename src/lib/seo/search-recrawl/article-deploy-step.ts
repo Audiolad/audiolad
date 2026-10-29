@@ -7,7 +7,7 @@
  * confirmed paths advanced. A crash or timeout at any point therefore leaves
  * a manifest that makes the next deploy plan the same URLs again.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -62,7 +62,29 @@ function readManifest(dir: string | null): ArticleRecrawlManifest | null {
 }
 
 function writeManifest(dir: string, manifest: ArticleRecrawlManifest): void {
-  writeFileSync(path.join(dir, ARTICLE_RECRAWL_MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+  const target = path.join(dir, ARTICLE_RECRAWL_MANIFEST_FILE);
+  const temporary = `${target}.tmp-${process.pid}`;
+  const fd = openSync(temporary, "wx");
+  try {
+    try {
+      writeFileSync(fd, `${JSON.stringify(manifest, null, 2)}\n`);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    try {
+      copyFileSync(target, `${target}.prev`);
+    } catch {
+      // First run or backup failure: publishing the manifest must still proceed.
+    }
+    renameSync(temporary, target);
+  } finally {
+    try {
+      rmSync(temporary, { force: true });
+    } catch {
+      // Best effort cleanup must not hide the original write/rename error.
+    }
+  }
 }
 
 function isQueued(result: EnqueueSearchRecrawlResult): boolean {
