@@ -6,9 +6,12 @@ import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } f
 import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, soundDraftFromBody } from "@/lib/business-app/point-sound";
 import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
+import { pointJoinResult } from "@/lib/business-app/point-join";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
+import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +49,9 @@ export async function POST(request: Request) {
   if (body.action === "create") {
     const locationId = typeof body.locationId === "string" ? body.locationId : "";
     const { data, error } = await supabase.rpc("create_business_point_pairing", { p_location_id: locationId });
+    if (error?.message?.includes("too_many_open_codes")) {
+      return json({ ok: false, error: "Слишком много новых кодов. Подождите 10 минут и попробуйте снова." });
+    }
     if (error || !data || (data as { ok?: boolean }).ok !== true) {
       return json({ ok: false, error: "Не удалось создать код. Попробуйте ещё раз." });
     }
@@ -54,18 +60,27 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "join") {
-    const code = typeof body.code === "string" ? normalizePointCode(body.code) : null;
-    if (!code) return json({ ok: false, error: "Код не подошёл. Запросите новый." });
-    const { data, error } = await supabase.rpc("consume_business_point_pairing", { p_code: code });
-    const payload = data as { ok?: boolean; token?: string; location_name?: string } | null;
-    if (error || !payload?.ok || !isPointToken(payload.token)) {
-      return json({ ok: false, error: "Код не подошёл. Запросите новый." });
+    // Every attempt, even a malformed one, goes to the database limiter with the client IP.
+    // The redeem function is server-only, so the anon key cannot skip the limits.
+    const code = typeof body.code === "string" ? (normalizePointCode(body.code) ?? body.code.slice(0, 16)) : "";
+    let data: unknown = null;
+    let failed = false;
+    try {
+      const admin = createServiceRoleClient();
+      const result = await admin.rpc("redeem_business_point_pairing", {
+        p_code: code,
+        p_client_key: getTrustedClientIp(request),
+      });
+      data = result.data;
+      failed = Boolean(result.error);
+    } catch {
+      failed = true;
     }
-    return json(
-      { ok: true, locationName: payload.location_name ?? "" },
-      200,
-      { token: payload.token, secure },
-    );
+    const outcome = pointJoinResult(failed ? null : data);
+    if (outcome.ok) {
+      return json({ ok: true, locationName: outcome.locationName }, 200, { token: outcome.token, secure });
+    }
+    return json({ ok: false, reason: outcome.reason, error: outcome.error }, outcome.status);
   }
 
   if (body.action === "revoke") {
