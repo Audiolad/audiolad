@@ -23,6 +23,7 @@ import {
   formatProductDuration,
   sumDurationSeconds,
 } from "@/lib/products/duration";
+import { resolvePracticeHeroLightMetaRest } from "@/lib/catalog/product-hero-gallery";
 import type { PublicPromoRecommendation } from "@/lib/products/promo-recommendation";
 import { platformBottomContentPaddingClass } from "@/lib/navigation/bottom-nav";
 
@@ -124,6 +125,12 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
       sumDurationSeconds(publicAudioItems),
       practice.duration_minutes,
     ) ?? viewModel.meta;
+  // Desktop hero shows the linked author on its own line; the grey meta line
+  // must not repeat the name («Зоя Петрова · 10 мин» → «10 мин»).
+  const desktopMetaLine = resolvePracticeHeroLightMetaRest(
+    viewModel.meta,
+    authorName,
+  );
 
   const playerProps = {
     items: publicAudioItems,
@@ -248,8 +255,13 @@ export default function AudioPostPage({ viewModel }: AudioPostPageProps) {
                 />
               ) : null}
 
-              {viewModel.meta ? (
-                <p className="mt-2 text-sm text-[#7d70a2]">{viewModel.meta}</p>
+              {desktopMetaLine ? (
+                <p
+                  data-audio-post-desktop-meta=""
+                  className="mt-2 text-sm text-[#7d70a2]"
+                >
+                  {desktopMetaLine}
+                </p>
               ) : null}
             </div>
           </div>
