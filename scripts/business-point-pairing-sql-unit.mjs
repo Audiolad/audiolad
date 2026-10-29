@@ -37,12 +37,13 @@ assert(next.includes("WHERE consumed_at IS NULL AND retired_at IS NULL"), "4digi
 assert(next.includes("CREATE TABLE IF NOT EXISTS public.business_point_pairing_failures"), "4digit: failures table");
 assert(next.includes("c_client_limit constant integer := 5"), "4digit: 5 per client");
 assert(next.includes("c_global_limit constant integer := 30"), "4digit: global burn");
-assert(next.includes("c_window constant interval := interval '10 minutes'"), "4digit: 10 minute window");
+assert(next.includes("c_client_window constant interval := interval '10 minutes'"), "4digit: 10 minute client window");
+assert(next.includes("c_global_window constant interval := interval '20 minutes'"), "4digit: global window equals TTL");
 assert(next.includes("'^[0-9]{4}$'"), "4digit: format");
 assert(next.includes("% 10000"), "4digit: 0000-9999");
 assert(next.includes("gen_random_uuid()"), "4digit: CSPRNG");
 assert(!/random\(\)/.test(next), "4digit: no random()");
-assert(next.includes("interval '10 minutes'"), "4digit: 10 minute TTL");
+assert(next.includes("v_expires timestamptz := statement_timestamp() + interval '20 minutes'"), "4digit: 20 minute TTL");
 assert(next.includes("GRANT EXECUTE ON FUNCTION public.redeem_business_point_pairing(text, text) TO service_role"), "4digit: server redeem");
 assert(!/GRANT EXECUTE ON FUNCTION public\.redeem_business_point_pairing\(text, text\) TO[^;]*anon/.test(next), "4digit: no anon redeem");
 assert(next.includes("REVOKE EXECUTE ON FUNCTION public.consume_business_point_pairing(text) FROM PUBLIC, anon, authenticated"), "4digit: old consume closed");

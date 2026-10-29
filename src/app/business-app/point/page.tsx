@@ -114,7 +114,7 @@ export default function BusinessPointJoinPage() {
       <h1 className="text-[1.75rem] font-bold text-[var(--biz-text)]">Подключить устройство</h1>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
         Введите 4 цифры из кабинета на телефоне («Устройство в зале», кнопка «Получить код для устройства»).
-        Код действует 10 минут. После этого музыку в кофейне сообщает это устройство.
+        Код действует 20 минут. После этого музыку в кофейне сообщает это устройство.
       </p>
       <label className="block text-sm font-medium text-[var(--biz-text)]" htmlFor="biz-point-code">
         Код из 4 цифр

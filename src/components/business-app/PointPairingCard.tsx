@@ -157,7 +157,7 @@ export default function PointPairingCard({ locationId }: { locationId: string })
       ) : null}
       <h2 className="text-[1.15rem] font-bold text-[var(--biz-text)]">Устройство в зале</h2>
       <p className="text-sm leading-6 text-[var(--biz-text-muted)]">
-        Код из 4 цифр действует 10 минут. Отправьте ссылку на устройство у колонки в кофейне – оно подключится само.
+        Код из 4 цифр действует 20 минут. Отправьте ссылку на устройство у колонки в кофейне – оно подключится само.
         Или откройте на нём страницу подключения и введите код. Музыку в зале сообщает только это устройство.
       </p>
       {link?.linked ? (

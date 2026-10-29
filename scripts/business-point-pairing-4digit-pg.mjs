@@ -88,6 +88,8 @@ for (let i = 1; i <= 40; i += 1) {
   seen.add(out.code);
 }
 check(seen.size === 40, "open codes are unique");
+const ttl = Number(psql(`SELECT round(extract(epoch FROM expires_at - created_at)) FROM business_point_pairings WHERE location_id='${loc(1)}' ORDER BY created_at DESC LIMIT 1`));
+check(ttl === 1200, `code TTL is 20 minutes, got ${ttl}`);
 const sample = psql("SELECT string_agg(public.business_point_random_code(), ',') FROM generate_series(1, 2000)").split(",");
 check(sample.every((c) => /^[0-9]{4}$/.test(c)), "random code format");
 check(new Set(sample).size > 1500, "random codes spread");
@@ -145,10 +147,19 @@ psql("TRUNCATE business_point_pairing_failures");
 const live = create(6).code;
 const miss = live === "0000" ? "0001" : "0000";
 for (let i = 0; i < 29; i += 1) redeem(miss, `192.0.2.${i}`);
+// The global window is the code TTL: 15 minute old misses still count, 21 minute old do not.
+psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '15 minutes'");
 check(Number(psql("SELECT count(*) FROM business_point_pairings WHERE consumed_at IS NULL AND retired_at IS NULL AND expires_at > now()")) > 0, "open before burn");
 redeem(miss, "192.0.2.200");
 check(Number(psql("SELECT count(*) FROM business_point_pairings WHERE consumed_at IS NULL AND retired_at IS NULL")) === 0, "burned");
 check(redeem(live, "192.0.2.201").reason === "invalid_point_code", "burned code refused");
+psql("TRUNCATE business_point_pairing_failures");
+const live2 = create(7).code;
+const miss2 = live2 === "0000" ? "0001" : "0000";
+for (let i = 0; i < 29; i += 1) redeem(miss2, `192.0.2.${i}`);
+psql("UPDATE business_point_pairing_failures SET created_at = created_at - interval '21 minutes'");
+redeem(miss2, "192.0.2.202");
+check(redeem(live2, "192.0.2.203").ok === true, "old misses outside the window do not burn");
 
 // Grants.
 check(psql("SELECT has_function_privilege('anon', 'public.redeem_business_point_pairing(text, text)', 'EXECUTE')") === "f", "anon cannot redeem");

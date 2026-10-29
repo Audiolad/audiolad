@@ -1,7 +1,7 @@
 /** Host-only cookie for the venue device. Never set Domain. */
 export const BUSINESS_POINT_COOKIE = "al-point";
 
-/** Pairing code: exactly 4 digits, 0000-9999. Single use, 10 minutes. */
+/** Pairing code: exactly 4 digits, 0000-9999. Single use, 20 minutes. */
 export const BUSINESS_POINT_CODE_RE = /^[0-9]{4}$/;
 
 export const BUSINESS_POINT_CODE_LENGTH = 4;

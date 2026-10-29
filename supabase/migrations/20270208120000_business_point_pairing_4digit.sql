@@ -4,7 +4,7 @@
 -- only 10 000 codes, so uniqueness now covers open codes only (partial index).
 -- Old 10-character codes are not migrated. The new redeem function accepts
 -- only 4 digits, so a code issued before this release stops working at once
--- (it would expire within 10 minutes anyway).
+-- (it would expire within 10 minutes anyway). New codes live 20 minutes.
 
 BEGIN;
 
@@ -78,7 +78,7 @@ DECLARE
   v_hash bytea;
   v_id uuid;
   v_try integer := 0;
-  v_expires timestamptz := statement_timestamp() + interval '10 minutes';
+  v_expires timestamptz := statement_timestamp() + interval '20 minutes'; -- code TTL
   v_created jsonb;
   v_assigned jsonb;
 BEGIN
@@ -196,7 +196,9 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  c_window constant interval := interval '10 minutes';
+  c_client_window constant interval := interval '10 minutes';
+  -- Equals the code TTL: a code sees fewer than c_global_limit wrong codes in its whole life.
+  c_global_window constant interval := interval '20 minutes';
   c_client_limit constant integer := 5;
   c_global_limit constant integer := 30;
   v_code text := btrim(coalesce(p_code, ''));
@@ -218,13 +220,13 @@ BEGIN
 
   SELECT count(*), min(created_at) INTO v_client_failures, v_oldest
   FROM public.business_point_pairing_failures
-  WHERE client_key = v_key AND created_at > v_now - c_window;
+  WHERE client_key = v_key AND created_at > v_now - c_client_window;
 
   IF v_client_failures >= c_client_limit THEN
     RETURN jsonb_build_object(
       'ok', false,
       'reason', 'too_many_attempts',
-      'retry_after', greatest(1, ceil(extract(epoch FROM (v_oldest + c_window - v_now)))::integer)
+      'retry_after', greatest(1, ceil(extract(epoch FROM (v_oldest + c_client_window - v_now)))::integer)
     );
   END IF;
 
@@ -244,7 +246,7 @@ BEGIN
 
     SELECT count(*) INTO v_global_failures
     FROM public.business_point_pairing_failures
-    WHERE created_at > v_now - c_window;
+    WHERE created_at > v_now - c_global_window;
 
     -- Many wrong codes from anywhere: burn every open code. Owners ask for a new one.
     IF v_global_failures >= c_global_limit THEN
@@ -290,7 +292,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.redeem_business_point_pairing(text, text) IS
-  'audiolad:business-point; exchange a 4-digit code once. 5 wrong codes per client per 10 minutes; 30 wrong codes worldwide per 10 minutes burn all open codes. Server-only.';
+  'audiolad:business-point; exchange a 4-digit code once. 5 wrong codes per client per 10 minutes; 30 wrong codes worldwide per 20 minutes (the code TTL) burn all open codes. Server-only.';
 
 REVOKE ALL ON FUNCTION public.redeem_business_point_pairing(text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.redeem_business_point_pairing(text, text) TO service_role;

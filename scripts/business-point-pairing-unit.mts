@@ -52,13 +52,14 @@ assert.ok(!new URL(pointDeviceLink("https://business.audiolad.ru", "business.aud
 const link = pointDeviceLink("https://business.audiolad.ru", "business.audiolad.ru", "4719");
 const text = pointShareText("4719");
 assert.match(text, /кофейне/);
+assert.match(text, /действует 20 минут/);
 assert.doesNotMatch(text, /точк/i);
 assert.doesNotMatch(text, /\u2014/);
 assert.ok(pointTelegramShareUrl(link, text).startsWith("https://t.me/share/url?url=https%3A%2F%2Fbusiness.audiolad.ru%2Fpoint%234719&text="));
 assert.ok(pointMailtoUrl(link, text).startsWith("mailto:?subject="));
 assert.ok(decodeURIComponent(pointMailtoUrl(link, text)).includes(link));
 
-assert.equal(pointCodeSecondsLeft("2026-10-29T08:10:00.000Z", Date.parse("2026-10-29T08:00:00.000Z")), 600);
+assert.equal(pointCodeSecondsLeft("2026-10-29T08:20:00.000Z", Date.parse("2026-10-29T08:00:00.000Z")), 1200);
 assert.equal(pointCodeSecondsLeft("2026-10-29T08:00:00.000Z", Date.parse("2026-10-29T08:00:01.000Z")), 0);
 assert.equal(pointCodeSecondsLeft(null, 0), 0);
 assert.equal(pointWaitMinutes(30), "1 минуту");
@@ -93,6 +94,8 @@ assert.doesNotMatch(route, /"consume_business_point_pairing"/);
 // Device page: numeric keypad, 4 digits, fragment cleared.
 const page = readFileSync(new URL("../src/app/business-app/point/page.tsx", import.meta.url), "utf8");
 assert.match(page, /inputMode="numeric"/);
+assert.match(page, /Код действует 20 минут/);
+assert.match(readFileSync(new URL("../src/components/business-app/PointPairingCard.tsx", import.meta.url), "utf8"), /действует 20 минут/);
 assert.match(page, /pattern="\[0-9\]\{4\}"/);
 assert.match(page, /autoComplete="one-time-code"/);
 assert.match(page, /window\.history\.replaceState/);
