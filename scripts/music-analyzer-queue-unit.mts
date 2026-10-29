@@ -127,8 +127,8 @@ try {
   const blocks = [setup.slice(0, setupSplit),
     read("supabase/migrations/20261217120000_music_analyzer_runs_v01.sql"),
     setup.slice(setupSplit),
-    read("supabase/migrations/20270208120000_music_analyzer_queue_guards.sql"),
-    read("supabase/migrations/20270208120000_music_analyzer_queue_guards.sql"),
+    read("supabase/migrations/20270208130000_music_analyzer_queue_guards.sql"),
+    read("supabase/migrations/20270208130000_music_analyzer_queue_guards.sql"),
     smoke];
   const sqlPath = path.join(scratch, "test.sql");
   writeFileSync(sqlPath, blocks.join("\n"));

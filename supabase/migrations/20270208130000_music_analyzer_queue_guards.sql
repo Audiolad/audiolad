@@ -2,6 +2,7 @@
 -- The legacy enqueue RPC remains unchanged for passport callers.
 -- Existing duplicate active rows are left intact, so they cannot fail this migration.
 BEGIN;
+SET LOCAL lock_timeout = '5s';
 
 -- Keep first started_at semantics; retries and releases still consume author turns.
 ALTER TABLE public.music_analyzer_runs
