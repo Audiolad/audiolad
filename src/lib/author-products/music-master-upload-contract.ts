@@ -1,3 +1,5 @@
+import { detectProductAudioSourceFormat, isAllowedProductAudioSourceType } from "./product-audio-upload-contract";
+
 export const MUSIC_MASTERS_BUCKET = "music-masters";
 export const MUSIC_STREAMS_BUCKET = "music-streams";
 
@@ -9,10 +11,10 @@ export const MAX_MUSIC_MASTER_BYTES = 300 * 1024 * 1024;
 export const MUSIC_MASTER_MAX_MB = MAX_MUSIC_MASTER_BYTES / (1024 * 1024);
 
 export const MUSIC_MASTER_TOO_LARGE_MESSAGE =
-  "Размер WAV-файла не должен превышать 300 МБ.";
+  "Размер аудиофайла не должен превышать 300 МБ.";
 export const MUSIC_MASTER_WRONG_TYPE_MESSAGE =
-  "Загрузите мастер-файл в формате WAV.";
-export const MUSIC_MASTER_SIZE_HINT = `WAV · до ${MUSIC_MASTER_MAX_MB} МБ`;
+  "Загрузите мастер-файл в формате WAV или OGG (Opus/Vorbis).";
+export const MUSIC_MASTER_SIZE_HINT = `WAV, OGG · до ${MUSIC_MASTER_MAX_MB} МБ`;
 
 export const ALLOWED_MUSIC_MASTER_WAV_MIME_TYPES = [
   "audio/wav",
@@ -28,7 +30,7 @@ const ALLOWED_MUSIC_MASTER_WAV_MIME_SET = new Set<string>(
 const UUID_PATTERN =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const VERSIONED_MUSIC_MASTER_PATH = new RegExp(
-  `^practices/(${UUID_PATTERN})/audio/(${UUID_PATTERN})/masters/(${UUID_PATTERN})\\.wav$`,
+  `^practices/(${UUID_PATTERN})/audio/(${UUID_PATTERN})/masters/(${UUID_PATTERN})\\.(wav|ogg)$`,
   "i",
 );
 
@@ -59,8 +61,9 @@ export function validateMusicMasterDescriptor(
   file: MusicMasterDescriptor,
 ): MusicMasterValidationCode | null {
   if (
-    !isAllowedMusicMasterWavName(file.name) ||
-    !isAllowedMusicMasterWavMime(file.type)
+    !(detectProductAudioSourceFormat(file.name) === "ogg"
+      ? isAllowedProductAudioSourceType(file.name, file.type)
+      : isAllowedMusicMasterWavName(file.name) && isAllowedMusicMasterWavMime(file.type))
   ) {
     return "invalid_file_type";
   }
@@ -80,8 +83,9 @@ export function buildMusicMasterStoragePath(
   practiceId: string,
   audioId: string,
   assetId: string,
+  format: "wav" | "ogg" = "wav",
 ): string {
-  return `practices/${practiceId}/audio/${audioId}/masters/${assetId}.wav`;
+  return `practices/${practiceId}/audio/${audioId}/masters/${assetId}.${format}`;
 }
 
 export function isOwnedMusicMasterStoragePath(

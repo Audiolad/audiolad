@@ -19,6 +19,7 @@ const EXTENSIONS: Record<string, string> = {
   "audio/wav": "wav",
   "audio/x-wav": "wav",
   "audio/webm": "webm",
+  "audio/ogg": "ogg",
 };
 
 export function studioAudioTempExtension(mimeType: string): string | null {

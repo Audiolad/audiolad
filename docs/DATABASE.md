@@ -2336,3 +2336,33 @@ apply: `scripts/audio-sprint-general-release.mjs`. Скрипт применяе
 анализа нет. Единственный каталог остаётся `seo_queries` с уникальным
 `normalized_query`. До публикации нового кода требуется отдельно согласованное
 применение схемы. Инструкции и ограничения: `docs/ai-company/task-2a3f80bf.md`.
+
+### Ogg source uploads (owner request 29.10.2026)
+
+Forward migration: `20270209120000_ogg_audio_upload.sql`, after the latest
+existing migration `20270208130000_music_analyzer_queue_guards.sql`.
+It has been prepared in the repository, not applied to a database.
+
+- Idempotently append canonical `audio/ogg` to non-NULL bucket MIME arrays for
+  `practice-audio`, `studio-draft-assets`, `music-masters`, `music-analyzer-runs`.
+  Existing MIME values, privacy and size limits remain intact (product, Studio
+  and music master source limits are 300 MiB).
+- Replace normalize job format/path CHECKs with the existing M4A/AAC/WAV values
+  plus `ogg`. Replace the same-signature enqueue function with its existing
+  locking/supersession/cleanup implementation plus the Ogg format gate.
+  Execution remains service_role-only.
+- Extend `music_analyzer_runs_mime_check` with `audio/ogg`, preserving all four
+  existing values. Verified music masters reach the analyzer's existing
+  ffmpeg-to-PCM decoding path. Studio asset/source and music asset tables do
+  not have a MIME enumeration or WAV-only storage path CHECK to widen.
+
+Filename aliases `.oga` and `.opus` become `.ogg` in source storage. Browser
+MIME aliases, including `video/ogg`, become `audio/ogg`. Actual Ogg media must
+have a positive duration, no video streams, and only Opus/Vorbis audio streams;
+FLAC-in-Ogg is rejected. Ordinary products are delivered through their existing
+normalize worker as MP3 at `audio_items.audio_path`. Music uses its existing
+master/transcode/stream activation pipeline and MP3 delivery.
+
+The migration plan expectation lists and normalize SQL contract checks cover
+this forward migration. Application requires the migration and updated workers
+before accepting these uploads. No production operation was performed.

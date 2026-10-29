@@ -3,7 +3,7 @@ import { MUSIC_STREAMS_BUCKET } from "@/lib/author-products/music-master-upload-
 export const PRACTICE_AUDIO_BUCKET = "practice-audio";
 
 export const MUSIC_DELIVERY_UPLOAD_HINT =
-  "Поддерживаются WAV и MP3. Предпочтительный формат — WAV: мы автоматически подготовим версию для прослушивания.";
+  "Поддерживаются WAV, MP3 и OGG (Opus/Vorbis). Предпочтительный формат – WAV: мы автоматически подготовим версию для прослушивания.";
 
 export const MUSIC_DELIVERY_EMPTY_TEXT = "Аудио ещё не загружено";
 export const MUSIC_DELIVERY_UPLOAD_LABEL = "Загрузить аудио";
@@ -17,7 +17,7 @@ export const MUSIC_DELIVERY_FAILED_TEXT =
   "Не удалось подготовить версию для прослушивания. Загрузите файл ещё раз.";
 export const MUSIC_TRACK_UPLOAD_FAILED_TEXT = "Не удалось загрузить";
 export const MUSIC_DELIVERY_UNSUPPORTED_TEXT =
-  "Загрузите аудио в формате WAV или MP3.";
+  "Загрузите аудио в формате WAV, MP3 или OGG (Opus/Vorbis).";
 
 export type MusicListenSource =
   | { kind: "stream"; bucket: typeof MUSIC_STREAMS_BUCKET; path: string }
@@ -97,6 +97,7 @@ export function isMusicMp3UploadFile(file: { name: string; type?: string | null 
 }
 
 export function resolveMusicUploadMode(file: { name: string; type?: string | null }): "master" | "legacy" | null {
+  if (/\.(ogg|oga|opus)$/i.test(file.name.trim())) return "master";
   if (isMusicWavUploadFile(file)) return "master";
   if (isMusicMp3UploadFile(file)) return "legacy";
   return null;

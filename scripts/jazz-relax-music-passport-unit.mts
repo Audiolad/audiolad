@@ -1392,4 +1392,7 @@ assert.doesNotMatch(read("src/lib/authors/aurafon.ts"), /AlbumMusicPassport|Пе
   );
 }
 
+
+assert.equal(jazzRelaxAnalyzerFilename("master.ogg", "telegram.opus"), "telegram.ogg");
+
 console.log("jazz-relax-music-passport-unit: ok");

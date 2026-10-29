@@ -12,6 +12,9 @@ import {
   buildVersionedProductAudioPath,
   buildVersionedProductAudioSourcePath,
   canAbandonProductAudioUploadPath,
+  parseProductAudioSourcePath,
+  PRODUCT_OGG_MIME_TYPES,
+  canonicalProductAudioUploadMime,
   detectProductAudioSourceFormat,
   isAllowedProductAudioSourceType,
   isAllowedProductMp3Type,
@@ -30,8 +33,8 @@ const versionId = "33333333-3333-4333-8333-333333333333";
 
 assert.equal(PRODUCT_AUDIO_DELIVERY_BITRATE_KBPS, 192);
 assert.equal(PRODUCT_AUDIO_DELIVERY_BITRATE, "192k");
-assert.equal(PRODUCT_AUDIO_SIZE_HINT, "MP3, WAV, M4A, AAC · до 300 МБ");
-assert.equal(PRODUCT_AUDIO_WRONG_TYPE_MESSAGE, "Загрузите аудиофайл в формате MP3, WAV, M4A или AAC.");
+assert.equal(PRODUCT_AUDIO_SIZE_HINT, "MP3, WAV, M4A, AAC, OGG · до 300 МБ");
+assert.equal(PRODUCT_AUDIO_WRONG_TYPE_MESSAGE, "Загрузите аудиофайл в формате MP3, WAV, M4A, AAC или OGG (Opus/Vorbis).");
 assert.ok(ALLOWED_PRODUCT_MP3_MIME_TYPES.includes("application/octet-stream"));
 
 assert.equal(detectProductAudioSourceFormat("track.mp3"), "mp3");
@@ -195,5 +198,25 @@ assert.doesNotMatch(
   /already_online[\s\S]*exit 0/,
   "online worker must not bypass cutover restart",
 );
+
+
+for (const extension of ["ogg", "oga", "opus", "OGG"]) {
+  for (const type of [...PRODUCT_OGG_MIME_TYPES, "", "application/octet-stream"]) {
+    assert.equal(validateProductAudioSourceDescriptor({ name: `voice.${extension}`, type, size: 2048 }), null);
+  }
+  assert.equal(detectProductAudioSourceFormat(`voice.${extension}`), "ogg");
+  assert.equal(validateProductAudioSourceDescriptor({ name: `voice.${extension}`, type: "audio/mpeg", size: 2048 }), "invalid_file_type");
+}
+const oggPath = buildVersionedProductAudioSourcePath(practiceId, audioId, versionId, "ogg");
+assert.equal(parseProductAudioSourcePath(oggPath)?.format, "ogg");
+assert.equal(isOwnedVersionedProductAudioSourcePath(oggPath, practiceId, audioId), true);
+assert.equal(canonicalProductAudioUploadMime("ogg"), "audio/ogg");
+for (const codec of ["opus", "vorbis"]) {
+  const probe = { formatNames: ["ogg"], durationSeconds: 2, hasAudioStream: true, hasVideoStream: false, audioCodecNames: [codec] };
+  assert.equal(validateProductSourceProbe("ogg", probe), "ok");
+  assert.equal(validateProductSourceProbe("ogg", { ...probe, hasVideoStream: true }), "has_video");
+  assert.equal(validateProductSourceProbe("ogg", { ...probe, formatNames: ["mp3"] }), "container_mismatch");
+  assert.equal(validateProductSourceProbe("ogg", { ...probe, audioCodecNames: ["aac"] }), "codec_mismatch");
+}
 
 console.log("product-audio-normalize-contract-unit: ok");

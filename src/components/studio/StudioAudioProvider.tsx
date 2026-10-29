@@ -1728,7 +1728,7 @@ export function StudioAudioProvider({
           return [];
         }
 
-        setProjectError(formatStudioLocalIngestError(decodeError));
+        setProjectError(formatStudioLocalIngestError(decodeError, files));
         if (tracksRef.current.length === 0) {
           setStatusValue("error");
         } else if (statusBeforeLoad !== "playing") {
@@ -2000,7 +2000,7 @@ export function StudioAudioProvider({
         updateTrack(trackId, (item) => ({
           ...item,
           isReplacing: false,
-          replacementError: `Не удалось заменить аудио. ${formatStudioLocalIngestError(error)}`,
+          replacementError: `Не удалось заменить аудио. ${formatStudioLocalIngestError(error, file)}`,
         }));
         return false;
       }
