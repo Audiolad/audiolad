@@ -80,7 +80,7 @@ import {
   type ProductWizardStep,
 } from "@/lib/author-products/product-wizard-steps";
 import { isMusicProductWizardEnabled } from "@/lib/author-products/music-product-wizard";
-import { isMusicPassportPilotAuthor } from "@/lib/music-passport/pilot-authors";
+import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
 import {
   describeJazzRelaxPassportActivity,
   type JazzRelaxPassportView,
@@ -1426,7 +1426,8 @@ export default function AuthorProductForm({
     productKind: form.productKind,
     publicationClass: form.publicationClass,
   });
-  const jazzRelaxMusicPassport = musicProductWizard && isMusicPassportPilotAuthor(form.authorId);
+  const jazzRelaxMusicPassport = musicProductWizard
+    && isMusicPassportAvailable({ productKind: form.productKind });
   const practiceProductWizard = isPracticeProductWizardEnabled({
     publicationClass: form.publicationClass,
   });
