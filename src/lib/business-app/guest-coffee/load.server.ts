@@ -1,11 +1,13 @@
 import "server-only";
 
+import { soundAllowedTrackIds } from "@/lib/business/track-sound-review.server";
 import { loadCatalogPlaySession } from "@/lib/catalog/catalog-playback";
 import { getPublishedCatalogProducts } from "@/lib/products/catalog";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@supabase/supabase-js";
 
 import type { GuestCoffeePlaylist } from "./catalog";
-import { buildGuestCoffeeShelf } from "./shelf";
+import { GUEST_COFFEE_BUSINESS_DIRECTION, buildGuestCoffeeShelf, guestCoffeeShelfArtistCount } from "./shelf";
 
 const CACHE_MS = 5 * 60 * 1000;
 let cache: { at: number; value: Promise<GuestCoffeePlaylist[]> } | null = null;
@@ -45,10 +47,41 @@ export async function isGuestCoffeePlaylistStillFree(playlist: GuestCoffeePlayli
   }
 }
 
+/**
+ * Called by the stream-URL route immediately before signing (uncached): the track is still
+ * admitted to AudioLad Business for cafés. Fails closed.
+ */
+export async function isGuestCoffeeTrackStillAdmitted(audioItemId: string): Promise<boolean> {
+  try {
+    return (await soundAllowedTrackIds([audioItemId], GUEST_COFFEE_BUSINESS_DIRECTION)).has(audioItemId);
+  } catch {
+    return false;
+  }
+}
+
+type AdmissionRow = { author_id: string | null; practice_id: string | null };
+
+/** Allowed café admissions (artists / albums) – narrows the candidates; the track gate decides. */
+async function loadCafeAdmissions(): Promise<{ authorIds: Set<string>; practiceIds: Set<string> }> {
+  const { data, error } = await createServiceRoleClient()
+    .from("business_content_admissions")
+    .select("author_id, practice_id")
+    .eq("direction_key", GUEST_COFFEE_BUSINESS_DIRECTION)
+    .eq("allowed", true);
+  if (error || !Array.isArray(data)) throw new Error("guest_coffee_admissions_unavailable");
+  const rows = data as AdmissionRow[];
+  return {
+    authorIds: new Set(rows.flatMap((r) => (r.author_id ? [r.author_id] : []))),
+    practiceIds: new Set(rows.flatMap((r) => (r.practice_id ? [r.practice_id] : []))),
+  };
+}
+
 async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
   const supabase = createGuestClient();
   const shelf = await buildGuestCoffeeShelf({
     loadPublishedProducts: () => getPublishedCatalogProducts(supabase, { productKind: "music" }),
+    loadAdmissions: loadCafeAdmissions,
+    admittedTrackIds: (ids) => soundAllowedTrackIds(ids, GUEST_COFFEE_BUSINESS_DIRECTION),
     loadFullTracks: async ({ authorSlug, productSlug }) => {
       // Same loader as /api/catalog/play, as an anonymous guest (userId null).
       const loaded = await loadCatalogPlaySession(supabase, authorSlug, productSlug, null);
@@ -64,11 +97,18 @@ async function loadUncached(): Promise<GuestCoffeePlaylist[]> {
   // The catalogue's isFree may include temporary promo pricing; the guest shelf keeps only
   // albums that are free by their own is_free flag (same rule as the per-request re-check).
   const free = await loadStillFreeIds(supabase, shelf.map((p) => p.id));
-  return shelf.filter((p) => free.has(p.id));
+  const result = shelf.filter((p) => free.has(p.id));
+  const artists = guestCoffeeShelfArtistCount(result);
+  if (result.length > 0 && artists < 3) {
+    // The atmosphere then falls back to fewer artists (best matches) – visible in the logs.
+    console.warn("[business-guest-coffee] admitted guest shelf has few artists", { artists, albums: result.length });
+  }
+  return result;
 }
 
 /**
- * The guest coffee shelf: curated free albums resolved against the live catalogue.
+ * The guest coffee shelf: free albums admitted to AudioLad Business for cafés (only their
+ * admitted tracks), resolved against the live catalogue.
  * Short process cache (5 min) shared by the page and the stream-URL route; an empty
  * result is not cached so a transient failure heals on the next request.
  */

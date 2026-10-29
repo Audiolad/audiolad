@@ -124,35 +124,52 @@ assert.equal(guestCoffeePlaylistMinutes(sample[0]), 6);
 assert.equal(findGuestCoffeeTrack(sample, "b-all-t1")?.playlist.id, "b-all");
 assert.equal(findGuestCoffeeTrack(sample, "nope"), null);
 
-// shelf builder: only FREE published albums the existing loader can play in full
+// shelf builder: only FREE published albums the existing loader can play in full, and only
+// music admitted to AudioLad Business for cafés (Sergey 29.10.2026)
 {
   const products = [
-    { id: "p1", title: "Free jazz", slug: "dzhazovaya-muzyka-dlya-kofeen", authorSlug: "teplyy-takt", href: "/x", coverUrl: null, isFree: true, audioCount: 7 },
-    { id: "p2", title: "Paid", slug: "muzyka-dlya-kofeyni-dzhaz", authorSlug: "teplyy-takt", href: "/y", coverUrl: null, isFree: false, audioCount: 7 },
-    { id: "p3", title: "Preview only", slug: "uyutnaya-muzyka-kofeyni", authorSlug: "teplyy-takt", href: "/z", coverUrl: null, isFree: true, audioCount: 7 },
-    { id: "p4", title: "Not on shelf", slug: "something", authorSlug: "someone", href: "/w", coverUrl: null, isFree: true, audioCount: 3 },
+    { id: "p1", title: "Free jazz", slug: "dzhazovaya-muzyka-dlya-kofeen", authorSlug: "teplyy-takt", authorId: "a-tt", href: "/x", coverUrl: null, isFree: true, audioCount: 7 },
+    { id: "p2", title: "Paid", slug: "muzyka-dlya-kofeyni-dzhaz", authorSlug: "teplyy-takt", authorId: "a-tt", href: "/y", coverUrl: null, isFree: false, audioCount: 7 },
+    { id: "p3", title: "Preview only", slug: "uyutnaya-muzyka-kofeyni", authorSlug: "teplyy-takt", authorId: "a-tt", href: "/z", coverUrl: null, isFree: true, audioCount: 7 },
+    { id: "p4", title: "Вечерний лаунж", slug: "something", authorSlug: "someone", authorId: "a-some", href: "/w", coverUrl: null, isFree: true, audioCount: 3 },
+    { id: "p5", title: "Not admitted", slug: "bossa-nova-muzyka-dlya-kofeyni", authorSlug: "tonolia", authorId: "a-ton", href: "/v", coverUrl: null, isFree: true, audioCount: 3 },
+    { id: "p6", title: "Admitted album only", slug: "album-six", authorSlug: "other", authorId: "a-other", href: "/u", coverUrl: null, isFree: true, audioCount: 3 },
   ];
   const calls: string[] = [];
-  const shelf = await buildGuestCoffeeShelf({
+  const gateCalls: string[][] = [];
+  const deps = {
     loadPublishedProducts: async () => products,
-    loadFullTracks: async ({ productSlug }) => {
+    loadFullTracks: async ({ productSlug }: { productSlug: string }) => {
       calls.push(productSlug);
       if (productSlug === "uyutnaya-muzyka-kofeyni") return null;
-      return [{ audioItemId: "t1", title: "Track 1", durationSeconds: 200 }];
+      return [
+        { audioItemId: `${productSlug}-t1`, title: "Track 1", durationSeconds: 200 },
+        { audioItemId: `${productSlug}-t2`, title: "Track 2", durationSeconds: 200 },
+      ];
     },
-  });
-  assert.deepEqual(shelf.map((p) => p.id), ["p1"], "paid, preview-only and unknown albums are dropped");
+    loadAdmissions: async () => ({ authorIds: new Set(["a-tt", "a-some"]), practiceIds: new Set(["p6"]) }),
+    admittedTrackIds: async (ids: readonly string[]) => {
+      gateCalls.push([...ids]);
+      return new Set(ids.filter((id) => id !== "something-t2"));
+    },
+  };
+  const shelf = await buildGuestCoffeeShelf(deps);
+  assert.deepEqual(shelf.map((p) => p.id), ["p1", "p6", "p4"], "paid, preview-only and not admitted albums are dropped; curated first");
   assert.ok(!calls.includes("muzyka-dlya-kofeyni-dzhaz"), "paid album is never even loaded");
-  assert.equal(shelf[0].direction, "jazz");
+  assert.ok(!calls.includes("bossa-nova-muzyka-dlya-kofeyni"), "not admitted album (curated or not) is never even loaded");
+  assert.equal(shelf[0].direction, "jazz", "curated album keeps its editorial tags");
+  assert.deepEqual(shelf.find((p) => p.id === "p4")?.tracks.map((t) => t.audioItemId), ["something-t1"], "a not admitted track is dropped");
+  assert.equal(shelf.find((p) => p.id === "p4")?.direction, "sax", "admitted album off the curated list: tags from its title");
+  assert.equal(gateCalls.length, 1, "one batched per-track gate call");
   assert.deepEqual(
-    await buildGuestCoffeeShelf({ loadPublishedProducts: async () => { throw new Error("down"); }, loadFullTracks: async () => [] }),
+    await buildGuestCoffeeShelf({ ...deps, loadPublishedProducts: async () => { throw new Error("down"); } }),
     [],
     "catalogue failure → empty shelf (honest empty state), never fake tracks",
   );
-  assert.deepEqual(
-    await buildGuestCoffeeShelf({ loadPublishedProducts: async () => products, loadFullTracks: async () => { throw new Error("x"); } }),
-    [],
-  );
+  assert.deepEqual(await buildGuestCoffeeShelf({ ...deps, loadFullTracks: async () => { throw new Error("x"); } }), []);
+  assert.deepEqual(await buildGuestCoffeeShelf({ ...deps, loadAdmissions: async () => { throw new Error("x"); } }), [], "admissions unavailable → fail closed");
+  assert.deepEqual(await buildGuestCoffeeShelf({ ...deps, admittedTrackIds: async () => { throw new Error("x"); } }), [], "track gate unavailable → fail closed");
+  assert.deepEqual(await buildGuestCoffeeShelf({ ...deps, admittedTrackIds: async () => new Set<string>() }), [], "nothing admitted → nothing");
 }
 
 // ---------------------------------------------------------------- limit (actual playback)
@@ -232,10 +249,12 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   let signed = 0;
   let leases: number[] = [];
   let stillFree = true;
+  let stillAdmitted = true;
   let calls: string[] = [];
   const deps = (used: number | null, issued: number | null = used) => ({
     loadShelf: async () => shelf,
     isStillFree: async () => stillFree,
+    isStillAdmitted: async () => stillAdmitted,
     peekUsage: async () => {
       calls.push("peek");
       return used;
@@ -275,6 +294,12 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
   assert.equal(signed, signedBefore, "paid-now album is never signed");
   assert.deepEqual(leases, [], "and never charged");
   stillFree = true;
+  // Admission withdrawn after the shelf was cached → refused before any lease or signing.
+  stillAdmitted = false;
+  assert.deepEqual(await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(0)), { ok: false, reason: "not_in_manifest" });
+  assert.equal(signed, signedBefore, "no longer admitted track is never signed");
+  assert.deepEqual(leases, [], "and never charged");
+  stillAdmitted = true;
   // Order: read-only peek → sign → atomic issue (charge). Exhausted at peek → nothing signed or charged.
   calls = [];
   await handleGuestCoffeeTrackUrl({ audioItemId: "j-morning-t0" }, deps(100));
@@ -433,6 +458,10 @@ for (const file of [
   assert.match(loader, /export async function isGuestCoffeePlaylistStillFree/);
   assert.match(loader, /is_free === true && row\.status === "published" && row\.catalog_visibility === "listed"/);
   assert.match(route, /isStillFree: isGuestCoffeePlaylistStillFree/, "uncached re-check right before signing");
+  assert.match(route, /isStillAdmitted: isGuestCoffeeTrackStillAdmitted/, "uncached admission re-check right before signing");
+  assert.match(loader, /soundAllowedTrackIds\(\[audioItemId\], GUEST_COFFEE_BUSINESS_DIRECTION\)/);
+  assert.match(loader, /admittedTrackIds: \(ids\) => soundAllowedTrackIds\(ids, GUEST_COFFEE_BUSINESS_DIRECTION\)/);
+  assert.match(loader, /\.from\("business_content_admissions"\)[\s\S]*?\.eq\("allowed", true\)/);
   assert.match(route, /issueLease: \(trackSeconds\) => issueGuestCoffeeLease\(request, trackSeconds\)/);
   assert.match(route, /peekUsage: peekGuestCoffeeUsage/);
 }
