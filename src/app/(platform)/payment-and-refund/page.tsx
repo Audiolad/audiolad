@@ -87,7 +87,7 @@ export default function PaymentAndRefundPage() {
           </p>
 
           <p className="mt-3 text-sm leading-6 text-[#8c7dab]">
-            Последнее обновление: 13 июля 2026 года
+            Последнее обновление: 29 октября 2026 года
           </p>
 
           <Section id="section-1" title="1. Общие положения">
@@ -413,7 +413,7 @@ export default function PaymentAndRefundPage() {
               <RequisiteItem label="ОГРНИП">316505300063237</RequisiteItem>
 
               <RequisiteItem label="Адрес регистрации">
-                355045, г. Ставрополь, ул. 45 Параллель, д. 73, кв. 45
+                355035, г. Ставрополь, ул. Дачная, д. 36
               </RequisiteItem>
             </div>
           </section>

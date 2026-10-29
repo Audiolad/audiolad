@@ -36,7 +36,7 @@ for (const d of [terms, rights]) {
   assert.match(d.markdown, /ИНН 507305817690/);
   assert.match(d.markdown, /ОГРНИП 316505300063237/);
   assert.match(d.markdown, /Петров Сергей Сергеевич/);
-  assert.doesNotMatch(d.markdown, /паспорт\s*\[|адрес\s*\[\s*\]|ИНН \[ \]|ОГРНИП \[ \]|355045|Ставрополь|45 Параллель/);
+  assert.doesNotMatch(d.markdown, /паспорт\s*\[|адрес\s*\[\s*\]|ИНН \[ \]|ОГРНИП \[ \]|355045|355035|Ставрополь|45 Параллель|Дачная/);
   // Rights rules preserved.
   assert.doesNotMatch(d.markdown, /без\s+(РАО|ВОИС)/i);
 }
@@ -50,7 +50,7 @@ assert.match(pageSrc, /PROGRAM_DOCUMENT_REQUISITES\.inn/);
 assert.match(pageSrc, /PROGRAM_DOCUMENT_REQUISITES\.ogrnip/);
 assert.match(pageSrc, /\{documentEditionLabel\(doc\)\}/);
 assert.doesNotMatch(pageSrc, /Это черновик|версия \{doc\.version\}|SHA-256 текста/);
-assert.doesNotMatch(JSON.stringify(PROGRAM_DOCUMENT_REQUISITES), /паспорт|адрес|355045|Ставрополь/i);
+assert.doesNotMatch(JSON.stringify(PROGRAM_DOCUMENT_REQUISITES), /паспорт|адрес|355045|355035|Ставрополь|Дачная/i);
 assert.equal(documentEditionLabel({ date: "2026-11-01", status: "approved" }), "Редакция от 01.11.2026");
 assert.match(terms.markdown, /^# Условия лицензирования музыки для бизнеса/);
 assert.match(rights.markdown, /^# Заявление правообладателя о правах на музыку/);

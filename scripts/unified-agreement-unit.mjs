@@ -30,7 +30,7 @@ for (const edition of APPROVED_AUTHOR_TERMS_EDITIONS) assert.equal(sha(edition.t
 assert.equal(AUTHOR_TERMS_V2_META.version, "2.0");
 assert.equal(AUTHOR_TERMS_V2_META.coversBusiness, true);
 assert.match(AUTHOR_TERMS_V2_TEXT, /Петров Сергей Сергеевич, ИНН 507305817690, ОГРНИП 316505300063237/);
-for (const forbidden of ["40802810", "Ставрополь", "Параллель", "БИК", "Корреспондентский", "+7 9", "Телефон", "паспорт"]) {
+for (const forbidden of ["40802810", "Ставрополь", "Параллель", "355035", "Дачная", "БИК", "Корреспондентский", "+7 9", "Телефон", "паспорт"]) {
   assert.ok(!AUTHOR_TERMS_V2_TEXT.includes(forbidden), `no non-public requisites: ${forbidden}`);
 }
 assert.ok(!AUTHOR_TERMS_V2_TEXT.includes("—"), "en-dash only");
