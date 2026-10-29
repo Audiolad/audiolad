@@ -258,12 +258,17 @@
   cursor: pointer;
 }
 
+/* Arrows sit beside the slides, never on top of the image. */
+.guide-cups__scroller {
+  margin: 0 56px;
+}
+
 .guide-cups__arrow--prev {
-  left: -6px;
+  left: 0;
 }
 
 .guide-cups__arrow--next {
-  right: -6px;
+  right: 0;
 }
 
 .guide-cups__count {
@@ -609,8 +614,8 @@
 }
 
 .guide-expert__photo {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   flex: none;
   object-fit: cover;
@@ -950,12 +955,86 @@
     justify-content: flex-start;
   }
 
+  /* Mobile slider: the arrow circles touch the screen edges, the slides start after them. */
+  .guide-cups__arrow {
+    width: 36px;
+    height: 36px;
+  }
+
+  .guide-cups__arrow--prev {
+    left: -20px;
+  }
+
+  .guide-cups__arrow--next {
+    right: -20px;
+  }
+
+  .guide-cups__scroller {
+    margin: 0 20px;
+  }
+}
+
+/* Mobile tables: one card per row, column names as labels, no horizontal scroll. */
+@media (max-width: 600px) {
+  .guide-table__scroll {
+    overflow: visible;
+  }
+
+  .guide-table,
+  .guide-table tbody,
+  .guide-table tr,
+  .guide-table th,
+  .guide-table td {
+    display: block;
+    width: 100%;
+  }
+
   .guide-table {
-    font-size: 0.875rem;
+    background: none;
+    font-size: 0.95rem;
+  }
+
+  .guide-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .guide-table tbody tr,
+  .guide-table tbody tr:nth-child(even) {
+    margin: 0 0 12px;
+    border: 1px solid var(--guide-cream-border);
+    border-radius: 14px;
+    background: var(--guide-card-warm);
+    overflow: hidden;
   }
 
   .guide-table th,
   .guide-table td {
-    padding: 8px 9px;
+    border: 0;
+    padding: 10px 14px;
+  }
+
+  .guide-table tbody th {
+    background: #f1e6d6;
+    color: var(--guide-accent);
+    font-size: 1rem;
+  }
+
+  .guide-table td + td {
+    border-top: 1px solid var(--guide-cream-border);
+  }
+
+  .guide-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin: 0 0 2px;
+    color: var(--guide-muted);
+    font-size: 0.78rem;
+    font-weight: 650;
+    letter-spacing: 0.02em;
   }
 }

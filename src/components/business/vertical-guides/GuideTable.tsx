@@ -2,6 +2,10 @@ import type { GuideTable as GuideTableData } from "@/lib/business/vertical-guide
 
 import { GuideParagraphs } from "./GuideSections";
 
+/**
+ * Article table. Under 600 px every row becomes a card: the first cell is the card heading,
+ * the other cells follow with their column name as a small label (no horizontal scroll).
+ */
 export default function GuideTable({ table }: { table: GuideTableData }) {
   return (
     <section className="guide-wrap guide-block guide-prose" aria-labelledby={table.id}>
@@ -26,11 +30,13 @@ export default function GuideTable({ table }: { table: GuideTableData }) {
               <tr key={row[0]}>
                 {row.map((cell, index) =>
                   index === 0 ? (
-                    <th key={cell} scope="row">
+                    <th key={cell} scope="row" data-label={table.columns[0]}>
                       {cell}
                     </th>
                   ) : (
-                    <td key={`${row[0]}-${index}`}>{cell}</td>
+                    <td key={`${row[0]}-${index}`} data-label={table.columns[index]}>
+                      {cell}
+                    </td>
                   ),
                 )}
               </tr>

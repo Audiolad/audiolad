@@ -19,7 +19,13 @@ export default function GuideAtlasCardsBanner() {
   const cities = COFFEE_ATLAS_SHOPS.map((shop) => shop.city);
   return (
     <div className="guide-wrap guide-block">
-      <Link href={COFFEE_ATLAS_PATH} className="guide-atlas-cards" data-guide-banner="atlas-cards">
+      <Link
+        href={COFFEE_ATLAS_PATH}
+        className="guide-atlas-cards"
+        data-guide-banner="atlas-cards"
+        target="_blank"
+        rel="noopener"
+      >
         <span className="guide-atlas-cards__head">
           <span className="guide-atlas-cards__title guide-display">10 кофеен – 10 характеров звучания</span>
           <span className="guide-atlas-cards__subtitle">

@@ -12,7 +12,13 @@ import {
 export default function GuideAtlasHeroBanner() {
   return (
     <div className="guide-wrap guide-block">
-      <Link href={COFFEE_ATLAS_PATH} className="guide-atlas-hero" data-guide-banner="atlas-hero">
+      <Link
+        href={COFFEE_ATLAS_PATH}
+        className="guide-atlas-hero"
+        data-guide-banner="atlas-hero"
+        target="_blank"
+        rel="noopener"
+      >
         <span className="guide-atlas-hero__text">
           <span className="guide-atlas-hero__kicker">Кофе · люди · города · вдохновение</span>
           <span className="guide-atlas-hero__title guide-display">{COFFEE_ATLAS_TITLE}</span>

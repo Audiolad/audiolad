@@ -2,10 +2,11 @@
  * Data model of a B2B vertical guide article (reference: «Кофе в зёрнах для кофейни»).
  *
  * The page renders these slots in a fixed order (docs/business/coffee-guides/TEMPLATE.md):
- * header → H1 + intro → «Четыре чашки» slider → partOne → atlas cover banner → table →
- * expertOne → partTwo → «10 кофеен» banner → expertTwo → steps → checklist → FAQ →
- * final cups block → «Читайте также». A new article only fills this data; it never
- * adds its own markup.
+ * header → H1 + intro → «Четыре чашки» slider → partOne[0] → atlas cover banner →
+ * partOne[1] → table → partTwo[0] → expertOne → partTwo[1] → «10 кофеен» banner →
+ * partTwo[2] → expertTwo → steps → checklist → FAQ → final cups block → «Читайте также».
+ * Text and inserts alternate: never two text sections in a row. A new article only fills
+ * this data; it never adds its own markup.
  */
 export type TextPart = string | { href: string; label: string };
 
@@ -115,10 +116,12 @@ export type VerticalGuideArticle = {
   intro: string[];
   /** Heading above the «Четыре чашки» slider. */
   question: string;
-  partOne: GuideSection[];
+  /** [0] before the atlas cover banner, [1] before the table. */
+  partOne: [GuideSection, GuideSection];
   table: GuideTable;
   expertOne: GuideExpertSlot;
-  partTwo: GuideSection[];
+  /** [0] before expertOne, [1] before the «10 кофеен» banner, [2] before expertTwo. */
+  partTwo: [GuideSection, GuideSection, GuideSection];
   expertTwo: GuideExpertSlot;
   steps: GuideSteps;
   checklist: GuideChecklist;
