@@ -1,6 +1,8 @@
 "use client";
 
 import { AuthorProductCharCounter } from "@/components/author-dashboard/product-form-sections/AuthorProductCharCounter";
+import NextStepProductPicker from "@/components/author-dashboard/product-form-sections/NextStepProductPicker";
+import type { NextStepProductOption } from "@/lib/products/next-step-product-options";
 import {
   PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH,
   PROMO_RECOMMENDATION_TEXT_MAX_LENGTH,
@@ -22,6 +24,10 @@ type AuthorProductPostListenPromoSectionProps = {
   onPromoButtonTextChange: (value: string) => void;
   onPromoUrlChange: (value: string) => void;
   onPromoOpenInNewTabChange: (value: boolean) => void;
+  /** Current product, hidden from the «Выбрать свой продукт» list. */
+  currentProductId?: string | null;
+  /** When set, the product picker is shown above the manual link field. */
+  onPromoProductPick?: (option: NextStepProductOption) => void;
 };
 
 export default function AuthorProductPostListenPromoSection({
@@ -39,6 +45,8 @@ export default function AuthorProductPostListenPromoSection({
   onPromoButtonTextChange,
   onPromoUrlChange,
   onPromoOpenInNewTabChange,
+  currentProductId = null,
+  onPromoProductPick,
 }: AuthorProductPostListenPromoSectionProps) {
   return (
     <section className="space-y-4 rounded-[24px] border border-[#eadff8] bg-white p-5">
@@ -112,8 +120,18 @@ export default function AuthorProductPostListenPromoSection({
             max={PROMO_RECOMMENDATION_BUTTON_TEXT_MAX_LENGTH}
           />
         </label>
+        {onPromoProductPick && promoEnabled ? (
+          <NextStepProductPicker
+            excludeProductId={currentProductId}
+            selectedHref={promoUrl}
+            disabled={busy}
+            onSelect={onPromoProductPick}
+          />
+        ) : null}
         <label className="block">
-          <span className="mb-2 block text-sm font-medium">Ссылка</span>
+          <span className="mb-2 block text-sm font-medium">
+            {onPromoProductPick ? "Или вставьте ссылку" : "Ссылка"}
+          </span>
           <input
             type="url"
             value={promoUrl}
