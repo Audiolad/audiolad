@@ -475,7 +475,7 @@ assert.equal(pageHtml.includes("guide-expert__initials"), false);
 assert.equal(pageHtml.includes("Оригинал"), false, "no English original under a translation");
 assert.ok(pageHtml.includes("dmitry-kotov.webp"));
 
-// Every clickable link in the article body and inserts opens in a new tab; header, crumbs and footer do not.
+// Every clickable link in the article body and inserts opens in a new tab.
 const mainHtml = pageHtml.slice(pageHtml.indexOf('<main id="content">'), pageHtml.indexOf("</main>"));
 const bodyHtml = mainHtml.slice(mainHtml.indexOf("</nav>") + "</nav>".length);
 const bodyLinks = [...bodyHtml.matchAll(/<a\s[^>]*>/g)].map((match) => match[0]);
@@ -487,8 +487,25 @@ for (const tag of bodyLinks) {
 for (const required of ['data-guide-banner="atlas-hero"', 'data-guide-banner="atlas-cards"', 'data-max-placement="final"']) {
   assert.ok(bodyLinks.some((tag) => tag.includes(required)), `new-tab link missing: ${required}`);
 }
-const chromeHtml = pageHtml.slice(0, pageHtml.indexOf("</nav>", pageHtml.indexOf('<main id="content">'))) + pageHtml.slice(pageHtml.indexOf("</main>"));
-assert.equal(/<a\s[^>]*target="_blank"/.test(chromeHtml), false, "header, crumbs and footer stay in the same tab");
+// Whole article (top strip, crumbs, body, footer): only the rubric brand link and the plain crumbs to Home / rubric
+// stay in the same tab; every other link, including the atlas link in the top strip, opens in a new tab.
+const articleHtml = pageHtml.slice(pageHtml.indexOf("<article"), pageHtml.lastIndexOf("</article>"));
+const crumbsHtml = articleHtml.slice(articleHtml.indexOf('<nav class="guide-wrap guide-crumbs"'), articleHtml.indexOf("</nav>", articleHtml.indexOf('<nav class="guide-wrap guide-crumbs"')));
+const crumbLinks = [...crumbsHtml.matchAll(/<a\s[^>]*>/g)].map((match) => match[0]);
+assert.deepEqual(crumbLinks.map((tag) => tag.match(/href="([^"]*)"/)?.[1]), ["/", "/b/coffee"]);
+const sameTabAllowed = new Set([...crumbLinks, ...[...articleHtml.matchAll(/<a\s[^>]*class="guide-brand"[^>]*>/g)].map((match) => match[0])]);
+const articleLinks = [...articleHtml.matchAll(/<a\s[^>]*>/g)].map((match) => match[0]);
+for (const tag of articleLinks) {
+  if (sameTabAllowed.has(tag)) {
+    assert.equal(/\starget=/.test(tag), false, `brand and crumbs stay in the same tab: ${tag}`);
+    assert.ok(/href="(?:\/|\/b\/coffee)"/.test(tag), `only Home / rubric may stay in the same tab: ${tag}`);
+    continue;
+  }
+  assert.ok(/\starget="_blank"/.test(tag), `article link must open in a new tab: ${tag}`);
+  assert.ok(/\srel="noopener(?: noreferrer)?"/.test(tag), `article link needs rel="noopener": ${tag}`);
+}
+const headerAtlas = articleLinks.find((tag) => tag.includes('data-guide-header-link="atlas"'));
+assert.ok(headerAtlas && headerAtlas.includes('href="/b/atlas-kofeen"') && headerAtlas.includes('target="_blank"'), "top-strip atlas link opens in a new tab");
 assert.ok(pageHtml.includes("sunalini-menon.webp"));
 // Mobile tables: every cell carries its column name for the stacked-card layout.
 for (const column of ARTICLE.table.columns) {
