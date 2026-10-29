@@ -215,3 +215,36 @@ checks source backfill/reference integrity, duplicates through the application
 API, verifies shared Storage survives original deletion, and checks autosave.
 Reset the disposable stack (`docker compose down -v`) before a repeated
 pre-migration/backfill run.
+
+## Ogg upload compatibility (29.10.2026)
+
+Studio accepts `.ogg`, `.oga`, `.opus` with Ogg/Opus or Ogg/Vorbis media. MIME
+aliases become `audio/ogg` for initial upload, retry and replacement; source
+paths use `.ogg`. Finalization probes the actual container/codecs, rejects any
+video stream and renamed non-Ogg media, and checks positive duration and the
+existing limits. Original compressed bytes are preserved.
+
+The editor uses `HTMLAudioElement` for both local blob URLs and signed Storage
+URLs (`local-playback-asset.ts`, `StudioAudioProvider.tsx`). WebAudio routes the
+media element through the mix/effects graph; it does not decode uploaded files
+with `decodeAudioData`. Initial import waits for local HTMLAudio metadata before
+persisting. There is no per-asset playable derivative or transcoding proxy.
+The existing WebM recorder precedent also persists the original; recorder MIME
+selection uses `MediaRecorder.isTypeSupported` to select a format the recording
+browser supports. That does not make recordings portable to another browser.
+
+Ogg follows that same original-file playback approach. On a browser unable to
+decode Ogg/Opus or Vorbis (including affected Safari/iOS versions), initial import
+can fail before upload with «Браузеру не удалось открыть выбранное аудио.»;
+an existing project imported elsewhere can load its data but fail audio playback.
+No Safari compatibility derivative was added: whole-project MP3 exports are not
+usable as per-track sources for editing. Import/edit on a browser with native
+Ogg support is required in this case. This is a known limitation, not a claim
+of universal Studio upload support on Safari.
+
+The render worker downloads source bytes into `.audio` temp files and ffmpeg
+autodetects the actual container, so Ogg needs no render input-format mapping.
+Export remains MP3. Server peak generation also uses ffmpeg; upload finalization
+currently returns `peaks: null` and keeps the existing optional/fallback waveform
+behavior. Product cabinet upload does not depend on HTMLAudio metadata: ordinary
+products and music both obtain an MP3 delivery before public playback.

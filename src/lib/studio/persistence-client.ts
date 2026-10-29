@@ -1,5 +1,7 @@
 "use client";
 
+import { canonicalizeStudioUploadMimeType } from "./recording-mime";
+
 import { STUDIO_ASSETS_BUCKET } from "@/lib/studio/limits";
 
 export type StudioAssetSourceType = "upload" | "recording" | "catalog";
@@ -793,7 +795,7 @@ export async function retryStudioProjectAssetUpload({
     throw new StudioPersistenceClientError("server_error", retryResponse.status);
   }
   try {
-    await putFileToSignedUpload(retried.signedUpload, file, file.type || "audio/mpeg", signal);
+    await putFileToSignedUpload(retried.signedUpload, file, canonicalizeStudioUploadMimeType(file), signal);
   } catch (error) {
     if (isAbortError(error) || signal?.aborted) {
       await abandonStudioProjectAssetUpload({ projectId, assetId });
@@ -848,7 +850,7 @@ export async function replaceStudioProjectAsset({
     throw new StudioPersistenceClientError("server_error", reserveResponse.status);
   }
   try {
-    await putFileToSignedUpload(reserved.signedUpload, file, file.type || "audio/mpeg", signal);
+    await putFileToSignedUpload(reserved.signedUpload, file, canonicalizeStudioUploadMimeType(file), signal);
     const finalizeResponse = await studioFetch(
       `/api/studio/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(assetId)}/replace/finalize`,
       { method: "POST", signal },

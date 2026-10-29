@@ -33,6 +33,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "audio/mp4",
   "audio/aac",
   "audio/webm",
+  "audio/ogg",
 ]);
 
 export function parseUuid(value: unknown, code = "invalid_request"): string {
@@ -312,6 +313,9 @@ export function validateStudioUploadMeta(input: {
     name: typeof input.name === "string" ? input.name : filename,
     type: typeof input.type === "string" ? input.type : "",
   });
+  if (/\.(ogg|oga|opus)$/i.test(filename) && mimeType !== "audio/ogg") {
+    throw new StudioApiError("unsupported_mime_type", 422);
+  }
   if (!ALLOWED_MIME_TYPES.has(mimeType)) {
     throw new StudioApiError("unsupported_mime_type", 422);
   }
@@ -322,7 +326,7 @@ export function validateStudioUploadMeta(input: {
   if (byteSize > STUDIO_LIMITS.maxAssetBytes) {
     throw new StudioApiError("asset_too_large", 413);
   }
-  return { filename, mimeType, byteSize };
+  return { filename: mimeType === "audio/ogg" ? `${filename.replace(/\.[^.]*$/, "")}.ogg` : filename, mimeType, byteSize };
 }
 
 export function validateStudioUpload(file: Pick<File, "name" | "type" | "size">): {

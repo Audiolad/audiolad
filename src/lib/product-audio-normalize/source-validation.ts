@@ -36,6 +36,14 @@ export function validateProductSourceProbe(
   const formats = new Set(probe.formatNames);
   const codecs = new Set(probe.audioCodecNames);
 
+  if (format === "ogg") {
+    if (!formats.has("ogg")) return "container_mismatch";
+    if (codecs.size === 0 || [...codecs].some((codec) => codec !== "opus" && codec !== "vorbis")) {
+      return "codec_mismatch";
+    }
+    return "ok";
+  }
+
   if (format === "m4a") {
     const containerOk = [...M4A_CONTAINERS].some((name) => formats.has(name));
     if (!containerOk) return "container_mismatch";

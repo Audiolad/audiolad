@@ -103,7 +103,7 @@ export default function StudioWorkspace() {
               ref={fileInputRef}
               type="file"
               multiple
-              accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac"
+              accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
               className="sr-only"
               onChange={(event) => {
                 const files = Array.from(event.target.files ?? []);
@@ -116,7 +116,7 @@ export default function StudioWorkspace() {
             <input
               ref={replacementInputRef}
               type="file"
-              accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac"
+              accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/aac,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,audio/ogg,audio/opus,application/ogg,video/ogg,audio/x-opus+ogg,audio/vorbis,audio/x-vorbis+ogg"
               className="sr-only"
               onChange={(event) => {
                 const trackId = event.currentTarget.dataset.trackId;
@@ -151,8 +151,8 @@ export default function StudioWorkspace() {
                 Добавьте локальные аудиодорожки
               </p>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#70618e]">
-                Поддерживаются MP3, WAV и файлы M4A/AAC. Лимит одной
-                дорожки — 3 часа и 300 МБ.
+                Поддерживаются MP3, WAV, M4A, AAC и OGG (Opus/Vorbis). Лимит одной
+                дорожки – 3 часа и 300 МБ.
               </p>
             </div>
           ) : null}
