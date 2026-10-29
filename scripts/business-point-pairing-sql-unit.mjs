@@ -50,4 +50,11 @@ assert(next.includes("REVOKE EXECUTE ON FUNCTION public.consume_business_point_p
 assert(next.split("COMMIT;")[0].includes("DROP TABLE") === false, "4digit: no drop before commit");
 assert(!/https?:\/\//.test(next), "4digit: no links");
 
+assert(next.includes("pg_advisory_xact_lock(hashtext('audiolad:business-point-create:' || p_location_id::text))"), "4digit: create locked per кофейня");
+assert(next.includes("'burned', v_global_failures >= c_global_limit"), "4digit: burn reported");
+const rollback = next.slice(next.lastIndexOf("COMMIT;", next.indexOf("-- Rollback")));
+assert(rollback.includes("expires_at = least(expires_at, now())"), "4digit: rollback expires open codes");
+assert(!/^-- DROP INDEX/m.test(rollback), "4digit: rollback keeps the partial index");
+assert(!/^-- .*ADD CONSTRAINT/m.test(rollback), "4digit: rollback does not restore UNIQUE");
+
 console.log("business-point-pairing-sql-unit: ok");

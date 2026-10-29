@@ -7,7 +7,7 @@ import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
 import { formatPointCode } from "@/lib/business-app/point-session";
 import {
   POINT_SHARE_TITLE,
-  pointCodeSecondsLeft,
+  pointCodeDeadline,
   pointDeviceLink,
   pointMailtoUrl,
   pointShareText,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/business-app/point-share";
 
 type LinkState = { linked: boolean; playerCode: string | null };
-type Issued = { code: string; expiresAt: string | null };
+type Issued = { code: string; deadlineMs: number };
 
 /** Anchor of this card. The owner home links here with «Подключить устройство в зале». */
 export const POINT_PAIRING_ANCHOR_ID = "device";
@@ -35,6 +35,8 @@ export default function PointPairingCard({ locationId }: { locationId: string })
   const [confirm, setConfirm] = useState<"create" | "revoke" | null>(null);
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyByHand, setCopyByHand] = useState(false);
+  const linkField = useRef<HTMLInputElement | null>(null);
   const yesGuard = useRef(false);
   const ask = (action: "create" | "revoke") => {
     yesGuard.current = false;
@@ -68,7 +70,7 @@ export default function PointPairingCard({ locationId }: { locationId: string })
     return () => window.clearInterval(timer);
   }, [issued]);
 
-  const secondsLeft = issued ? pointCodeSecondsLeft(issued.expiresAt, now) : 0;
+  const secondsLeft = issued ? Math.max(0, Math.floor((issued.deadlineMs - now) / 1000)) : 0;
   const live = issued && secondsLeft > 0 ? issued : null;
   const deviceUrl = typeof window === "undefined"
     ? ""
@@ -86,10 +88,11 @@ export default function PointPairingCard({ locationId }: { locationId: string })
       body: JSON.stringify({ action: "create", locationId }),
     })
       .then((res) => res.json())
-      .then((json: { ok?: boolean; code?: string; expiresAt?: string; error?: string }) => {
+      .then((json: { ok?: boolean; code?: string; expiresAt?: string; expiresIn?: number; error?: string }) => {
         if (json.ok === true && json.code) {
-          setNow(Date.now());
-          setIssued({ code: json.code, expiresAt: json.expiresAt ?? null });
+          const receivedAt = Date.now();
+          setNow(receivedAt);
+          setIssued({ code: json.code, deadlineMs: pointCodeDeadline(json.expiresIn, json.expiresAt, receivedAt) });
         } else setError(json.error ?? "Не удалось создать код. Попробуйте ещё раз.");
       })
       .catch(() => setError("Не удалось создать код. Попробуйте ещё раз."))
@@ -128,11 +131,21 @@ export default function PointPairingCard({ locationId }: { locationId: string })
     });
   };
 
+  // Without the Clipboard API (old browsers, plain http) the link field is selected for a manual copy.
+  const copyByHandNow = () => {
+    setMore(true);
+    setCopyByHand(true);
+    window.setTimeout(() => {
+      linkField.current?.focus();
+      linkField.current?.select();
+    }, 0);
+  };
+
   const copy = () => {
-    const done = () => setCopied(true);
+    setCopyByHand(false);
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(deviceUrl).then(done, () => setMore(true));
-    }
+      navigator.clipboard.writeText(deviceUrl).then(() => setCopied(true), copyByHandNow);
+    } else copyByHandNow();
   };
 
   return (
@@ -258,7 +271,13 @@ export default function PointPairingCard({ locationId }: { locationId: string })
                   Почта
                 </a>
               </div>
+              {copyByHand ? (
+                <p className="text-sm text-[var(--biz-text-muted)]" role="status" data-testid="biz-point-copy-hand">
+                  Ссылка выделена в поле ниже – скопируйте её вручную.
+                </p>
+              ) : null}
               <input
+                ref={linkField}
                 readOnly
                 className="business-app-input w-full text-sm"
                 value={deviceUrl}

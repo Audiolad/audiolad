@@ -6,12 +6,16 @@ import { locationSoundFromRow, locationSoundRpcArgs, type LocationSoundDraft } f
 import { pointMusicAllowed, POINT_MUSIC_FORBIDDEN, soundDraftFromBody } from "@/lib/business-app/point-sound";
 import { isPointCommandId, isPointCommandType } from "@/lib/business-app/point-commands";
 import { isPointToken, BUSINESS_POINT_COOKIE, normalizePointCode, pointCookieOptions } from "@/lib/business-app/point-session";
-import { pointJoinResult } from "@/lib/business-app/point-join";
+import { pointClientIpCollapsed, pointJoinResult } from "@/lib/business-app/point-join";
+import { pointCodeSecondsLeft } from "@/lib/business-app/point-share";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
 import { isSpaLiveReport } from "@/lib/business-app/spa-live-report";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+
+/** Log the collapsed client IP once per server process, not on every attempt. */
+let warnedCollapsedIp = false;
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +60,8 @@ export async function POST(request: Request) {
       return json({ ok: false, error: "Не удалось создать код. Попробуйте ещё раз." });
     }
     const payload = data as { code?: string; expires_at?: string };
-    return json({ ok: true, code: payload.code, expiresAt: payload.expires_at });
+    // Seconds left by the server clock: the card counts down from them, not from the phone clock.
+    return json({ ok: true, code: payload.code, expiresAt: payload.expires_at, expiresIn: pointCodeSecondsLeft(payload.expires_at, Date.now()) });
   }
 
   if (body.action === "join") {
@@ -65,16 +70,26 @@ export async function POST(request: Request) {
     const code = typeof body.code === "string" ? (normalizePointCode(body.code) ?? body.code.slice(0, 16)) : "";
     let data: unknown = null;
     let failed = false;
+    const clientIp = getTrustedClientIp(request);
+    if (pointClientIpCollapsed(clientIp) && !warnedCollapsedIp) {
+      warnedCollapsedIp = true;
+      console.warn(
+        `[business-point] join sees client IP "${clientIp}": nginx passes no X-Real-IP / X-Forwarded-For, so all devices share one attempt limit`,
+      );
+    }
     try {
       const admin = createServiceRoleClient();
       const result = await admin.rpc("redeem_business_point_pairing", {
         p_code: code,
-        p_client_key: getTrustedClientIp(request),
+        p_client_key: clientIp,
       });
       data = result.data;
       failed = Boolean(result.error);
     } catch {
       failed = true;
+    }
+    if (!failed && (data as { burned?: unknown } | null)?.burned === true) {
+      console.warn("[business-point] 30 wrong codes in 20 minutes: all open pairing codes were closed");
     }
     const outcome = pointJoinResult(failed ? null : data);
     if (outcome.ok) {

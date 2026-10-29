@@ -97,6 +97,10 @@ BEGIN
     RAISE EXCEPTION 'not_organization_owner' USING ERRCODE = '42501';
   END IF;
 
+  -- One create per кофейня at a time (double click, two tabs): only one open code
+  -- survives and the 10 codes / 10 minutes count stays exact.
+  PERFORM pg_advisory_xact_lock(hashtext('audiolad:business-point-create:' || p_location_id::text));
+
   SELECT z.id INTO v_zone
   FROM public.business_zones AS z
   WHERE z.location_id = p_location_id AND z.status = 'active'
@@ -258,7 +262,8 @@ BEGIN
     RETURN jsonb_build_object(
       'ok', false,
       'reason', 'invalid_point_code',
-      'attempts_left', greatest(0, c_client_limit - v_client_failures - 1)
+      'attempts_left', greatest(0, c_client_limit - v_client_failures - 1),
+      'burned', v_global_failures >= c_global_limit
     );
   END IF;
 
@@ -328,15 +333,21 @@ $post$;
 
 COMMIT;
 
--- Rollback after a backup and a separate decision (also roll the app back first,
--- because the new app calls redeem_business_point_pairing):
+-- Rollback after a backup and a separate decision. Roll the app back first:
+-- the new app calls redeem_business_point_pairing.
 -- BEGIN;
+-- -- Close every unused code so the old consume (which ignores retired_at) cannot take it either.
+-- UPDATE public.business_point_pairings
+--    SET retired_at = coalesce(retired_at, now()),
+--        expires_at = least(expires_at, now())
+--  WHERE consumed_at IS NULL;
 -- GRANT EXECUTE ON FUNCTION public.consume_business_point_pairing(text) TO anon, authenticated, service_role;
 -- DROP FUNCTION IF EXISTS public.redeem_business_point_pairing(text, text);
--- Re-run create_business_point_pairing from 20270206120000 (10-character codes).
+-- -- Re-run CREATE OR REPLACE FUNCTION public.create_business_point_pairing(uuid) from
+-- -- 20270206120000 (10-character codes) with its REVOKE/GRANT lines.
 -- DROP FUNCTION IF EXISTS public.business_point_random_code();
 -- DROP TABLE IF EXISTS public.business_point_pairing_failures;
--- UPDATE public.business_point_pairings SET retired_at = coalesce(retired_at, now()) WHERE consumed_at IS NULL;
--- DROP INDEX IF EXISTS public.business_point_pairings_open_code_uidx;
--- Old UNIQUE (code_hash) cannot come back while used 4-digit hashes repeat; keep the partial index instead, or delete closed 4-digit rows not referenced by sessions first.
+-- -- KEEP business_point_pairings_open_code_uidx. Do NOT restore UNIQUE (code_hash):
+-- -- used 4-digit hashes repeat and business_point_sessions.pairing_id references them (ON DELETE RESTRICT).
+-- -- retired_at and the (location_id, created_at) index are harmless and stay.
 -- COMMIT;

@@ -29,3 +29,12 @@ export function pointJoinResult(data: unknown): PointJoinResult {
   }
   return { ok: false, status: 503, reason: "join_failed", error: POINT_JOIN_FAILED };
 }
+
+/**
+ * True when the route sees no real client address (nginx sends no X-Real-IP / X-Forwarded-For):
+ * every device would share one per-IP limit. Logged so the misconfiguration is noticed.
+ */
+export function pointClientIpCollapsed(ip: string): boolean {
+  const v = ip.trim().toLowerCase();
+  return v === "unknown" || v === "::1" || /^(?:::ffff:)?127\./.test(v);
+}

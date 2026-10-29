@@ -4,7 +4,8 @@
  * BUSINESS_POINT_PG_TEST_URL points at a throwaway postgres (never production).
  * Builds minimal stubs, the pairing part of 20270206120000, then 20270208120000.
  */
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,13 +19,21 @@ if (!url && !container) {
 if (url && /supabase\.co|audiolad\.ru|timeweb/i.test(url)) throw new Error("refusing a non-isolated database");
 const DB = "audiolad_point_pairing_test";
 
-function run(sql, database) {
+function command(sql, database) {
   const args = ["-v", "ON_ERROR_STOP=1", "-qtA", "-c", sql];
-  const opts = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
-  if (container) {
-    return execFileSync("docker", ["exec", container, "psql", "-U", "postgres", "-d", database, ...args], opts).trim();
-  }
-  return execFileSync("psql", [url.replace(/\/[^/?]*(\?|$)/, `/${database}$1`), ...args], opts).trim();
+  if (container) return ["docker", ["exec", container, "psql", "-U", "postgres", "-d", database, ...args]];
+  return ["psql", [url.replace(/\/[^/?]*(\?|$)/, `/${database}$1`), ...args]];
+}
+
+function run(sql, database) {
+  const [bin, args] = command(sql, database);
+  return execFileSync(bin, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+}
+
+/** Same as run, but in parallel with other calls (separate psql sessions). */
+async function runAsync(sql, database) {
+  const [bin, args] = command(sql, database);
+  return (await promisify(execFile)(bin, args, { encoding: "utf8" })).stdout.trim();
 }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -99,6 +108,12 @@ check(sample.some((c) => c.startsWith("0")), "leading zeros kept");
 const first = create(1).code;
 const second = create(1).code;
 check(Number(psql(`SELECT count(*) FROM business_point_pairings WHERE location_id='${loc(1)}' AND consumed_at IS NULL AND retired_at IS NULL`)) === 1, "one open per location");
+
+// Two creates at once for one кофейня (double click, two tabs): still one open code.
+const slowCreate = () => runAsync(`SET test.uid = '00000000-0000-0000-0000-0000000000aa'; BEGIN; SELECT public.create_business_point_pairing('${loc(8)}'); SELECT pg_sleep(0.7); COMMIT;`, DB);
+await Promise.all([slowCreate(), slowCreate()]);
+const openAfterRace = Number(psql(`SELECT count(*) FROM business_point_pairings WHERE location_id='${loc(8)}' AND consumed_at IS NULL AND retired_at IS NULL`));
+check(openAfterRace === 1, `concurrent creates leave one open code, got ${openAfterRace}`);
 
 // Collision retry: force the generator through a sequence that starts with an open code.
 psql(`CREATE TABLE public.t_seq (n int); INSERT INTO public.t_seq VALUES (0);

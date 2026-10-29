@@ -36,6 +36,18 @@ export function pointCodeSecondsLeft(expiresAt: string | null | undefined, nowMs
   return Math.max(0, Math.floor((at - nowMs) / 1000));
 }
 
+/**
+ * When the code ends on this device's clock: received time + seconds left by the server.
+ * Immune to a phone clock that runs fast or slow. Falls back to the absolute expiry.
+ */
+export function pointCodeDeadline(expiresIn: unknown, expiresAt: string | null | undefined, receivedAtMs: number): number {
+  if (typeof expiresIn === "number" && Number.isFinite(expiresIn) && expiresIn >= 0) {
+    return receivedAtMs + Math.floor(expiresIn) * 1000;
+  }
+  const at = expiresAt ? Date.parse(expiresAt) : NaN;
+  return Number.isFinite(at) ? at : receivedAtMs;
+}
+
 /** Russian minutes for the retry hint: 1 минуту, 2 минуты, 5 минут. */
 export function pointWaitMinutes(seconds: number): string {
   const n = Math.max(1, Math.ceil(seconds / 60));

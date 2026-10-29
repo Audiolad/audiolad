@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { pointJoinResult, POINT_JOIN_WRONG } from "../src/lib/business-app/point-join";
+import { pointClientIpCollapsed, pointJoinResult, POINT_JOIN_WRONG } from "../src/lib/business-app/point-join";
 import {
   BUSINESS_POINT_COOKIE,
   formatPointCode,
@@ -11,6 +11,7 @@ import {
   pointCookieOptions,
 } from "../src/lib/business-app/point-session";
 import {
+  pointCodeDeadline,
   pointCodeSecondsLeft,
   pointDeviceLink,
   pointMailtoUrl,
@@ -62,6 +63,10 @@ assert.ok(decodeURIComponent(pointMailtoUrl(link, text)).includes(link));
 assert.equal(pointCodeSecondsLeft("2026-10-29T08:20:00.000Z", Date.parse("2026-10-29T08:00:00.000Z")), 1200);
 assert.equal(pointCodeSecondsLeft("2026-10-29T08:00:00.000Z", Date.parse("2026-10-29T08:00:01.000Z")), 0);
 assert.equal(pointCodeSecondsLeft(null, 0), 0);
+// Countdown from the server's seconds left, not the phone clock.
+assert.equal(pointCodeDeadline(1200, "2000-01-01T00:00:00.000Z", 5_000), 5_000 + 1_200_000);
+assert.equal(pointCodeDeadline(undefined, "2026-10-29T08:20:00.000Z", 0), Date.parse("2026-10-29T08:20:00.000Z"));
+assert.equal(pointCodeDeadline(-5, null, 7), 7);
 assert.equal(pointWaitMinutes(30), "1 минуту");
 assert.equal(pointWaitMinutes(130), "3 минуты");
 assert.equal(pointWaitMinutes(600), "10 минут");
@@ -88,8 +93,15 @@ assert.equal(pointJoinResult({ ok: true, token: "short" }).ok, false, "a bad tok
 const route = readFileSync(new URL("../src/app/api/business/point/route.ts", import.meta.url), "utf8");
 assert.match(route, /createServiceRoleClient\(\)/);
 assert.match(route, /"redeem_business_point_pairing"/);
-assert.match(route, /p_client_key: getTrustedClientIp\(request\)/);
+assert.match(route, /const clientIp = getTrustedClientIp\(request\)[\s\S]*p_client_key: clientIp/);
 assert.doesNotMatch(route, /"consume_business_point_pairing"/);
+assert.match(route, /expiresIn: pointCodeSecondsLeft\(payload\.expires_at, Date\.now\(\)\)/);
+assert.match(route, /pointClientIpCollapsed\(clientIp\)/);
+assert.equal(pointClientIpCollapsed("unknown"), true);
+assert.equal(pointClientIpCollapsed("127.0.0.1"), true);
+assert.equal(pointClientIpCollapsed("::1"), true);
+assert.equal(pointClientIpCollapsed("::ffff:127.0.0.1"), true);
+assert.equal(pointClientIpCollapsed("203.0.113.7"), false);
 
 // Device page: numeric keypad, 4 digits, fragment cleared.
 const page = readFileSync(new URL("../src/app/business-app/point/page.tsx", import.meta.url), "utf8");
@@ -110,6 +122,8 @@ assert.match(card, /Скопировать ссылку/);
 assert.match(card, /pointTelegramShareUrl/);
 assert.match(card, /pointMailtoUrl/);
 assert.match(card, /<PointQrCode/);
+assert.match(card, /pointCodeDeadline\(json\.expiresIn/);
+assert.match(card, /скопируйте её вручную/);
 const qr = readFileSync(new URL("../src/components/business-app/PointQrCode.tsx", import.meta.url), "utf8");
 assert.match(qr, /from "qrcode-generator"/);
 assert.doesNotMatch(qr, /https?:\/\//, "QR is drawn locally");
