@@ -37,6 +37,8 @@ export type BackfillTrackInput = {
   /** practice_audio | music_master | missing (resolved like the wizard does). */
   source: "practice_audio" | "music_master" | "missing";
   sizeBytes: number | null;
+  /** Effective duration of the analysis source. */
+  durationSeconds: number | null;
   prepareInFlight: boolean;
   prepareFailed: boolean;
 };
@@ -50,12 +52,13 @@ export type BackfillTrackClass =
   | "blocked_missing_audio"
   | "blocked_preparing"
   | "blocked_prepare_failed"
+  | "blocked_too_long"
   | "blocked_file_too_large"
   | "candidate";
 
 export function classifyBackfillTrack(
   track: BackfillTrackInput,
-  options: { retryFailed?: boolean; enqueueErrors?: ReadonlySet<string> } = {},
+  options: { retryFailed?: boolean; enqueueErrors?: ReadonlySet<string>; maxDurationSeconds?: number | null } = {},
 ): BackfillTrackClass {
   if (track.hasPassport) return "has_passport";
   if (track.latestRunStatus === "queued" || track.latestRunStatus === "processing") return "in_flight";
@@ -66,6 +69,10 @@ export function classifyBackfillTrack(
   if (track.prepareFailed) return "blocked_prepare_failed";
   if (typeof track.sizeBytes === "number" && track.sizeBytes > MUSIC_ANALYZER_MAX_UPLOAD_BYTES) {
     return "blocked_file_too_large";
+  }
+  if (typeof options.maxDurationSeconds === "number" && options.maxDurationSeconds > 0
+    && typeof track.durationSeconds === "number" && track.durationSeconds > options.maxDurationSeconds) {
+    return "blocked_too_long";
   }
   if (track.latestRunStatus === "failed" && !options.retryFailed) return "previously_failed";
   if (options.enqueueErrors?.has(track.audioItemId)) return "enqueue_error";
@@ -149,6 +156,7 @@ function emptyCounts(): Record<BackfillTrackClass, number> {
     blocked_preparing: 0,
     blocked_prepare_failed: 0,
     blocked_file_too_large: 0,
+    blocked_too_long: 0,
     candidate: 0,
   };
 }
@@ -158,6 +166,7 @@ export function summarizeBackfill(input: {
   tracks: readonly BackfillTrackInput[];
   retryFailed?: boolean;
   enqueueErrors?: ReadonlySet<string>;
+  maxDurationSeconds?: number | null;
 }): { projects: BackfillProjectSummary[]; total: BackfillProjectSummary } {
   const total: BackfillProjectSummary = {
     slug: "*",
@@ -203,6 +212,7 @@ export function orderBackfillCandidates(input: {
   practiceOrder: ReadonlyMap<string, number>;
   retryFailed?: boolean;
   enqueueErrors?: ReadonlySet<string>;
+  maxDurationSeconds?: number | null;
 }): BackfillTrackInput[] {
   const authorRank = new Map(sortAuthors(input.authors).map((author, index) => [author.id, index]));
   return input.tracks
@@ -309,6 +319,7 @@ export type BackfillArgs = {
   excludeAuthors: string[];
   window: BackfillWindow;
   maxInflight: number;
+  maxDurationSeconds: number | null;
   perTick: number;
   maxPerRun: number;
   loop: boolean;
@@ -338,6 +349,7 @@ export function parseBackfillArgs(argv: readonly string[]): BackfillArgs {
     excludeAuthors: [],
     window: parseBackfillWindow(MUSIC_PASSPORT_BACKFILL_DEFAULT_WINDOW) as BackfillWindow,
     maxInflight: 1,
+    maxDurationSeconds: null,
     perTick: 1,
     maxPerRun: 1,
     loop: false,
@@ -371,6 +383,7 @@ export function parseBackfillArgs(argv: readonly string[]): BackfillArgs {
         args.window = parsed;
         break;
       }
+      case "--max-duration-sec": args.maxDurationSeconds = positiveInt(flag, value(), 86400); break;
       case "--max-inflight": args.maxInflight = positiveInt(flag, value(), 4); break;
       case "--per-tick": args.perTick = positiveInt(flag, value(), 4); break;
       case "--max-per-run": args.maxPerRun = positiveInt(flag, value(), 1000); explicitMaxPerRun = true; break;
