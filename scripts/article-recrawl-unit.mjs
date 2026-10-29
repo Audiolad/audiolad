@@ -28,7 +28,7 @@ import {
 import { isAudioladRecrawlUrl } from "../src/lib/seo/search-recrawl/origin.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const COFFEE_PATH = "/b/coffee/muzyka-dlya-kofeyni";
+const COFFEE_PATH = "/b/coffee/kofe-v-zernah-dlya-kofeyni";
 
 // --- current entries mirror the published article set
 const entries = listArticleRecrawlEntries();

@@ -9,6 +9,10 @@ export type ExpertQuote = {
   sourceUrl: string;
   sourceDate: string | null;
   context: string;
+  /** Language of `text`. A quote that is not Russian is shown with a labelled translation. */
+  language?: "ru" | "en";
+  /** Plain-text source line printed on the page after «Источник:». Never a URL. */
+  sourceLabel?: string;
 };
 
 export type CoffeeExpert = {
@@ -22,6 +26,10 @@ export type CoffeeExpert = {
   role: string;
   competence: string;
   competenceUrl: string;
+  /**
+   * Required: an expert without a real, freely licensed portrait does not go into the registry
+   * (no initials placeholders). `credit` is printed on the page and must be Russian only.
+   */
   photo: {
     file: string;
     commonsPage: string;
@@ -44,7 +52,10 @@ const ALLOWED_LICENSES = new Set([
   "CC BY-SA 4.0",
 ]);
 
-export const COFFEE_EXPERTS = registryJson.experts as readonly CoffeeExpert[];
+/** Latin letters are not allowed in anything the guide prints (owner rule, 2026-10-29). */
+export const HAS_LATIN = /[A-Za-z]/;
+
+export const COFFEE_EXPERTS = registryJson.experts as unknown as readonly CoffeeExpert[];
 
 export function getCoffeeExpert(id: string): CoffeeExpert | null {
   return COFFEE_EXPERTS.find((expert) => expert.id === id) ?? null;
@@ -78,6 +89,9 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     if (expert.quotes.length < 1 || expert.quotes.length > 2) {
       throw new Error(`${expert.id}: need 1 or 2 quotes`);
     }
+    if (!expert.photo) {
+      throw new Error(`${expert.id}: a real portrait is required, no initials placeholders`);
+    }
     if (!ALLOWED_LICENSES.has(expert.photo.license)) {
       throw new Error(`${expert.id}: license ${expert.photo.license} is not in the allowlist`);
     }
@@ -86,6 +100,9 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     }
     if (!expert.photo.credit || /https?:\/\//.test(expert.photo.credit)) {
       throw new Error(`${expert.id}: visible credit must name the author without a URL`);
+    }
+    if (HAS_LATIN.test(expert.photo.credit)) {
+      throw new Error(`${expert.id}: visible photo credit must be Russian only`);
     }
     for (const quote of expert.quotes) {
       if (quote.text.trim().length < 40) {
@@ -96,6 +113,9 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
       }
       if (!quote.context.trim()) {
         throw new Error(`${expert.id}: quote context is required`);
+      }
+      if (quote.sourceLabel !== undefined && (!quote.sourceLabel.trim() || /https?:\/\/|www\./.test(quote.sourceLabel))) {
+        throw new Error(`${expert.id}: source label must be plain text without a URL`);
       }
     }
   }

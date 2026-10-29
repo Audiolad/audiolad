@@ -4,10 +4,18 @@
   --guide-ink: #2c2018;
   --guide-muted: #6f5b4c;
   --guide-line: rgba(84, 56, 32, 0.16);
-  --guide-accent: #8e1f22;
+  --guide-accent: #7c2d12;
   --guide-accent-ink: #fff8ef;
-  --guide-gold: #c49b55;
+  --guide-gold: #c4a574;
   --guide-deep: #22150d;
+  /* Ported from sergey-zoya.ru article blocks. */
+  --guide-card-warm: #fffcf9;
+  --guide-border: #e7e5e4;
+  --guide-cream: #faf6ef;
+  --guide-cream-border: #eadfce;
+  --guide-lavender: #f3eef7;
+  --guide-lavender-ink: #5b4570;
+  --guide-espresso: #2a1a10;
   --guide-display: var(--font-guide-serif), "Iowan Old Style", Georgia, serif;
   background: var(--guide-bg);
   color: var(--guide-ink);
@@ -160,26 +168,26 @@
   margin: 22px 0 8px;
 }
 
+/* Vertical rhythm between blocks. Margin, not padding: .guide-wrap owns the side padding. */
 .guide-block {
-  padding: 28px 20px 8px;
+  margin-top: clamp(36px, 5vw, 52px);
+}
+
+.guide-intro {
+  margin-top: 8px;
 }
 
 .guide-figure {
   margin: 28px 0;
 }
 
-.guide-figure img,
-.guide-expert__photo img {
+.guide-figure img {
   width: 100%;
   height: auto;
   border-radius: 22px;
 }
 
-.guide-figure figcaption,
-.guide-expert__credit,
-.guide-offer__note,
-.guide-player__note,
-.guide-translation {
+.guide-figure figcaption {
   color: var(--guide-muted);
   font-size: 0.95rem;
   line-height: 1.5;
@@ -190,7 +198,7 @@
   font-size: clamp(1.35rem, 2.4vw, 1.7rem);
   font-weight: 600;
   line-height: 1.3;
-  margin: 0 0 16px;
+  margin: 0 0 18px;
 }
 
 .guide-cups {
@@ -278,19 +286,22 @@
   border: 0;
 }
 
-.b2b-guide a.guide-cups__max,
-.b2b-guide a.guide-cups__max:hover {
+/* ---------- MAX button (slider and final block) ---------- */
+
+.b2b-guide a.guide-max,
+.b2b-guide a.guide-max:hover {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   width: 100%;
+  max-width: 680px;
   min-height: 64px;
-  margin: 18px auto 0;
+  margin: 18px 0 0;
   padding: 12px 22px 12px 14px;
   border-radius: 999px;
-  background: linear-gradient(100deg, #5b46f8 0%, #7c3aed 52%, #c026d3 100%);
-  box-shadow: 0 12px 28px rgba(110, 50, 210, 0.28);
+  background: linear-gradient(100deg, #5533ee, #7a33e4 55%, #9933dd);
+  box-shadow: 0 12px 28px rgba(110, 50, 210, 0.26);
   color: #fff;
   font-weight: 700;
   font-size: clamp(0.98rem, 2.5vw, 1.12rem);
@@ -299,7 +310,7 @@
   text-decoration: none;
 }
 
-.guide-cups__max-icon {
+.guide-max__icon {
   width: 42px;
   height: 42px;
   border-radius: 12px;
@@ -309,86 +320,454 @@
   flex: none;
 }
 
-.guide-cups__max-icon img {
+.guide-max__icon img {
   width: 32px;
   height: 32px;
   border-radius: 8px;
 }
 
-.guide-cups__notes {
-  margin-top: 26px;
-  max-width: 68ch;
+/* ---------- Atlas cover banner ---------- */
+
+.b2b-guide a.guide-atlas-hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 22px;
+  align-items: center;
+  padding: clamp(22px, 4vw, 36px);
+  border-radius: 28px;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(196, 165, 116, 0.18), transparent 60%),
+    linear-gradient(150deg, #3a2417, var(--guide-espresso) 60%, #1b110a);
+  color: #f6ead7;
+  text-decoration: none;
+  box-shadow: 0 18px 40px rgba(42, 26, 16, 0.22);
 }
 
-.guide-cups__notes ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.guide-atlas-hero__text {
   display: grid;
   gap: 12px;
+  justify-items: start;
 }
 
-.guide-cups__notes strong {
+.guide-atlas-hero__kicker {
+  color: var(--guide-gold);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.guide-atlas-hero__title {
+  color: #fff8ef;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+
+.guide-atlas-hero__subtitle {
+  color: #e9dccb;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  max-width: 44ch;
+}
+
+.guide-atlas-hero__question {
+  color: var(--guide-gold);
   font-family: var(--guide-display);
+  font-style: italic;
+  font-size: 1.2rem;
+}
+
+.guide-atlas-hero__button,
+.guide-atlas-cards__button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  background: var(--guide-gold);
+  color: var(--guide-espresso);
+  font-weight: 700;
+}
+
+.guide-atlas-hero__cover {
+  justify-self: center;
+  width: min(220px, 60vw);
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(196, 165, 116, 0.55);
+  box-shadow: 0 0 0 6px rgba(196, 165, 116, 0.12), 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.guide-atlas-hero__cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.b2b-guide a.guide-atlas-hero:hover .guide-atlas-hero__button,
+.b2b-guide a.guide-atlas-cards:hover .guide-atlas-cards__button {
+  background: #d6b98a;
+}
+
+/* ---------- «10 кофеен» banner ---------- */
+
+.b2b-guide a.guide-atlas-cards {
+  display: grid;
+  gap: 22px;
+  justify-items: start;
+  padding: clamp(20px, 3.5vw, 32px);
+  border-radius: 28px;
+  background: var(--guide-cream);
+  border: 1px solid var(--guide-cream-border);
+  color: var(--guide-ink);
+  text-decoration: none;
+}
+
+.guide-atlas-cards__head {
+  display: grid;
+  gap: 10px;
+}
+
+.guide-atlas-cards__title {
+  font-size: clamp(1.7rem, 3.6vw, 2.4rem);
+  color: var(--guide-accent);
+}
+
+.guide-atlas-cards__subtitle {
+  color: var(--guide-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  max-width: 60ch;
+}
+
+.guide-atlas-cards__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.guide-atlas-cards__chip {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--guide-lavender);
+  color: var(--guide-lavender-ink);
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
-.guide-band {
-  margin-top: 28px;
-  background: var(--guide-deep);
-  color: #f6ead7;
-  padding: 36px 0;
-}
-
-.guide-band a {
-  color: #f0d7b0;
-}
-
-.guide-listen {
+.guide-atlas-cards__grid {
+  width: 100%;
   display: grid;
-  gap: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.guide-player__row,
-.guide-player__empty {
-  background: #fffaf3;
-  color: var(--guide-ink);
-  border-radius: 22px;
-  padding: 16px;
+.guide-atlas-cards__button {
+  background: var(--guide-accent);
+  color: #fff8ef;
 }
 
-.guide-player__row {
+.b2b-guide a.guide-atlas-cards:hover .guide-atlas-cards__button {
+  background: #9a3c1c;
+}
+
+.guide-atlas-card {
   display: grid;
-  grid-template-columns: 84px 1fr auto;
+  grid-template-rows: auto 1fr;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--card-surface);
+  color: var(--card-ink);
+  border: 1px solid color-mix(in srgb, var(--card-ink) 12%, transparent);
+  box-shadow: 0 8px 20px rgba(42, 26, 16, 0.08);
+}
+
+.guide-atlas-card__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 756 / 807;
+}
+
+.guide-atlas-card__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.guide-atlas-card__number {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--card-accent);
+  color: var(--card-accent-ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-atlas-card__body {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 10px 12px 12px;
+}
+
+.guide-atlas-card__place {
+  color: var(--card-accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-atlas-card="starbucks-reserve-shanghai"] .guide-atlas-card__place,
+[data-atlas-card="truth-coffee-roasting"] .guide-atlas-card__place,
+[data-atlas-card="single-o-surry-hills"] .guide-atlas-card__place,
+[data-atlas-card="coffee-collective"] .guide-atlas-card__place {
+  color: var(--card-muted);
+}
+
+.guide-atlas-card__name {
+  font-family: var(--guide-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  line-height: 1.2;
+}
+
+.guide-atlas-card__tags {
+  color: var(--card-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+/* ---------- Table ---------- */
+
+.guide-table__scroll {
+  overflow-x: auto;
+  margin: 18px 0;
+  border-radius: 14px;
+}
+
+.guide-wrap.guide-prose > .guide-table__scroll {
+  max-width: none;
+}
+
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  background: var(--guide-card-warm);
+}
+
+.guide-table th,
+.guide-table td {
+  border: 1px solid var(--guide-cream-border);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.guide-table thead th {
+  background: #f1e6d6;
+  color: var(--guide-accent);
+  font-weight: 650;
+}
+
+.guide-table tbody tr:nth-child(even) {
+  background: var(--guide-cream);
+}
+
+.guide-table tbody th {
+  font-weight: 650;
+}
+
+/* ---------- Expert card ---------- */
+
+.guide-expert {
+  background: var(--guide-card-warm);
+  border: 1px solid var(--guide-border);
+  border-radius: 20px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.guide-expert__person {
+  display: flex;
   gap: 14px;
   align-items: center;
 }
 
-.guide-player__title {
-  font-weight: 700;
-  text-decoration: none;
+.guide-expert__person p {
+  margin: 0;
 }
 
-.guide-player__play {
-  width: 52px;
-  height: 52px;
+.guide-expert__photo {
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  border: 0;
-  background: var(--guide-accent);
-  color: var(--guide-accent-ink);
+  flex: none;
+  object-fit: cover;
+}
+
+.guide-block p.guide-expert__name {
+  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.guide-block p.guide-expert__role {
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.75;
+}
+
+.guide-block p.guide-expert__credit {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.55;
+}
+
+.guide-expert__heading {
+  font-size: 1.45rem;
+  margin: 20px 0 6px;
+}
+
+.guide-block p.guide-expert__source {
+  margin: 0 0 14px;
+  color: var(--guide-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.guide-expert__quote {
+  margin: 16px 0;
+  padding: 14px 18px;
+  border-left: 4px solid var(--guide-accent);
+  border-radius: 4px 14px 14px 4px;
+  background: rgba(124, 45, 18, 0.06);
+}
+
+.guide-block .guide-expert__quote p {
+  margin: 0;
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.6;
+}
+
+.guide-block p.guide-expert__translation-note {
+  margin: -6px 0 16px;
+  color: var(--guide-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* ---------- Steps ---------- */
+
+.guide-steps {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 22px;
+}
+
+.guide-steps__item {
+  position: relative;
+  padding-left: 3.1rem;
+}
+
+.guide-steps__item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 1.05rem;
+  top: 2.4rem;
+  bottom: -22px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--guide-gold), rgba(196, 165, 116, 0.15));
+}
+
+.guide-steps__num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
   display: grid;
   place-items: center;
+  background: linear-gradient(145deg, #9a3c1c, var(--guide-accent));
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px var(--guide-card-warm), 0 0 0 4px var(--guide-gold);
 }
 
+.guide-steps__title {
+  margin: 0.25rem 0 6px;
+  font-family: var(--guide-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ---------- Checklist ---------- */
+
 .guide-check {
-  border: 0;
   margin: 0;
+  min-width: 0;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid var(--guide-border);
+  border-radius: 20px;
+  background: var(--guide-card-warm);
+  transition: border-color 0.35s;
+}
+
+.guide-check.is-complete {
+  border-color: #e9b68f;
+}
+
+.guide-check legend {
+  float: left;
+  width: 100%;
   padding: 0;
+}
+
+.guide-block p.guide-check__progress {
+  clear: both;
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+}
+
+.guide-check__count {
+  color: var(--guide-accent);
+  font-weight: 600;
+}
+
+.guide-check__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #f1e6d6;
+  overflow: hidden;
+}
+
+.guide-check__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #e9b68f, var(--guide-accent));
+  transition: width 0.35s;
 }
 
 .guide-check ul {
   list-style: none;
   padding: 0;
+  margin: 16px 0;
 }
 
 .guide-check li {
@@ -399,60 +778,68 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  background: var(--guide-surface);
-  border-radius: 16px;
-  padding: 14px 16px;
-  line-height: 1.45;
+  background: var(--guide-cream);
+  border: 1px solid var(--guide-cream-border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  line-height: 1.5;
+  cursor: pointer;
 }
 
 .guide-check input {
   width: 1.15rem;
   height: 1.15rem;
   margin-top: 0.2rem;
+  flex: none;
   accent-color: var(--guide-accent);
 }
 
-.guide-experts {
-  display: grid;
-  gap: 22px;
-}
-
-.guide-expert {
-  display: grid;
-  gap: 16px;
-  background: var(--guide-surface);
-  border-radius: 22px;
-  padding: 16px;
-  border: 1px solid var(--guide-line);
-}
-
-.guide-quote {
-  margin: 12px 0;
-  padding-left: 14px;
-  border-left: 3px solid var(--guide-gold);
-}
-
-.guide-quote p {
-  font-family: var(--guide-display);
-  font-size: 1.2rem;
-  line-height: 1.45;
-}
-
-.guide-quote figcaption {
+.guide-block p.guide-check__note {
+  margin: 0;
   color: var(--guide-muted);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
+
+/* ---------- FAQ, final block, read more ---------- */
 
 .guide-faq details {
-  background: var(--guide-surface);
+  background: var(--guide-card-warm);
+  border: 1px solid var(--guide-border);
   border-radius: 16px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   margin: 10px 0;
 }
 
 .guide-faq summary {
   cursor: pointer;
-  font-weight: 680;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.guide-faq details p {
+  margin: 10px 0 0;
+}
+
+.guide-final {
+  display: grid;
+  justify-items: start;
+}
+
+.guide-block p.guide-final__question {
+  margin: 0 0 18px;
+  max-width: 34ch;
+  font-family: var(--guide-display);
+  font-size: clamp(1.45rem, 3vw, 1.9rem);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.guide-final__image {
+  width: 100%;
+  max-width: 680px;
+  height: auto;
+  border-radius: 28px;
 }
 
 .guide-links {
@@ -464,19 +851,11 @@
 
 .guide-links a {
   display: block;
-  background: var(--guide-surface);
+  background: var(--guide-card-warm);
   border-radius: 16px;
   padding: 14px 16px;
   text-decoration: none;
-  border: 1px solid var(--guide-line);
-}
-
-.guide-offer {
-  margin: 28px auto 12px;
-  background: #fffaf3;
-  border-radius: 22px;
-  padding: 22px 20px;
-  border: 1px solid var(--guide-line);
+  border: 1px solid var(--guide-border);
 }
 
 .guide-footer {
@@ -529,6 +908,17 @@
   .guide-cups__scroller {
     scroll-behavior: auto;
   }
+
+  .guide-check,
+  .guide-check__fill {
+    transition: none;
+  }
+}
+
+@media (min-width: 600px) {
+  .guide-atlas-cards__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 720px) {
@@ -536,14 +926,14 @@
     padding: 0 32px;
   }
 
-  .guide-listen,
-  .guide-expert {
-    grid-template-columns: 220px 1fr;
-    align-items: start;
+  .b2b-guide a.guide-atlas-hero {
+    grid-template-columns: 1fr 220px;
   }
+}
 
-  .guide-listen {
-    grid-template-columns: 1fr 1.1fr;
+@media (min-width: 900px) {
+  .guide-atlas-cards__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -560,12 +950,12 @@
     justify-content: flex-start;
   }
 
-  .guide-player__row {
-    grid-template-columns: 72px 1fr;
+  .guide-table {
+    font-size: 0.875rem;
   }
 
-  .guide-player__play {
-    grid-column: 2;
-    justify-self: start;
+  .guide-table th,
+  .guide-table td {
+    padding: 8px 9px;
   }
 }

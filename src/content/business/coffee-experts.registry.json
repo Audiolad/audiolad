@@ -10,32 +10,68 @@
       "countryCode": "RU",
       "origin": "ru",
       "gender": "woman",
-      "role": "Основательница сети кофеен",
-      "competence": "В интервью Радио Свобода от 6 января 2019 года она названа основателем и генеральным директором сети кофеен «Даблби».",
-      "competenceUrl": "https://www.svoboda.org/a/29693086.html",
+      "role": "Основательница сети кофеен «Даблби»",
+      "competence": "В интервью порталу «Что делать Консалт» от 26 апреля 2019 года она названа основателем сети кофеен «Даблби»; там же она рассказывает, как сеть закупает и обжаривает зерно.",
+      "competenceUrl": "https://www.4dk.ru/content/art/5924-d-kofe-trebuet-beskompromissnogo-podkhoda-intervyu-s-annoy-tsfasman-20190426",
       "photo": {
         "file": "/business/coffee-guides/experts/anna-tsfasman.jpg",
         "commonsPage": "https://commons.wikimedia.org/wiki/File:Anna_Tsfasman.jpg",
         "license": "CC0",
         "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
         "author": "Андрей Ильин",
-        "credit": "Фото: Андрей Ильин, «Бизнес-журнал», лицензия CC0",
+        "credit": "Фото: Андрей Ильин, «Бизнес-журнал», Викисклад, передано в общественное достояние",
         "rightsNote": "Шаблон Business journal на Wikimedia Commons ссылается на разрешение правообладателя, тикет VRT 2014051310011179."
       },
       "quotes": [
         {
-          "text": "Ну, кофе это не очень музыкальная история, хотя маркетологи иногда приходят с тем, что можно как-то это обыграть, потому что в кофе очень много нот, и когда мы описываем вкус кофе, чаще всего мы описываем его через ноты, которые мы улавливаем в аромате, во вкусе, послевкусии.",
-          "sourceTitle": "Быстрое движение. Анна Цфасман о двоюродном дедушке, бабушке Бэтмен, кофе и музыке",
-          "sourceUrl": "https://www.svoboda.org/a/29693086.html",
-          "sourceDate": "2019-01-06",
-          "context": "Елена Поляковская и Юрий Лебедев спросили, почему она занялась кофе и услышала ли в нём музыку. Это первое предложение ответа. Дальше в том же ответе она говорит о дегустационных нотах, об уютном напитке и о беседе."
+          "text": "Мы обжариваем зерно в специальных ростерах разными способами: отдельно для эспрессо, отдельно для немашинных методов заваривания. Обжарка определяет вкус кофе.",
+          "sourceTitle": "«Кофе требует бескомпромиссного подхода»: интервью с Анной Цфасман",
+          "sourceUrl": "https://www.4dk.ru/content/art/5924-d-kofe-trebuet-beskompromissnogo-podkhoda-intervyu-s-annoy-tsfasman-20190426",
+          "sourceDate": "2019-04-26",
+          "language": "ru",
+          "sourceLabel": "интервью «Кофе требует бескомпромиссного подхода», портал «Что делать Консалт», 26 апреля 2019 года",
+          "context": "Ответ на вопрос о том, какой труд стоит за хорошим продуктом. Перед этим она рассказывает об экспериментах главного обжарщика на плантациях, вакуумных мешках для перевозки зерна и пачках с клапанами; дальше о том, что «Даблби» использует только светлую обжарку."
         },
         {
-          "text": "Скорее это напиток, который помогает провести время в приятной беседе.",
-          "sourceTitle": "Быстрое движение. Анна Цфасман о двоюродном дедушке, бабушке Бэтмен, кофе и музыке",
-          "sourceUrl": "https://www.svoboda.org/a/29693086.html",
-          "sourceDate": "2019-01-06",
-          "context": "То же интервью и тот же ответ. Перед этой фразой она говорит, что бодрящая ассоциация отходит на второй план. Это не совет, какую музыку включить в зале."
+          "text": "После обжарки у нас есть месяц, чтобы приготовить кофе для наших гостей. Поскольку после месяца хранения кофе начинает терять свои вкусоароматические свойства.",
+          "sourceTitle": "«Кофе требует бескомпромиссного подхода»: интервью с Анной Цфасман",
+          "sourceUrl": "https://www.4dk.ru/content/art/5924-d-kofe-trebuet-beskompromissnogo-podkhoda-intervyu-s-annoy-tsfasman-20190426",
+          "sourceDate": "2019-04-26",
+          "language": "ru",
+          "sourceLabel": "интервью «Кофе требует бескомпромиссного подхода», портал «Что делать Консалт», 26 апреля 2019 года",
+          "context": "Тот же ответ, следующий абзац. Дальше она говорит о подборе воды и обучении бариста."
+        }
+      ]
+    },
+    {
+      "id": "dmitry-kotov",
+      "name": "Дмитрий Котов",
+      "nameOriginal": "Дмитрий Котов",
+      "country": "Россия",
+      "countryCode": "RU",
+      "origin": "ru",
+      "gender": "man",
+      "role": "Владелец сети кофеен в Геленджике",
+      "competence": "В статье «Краснодарских известий» от 18 июля 2025 года рассказано, что двадцать лет назад он открыл в Геленджике чайный магазин, к чаю позже добавил кофе, а из магазина выросла сеть кофеен.",
+      "competenceUrl": "https://ki-news.ru/article/kurort-na-konchike-yazyka-kak-lyubov-k-chayu-vyrosla-v-set-kofeen-v-gelendzhike/",
+      "photo": {
+        "file": "/business/coffee-guides/experts/dmitry-kotov.webp",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Dmitry_Ivanovich_Kotov_in_2023.jpg",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "author": "Genriettta",
+        "credit": "Фото: Генриеттта, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 4.0», кадрировано",
+        "rightsNote": "Загружено участником Genriettta как собственная работа, снимок от 15 июня 2023 года. Описание файла на Викискладе: «Дмитрий Иванович Котов – российский предприниматель, ресторатор, основатель компании «KOTOV Family Group»». Для карточки снимок кадрирован до квадрата 480×480 и сохранён в webp; кадрированная версия распространяется на тех же условиях (CC BY-SA 4.0)."
+      },
+      "quotes": [
+        {
+          "text": "Нашли этот чудесный старый дом 1903 года постройки и продавали в нем 50 сортов чая, больше ничего. Позже к чаю добавили 30 сортов кофе, а затем и сладости. Пристроили зону для кафе, и оно получилось уютным и популярным.",
+          "sourceTitle": "Курорт на кончике языка: как любовь к чаю выросла в сеть кофеен в Геленджике",
+          "sourceUrl": "https://ki-news.ru/article/kurort-na-konchike-yazyka-kak-lyubov-k-chayu-vyrosla-v-set-kofeen-v-gelendzhike/",
+          "sourceDate": "2025-07-18",
+          "language": "ru",
+          "sourceLabel": "статья «Курорт на кончике языка: как любовь к чаю выросла в сеть кофеен в Геленджике», газета «Краснодарские известия», 18 июля 2025 года",
+          "context": "Рассказ о том, с чего начался бизнес. Перед этим он говорит, что захотел открыть на курорте маленький уютный чайный магазин с большим выбором чая. В источнике цитата заканчивается запятой перед словами автора «– рассказывает Дмитрий»; здесь вместо запятой точка. Автор статьи – Анастасия Камнева."
         }
       ]
     },
@@ -56,7 +92,7 @@
         "license": "CC BY-SA 3.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
         "author": "Gage Skidmore",
-        "credit": "Фото: Gage Skidmore, лицензия CC BY-SA 3.0",
+        "credit": "Фото: Гейдж Скидмор, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 3.0»",
         "rightsNote": "Свободная лицензия на снимок. Портрет живого человека: авторские права и право на изображение – разные вещи, это отмечено для приёмки."
       },
       "quotes": [
@@ -86,7 +122,7 @@
         "license": "CC BY 2.0",
         "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
         "author": "Bex Harrison",
-        "credit": "Фото: Bex Harrison, лицензия CC BY 2.0",
+        "credit": "Фото: Бекс Харрисон, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства 2.0»",
         "rightsNote": ""
       },
       "quotes": [
@@ -123,7 +159,7 @@
         "license": "CC BY-SA 2.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
         "author": "Dennis Tang",
-        "credit": "Фото: Dennis Tang, лицензия CC BY-SA 2.0",
+        "credit": "Фото: Деннис Тан, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 2.0»",
         "rightsNote": "Длинное тире источника в сохранённой строке заменено на среднее «–». На пилотной странице цитата не выводится: в тексте Анна Цфасман и Говард Шульц."
       },
       "quotes": [
@@ -153,7 +189,7 @@
         "license": "CC BY-SA 2.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
         "author": "World Economic Forum / Benedikt Loebell",
-        "credit": "Фото: World Economic Forum, Benedikt Loebell, лицензия CC BY-SA 2.0",
+        "credit": "Фото: Всемирный экономический форум, Бенедикт Лёбелль, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 2.0»",
         "rightsNote": ""
       },
       "quotes": [
@@ -183,7 +219,7 @@
         "license": "CC BY 4.0",
         "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
         "author": "Kevin Paul",
-        "credit": "Фото: Kevin Paul, лицензия CC BY 4.0",
+        "credit": "Фото: Кевин Пол, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства 4.0»",
         "rightsNote": "На странице файла есть стандартное предупреждение Commons о правах на изображение личности. Авторские права на снимок свободные."
       },
       "quotes": [
@@ -213,7 +249,7 @@
         "license": "CC BY 3.0",
         "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
         "author": "Frettie",
-        "credit": "Фото: Frettie, лицензия CC BY 3.0",
+        "credit": "Фото: Фретти, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства 3.0»",
         "rightsNote": "Файл на Commons также помечен GFDL. Для нас выбрана лицензия CC BY 3.0."
       },
       "quotes": [
@@ -243,7 +279,7 @@
         "license": "CC BY 4.0",
         "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
         "author": "Samuel Wiki",
-        "credit": "Фото: Samuel Wiki, лицензия CC BY 4.0",
+        "credit": "Фото: Сэмюэл Вики, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства 4.0»",
         "rightsNote": "Имя в файле Commons написано Jefferies, в статье The West Australian – Jafferies. В реестре оставлено написание статьи."
       },
       "quotes": [
@@ -273,23 +309,27 @@
         "license": "CC BY-SA 4.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "author": "Mmswallow",
-        "credit": "Фото: Mmswallow, лицензия CC BY-SA 4.0",
+        "credit": "Фото: Ммсваллоу, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 4.0»",
         "rightsNote": "Снимок загружен автором как собственная работа. Подпись: признание на конференции SCAA в апреле 2005 года."
       },
       "quotes": [
         {
-          "text": "I set up a coffee laboratory, which was the first of its kind in India, with the help of the farmers, where I could evaluate the quality aspects of coffees of all in the coffee value chain.",
+          "text": "The lab helped in developing various blends for the first Café, which started the Café culture in India, with these blends being served, even today, at its various outlets opened in urban and rural India.",
           "sourceTitle": "Dr. Sunalini Menon: The Sprudge Twenty Interview",
           "sourceUrl": "https://sprudge.com/dr-sunalini-menon-the-sprudge-twenty-interview-251524.html",
           "sourceDate": "2024-08-20",
-          "context": "Ответ на вопрос, сколько лет она в индустрии. Следующее предложение на странице – про фермера и обработку после сбора."
+          "language": "en",
+          "sourceLabel": "интервью кофейному изданию «Спрадж», 20.08.2024",
+          "context": "Ответ на вопрос о её нынешней роли в кофе. Перед этим она пишет, что кафейная культура в Индии началась 1 января 1996 года и что лаборатория позволила ей разрабатывать смеси и моносорта. Следующее предложение – о том, что лаборатория помогла многим кафе подавать гостю хорошую чашку."
         },
         {
           "text": "The lab has helped many cafes in their journey to serve a good cup of coffee to the consumer, which has become an important role in my coffee journey.",
           "sourceTitle": "Dr. Sunalini Menon: The Sprudge Twenty Interview",
           "sourceUrl": "https://sprudge.com/dr-sunalini-menon-the-sprudge-twenty-interview-251524.html",
           "sourceDate": "2024-08-20",
-          "context": "Ответ о нынешней роли. Перед этим она пишет, что лаборатория делала смеси для первого кафе, с которого в Индии началась кафейная культура. Это не совет по музыке."
+          "context": "Ответ о нынешней роли. Перед этим она пишет, что лаборатория делала смеси для первого кафе, с которого в Индии началась кафейная культура. Это не совет по музыке.",
+          "language": "en",
+          "sourceLabel": "интервью кофейному изданию «Спрадж», 20.08.2024"
         }
       ]
     },
@@ -310,7 +350,7 @@
         "license": "CC BY 3.0",
         "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
         "author": "Iclif Executive Education Centre at ASB",
-        "credit": "Фото: Iclif Executive Education Centre at ASB, лицензия CC BY 3.0",
+        "credit": "Фото: Центр обучения руководителей «Иклиф» при Азиатской школе бизнеса, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства 3.0»",
         "rightsNote": ""
       },
       "quotes": [
@@ -347,7 +387,7 @@
         "license": "CC BY-SA 4.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "author": "Anamaolarte",
-        "credit": "Фото: Anamaolarte, лицензия CC BY-SA 4.0",
+        "credit": "Фото: Анамаоларте, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 4.0»",
         "rightsNote": "Подпись файла: Caficultora Colombiana, собственная работа автора, 2015-07-15."
       },
       "quotes": [

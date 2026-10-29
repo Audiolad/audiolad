@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import GuideArticleView from "@/components/business/vertical-guides/GuideArticleView";
 import JsonLd from "@/components/seo/JsonLd";
 import { buildVerticalArticleJsonLd } from "@/lib/business/vertical-guides/json-ld";
-import { loadGuideTrack } from "@/lib/business/vertical-guides/load-track";
 import { buildVerticalArticleMetadata } from "@/lib/business/vertical-guides/metadata";
 import { getVerticalArticle } from "@/lib/business/vertical-guides/registry";
 
@@ -26,11 +25,10 @@ export default async function CoffeeGuideArticlePage({ params }: PageProps) {
   if (!article) {
     notFound();
   }
-  const track = await loadGuideTrack(article.track);
   return (
     <>
       <JsonLd data={buildVerticalArticleJsonLd(article)} />
-      <GuideArticleView article={article} track={track} />
+      <GuideArticleView article={article} />
     </>
   );
 }
