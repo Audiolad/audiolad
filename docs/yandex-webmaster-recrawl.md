@@ -107,8 +107,29 @@ Queue outcomes:
 Yandex is enqueued for listed product publish, admin approve-and-publish,
 scheduled first go-live, SEO/content/slug edits, unlisted→listed, public
 playlist publish/update, and public author page updates. IndexNow still sends
-immediately and is enqueued only when that send fails. `/listens` and SEO
-articles stay unwired. The migration does not resend older URLs.
+immediately and is enqueued only when that send fails. The migration does not
+resend older URLs. `/listens` stay unwired.
+
+Editorial articles (`/articles/<slug>`, the standalone neuromusic guides and
+`/b/coffee/<slug>`) are static files and go live with a deploy. After cutover
+`deploy/scripts/deploy.sh` runs `scripts/enqueue-article-recrawl.mts` in the
+new release. It writes `.article-recrawl-manifest.json` (public path → content
+fingerprint) into the release and compares it with the previous release's
+manifest. New articles (`article_published`) and changed article definitions
+(`article_updated`) are queued for both `yandex` and `indexnow`, and this worker
+delivers them. Rules:
+
+- best effort: any failure logs `article_recrawl_enqueue_failed` and never
+  fails or rolls back the deploy
+- no previous manifest (first deploy with this step, or a rollback to an older
+  release) → only seeds the manifest, nothing is resent
+- redeploying the same content queues nothing; a pending row for the same URL
+  is refreshed, not duplicated
+- more than 20 edited articles in one deploy → edits are skipped
+  (`mass_update_skipped`) so a refactor does not spend the Yandex quota; new
+  articles are still queued
+- standalone guides keep their body copy in TSX views, so only new pages and
+  metadata changes are detected for them
 
 Log lines start with an ISO timestamp. If Yandex has no successful delivery for
 more than 24 hours while rows are pending, the worker logs
