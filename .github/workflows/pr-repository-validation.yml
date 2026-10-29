@@ -117,6 +117,7 @@ jobs:
           npm run test:business-app-onboarding-wizard
           npm run test:music-lab
           npm run test:music-analyzer-runs
+          npm run test:music-analyzer-queue
           npm run test:music-analyzer-features
           npm run test:jazz-relax-music-passport
           npm run test:music-passport-backfill
