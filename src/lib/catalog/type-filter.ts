@@ -52,6 +52,14 @@ const practiceMusic = (): Predicate => and(
   notValues("format", storyOrPostFormats),
 );
 
+// Practice-class rows in the education section (forecasts, podcasts, lectures).
+// Education-section courses/posts keep their own chips («Курсы»/«Посты»).
+const practiceEducation = (): Predicate => and(
+  practiceClass,
+  eq("catalog_section", "education"),
+  notValues("format", [...storyOrPostFormats, ...musicFormats]),
+);
+
 function typePredicate(filter: CatalogClassFilter): Predicate | null {
   switch (filter) {
     case "all": return null;
@@ -60,6 +68,7 @@ function typePredicate(filter: CatalogClassFilter): Predicate | null {
       notValues("catalog_section", ["music", "education", "stories", "books"]),
       notValues("format", nonPracticeFormats),
     );
+    case "education": return practiceEducation();
     case "stories": return and(practiceClass, story, notValues("format", ["Аудиопост", "Аудиоэфир"]));
     case "post": return or(publicationClass("post", "audio_post"), and(practiceClass, postFormat));
     case "release": return or(publicationClass("release", "music"), practiceMusic());

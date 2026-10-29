@@ -242,7 +242,10 @@ assert(
 assert(
   !catalogFilterUi.includes("Карьера") &&
     !catalogFilterUi.includes("Бизнес") &&
-    !catalogFilterUi.includes("Обучение") &&
+    // «Обучение» appears only as the type chip class=education (catalog_section
+    // education), never as a hardcoded topic option (topics.key=learning).
+    (catalogFilterUi.match(/Обучение/g) ?? []).length === 1 &&
+    catalogFilterUi.includes('{ value: "education", label: "Обучение" }') &&
     !catalogFilterUi.includes("Духовность"),
   "catalog-filter-ui does not hardcode the new topic titles",
 );
