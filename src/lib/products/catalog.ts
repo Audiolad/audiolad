@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { catalogTypeQueryFilter } from "@/lib/catalog/type-filter";
+import type { CatalogClassFilter } from "@/lib/catalog/listing-contract";
 import type { CatalogSection } from "@/lib/catalog/catalog-sections";
 
 import { filterPublicPracticeRows } from "@/lib/fixtures/test-fixture-marker";
@@ -58,6 +60,7 @@ type CatalogPracticeRow = {
   format: string | null;
   product_kind?: string | null;
   publication_class?: string | null;
+  catalog_section?: CatalogSection | null;
   duration_minutes: number | null;
   price: number | null;
   is_free: boolean | null;
@@ -85,6 +88,7 @@ export type CatalogProduct = ProductCoverFields & {
   productKind?: ProductKind;
   /** NULL on legacy rows. Adapter prefers this over productKind. */
   publicationClass?: PublicationClass | null;
+  catalogSection?: CatalogSection | null;
   price: number | null;
   compareAtPrice?: number | null;
   isFree: boolean;
@@ -124,6 +128,7 @@ export type CatalogQueryOptions = {
   productIds?: string[];
   topicKey?: string | null;
   catalogSection?: CatalogSection | null;
+  catalogType?: CatalogClassFilter;
   /** When set, only return products of this kind (e.g. practice-only SEO hubs). */
   productKind?: ProductKind | null;
   /** Throw the canonical query failure to a trusted server caller. */
@@ -338,6 +343,7 @@ export async function getPublishedCatalogProducts(
       format,
       product_kind,
       publication_class,
+      catalog_section,
       duration_minutes,
       price,
       is_free,
@@ -363,6 +369,11 @@ export async function getPublishedCatalogProducts(
 
   if (options?.productIds) {
     query = query.in("id", options.productIds).is("deleted_at", null);
+  }
+
+  const typeFilter = catalogTypeQueryFilter(options?.catalogType ?? "all");
+  if (typeFilter) {
+    query = query.or(typeFilter);
   }
 
   if (options?.productKind) {
@@ -482,6 +493,7 @@ export async function mapPracticeRowsToCatalogProducts(
         format: practice.format?.trim() || null,
         productKind: normalizeProductKind(practice.product_kind),
         publicationClass: parsePublicationClass(practice.publication_class),
+        catalogSection: practice.catalog_section ?? null,
         price: catalogPrice,
         compareAtPrice: listingPrice.compareAtPrice,
         isFree: listingPrice.isFree,
