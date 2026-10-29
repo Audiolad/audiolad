@@ -15,12 +15,18 @@ export type BusinessAccess = {
   level: BusinessAccessLevel;
   signedIn: boolean;
   hasPoint: boolean;
+  /**
+   * This browser is a paired venue device (live `al-point` session). It plays that venue's
+   * music whatever account is signed in, so it never gets the guest preview links or strip.
+   */
+  pointDevice?: boolean;
 };
 
-export function resolveBusinessAccess(domain: BusinessOwnerHomeContext): BusinessAccess {
-  if (domain.status !== "authenticated") return { level: "guest", signedIn: false, hasPoint: false };
+export function resolveBusinessAccess(domain: BusinessOwnerHomeContext, pointDevice = false): BusinessAccess {
+  const device = pointDevice ? { pointDevice: true } : {};
+  if (domain.status !== "authenticated") return { level: "guest", signedIn: false, hasPoint: false, ...device };
   const member = Boolean(domain.organizationId);
-  return { level: member ? "member" : "guest", signedIn: true, hasPoint: Boolean(domain.location) };
+  return { level: member ? "member" : "guest", signedIn: true, hasPoint: Boolean(domain.location), ...device };
 }
 
 export function isBusinessNavItemLocked(item: Pick<BusinessNavItem, "requires">, access: BusinessAccess): boolean {
@@ -29,7 +35,7 @@ export function isBusinessNavItemLocked(item: Pick<BusinessNavItem, "requires">,
 
 /** Where a nav item leads for this visitor (guests enter Music through the permanent atlas URL). */
 export function businessNavHref(item: Pick<BusinessNavItem, "href" | "guestHref">, access: BusinessAccess): string {
-  return access.level === "guest" && item.guestHref ? item.guestHref : item.href;
+  return access.level === "guest" && !access.pointDevice && item.guestHref ? item.guestHref : item.href;
 }
 
 export const BUSINESS_LOCKED_LABEL = "доступно после подключения";

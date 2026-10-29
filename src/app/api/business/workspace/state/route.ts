@@ -10,6 +10,7 @@ import { handleWorkspaceState } from "@/lib/business-workspace/routes";
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
+const POINT_DEVICE_STATE_ACTOR = "point-device";
 
 /** Refresh the authenticated access model after its local deadline. */
 export async function GET(request: Request) {
@@ -29,16 +30,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, reason: "invalid_request" }, { status: 400, headers: NO_STORE });
   }
   const actor = await loadWorkspaceActor(new URL(request.url).searchParams.get("space"));
+  // The paired venue device has no account: its position is not saved under whoever is
+  // signed in on the browser and it records no trial analytics.
+  const account = actor.ok && !actor.device ? actor : null;
   const result = await handleWorkspaceState(body, {
-    userId: async () => (actor.ok ? actor.userId : null),
+    userId: async () => (actor.ok ? (actor.device ? POINT_DEVICE_STATE_ACTOR : actor.userId) : null),
     playerOpen: async () => actor.ok && actor.playerOpen,
     savePlayback: async (input) => {
-      if (!actor.ok) return;
+      if (!account) return;
       const store = createSupabaseAccessGrantStore();
       const clamped = clampWorkspacePlayback({ ...input, updatedAt: new Date().toISOString() }, 10_000);
       await store.writePlayback({
-        userId: actor.userId,
-        spaceId: actor.space.id,
+        userId: account.userId,
+        spaceId: account.space.id,
         index: clamped.index,
         positionSec: clamped.positionSec,
         volume: clamped.volume,
@@ -46,18 +50,18 @@ export async function POST(request: Request) {
       });
     },
     recordPlay: async () => {
-      if (!actor.ok) return;
+      if (!account) return;
       await recordAccessActivity(createSupabaseAccessGrantStore(), {
-        userId: actor.userId,
-        email: actor.email,
+        userId: account.userId,
+        email: account.email,
         action: "play",
       });
     },
     recordOfferClick: async () => {
-      if (!actor.ok) return;
+      if (!account) return;
       await recordAccessActivity(createSupabaseAccessGrantStore(), {
-        userId: actor.userId,
-        email: actor.email,
+        userId: account.userId,
+        email: account.email,
         action: "offer_click",
       });
     },
