@@ -19,6 +19,7 @@ export const CATALOG_CLASS_FILTERS = [
   "all",
   ...CATALOG_PUBLICATION_CLASSES,
   "stories",
+  "education",
 ] as const;
 
 /** @deprecated Use CATALOG_CLASS_FILTERS. Kept for URL/query aliases. */
@@ -97,7 +98,7 @@ export function parseCatalogClassFilter(
 ): CatalogClassFilter {
   const normalized = value?.trim().toLowerCase() ?? "";
 
-  if (normalized === "all" || normalized === "stories") {
+  if (normalized === "all" || normalized === "stories" || normalized === "education") {
     return normalized;
   }
 
