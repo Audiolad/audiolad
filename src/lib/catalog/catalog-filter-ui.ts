@@ -7,6 +7,7 @@ export const CATALOG_ACCESS_FILTER_OPTIONS = [
 export const CATALOG_CLASS_FILTER_OPTIONS = [
   { value: "all", label: "Все" },
   { value: "practice", label: "Практики" },
+  { value: "stories", label: "Истории" },
   { value: "course", label: "Курсы" },
   { value: "audiobook", label: "Аудиокниги" },
   { value: "release", label: "Музыка" },
