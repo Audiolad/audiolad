@@ -33,8 +33,8 @@ export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
             className="guide-expert__photo"
             src={expert.photo.file}
             alt={`${expert.name}, портрет`}
-            width={64}
-            height={64}
+            width={80}
+            height={80}
           />
           <div>
             <p className="guide-expert__name">{expert.name}</p>

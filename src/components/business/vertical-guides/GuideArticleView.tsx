@@ -19,6 +19,7 @@ import GuideTable from "./GuideTable";
 
 /**
  * Fixed block order of every vertical guide article (docs/business/coffee-guides/TEMPLATE.md).
+ * No long runs of text: every text section is followed by an insert (banner, table, expert).
  * The article file only supplies data; this view owns the markup.
  */
 export default function GuideArticleView({ article }: { article: VerticalGuideArticle }) {
@@ -68,12 +69,15 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
           <GuideFourCups question={article.question} />
         </section>
 
-        <GuideSections sections={article.partOne} />
+        <GuideSections sections={[article.partOne[0]]} />
         <GuideAtlasHeroBanner />
+        <GuideSections sections={[article.partOne[1]]} />
         <GuideTable table={article.table} />
+        <GuideSections sections={[article.partTwo[0]]} />
         <GuideExpertCard slot={article.expertOne} />
-        <GuideSections sections={article.partTwo} />
+        <GuideSections sections={[article.partTwo[1]]} />
         <GuideAtlasCardsBanner />
+        <GuideSections sections={[article.partTwo[2]]} />
         <GuideExpertCard slot={article.expertTwo} />
         <GuideSteps steps={article.steps} />
 
