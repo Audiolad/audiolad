@@ -23,7 +23,7 @@ function passportErrorResponse(error: unknown) {
     const message = error.code === "tracks_not_ready"
       ? "Сначала загрузите аудио и дождитесь подготовки файлов."
       : error.code === "jazz_relax_passport_forbidden"
-        ? "Музыкальный паспорт доступен только для этого проекта."
+        ? "Музыкальный паспорт доступен только для музыкальных продуктов."
         : "Не удалось обновить музыкальный паспорт.";
     return NextResponse.json({ error: message, code: error.code }, { status: error.status });
   }

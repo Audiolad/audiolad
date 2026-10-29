@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
+import { AUTHOR_BANNER_EDITOR_FRAME_CLASS } from "@/lib/authors/banner-frame";
 import {
   applyBannerPositionDragDelta,
   clampBannerPositionToCoverExcess,
@@ -154,8 +155,9 @@ export default function BannerPositionEditorModal({
               Положение баннера
             </h2>
             <p id={descriptionId} className="mt-2 text-sm leading-6 text-[#796ba0]">
-              Перетащите изображение, чтобы выбрать видимую область. Обычно достаточно
-              сдвинуть баннер вверх или вниз.
+              Перетащите изображение, чтобы выбрать видимую область. На компьютере
+              баннер показывается в пропорции 4:1, на телефоне по бокам обрезается
+              чуть больше.
             </p>
           </div>
           <button
@@ -172,7 +174,7 @@ export default function BannerPositionEditorModal({
         <div className="px-5 pt-5">
           <div
             ref={frameRef}
-            className="relative h-32 w-full touch-none overflow-hidden rounded-[20px] border border-[#d9c9ef] bg-[#1b1230] sm:h-40"
+            className={`relative w-full touch-none overflow-hidden rounded-[20px] border border-[#d9c9ef] bg-[#1b1230] ${AUTHOR_BANNER_EDITOR_FRAME_CLASS}`}
             style={{ touchAction: "none" }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}

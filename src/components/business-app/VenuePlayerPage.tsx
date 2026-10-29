@@ -232,7 +232,7 @@ export default function VenuePlayerPage() {
 
   async function onProvision() {
     if (domain.status !== "authenticated" || !domain.location?.defaultZoneId) {
-      setError("Данные точки пока недоступны. Попробуйте обновить страницу.");
+      setError("Данные кофейни пока недоступны. Попробуйте обновить страницу.");
       return;
     }
     setPhase("provisioning");
@@ -299,9 +299,9 @@ export default function VenuePlayerPage() {
   if (domain.status === "anonymous") {
     return (
       <section className="business-app-span-full business-app-card">
-        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер точки</h1>
+        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер кофейни</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          <a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите как владелец точки</a>, чтобы подключить плеер и включить музыку.</p>
+          <a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите как владелец кофейни</a>, чтобы подключить плеер и включить музыку.</p>
       </section>
     );
   }
@@ -309,7 +309,7 @@ export default function VenuePlayerPage() {
   if (!domain.location?.defaultZoneId) {
     return (
       <section className="business-app-span-full business-app-card">
-        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер точки</h1>
+        <h1 className="text-2xl font-bold text-[var(--biz-text)]">Плеер кофейни</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
           <Link href="/" className="underline">Подключите заведение на главной</Link>, затем вернитесь сюда, чтобы настроить плеер зала.</p>
       </section>
@@ -320,11 +320,11 @@ export default function VenuePlayerPage() {
     <section className="business-app-span-full space-y-4">
       <header className="business-app-card">
         <p className="business-app-eyebrow">
-          Плеер точки
+          Плеер кофейни
         </p>
-        <h1 className="mt-1 text-2xl font-bold text-[var(--biz-text)] sm:text-3xl">Эфир точки</h1>
+        <h1 className="mt-1 text-2xl font-bold text-[var(--biz-text)] sm:text-3xl">Эфир кофейни</h1>
         <p className="mt-2 text-[1.05rem] text-[var(--biz-text-muted)]">
-          Точка: <strong>{domain.location.name}</strong>
+          Кофейня: <strong>{domain.location.name}</strong>
           {playerCode ? (
             <>
               {" "}

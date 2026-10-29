@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { requireAdminPermission } from '@/lib/admin/guard';
 import { listSectorAlbums, loadAgreementSoundQueue } from '@/lib/business-admission/agreement.server';
 import { sectorChecked, sectorInherited } from '@/lib/business-admission/sectors';
-import { isSoundReviewStatus, SOUND_REVIEW_LABELS } from '@/lib/business/track-sound-review';
+import { isSoundReviewStatus, sectorFocusAlbumIds, SOUND_REVIEW_LABELS } from '@/lib/business/track-sound-review';
 import { createClient } from '@/lib/supabase/server';
 import { saveAlbumSectors } from './actions';
 import ReviewQueue from './ReviewQueue';
@@ -26,7 +26,7 @@ export default async function BusinessTrackReviewPage({ searchParams }: {
   let sectors: Awaited<ReturnType<typeof listSectorAlbums>> = { directions: [], albums: [] };
   try {
     queue = await loadAgreementSoundQueue(db, { status, artist, album, space, page });
-    sectors = await listSectorAlbums(queue.rows.map((row) => row.album_id));
+    sectors = await listSectorAlbums(sectorFocusAlbumIds(queue, { status, artist, album, space }), { status, artist, album, space });
   } catch {
     return <p role="alert">Не удалось загрузить очередь. Проверьте применение миграции и обновите страницу.</p>;
   }

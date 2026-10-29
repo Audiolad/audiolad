@@ -36,7 +36,7 @@ export function assertCleanRussian(label: string, text: string) {
   const latin = stripped.match(/[^\s]*[A-Za-z][^\s]*/g);
   assert.equal(latin, null, `${label}: Latin text found: ${latin?.slice(0, 10).join(", ")}`);
   assert.doesNotMatch(text, /черновик|юрист|проект|заключени[ея] юрист|draft|До него текст|после проверки/i, `${label}: draft/lawyer wording`);
-  assert.doesNotMatch(text, /паспорт|355045|Ставрополь|45 Параллель/i, `${label}: passport/address must not be published`);
+  assert.doesNotMatch(text, /паспорт|355045|355035|Ставрополь|45 Параллель|Дачная/i, `${label}: passport/address must not be published`);
   assert.doesNotMatch(text, /без\s+(РАО|ВОИС)/i, `${label}: no «без РАО/ВОИС» promise`);
   assert.doesNotMatch(text, /^\s*\d{2}\.\s/, `${label}: internal numbering prefix in title`);
 }

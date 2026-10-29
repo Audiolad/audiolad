@@ -67,7 +67,7 @@ export default function BusinessAccessLine({ access }: { access: BusinessChromeA
           <>
             {" "}
             <Link href={BUSINESS_CONNECT_HREF} className="underline" data-testid="biz-locked-connect">
-              Подключить точку
+              Подключить кофейню
             </Link>
           </>
         ) : null}

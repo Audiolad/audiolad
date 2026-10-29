@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { SoundReviewRow } from "@/lib/business/track-sound-review";
-import { restrictSoundQueueToAgreement } from "@/lib/business/track-sound-review";
+import type { SectorAlbumFilter, SoundReviewRow } from "@/lib/business/track-sound-review";
+import { restrictSoundQueueToAgreement, selectSectorAlbums } from "@/lib/business/track-sound-review";
 import { authorIdsWithVerifiedRights, filterAgreementSubjects, type AgreementDecision, type AgreementSubject } from "@/lib/business-admission/agreement-list";
 import type { SectorDecision } from "@/lib/business-admission/sectors";
 
@@ -133,7 +133,7 @@ export type SectorAlbum = {
 };
 
 /** Verified, visible artists. Includes albums that have no sector decision yet. */
-export async function listSectorAlbums(focusIds: readonly string[]): Promise<{
+export async function listSectorAlbums(focusIds: readonly string[], filter: SectorAlbumFilter = {}): Promise<{
   directions: { key: string; name: string }[];
   albums: SectorAlbum[];
 }> {
@@ -166,8 +166,7 @@ export async function listSectorAlbums(focusIds: readonly string[]): Promise<{
     if (error) throw new Error("unavailable");
     decisions.push(...((data ?? []) as AgreementDecision[]));
   }
-  const focus = new Set(focusIds);
-  const listed = albums.map((album) => {
+  const listed = selectSectorAlbums(albums.map((album) => {
     const sectors: Record<string, SectorDecision> = {};
     for (const direction of directions) {
       const artist = decisions.find((row) => row.author_id === album.authorId && row.direction_key === direction.key);
@@ -179,7 +178,7 @@ export async function listSectorAlbums(focusIds: readonly string[]): Promise<{
       return state.album === true || (state.album == null && state.artist === true);
     });
     return { id: album.id, title: album.title, authorId: album.authorId, authorName: names.get(album.authorId) ?? "", sectors, admitted };
-  }).filter((album) => focus.has(album.id) || !album.admitted);
+  }), focusIds, filter);
   listed.sort((left, right) => Number(left.admitted) - Number(right.admitted) || (left.title < right.title ? -1 : left.title > right.title ? 1 : left.id < right.id ? -1 : 1));
   return { directions, albums: listed.slice(0, 80) };
 }

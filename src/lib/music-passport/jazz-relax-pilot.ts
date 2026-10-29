@@ -41,7 +41,7 @@ import {
   type JazzRelaxPassportTrackView,
   type JazzRelaxPassportView,
 } from "@/lib/music-passport/jazz-relax-status";
-import { isMusicPassportPilotAuthor } from "@/lib/music-passport/pilot-authors";
+import { isMusicPassportAvailable } from "@/lib/music-passport/availability";
 
 export class JazzRelaxPassportError extends Error {
   constructor(
@@ -57,7 +57,7 @@ export function assertJazzRelaxMusicPassport(input: {
   authorId: string | null | undefined;
   productKind: string | null | undefined;
 }): void {
-  if (!isMusicPassportPilotAuthor(input.authorId) || input.productKind?.trim() !== "music") {
+  if (!isMusicPassportAvailable(input)) {
     throw new JazzRelaxPassportError("jazz_relax_passport_forbidden", 403);
   }
 }
@@ -654,6 +654,53 @@ async function enqueueTrack(input: {
   if (linkError) throw new JazzRelaxPassportError("passport_storage_failed", 500);
 }
 
+export type JazzRelaxBackfillEnqueueResult =
+  | { outcome: "enqueued" }
+  | { outcome: "skipped"; reason: "track_not_found" | "has_passport" | "in_flight" | "succeeded_run" | "blocked" | "previously_failed" };
+
+/**
+ * Music Passport backfill (scripts/music-passport-backfill.mts): enqueue one
+ * track through the same enqueueTrack path the wizard uses, after re-checking
+ * every guard against fresh DB state (passport, queued/processing run, audio,
+ * prepare state, size). Unlike runJazzRelaxPassportAction it writes no pending
+ * album row; the worker hook settleJazzRelaxPassportForAnalyzerRun assembles
+ * and registers the album passport once the product's last track settles.
+ */
+export async function enqueueJazzRelaxTrackForBackfill(input: {
+  practiceId: string;
+  audioItemId: string;
+  userId: string;
+  retryFailed?: boolean;
+}): Promise<JazzRelaxBackfillEnqueueResult> {
+  const tracks = await loadTracks(input.practiceId);
+  const track = tracks.find((item) => item.id === input.audioItemId);
+  if (!track) return { outcome: "skipped", reason: "track_not_found" };
+  const { data: active, error: activeError } = await service()
+    .from("music_passport_versions")
+    .select("id")
+    .eq("audio_item_id", track.id)
+    .eq("status", "active")
+    .limit(1);
+  if (activeError) throw new JazzRelaxPassportError("passport_storage_failed", 500);
+  if ((active ?? []).length > 0) return { outcome: "skipped", reason: "has_passport" };
+  const latest = latestLinks(await loadLinks(input.practiceId)).get(track.id);
+  const run = latest ? (await loadRuns([latest.analyzer_run_id])).get(latest.analyzer_run_id) ?? null : null;
+  const passport = latest ? (await loadPassportsByRun([latest.analyzer_run_id])).get(latest.analyzer_run_id) : null;
+  if (passport) return { outcome: "skipped", reason: "has_passport" };
+  const kind = jazzRelaxTrackEnqueueKind({ action: "start", runStatus: run?.status ?? null, hasPassport: false });
+  if (kind !== "enqueue") return { outcome: "skipped", reason: "in_flight" };
+  if (run?.status === "succeeded") return { outcome: "skipped", reason: "succeeded_run" };
+  if (run?.status === "failed" && !input.retryFailed) return { outcome: "skipped", reason: "previously_failed" };
+  const prepare = await loadPrepareState([track]);
+  const masters = await loadDesiredMasterAssets([track]);
+  const analysis = analysisForTrack(track, masters);
+  if (analysis.kind === "missing_audio" || jazzRelaxPassportTrackBlock(track, prepare.failed, prepare.inflight, analysis)) {
+    return { outcome: "skipped", reason: "blocked" };
+  }
+  await enqueueTrack({ practiceId: input.practiceId, userId: input.userId, track, source: analysis });
+  return { outcome: "enqueued" };
+}
+
 export function jazzRelaxPassportTrackBlock(
   track: Pick<AudioRow, "id" | "file_size_bytes">,
   prepareFailed: ReadonlySet<string>,
@@ -1099,7 +1146,7 @@ export async function jazzRelaxAlbumFactsForDescription(input: {
   facts: string | null;
   alreadyBound: boolean;
 }> {
-  if (!isMusicPassportPilotAuthor(input.authorId) || input.productKind?.trim() !== "music") {
+  if (!isMusicPassportAvailable(input)) {
     return { albumPassportVersionId: null, facts: null, alreadyBound: false };
   }
   const { data: practice, error } = await service()

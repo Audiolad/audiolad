@@ -6,6 +6,8 @@
  * same controller (src/lib/business-app/spa-online-player.ts).
  * The venue cabinet uses round icon buttons. Other callers keep the text buttons.
  */
+import { WORKSPACE_DEFAULT_VOLUME } from "@/lib/business-workspace/playback";
+
 type Props = {
   /** data-testid prefix: "<prefix>-play", "<prefix>-next", "<prefix>-now". */
   testIdPrefix: string;
@@ -30,7 +32,7 @@ type Props = {
   size?: "large" | "compact";
 };
 
-function PlayIcon() {
+export function PlayIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M8.2 5.1v13.8l11.4-6.9L8.2 5.1z" fill="currentColor" />
@@ -38,7 +40,7 @@ function PlayIcon() {
   );
 }
 
-function PauseIcon() {
+export function PauseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M6.4 4.8h3.7v14.4H6.4zm7.5 0h3.7v14.4h-3.7z" fill="currentColor" />
@@ -137,12 +139,12 @@ export default function BusinessPlayerControls({
             min={0}
             max={1}
             step={0.05}
-            value={volume ?? 0.8}
+            value={volume ?? WORKSPACE_DEFAULT_VOLUME}
             onChange={(event) => onVolume(Number(event.target.value))}
             data-testid={`${testIdPrefix}-volume`}
             aria-valuemin={0}
             aria-valuemax={1}
-            aria-valuenow={volume ?? 0.8}
+            aria-valuenow={volume ?? WORKSPACE_DEFAULT_VOLUME}
           />
         </label>
       ) : null}

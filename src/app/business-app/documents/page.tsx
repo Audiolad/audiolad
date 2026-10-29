@@ -82,13 +82,13 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
         </h2>
         <p className="mt-2 text-sm text-[var(--biz-text-muted)]">
           Отчёт строится по сообщениям плеера АудиоЛад о воспроизведении, которые принял
-          сервер: сервер проверяет плеер и точку и фиксирует время получения, время начала
-          и длительность сообщает плеер. Время – по часовому поясу точки.
+          сервер: сервер проверяет плеер и кофейню и фиксирует время получения, время начала
+          и длительность сообщает плеер. Время – по часовому поясу кофейни.
         </p>
         {result.kind === "anonymous" ? (
           <p className="mt-3 text-sm"><a href="https://audiolad.ru/auth/sign-in" className="underline">Войдите</a>, чтобы построить отчёт.</p>
         ) : result.kind === "no_location" ? (
-          <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте точку</Link>.</p>
+          <p className="mt-3 text-sm">Сначала <Link href="/onboarding" className="underline">добавьте кофейню</Link>.</p>
         ) : (
           <>
             <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
@@ -132,7 +132,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                 </p>
                 {result.report.tracks.length === 0 ? (
                   <p className="mt-3 text-sm">
-                    В этом интервале сервер не получал данных о воспроизведении в точке.
+                    В этом интервале сервер не получал данных о воспроизведении в кофейне.
                   </p>
                 ) : (
                   <table className="mt-3 w-full text-sm">
@@ -166,7 +166,7 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
                 )}
                 <p className="mt-3 text-xs text-[var(--biz-text-muted)]">
                   Отчёт подтверждает работу плеера АудиоЛад, но не доказывает, что
-                  музыка была слышна в помещении и что в точке не звучала другая
+                  музыка была слышна в помещении и что в кофейне не звучала другая
                   музыка. Если связь прерывалась, часть воспроизведений может
                   отсутствовать. Отчёт не включает статус прав на момент
                   воспроизведения и не подписан электронной подписью. Для претензии

@@ -71,7 +71,7 @@ export function anonymousSupportDiagnostics(): BusinessSupportDiagnostics {
       {
         code: "ANONYMOUS",
         severity: "info",
-        messageRu: "Проверка работы музыки доступна владельцу точки.",
+        messageRu: "Проверка работы музыки доступна владельцу кофейни.",
       },
     ],
     overall: "ok",
@@ -152,7 +152,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "ANONYMOUS",
       severity: "info",
-      messageRu: "Проверка работы музыки доступна владельцу точки.",
+      messageRu: "Проверка работы музыки доступна владельцу кофейни.",
     });
     return issues;
   }
@@ -170,7 +170,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "NO_LOCATION",
       severity: "error",
-      messageRu: "Активная точка не найдена.",
+      messageRu: "Активная кофейня не найдена.",
     });
   }
 
@@ -184,7 +184,7 @@ export function deriveSupportIssues(input: {
     issues.push({
       code: "NO_PLAYER",
       severity: "error",
-      messageRu: "Плеер ещё не подключён к заведению или точке.",
+      messageRu: "Плеер ещё не подключён к заведению или кофейне.",
     });
   } else {
     for (const player of scoped) {

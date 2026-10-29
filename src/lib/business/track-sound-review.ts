@@ -31,7 +31,7 @@ export function restrictSoundQueueToAgreement(
   rows: readonly SoundReviewRow[],
   acceptedAuthorIds: ReadonlySet<string>,
   filter: { status?: string; artist?: string; album?: string; space?: string; page?: number; hiddenAuthorIds?: ReadonlySet<string> },
-): SoundReviewQueue & { albumTotal: number | null; artistTotal: number | null } {
+): SoundReviewQueue & { albumTotal: number | null; artistTotal: number | null; matchedAlbumIds: string[] } {
   const hidden = filter.hiddenAuthorIds ?? new Set<string>();
   const qualified = rows.filter((row) => acceptedAuthorIds.has(row.artist_id) && !hidden.has(row.artist_id));
   const byName = (left: { name: string; id: string }, right: { name: string; id: string }) =>
@@ -54,7 +54,40 @@ export function restrictSoundQueueToAgreement(
     albums,
     albumTotal: filter.album ? qualified.filter((row) => row.album_id === filter.album).length : null,
     artistTotal: filter.artist ? qualified.filter((row) => row.artist_id === filter.artist).length : null,
+    matchedAlbumIds: [...new Set(matched.map((row) => row.album_id))],
   };
+}
+
+/**
+ * Albums that anchor the «Секторы альбомов» table. With any filter active – albums of all matched rows;
+ * without filters – albums of the current page only, as before.
+ */
+export function sectorFocusAlbumIds(
+  queue: { rows: readonly { album_id: string }[]; matchedAlbumIds: readonly string[] },
+  filter: SectorAlbumFilter,
+): string[] {
+  return filter.status || filter.artist || filter.album || filter.space
+    ? [...queue.matchedAlbumIds]
+    : [...new Set(queue.rows.map((row) => row.album_id))];
+}
+
+export type SectorAlbumFilter = { status?: string; artist?: string; album?: string; space?: string };
+
+/**
+ * Albums for the «Секторы альбомов» table, consistent with the track list filters.
+ * Artist matches the album's primary author. Albums with tracks in the filtered list are kept.
+ * Albums without admission are appended only when no track-level filter (status, sector) is active.
+ */
+export function selectSectorAlbums<T extends { id: string; authorId: string; admitted: boolean }>(
+  albums: readonly T[],
+  matchedAlbumIds: Iterable<string>,
+  filter: SectorAlbumFilter = {},
+): T[] {
+  const matched = new Set(matchedAlbumIds);
+  const trackLevel = Boolean(filter.status || filter.space);
+  return albums.filter((album) => (!filter.artist || album.authorId === filter.artist)
+    && (!filter.album || album.id === filter.album)
+    && (matched.has(album.id) || (!trackLevel && !album.admitted)));
 }
 
 /** Stable wraparound navigation within the current filtered page. */

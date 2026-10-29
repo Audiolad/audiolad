@@ -24,7 +24,7 @@ import {
 } from "../src/lib/catalog/listing.ts";
 import { mapLegacyProductKindToClass } from "../src/lib/catalog/legacy-adapter.ts";
 import { catalogMoneyFromRubles } from "../src/lib/catalog/offer.ts";
-import { buildCatalogHref } from "../src/lib/catalog/topic-filter.ts";
+import { buildCatalogHref, countCatalogFilterGroups } from "../src/lib/catalog/topic-filter.ts";
 
 function assert(condition, message) {
   if (!condition) {
@@ -551,5 +551,41 @@ assert(
   teaserCard.paths.pdp === "/practice/anna/practice?promo=token-1",
   "never-started listing keeps promo start href on paths.pdp",
 );
+
+// A stored practice shadow class must not turn stories or old posts into practices.
+const typeRegressionItems = [
+  candidate({ id: "free-practice", isFree: true, price: 0, catalogSection: "meditations" }),
+  candidate({ id: "paid-practice" }),
+  candidate({ id: "story", isFree: true, price: 0, publicationClass: "practice", format: "Аудиоистория", catalogSection: "stories" }),
+  candidate({ id: "legacy-story", isFree: true, price: 0, format: "Аудиоистория" }),
+  candidate({ id: "post", productKind: "audio_post", format: "Аудиопост", isFree: true }),
+  candidate({ id: "legacy-post", publicationClass: "practice", format: "Аудиопост", isFree: true }),
+  candidate({ id: "release", productKind: "music", isFree: true }),
+  candidate({ id: "course", publicationClass: "course", isFree: true }),
+  candidate({ id: "audiobook", publicationClass: "audiobook", isFree: true }),
+];
+const filteredIds = (publicationClass, access = "all") => filterCatalogListingItems(
+  typeRegressionItems, { class: publicationClass, access },
+).map((item) => item.publication_id).join();
+assert(filteredIds("practice") === "free-practice,paid-practice", "practice excludes stories, posts and other classes");
+assert(filteredIds("practice", "free") === "free-practice", "free AND practice");
+assert(filteredIds("stories") === "story,legacy-story", "stories include section and legacy format");
+assert(filteredIds("post") === "post,legacy-post", "posts include legacy practice shadows");
+assert(typeRegressionItems[5].class === "post", "legacy post uses existing post card semantics");
+assert(parseCatalogClassFilter("stories") === "stories", "stories URL parses");
+assert(parseCatalogListingQuery({ kind: "stories" }).class === "stories", "legacy kind URL can select stories");
+assert(buildCatalogListingApiUrl({ class: "stories", access: "free" }) === "/api/catalog?access=free&class=stories", "stories API URL");
+assert(buildCatalogHref({ class: "stories", access: "free" }) === "/catalog?access=free&class=stories", "stories href");
+assert(countCatalogFilterGroups({ topicKeys: [], access: "free", class: "stories" }) === 2, "stories counted as a type group");
+
+const regressionPageItems = sortCatalogListingItems(filterCatalogListingItems(
+  [...typeRegressionItems, ...pageItems], { access: "all", class: "practice" },
+), "new");
+const regressionFirstPage = paginateCatalogListingItems(regressionPageItems, { cursor: null, limit: 20, sort: "new" });
+const regressionSecondPage = paginateCatalogListingItems(regressionPageItems, { cursor: regressionFirstPage.nextCursor, limit: 20, sort: "new" });
+assert(regressionFirstPage.items.length === 20, "mixed types still fill the practice page");
+assert(regressionSecondPage.items.length === 7, "practice cursor returns all remaining practices");
+assert(regressionSecondPage.nextCursor === null, "filtered final page has no cursor");
+assert(new Set([...regressionFirstPage.items, ...regressionSecondPage.items].map((item) => item.publication_id)).size === 27, "filtered pages have no gaps or duplicates");
 
 console.log("catalog-listing-unit: ok");
