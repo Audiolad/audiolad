@@ -81,6 +81,8 @@ export default function NextStepRecommendation({
         <Link
           href={recommendation.target.href}
           className={buttonClassName}
+          target={recommendation.openInNewTab ? "_blank" : undefined}
+          rel={recommendation.openInNewTab ? "noopener noreferrer" : undefined}
           onClick={handleClick}
         >
           {recommendation.buttonText}
