@@ -248,7 +248,7 @@ export function imageProcessErrorMessage(
       return "Выберите изображение JPG, PNG или WebP.";
     case "invalid_aspect_ratio":
       if (profile === "author-banner") {
-        return "Минимальный размер баннера — 1200 × 400 пикселей.";
+        return "Минимальный размер баннера – 1200 × 400 пикселей.";
       }
       if (
         profile === "author-avatar" ||

@@ -1,3 +1,4 @@
+import { AUTHOR_BANNER_PUBLIC_FRAME_CLASS } from "@/lib/authors/banner-frame";
 import { formatBannerObjectPosition } from "@/lib/authors/banner-position";
 import { resolveAuthorPositioningText } from "@/lib/authors/brand-assets";
 import { formatAuthorPublishedCount } from "@/lib/authors/public-list";
@@ -49,7 +50,7 @@ export default function AuthorPublicHeader({
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-[#eadff8] bg-white shadow-[0_12px_32px_rgba(91,62,145,0.08)]">
-      <div className="relative h-32 sm:h-40 xl:h-48">
+      <div className={`relative w-full ${AUTHOR_BANNER_PUBLIC_FRAME_CLASS}`}>
         <AuthorHeaderBanner
           bannerUrl={bannerUrl}
           bannerManifest={bannerManifest}

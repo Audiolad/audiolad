@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import BannerPositionEditorModal from "@/components/author-dashboard/BannerPositionEditorModal";
+import { AUTHOR_BANNER_PREVIEW_FRAME_CLASS } from "@/lib/authors/banner-frame";
 import { AUTHOR_DEFAULT_BANNER_PATH } from "@/lib/authors/brand-assets";
 import {
   formatBannerObjectPosition,
@@ -127,7 +128,7 @@ export default function AuthorBannerUploadBlock({
               ? "Заменить фоновый баннер"
               : "Загрузить свой фоновый баннер"
           }
-          className="group relative block h-32 w-full overflow-hidden rounded-[20px] border border-[#d9c9ef] bg-[#f8f4fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 sm:h-40"
+          className={`group relative block w-full overflow-hidden rounded-[20px] border border-[#d9c9ef] bg-[#f8f4fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7042c5] disabled:opacity-60 ${AUTHOR_BANNER_PREVIEW_FRAME_CLASS}`}
         >
           {hasCustomBanner && displaySrc ? (
             <>
