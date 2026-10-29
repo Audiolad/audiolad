@@ -51,6 +51,7 @@ function track(id: string, patch: Partial<BackfillTrackInput> = {}): BackfillTra
     latestRunStatus: null,
     source: "practice_audio",
     sizeBytes: 10 * 1048576,
+    durationSeconds: null,
     prepareInFlight: false,
     prepareFailed: false,
     ...patch,
@@ -73,6 +74,21 @@ assert.equal(classifyBackfillTrack(track("t", { prepareFailed: true })), "blocke
 assert.equal(classifyBackfillTrack(track("t", { sizeBytes: 100 * 1048576 })), "candidate");
 assert.equal(classifyBackfillTrack(track("t", { sizeBytes: 100 * 1048576 + 1 })), "blocked_file_too_large");
 assert.equal(classifyBackfillTrack(track("t"), { enqueueErrors: new Set(["t"]) }), "enqueue_error");
+
+// --- Duration limits affect only new enqueues; equal/unknown durations remain candidates.
+const durationLimit = { maxDurationSeconds: 1200 };
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 1201 }), durationLimit), "blocked_too_long");
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 1200 }), durationLimit), "candidate");
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: null }), durationLimit), "candidate");
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 3600 })), "candidate");
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 3600 }), { maxDurationSeconds: null }), "candidate");
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 3600 }), { maxDurationSeconds: 0 }), "candidate");
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 3600, hasPassport: true }), durationLimit), "has_passport");
+for (const latestRunStatus of ["queued", "processing", "succeeded"] as const) {
+  assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 3600, latestRunStatus }), durationLimit),
+    latestRunStatus === "succeeded" ? "succeeded_unmaterialized" : "in_flight");
+}
+assert.equal(classifyBackfillTrack(track("t", { durationSeconds: 3600, sizeBytes: 150 * 1048576 }), durationLimit), "blocked_file_too_large");
 
 // --- Scope: Business-verified authors narrowed to an explicit allowlist, fail closed.
 assert.deepEqual(resolveBackfillScope({ verifiedAuthors: authors, allowlist: null, requireAllowlist: true }),
@@ -158,6 +174,21 @@ const order = orderBackfillCandidates({
 assert.deepEqual(order.map((t) => t.audioItemId), ["j-p1-1", "j-p1-2", "j-p2-1", "l-1"]);
 assert.equal(order.some((t) => t.authorId === "a-new"), false);
 
+const durationTracks = tracks.map((t) => t.audioItemId === "j-p1-2" ? { ...t, durationSeconds: 1201 } : t);
+const durationOrder = orderBackfillCandidates({
+  authors: inScope,
+  tracks: durationTracks,
+  practiceOrder: new Map([["p-1", 0], ["p-2", 1], ["p-3", 2], ["p-4", 3]]),
+  ...durationLimit,
+});
+assert.deepEqual(durationOrder.map((t) => t.audioItemId), ["j-p1-1", "j-p2-1", "l-1"]);
+const durationSummary = summarizeBackfill({ authors: inScope, tracks: durationTracks, ...durationLimit });
+assert.equal(durationSummary.projects[0]?.counts.blocked_too_long, 1);
+assert.equal(durationSummary.projects[0]?.candidateBytes, 20 * 1048576);
+assert.equal(durationSummary.total.counts.blocked_too_long, 1);
+assert.equal(durationSummary.total.counts.candidate, 3);
+assert.equal(durationSummary.total.candidateBytes, summary.total.candidateBytes - 3 * 1048576);
+
 // --- Night window in Europe/Moscow (UTC+3)
 const night = parseBackfillWindow("00:00-07:00") as BackfillWindow;
 assert.equal(insideBackfillWindow(new Date("2026-10-29T21:00:00Z"), night), true); // 00:00 MSK
@@ -211,6 +242,16 @@ assert.deepEqual(exec.authors, ["jazz-relax", "lara-larina"]);
 assert.equal(exec.window, "any");
 assert.equal(exec.maxPerRun, 1000);
 assert.equal(parseBackfillArgs(["--execute", "--dry-run", "--authors", "x"]).execute, false);
+
+assert.equal(parseBackfillArgs([]).maxDurationSeconds, null);
+assert.equal(parseBackfillArgs(["--max-duration-sec", "1200"]).maxDurationSeconds, 1200);
+assert.equal(parseBackfillArgs(["--max-duration-sec=1200"]).maxDurationSeconds, 1200);
+assert.equal(parseBackfillArgs(["--max-duration-sec=86400"]).maxDurationSeconds, 86400);
+for (const raw of ["0", "-5", "1.5", "abc", "86401"]) {
+  assert.throws(() => parseBackfillArgs(["--max-duration-sec", raw]), BackfillArgsError, raw);
+  assert.throws(() => parseBackfillArgs([`--max-duration-sec=${raw}`]), BackfillArgsError, raw);
+}
+assert.throws(() => parseBackfillArgs(["--max-duration-sec"]), BackfillArgsError);
 
 assert.equal(estimateBackfillHours(518), 10.4);
 

@@ -17,6 +17,10 @@ function fail(stage: string): never {
   throw new Error(`music_passport_backfill_read_failed:${stage}`);
 }
 
+function positiveFinite(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
 async function inChunks<T>(
   ids: readonly string[],
   load: (chunk: string[]) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
@@ -90,13 +94,14 @@ export async function loadBackfillSnapshot(db: Db, authors: readonly BackfillAut
     position: number | null;
     audio_path: string | null;
     file_size_bytes: number | null;
+    duration_seconds: number | null;
     desired_music_master_asset_id: string | null;
     desired_product_audio_normalize_job_id: string | null;
   };
   const items = await inChunks<Item>(
     practices.map((practice) => practice.id),
     (chunk) => db.from("audio_items")
-      .select("id, practice_id, position, audio_path, file_size_bytes, desired_music_master_asset_id, desired_product_audio_normalize_job_id")
+      .select("id, practice_id, position, audio_path, file_size_bytes, duration_seconds, desired_music_master_asset_id, desired_product_audio_normalize_job_id")
       .in("practice_id", chunk),
     "audio_items",
   );
@@ -105,11 +110,13 @@ export async function loadBackfillSnapshot(db: Db, authors: readonly BackfillAut
   const masters = await inChunks<{
     id: string; audio_item_id: string; asset_role: string; lifecycle_state: string;
     storage_bucket: string; storage_path: string | null; size_bytes: number | null;
+    duration_seconds: number | string | null;
   }>(
-    items.filter((item) => !item.audio_path?.trim() && item.desired_music_master_asset_id)
+    items.filter((item) => item.desired_music_master_asset_id
+      && (!item.audio_path?.trim() || positiveFinite(item.duration_seconds) === null))
       .map((item) => item.desired_music_master_asset_id as string),
     (chunk) => db.from("music_audio_assets")
-      .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, size_bytes").in("id", chunk),
+      .select("id, audio_item_id, asset_role, lifecycle_state, storage_bucket, storage_path, size_bytes, duration_seconds").in("id", chunk),
     "masters",
   );
   const masterById = new Map(masters.map((row) => [row.id, row]));
@@ -164,6 +171,10 @@ export async function loadBackfillSnapshot(db: Db, authors: readonly BackfillAut
     const job = item.desired_product_audio_normalize_job_id ? jobById.get(item.desired_product_audio_normalize_job_id) : undefined;
     const prepare = mapProductNormalizeJobToPrepareStatus(typeof job?.status === "string" ? job.status : null);
     const runId = latestRunByItem.get(item.id);
+    // Prefer the item duration; consult the master only for a master source or
+    // missing item duration. PostgREST numeric master values may be strings.
+    const itemDuration = positiveFinite(item.duration_seconds);
+    const durationSeconds = itemDuration ?? positiveFinite(Number(master?.duration_seconds));
     return {
       audioItemId: item.id,
       practiceId: item.practice_id,
@@ -173,6 +184,7 @@ export async function loadBackfillSnapshot(db: Db, authors: readonly BackfillAut
       latestRunStatus: runId ? runStatus.get(runId) ?? null : null,
       source: analysis.kind === "missing_audio" ? "missing" : analysis.kind,
       sizeBytes: analysis.kind === "music_master" ? master?.size_bytes ?? null : item.file_size_bytes,
+      durationSeconds,
       prepareInFlight: isAudioPrepareInFlight(prepare),
       prepareFailed: prepare === "failed",
     };
