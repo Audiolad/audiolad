@@ -72,11 +72,13 @@ export function jazzRelaxTrackEnqueueKind(input: {
   runStatus: "queued" | "processing" | "succeeded" | "failed" | null;
   hasPassport: boolean;
 }): JazzRelaxEnqueueKind {
+  // Never stack a second job (and a second audio copy in the runs bucket) on
+  // a track whose latest run is still queued/processing – for any action.
+  if (input.runStatus === "queued" || input.runStatus === "processing") return "skip";
   if (input.action === "retry") {
     return input.runStatus === "failed" ? "enqueue" : "skip";
   }
   if (input.action === "start") {
-    if (input.runStatus === "queued" || input.runStatus === "processing") return "skip";
     if (input.runStatus === "succeeded" && input.hasPassport) return "compare";
     return "enqueue";
   }
