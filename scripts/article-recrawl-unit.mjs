@@ -5,7 +5,7 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -167,6 +167,40 @@ const deps = (entriesForDeploy, failUrls, calls, extra = {}) => ({
 });
 const seed = await runArticleRecrawlStep({ releaseDir: stepDirs[0], previousDir: null }, deps(v1, new Set(), []));
 assert.equal(seed.state, "seeded");
+
+// --- atomic manifest publication and best-effort backup
+const atomicDir = mkdtempSync(path.join(tmpdir(), "article-step-atomic-"));
+const atomicTarget = path.join(atomicDir, ARTICLE_RECRAWL_MANIFEST_FILE);
+const atomicOptions = { releaseDir: atomicDir, previousDir: null };
+await runArticleRecrawlStep(atomicOptions, deps(v1, new Set(), []));
+const original = readFileSync(atomicTarget, "utf8");
+assert.deepEqual(JSON.parse(original), buildArticleRecrawlManifest(v1), "first run writes valid JSON");
+assert.deepEqual(readdirSync(atomicDir), [ARTICLE_RECRAWL_MANIFEST_FILE], "first run leaves no temp or backup");
+const originalFd = openSync(atomicTarget, "r");
+try {
+  await runArticleRecrawlStep(atomicOptions, deps(injected, new Set(), []));
+  assert.equal(readFileSync(originalFd, "utf8"), original, "old open file is unchanged by atomic replacement");
+} finally {
+  closeSync(originalFd);
+}
+assert.deepEqual(JSON.parse(readFileSync(atomicTarget, "utf8")), manifest, "replacement is valid JSON");
+assert.equal(readFileSync(`${atomicTarget}.prev`, "utf8"), original, "backup contains bytes from before overwrite");
+assert.deepEqual(readdirSync(atomicDir).sort(), [ARTICLE_RECRAWL_MANIFEST_FILE, `${ARTICLE_RECRAWL_MANIFEST_FILE}.prev`]);
+
+const backupFailureDir = mkdtempSync(path.join(tmpdir(), "article-step-backup-failure-"));
+const backupFailureTarget = path.join(backupFailureDir, ARTICLE_RECRAWL_MANIFEST_FILE);
+writeFileSync(backupFailureTarget, original);
+mkdirSync(`${backupFailureTarget}.prev`);
+await runArticleRecrawlStep({ releaseDir: backupFailureDir, previousDir: null }, deps(injected, new Set(), []));
+assert.deepEqual(JSON.parse(readFileSync(backupFailureTarget, "utf8")), manifest, "backup failure does not prevent publication");
+assert.ok(!readdirSync(backupFailureDir).some((name) => name.includes(".tmp-")));
+
+const renameFailureDir = mkdtempSync(path.join(tmpdir(), "article-step-rename-failure-"));
+mkdirSync(path.join(renameFailureDir, ARTICLE_RECRAWL_MANIFEST_FILE));
+await assert.rejects(runArticleRecrawlStep(
+  { releaseDir: renameFailureDir, previousDir: null }, deps(v1, new Set(), []),
+));
+assert.deepEqual(readdirSync(renameFailureDir), [ARTICLE_RECRAWL_MANIFEST_FILE], "rename failure cleans up temp file");
 
 const v2 = listArticleRecrawlEntries({
   articles: [{ slug: "a" }, { slug: "b", v: 2 }, { slug: "c", v: 2 }, { slug: "new" }],
