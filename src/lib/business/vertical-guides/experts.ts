@@ -9,6 +9,10 @@ export type ExpertQuote = {
   sourceUrl: string;
   sourceDate: string | null;
   context: string;
+  /** Language of `text`. A quote that is not Russian is shown with a labelled translation. */
+  language?: "ru" | "en";
+  /** Plain-text source line printed on the page after «Источник:». Never a URL. */
+  sourceLabel?: string;
 };
 
 export type CoffeeExpert = {
@@ -22,6 +26,7 @@ export type CoffeeExpert = {
   role: string;
   competence: string;
   competenceUrl: string;
+  /** Null when no freely licensed portrait exists; the card then shows initials. */
   photo: {
     file: string;
     commonsPage: string;
@@ -30,7 +35,7 @@ export type CoffeeExpert = {
     author: string;
     credit: string;
     rightsNote: string;
-  };
+  } | null;
   quotes: ExpertQuote[];
 };
 
@@ -44,7 +49,7 @@ const ALLOWED_LICENSES = new Set([
   "CC BY-SA 4.0",
 ]);
 
-export const COFFEE_EXPERTS = registryJson.experts as readonly CoffeeExpert[];
+export const COFFEE_EXPERTS = registryJson.experts as unknown as readonly CoffeeExpert[];
 
 export function getCoffeeExpert(id: string): CoffeeExpert | null {
   return COFFEE_EXPERTS.find((expert) => expert.id === id) ?? null;
@@ -78,14 +83,16 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     if (expert.quotes.length < 1 || expert.quotes.length > 2) {
       throw new Error(`${expert.id}: need 1 or 2 quotes`);
     }
-    if (!ALLOWED_LICENSES.has(expert.photo.license)) {
-      throw new Error(`${expert.id}: license ${expert.photo.license} is not in the allowlist`);
-    }
-    if (!expert.photo.file.startsWith("/business/coffee-guides/experts/")) {
-      throw new Error(`${expert.id}: photo must live in the guide portrait folder`);
-    }
-    if (!expert.photo.credit || /https?:\/\//.test(expert.photo.credit)) {
-      throw new Error(`${expert.id}: visible credit must name the author without a URL`);
+    if (expert.photo) {
+      if (!ALLOWED_LICENSES.has(expert.photo.license)) {
+        throw new Error(`${expert.id}: license ${expert.photo.license} is not in the allowlist`);
+      }
+      if (!expert.photo.file.startsWith("/business/coffee-guides/experts/")) {
+        throw new Error(`${expert.id}: photo must live in the guide portrait folder`);
+      }
+      if (!expert.photo.credit || /https?:\/\//.test(expert.photo.credit)) {
+        throw new Error(`${expert.id}: visible credit must name the author without a URL`);
+      }
     }
     for (const quote of expert.quotes) {
       if (quote.text.trim().length < 40) {
@@ -97,8 +104,21 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
       if (!quote.context.trim()) {
         throw new Error(`${expert.id}: quote context is required`);
       }
+      if (quote.sourceLabel !== undefined && (!quote.sourceLabel.trim() || /https?:\/\/|www\./.test(quote.sourceLabel))) {
+        throw new Error(`${expert.id}: source label must be plain text without a URL`);
+      }
     }
   }
+}
+
+/** Two letters for the round placeholder when a portrait is missing. */
+export function expertInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase("ru") ?? "")
+    .join("");
 }
 
 export function countExperts(experts: readonly CoffeeExpert[] = COFFEE_EXPERTS): {
