@@ -7,7 +7,7 @@
  * slug allowlist (each slug must be a verified-rights Business author).
  *
  *   # counts only (safe):
- *   nice -n 10 npx tsx scripts/music-passport-backfill.mts --dry-run [--authors a,b]
+ *   nice -n 10 npx tsx scripts/music-passport-backfill.mts --dry-run [--authors a,b] [--max-duration-sec 1200]
  *   # one throttled tick (cron every 2 min, night window 00:00–07:00 MSK):
  *   MUSIC_PASSPORT_BACKFILL_EXECUTE=1 nice -n 10 npx tsx scripts/music-passport-backfill.mts \
  *     --execute --authors a,b --window 00:00-07:00 --max-inflight 1
@@ -97,13 +97,13 @@ function printSummary(title: string, rows: BackfillProjectSummary[], total: Back
     return;
   }
   console.log(`\n${title}`);
-  console.log("slug | project | products | tracks | has_passport | in_flight | to_enqueue | prev_failed | blocked(missing/preparing/prepare_failed/>100MiB) | to_enqueue_MiB");
+  console.log("slug | project | products | tracks | has_passport | in_flight | to_enqueue | prev_failed | blocked(missing/preparing/prepare_failed/>100MiB/too_long) | to_enqueue_MiB");
   for (const row of [...rows, total]) {
     const c = row.counts;
     console.log([
       row.slug, row.name, row.products, row.tracks, c.has_passport, c.in_flight + c.succeeded_unmaterialized, c.candidate,
       c.previously_failed + c.enqueue_error,
-      `${c.blocked_missing_audio}/${c.blocked_preparing}/${c.blocked_prepare_failed}/${c.blocked_file_too_large}`,
+      `${c.blocked_missing_audio}/${c.blocked_preparing}/${c.blocked_prepare_failed}/${c.blocked_file_too_large}/${c.blocked_too_long}`,
       mib(row.candidateBytes),
     ].join(" | "));
   }
@@ -133,6 +133,7 @@ async function main(args: BackfillArgs) {
     excludedProjects: args.excludeAuthors,
     window: args.window === "any" ? "always" : args.window,
     maxInflight: args.maxInflight,
+    maxDurationSec: args.maxDurationSeconds,
   });
   const release = args.execute ? acquireLock(`${args.stateFile}.lock`) : () => {};
   let stopping = false;
@@ -146,11 +147,14 @@ async function main(args: BackfillArgs) {
       const state = readState(args.stateFile);
       const enqueueErrors = args.retryErrors ? new Set<string>() : new Set(Object.keys(state.enqueueErrors));
       const snapshot = await loadBackfillSnapshot(db, [...scope.authors, ...scope.excludedVerified]);
-      const summary = summarizeBackfill({ authors: scope.authors, tracks: snapshot.tracks, retryFailed: args.retryFailed, enqueueErrors });
+      const summary = summarizeBackfill({ authors: scope.authors, tracks: snapshot.tracks, retryFailed: args.retryFailed, enqueueErrors, maxDurationSeconds: args.maxDurationSeconds });
       if (!args.execute) {
+        if (!args.json && args.maxDurationSeconds !== null) {
+          console.log(`max duration: ${args.maxDurationSeconds} s (longer tracks are not enqueued)`);
+        }
         printSummary("In scope", summary.projects, summary.total, args.json);
         if (scope.excludedVerified.length > 0) {
-          const excluded = summarizeBackfill({ authors: scope.excludedVerified, tracks: snapshot.tracks });
+          const excluded = summarizeBackfill({ authors: scope.excludedVerified, tracks: snapshot.tracks, maxDurationSeconds: args.maxDurationSeconds });
           printSummary("Verified Business authors NOT in scope (--authors / --exclude-projects; never enqueued)", excluded.projects, excluded.total, args.json);
         }
         log("music_passport_backfill_dry_run_done", { mode: "dry_run", enqueued: 0 });
@@ -160,6 +164,7 @@ async function main(args: BackfillArgs) {
         authors: scope.authors,
         tracks: snapshot.tracks,
         practiceOrder: snapshot.practiceOrder,
+        maxDurationSeconds: args.maxDurationSeconds,
         retryFailed: args.retryFailed,
         enqueueErrors,
       });
