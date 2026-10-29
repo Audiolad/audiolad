@@ -184,7 +184,7 @@ export default function BusinessSidebar() {
 
   const domain = useBusinessDomain();
   const pointMode = usePointMode();
-  const access = resolveBusinessAccess(domain);
+  const access = resolveBusinessAccess(domain, pointMode);
   const ownerFirstName =
     domain.status === "authenticated" ? domain.owner.firstName : "Гость";
   const locationName =
@@ -268,7 +268,7 @@ export default function BusinessSidebar() {
             </div>
           </div>
         )}
-        {access.level === "guest" && !collapsed ? (
+        {access.level === "guest" && !access.pointDevice && !collapsed ? (
           <Link
             href={BUSINESS_CONNECT_HREF}
             className="mt-3 business-app-btn business-app-btn-primary business-app-focus-ring w-full"
