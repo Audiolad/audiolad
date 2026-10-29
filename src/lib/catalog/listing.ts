@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { PRODUCT_KIND, type ProductKind } from "@/lib/author-products/product-kind";
+import { matchesCatalogProductType } from "@/lib/catalog/type-filter";
 import { searchPublishedCatalogProducts } from "@/lib/catalog/search";
 import type { CatalogCard, PublicationClass } from "@/lib/catalog/dto";
 import {
@@ -26,6 +26,7 @@ import {
 import {
   decodeCatalogCursor,
   encodeCatalogCursor,
+  CATALOG_CLASS_FILTERS,
   type CatalogAccessFilter,
   type CatalogClassFilter,
   type CatalogListingQuery,
@@ -64,6 +65,7 @@ export const CATALOG_LISTING_SEARCH_LIMIT = 200;
 
 export type CatalogListingCandidate = CatalogCard & {
   sortTimestamp: number;
+  listingTypes?: CatalogClassFilter[];
 };
 
 export function mapLegacyCatalogProductToSource(
@@ -76,7 +78,7 @@ export function mapLegacyCatalogProductToSource(
     subtitle: product.subtitle,
     format: product.format,
     productKind: product.productKind,
-    publicationClass: product.publicationClass,
+    publicationClass: resolveCatalogListingClass(product),
     price: product.price,
     compareAtPrice: product.compareAtPrice,
     isFree: product.isFree,
@@ -107,6 +109,14 @@ export function mapCatalogProductToListingItem(
   return {
     ...card,
     sortTimestamp: product.sortTimestamp,
+    listingTypes: CATALOG_CLASS_FILTERS.filter((filter) =>
+      matchesCatalogProductType({
+        product_kind: product.productKind,
+        publication_class: product.publicationClass,
+        catalog_section: product.catalogSection,
+        format: product.format,
+      }, filter),
+    ),
   };
 }
 
@@ -122,15 +132,20 @@ export function matchesCatalogAccessFilter(
 }
 
 export function matchesCatalogClassFilter(
-  item: Pick<CatalogListingCandidate, "class">,
+  item: Pick<CatalogListingCandidate, "class" | "listingTypes">,
   publicationClass: CatalogClassFilter,
 ): boolean {
-  return publicationClass === "all" || item.class === publicationClass;
+  return (
+    publicationClass === "all" ||
+    (item.listingTypes
+      ? item.listingTypes.includes(publicationClass)
+      : item.class === publicationClass)
+  );
 }
 
 /** @deprecated Use matchesCatalogClassFilter. */
 export function matchesCatalogKindFilter(
-  item: Pick<CatalogListingCandidate, "class">,
+  item: Pick<CatalogListingCandidate, "class" | "listingTypes">,
   publicationClass: CatalogClassFilter,
 ): boolean {
   return matchesCatalogClassFilter(item, publicationClass);
@@ -288,35 +303,24 @@ export function applyCatalogListingGrantState(
   }));
 }
 
-function listingProductKindHint(
-  publicationClass: CatalogClassFilter,
-): ProductKind | null {
-  if (publicationClass === "release") {
-    return PRODUCT_KIND.MUSIC;
-  }
-
-  if (publicationClass === "post") {
-    return PRODUCT_KIND.AUDIO_POST;
-  }
-
-  if (
-    publicationClass === "practice" ||
-    publicationClass === "course" ||
-    publicationClass === "audiobook"
-  ) {
-    return PRODUCT_KIND.PRACTICE;
-  }
-
-  return null;
-}
-
 export function resolveCatalogListingClass(
-  product: Pick<CatalogProduct, "productKind" | "publicationClass">,
+  product: Pick<CatalogProduct, "productKind" | "publicationClass"> &
+    Partial<Pick<CatalogProduct, "format">>,
 ): PublicationClass {
-  return resolvePublicationClass(
+  const publicationClass = resolvePublicationClass(
     product.publicationClass,
     product.productKind,
   );
+  // Old posts can still carry the practice shadow kind/class.
+  if (publicationClass === "practice" && matchesCatalogProductType({
+    publication_class: product.publicationClass,
+    product_kind: product.productKind,
+    format: product.format,
+  }, "post")) {
+    return "post";
+  }
+
+  return publicationClass;
 }
 
 export async function listPublishedCatalog(
@@ -328,7 +332,6 @@ export async function listPublishedCatalog(
     savesStore?: LibrarySavesAsyncStore;
   } = {},
 ): Promise<CatalogListingResult> {
-  const productKindHint = listingProductKindHint(query.class);
   const userId = await resolveCatalogViewerUserId(supabase, options.userId);
   const ordinaryViewer = await loadOrdinaryCatalogViewer(supabase, userId);
   const viewer: CatalogProductViewer = {
@@ -342,13 +345,14 @@ export async function listPublishedCatalog(
         query: query.q,
         topicKey: query.topic,
         catalogSection: query.section,
+        catalogType: query.class,
         limit: CATALOG_LISTING_SEARCH_LIMIT,
         viewer,
       })
     : await getPublishedCatalogProducts(supabase, {
         topicKey: query.topic,
         catalogSection: query.section,
-        productKind: productKindHint,
+        catalogType: query.class,
         viewer,
       });
 
