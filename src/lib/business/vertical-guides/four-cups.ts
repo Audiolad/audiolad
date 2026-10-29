@@ -4,7 +4,7 @@
  */
 export const FOUR_CUPS_MAX_HREF = "https://max-potok.ru/r/gqwvf";
 
-export const FOUR_CUPS_MAX_LABEL = "Выбрать чашку и узнать характер кофейни в MAX";
+export const FOUR_CUPS_MAX_LABEL = "Выбрать чашку и узнать характер кофейни в Максе";
 
 export const FOUR_CUPS_SLIDES = [
   {

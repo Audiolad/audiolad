@@ -9,9 +9,14 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import * as GuideArticleViewModule from "../src/components/business/vertical-guides/GuideArticleView";
+
 import { COFFEE_ATLAS_SHOPS } from "../src/lib/business/coffee-atlas/shops";
 import { KOFE_V_ZERNAH_DLYA_KOFEYNI } from "../src/lib/business/vertical-guides/articles/kofe-v-zernah-dlya-kofeyni";
-import { ATLAS_CARD_THEMES } from "../src/lib/business/vertical-guides/atlas-card-themes";
+import { ATLAS_CARD_NAMES_RU, ATLAS_CARD_THEMES } from "../src/lib/business/vertical-guides/atlas-card-themes";
 import {
   FOUR_CUPS_FINAL_IMAGE,
   FOUR_CUPS_MAX_HREF,
@@ -22,10 +27,11 @@ import {
   assertCoffeeExpertRegistry,
   COFFEE_EXPERTS,
   countExperts,
-  expertInitials,
   expertQuote,
   getCoffeeExpert,
+  HAS_LATIN,
 } from "../src/lib/business/vertical-guides/experts";
+import { buildVerticalArticleMetadata } from "../src/lib/business/vertical-guides/metadata";
 import { buildVerticalArticleJsonLd } from "../src/lib/business/vertical-guides/json-ld";
 import {
   buildVerticalGuideRedirects,
@@ -62,13 +68,16 @@ assert.equal(counts.women, 6);
 assert.equal(counts.men, 6);
 
 for (const expert of COFFEE_EXPERTS) {
-  if (!expert.photo) continue; // no free licence: the card shows initials
+  // Owner rule 2026-10-29: only experts with a real portrait, no initials placeholders.
+  assert.ok(expert.photo?.file, `${expert.id} has a real portrait`);
+  assert.equal(HAS_LATIN.test(expert.photo.credit), false, `${expert.id} credit is Russian only`);
+  assert.equal(HAS_LATIN.test(expert.name + expert.role), false, `${expert.id} name and role are Russian only`);
   const photo = join(root, "public", expert.photo.file);
   assert.ok(existsSync(photo), `${expert.id} photo`);
   assert.ok(statSync(photo).size > 5_000 && statSync(photo).size < 260_000, `${expert.id} photo size`);
-  assert.equal(expert.photo.file.endsWith(".jpg"), true);
+  assert.match(expert.photo.file, /^\/business\/coffee-guides\/experts\/[a-z0-9-]+\.(jpg|webp)$/);
 }
-assert.equal(expertInitials("Дмитрий Бородай"), "ДБ");
+assert.equal(getCoffeeExpert("dmitry-borodai"), null, "no expert without a portrait");
 assert.equal(read("src/content/business/coffee-experts.registry.json").includes(EM_DASH), false);
 
 // ---------- Routing ----------
@@ -235,7 +244,7 @@ for (const link of ARTICLE.readMore) {
 }
 
 // ---------- Experts: one Russian-speaking man, one English-speaking woman ----------
-assert.deepEqual([ARTICLE.expertOne.expertId, ARTICLE.expertTwo.expertId], ["dmitry-borodai", "sunalini-menon"]);
+assert.deepEqual([ARTICLE.expertOne.expertId, ARTICLE.expertTwo.expertId], ["dmitry-kotov", "sunalini-menon"]);
 const slotExperts = [ARTICLE.expertOne, ARTICLE.expertTwo].map((slot) => {
   const expert = getCoffeeExpert(slot.expertId);
   assert.ok(expert, slot.expertId);
@@ -243,6 +252,7 @@ const slotExperts = [ARTICLE.expertOne, ARTICLE.expertTwo].map((slot) => {
   assert.equal(quote.text.includes(EM_DASH), false, "quote shown on the page must not contain an em dash");
   assert.ok(quote.sourceLabel, `${expert.id} has a plain-text source label`);
   assert.equal(/https?:/.test(quote.sourceLabel ?? ""), false);
+  assert.equal(HAS_LATIN.test(quote.sourceLabel ?? ""), false, `${expert.id} source label is Russian only`);
   for (const paragraph of [...slot.lead, ...slot.after]) {
     const text = paragraph.map((part) => (typeof part === "string" ? part : part.label)).join("");
     assert.equal(text.includes(quote.text), false, "editor text does not repeat the quote");
@@ -258,8 +268,9 @@ assert.equal(slotExperts[0]?.expert.gender, "man");
 assert.equal(slotExperts[0]?.quote.language, "ru");
 assert.equal(slotExperts[1]?.expert.gender, "woman");
 assert.equal(slotExperts[1]?.quote.language, "en");
-assert.equal(slotExperts[0]?.expert.photo, null, "no free portrait of Borodai: initials");
-assert.ok(slotExperts[1]?.expert.photo?.credit, "Menon portrait has a licence credit");
+assert.equal(slotExperts[0]?.expert.photo.file, "/business/coffee-guides/experts/dmitry-kotov.webp");
+assert.equal(slotExperts[0]?.expert.photo.license, "CC BY-SA 4.0");
+assert.ok(slotExperts[1]?.expert.photo.credit, "Menon portrait has a licence credit");
 
 // ---------- JSON-LD and sitemap ----------
 const structuredData = buildVerticalArticleJsonLd(ARTICLE);
@@ -363,7 +374,7 @@ assert.match(maxButton, /rel="noopener noreferrer"/);
 assert.match(maxButton, /data-four-cups-max="true"/);
 assert.match(maxButton, /\/school\/messengers\/max\.png/);
 assert.match(read(`${guideDir}/GuideFinalCups.tsx`), /<GuideMaxButton placement="final" \/>/);
-assert.equal(FOUR_CUPS_MAX_LABEL, "Выбрать чашку и узнать характер кофейни в MAX");
+assert.equal(FOUR_CUPS_MAX_LABEL, "Выбрать чашку и узнать характер кофейни в Максе");
 const slideSource = read("src/lib/business/vertical-guides/four-cups.ts");
 assert.equal(slideSource.includes(EM_DASH), false);
 assert.equal(slideSource.includes("http://"), false);
@@ -403,7 +414,8 @@ const expertCard = read(`${guideDir}/GuideExpertCard.tsx`);
 assert.match(expertCard, /blockquote/);
 assert.match(expertCard, /Источник: /);
 assert.match(expertCard, /Перевод с английского/);
-assert.match(expertCard, /expertInitials/);
+assert.doesNotMatch(expertCard, /expertInitials|guide-expert__initials|Оригинал/);
+assert.match(expertCard, /lang="ru"/);
 
 const seriesPlan = read("docs/business/coffee-guides/SERIES-PLAN.md");
 assert.equal(seriesPlan.includes("\u2014"), false);
@@ -436,3 +448,34 @@ assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/[slug]/page.tsx")))
 assert.ok(existsSync(join(root, "docs/business/coffee-guides/TEMPLATE.md")));
 assert.doesNotMatch(read("src/app/(platform)/b/coffee/[slug]/page.tsx"), /loadGuideTrack/);
 assert.doesNotMatch(read("src/app/(platform)/b/atlas-kofeen/[slug]/page.tsx"), /vertical-guides/);
+
+// ---------- No Latin text on the page (owner rule 2026-10-29) ----------
+// Only URL slugs may stay Latin. Expert names, credentials, sources, credits, quotes,
+// atlas names and tags, labels and metadata are printed in Russian only.
+for (const shop of COFFEE_ATLAS_SHOPS) {
+  assert.ok(ATLAS_CARD_NAMES_RU[shop.slug], `${shop.slug} has a Russian name for the guide banner`);
+}
+const withoutPaths = (text: string) => text.replace(/\/b\/[a-z0-9/-]+/g, "");
+for (const text of collectArticleText(ARTICLE)) {
+  assert.equal(HAS_LATIN.test(withoutPaths(text)), false, `Latin in article text: ${text}`);
+}
+const metadata = buildVerticalArticleMetadata(ARTICLE);
+for (const text of [metadata.title, metadata.description, metadata.openGraph?.title, metadata.openGraph?.description]) {
+  if (typeof text === "string") assert.equal(HAS_LATIN.test(text), false, `Latin in metadata: ${text}`);
+}
+// tsx loads the .tsx component as CommonJS, so from this ESM test its default export arrives wrapped.
+type GuideArticleViewComponent = typeof GuideArticleViewModule.default;
+const moduleDefault = GuideArticleViewModule.default as GuideArticleViewComponent | { default: GuideArticleViewComponent };
+const GuideArticleView = typeof moduleDefault === "function" ? moduleDefault : moduleDefault.default;
+const pageHtml = renderToStaticMarkup(createElement(GuideArticleView, { article: ARTICLE }));
+assert.equal(pageHtml.includes("guide-expert__initials"), false);
+assert.equal(pageHtml.includes("Оригинал"), false, "no English original under a translation");
+assert.ok(pageHtml.includes("dmitry-kotov.webp"));
+const pageText = pageHtml
+  .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ")
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&[a-z]+;|&#\d+;/g, " ");
+assert.equal(HAS_LATIN.test(withoutPaths(pageText)), false, `Latin on the page: ${withoutPaths(pageText).match(/.{0,40}[A-Za-z].{0,40}/)?.[0]}`);
+for (const [, value] of pageHtml.matchAll(/\s(?:alt|title|aria-label|placeholder)="([^"]*)"/g)) {
+  assert.equal(HAS_LATIN.test(value ?? ""), false, `Latin in attribute: ${value}`);
+}

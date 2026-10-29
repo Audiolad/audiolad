@@ -4,7 +4,12 @@ import type { CSSProperties } from "react";
 
 import { COFFEE_ATLAS_PATH, coffeeAtlasAsset } from "@/lib/business/coffee-atlas/constants";
 import { COFFEE_ATLAS_SHOPS } from "@/lib/business/coffee-atlas/shops";
-import { ATLAS_CARD_THEMES, DEFAULT_ATLAS_CARD_THEME } from "@/lib/business/vertical-guides/atlas-card-themes";
+import {
+  ATLAS_CARD_NAMES_RU,
+  ATLAS_CARD_THEMES,
+  atlasSoundTagRu,
+  DEFAULT_ATLAS_CARD_THEME,
+} from "@/lib/business/vertical-guides/atlas-card-themes";
 
 /**
  * «10 кофеен – 10 характеров звучания»: one internal link to the atlas that wraps
@@ -56,8 +61,8 @@ export default function GuideAtlasCardsBanner() {
                   <span className="guide-atlas-card__place">
                     {shop.city}, {shop.country}
                   </span>
-                  <span className="guide-atlas-card__name">{shop.name}</span>
-                  <span className="guide-atlas-card__tags">{shop.soundTags.join(" · ")}</span>
+                  <span className="guide-atlas-card__name">{ATLAS_CARD_NAMES_RU[shop.slug] ?? shop.name}</span>
+                  <span className="guide-atlas-card__tags">{shop.soundTags.map(atlasSoundTagRu).join(" · ")}</span>
                 </span>
               </span>
             );

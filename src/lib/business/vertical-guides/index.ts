@@ -2,7 +2,6 @@ export {
   assertCoffeeExpertRegistry,
   COFFEE_EXPERTS,
   countExperts,
-  expertInitials,
   expertQuote,
   getCoffeeExpert,
 } from "./experts";

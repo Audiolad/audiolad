@@ -26,7 +26,10 @@ export type CoffeeExpert = {
   role: string;
   competence: string;
   competenceUrl: string;
-  /** Null when no freely licensed portrait exists; the card then shows initials. */
+  /**
+   * Required: an expert without a real, freely licensed portrait does not go into the registry
+   * (no initials placeholders). `credit` is printed on the page and must be Russian only.
+   */
   photo: {
     file: string;
     commonsPage: string;
@@ -35,7 +38,7 @@ export type CoffeeExpert = {
     author: string;
     credit: string;
     rightsNote: string;
-  } | null;
+  };
   quotes: ExpertQuote[];
 };
 
@@ -48,6 +51,9 @@ const ALLOWED_LICENSES = new Set([
   "CC BY-SA 3.0",
   "CC BY-SA 4.0",
 ]);
+
+/** Latin letters are not allowed in anything the guide prints (owner rule, 2026-10-29). */
+export const HAS_LATIN = /[A-Za-z]/;
 
 export const COFFEE_EXPERTS = registryJson.experts as unknown as readonly CoffeeExpert[];
 
@@ -83,16 +89,20 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     if (expert.quotes.length < 1 || expert.quotes.length > 2) {
       throw new Error(`${expert.id}: need 1 or 2 quotes`);
     }
-    if (expert.photo) {
-      if (!ALLOWED_LICENSES.has(expert.photo.license)) {
-        throw new Error(`${expert.id}: license ${expert.photo.license} is not in the allowlist`);
-      }
-      if (!expert.photo.file.startsWith("/business/coffee-guides/experts/")) {
-        throw new Error(`${expert.id}: photo must live in the guide portrait folder`);
-      }
-      if (!expert.photo.credit || /https?:\/\//.test(expert.photo.credit)) {
-        throw new Error(`${expert.id}: visible credit must name the author without a URL`);
-      }
+    if (!expert.photo) {
+      throw new Error(`${expert.id}: a real portrait is required, no initials placeholders`);
+    }
+    if (!ALLOWED_LICENSES.has(expert.photo.license)) {
+      throw new Error(`${expert.id}: license ${expert.photo.license} is not in the allowlist`);
+    }
+    if (!expert.photo.file.startsWith("/business/coffee-guides/experts/")) {
+      throw new Error(`${expert.id}: photo must live in the guide portrait folder`);
+    }
+    if (!expert.photo.credit || /https?:\/\//.test(expert.photo.credit)) {
+      throw new Error(`${expert.id}: visible credit must name the author without a URL`);
+    }
+    if (HAS_LATIN.test(expert.photo.credit)) {
+      throw new Error(`${expert.id}: visible photo credit must be Russian only`);
     }
     for (const quote of expert.quotes) {
       if (quote.text.trim().length < 40) {
@@ -109,16 +119,6 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
       }
     }
   }
-}
-
-/** Two letters for the round placeholder when a portrait is missing. */
-export function expertInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase("ru") ?? "")
-    .join("");
 }
 
 export function countExperts(experts: readonly CoffeeExpert[] = COFFEE_EXPERTS): {

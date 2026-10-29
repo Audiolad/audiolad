@@ -27,3 +27,35 @@ export const ATLAS_CARD_THEMES: Readonly<Record<string, AtlasCardTheme>> = {
 };
 
 export const DEFAULT_ATLAS_CARD_THEME: AtlasCardTheme = ATLAS_CARD_THEMES["caffe-florian"]!;
+
+/**
+ * Russian spelling of the atlas shop names for the guide banner. Guide pages print no Latin
+ * text (owner rule, 2026-10-29); the atlas pages themselves keep the original names.
+ */
+export const ATLAS_CARD_NAMES_RU: Readonly<Record<string, string>> = {
+  "caffe-florian": "Кафе «Флориан»",
+  "cafe-de-flore": "Кафе «Де Флор»",
+  "coffee-collective": "«Кофи Коллектив»",
+  "fuglen-tokyo": "«Фуглен Токио»",
+  "starbucks-reserve-shanghai": "«Старбакс Резерв Ростери Шанхай»",
+  "cafe-tortoni": "Кафе «Тортони»",
+  "cafe-san-alberto": "Кафе «Сан-Альберто»",
+  "truth-coffee-roasting": "«Трут Кофи Ростинг»",
+  "single-o-surry-hills": "«Сингл О Сарри-Хиллз»",
+  "la-colombe": "«Ла Коломб»",
+};
+
+const SOUND_TAG_RU: Readonly<Record<string, string>> = {
+  "вечером – lounge-jazz": "вечером – лаунж-джаз",
+  "nu-jazz": "ню-джаз",
+  "Latin jazz": "латиноамериканский джаз",
+  funk: "фанк",
+  "neo-soul": "неосоул",
+  "jazz-funk": "джаз-фанк",
+  groove: "грув",
+};
+
+/** Sound tag as printed on a guide page: Russian only. */
+export function atlasSoundTagRu(tag: string): string {
+  return SOUND_TAG_RU[tag] ?? tag;
+}
