@@ -1,6 +1,6 @@
 import type { Metadata, MetadataRoute } from "next";
 
-import { BUSINESS_ORIGIN } from "./host";
+import { BUSINESS_ORIGIN, COFFEE_HOSTNAME, COFFEE_ORIGIN, coffeeHostEnabled } from "./host";
 
 export const BUSINESS_APP_SEO_TITLE = "Аудиолад Бизнес";
 
@@ -8,12 +8,12 @@ export const BUSINESS_APP_SEO_DESCRIPTION =
   "Кабинет владельца кофейни Аудиолад Бизнес";
 
 /** Private B2B app — never index. */
-export function buildBusinessAppMetadata(): Metadata {
+export function buildBusinessAppMetadata(hostname?: string): Metadata {
   return {
     title: BUSINESS_APP_SEO_TITLE,
     description: BUSINESS_APP_SEO_DESCRIPTION,
     alternates: {
-      canonical: `${BUSINESS_ORIGIN}/`,
+      canonical: `${coffeeHostEnabled() && hostname === COFFEE_HOSTNAME ? COFFEE_ORIGIN : BUSINESS_ORIGIN}/`,
     },
     robots: {
       index: false,

@@ -7,6 +7,7 @@ import {
   SCHOOL_SITE_PATH,
 } from "@/lib/school/host";
 import { resolveSchoolProxyAction } from "@/lib/school/proxy-policy";
+import { coffeeHandoffRedirect, migrateCoffeeGuestCookie } from "@/lib/business-app/coffee-host-proxy";
 import { resolveBusinessProxyAction } from "@/lib/business-app/proxy-policy";
 import {
   COURSE_UPGRADE_CHECKOUT_STAGES,
@@ -54,9 +55,11 @@ export async function proxy(request: NextRequest) {
   }
 
   if (businessAction.action === "rewrite_business_app") {
-    return updateSession(request, {
+    const handoff = coffeeHandoffRedirect(request);
+    if (handoff) return handoff;
+    return migrateCoffeeGuestCookie(request, await updateSession(request, {
       rewritePathname: businessAction.pathname,
-    });
+    }));
   }
 
   return runCourseUpgradeProtectedUpdateSession({

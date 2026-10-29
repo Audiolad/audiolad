@@ -323,7 +323,7 @@ function paid0(): BusinessChromeAccess {
 
 // ---------------------------------------------------------------- permanent atlas URL
 assert.equal(BUSINESS_GUEST_COFFEE_URL, "https://business.audiolad.ru/guest/coffee");
-assert.equal(COFFEE_ATLAS_CTA_HREF, "https://business.audiolad.ru/guest/coffee", "atlas CTA unchanged");
+assert.equal(COFFEE_ATLAS_CTA_HREF, process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED === "1" ? "https://coffee.audiolad.ru/" : "https://business.audiolad.ru/guest/coffee", "atlas CTA follows the storefront flag");
 assert.deepEqual(resolveBusinessProxyAction("business.audiolad.ru", "/guest/coffee"), { action: "rewrite_business_app", pathname: "/business-app/guest/coffee" });
 
 closedApis().then(

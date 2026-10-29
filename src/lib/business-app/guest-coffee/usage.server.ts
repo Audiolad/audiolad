@@ -2,6 +2,8 @@ import "server-only";
 
 import { cookies, headers } from "next/headers";
 
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
+import { SHARED_GUEST_COFFEE_COOKIE, selectGuestToken, sharedGuestOptions } from "./shared-identity";
 import { getTrustedClientIp } from "@/lib/http/trusted-client-ip";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -37,7 +39,9 @@ export async function peekGuestCoffeeUsage(): Promise<number | null> {
   try {
     const store = await cookies();
     const h = await headers();
-    const token = store.get(GUEST_COFFEE_COOKIE_NAME)?.value;
+    const token = sharedGuestOptions(hostnameFromHeaders(h))
+      ? selectGuestToken(store.get(SHARED_GUEST_COFFEE_COOKIE)?.value, store.get(GUEST_COFFEE_COOKIE_NAME)?.value)
+      : store.get(GUEST_COFFEE_COOKIE_NAME)?.value;
     const deviceHash = isGuestCoffeeToken(token) ? hashGuestCoffeeToken(token) : "0".repeat(64);
     const db = createServiceRoleClient();
     const { data, error } = await db.rpc("business_guest_listening_peek", {
@@ -53,9 +57,14 @@ export async function peekGuestCoffeeUsage(): Promise<number | null> {
 
 async function deviceToken(): Promise<string> {
   const store = await cookies();
-  let token = store.get(GUEST_COFFEE_COOKIE_NAME)?.value;
-  if (!isGuestCoffeeToken(token)) {
-    token = createGuestCoffeeToken();
+  const shared = sharedGuestOptions(hostnameFromHeaders(await headers()));
+  let token = shared
+    ? selectGuestToken(store.get(SHARED_GUEST_COFFEE_COOKIE)?.value, store.get(GUEST_COFFEE_COOKIE_NAME)?.value)
+    : store.get(GUEST_COFFEE_COOKIE_NAME)?.value;
+  if (!isGuestCoffeeToken(token)) token = createGuestCoffeeToken();
+  if (shared) {
+    store.set(SHARED_GUEST_COFFEE_COOKIE, token, shared);
+  } else if (store.get(GUEST_COFFEE_COOKIE_NAME)?.value !== token) {
     const o = guestCoffeeCookieOptions(process.env.NODE_ENV === "production");
     store.set(o.name, token, { httpOnly: o.httpOnly, sameSite: o.sameSite, secure: o.secure, path: o.path, maxAge: o.maxAge });
   }

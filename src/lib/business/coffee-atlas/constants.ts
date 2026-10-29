@@ -1,5 +1,5 @@
 import { BUSINESS_GIFT_TITLE } from "@/lib/access-grants/copy";
-import { BUSINESS_GUEST_COFFEE_URL } from "@/lib/business-app/host";
+import { coffeeStorefrontUrl } from "@/lib/business-app/host";
 import { BUSINESS_PLAN_PERIOD_LABEL, formatBusinessMonthlyPrice } from "@/lib/business/plan";
 import { BUSINESS_LANDING_PATH } from "@/lib/business/landing";
 import { PRODUCTION_APP_ORIGIN } from "@/lib/seo/app-origin";
@@ -27,14 +27,9 @@ export function coffeeAtlasAsset(file: string): string {
 export const COFFEE_ATLAS_PDF_PATH = coffeeAtlasAsset("atlas-10-kofeen-mira.pdf");
 export const COFFEE_ATLAS_PDF_DOWNLOAD_NAME = "Атлас-10-кофеен-мира-АудиоЛад.pdf";
 
-/**
- * «Подобрать звучание моей кофейни» (every CTA of the web atlas: overview + all 10 shop
- * pages, desktop and mobile) leads to the permanent guest coffee cabinet of AudioLad
- * Business — https://business.audiolad.ru/guest/coffee (Sergey 17.10.2026 15:34 MSK,
- * task a8240527). The same URL is printed in the PDF atlas (pp. 32–33): never change it.
- */
+/** Web CTA is gated until DNS/TLS rollout; the permanent PDF URL stays available. */
 export const COFFEE_ATLAS_CTA_LABEL = "Подобрать звучание моей кофейни";
-export const COFFEE_ATLAS_CTA_HREF = BUSINESS_GUEST_COFFEE_URL;
+export const COFFEE_ATLAS_CTA_HREF = coffeeStorefrontUrl();
 
 /** AudioLad Business offer printed at the bottom of every atlas page. */
 export const COFFEE_ATLAS_OFFER = {

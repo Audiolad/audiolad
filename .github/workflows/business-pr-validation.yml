@@ -42,9 +42,13 @@ jobs:
           set -euo pipefail
           npx tsx scripts/business-landing-unit.mts
           npm run test:business-app-domain-bind
+          npm run test:business-coffee-host
+          npm run test:business-coffee-atlas
+          NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-atlas
           npm run test:business-app-proxy-routing
           AUDIOLAD_REQUIRE_GUEST_COFFEE_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-guest-coffee
           npm run test:business-guest-shell
+          NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-guest-shell
           npm run test:business-ru-copy
           npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere

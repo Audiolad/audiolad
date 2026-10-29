@@ -175,7 +175,7 @@ assert.deepEqual(
 
 // --- CTA: permanent guest coffee cabinet (a8240527, Sergey 17.10 15:34 MSK; URL printed in the PDF) ---
 assert.equal(COFFEE_ATLAS_CTA_LABEL, "Подобрать звучание моей кофейни");
-assert.equal(COFFEE_ATLAS_CTA_HREF, "https://business.audiolad.ru/guest/coffee");
+assert.equal(COFFEE_ATLAS_CTA_HREF, process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED === "1" ? "https://coffee.audiolad.ru/" : "https://business.audiolad.ru/guest/coffee");
 {
   const ctaSources = [
     read("src/components/business/coffee-atlas/CoffeeAtlasChrome.tsx"),

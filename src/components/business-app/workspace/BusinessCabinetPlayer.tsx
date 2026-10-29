@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
+
 import BusinessCabinetMiniBar from "@/components/business-app/workspace/BusinessCabinetMiniBar";
 import { cabinetAlbumCoverUrl } from "@/lib/business-app/album-cover";
 import { postPointReport } from "@/lib/business-app/cabinet-player-client";
@@ -201,7 +203,7 @@ export function BusinessCabinetPlayerProvider({
     savedPlaceRef.current = false;
     let stored: string | null = null;
     try {
-      stored = window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY);
+      stored = coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY);
     } catch {
       stored = null;
     }

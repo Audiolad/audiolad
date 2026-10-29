@@ -360,7 +360,7 @@ assert.match(cabinet, /BusinessSoundSettings/, "shared sound settings");
 // ---------------------------------------------------------------- atlas CTA → permanent URL
 {
   const constants = read("src/lib/business/coffee-atlas/constants.ts");
-  assert.match(constants, /COFFEE_ATLAS_CTA_HREF = BUSINESS_GUEST_COFFEE_URL;/);
+  assert.match(constants, /COFFEE_ATLAS_CTA_HREF = coffeeStorefrontUrl\(\);/);
   assert.match(cabinet, /GUEST_COFFEE_ATLAS_URL/, "way back to the atlas");
   assert.match(copy, /COFFEE_ATLAS_OFFER\.price/, "terms share the atlas offer source");
   assert.match(copy, /BUSINESS_GIFT_TITLE/);

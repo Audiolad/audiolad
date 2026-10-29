@@ -2,6 +2,9 @@ import { isPrivateRoute } from "@/lib/auth/routes";
 
 import {
   BUSINESS_GUEST_COFFEE_PUBLIC_PATH,
+  BUSINESS_GUEST_COFFEE_INTERNAL_PATH,
+  COFFEE_HOSTNAME,
+  coffeeHostEnabled,
   BUSINESS_PUBLIC_PATH_REWRITES,
   BUSINESS_SITE_PATH,
   isBusinessHostname,
@@ -61,6 +64,7 @@ export function resolveBusinessProxyAction(
   hostname: string,
   pathname: string,
 ): BusinessProxyAction {
+  if (hostname === COFFEE_HOSTNAME && !coffeeHostEnabled()) return { action: "not_found" };
   if (!isBusinessHostname(hostname) && isBusinessSitePath(pathname)) {
     return { action: "not_found" };
   }
@@ -86,6 +90,19 @@ export function resolveBusinessProxyAction(
 
   if ((BUSINESS_ALLOWED_API_PATHS as readonly string[]).includes(pathname)) {
     return { action: "pass_through" };
+  }
+
+  if (coffeeHostEnabled() && pathname === "/coffee-handoff") {
+    return hostname === COFFEE_HOSTNAME ? { action: "not_found" } :
+      { action: "rewrite_business_app", pathname: `${BUSINESS_SITE_PATH}/coffee-handoff` };
+  }
+  if (hostname === COFFEE_HOSTNAME &&
+      ["/spa", `${BUSINESS_SITE_PATH}/spa`, `${BUSINESS_SITE_PATH}/coffee-handoff`].some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return { action: "not_found" };
+  }
+  if (hostname === COFFEE_HOSTNAME && pathname === "/") {
+    return { action: "rewrite_business_app", pathname: BUSINESS_GUEST_COFFEE_INTERNAL_PATH };
   }
 
   // After rewrite Next re-enters proxy with the internal path — pass through.

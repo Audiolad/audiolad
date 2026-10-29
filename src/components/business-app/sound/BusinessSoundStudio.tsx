@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
+
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { useHasLiveBusinessAccess } from "@/components/business-app/BusinessAccessLine";
 import { useBusinessGuestStatus } from "@/components/business-app/BusinessGuestStatus";
@@ -102,7 +104,7 @@ function isLimit(value: unknown): value is GuestCoffeeLimitState {
 
 function readStoredProfile(): GuestCoffeeProfile {
   try {
-    return parseBusinessSoundProfile(window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY));
+    return parseBusinessSoundProfile(coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY));
   } catch {
     return GUEST_COFFEE_DEFAULT_PROFILE;
   }
@@ -335,7 +337,7 @@ export default function BusinessSoundStudio({ playlists, plan = null, initialLim
     setProfile((prev) => {
       const next = { ...prev, [key]: value };
       try {
-        window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
+        coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
       } catch {
         // storage blocked (private mode): settings still work for this visit
       }
