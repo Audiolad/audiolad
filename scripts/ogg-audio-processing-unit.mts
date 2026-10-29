@@ -21,6 +21,9 @@ try {
 } catch {
   toolsAvailable = false;
 }
+if (!toolsAvailable && process.env.AUDIOLAD_REQUIRE_FFMPEG === "1") {
+  throw new Error("AUDIOLAD_REQUIRE_FFMPEG=1 but ffmpeg/ffprobe are not installed");
+}
 
 test("Ogg source probe and real product/music MP3 delivery", {
   skip: toolsAvailable ? false : "ffmpeg/ffprobe not installed; synthetic Ogg processing test skipped",

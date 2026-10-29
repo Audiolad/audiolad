@@ -22,6 +22,9 @@ on:
       - "src/lib/studio/server/repository.ts"
       - "src/components/studio/StudioEditorShell.tsx"
       - "supabase/migrations/20261004120200_studio_catalog_render_principal.sql"
+      - "scripts/ogg-audio-processing-unit.mts"
+      - "src/lib/product-audio-normalize/**"
+      - "src/lib/music-transcode/**"
 
 permissions:
   contents: read
@@ -55,3 +58,9 @@ jobs:
         run: |
           set -euo pipefail
           AUDIOLAD_REQUIRE_FFMPEG=1 npm run test:studio-catalog-music-render
+      - name: Run Ogg audio processing with required ffmpeg
+        env:
+          AUDIOLAD_REQUIRE_FFMPEG: "1"
+        run: |
+          set -euo pipefail
+          AUDIOLAD_REQUIRE_FFMPEG=1 npx tsx scripts/ogg-audio-processing-unit.mts
