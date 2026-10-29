@@ -81,30 +81,47 @@ export type BackfillAuthor = {
 
 export type BackfillScope =
   | { ok: true; authors: BackfillAuthor[]; excludedVerified: BackfillAuthor[] }
-  | { ok: false; error: "authors_allowlist_required" | "author_not_verified"; slugs: string[] };
+  | {
+      ok: false;
+      error: "authors_allowlist_required" | "author_not_verified" | "exclude_not_verified" | "scope_empty";
+      slugs: string[];
+    };
+
+function normalizeSlugs(list: readonly string[] | null | undefined): string[] {
+  return [...new Set((list ?? []).map((slug) => slug.trim()).filter(Boolean))];
+}
 
 /**
- * Narrow verified Business authors to the slug allowlist. Fails closed: an
- * allowlisted slug that is not a verified-rights author aborts the run.
+ * Narrow verified Business authors to the slug allowlist, minus the explicit
+ * project exclusions (exclusion wins over the allowlist). Fails closed: an
+ * allowlisted or excluded slug that is not a verified-rights author aborts
+ * the run (a typo must never silently widen or keep the scope).
  */
 export function resolveBackfillScope(input: {
   verifiedAuthors: readonly BackfillAuthor[];
   allowlist: readonly string[] | null;
+  exclude?: readonly string[] | null;
   requireAllowlist: boolean;
 }): BackfillScope {
-  const slugs = [...new Set((input.allowlist ?? []).map((slug) => slug.trim()).filter(Boolean))];
-  if (slugs.length === 0) {
-    if (input.requireAllowlist) return { ok: false, error: "authors_allowlist_required", slugs: [] };
-    return { ok: true, authors: sortAuthors(input.verifiedAuthors), excludedVerified: [] };
+  const slugs = normalizeSlugs(input.allowlist);
+  const excludeSlugs = normalizeSlugs(input.exclude);
+  if (slugs.length === 0 && input.requireAllowlist) {
+    return { ok: false, error: "authors_allowlist_required", slugs: [] };
   }
   const bySlug = new Map(input.verifiedAuthors.map((author) => [author.slug, author]));
   const unknown = slugs.filter((slug) => !bySlug.has(slug));
   if (unknown.length > 0) return { ok: false, error: "author_not_verified", slugs: unknown };
-  const allowed = new Set(slugs);
+  const unknownExcluded = excludeSlugs.filter((slug) => !bySlug.has(slug));
+  if (unknownExcluded.length > 0) return { ok: false, error: "exclude_not_verified", slugs: unknownExcluded };
+  const excluded = new Set(excludeSlugs);
+  const allowed = new Set(slugs.length > 0 ? slugs : input.verifiedAuthors.map((author) => author.slug));
+  const inScope = (author: BackfillAuthor) => allowed.has(author.slug) && !excluded.has(author.slug);
+  const authors = sortAuthors(input.verifiedAuthors.filter(inScope));
+  if (authors.length === 0) return { ok: false, error: "scope_empty", slugs: excludeSlugs };
   return {
     ok: true,
-    authors: sortAuthors(input.verifiedAuthors.filter((author) => allowed.has(author.slug))),
-    excludedVerified: sortAuthors(input.verifiedAuthors.filter((author) => !allowed.has(author.slug))),
+    authors,
+    excludedVerified: sortAuthors(input.verifiedAuthors.filter((author) => !inScope(author))),
   };
 }
 
@@ -204,7 +221,8 @@ export type BackfillWindow = { startMinute: number; endMinute: number } | "any";
 
 export function parseBackfillWindow(raw: string): BackfillWindow | null {
   const value = raw.trim().toLowerCase();
-  if (value === "any" || value === "24h") return "any";
+  // Around the clock (29.10.2026, Sergey): the window is disabled entirely.
+  if (value === "always" || value === "any" || value === "24h" || value === "off") return "any";
   const match = /^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/.exec(value);
   if (!match) return null;
   const [h1, m1, h2, m2] = match.slice(1).map(Number);
@@ -287,6 +305,8 @@ export function estimateBackfillHours(tracks: number, secondsPerTrack = MUSIC_PA
 export type BackfillArgs = {
   execute: boolean;
   authors: string[] | null;
+  /** Project (author) slugs never enqueued, even if listed in --authors. */
+  excludeAuthors: string[];
   window: BackfillWindow;
   maxInflight: number;
   perTick: number;
@@ -315,6 +335,7 @@ export function parseBackfillArgs(argv: readonly string[]): BackfillArgs {
   const args: BackfillArgs = {
     execute: false,
     authors: null,
+    excludeAuthors: [],
     window: parseBackfillWindow(MUSIC_PASSPORT_BACKFILL_DEFAULT_WINDOW) as BackfillWindow,
     maxInflight: 1,
     perTick: 1,
@@ -340,9 +361,13 @@ export function parseBackfillArgs(argv: readonly string[]): BackfillArgs {
       case "--dry-run": args.execute = false; break;
       case "--execute": args.execute = true; break;
       case "--authors": args.authors = value().split(",").map((slug) => slug.trim()).filter(Boolean); break;
+      case "--exclude-projects":
+      case "--exclude-authors":
+        args.excludeAuthors = [...args.excludeAuthors, ...value().split(",").map((slug) => slug.trim()).filter(Boolean)];
+        break;
       case "--window": {
         const parsed = parseBackfillWindow(value());
-        if (!parsed) throw new BackfillArgsError("--window must be HH:MM-HH:MM (Europe/Moscow) or any");
+        if (!parsed) throw new BackfillArgsError("--window must be HH:MM-HH:MM (Europe/Moscow) or always");
         args.window = parsed;
         break;
       }

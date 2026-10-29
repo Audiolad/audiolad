@@ -88,6 +88,45 @@ if (scoped.ok) {
 const dryAll = resolveBackfillScope({ verifiedAuthors: authors, allowlist: null, requireAllowlist: false });
 assert.equal(dryAll.ok && dryAll.authors.length, 3);
 
+// --- Project-level exclusion (29.10.2026: «Орий» stays out), exclusion wins, fail closed.
+const withOrij: BackfillAuthor[] = [...authors, { id: "a-orij", slug: "orij", name: "Орий", ownerUserId: "u-1" }];
+const noOrij = resolveBackfillScope({
+  verifiedAuthors: withOrij,
+  allowlist: ["jazz-relax", "orij", "liniya-dnya"],
+  exclude: ["orij", " orij "],
+  requireAllowlist: true,
+});
+assert.equal(noOrij.ok, true);
+if (noOrij.ok) {
+  assert.deepEqual(noOrij.authors.map((a) => a.slug), ["jazz-relax", "liniya-dnya"]);
+  assert.deepEqual(noOrij.excludedVerified.map((a) => a.slug), ["lara-larina", "orij"]);
+}
+assert.deepEqual(
+  resolveBackfillScope({ verifiedAuthors: withOrij, allowlist: ["jazz-relax"], exclude: ["orjj"], requireAllowlist: true }),
+  { ok: false, error: "exclude_not_verified", slugs: ["orjj"] },
+);
+assert.deepEqual(
+  resolveBackfillScope({ verifiedAuthors: withOrij, allowlist: ["orij", "not-business"], exclude: ["orij"], requireAllowlist: true }),
+  { ok: false, error: "author_not_verified", slugs: ["not-business"] },
+  "an unverified slug still aborts even next to an exclusion",
+);
+assert.deepEqual(
+  resolveBackfillScope({ verifiedAuthors: withOrij, allowlist: ["orij"], exclude: ["orij"], requireAllowlist: true }),
+  { ok: false, error: "scope_empty", slugs: ["orij"] },
+);
+assert.deepEqual(
+  resolveBackfillScope({ verifiedAuthors: withOrij, allowlist: null, exclude: ["orij"], requireAllowlist: true }),
+  { ok: false, error: "authors_allowlist_required", slugs: [] },
+);
+const dryNoOrij = resolveBackfillScope({ verifiedAuthors: withOrij, allowlist: null, exclude: ["orij"], requireAllowlist: false });
+assert.equal(dryNoOrij.ok && dryNoOrij.authors.some((a) => a.slug === "orij"), false);
+assert.equal(dryNoOrij.ok && dryNoOrij.authors.length, 3);
+const orijTracks = [track("o-1", { authorId: "a-orij", practiceId: "p-9" }), track("j-1")];
+if (noOrij.ok) {
+  const ordered = orderBackfillCandidates({ authors: noOrij.authors, tracks: orijTracks, practiceOrder: new Map() });
+  assert.deepEqual(ordered.map((t) => t.audioItemId), ["j-1"], "excluded project is never enqueued");
+}
+
 // --- Summary + order
 const tracks: BackfillTrackInput[] = [
   track("j-p2-1", { practiceId: "p-2", position: 1 }),
@@ -175,6 +214,29 @@ assert.equal(parseBackfillArgs(["--execute", "--dry-run", "--authors", "x"]).exe
 
 assert.equal(estimateBackfillHours(518), 10.4);
 
+// --exclude-projects / --exclude-authors (repeatable, comma list) and --window=always.
+const scoped643 = parseBackfillArgs([
+  "--execute", "--authors=jazz-relax,orij,liniya-dnya", "--exclude-projects=orij", "--exclude-authors", "x,y",
+  "--window=always", "--max-inflight", "1", "--loop",
+]);
+assert.deepEqual(scoped643.excludeAuthors, ["orij", "x", "y"]);
+assert.equal(scoped643.window, "any");
+assert.equal(scoped643.maxInflight, 1);
+assert.deepEqual(parseBackfillArgs([]).excludeAuthors, []);
+assert.throws(() => parseBackfillArgs(["--exclude-projects"]), BackfillArgsError);
+assert.throws(() => parseBackfillArgs(["--window", "sometimes"]), BackfillArgsError);
+for (const raw of ["always", "ALWAYS", "off", "any", "24h"]) assert.equal(parseBackfillWindow(raw), "any", raw);
+// Around the clock: daytime MSK is not "outside_window", but the empty-queue throttle still holds.
+const always = parseBackfillWindow("always") as BackfillWindow;
+for (const iso of ["2026-10-29T09:00:00Z", "2026-10-29T15:30:00Z", "2026-10-29T21:00:00Z"]) {
+  assert.equal(insideBackfillWindow(new Date(iso), always), true, iso);
+  assert.equal(decideBackfillTick({ ...base, window: always, now: new Date(iso) }).action, "enqueue", iso);
+  assert.deepEqual(decideBackfillTick({ ...base, window: always, now: new Date(iso), globalInflight: 1 }), { action: "wait", reason: "queue_busy" });
+}
+assert.equal(estimateBackfillHours(639), 12.8);
+
+
+
 // --- Source guards
 const pilot = read("src/lib/music-passport/jazz-relax-pilot.ts");
 const backfillFn = pilot.slice(pilot.indexOf("export async function enqueueJazzRelaxTrackForBackfill"), pilot.indexOf("export function jazzRelaxPassportTrackBlock"));
@@ -185,6 +247,7 @@ const script = read("scripts/music-passport-backfill.mts");
 assert.match(script, /MUSIC_PASSPORT_BACKFILL_EXECUTE_ENV\] === "1"/);
 assert.match(script, /existsSync\(args\.stopFile\)/);
 assert.match(script, /countGlobalAnalyzerInflight/);
+assert.match(script, /exclude: args\.excludeAuthors/);
 const server = read("src/lib/music-passport/backfill.server.ts");
 assert.doesNotMatch(server, /\.(insert|update|upsert|delete|rpc)\(/, "snapshot loader is read-only");
 

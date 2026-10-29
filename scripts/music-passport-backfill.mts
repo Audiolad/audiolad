@@ -11,7 +11,12 @@
  *   # one throttled tick (cron every 2 min, night window 00:00–07:00 MSK):
  *   MUSIC_PASSPORT_BACKFILL_EXECUTE=1 nice -n 10 npx tsx scripts/music-passport-backfill.mts \
  *     --execute --authors a,b --window 00:00-07:00 --max-inflight 1
- *   # or a supervised loop: … --execute --authors a,b --loop --interval 60 --window any
+ *   # or a supervised loop around the clock (only into an empty analyzer queue):
+ *   … --execute --authors a,b --exclude-projects c --loop --interval 60 --window=always --max-inflight 1
+ *
+ * Scope: --authors is a project (author) slug allowlist; --exclude-projects
+ * removes projects from it (exclusion wins). Any slug in either list that is
+ * not a verified Business author aborts the run.
  *
  * Throttle: enqueues only while the global analyzer queue (queued+processing,
  * all sources) is below --max-inflight (default 1 = only when empty).
@@ -111,12 +116,24 @@ async function main(args: BackfillArgs) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const verified = await loadVerifiedBusinessAuthors(db);
-  const scope = resolveBackfillScope({ verifiedAuthors: verified, allowlist: args.authors, requireAllowlist: args.execute });
+  const scope = resolveBackfillScope({
+    verifiedAuthors: verified,
+    allowlist: args.authors,
+    exclude: args.excludeAuthors,
+    requireAllowlist: args.execute,
+  });
   if (!scope.ok) {
     log("music_passport_backfill_scope_rejected", { error: scope.error, slugs: scope.slugs });
     process.exitCode = 2;
     return;
   }
+  log("music_passport_backfill_scope", {
+    mode: args.execute ? "execute" : "dry_run",
+    inScope: scope.authors.map((author) => author.slug),
+    excludedProjects: args.excludeAuthors,
+    window: args.window === "any" ? "always" : args.window,
+    maxInflight: args.maxInflight,
+  });
   const release = args.execute ? acquireLock(`${args.stateFile}.lock`) : () => {};
   let stopping = false;
   const onSignal = () => { stopping = true; };
@@ -134,7 +151,7 @@ async function main(args: BackfillArgs) {
         printSummary("In scope", summary.projects, summary.total, args.json);
         if (scope.excludedVerified.length > 0) {
           const excluded = summarizeBackfill({ authors: scope.excludedVerified, tracks: snapshot.tracks });
-          printSummary("Verified Business authors NOT in --authors (never enqueued)", excluded.projects, excluded.total, args.json);
+          printSummary("Verified Business authors NOT in scope (--authors / --exclude-projects; never enqueued)", excluded.projects, excluded.total, args.json);
         }
         log("music_passport_backfill_dry_run_done", { mode: "dry_run", enqueued: 0 });
         return;
