@@ -26,11 +26,11 @@ export default function PointQrCode({ value, size = 200, label }: { value: strin
       width={size}
       height={size}
       shapeRendering="crispEdges"
-      className="rounded-lg bg-white"
+      className="rounded-lg"
       data-testid="biz-point-qr"
     >
-      <rect width={count} height={count} fill="#fff" />
-      <path d={path} fill="#1f1a14" />
+      <rect width={count} height={count} fill="white" />
+      <path d={path} fill="black" />
     </svg>
   );
 }
