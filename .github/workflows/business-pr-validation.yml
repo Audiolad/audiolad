@@ -58,7 +58,7 @@ jobs:
           npm run test:business-app-onboarding-wizard
           npm run test:business-domain-core
           npm run test:business-location-sound-settings
-          npm run test:business-point-pairing
+          AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-point-pairing
           npm run test:business-point-commands
           npm run test:business-player-foundation
           npm run test:business-playback-attribution
