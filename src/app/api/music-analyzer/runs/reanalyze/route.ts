@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         if (!run) {
           const path = buildRunStoragePath(id, source.source_filename);
           await copyMusicAnalyzerObject(source.storage_path, path);
-          run = await enqueueMusicAnalyzerRun({ id, createdBy: guard.actor.userId, sourceFilename: source.source_filename, sha256: source.sha256, byteSize: Number(source.byte_size), mimeType: source.mime_type, storagePath: path });
+          run = await enqueueMusicAnalyzerRun({ deduplicate: true, id, createdBy: guard.actor.userId, sourceFilename: source.source_filename, sha256: source.sha256, byteSize: Number(source.byte_size), mimeType: source.mime_type, storagePath: path });
         }
         results.push({ sourceId: source.id, run: toClientRun(run) });
       } catch (error) {
