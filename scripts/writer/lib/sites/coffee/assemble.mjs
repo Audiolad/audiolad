@@ -87,7 +87,7 @@ export function assembleCoffeeArticle(brief, fields, { today = moscowDate() } = 
     primaryQuery: brief.primaryQuery,
     relatedQueries: brief.relatedQueries.map((query) => ({ phrase: query.phrase, frequency: query.frequency, note: brief.wordstatNote || COFFEE.wordstatNote })),
     hero: { src: COFFEE.heroSrc, alt: plain(fields.heroAlt), caption: "Четыре чашки – четыре характера кофейни." },
-    // Generated text card (own artwork), written by og-card.py in applyCoffeePack.
+    // Generated text card (own artwork), written by og-card.mjs in applyCoffeePack.
     ogImage: { src: COFFEE.ogSrc(brief.slug), alt: `${brief.title} – текстовая обложка ${COFFEE.byline}`, ...COFFEE.ogSize },
     // No opening story (owner rule 2026-10-30): the intro goes straight to the topic, query first.
     // Intro paragraphs may carry [анкор](адрес) links to sibling guides.

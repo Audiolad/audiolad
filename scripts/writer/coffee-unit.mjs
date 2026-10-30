@@ -472,7 +472,7 @@ test("applyCoffeePack writes into a scratch tree only", () => {
     writeFileSync(registry, readFileSync(join(root, COFFEE.registryFile), "utf8"));
     const { changed } = applyCoffeePack(dir, { items: [{ article: assembleCoffeeArticle(brief, fields) }], packId: "p", model: "m" });
     assert.deepEqual(changed, [`${COFFEE.articlesDir}/${brief.slug}.ts`, `${COFFEE.ogDir}/${brief.slug}.jpg`, COFFEE.registryFile]);
-    // og:image text card (own artwork): JPEG 1200×630 from og-card.py.
+    // og:image text card (own artwork): JPEG 1200×630 from og-card.mjs.
     const jpg = readFileSync(join(dir, COFFEE.ogDir, `${brief.slug}.jpg`));
     assert.equal(jpg.readUInt16BE(0), 0xffd8, "JPEG");
     let at = 2;

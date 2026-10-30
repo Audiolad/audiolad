@@ -22,7 +22,7 @@ export const COFFEE = {
   heroSrc: "/images/b/coffee/four-cups/06-all-cups.jpg",
   /**
    * og:image and JSON-LD image: a generated text card (own artwork, not a photo) per article,
-   * written by og-card.py at apply time. Dates are markup-only (JSON-LD, OG meta, sitemap), never visible.
+   * written by og-card.mjs at apply time. Dates are markup-only (JSON-LD, OG meta, sitemap), never visible.
    */
   ogDir: "public/images/b/coffee/og",
   ogSrc: (slug) => `/images/b/coffee/og/${slug}.jpg`,

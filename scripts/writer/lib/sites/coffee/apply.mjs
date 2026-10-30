@@ -29,12 +29,12 @@ export function registerArticles(source, slugs) {
   return out.replace(arrayRe, `const ARTICLES: readonly VerticalGuideArticle[] = [${names.join(", ")}];`);
 }
 
-const OG_CARD = fileURLToPath(new URL("./og-card.py", import.meta.url));
+const OG_CARD = fileURLToPath(new URL("./og-card.mjs", import.meta.url));
 
-/** og:image text card (own artwork, 1200×630) for one article; throws if Pillow or a font is missing. */
-export function writeOgCard(worktree, article, { python = process.env.PYTHON || "python3" } = {}) {
-  const result = spawnSync(python, [OG_CARD, article.slug, article.title, join(worktree, COFFEE.ogDir)], { encoding: "utf8" });
-  if (result.status !== 0) throw new Error(`og-card.py ${article.slug}: ${(result.stderr || result.error?.message || "").trim().slice(-300)}`);
+/** og:image text card (own artwork, 1200×630, rendered with sharp) for one article. */
+export function writeOgCard(worktree, article) {
+  const result = spawnSync(process.execPath, [OG_CARD, article.slug, article.title, join(worktree, COFFEE.ogDir)], { encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`og-card.mjs ${article.slug}: ${(result.stderr || result.error?.message || "").trim().slice(-300)}`);
   return `${COFFEE.ogDir}/${article.slug}.jpg`;
 }
 
