@@ -1,8 +1,20 @@
+import { BIZNES_PLAN_KOFEYNI } from "./articles/biznes-plan-kofeyni";
+import { CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI } from "./articles/chto-nuzhno-dlya-otkrytiya-kofeyni";
+import { BARNAYA_STOYKA_DLYA_KOFEYNI } from "./articles/barnaya-stoyka-dlya-kofeyni";
+import { OPISANIE_BIZNESA_KOFEYNI } from "./articles/opisanie-biznesa-kofeyni";
+import { PECHENE_DLYA_KOFEYNI } from "./articles/pechene-dlya-kofeyni";
 import { KOFE_V_ZERNAH_DLYA_KOFEYNI } from "./articles/kofe-v-zernah-dlya-kofeyni";
 import type { GuideParagraph, TextPart, VerticalGuideArticle } from "./types";
 import { getVertical } from "./verticals";
 
-const ARTICLES: readonly VerticalGuideArticle[] = [KOFE_V_ZERNAH_DLYA_KOFEYNI];
+const ARTICLES: readonly VerticalGuideArticle[] = [
+  KOFE_V_ZERNAH_DLYA_KOFEYNI,
+  BIZNES_PLAN_KOFEYNI,
+  CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI,
+  BARNAYA_STOYKA_DLYA_KOFEYNI,
+  OPISANIE_BIZNESA_KOFEYNI,
+  PECHENE_DLYA_KOFEYNI,
+];
 
 export function listVerticalArticles(verticalId?: string): VerticalGuideArticle[] {
   return ARTICLES.filter((article) => !verticalId || article.verticalId === verticalId);

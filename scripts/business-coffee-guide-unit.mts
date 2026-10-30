@@ -55,6 +55,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 const ARTICLE = KOFE_V_ZERNAH_DLYA_KOFEYNI;
 const EM_DASH = "\u2014";
+const SET_01_SLUGS = [
+  "biznes-plan-kofeyni", "chto-nuzhno-dlya-otkrytiya-kofeyni", "barnaya-stoyka-dlya-kofeyni",
+  "opisanie-biznesa-kofeyni", "pechene-dlya-kofeyni",
+];
 
 // ---------- Expert registry ----------
 assertCoffeeExpertRegistry();
@@ -81,7 +85,7 @@ assert.equal(getCoffeeExpert("dmitry-borodai"), null, "no expert without a portr
 assert.equal(read("src/content/business/coffee-experts.registry.json").includes(EM_DASH), false);
 
 // ---------- Routing ----------
-assert.equal(listVerticalArticles().length, 1, "reference article is the only article");
+assert.equal(listVerticalArticles().length, 6, "reference and five articles of set 01");
 assert.equal(listVerticalArticles("restaurants").length, 0);
 assert.deepEqual(getVerticalArticle("coffee", "kofe-v-zernah-dlya-kofeyni"), ARTICLE);
 assert.equal(getVerticalArticle("coffee", "muzyka-dlya-kofeyni"), null, "old slug is only a redirect");
@@ -212,6 +216,7 @@ assert.doesNotMatch(visible, /пилот/i, "article visible text has no pilot w
 for (const vertical of B2B_VERTICALS) {
   assert.doesNotMatch([vertical.title, vertical.kicker, vertical.intro].join("\n"), /пилот/i);
 }
+assert.doesNotMatch(visible, /--|(?:^|[^\p{L}])точк[\p{L}]*/iu);
 assert.equal(visible.includes(EM_DASH), false, "visible article text uses an en dash, not an em dash");
 assert.equal(visible.includes("http://") || visible.includes("https://"), false);
 assert.equal(/www\.|\.ru\b|\.com\b/i.test(visible), false, "sources are named in plain text, no addresses");
@@ -294,7 +299,7 @@ assert.equal((faqNode?.mainEntity as unknown[]).length, ARTICLE.faq.length);
 assert.equal(jsonLd.includes(EM_DASH), false);
 assert.doesNotMatch(jsonLd, /пилот/i);
 
-assert.deepEqual(listVerticalGuideSitemapPaths(), ["/b/coffee", "/b/coffee/kofe-v-zernah-dlya-kofeyni"]);
+assert.deepEqual(listVerticalGuideSitemapPaths(), ["/b/coffee", ...listVerticalArticles("coffee").map(articlePath)]);
 assert.match(read("src/lib/seo/sitemap-data.ts"), /listVerticalGuideSitemapPaths/);
 
 // ---------- View: fixed block order ----------
@@ -426,25 +431,8 @@ assert.match(seriesPlan, /3 558/);
 assert.match(seriesPlan, /1 829/);
 assert.match(seriesPlan, /1 729/);
 assert.match(seriesPlan, /838/);
-for (const slug of [
-  "otkrytie-kofeyni",
-  "biznes-plan-kofeyni",
-  "oborudovanie-dlya-kofeyni",
-  "postavshchiki-dlya-kofeyni",
-  "personal-kofeyni",
-  "arenda-kofeyni",
-  "formaty-kofeyni",
-  "tovary-dlya-kofeyni",
-  "uchet-i-dokumenty-kofeyni",
-  "logotip-kofeyni",
-  "menyu-kofeyni",
-  "interer-kofeyni",
-  "nazvanie-kofeyni",
-  "marketing-kofeyni",
-  "idei-kofeyni",
-]) {
-  assert.match(seriesPlan, new RegExp(`/b/coffee/${slug}`));
-  assert.equal(getVerticalArticle("coffee", slug), null, slug);
+for (const slug of SET_01_SLUGS) {
+  assert.ok(seriesPlan.includes(`/b/coffee/${slug}`));
 }
 assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/page.tsx")));
 assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/[slug]/page.tsx")));
@@ -521,7 +509,182 @@ const pageText = pageHtml
   .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ")
   .replace(/<[^>]+>/g, " ")
   .replace(/&[a-z]+;|&#\d+;/g, " ");
+assert.doesNotMatch(withoutPaths(pageText), /--|(?:^|[^\p{L}])точк[\p{L}]*/iu);
 assert.equal(HAS_LATIN.test(withoutPaths(pageText)), false, `Latin on the page: ${withoutPaths(pageText).match(/.{0,40}[A-Za-z].{0,40}/)?.[0]}`);
 for (const [, value] of pageHtml.matchAll(/\s(?:alt|title|aria-label|placeholder)="([^"]*)"/g)) {
   assert.equal(HAS_LATIN.test(value ?? ""), false, `Latin in attribute: ${value}`);
 }
+
+
+// Set 01: every article uses the reference renderer and the same publication sources.
+const allArticles = listVerticalArticles("coffee");
+const knownTargets = new Set([
+  "/", "/b/coffee", "/b/atlas-kofeen",
+  ...COFFEE_ATLAS_SHOPS.map((shop) => `/b/atlas-kofeen/${shop.slug}`),
+  ...allArticles.map(articlePath),
+]);
+assert.equal(new Set(allArticles.map((article) => article.slug)).size, allArticles.length);
+assert.equal(new Set(allArticles.map((article) => article.checklist.storageKey)).size, allArticles.length);
+assert.deepEqual(allArticles.map((article) => article.slug).sort(), [ARTICLE.slug, ...SET_01_SLUGS].sort());
+for (const slug of SET_01_SLUGS) {
+  const article = getVerticalArticle("coffee", slug);
+  assert.ok(article, `registered: ${slug}`);
+  for (const related of article.relatedQueries) {
+    const row = candidateRows.find((candidate) => candidate.query === related.phrase);
+    assert.equal(related.frequency, row?.frequency ?? null, related.phrase);
+  }
+  assert.ok(article.relatedQueries.some((related) => related.phrase === article.primaryQuery));
+  assert.equal(atlasSlugs.has(slug), false);
+  assert.equal(article.partOne.length, 2);
+  assert.equal(article.partTwo.length, 3);
+  assert.equal(article.checklist.items.length, 5);
+  assert.equal(article.steps.items.length, 3);
+  assert.ok(article.faq.length >= 5 && article.faq.length <= 7);
+  assert.ok(article.table.rows.length >= 3);
+  for (const row of article.table.rows) assert.equal(row.length, article.table.columns.length);
+  const text = collectArticleText(article).join("\n");
+  assert.doesNotMatch(text, /[A-Za-z\u2014]|--/u, slug);
+  assert.doesNotMatch(text, /https?:|www\.|(?:^|[^\p{L}])точк[\p{L}]*|Редакция/iu, slug);
+  assert.doesNotMatch(text, /плейлист|плеер|слушать онлайн/iu, slug);
+  const keyword = article.primaryQuery.toLocaleLowerCase("ru");
+  const hits = text.toLocaleLowerCase("ru").split(keyword).length - 1;
+  assert.ok(hits >= 3 && hits <= 10, `${slug}: ${hits} keyword occurrences`);
+  for (const value of [article.title, article.seoTitle, article.description, article.intro[0], article.hero.alt]) {
+    assert.ok(value.toLocaleLowerCase("ru").includes(keyword), `${slug}: keyword in SEO field`);
+  }
+  assert.ok([...article.partOne, ...article.partTwo].some((section) => section.heading.toLocaleLowerCase("ru").includes(keyword)));
+  assert.ok(article.seoTitle.length <= 70);
+  assert.ok(article.description.length >= 80 && article.description.length <= 180);
+  assert.ok(existsSync(join(root, "public", article.hero.src)));
+  const links = collectArticleHrefs(article);
+  assert.ok(links.includes("/b/atlas-kofeen"));
+  assert.ok(links.includes(articlePath(ARTICLE)));
+  for (const href of links) assert.ok(knownTargets.has(href), `${slug}: resolves internally: ${href}`);
+  for (const other of allArticles.filter((other) => other.slug !== slug)) {
+    assert.ok(article.readMore.some((link) => link.href === articlePath(other)), `${slug}: links to ${other.slug}`);
+  }
+  assert.ok(ARTICLE.readMore.some((link) => link.href === articlePath(article)), `reference links to ${slug}`);
+  const experts = [article.expertOne, article.expertTwo].map((slot) => {
+    const expert = getCoffeeExpert(slot.expertId);
+    assert.ok(expert);
+    assert.ok(existsSync(join(root, "public", expert.photo.file)));
+    const quote = expertQuote(expert, slot.quoteIndex);
+    const displayed = slot.translation ?? quote.text;
+    assert.doesNotMatch(displayed + expert.name + expert.role + expert.photo.credit + (quote.sourceLabel ?? quote.sourceTitle), /[A-Za-z\u2014]/u);
+    if (quote.language !== "ru") assert.ok(slot.translation);
+    return expert;
+  });
+  assert.deepEqual(new Set(experts.map((expert) => expert.gender)), new Set(["man", "woman"]));
+  assert.deepEqual(new Set(experts.map((expert) => expert.origin)), new Set(["ru", "foreign"]));
+  const data = buildVerticalArticleJsonLd(article);
+  const nodes = data["@graph"] as Array<Record<string, unknown>>;
+  assert.equal((nodes.find((node) => node["@type"] === "FAQPage")?.mainEntity as unknown[]).length, article.faq.length);
+  assert.equal((nodes.find((node) => node["@type"] === "Article")?.author as { name: string })?.name, "АудиоЛад Кофейни");
+  assert.equal(nodes.find((node) => node["@type"] === "Article")?.url, `https://audiolad.ru${articlePath(article)}`);
+  const meta = buildVerticalArticleMetadata(article);
+  assert.equal(meta.description, article.description);
+  const html = renderToStaticMarkup(createElement(GuideArticleView, { article }));
+  const plain = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;|&#\d+;/g, " ");
+  assert.ok(html.includes("АудиоЛад Кофейни"));
+  assert.doesNotMatch(withoutPaths(plain), /(?:^|[^\p{L}])точк[\p{L}]*/iu, `${slug}: no replacement for кофейня`);
+  assert.doesNotMatch(withoutPaths(plain), /[A-Za-z\u2014]|--/u, `${slug}: rendered visible text`);
+  const internalIds = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(internalIds).size, internalIds.length, `${slug}: unique DOM ids`);
+  for (const [, value] of html.matchAll(/\s(?:alt|title|aria-label|placeholder)="([^"]*)"/g)) {
+    assert.doesNotMatch(value, /[A-Za-z\u2014]/u, `${slug}: accessible labels`);
+  }
+  for (const [, attributes] of html.matchAll(/<a\s([^>]+)>/g)) {
+    const href = attributes.match(/href="([^"]*)"/)?.[1];
+    assert.ok(href);
+    const allowedSameTab = (href === "/" || href === "/b/coffee") && !attributes.includes('target="_blank"');
+    if (allowedSameTab) continue;
+    assert.match(attributes, /target="_blank"/);
+    assert.match(attributes, /rel="noopener(?: noreferrer)?"/);
+    assert.ok(knownTargets.has(href) || href === FOUR_CUPS_MAX_HREF, `${slug}: sole external target is MAX`);
+  }
+  for (const column of article.table.columns) assert.ok(html.includes(`data-label="${column}"`));
+}
+// Owner-approved topics are the complete set, independent of source-cluster popularity.
+const approvedTopics = [
+  ["Бизнес-план кофейни с расчётами", "бизнес-план кофейни с расчётами"],
+  ["Что нужно для открытия кофейни", "что нужно для открытия кофейни"],
+  ["Барная стойка для кофейни", "барная стойка для кофейни"],
+  ["Описание бизнеса кофейни", "описание бизнеса кофейни"],
+  ["Печенье для кофейни: ассортимент и поставки", "печенье для кофейни"],
+];
+for (const [index, slug] of SET_01_SLUGS.entries()) {
+  const article = getVerticalArticle("coffee", slug)!;
+  assert.equal(article.title, approvedTopics[index]?.[0]);
+  assert.equal(article.seoTitle, article.title);
+  assert.equal(article.primaryQuery, approvedTopics[index]?.[1]);
+}
+
+// Compare authored prose, including intros, table lead-ins, expert lead/after text,
+// steps, checklist captions, FAQ answers and final CTA questions. Metadata, navigation
+// labels and immutable attributed quotations are not editorial paragraphs. The owner
+// explicitly permits reusing approved experts when required by the article type.
+function editorialParagraphs(article: typeof ARTICLE): string[] {
+  const flatten = (paragraphs: Array<Array<string | { href: string; label: string }>>) =>
+    paragraphs.map((paragraph) => paragraph.map((part) => typeof part === "string" ? part : part.label).join(""));
+  return [
+    ...article.intro,
+    ...[...article.partOne, ...article.partTwo].flatMap((section) => [
+      ...flatten(section.paragraphs),
+      ...(section.subsections ?? []).flatMap((subsection) => flatten(subsection.paragraphs)),
+    ]),
+    ...flatten(article.table.intro), ...flatten(article.table.after),
+    ...[article.expertOne, article.expertTwo].flatMap((slot) => [...flatten(slot.lead), ...flatten(slot.after)]),
+    article.hero.caption, article.question, article.steps.intro,
+    ...article.steps.items.map((item) => item.text),
+    article.checklist.note, article.checklist.doneNote,
+    ...article.checklist.items.map((item) => item.text),
+    ...article.faq.map((item) => item.answer), article.finalQuestion,
+  ];
+}
+function normalizeProse(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase("ru").replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+function substantial(value: string): boolean {
+  return value.length >= 70 && value.split(" ").length >= 9;
+}
+function proseUnits(paragraphs: string[]): string[] {
+  return paragraphs.flatMap((paragraph) => [paragraph, ...paragraph.split(/[.!?…]+(?:\s|$)/u)])
+    .map(normalizeProse).filter(substantial);
+}
+function shingles(text: string): Set<string> {
+  const words = text.split(" ");
+  return new Set(words.slice(0, -2).map((_, index) => words.slice(index, index + 3).join(" ")));
+}
+function assertUniqueProse(groups: Array<{ slug: string; paragraphs: string[] }>): void {
+  const seen: Array<{ slug: string; unit: string; grams: Set<string> }> = [];
+  for (const group of groups) {
+    for (const unit of new Set(proseUnits(group.paragraphs))) {
+      const grams = shingles(unit);
+      for (const previous of seen) {
+        if (previous.slug === group.slug) continue;
+        assert.notEqual(unit, previous.unit, `Repeated prose: ${previous.slug} / ${group.slug}: ${unit}`);
+        const overlap = [...grams].filter((gram) => previous.grams.has(gram)).length;
+        const similarity = 2 * overlap / (grams.size + previous.grams.size);
+        assert.ok(similarity < 0.85, `Near-identical prose: ${previous.slug} / ${group.slug}: ${unit}`);
+      }
+      seen.push({ slug: group.slug, unit, grams });
+    }
+  }
+}
+// Prove that punctuation/case/ё changes and an embedded repeated sentence are caught.
+const sample = "Ещё до заказа оборудования владелец должен проверить расположение дверей и доступ к рабочему месту бариста.";
+assert.throws(() => assertUniqueProse([
+  { slug: "a", paragraphs: [sample] },
+  { slug: "b", paragraphs: [sample.toUpperCase().replace(/Ё/g, "Е").replace(/ /g, "  ")] },
+]), /Repeated prose/);
+assert.throws(() => assertUniqueProse([
+  { slug: "a", paragraphs: [sample] },
+  { slug: "b", paragraphs: [`Другой вводный абзац. ${sample} Завершение с новым смыслом.`] },
+]), /Repeated prose/);
+assert.throws(() => assertUniqueProse([
+  { slug: "a", paragraphs: [sample] },
+  { slug: "b", paragraphs: [sample.replace("бариста", "сотрудника")] },
+]), /Near-identical prose/);
+assertUniqueProse(allArticles.map((article) => ({ slug: article.slug, paragraphs: editorialParagraphs(article) })));
+console.log("business-coffee-guide: reference and five set-01 articles passed");
