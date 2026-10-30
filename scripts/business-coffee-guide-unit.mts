@@ -33,6 +33,7 @@ import {
 } from "../src/lib/business/vertical-guides/experts";
 import { buildVerticalArticleMetadata } from "../src/lib/business/vertical-guides/metadata";
 import { buildVerticalArticleJsonLd } from "../src/lib/business/vertical-guides/json-ld";
+import { authorProse, quoteKey, TONE, toneMetrics } from "./writer/lib/sites/coffee/rules.mjs";
 import {
   buildVerticalGuideRedirects,
   VERTICAL_GUIDE_LEGACY_REDIRECTS,
@@ -572,6 +573,8 @@ for (const slug of SET_01_SLUGS) {
     const displayed = slot.translation ?? quote.text;
     assert.doesNotMatch(displayed + expert.name + expert.role + expert.photo.credit + (quote.sourceLabel ?? quote.sourceTitle), /[A-Za-z\u2014]/u);
     if (quote.language !== "ru") assert.ok(slot.translation);
+    // The page shows the translation checked against the source in the registry, word for word.
+    if (quote.translationRu) assert.equal(slot.translation, quote.translationRu, `${slot.expertId} #${slot.quoteIndex}: translation differs from the registry`);
     return expert;
   });
   assert.deepEqual(new Set(experts.map((expert) => expert.gender)), new Set(["man", "woman"]));
@@ -621,8 +624,8 @@ for (const [index, slug] of SET_01_SLUGS.entries()) {
 
 // Compare authored prose, including intros, table lead-ins, expert lead/after text,
 // steps, checklist captions, FAQ answers and final CTA questions. Metadata, navigation
-// labels and immutable attributed quotations are not editorial paragraphs. The owner
-// explicitly permits reusing approved experts when required by the article type.
+// labels and immutable attributed quotations are not editorial paragraphs. Experts rotate:
+// see the rotation checks below (owner rule 2026-10-30, no reuse inside a set or of a quote).
 function editorialParagraphs(article: typeof ARTICLE): string[] {
   const flatten = (paragraphs: Array<Array<string | { href: string; label: string }>>) =>
     paragraphs.map((paragraph) => paragraph.map((part) => typeof part === "string" ? part : part.label).join(""));
@@ -687,4 +690,44 @@ assert.throws(() => assertUniqueProse([
   { slug: "b", paragraphs: [sample.replace("бариста", "сотрудника")] },
 ]), /Near-identical prose/);
 assertUniqueProse(allArticles.map((article) => ({ slug: article.slug, paragraphs: editorialParagraphs(article) })));
+
+// ---------- Expert rotation (owner rule 2026-10-30) ----------
+// Every set-01 article has its own two experts: ten distinct people, none taken from the reference,
+// and no registry quote (expert#quoteIndex) or displayed quote text appears twice on the site.
+const setSlots = SET_01_SLUGS.flatMap((slug) => {
+  const article = getVerticalArticle("coffee", slug)!;
+  return [article.expertOne, article.expertTwo].map((slot) => ({ slug, slot }));
+});
+const setExpertIds = setSlots.map(({ slot }) => slot.expertId);
+assert.equal(new Set(setExpertIds).size, setExpertIds.length, `set-01 repeats an expert: ${setExpertIds.join(", ")}`);
+for (const id of [ARTICLE.expertOne.expertId, ARTICLE.expertTwo.expertId]) {
+  assert.equal(setExpertIds.includes(id), false, `set-01 reuses the reference expert ${id}`);
+}
+const siteQuotes = new Map<string, string>();
+const siteQuoteTexts = new Map<string, string>();
+for (const article of allArticles) {
+  for (const slot of [article.expertOne, article.expertTwo]) {
+    const key = quoteKey(slot.expertId, slot.quoteIndex);
+    assert.equal(siteQuotes.has(key), false, `quote ${key} is on ${siteQuotes.get(key)} and ${article.slug}`);
+    siteQuotes.set(key, article.slug);
+    const shown = normalizeProse(slot.translation ?? expertQuote(getCoffeeExpert(slot.expertId)!, slot.quoteIndex).text);
+    assert.equal(siteQuoteTexts.has(shown), false, `quote text repeats on ${siteQuoteTexts.get(shown)} and ${article.slug}`);
+    siteQuoteTexts.set(shown, article.slug);
+  }
+}
+
+// ---------- Tone: warm and explanatory like the reference (owner rule 2026-10-30) ----------
+// Author prose only (headings, step titles and checklist items may stay imperative).
+for (const article of allArticles) {
+  const m = toneMetrics(authorProse(article));
+  assert.deepEqual(m.prohibitions, [], `${article.slug}: «Не …йте» prohibitions`);
+  assert.ok(m.imperativesPer1000 <= TONE.imperativesPer1000.error, `${article.slug}: ${m.imperativesPer1000} imperatives per 1000 words`);
+  assert.ok(m.imperativeStartShare <= TONE.imperativeStartShare.error, `${article.slug}: imperative-start share ${m.imperativeStartShare}`);
+  if (article.slug === ARTICLE.slug) continue;
+  // The rewritten set meets the stricter targets.
+  assert.ok(m.imperativesPer1000 <= TONE.imperativesPer1000.warn, `${article.slug}: ${m.imperativesPer1000} imperatives per 1000 words (target ≤ ${TONE.imperativesPer1000.warn})`);
+  assert.ok(m.imperativeStartShare <= TONE.imperativeStartShare.warn, `${article.slug}: imperative-start share ${m.imperativeStartShare}`);
+  assert.ok(m.explanatoryShare >= TONE.explanatoryShareMin, `${article.slug}: explanatory share ${m.explanatoryShare}`);
+  assert.ok(m.kanceliaritPer1000 <= TONE.kanceliaritPer1000, `${article.slug}: канцелярит ${m.kanceliarit.map(([, w]) => w).join(", ")}`);
+}
 console.log("business-coffee-guide: reference and five set-01 articles passed");

@@ -20,7 +20,9 @@ export const FORBIDDEN = [
 export const MUSIC = /музык|(^|[^а-яё])трек|песн|мелоди|саундтрек|радио(?!активн)/i;
 
 export const NEGATIVE = [
-  /дискомфорт/i, /неприятн/i, /неуютн/i, /раздраж/i, /стресс/i, /тревож/i, /тревог/i, /(^|[^а-яё])страх(?!ов)/i, /боит/i, /бояться/i,
+  /дискомфорт/i, /неприятн/i, /неуютн/i, /раздраж/i, /стресс/i, /тревож/i, /тревог/i, /(^|[^а-яё])страх(?!ов)/i,
+  // «не боится», «не бояться» reassure (Codex should-fix of #1086, rules.mjs:23); only the affirmative primes fear.
+  /(?<!(?:^|[^а-яё])не\s+)бо(?:ит|ят|юсь|ишь|ялся|ялась|ялись|ясь|яться)/i,
   /стыд/i, /провал/i, /разочаров/i, /выгора/i, /кошмар/i, /паник/i, /ужас/i, /обидн/i, /беси/i, /злит/i,
   // Direct pain, heaviness and fatigue wording (Codex review of #1086).
   /(^|[^а-яё])(боль|боли|болью|болей|болит|болят|болела|болел|заболе\S*|болезн\S*|болезненн\S*)(?![а-яё])/i,
@@ -125,22 +127,36 @@ const NOUN_GENDER = new Map([
   ..."шаг этап вариант стол модуль уровень раздел ряд вопрос ящик блок прилавок проход гость".split(" ").map((w) => [w, "m"]),
 ]);
 const GENDER_WORD = { m: "мужской", f: "женский", n: "средний" };
-/** Obvious agreement slips of an ordinal and the next noun: ["Третий место", …]. */
+// «-ой» is the masculine nominative only for stressed ordinals (второй, шестой, седьмой, восьмой);
+// «первой», «третьей», «последней» are feminine oblique cases and never agree with a nominative noun.
+const STRESSED_OJ = /^(втор|шест|седьм|восьм)$/;
+/**
+ * Obvious agreement slips of an ordinal and the next noun: ["Третий место", …]. Only two words of the
+ * same phrase are compared: punctuation between them (a sentence end, a comma, a colon) breaks the pair,
+ * so «Начните с первой. Место хранения…» is not a slip (Codex should-fix of #1086, rules.mjs:130).
+ */
 export function ordinalAgreementSlips(text) {
-  const tokens = String(text).split(/[^А-Яа-яЁё]+/).filter(Boolean);
+  const tokens = String(text).split(/\s+/).filter(Boolean);
   const slips = [];
   for (let i = 0; i + 1 < tokens.length; i++) {
-    const match = norm(tokens[i]).match(ORDINAL);
+    const head = tokens[i].replace(/^[«„"(]+/, "");
+    if (!/^[А-Яа-яЁё]+$/.test(head)) continue; // trailing punctuation ends the phrase
+    const match = norm(head).match(ORDINAL);
     if (!match) continue;
+    if (match[2] === "ой" && !STRESSED_OJ.test(match[1])) continue;
+    const next = tokens[i + 1].replace(/[^А-Яа-яЁё]+$/, "");
+    if (!/^[А-Яа-яЁё]+$/.test(next)) continue;
     const gender = ORDINAL_GENDER[match[2]];
-    const noun = NOUN_GENDER.get(norm(tokens[i + 1]));
-    if (gender && noun && gender !== noun) slips.push({ text: `${tokens[i]} ${tokens[i + 1]}`, noun: GENDER_WORD[noun] });
+    const noun = NOUN_GENDER.get(norm(next));
+    if (gender && noun && gender !== noun) slips.push({ text: `${head} ${next}`, noun: GENDER_WORD[noun] });
   }
   return slips;
 }
 
 // Columns whose header promises figures: every cell must carry a number.
-export const NUMERIC_COLUMN = /размер|высот|глубин|ширин|длин|габарит|цен[аы]|стоимост|сумм|бюджет|₽|руб|(^|[^а-яё])(см|мм|м|кг|г|л)(?![а-яё])|количеств|сколько|срок|объ[её]м|вес(?![её]л)|процент|%|норм[аы]|расстояни/i;
+// Whole words only: «Нормативный документ» or «Весь ассортимент» are descriptive headers
+// (Codex should-fix of #1086, rules.mjs:143).
+export const NUMERIC_COLUMN = /(^|[^а-яё])(размер\S*|высот\S*|глубин\S*|ширин\S*|длин[аыеу]|габарит\S*|цен[аыеу]|стоимост\S*|сумм[аыеу]?|бюджет\S*|руб\S*|см|мм|м|кг|г|л|количеств\S*|сколько|срок\S*|объ[её]м\S*|вес|веса|процент\S*|норм[аы]?|расстояни\S*)(?![а-яё])|₽|%/i;
 // Exclamatory filler: guides keep a calm business tone.
 const EXCLAMATORY = /!|(^|[.?…]\s+)(отлично|супер|здорово|ура|поздравляем|вуаля)(?![а-яё])/i;
 
@@ -196,10 +212,129 @@ export function hasQueryWords(text, query) {
 }
 const countQuery = (text, query) => norm(text).split(norm(query)).length - 1;
 
+// ── Tone (Sergey, 30.10.2026): warm and explanatory like the reference, not a list of orders ──────
+// Imperatives live mainly in step titles and checklist items; the author prose explains «why» first and
+// suggests gently («удобно», «можно», «поможет»). Measured on authorProse(), not on headings or lists.
+export const TONE = {
+  /** Imperatives per 1000 words of author prose: warning above, error above. */
+  imperativesPer1000: { warn: 20, error: 25 },
+  /** Share of sentences that open with an imperative («Проверьте…», «Не ставьте…»). */
+  imperativeStartShare: { warn: 0.15, error: 0.3 },
+  /** Explanatory sentences (no imperative at all): at least this share. */
+  explanatoryShareMin: 0.65,
+  /** Канцелярит: every hit is a warning; the published set keeps it at or below this per 1000 words. */
+  kanceliaritPer1000: 4,
+};
+// Plural «вы»-imperative: -йте/-ите/-ьте (+ reflexive -сь). «вы готовите» (indicative) and «на сайте»
+// (a noun after a preposition) are not imperatives. A heuristic: it may miss «Если вы хотите, смотрите…».
+const IMPERATIVE_FORM = /^[а-яё]{2,}(?:йте|ите|ьте)(?:сь)?$/;
+const NOT_IMPERATIVE = new Set(["сайте", "кредите", "лимите", "дефиците", "аппетите", "бите", "ките", "граните", "элите", "свите", "орбите", "визите", "транзите", "депозите", "профите", "минимуме"]);
+const NOT_AFTER = new Set(["вы", "в", "во", "на", "о", "об", "обо", "при", "по"]);
+const sentenceWords = (sentence) => norm(sentence).match(/[а-яё]+/g) ?? [];
+/** Indexes of imperative verbs among the words of one sentence. */
+export function imperativeIndexes(sentence) {
+  const list = sentenceWords(sentence);
+  const out = [];
+  list.forEach((word, i) => {
+    if (!IMPERATIVE_FORM.test(word) || NOT_IMPERATIVE.has(word)) return;
+    const prev = list[i - 1];
+    // «на сайте», «в кредите», «вы делайте» is still a request only when not after «вы»; -ите is also the
+    // present tense («вы сами стоите, ведёте и следите»), so any earlier «вы» in the sentence makes it indicative.
+    if (NOT_AFTER.has(prev)) return;
+    if (/ите(?:сь)?$/.test(word) && list.slice(0, i).includes("вы")) return;
+    out.push(i);
+  });
+  return out;
+}
+/** «Не …йте»: a prohibition addressed to the reader («Не приравнивайте», «не ставьте»). */
+export function prohibitions(text) {
+  const found = [];
+  for (const sentence of sentences(text)) {
+    const list = sentenceWords(sentence);
+    for (const i of imperativeIndexes(sentence)) if (list[i - 1] === "не") found.push(`не ${list[i]}`);
+  }
+  return found;
+}
+// Bureaucratic wording that reads like a regulation, not like a colleague.
+export const KANCELIARIT = /(^|[^а-яё])(осуществл[а-яё]*|являет(?:ся|ь)|являются|данн(?:ый|ого|ому|ой|ом|ую|ое)|в рамках|в целях|в связи с|в соответствии|применительно|надлежащ[а-яё]*|вышеуказанн[а-яё]*|вышеперечисленн[а-яё]*|нижеследующ[а-яё]*|посредством|на предмет|по факту|в части|в случае|при наличии|при отсутствии|имеет место|в настоящее время|в обязательном порядке|производится|обеспечени[а-яё]*|соответствующ[а-яё]*|с целью)(?![а-яё])/gi;
+export function kanceliarit(text) {
+  return [...String(text).matchAll(KANCELIARIT)].map((m) => m[2].toLowerCase());
+}
+/**
+ * [field, text] of the author's running prose: intro, sections, table intro/after, expert lead/after,
+ * steps intro and texts, FAQ answers, checklist note. Headings, step titles, checklist items, table cells,
+ * questions and quotes/translations are not prose (step titles and checklist items may stay imperative).
+ */
+export function authorProse(article) {
+  return visibleTexts(article).filter(([field]) => /^intro\[|\.paragraphs\[|^table\.(intro|after)$|\.(lead|after)$|^steps\.intro$|^steps\.items\[\d+\]\.text$|^faq\[\d+\]\.answer$|^checklist\.(note|doneNote)$/.test(field));
+}
+/** Tone metrics of a list of [field, text] (authorProse by default). */
+export function toneMetrics(texts) {
+  let total = 0, imperatives = 0, imperativeStarts = 0, explanatory = 0, wordCount = 0;
+  const bans = [];
+  const kanc = [];
+  for (const [field, text] of texts) {
+    wordCount += words(text);
+    for (const sentence of sentences(text)) {
+      if (!/[а-яё]/i.test(sentence)) continue;
+      total += 1;
+      const idx = imperativeIndexes(sentence);
+      imperatives += idx.length;
+      const list = sentenceWords(sentence);
+      if (idx.includes(0) || (list[0] === "не" && idx.includes(1))) imperativeStarts += 1;
+      if (!idx.length) explanatory += 1;
+    }
+    for (const ban of prohibitions(text)) bans.push([field, ban]);
+    for (const hit of kanceliarit(text)) kanc.push([field, hit]);
+  }
+  const per1000 = (n) => (wordCount ? Math.round((n * 10000) / wordCount) / 10 : 0);
+  const share = (n) => (total ? Math.round((n * 1000) / total) / 1000 : 0);
+  return {
+    words: wordCount, sentences: total, imperatives, imperativesPer1000: per1000(imperatives),
+    imperativeStarts, imperativeStartShare: share(imperativeStarts), explanatoryShare: share(explanatory),
+    prohibitions: bans, kanceliarit: kanc, kanceliaritPer1000: per1000(kanc.length),
+  };
+}
+/** Tone problems by TONE thresholds: [severity, field, message]. */
+export function toneProblems(article) {
+  const m = toneMetrics(authorProse(article));
+  const out = [];
+  const T = TONE;
+  if (m.imperativesPer1000 > T.imperativesPer1000.error) out.push(["error", "tone", `повелительных глаголов ${m.imperativesPer1000} на 1000 слов (> ${T.imperativesPer1000.error}) – объясняйте «почему» и предлагайте мягко («удобно», «можно», «поможет»), приказы оставьте заголовкам шагов и чек-листу`]);
+  else if (m.imperativesPer1000 > T.imperativesPer1000.warn) out.push(["warning", "tone", `повелительных глаголов ${m.imperativesPer1000} на 1000 слов (цель ≤ ${T.imperativesPer1000.warn})`]);
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  if (m.imperativeStartShare > T.imperativeStartShare.error) out.push(["error", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (> ${pct(T.imperativeStartShare.error)})`]);
+  else if (m.imperativeStartShare > T.imperativeStartShare.warn) out.push(["warning", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (цель ≤ ${pct(T.imperativeStartShare.warn)})`]);
+  for (const [field, ban] of m.prohibitions) out.push(["error", field, `запрет «${ban}…» – вместо «Не …йте» объясните, как удобнее, и почему`]);
+  if (m.explanatoryShare < T.explanatoryShareMin) out.push(["warning", "tone", `объясняющих предложений ${pct(m.explanatoryShare)} (цель ≥ ${pct(T.explanatoryShareMin)})`]);
+  if (m.kanceliarit.length) out.push(["warning", "tone", `канцелярит ${m.kanceliaritPer1000} на 1000 слов (цель ≤ ${T.kanceliaritPer1000}): ${[...new Set(m.kanceliarit.map(([, w]) => w))].join(", ")} – пишите проще, как коллега`]);
+  return out;
+}
+
+// ── Expert rotation (Sergey, 30.10.2026): fresh people in every set, no quote twice on the site ──────
+export const quoteKey = (expertId, quoteIndex) => `${expertId}#${quoteIndex}`;
+/**
+ * env.siteQuotes: Map quoteKey → slug of a published article outside this pack that already shows it;
+ * env.packExperts: Map expertId → slug of an earlier article of the same pack.
+ */
+export function rotationProblems(article, env = {}) {
+  const out = [];
+  for (const key of ["expertOne", "expertTwo"]) {
+    const slot = article[key];
+    if (!slot?.expertId) continue;
+    const onSite = env.siteQuotes?.get(quoteKey(slot.expertId, slot.quoteIndex));
+    if (onSite && onSite !== article.slug) out.push([key, `цитата ${slot.expertId} №${slot.quoteIndex} уже есть на сайте (/b/coffee/${onSite}) – одна цитата выходит на сайте один раз, возьмите другую из реестра`]);
+    const inPack = env.packExperts?.get(slot.expertId);
+    if (inPack && inPack !== article.slug) out.push([key, `эксперт ${slot.expertId} уже есть в этом пакете (${inPack}) – в наборе каждый эксперт один раз`]);
+  }
+  if (article.expertOne?.expertId && article.expertOne.expertId === article.expertTwo?.expertId) out.push(["expertTwo", "два слота одного эксперта"]);
+  return out;
+}
+
 /**
  * @param article assembled VerticalGuideArticle
  * @param brief   normalized pack article (brief.mjs)
- * @param env     { experts: Map, repoDir?: string, avoid?: Set<string> }
+ * @param env     { experts: Map, repoDir?: string, avoid?: Set<string>, siteQuotes?: Map, packExperts?: Map }
  */
 export function checkCoffeeArticle(article, brief, env) {
   const L = COFFEE.limits;
@@ -306,6 +441,12 @@ export function checkCoffeeArticle(article, brief, env) {
       if (!lead.includes(surname.slice(0, Math.max(4, surname.length - 1)))) error(`${key}.lead`, `lead называет эксперта: «${expert.name} …», а не «эксперт ответил»`);
     }
   }
+
+  // Rotation: one expert once per set, one quote once on the site.
+  for (const [field, message] of rotationProblems(article, env)) error(field, message);
+
+  // Tone: warm and explanatory, not a list of orders.
+  for (const [severity, field, message] of toneProblems(article)) (severity === "error" ? error : warn)(field, message);
 
   // Uniqueness against the section and the other articles of the pack.
   for (const [field, text] of texts.filter(([f]) => /heading$|question$/.test(f))) {

@@ -27,7 +27,7 @@ import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
-import { capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, ordinalAgreementSlips } from "./lib/sites/coffee/rules.mjs";
+import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitions, rotationProblems, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
 import { buildRequest } from "./lib/prompt.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
 import { LOCK_FILE, szHashes } from "./sz-template-lock.mjs";
@@ -235,7 +235,9 @@ test("tone sample is verbatim from the reference article", () => {
 // ── rules ────────────────────────────────────────────────────────────────────
 
 test("reference intro (no story, query first) passes all coffee rules", () => {
-  assert.deepEqual(check(fields), []);
+  // The reference has 22.5 imperatives per 1000 words: above the 20 target (warning), below the 25 error.
+  assert.deepEqual(errorsOf(check(fields)), []);
+  assert.deepEqual(check(fields).map((p) => p.message), ["повелительных глаголов 22.5 на 1000 слов (цель ≤ 20)"]);
 });
 
 test("helpers: dialogue, names, query words, links, typography", () => {
@@ -336,6 +338,9 @@ const NEGATIVES = [
   ["numeric column without numbers", (f) => { f.table.columns[1] = "Размер"; }, /обещает цифры/],
   ["seoTitle in lowercase", (f) => { f.seoTitle = f.seoTitle.charAt(0).toLowerCase() + f.seoTitle.slice(1); }, /заглавной/],
   ["description without the exact query form", (f) => { f.description = "Как выбрать кофе в зёрнах для кофеен: свежесть обжарки, вкус в чашке, расчёт стоимости порции и вопросы поставщику перед первой закупкой."; }, /дословно/],
+  // Round 3 (30.10.2026): tone and expert rotation.
+  ["«Не …йте» prohibition", (f) => { f.partTwo[0].paragraphs[0] += " Не покупайте зерно без даты обжарки."; }, /запрет «не покупайте…»/],
+  ["imperative density above 25 per 1000 words", (f) => { f.partTwo[0].paragraphs[0] += " Проверьте пачку, посчитайте расход, сравните цены, запишите итог, обсудите выбор, закажите партию, попробуйте зерно."; f.partTwo[1].paragraphs[0] += " Спросите поставщика, уточните график, договоритесь о замене, сохраните ответы."; }, /повелительных глаголов [\d.]+ на 1000 слов \(> 25\)/],
   ["description too long", (f) => { f.description = "Кофе в зёрнах для кофейни: " + "свежесть обжарки, вкус, ".repeat(8); }, /description 120–170 символов/],
 ];
 for (const [name, mutate, expected] of NEGATIVES) {
@@ -451,6 +456,77 @@ test("ordinal agreement helper: slips only, correct pairs pass", () => {
   assert.equal(ordinalAgreementSlips("Второй стол, второе правило, вторая стойка.").length, 0);
   assert.equal(ordinalAgreementSlips("Первое решение и первый вопрос").length, 0);
   assert.equal(ordinalAgreementSlips("Последний зона").length, 1);
+});
+
+test("tone: imperatives, prohibitions, канцелярит and explanatory share", () => {
+  assert.deepEqual(imperativeIndexes("Проверьте дату обжарки и сравните два образца."), [0, 4]);
+  assert.deepEqual(imperativeIndexes("Если вы сами стоите за стойкой, ведёте закупки и следите за залом, это видно."), [], "-ите after «вы» is the present tense");
+  assert.deepEqual(imperativeIndexes("Вы готовите эспрессо на сайте и в кредите."), []);
+  assert.deepEqual(prohibitions("Не ставьте выдачу у кассы. Гость не спешит."), ["не ставьте"]);
+  assert.deepEqual(kanceliarit("Это является основой, а при отсутствии данных – в целях проверки."), ["является", "при отсутствии", "в целях"]);
+  assert.deepEqual(kanceliarit("Удобно, когда выдача стоит чуть в стороне."), []);
+  const warm = toneMetrics([["p", "Выдача работает свободнее чуть в стороне от кассы. Так гостю удобно забрать заказ. Можно попробовать оба варианта на макете."]]);
+  assert.equal(warm.imperatives, 0);
+  assert.equal(warm.explanatoryShare, 1);
+  const strict = toneMetrics([["p", "Проверьте кассу. Не ставьте выдачу рядом. Посчитайте поток."]]);
+  assert.equal(strict.imperativeStartShare, 1);
+  assert.deepEqual(strict.prohibitions, [["p", "не ставьте"]]);
+  assert.ok(strict.imperativesPer1000 > TONE.imperativesPer1000.error);
+  // Step titles and checklist items may stay imperative: they are not author prose.
+  const article = assembleCoffeeArticle(brief, fields);
+  const proseFields = authorProse(article).map(([field]) => field);
+  assert.ok(!proseFields.some((f) => /title|checklist\.items|heading|question/.test(f)), proseFields.join(", "));
+  assert.ok(proseFields.some((f) => f.startsWith("steps.items[")) && proseFields.some((f) => f.startsWith("faq[")));
+  const many = clone(fields);
+  many.partOne[0].paragraphs[0] += " Это является нормой, при отсутствии данных – в целях проверки, в рамках закупки, в соответствии с планом.";
+  assert.match(check(many).filter((p) => p.severity === "warning").map((p) => p.message).join("\n"), /канцелярит/);
+});
+
+test("rotation: a quote already on the site and an expert repeated in the pack are errors", () => {
+  const article = assembleCoffeeArticle(brief, fields);
+  const one = article.expertOne;
+  const siteQuotes = new Map([[`${one.expertId}#${one.quoteIndex}`, "kofe-v-zernah-dlya-kofeyni"]]);
+  assert.match(rotationProblems({ ...article, slug: "other" }, { siteQuotes }).map(([, m]) => m).join("\n"), /уже есть на сайте/);
+  assert.deepEqual(rotationProblems({ ...article, slug: "kofe-v-zernah-dlya-kofeyni" }, { siteQuotes }), [], "an article does not clash with itself");
+  const packExperts = new Map([[one.expertId, "first-article"]]);
+  assert.match(rotationProblems({ ...article, slug: "second-article" }, { packExperts }).map(([, m]) => m).join("\n"), /уже есть в этом пакете/);
+  const errors = errorsOf(checkCoffeeArticle(article, brief, { experts, repoDir: root, siteQuotes: new Map([[`${one.expertId}#${one.quoteIndex}`, "elsewhere"]]) }));
+  assert.ok(errors.some((e) => /уже есть на сайте/.test(e.message)));
+  assert.match(rotationProblems({ slug: "x", expertOne: { expertId: "a", quoteIndex: 0 }, expertTwo: { expertId: "a", quoteIndex: 1 } }).map(([, m]) => m).join("\n"), /два слота одного эксперта/);
+  // Brief level: one expert in two articles of a pack is rejected.
+  const raw = readJson(packFile);
+  const twice = clone(raw);
+  twice.articles.push({ ...clone(raw.articles[0]), slug: "vtoraya-statya" });
+  assert.throws(() => normalizeCoffeePack(twice, { experts, repoDir: root }), /в пакете каждый эксперт один раз/);
+});
+
+test("round 3 should-fixes: «не боится» is not negative; ordinals; numeric headers by whole word", () => {
+  const negative = (text) => { const f = clone(fields); f.partTwo[1].paragraphs[0] += text; return errorsOf(check(f)).filter((p) => /негативн/.test(p.message)); };
+  assert.equal(negative(" Хорошая смесь не боится молока.").length, 0);
+  assert.equal(negative(" Гость боится ждать.").length, 1);
+  assert.deepEqual(ordinalAgreementSlips("Начните с первой. Место у окна свободно."), []);
+  assert.deepEqual(ordinalAgreementSlips("Вторая стойка, второй шаг.").map((s) => s.text), []);
+  for (const header of ["Нормативный документ", "Весь ассортимент", "Длинный путь"]) {
+    const f = clone(fields);
+    f.table.columns[1] = header;
+    assert.ok(!errorsOf(check(f)).some((p) => /обещает цифры/.test(p.message)), header);
+  }
+  for (const header of ["Норма", "Вес", "Цена"]) {
+    const f = clone(fields);
+    f.table.columns[1] = header;
+    assert.ok(errorsOf(check(f)).some((p) => /обещает цифры/.test(p.message)), header);
+  }
+});
+
+test("prompt asks for the warm explanatory tone; no reuse-expert permission anywhere in the coffee template", () => {
+  const text = buildCoffeeMessages(brief, { experts }).map((m) => m.content).join("\n");
+  assert.match(text, /тёплый/);
+  assert.match(text, /Не …йте/);
+  assert.match(text, /explanatoryParagraphs/);
+  assert.ok(toneSample().explanatoryParagraphs.length >= 4);
+  const docs = [join(here, "lib/sites/coffee/knowledge/TEMPLATE_RU.md"), join(root, "docs/business/coffee-guides/TEMPLATE.md"), join(root, "scripts/business-coffee-guide-unit.mts")].map((p) => readFileSync(p, "utf8")).join("\n");
+  assert.doesNotMatch(docs, /permits reusing|разрешает повтор|можно повторять эксперт/i);
+  assert.match(docs, /ротир/);
 });
 
 test("facts block is required: 3–6 sourced facts; the reference fixture brief carries 3 real ones", () => {
