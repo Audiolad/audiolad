@@ -14,7 +14,7 @@ const URL_ = "https://abcd.supabase.co";
 const KEY = "sb-abcd-auth-token";
 
 // Domain derivation.
-for (const h of ["audiolad.ru", "AUDIOLAD.RU:443", "business.audiolad.ru", "www.audiolad.ru", "audiolad.ru."]) {
+for (const h of ["audiolad.ru", "AUDIOLAD.RU:443", "business.audiolad.ru", "coffee.audiolad.ru", "www.audiolad.ru", "audiolad.ru."]) {
   assert.equal(resolveSupabaseCookieDomain(h), ".audiolad.ru", h);
 }
 for (const h of ["localhost", "localhost:3000", "127.0.0.1", "evilaudiolad.ru", "audiolad.ru.evil.com", "", null, "[::1]:3000"]) {

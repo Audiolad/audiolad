@@ -17,6 +17,7 @@
     "test:analytics-consent-playback-hit-test": "node scripts/analytics-consent-playback-hit-test.mjs",
     "test:supabase-cookie-domain": "npx tsx scripts/supabase-cookie-domain-unit.mts",
     "test:practice-embed": "npx tsx scripts/practice-embed-unit.mts",
+    "test:business-coffee-host": "npx tsx scripts/business-coffee-host-unit.mts",
     "test:business-coffee-atlas": "npx tsx scripts/business-coffee-atlas-unit.mts",
     "test:business-coffee-guide": "npx tsx scripts/business-coffee-guide-unit.mts",
     "test:business-guest-coffee": "npx tsx scripts/business-guest-coffee-unit.mts",

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
+
 import {
   AtmosphereAssembling,
   ATMOSPHERE_REDUCED_MOTION_MS,
@@ -100,7 +102,7 @@ export default function BusinessPlayerSettings({
     if (saved) {
       const next = locationSoundProfile(saved);
       try {
-        window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
+        coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
       } catch {
         /* private mode keeps the server profile for this visit */
       }
@@ -108,7 +110,7 @@ export default function BusinessPlayerSettings({
     }
     let next = GUEST_COFFEE_DEFAULT_PROFILE;
     try {
-      next = parseBusinessSoundProfile(window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY));
+      next = parseBusinessSoundProfile(coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY));
     } catch {
       next = GUEST_COFFEE_DEFAULT_PROFILE;
     }
@@ -174,7 +176,7 @@ export default function BusinessPlayerSettings({
       setSendState("idle");
       setSaveError(null);
       try {
-        window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
+        coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
       } catch {
         /* private mode keeps the choice for this visit */
       }
@@ -188,7 +190,7 @@ export default function BusinessPlayerSettings({
       clearTimers();
       setPhase("idle");
       try {
-        window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
+        coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(next));
       } catch {
         /* private mode keeps the choice for this visit */
       }
@@ -232,7 +234,7 @@ export default function BusinessPlayerSettings({
     const daypart = queue.effectiveDaypart;
     if (!daypart) return;
     try {
-      window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(profile));
+      coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(profile));
     } catch {
       /* the in-memory profile still goes to the player */
     }

@@ -7,7 +7,7 @@
  * keeps host-only cookies — derived from the actual request/document host,
  * there is no user-visible toggle.
  *
- * Legacy host-only cookies (written before this change) are NEVER re-issued
+ * Legacy host-only cookies, written before this change, are NEVER re-issued
  * with the domain scope (a stale host-only session must not be promoted to all
  * subdomains or overwrite a live shared session): the proxy only expires them,
  * so a user with a legacy-only session logs in once more. Every later write/removal also expires the
@@ -165,7 +165,7 @@ export function allSupabaseAuthCookieNames(storageKey: string): string[] {
 }
 
 /**
- * Per-host migration of legacy host-only Supabase cookies (production only).
+ * Per-host migration of legacy host-only Supabase cookies, production only.
  * The marker is HOST-ONLY on purpose: each host migrates its own legacy twins.
  * Also: every Supabase cookie written in this response expires its host-only twin.
  */

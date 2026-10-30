@@ -21,7 +21,9 @@ import {
 import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
 import { BUSINESS_THEMES, resolveBusinessTheme } from "@/lib/business-app/theme";
 
-export const metadata: Metadata = buildBusinessAppMetadata();
+export async function generateMetadata(): Promise<Metadata> {
+  return buildBusinessAppMetadata(getHostnameFromHeaders(await headers()));
+}
 
 // One theme for every Business screen (21546de4); see src/lib/business-app/theme.ts.
 const theme = resolveBusinessTheme();

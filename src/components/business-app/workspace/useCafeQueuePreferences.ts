@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { coffeeStorage } from "@/lib/business-app/shared-coffee-storage";
+
 import { useBusinessDomain } from "@/components/business-app/BusinessDomainProvider";
 import { GUEST_COFFEE_DEFAULT_PROFILE, type GuestCoffeeProfile } from "@/lib/business-app/guest-coffee/catalog";
 import {
@@ -55,7 +57,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
       if (seeded.prefs) {
         setPrefs(seeded.prefs);
         try {
-          window.localStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(seeded.prefs));
+          coffeeStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(seeded.prefs));
         } catch {
           /* private mode keeps the server choice for this visit */
         }
@@ -63,7 +65,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
       if (seeded.hours) {
         setHours(seeded.hours);
         try {
-          window.localStorage.setItem(cafeDaypartHoursKey(locationId), serializeCafeDaypartHours(seeded.hours));
+          coffeeStorage.setItem(cafeDaypartHoursKey(locationId), serializeCafeDaypartHours(seeded.hours));
         } catch {
           /* private mode keeps the server windows for this visit */
         }
@@ -71,14 +73,14 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
       if (seeded.profile) {
         setProfile(seeded.profile);
         try {
-          window.localStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(seeded.profile));
+          coffeeStorage.setItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY, serializeBusinessSoundProfile(seeded.profile));
         } catch {
           /* private mode keeps the server profile for this visit */
         }
       }
     } else {
       try {
-        setPrefs(parseCafeQueuePrefs(window.localStorage.getItem(CAFE_QUEUE_PREFS_KEY)));
+        setPrefs(parseCafeQueuePrefs(coffeeStorage.getItem(CAFE_QUEUE_PREFS_KEY)));
       } catch {
         setPrefs(CAFE_QUEUE_DEFAULT_PREFS);
       }
@@ -88,12 +90,12 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
         setFeedback([]);
       }
       try {
-        setProfile(parseBusinessSoundProfile(window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
+        setProfile(parseBusinessSoundProfile(coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
       } catch {
         setProfile(GUEST_COFFEE_DEFAULT_PROFILE);
       }
       try {
-        setHours(parseCafeDaypartHours(window.localStorage.getItem(cafeDaypartHoursKey(locationId))));
+        setHours(parseCafeDaypartHours(coffeeStorage.getItem(cafeDaypartHoursKey(locationId))));
       } catch {
         setHours(CAFE_DAYPART_HOURS_DEFAULT);
       }
@@ -106,12 +108,12 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
       const clock = new Date();
       setMinuteOfDay(clock.getHours() * 60 + clock.getMinutes());
       try {
-        setProfile(parseBusinessSoundProfile(window.localStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
+        setProfile(parseBusinessSoundProfile(coffeeStorage.getItem(BUSINESS_SOUND_PROFILE_STORAGE_KEY)));
       } catch {
         /* keep the profile already on screen */
       }
       try {
-        setHours(parseCafeDaypartHours(window.localStorage.getItem(cafeDaypartHoursKey(locationId))));
+        setHours(parseCafeDaypartHours(coffeeStorage.getItem(cafeDaypartHoursKey(locationId))));
       } catch {
         /* keep the windows already on screen */
       }
@@ -124,7 +126,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
     setPrefs((prev) => {
       const next = { ...prev, daypartMode };
       try {
-        window.localStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(next));
+        coffeeStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(next));
       } catch {
         /* private mode keeps the choice for this visit */
       }
@@ -136,7 +138,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
     setPrefs((prev) => {
       const next = { ...prev, energyOffset };
       try {
-        window.localStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(next));
+        coffeeStorage.setItem(CAFE_QUEUE_PREFS_KEY, serializeCafeQueuePrefs(next));
       } catch {
         /* private mode keeps the choice for this visit */
       }
@@ -149,7 +151,7 @@ export function useCafeQueuePreferences(seed?: CafeQueuePreferenceSeed | null) {
     if (error) return error;
     setHours(next);
     try {
-      window.localStorage.setItem(cafeDaypartHoursKey(locationId), serializeCafeDaypartHours(next));
+      coffeeStorage.setItem(cafeDaypartHoursKey(locationId), serializeCafeDaypartHours(next));
     } catch {
       /* private mode keeps the windows for this visit */
     }

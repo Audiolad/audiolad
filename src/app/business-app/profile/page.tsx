@@ -4,13 +4,13 @@ import Link from "next/link";
 import { signOut } from "@/app/(platform)/auth/sign-out/actions";
 import SignOutForm from "@/components/auth/SignOutForm";
 import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
-import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
+import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  ...buildBusinessAppMetadata(),
+  ...buildBusinessAppPageMetadata(),
   title: "Профиль – АудиоЛад Бизнес",
   robots: { index: false, follow: false },
 };

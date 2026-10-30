@@ -4,14 +4,14 @@ import { redirect } from "next/navigation";
 import BusinessWorkspace from "@/components/business-app/workspace/BusinessWorkspace";
 import { businessMusicRoute } from "@/lib/business-app/point-device";
 import { loadPointDeviceVenue } from "@/lib/business-app/point-device.server";
-import { buildBusinessAppMetadata } from "@/lib/business-app/seo";
+import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
 import { loadWorkspacePage } from "@/lib/business-workspace/load.server";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  ...buildBusinessAppMetadata(),
+  ...buildBusinessAppPageMetadata(),
   title: "Музыка – АудиоЛад Бизнес",
   robots: { index: false, follow: false },
 };

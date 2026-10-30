@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { handleCabinetPlayerReport } from "@/lib/business-app/cabinet-player-report.server";
+import { isCoffeeHostRequest } from "@/lib/business-app/host";
 import { isCabinetReportSource } from "@/lib/business-app/cabinet-player-report";
 import { loadSpaPilotContext } from "@/lib/business-app/spa-pilot";
 import { handleSpaReport, isSameOriginJsonRequest, spaReportHttpStatus } from "@/lib/business-app/spa-player-report";
@@ -26,6 +27,10 @@ export async function POST(request: Request) {
   if (isCabinetReportSource(body)) {
     const cabinet = await handleCabinetPlayerReport(body);
     return NextResponse.json(cabinet, { status: spaReportHttpStatus(cabinet), headers: NO_STORE });
+  }
+  // The /spa pilot is not part of coffee.audiolad.ru (only the cabinet report above is).
+  if (isCoffeeHostRequest(request.headers)) {
+    return NextResponse.json({ ok: false, reason: "not_found" }, { status: 404, headers: NO_STORE });
   }
   const result = await handleSpaReport(body, {
     loadPlayerId: async () => (await loadSpaPilotContext())?.playerId ?? null,

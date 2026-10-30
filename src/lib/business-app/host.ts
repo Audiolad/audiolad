@@ -2,9 +2,21 @@ import {
   getHostnameFromHeaders,
   normalizeHostname,
 } from "@/lib/school/host";
+import { hostnameFromHeaders } from "@/lib/supabase/cookie-domain";
 
 /** Business B2B subdomain (no www). Code-only host isolation; Nginx/DNS wiring is a later infra step. */
 export const BUSINESS_HOSTNAME = "business.audiolad.ru";
+
+/** Build-time switch, shared by server routing and browser storage. Default OFF. */
+export function coffeeHostEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED === "1";
+}
+export const COFFEE_HOSTNAME = "coffee.audiolad.ru";
+export const COFFEE_ORIGIN = `https://${COFFEE_HOSTNAME}`;
+
+export function coffeeStorefrontUrl(): string {
+  return coffeeHostEnabled() ? `${COFFEE_ORIGIN}/` : BUSINESS_GUEST_COFFEE_URL;
+}
 
 export const BUSINESS_ORIGIN = `https://${BUSINESS_HOSTNAME}`;
 
@@ -13,7 +25,7 @@ export const BUSINESS_SITE_PATH = "/business-app";
 
 /**
  * a8240527: permanent guest coffee-shop cabinet. This exact URL is printed in the
- * distributed PDF atlas (pages 32–33) and linked from every atlas CTA — NEVER change it.
+ * distributed PDF atlas (pages 32–33). Keep this legacy URL available permanently.
  */
 export const BUSINESS_GUEST_COFFEE_PUBLIC_PATH = "/guest/coffee";
 export const BUSINESS_GUEST_COFFEE_URL = `${BUSINESS_ORIGIN}${BUSINESS_GUEST_COFFEE_PUBLIC_PATH}`;
@@ -21,8 +33,13 @@ export const BUSINESS_GUEST_COFFEE_INTERNAL_PATH = `${BUSINESS_SITE_PATH}/guest/
 
 export { normalizeHostname, getHostnameFromHeaders };
 
+/** Coffee host request (flag ON only). Real `Host` wins over X-Forwarded-Host. */
+export function isCoffeeHostRequest(headers: { get(name: string): string | null }): boolean {
+  return coffeeHostEnabled() && hostnameFromHeaders(headers) === COFFEE_HOSTNAME;
+}
+
 export function isBusinessHostname(hostname: string): boolean {
-  return hostname === BUSINESS_HOSTNAME;
+  return hostname === BUSINESS_HOSTNAME || (coffeeHostEnabled() && hostname === COFFEE_HOSTNAME);
 }
 
 export function isBusinessSitePath(pathname: string): boolean {
