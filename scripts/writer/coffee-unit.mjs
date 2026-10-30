@@ -407,10 +407,15 @@ test("brief: experts must be registry, licensed, man+woman, ru+foreign; foreign 
 
 test("registerArticles adds import + ARTICLES entry and refuses duplicates", () => {
   const source = readFileSync(join(root, COFFEE.registryFile), "utf8");
-  const next = registerArticles(source, ["barnaya-stoyka-dlya-kofeyni"]);
-  assert.match(next, /import \{ BARNAYA_STOYKA_DLYA_KOFEYNI \} from "\.\/articles\/barnaya-stoyka-dlya-kofeyni";/);
-  assert.match(next, /\[KOFE_V_ZERNAH_DLYA_KOFEYNI, BARNAYA_STOYKA_DLYA_KOFEYNI\]/);
-  assert.throws(() => registerArticles(next, ["barnaya-stoyka-dlya-kofeyni"]), /уже/);
+  // Slug that is never a real article, so the test stays valid as content sets get registered.
+  const slug = "unit-test-stoyka-dlya-kofeyni";
+  assert.ok(!source.includes(slug));
+  const next = registerArticles(source, [slug]);
+  assert.match(next, /import \{ UNIT_TEST_STOYKA_DLYA_KOFEYNI \} from "\.\/articles\/unit-test-stoyka-dlya-kofeyni";/);
+  assert.match(next, /\[KOFE_V_ZERNAH_DLYA_KOFEYNI(, [A-Z0-9_]+)*, UNIT_TEST_STOYKA_DLYA_KOFEYNI\]/);
+  assert.throws(() => registerArticles(next, [slug]), /уже/);
+  // Real registered articles are refused too.
+  assert.throws(() => registerArticles(source, ["kofe-v-zernah-dlya-kofeyni"]), /уже/);
 });
 
 test("generated data module imports and equals the assembled article", async () => {
