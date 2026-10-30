@@ -63,13 +63,13 @@ const SET_01_SLUGS = [
 // ---------- Expert registry ----------
 assertCoffeeExpertRegistry();
 const counts = countExperts();
-assert.equal(counts.foreignMen, 5);
-assert.equal(counts.foreignWomen, 5);
-assert.equal(counts.russianWomen, 1);
-assert.equal(counts.russianMen, 1);
-assert.equal(counts.total, 12);
-assert.equal(counts.women, 6);
-assert.equal(counts.men, 6);
+assert.equal(counts.foreignMen, 9);
+assert.equal(counts.foreignWomen, 10);
+assert.equal(counts.russianWomen, 6);
+assert.equal(counts.russianMen, 8);
+assert.equal(counts.total, 33);
+assert.equal(counts.women, 16);
+assert.equal(counts.men, 17);
 
 for (const expert of COFFEE_EXPERTS) {
   // Owner rule 2026-10-29: only experts with a real portrait, no initials placeholders.
