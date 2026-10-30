@@ -27,7 +27,7 @@ import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
-import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitionHits, prohibitions, rotationProblems, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
+import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitions, rotationProblems, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
 import { buildRequest } from "./lib/prompt.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
 import { LOCK_FILE, szHashes } from "./sz-template-lock.mjs";
@@ -339,7 +339,6 @@ const NEGATIVES = [
   ["seoTitle in lowercase", (f) => { f.seoTitle = f.seoTitle.charAt(0).toLowerCase() + f.seoTitle.slice(1); }, /заглавной/],
   ["description without the exact query form", (f) => { f.description = "Как выбрать кофе в зёрнах для кофеен: свежесть обжарки, вкус в чашке, расчёт стоимости порции и вопросы поставщику перед первой закупкой."; }, /дословно/],
   // Round 3 (30.10.2026): tone and expert rotation.
-  ["«Не …йте» prohibition", (f) => { f.partTwo[0].paragraphs[0] += " Не покупайте зерно без даты обжарки."; }, /запрет «не покупайте…»/],
   ["description too long", (f) => { f.description = "Кофе в зёрнах для кофейни: " + "свежесть обжарки, вкус, ".repeat(8); }, /description 120–170 символов/],
 ];
 for (const [name, mutate, expected] of NEGATIVES) {
@@ -352,20 +351,32 @@ for (const [name, mutate, expected] of NEGATIVES) {
   });
 }
 
-test("tone heuristics are warnings for the Codex polish pass; only a sentence-initial «Не …йте» without «вы» is an error", () => {
+test("every tone check is a warning for the Codex polish pass, never an error", () => {
+  const toneErrors = (problems) => errorsOf(problems).filter((p) => p.field === "tone" || /запрет|повелительн|объясняющих|канцелярит/.test(p.message));
   const dense = clone(fields);
   dense.partTwo[0].paragraphs[0] += " Проверьте пачку, посчитайте расход, сравните цены, запишите итог, обсудите выбор, закажите партию, попробуйте зерно.";
   dense.partTwo[1].paragraphs[0] += " Спросите поставщика, уточните график, договоритесь о замене, сохраните ответы.";
   const problems = check(dense);
-  assert.deepEqual(errorsOf(problems).filter((p) => p.field === "tone"), []);
-  assert.match(problems.filter((p) => p.severity === "warning").map((p) => p.message).join("\n"), /повелительных глаголов [\d.]+ на 1000 слов \(> 25\)/);
-  const inner = clone(fields);
-  inner.partTwo[0].paragraphs[0] += " Зерно лучше хранить в банке, и не держите его у кофемашины.";
-  assert.deepEqual(errorsOf(check(inner)).filter((p) => /запрет/.test(p.message)), []);
-  assert.match(check(inner).filter((p) => p.severity === "warning").map((p) => p.message).join("\n"), /запрет «не держите…»/);
+  assert.deepEqual(toneErrors(problems), []);
+  const warnings = problems.filter((p) => p.severity === "warning").map((p) => p.message).join("\n");
+  assert.match(warnings, /повелительных глаголов [\d.]+ на 1000 слов \(> 25\)/);
+  for (const [line, ban] of [
+    ["Не покупайте зерно без даты обжарки.", "не покупайте"],
+    ["Не ставьте выдачу у кассы.", "не ставьте"],
+    ["Зерно лучше хранить в банке, и не держите его у кофемашины.", "не держите"],
+    // Codex final review of #1092: present tense at the start of a sentence – a warning at most, never an error.
+    ["Не хотите менять меню целиком – достаточно добавить сезонный напиток.", "не хотите"],
+    ["Не видите разницы между образцами – значит, можно выбрать более доступный.", "не видите"],
+  ]) {
+    const one = clone(fields);
+    one.partTwo[0].paragraphs[0] += ` ${line}`;
+    const found = check(one);
+    assert.deepEqual(toneErrors(found), [], line);
+    assert.ok(found.some((p) => p.severity === "warning" && p.message.includes(`запрет «${ban}…»`)), line);
+  }
   const good = clone(fields);
   good.partTwo[0].paragraphs[0] += " Если вы торопитесь, то не видите мелких ошибок. Когда вы стоите за стойкой, видите весь зал.";
-  assert.deepEqual(check(good).filter((p) => p.field === "tone" || /запрет/.test(p.message)).filter((p) => p.severity === "error"), []);
+  assert.deepEqual(toneErrors(check(good)), []);
 });
 
 test("statistic with a sourced brief fact passes; the brief refuses a fact without a source", () => {
@@ -509,11 +520,10 @@ test("tone: imperatives, prohibitions, канцелярит and explanatory shar
     "Вы готовите кофе, гости ждут, не берите зерно без даты.",
     "Вы проверьте дату обжарки.",
   ]) assert.deepEqual(imperativeIndexes(missed), [], `known miss: ${missed}`);
-  // Only an unambiguous prohibition is certain (an error): it opens the sentence and the sentence has no «вы».
-  assert.deepEqual(prohibitionHits("Не ставьте выдачу у кассы."), [{ ban: "не ставьте", certain: true }]);
-  assert.deepEqual(prohibitionHits("Не берите зерно без даты."), [{ ban: "не берите", certain: true }]);
-  assert.deepEqual(prohibitionHits("Выдачу лучше вынести, и не ставьте её у кассы."), [{ ban: "не ставьте", certain: false }]);
-  assert.deepEqual(prohibitionHits("Не видите разницы?"), [{ ban: "не видите", certain: false }], "a question may be the present tense");
+  // Restored from eb576112 (there: [3]); with «вы» earlier in the sentence they are now known misses too.
+  assert.deepEqual(imperativeIndexes("Если вы хотите, смотрите на дату."), []);
+  assert.deepEqual(imperativeIndexes("Когда вы заняты, заложите в бюджете запас."), [], "«в бюджете» is not a verb; «заложите» follows «вы»");
+  assert.deepEqual(prohibitions("Не хотите менять меню целиком – достаточно добавить сезонный напиток."), ["не хотите"], "found, but only as a warning");
   assert.deepEqual(kanceliarit("Это является основой, а при отсутствии данных – в целях проверки."), ["является", "при отсутствии", "в целях"]);
   assert.deepEqual(kanceliarit("Удобно, когда выдача стоит чуть в стороне."), []);
   const warm = toneMetrics([["p", "Выдача работает свободнее чуть в стороне от кассы. Так гостю удобно забрать заказ. Можно попробовать оба варианта на макете."]]);

@@ -216,7 +216,7 @@ const countQuery = (text, query) => norm(text).split(norm(query)).length - 1;
 // Imperatives live mainly in step titles and checklist items; the author prose explains «why» first and
 // suggests gently («удобно», «можно», «поможет»). Measured on authorProse(), not on headings or lists.
 export const TONE = {
-  /** Imperatives per 1000 words of author prose: warning above, a stronger warning above (the detector is a heuristic). */
+  /** Imperatives per 1000 words of author prose: a warning above `warn`, a stronger warning above `error` (key name kept; no tone error). */
   imperativesPer1000: { warn: 20, error: 25 },
   /** Share of sentences that open with an imperative («Проверьте…», «Не ставьте…»). */
   imperativeStartShare: { warn: 0.15, error: 0.3 },
@@ -255,25 +255,12 @@ export function imperativeIndexes(sentence) {
   });
   return out;
 }
-/** «Не …йте»: a prohibition addressed to the reader («Не приравнивайте», «не ставьте»). */
+/** «Не …йте»: a prohibition addressed to the reader («Не приравнивайте», «не ставьте»). Heuristic, a warning only. */
 export function prohibitions(text) {
-  return prohibitionHits(text).map(({ ban }) => ban);
-}
-/**
- * Each «не» + imperative: { ban, certain }. certain – the sentence opens with «Не …йте/…ьте/…ите», has no «вы»
- * and is not a question with -ите («Не ставьте выдачу у кассы.»): only then the form is unambiguous, so only then
- * it is an error.
- */
-export function prohibitionHits(text) {
   const found = [];
   for (const sentence of sentences(text)) {
     const list = sentenceWords(sentence);
-    for (const i of imperativeIndexes(sentence)) {
-      if (list[i - 1] !== "не") continue;
-      // -йте/-ьте are imperative only; a question («Не видите разницы?») may be the present tense.
-      const certain = i === 1 && !list.includes("вы") && (!/ите(?:сь)?$/.test(list[i]) || !/\?[»")]*$/.test(sentence.trim()));
-      found.push({ ban: `не ${list[i]}`, certain });
-    }
+    for (const i of imperativeIndexes(sentence)) if (list[i - 1] === "не") found.push(`не ${list[i]}`);
   }
   return found;
 }
@@ -294,7 +281,6 @@ export function authorProse(article) {
 export function toneMetrics(texts) {
   let total = 0, imperatives = 0, imperativeStarts = 0, explanatory = 0, wordCount = 0;
   const bans = [];
-  const hits = [];
   const kanc = [];
   for (const [field, text] of texts) {
     wordCount += words(text);
@@ -307,10 +293,7 @@ export function toneMetrics(texts) {
       if (idx.includes(0) || (list[0] === "не" && idx.includes(1))) imperativeStarts += 1;
       if (!idx.length) explanatory += 1;
     }
-    for (const { ban, certain } of prohibitionHits(text)) {
-      bans.push([field, ban]);
-      hits.push([field, ban, certain]);
-    }
+    for (const ban of prohibitions(text)) bans.push([field, ban]);
     for (const hit of kanceliarit(text)) kanc.push([field, hit]);
   }
   const per1000 = (n) => (wordCount ? Math.round((n * 10000) / wordCount) / 10 : 0);
@@ -318,13 +301,14 @@ export function toneMetrics(texts) {
   return {
     words: wordCount, sentences: total, imperatives, imperativesPer1000: per1000(imperatives),
     imperativeStarts, imperativeStartShare: share(imperativeStarts), explanatoryShare: share(explanatory),
-    prohibitions: bans, prohibitionHits: hits, kanceliarit: kanc, kanceliaritPer1000: per1000(kanc.length),
+    prohibitions: bans, kanceliarit: kanc, kanceliaritPer1000: per1000(kanc.length),
   };
 }
 /**
- * Tone problems by TONE thresholds: [severity, field, message]. The imperative detector is a heuristic, so density,
- * imperative starts and «Не …йте» are warnings for the Codex polish pass (PR body); the only error is an unambiguous
- * prohibition – a sentence that opens with «Не …йте/…ите» and has no «вы».
+ * Tone problems by TONE thresholds: [severity, field, message]. The imperative detector is a heuristic, so EVERY tone
+ * check (density, imperative starts, «Не …йте/…ьте/…ите», explanatory share, канцелярит) is a warning for the Codex
+ * polish pass (PR body) – a tone check never produces an error (decision 30.10.2026, PR #1092). Expert rotation and
+ * quote reuse (rotationProblems) stay errors.
  */
 export function toneProblems(article) {
   const m = toneMetrics(authorProse(article));
@@ -335,9 +319,7 @@ export function toneProblems(article) {
   const pct = (x) => `${Math.round(x * 100)}%`;
   if (m.imperativeStartShare > T.imperativeStartShare.error) out.push(["warning", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (> ${pct(T.imperativeStartShare.error)})`]);
   else if (m.imperativeStartShare > T.imperativeStartShare.warn) out.push(["warning", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (цель ≤ ${pct(T.imperativeStartShare.warn)})`]);
-  for (const [field, ban, sure] of m.prohibitionHits) {
-    out.push([sure ? "error" : "warning", field, `запрет «${ban}…» – вместо «Не …йте» объясните, как удобнее, и почему${sure ? "" : " (проверьте при доводке: возможно, это настоящее время)"}`]);
-  }
+  for (const [field, ban] of m.prohibitions) out.push(["warning", field, `запрет «${ban}…» – вместо «Не …йте» объясните, как удобнее, и почему (проверьте при доводке: «-ите» бывает настоящим временем)`]);
   if (m.explanatoryShare < T.explanatoryShareMin) out.push(["warning", "tone", `объясняющих предложений ${pct(m.explanatoryShare)} (цель ≥ ${pct(T.explanatoryShareMin)})`]);
   if (m.kanceliarit.length) out.push(["warning", "tone", `канцелярит ${m.kanceliaritPer1000} на 1000 слов (цель ≤ ${T.kanceliaritPer1000}): ${[...new Set(m.kanceliarit.map(([, w]) => w))].join(", ")} – пишите проще, как коллега`]);
   return out;
@@ -478,7 +460,7 @@ export function checkCoffeeArticle(article, brief, env) {
   for (const [field, message] of rotationProblems(article, env)) error(field, message);
 
   // Tone: warm and explanatory, not a list of orders.
-  for (const [severity, field, message] of toneProblems(article)) (severity === "error" ? error : warn)(field, message);
+  for (const [, field, message] of toneProblems(article)) warn(field, message);
 
   // Uniqueness against the section and the other articles of the pack.
   for (const [field, text] of texts.filter(([f]) => /heading$|question$/.test(f))) {
