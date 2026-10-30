@@ -181,7 +181,9 @@ assert.equal(
 const form = read("src/components/author-dashboard/AuthorProductForm.tsx");
 const createPage = read("src/app/(platform)/author-dashboard/products/new/page.tsx");
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
-const proposalsRoute = read("src/app/api/author/seo/proposals/route.ts");
+const proposalsRoute = `${read("src/app/api/author/seo/proposals/route.ts")}\n${read(
+  "src/lib/seo-queries/author-proposal-flow.ts",
+)}`;
 const reservationRoute = read("src/app/api/author/seo-reservations/route.ts");
 const qualityRoute = read("src/app/api/author/seo/product-quality-review/route.ts");
 const nav = read("src/components/author-dashboard/AuthorDashboardNav.tsx");
