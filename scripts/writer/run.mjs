@@ -71,7 +71,7 @@ if (args.help || (!args.brief && !szMode && !coffeeMode) || (szMode && !args.bri
     "Использование: npx tsx scripts/writer/run.mjs --brief brief.json [--model M] [--dry-run] [--no-repair] [--offline] [--article a.json] [--max-rub 3]",
     "  sergey-zoya.ru: --site sz --repo <клон sergey-zoya-site> --briefs pack.json [--experts EXPERTS_RU.md] [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 3]",
     "                  --site sz --repo <клон> --experts-report   (эксперты пула: кто реже использован, есть ли портрет)",
-    "  audiolad.ru/b/coffee: --site coffee --briefs coffee-pack.json [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 400]",
+    "  audiolad.ru/b/coffee: --site coffee --briefs coffee-pack.json [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 50]",
     "См. scripts/writer/README.md",
     "",
   ].join("\n"));

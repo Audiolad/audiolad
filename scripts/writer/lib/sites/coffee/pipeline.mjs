@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { makeCaller } from "../../call.mjs";
-import { formatRub } from "../../cost.mjs";
+import { costRub, estimatePromptTokens, formatRub, TARIFF } from "../../cost.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "../../publish.mjs";
 import { log, mskDate, mskNow, mustRun, readJson, run, writeJson, writeText } from "../../util.mjs";
 import { applyCoffeePack } from "./apply.mjs";
@@ -17,6 +17,20 @@ import { loadCoffeeExperts, loadCoffeePack } from "./brief.mjs";
 import { COFFEE } from "./config.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./prompt.mjs";
 import { checkCoffeeArticle, uniqueKeys } from "./rules.mjs";
+
+/**
+ * Completion tokens that fit the per-draft cap: the prompt plus every requested token at the output
+ * price must stay within cap − spent. Returns 0 if not even `minTokens` fit.
+ */
+export function draftTokenWindow(model, messages, { spentRub, capRub, maxTokens, minTokens }) {
+  const tariff = TARIFF[model];
+  if (!tariff) throw new CoffeeStop(1, `нет тарифа для модели ${model}`);
+  const promptRub = costRub(model, estimatePromptTokens(messages, model), 0);
+  const left = capRub - spentRub - promptRub;
+  const fit = Math.floor((left * 1e6) / tariff.outputPer1M);
+  const tokens = Math.min(maxTokens, fit);
+  return tokens >= minTokens ? tokens : 0;
+}
 
 /** 1 статья, 2 статьи, 5 статей. */
 export function articlesWord(n) {
@@ -81,11 +95,21 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
   const worktree = join(outDir, "site");
   const branch = `writer/coffee-${pack.pack}`;
   if (!args.offline) assertBranchFree(repo, branch);
-  const budget = Math.min(maxRub, pack.maxRub ?? Infinity);
+  const budget = Math.min(maxRub, pack.maxRub ?? Infinity, COFFEE.maxRubPerDraft * pack.articles.length);
   const state = { site: COFFEE.site, template: COFFEE.templateId, runId, model, startedAt: mskNow(), calls: [], spentRub: 0, outDir, branch, articles: [] };
   mkdirSync(outDir, { recursive: true });
   writeJson(join(outDir, "pack.json"), pack);
-  const callWriter = makeCaller({ model, maxTokens, maxRub: budget, outDir, runId, state, schemaName: COFFEE.schemaName, generate });
+  // Each call gets its own completion window so that one draft never crosses COFFEE.maxRubPerDraft.
+  const draftCall = (slug, callName, messages, schema) => {
+    const before = state.spentRub;
+    const spentOnDraft = state.calls.filter((call) => call.name.startsWith(`${slug}-`)).reduce((sum, call) => sum + (call.costRub ?? 0), 0);
+    const tokens = draftTokenWindow(model, messages, { spentRub: spentOnDraft, capRub: COFFEE.maxRubPerDraft, maxTokens, minTokens: COFFEE.draftMinTokens });
+    if (!tokens) return { skipped: true, spentOnDraft };
+    const callWriter = makeCaller({ model, maxTokens: tokens, maxRub: budget, outDir, runId, state, schemaName: COFFEE.schemaName, generate });
+    const article = callWriter(callName, messages, schema);
+    log(`${callName}: окно ${tokens} токенов, черновик стоит ${formatRub(spentOnDraft + state.spentRub - before)} из ${formatRub(COFFEE.maxRubPerDraft)}`);
+    return { article };
+  };
 
   let code = 0;
   try {
@@ -113,14 +137,18 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
         raw = readJson(file);
         state.calls.push({ name: `${brief.slug}-offline`, costRub: 0, note: file });
       } else {
-        raw = callWriter(`${brief.slug}-generate`, messages, schema);
+        const call = draftCall(brief.slug, `${brief.slug}-generate`, messages, schema);
+        if (call.skipped) throw new CoffeeStop(5, `${brief.slug}: черновик не помещается в лимит ${formatRub(COFFEE.maxRubPerDraft)} на статью (модель ${model}) – вызов не сделан`);
+        raw = call.article;
       }
       if (!raw) throw new CoffeeStop(2, `${brief.slug}: Райтер не вернул JSON`);
       let result = build(raw);
       let errors = result.problems.filter((problem) => problem.severity === "error");
       log(`${brief.slug}: ошибок ${errors.length}, предупреждений ${result.problems.length - errors.length}`);
       if (errors.length && !args.offline && !args["no-repair"]) {
-        const repaired = callWriter(`${brief.slug}-repair`, buildCoffeeRepairMessages(messages, raw, result.problems), schema);
+        const call = draftCall(brief.slug, `${brief.slug}-repair`, buildCoffeeRepairMessages(messages, raw, result.problems), schema);
+        if (call.skipped) log(`${brief.slug}: исправление пропущено – не помещается в лимит ${formatRub(COFFEE.maxRubPerDraft)} на статью (потрачено ${formatRub(call.spentOnDraft)})`);
+        const repaired = call.article;
         if (repaired) {
           raw = repaired;
           result = build(raw);

@@ -31,6 +31,11 @@ export const COFFEE = {
    */
   wordstatNote: "Яндекс Wordstat, частоты из задачи на пакет. Показы запроса, не число владельцев.",
   packMax: 5,
+  // Per-draft budget (Sergey, 30.10.2026): one article (generate + optional repair) never costs more
+  // than this. A call whose worst case would cross it is not made.
+  maxRubPerDraft: 10,
+  // A full article needs at least this many completion tokens; a smaller window is not worth a call.
+  draftMinTokens: 6000,
   limits: {
     seoTitleMax: 70,
     description: [120, 170],

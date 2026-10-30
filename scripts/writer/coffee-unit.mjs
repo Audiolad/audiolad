@@ -19,13 +19,13 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { COFFEE_DEFAULT_MODEL, DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
+import { COFFEE_ALT_MODEL, COFFEE_DEFAULT_MODEL, DEFAULT_MODEL, TARIFF, costRub, estimatePromptTokens, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
 import { applyCoffeePack, registerArticles } from "./lib/sites/coffee/apply.mjs";
 import { assembleCoffeeArticle, normalizeText, parseInline, toTsModule } from "./lib/sites/coffee/assemble.mjs";
 import { CoffeeBriefError, expertSlotProblems, isAllowedTextHref, isInternalHref, loadCoffeeExperts, loadCoffeePack, normalizeCoffeePack } from "./lib/sites/coffee/brief.mjs";
 import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
-import { CoffeeStop, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
+import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
 import { capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords } from "./lib/sites/coffee/rules.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
@@ -133,6 +133,22 @@ test("coffee never reaches sz and sz never reaches coffee (full import graph, bo
   for (const file of coffeeGraph) if (!inside(file, coffeeDir)) assert.ok(!inside(file, szDir));
 });
 
+test("per-draft cap: a call never makes one draft cost more than 10 ₽", () => {
+  assert.equal(COFFEE.maxRubPerDraft, 10);
+  const messages = buildCoffeeMessages(brief, { experts });
+  const window = (model, spentRub = 0) => draftTokenWindow(model, messages, { spentRub, capRub: COFFEE.maxRubPerDraft, maxTokens: 16000, minTokens: COFFEE.draftMinTokens });
+  const worst = (model, tokens, spent = 0) => spent + costRub(model, estimatePromptTokens(messages, model), tokens);
+  const mini = window("openai/gpt-5.4-mini");
+  assert.ok(mini >= COFFEE.draftMinTokens && mini < 16000, `окно mini ${mini}`);
+  assert.ok(worst("openai/gpt-5.4-mini", mini) <= 10);
+  assert.ok(worst("openai/gpt-5.4-mini", mini + 50) > 10, "окно не меньше, чем позволяет лимит");
+  assert.equal(window("openai/gpt-5.4-mini", 6), 0, "после 6 ₽ второй полный вызов mini не помещается");
+  assert.equal(window("openai/gpt-oss-120b"), 16000);
+  assert.ok(worst("openai/gpt-oss-120b", 16000, 8) <= 10);
+  assert.equal(window("openai/gpt-5.5"), 0, "gpt-5.5 в лимит черновика не помещается");
+  assert.throws(() => window("no/such-model"), /нет тарифа/);
+});
+
 test("separate ids: template, schema name, site, branch prefix", () => {
   assert.equal(COFFEE.templateId, COFFEE_TEMPLATE_ID);
   assert.equal(COFFEE.site, "coffee");
@@ -150,6 +166,10 @@ test("model defaults: sz unchanged, coffee explicit", () => {
   assert.equal(defaultModelFor("coffee"), COFFEE_DEFAULT_MODEL);
   assert.equal(defaultModelFor("coffee", "openai/gpt-oss-120b"), "openai/gpt-oss-120b");
   assert.ok(SUPPORTED_MODELS.includes(COFFEE_DEFAULT_MODEL));
+  assert.equal(COFFEE_DEFAULT_MODEL, "openai/gpt-5.4-mini");
+  assert.equal(COFFEE_ALT_MODEL, "openai/gpt-oss-120b");
+  assert.ok(SUPPORTED_MODELS.includes(COFFEE_ALT_MODEL));
+  assert.deepEqual(TARIFF["openai/gpt-5.4-mini"], { inputPer1M: 147.315, outputPer1M: 883.89 });
 });
 
 test("coffee loader refuses sz packs and untagged packs", () => {

@@ -14,7 +14,7 @@ npm run writer -- --brief path/to/brief.json
 
 | Флаг | Назначение |
 |---|---|
-| `--model` | по умолчанию `openai/gpt-oss-120b`, для `--site sz` – `openai/gpt-5.5` (победитель сравнения моделей на пакете 07). Доступны все модели из `TARIFF` в `lib/cost.mjs` |
+| `--model` | по умолчанию `openai/gpt-oss-120b`, для `--site sz` – `openai/gpt-5.5` (победитель сравнения моделей на пакете 07), для `--site coffee` – `openai/gpt-5.4-mini` (черновик до 10 ₽ за статью). Доступны все модели из `TARIFF` в `lib/cost.mjs` |
 | `--dry-run` | всё, кроме push и PR: коммит остаётся в локальном worktree |
 | `--no-repair` | без автоматического раунда исправлений |
 | `--offline` | без живой проверки ссылок на audiolad.ru |
@@ -157,12 +157,12 @@ JSON-файл, пример – `examples/pilot-brief.json`. Поля:
 - файлы шаблона sz закреплены хешами в `sz-template.lock.json`; `coffee-unit.mjs` падает, если они изменились или если между `lib/sites/coffee` и `lib/sites/sz` появился импорт.
 
 ```bash
-npx tsx scripts/writer/run.mjs --site coffee --briefs coffee-pack.json --dry-run --max-rub 400
+npx tsx scripts/writer/run.mjs --site coffee --briefs coffee-pack.json --dry-run --max-rub 50
 npx tsx scripts/writer/run.mjs --site coffee --briefs scripts/writer/fixtures/coffee/pack-fixture.json \
   --offline --fixtures scripts/writer/fixtures/coffee --out /tmp/coffee-run   # 0 ₽, без PR
 ```
 
-Модель по умолчанию – `openai/gpt-5.5` (как sz). Результат – данные статьи `src/lib/business/vertical-guides/articles/<slug>.ts` (тип `VerticalGuideArticle`) и строка в `registry.ts`; страницу рисует существующий `GuideArticleView`, Райтер компонентов не пишет. Перед merge нужно обновить `scripts/business-coffee-guide-unit.mts` (сейчас он считает эталон единственной статьёй).
+Модель по умолчанию – `openai/gpt-5.4-mini` (дешёвый черновик; альтернатива – `--model openai/gpt-oss-120b`). Лимит – **10 ₽ на черновик статьи** (`COFFEE.maxRubPerDraft`): перед каждым вызовом окно ответа (`max_tokens`) урезается так, чтобы худший случай (промпт + все запрошенные токены) не вышел за остаток лимита статьи; если не помещается даже `draftMinTokens` (6000), генерация останавливается с кодом 5, а исправление пропускается. Общий лимит запуска – меньшее из `--max-rub`, `maxRub` пакета и 10 ₽ × число статей; для пакета из 5 статей передайте `--max-rub 50`. Результат – данные статьи `src/lib/business/vertical-guides/articles/<slug>.ts` (тип `VerticalGuideArticle`) и строка в `registry.ts`; страницу рисует существующий `GuideArticleView`, Райтер компонентов не пишет. Перед merge нужно обновить `scripts/business-coffee-guide-unit.mts` (сейчас он считает эталон единственной статьёй).
 
 **Порядок работы с пакета №2 (решение Сергея, 30.10.2026).** Райтер пишет **черновик** пакета по шаблону coffee: ветку `writer/coffee-<pack>` и черновой PR с отчётом проверок. Это не публикация: Райтер ничего не сливает и не деплоит. Финальную доводку текстов делает Codex в той же ветке обычными коммитами, затем Codex публикует (merge и деплой по правилам продакшена). Пакет №1 (Core 56d0bb5a) целиком сделал Codex вне Райтера.
 
