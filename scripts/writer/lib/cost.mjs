@@ -7,16 +7,23 @@ export const TARIFF = {
   "openai/gpt-5.5": { inputPer1M: 854, outputPer1M: 5124 },
   "google/gemini-3.1-pro-preview": { inputPer1M: 341.6, outputPer1M: 2049.6 },
   "deepseek-ai/DeepSeek-V4-Pro": { inputPer1M: 183, outputPer1M: 732 },
+  // Cheap draft model for --site coffee, price from GET /v1/models metadata, 2026-10-30.
+  "openai/gpt-5.4-mini": { inputPer1M: 147.315, outputPer1M: 883.89 },
 };
 
 export const DEFAULT_MODEL = "openai/gpt-oss-120b";
 // --site sz default: winner of the pack-07 model trial (c62ac1d5): 0 gate errors on 5/5, ≈300 ₽ per pack.
 export const SZ_DEFAULT_MODEL = "openai/gpt-5.5";
+// --site coffee (Sergey, 30.10.2026): the proven sz draft setup of pack 17 (task 354517de) – gpt-5.4-mini,
+// one draft call per article, no repair, Codex polishes and publishes. The only model coffee accepts.
+export const COFFEE_DEFAULT_MODEL = "openai/gpt-5.4-mini";
 
 /** Model for a run: an explicit --model wins, otherwise the site default. */
 export function defaultModelFor(site, explicit) {
   if (explicit) return explicit;
-  return site === "sz" ? SZ_DEFAULT_MODEL : DEFAULT_MODEL;
+  if (site === "sz") return SZ_DEFAULT_MODEL;
+  if (site === "coffee") return COFFEE_DEFAULT_MODEL;
+  return DEFAULT_MODEL;
 }
 export const SUPPORTED_MODELS = Object.keys(TARIFF);
 
