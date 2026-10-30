@@ -58,7 +58,6 @@ function slot(brief, index, fields) {
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export function assembleCoffeeArticle(brief, fields) {
-  const story = (fields.story ?? []).map(plain);
   return {
     verticalId: COFFEE.verticalId,
     slug: brief.slug,
@@ -66,10 +65,10 @@ export function assembleCoffeeArticle(brief, fields) {
     seoTitle: plain(fields.seoTitle),
     description: plain(fields.description),
     primaryQuery: brief.primaryQuery,
-    relatedQueries: brief.relatedQueries.map((query) => ({ phrase: query.phrase, frequency: query.frequency, note: COFFEE.wordstatNote })),
+    relatedQueries: brief.relatedQueries.map((query) => ({ phrase: query.phrase, frequency: query.frequency, note: brief.wordstatNote || COFFEE.wordstatNote })),
     hero: { src: COFFEE.heroSrc, alt: plain(fields.heroAlt), caption: "Четыре чашки – четыре характера кофейни." },
-    // The opening story is the first intro paragraphs; the bridge with the primary query closes it.
-    intro: [...story, plain(fields.bridge)],
+    // No opening story (owner rule 2026-10-30): the intro goes straight to the topic, query first.
+    intro: (fields.intro ?? []).map(plain),
     question: plain(fields.question),
     partOne: sections(fields.partOne, 0),
     table: {

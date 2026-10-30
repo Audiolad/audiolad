@@ -16,8 +16,7 @@ export function coffeeArticleSchema() {
   return object({
     seoTitle: str,
     description: str,
-    story: arrayOf(str, 6),
-    bridge: str,
+    intro: arrayOf(str, 3),
     question: str,
     partOne: arrayOf(section(), 2),
     table: object({
@@ -72,8 +71,7 @@ export function buildCoffeeMessages(brief, { experts, avoid = [] } = {}) {
     "СТРУКТУРА (поля JSON, в порядке страницы):",
     `- seoTitle: ≤ ${L.seoTitleMax} символов, начинается с «${q}» (с заглавной), без названия сайта.`,
     `- description: ${L.description[0]}–${L.description[1]} символов, законченная фраза, содержит «${q}».`,
-    `- story: ${L.story[0]}–${L.story[1]} коротких абзацев истории от первого лица (я – собирательный владелец или бариста кофейни), всего ${L.storyWords[0]}–${L.storyWords[1]} слов. Начни с яркого момента. Не меньше двух реплик прямой речи («…» или абзац с «– »). Без имён, названий кофеен и городов. Только тёплые сильные эмоции.`,
-    `- bridge: один абзац – мостик от истории к теме, содержит «${q}» как есть.`,
+    `- intro: ${L.intro[0]}–${L.intro[1]} абзаца вступления, всего ${L.introWords[0]}–${L.introWords[1]} слов. Сразу к практической теме: первый абзац начинается с запроса «${q}» как есть (с заглавной) и объясняет, о чём речь и зачем это кофейне; следующий – что читатель найдёт в статье. Без истории, без диалогов и прямой речи, без рассказчика «я» и выдуманных героев.`,
     "- question: короткий вопрос к читателю со «?» – подпись над каруселью «Четыре чашки» (какая чашка похожа на вашу кофейню).",
     `- partOne: ровно 2 раздела {heading, paragraphs: ${L.sectionParagraphs[0]}–${L.sectionParagraphs[1]} абзаца по 40–90 слов}. Хотя бы один heading содержит «${q}». Между разделами сайт поставит баннер атласа.`,
     `- table: heading, intro (1 абзац), caption (подпись с запросом), columns (${L.tableColumns[0]}–${L.tableColumns[1]}), rows (${L.tableRows[0]}–${L.tableRows[1]} строк, в каждой столько значений, сколько колонок; значения короткие – на телефоне строка станет карточкой), after (1 абзац).`,
@@ -94,8 +92,9 @@ export function buildCoffeeMessages(brief, { experts, avoid = [] } = {}) {
     "ЭКСПЕРТЫ:",
     ...expertLines,
     "",
-    brief.facts.length && `ФАКТЫ (опирайся только на них и на общеизвестное):\n${bullets(brief.facts)}`,
-    brief.storyHint && `ИСТОРИЯ (идея): ${brief.storyHint}`,
+    brief.facts.length
+      ? `ФАКТЫ (цифры, даты и исследования – только отсюда; источник называй словами в том же абзаце):\n${bullets(brief.facts)}`
+      : "ФАКТОВ В БРИФЕ НЕТ: никаких цифр статистики, процентов, дат и «исследования показывают». Допустим только пример расчёта, начатый с «например».",
     brief.sectionsHint.length && `РАЗДЕЛЫ (идеи):\n${bullets(brief.sectionsHint)}`,
     brief.tableHint && `ТАБЛИЦА (идея): ${brief.tableHint}`,
     brief.forbiddenPhrases.length && `НЕ ИСПОЛЬЗУЙ:\n${bullets(brief.forbiddenPhrases)}`,

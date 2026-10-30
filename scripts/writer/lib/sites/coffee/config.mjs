@@ -24,14 +24,19 @@ export const COFFEE = {
   maxUrl: "https://max-potok.ru/r/gqwvf",
   /** Absolute links allowed inside the text: cross-links to sergey-zoya.ru articles. */
   crossSiteHosts: ["sergey-zoya.ru"],
-  wordstatNote: "Яндекс Wordstat, 19.09–19.10.2026. Строка wordstat-candidates.csv. Показы запроса, не число владельцев.",
+  /**
+   * Default note for relatedQueries (not printed on the page). A pack may pass its own `wordstatNote`.
+   * Topics and frequencies come only from Sergey's task for the pack (`task` + `articles[]`);
+   * the coffee mode never picks topics from a Wordstat CSV by itself.
+   */
+  wordstatNote: "Яндекс Wordstat, частоты из задачи на пакет. Показы запроса, не число владельцев.",
   packMax: 5,
   limits: {
     seoTitleMax: 70,
     description: [120, 170],
-    story: [3, 6],
-    storyWords: [120, 260],
-    dialogueLines: 2,
+    /** Intro: straight to the practical topic, no story; the first paragraph carries the query. */
+    intro: [1, 3],
+    introWords: [40, 160],
     sectionParagraphs: [2, 4],
     tableRows: [3, 6],
     tableColumns: [3, 4],

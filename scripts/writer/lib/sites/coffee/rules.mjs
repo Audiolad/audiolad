@@ -17,14 +17,19 @@ export const FORBIDDEN = [
 ];
 
 // Never prime a negative experience (owner rule). Business words such as «риск» or «расход» are fine.
+export const MUSIC = /музык|(^|[^а-яё])трек|песн|мелоди|саундтрек|радио(?!активн)/i;
+
 export const NEGATIVE = [
   /дискомфорт/i, /неприятн/i, /неуютн/i, /раздраж/i, /стресс/i, /тревож/i, /тревог/i, /(^|[^а-яё])страх(?!ов)/i, /боит/i, /бояться/i,
   /стыд/i, /провал/i, /разочаров/i, /выгора/i, /кошмар/i, /паник/i, /ужас/i, /обидн/i, /беси/i, /злит/i,
+  // Direct pain, heaviness and fatigue wording (Codex review of #1086).
+  /(^|[^а-яё])(боль|боли|болью|болей|болит|болят|болела|болел|заболе\S*|болезн\S*|болезненн\S*)(?![а-яё])/i,
+  /неприятно/i, /тяжело/i, /(^|[^а-яё])тягост/i, /устал/i, /утомл/i, /измотан/i, /мучит/i, /мучени/i, /страда/i, /напряжени/i, /неловк/i, /неудобн/i, /досад/i, /жалоб/i, /недовол/i,
 ];
 
 const FIRST_PERSON = /(^|[^а-яё])(я|мне|меня|мной|мой|моя|моё|мои|мою|моей|мы|нам|нас|наш|наша|наше)(?![а-яё])/i;
-// Capitalised words that may stand mid-sentence in a story without being a person's name.
-const STORY_CAPS_OK = new Set(["Я", "Вы", "Вас", "Вам", "Ваш", "Ваша", "Ваше", "Ваши"]);
+// Narrative openers: coffee guides never start with a story (owner rule 2026-10-30).
+const STORY_MARKERS = /(^|[^а-яё])(однажды|помню|как-то раз|в то утро|тем утром|в тот день|тем вечером|история о том)(?![а-яё])/i;
 
 /** Replies of direct speech: «…» quotes plus lines that open with a dash. */
 export function dialogueLines(paragraphs) {
@@ -49,6 +54,62 @@ export function capitalisedMidSentence(text) {
     found.push(word);
   }
   return found;
+}
+
+// Statistics and research claims: allowed only from a brief fact that names its source in words.
+export const STAT = /%|процент|(^|[^а-яё])(?:исследовани|исследова[лт]|опрос|опрош|статистик|учён(?:ые|ых)|доказан)|по данным|в среднем|(^|[^а-яё])в \d+(?:[.,]\d+)? раз/i;
+// A worked example («например», a formula) may use its own numbers.
+const ILLUSTRATIVE = /например|допустим|предположим|при дозе|[×÷]|раздели|умнож/i;
+const NUMBER = /\d+(?:[ \u00a0]\d{3})*(?:[.,]\d+)?/g;
+export const numbersIn = (text) => (String(text).match(NUMBER) ?? []).map((n) => n.replace(/[ \u00a0]/g, "").replace(",", "."));
+const sentences = (text) => String(text).split(/(?<=[.!?…])\s+/).filter(Boolean);
+
+/** Source part of a brief fact: «Утверждение. Источник: название, дата». */
+export function factSource(fact) {
+  return String(fact).split(/Источник:/i)[1]?.trim() ?? "";
+}
+// Words that every source shares and that therefore name nothing.
+const GENERIC_SOURCE = /^(опрос|иссле|данны|стати|отчёт|отчет|кофей|кофее|компа|сайта|интер|источ|резул|годов)/;
+/** Does the text name the fact's source? At least half of its distinctive words (by first 5 letters). */
+export function namesSource(text, fact) {
+  const stems = [...new Set((factSource(fact).toLowerCase().replace(/ё/g, "е").match(/[а-я]{5,}/g) ?? []).map((w) => w.slice(0, 5)).filter((stem) => !GENERIC_SOURCE.test(stem)))];
+  const have = String(text).toLowerCase().replace(/ё/g, "е");
+  const hits = stems.filter((stem) => have.includes(stem)).length;
+  return stems.length > 0 && hits >= Math.ceil(stems.length / 2);
+}
+
+/** Numbers and statistics that are not grounded in the brief facts or the expert registry. */
+export function ungroundedClaims(texts, brief, experts) {
+  const grounded = [brief.title, brief.primaryQuery, ...brief.facts];
+  for (const slot of brief.experts) {
+    const expert = experts?.get(slot.id);
+    if (!expert) continue;
+    grounded.push(expert.competence ?? "", slot.translation ?? "");
+    for (const quote of expert.quotes ?? []) grounded.push(quote.text, quote.context, quote.sourceLabel ?? "");
+  }
+  const known = new Set(grounded.flatMap(numbersIn));
+  const out = [];
+  for (const [field, text] of texts) {
+    const list = sentences(text);
+    for (const [index, sentence] of list.entries()) {
+      const nums = numbersIn(sentence);
+      if (STAT.test(sentence)) {
+        // The source is named in the same sentence or right before it.
+        const near = `${list[index - 1] ?? ""} ${sentence}`;
+        const backed = brief.facts.some((fact) => (nums.length === 0 || nums.some((n) => numbersIn(fact).includes(n))) && namesSource(near, fact));
+        if (!backed) out.push([field, `статистика или исследование без источника: «${sentence.slice(0, 90)}» – только из фактов брифа, источник назван словами в тексте`]);
+        continue;
+      }
+      if (ILLUSTRATIVE.test(sentence)) continue;
+      for (const n of nums) {
+        const value = Number(n);
+        const year = Number.isInteger(value) && value >= 1800 && value <= 2100;
+        if (!year && value <= 10) continue;
+        if (!known.has(n)) out.push([field, `число ${n} не из фактов брифа: «${sentence.slice(0, 90)}» – цифры и даты только из фактов с источником`]);
+      }
+    }
+  }
+  return out;
 }
 
 export const words = (text) => String(text).match(WORD)?.length ?? 0;
@@ -110,7 +171,7 @@ const countQuery = (text, query) => norm(text).split(norm(query)).length - 1;
 /**
  * @param article assembled VerticalGuideArticle
  * @param brief   normalized pack article (brief.mjs)
- * @param env     { experts: Map, storyCount: number, repoDir?: string, avoid?: Set<string> }
+ * @param env     { experts: Map, repoDir?: string, avoid?: Set<string> }
  */
 export function checkCoffeeArticle(article, brief, env) {
   const L = COFFEE.limits;
@@ -123,30 +184,24 @@ export function checkCoffeeArticle(article, brief, env) {
     if (EM_DASH.test(text)) error(field, "длинное тире «—» – только «–»");
     if (LATIN.test(text)) error(field, `латиница в тексте: «${String(text).match(/.{0,20}[A-Za-z]+.{0,20}/)?.[0]}»`);
     for (const rule of FORBIDDEN) if (rule.re.test(rule.strip ? rule.strip(text) : text)) error(field, rule.message);
-    if (/музык|трек|песн/i.test(text)) warn(field, "музыка в тексте статьи – по правилу владельца статья не про музыку и без плееров; проверьте на вычитке");
+    if (MUSIC.test(text)) error(field, "музыка в тексте статьи – по правилу владельца статьи о кофейнях без музыки, плееров и плейлистов");
     for (const re of NEGATIVE) if (re.test(text)) { error(field, `негативная формулировка («${String(text).match(re)[0]}…») – правило: не настраивать на неприятный опыт`); break; }
   }
 
-  // Opening story: first-person, dialogue, no names.
-  const storyCount = env.storyCount ?? 0;
-  const story = article.intro.slice(0, storyCount);
-  const bridge = article.intro[storyCount] ?? "";
-  if (storyCount < L.story[0] || storyCount > L.story[1]) error("story", `история – ${L.story[0]}–${L.story[1]} абзацев, сейчас ${storyCount}`);
-  const storyText = story.join("\n");
-  const storyWords = words(storyText);
-  if (storyWords < L.storyWords[0] || storyWords > L.storyWords[1]) error("story", `история – ${L.storyWords[0]}–${L.storyWords[1]} слов, сейчас ${storyWords}`);
-  if (!FIRST_PERSON.test(storyText)) error("story", "история от первого лица («я», «мне», «мы»)");
-  const dialogue = dialogueLines(story);
-  if (dialogue < L.dialogueLines) error("story", `в истории нужен диалог: не меньше ${L.dialogueLines} реплик прямой речи, сейчас ${dialogue}`);
-  for (const [i, paragraph] of story.entries()) {
-    const names = capitalisedMidSentence(paragraph).filter((w) => !STORY_CAPS_OK.has(w));
-    if (names.length) error(`story[${i}]`, `похоже на имя или название: ${[...new Set(names)].join(", ")} – в истории без имён, кофеен и городов`);
-  }
-  for (const id of brief.experts.map((slot) => slot.id)) {
-    const surname = env.experts.get(id)?.name?.split(" ").pop();
-    if (surname && storyText.includes(surname)) error("story", `в истории упомянут эксперт ${surname}`);
-  }
-  if (!bridge || countQuery(bridge, brief.primaryQuery) < 1) error("bridge", `мостик после истории содержит запрос «${brief.primaryQuery}»`);
+  // Intro: no opening story (owner rule 2026-10-30) – straight to the practical topic, query first.
+  const intro = article.intro;
+  const introText = intro.join("\n");
+  if (intro.length < L.intro[0] || intro.length > L.intro[1]) error("intro", `вступление – ${L.intro[0]}–${L.intro[1]} абзаца, сейчас ${intro.length}`);
+  const introWords = words(introText);
+  if (introWords < L.introWords[0] || introWords > L.introWords[1]) error("intro", `вступление – ${L.introWords[0]}–${L.introWords[1]} слов, сейчас ${introWords}`);
+  if (!intro[0] || countQuery(intro[0], brief.primaryQuery) < 1) error("intro[0]", `первый абзац вступления содержит запрос «${brief.primaryQuery}»`);
+  else if (!norm(intro[0]).startsWith(norm(brief.primaryQuery))) warn("intro[0]", `лучше начать первый абзац с запроса «${brief.primaryQuery}», как в эталоне`);
+  if (dialogueLines(intro) > 0) error("intro", "во вступлении нет истории, диалогов и прямой речи – сразу к теме");
+  if (FIRST_PERSON.test(introText)) error("intro", "вступление без рассказчика «я/мы» – статья не открывается историей");
+  if (STORY_MARKERS.test(introText)) error("intro", `похоже на историю («${introText.match(STORY_MARKERS)[2]}») – статьи о кофейнях начинаются сразу с практической темы`);
+
+  // No invented numbers or statistics: every claim must come from a brief fact with a named source.
+  for (const [field, message] of ungroundedClaims(texts.filter(([f]) => !/^readMore|\.translation$/.test(f)), brief, env.experts)) error(field, message);
 
   // SEO.
   const q = brief.primaryQuery;

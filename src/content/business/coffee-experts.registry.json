@@ -83,17 +83,17 @@
       "countryCode": "US",
       "origin": "foreign",
       "gender": "man",
-      "role": "Предприниматель в кофейном бизнесе",
+      "role": "Предприниматель, много лет руководил сетью кофеен «Старбакс»",
       "competence": "10 мая 2018 года Atlantic Council представлял его как исполнительного председателя Starbucks. В стенограмме он рассказывает, как пришёл в компанию из шести кофеен и описывает итальянские бары как образец сообщества.",
       "competenceUrl": "https://www.atlanticcouncil.org/commentary/transcript/the-role-and-responsibility-of-a-global-company-2/",
       "photo": {
-        "file": "/business/coffee-guides/experts/howard-schultz.jpg",
+        "file": "/business/coffee-guides/experts/howard-schultz.webp",
         "commonsPage": "https://commons.wikimedia.org/wiki/File:Howard_Schultz_by_Gage_Skidmore.jpg",
         "license": "CC BY-SA 3.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
         "author": "Gage Skidmore",
-        "credit": "Фото: Гейдж Скидмор, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 3.0»",
-        "rightsNote": "Свободная лицензия на снимок. Портрет живого человека: авторские права и право на изображение – разные вещи, это отмечено для приёмки."
+        "credit": "Фото: Гейдж Скидмор, Викисклад, лицензия «Криэйтив Коммонс – с указанием авторства и сохранением условий 3.0», кадрировано",
+        "rightsNote": "Снимок Гейджа Скидмора (собственная работа, 30 января 2019 года, Финикс, Аризона), лицензия CC BY-SA 3.0; условие автора – указывать его имя. Для карточки оригинал 2899×4136 кадрирован по лицу до квадрата 600×600 и сохранён в webp (вся ширина кадра, подбородок целиком, небольшой запас над головой; глаза примерно на 40 % высоты – выше поднять нельзя без среза макушки). Кадрированная версия распространяется на тех же условиях (CC BY-SA 3.0). Портрет живого человека: авторские права и право на изображение – разные вещи, это отмечено для приёмки."
       },
       "quotes": [
         {
@@ -101,7 +101,18 @@
           "sourceTitle": "The role and responsibility of a global company",
           "sourceUrl": "https://www.atlanticcouncil.org/commentary/transcript/the-role-and-responsibility-of-a-global-company-2/",
           "sourceDate": "2018-05-10",
-          "context": "Дэвид Игнатиус спросил, как появилась идея. Шульц отвечает про поездку 1983 года. Он не называет плейлист и не рекомендует жанр."
+          "context": "Дэвид Игнатиус спросил, как появилась идея. Шульц отвечает про поездку 1983 года в Италию и про третье место между домом и работой.",
+          "language": "en",
+          "sourceLabel": "стенограмма беседы «Роль и ответственность глобальной компании», Атлантический совет, Вашингтон, 10 мая 2018 года"
+        },
+        {
+          "text": "But what we learned along the way was that it wasn’t the coffee that we were selling. It was the experience and this sense of community.",
+          "sourceTitle": "The role and responsibility of a global company",
+          "sourceUrl": "https://www.atlanticcouncil.org/commentary/transcript/the-role-and-responsibility-of-a-global-company-2/",
+          "sourceDate": "2018-05-10",
+          "context": "Шульц рассказывает, как росла компания. Перед этим он говорит, что фундаментом были культура и ценности и что сеть решила не продавать франшизы, а самой управлять каждой кофейней; после – что людям в разных странах нужно место для общения, а кофе становится поводом для разговора.",
+          "language": "en",
+          "sourceLabel": "стенограмма беседы «Роль и ответственность глобальной компании», Атлантический совет, Вашингтон, 10 мая 2018 года"
         }
       ]
     },

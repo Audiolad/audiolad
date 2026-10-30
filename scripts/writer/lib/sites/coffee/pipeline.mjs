@@ -103,7 +103,7 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
       writeJson(join(outDir, brief.slug, "messages.json"), messages);
       const build = (raw) => {
         const article = assembleCoffeeArticle(brief, raw);
-        const problems = checkCoffeeArticle(article, brief, { experts: live, storyCount: (raw.story ?? []).length, repoDir: worktree, avoid });
+        const problems = checkCoffeeArticle(article, brief, { experts: live, repoDir: worktree, avoid });
         return { article, problems };
       };
       let raw;
@@ -178,7 +178,7 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
 
 export function prBody(state, items, pack) {
   return [
-    `Пакет **${pack.pack}** раздела «Музыка для кофейни» (audiolad.ru/b/coffee): ${articlesWord(items.length)}. Шаблон Райтера \`${COFFEE.templateId}\` (\`--site coffee\`), подпись – «${COFFEE.byline}», эталон – ${COFFEE.referenceUrl}.`,
+    `Пакет **${pack.pack}** раздела «${COFFEE.byline}» (audiolad.ru/b/coffee): ${articlesWord(items.length)}. Темы – из задачи Сергея: ${pack.task}. Шаблон Райтера \`${COFFEE.templateId}\` (\`--site coffee\`), подпись – «${COFFEE.byline}», эталон – ${COFFEE.referenceUrl}.`,
     "",
     "## Статьи",
     ...items.map(({ brief }) => `- \`/b/coffee/${brief.slug}\` – «${brief.title}» (запрос «${brief.primaryQuery}»; эксперты: ${brief.experts.map((slot) => slot.id).join(", ")})`),
@@ -191,7 +191,7 @@ export function prBody(state, items, pack) {
     "",
     "## Перед merge",
     "- обновить ожидания scripts/business-coffee-guide-unit.mts (сейчас тест считает эталон единственной статьёй и сверяет sitemap);",
-    "- независимая вычитка: факты, история (без имён, тёплая), эксперты по источникам, ссылки;",
+    "- независимая вычитка: факты, вступление сразу по теме (без истории), эксперты по источникам, ссылки;",
     "- merge и деплой – вручную, Райтер их не делает.",
   ].join("\n");
 }

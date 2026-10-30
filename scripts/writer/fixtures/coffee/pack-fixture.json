@@ -2,6 +2,7 @@
   "site": "coffee",
   "template": "audiolad-coffee-guide-v1",
   "pack": "coffee-fixture",
+  "task": "Тестовая задача: эталон «Кофе в зёрнах для кофейни» (фикстура)",
   "articles": [
     {
       "slug": "kofe-v-zernah-fixture",
@@ -26,7 +27,6 @@
         }
       ],
       "intent": "Владелец кофейни выбирает зерно и обжарщика.",
-      "storyHint": "Утро, когда в кофейню привезли зерно нового обжарщика.",
       "facts": [],
       "links": [],
       "readMore": [

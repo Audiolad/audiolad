@@ -6,7 +6,9 @@
  *  - no import edge between lib/sites/coffee and lib/sites/sz in either direction;
  *  - the coffee loader refuses sz packs, run.mjs refuses a coffee pack in sz mode and vice versa
  *    (before any Cloud.ru call);
- *  - the approved reference (+ a composite story) passes the coffee rules, broken copies fail;
+ *  - the approved reference passes the coffee rules (no opening story), broken copies fail;
+ *  - topics come only from the pack (Sergey's task), never from a Wordstat CSV;
+ *  - the foreign expert Howard Schultz is page-ready (licensed photo, verified quotes);
  *  - the generated data module imports and matches the article.
  * No network, no Cloud.ru.
  */
@@ -20,7 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { COFFEE_DEFAULT_MODEL, DEFAULT_MODEL, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
 import { applyCoffeePack, registerArticles } from "./lib/sites/coffee/apply.mjs";
 import { assembleCoffeeArticle, normalizeText, parseInline, toTsModule } from "./lib/sites/coffee/assemble.mjs";
-import { CoffeeBriefError, isAllowedTextHref, loadCoffeeExperts, loadCoffeePack, normalizeCoffeePack } from "./lib/sites/coffee/brief.mjs";
+import { CoffeeBriefError, expertSlotProblems, isAllowedTextHref, isInternalHref, loadCoffeeExperts, loadCoffeePack, normalizeCoffeePack } from "./lib/sites/coffee/brief.mjs";
 import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
@@ -44,7 +46,7 @@ const packFile = join(fixtures, "pack-fixture.json");
 const pack = loadCoffeePack(packFile, { experts, repoDir: root });
 const brief = pack.articles[0];
 const fields = readJson(join(fixtures, `${brief.slug}.json`));
-const check = (raw, b = brief) => checkCoffeeArticle(assembleCoffeeArticle(b, raw), b, { experts, storyCount: (raw.story ?? []).length, repoDir: root });
+const check = (raw, b = brief) => checkCoffeeArticle(assembleCoffeeArticle(b, raw), b, { experts, repoDir: root });
 const szPackFile = join(here, "fixtures/sz/pack-angel-replay.json");
 
 function walk(dir) {
@@ -64,24 +66,71 @@ test("sz template is byte-for-byte equal to sz-template.lock.json", () => {
   assert.ok(Object.keys(lock).length >= 10);
 });
 
-test("coffee never imports sz and sz never imports coffee", () => {
-  for (const file of sources("lib/sites/coffee")) {
-    const text = readFileSync(file, "utf8");
-    assert.doesNotMatch(text, /sites\/sz|\.\.\/sz\/|from "\.\/sz/, `${relative(here, file)} ссылается на шаблон sz`);
-  }
-  for (const file of sources("lib/sites/sz")) {
-    const text = readFileSync(file, "utf8");
-    assert.doesNotMatch(text, /sites\/coffee|\.\.\/coffee\/|audiolad-coffee|АудиоЛад Кофейни/, `${relative(here, file)} ссылается на шаблон coffee`);
-  }
-  for (const file of sources("lib/sites/coffee").filter((f) => f.endsWith(".mjs"))) {
-    const text = readFileSync(file, "utf8");
-    const specs = [...text.matchAll(/^import [^;]*?from "([^"]+)";/gms), ...text.matchAll(/\bimport\("([^"]+)"\)/g)].map((m) => m[1]);
-    for (const spec of specs) {
-      if (!spec.startsWith(".")) continue;
-      const target = relative(here, join(dirname(file), spec));
-      assert.ok(target.startsWith("lib/sites/coffee/") || /^lib\/(call|cost|publish|util|prompt|moscow)\.mjs$/.test(target), `${relative(here, file)} импортирует ${target}`);
+// Every static or dynamic import / re-export, single or double quotes, multi-line.
+// Code that this file generates or passes to `tsx -e` sits inside string literals and is not an import edge of
+// the writer itself; real imports never follow a quote.
+const IMPORT_SPECS = [
+  /(?<!['"`]\s*)\bimport\s+(?:[\w*{}\s,$]+?\s+from\s+)?(["'])([^"'\n]+)\1/g,
+  /(?<!['"`]\s*)\bexport\s+(?:\*(?:\s+as\s+[\w$]+)?|\{[^}]*\})\s*from\s*(["'])([^"'\n]+)\1/g,
+  /\bimport\s*\(\s*(["'`])([^"'`\n]+)\1\s*\)/g,
+  /\brequire\s*\(\s*(["'`])([^"'`\n]+)\1\s*\)/g,
+];
+function importSpecs(text) {
+  return IMPORT_SPECS.flatMap((re) => [...text.matchAll(re)].map((m) => m[2]));
+}
+function resolveImport(from, spec) {
+  if (!spec.startsWith(".") && !spec.startsWith("/")) return null; // node: and packages are outside the repo graph
+  // Code passed to child processes (tsx -e) imports relative to the repo/worktree root.
+  const bases = spec.startsWith("/") ? [spec] : [join(dirname(from), spec), join(root, spec)];
+  for (const base of bases) {
+    for (const candidate of [base, `${base}.mjs`, `${base}.js`, `${base}.ts`, `${base}.mts`, join(base, "index.mjs"), join(base, "index.js"), join(base, "index.ts")]) {
+      try {
+        if (statSync(candidate).isFile()) return candidate;
+      } catch {}
     }
   }
+  throw new Error(`${relative(root, from)}: не найден импорт ${spec}`);
+}
+/** Transitive closure of repo files reachable by imports from the given roots. */
+function importGraph(roots) {
+  const seen = new Set();
+  const stack = [...roots];
+  while (stack.length) {
+    const file = stack.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    if (!/\.(mjs|js|ts|mts)$/.test(file)) continue;
+    for (const spec of importSpecs(readFileSync(file, "utf8"))) {
+      const target = resolveImport(file, spec);
+      if (target && !seen.has(target)) stack.push(target);
+    }
+  }
+  return seen;
+}
+
+test("import parser sees every form (quotes, multi-line, re-export, dynamic)", () => {
+  const text = `import a from './a.mjs';\nimport {\n  b,\n  c,\n} from "../b.mjs";\nimport './side.mjs';\nexport * from "./d.mjs";\nexport { e } from './e.mjs';\nconst f = await import('./f.mjs');\nconst g = await import(\`./g.mjs\`);\nconst generated = 'import type { T } from "../types";';`;
+  assert.deepEqual(importSpecs(text).sort(), ["../b.mjs", "./a.mjs", "./d.mjs", "./e.mjs", "./f.mjs", "./g.mjs", "./side.mjs"]);
+});
+
+test("coffee never reaches sz and sz never reaches coffee (full import graph, both ways)", () => {
+  const coffeeDir = join(here, "lib/sites/coffee");
+  const szDir = join(here, "lib/sites/sz");
+  const inside = (file, dir) => file === dir || file.startsWith(`${dir}/`);
+  const code = (dir) => walk(dir).filter((path) => /\.(mjs|js|ts|mts)$/.test(path));
+  const coffeeRoots = code(coffeeDir);
+  const szRoots = [...code(szDir), join(here, "sz-unit.mjs")];
+  const coffeeGraph = importGraph(coffeeRoots);
+  const szGraph = importGraph(szRoots);
+  assert.ok(coffeeGraph.size > coffeeRoots.length, "граф coffee должен включать общие модули");
+  for (const file of coffeeGraph) assert.ok(!inside(file, szDir), `coffee достаёт до sz: ${relative(here, file)}`);
+  for (const file of szGraph) assert.ok(!inside(file, coffeeDir), `sz достаёт до coffee: ${relative(here, file)}`);
+  for (const file of szGraph) {
+    if (!/\.(mjs|js|ts|mts)$/.test(file)) continue;
+    assert.doesNotMatch(readFileSync(file, "utf8"), /audiolad-coffee|АудиоЛад Кофейни/, `${relative(root, file)} (граф sz) знает о шаблоне coffee`);
+  }
+  // Shared modules reachable from coffee stay outside both template folders.
+  for (const file of coffeeGraph) if (!inside(file, coffeeDir)) assert.ok(!inside(file, szDir));
 });
 
 test("separate ids: template, schema name, site, branch prefix", () => {
@@ -138,11 +187,14 @@ test("coffee prompt carries coffee rules and no sz markers", () => {
   assert.doesNotMatch(text.replace(/«\u2014»/g, ""), /\u2014/, "длинное тире в промпте (кроме самого правила «—»)");
   assert.ok(text.includes("Как выбрать обжарщика"));
   assert.ok(LESSONS.length >= 10 && corrections().length >= 8);
-  const repair = buildCoffeeRepairMessages(messages, fields, [{ field: "story", severity: "error", message: "тест" }]);
+  const repair = buildCoffeeRepairMessages(messages, fields, [{ field: "intro", severity: "error", message: "тест" }]);
   assert.ok(repair.length > messages.length);
   const schema = coffeeArticleSchema();
   assert.equal(schema.additionalProperties, false);
-  assert.ok(schema.required.includes("story") && schema.required.includes("bridge"));
+  assert.ok(schema.required.includes("intro"));
+  assert.ok(!("story" in schema.properties) && !("bridge" in schema.properties), "в схеме coffee нет истории");
+  assert.doesNotMatch(text, /ИСТОРИЯ|от первого лица|реплик|мостик|bridge/, "промпт coffee не просит историю");
+  assert.match(text, /Статья сразу начинается с практической темы, без истории/);
 });
 
 test("tone sample is verbatim from the reference article", () => {
@@ -155,7 +207,7 @@ test("tone sample is verbatim from the reference article", () => {
 
 // ── rules ────────────────────────────────────────────────────────────────────
 
-test("reference + composite story passes all coffee rules", () => {
+test("reference intro (no story, query first) passes all coffee rules", () => {
   assert.deepEqual(check(fields), []);
 });
 
@@ -169,25 +221,80 @@ test("helpers: dialogue, names, query words, links, typography", () => {
   assert.ok(isAllowedTextHref("https://sergey-zoya.ru/articles/x"));
   assert.ok(!isAllowedTextHref("https://example.com/"));
   assert.ok(!isAllowedTextHref("//evil.ru/x"));
+  for (const href of ["/\\example.com/x", "/\\\\example.com", "\\\\example.com", "\\/example.com", "/%5Cexample.com", "/%2F%2Fexample.com", "/%2fexample.com", "/\t/example.com", "/ /example.com", "https://sergey-zoya.ru\\@example.com/", "https://user@sergey-zoya.ru/x", "https://sergey-zoya.ru.example.com/", "http://sergey-zoya.ru/x", "javascript:alert(1)"]) {
+    assert.ok(!isAllowedTextHref(href), `пропущена ссылка ${href}`);
+    assert.ok(!isInternalHref(href), `внутренней признана ${href}`);
+  }
+  assert.ok(isInternalHref("/b/coffee?tab=1#faq"));
   assert.equal(normalizeText("а \u2014 б - в"), "а – б – в");
   assert.deepEqual(parseInline("см. [атлас](/b/atlas-kofeen) тут"), ["см. ", { href: "/b/atlas-kofeen", label: "атлас" }, " тут"]);
+});
+
+test("topics come only from Sergey's task: pack needs task, no storyHint, no Wordstat CSV in the code", () => {
+  const raw = readJson(packFile);
+  const noTask = clone(raw);
+  delete noTask.task;
+  assert.throws(() => normalizeCoffeePack(noTask, { experts, repoDir: root }), /task: укажите задачу Сергея/);
+  const withStory = clone(raw);
+  withStory.articles[0].storyHint = "Утро в кофейне";
+  assert.throws(() => normalizeCoffeePack(withStory, { experts, repoDir: root }), /storyHint больше не используется/);
+  assert.equal(pack.task, raw.task);
+  for (const file of sources("lib/sites/coffee").filter((path) => path.endsWith(".mjs"))) {
+    assert.doesNotMatch(readFileSync(file, "utf8"), /wordstat-candidates|\.csv/i, `${relative(here, file)} не должен читать темы из CSV`);
+  }
+});
+
+test("foreign expert Howard Schultz is page-ready: licensed face crop, verified quotes, Russian labels", () => {
+  const schultz = experts.get("howard-schultz");
+  assert.equal(schultz.name, "Говард Шульц");
+  assert.equal(schultz.origin, "foreign");
+  assert.equal(schultz.gender, "man");
+  assert.equal(schultz.photo.file, "/business/coffee-guides/experts/howard-schultz.webp");
+  assert.equal(schultz.photo.license, "CC BY-SA 3.0");
+  assert.equal(schultz.photo.author, "Gage Skidmore");
+  assert.match(schultz.photo.credit, /^Фото: Гейдж Скидмор, Викисклад, .*кадрировано$/);
+  const head = readFileSync(join(root, "public", schultz.photo.file)).subarray(0, 12).toString("latin1");
+  assert.ok(head.startsWith("RIFF") && head.endsWith("WEBP"), "портрет – webp");
+  assert.equal(schultz.quotes.length, 2);
+  const translations = [
+    "В 1983 году я, ещё молодым человеком, впервые поехал в Италию. Как и многих, кто бывал в Италии, меня покорили итальянские кофейные бары, романтика и театр эспрессо. Но по-настоящему меня поразило чувство общности, которое было внутри всех этих баров, – то, что я начал понимать и называть третьим местом между домом и работой.",
+    "Но со временем мы поняли, что продавали не кофе. Мы продавали впечатление и это чувство общности.",
+  ];
+  for (const [quoteIndex, quote] of schultz.quotes.entries()) {
+    assert.equal(quote.language, "en");
+    assert.match(quote.sourceLabel, /Атлантический совет, Вашингтон, 10 мая 2018 года$/);
+    assert.deepEqual(expertSlotProblems({ id: "howard-schultz", quoteIndex, translation: translations[quoteIndex] }, experts, { repoDir: root }), []);
+    assert.match(expertSlotProblems({ id: "howard-schultz", quoteIndex }, experts, { repoDir: root }).join("\n"), /нужен перевод/);
+  }
 });
 
 const NEGATIVES = [
   ["em dash survives only if not normalised – a Latin word fails", (f) => { f.partOne[0].paragraphs[0] += " Это эспрессо blend."; }, /латиница/],
   ["«точка» instead of «кофейня»", (f) => { f.partTwo[0].paragraphs[0] += " Каждая точка выбирает своё зерно."; }, /точка/],
   ["«точка безубыточности»", (f) => { f.partTwo[0].paragraphs[0] += " Так быстрее достигается точка безубыточности."; }, /точка/],
-  ["«Редакция»", (f) => { f.bridge += " Редакция советует не спешить."; }, /Редакция/],
+  ["«Редакция»", (f) => { f.intro[1] += " Редакция советует не спешить."; }, /Редакция/],
+  ["music in the text is blocking", (f) => { f.partTwo[1].paragraphs[0] += " Включите гостям спокойную музыку."; }, /музыка в тексте/],
+  ["songs in the text are blocking", (f) => { f.faq[0].answer += " Хорошо звучат песни без слов."; }, /музыка в тексте/],
   ["player/comments", (f) => { f.partTwo[1].paragraphs[0] += " Включите плеер с музыкой."; }, /плеер/],
   ["negative priming", (f) => { f.partTwo[1].paragraphs[0] += " Гости испытывают дискомфорт."; }, /негативн/],
+  ["pain wording", (f) => { f.partTwo[1].paragraphs[0] += " От громкой кофемолки у гостей болит голова."; }, /негативн/],
+  ["heaviness wording", (f) => { f.partTwo[1].paragraphs[0] += " Бариста тяжело работать без графика."; }, /негативн/],
+  ["unpleasant wording", (f) => { f.partTwo[1].paragraphs[0] += " Гостям неприятно ждать."; }, /негативн/],
+  ["fatigue wording", (f) => { f.partTwo[1].paragraphs[0] += " К вечеру команда устаёт и устала от потока."; }, /негативн/],
+  ["made-up statistic", (f) => { f.partTwo[1].paragraphs[0] += " По данным исследования, 87 % гостей выбирают кофе по цвету чашки."; }, /статистика или исследование без источника/],
+  ["made-up research without numbers", (f) => { f.partOne[0].paragraphs[0] += " Исследования показывают, что гости любят светлую обжарку."; }, /статистика или исследование без источника/],
+  ["made-up percent", (f) => { f.faq[0].answer += " Так экономится 30% зерна."; }, /статистика или исследование без источника/],
+  ["number not from the facts", (f) => { f.partOne[0].paragraphs[0] += " Зерно лучше всего раскрывается на 14-й день после обжарки."; }, /число 14 не из фактов брифа/],
+  ["year not from the facts", (f) => { f.partOne[0].paragraphs[0] += " Эспрессо появился в 1884 году."; }, /число 1884 не из фактов брифа/],
+  ["link /\\ escapes to another host", (f) => { f.partOne[1].paragraphs[0] += " Подробнее – [здесь](/\\example.com/x)."; }, /запрещённая ссылка/],
   ["external link", (f) => { f.partOne[1].paragraphs[0] += " Подробнее – [здесь](https://example.com/coffee)."; }, /запрещённая ссылка/],
   ["link not from the brief", (f) => { f.partOne[1].paragraphs[0] += " Подробнее – [здесь](/b/other)."; }, /нет в брифе/],
   ["raw address in text", (f) => { f.partOne[1].paragraphs[0] += " Пишите на сайт www.coffee.ru."; }, /адрес сайта/],
-  ["named person in the story", (f) => { f.story[2] = f.story[2].replace("первый гость", "гость Иван"); }, /имя/],
-  ["story without dialogue", (f) => { f.story = f.story.map((p) => p.replace(/«[^»]*»/g, "это").replace(/^– /gm, "")); }, /диалог/],
-  ["story too short", (f) => { f.story = f.story.slice(0, 2); }, /история/],
-  ["story not in first person", (f) => { f.story = ["Утро было светлым и тихим, кофе пах карамелью и орехами, бариста улыбалась каждому гостю у стойки.", "– Попробуете? – спросила бариста.\n– Конечно, – ответил гость.", "Гость сказал: «Это особенный кофе». Бариста кивнула: «Спасибо, мы старались»."]; }, /первого лица|история/],
-  ["bridge without the query", (f) => { f.bridge = "Дальше – спокойный разбор."; }, /мостик/],
+  ["intro without the query", (f) => { f.intro[0] = "Зерно – то, с чего начинается каждая чашка в зале. От него зависит вкус эспрессо и капучино."; }, /первый абзац вступления/],
+  ["intro opens with a dialogue story", (f) => { f.intro = ["Кофе в зёрнах для кофейни привезли рано утром.", "– Попробуете? – спросила бариста.\n– Конечно, – ответил гость."]; }, /диалогов и прямой речи/],
+  ["intro in the first person", (f) => { f.intro[1] += " Я выбираю зерно сам."; }, /рассказчика/],
+  ["intro with a story opener", (f) => { f.intro[0] = "Однажды кофе в зёрнах для кофейни привезли раньше обычного, и все в зале это заметили."; }, /похоже на историю/],
+  ["intro too long", (f) => { f.intro = [...f.intro, f.intro[1], f.intro[1]]; }, /вступление – 1–3 абзаца/],
   ["table row length mismatch", (f) => { f.table.rows[0] = f.table.rows[0].slice(0, 2); }, /значений/],
   ["only 2 FAQ", (f) => { f.faq = f.faq.slice(0, 2); }, /вопросов/],
   ["4 checklist items", (f) => { f.checklist.items = f.checklist.items.slice(0, 4); }, /пунктов/],
@@ -203,6 +310,28 @@ for (const [name, mutate, expected] of NEGATIVES) {
     assert.ok(errors.some((e) => expected.test(e.message)), errors.map((e) => e.message).join(" | "));
   });
 }
+
+test("statistic with a sourced brief fact passes; the brief refuses a fact without a source", () => {
+  const sourced = { ...brief, facts: ["Две трети посетителей кофеен заказывают напитки на основе эспрессо: 64 % опрошенных. Источник: опрос Национальной кофейной ассоциации США, 2024 год"] };
+  const ok = clone(fields);
+  ok.partTwo[1].paragraphs[0] += " По опросу Национальной кофейной ассоциации США, 64 % гостей кофеен заказывают напитки на основе эспрессо.";
+  assert.deepEqual(errorsOf(check(ok, sourced)), []);
+  const unnamed = clone(fields);
+  unnamed.partTwo[1].paragraphs[0] += " По данным опроса, 64 % гостей кофеен заказывают напитки на основе эспрессо.";
+  assert.match(errorsOf(check(unnamed, sourced)).map((e) => e.message).join("\n"), /статистика или исследование без источника/);
+  const raw = readJson(packFile);
+  raw.articles[0].facts = ["64 % гостей заказывают эспрессо"];
+  assert.throws(() => normalizeCoffeePack(raw, { experts, repoDir: root }), /нужен реальный источник/);
+  raw.articles[0].facts = ["64 % гостей заказывают эспрессо. Источник: опрос Национальной кофейной ассоциации США, 2024 год"];
+  assert.doesNotThrow(() => normalizeCoffeePack(raw, { experts, repoDir: root }));
+});
+
+test("prompt has no «общеизвестное» allowance for numbers", () => {
+  const text = buildCoffeeMessages(brief, { experts }).map((m) => m.content).join("\n");
+  assert.doesNotMatch(text, /общеизвест/i);
+  assert.doesNotMatch(LESSONS.join("\n"), /общеизвест/i);
+  assert.match(text, /никаких цифр статистики/);
+});
 
 test("em dash from the model is normalised to en dash", () => {
   const raw = clone(fields);
