@@ -31,8 +31,10 @@ import {
 } from "../src/lib/business/coffee-atlas/shops";
 import {
   applyExactTrackOptions,
+  isExactTrackReplacement,
   isExactTrackSessionActive,
 } from "../src/lib/catalog/exact-track-session";
+import { resolveSameKeySessionAction } from "../src/lib/listen/resolve-same-key-session-action";
 import { COFFEE_ATLAS_SITEMAP_PATHS } from "../src/lib/business/coffee-atlas/sitemap";
 import {
   isYandexMetrikaGoalName,
@@ -188,6 +190,50 @@ assert.match(listen, /hideAuthor/, "atlas player sessions carry no artist (mini 
   assert.equal(narrowed.authorName, "", "artist dropped");
   assert.equal(full.authorName, "Artist", "input not mutated");
   assert.equal(applyExactTrackOptions(full, { audioItemId: "missing" }), null, "absent track → nothing starts");
+}
+
+// --- provider same-key replacement (behaviour): exact payload must not be discarded ---
+{
+  const provider = readFileSync(
+    join(process.cwd(), "src/components/audio/GlobalAudioPlayerProvider.tsx"),
+    "utf8",
+  );
+  assert.match(
+    provider,
+    /const trackSelectionChanged =[\s\S]{0,200}isExactTrackReplacement\(current, nextSession\);/,
+    "provider feeds exact-track replacement into same-key decision",
+  );
+  // Mirror of the provider's same-key decision for catalogue Play payloads.
+  const decide = (current: Record<string, unknown>, next: Record<string, unknown>) =>
+    resolveSameKeySessionAction({
+      trackSelectionChanged:
+        (Boolean(next.initialTrackId) && next.initialTrackId !== current.initialTrackId) ||
+        isExactTrackReplacement(current as never, next as never),
+      requestAutoplay: true,
+      currentRequestAutoplay: Boolean(current.requestAutoplay),
+      preservePlayback: false,
+      forceStartAtBeginning: Boolean(next.forceStartAtBeginning),
+      currentForceStartAtBeginning: Boolean(current.forceStartAtBeginning),
+    });
+  const base = { requestAutoplay: true, forceStartAtBeginning: true };
+  const album = { ...base, authorName: "Artist", tracks: [{ id: "t1" }, { id: "t2" }] };
+  const otherTrack = { ...base, authorName: "Artist", tracks: [{ id: "t2" }] };
+  const sameTrackWithArtist = { ...base, authorName: "Artist", tracks: [{ id: "t1" }] };
+  const fresh = applyExactTrackOptions(
+    { ...album, tracks: [{ id: "t1" }, { id: "t2" }], initialProgress: [] } as never,
+    { audioItemId: "t1", hideAuthor: true },
+  );
+  assert.ok(fresh);
+  const exactPayload = { ...fresh, ...base };
+  assert.equal(exactPayload.exactTrackSelection, true, "exact payload is flagged");
+  assert.equal(decide(album, exactPayload), "same_key_bump", "whole-album session is replaced");
+  assert.equal(decide(otherTrack, exactPayload), "same_key_bump", "another track of the album is replaced");
+  assert.equal(decide(sameTrackWithArtist, exactPayload), "same_key_bump", "session with artist is replaced");
+  assert.equal(decide({ ...exactPayload }, exactPayload), "noop", "identical exact session stays a no-op");
+  // Callers without the flag keep the previous same-key rules.
+  assert.equal(isExactTrackReplacement(album, { ...otherTrack }), false);
+  assert.equal(decide(album, { ...otherTrack }), "noop", "unflagged payloads unchanged");
+  assert.equal(applyExactTrackOptions(album as never), album, "no options → no flag");
 }
 const loader = read("src/lib/business/coffee-atlas/load-music.ts");
 assert.match(loader, /getPublishedCatalogProducts/, "resolves against the published catalogue");

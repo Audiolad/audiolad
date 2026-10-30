@@ -53,6 +53,9 @@ export function applyExactTrackOptions(
   if (options.hideAuthor) {
     next = { ...next, authorName: "" };
   }
+  if (options.hideAuthor || options.audioItemId?.trim()) {
+    next = { ...next, exactTrackSelection: true };
+  }
   const audioItemId = options.audioItemId?.trim();
   if (audioItemId) {
     const only = next.tracks.filter((track) => track.id === audioItemId);
@@ -64,4 +67,24 @@ export function applyExactTrackOptions(
     };
   }
   return next;
+}
+
+type ReplaceableSession = {
+  authorName?: string | null;
+  tracks?: readonly { id: string }[] | null;
+};
+
+/**
+ * Pure: for a same-key `loadSession`, does an exact-track payload materially differ from
+ * the loaded session (other track list or other artist)? Only payloads flagged
+ * `exactTrackSelection` are considered – other callers keep the previous same-key rules.
+ */
+export function isExactTrackReplacement(
+  current: ReplaceableSession | null | undefined,
+  next: ReplaceableSession & { exactTrackSelection?: boolean },
+): boolean {
+  if (!next.exactTrackSelection || !current) return false;
+  const ids = (session: ReplaceableSession) => (session.tracks ?? []).map((track) => track.id).join("\u0000");
+  if (ids(current) !== ids(next)) return true;
+  return (current.authorName ?? "") !== (next.authorName ?? "");
 }
