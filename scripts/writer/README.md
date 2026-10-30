@@ -148,6 +148,28 @@ JSON-файл, пример – `examples/pilot-brief.json`. Поля:
 - объёмы, FAQ и чек-лист;
 - заголовки, FAQ и начала историй уникальны на сайте и в пакете.
 
+## Режим coffee: статьи «АудиоЛад Кофейни» (audiolad.ru/b/coffee)
+
+Отдельный шаблон Райтера для статей раздела «Музыка для кофейни». Эталон – https://audiolad.ru/b/coffee/kofe-v-zernah-dlya-kofeyni. Шаблон «Сергей и Зоя» (`--site sz`) им не затрагивается и с ним не смешивается:
+
+- свои файлы – `lib/sites/coffee/` (config, knowledge, prompt, brief, assemble, rules, apply, pipeline), свой id `audiolad-coffee-guide-v1`, своё имя схемы `audiolad_coffee_guide_article`, свои ветки `writer/coffee-<pack>`;
+- режим выбирается явно: `--site coffee`; пакет обязан содержать `"site": "coffee"` и `"template": "audiolad-coffee-guide-v1"`. `--site sz` (и одиночный режим) пакет кофеен не примут, `--site coffee` не примет пакет sz – отказ до любого вызова Cloud.ru (`lib/template-guard.mjs`);
+- файлы шаблона sz закреплены хешами в `sz-template.lock.json`; `coffee-unit.mjs` падает, если они изменились или если между `lib/sites/coffee` и `lib/sites/sz` появился импорт.
+
+```bash
+npx tsx scripts/writer/run.mjs --site coffee --briefs coffee-pack.json --dry-run --max-rub 400
+npx tsx scripts/writer/run.mjs --site coffee --briefs scripts/writer/fixtures/coffee/pack-fixture.json \
+  --offline --fixtures scripts/writer/fixtures/coffee --out /tmp/coffee-run   # 0 ₽, без PR
+```
+
+Модель по умолчанию – `openai/gpt-5.5` (как sz). Результат – данные статьи `src/lib/business/vertical-guides/articles/<slug>.ts` (тип `VerticalGuideArticle`) и строка в `registry.ts`; страницу рисует существующий `GuideArticleView`, Райтер компонентов не пишет. Перед merge нужно обновить `scripts/business-coffee-guide-unit.mts` (сейчас он считает эталон единственной статьёй).
+
+Бриф пакета (до 5 статей): `pack`, `articles[]` с `slug`, `title`, `primaryQuery`, `relatedQueries` (Wordstat), `intent`, `storyHint`, `facts` (только проверенные), `sectionsHint`, `tableHint`, `links` (только `/…` audiolad.ru, `https://sergey-zoya.ru/…`, MAX), `readMore` (внутренние), `experts` – ровно два из `coffee-experts.registry.json`: мужчина и женщина, русский и иностранный, у каждого фото с лицензией и цитата с русской подписью источника; для иностранной цитаты – готовый русский `translation`.
+
+Правила владельца – `lib/sites/coffee/knowledge/TEMPLATE_RU.md`; что проверяет код (`rules.mjs`): история от первого лица с диалогом и без имён, мостик с запросом, подпись «АудиоЛад Кофейни» и никакой «Редакции», «кофейня» вместо «точки», ни слова латиницей, только «–», ссылки только из брифа (страница открывает их в новой вкладке), нет плееров, музыки в тексте и комментариев, нет настройки на негатив, структура «текст – вставка – текст» (2 раздела, таблица, эксперт, 3 раздела, эксперт, 3 шага, чек-лист из 5, FAQ), таблица с короткими значениями (на телефоне – карточки).
+
 ## Тесты
 
 `npm run test:writer` – офлайн-тесты валидаторов, нормализации и конвертера (`writer-unit.mjs`) и режима sz (`sz-unit.mjs`). В `sz-unit.mjs` эталонная статья angel-hranitel должна проходить без ошибок, а негативные образцы (дискомфорт, предсказание, внешние ссылки, max.ru, длинное тире, обещания, «призыв», чужой автор, другая кнопка MAX, видимая дата, латиница в слове, «3:1» Фредриксон) – давать ошибку. Ещё там проверяются бриф пакета, ротация и пул из 40 экспертов, сгенерированный гейт на синтетическом сайте и сравнение проверок сайта с базой.
+
+`npm run test:writer-coffee` (`coffee-unit.mjs`, входит в `test:writer` и в CI `business-pr-validation`) – режим coffee и его отделение от sz: хеши шаблона sz, отсутствие импортов в обе стороны, отказ при чужом пакете, эталон с историей проходит правила, негативные образцы (латиница, «точка», «Редакция», плеер, дискомфорт, внешняя ссылка, имя в истории, без диалога и т. п.) дают ошибку, сгенерированный модуль импортируется.

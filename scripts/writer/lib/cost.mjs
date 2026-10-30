@@ -12,11 +12,15 @@ export const TARIFF = {
 export const DEFAULT_MODEL = "openai/gpt-oss-120b";
 // --site sz default: winner of the pack-07 model trial (c62ac1d5): 0 gate errors on 5/5, ≈300 ₽ per pack.
 export const SZ_DEFAULT_MODEL = "openai/gpt-5.5";
+// --site coffee default: same quality tier as sz (story + dialogue + strict Russian-only rules).
+export const COFFEE_DEFAULT_MODEL = "openai/gpt-5.5";
 
 /** Model for a run: an explicit --model wins, otherwise the site default. */
 export function defaultModelFor(site, explicit) {
   if (explicit) return explicit;
-  return site === "sz" ? SZ_DEFAULT_MODEL : DEFAULT_MODEL;
+  if (site === "sz") return SZ_DEFAULT_MODEL;
+  if (site === "coffee") return COFFEE_DEFAULT_MODEL;
+  return DEFAULT_MODEL;
 }
 export const SUPPORTED_MODELS = Object.keys(TARIFF);
 

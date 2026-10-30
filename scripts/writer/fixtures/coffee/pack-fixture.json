@@ -1,0 +1,67 @@
+{
+  "site": "coffee",
+  "template": "audiolad-coffee-guide-v1",
+  "pack": "coffee-fixture",
+  "articles": [
+    {
+      "slug": "kofe-v-zernah-fixture",
+      "title": "Кофе в зёрнах для кофейни: как выбрать зерно, обжарку и поставщика",
+      "primaryQuery": "кофе в зёрнах для кофейни",
+      "relatedQueries": [
+        {
+          "phrase": "кофе в зернах для кофейни",
+          "frequency": 161
+        },
+        {
+          "phrase": "кофе в зернах для кофеен",
+          "frequency": 273
+        },
+        {
+          "phrase": "кофе для кофеен зерновой",
+          "frequency": 104
+        },
+        {
+          "phrase": "кофейные зерна для кофейни",
+          "frequency": 74
+        }
+      ],
+      "intent": "Владелец кофейни выбирает зерно и обжарщика.",
+      "storyHint": "Утро, когда в кофейню привезли зерно нового обжарщика.",
+      "facts": [],
+      "links": [],
+      "readMore": [
+        {
+          "href": "/b/atlas-kofeen",
+          "label": "Атлас: 10 удивительных кофеен мира"
+        },
+        {
+          "href": "/b/atlas-kofeen/coffee-collective",
+          "label": "«Кофи Коллектив», Копенгаген"
+        },
+        {
+          "href": "/b/atlas-kofeen/truth-coffee-roasting",
+          "label": "«Трут Кофи Ростинг», Кейптаун"
+        },
+        {
+          "href": "/b/atlas-kofeen/starbucks-reserve-shanghai",
+          "label": "«Старбакс Резерв Ростери», Шанхай"
+        },
+        {
+          "href": "/b/atlas-kofeen/la-colombe",
+          "label": "«Ла Коломб», Филадельфия"
+        }
+      ],
+      "experts": [
+        {
+          "id": "dmitry-kotov",
+          "quoteIndex": 0
+        },
+        {
+          "id": "sunalini-menon",
+          "quoteIndex": 0,
+          "translation": "Лаборатория помогла разработать разные смеси для первого кафе, с которого в Индии началась кафейная культура, и эти смеси подают до сих пор в его заведениях, открытых в городах и сёлах Индии."
+        }
+      ]
+    }
+  ]
+}

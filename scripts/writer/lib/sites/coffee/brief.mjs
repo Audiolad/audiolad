@@ -1,0 +1,118 @@
+// Pack brief for `--site coffee`: up to 5 coffee guides. A pack must declare
+// "site": "coffee" and "template": "audiolad-coffee-guide-v1"; anything else (an sz pack, a
+// single-article brief) is refused before any Cloud.ru call.
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { COFFEE } from "./config.mjs";
+
+export class CoffeeBriefError extends Error {
+  constructor(message) {
+    super(message);
+    this.code = 1;
+  }
+}
+
+const LATIN = /[A-Za-z]/;
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const strings = (value) => (Array.isArray(value) ? value.map(String).map((item) => item.trim()).filter(Boolean) : []);
+
+/** Throws unless the raw JSON is a coffee pack (used by run.mjs before choosing a pipeline). */
+export function assertCoffeePack(raw) {
+  if (!raw || typeof raw !== "object") throw new CoffeeBriefError("бриф coffee: ожидается JSON-объект пакета");
+  if (raw.site !== COFFEE.site || raw.template !== COFFEE.templateId) {
+    throw new CoffeeBriefError(`бриф не для шаблона coffee: нужны "site": "${COFFEE.site}" и "template": "${COFFEE.templateId}", получено site=${JSON.stringify(raw.site)}, template=${JSON.stringify(raw.template)}`);
+  }
+}
+
+/** Expert registry of the coffee section (src/content/business/coffee-experts.registry.json). */
+export function loadCoffeeExperts(repoDir) {
+  const file = join(repoDir, COFFEE.expertsRegistry);
+  const json = JSON.parse(readFileSync(file, "utf8"));
+  return new Map(json.experts.map((expert) => [expert.id, expert]));
+}
+
+/** Problems with one expert slot: registry entry, licensed portrait on disk, Russian-only texts. */
+export function expertSlotProblems(slot, experts, { repoDir } = {}) {
+  const problems = [];
+  const expert = experts.get(slot.id);
+  if (!expert) return [`эксперт ${slot.id}: нет в реестре ${COFFEE.expertsRegistry}`];
+  const photo = expert.photo ?? {};
+  if (!photo.file || !photo.license || !photo.credit || !photo.author) problems.push(`эксперт ${slot.id}: нет настоящего фото со свободной лицензией и подписью автора – экспертный блок недопустим`);
+  else if (repoDir && !existsSync(join(repoDir, COFFEE.expertsPublicDir, photo.file))) problems.push(`эксперт ${slot.id}: файла портрета ${photo.file} нет в public/`);
+  if (LATIN.test(`${expert.name} ${expert.role} ${photo.credit ?? ""}`)) problems.push(`эксперт ${slot.id}: латиница в имени, роли или подписи фото`);
+  const quote = expert.quotes?.[slot.quoteIndex];
+  if (!quote) return [...problems, `эксперт ${slot.id}: нет цитаты №${slot.quoteIndex}`];
+  if (!quote.sourceLabel || LATIN.test(quote.sourceLabel)) problems.push(`эксперт ${slot.id}: у цитаты №${slot.quoteIndex} нет русской подписи источника (sourceLabel) – цитата не готова для страницы`);
+  const russian = quote.language === "ru";
+  if (!russian && !slot.translation) problems.push(`эксперт ${slot.id}: иностранная цитата – нужен перевод в брифе (experts[].translation), Райтер его не пишет`);
+  if (slot.translation && LATIN.test(slot.translation)) problems.push(`эксперт ${slot.id}: латиница в переводе`);
+  if (russian && slot.translation) problems.push(`эксперт ${slot.id}: русская цитата не переводится – уберите translation`);
+  return problems;
+}
+
+export function normalizeCoffeePack(raw, { experts, repoDir } = {}) {
+  assertCoffeePack(raw);
+  const problems = [];
+  const articles = Array.isArray(raw.articles) ? raw.articles : [];
+  if (!articles.length || articles.length > COFFEE.packMax) problems.push(`в пакете должно быть 1–${COFFEE.packMax} статей, получено ${articles.length}`);
+  if (!raw.pack || !SLUG.test(String(raw.pack))) problems.push(`pack: нужен латинский id пакета (например coffee-01), получено ${JSON.stringify(raw.pack)}`);
+  const seen = new Set();
+  const out = articles.map((item, index) => {
+    const at = item?.slug ?? `#${index + 1}`;
+    const brief = {
+      slug: String(item?.slug ?? ""),
+      title: String(item?.title ?? "").trim(),
+      primaryQuery: String(item?.primaryQuery ?? "").trim(),
+      relatedQueries: Array.isArray(item?.relatedQueries) ? item.relatedQueries.map((q) => ({ phrase: String(q.phrase), frequency: Number.isInteger(q.frequency) ? q.frequency : null })) : [],
+      intent: item?.intent ? String(item.intent) : "",
+      storyHint: item?.storyHint ? String(item.storyHint) : "",
+      facts: strings(item?.facts),
+      sectionsHint: strings(item?.sectionsHint),
+      tableHint: item?.tableHint ? String(item.tableHint) : "",
+      forbiddenPhrases: strings(item?.forbiddenPhrases),
+      links: strings(item?.links),
+      readMore: Array.isArray(item?.readMore) ? item.readMore.map((link) => ({ href: String(link.href), label: String(link.label) })) : [],
+      experts: Array.isArray(item?.experts) ? item.experts.map((slot) => ({ id: String(slot.id), quoteIndex: Number(slot.quoteIndex ?? 0), ...(slot.translation ? { translation: String(slot.translation) } : {}) })) : [],
+    };
+    if (!SLUG.test(brief.slug)) problems.push(`${at}: slug только латиница, цифры и дефисы`);
+    if (seen.has(brief.slug)) problems.push(`${at}: slug повторяется в пакете`);
+    seen.add(brief.slug);
+    if (brief.slug === COFFEE.referenceSlug) problems.push(`${at}: это эталонная статья, её не переписывают`);
+    if (!brief.title || LATIN.test(brief.title)) problems.push(`${at}: title обязателен и без латиницы`);
+    if (!brief.primaryQuery || LATIN.test(brief.primaryQuery)) problems.push(`${at}: primaryQuery обязателен и без латиницы`);
+    for (const href of brief.links) if (!isAllowedTextHref(href)) problems.push(`${at}: ссылка ${href} – разрешены только адреса audiolad.ru («/…»), статьи ${COFFEE.crossSiteHosts.join(", ")} и ${COFFEE.maxUrl}`);
+    if (!brief.readMore.length) problems.push(`${at}: readMore – нужна хотя бы одна внутренняя ссылка`);
+    for (const link of brief.readMore) if (!isInternalHref(link.href) || LATIN.test(link.label)) problems.push(`${at}: readMore ${link.href} – только внутренние адреса и подписи без латиницы`);
+    if (brief.experts.length !== 2) problems.push(`${at}: нужны ровно 2 эксперта`);
+    else {
+      for (const slot of brief.experts) problems.push(...expertSlotProblems(slot, experts, { repoDir }).map((p) => `${at}: ${p}`));
+      const [a, b] = brief.experts.map((slot) => experts.get(slot.id));
+      if (a && b) {
+        if (a.gender === b.gender) problems.push(`${at}: эксперты – мужчина и женщина`);
+        if ((a.origin === "ru") === (b.origin === "ru")) problems.push(`${at}: эксперты – один русскоязычный и один иностранный`);
+      }
+    }
+    return brief;
+  });
+  if (problems.length) throw new CoffeeBriefError(`бриф coffee не прошёл проверку:\n- ${problems.join("\n- ")}`);
+  return { site: COFFEE.site, template: COFFEE.templateId, pack: String(raw.pack), maxRub: raw.maxRub, articles: out };
+}
+
+export function loadCoffeePack(path, options) {
+  return normalizeCoffeePack(JSON.parse(readFileSync(path, "utf8")), options);
+}
+
+export function isInternalHref(href) {
+  return typeof href === "string" && href.startsWith("/") && !href.startsWith("//") && !/\s/.test(href);
+}
+
+export function isAllowedTextHref(href) {
+  if (isInternalHref(href) || href === COFFEE.maxUrl) return true;
+  try {
+    const url = new URL(href);
+    return url.protocol === "https:" && COFFEE.crossSiteHosts.includes(url.hostname);
+  } catch {
+    return false;
+  }
+}

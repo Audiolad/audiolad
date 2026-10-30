@@ -42,6 +42,7 @@ const { values: args } = parseArgs({
     "keep-worktree": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
     // --site sz: a pack of sergey-zoya.ru articles (see README «Режим sz»)
+    // --site coffee: a pack of audiolad.ru/b/coffee guides (see README «Режим coffee»)
     site: { type: "string", default: "audiolad" },
     repo: { type: "string" },
     briefs: { type: "string" },
@@ -60,15 +61,17 @@ class Stop extends Error {
 }
 
 const szMode = args.site === "sz";
-if (!["audiolad", "sz"].includes(args.site)) {
-  process.stderr.write(`--site: audiolad или sz, получено ${args.site}\n`);
+const coffeeMode = args.site === "coffee";
+if (!["audiolad", "sz", "coffee"].includes(args.site)) {
+  process.stderr.write(`--site: audiolad, sz или coffee, получено ${args.site}\n`);
   process.exit(1);
 }
-if (args.help || (!args.brief && !szMode) || (szMode && !args.briefs && !args.brief && !args["experts-report"])) {
+if (args.help || (!args.brief && !szMode && !coffeeMode) || (szMode && !args.briefs && !args.brief && !args["experts-report"]) || (coffeeMode && !args.briefs && !args.brief)) {
   process.stdout.write([
     "Использование: npx tsx scripts/writer/run.mjs --brief brief.json [--model M] [--dry-run] [--no-repair] [--offline] [--article a.json] [--max-rub 3]",
     "  sergey-zoya.ru: --site sz --repo <клон sergey-zoya-site> --briefs pack.json [--experts EXPERTS_RU.md] [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 3]",
     "                  --site sz --repo <клон> --experts-report   (эксперты пула: кто реже использован, есть ли портрет)",
+    "  audiolad.ru/b/coffee: --site coffee --briefs coffee-pack.json [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 400]",
     "См. scripts/writer/README.md",
     "",
   ].join("\n"));
@@ -91,6 +94,36 @@ try {
   process.exit(1);
 }
 const { maxRub, maxTokens } = limits;
+// Templates never mix: a coffee pack is refused by the sz mode, and the coffee mode accepts only
+// packs that declare site "coffee" and its template id (checked again inside the coffee pipeline).
+{
+  const packFile = args.briefs ?? args.brief;
+  if (packFile) {
+    const { packTemplateMismatch } = await import("./lib/template-guard.mjs");
+    let raw = null;
+    try {
+      raw = readJson(resolve(packFile));
+    } catch {
+      // unreadable file: the mode's own loader reports it
+    }
+    const mismatch = raw ? packTemplateMismatch(args.site, raw) : null;
+    if (mismatch) {
+      process.stderr.write(`${mismatch}\n`);
+      process.exit(2);
+    }
+  }
+}
+if (coffeeMode) {
+  const { runCoffeePipeline } = await import("./lib/sites/coffee/pipeline.mjs");
+  let result;
+  try {
+    result = await runCoffeePipeline(args, { model, maxRub, maxTokens });
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exit(typeof error.code === "number" ? error.code : 1);
+  }
+  process.exit(result.code);
+}
 if (szMode) {
   const { runSzPipeline } = await import("./lib/sites/sz/pipeline.mjs");
   let result;
