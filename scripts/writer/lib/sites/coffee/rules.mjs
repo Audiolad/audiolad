@@ -216,7 +216,7 @@ const countQuery = (text, query) => norm(text).split(norm(query)).length - 1;
 // Imperatives live mainly in step titles and checklist items; the author prose explains «why» first and
 // suggests gently («удобно», «можно», «поможет»). Measured on authorProse(), not on headings or lists.
 export const TONE = {
-  /** Imperatives per 1000 words of author prose: warning above, error above. */
+  /** Imperatives per 1000 words of author prose: warning above, a stronger warning above (the detector is a heuristic). */
   imperativesPer1000: { warn: 20, error: 25 },
   /** Share of sentences that open with an imperative («Проверьте…», «Не ставьте…»). */
   imperativeStartShare: { warn: 0.15, error: 0.3 },
@@ -225,19 +225,23 @@ export const TONE = {
   /** Канцелярит: every hit is a warning; the published set keeps it at or below this per 1000 words. */
   kanceliaritPer1000: 4,
 };
-// Plural «вы»-imperative: -йте/-ите/-ьте (+ reflexive -сь). «вы готовите» (indicative) and «на сайте»
-// (a noun after a preposition) are not imperatives. A heuristic: a main clause that continues a «вы» clause
-// («Вы готовите кофе, следите за залом») counts as indicative, even if the author meant a request.
+// Plural «вы»-imperative: -йте/-ите/-ьте (+ reflexive -сь). A heuristic that leans to missing a request rather
+// than flagging good prose (decision 30.10.2026, PR #1092): -ите is also the present tense («вы готовите», «видите
+// весь зал»), so after «вы» it counts as a statement: «вы» earlier in the sentence or anywhere in the same clause
+// («За сроками следите вы сами»); a «вы» in a later clause leaves the request («посмотрите, встречаетесь ли вы…»).
+// «на сайте», «в новом буклете» are nouns after a preposition. Known misses: scripts/writer/README.md («Тон:
+// известные ограничения»).
 const IMPERATIVE_FORM = /^[а-яё]{2,}(?:йте|ите|ьте)(?:сь)?$/;
 const NOT_IMPERATIVE = new Set(["сайте", "кредите", "лимите", "дефиците", "аппетите", "бите", "ките", "граните", "элите", "свите", "орбите", "визите", "транзите", "депозите", "профите", "минимуме"]);
 const NOT_AFTER = new Set(["вы", "в", "во", "на", "о", "об", "обо", "при", "по"]);
 const sentenceWords = (sentence) => norm(sentence).match(/[а-яё]+/g) ?? [];
 /** Indexes of imperative verbs among the words of one sentence. */
 export function imperativeIndexes(sentence) {
-  // Clauses split at , ; : ( ) and dashes; word indexes stay those of sentenceWords().
-  const clauses = norm(sentence).split(/[,;:()\u2013\u2014]/).map((part) => part.match(/[а-яё]+/g) ?? []);
-  const list = clauses.flat();
-  const clauseOf = clauses.flatMap((words, c) => words.map(() => c));
+  const list = sentenceWords(sentence);
+  // Clause number of every word (split at , ; : ( ) and dashes): «вы» later in another clause («посмотрите,
+  // встречаетесь ли вы взглядом») does not make an earlier -ите a statement.
+  const clauseOf = norm(sentence).split(/[,;:()\u2013\u2014]/).flatMap((part, c) => (part.match(/[а-яё]+/g) ?? []).map(() => c));
+  const vyBefore = (i) => list.slice(0, i).includes("вы") || list.some((w, k) => w === "вы" && k > i && clauseOf[k] === clauseOf[i]);
   const out = [];
   list.forEach((word, i) => {
     if (!IMPERATIVE_FORM.test(word) || NOT_IMPERATIVE.has(word)) return;
@@ -246,48 +250,30 @@ export function imperativeIndexes(sentence) {
     // addressed as a request.
     if (NOT_AFTER.has(prev)) return;
     if (NOT_AFTER.has(list[i - 2]) && /(?:ом|ем|ём|ой|ей)$/.test(prev ?? "")) return;
-    if (/ите(?:сь)?$/.test(word) && governedByVy(i)) return;
+    if (/ите(?:сь)?$/.test(word) && vyBefore(i)) return;
     out.push(i);
   });
   return out;
-
-  // The check leans to missing a request rather than flagging good prose. -ите in a clause with «вы» anywhere is the
-  // present tense («вы готовите», «За сроками следите вы сами»). A clause without «вы» inherits it from the clause
-  // chain before it: always after a main clause («Вы готовите кофе, следите за залом»). After a subordinate «вы»
-  // clause it is a request only as the last clause of the sentence («Если вы хотите, не берите зерно без даты.»):
-  // a later clause means it still belongs to the condition («Если вы готовите кофе, не спешите и следите за
-  // температурой, напиток получается ровнее»), and an -ете/-ёте verb up front continues the list of verbs.
-  // Known limitation (under-detection only): «Если вы готовите кофе, ведёте учёт, не берите…» and «Вы готовите
-  // кофе, гости ждут, не берите…» are not flagged.
-  function governedByVy(i) {
-    const c = clauseOf[i];
-    return clauses[c].includes("вы") || inherits(c);
-  }
-  function inherits(c) {
-    let p = c - 1;
-    while (p >= 0 && clauses[p].length === 0) p -= 1;
-    if (p < 0) return false;
-    const prev = clauses[p];
-    if (!prev.includes("вы")) return inherits(p);
-    if (!opensSubordinate(prev)) return true;
-    if (PRESENT_ONLY.test(firstWord(clauses[c]) ?? "")) return true;
-    return clauses.slice(c + 1).some((words) => words.length > 0);
-  }
-}
-// Conjunctions and relative words that open a subordinate clause; leading «и», «а», «но» are skipped.
-const SUBORDINATORS = new Set(["если", "когда", "пока", "чтобы", "хотя", "хоть", "раз", "как", "где", "куда", "откуда", "что", "поскольку", "потому", "после", "прежде", "пусть", "словно", "будто"]);
-const PRESENT_ONLY = /(?:ете|ёте)(?:сь)?$/;
-const firstWord = (words) => words.find((w) => !["и", "а", "но", "или", "да", "даже"].includes(w));
-function opensSubordinate(words) {
-  const first = firstWord(words);
-  return first !== undefined && (SUBORDINATORS.has(first) || /^котор/.test(first));
 }
 /** «Не …йте»: a prohibition addressed to the reader («Не приравнивайте», «не ставьте»). */
 export function prohibitions(text) {
+  return prohibitionHits(text).map(({ ban }) => ban);
+}
+/**
+ * Each «не» + imperative: { ban, certain }. certain – the sentence opens with «Не …йте/…ьте/…ите», has no «вы»
+ * and is not a question with -ите («Не ставьте выдачу у кассы.»): only then the form is unambiguous, so only then
+ * it is an error.
+ */
+export function prohibitionHits(text) {
   const found = [];
   for (const sentence of sentences(text)) {
     const list = sentenceWords(sentence);
-    for (const i of imperativeIndexes(sentence)) if (list[i - 1] === "не") found.push(`не ${list[i]}`);
+    for (const i of imperativeIndexes(sentence)) {
+      if (list[i - 1] !== "не") continue;
+      // -йте/-ьте are imperative only; a question («Не видите разницы?») may be the present tense.
+      const certain = i === 1 && !list.includes("вы") && (!/ите(?:сь)?$/.test(list[i]) || !/\?[»")]*$/.test(sentence.trim()));
+      found.push({ ban: `не ${list[i]}`, certain });
+    }
   }
   return found;
 }
@@ -308,6 +294,7 @@ export function authorProse(article) {
 export function toneMetrics(texts) {
   let total = 0, imperatives = 0, imperativeStarts = 0, explanatory = 0, wordCount = 0;
   const bans = [];
+  const hits = [];
   const kanc = [];
   for (const [field, text] of texts) {
     wordCount += words(text);
@@ -320,7 +307,10 @@ export function toneMetrics(texts) {
       if (idx.includes(0) || (list[0] === "не" && idx.includes(1))) imperativeStarts += 1;
       if (!idx.length) explanatory += 1;
     }
-    for (const ban of prohibitions(text)) bans.push([field, ban]);
+    for (const { ban, certain } of prohibitionHits(text)) {
+      bans.push([field, ban]);
+      hits.push([field, ban, certain]);
+    }
     for (const hit of kanceliarit(text)) kanc.push([field, hit]);
   }
   const per1000 = (n) => (wordCount ? Math.round((n * 10000) / wordCount) / 10 : 0);
@@ -328,20 +318,26 @@ export function toneMetrics(texts) {
   return {
     words: wordCount, sentences: total, imperatives, imperativesPer1000: per1000(imperatives),
     imperativeStarts, imperativeStartShare: share(imperativeStarts), explanatoryShare: share(explanatory),
-    prohibitions: bans, kanceliarit: kanc, kanceliaritPer1000: per1000(kanc.length),
+    prohibitions: bans, prohibitionHits: hits, kanceliarit: kanc, kanceliaritPer1000: per1000(kanc.length),
   };
 }
-/** Tone problems by TONE thresholds: [severity, field, message]. */
+/**
+ * Tone problems by TONE thresholds: [severity, field, message]. The imperative detector is a heuristic, so density,
+ * imperative starts and «Не …йте» are warnings for the Codex polish pass (PR body); the only error is an unambiguous
+ * prohibition – a sentence that opens with «Не …йте/…ите» and has no «вы».
+ */
 export function toneProblems(article) {
   const m = toneMetrics(authorProse(article));
   const out = [];
   const T = TONE;
-  if (m.imperativesPer1000 > T.imperativesPer1000.error) out.push(["error", "tone", `повелительных глаголов ${m.imperativesPer1000} на 1000 слов (> ${T.imperativesPer1000.error}) – объясняйте «почему» и предлагайте мягко («удобно», «можно», «поможет»), приказы оставьте заголовкам шагов и чек-листу`]);
+  if (m.imperativesPer1000 > T.imperativesPer1000.error) out.push(["warning", "tone", `повелительных глаголов ${m.imperativesPer1000} на 1000 слов (> ${T.imperativesPer1000.error}) – объясняйте «почему» и предлагайте мягко («удобно», «можно», «поможет»), приказы оставьте заголовкам шагов и чек-листу`]);
   else if (m.imperativesPer1000 > T.imperativesPer1000.warn) out.push(["warning", "tone", `повелительных глаголов ${m.imperativesPer1000} на 1000 слов (цель ≤ ${T.imperativesPer1000.warn})`]);
   const pct = (x) => `${Math.round(x * 100)}%`;
-  if (m.imperativeStartShare > T.imperativeStartShare.error) out.push(["error", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (> ${pct(T.imperativeStartShare.error)})`]);
+  if (m.imperativeStartShare > T.imperativeStartShare.error) out.push(["warning", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (> ${pct(T.imperativeStartShare.error)})`]);
   else if (m.imperativeStartShare > T.imperativeStartShare.warn) out.push(["warning", "tone", `${pct(m.imperativeStartShare)} предложений начинаются с повелительного глагола (цель ≤ ${pct(T.imperativeStartShare.warn)})`]);
-  for (const [field, ban] of m.prohibitions) out.push(["error", field, `запрет «${ban}…» – вместо «Не …йте» объясните, как удобнее, и почему`]);
+  for (const [field, ban, sure] of m.prohibitionHits) {
+    out.push([sure ? "error" : "warning", field, `запрет «${ban}…» – вместо «Не …йте» объясните, как удобнее, и почему${sure ? "" : " (проверьте при доводке: возможно, это настоящее время)"}`]);
+  }
   if (m.explanatoryShare < T.explanatoryShareMin) out.push(["warning", "tone", `объясняющих предложений ${pct(m.explanatoryShare)} (цель ≥ ${pct(T.explanatoryShareMin)})`]);
   if (m.kanceliarit.length) out.push(["warning", "tone", `канцелярит ${m.kanceliaritPer1000} на 1000 слов (цель ≤ ${T.kanceliaritPer1000}): ${[...new Set(m.kanceliarit.map(([, w]) => w))].join(", ")} – пишите проще, как коллега`]);
   return out;

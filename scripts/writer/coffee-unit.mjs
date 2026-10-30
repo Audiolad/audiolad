@@ -27,7 +27,7 @@ import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
-import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitions, rotationProblems, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
+import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitionHits, prohibitions, rotationProblems, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
 import { buildRequest } from "./lib/prompt.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
 import { LOCK_FILE, szHashes } from "./sz-template-lock.mjs";
@@ -340,7 +340,6 @@ const NEGATIVES = [
   ["description without the exact query form", (f) => { f.description = "Как выбрать кофе в зёрнах для кофеен: свежесть обжарки, вкус в чашке, расчёт стоимости порции и вопросы поставщику перед первой закупкой."; }, /дословно/],
   // Round 3 (30.10.2026): tone and expert rotation.
   ["«Не …йте» prohibition", (f) => { f.partTwo[0].paragraphs[0] += " Не покупайте зерно без даты обжарки."; }, /запрет «не покупайте…»/],
-  ["imperative density above 25 per 1000 words", (f) => { f.partTwo[0].paragraphs[0] += " Проверьте пачку, посчитайте расход, сравните цены, запишите итог, обсудите выбор, закажите партию, попробуйте зерно."; f.partTwo[1].paragraphs[0] += " Спросите поставщика, уточните график, договоритесь о замене, сохраните ответы."; }, /повелительных глаголов [\d.]+ на 1000 слов \(> 25\)/],
   ["description too long", (f) => { f.description = "Кофе в зёрнах для кофейни: " + "свежесть обжарки, вкус, ".repeat(8); }, /description 120–170 символов/],
 ];
 for (const [name, mutate, expected] of NEGATIVES) {
@@ -352,6 +351,22 @@ for (const [name, mutate, expected] of NEGATIVES) {
     assert.ok(errors.some((e) => expected.test(e.message)), errors.map((e) => e.message).join(" | "));
   });
 }
+
+test("tone heuristics are warnings for the Codex polish pass; only a sentence-initial «Не …йте» without «вы» is an error", () => {
+  const dense = clone(fields);
+  dense.partTwo[0].paragraphs[0] += " Проверьте пачку, посчитайте расход, сравните цены, запишите итог, обсудите выбор, закажите партию, попробуйте зерно.";
+  dense.partTwo[1].paragraphs[0] += " Спросите поставщика, уточните график, договоритесь о замене, сохраните ответы.";
+  const problems = check(dense);
+  assert.deepEqual(errorsOf(problems).filter((p) => p.field === "tone"), []);
+  assert.match(problems.filter((p) => p.severity === "warning").map((p) => p.message).join("\n"), /повелительных глаголов [\d.]+ на 1000 слов \(> 25\)/);
+  const inner = clone(fields);
+  inner.partTwo[0].paragraphs[0] += " Зерно лучше хранить в банке, и не держите его у кофемашины.";
+  assert.deepEqual(errorsOf(check(inner)).filter((p) => /запрет/.test(p.message)), []);
+  assert.match(check(inner).filter((p) => p.severity === "warning").map((p) => p.message).join("\n"), /запрет «не держите…»/);
+  const good = clone(fields);
+  good.partTwo[0].paragraphs[0] += " Если вы торопитесь, то не видите мелких ошибок. Когда вы стоите за стойкой, видите весь зал.";
+  assert.deepEqual(check(good).filter((p) => p.field === "tone" || /запрет/.test(p.message)).filter((p) => p.severity === "error"), []);
+});
 
 test("statistic with a sourced brief fact passes; the brief refuses a fact without a source", () => {
   const sourced = { ...brief, facts: ["Две трети посетителей кофеен заказывают напитки на основе эспрессо: 64 % опрошенных. Источник: опрос Национальной кофейной ассоциации США, 2024 год"] };
@@ -460,26 +475,45 @@ test("ordinal agreement helper: slips only, correct pairs pass", () => {
 
 test("tone: imperatives, prohibitions, канцелярит and explanatory share", () => {
   assert.deepEqual(imperativeIndexes("Проверьте дату обжарки и сравните два образца."), [0, 4]);
-  assert.deepEqual(imperativeIndexes("Если вы сами стоите за стойкой, ведёте закупки и следите за залом, это видно."), [], "-ите after «вы» is the present tense");
+  assert.deepEqual(imperativeIndexes("Если вы сами стоите за стойкой, ведёте закупки и следите за залом, это видно."), [], "-ите in a sentence with «вы» is the present tense");
   assert.deepEqual(imperativeIndexes("Вы готовите эспрессо на сайте и в кредите."), []);
   assert.deepEqual(prohibitions("Не ставьте выдачу у кассы. Гость не спешит."), ["не ставьте"]);
-  // Codex review #1092: «вы» in a subordinate clause does not turn the main-clause request into a statement.
-  assert.deepEqual(prohibitions("Если вы открываете кофейню, не берите зерно без даты."), ["не берите"]);
-  assert.deepEqual(imperativeIndexes("Когда вы готовите меню, следите за сроками."), [4]);
-  assert.deepEqual(imperativeIndexes("Вы стоите, следите и ведёте учёт."), []);
-  assert.deepEqual(prohibitions("Если вы хотите, не берите зерно без даты."), ["не берите"], "a subordinate «вы» does not reach the main clause");
-  assert.deepEqual(imperativeIndexes("Вы готовите кофе, следите за залом."), [], "a main clause with «вы» carries over");
-  assert.deepEqual(imperativeIndexes("Если вы хотите, смотрите на дату."), [3]);
-  assert.deepEqual(imperativeIndexes("Когда вы заняты, заложите в бюджете запас."), [3], "«в бюджете» is not a present-tense verb");
-  assert.deepEqual(prohibitions("Когда вы готовите меню, не берите зерно в новом пакете."), ["не берите"], "«в новом пакете» is a noun, not a verb");
-  assert.deepEqual(imperativeIndexes("Когда вы заняты, сравните цены в новом буклете."), [3], "«в новом буклете» is a noun, not a verb");
   assert.deepEqual(prohibitions("Не берите зерно в новом пакете."), ["не берите"]);
-  assert.deepEqual(imperativeIndexes("Сравните цены в новом буклете."), [0]);
-  assert.deepEqual(imperativeIndexes("Вы готовите кофе, когда гости ждут, следите за залом."), [], "a main «вы» clause carries over a subordinate one");
-  assert.deepEqual(prohibitions("Если вы готовите кофе, не спешите и следите за температурой, напиток получается ровнее."), [], "a later clause keeps it inside the condition");
-  assert.deepEqual(imperativeIndexes("За сроками следите вы сами."), [], "«вы» after the verb");
-  assert.deepEqual(imperativeIndexes("Если вы готовите кофе, не спешите и следите за температурой, напиток получается ровнее."), []);
+  assert.deepEqual(imperativeIndexes("Сравните цены в новом буклете."), [0], "«в новом буклете» is a noun, not a verb");
+  assert.deepEqual(imperativeIndexes("Заложите в бюджете запас."), [0], "«в бюджете» is a noun, not a verb");
   assert.deepEqual(imperativeIndexes("Цены висят на новом магните."), [], "a noun after a preposition and an adjective");
+  assert.deepEqual(imperativeIndexes("Встаньте на место гостя и посмотрите, встречаетесь ли вы взглядом с бариста."), [0, 5], "«вы» in a later clause");
+  // Codex reviews of #1092, rounds 2–4: present-tense prose with «вы» never counts as a request (no false errors).
+  for (const good of [
+    "Вы готовите кофе, следите за залом.",
+    "Вы стоите, следите и ведёте учёт.",
+    "Вы готовите кофе, когда гости ждут, следите за залом.",
+    "Если вы готовите кофе, не спешите и следите за температурой, напиток получается ровнее.",
+    "За сроками следите вы сами.",
+    "Если вы торопитесь, то не видите мелких ошибок.",
+    "Когда вы стоите за стойкой, видите весь зал.",
+    "Если вы работаете без помощника, одновременно готовите кофе и следите за залом.",
+  ]) {
+    assert.deepEqual(imperativeIndexes(good), [], good);
+    assert.deepEqual(prohibitions(good), [], good);
+  }
+  // Known limitation (scripts/writer/README.md, «Тон: известные ограничения»): with «вы» in the sentence a real
+  // request is missed. The check is lenient here; the Codex polish pass reads the text.
+  for (const missed of [
+    "Если вы открываете кофейню, не берите зерно без даты.",
+    "Если вы хотите, не берите зерно без даты.",
+    "Когда вы готовите меню, следите за сроками.",
+    "Когда вы готовите меню, не берите зерно в новом пакете.",
+    "Когда вы заняты, сравните цены в новом буклете.",
+    "Если вы готовите кофе, ведёте учёт, не берите зерно без даты.",
+    "Вы готовите кофе, гости ждут, не берите зерно без даты.",
+    "Вы проверьте дату обжарки.",
+  ]) assert.deepEqual(imperativeIndexes(missed), [], `known miss: ${missed}`);
+  // Only an unambiguous prohibition is certain (an error): it opens the sentence and the sentence has no «вы».
+  assert.deepEqual(prohibitionHits("Не ставьте выдачу у кассы."), [{ ban: "не ставьте", certain: true }]);
+  assert.deepEqual(prohibitionHits("Не берите зерно без даты."), [{ ban: "не берите", certain: true }]);
+  assert.deepEqual(prohibitionHits("Выдачу лучше вынести, и не ставьте её у кассы."), [{ ban: "не ставьте", certain: false }]);
+  assert.deepEqual(prohibitionHits("Не видите разницы?"), [{ ban: "не видите", certain: false }], "a question may be the present tense");
   assert.deepEqual(kanceliarit("Это является основой, а при отсутствии данных – в целях проверки."), ["является", "при отсутствии", "в целях"]);
   assert.deepEqual(kanceliarit("Удобно, когда выдача стоит чуть в стороне."), []);
   const warm = toneMetrics([["p", "Выдача работает свободнее чуть в стороне от кассы. Так гостю удобно забрать заказ. Можно попробовать оба варианта на макете."]]);
