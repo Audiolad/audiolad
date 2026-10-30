@@ -11,6 +11,7 @@ import BusinessAccessLine, { BusinessChromeAccessProvider, useBusinessChromeAcce
 
 import BusinessBrandLockup from "@/components/business-app/BusinessBrandLockup";
 import BusinessEntrySwitcher from "@/components/business-app/BusinessEntrySwitcher";
+import BusinessLiveRefresh from "@/components/business-app/BusinessLiveRefresh";
 import { BusinessEntryProvider, BusinessPointModeProvider } from "@/components/business-app/BusinessPointMode";
 import BusinessBottomNav from "@/components/business-app/BusinessBottomNav";
 import { BusinessCabinetPlayerProvider } from "@/components/business-app/workspace/BusinessCabinetPlayer";
@@ -19,6 +20,7 @@ import { BusinessGuestStatusBar, BusinessGuestStatusProvider } from "@/component
 import BusinessSidebar from "@/components/business-app/BusinessSidebar";
 import { resolveBusinessAccess } from "@/lib/business-app/access";
 import { normalizeBusinessAppPathname } from "@/lib/business-app/host";
+import type { BusinessEntry } from "@/lib/business-app/live-refresh";
 
 /**
  * One AudioLad Business cabinet for everyone (a8240527, Sergey 17.10.2026): the guest from the
@@ -35,6 +37,7 @@ export default function BusinessAppShell({
   initialGuestLimit = null,
   customerAccess = null,
   pointReports = false,
+  initialEntry = "person",
 }: {
   children: ReactNode;
   /** Read-only gift / paid state from the layout; null for anonymous visitors. */
@@ -43,12 +46,14 @@ export default function BusinessAppShell({
   initialGuestLimit?: GuestCoffeeLimitState | null;
   /** This browser is the paired venue device and may report now playing. */
   pointReports?: boolean;
+  /** Header switcher side saved in the UI cookie (person or venue). */
+  initialEntry?: BusinessEntry;
 }) {
   return (
     <BusinessChromeAccessProvider value={customerAccess}>
       <BusinessGuestStatusProvider initialLimit={initialGuestLimit}>
         <BusinessPointModeProvider value={pointReports}>
-          <BusinessEntryProvider>
+          <BusinessEntryProvider initialEntry={initialEntry}>
             <BusinessShellFrame pointReports={pointReports}>{children}</BusinessShellFrame>
           </BusinessEntryProvider>
         </BusinessPointModeProvider>
@@ -60,6 +65,7 @@ export default function BusinessAppShell({
 /** Reads the chrome access from context, so a live period reported by /workspace applies at once. */
 function BusinessShellFrame({ children, pointReports }: { children: ReactNode; pointReports: boolean }) {
   const access = resolveBusinessAccess(useBusinessDomain(), pointReports);
+  const signedIn = useBusinessDomain().status === "authenticated";
   const chromeAccess = useBusinessChromeAccess();
   const pathname = normalizeBusinessAppPathname(usePathname() ?? "");
   const workspace = pathname === "/workspace" || pathname.startsWith("/workspace/");
@@ -70,6 +76,7 @@ function BusinessShellFrame({ children, pointReports }: { children: ReactNode; p
 
   return (
     <div className="business-app-shell" data-access={access.level}>
+      <BusinessLiveRefresh enabled={signedIn || pointReports} />
       <BusinessSidebar />
       <BusinessCabinetPlayerProvider pointReports={pointReports}>
         <div className="business-app-main">

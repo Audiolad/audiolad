@@ -8,7 +8,6 @@ import { useBusinessEntry, usePointMode } from "@/components/business-app/Busine
 import PointDeviceControls from "@/components/business-app/PointDeviceControls";
 import { POINT_PAIRING_ANCHOR_ID } from "@/components/business-app/PointPairingCard";
 import VenueControlPanel from "@/components/business-app/VenueControlPanel";
-import BusinessOwnerHomeLiveRefresh from "@/components/business-app/BusinessOwnerHomeLiveRefresh";
 import { useOwnerHomeElapsed } from "@/components/business-app/useOwnerHomeElapsed";
 import BusinessDomainBootstrapForm from "@/components/business-app/BusinessDomainBootstrapForm";
 import { BUSINESS_GUEST_COFFEE_PUBLIC_PATH } from "@/lib/business-app/host";
@@ -257,19 +256,24 @@ export default function BusinessHomePage({ currentTrack, playbackConfirmation, p
     );
   }
 
+  // Header switcher side: the venue screen is titled with the venue, so a switch is visible
+  // at the top of the page and not only far below.
+  const venueSide = pointMode || entry === "venue";
+  const title = venueSide ? locationName || "Кофейня" : greeting;
+  const lead = venueSide ? "Что звучит в зале, управление музыкой и устройство у колонки." : subtitle;
+
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl" data-testid="biz-home" data-entry={venueSide ? "venue" : "person"}>
       <header className="mb-5">
-        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]">
-          {greeting}
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-[var(--biz-text)] sm:text-[2rem]" data-testid="biz-home-title">
+          {title}
         </h1>
-          <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
-            {subtitle}
-          </p>
-        </header>
+        <p className="mt-1.5 max-w-2xl text-[1.05rem] leading-relaxed text-[var(--biz-text-muted)]">
+          {lead}
+        </p>
+      </header>
 
       {pointMode || entry === "venue" ? null : <BusinessHomeAccessCard />}
-      <BusinessOwnerHomeLiveRefresh />
       <div className="business-app-home-grid business-app-owner-home">
         <div className="business-app-home-stack">
           <StatusBanner locationName={locationName || "Кофейня"} signals={signals} playback={playback} />
