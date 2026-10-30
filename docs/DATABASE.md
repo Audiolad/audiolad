@@ -2376,3 +2376,16 @@ master/transcode/stream activation pipeline and MP3 delivery.
 The migration plan expectation lists and normalize SQL contract checks cover
 this forward migration. Application requires the migration and updated workers
 before accepting these uploads. No production operation was performed.
+
+## Business player listening history retention (f381f92b, proposal)
+
+New forward-only migration `20270211120000_business_player_history_retention.sql`
+adds `business_player_listening_history_retention_idx (last_confirmed_at, id)`
+and service-role-only RPC `cleanup_business_player_listening_history(boolean,
+boolean, integer, integer)`. Defaults disable execution and deletion. An enabled
+dry-run counts candidates; explicitly enabled deletion is limited to 500 rows
+per batch and 20 batches per call, strictly older than 400 days by last confirmation.
+No heartbeat or playback-state writes, scheduling or deletion on migration apply.
+**400 days is a PROPOSAL awaiting Sergey's confirmation; deletion stays disabled.**
+See [policy, controls and local EXPLAIN evidence](business/player-retention.md).
+This task applied the migration only to an isolated synthetic local test cluster.
