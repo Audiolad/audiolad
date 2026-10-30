@@ -16,6 +16,7 @@ import PracticeBackToCatalogLink from "@/components/products/practice-page/Pract
 import CatalogProductHeartButton from "@/components/products/CatalogProductHeartButton";
 import ProductTopicLinks from "@/components/products/ProductTopicLinks";
 import type { CatalogListingItem } from "@/lib/catalog/listing-contract";
+import { resolvePracticeHeroLightMetaRest } from "@/lib/catalog/product-hero-gallery";
 import { getProductPriceLabel } from "@/lib/products/price-format";
 import type { PracticeAccessPresentation } from "@/lib/products/practice-access-ui";
 import { shouldShowPaidBuyPreviewCta } from "@/lib/course-content/storefront-preview";
@@ -303,8 +304,10 @@ export function PracticeMetaSection({
   /** Desktop: author and type/duration on one wrapping line. Mobile keeps stacked by default. */
   authorMetaLayout?: "stacked" | "inline";
 }) {
-  const { presentation, practice, resolvedAuthorSlug, authorName, meta, subtitle, practiceTopics } =
+  const { presentation, practice, resolvedAuthorSlug, authorName, subtitle, practiceTopics } =
     viewModel;
+  // viewModel.meta starts with the author name; the author is rendered as a link.
+  const meta = resolvePracticeHeroLightMetaRest(viewModel.meta, authorName);
 
   const showStatusBadge = presentation.primaryAction.kind !== "buy";
 
