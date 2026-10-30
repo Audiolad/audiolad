@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { isGuestCoffeePlaylistStillFree, loadGuestCoffeeShelf } from "@/lib/business-app/guest-coffee/load.server";
+import {
+  isGuestCoffeePlaylistStillFree,
+  isGuestCoffeeTrackStillAdmitted,
+  loadGuestCoffeeShelf,
+} from "@/lib/business-app/guest-coffee/load.server";
 import { handleGuestCoffeeTrackUrl } from "@/lib/business-app/guest-coffee/routes";
 import { issueGuestCoffeeLease, peekGuestCoffeeUsage } from "@/lib/business-app/guest-coffee/usage.server";
 import { isSameOriginJsonRequest } from "@/lib/business-app/spa-player-report";
@@ -24,6 +28,7 @@ export async function POST(request: Request) {
   const result = await handleGuestCoffeeTrackUrl(body, {
     loadShelf: loadGuestCoffeeShelf,
     isStillFree: isGuestCoffeePlaylistStillFree,
+    isStillAdmitted: isGuestCoffeeTrackStillAdmitted,
     peekUsage: peekGuestCoffeeUsage,
     issueLease: (trackSeconds) => issueGuestCoffeeLease(request, trackSeconds),
     sign: async ({ authorSlug, productSlug, audioId }) => {

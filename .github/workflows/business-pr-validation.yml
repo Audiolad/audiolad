@@ -46,6 +46,9 @@ jobs:
           npm run test:business-coffee-atlas
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-atlas
           npm run test:business-app-proxy-routing
+          npx tsx scripts/business-venue-licence-unit.tsx
+          node scripts/business-venue-licence-isolation-unit.mjs
+          npx tsx scripts/business-venue-licence-access-unit.mts
           AUDIOLAD_REQUIRE_GUEST_COFFEE_SQL=1 AUDIOLAD_ONBOARDING_TEST_CONTAINER=audiolad-onboarding-test-ci npm run test:business-guest-coffee
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-guest-coffee
           npm run test:supabase-cookie-domain
@@ -57,6 +60,7 @@ jobs:
           npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere
           npm run test:business-guest-passport
+          npm run test:business-guest-diversity
           npm run test:business-brand-icons
           npm run test:business-app-venue-player
           npm run test:business-app-eligibility

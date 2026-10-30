@@ -17,7 +17,9 @@ export default function GuideIndexView({ vertical }: { vertical: B2BVertical }) 
             <span>{vertical.title}</span>
           </Link>
           <nav className="guide-header__nav" aria-label="Раздел">
-            <Link href={COFFEE_ATLAS_PATH}>Атлас: 10 удивительных кофеен мира</Link>
+            <Link href={COFFEE_ATLAS_PATH} target="_blank" rel="noopener" data-guide-header-link="atlas">
+              Атлас: 10 удивительных кофеен мира
+            </Link>
           </nav>
         </div>
       </header>

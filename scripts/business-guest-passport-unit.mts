@@ -158,7 +158,11 @@ const rhythmDayCity: GuestCoffeeProfile = { character: "city", direction: "rhyth
   assert.equal(ids(plan, k2)[0], P("chasy-otelya-muzyka-dlya-oteley-i-restoranov"), "passport: upbeat bossa sound → first for light rhythm by day");
   const a = assembleGuestCoffeeAtmosphere(shelf, rhythmDayCity, plan)!;
   assert.equal(a.sources[0].id, P("chasy-otelya-muzyka-dlya-oteley-i-restoranov"));
-  assert.equal(a.match.direction.state, "all");
+  // Light rhythm fits albums of fewer than 3 artists with short tracks here – the third artist
+  // (Sergey 29.10.2026: at least 3 different artists) comes from a closer album, said honestly.
+  assert.equal(a.match.direction.state, "some");
+  assert.equal(a.match.direction.matched, a.match.direction.of - 1);
+  assert.ok(a.diversity.artists >= 3);
   // The same features on only 3 of 8 tracks: partial coverage → the album keeps its editorial place.
   const partial = buildGuestCoffeeRecommendationPlan(shelf, featuresFor([["chasy-otelya-muzyka-dlya-oteley-i-restoranov", synth("upbeatBossa"), 3]]));
   assert.deepEqual(ids(partial, k2), ids(editorialPlan, k2), "partial coverage → editorial album ranking");

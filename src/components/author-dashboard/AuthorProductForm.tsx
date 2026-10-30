@@ -22,6 +22,7 @@ import JazzRelaxMusicPassportPanel, {
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
 import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
 import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
+import { applyNextStepProductSelection } from "@/lib/products/next-step-product-options";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
@@ -217,6 +218,7 @@ import {
 import {
   appendCreatedAudioItem,
   applyMusicAudioItemDeletion,
+  applyServerAudioPrepareStatus,
   applyServerMusicMasterStatus,
   mergeServerAudioItems,
   mergeServerProductIntoForm,
@@ -532,7 +534,7 @@ function deriveTitleFromFilename(fileName: string): {
   title: string;
   truncated: boolean;
 } {
-  const withoutExtension = fileName.trim().replace(/\.(mp3|wav|m4a|aac)$/i, "").trim();
+  const withoutExtension = fileName.trim().replace(/\.(mp3|wav|m4a|aac|ogg|oga|opus)$/i, "").trim();
 
   if (!withoutExtension || !isUsableMusicTrackTitle(withoutExtension)) {
     return { title: "", truncated: false };
@@ -582,6 +584,19 @@ function applyAudioSprintTitleLock(
     title: sprintTitle,
     seoPrimaryQuery: sprintTitle,
   };
+}
+
+async function fetchAuthorProductDetail(
+  targetPracticeId: string,
+): Promise<AuthorProductDetail | null> {
+  const response = await fetch(`/api/author/products/${targetPracticeId}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    return null;
+  }
+  const payload = (await response.json()) as { product?: AuthorProductDetail };
+  return payload.product ?? null;
 }
 
 function buildInitialForm(
@@ -1041,10 +1056,12 @@ export default function AuthorProductForm({
   const musicAbortRef = useRef(new Map<string, AbortController>());
   const musicLaunchRef = useRef<(audioId: string) => void>(() => undefined);
   const audioItemsRef = useRef(audioItems);
+  // eslint-disable-next-line react-hooks/refs -- existing latest-value ref, read only in async handlers
   audioItemsRef.current = audioItems;
   const ensurePracticeInFlightRef = useRef<Promise<PracticeContext | null> | null>(
     null,
   );
+  // eslint-disable-next-line react-hooks/refs -- existing latest-value ref, read only in async handlers
   musicQueueRef.current = musicQueue;
   const [savingSharedCover, setSavingSharedCover] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -1133,8 +1150,31 @@ export default function AuthorProductForm({
     if (!pending) {
       return;
     }
+    // Poll tick: only the prepare/file status comes from the server here.
+    // A full reload via reloadSavedProduct would rebuild the form and topics
+    // from the saved draft and wipe everything the author has not saved yet.
+    const refreshAudioPrepareStatus = async (targetPracticeId: string) => {
+      try {
+        const product = await fetchAuthorProductDetail(targetPracticeId);
+        if (
+          !product ||
+          (practiceIdRef.current || targetPracticeId) !== targetPracticeId
+        ) {
+          return;
+        }
+        setAudioItems((current) =>
+          applyServerAudioPrepareStatus(current, product.audio_items),
+        );
+        setContentLockedAfterSale(product.contentLockedAfterSale === true);
+        setDeleteLockedAfterPaidPurchase(
+          product.deleteLockedAfterPaidPurchase === true,
+        );
+      } catch {
+        // The next tick reads the status again.
+      }
+    };
     const timer = window.setInterval(() => {
-      void reloadSavedProduct(practiceId);
+      void refreshAudioPrepareStatus(practiceId);
     }, 3000);
     return () => window.clearInterval(timer);
   }, [audioItems, form.productKind, practiceId]);
@@ -1820,8 +1860,25 @@ export default function AuthorProductForm({
     return true;
   }
 
+  /** Refresh server-owned metadata after an upload without dropping local edits. */
+  async function refreshProductPreservingDraft(
+    targetPracticeId: string,
+  ): Promise<AuthorProductDetail | null> {
+    const product = await fetchAuthorProductDetail(targetPracticeId);
+    if (product) {
+      applyServerProductPreservingDraft(product);
+    }
+    return product;
+  }
+
+  /**
+   * Rebuild the whole form from the saved draft. Only call this after every
+   * field was saved (or when the caller passes keepLocalTopics for topics that
+   * were not saved yet); otherwise unsaved input is lost.
+   */
   async function reloadSavedProduct(
     targetPracticeId: string,
+    options: { keepLocalTopics?: boolean } = {},
   ): Promise<AuthorProductDetail | null> {
     const [productResponse, topicsResponse] = await Promise.all([
       fetch(`/api/author/products/${targetPracticeId}`, {
@@ -1862,7 +1919,13 @@ export default function AuthorProductForm({
     setAudioItems(productPayload.product.audio_items);
 
     if (topicsResponse.ok && topicsPayload.topics) {
-      await applyTopicFormData(topicsPayload.topics);
+      if (options.keepLocalTopics) {
+        setTopicOptions(topicsPayload.topics.topicOptions);
+        setTopicLimit(topicsPayload.topics.topicLimit);
+        setArchivedTopics(topicsPayload.topics.archivedTopics);
+      } else {
+        await applyTopicFormData(topicsPayload.topics);
+      }
     }
 
     return productPayload.product;
@@ -2200,7 +2263,8 @@ export default function AuthorProductForm({
         }
 
         setError(audioSaveResult.message);
-        await reloadSavedProduct(id);
+        // Topics are synced after audio; keep the author's selection for retry.
+        await reloadSavedProduct(id, { keepLocalTopics: true });
         return failSave(audioSaveResult.message);
       }
 
@@ -2210,7 +2274,7 @@ export default function AuthorProductForm({
         const topicFailureReason =
           lastSaveFailureReasonRef.current ?? "Не удалось сохранить темы продукта.";
         setError("Не удалось сохранить темы продукта.");
-        await reloadSavedProduct(id);
+        await reloadSavedProduct(id, { keepLocalTopics: true });
         return failSave(topicFailureReason);
       }
 
@@ -3331,6 +3395,7 @@ export default function AuthorProductForm({
     }
   }
 
+  // eslint-disable-next-line react-hooks/refs -- existing latest-value ref, read only in async handlers
   musicLaunchRef.current = (audioId: string) => {
     void launchMusicUpload(audioId);
   };
@@ -3593,7 +3658,7 @@ export default function AuthorProductForm({
       }
 
       if ("message" in result) {
-        await reloadSavedProduct(id);
+        await refreshProductPreservingDraft(id);
         setMessage(result.message);
       } else {
         applyServerProductPreservingDraft(result.product);
@@ -5431,6 +5496,13 @@ export default function AuthorProductForm({
           onPromoOpenInNewTabChange={(promoOpenInNewTab) => {
             setPromoError(null);
             setForm((current) => ({ ...current, promoOpenInNewTab }));
+          }}
+          currentProductId={practiceId || null}
+          onPromoProductPick={(option) => {
+            setPromoError(null);
+            setForm((current) =>
+              applyNextStepProductSelection(current, option),
+            );
           }}
         />
       ) : null}
