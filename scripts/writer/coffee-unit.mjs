@@ -476,6 +476,10 @@ test("tone: imperatives, prohibitions, канцелярит and explanatory shar
   assert.deepEqual(prohibitions("Не берите зерно в новом пакете."), ["не берите"]);
   assert.deepEqual(imperativeIndexes("Сравните цены в новом буклете."), [0]);
   assert.deepEqual(imperativeIndexes("Вы готовите кофе, когда гости ждут, следите за залом."), [], "a main «вы» clause carries over a subordinate one");
+  assert.deepEqual(prohibitions("Если вы готовите кофе, не спешите и следите за температурой, напиток получается ровнее."), [], "a later clause keeps it inside the condition");
+  assert.deepEqual(imperativeIndexes("За сроками следите вы сами."), [], "«вы» after the verb");
+  assert.deepEqual(imperativeIndexes("Если вы готовите кофе, не спешите и следите за температурой, напиток получается ровнее."), []);
+  assert.deepEqual(imperativeIndexes("Цены висят на новом магните."), [], "a noun after a preposition and an adjective");
   assert.deepEqual(kanceliarit("Это является основой, а при отсутствии данных – в целях проверки."), ["является", "при отсутствии", "в целях"]);
   assert.deepEqual(kanceliarit("Удобно, когда выдача стоит чуть в стороне."), []);
   const warm = toneMetrics([["p", "Выдача работает свободнее чуть в стороне от кассы. Так гостю удобно забрать заказ. Можно попробовать оба варианта на макете."]]);

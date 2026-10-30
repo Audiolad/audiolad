@@ -238,26 +238,30 @@ export function imperativeIndexes(sentence) {
   const clauses = norm(sentence).split(/[,;:()\u2013\u2014]/).map((part) => part.match(/[а-яё]+/g) ?? []);
   const list = clauses.flat();
   const clauseOf = clauses.flatMap((words, c) => words.map(() => c));
-  const startOf = clauses.map((_, c) => clauses.slice(0, c).reduce((n, words) => n + words.length, 0));
   const out = [];
   list.forEach((word, i) => {
     if (!IMPERATIVE_FORM.test(word) || NOT_IMPERATIVE.has(word)) return;
     const prev = list[i - 1];
-    // «на сайте», «в кредите»: a noun after a preposition; «вы делайте» is not addressed as a request.
+    // «на сайте», «в кредите», «в новом буклете»: a noun after a preposition (and an adjective); «вы делайте» is not
+    // addressed as a request.
     if (NOT_AFTER.has(prev)) return;
+    if (NOT_AFTER.has(list[i - 2]) && /(?:ом|ем|ём|ой|ей)$/.test(prev ?? "")) return;
     if (/ите(?:сь)?$/.test(word) && governedByVy(i)) return;
     out.push(i);
   });
   return out;
 
-  // -ите after «вы» in the same clause is the present tense («вы готовите»). A clause without «вы» inherits it only
-  // directly from the clause before: always after a main clause («Вы готовите кофе, следите за залом»), after a
-  // subordinate one («Если вы сами стоите за стойкой, ведёте закупки и следите…») only when it opens with a
-  // present-only verb (-ете/-ёте), which continues the list of verbs. «-ете» elsewhere in the clause proves nothing
-  // («в новом пакете»), and «Если вы хотите, не берите…» starts the main clause afresh, so «берите» is a request.
+  // The check leans to missing a request rather than flagging good prose. -ите in a clause with «вы» anywhere is the
+  // present tense («вы готовите», «За сроками следите вы сами»). A clause without «вы» inherits it from the clause
+  // chain before it: always after a main clause («Вы готовите кофе, следите за залом»). After a subordinate «вы»
+  // clause it is a request only as the last clause of the sentence («Если вы хотите, не берите зерно без даты.»):
+  // a later clause means it still belongs to the condition («Если вы готовите кофе, не спешите и следите за
+  // температурой, напиток получается ровнее»), and an -ете/-ёте verb up front continues the list of verbs.
+  // Known limitation (under-detection only): «Если вы готовите кофе, ведёте учёт, не берите…» and «Вы готовите
+  // кофе, гости ждут, не берите…» are not flagged.
   function governedByVy(i) {
     const c = clauseOf[i];
-    return list.slice(startOf[c], i).includes("вы") || inherits(c);
+    return clauses[c].includes("вы") || inherits(c);
   }
   function inherits(c) {
     let p = c - 1;
@@ -265,7 +269,9 @@ export function imperativeIndexes(sentence) {
     if (p < 0) return false;
     const prev = clauses[p];
     if (!prev.includes("вы")) return inherits(p);
-    return !opensSubordinate(prev) || PRESENT_ONLY.test(firstWord(clauses[c]) ?? "");
+    if (!opensSubordinate(prev)) return true;
+    if (PRESENT_ONLY.test(firstWord(clauses[c]) ?? "")) return true;
+    return clauses.slice(c + 1).some((words) => words.length > 0);
   }
 }
 // Conjunctions and relative words that open a subordinate clause; leading «и», «а», «но» are skipped.
