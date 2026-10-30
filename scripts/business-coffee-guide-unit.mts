@@ -55,6 +55,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 const ARTICLE = KOFE_V_ZERNAH_DLYA_KOFEYNI;
 const EM_DASH = "\u2014";
+const SET_01_SLUGS = [
+  "biznes-plan-kofeyni", "oborudovanie-dlya-kofeyni", "personal-kofeyni",
+  "arenda-kofeyni", "formaty-kofeyni",
+];
 
 // ---------- Expert registry ----------
 assertCoffeeExpertRegistry();
@@ -81,7 +85,7 @@ assert.equal(getCoffeeExpert("dmitry-borodai"), null, "no expert without a portr
 assert.equal(read("src/content/business/coffee-experts.registry.json").includes(EM_DASH), false);
 
 // ---------- Routing ----------
-assert.equal(listVerticalArticles().length, 1, "reference article is the only article");
+assert.equal(listVerticalArticles().length, 6, "reference and five articles of set 01");
 assert.equal(listVerticalArticles("restaurants").length, 0);
 assert.deepEqual(getVerticalArticle("coffee", "kofe-v-zernah-dlya-kofeyni"), ARTICLE);
 assert.equal(getVerticalArticle("coffee", "muzyka-dlya-kofeyni"), null, "old slug is only a redirect");
@@ -294,7 +298,7 @@ assert.equal((faqNode?.mainEntity as unknown[]).length, ARTICLE.faq.length);
 assert.equal(jsonLd.includes(EM_DASH), false);
 assert.doesNotMatch(jsonLd, /пилот/i);
 
-assert.deepEqual(listVerticalGuideSitemapPaths(), ["/b/coffee", "/b/coffee/kofe-v-zernah-dlya-kofeyni"]);
+assert.deepEqual(listVerticalGuideSitemapPaths(), ["/b/coffee", ...listVerticalArticles("coffee").map(articlePath)]);
 assert.match(read("src/lib/seo/sitemap-data.ts"), /listVerticalGuideSitemapPaths/);
 
 // ---------- View: fixed block order ----------
@@ -444,7 +448,7 @@ for (const slug of [
   "idei-kofeyni",
 ]) {
   assert.match(seriesPlan, new RegExp(`/b/coffee/${slug}`));
-  assert.equal(getVerticalArticle("coffee", slug), null, slug);
+  if (!SET_01_SLUGS.includes(slug)) assert.equal(getVerticalArticle("coffee", slug), null, slug);
 }
 assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/page.tsx")));
 assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/[slug]/page.tsx")));
@@ -525,3 +529,97 @@ assert.equal(HAS_LATIN.test(withoutPaths(pageText)), false, `Latin on the page: 
 for (const [, value] of pageHtml.matchAll(/\s(?:alt|title|aria-label|placeholder)="([^"]*)"/g)) {
   assert.equal(HAS_LATIN.test(value ?? ""), false, `Latin in attribute: ${value}`);
 }
+
+
+// Set 01: every article uses the reference renderer and the same publication sources.
+const allArticles = listVerticalArticles("coffee");
+const knownTargets = new Set([
+  "/", "/b/coffee", "/b/atlas-kofeen",
+  ...COFFEE_ATLAS_SHOPS.map((shop) => `/b/atlas-kofeen/${shop.slug}`),
+  ...allArticles.map(articlePath),
+]);
+assert.equal(new Set(allArticles.map((article) => article.slug)).size, allArticles.length);
+assert.equal(new Set(allArticles.map((article) => article.checklist.storageKey)).size, allArticles.length);
+const selectedThemes = new Set<string>();
+for (const slug of SET_01_SLUGS) {
+  const article = getVerticalArticle("coffee", slug);
+  assert.ok(article, `registered: ${slug}`);
+  const mainRow = candidateRows.slice(0, 300).find((row) => row.query === article.primaryQuery);
+  assert.ok(mainRow, `primary query in data rows 1–300: ${slug}`);
+  assert.equal(selectedThemes.has(mainRow.theme), false, "one selected cluster per source block");
+  selectedThemes.add(mainRow.theme);
+  assert.ok(!["Музыка и атмосфера", "Кофе и поставщики"].includes(mainRow.theme));
+  for (const related of article.relatedQueries) {
+    const row = candidateRows.find((candidate) => candidate.query === related.phrase);
+    assert.equal(related.frequency, row?.frequency ?? null, related.phrase);
+    assert.ok(candidateRows.slice(0, 300).some((candidate) => candidate.query === related.phrase));
+  }
+  assert.ok(article.relatedQueries.some((related) => related.phrase === article.primaryQuery));
+  assert.equal(atlasSlugs.has(slug), false);
+  assert.equal(article.partOne.length, 2);
+  assert.equal(article.partTwo.length, 3);
+  assert.equal(article.checklist.items.length, 5);
+  assert.equal(article.steps.items.length, 3);
+  assert.ok(article.faq.length >= 5 && article.faq.length <= 7);
+  assert.ok(article.table.rows.length >= 3);
+  for (const row of article.table.rows) assert.equal(row.length, article.table.columns.length);
+  const text = collectArticleText(article).join("\n");
+  assert.doesNotMatch(text, /[A-Za-z\u2014]/u, slug);
+  assert.doesNotMatch(text, /https?:|www\.|(?:^|\s)точк[а-яё]*|Редакция/iu, slug);
+  assert.doesNotMatch(text, /плейлист|плеер|слушать онлайн/iu, slug);
+  const keyword = article.primaryQuery.toLocaleLowerCase("ru");
+  const hits = text.toLocaleLowerCase("ru").split(keyword).length - 1;
+  assert.ok(hits >= 3 && hits <= 10, `${slug}: ${hits} keyword occurrences`);
+  for (const value of [article.title, article.seoTitle, article.description, article.intro[0], article.hero.alt]) {
+    assert.ok(value.toLocaleLowerCase("ru").includes(keyword), `${slug}: keyword in SEO field`);
+  }
+  assert.ok([...article.partOne, ...article.partTwo].some((section) => section.heading.toLocaleLowerCase("ru").includes(keyword)));
+  assert.ok(article.seoTitle.length <= 70);
+  assert.ok(article.description.length >= 80 && article.description.length <= 180);
+  assert.ok(existsSync(join(root, "public", article.hero.src)));
+  const links = collectArticleHrefs(article);
+  assert.ok(links.includes("/b/atlas-kofeen"));
+  assert.ok(links.includes(articlePath(ARTICLE)));
+  for (const href of links) assert.ok(knownTargets.has(href), `${slug}: resolves internally: ${href}`);
+  for (const other of allArticles.filter((other) => other.slug !== slug)) {
+    assert.ok(article.readMore.some((link) => link.href === articlePath(other)), `${slug}: links to ${other.slug}`);
+  }
+  assert.ok(ARTICLE.readMore.some((link) => link.href === articlePath(article)), `reference links to ${slug}`);
+  const experts = [article.expertOne, article.expertTwo].map((slot) => {
+    const expert = getCoffeeExpert(slot.expertId);
+    assert.ok(expert);
+    assert.ok(existsSync(join(root, "public", expert.photo.file)));
+    const quote = expertQuote(expert, slot.quoteIndex);
+    const displayed = slot.translation ?? quote.text;
+    assert.doesNotMatch(displayed + expert.name + expert.role + expert.photo.credit + quote.sourceLabel, /[A-Za-z\u2014]/u);
+    if (quote.language !== "ru") assert.ok(slot.translation);
+    return expert;
+  });
+  assert.deepEqual(new Set(experts.map((expert) => expert.gender)), new Set(["man", "woman"]));
+  assert.deepEqual(new Set(experts.map((expert) => expert.origin)), new Set(["ru", "foreign"]));
+  const data = buildVerticalArticleJsonLd(article);
+  const nodes = data["@graph"] as Array<Record<string, unknown>>;
+  assert.equal((nodes.find((node) => node["@type"] === "FAQPage")?.mainEntity as unknown[]).length, article.faq.length);
+  assert.equal(nodes.find((node) => node["@type"] === "Article")?.url, `https://audiolad.ru${articlePath(article)}`);
+  const meta = buildVerticalArticleMetadata(article);
+  assert.equal(meta.description, article.description);
+  const html = renderToStaticMarkup(createElement(GuideArticleView, { article }));
+  const plain = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;|&#\d+;/g, " ");
+  assert.doesNotMatch(withoutPaths(plain), /[A-Za-z\u2014]/u, `${slug}: rendered visible text`);
+  const internalIds = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(internalIds).size, internalIds.length, `${slug}: unique DOM ids`);
+  for (const [, value] of html.matchAll(/\s(?:alt|title|aria-label|placeholder)="([^"]*)"/g)) {
+    assert.doesNotMatch(value, /[A-Za-z\u2014]/u, `${slug}: accessible labels`);
+  }
+  for (const [, attributes] of html.matchAll(/<a\s([^>]+)>/g)) {
+    const href = attributes.match(/href="([^"]*)"/)?.[1];
+    assert.ok(href);
+    const allowedSameTab = (href === "/" || href === "/b/coffee") && !attributes.includes('target="_blank"');
+    if (allowedSameTab) continue;
+    assert.match(attributes, /target="_blank"/);
+    assert.match(attributes, /rel="noopener(?: noreferrer)?"/);
+    assert.ok(knownTargets.has(href) || href === FOUR_CUPS_MAX_HREF, `${slug}: sole external target is MAX`);
+  }
+  for (const column of article.table.columns) assert.ok(html.includes(`data-label="${column}"`));
+}
+console.log("business-coffee-guide: reference and five set-01 articles passed");

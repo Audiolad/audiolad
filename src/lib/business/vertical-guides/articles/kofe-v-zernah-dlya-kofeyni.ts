@@ -262,6 +262,11 @@ export const KOFE_V_ZERNAH_DLYA_KOFEYNI: VerticalGuideArticle = {
   ],
   finalQuestion: "А теперь, когда зерно выбрано, – какая из четырёх чашек расскажет о характере вашей кофейни?",
   readMore: [
+    { href: "/b/coffee/biznes-plan-kofeyni", label: "Бизнес план кофейни: выручка, расходы и запас денег" },
+    { href: "/b/coffee/oborudovanie-dlya-kofeyni", label: "Кофемашина для кофейни: как собрать комплект оборудования" },
+    { href: "/b/coffee/personal-kofeyni", label: "Сотрудники кофейни: роли, обучение и передача смены" },
+    { href: "/b/coffee/arenda-kofeyni", label: "Аренда кофейни: как проверить помещение до решения" },
+    { href: "/b/coffee/formaty-kofeyni", label: "Мини кофейня: как выбрать компактный формат" },
     { href: "/b/atlas-kofeen", label: "Атлас: 10 удивительных кофеен мира" },
     { href: "/b/atlas-kofeen/coffee-collective", label: "«Кофи Коллектив», Копенгаген" },
     { href: "/b/atlas-kofeen/truth-coffee-roasting", label: "«Трут Кофи Ростинг», Кейптаун" },

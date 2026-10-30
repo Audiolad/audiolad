@@ -35,6 +35,18 @@ const entries = listArticleRecrawlEntries();
 const paths = entries.map((entry) => entry.path);
 assert.equal(new Set(paths).size, paths.length, "paths are unique");
 assert.ok(paths.includes(COFFEE_PATH), "coffee guide is covered");
+const set01Paths = ["biznes-plan-kofeyni", "oborudovanie-dlya-kofeyni", "personal-kofeyni", "arenda-kofeyni", "formaty-kofeyni"]
+  .map((slug) => `/b/coffee/${slug}`);
+for (const coffeePath of set01Paths) {
+  assert.ok(entries.some((entry) => entry.path === coffeePath && entry.kind === "vertical_guide"));
+  assert.equal(isPrivateIndexNowPath(coffeePath), false, `${coffeePath}: IndexNow allows publication`);
+}
+const beforeSet01 = buildArticleRecrawlManifest(entries.filter((entry) => !set01Paths.includes(entry.path)));
+const set01Plan = planArticleRecrawl(beforeSet01, entries);
+assert.equal(set01Plan.state, "diff");
+assert.deepEqual(set01Plan.changes.map((change) => change.path).sort(), [...set01Paths].sort());
+for (const change of set01Plan.changes) assert.equal(change.reason, ARTICLE_RECRAWL_REASONS.article_published);
+
 for (const slug of listArticleSlugs()) {
   assert.ok(paths.includes(`/articles/${slug}`), `article ${slug} covered`);
 }
@@ -257,7 +269,6 @@ const throwing = await runArticleRecrawlStep(
 assert.deepEqual(throwing.failed, ["/articles/new", "/articles/b"]);
 
 // --- script: writes manifest, queues nothing without a diff, never needs env for that
-const tsx = path.join(root, "node_modules/.bin/tsx");
 const script = path.join(root, "scripts/enqueue-article-recrawl.mts");
 const childEnv = {
   ...process.env,
@@ -266,7 +277,7 @@ const childEnv = {
   SUPABASE_SERVICE_ROLE_KEY: "",
 };
 function runScript(args, expectedStatus = 0) {
-  const result = spawnSync(tsx, [script, ...args], { cwd: root, env: childEnv, encoding: "utf8" });
+  const result = spawnSync(process.execPath, ["--import", "tsx", script, ...args], { cwd: root, env: childEnv, encoding: "utf8" });
   assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   return result.stdout;
 }
