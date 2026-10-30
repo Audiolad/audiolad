@@ -6,6 +6,7 @@ import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadLocationSoundSettings } from "@/lib/business-app/location-sound-settings.server";
 import { businessPointSessionAlive, loadPointDevicePermission } from "@/lib/business-app/point-session.server";
 import { buildBusinessAppPageMetadata } from "@/lib/business-app/seo";
+import { loadOwnVenueSticker } from "@/lib/business-app/venue-licence/sticker-access.server";
 
 export const metadata: Metadata = {
   ...buildBusinessAppPageMetadata(),
@@ -26,6 +27,7 @@ export default async function BusinessAppSettingsPage({
   const locationId =
     (domain.status === "authenticated" ? domain.location?.id ?? null : null) ?? pointPermission?.locationId ?? null;
   const saved = locationId ? await loadLocationSoundSettings(locationId) : null;
+  const sticker = locationId && !pointDevice ? await loadOwnVenueSticker(locationId) : null;
   const pointCanEdit = pointPermission ? pointPermission.pointCanEdit : saved?.pointCanEditSettings !== false;
 
   return (
@@ -41,6 +43,7 @@ export default async function BusinessAppSettingsPage({
           locationName={domain.status === "authenticated" ? domain.location?.name ?? "Кофейня" : "Кофейня"}
           pointCanEdit={pointCanEdit}
           soundInitiallyOpen={query.sound === "open"}
+          licenceSticker={sticker ? { publicId: sticker.publicId } : null}
           soundSlot={<BusinessPlayerSettings locationId={locationId} saved={saved} pointDevice={false} pointCanEdit={pointCanEdit} />}
         />
       ) : (

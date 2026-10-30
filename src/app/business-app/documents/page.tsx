@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import VenueLicenceStickerCard from "@/components/business-app/venue-licence/VenueLicenceStickerCard";
+
 import {
   CLIENT_DOCUMENT_EDITION_LABEL,
   CLIENT_DOCUMENT_REQUISITES,
@@ -9,7 +11,10 @@ import {
   formatVenueTime,
   formatVenueZoneRu,
 } from "@/lib/business-app/client-documents";
+import { loadBusinessOwnerHomeContext } from "@/lib/business-app/domain";
 import { loadPlaybackReport } from "@/lib/business-app/load-playback-report";
+import { businessPointSessionAlive } from "@/lib/business-app/point-session.server";
+import { loadOwnVenueSticker } from "@/lib/business-app/venue-licence/sticker-access.server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +26,20 @@ function first(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+/** The venue's own QR sticker, as in «Управление кофейней». Not on a device in the hall. */
+async function loadDocumentsSticker() {
+  if (await businessPointSessionAlive()) return null;
+  const domain = await loadBusinessOwnerHomeContext();
+  const locationId = domain.status === "authenticated" ? domain.location?.id ?? null : null;
+  return loadOwnVenueSticker(locationId);
+}
+
 export default async function BusinessAppDocumentsPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const at = first(sp.at);
   const windowMinutes = first(sp.window);
   const result = await loadPlaybackReport({ at, windowMinutes });
+  const sticker = await loadDocumentsSticker();
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -75,6 +89,10 @@ export default async function BusinessAppDocumentsPage({ searchParams }: PagePro
           судебному акту на условиях раздела 4 порядка.
         </p>
       </section>
+
+      {sticker ? (
+        <VenueLicenceStickerCard locationId={sticker.locationId} publicId={sticker.publicId} placement="documents" />
+      ) : null}
 
       <section className="business-app-card" data-testid="playback-report">
         <h2 className="text-[1.2rem] font-bold text-[var(--biz-text)]">
