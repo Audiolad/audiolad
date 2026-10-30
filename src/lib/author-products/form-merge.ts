@@ -231,6 +231,7 @@ export function mergeServerProductIntoForm(
     studioMusicPriceRubles: current.studioMusicPriceRubles,
     formatPreset: current.formatPreset || server.formatPreset,
     customFormat: current.customFormat,
+    slug: current.slug.trim() ? current.slug : server.slug,
     isFree: current.productKind === "audio_post" ? true : current.isFree,
     price: current.productKind === "audio_post" ? 0 : current.price,
     isCatalogListed: current.isCatalogListed,
@@ -336,6 +337,51 @@ export function mergeServerAudioItems(
       description: localItem.description ?? serverItem.description,
     };
   });
+}
+
+const AUDIO_PREPARE_PATCH_FIELDS = [
+  "audio_path",
+  "duration_seconds",
+  "original_file_name",
+  "file_size_bytes",
+  "status",
+  "updated_at",
+  "audio_prepare_status",
+] as const;
+
+/**
+ * Background «аудио обрабатывается» poll. Copies only server-owned file/prepare
+ * fields onto rows the author already has. Product text, topics, local rows
+ * that are not on the server yet, and track titles/descriptions stay local.
+ * Returns the same array when nothing changed.
+ */
+export function applyServerAudioPrepareStatus(
+  localItems: AudioItemRow[],
+  serverItems: readonly AudioItemRow[],
+): AudioItemRow[] {
+  const serverById = new Map(serverItems.map((item) => [item.id, item]));
+  let changed = false;
+  const next = localItems.map((item) => {
+    const serverItem = serverById.get(item.id);
+    if (!serverItem) {
+      return item;
+    }
+    let patched: AudioItemRow | null = null;
+    for (const field of AUDIO_PREPARE_PATCH_FIELDS) {
+      const serverValue = serverItem[field] ?? null;
+      const localValue = item[field] ?? null;
+      if (serverValue !== localValue) {
+        patched ??= { ...item };
+        (patched as Record<string, unknown>)[field] = serverValue;
+      }
+    }
+    if (!patched) {
+      return item;
+    }
+    changed = true;
+    return patched;
+  });
+  return changed ? next : localItems;
 }
 
 const MUSIC_UPLOAD_PATCH_FIELDS = [
