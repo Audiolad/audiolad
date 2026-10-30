@@ -7,6 +7,14 @@ const DISALLOWED_INTERNAL_PREFIXES = [
   "/api/",
 ] as const;
 
+/**
+ * Hosts that serve the AudioLad listener app itself. An absolute https link to
+ * one of them (e.g. «https://audiolad.ru/practice/…» pasted by an author) is
+ * treated as an internal path so the button uses client-side navigation and
+ * the persistent bottom player keeps playing instead of a full page reload.
+ */
+const SAME_SITE_HOSTS = new Set(["audiolad.ru", "www.audiolad.ru"]);
+
 const BLOCKED_SCHEMES = [
   "javascript:",
   "data:",
@@ -124,6 +132,16 @@ function resolveExternalTarget(trimmed: string): PromoPageCtaTarget | "invalid" 
 
   if (parsed.username || parsed.password) {
     return "invalid";
+  }
+
+  if (SAME_SITE_HOSTS.has(host) && !parsed.port) {
+    const internal = resolveInternalTarget(
+      `${parsed.pathname}${parsed.search}${parsed.hash}`,
+    );
+
+    if (internal !== "invalid") {
+      return internal;
+    }
   }
 
   return {
