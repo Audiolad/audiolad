@@ -45,6 +45,8 @@ export const BUSINESS_ALLOWED_API_PATHS = [
   "/api/business/onboarding/preview",
   "/api/business/onboarding/preview/audio",
   "/api/business/point",
+  // 90d24628: the venue's own QR sticker. Flag, session and membership are checked in the handler.
+  "/api/business/venue-licence/sticker",
 ] as const;
 
 /**

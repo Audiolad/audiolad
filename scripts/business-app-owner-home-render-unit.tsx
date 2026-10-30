@@ -30,7 +30,9 @@ const render = (signals = context.signals, props: BusinessHomePageProps = {}) =>
 );
 // Live refresh (c02fe282) uses router.refresh(); SSR render needs an app router.
 const fakeRouter = { refresh() {}, push() {}, replace() {}, back() {}, forward() {}, prefetch() {} } as never;
-assert.match(readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8"), /<BusinessOwnerHomeLiveRefresh \/>/);
+// Live refresh moved from the home page into the shell (every cabinet screen, 3 s, 30.10.2026).
+assert.doesNotMatch(readFileSync("src/components/business-app/BusinessHomePage.tsx", "utf8"), /BusinessOwnerHomeLiveRefresh/);
+assert.match(readFileSync("src/components/business-app/BusinessAppShell.tsx", "utf8"), /<BusinessLiveRefresh enabled=/);
 const track = { title: "Реальный трек", coverUrl: "/real-cover.webp" };
 for (const signals of [null, emptyBusinessOwnerHomeSignals(), context.signals, { ...context.signals!, secondsSinceHeartbeat: 301 }, { ...context.signals!, lastBusinessPlayAt: new Date().toISOString(), lastPlayMinutesAgo: 0 }]) {
   const html = render(signals, { currentTrack: track });
