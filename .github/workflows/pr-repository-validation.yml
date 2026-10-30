@@ -70,6 +70,8 @@ jobs:
           npm run test:supabase-cookie-domain
           npm run test:database-migrations:ci
           npm run test:ogg-audio-upload
+          npm run test:product-hero-author-dedupe
+          npm run test:author-product-upload-preserves-draft
           npm run test:studio-render-worker-env
           npm run test:production-pr-safety
           npm run test:production-deploy-gha
@@ -130,6 +132,7 @@ jobs:
           npm run test:admin-mailings
           npm run test:catalog-type-filter
           npm run test:catalog-return
+          npm run test:next-step-same-site-navigation
           npm run test:mobile-author-cabinet-top-chrome
           npm run test:admin-nav-author-space
           npm run test:admin-nav-moderation-badge

@@ -81,7 +81,13 @@ function PromoPageCtaButton({
 
   if (cta.kind === "internal") {
     return (
-      <Link href={cta.href} className={className} onClick={onCtaClick}>
+      <Link
+        href={cta.href}
+        className={className}
+        target={cta.openInNewTab ? "_blank" : undefined}
+        rel={cta.openInNewTab ? "noopener noreferrer" : undefined}
+        onClick={onCtaClick}
+      >
         {cta.label}
       </Link>
     );

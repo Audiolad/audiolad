@@ -17,6 +17,11 @@ export type GuestCoffeeTrackUrlDeps = {
    * paid products with guest access, so this re-check is what keeps paid audio out.
    */
   isStillFree: (playlist: GuestCoffeePlaylist) => Promise<boolean>;
+  /**
+   * Fresh (uncached) Business admission of THIS track for cafés (Sergey 29.10.2026: guests hear
+   * only admitted music). A withdrawn admission stops playback at once; failure = refused.
+   */
+  isStillAdmitted: (audioItemId: string) => Promise<boolean>;
   /** Read-only server total (no lease, no charge) — skip signing when already exhausted. */
   peekUsage: () => Promise<number | null>;
   /**
@@ -51,11 +56,12 @@ export async function handleGuestCoffeeTrackUrl(
   const audioItemId = parseGuestCoffeeAudioItemId(body);
   if (!audioItemId) return { ok: false, reason: "invalid_request" };
 
-  // Only tracks of the curated, currently playable free albums — never an arbitrary id.
+  // Only tracks of the admitted, currently playable free albums — never an arbitrary id.
   const found = findGuestCoffeeTrack(await deps.loadShelf(), audioItemId);
   if (!found) return { ok: false, reason: "not_in_manifest" };
 
   if (!(await deps.isStillFree(found.playlist))) return { ok: false, reason: "not_in_manifest" };
+  if (!(await deps.isStillAdmitted(audioItemId))) return { ok: false, reason: "not_in_manifest" };
 
   // 1. Cheap read-only gate: no signing for a guest whose limit is already used up.
   const before = guestCoffeeLimitState(await deps.peekUsage());

@@ -89,7 +89,10 @@ Queue outcomes:
 - `409 URL_ALREADY_ADDED` → `delivered` (already added)
 - `429 QUOTA_EXCEEDED` or remainder `0` → retry next day
 - `5xx`, including `504`, timeout, network → exponential backoff from 5 minutes,
-  capped at 6 hours, then `dead` after 20 attempts
+  capped at 1 hour, then `dead` after 100 attempts (about four days). Yandex
+  can answer the POST with `504` for hours while hosts and quota GETs work
+  (2026-10-28 and 2026-10-29); a failed POST does not spend quota, so the
+  hourly cap sends the URL within about an hour after Yandex recovers
 - `400 INVALID_URL` and a URL whose origin is not `https://audiolad.ru` →
   terminal for that URL only (`dead` or `rejected`). Not a success.
 - `disabled` (flag off, missing token, `SEO_INDEXING=false`, non-production
@@ -137,6 +140,13 @@ release's `.article-recrawl-manifest.json` and queues new pages
   deploys, 20 at a time. New pages are always queued
 - standalone guides keep their body copy in TSX views, so only new pages and
   metadata changes are detected for them
+- a slug change is a new path: the new URL is queued as `article_published`;
+  the old URL (now a 301) is not queued
+- `article_recrawl_enqueue_done` / `done {"queued":1}` means the URL is in
+  `search_recrawl_queue`, not that Yandex accepted it. Yandex delivery is the
+  worker's job: check the row's `status` (`delivered` = 202 or 409),
+  `attempts`, `last_http_status` and `next_attempt_at`, or the worker log
+  lines `[yandex-webmaster] ... failed` / `cycle`
 
 Log lines start with an ISO timestamp. If Yandex has no successful delivery for
 more than 24 hours while rows are pending, the worker logs

@@ -49,6 +49,7 @@ jobs:
           npm run test:business-workspace-trial
           npm run test:business-guest-atmosphere
           npm run test:business-guest-passport
+          npm run test:business-guest-diversity
           npm run test:business-brand-icons
           npm run test:business-app-venue-player
           npm run test:business-app-eligibility

@@ -874,8 +874,17 @@
 }
 
 .guide-index h1 {
-  font-size: clamp(2.2rem, 6vw, 4rem);
-  max-width: 12ch;
+  max-width: none;
+  margin: 0 0 16px;
+  font-size: clamp(2.2rem, 6vw, 3.6rem);
+  text-wrap: balance;
+}
+
+/* Desktop: the rubric title stays on one line (the old 12ch limit broke «Музыка для кофейни» in two). */
+@media (min-width: 900px) {
+  .guide-index h1 {
+    white-space: nowrap;
+  }
 }
 
 .guide-index__list {
