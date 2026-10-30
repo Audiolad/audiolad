@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS, BUSINESS_PLAYER_RETENTION_DAYS_ERROR, runPlayerRetention, type RetentionRpc } from "../src/lib/business-app/player-retention";
+import { BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS, BUSINESS_PLAYER_RETENTION_DAYS_ERROR_CODE, runPlayerRetention, type RetentionRpc } from "../src/lib/business-app/player-retention";
 
 assert.equal(BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS, 400);
 let calls = 0;
@@ -47,7 +47,7 @@ for (const value of ["", " ", "400 ", "29", "3651", "-1", "0", "400.5", "NaN", "
       BUSINESS_PLAYER_RETENTION_ENABLED: enabled,
       BUSINESS_PLAYER_RETENTION_DELETE_ENABLED: "true",
       BUSINESS_PLAYER_RETENTION_DAYS: value,
-    }, rpc, log), { message: BUSINESS_PLAYER_RETENTION_DAYS_ERROR });
+    }, rpc, log), { message: BUSINESS_PLAYER_RETENTION_DAYS_ERROR_CODE });
     assert.equal(calls, before, "invalid config must fail before any RPC");
     assert.equal(logs.length, logCount, "invalid config must not log success");
   }

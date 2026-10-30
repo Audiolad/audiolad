@@ -7,14 +7,14 @@ export type RetentionResult = {
 };
 
 export const BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS = 400;
-export const BUSINESS_PLAYER_RETENTION_DAYS_ERROR =
-  "BUSINESS_PLAYER_RETENTION_DAYS must be an integer between 30 and 3650";
+export const BUSINESS_PLAYER_RETENTION_DAYS_ERROR_CODE =
+  "invalid_business_player_retention_days";
 
 function retentionDays(value: string | undefined): number {
   if (value === undefined) return BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS;
   if (!/^[0-9]+$/.test(value) || !Number.isSafeInteger(Number(value))
       || Number(value) < 30 || Number(value) > 3650) {
-    throw new Error(BUSINESS_PLAYER_RETENTION_DAYS_ERROR);
+    throw new Error(BUSINESS_PLAYER_RETENTION_DAYS_ERROR_CODE);
   }
   return Number(value);
 }
