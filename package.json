@@ -470,7 +470,8 @@
     "test:unified-agreement": "node scripts/unified-agreement-sql-unit.mjs && npx tsx scripts/unified-agreement-unit.mjs && npx tsx scripts/author-terms-account-level-unit.mts && npx tsx scripts/author-terms-edition-21-unit.mts",
     "test:managed-catalog-promo": "node --import tsx scripts/managed-catalog-promo-unit.mts && node scripts/catalog-grid-ui-unit.mjs && node scripts/catalog-mobile-chrome-unit.mjs",
     "test:practice-listener-comments": "npx tsx scripts/practice-listener-comments-unit.mts && node scripts/practice-listener-comments-sql-unit.mjs",
-    "test:mobile-author-cabinet-top-chrome": "npx tsx scripts/mobile-author-cabinet-top-chrome-unit.mts"
+    "test:mobile-author-cabinet-top-chrome": "npx tsx scripts/mobile-author-cabinet-top-chrome-unit.mts",
+    "test:next-step-product-picker": "npx tsx scripts/next-step-product-picker-unit.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

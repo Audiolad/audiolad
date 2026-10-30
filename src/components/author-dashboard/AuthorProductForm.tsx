@@ -22,6 +22,7 @@ import JazzRelaxMusicPassportPanel, {
 import AuthorProductFormStatusNotices from "@/components/author-dashboard/product-form-sections/AuthorProductFormStatusNotices";
 import AuthorProductListeningNoticeSection from "@/components/author-dashboard/product-form-sections/AuthorProductListeningNoticeSection";
 import AuthorProductPostListenPromoSection from "@/components/author-dashboard/product-form-sections/AuthorProductPostListenPromoSection";
+import { applyNextStepProductSelection } from "@/lib/products/next-step-product-options";
 import { useAudioItemsReorder } from "@/components/author-dashboard/useAudioItemsReorder";
 import AuthorProductPromotions from "@/components/author-dashboard/AuthorProductPromotions";
 import AuthorProductSeoSection from "@/components/author-dashboard/AuthorProductSeoSection";
@@ -5495,6 +5496,13 @@ export default function AuthorProductForm({
           onPromoOpenInNewTabChange={(promoOpenInNewTab) => {
             setPromoError(null);
             setForm((current) => ({ ...current, promoOpenInNewTab }));
+          }}
+          currentProductId={practiceId || null}
+          onPromoProductPick={(option) => {
+            setPromoError(null);
+            setForm((current) =>
+              applyNextStepProductSelection(current, option),
+            );
           }}
         />
       ) : null}

@@ -138,6 +138,7 @@ jobs:
           npm run test:admin-nav-moderation-badge
           npm run test:admin-business-nav
           npm run test:application-email-outbox-timer
+          npm run test:next-step-product-picker
           # Dummy public Supabase config so `/` renders in the head-render check (validation build only).
           NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=ci-dummy npm run build
           npm run test:host-brand-head-render
