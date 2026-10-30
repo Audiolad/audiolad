@@ -102,6 +102,16 @@ export function normalizeCoffeePack(raw, { experts, repoDir } = {}) {
     brief.warnings = brief.experts.length === 2 ? quoteFitWarnings(brief, experts) : [];
     return brief;
   });
+  // Experts rotate (Sergey, 2026-10-30): inside a pack every expert appears once.
+  const expertIn = new Map();
+  for (const brief of out) {
+    for (const slot of brief.experts) {
+      const first = expertIn.get(slot.id);
+      if (first && first !== brief.slug) problems.push(`${brief.slug}: эксперт ${slot.id} уже есть в статье ${first} – в пакете каждый эксперт один раз`);
+      else if (first === brief.slug) problems.push(`${brief.slug}: эксперт ${slot.id} стоит в двух слотах`);
+      else expertIn.set(slot.id, brief.slug);
+    }
+  }
   if (problems.length) throw new CoffeeBriefError(`бриф coffee не прошёл проверку:\n- ${problems.join("\n- ")}`);
   return { site: COFFEE.site, template: COFFEE.templateId, pack: String(raw.pack), task: String(raw.task).trim(), maxRub: raw.maxRub, articles: out };
 }
@@ -133,7 +143,7 @@ export function quoteFitWarnings(brief, experts) {
       if (score > best.score) best = { index, score };
     });
     if (best.index !== slot.quoteIndex) out.push(`${brief.slug}: у эксперта ${slot.id} цитата №${best.index} ближе к теме (${best.score} общих слов против ${chosen}) – возьмите её, если она подходит по смыслу`);
-    else if (chosen === 0) out.push(`${brief.slug}: цитата ${slot.id} №${slot.quoteIndex} не пересекается с темой – lead и after должны честно связать её с темой или нужен другой эксперт из реестра`);
+    else if (chosen === 0) out.push(`${brief.slug}: цитата ${slot.id} №${slot.quoteIndex} не пересекается с темой – возьмите цитату ближе к теме или другого эксперта из реестра; если оставляете, lead и after честно связывают её с темой`);
   }
   return out;
 }

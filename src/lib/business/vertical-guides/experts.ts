@@ -10,7 +10,11 @@ export type ExpertQuote = {
   sourceDate: string | null;
   context: string;
   /** Language of `text`. A quote that is not Russian is shown with a labelled translation. */
-  language?: "ru" | "en";
+  language?: "ru" | "en" | "cs";
+  /** Careful Russian translation of a non-Russian quote (editor reference; the article slot still carries its own translation). */
+  translationRu?: string;
+  /** Topic tags used to pick a fitting quote for an article section. */
+  topics?: string[];
   /** Plain-text source line printed on the page after «Источник:». Never a URL. */
   sourceLabel?: string;
 };
@@ -86,8 +90,8 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
     if (expert.origin === "foreign" && expert.countryCode === "RU") {
       throw new Error(`${expert.id}: foreign origin cannot be RU`);
     }
-    if (expert.quotes.length < 1 || expert.quotes.length > 2) {
-      throw new Error(`${expert.id}: need 1 or 2 quotes`);
+    if (expert.quotes.length < 1 || expert.quotes.length > 3) {
+      throw new Error(`${expert.id}: need 1 to 3 quotes`);
     }
     if (!expert.photo) {
       throw new Error(`${expert.id}: a real portrait is required, no initials placeholders`);
@@ -113,6 +117,9 @@ export function assertCoffeeExpertRegistry(experts: readonly CoffeeExpert[] = CO
       }
       if (!quote.context.trim()) {
         throw new Error(`${expert.id}: quote context is required`);
+      }
+      if (quote.language && quote.language !== "ru" && quote.translationRu !== undefined && HAS_LATIN.test(quote.translationRu)) {
+        throw new Error(`${expert.id}: Russian translation must not contain Latin letters`);
       }
       if (quote.sourceLabel !== undefined && (!quote.sourceLabel.trim() || /https?:\/\/|www\./.test(quote.sourceLabel))) {
         throw new Error(`${expert.id}: source label must be plain text without a URL`);

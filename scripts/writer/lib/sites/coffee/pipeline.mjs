@@ -84,6 +84,17 @@ function sectionKeys(worktree) {
   }
 }
 
+/** Registry quotes already on the site: Map «expertId#quoteIndex» → slug (one quote is used once). */
+function siteQuotes(worktree) {
+  const result = run("npx", ["tsx", "-e", [
+    'import { listVerticalArticles } from "./src/lib/business/vertical-guides/registry";',
+    "const keys = listVerticalArticles(\"coffee\").flatMap((a) => [a.expertOne, a.expertTwo].map((s) => [`${s.expertId}#${s.quoteIndex}`, a.slug]));",
+    "console.log(JSON.stringify(keys));",
+  ].join("\n")], { cwd: worktree, timeoutMs: 120 * 1000 });
+  if (result.status !== 0) throw new CoffeeStop(1, "не удалось собрать цитаты экспертов с сайта – без них нельзя проверить ротацию");
+  return new Map(JSON.parse(result.stdout.trim().split("\n").pop()));
+}
+
 export async function runCoffeePipeline(args, { model, maxRub, maxTokens: cliMaxTokens, generate }) {
   let maxTokens = cliMaxTokens;
   const repo = resolve(args.repo ?? mustRun("git", ["rev-parse", "--show-toplevel"]).trim());
@@ -124,6 +135,8 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens: cliMax
     state.baseSha = prepareWorktree(repo, worktree, args.base);
     const live = loadCoffeeExperts(worktree);
     const avoid = new Set(sectionKeys(worktree).map((text) => text.toLowerCase().replace(/ё/g, "е")));
+    const quotesOnSite = siteQuotes(worktree);
+    const packExperts = new Map(pack.articles.flatMap((brief) => brief.experts.map((slot) => [slot.id, brief.slug])));
     for (const brief of pack.articles) {
       if (existsSync(join(worktree, COFFEE.articlesDir, `${brief.slug}.ts`))) throw new CoffeeStop(2, `${brief.slug}: статья уже есть в разделе`);
     }
@@ -134,7 +147,7 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens: cliMax
       writeJson(join(outDir, brief.slug, "messages.json"), messages);
       const build = (raw) => {
         const article = assembleCoffeeArticle(brief, raw);
-        const problems = checkCoffeeArticle(article, brief, { experts: live, repoDir: worktree, avoid });
+        const problems = checkCoffeeArticle(article, brief, { experts: live, repoDir: worktree, avoid, siteQuotes: quotesOnSite, packExperts });
         return { article, problems };
       };
       let raw;
@@ -231,6 +244,7 @@ export function prBody(state, items, pack) {
     "- Codex дорабатывает тексты в этой ветке обычными коммитами, без force-push;",
     "- обновить ожидания scripts/business-coffee-guide-unit.mts (сейчас тест считает эталон единственной статьёй и сверяет sitemap);",
     "- независимая вычитка: факты, вступление сразу по теме (без истории), эксперты по источникам, ссылки;",
+    "- тон: предупреждения о повелительных формах и запретах «Не …йте» проверить по тексту, детектор может пропустить просьбу в предложении с «вы» (scripts/writer/README.md, «Тон: известные ограничения»);",
     "- публикацию (merge и деплой) делает Codex после доводки; Райтер не публикует.",
   ].join("\n");
 }
