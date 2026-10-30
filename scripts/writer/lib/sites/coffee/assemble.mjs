@@ -35,11 +35,24 @@ const plain = (text) => normalizeText(text).replace(/\[([^\]]+)\]\([^)]*\)/g, "$
 const ids = ["part-1a", "part-1b", "part-2a", "part-2b", "part-2c"];
 
 function sections(list, offset) {
-  return (list ?? []).map((item, i) => ({
-    id: ids[offset + i] ?? `part-${offset + i}`,
-    heading: plain(item.heading),
-    paragraphs: (item.paragraphs ?? []).map(paragraph),
-  }));
+  return (list ?? []).map((item, i) => {
+    const out = {
+      id: ids[offset + i] ?? `part-${offset + i}`,
+      heading: plain(item.heading),
+      paragraphs: (item.paragraphs ?? []).map(paragraph),
+    };
+    // Optional H3 subsections (SEO audit 30.10.2026): only when the model wrote them.
+    const subsections = (item.subsections ?? [])
+      .map((sub) => ({ heading: plain(sub.heading), paragraphs: (sub.paragraphs ?? []).map(paragraph) }))
+      .filter((sub) => sub.heading && sub.paragraphs.length);
+    if (subsections.length) out.subsections = subsections;
+    return out;
+  });
+}
+
+/** Today in Moscow as YYYY-MM-DD (the owner's zone). */
+export function moscowDate(now = new Date()) {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
 function slot(brief, index, fields) {
@@ -57,18 +70,29 @@ function slot(brief, index, fields) {
 
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
-export function assembleCoffeeArticle(brief, fields) {
+/**
+ * @param options.today YYYY-MM-DD for publishedAt/updatedAt when the brief has none (default: today in Moscow).
+ * Dates go only to markup (JSON-LD, article:published_time / modified_time, sitemap lastmod); the page never prints them.
+ */
+export function assembleCoffeeArticle(brief, fields, { today = moscowDate() } = {}) {
+  const publishedAt = brief.publishedAt || today;
   return {
     verticalId: COFFEE.verticalId,
     slug: brief.slug,
     title: brief.title,
     seoTitle: plain(fields.seoTitle),
     description: plain(fields.description),
+    publishedAt,
+    updatedAt: brief.updatedAt || publishedAt,
     primaryQuery: brief.primaryQuery,
     relatedQueries: brief.relatedQueries.map((query) => ({ phrase: query.phrase, frequency: query.frequency, note: brief.wordstatNote || COFFEE.wordstatNote })),
     hero: { src: COFFEE.heroSrc, alt: plain(fields.heroAlt), caption: "Четыре чашки – четыре характера кофейни." },
+    // Generated text card (own artwork), written by og-card.py in applyCoffeePack.
+    ogImage: { src: COFFEE.ogSrc(brief.slug), alt: `${brief.title} – текстовая обложка ${COFFEE.byline}`, ...COFFEE.ogSize },
     // No opening story (owner rule 2026-10-30): the intro goes straight to the topic, query first.
-    intro: (fields.intro ?? []).map(plain),
+    // Intro paragraphs may carry [анкор](адрес) links to sibling guides.
+    intro: (fields.intro ?? []).map(paragraph),
+    summary: (fields.summary ?? []).map(plain).filter(Boolean),
     question: plain(fields.question),
     partOne: sections(fields.partOne, 0),
     table: {

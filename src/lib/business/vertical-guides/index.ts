@@ -20,7 +20,7 @@ export {
   getVerticalArticle,
   listVerticalArticles,
 } from "./registry";
-export { listVerticalGuideSitemapPaths } from "./sitemap";
+export { listVerticalGuideSitemapEntries, listVerticalGuideSitemapPaths } from "./sitemap";
 export type {
   B2BVertical,
   GuideExpertSlot,

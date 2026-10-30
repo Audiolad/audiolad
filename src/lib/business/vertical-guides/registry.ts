@@ -51,7 +51,7 @@ function walkParagraphs(blocks: readonly GuideParagraph[], onPart: (part: TextPa
 }
 
 function articleParagraphBlocks(article: VerticalGuideArticle): GuideParagraph[] {
-  const blocks: GuideParagraph[] = [];
+  const blocks: GuideParagraph[] = [...article.intro];
   for (const section of [...article.partOne, ...article.partTwo]) {
     blocks.push(...section.paragraphs);
     for (const subsection of section.subsections ?? []) {
@@ -74,7 +74,6 @@ export function collectArticleText(article: VerticalGuideArticle): string[] {
     article.question,
     article.hero.caption,
     article.hero.alt,
-    ...article.intro,
     ...[...article.partOne, ...article.partTwo].flatMap((section) => [
       section.heading,
       ...(section.subsections ?? []).map((subsection) => subsection.heading),

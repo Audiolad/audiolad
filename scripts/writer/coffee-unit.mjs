@@ -235,9 +235,9 @@ test("tone sample is verbatim from the reference article", () => {
 // ── rules ────────────────────────────────────────────────────────────────────
 
 test("reference intro (no story, query first) passes all coffee rules", () => {
-  // The reference has 22.5 imperatives per 1000 words: above the 20 target (warning), below the 25 error.
+  // The reference has 22.1 imperatives per 1000 words: above the 20 target (warning), below the 25 error.
   assert.deepEqual(errorsOf(check(fields)), []);
-  assert.deepEqual(check(fields).map((p) => p.message), ["повелительных глаголов 22.5 на 1000 слов (цель ≤ 20)"]);
+  assert.deepEqual(check(fields).map((p) => p.message), ["повелительных глаголов 22.1 на 1000 слов (цель ≤ 20)"]);
 });
 
 test("helpers: dialogue, names, query words, links, typography", () => {
@@ -471,7 +471,13 @@ test("applyCoffeePack writes into a scratch tree only", () => {
     spawnSync("mkdir", ["-p", dirname(registry), join(dir, COFFEE.articlesDir)]);
     writeFileSync(registry, readFileSync(join(root, COFFEE.registryFile), "utf8"));
     const { changed } = applyCoffeePack(dir, { items: [{ article: assembleCoffeeArticle(brief, fields) }], packId: "p", model: "m" });
-    assert.deepEqual(changed, [`${COFFEE.articlesDir}/${brief.slug}.ts`, COFFEE.registryFile]);
+    assert.deepEqual(changed, [`${COFFEE.articlesDir}/${brief.slug}.ts`, `${COFFEE.ogDir}/${brief.slug}.jpg`, COFFEE.registryFile]);
+    // og:image text card (own artwork): JPEG 1200×630 from og-card.py.
+    const jpg = readFileSync(join(dir, COFFEE.ogDir, `${brief.slug}.jpg`));
+    assert.equal(jpg.readUInt16BE(0), 0xffd8, "JPEG");
+    let at = 2;
+    while (at < jpg.length && ![0xc0, 0xc2].includes(jpg[at + 1])) at += 2 + jpg.readUInt16BE(at + 2);
+    assert.deepEqual([jpg.readUInt16BE(at + 7), jpg.readUInt16BE(at + 5)], [1200, 630]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -646,6 +652,50 @@ test("PR body names template, byline and the coffee guide test to update", () =>
   assert.match(body, /черновик Райтера, не публикация/);
   assert.match(body, /Codex делает финальную доводку и публикует/);
   assert.doesNotMatch(body, /\u2014/);
+});
+
+test("SEO audit 30.10.2026: dates in markup only, og card, «Коротко», ≥3 in-text guide links, FAQ 7–8", () => {
+  const article = assembleCoffeeArticle(brief, fields, { today: "2026-11-02" });
+  assert.equal(article.publishedAt, "2026-11-02");
+  assert.equal(article.updatedAt, "2026-11-02");
+  assert.deepEqual(article.ogImage, { src: `/images/b/coffee/og/${brief.slug}.jpg`, alt: `${brief.title} – текстовая обложка АудиоЛад Кофейни`, width: 1200, height: 630 });
+  assert.ok(article.summary.length >= 3 && article.summary.length <= 5);
+  assert.ok(Array.isArray(article.intro[0]), "intro paragraphs are GuideParagraph arrays (links allowed)");
+  const dated = assembleCoffeeArticle({ ...brief, publishedAt: "2026-10-29", updatedAt: "2026-10-30" }, fields);
+  assert.equal(dated.publishedAt, "2026-10-29");
+  assert.equal(dated.updatedAt, "2026-10-30");
+  assert.deepEqual(COFFEE.limits.faq, [7, 8]);
+  const schema = coffeeArticleSchema();
+  assert.ok(schema.required.includes("summary"));
+  assert.equal(schema.properties.faq.maxItems, 8);
+  assert.ok(schema.properties.partOne.items.required.includes("subsections"));
+  const prompt = buildCoffeeMessages(brief, { experts }).map((m) => m.content).join("\n");
+  assert.match(prompt, /инфинитив/);
+  assert.match(prompt, /summary/);
+  assert.match(prompt, /ДАТЫ: .*только в разметку/);
+  assert.doesNotMatch(prompt, /глагол в повелительном наклонении/);
+});
+
+test("SEO audit rules: visible dates, year in seoTitle, few links, summary size and imperative steps", () => {
+  const messages = (mutate, b = brief) => {
+    const f = structuredClone(fields);
+    mutate(f);
+    return checkCoffeeArticle(assembleCoffeeArticle(b, f, { today: "2026-10-30" }), b, { experts, repoDir: root });
+  };
+  const errorsOf = (list) => list.filter((p) => p.severity === "error").map((p) => p.message).join("\n");
+  assert.equal(errorsOf(messages(() => {})), "");
+  assert.match(errorsOf(messages((f) => { f.faq[0].answer += " Обновлено 30.10.2026."; })), /дата статьи в видимом тексте/);
+  assert.match(errorsOf(messages((f) => { f.seoTitle = `${f.seoTitle.split(":")[0]}: выбор 2026`; })), /seoTitle без года/);
+  assert.match(errorsOf(messages((f) => { f.summary = f.summary.slice(0, 2); })), /«Коротко»/);
+  assert.match(errorsOf(messages((f) => { f.faq = f.faq.slice(0, 6); })), /7–8 вопросов/);
+  const unlinked = (f) => {
+    for (const s of [...f.partOne, ...f.partTwo]) s.paragraphs = s.paragraphs.map((p) => p.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"));
+  };
+  assert.match(errorsOf(messages(unlinked)), /не меньше 3 ссылок на разные статьи раздела/);
+  const warnings = messages((f) => { f.steps.items[0].title = "Посчитайте расход"; }).filter((p) => p.severity === "warning").map((p) => p.message).join("\n");
+  assert.match(warnings, /инфинитивом/);
+  const briefProblems = (() => { try { const raw = readJson(packFile); normalizeCoffeePack({ ...raw, articles: raw.articles.map((a) => ({ ...a, links: [] })) }, { experts, repoDir: root }); return ""; } catch (error) { return error.message; } })();
+  assert.match(briefProblems, /не меньше 3 адресов статей раздела/);
 });
 
 for (const [name, fn] of tests) {

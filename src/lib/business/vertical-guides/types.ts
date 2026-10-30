@@ -97,6 +97,14 @@ export type GuideFigure = {
   caption: string;
 };
 
+/** Generated text card (own artwork, not a photo) for social previews and JSON-LD. */
+export type GuideOgImage = {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+};
+
 export type VerticalGuideArticle = {
   verticalId: "coffee";
   slug: string;
@@ -110,13 +118,23 @@ export type VerticalGuideArticle = {
    * phrase is not in that file.
    */
   relatedQueries: Array<{ phrase: string; frequency: number | null; note: string }>;
+  /**
+   * ISO dates (YYYY-MM-DD). Owner decision: never rendered on the page.
+   * Used only in JSON-LD Article, sitemap lastmod and article:*_time meta.
+   */
+  publishedAt: string;
+  updatedAt: string;
   /** Social preview and JSON-LD image. Not rendered in the article header. */
   hero: GuideFigure;
-  /** Paragraphs right under the H1. */
-  intro: string[];
-  /** Heading above the «Четыре чашки» slider. */
+  /** Text card for og:image and JSON-LD (public/images/b/coffee/og/<slug>.png). */
+  ogImage: GuideOgImage;
+  /** Paragraphs right under the H1 (may carry internal links). */
+  intro: GuideParagraph[];
+  /** «Коротко» box under the intro: 3–5 one-sentence takeaways. */
+  summary: string[];
+  /** Lead-in above the «Четыре чашки» slider (shown after partOne[0], not a heading). */
   question: string;
-  /** [0] before the atlas cover banner, [1] before the table. */
+  /** [0] before the «Четыре чашки» slider, [1] before the table. */
   partOne: [GuideSection, GuideSection];
   table: GuideTable;
   expertOne: GuideExpertSlot;
@@ -143,6 +161,8 @@ export type B2BVertical = {
   kicker: string;
   byline?: string;
   intro: string;
+  /** «О разделе» block on the section index (anchor #o-razdele); byline links there. */
+  about?: string[];
   /** Venue landing reserved by the business page, when one exists. */
   reservedVenuePath: string | null;
 };

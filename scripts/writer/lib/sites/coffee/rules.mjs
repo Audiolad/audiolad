@@ -165,12 +165,17 @@ export function visibleTexts(article) {
   const out = [
     ["title", article.title], ["seoTitle", article.seoTitle], ["description", article.description],
     ["question", article.question], ["hero.alt", article.hero.alt], ["hero.caption", article.hero.caption],
-    ...article.intro.map((text, i) => [`intro[${i}]`, text]),
+    ...article.intro.map((paragraph, i) => [`intro[${i}]`, partText(paragraph)]),
+    ...(article.summary ?? []).map((text, i) => [`summary[${i}]`, text]),
   ];
   const sections = [...article.partOne.map((s, i) => [`partOne[${i}]`, s]), ...article.partTwo.map((s, i) => [`partTwo[${i}]`, s])];
   for (const [field, section] of sections) {
     out.push([`${field}.heading`, section.heading]);
     section.paragraphs.forEach((p, i) => out.push([`${field}.paragraphs[${i}]`, partText(p)]));
+    (section.subsections ?? []).forEach((sub, j) => {
+      out.push([`${field}.subsections[${j}].heading`, sub.heading]);
+      sub.paragraphs.forEach((p, i) => out.push([`${field}.subsections[${j}].paragraphs[${i}]`, partText(p)]));
+    });
   }
   out.push(["table.heading", article.table.heading], ["table.caption", article.table.caption]);
   article.table.intro.forEach((p) => out.push(["table.intro", partText(p)]));
@@ -196,7 +201,8 @@ export function visibleTexts(article) {
 
 export function textLinks(article) {
   const paragraphs = [
-    ...[...article.partOne, ...article.partTwo].flatMap((s) => s.paragraphs),
+    ...article.intro,
+    ...[...article.partOne, ...article.partTwo].flatMap((s) => [...s.paragraphs, ...(s.subsections ?? []).flatMap((sub) => sub.paragraphs)]),
     ...article.table.intro, ...article.table.after,
     ...[article.expertOne, article.expertTwo].flatMap((slot) => [...slot.lead, ...slot.after]),
   ];
@@ -277,6 +283,22 @@ export function kanceliarit(text) {
 export function authorProse(article) {
   return visibleTexts(article).filter(([field]) => /^intro\[|\.paragraphs\[|^table\.(intro|after)$|\.(lead|after)$|^steps\.intro$|^steps\.items\[\d+\]\.text$|^faq\[\d+\]\.answer$|^checklist\.(note|doneNote)$/.test(field));
 }
+/** The text opens with an imperative («Посчитайте…», «Не ставьте…»). */
+export function startsImperative(text) {
+  const idx = imperativeIndexes(text);
+  const list = sentenceWords(text);
+  return idx.includes(0) || (list[0] === "не" && idx.includes(1));
+}
+
+const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+/** The article's own dates in the forms a reader would see: 2026-10-30, 30.10.2026, 30 октября 2026. */
+export function visibleDateForms(article) {
+  return [article.publishedAt, article.updatedAt].filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date ?? "")).flatMap((date) => {
+    const [y, m, d] = date.split("-");
+    return [date, `${d}.${m}.${y}`, `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`];
+  });
+}
+
 /** Tone metrics of a list of [field, text] (authorProse by default). */
 export function toneMetrics(texts) {
   let total = 0, imperatives = 0, imperativeStarts = 0, explanatory = 0, wordCount = 0;
@@ -368,7 +390,7 @@ export function checkCoffeeArticle(article, brief, env) {
   }
 
   // Intro: no opening story (owner rule 2026-10-30) – straight to the practical topic, query first.
-  const intro = article.intro;
+  const intro = article.intro.map(partText);
   const introText = intro.join("\n");
   if (intro.length < L.intro[0] || intro.length > L.intro[1]) error("intro", `вступление – ${L.intro[0]}–${L.intro[1]} абзаца, сейчас ${intro.length}`);
   const introWords = words(introText);
@@ -379,6 +401,24 @@ export function checkCoffeeArticle(article, brief, env) {
   if (FIRST_PERSON.test(introText)) error("intro", "вступление без рассказчика «я/мы» – статья не открывается историей");
   if (STORY_MARKERS.test(introText)) error("intro", `похоже на историю («${introText.match(STORY_MARKERS)[2]}») – статьи о кофейнях начинаются сразу с практической темы`);
 
+  // «Коротко»: 3–5 short takeaways under the intro.
+  const summary = article.summary ?? [];
+  if (summary.length < L.summary[0] || summary.length > L.summary[1]) error("summary", `блок «Коротко» – ${L.summary[0]}–${L.summary[1]} пунктов, сейчас ${summary.length}`);
+  for (const [i, item] of summary.entries()) {
+    const n = words(item);
+    if (n < L.summaryItemWords[0] || n > L.summaryItemWords[1]) warn(`summary[${i}]`, `пункт «Коротко» – ${L.summaryItemWords[0]}–${L.summaryItemWords[1]} слов, сейчас ${n}`);
+  }
+
+  // Dates and og image: markup only (owner rule 30.10.2026) – JSON-LD, OG meta and sitemap; never on the page.
+  const ISO = /^\d{4}-\d{2}-\d{2}$/;
+  for (const key of ["publishedAt", "updatedAt"]) if (!ISO.test(article[key] ?? "")) error(key, `${key} – дата ГГГГ-ММ-ДД для разметки`);
+  if (ISO.test(article.publishedAt ?? "") && ISO.test(article.updatedAt ?? "") && article.updatedAt < article.publishedAt) error("updatedAt", "updatedAt не раньше publishedAt");
+  for (const [field, text] of texts) {
+    if (visibleDateForms(article).some((form) => String(text).includes(form)) || /(^|[^а-яё])(обновлено|опубликовано|дата публикации)(?![а-яё])/i.test(text)) error(field, "дата статьи в видимом тексте – даты только в разметке, на странице их нет");
+  }
+  const og = article.ogImage;
+  if (!og || og.src !== COFFEE.ogSrc(article.slug) || og.width !== COFFEE.ogSize.width || og.height !== COFFEE.ogSize.height || !og.alt) error("ogImage", `ogImage – текстовая обложка ${COFFEE.ogSrc(article.slug)} ${COFFEE.ogSize.width}×${COFFEE.ogSize.height} с alt`);
+
   // No invented numbers or statistics: every claim must come from a brief fact with a named source.
   for (const [field, message] of ungroundedClaims(texts.filter(([f]) => !/^readMore|\.translation$/.test(f)), brief, env.experts)) error(field, message);
 
@@ -387,6 +427,7 @@ export function checkCoffeeArticle(article, brief, env) {
   if (article.seoTitle.length > L.seoTitleMax) error("seoTitle", `seoTitle ≤ ${L.seoTitleMax} символов, сейчас ${article.seoTitle.length}`);
   if (!norm(article.seoTitle).startsWith(norm(q))) error("seoTitle", `seoTitle начинается с «${q}»`);
   if (!/^[А-ЯЁ]/.test(article.seoTitle)) error("seoTitle", "seoTitle начинается с заглавной буквы");
+  if (/(^|\D)(19|20)\d{2}(?!\d)/.test(article.seoTitle)) error("seoTitle", "seoTitle без года – статьи вечнозелёные, даты только в разметке");
   if (article.description.length < L.description[0] || article.description.length > L.description[1]) error("description", `description ${L.description[0]}–${L.description[1]} символов, сейчас ${article.description.length}`);
   if (!countQuery(article.description, q)) error("description", `description должна содержать запрос «${q}» дословно, в той же форме и падеже`);
   if (!countQuery(article.hero.alt, q)) error("hero.alt", `alt картинки содержит «${q}»`);
@@ -421,6 +462,9 @@ export function checkCoffeeArticle(article, brief, env) {
     for (const cell of row) if (words(cell) > 25) warn(`table.rows[${i}]`, "длинное значение – на телефоне карточка станет тяжёлой");
   }
   if (article.steps.items.length !== 3) error("steps", "ровно 3 шага");
+  // Steps and checklist without the imperative (SEO audit 30.10.2026): «Посчитать расход», «На пачке есть дата обжарки».
+  for (const [i, item] of article.steps.items.entries()) if (startsImperative(item.title)) warn(`steps.items[${i}].title`, `«${item.title}» – заголовок шага инфинитивом («Посчитать расход»), без повелительного наклонения`);
+  for (const [i, item] of article.checklist.items.entries()) if (startsImperative(item.text)) warn(`checklist.items[${i}]`, `«${item.text}» – пункт чек-листа готовым результатом («Объём заказа рассчитан…»), без повелительного наклонения`);
   if (!/^Три шага/.test(article.steps.heading)) warn("steps.heading", "заголовок обычно начинается с «Три шага»");
   if (article.checklist.items.length !== L.checklist) error("checklist", `ровно ${L.checklist} пунктов`);
   if (article.faq.length < L.faq[0] || article.faq.length > L.faq[1]) error("faq", `${L.faq[0]}–${L.faq[1]} вопросов`);
@@ -440,6 +484,8 @@ export function checkCoffeeArticle(article, brief, env) {
   for (const link of article.readMore) if (!isInternalHref(link.href)) error("readMore", `только внутренние ссылки: ${link.href}`);
   const used = new Set(textLinks(article).map((link) => link.href));
   if (brief.links.length && used.size === 0) warn("links", "в тексте нет ни одной ссылки из брифа");
+  const guideLinks = [...used].filter((href) => href.startsWith(`${COFFEE.verticalPath}/`) && href.split(/[?#]/)[0] !== `${COFFEE.verticalPath}/${article.slug}`);
+  if (guideLinks.length < L.textLinksMin) error("links", `в тексте не меньше ${L.textLinksMin} ссылок на разные статьи раздела, сейчас ${guideLinks.length}`);
 
   // Experts: registry, licensed portrait, Russian-only, pair man/woman and ru/foreign.
   for (const [i, key] of ["expertOne", "expertTwo"].entries()) {
