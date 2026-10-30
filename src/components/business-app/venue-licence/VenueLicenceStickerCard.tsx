@@ -57,11 +57,11 @@ export default function VenueLicenceStickerCard({
           className="business-app-btn business-app-btn-secondary business-app-focus-ring"
           data-testid="biz-venue-sticker-a6"
         >
-          Скачать тент A6
+          Скачать тент А6
         </a>
       </div>
       <p className="text-xs leading-5 text-[var(--biz-text-muted)]">
-        Файлы в формате SVG с полями под обрез: их можно распечатать из браузера или отдать в типографию.
+        Векторные файлы с полями под обрез: их можно распечатать из браузера или отдать в типографию.
       </p>
     </section>
   );

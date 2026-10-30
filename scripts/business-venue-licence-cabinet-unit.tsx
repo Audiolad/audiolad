@@ -129,7 +129,7 @@ async function main() {
   assert.ok(card.includes(`href="${venueLicencePublicUrl(PUBLIC_A)}" target="_blank" rel="noopener noreferrer"`));
   assert.match(card, />Открыть страницу проверки</);
   assert.match(card, />Скачать наклейку 80×80 мм</);
-  assert.match(card, />Скачать тент A6</);
+  assert.match(card, />Скачать тент А6</);
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "square80").replaceAll("&", "&amp;")}"`));
   assert.ok(card.includes(`href="${venueStickerHref(LOC_A, "a6").replaceAll("&", "&amp;")}"`));
   assert.match(card, /data-placement="documents"/);
