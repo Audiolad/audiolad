@@ -176,7 +176,7 @@ for (const path of ["/guest/coffee", "/music", "/"]) {
   const layout = read("src/app/business-app/layout.tsx");
   has(layout, /resolveBusinessAccess\(domain\)\.level === "guest" && !hasLiveBusinessAccess\(customerAccess\)\s*\?\s*guestCoffeeLimitState\(await peekGuestCoffeeUsage\(\)\)\s*:\s*null/, "layout peeks the server meter for guests without a live gift only");
   has(layout, /const customerAccess = domain\.status === "authenticated" \? await peekBusinessChromeAccess\(\) : null;/, "layout reads the gift state (read-only) for signed-in visitors");
-  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\}>/);
+  has(layout, /<BusinessAppShell initialGuestLimit=\{initialGuestLimit\} customerAccess=\{customerAccess\} pointReports=\{pointReports\} initialEntry=\{initialEntry\}>/);
   const peek = read("src/lib/access-grants/peek.server.ts") + read("src/lib/access-grants/peek-reader.server.ts") + read("src/lib/access-grants/peek-closure.ts");
   hasNot(peek, /\.rpc\(|\.insert\(|\.upsert\(|\.update\(|\.delete\(|activateBusinessTrial\(|insertGrant\(/, "chrome access peek is read-only (no gift issue, no identity binding)");
 }
