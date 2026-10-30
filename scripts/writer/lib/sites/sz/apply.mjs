@@ -27,6 +27,14 @@ export function ruleConfig(article, date, pool = defaultExpertPool()) {
     experts: article.experts.map((expert) => ({ name: expert.name, quote: expert.quote, forbiddenInBridge: expert.forbiddenInBridge ?? [] })),
     verbatim: article.verbatim ?? [],
     forbiddenPhrases: article.forbiddenPhrases ?? [],
+    additionalQueries: article.additionalQueries ?? [],
+    additionalQueryForms: article.additionalQueryForms ?? {},
+    requiredSlugs: article.links?.contextual ?? [],
+    linkAnchors: article.links?.anchors ?? [],
+    faqHints: article.faqHints ?? [],
+    examplePhrases: article.examplePhrases ?? null,
+    storyHeroine: article.storyHeroine ?? "",
+    practiceSubtitle: article.practice?.subtitle ?? "",
     materials: article.practice.materials,
     expertTags: Object.fromEntries(article.experts.map(({ name }) => [name, [pool.get(name)?.gender, pool.get(name)?.group]])),
     expertBans: article.experts.flatMap(({ name }) => (EXPERT_BANS[name] ?? []).map((ban) => ({ expert: name, name: ban.name, source: ban.re.source, flags: ban.re.flags }))),
@@ -166,7 +174,7 @@ ${experts.join("\n")}
 
 ## Ссылки и источники
 
-Исходящих ссылок на другие сайты нет: только внутренние \`/s/...\` и \`pageUrl/embedUrl\` практик на audiolad.ru. Источники цитат названы текстом.
+Исходящих ссылок на другие сайты нет: внутренние \`/s/...\`, \`pageUrl/embedUrl\` практики на audiolad.ru и перекрёстные адреса audiolad.ru / sergey-zoya.ru, включая \`www\` и поддомены. Голый домен чужого сайта (в том числе .рф, .рус, .москва, .дети, .онлайн, .сайт и punycode xn--), почта, чужой URL и такой же адрес в пути, query или якоре – ошибка. Источники цитат названы текстом, без адреса.
 
 ${links.join("\n")}
 

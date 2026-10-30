@@ -20,7 +20,7 @@ import { runChecks, runTests } from "./lib/checks.mjs";
 import { loadContext } from "./lib/context.mjs";
 import { applyToRepo } from "./lib/convert.mjs";
 import { SUPPORTED_MODELS, defaultModelFor, chargedCost, estimatePromptTokens, formatRub, parseLimits, worstCaseRub } from "./lib/cost.mjs";
-import { generateOnMoscow } from "./lib/moscow.mjs";
+import { generateOnMoscow, writerCallId } from "./lib/moscow.mjs";
 import { normalizeArticle } from "./lib/normalize.mjs";
 import { articleSchema, buildExpandMessages, buildMessages, buildRepairMessages, buildRequest, expandSchema, mergeExpansion } from "./lib/prompt.mjs";
 import { commit, pushAndOpenDraft, secretScan } from "./lib/publish.mjs";
@@ -33,6 +33,16 @@ const { values: args } = parseArgs({
     brief: { type: "string" },
     model: { type: "string" },
     "dry-run": { type: "boolean", default: false },
+    "repair-model": { type: "string" },
+    "repair-max-tokens": { type: "string" },
+    "repair-mode": { type: "string" },
+    "tier-cheap-model": { type: "string" },
+    "tier-strong-model": { type: "string" },
+    "tier-cheap-tries": { type: "string" },
+    "tier-cheap-max-tokens": { type: "string" },
+    "tier-strong-max-tokens": { type: "string" },
+    "tier-cheap-budget": { type: "string" },
+    "tier-strong-budget": { type: "string" },
     "no-repair": { type: "boolean", default: false },
     offline: { type: "boolean", default: false },
     article: { type: "string" },
@@ -68,11 +78,19 @@ if (args.help || (!args.brief && !szMode) || (szMode && !args.briefs && !args.br
   process.stdout.write([
     "Использование: npx tsx scripts/writer/run.mjs --brief brief.json [--model M] [--dry-run] [--no-repair] [--offline] [--article a.json] [--max-rub 3]",
     "  sergey-zoya.ru: --site sz --repo <клон sergey-zoya-site> --briefs pack.json [--experts EXPERTS_RU.md] [--dry-run] [--offline --fixtures dir] [--skip-build] [--max-rub 3]",
+    "                  [--repair-model M] [--repair-max-tokens N] [--repair-mode full|targeted|tiered]",
+    "                  [--tier-cheap-model M] [--tier-strong-model M] [--tier-cheap-tries N]",
+    "                  [--tier-cheap-max-tokens N] [--tier-strong-max-tokens N]",
+    "                  [--tier-cheap-budget RUB] [--tier-strong-budget RUB]",
     "                  --site sz --repo <клон> --experts-report   (эксперты пула: кто реже использован, есть ли портрет)",
     "См. scripts/writer/README.md",
     "",
   ].join("\n"));
   process.exit(args.help ? 0 : 1);
+}
+if (!szMode && ["repair-model", "repair-max-tokens", "repair-mode", "tier-cheap-model", "tier-strong-model", "tier-cheap-tries", "tier-cheap-max-tokens", "tier-strong-max-tokens", "tier-cheap-budget", "tier-strong-budget"].some((flag) => args[flag] !== undefined)) {
+  process.stderr.write("Флаги repair и tier доступны только для --site sz\n");
+  process.exit(1);
 }
 args.model = defaultModelFor(args.site, args.model);
 if (!SUPPORTED_MODELS.includes(args.model)) {
@@ -105,7 +123,7 @@ if (szMode) {
 const brief = loadBrief(resolve(args.brief));
 const today = mskDate();
 const stamp = mskNow().slice(11, 16).replace(":", "");
-const runId = `${today}-${stamp}-${brief.slug}`.slice(0, 100);
+const runId = writerCallId(`${today}-${stamp}-${brief.slug}`, { maxLength: 100 });
 const outDir = resolve(args.out ?? join(homedir(), ".cache/writer/runs", runId));
 const repoRoot = mustRun("git", ["rev-parse", "--show-toplevel"]).trim();
 const worktree = join(outDir, "worktree");
@@ -130,7 +148,8 @@ function prepareWorktree() {
   state.baseSha = mustRun("git", ["rev-parse", "HEAD"], { cwd: worktree }).trim();
 }
 
-function callWriter(callName, messages, schema) {
+function callWriter(rawName, messages, schema) {
+  const callName = writerCallId(rawName);
   const request = buildRequest(model, messages, schema, { maxTokens });
   const worst = worstCaseRub(model, estimatePromptTokens(messages, model), maxTokens);
   if (state.spentRub + worst > maxRub) {

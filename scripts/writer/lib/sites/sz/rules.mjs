@@ -2,7 +2,8 @@
 // Self-contained on purpose (no imports): apply.mjs copies this file's text into
 // scripts/check-stageNN-articles.mjs of the site, so the site checks exactly what «Райтер» checked.
 // Rules = check-stage24-articles.mjs (sz, angel-hranitel) + editorial lessons from the angel edits
-// (EDITS.md) + Sergey's rules: no outgoing links except the practice on audiolad.ru, en dash only,
+// (EDITS.md) + Sergey's rules: no outgoing links to other websites (internal /s/ and
+// cross-links of audiolad.ru and sergey-zoya.ru only; a bare domain or e-mail counts too), en dash only,
 // practice is described only positively (no discomfort priming), MAX only via the default funnel label.
 // Each problem: { code, field, message, severity: "error" | "warn" }. Warnings never fail the gate.
 
@@ -10,7 +11,1228 @@ export const SZ_RULES_VERSION = 1;
 
 export const words = (text) => String(text).match(/[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu)?.length ?? 0;
 export const normalize = (text) => String(text).trim().replace(/,/g, "").replace(/\s+/g, " ").toLocaleLowerCase("ru").replace(/ё/g, "е");
+// A copied or lightly edited paragraph. 0.9 on similar-length word sets; the approved angel article stays under it.
+export const PARAGRAPH_SIMILARITY = 0.9;
+const PARAGRAPH_MIN_WORDS = 8;
+
+export function paragraphTokens(text) {
+  return normalize(text).replace(/[^\p{L}\p{N}\s]+/gu, " ").replace(/\s+/g, " ").trim().split(" ").filter((token) => token.length >= 2);
+}
+
+/** 1 when the paragraphs are the same after normalization, else token Jaccard. Short lines stay at 0. */
+export function paragraphSimilarity(a, b) {
+  const left = paragraphTokens(a);
+  const right = paragraphTokens(b);
+  if (left.length < PARAGRAPH_MIN_WORDS || right.length < PARAGRAPH_MIN_WORDS) return 0;
+  if (left.join(" ") === right.join(" ")) return 1;
+  const shorter = Math.min(left.length, right.length);
+  const longer = Math.max(left.length, right.length);
+  if (shorter / longer < 0.75) return 0;
+  const aSet = new Set(left);
+  const bSet = new Set(right);
+  let shared = 0;
+  for (const token of aSet) if (bSet.has(token)) shared += 1;
+  const union = aSet.size + bSet.size - shared;
+  return union ? shared / union : 0;
+}
+
+export function paragraphsTooClose(a, b) {
+  return paragraphSimilarity(a, b) >= PARAGRAPH_SIMILARITY;
+}
+
+/** The one FAQ question that must stay about seeing a specialist. */
+export function isSpecialistQuestion(question) {
+  return /специалист|психолог|обратиться/iu.test(String(question ?? ""));
+}
+
+const GENERIC_LINK_ANCHORS = new Set(["материал", "здесь", "подробнее", "тут", "ссылка", "статья", "статье", "читать", "далее", "этом"]);
+/** Anchor is only a generic pointer («материал», «здесь», «подробнее»), not a description of the article. */
+export function genericLinkAnchor(anchor) {
+  const tokens = paragraphTokens(anchor).filter((token) => token.length >= 3);
+  if (!tokens.length) return true;
+  return tokens.every((token) => GENERIC_LINK_ANCHORS.has(token));
+}
+
+const NOT_WORD_BEFORE = String.raw`(?<![\p{L}\p{N}])`;
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+// Whole leads, longest first. JS `\b` is ASCII-only, so the boundary is a Unicode lookbehind.
+// «Читайте также» must not match inside «Прочитайте» / «Дочитайте» / «Перечитайте».
+const LINK_LEADS = [
+  "прочитайте также",
+  "прочитайте ещё",
+  "прочтите также",
+  "прочтите ещё",
+  "читайте также",
+  "читайте ещё",
+  "смотрите также",
+  "смотрите ещё",
+  "см. также",
+  "см. ещё",
+  "узнать больше",
+  "узнайте больше",
+  "подробнее",
+  "подробности",
+];
+const LINK_LEAD_PATTERN = [...LINK_LEADS]
+  .sort((a, b) => b.length - a.length)
+  .map((lead) => lead.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/е/g, "[её]"))
+  .join("|");
+// Colon, en dash, em dash, hyphen. The hyphen stays at the end of the class.
+const LEAD_SEPARATOR = "[:–—-]";
+
+/** One markdown link starting at `index`, with balanced [] in the anchor. Null for images and for a `[` that is not a link. */
+export function markdownLinkAt(text, index) {
+  const raw = String(text ?? "");
+  if (raw[index] !== "[" || (index > 0 && raw[index - 1] === "!")) return null;
+  let depth = 0;
+  let close = -1;
+  for (let i = index; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (ch === "\n") return null;
+    if (ch === "[") depth += 1;
+    else if (ch === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        close = i;
+        break;
+      }
+    }
+  }
+  if (close < 0 || raw[close + 1] !== "(") return null;
+  const hrefEnd = raw.indexOf(")", close + 2);
+  if (hrefEnd < 0) return null;
+  const href = raw.slice(close + 2, hrefEnd);
+  if (/[\s\n]/.test(href)) return null;
+  const anchor = raw.slice(index + 1, close);
+  const slug = /^\/s\/([a-z0-9-]+)$/u.exec(href)?.[1] ?? "";
+  return { anchor, href, slug, start: index, end: hrefEnd + 1, raw: raw.slice(index, hrefEnd + 1) };
+}
+
+/** Every markdown link in `text`. An inner `[…]` inside an anchor is not a second link. */
+export function markdownLinks(text) {
+  const raw = String(text ?? "");
+  const links = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const link = markdownLinkAt(raw, i);
+    if (!link) continue;
+    links.push(link);
+    i = link.end - 1;
+  }
+  return links;
+}
+
+export function anchorHasBrackets(anchor) {
+  return /[\[\]]/u.test(String(anchor ?? ""));
+}
+
+function realInternalLink(link) {
+  return Boolean(link?.slug && String(link.anchor ?? "").trim());
+}
+
+/** Length of one whole lead+separator+markdown link at `index`. 0 when the lead continues a word. */
+export function gluedLeadBodyLength(text, index = 0) {
+  const source = String(text ?? "");
+  if (index < 0 || index >= source.length) return 0;
+  if (index > 0 && WORD_CHAR.test(source[index - 1]) && WORD_CHAR.test(source[index])) return 0;
+  const head = source.slice(index).match(new RegExp(`^(?:${LINK_LEAD_PATTERN})`, "iu"));
+  if (!head) return 0;
+  const afterLead = index + head[0].length;
+  if (afterLead < source.length && WORD_CHAR.test(source[afterLead - 1]) && WORD_CHAR.test(source[afterLead])) return 0;
+  const sep = source.slice(afterLead).match(new RegExp(`^\\s*${LEAD_SEPARATOR}\\s*`, "u"));
+  if (!sep) return 0;
+  const link = markdownLinkAt(source, afterLead + sep[0].length);
+  if (!realInternalLink(link)) return 0;
+  let end = link.end;
+  if (source[end] === ".") end += 1;
+  return end - index;
+}
+
+/** A glued lead at a word boundary, including «Прочитайте также: [..]» and «Подробнее – [см. [это]]». */
+export function hasGluedLead(text) {
+  const source = String(text ?? "");
+  for (let i = 0; i < source.length; i += 1) {
+    if (i > 0 && WORD_CHAR.test(source[i - 1])) continue;
+    if (gluedLeadBodyLength(source, i)) return true;
+  }
+  return false;
+}
+
+function leadResidueSpan(raw, from = 0) {
+  const lead = new RegExp(`${NOT_WORD_BEFORE}(?:${LINK_LEAD_PATTERN})(?![\\p{L}\\p{N}])`, "giu");
+  for (const match of raw.matchAll(lead)) {
+    if (match.index < from) continue;
+    const after = raw.slice(match.index + match[0].length);
+    const sep = after.match(new RegExp(`^\\s*${LEAD_SEPARATOR}`, "u"));
+    if (!sep) continue;
+    const sepEnd = match.index + match[0].length + sep[0].length;
+    const ws = raw.slice(sepEnd).match(/^\s*/u)?.[0] ?? "";
+    const link = markdownLinkAt(raw, sepEnd + ws.length);
+    if (realInternalLink(link)) continue;
+    const line = raw.slice(sepEnd).split("\n", 1)[0];
+    if (!/^[\s\p{P}]*$/u.test(line)) continue;
+    let end = sepEnd;
+    while (end < raw.length && raw[end] !== "\n" && /[\s.!?…]/u.test(raw[end])) end += 1;
+    return { start: match.index, end, label: raw.slice(match.index, end).replace(/\s+/g, " ").trim() };
+  }
+  return null;
+}
+
+function punctuationResidueSpans(raw) {
+  const spans = [];
+  for (const match of raw.matchAll(/(?<!!)\[\s*\]\([^)\n]*\)/g)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  for (const match of raw.matchAll(/:\s*\.(?=\s|$|[»”’"])/gu)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  // Closing quotes only. ASCII " before a letter opens a quotation («сказал: "Цвет…»).
+  for (const match of raw.matchAll(/:\s*(?=[»”’])/gu)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  for (const match of raw.matchAll(/:\s*"(?![\p{L}\p{N}])/gu)) spans.push({ start: match.index, end: match.index + match[0].length, label: match[0] });
+  return spans;
+}
+
+/** A lead whose separator and link were cut away, leaving the lead. Unchanged prose is not residue. */
+export function linkRemovedResidue(draft, repaired) {
+  if (typeof draft !== "string" || typeof repaired !== "string" || draft === repaired) return [];
+  const spans = deletionSpans(draft, repaired);
+  if (!spans) return [];
+  const hits = [];
+  const leadBefore = new RegExp(`(?:${LINK_LEAD_PATTERN})$`, "iu");
+  for (const [start, end] of spans) {
+    const deleted = draft.slice(start, end);
+    if (!markdownLinks(deleted).some((link) => link.slug)) continue;
+    const before = draft.slice(0, start);
+    const lead = before.match(leadBefore);
+    const sepFirst = new RegExp(`^\\s*${LEAD_SEPARATOR}`, "u").test(deleted) || new RegExp(`\\s*${LEAD_SEPARATOR}\\s*$`, "u").test(before);
+    if (!lead || !sepFirst) continue;
+    hits.push(lead[0]);
+  }
+  return hits;
+}
+
+/**
+ * Orphan link glue. A whole lead plus an explicit «:» / «–» / «—» / «-», then only punctuation.
+ * «Расскажем подробнее.» has no separator and is not residue. A real [анкор](/s/…) is not residue.
+ * Pass `draft` to also flag a lead whose link the repair removed.
+ */
+export function linkLeadResidue(text, draft) {
+  const raw = String(text ?? "");
+  const hits = [];
+  let from = 0;
+  let guard = 0;
+  while (guard < 12) {
+    const span = leadResidueSpan(raw, from);
+    if (!span) break;
+    if (span.label) hits.push(span.label);
+    from = Math.max(span.end, span.start + 1);
+    guard += 1;
+  }
+  for (const span of punctuationResidueSpans(raw)) hits.push(span.label);
+  if (typeof draft === "string") hits.push(...linkRemovedResidue(draft, raw));
+  return hits;
+}
+
+function wordBoundary(text, index) {
+  if (index <= 0 || index >= text.length) return true;
+  return !(WORD_CHAR.test(text[index - 1]) && WORD_CHAR.test(text[index]));
+}
+
+function joinsLetters(text, start, end) {
+  if (start <= 0 || end >= text.length) return false;
+  return WORD_CHAR.test(text[start - 1]) && WORD_CHAR.test(text[end]);
+}
+
+function spanIsWholeLeadOrToken(span, original = "", start = 0) {
+  const leadSpace = /^\s/u.test(span) ? 1 : 0;
+  const trimmed = span.trim();
+  const trailSpace = trimmed && span.endsWith(" ") ? span.length - leadSpace - trimmed.length : 0;
+  const core = span.slice(leadSpace, span.length - trailSpace);
+  if (core && gluedLeadBodyLength(core, 0) === core.length) return true;
+  const link = markdownLinkAt(core, 0);
+  if (!link || link.end !== core.length || !link.slug) return false;
+  const before = original.slice(0, start + leadSpace);
+  if (new RegExp(`(?:${LINK_LEAD_PATTERN})\\s*${LEAD_SEPARATOR}\\s*$`, "iu").test(before)) return false;
+  return true;
+}
+
+/** Pure deletions that turn `original` into `next`. Null when `next` inserts or replaces text. */
+function deletionSpans(original, next) {
+  if (typeof original !== "string" || typeof next !== "string" || next.length > original.length) return null;
+  const spans = [];
+  let o = 0;
+  let s = 0;
+  while (o < original.length && s < next.length) {
+    if (original[o] === next[s]) {
+      o += 1;
+      s += 1;
+      continue;
+    }
+    const rest = next.slice(s);
+    const probe = rest.slice(0, Math.min(80, rest.length));
+    const found = original.indexOf(probe, o + 1);
+    if (found < 0) return null;
+    spans.push([o, found]);
+    o = found;
+  }
+  if (s < next.length) return null;
+  if (o < original.length) spans.push([o, original.length]);
+  return spans;
+}
+
+function fragmentLabel(original, start, end) {
+  let wordStart = start;
+  while (wordStart > 0 && WORD_CHAR.test(original[wordStart - 1])) wordStart -= 1;
+  const kept = original.slice(wordStart, start);
+  if (kept.length >= 2) return kept;
+  let wordEnd = end;
+  while (wordEnd < original.length && WORD_CHAR.test(original[wordEnd])) wordEnd += 1;
+  const leftover = original.slice(end, wordEnd);
+  if (leftover.length >= 2) return leftover;
+  const piece = original.slice(start, Math.min(end, start + 40)).replace(/\s+/g, " ").trim();
+  return piece || kept || leftover;
+}
+
+/**
+ * Scraps introduced by a repair. One argument is not a change, so ordinary prose is never a fragment.
+ * A hit is a deletion that starts or ends inside a word: a truncated lead («Прочитайте» → «Про»),
+ * letters joined across the cut, or part of a word removed. Words already in the draft are not hits.
+ */
+export function leadWordFragments(draft, repaired) {
+  if (typeof repaired !== "string") return [];
+  const original = String(draft ?? "");
+  const next = String(repaired);
+  if (!original || original === next) return [];
+  const spans = deletionSpans(original, next);
+  if (!spans?.length) return [];
+  const hits = [];
+  for (const [start, end] of spans) {
+    if (start >= end || (wordBoundary(original, start) && wordBoundary(original, end))) continue;
+    const label = fragmentLabel(original, start, end);
+    if (label) hits.push(label);
+  }
+  return hits;
+}
+
+function articleBody(md) {
+  return split(md)[1] ?? "";
+}
+
+function protectedBlocksOf(md) {
+  const body = articleBody(md);
+  const galleryAt = body.search(/^:::gallery\nvariant: angels-carousel/m);
+  if (galleryAt < 0) return [];
+  const storyParagraphs = body.slice(0, galleryAt).trimEnd().split("\n\n").slice(0, -2);
+  const blocks = [...storyParagraphs];
+  for (const match of body.matchAll(/^>[^\n]*$/gm)) blocks.push(match[0]);
+  for (const block of body.split(/\n\n+/)) {
+    const trimmed = block.trim();
+    if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith(":::") || trimmed.startsWith("|")) continue;
+    if (/[«»"“”„]|^\s*>/u.test(trimmed)) blocks.push(trimmed);
+  }
+  return blocks;
+}
+
+function edgeOverlap(a, b) {
+  let prefix = 0;
+  const n = Math.min(a.length, b.length);
+  while (prefix < n && a[prefix] === b[prefix]) prefix += 1;
+  let suffix = 0;
+  while (suffix < n && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix += 1;
+  return Math.max(prefix, suffix);
+}
+
+/** Fragments in protected paragraphs whose text changed relative to the draft. Unchanged words are ignored. */
+export function protectedDiffFragments(draftMd, md) {
+  if (typeof draftMd !== "string" || typeof md !== "string" || draftMd === md) return [];
+  const drafts = protectedBlocksOf(draftMd);
+  const blocks = protectedBlocksOf(md);
+  const hits = [];
+  const used = new Set();
+  for (const block of blocks) {
+    if (drafts.includes(block)) continue;
+    let best = -1;
+    let bestScore = 0;
+    let bestDeleted = Infinity;
+    for (let i = 0; i < drafts.length; i += 1) {
+      if (used.has(i)) continue;
+      const overlap = edgeOverlap(drafts[i], block);
+      if (overlap < 8) continue;
+      const spans = deletionSpans(drafts[i], block);
+      if (!spans) continue;
+      const deleted = spans.reduce((sum, [start, end]) => sum + (end - start), 0);
+      if (deleted < bestDeleted || (deleted === bestDeleted && overlap > bestScore)) {
+        best = i;
+        bestScore = overlap;
+        bestDeleted = deleted;
+      }
+    }
+    if (best < 0) continue;
+    used.add(best);
+    hits.push(...leadWordFragments(drafts[best], block));
+  }
+  return hits;
+}
+
+function edgeSpaces(span) {
+  const trimmed = span.trim();
+  if (!trimmed) return span.length;
+  return span.indexOf(trimmed) + (span.length - span.indexOf(trimmed) - trimmed.length);
+}
+
+function countSentences(text) {
+  const parts = String(text).split(/(?<=[.!?…])\s+/u).map((part) => part.trim()).filter(Boolean);
+  return parts.length;
+}
+
+function linkSentences(span) {
+  return span.match(/[.!?…]/gu)?.length ?? 0;
+}
+
+function candidateRemovalEnds(original, start, stripped, s) {
+  const link = markdownLinks(original.slice(start)).find((item) => item.slug && item.start <= 80);
+  if (!link) return [];
+  const minEnd = start + link.end;
+  const limit = Math.min(original.length, minEnd + 8);
+  const ends = [];
+  for (let end = minEnd; end <= limit; end += 1) {
+    if (!wordBoundary(original, end) || joinsLetters(original, start, end)) continue;
+    const span = original.slice(start, end);
+    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span, original, start)) continue;
+    ends.push(end);
+  }
+  return ends;
+}
+
+/** Removed spans that turn `original` into `stripped`: each is a whole link sentence at a word boundary. */
+function explainLinkRemovals(original, stripped) {
+  const memo = new Map();
+  const walk = (startO, startS) => {
+    const key = `${startO}:${startS}`;
+    if (memo.has(key)) return memo.get(key);
+    let o = startO;
+    let s = startS;
+    while (o < original.length && s < stripped.length && original[o] === stripped[s]) {
+      if (o !== startO && wordBoundary(original, o)) break;
+      o += 1;
+      s += 1;
+    }
+    let result = null;
+    if (o === original.length && s === stripped.length) result = [];
+    else if (o < original.length && wordBoundary(original, o)) {
+      for (const end of candidateRemovalEnds(original, o, stripped, s)) {
+        const rest = walk(end, s);
+        if (rest) {
+          result = [[o, end], ...rest];
+          break;
+        }
+      }
+    }
+    if (!result && o < original.length && s < stripped.length && original[o] === stripped[s]) {
+      const rest = walk(o + 1, s + 1);
+      if (rest) result = rest;
+    }
+    memo.set(key, result);
+    return result;
+  };
+  return walk(0, 0);
+}
+
+/**
+ * A protected paragraph may lose only whole link sentences. Each removed span starts and ends on a
+ * word boundary, contains a markdown link, and is a listed lead (or the link token alone). The cut
+ * must not join the letters on either side, and the sentence count cannot fall by more than the
+ * removed link sentences. Anything else – including «Прочитайте» shortened to «Про» – is rejected.
+ */
+export function protectedRemovalOk(original, stripped) {
+  if (typeof original !== "string" || typeof stripped !== "string") return false;
+  if (!stripped.trim() || stripped === original) return false;
+  if (linkLeadResidue(stripped).length || linkRemovedResidue(original, stripped).length || leadWordFragments(original, stripped).length) return false;
+  if (!original.includes("  ") && stripped.includes("  ")) return false;
+  const spans = explainLinkRemovals(original, stripped);
+  if (!spans?.length) return false;
+  let removed = 0;
+  for (const [start, end] of spans) {
+    const span = original.slice(start, end);
+    if (!wordBoundary(original, start) || !wordBoundary(original, end)) return false;
+    if (joinsLetters(original, start, end)) return false;
+    if (edgeSpaces(span) > 1 || !spanIsWholeLeadOrToken(span, original, start)) return false;
+    removed += linkSentences(span);
+  }
+  return countSentences(stripped) >= countSentences(original) - removed;
+}
+
+const RETELL_STOP = new Set(["ангел", "ангела", "ангелу", "ангеле", "хранитель", "хранителя", "хранителю", "молитва", "молитвы", "молитву", "молитве", "образ", "образа", "человек", "человека", "можно", "когда", "этот", "этой", "этого", "только", "после", "перед", "через", "чтобы", "который", "которая", "которые", "практика", "практике", "также", "будет", "были", "было", "очень", "просто", "потом", "тогда", "здесь", "свой", "свою", "свои"]);
+const RETELL_NAMES = new Set(["ангел", "ангела", "ангелу", "ангеле", "ангелом", "божий", "бога", "бог", "христос", "христа", "христов", "святый", "аминь", "господь", "господа", "крещении", "православного", "эзотерика", "ченнелинг", "молитвы", "хранителю", "молитва"]);
+
+function topicStems(topic) {
+  return normalize(topic).split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 5);
+}
+
+/** Shared prefix of at least 5 letters: «аффирмация» and «аффирмации» are one topic word. */
+function sharesStem(word, stem) {
+  const left = String(word).replace(/[^\p{L}\p{N}]+/gu, "");
+  const right = String(stem).replace(/[^\p{L}\p{N}]+/gu, "");
+  const limit = Math.min(left.length, right.length);
+  let i = 0;
+  while (i < limit && left[i] === right[i]) i += 1;
+  return i >= 5;
+}
+
+function isTopicToken(token, stems) {
+  return stems.some((stem) => sharesStem(token, stem));
+}
+
+function retellTokens(text, banned = () => false) {
+  return paragraphTokens(text).filter((token) => token.length >= 5 && !RETELL_STOP.has(token) && !banned(token));
+}
+
+/** Tokens that occur only in the last paragraph – the topic bridge, not the plot. */
+function bridgeOnlyTokens(story) {
+  const parts = String(story ?? "").split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return new Set();
+  const plot = new Set(retellTokens(parts.slice(0, -1).join("\n\n")));
+  return new Set(retellTokens(parts.at(-1)).filter((token) => !plot.has(token)));
+}
+
+function retellShards(tokens) {
+  const grams = [];
+  for (let i = 0; i < tokens.length - 1; i += 1) grams.push(`${tokens[i]} ${tokens[i + 1]}`);
+  return grams;
+}
+
+function properNames(text) {
+  const found = new Set();
+  for (const match of String(text).matchAll(/[А-ЯЁ][а-яё]{3,}/g)) {
+    const name = normalize(match[0]);
+    if (name.length < 4 || RETELL_NAMES.has(name)) continue;
+    found.add(name);
+  }
+  return found;
+}
+
+function retellSentences(text) {
+  return String(text ?? "").split(/(?<=[.!?…])\s+/u).map((sentence) => sentence.trim()).filter((sentence) => /[\p{L}\p{N}]/u.test(sentence));
+}
+
+function retellOverlap(story, section, banned = () => false) {
+  const left = retellTokens(story, banned);
+  const right = retellTokens(section, banned);
+  const a = new Set(left);
+  const b = new Set(right);
+  if (a.size < 12 || b.size < 12) return false;
+  const shared = [...a].filter((token) => b.has(token));
+  const ratio = shared.length / Math.min(a.size, b.size);
+  const leftShards = new Set(retellShards(left));
+  const rightShards = new Set(retellShards(right));
+  let sharedShards = 0;
+  for (const gram of leftShards) if (rightShards.has(gram)) sharedShards += 1;
+  const shardRatio = leftShards.size && rightShards.size ? sharedShards / Math.min(leftShards.size, rightShards.size) : 0;
+  const names = [...properNames(story)].filter((name) => properNames(section).has(name));
+  if (shared.length >= 8 && ratio >= 0.28) return true;
+  if (sharedShards >= 5 && shardRatio >= 0.18) return true;
+  if (names.length && shared.length >= 6 && ratio >= 0.15) return true;
+  return false;
+}
+
+/**
+ * A later section retells the opening story: the same plot after the first sentence,
+ * not a shared opening and not the topic bridge. Overlap ignores the article query
+ * and words that appear only in the last story paragraph. A character or a
+ * plot detail still counts. The approved angel article stays under every threshold.
+ */
+export function sectionRetellsStory(story, section, topic = "") {
+  const stems = topicStems(topic);
+  const bridgeOnly = bridgeOnlyTokens(story);
+  const banned = (token) => bridgeOnly.has(token) || isTopicToken(token, stems);
+  if (!retellOverlap(story, section, banned)) return false;
+  const storyRest = retellSentences(story).slice(1).join(" ");
+  const sectionRest = retellSentences(section).slice(1).join(" ");
+  if (!storyRest.trim() || !sectionRest.trim()) return false;
+  return retellOverlap(storyRest, sectionRest, banned);
+}
+
+const LIST_COUNT_WORDS = [["один", 1], ["одна", 1], ["одно", 1], ["два", 2], ["две", 2], ["три", 3], ["четыре", 4], ["пять", 5], ["шесть", 6], ["семь", 7], ["восемь", 8], ["девять", 9], ["десять", 10]];
+const NOT_WORD = String.raw`(?<![\p{L}\p{N}])`;
+const WORD_END = String.raw`(?![\p{L}\p{N}])`;
+const LIST_NOUN = String.raw`шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?|правило|правила|правил|фраза|фразы|фраз`;
+const STEP_NOUN = String.raw`шаг(?:а|ов)?|действи(?:е|я|й)|пункт(?:а|ов)?`;
+
+function countWordBefore(text, nounAt) {
+  const head = text.slice(0, nounAt).trimEnd();
+  const token = head.match(new RegExp(`${NOT_WORD}(\\d{1,2}|[а-яё]+)$`, "u"))?.[1];
+  if (!token) return null;
+  if (/^\d{1,2}$/.test(token)) return Number(token);
+  return LIST_COUNT_WORDS.find(([word]) => word === token)?.[1] ?? null;
+}
+
+/** «пять шагов», «5 действия», «Три пункта:» – the number and the noun are adjacent whole words. */
+export function stepHeadingCount(title) {
+  const text = normalize(title);
+  const noun = text.match(new RegExp(`${NOT_WORD}(${STEP_NOUN})${WORD_END}`, "u"));
+  if (!noun) return null;
+  return countWordBefore(text, noun.index);
+}
+
+/** A heading that names N items, or null. Nouns are whole words, never a stem inside another word. */
+export function statedListCount(title) {
+  const text = normalize(title);
+  const noun = text.match(new RegExp(`${NOT_WORD}(?:${LIST_NOUN})${WORD_END}`, "u"));
+  if (!noun) return null;
+  return countWordBefore(text, noun.index);
+}
+
+function listNoun(stem, count) {
+  const forms = {
+    шаг: ["шаг", "шага", "шагов"],
+    пункт: ["пункт", "пункта", "пунктов"],
+    признак: ["признак", "признака", "признаков"],
+    правил: ["правило", "правила", "правил"],
+    фраз: ["фраза", "фразы", "фраз"],
+  }[stem];
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+  return forms[2];
+}
+
+/** Replace the count in a heading so it agrees with the list. Other words stay. */
+export function alignListCount(title, count) {
+  const stated = statedListCount(title);
+  if (stated == null || stated === count || count < 1 || count > 10) return title;
+  const stem = listStem(title);
+  const noun = listNoun(stem, count);
+  const word = LIST_COUNT_WORDS.find(([, num]) => num === count)?.[0] ?? String(count);
+  return String(title).replace(
+    /(\d{1,2}|[Оо]дин|[Оо]дна|[Оо]дно|[Дд]ва|[Дд]ве|[Тт]ри|[Чч]етыре|[Пп]ять|[Шш]есть|[Сс]емь|[Вв]осемь|[Дд]евять|[Дд]есять)(\s+)(правило|правила|правил|фраза|фразы|фраз|шаг(?:а|ов)?|пункт(?:а|ов)?|признак(?:а|ов)?)(?![\p{L}\p{N}])/u,
+    (full, num, space) => {
+      const digit = /^\d/.test(num);
+      const cap = !digit && num[0] !== num[0].toLocaleLowerCase("ru");
+      const next = digit ? String(count) : (cap ? word[0].toLocaleUpperCase("ru") + word.slice(1) : word);
+      return `${next}${space}${noun}`;
+    },
+  );
+}
+
+function listStem(title) {
+  const text = normalize(title);
+  const has = (body) => new RegExp(`${NOT_WORD}(?:${body})${WORD_END}`, "u").test(text);
+  if (has("пункт(?:а|ов)?")) return "пункт";
+  if (has("признак(?:а|ов)?")) return "признак";
+  if (has("правило|правила|правил")) return "правил";
+  if (has("фраза|фразы|фраз")) return "фраз";
+  return "шаг";
+}
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Link anchor text is not prose: the query has to stand in the sentence around the link. */
+export function proseWithoutLinkText(text) {
+  const raw = String(text ?? "");
+  const links = markdownLinks(raw);
+  if (!links.length) return raw;
+  let out = "";
+  let cursor = 0;
+  for (const link of links) {
+    out += raw.slice(cursor, link.start);
+    out += " ";
+    cursor = link.end;
+  }
+  return out + raw.slice(cursor);
+}
+
+/** Exact phrase, with word boundaries, outside markdown link text and outside headings. */
+export function phraseInProse(text, phrase) {
+  const needle = normalize(phrase);
+  if (!needle) return false;
+  const hay = normalize(proseWithoutLinkText(text).replace(/^#{1,6} .+$/gm, " "));
+  return new RegExp(`${NOT_WORD}${escapeRegExp(needle)}${WORD_END}`, "u").test(hay);
+}
+
+/** True when the uninflected query sits immediately after «про», «о» or «об». */
+export function boltedPrepositionQuery(text, query) {
+  const needle = normalize(query);
+  if (!needle) return false;
+  const hay = normalize(text);
+  return new RegExp(`${NOT_WORD}(?:про|об|о)\\s+${escapeRegExp(needle)}${WORD_END}`, "u").test(hay);
+}
+
+const FIRST_PERSON_VERB = new RegExp(String.raw`${NOT_WORD}(?:сказал|сказала|подумал|подумала|прошептал|прошептала|спросил|спросила|ответил|ответила|шепнул|шепнула)\s+я${WORD_END}`, "iu");
+
+/** Speech tag of a first-person narrator («сказала я»). Quoted «Я…» inside the line does not match. */
+export function firstPersonNarration(text) {
+  return FIRST_PERSON_VERB.test(String(text ?? ""));
+}
+
+export function paragraphSentenceCount(text) {
+  return String(text ?? "").split(/(?<=[.!?…])\s+/u).filter((sentence) => /[\p{L}\p{N}]/u.test(sentence)).length;
+}
+
+/** Paragraphs longer than 7 sentences. Headings, lists, tables and directives are not paragraphs. */
+export function oversizedParagraphs(markdown) {
+  const hits = [];
+  for (const block of String(markdown ?? "").split(/\n\n+/)) {
+    const line = block.trim();
+    if (!line || /^[#|>]/.test(line) || line.startsWith(":::") || line.startsWith("<") || line.startsWith("|") || /^(?:[-*] |\d+\. |title:| {2}text:)/.test(line)) continue;
+    const count = paragraphSentenceCount(line);
+    if (count > 7) hits.push({ count, sample: line.slice(0, 80) });
+  }
+  return hits;
+}
+
+const DANGLING_LEAD = /(?:^|[.!?…]\s+|\n)(?:ниже|вот)\s*(?:[–—:-]|простые\s+примеры|примеры\b|пример\b)/iu;
+
+function blockIsList(block) {
+  const line = String(block ?? "").trim();
+  return /^(?:[-*] |\d+\. |\||«|### |>)/.test(line);
+}
+
+/** «Ниже – простые примеры…» / «Вот примеры…» whose next line is not a list, table or quoted line. */
+export function danglingLeads(markdown) {
+  const blocks = String(markdown ?? "").split(/\n\n+/);
+  const hits = [];
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i].trim();
+    if (!block || !DANGLING_LEAD.test(block)) continue;
+    const lines = block.split("\n");
+    const at = lines.findIndex((line) => DANGLING_LEAD.test(line));
+    const leadLine = at < 0 ? block : lines[at];
+    const rest = (at < 0 ? "" : lines.slice(at + 1).join("\n")).trim();
+    const next = rest || (blocks.slice(i + 1).map((part) => part.trim()).find(Boolean) ?? "");
+    if (blockIsList(next)) continue;
+    hits.push(leadLine.slice(0, 90));
+  }
+  return hits;
+}
+
+function followingListCount(blocks, index) {
+  let count = 0;
+  for (let j = index + 1; j < blocks.length; j += 1) {
+    const block = blocks[j].trim();
+    if (/^(?:[-*] |\d+\. |### )/u.test(block)) {
+      count += (block.match(/^(?:[-*] |\d+\. |### )/gm) || [1]).length;
+      continue;
+    }
+    if (count > 0 || /^## /.test(block) || block.startsWith(":::")) break;
+    return 0;
+  }
+  return count;
+}
+
+function promiseHit(title, count) {
+  const strictCount = stepHeadingCount(title);
+  if (strictCount != null) {
+    return strictCount === count ? null : { title: String(title).slice(0, 80), stated: strictCount, count, strict: true };
+  }
+  const stated = statedListCount(title);
+  if (stated == null || stated === count) return null;
+  return { title: String(title).slice(0, 80), stated, count, strict: false };
+}
+
+/**
+ * A heading or a lead-in immediately before a list whose count differs.
+ * strict is only an adjacent «<число> шаг/шага/шагов», «действие/действия/действий» or «пункт/пункта/пунктов». Other nouns are warnings for the editor.
+ * The «## Три шага» section is left to the steps check (it uses ###, not a bullet list).
+ */
+export function listPromiseMismatches(markdown) {
+  const hits = [];
+  const sections = String(markdown ?? "").split(/(?=^## )/m);
+  for (const section of sections) {
+    const heading = section.match(/^## (.+)$/m)?.[1];
+    const h3 = (section.match(/^### /gm) || []).length;
+    const blocks = section.split(/\n\n+/);
+    if (heading && h3 < 2) {
+      const headingIndex = blocks.findIndex((block) => /^## /.test(block.trim()));
+      const count = headingIndex >= 0 ? followingListCount(blocks, headingIndex) : 0;
+      const hit = count > 0 ? promiseHit(heading, count) : null;
+      if (hit) hits.push(hit);
+    }
+    for (let i = 0; i < blocks.length; i += 1) {
+      const block = blocks[i].trim();
+      if (!block || /^## /.test(block)) continue;
+      const count = followingListCount(blocks, i);
+      if (count < 1) continue;
+      const hit = promiseHit(block, count);
+      if (hit) hits.push(hit);
+    }
+  }
+  return hits;
+}
+
+export function linkAnchorMismatches(text, expected) {
+  const links = markdownLinks(text);
+  const hits = [];
+  for (const item of expected ?? []) {
+    const needle = normalize(item?.anchor);
+    const href = item?.href || (item?.slug ? `/s/${item.slug}` : "");
+    if (!needle || !href) continue;
+    const found = links.filter((link) => normalize(link.anchor) === needle);
+    const ok = found.some((link) => link.href === href || (item.slug && link.slug === item.slug));
+    if (!ok) hits.push({ ...item, href, found: found.map((link) => link.href) });
+  }
+  return hits;
+}
+
+/** «можно использовать и [анкор] через …» – the conjunction and the preposition do not meet. */
+export function ungrammaticalLinks(text) {
+  const raw = String(text ?? "");
+  const hits = [];
+  for (const link of markdownLinks(raw)) {
+    const before = raw.slice(Math.max(0, link.start - 48), link.start);
+    const after = raw.slice(link.end, link.end + 32);
+    if (/(?:^|[\s,.;])и\s*$/u.test(before) && /^\s*через(?![\p{L}\p{N}])/u.test(after)) hits.push(link);
+  }
+  return hits;
+}
+
+const EXAMPLE_ITEM = /^(?:[-*] |\d+\. )(.+)$/gm;
+const EXAMPLE_PAST = new RegExp(String.raw`${NOT_WORD}(?:был[аои]?|стал[аои]?|сказал[аои]?|подумал[аои]?|произошл[аои]|случил[аои]сь|получил[аои]?)${WORD_END}`, "iu");
+const EXAMPLE_NEGATIVE = new RegExp(String.raw`${NOT_WORD}(?:не|нет|никогда|нельзя|страх|боюсь|боль|тревог\p{L}*|дискомфорт)${WORD_END}`, "iu");
+
+export function examplePhraseLines(markdown) {
+  const phrases = [];
+  for (const section of String(markdown ?? "").split(/(?=^## )/m)) {
+    const title = section.match(/^## (.+)$/m)?.[1] ?? "";
+    if (!/пример/iu.test(title)) continue;
+    for (const match of section.matchAll(EXAMPLE_ITEM)) phrases.push(match[1].trim());
+  }
+  return phrases;
+}
+
+/** A usable affirmation: at least 3 words, present (no past verb), no negative priming. */
+export function examplePhraseDefect(phrase) {
+  const text = String(phrase ?? "").trim();
+  if (words(text) < 3) return "короче 3 слов";
+  if (EXAMPLE_PAST.test(text)) return "прошедшее время";
+  if (EXAMPLE_NEGATIVE.test(text)) return "отрицание или тяжёлое слово";
+  return "";
+}
+
+export function examplePhraseStats(markdown) {
+  let heading = false;
+  let count = 0;
+  for (const section of String(markdown ?? "").split(/(?=^## )/m)) {
+    const title = section.match(/^## (.+)$/m)?.[1] ?? "";
+    if (!/пример/iu.test(title)) continue;
+    heading = true;
+    count += (section.match(/^(?:[-*] |\d+\. )/gm) || []).length;
+    const rows = [...section.matchAll(/^\|(.+)\|\s*$/gm)].map((match) => match[1]).filter((row) => !/^[\s|:-]+$/.test(row));
+    if (rows.length > 1) count += rows.length - 1;
+    count += (section.match(/^«[^»\n]{1,120}»\.?\s*$/gm) || []).length;
+  }
+  return { heading, count };
+}
+
+const META_QUERY = /(?:запрос\s*«|как в теме\s*«)/giu;
+/** «Вопрос: «» only as a service label: capital В at the start of a paragraph or FAQ answer. */
+const META_QUESTION_LABEL = /(?:^|\n)[ \t]*Вопрос:[ \t]*«/g;
+
+/** Service leftovers: «запрос «…»», «как в теме «…»», and a leading «Вопрос: «…»». */
+export function metaQueryLeftovers(text) {
+  const source = String(text ?? "");
+  return [...source.matchAll(META_QUERY), ...source.matchAll(META_QUESTION_LABEL)].map((match) => match[0].trim());
+}
+
+const ENGLISH_NOTE = /\b(?:Wait|FIXME|TODO|NOTE)\b|\bmust\s+not\s+include\b/iu;
+const ENGLISH_RUN = /(?:^|[^\p{L}])([A-Za-z]{2,}(?:\s+[A-Za-z]{2,}){3,})/u;
+
+/** Editor notes and English sentences left in the prose. Tags, urls and slugs are ignored. */
+export function englishLeftovers(text) {
+  const source = String(text ?? "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\]\([^)]*\)/g, " ")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/\/[A-Za-z0-9_./-]+/g, " ");
+  const hits = [];
+  const note = source.match(ENGLISH_NOTE);
+  if (note) hits.push(note[0]);
+  const run = source.match(ENGLISH_RUN);
+  if (run) hits.push(run[1]);
+  return hits;
+}
+
+const FAQ_NEGATION = /^(?:нет|нельзя|не стоит|не нужно)(?![\p{L}\p{N}])/iu;
+
+/**
+ * A FAQ answer that opens with a refusal while the body already states the same
+ * claim without that refusal. Words of the article query are the topic, not the
+ * claim, so «аффирмация / удачу / деньги» do not count. Ordinary answers that
+ * do not start with «нет» / «нельзя» are left alone.
+ */
+export function faqContradictsBody(question, answer, body, topic = "") {
+  const reply = String(answer ?? "").trim();
+  if (!FAQ_NEGATION.test(reply)) return false;
+  const stems = topicStems(topic);
+  const keys = normalize(question).split(/\s+/).filter((word) => word.length >= 5).slice(0, 6)
+    .map((word) => word.replace(/[^\p{L}\p{N}]+/gu, ""))
+    .filter((word) => word.length >= 5 && !isTopicToken(word, stems));
+  if (keys.length < 2) return false;
+  const need = Math.min(3, keys.length);
+  return String(body ?? "").split(/(?<=[.!?…])\s+/u).some((sentence) => {
+    if (FAQ_NEGATION.test(sentence.trim())) return false;
+    const hay = normalize(sentence);
+    return keys.filter((key) => hay.includes(key)).length >= need;
+  });
+}
+
+export function faqStanceMismatch(question, answer, hints) {
+  const ask = normalize(question);
+  const hint = (hints ?? []).find((item) => item?.match && ask.includes(normalize(item.match)));
+  if (!hint) return false;
+  const stance = normalize(hint.stance);
+  const reply = String(answer ?? "").trim();
+  if (stance === "нет") return /^(?:да|можно|конечно)(?![\p{L}\p{N}])/iu.test(reply);
+  if (stance === "да") return /^(?:нет|нельзя)(?![\p{L}\p{N}])/iu.test(reply);
+  return false;
+}
+
+const NOT_LETTER = String.raw`(?![\p{L}\p{N}])`;
+const YES_NO_QUESTION = new RegExp(String.raw`^(?:а\s+)?(?:можно|нужно|нужен|нужна|нужны|стоит|есть|был|была|будет|верно|правда|должен|должна|надо|возможно|обязательно)\s+ли${NOT_LETTER}`, "iu");
+const OPEN_QUESTION = new RegExp(String.raw`^(?:а\s+)?(?:(?:с|со|о|об|на|в|во|для|от|по|при)\s+)?(?:как|почему|зачем|что|чем|какой|какая|какие|какое|какого|какую|каких|кто|кого|где|когда|откуда|куда|сколько|насколько)${NOT_LETTER}`, "iu");
+const YES_NO_ANSWER = new RegExp(String.raw`^(?:да|нет|можно|нельзя|конечно|разумеется)${NOT_LETTER}`, "iu");
+
+/** Open question («Как понять…») answered as yes/no («Да, …»). A question with «ли» may start with «Да». */
+export function faqAnswerTypeMismatch(question, answer) {
+  const ask = String(question ?? "").trim();
+  const reply = String(answer ?? "").trim();
+  if (!ask || !reply) return false;
+  if (YES_NO_QUESTION.test(ask) || !OPEN_QUESTION.test(ask)) return false;
+  return YES_NO_ANSWER.test(reply);
+}
+
+/** Description opened with the query in «ёлочки», including a lowercase query. */
+export function descriptionOpensWithQuotedQuery(description, query) {
+  const nq = normalize(query);
+  if (!nq) return false;
+  const match = String(description ?? "").match(/^«\s*([^»]+?)\s*»/u);
+  return Boolean(match && normalize(match[1]) === nq);
+}
+
+// Same owner rule as findTextAddresses in lib/validate.mjs. This file cannot import it:
+// the stage gate copies these rules verbatim. One allowlist for the gate, the fragment
+// validator and the plain-text scanner.
+const ALLOWED_SITE_HOSTS = ["audiolad.ru", "sergey-zoya.ru"];
+// Real public suffixes only. File and runtime suffixes (.js, .jpg, .webp, …) are not TLDs,
+// so «Node.js», «Vue.js», «Next.js» and «photo.jpg» are not addresses. «ASP.NET» uses a real TLD.
+const KNOWN_TLDS = ["com", "org", "net", "ru", "su", "info", "biz", "pro", "name", "mobi", "app", "dev", "io", "ai", "co", "me", "uk", "ly", "cc", "tv", "xyz", "site", "online", "shop", "ua", "by", "kz", "eu", "de", "fr", "it", "es", "nl", "pl", "us", "ca", "au", "edu", "gov", "int", "fm", "to"];
+const TECHNOLOGY_NAMES = new Set(["node.js", "vue.js", "next.js", "asp.net"]);
+const TLD_PATTERN = [...KNOWN_TLDS].sort((a, b) => b.length - a.length).join("|");
+// Cyrillic public suffixes. A dotted Russian word is an address only when the last label is one of these,
+// so «в конце.Далее» and «т.е.» stay ordinary prose. Longer names first.
+const IDN_TLDS = ["онлайн", "москва", "дети", "сайт", "рус", "рф"];
+const IDN_TLD_PATTERN = [...IDN_TLDS].sort((a, b) => b.length - a.length).join("|");
+const HOST_BOUNDARY = "(?<![\\p{L}\\d@._/-])";
+const ASCII_HOST = `(?:www\\.)?(?:[a-z\\d][a-z\\d-]*\\.)+(?:${TLD_PATTERN})(?![\\p{L}\\d-])`;
+const IDN_HOST = `(?:www\\.)?(?:[а-яё\\d][а-яё\\d-]*\\.)+(?:${IDN_TLD_PATTERN})(?![\\p{L}\\d-])`;
+// A label xn-- is punycode (xn--80aswg.xn--p1ai, www.xn--80aswg.xn--p1ai), including when the last label is an ASCII TLD.
+const PUNY_HOST = `(?:www\\.)?(?=[a-z0-9.-]*xn--)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?:xn--[a-z0-9-]+|${TLD_PATTERN})(?![\\p{L}\\d-])`;
+const PATH_TAIL = "(?:\\/[^\\s«»\"()<>]*)?";
+const OUTGOING_ADDRESS_PATTERNS = [
+  { name: "e-mail", re: /[\p{L}\d._%+-]+@[\p{L}\d-]+(?:\.[\p{L}\d-]+)*\.\p{L}{2,}/gu, always: true },
+  { name: "ссылка mailto:/tel:", re: /\b(?:mailto|tel|sms|tg|whatsapp|viber|skype):[^\s«»"]*/giu, always: true },
+  { name: "адрес сайта", re: /(?:https?:)?\/\/[^\s«»"()<>]+/giu },
+  { name: "адрес сайта", re: new RegExp(`${HOST_BOUNDARY}${ASCII_HOST}${PATH_TAIL}`, "giu") },
+  { name: "адрес сайта", re: new RegExp(`${HOST_BOUNDARY}${IDN_HOST}${PATH_TAIL}`, "giu") },
+  { name: "адрес сайта", re: new RegExp(`${HOST_BOUNDARY}${PUNY_HOST}${PATH_TAIL}`, "giu") },
+];
+// Inside a path, query or fragment the token may follow /, ?, # or =. The plain-text lookbehind hides those.
+const NESTED_HOST_SOURCES = [
+  `(?:^|[^\\p{L}\\d@._-])${ASCII_HOST}`,
+  `(?:^|[^\\p{L}\\d@._-])${IDN_HOST}`,
+  `(?:^|[^\\p{L}\\d@._-])${PUNY_HOST}`,
+];
+
+function addressHost(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
+  let url = trimmed;
+  if (trimmed.startsWith("//")) url = `https:${trimmed}`;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) url = `https://${trimmed}`;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function hostAllowed(host) {
+  if (!host) return false;
+  const bare = host.toLowerCase().replace(/^www\./, "");
+  return ALLOWED_SITE_HOSTS.some((allowed) => bare === allowed || bare.endsWith(`.${allowed}`));
+}
+
+/** A bare technology token («Node.js», «Vue.js», «ASP.NET»), not a URL with a scheme or a path. */
+function technologyMention(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
+  if (/[/:?#]/.test(trimmed) || /\s/u.test(trimmed)) return false;
+  return TECHNOLOGY_NAMES.has(trimmed.toLowerCase());
+}
+
+/** Path, query and fragment of the original string. `new URL` would percent-encode «сайт.рф» before the scan. */
+function rawAddressTail(raw) {
+  const trimmed = String(raw ?? "").trim().replace(/[.,;:!?…]+$/u, "");
+  const withScheme = trimmed.match(/^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#\s]+)([\s\S]*)$/i);
+  if (withScheme) return withScheme[2] ?? "";
+  const bare = trimmed.match(/^[^\s/?#]+([/?#][\s\S]*)$/u);
+  return bare?.[1] ?? "";
+}
+
+/**
+ * The original tail, then the same text with percent-escapes turned into separators,
+ * then up to two decodeURIComponent passes (evil%252Ecom → evil%2Ecom → evil.com).
+ * Separators stop %2F from gluing into a fake label (2Fevil.com / 2Faudiolad.ru).
+ */
+function tailScanTexts(tail) {
+  const texts = [];
+  const add = (value) => {
+    // %HH is not a host character. Replacing it before the scan keeps «сайт.рф» and «evil.com»
+    // and stops «%2Fevil.com» from being read as the fake label 2fevil.com.
+    const separated = value.replace(/%[0-9a-f]{2}/gi, "/");
+    if (!texts.includes(separated)) texts.push(separated);
+  };
+  let current = String(tail ?? "");
+  add(current);
+  for (let pass = 0; pass < 2; pass += 1) {
+    if (!/%[0-9a-f]{2}/i.test(current)) break;
+    try {
+      const next = decodeURIComponent(current);
+      if (next === current) break;
+      current = next;
+      add(current);
+    } catch {
+      break;
+    }
+  }
+  return texts;
+}
+
+/** A host token inside a tail. Technology names are not exempt here: asp.net in a path is still a domain. */
+function nestedHostDisallowed(raw, seen) {
+  const key = String(raw ?? "");
+  if (seen.has(key)) return true;
+  const next = new Set(seen);
+  next.add(key);
+  const host = addressHost(key);
+  if (!host || !hostAllowed(host)) return true;
+  return tailHasDisallowedAddress(key, next);
+}
+
+function textHasDisallowedTail(text, seen) {
+  for (const pattern of OUTGOING_ADDRESS_PATTERNS) {
+    const re = new RegExp(pattern.re.source, pattern.re.flags);
+    for (const match of text.matchAll(re)) {
+      const nested = match[0].replace(/^[^\p{L}\d]+/u, "").replace(/[.,;:!?…]+$/u, "");
+      if (!nested) continue;
+      if (pattern.always || nestedHostDisallowed(nested, seen)) return true;
+    }
+  }
+  for (const source of NESTED_HOST_SOURCES) {
+    const re = new RegExp(source, "giu");
+    for (const match of text.matchAll(re)) {
+      const nested = match[0].replace(/^[^\p{L}\d]+/u, "").replace(/[.,;:!?…]+$/u, "");
+      if (nested && nestedHostDisallowed(nested, seen)) return true;
+    }
+  }
+  return false;
+}
+
+/** True when the raw path, query or fragment hides another site, a bare domain or an e-mail. */
+function tailHasDisallowedAddress(raw, seen) {
+  const tail = rawAddressTail(raw);
+  if (!tail || tail === "/") return false;
+  return tailScanTexts(tail).some((text) => textHasDisallowedTail(text, seen));
+}
+
+function addressDisallowed(raw, seen = new Set()) {
+  const key = String(raw ?? "");
+  if (seen.has(key)) return true;
+  if (technologyMention(key)) return false;
+  const next = new Set(seen);
+  next.add(key);
+  const host = addressHost(key);
+  if (!hostAllowed(host)) return true;
+  return tailHasDisallowedAddress(key, next);
+}
+
+/**
+ * http(s) and protocol-relative addresses of audiolad.ru and sergey-zoya.ru,
+ * including www and other subdomains. The raw path, query and fragment, and the
+ * same text percent-decoded up to twice, may not hide another host
+ * (https://audiolad.ru/сайт.рф, ?u=сайт.рф, #сайт.рф, /path/evil%2Ecom).
+ * audiolad.ru and sergey-zoya.ru inside that tail stay allowed.
+ */
+export function allowedSiteAddress(value) {
+  if (technologyMention(value)) return false;
+  return !addressDisallowed(value);
+}
+
+/**
+ * Bare domains (example.com/candle, t.me/x, www.example.com, сайт.рф, www.сайт.рф,
+ * пример.москва, xn--80aswg.xn--p1ai), //host, http(s)://, mailto:/tel: and e-mails.
+ * audiolad.ru and sergey-zoya.ru, with www and subdomains, are allowed.
+ * E-mail is never allowed. «т.е.», «т.д.», initials, decimals, «в конце.Далее»,
+ * Node.js / Vue.js / Next.js, ASP.NET and file names such as photo.jpg do not match.
+ */
+export function outgoingAddressProblems(text) {
+  const problems = [];
+  const taken = [];
+  const source = String(text ?? "");
+  for (const pattern of OUTGOING_ADDRESS_PATTERNS) {
+    const re = new RegExp(pattern.re.source, pattern.re.flags);
+    for (const match of source.matchAll(re)) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (taken.some(([from, to]) => start < to && end > from)) continue;
+      const raw = match[0].replace(/[.,;:!?…]+$/u, "");
+      if (technologyMention(raw)) continue;
+      taken.push([start, end]);
+      if (!pattern.always && allowedSiteAddress(raw)) continue;
+      problems.push(`${pattern.name} в тексте: ${raw.slice(0, 80)}`);
+    }
+  }
+  return problems;
+}
+
 export const quoteText = (text) => String(text).replace(/[«»"“”„]/g, "").replace(/[—–-]/g, "–").replace(/\s+/g, " ").trim();
+// Assembler placeholder. A thesis of «а» or «главная мысль а» is the same failure as the exact phrase.
+export const EXPERT_PLACEHOLDER_THESIS = "главная мысль";
+const INVISIBLE = /[\u200B\u200C\u200D\uFEFF\u2060\u00AD]/g;
+export const stripInvisible = (text) => String(text ?? "").replace(INVISIBLE, "");
+const WORD = /[\p{L}\p{N}]+(?:[-’'][\p{L}\p{N}]+)*/gu;
+// What a reader still sees after sz normalization: no invisible chars, no markdown bold,
+// no heading the assembler strips («Чем закончилась история.»).
+export function visibleProse(text) {
+  return stripInvisible(text).replace(/\*\*/g, "").replace(/^Чем закончилась история\.?\s*/u, "").trim();
+}
+function meaningfulWords(text) {
+  return (visibleProse(text).match(WORD) ?? []).filter((token) => (token.match(/\p{L}/gu) ?? []).length >= 2);
+}
+// A sentence counts only when it has two real words. «А.» and «Б.» do not.
+function sentenceCount(text) {
+  return visibleProse(text).split(/[.!?…]+/u).filter((part) => meaningfulWords(part).length >= 2).length;
+}
+/** Minimum for any model string. Names and table cells stay short; prose does not. */
+export function proseLimit(path) {
+  const parts = String(path).replace(/\[\d+\]/g, "").split(".").filter(Boolean);
+  const key = parts.at(-1) ?? "";
+  const parent = parts.at(-2) ?? "";
+  if (key === "name") return { minWords: 1, minSentences: 0 };
+  if (key === "thesis") return { minWords: 3, minSentences: 0 };
+  if (key === "bridge" || key === "storyEnding") return { minWords: 8, minSentences: 2 };
+  if (key === "columns" || key === "rows") return { minWords: 1, minSentences: 0 };
+  if (key === "title" || key === "seoTitle" || key === "faqHeading") return { minWords: 2, minSentences: 0 };
+  // «Наденьте наушники.» is a real imperative (2 words). «а», «б» and «главная мысль» still fail.
+  if (key === "items" && parent === "checklist") return { minWords: 2, minSentences: 0 };
+  if (key === "question" || key === "finalQuestion" || (key === "items" && parent === "specialist") || key.startsWith("feedback")) return { minWords: 3, minSentences: 0 };
+  return { minWords: 4, minSentences: 0 };
+}
+/** Null when the text is still substantive after normalization. */
+export function proseDefect(text, spec = proseLimit("paragraph")) {
+  const count = meaningfulWords(text).length;
+  if (count < spec.minWords) return `после нормализации ${count} содержательных слов, нужно ≥ ${spec.minWords}`;
+  if (spec.minSentences) {
+    const sentences = sentenceCount(text);
+    if (sentences < spec.minSentences) return `после нормализации ${sentences} предложений, нужно ≥ ${spec.minSentences}`;
+  }
+  const plain = visibleProse(text).replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ru").replace(/ё/g, "е");
+  if (plain.includes(EXPERT_PLACEHOLDER_THESIS)) {
+    const rest = plain.replaceAll(EXPERT_PLACEHOLDER_THESIS, " ").replace(/\s+/g, " ").trim();
+    const restCount = meaningfulWords(rest).length;
+    if (restCount < spec.minWords) return "заглушка «главная мысль» или текст, который от неё почти не отличается";
+  }
+  return null;
+}
+
+// A cut such as «…чудес. Это не» is still inside the length window, so length alone
+// used to accept it. Descriptions and FAQ answers must end on a finished sentence.
+const DANGLING_CLAUSE = /(?:^|\s)(?:это\s+)?не$/iu;
+export function danglingFragment(text) {
+  const visible = visibleProse(text).replace(/\s+/g, " ").trim();
+  if (!visible) return "пустой текст";
+  const bare = visible.replace(/[»"”']+$/u, "");
+  if (!/[.!?…]$/u.test(bare)) return "нет конца предложения";
+  const last = bare.split(/(?<=[.!?…])\s+/u).at(-1) ?? bare;
+  const clause = last.replace(/[.!?…]+$/u, "").trim();
+  if (meaningfulWords(clause).length < 2) return "последнее предложение оборвано";
+  if (DANGLING_CLAUSE.test(clause)) return "обрывается на «не»";
+  return null;
+}
+
+// Drop one :::block through the line that closes it. A following :::name must stay,
+// including an empty block (`:::overview\n:::`).
+function stripDirectives(text) {
+  const kept = [];
+  let inside = false;
+  for (const line of text.split("\n")) {
+    if (!inside && line.startsWith(":::")) {
+      inside = true;
+      continue;
+    }
+    if (inside) {
+      if (line.trim() === ":::") inside = false;
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+// Every visible block, not only the fields a reviewer happened to name.
+function auditHollowProse(body, add) {
+  const plain = stripDirectives(body
+    .replace(/<section[\s\S]*?<\/section>/g, "\n")
+    .replace(/<p class="article-disclaimer">[\s\S]*?<\/p>/g, "\n"));
+  for (const row of plain.matchAll(/^\|(.+)\|$/gm)) {
+    if (/^[\s|:-]+$/.test(row[1])) continue;
+    for (const cell of row[1].split("|")) {
+      const text = cell.trim();
+      if (!text || /^:?-+:?$/.test(text)) continue;
+      const defect = proseDefect(text, proseLimit("tableSection.columns"));
+      if (defect) add("thin-prose", "tableSection", defect);
+    }
+  }
+  for (const paragraph of plain.replace(/^\|.*$/gm, "").split(/\n\n+/)) {
+    const block = paragraph.trim();
+    if (!block || block.startsWith("<") || block.startsWith(":::") || block.startsWith("**Чем закончилась история.")) continue;
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    const pieces = lines.every((line) => line.startsWith("- ")) ? lines : [block];
+    for (const text of pieces) {
+      if (/^#{1,3}\s/.test(text)) {
+        const defect = proseDefect(text.replace(/^#+\s*/, ""), proseLimit("title"));
+        if (defect) add("thin-prose", "sections", defect);
+      } else if (text.startsWith("- ")) {
+        const defect = proseDefect(text.replace(/^- /, ""), proseLimit("specialist.items"));
+        if (defect) add("thin-prose", "specialist", defect);
+      } else if (/^\*\*[^*\n]+\?\*\*$/.test(text)) {
+        const defect = proseDefect(text, proseLimit("question"));
+        if (defect) add("thin-prose", "question", defect);
+      } else {
+        const defect = proseDefect(text, proseLimit("paragraph"));
+        if (defect) add("thin-prose", "sections", defect);
+      }
+    }
+  }
+}
+
+export function fieldProseDefect(value, path = "") {
+  if (typeof value === "string") {
+    const defect = proseDefect(value, proseLimit(path));
+    return defect ? `${path}: ${defect}` : null;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      const defect = fieldProseDefect(value[i], `${path}[${i}]`);
+      if (defect) return defect;
+    }
+    return null;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      const defect = fieldProseDefect(item, path ? `${path}.${key}` : key);
+      if (defect) return defect;
+    }
+  }
+  return null;
+}
 const sharedHeading = (text) => /^(?:Частые вопросы|Читайте также$|Когда стоит обратиться к специалисту$)/iu.test(text);
 
 // Healing/outcome promise guard (stage 11/24). JS `\b` is ASCII-only → Unicode lookahead.
@@ -113,6 +1335,39 @@ export function uniqueKeys(md) {
   return out;
 }
 
+function visibleParagraphs(body) {
+  const plain = stripDirectives(String(body)
+    .replace(/<section[\s\S]*?<\/section>/g, "\n")
+    .replace(/<p class="article-disclaimer">[\s\S]*?<\/p>/g, "\n")
+    .replace(/<[^>]+>/g, "\n"));
+  const out = [];
+  for (const paragraph of plain.replace(/^\|.*$/gm, "").split(/\n\n+/)) {
+    const block = paragraph.trim();
+    if (!block || block.startsWith("<") || block.startsWith(":::") || block.startsWith("**Чем закончилась история.")) continue;
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (!lines.length || lines.every((line) => line.startsWith("- ") || /^#{1,3}\s/.test(line))) continue;
+    if (/^\*\*[^*\n]+\?\*\*$/.test(block)) continue;
+    const prose = lines.map((line) => line.replace(/^>\s?/, "").replace(/\*\*/g, "")).join(" ").trim();
+    if (words(prose) >= PARAGRAPH_MIN_WORDS) out.push(prose);
+  }
+  return out;
+}
+
+/** Every later paragraph that repeats an earlier one. Each later paragraph is reported once. */
+function duplicateParagraphs(body) {
+  const paragraphs = visibleParagraphs(body);
+  const duplicated = [];
+  const reported = new Set();
+  for (let i = 0; i < paragraphs.length; i += 1) {
+    for (let j = i + 1; j < paragraphs.length; j += 1) {
+      if (reported.has(j) || !paragraphsTooClose(paragraphs[i], paragraphs[j])) continue;
+      reported.add(j);
+      duplicated.push(paragraphs[j]);
+    }
+  }
+  return duplicated;
+}
+
 /**
  * Checks one assembled article.
  * cfg: { slug, query, title, topic, date, author, maxLabel, practice: {title, author, duration, path},
@@ -149,6 +1404,9 @@ export function checkSzArticle(md, cfg, env) {
   const dl = [...description].length;
   if (dl < L.description[0] || dl > L.description[1]) add("description-length", "description", `description ${dl} символов, нужно ${L.description[0]}–${L.description[1]}`);
   if (!normalize(description).includes(nq)) add("description-query", "description", `в description нет запроса «${query}»`);
+  if (descriptionOpensWithQuotedQuery(description, query)) add("description-start", "description", `description начинается с запроса в кавычках «${query}» – начните фразу с заглавной, без кавычек`);
+  const descriptionFragment = danglingFragment(description);
+  if (descriptionFragment) add("description-fragment", "description", `description ${descriptionFragment}`);
   const faqHeading = get("faqHeading") ?? "";
   if (!/^Частые вопросы об? /.test(faqHeading)) add("faqHeading", "faqHeading", "faqHeading начинается с «Частые вопросы о/об …»");
   if (get("ogImage") !== `/media/og/${slug}.jpg`) add("ogImage", "*", "ogImage");
@@ -177,13 +1435,24 @@ export function checkSzArticle(md, cfg, env) {
   const question = beforeGallery.at(-1) ?? "";
   const invitation = beforeGallery.at(-2) ?? "";
   if (!/^\*\*[^\n]+\?\*\*$/.test(question)) add("question", "question", "перед каруселью – жирный вопрос-приглашение «**…?**»");
+  else {
+    const questionDefect = proseDefect(question, proseLimit("question"));
+    if (questionDefect) add("question", "question", questionDefect);
+  }
   if (!/ангел/i.test(invitation)) add("invitation", "invitation", "абзац-приглашение перед вопросом должен упоминать ангела");
+  else {
+    const invitationDefect = proseDefect(invitation, proseLimit("invitation"));
+    if (invitationDefect) add("invitation", "invitation", invitationDefect);
+  }
   const storyParagraphs = beforeGallery.slice(0, -2);
   const story = storyParagraphs.join("\n\n").trim();
   const sw = words(story);
   if (sw < L.story[0] || sw > L.story[1]) add("story-length", "story", `история ${sw} слов, нужно ${L.story[0]}–${L.story[1]} (вместе с переходом)`);
   if (!/[«»]/.test(storyParagraphs.slice(0, 3).join(" "))) add("story-speech", "story", "прямая речь «…» в первых трёх абзацах истории");
   if (!normalize(storyParagraphs.at(-1) ?? "").includes(nq)) add("transition-query", "transition", `последний абзац истории (переход) должен содержать запрос «${query}»`);
+  if (cfg.storyHeroine && firstPersonNarration(storyParagraphs.slice(0, -1).join("\n"))) {
+    add("story-pov", "story", `история героини «${cfg.storyHeroine}» говорит от первого лица («сказала я»)`);
+  }
   if (FICTION.test(body)) add("fiction", "story", "оговорка о вымышленности истории запрещена");
   for (const bold of body.matchAll(/\*\*([^*\n]+)\*\*/g)) {
     if (normalize(bold[1]).includes(nq)) add("bold-query", "question", `запрос «${query}» не выделяется жирным («${bold[1].slice(0, 40)}»)`);
@@ -200,13 +1469,25 @@ export function checkSzArticle(md, cfg, env) {
   const intro = body.slice(pToc + ":::overview\n:::".length, pAudio).trim().split(/\n\n+/).filter(Boolean);
   if (intro.length < 1 || intro.length > 2) add("practice-intro", "practiceIntro", "описание практики – 1–2 абзаца");
   for (const paragraph of intro) if (words(paragraph) > L.practiceIntroWords) add("practice-intro", "practiceIntro", `абзац о практике ${words(paragraph)} слов, нужно ≤ ${L.practiceIntroWords}`);
+  if (cfg.practiceSubtitle && cfg.practice?.title && !intro.join("\n").includes(cfg.practice.title)) {
+    add("practice-name", "practiceIntro", `название практики должно быть дословно «${cfg.practice.title}», не подзаголовок «${cfg.practiceSubtitle}»`);
+  }
   if (body.slice(pAudio + ":::practiceAudio\n:::".length, pChecklist).trim() !== "") add("order", "*", "чек-лист сразу после плеера");
   const checklist = body.slice(pChecklist).match(/^:::checklist\n([\s\S]*?)\n:::/)?.[1] ?? "";
   if (!checklist.includes(`storageKey: ${slug}-5-shagov\n`) || !/^persist: local$/m.test(checklist)) add("checklist", "*", "storageKey/persist чек-листа");
   for (const key of ["title", "feedbackEmpty", "feedbackStart", "feedbackHalf", "feedbackDone"]) if (!new RegExp(`^${key}: .+$`, "m").test(checklist)) add("checklist", "checklist", `нет ${key} в чек-листе`);
   const items = [...checklist.matchAll(/^ {2}text: (.+)$/gm)].map((m) => m[1]);
   if (items.length !== 5 || [...checklist.matchAll(/^- id: /gm)].length !== 5) add("checklist", "checklist", "ровно 5 пунктов чек-листа");
-  for (const item of items) if (words(item) > L.checklistWords) add("checklist-length", "checklist", `пункт чек-листа длиннее ${L.checklistWords} слов: «${item}»`);
+  const checklistTitle = checklist.match(/^title: (.+)$/m)?.[1] ?? "";
+  const strictChecklist = stepHeadingCount(checklistTitle);
+  const statedChecklist = statedListCount(checklistTitle);
+  if (strictChecklist != null && items.length > 0 && strictChecklist !== items.length) add("count-mismatch", "checklist", `заголовок «${checklistTitle}» обещает ${strictChecklist}, а пунктов ${items.length}`);
+  else if (strictChecklist == null && statedChecklist != null && items.length > 0 && statedChecklist !== items.length) add("count-mismatch", "checklist", `заголовок «${checklistTitle}» обещает ${statedChecklist}, а пунктов ${items.length}`, "warn");
+  for (const item of items) {
+    if (words(item) > L.checklistWords) add("checklist-length", "checklist", `пункт чек-листа длиннее ${L.checklistWords} слов: «${item}»`);
+    const itemDefect = proseDefect(item, proseLimit("checklist.items"));
+    if (itemDefect) add("checklist", "checklist", itemDefect);
+  }
   if (cfg.materials) {
     const known = new Set(trigrams(cfg.materials));
     const novel = intro.flatMap((paragraph) => trigrams(paragraph)).filter((t) => /[а-яё]{5,}/.test(t) && !known.has(t));
@@ -220,7 +1501,13 @@ export function checkSzArticle(md, cfg, env) {
   const pExpert = need(pos(/<section class="article-expert"/, pPsychology), "experts", "нет карточек экспертов");
   const pFaq = need(pos(/^:::faq\n:::$/m, pEarly), "order", "нет :::faq");
   if (pExpert < 0 || pFaq < 0) return problems;
-  if (body.slice(body.indexOf("\n", pPsychology) + 1, pExpert).trim().split(/\n\n+/).length !== 1) add("psychology-intro", "psychologyIntro", "ровно один вводный абзац перед карточками");
+  const psychologyIntro = body.slice(body.indexOf("\n", pPsychology) + 1, pExpert).trim();
+  const introParts = psychologyIntro.split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+  if (introParts.length !== 1) add("psychology-intro", "psychologyIntro", "ровно один вводный абзац перед карточками");
+  else {
+    const introDefect = proseDefect(introParts[0], proseLimit("psychologyIntro"));
+    if (introDefect) add("psychology-intro", "psychologyIntro", introDefect);
+  }
   const cards = [...body.matchAll(/<section class="article-expert" aria-label="([^"]+)">\n([\s\S]*?)<\/section>/g)];
   if (cards.length !== cfg.experts.length) add("experts", "experts", `${cfg.experts.length} карточки экспертов`);
   const tags = [];
@@ -231,7 +1518,10 @@ export function checkSzArticle(md, cfg, env) {
     if (!src?.startsWith("/media/experts/") || !env.portraitExists(src)) add("portrait", "*", `${name}: нет локального портрета`);
     if (!/alt="[^"]+" width="96" height="96" loading="lazy"/.test(html)) add("portrait", "*", `${name}: alt/размер портрета`);
     for (const cls of ["name", "role", "credit"]) if (!new RegExp(`<p class="article-expert-${cls}">[^<]+<\\/p>`).test(html)) add("expert-card", "*", `${name}: нет ${cls}`);
-    if (!/^### .+: .+$/m.test(html)) add("expert-thesis", "experts", `${name}: «### Имя: тезис»`);
+    // Card count is not enough: the assembler still emits a card, and «а» / «главная мысль а» used to pass.
+    const thesis = html.match(/^### [^:\n]+:\s*(.*)$/m)?.[1] ?? "";
+    const thesisDefect = proseDefect(thesis, proseLimit("experts.thesis"));
+    if (thesisDefect) add("expert-thesis", "experts", `${name}: ${thesisDefect}`);
     const quotes = [...html.matchAll(/^> («[^\n]+»\.?)$/gm)];
     if (quotes.length !== 1) add("expert-quote", "*", `${name}: ровно одна цитата`);
     const quote = quotes[0]?.[1] ?? "";
@@ -240,6 +1530,8 @@ export function checkSzArticle(md, cfg, env) {
     else if (quoteText(quote) !== quoteText(expected.quote)) add("expert-quote", "*", `${name}: цитата не совпадает дословно с брифом`);
     if (/article-expert-initials|href=|\]\(/.test(html)) add("expert-card", "experts", `${name}: в карточке нет ссылок и инициалов`);
     const bridge = html.split(/^> «[^\n]+»\.?$/m)[1] ?? "";
+    const bridgeDefect = proseDefect(bridge.replace(/<[^>]+>/g, ""), proseLimit("experts.bridge"));
+    if (bridgeDefect) add("expert-bridge", "experts", `${name}: ${bridgeDefect}`);
     for (const phrase of expected?.forbiddenInBridge ?? []) if (normalize(bridge).includes(normalize(phrase))) add("expert-bridge", "experts", `${name}: в пояснении нельзя «${phrase}» – эксперт этого не говорит`);
     if (!cfg.expertTags[name]) add("expert-list", "*", `${name}: не из утверждённого списка`);
     else tags.push(...cfg.expertTags[name]);
@@ -252,6 +1544,14 @@ export function checkSzArticle(md, cfg, env) {
   if (h2.length < L.bodyH2[0] || h2.length > L.bodyH2[1]) add("body-sections", "sections", `в основной части ${h2.length} H2, нужно ${L.bodyH2[0]}–${L.bodyH2[1]}`);
   const mw = words(mainBody);
   if (mw < L.mainBody[0] || mw > L.mainBody[1]) add("body-length", "sections", `основная часть ${mw} слов, нужно ${L.mainBody[0]}–${L.mainBody[1]}`);
+  for (const block of mainBody.split(/(?=^## )/m)) {
+    const title = block.match(/^## (.+)$/m)?.[1];
+    if (!title) continue;
+    const heading = normalize(title);
+    if (heading.startsWith("три шага") || heading.startsWith("когда стоит обратиться")) continue;
+    const prose = block.replace(/^## .+$/m, " ").replace(/^### .+$/gm, " ").replace(/^\|.*$/gm, " ");
+    if (sectionRetellsStory(story, prose, query)) add("story-retell", "sections", `раздел «${title}» пересказывает историю`);
+  }
   if (!/^\|[^\n]+\|\n\|(?:\s*:?-+:?\s*\|)+$/m.test(mainBody)) add("table", "table", "нет сравнительной таблицы");
   const pSpecialist = pos(/^## Когда стоит обратиться к специалисту$/m, pExpert);
   if (pSpecialist < 0 || pSpecialist > pFaq) add("specialist", "*", "нет «## Когда стоит обратиться к специалисту» перед FAQ");
@@ -263,7 +1563,13 @@ export function checkSzArticle(md, cfg, env) {
   }
   const tableAt = body.search(/^\|(?:\s*:?-+:?\s*\|)+$/m);
   const stepSection = tableAt < 0 ? undefined : body.slice(tableAt).split(/^(?=## )/m).find((section) => (section.match(/^### /gm) || []).length >= 2);
-  if ((stepSection?.match(/^### /gm) || []).length !== 3 || !/^## Три шага/m.test(stepSection ?? "")) add("steps", "steps", "первый раздел с H3 после таблицы – «## Три шага…» ровно с тремя «###»");
+  const stepItems = (stepSection?.match(/^### /gm) || []).length;
+  const stepsTitle = stepSection?.match(/^## (.+)$/m)?.[1] ?? "";
+  if (stepItems !== 3 || !/^## Три шага/m.test(stepSection ?? "")) add("steps", "steps", "первый раздел с H3 после таблицы – «## Три шага…» ровно с тремя «###»");
+  const strictSteps = stepHeadingCount(stepsTitle);
+  const statedSteps = statedListCount(stepsTitle);
+  if (strictSteps != null && stepItems > 0 && strictSteps !== stepItems) add("count-mismatch", "steps", `заголовок «${stepsTitle}» обещает ${strictSteps}, а пунктов ${stepItems}`);
+  else if (strictSteps == null && statedSteps != null && stepItems > 0 && statedSteps !== stepItems) add("count-mismatch", "steps", `заголовок «${stepsTitle}» обещает ${statedSteps}, а пунктов ${stepItems}`, "warn");
   for (const [, heading] of (stepSection ?? "").matchAll(/^### (.+)$/gm)) {
     // docs/article-numbered-steps.md: the site numbers steps itself; «Если …» headings are scenarios, not steps.
     if (/^(?:\d|Если\s)/iu.test(heading)) add("steps", "steps", `заголовок шага – глагол без номера и без «Если»: «${heading}»`);
@@ -273,23 +1579,76 @@ export function checkSzArticle(md, cfg, env) {
   // ── FAQ ──
   const faq = faqEntries(fm);
   if (faq.length !== L.faqCount) add("faq-count", "faq", `ровно ${L.faqCount} вопросов FAQ`);
-  if (!faq.some(([q]) => /специалист|психолог|обратиться/iu.test(q))) add("faq-specialist", "faq", "один вопрос FAQ – про обращение к специалисту/психологу");
+  if (!faq.some(([q]) => isSpecialistQuestion(q))) add("faq-specialist", "faq", "один вопрос FAQ – про обращение к специалисту/психологу");
   for (const [q, a] of faq) {
     const aw = words(a);
     if (aw < L.faqAnswer[0] || aw > L.faqAnswer[1]) add("faq-length", "faq", `ответ на «${q}» ${aw} слов, нужно ${L.faqAnswer[0]}–${L.faqAnswer[1]}`);
+    const answerFragment = danglingFragment(a);
+    if (answerFragment) add("faq-fragment", "faq", `ответ на «${q}» ${answerFragment}`);
+    if (faqAnswerTypeMismatch(q, a)) add("faq-answer-type", "faq", `ответ на «${q}» начинается как да/нет, а вопрос открытый`);
+    if (faqStanceMismatch(q, a, cfg.faqHints)) add("faq-stance", "faq", `ответ на «${q}» противоречит позиции брифа «${(cfg.faqHints ?? []).find((hint) => normalize(q).includes(normalize(hint.match)))?.stance ?? ""}»`, "warn");
+    if (faqContradictsBody(q, a, mainBody, query)) add("faq-contradiction", "faq", `ответ на «${q}» отрицает то, что основная часть уже говорит`);
   }
   const faqText = faq.flat().join("\n");
 
   // ── links ──
-  const contextual = [...body.slice(0, pFaq).matchAll(/\[[^\]]+\]\(\/s\/([a-z0-9-]+)\)/g)];
-  if (contextual.length < L.contextualLinks[0] || contextual.length > L.contextualLinks[1]) add("links-contextual", "sections", `${contextual.length} ссылок /s в тексте, нужно ${L.contextualLinks[0]}–${L.contextualLinks[1]}`);
+  const proseBeforeFaq = body.slice(0, pFaq);
+  const proseLinks = markdownLinks(proseBeforeFaq).filter((link) => link.slug);
+  const requiredLinks = [...new Set((cfg.requiredSlugs ?? []).filter(Boolean))];
+  const linkMin = requiredLinks.length || L.contextualLinks[0];
+  const linkMax = L.contextualLinks[1];
+  const linkSlugs = proseLinks.map((link) => link.slug);
+  const missingLinks = requiredLinks.filter((slug) => !linkSlugs.includes(slug));
+  const extraLinks = [...new Set(linkSlugs.filter((slug) => requiredLinks.length && !requiredLinks.includes(slug)))];
+  if (linkSlugs.length < linkMin || linkSlugs.length > linkMax || missingLinks.length || extraLinks.length) {
+    problems.push({ code: "links-contextual", field: "sections", message: `${linkSlugs.length} ссылок /s в тексте, нужно ${linkMin}–${linkMax}`, severity: "error", actual: linkSlugs.length, min: linkMin, max: linkMax });
+  }
+  for (const slug of missingLinks) add("links-required", "sections", `нет обязательной ссылки /s/${slug} в тексте до FAQ`);
+  for (const item of linkAnchorMismatches(proseBeforeFaq, cfg.linkAnchors)) {
+    const actual = item.found?.length ? item.found.join(", ") : "ссылки нет";
+    add("links-map", "sections", `анкор «${item.anchor}» должен вести на ${item.href}, сейчас: ${actual}`);
+  }
+  for (const link of ungrammaticalLinks(proseBeforeFaq)) {
+    add("links-grammar", "sections", `ссылка «${link.anchor}» стоит в конструкции «и […] через»`, "warn");
+  }
+  let anchorIndex = 0;
+  for (const link of proseLinks) {
+    const brackets = anchorHasBrackets(link.anchor);
+    if (!brackets && !genericLinkAnchor(link.anchor)) continue;
+    const why = brackets ? "содержит скобки" : "слишком общий";
+    add("links-anchor", "sections", `анкор «${link.anchor}» у ссылки /s/${link.slug} ${why} (#${anchorIndex})`);
+    anchorIndex += 1;
+  }
+  for (const residue of linkLeadResidue(`${body}\n${faqText}`)) {
+    add("links-residue", "sections", `оборванный ярлык ссылки: «${residue}»`);
+  }
+  if (typeof env?.draftMd === "string") {
+    const seenFragment = new Set();
+    for (const fragment of protectedDiffFragments(env.draftMd, md)) {
+      if (seenFragment.has(fragment)) continue;
+      seenFragment.add(fragment);
+      add("links-fragment", "story", `защищённый абзац обрезан на обломке ярлыка: «${fragment}»`);
+    }
+    const seenResidue = new Set();
+    for (const residue of linkRemovedResidue(env.draftMd, md)) {
+      if (seenResidue.has(residue)) continue;
+      seenResidue.add(residue);
+      add("links-residue", "sections", `оборванный ярлык ссылки: «${residue}»`);
+    }
+  }
   const links = [...body.matchAll(/(?:\]\(|href=")\/s\/([a-z0-9-]+)(?:[)#"?])/g)].map((m) => m[1]);
   for (const link of links) if (!env.published.has(link)) add("links-target", "sections", `ссылка /s/${link} не на опубликованную статью`);
   const urls = [...(fm + "\n" + body).matchAll(/(?:https?:)?\/\/[^\s)"'<>]+/g)].map((m) => m[0]);
   const practiceUrls = [`https://audiolad.ru/practice/${p.path}`, `https://audiolad.ru/embed/practice/${p.path}`];
-  if (urls.join("\n") !== practiceUrls.join("\n")) add("links-external", "*", `внешние адреса запрещены (кроме pageUrl/embedUrl практики): ${urls.filter((u) => !practiceUrls.includes(u)).join(", ") || "порядок"}`);
-  for (const [, href] of body.matchAll(/(?:href="|\]\()([^")]+)/g)) if (!/^\/s\/[a-z0-9-]+$/.test(href)) add("links-internal", "sections", `ссылка ${href}: только /s/<slug>`);
-  if (/azbyka|wikipedia|litres|www\.|max\.ru|max-potok/i.test(body + faqText)) add("links-external", "*", "упоминание сторонних сайтов / MAX в тексте");
+  const practiceHits = urls.filter((url) => practiceUrls.includes(url));
+  if (practiceHits.join("\n") !== practiceUrls.join("\n")) add("links-external", "*", `нужны pageUrl и embedUrl практики в этом порядке: ${practiceUrls.join(", ")}`);
+  for (const url of urls) if (!practiceUrls.includes(url) && !allowedSiteAddress(url)) add("links-external", "*", `внешний адрес запрещён: ${url}`);
+  for (const [, href] of body.matchAll(/(?:href="|\]\()([^")]+)/g)) {
+    if (/^\/s\/[a-z0-9-]+$/.test(href) || allowedSiteAddress(href)) continue;
+    add("links-internal", "sections", `ссылка ${href}: только /s/<slug> или адрес audiolad.ru / sergey-zoya.ru`);
+  }
+  for (const problem of outgoingAddressProblems(fm + "\n" + body)) add("links-external", "*", problem);
+  if (/azbyka|wikipedia|litres|max\.ru|max-potok/i.test(body + faqText)) add("links-external", "*", "упоминание сторонних сайтов / MAX в тексте");
 
   // ── content safety ──
   const visible = visibleText(body);
@@ -326,6 +1685,41 @@ export function checkSzArticle(md, cfg, env) {
   if (tw < L.total[0] || tw > L.total[1]) add("total-length", "sections", `всего ${tw} слов с FAQ, нужно ${L.total[0]}–${L.total[1]}`);
   const mainCount = normalize(body).split(nq).length - 1;
   if (mainCount < L.mainQuery[0] || mainCount > L.mainQuery[1]) add("query-count", "sections", `запрос «${query}» в тексте ${mainCount} раз, нужно ${L.mainQuery[0]}–${L.mainQuery[1]}`);
+  const queryPhrases = (cfg.additionalQueries ?? []).map((phrase) => (typeof phrase === "string" ? phrase : phrase?.text)).filter(Boolean);
+  for (const phrase of queryPhrases) {
+    const forms = cfg.additionalQueryForms?.[phrase] ?? [];
+    const ok = [phrase, ...forms].some((form) => phraseInProse(mainBody, form));
+    if (!ok) add("extra-query", "sections", `дополнительный запрос «${phrase}» не встречается в тексте`);
+  }
+  for (const hit of metaQueryLeftovers(`${mainBody}\n${faqText}`)) {
+    add("query-meta", "sections", `служебная вставка вместо фразы: «${hit.trim()}»`);
+  }
+  for (const phrase of [query, ...queryPhrases]) {
+    if (phrase && (boltedPrepositionQuery(storyParagraphs.at(-1) ?? "", phrase) || boltedPrepositionQuery(mainBody, phrase))) {
+      add("query-case", "transition", `запрос «${phrase}» стоит сразу после «про», «о» или «об»`);
+    }
+  }
+  for (const hit of oversizedParagraphs(mainBody)) {
+    add("paragraph-size", "sections", `абзац из ${hit.count} предложений (больше 7) – не наполнитель, разбейте на абзацы по 3–5`);
+  }
+  for (const lead of danglingLeads(mainBody)) add("dangling-lead", "sections", `подводка без списка: «${lead}»`, "warn");
+  for (const hit of listPromiseMismatches(mainBody)) {
+    add("count-mismatch", "sections", `«${hit.title}» обещает ${hit.stated}, а пунктов ${hit.count}`, hit.strict ? "error" : "warn");
+  }
+  if (cfg.examplePhrases) {
+    const examples = examplePhraseStats(mainBody);
+    const { min, max } = cfg.examplePhrases;
+    if (!examples.heading) add("example-count", "sections", `нет раздела H2 «примеры фраз» (${min}–${max} фраз)`);
+    else if (examples.count < min || examples.count > max) add("example-count", "sections", `примеров фраз ${examples.count}, нужно ${min}–${max}`);
+    for (const phrase of examplePhraseLines(mainBody)) {
+      const defect = examplePhraseDefect(phrase);
+      if (defect) add("example-phrase", "sections", `фраза-пример «${phrase.slice(0, 60)}»: ${defect}`);
+    }
+  }
+  for (const hit of englishLeftovers(`${body}\n${faqText}`)) {
+    add("english-note", "sections", `английская заметка в тексте: «${hit.slice(0, 80)}»`);
+  }
+  for (const duplicated of duplicateParagraphs(body)) add("duplicate-paragraph", "sections", `абзац повторяет уже сказанное: «${duplicated.slice(0, 70)}»`);
   for (const verbatim of cfg.verbatim ?? []) {
     // Verified texts (prayers, poems) quoted in «…»: the whole text or its beginning ending with «…».
     const head = verbatim.slice(0, 12);
@@ -341,7 +1735,23 @@ export function checkSzArticle(md, cfg, env) {
   const pGrid = need(pos(/<img src="\/media\/angels\/four-angels-06-all-angels\.webp"/, Math.max(pReadmore, 0)), "order", "нет картинки всех ангелов");
   const pFinal = need(pos(/^:::cta final\n:::$/m, Math.max(pGrid, 0)), "order", "нет :::cta final");
   if (pReadmore >= 0 && pGrid >= 0 && pFinal >= 0) {
-    if (!/^\*\*Чем закончилась история\.\*\* /m.test(body.slice(pFaq, pReadmore))) add("story-ending", "storyEnding", "«**Чем закончилась история.**» между FAQ и «Читайте также»");
+    const endingBody = body.slice(pFaq, pReadmore);
+    const ending = endingBody.match(/\*\*Чем закончилась история\.\*\*([^\n]*)/);
+    if (!ending) add("story-ending", "storyEnding", "«**Чем закончилась история.**» между FAQ и «Читайте также»");
+    else {
+      const endingDefect = proseDefect(ending[1], proseLimit("storyEnding"));
+      if (endingDefect) add("story-ending", "storyEnding", endingDefect);
+    }
+    const moreAt = body.indexOf(":::morelinks\n:::");
+    if (moreAt >= 0 && pGrid > moreAt) {
+      const chunks = body.slice(moreAt + ":::morelinks\n:::".length, pGrid).trim().split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+      const invite = chunks.find((part) => !part.startsWith("**") && !part.startsWith("<"));
+      const inviteDefect = proseDefect(invite ?? "", proseLimit("finalInvite"));
+      if (inviteDefect) add("final-invite", "finalInvite", inviteDefect);
+      const finalQuestion = chunks.find((part) => part.startsWith("**")) ?? "";
+      const finalQuestionDefect = proseDefect(finalQuestion, proseLimit("finalQuestion"));
+      if (finalQuestionDefect) add("final-question", "finalQuestion", finalQuestionDefect);
+    }
     const readmore = body.slice(pReadmore, pGrid);
     if (!readmore.includes('<h2 id="readmore-heading">Читайте также</h2>') || [...readmore.matchAll(/<li><a href="\/s\//g)].length !== 3) add("readmore", "*", "«Читайте также» – 3 ссылки");
     if (body.slice(pFinal).trim() !== ":::cta final\n:::") add("order", "*", "статья заканчивается :::cta final");
@@ -351,6 +1761,8 @@ export function checkSzArticle(md, cfg, env) {
   for (const marker of ["gallery", "practiceAudio", "checklist", "faq", "cta early", "cta final"]) {
     if (body.split(`:::${marker}\n`).length - 1 !== 1) add("order", "*", `ровно один блок :::${marker}`);
   }
+
+  auditHollowProse(body, add);
 
   // ── uniqueness against the site ──
   const own = uniqueKeys(md);

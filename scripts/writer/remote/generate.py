@@ -24,6 +24,8 @@ PRICES = {
     "openai/gpt-oss-120b": ("15.86", "61.00"),
     "Qwen/Qwen3.6-35B-A3B": ("219.60", "329.40"),
     "anthropic/claude-opus-4.8": ("854.00", "4270.00"),
+    # GET /v1/models Cloud.ru, 2026-10-24, models-prices.tsv; RUB incl. VAT per 1M tokens.
+    "openai/gpt-5.4-mini": ("147.315", "883.89"),
     "openai/gpt-5.5": ("854.00", "5124.00"),
     "google/gemini-3.1-pro-preview": ("341.60", "2049.60"),
     "deepseek-ai/DeepSeek-V4-Pro": ("183.00", "732.00"),

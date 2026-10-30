@@ -1,8 +1,10 @@
 // Prompt and strict JSON schema for sergey-zoya.ru articles. The model writes ONLY texts
 // (fields); everything fixed – carousel, CTA, TOC, player, expert cards with quotes, phones,
 // disclaimer, «Читайте также», final picture – is inserted by assemble.mjs.
-import { SZ } from "./config.mjs";
+import { normalizeSzFields } from "./assemble.mjs";
+import { SZ, SZ_BODY_PLAN, szBodyPlanBudget } from "./config.mjs";
 import { CORRECTIONS, LESSONS, toneSample } from "./knowledge.mjs";
+import { fieldProseDefect } from "./rules.mjs";
 
 const str = { type: "string" };
 // As in lib/prompt.mjs: only upper bounds go into the grammar (runaway guard).
@@ -70,44 +72,95 @@ const toneJson = () => (sample ??= JSON.stringify(toneSample(), null, 1));
 
 const bullets = (items) => items.filter(Boolean).map((item) => `- ${item}`).join("\n");
 
+const QUERY_SLOTS = [
+  "второе предложение второго абзаца sectionsBefore[0]",
+  "второе предложение второго абзаца sectionsBefore[1]",
+  "одно предложение paragraphsBefore таблицы",
+  "одно предложение текста первого шага",
+  "одно предложение текста второго шага",
+  "одно предложение текста третьего шага",
+  "одно предложение specialist.intro",
+];
+
+function querySlotLines(article) {
+  const forms = article.additionalQueryForms ?? {};
+  return (article.additionalQueries ?? []).map((phrase, index) => {
+    const where = QUERY_SLOTS[index] ?? `отдельное предложение основной части (слот ${index + 1})`;
+    const allowed = forms[phrase] ?? [];
+    const variant = allowed.length ? ` Допустима только форма из брифа: ${allowed.map((form) => `«${form}»`).join(", ")}.` : " Другой падеж и пересказ не подходят.";
+    return `- «${phrase}» – ${where}. Дословно, отдельным вхождением, не внутри слова и не текстом анкора.${variant}`;
+  }).join("\n");
+}
+
 export function buildSzMessages(article, site, { avoid, siblings = new Map() } = {}) {
   const L = SZ.limits;
+  const plan = SZ_BODY_PLAN;
+  const budget = szBodyPlanBudget(plan);
   const titles = (slugs) => slugs.map((slug) => `/s/${slug} – «${site.articles.get(slug)?.title ?? siblings.get(slug) ?? slug}»${siblings.has(slug) ? " (статья этого пакета)" : ""}`);
   const user = [
     `СТАТЬЯ: «${article.title}» (H1 уже задан). Основной запрос: «${article.query}».`,
     article.intent && `Намерение читателя: ${article.intent}`,
     article.audience && `Читатель: ${article.audience}`,
     "",
+    "ОБЯЗАТЕЛЬНЫЕ ССЫЛКИ (каждую один раз, до того как пишешь абзацы):",
+    bullets(titles(article.links?.contextual ?? [])),
+    `Обязательны все ${(article.links?.contextual ?? []).length} ссылок из этого списка, точным slug, каждая один раз до FAQ. Норма брифа и гейта одна: ${L.contextualLinks[0]}–${L.contextualLinks[1]}, и этот список уже внутри неё. Урок про диапазон 2–5 не отменяет список: пропуск любого slug – ошибка, лишняя ссылка /s – тоже. Место – разные разделы основной части: sectionsBefore, проза tableSection или текст шага. Одна ссылка – одно обычное предложение. Анкор – естественная фраза о содержании статьи, не «материал», не «здесь», не «подробнее», не «тут». Анкор из брифа ведёт только на свой slug, не на соседнюю статью.`,
+    article.links?.anchors?.length ? `Пары анкор → адрес (не менять местами):\n${bullets(article.links.anchors.map((item) => `«${item.anchor}» → ${item.href}`))}` : "",
+    "Куда нельзя: story, transition, storyEnding, цитата, молитва, invitation, question, practiceIntro, checklist, psychologyIntro, experts, specialist, faq. История и молитва остаются без ссылок.",
+    "Как нельзя: не клеить «Подробнее:», «Читайте также:», «См. также:», «Узнайте больше:» и не ставить анкор-указатель. В анкоре нет квадратных скобок. Блок «Читайте также» в конце вставит сайт.",
+    "",
     "СТРУКТУРА (поля JSON):",
     `- seoTitle: ≤ ${L.seoTitleMax} символов, начинается с «${article.query}» (с заглавной), отличается от H1, без названия сайта.`,
-    `- description: ${L.description[0]}–${L.description[1]} символов (считай!), содержит «${article.query}».`,
+    `- description: РОВНО ${L.description[0]}–${L.description[1]} символов. Посчитай символы перед ответом: 116–135 не проходит. Содержит «${article.query}».`,
     `- faqHeading: «Частые вопросы о …» / «Частые вопросы об …», уникальный.`,
-    `- story: 3–6 абзацев истории от первого лица (Зоя или героиня), начинается с пика – с прямой речи «…»; прямая речь в первых трёх абзацах. Без оговорок «история вымышлена».`,
-    `- transition: последний абзац истории – мостик к теме, содержит запрос «${article.query}» как есть (не жирным).`,
+    `- story: 3–6 абзацев, начинается с пика – с прямой речи «…»; прямая речь в первых трёх абзацах. ${article.storyHeroine ? `Героиня «${article.storyHeroine}» – третье лицо от первой фразы до концовки: «сказала ${article.storyHeroine}», не «сказала я», не «подумала я». «Я» рассказчицы – только в transition.` : "Одна точка зрения, третье лицо: «сказала она», не «сказала я». Не смешивай «сказала я» с героиней, названной по имени. «Я» рассказчицы – только в transition."} Без оговорок «история вымышлена» и без ссылок /s/. Сюжет рассказывается только здесь, один раз. Разделы, таблица, шаги и storyEnding не пересказывают сцену и не повторяют концовку.`,
+    `- transition: последний абзац истории – мостик к теме, содержит запрос «${article.query}» дословно, в той форме, как в брифе (не жирным, не в кавычках). Запрос не склоняется. Не ставь перед ним «про», «о» или «об»: «разговор про ${article.query}» – ошибка. Вставь цепочку после двоеточия, тире или запятой: «так начинается тема – ${article.query}».`,
     `  story + transition вместе: ${L.story[0]}–${L.story[1]} слов.`,
     "- invitation: 1–2 предложения – приглашение выбрать одного из четырёх ангелов (слово «ангел» обязательно).",
     `- question: короткий вопрос-приглашение со знаком «?», без запроса «${article.query}» (будет жирным).`,
-    `- practiceIntro: 1–2 абзаца по ≤ ${L.practiceIntroWords} слов о практике «${article.practice.title}» (${article.practice.author}, ${article.practice.duration}). Свойства практики – ТОЛЬКО из материалов ниже, ничего не придумывай. Только позитивно.`,
-    `- checklist: title (например «5 шагов, чтобы …»), feedbackEmpty/Start/Half/Done – короткие ободряющие фразы; items – ровно 5 действий по ≤ ${L.checklistWords} слов, глаголом в повелительном наклонении.`,
+    `- practiceIntro: 1–2 абзаца по ≤ ${L.practiceIntroWords} слов. Единственное название практики – дословно «${article.practice.title}» (${article.practice.author}, ${article.practice.duration}).${article.practice.subtitle ? ` Подзаголовок «${article.practice.subtitle}» названием не является.` : " Не подставляй подзаголовок страницы вместо названия."} Свойства практики – ТОЛЬКО из материалов ниже, ничего не придумывай. Только позитивно.`,
+    `- checklist: title без слова «шаг» (например «Пять действий, чтобы …» или «5 пунктов, чтобы …»). Список шагов в статье один – это поле steps. feedbackEmpty/Start/Half/Done – короткие ободряющие фразы; items – ровно 5 действий по 2–${L.checklistWords} слов, глаголом в повелительном наклонении. Число в заголовке равно числу пунктов: пять пунктов – только «Пять действий» или «5 пунктов», не «Три действия», не «Три шага» и не «Пять шагов». Если в тексте сказано «N шагов», пунктов сразу под этой фразой ровно N. Короткая команда («Наденьте наушники.») подходит; одно слово и заглушка – нет.`,
     `- psychologyIntro: один абзац перед карточками экспертов (раздел «${article.query}: что говорит психология» – заголовок вставит сайт).`,
     "- experts: ровно 2, в порядке брифа: name (как в брифе), thesis – короткий тезис карточки (3–7 слов, со строчной), bridge – 2–3 предложения: что эксперт говорит в цитате (с учётом контекста) и чем это полезно читателю. Не приписывай эксперту того, чего он не говорит (см. «не говорит»). Цитату не пересказывай в кавычках – её вставит сайт.",
-    "- sectionsBefore: 1–2 раздела {title, paragraphs (2–4 абзаца по 60–110 слов)} – суть темы.",
-    "- tableSection: раздел со сравнительной таблицей: title, paragraphsBefore (1 абзац), columns (3–4), rows (3–5 строк, по одному короткому значению на колонку), paragraphsAfter (0–1 абзац).",
-    "- steps: title начинается с «Три шага, чтобы …»; intro – 1 абзац; items – ровно 3 {title – повелительный глагол, без цифр и без «Если»; text – 50–90 слов}.",
-    "- sectionsAfter: 0–1 раздел {title, paragraphs}.",
-    "- specialist: intro – 1 абзац о том, когда нужна помощь специалиста (заголовок, телефоны и дисклеймер вставит сайт); items – 3–5 признаков, каждый со строчной буквы и с «;» в конце (последний – с «.»).",
-    `- faq: ровно ${L.faqCount} вопросов; ответы ${L.faqAnswer[0]}–${L.faqAnswer[1]} слов каждый (считай!); один вопрос – про то, когда обратиться к психологу/специалисту. Вопросы и заголовки не повторяют уже опубликованные на сайте.`,
-    "- storyEnding: 2–3 предложения – чем закончилась история из начала (вставится после «**Чем закончилась история.**»).",
+    `- sectionsBefore: ровно ${plan.sectionsBefore.count} раздела {title, paragraphs}. Каждый раздел ${plan.sectionsBefore.wordsEach[0]}–${plan.sectionsBefore.wordsEach[1]} слов: три абзаца примерно по 75–85 слов, в каждом абзаце 3–5 предложений и не больше 7. Короткий раздел дописывай новым абзацем, а не десятком предложений в один. Не добавляй третий раздел.`,
+    `- tableSection: раздел со сравнительной таблицей: title, paragraphsBefore + paragraphsAfter вместе ${plan.tableProse[0]}–${plan.tableProse[1]} слов, columns (3–4), rows (3–5 строк, по одному короткому значению на колонку).`,
+    `- steps: title начинается с «Три шага, чтобы …» и обещает ровно три пункта, не «Пять шагов»; intro ${plan.stepsIntro[0]}–${plan.stepsIntro[1]} слов; items – ровно 3 {title – повелительный глагол, без цифр и без «Если»; text ${plan.stepText[0]}–${plan.stepText[1]} слов}.`,
+    "- sectionsAfter: пустой массив []. Лишний раздел даёт седьмой H2, гейт его отклоняет.",
+    `- specialist: intro ${plan.specialistIntro[0]}–${plan.specialistIntro[1]} слов о том, когда нужна помощь специалиста (заголовок, телефоны и дисклеймер вставит сайт); items – 3–5 признаков, каждый со строчной буквы и с «;» в конце (последний – с «.»).`,
+    `- faq: ровно ${L.faqCount} вопросов; каждый ответ 45–70 слов (гейт ${L.faqAnswer[0]}–${L.faqAnswer[1]}, 39 слов не проходит – посчитай). Один вопрос – про то, когда обратиться к психологу/специалисту. На вопрос с «ли» ответ может начаться с «Да» или «Нет», но только если это позиция брифа. На открытый вопрос («Как», «Почему», «Что», «Когда», «Зачем», «Чем») не начинай ответ с «Да», «Нет», «Можно» или «Нельзя». Ответ не противоречит основной части: не отрицай то, что статья уже разрешила. Вопросы и заголовки не повторяют уже опубликованные на сайте и другие статьи пакета.`,
+    article.faqHints?.length ? `ПОЗИЦИЯ ОТВЕТОВ FAQ (первое слово не противоречит позиции):\n${bullets(article.faqHints.map((hint) => `если вопрос содержит «${hint.match}», ответ держит позицию «${hint.stance}»`))}` : "",
+    "- storyEnding: 2–3 предложения – коротко чем закончилась история (вставится после «**Чем закончилась история.**»). Не копируй абзацы story, не повторяй последнюю сцену и не пересказывай сюжет заново.",
     "- finalInvite: 1 предложение – мягкое приглашение вернуться к образу ангела; finalQuestion: короткий вопрос со «?».",
     "",
     "ОБЪЁМ:",
-    `- От первого H2 после карточек экспертов до FAQ (все sections, tableSection, steps, specialist): ${L.mainBody[0]}–${L.mainBody[1]} слов; всего H2 в этой части ${L.bodyH2[0]}–${L.bodyH2[1]} (включая «Три шага» и «Когда стоит обратиться к специалисту»).`,
+    `- ЦЕЛЬ основной части (от первого H2 после карточек экспертов до FAQ): ${plan.target[0]}–${plan.target[1]} слов, ориентир середины ≈ ${Math.round(budget.mid)}. Гейт пропускает ${L.mainBody[0]}–${L.mainBody[1]}, но черновик короче ${plan.target[0]} не готов. Черновик на 500–800 слов не проходит: пиши к середине цели, не к нижней границе гейта. Один абзац длиннее 7 предложений – наполнитель, так объём не набирают.`,
+    "- Счёт слов основной части, его нужно набрать до отправки:",
+    `  разделы sectionsBefore: ${plan.sectionsBefore.count} × ${plan.sectionsBefore.wordsEach[0]}–${plan.sectionsBefore.wordsEach[1]}`,
+    `  проза таблицы: ${plan.tableProse[0]}–${plan.tableProse[1]}`,
+    `  вступление шагов: ${plan.stepsIntro[0]}–${plan.stepsIntro[1]}; каждый из трёх шагов: ${plan.stepText[0]}–${plan.stepText[1]}`,
+    `  вступление специалиста: ${plan.specialistIntro[0]}–${plan.specialistIntro[1]}`,
+    `  заголовки, ячейки таблицы, пункты специалиста, телефоны и дисклеймер: около ${plan.chromeWords} слов`,
+    `  сумма минимумов ≈ ${budget.low} и уже лежит в ${plan.target[0]}–${plan.target[1]}. Раздел короче своего минимума допиши до минимума.`,
+    `- H2 в этой части: ${plan.h2} (ровно ${plan.sectionsBefore.count} раздела + таблица + «Три шага» + «Когда стоит обратиться к специалисту»). Гейт допускает ${L.bodyH2[0]}–${L.bodyH2[1]}. Семь и больше – ошибка.`,
+    "ОБЯЗАТЕЛЬНЫЙ ПЛАН H2 (не заменяй пункт другим разделом):",
+    `- sectionsBefore[0].title начинается с «Примеры», внутри маркированный список из ${(article.examplePhrases ?? { min: 10, max: 10 }).min}–${(article.examplePhrases ?? { min: 10, max: 10 }).max} фраз. Этот H2 нельзя заменить разделом вроде «План дня». Каждая фраза – настоящее время, без «не» и без страха, не короче 3 слов.`,
+    `- sectionsBefore: ${plan.sectionsBefore.count} × ${plan.sectionsBefore.wordsEach[0]}–${plan.sectionsBefore.wordsEach[1]} слов; проза таблицы ${plan.tableProse[0]}–${plan.tableProse[1]}; вступление шагов ${plan.stepsIntro[0]}–${plan.stepsIntro[1]}; каждый шаг ${plan.stepText[0]}–${plan.stepText[1]}; specialist.intro ${plan.specialistIntro[0]}–${plan.specialistIntro[1]}. Вместе со служебными ~${plan.chromeWords} словами сумма около 1000 и должна попасть в 880–${L.mainBody[1]} до отправки, без отдельного дописывания.`,
     `- Вся статья с FAQ: ${L.total[0]}–${L.total[1]} слов.`,
     `- Запрос «${article.query}» в тексте статьи всего ${L.mainQuery[0]}–${L.mainQuery[1]} раза (с учётом transition), не в жирном.`,
     "",
-    `ССЫЛКИ: в абзацы разделов (sectionsBefore/tableSection/steps/sectionsAfter) вставь ${L.contextualLinks[0]}–${L.contextualLinks[1]} ссылок в формате markdown [анкор](/s/slug) ТОЛЬКО на эти статьи:`,
-    bullets(titles(article.links.contextual)),
-    "Других ссылок нет. «См. в статье …» не пиши – ссылка встраивается в предложение.",
+    "ССЫЛКИ: только список «ОБЯЗАТЕЛЬНЫЕ ССЫЛКИ» выше, все slug из него, формат [анкор](/s/slug). По одной в разных разделах основной части. Не в историю и не в цитату. Не «Подробнее: [материал](/s/…)» и не две склейки в один абзац. Не «можно использовать и [анкор] через …»: ссылка стоит внутри грамматичной фразы.",
+    article.additionalQueries?.length ? `ДОПОЛНИТЕЛЬНЫЕ ЗАПРОСЫ: все ${article.additionalQueries.length}. Каждый вплетён в обычное предложение о содержании, дословно, с пробелом или знаком препинания по краям, не внутри другого слова, не текстом анкора и не только в FAQ. Не вставляй мета-обороты «запрос «…»», «как в теме «…»» и «Вопрос: «…»». Пересказ и другая форма слова не считаются.${Object.keys(article.additionalQueryForms ?? {}).length ? " Форма из брифа – единственное допустимое отклонение." : ""} Ноль пропусков – иначе черновик не готов:\n${querySlotLines(article)}` : "",
+    `ПРИМЕРЫ ФРАЗ: отдельный H2 со словом «примеры» и ${(article.examplePhrases ?? { min: 10, max: 10 }).min}–${(article.examplePhrases ?? { min: 10, max: 10 }).max} фраз (пункты списка). Каждая – настоящее время, позитивная, не короче 3 слов. Не пиши «Ниже – простые примеры» и «Вот примеры», если сразу после нет этого списка. Не оставляй английские заметки (Wait, TODO, must not include).`,
+    "",
+    "СВЕРКА ПЕРЕД ОТПРАВКОЙ:",
+    `- основная часть ${plan.target[0]}–${plan.target[1]} слов (черновик на 600–800 и на 911 не проходит) и ровно ${plan.h2} H2; ни один абзац не длиннее 7 предложений;`,
+    "- steps.title начинается с «Три шага», пунктов ровно 3; checklist – 5 пунктов без слова «шаг», и число в его title тоже 5;",
+    "- открытый вопрос FAQ не начинается с «Да» или «Нет»; позиция из брифа не перевёрнута; ответ не спорит с основной частью;",
+    "- нет английских заметок и длинного тире «—»: только среднее «–»;",
+    "- ни один раздел не пересказывает story;",
+    `- запрос «${article.query}» не стоит сразу после «про», «о» или «об»;`,
+    `- практика названа дословно «${article.practice.title}»;`,
+    article.additionalQueries?.length ? `- в основной части, не в анкоре, есть каждый из ${article.additionalQueries.length} дополнительных запросов – в своём слоте.` : "- дополнительных запросов в брифе нет.",
     "",
     "ПРАКТИКА – МАТЕРИАЛЫ (единственный источник свойств практики):",
     article.practice.materials,
@@ -158,4 +211,134 @@ export function buildSzRepairMessages(messages, previous, problems, stats = {}) 
       ].join("\n"),
     },
   ];
+}
+
+/** Select whole top-level fields; an ambiguous gate error conservatively keeps all candidates. */
+export function szRepairFields(previous, problems) {
+  const keys = Object.keys(szArticleSchema().properties);
+  const sections = ["sectionsBefore", "tableSection", "steps", "sectionsAfter", "specialist"];
+  const aliases = { sections, table: ["tableSection"], headings: [...sections, "faqHeading"], questions: ["faq"], quotations: ["experts"] };
+  const selected = new Set();
+  for (const problem of problems.filter((item) => item.severity === "error")) {
+    const field = String(problem.field).split(/[.[]/)[0];
+    let matches = keys.includes(field) ? [field] : aliases[field];
+    // unique files every heading under "sections", so a duplicated faqHeading is not in that alias.
+    // bold-query is filed under "question" even when the bold text lives in finalQuestion or a section.
+    if (/^unique(?:-pack)?$|^bold-query$/.test(problem.code)) {
+      const quoted = [...String(problem.message).matchAll(/«([^»]+)»/g)].map((match) => match[1]);
+      const texts = problem.code === "bold-query" ? quoted.slice(-1) : quoted;
+      const actual = texts.some(Boolean) ? keys.filter((key) => texts.some((text) => text && JSON.stringify(previous[key] ?? null).includes(text))) : [];
+      if (actual.length) matches = actual;
+      else if (problem.code === "bold-query") matches = ["question", "finalQuestion"];
+      else if ((field === "sections" || field === "headings") && /заголовок/u.test(problem.message)) matches = [...sections, "faqHeading"];
+    }
+    if (!matches) {
+      const quoted = [...problem.message.matchAll(/«([^»]+)»/g)].map((match) => match[1]);
+      matches = keys.filter((key) => quoted.some((text) => JSON.stringify(previous[key])?.includes(text)));
+      if (!matches.length && /expert|portrait/.test(problem.code)) matches = ["experts"];
+      if (!matches.length && /checklist/.test(problem.code)) matches = ["checklist"];
+      if (!matches.length && /specialist|disclaimer/.test(problem.code)) matches = ["specialist"];
+      if (!matches.length) matches = keys;
+    }
+    for (const key of matches) selected.add(key);
+  }
+  return keys.filter((key) => selected.has(key));
+}
+
+export function buildSzTargetedRepair(article, previous, problems) {
+  const fields = szRepairFields(previous, problems);
+  const schema = object(Object.fromEntries(fields.map((key) => [key, szArticleSchema().properties[key]])));
+  const relevant = { title: article.title, query: article.query, facts: article.facts, forbiddenPhrases: article.forbiddenPhrases, extraInstructions: article.extraInstructions };
+  if (fields.includes("practiceIntro") || fields.includes("checklist")) relevant.practice = article.practice;
+  if (fields.includes("experts") || problems.some((p) => /expert|quote|verbatim/.test(p.code))) {
+    relevant.experts = article.experts.map(({ name, quote, source, sourceText, context, doesNotSay, caution, forbiddenInBridge }) => ({ name, quote, source, sourceText, context, doesNotSay, caution, forbiddenInBridge }));
+    relevant.verbatim = article.verbatim;
+  }
+  if (fields.some((key) => ["story", "transition", "storyEnding"].includes(key))) {
+    relevant.storyHint = article.storyHint;
+    relevant.storyContext = Object.fromEntries(["story", "transition", "storyEnding"].map((key) => [key, previous[key]]));
+    relevant.storyContextRule = "storyContext – контекст только для чтения, не включай его в ответ. Меняй только выбранные поля; сохрани героев, факты и детали, согласуй начало, переход и окончание истории.";
+  }
+  if (fields.some((key) => ["sectionsBefore", "tableSection", "steps", "sectionsAfter"].includes(key))) relevant.links = article.links.contextual;
+  const messages = [
+    { role: "system", content: "Ты – Зоя Петрова. Пиши тепло, ясно, по-русски, на «вы», без пафоса. Зоя не психолог; эзотерика не наука. Только тире «–» и кавычки «». Цитаты строго дословно по материалам, не приписывай экспертам выводов. Без обещаний лечения, гарантий, защиты, призыва, предсказаний, дискомфорта и советов остановить запись. Без внешних адресов, MAX, видимых дат и служебных пометок. Не выдумывай факты. Сохрани внутренние ссылки. Исправь ошибки с указанными длинами полей. Верни только JSON patch по схеме: полные значения выбранных полей, без остальных полей и пояснений." },
+    { role: "user", content: ["БРИФ:", JSON.stringify(relevant), "ОШИБКИ (включая требуемые длины):", ...problems.filter((p) => p.severity === "error").map((p) => `${p.field}: ${p.message}`), "ТЕКУЩИЕ ПОЛЯ:", JSON.stringify(Object.fromEntries(fields.map((key) => [key, previous[key]])))].join("\n") },
+  ];
+  return { fields, schema, messages };
+}
+
+// Validate the exact schema subset used above, including nested required fields and array bounds.
+function matchesSchema(value, schema) {
+  if (schema.type === "string") return typeof value === "string";
+  if (schema.type === "array") return Array.isArray(value) && value.length <= schema.maxItems && value.every((item) => matchesSchema(item, schema.items));
+  if (schema.type !== "object" || !value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.keys(value).every((key) => Object.hasOwn(schema.properties, key))
+    && schema.required.every((key) => Object.hasOwn(value, key) && matchesSchema(value[key], schema.properties[key]));
+}
+
+// Judge the patch only after sz normalization: «****» and «Чем закончилась история.» become empty,
+// and a one-letter thesis is not substantive. Applies to every string in the patch, not one field.
+function rejectHollow(normalized, patch, path) {
+  if (typeof patch === "string") return fieldProseDefect(typeof normalized === "string" ? normalized : "", path);
+  if (Array.isArray(patch)) {
+    if (!Array.isArray(normalized) || (patch.length && normalized.length < patch.length)) return `${path}: после нормализации непустые элементы исчезли`;
+    for (let i = 0; i < patch.length; i += 1) {
+      const reason = rejectHollow(normalized[i], patch[i], `${path}[${i}]`);
+      if (reason) return reason;
+    }
+    return null;
+  }
+  if (patch && typeof patch === "object") {
+    for (const [key, value] of Object.entries(patch)) {
+      const reason = rejectHollow(normalized?.[key], value, path ? `${path}.${key}` : key);
+      if (reason) return reason;
+    }
+  }
+  return null;
+}
+
+function project(source, shape) {
+  if (Array.isArray(shape)) return Array.isArray(source) ? source : [];
+  if (shape && typeof shape === "object") return Object.fromEntries(Object.keys(shape).map((key) => [key, project(source?.[key], shape[key])]));
+  return source;
+}
+
+// Structural validity alone accepts experts: [] and a thesis of «а» / «главная мысль а». Reject before merge.
+export function szRepairPatchRejection(previous, patch, schema, brief) {
+  if (!schema?.required?.length || !matchesSchema(patch, schema)) return "невалидный/пустой patch: нарушение схемы";
+  if (Object.hasOwn(patch, "experts")) {
+    const expected = brief?.experts;
+    if (!expected?.length || patch.experts.length !== expected.length) return "experts: требуется полный список экспертов из брифа";
+    const names = patch.experts.map((expert) => expert.name);
+    if (new Set(names).size !== names.length || names.some((name, i) => name !== expected[i].name)) return "experts: имена/порядок не совпадают с брифом или есть дубли";
+  }
+  const merged = { ...structuredClone(previous ?? {}), ...structuredClone(patch) };
+  const normalized = normalizeSzFields(merged).fields;
+  const hollow = rejectHollow(normalized, patch, "");
+  if (hollow) return hollow;
+  const before = normalizeSzFields(previous ?? {}).fields;
+  const lostContent = (before, after, path) => {
+    if (typeof after === "string") return typeof before === "string" && before.trim() && !after.trim() ? `${path}: непустая строка стала пустой` : null;
+    if (Array.isArray(after)) {
+      if (Array.isArray(before) && before.length && !after.length) return `${path}: непустой массив стал пустым`;
+      for (let i = 0; i < after.length; i += 1) {
+        const reason = lostContent(before?.[i], after[i], `${path}[${i}]`);
+        if (reason) return reason;
+      }
+      return null;
+    }
+    if (after && typeof after === "object") {
+      for (const [key, value] of Object.entries(after)) {
+        const reason = lostContent(before?.[key], value, path ? `${path}.${key}` : key);
+        if (reason) return reason;
+      }
+    }
+    return null;
+  };
+  return lostContent(project(before, patch), project(normalized, patch), "");
+}
+
+export function applySzRepairPatch(previous, patch, schema, brief) {
+  if (szRepairPatchRejection(previous, patch, schema, brief)) return null;
+  return { ...structuredClone(previous), ...structuredClone(patch) };
 }
