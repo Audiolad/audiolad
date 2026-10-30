@@ -467,6 +467,10 @@ test("tone: imperatives, prohibitions, канцелярит and explanatory shar
   assert.deepEqual(prohibitions("Если вы открываете кофейню, не берите зерно без даты."), ["не берите"]);
   assert.deepEqual(imperativeIndexes("Когда вы готовите меню, следите за сроками."), [4]);
   assert.deepEqual(imperativeIndexes("Вы стоите, следите и ведёте учёт."), []);
+  assert.deepEqual(prohibitions("Если вы хотите, не берите зерно без даты."), ["не берите"], "a subordinate «вы» does not reach the main clause");
+  assert.deepEqual(imperativeIndexes("Вы готовите кофе, следите за залом."), [], "a main clause with «вы» carries over");
+  assert.deepEqual(imperativeIndexes("Если вы хотите, смотрите на дату."), [3]);
+  assert.deepEqual(imperativeIndexes("Когда вы заняты, заложите в бюджете запас."), [3], "«в бюджете» is not a present-tense verb");
   assert.deepEqual(kanceliarit("Это является основой, а при отсутствии данных – в целях проверки."), ["является", "при отсутствии", "в целях"]);
   assert.deepEqual(kanceliarit("Удобно, когда выдача стоит чуть в стороне."), []);
   const warm = toneMetrics([["p", "Выдача работает свободнее чуть в стороне от кассы. Так гостю удобно забрать заказ. Можно попробовать оба варианта на макете."]]);

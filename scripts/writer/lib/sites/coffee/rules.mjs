@@ -226,7 +226,8 @@ export const TONE = {
   kanceliaritPer1000: 4,
 };
 // Plural «вы»-imperative: -йте/-ите/-ьте (+ reflexive -сь). «вы готовите» (indicative) and «на сайте»
-// (a noun after a preposition) are not imperatives. A heuristic: it may miss «Если вы хотите, смотрите…».
+// (a noun after a preposition) are not imperatives. A heuristic: a main clause that continues a «вы» clause
+// («Вы готовите кофе, следите за залом») counts as indicative, even if the author meant a request.
 const IMPERATIVE_FORM = /^[а-яё]{2,}(?:йте|ите|ьте)(?:сь)?$/;
 const NOT_IMPERATIVE = new Set(["сайте", "кредите", "лимите", "дефиците", "аппетите", "бите", "ките", "граните", "элите", "свите", "орбите", "визите", "транзите", "депозите", "профите", "минимуме"]);
 const NOT_AFTER = new Set(["вы", "в", "во", "на", "о", "об", "обо", "при", "по"]);
@@ -251,22 +252,31 @@ export function imperativeIndexes(sentence) {
   });
   return out;
 
-  // -ите after «вы» in the same clause is the present tense («вы готовите»). A clause without «вы» continues an
-  // earlier one only as a list of 2nd-person verbs: it already has a present-only form (-ете/-ёте: «…, ведёте
-  // закупки и следите») or the previous clause ends with such a verb («вы стоите, следите»). «Если вы открываете
-  // кофейню, не берите…» starts a new clause, so «берите» is a request.
+  // -ите after «вы» in the same clause is the present tense («вы готовите»). A clause without «вы» is still indicative
+  // when it holds a present-only form (-ете/-ёте: «…, ведёте закупки и следите») or continues a main clause with «вы»
+  // («Вы готовите кофе, следите за залом»). After a subordinate clause («Если вы хотите, не берите…», «Когда вы
+  // готовите меню, следите…») the main clause starts afresh, so its -ите is a request.
   function governedByVy(i) {
-    let c = clauseOf[i];
-    let words = list.slice(startOf[c], i);
-    for (;;) {
+    const c = clauseOf[i];
+    if (list.slice(startOf[c], i).includes("вы")) return true;
+    if (!list.slice(0, i).includes("вы")) return false;
+    if (clauses[c].some((w, k) => PRESENT_ONLY.test(w) && !NOT_AFTER.has(clauses[c][k - 1]))) return true;
+    for (let p = c - 1; p >= 0; p -= 1) {
+      const words = clauses[p];
+      if (words.length === 0) continue;
+      if (opensSubordinate(words)) return false;
       if (words.includes("вы")) return true;
-      const before = c > 0 ? clauses[c - 1] : [];
-      const linked = words.some((w) => /(?:ете|ёте)(?:сь)?$/.test(w)) || (before.length > 0 && PRESENT_2PL.test(before[before.length - 1]));
-      if (!linked || c === 0) return false;
-      c -= 1;
-      words = clauses[c];
+      if (!words.some((w) => PRESENT_2PL.test(w))) return false;
     }
+    return false;
   }
+}
+// Conjunctions and relative words that open a subordinate clause; leading «и», «а», «но» are skipped.
+const SUBORDINATORS = new Set(["если", "когда", "пока", "чтобы", "хотя", "хоть", "раз", "как", "где", "куда", "откуда", "что", "поскольку", "потому", "после", "прежде", "пусть", "словно", "будто"]);
+const PRESENT_ONLY = /(?:ете|ёте)(?:сь)?$/;
+function opensSubordinate(words) {
+  const first = words.find((w) => !["и", "а", "но", "или", "да", "даже"].includes(w));
+  return first !== undefined && (SUBORDINATORS.has(first) || /^котор/.test(first));
 }
 /** «Не …йте»: a prohibition addressed to the reader («Не приравнивайте», «не ставьте»). */
 export function prohibitions(text) {
