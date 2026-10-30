@@ -36,7 +36,9 @@ assert.match(analyze, /sendSeoQueryProposalApprovedAuthorEmail/);
 assert.match(analyze, /sendSeoQueryProposalRejectedAuthorEmail/);
 assert.match(analyze, /Ordinary admin query without proposal/);
 
-const proposals = read("src/app/api/author/seo/proposals/route.ts");
+const proposals = `${read("src/app/api/author/seo/proposals/route.ts")}\n${read(
+  "src/lib/seo-queries/author-proposal-flow.ts",
+)}`;
 assert.match(proposals, /sendSeoQueryProposalAdminAlertEmail/);
 assert.match(proposals, /result\.status === "proposed"/);
 

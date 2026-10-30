@@ -96,6 +96,8 @@ jobs:
           npm run test:author-published-product-seo-link
           npm run test:author-create-seo-query-step
           npm run test:author-seo-discovery
+          npm run test:author-seo-proposal-support-audit
+          npx tsx scripts/author-support-mode-unit.mjs
           npm run test:seo-query-claim-occupancy
           npm run test:seo-discovery-ranking
           npm run test:product-seo-quality-review

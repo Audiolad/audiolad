@@ -11,6 +11,12 @@ import {
 import { SEO_QUERY_OCCUPIED_BY_PUBLISHED_PRODUCT_MESSAGE } from "@/lib/seo-queries/published-query-occupancy";
 import { isSeoReservationProductLinkAllowed } from "@/lib/seo-queries/reservation-product-link-gate";
 
+/** Support mode: fail-closed audit row before any reservation RPC. */
+const SEO_RESERVATION_SUPPORT_AUDIT = {
+  action: "author_seo_reservation_updated",
+  resourceType: "author_seo",
+} as const;
+
 function readString(body: Record<string, unknown>, key: string): string {
   return typeof body[key] === "string" ? body[key].trim() : "";
 }
@@ -128,7 +134,10 @@ export async function POST(request: Request) {
     }
     if (!productCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(
+      authorId,
+      SEO_RESERVATION_SUPPORT_AUDIT,
+    );
     const { data, error } = await supabase.rpc("reserve_seo_query", {
       p_query_id: queryId,
       p_author_id: authorId,
@@ -163,7 +172,10 @@ export async function DELETE(request: Request) {
     }
     if (!productCreateSeoDiscoveryAllowed(body)) return seoDiscoveryDisabledResponse();
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(
+      authorId,
+      SEO_RESERVATION_SUPPORT_AUDIT,
+    );
     const { data, error } = await supabase.rpc("release_seo_query_reservation", {
       p_reservation_id: reservationId,
     });
@@ -197,7 +209,10 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const { supabase } = await requireAuthorMutationMembership(authorId);
+    const { supabase } = await requireAuthorMutationMembership(
+      authorId,
+      SEO_RESERVATION_SUPPORT_AUDIT,
+    );
     const { data: practice, error: practiceError } = await supabase
       .from("practices")
       .select("id, author_id, product_kind, publication_class, deleted_at")

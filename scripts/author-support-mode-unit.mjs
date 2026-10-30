@@ -14,6 +14,7 @@ import { readdirSync } from "node:fs";
 
 import {
   AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES,
+  AUTHOR_SUPPORT_MUTATION_ACTIONS,
   AUTHOR_SUPPORT_COOKIE_NAME,
   AUTHOR_SUPPORT_TTL_SECONDS,
   assertSupportAuthorScope,
@@ -1016,13 +1017,99 @@ for (const routePath of [...authorRoutes, ...studioRoutes]) {
 
 for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
   assert.ok(
-    item.disposition === "allowed_audited" || item.disposition === "blocked",
+    item.disposition === "allowed_audited" ||
+      item.disposition === "blocked" ||
+      item.disposition === "read_only",
     item.key,
   );
   if (item.disposition === "allowed_audited") {
     assert.ok(item.action, item.key);
+    assert.ok(
+      AUTHOR_SUPPORT_MUTATION_ACTIONS.includes(item.action),
+      `inventory action ${item.action} missing from AUTHOR_SUPPORT_MUTATION_ACTIONS`,
+    );
+  }
+  for (const routePath of item.routePatterns) {
+    assert.ok(existsSync(path.join(root, routePath)), `stale inventory route ${routePath}`);
   }
 }
+
+const inventoryDispositionByRoute = new Map();
+for (const item of AUTHOR_SUPPORT_MUTATION_INVENTORY) {
+  for (const routePath of item.routePatterns) {
+    const prev = inventoryDispositionByRoute.get(routePath) ?? new Set();
+    prev.add(item.disposition);
+    inventoryDispositionByRoute.set(routePath, prev);
+  }
+}
+
+// read_only routes must not write directly.
+for (const [routePath, dispositions] of inventoryDispositionByRoute) {
+  if (!dispositions.has("read_only")) continue;
+  assert.equal(dispositions.size, 1, `${routePath} mixes read_only with other dispositions`);
+  const source = read(routePath);
+  assert.doesNotMatch(
+    source,
+    /\.(insert|upsert|update|delete)\(/,
+    `read_only route writes: ${routePath}`,
+  );
+  assert.doesNotMatch(source, /recordAuthorSupportAudit/, routePath);
+}
+
+// Fail-closed audit wiring guard: an author/studio mutating route that calls
+// requireAuthorMutationMembership(authorId) without a supportAudit argument
+// must have another audit path in the same file, or be read_only.
+const singleArgMutationMembership = /requireAuthorMutationMembership\(\s*[\w.]+\s*\)/;
+const auditedMutationMembership = /requireAuthorMutationMembership\(\s*[\w.]+\s*,/;
+for (const routePath of [...authorRoutes, ...studioRoutes]) {
+  const source = read(routePath);
+  if (!mutatingRouteRe.test(source)) continue;
+  if (!singleArgMutationMembership.test(source)) continue;
+  const dispositions = inventoryDispositionByRoute.get(routePath) ?? new Set();
+  const hasAuditPath =
+    /recordAuthorSupportAudit\(/.test(source) ||
+    /requirePracticeMutationAccess\(/.test(source) ||
+    auditedMutationMembership.test(source);
+  assert.ok(
+    dispositions.has("read_only") || hasAuditPath,
+    `${routePath} calls requireAuthorMutationMembership without supportAudit`,
+  );
+}
+
+// Regression: SEO proposals / reservations / author space write the support
+// audit before their writes.
+const seoProposalFlow = read("src/lib/seo-queries/author-proposal-flow.ts");
+assert.match(seoProposalFlow, /action: "author_seo_query_proposed"/);
+assert.match(
+  seoProposalFlow,
+  /deps\.requireMutationMembership\(\s*authorId,\s*AUTHOR_SEO_PROPOSAL_SUPPORT_AUDIT,?\s*\)/,
+);
+assert.match(
+  read("src/app/api/author/seo/proposals/route.ts"),
+  /requireMutationMembership: requireAuthorMutationMembership,/,
+);
+const seoReservationsRoute = read("src/app/api/author/seo-reservations/route.ts");
+assert.equal(
+  seoReservationsRoute.match(
+    /requireAuthorMutationMembership\(\s*authorId,\s*SEO_RESERVATION_SUPPORT_AUDIT,\s*\)/g,
+  )?.length,
+  3,
+);
+assert.match(seoReservationsRoute, /action: "author_seo_reservation_updated"/);
+const seoTransferRoute = read("src/app/api/author/seo-reservations/transfer/route.ts");
+assert.ok(
+  seoTransferRoute.indexOf('action: "author_seo_reservation_updated"') <
+    seoTransferRoute.indexOf('"transfer_seo_query_reservation"'),
+);
+const authorSpaceRoute = read("src/app/api/author/space/route.ts");
+assert.ok(
+  authorSpaceRoute.indexOf('action: "author_space_slug_updated"') <
+    authorSpaceRoute.indexOf("changeAuthorSlug(supabase"),
+);
+assert.ok(
+  authorSpaceRoute.indexOf('action: "author_space_deleted"') <
+    authorSpaceRoute.indexOf("deleteEmptyAuthorSpace(supabase"),
+);
 
 assert.match(proxy, /isAuthorSupportBlockedMutation/);
 assert.match(proxy, /support_mutation_blocked/);

@@ -1,4 +1,14 @@
-export type AuthorSupportMutationDisposition = "allowed_audited" | "blocked";
+/**
+ * allowed_audited — reachable in support mode; writes a fail-closed support
+ *   audit row (recordAuthorSupportAudit) before the change.
+ * blocked — rejected in support mode.
+ * read_only — POST used for analysis/lookup only; no author data is written,
+ *   so no support audit row is required.
+ */
+export type AuthorSupportMutationDisposition =
+  | "allowed_audited"
+  | "blocked"
+  | "read_only";
 
 export type AuthorSupportMutationInventoryItem = {
   key: string;
@@ -10,7 +20,8 @@ export type AuthorSupportMutationInventoryItem = {
 
 /**
  * Exhaustive support-mode mutation inventory.
- * Every mutating author/studio route must be A (allowed + audited) or B (blocked).
+ * Every author/studio route exporting POST/PATCH/PUT/DELETE must be listed:
+ * A (allowed + audited), B (blocked) or read_only (no writes).
  */
 export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryItem[] =
   [
@@ -424,6 +435,82 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
         "src/app/api/author/onboarding/route.ts",
         "src/app/api/author/onboarding/ui/route.ts",
       ],
+    },
+    {
+      key: "author_seo_query_proposal",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_seo_query_proposed",
+      routePatterns: ["src/app/api/author/seo/proposals/route.ts"],
+    },
+    {
+      key: "author_seo_reservations",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_seo_reservation_updated",
+      routePatterns: [
+        "src/app/api/author/seo-reservations/route.ts",
+        "src/app/api/author/seo-reservations/transfer/route.ts",
+      ],
+    },
+    {
+      key: "author_space_slug",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_space_slug_updated",
+      routePatterns: ["src/app/api/author/space/route.ts"],
+    },
+    {
+      key: "author_space_delete",
+      group: "cabinet",
+      disposition: "allowed_audited",
+      action: "author_space_deleted",
+      routePatterns: ["src/app/api/author/space/route.ts"],
+    },
+    {
+      // Audited inside requirePracticeMutationAccess (product_updated).
+      key: "product_seo_primary_query",
+      group: "product",
+      disposition: "allowed_audited",
+      action: "product_updated",
+      routePatterns: ["src/app/api/author/products/[id]/seo-primary-query/route.ts"],
+    },
+    {
+      // Audited inside requirePracticeMutationAccess via
+      // requireProductVideoExportAccess (product_updated).
+      key: "product_video_export",
+      group: "product",
+      disposition: "allowed_audited",
+      action: "product_updated",
+      routePatterns: [
+        "src/app/api/author/products/[id]/video/[audioId]/route.ts",
+        "src/app/api/author/products/[id]/video-covers/[orientation]/route.ts",
+      ],
+    },
+    {
+      // Audited inside requirePracticeMutationAccess (product_updated).
+      key: "author_studio_music_settings",
+      group: "product",
+      disposition: "allowed_audited",
+      action: "product_updated",
+      routePatterns: ["src/app/api/author/studio-music/[practiceId]/route.ts"],
+    },
+    {
+      // POST for search/analysis only: no author data is written.
+      key: "author_seo_read_only_analysis",
+      group: "cabinet",
+      disposition: "read_only",
+      routePatterns: [
+        "src/app/api/author/seo/discovery/route.ts",
+        "src/app/api/author/seo/product-quality-review/route.ts",
+      ],
+    },
+    {
+      // POST availability check only: no author data is written.
+      key: "author_name_availability",
+      group: "cabinet",
+      disposition: "read_only",
+      routePatterns: ["src/app/api/author/name-availability/route.ts"],
     },
   ];
 

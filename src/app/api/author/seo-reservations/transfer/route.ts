@@ -112,7 +112,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const targetContext = await requireAuthorMutationMembership(targetAuthorId);
+    // Support mode: fail-closed audit row before the transfer RPC.
+    const targetContext = await requireAuthorMutationMembership(targetAuthorId, {
+      action: "author_seo_reservation_updated",
+      resourceType: "author_seo",
+    });
     const { data: reservation, error: reservationError } =
       await targetContext.supabase
         .from("seo_query_reservations")

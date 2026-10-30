@@ -56,7 +56,10 @@ const root = process.cwd();
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 
 const discoveryRoute = read("src/app/api/author/seo/discovery/route.ts");
-const proposalsRoute = read("src/app/api/author/seo/proposals/route.ts");
+// POST /api/author/seo/proposals logic lives in author-proposal-flow.ts.
+const proposalsRoute = `${read("src/app/api/author/seo/proposals/route.ts")}\n${read(
+  "src/lib/seo-queries/author-proposal-flow.ts",
+)}`;
 const ui = read("src/components/author-dashboard/AuthorSeoOpportunitiesClient.tsx");
 const panel = read("src/components/author-dashboard/AuthorSeoDiscoveryPanel.tsx");
 const migration = read(
@@ -565,7 +568,11 @@ const normalize = async (phrase) =>
   assert.equal(repo.proposalRows.length, 2);
 }
 
-assert.match(proposalsRoute, /requireAuthorMutationMembership\(authorId\)/);
+assert.match(proposalsRoute, /requireMutationMembership: requireAuthorMutationMembership,/);
+assert.match(
+  proposalsRoute,
+  /deps\.requireMutationMembership\(\s*authorId,\s*AUTHOR_SEO_PROPOSAL_SUPPORT_AUDIT,?\s*\)/,
+);
 assert.match(reserveMigration, /seo_query_not_analyzed/);
 assert.match(reserveMigration, /v_active_count >= 5/);
 

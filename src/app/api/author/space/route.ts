@@ -5,6 +5,7 @@ import {
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
+import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
 import {
   buildAuthorProjectCookie,
   buildClearedAuthorProjectCookie,
@@ -72,6 +73,12 @@ export async function PATCH(request: Request) {
     }
 
     const { supabase, role } = await requireAuthorMembership(authorId);
+    // Support mode: fail-closed audit row before the slug change.
+    await recordAuthorSupportAudit({
+      action: "author_space_slug_updated",
+      resourceType: "author",
+      resourceId: authorId,
+    });
     const result = await changeAuthorSlug(supabase, authorId, normalized);
 
     if (!result.ok) {
@@ -164,6 +171,12 @@ export async function DELETE(request: Request) {
     }
 
     const { supabase } = await requireAuthorMembership(authorId);
+    // Support mode: fail-closed audit row before the space delete.
+    await recordAuthorSupportAudit({
+      action: "author_space_deleted",
+      resourceType: "author",
+      resourceId: authorId,
+    });
     const result = await deleteEmptyAuthorSpace(supabase, authorId);
 
     if (!result.ok) {
