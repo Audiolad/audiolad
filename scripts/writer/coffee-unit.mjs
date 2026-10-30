@@ -463,6 +463,10 @@ test("tone: imperatives, prohibitions, канцелярит and explanatory shar
   assert.deepEqual(imperativeIndexes("Если вы сами стоите за стойкой, ведёте закупки и следите за залом, это видно."), [], "-ите after «вы» is the present tense");
   assert.deepEqual(imperativeIndexes("Вы готовите эспрессо на сайте и в кредите."), []);
   assert.deepEqual(prohibitions("Не ставьте выдачу у кассы. Гость не спешит."), ["не ставьте"]);
+  // Codex review #1092: «вы» in a subordinate clause does not turn the main-clause request into a statement.
+  assert.deepEqual(prohibitions("Если вы открываете кофейню, не берите зерно без даты."), ["не берите"]);
+  assert.deepEqual(imperativeIndexes("Когда вы готовите меню, следите за сроками."), [4]);
+  assert.deepEqual(imperativeIndexes("Вы стоите, следите и ведёте учёт."), []);
   assert.deepEqual(kanceliarit("Это является основой, а при отсутствии данных – в целях проверки."), ["является", "при отсутствии", "в целях"]);
   assert.deepEqual(kanceliarit("Удобно, когда выдача стоит чуть в стороне."), []);
   const warm = toneMetrics([["p", "Выдача работает свободнее чуть в стороне от кассы. Так гостю удобно забрать заказ. Можно попробовать оба варианта на макете."]]);

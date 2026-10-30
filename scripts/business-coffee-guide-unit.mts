@@ -462,6 +462,9 @@ const GuideArticleView = typeof moduleDefault === "function" ? moduleDefault : m
 const pageHtml = renderToStaticMarkup(createElement(GuideArticleView, { article: ARTICLE }));
 assert.equal(pageHtml.includes("guide-expert__initials"), false);
 assert.equal(pageHtml.includes("Оригинал"), false, "no English original under a translation");
+assert.ok(pageHtml.includes("Перевод с английского"), "an English quote is labelled as translated from English");
+// The registry also holds Czech quotes: the note names the quote's own language, never English by default.
+assert.match(read(`${guideDir}/GuideExpertCard.tsx`), /cs: "чешского"/);
 assert.ok(pageHtml.includes("dmitry-kotov.webp"));
 
 // Every clickable link in the article body and inserts opens in a new tab.

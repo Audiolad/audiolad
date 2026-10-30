@@ -232,19 +232,41 @@ const NOT_IMPERATIVE = new Set(["сайте", "кредите", "лимите", 
 const NOT_AFTER = new Set(["вы", "в", "во", "на", "о", "об", "обо", "при", "по"]);
 const sentenceWords = (sentence) => norm(sentence).match(/[а-яё]+/g) ?? [];
 /** Indexes of imperative verbs among the words of one sentence. */
+// -ите/-ете also end the present tense («вы готовите», «вы ведёте»).
+const PRESENT_2PL = /(?:ите|ете|ёте)(?:сь)?$/;
 export function imperativeIndexes(sentence) {
-  const list = sentenceWords(sentence);
+  // Clauses split at , ; : ( ) and dashes; word indexes stay those of sentenceWords().
+  const clauses = norm(sentence).split(/[,;:()\u2013\u2014]/).map((part) => part.match(/[а-яё]+/g) ?? []);
+  const list = clauses.flat();
+  const clauseOf = clauses.flatMap((words, c) => words.map(() => c));
+  const startOf = clauses.map((_, c) => clauses.slice(0, c).reduce((n, words) => n + words.length, 0));
   const out = [];
   list.forEach((word, i) => {
     if (!IMPERATIVE_FORM.test(word) || NOT_IMPERATIVE.has(word)) return;
     const prev = list[i - 1];
-    // «на сайте», «в кредите», «вы делайте» is still a request only when not after «вы»; -ите is also the
-    // present tense («вы сами стоите, ведёте и следите»), so any earlier «вы» in the sentence makes it indicative.
+    // «на сайте», «в кредите»: a noun after a preposition; «вы делайте» is not addressed as a request.
     if (NOT_AFTER.has(prev)) return;
-    if (/ите(?:сь)?$/.test(word) && list.slice(0, i).includes("вы")) return;
+    if (/ите(?:сь)?$/.test(word) && governedByVy(i)) return;
     out.push(i);
   });
   return out;
+
+  // -ите after «вы» in the same clause is the present tense («вы готовите»). A clause without «вы» continues an
+  // earlier one only as a list of 2nd-person verbs: it already has a present-only form (-ете/-ёте: «…, ведёте
+  // закупки и следите») or the previous clause ends with such a verb («вы стоите, следите»). «Если вы открываете
+  // кофейню, не берите…» starts a new clause, so «берите» is a request.
+  function governedByVy(i) {
+    let c = clauseOf[i];
+    let words = list.slice(startOf[c], i);
+    for (;;) {
+      if (words.includes("вы")) return true;
+      const before = c > 0 ? clauses[c - 1] : [];
+      const linked = words.some((w) => /(?:ете|ёте)(?:сь)?$/.test(w)) || (before.length > 0 && PRESENT_2PL.test(before[before.length - 1]));
+      if (!linked || c === 0) return false;
+      c -= 1;
+      words = clauses[c];
+    }
+  }
 }
 /** «Не …йте»: a prohibition addressed to the reader («Не приравнивайте», «не ставьте»). */
 export function prohibitions(text) {
