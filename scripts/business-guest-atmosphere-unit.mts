@@ -8,8 +8,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+  GUEST_COFFEE_ATMOSPHERE_ARTIST_CAP,
   GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS,
   GUEST_COFFEE_ATMOSPHERE_MAX_SOURCES,
+  GUEST_COFFEE_ATMOSPHERE_MIN_ARTISTS,
   GUEST_COFFEE_ATMOSPHERE_MAX_TRACKS,
   GUEST_COFFEE_ATMOSPHERE_TARGET_SECONDS,
   assembleGuestCoffeeAtmosphere,
@@ -29,6 +31,7 @@ import {
   type GuestCoffeePlaylist,
   type GuestCoffeeProfile,
 } from "../src/lib/business-app/guest-coffee/catalog";
+import { guestCoffeeRecommendation } from "../src/lib/business-app/guest-coffee/recommend";
 import { cabinetAlbumCoverUrl, isCabinetPublicCoverUrl } from "../src/lib/business-app/album-cover";
 import { GUEST_COFFEE_ATMOSPHERE_COPY } from "../src/lib/business-app/guest-coffee/copy";
 
@@ -76,7 +79,26 @@ for (const profile of all()) {
     assert.equal(found.playlist.title, t.albumTitle);
   }
   assert.equal(a.directionFallback, false, "every sound type has fitting albums on the real shelf");
-  assert.equal(a.match.direction.state, "all", "only sound-fitting albums when they give enough tracks");
+  // Sergey 29.10.2026: at least 3 different artists. Only sound-fitting albums when they come
+  // from 3+ artists; otherwise a closer album of another artist completes the variety.
+  const fittingArtists = new Set(
+    guestCoffeeRecommendation(shelf, profile)
+      .albums.filter((x) => x.fits.sound && x.playlist.tracks.some((t) => (t.durationSeconds ?? 0) < GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS))
+      .map((x) => x.playlist.authorSlug),
+  ).size;
+  if (fittingArtists >= GUEST_COFFEE_ATMOSPHERE_MIN_ARTISTS) {
+    assert.equal(a.match.direction.state, "all", "only sound-fitting albums when they give enough tracks and artists");
+  } else {
+    assert.equal(a.match.direction.state, "some", "closer album of another artist, reported honestly");
+    assert.equal(a.match.direction.matched, a.sources.length - 1);
+  }
+  assert.ok(a.diversity.artists >= GUEST_COFFEE_ATMOSPHERE_MIN_ARTISTS, `${guestCoffeeAtmosphereKey(profile)}: 3+ artists`);
+  assert.equal(new Set(a.tracks.map((t) => t.authorName)).size, a.diversity.artists);
+  assert.equal(a.diversity.fallback, false);
+  const perArtist = new Map<string, number>();
+  for (const t of a.tracks) perArtist.set(t.authorName!, (perArtist.get(t.authorName!) ?? 0) + 1);
+  assert.ok(Math.max(...perArtist.values()) <= GUEST_COFFEE_ATMOSPHERE_ARTIST_CAP, "no artist gives more than 4 of 12");
+  a.tracks.forEach((t, i) => i > 0 && assert.notEqual(t.authorName, a.tracks[i - 1].authorName, "never the same artist twice in a row"));
   assert.ok(a.tracks.every((t) => (t.durationSeconds ?? 0) < GUEST_COFFEE_ATMOSPHERE_LONG_TRACK_SECONDS), "no 30-minute single piece when shorter tracks exist");
   const total = a.tracks.reduce((s, t) => s + (t.durationSeconds ?? 0), 0);
   assert.equal(a.totalSeconds, total);
