@@ -70,6 +70,7 @@ export default function CoffeeAtlasListen({ shopName, tracks }: CoffeeAtlasListe
               authorSlug={track.authorSlug}
               productSlug={track.slug}
               audioItemId={track.audioItemId}
+              hideAuthor
               className="atlas-track__play"
             >
               <PlayIcon />

@@ -6,6 +6,10 @@ import {
   useGlobalAudioPlayer,
   useOptionalPlayerEngine,
 } from "@/components/audio/GlobalAudioPlayerProvider";
+import {
+  applyExactTrackOptions,
+  isExactTrackSessionActive,
+} from "@/lib/catalog/exact-track-session";
 import { fetchCatalogPlaySession } from "@/lib/catalog/fetch-catalog-play-session";
 import { isCatalogGlobalPlayerSession } from "@/lib/listen/global-player-types";
 import { PLAY_ACTION_LABEL } from "@/lib/ui/action-labels";
@@ -22,6 +26,8 @@ type HomeProductPlayButtonProps = {
    * When the track is not in the play session nothing starts – never another track instead.
    */
   audioItemId?: string | null;
+  /** Optional: load the session without the artist name (mini / full player show none). */
+  hideAuthor?: boolean;
 };
 
 /**
@@ -36,6 +42,7 @@ export default function HomeProductPlayButton({
   children,
   ariaLabel,
   audioItemId,
+  hideAuthor = false,
 }: HomeProductPlayButtonProps) {
   const { session, loadSession, prepareSharedAudioGesture, clearPlaylistQueue } =
     useGlobalAudioPlayer();
@@ -45,9 +52,11 @@ export default function HomeProductPlayButton({
   const isActive = Boolean(
     session &&
       isCatalogGlobalPlayerSession(session) &&
-      (session.practiceId === practiceId ||
-        (session.authorSlug === authorSlug &&
-          session.productSlug === productSlug)),
+      isExactTrackSessionActive(
+        session,
+        { practiceId, authorSlug, productSlug },
+        { audioItemId, hideAuthor },
+      ),
   );
   const isPlaying = Boolean(isActive && engine?.isPlaying);
 
@@ -85,19 +94,9 @@ export default function HomeProductPlayButton({
           return;
         }
 
-        let session = loaded.session;
-        if (audioItemId) {
-          const only = session.tracks.filter((track) => track.id === audioItemId);
-          if (only.length === 0) {
-            return;
-          }
-          session = {
-            ...session,
-            tracks: only,
-            initialProgress: session.initialProgress.filter(
-              (entry) => entry.audioItemId === audioItemId,
-            ),
-          };
+        const session = applyExactTrackOptions(loaded.session, { audioItemId, hideAuthor });
+        if (!session) {
+          return;
         }
 
         clearPlaylistQueue();
@@ -115,6 +114,7 @@ export default function HomeProductPlayButton({
     [
       audioItemId,
       authorSlug,
+      hideAuthor,
       clearPlaylistQueue,
       engine,
       isActive,

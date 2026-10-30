@@ -29,6 +29,10 @@ import {
   getCoffeeAtlasNeighbours,
   getCoffeeAtlasShop,
 } from "../src/lib/business/coffee-atlas/shops";
+import {
+  applyExactTrackOptions,
+  isExactTrackSessionActive,
+} from "../src/lib/catalog/exact-track-session";
 import { COFFEE_ATLAS_SITEMAP_PATHS } from "../src/lib/business/coffee-atlas/sitemap";
 import {
   isYandexMetrikaGoalName,
@@ -152,7 +156,39 @@ assert.match(
 );
 const playButton = read("src/components/home/HomeProductPlayButton.tsx");
 assert.match(playButton, /fetchCatalogPlaySession\(\s*authorSlug,\s*productSlug,\s*audioItemId/, "requests the exact track");
-assert.match(playButton, /tracks: only/, "session is narrowed to that one track");
+assert.match(playButton, /applyExactTrackOptions\(loaded\.session, \{ audioItemId, hideAuthor \}\)/, "fresh session is narrowed / artist dropped");
+assert.match(playButton, /if \(!session\) \{\s*return;/, "absent track → nothing starts");
+assert.match(playButton, /isExactTrackSessionActive\(/, "toggle only the exact-track session");
+assert.match(listen, /hideAuthor/, "atlas player sessions carry no artist (mini / full player)");
+
+// --- exact-track session helpers (behaviour) ---
+{
+  const product = { practiceId: "album", authorSlug: "a", productSlug: "p" };
+  const albumSession = { practiceId: "album", authorSlug: "a", productSlug: "p", authorName: "Artist", tracks: [{ id: "t1" }, { id: "t2" }] };
+  const otherTrack = { ...albumSession, tracks: [{ id: "t2" }] };
+  const exact = { ...albumSession, authorName: "", tracks: [{ id: "t1" }] };
+  assert.equal(isExactTrackSessionActive(albumSession, product), true, "no options → same-product check unchanged");
+  assert.equal(isExactTrackSessionActive({ ...albumSession, practiceId: "x", productSlug: "q" }, product), false);
+  assert.equal(isExactTrackSessionActive(albumSession, product, { audioItemId: "t1" }), false, "whole album session is not resumed for an exact track");
+  assert.equal(isExactTrackSessionActive(otherTrack, product, { audioItemId: "t1" }), false, "another track of the album is not resumed");
+  assert.equal(isExactTrackSessionActive({ ...exact, authorName: "Artist" }, product, { audioItemId: "t1", hideAuthor: true }), false, "session with artist is reloaded");
+  assert.equal(isExactTrackSessionActive(exact, product, { audioItemId: "t1", hideAuthor: true }), true, "own exact session toggles");
+  assert.equal(isExactTrackSessionActive(null, product), false);
+
+  const full = {
+    ...albumSession,
+    tracks: [{ id: "t1", title: "Первый" }, { id: "t2", title: "Второй" }],
+    initialProgress: [{ audioItemId: "t1", positionSeconds: 3, completed: false }, { audioItemId: "t2", positionSeconds: 9, completed: false }],
+  } as unknown as Parameters<typeof applyExactTrackOptions>[0];
+  assert.equal(applyExactTrackOptions(full), full, "no options → session unchanged");
+  const narrowed = applyExactTrackOptions(full, { audioItemId: "t2", hideAuthor: true });
+  assert.ok(narrowed);
+  assert.deepEqual(narrowed.tracks.map((t) => t.id), ["t2"], "only the requested track");
+  assert.deepEqual(narrowed.initialProgress.map((e) => e.audioItemId), ["t2"]);
+  assert.equal(narrowed.authorName, "", "artist dropped");
+  assert.equal(full.authorName, "Artist", "input not mutated");
+  assert.equal(applyExactTrackOptions(full, { audioItemId: "missing" }), null, "absent track → nothing starts");
+}
 const loader = read("src/lib/business/coffee-atlas/load-music.ts");
 assert.match(loader, /getPublishedCatalogProducts/, "resolves against the published catalogue");
 assert.match(loader, /loadCatalogPlaySession/, "checks playability with the /api/catalog/play loader");
