@@ -133,6 +133,16 @@ test("coffee never reaches sz and sz never reaches coffee (full import graph, bo
   for (const file of coffeeGraph) if (!inside(file, coffeeDir)) assert.ok(!inside(file, szDir));
 });
 
+test("remote generate.py knows every TARIFF model at the same price (else Moscow refuses the call)", () => {
+  const source = readFileSync(join(root, "scripts/writer/remote/generate.py"), "utf8");
+  for (const [model, { inputPer1M, outputPer1M }] of Object.entries(TARIFF)) {
+    const match = source.match(new RegExp(`"${model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}": \\("([\\d.]+)", "([\\d.]+)"\\)`));
+    assert.ok(match, `${model} нет в PRICES generate.py`);
+    assert.equal(Number(match[1]), inputPer1M, `${model}: цена входа`);
+    assert.equal(Number(match[2]), outputPer1M, `${model}: цена выхода`);
+  }
+});
+
 test("per-draft cap: a call never makes one draft cost more than 10 ₽", () => {
   assert.equal(COFFEE.maxRubPerDraft, 10);
   const messages = buildCoffeeMessages(brief, { experts });
