@@ -35,7 +35,7 @@ const entries = listArticleRecrawlEntries();
 const paths = entries.map((entry) => entry.path);
 assert.equal(new Set(paths).size, paths.length, "paths are unique");
 assert.ok(paths.includes(COFFEE_PATH), "coffee guide is covered");
-const set01Paths = ["biznes-plan-kofeyni", "oborudovanie-dlya-kofeyni", "personal-kofeyni", "arenda-kofeyni", "formaty-kofeyni"]
+const set01Paths = ["biznes-plan-kofeyni", "chto-nuzhno-dlya-otkrytiya-kofeyni", "barnaya-stoyka-dlya-kofeyni", "opisanie-biznesa-kofeyni", "pechene-dlya-kofeyni"]
   .map((slug) => `/b/coffee/${slug}`);
 for (const coffeePath of set01Paths) {
   assert.ok(entries.some((entry) => entry.path === coffeePath && entry.kind === "vertical_guide"));

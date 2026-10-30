@@ -1,8 +1,8 @@
 import { BIZNES_PLAN_KOFEYNI } from "./articles/biznes-plan-kofeyni";
-import { OBORUDOVANIE_DLYA_KOFEYNI } from "./articles/oborudovanie-dlya-kofeyni";
-import { PERSONAL_KOFEYNI } from "./articles/personal-kofeyni";
-import { ARENDA_KOFEYNI } from "./articles/arenda-kofeyni";
-import { FORMATY_KOFEYNI } from "./articles/formaty-kofeyni";
+import { CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI } from "./articles/chto-nuzhno-dlya-otkrytiya-kofeyni";
+import { BARNAYA_STOYKA_DLYA_KOFEYNI } from "./articles/barnaya-stoyka-dlya-kofeyni";
+import { OPISANIE_BIZNESA_KOFEYNI } from "./articles/opisanie-biznesa-kofeyni";
+import { PECHENE_DLYA_KOFEYNI } from "./articles/pechene-dlya-kofeyni";
 import { KOFE_V_ZERNAH_DLYA_KOFEYNI } from "./articles/kofe-v-zernah-dlya-kofeyni";
 import type { GuideParagraph, TextPart, VerticalGuideArticle } from "./types";
 import { getVertical } from "./verticals";
@@ -10,10 +10,10 @@ import { getVertical } from "./verticals";
 const ARTICLES: readonly VerticalGuideArticle[] = [
   KOFE_V_ZERNAH_DLYA_KOFEYNI,
   BIZNES_PLAN_KOFEYNI,
-  OBORUDOVANIE_DLYA_KOFEYNI,
-  PERSONAL_KOFEYNI,
-  ARENDA_KOFEYNI,
-  FORMATY_KOFEYNI,
+  CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI,
+  BARNAYA_STOYKA_DLYA_KOFEYNI,
+  OPISANIE_BIZNESA_KOFEYNI,
+  PECHENE_DLYA_KOFEYNI,
 ];
 
 export function listVerticalArticles(verticalId?: string): VerticalGuideArticle[] {

@@ -105,7 +105,7 @@ export const KOFE_V_ZERNAH_DLYA_KOFEYNI: VerticalGuideArticle = {
     ],
     after: [
       [
-        "Таблица – не правило, а отправная точка. Окончательный выбор удобнее делать на дегустации вместе с бариста: им работать с этим зерном каждый день.",
+        "Таблица – начало обсуждения, а не готовое правило. Окончательный выбор удобнее делать на дегустации вместе с бариста: им работать с этим зерном каждый день.",
       ],
     ],
   },
@@ -262,11 +262,11 @@ export const KOFE_V_ZERNAH_DLYA_KOFEYNI: VerticalGuideArticle = {
   ],
   finalQuestion: "А теперь, когда зерно выбрано, – какая из четырёх чашек расскажет о характере вашей кофейни?",
   readMore: [
-    { href: "/b/coffee/biznes-plan-kofeyni", label: "Бизнес план кофейни: выручка, расходы и запас денег" },
-    { href: "/b/coffee/oborudovanie-dlya-kofeyni", label: "Кофемашина для кофейни: как собрать комплект оборудования" },
-    { href: "/b/coffee/personal-kofeyni", label: "Сотрудники кофейни: роли, обучение и передача смены" },
-    { href: "/b/coffee/arenda-kofeyni", label: "Аренда кофейни: как проверить помещение до решения" },
-    { href: "/b/coffee/formaty-kofeyni", label: "Мини кофейня: как выбрать компактный формат" },
+    { href: "/b/coffee/biznes-plan-kofeyni", label: "Бизнес-план кофейни с расчётами" },
+    { href: "/b/coffee/chto-nuzhno-dlya-otkrytiya-kofeyni", label: "Что нужно для открытия кофейни" },
+    { href: "/b/coffee/barnaya-stoyka-dlya-kofeyni", label: "Барная стойка для кофейни" },
+    { href: "/b/coffee/opisanie-biznesa-kofeyni", label: "Описание бизнеса кофейни" },
+    { href: "/b/coffee/pechene-dlya-kofeyni", label: "Печенье для кофейни: ассортимент и поставки" },
     { href: "/b/atlas-kofeen", label: "Атлас: 10 удивительных кофеен мира" },
     { href: "/b/atlas-kofeen/coffee-collective", label: "«Кофи Коллектив», Копенгаген" },
     { href: "/b/atlas-kofeen/truth-coffee-roasting", label: "«Трут Кофи Ростинг», Кейптаун" },
