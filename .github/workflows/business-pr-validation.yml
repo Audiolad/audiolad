@@ -45,6 +45,7 @@ jobs:
           npm run test:business-coffee-host
           npm run test:business-coffee-atlas
           NEXT_PUBLIC_AUDIOLAD_COFFEE_HOST_ENABLED=1 npm run test:business-coffee-atlas
+          npm run test:writer-coffee
           npm run test:business-app-proxy-routing
           npx tsx scripts/business-venue-licence-unit.tsx
           node scripts/business-venue-licence-isolation-unit.mjs
