@@ -27,7 +27,7 @@ import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
-import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitions, rotationProblems, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
+import { authorProse, capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, imperativeIndexes, kanceliarit, ordinalAgreementSlips, prohibitions, rotationProblems, startsInfinitive, TONE, toneMetrics } from "./lib/sites/coffee/rules.mjs";
 import { buildRequest } from "./lib/prompt.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
 import { LOCK_FILE, szHashes } from "./sz-template-lock.mjs";
@@ -247,7 +247,10 @@ test("helpers: dialogue, names, query words, links, typography", () => {
   assert.ok(!hasQueryWords("Обжарка под эспрессо", "кофе в зёрнах для кофейни"));
   assert.ok(isAllowedTextHref("/b/coffee"));
   assert.ok(isAllowedTextHref(COFFEE.maxUrl));
-  assert.ok(isAllowedTextHref("https://sergey-zoya.ru/articles/x"));
+  // SEO audit 30.10.2026: no outbound text links at all – sergey-zoya.ru included; MAX is the only external address.
+  assert.ok(!isAllowedTextHref("https://sergey-zoya.ru/articles/x"));
+  assert.ok(!isAllowedTextHref("https://example.com/x"));
+  assert.ok(isAllowedTextHref("https://max-potok.ru/r/gqwvf"));
   assert.ok(!isAllowedTextHref("https://example.com/"));
   assert.ok(!isAllowedTextHref("//evil.ru/x"));
   for (const href of ["/\\example.com/x", "/\\\\example.com", "\\\\example.com", "\\/example.com", "/%5Cexample.com", "/%2F%2Fexample.com", "/%2fexample.com", "/\t/example.com", "/ /example.com", "https://sergey-zoya.ru\\@example.com/", "https://user@sergey-zoya.ru/x", "https://sergey-zoya.ru.example.com/", "http://sergey-zoya.ru/x", "javascript:alert(1)"]) {
@@ -676,7 +679,7 @@ test("SEO audit 30.10.2026: dates in markup only, og card, «Коротко», �
   assert.doesNotMatch(prompt, /глагол в повелительном наклонении/);
 });
 
-test("SEO audit rules: visible dates, year in seoTitle, few links, summary size and imperative steps", () => {
+test("SEO audit rules: visible dates, year in seoTitle, few links, summary size, infinitive steps, outbound links", () => {
   const messages = (mutate, b = brief) => {
     const f = structuredClone(fields);
     mutate(f);
@@ -692,8 +695,12 @@ test("SEO audit rules: visible dates, year in seoTitle, few links, summary size 
     for (const s of [...f.partOne, ...f.partTwo]) s.paragraphs = s.paragraphs.map((p) => p.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1"));
   };
   assert.match(errorsOf(messages(unlinked)), /не меньше 3 ссылок на разные статьи раздела/);
-  const warnings = messages((f) => { f.steps.items[0].title = "Посчитайте расход"; }).filter((p) => p.severity === "warning").map((p) => p.message).join("\n");
-  assert.match(warnings, /инфинитивом/);
+  assert.match(errorsOf(messages((f) => { f.steps.items[0].title = "Посчитайте расход"; })), /начинается с инфинитива/);
+  const warnings = messages((f) => { f.checklist.items[0] = "Проверьте дату обжарки на каждой пачке."; }).filter((p) => p.severity === "warning").map((p) => p.message).join("\n");
+  assert.match(warnings, /готовым результатом/);
+  const nounStep = messages((f) => { f.steps.items[0].title = "Слепая дегустация"; }).filter((p) => p.severity === "error").map((p) => p.message).join("\n");
+  assert.match(nounStep, /начинается с инфинитива/);
+  assert.ok(startsInfinitive("Посчитать расход") && startsInfinitive("Договориться о пробной партии") && startsInfinitive("Беречь зерно") && !startsInfinitive("Посчитайте расход") && !startsInfinitive("Слепая дегустация"));
   const briefProblems = (() => { try { const raw = readJson(packFile); normalizeCoffeePack({ ...raw, articles: raw.articles.map((a) => ({ ...a, links: [] })) }, { experts, repoDir: root }); return ""; } catch (error) { return error.message; } })();
   assert.match(briefProblems, /не меньше 3 адресов статей раздела/);
 });

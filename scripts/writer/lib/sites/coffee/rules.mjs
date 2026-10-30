@@ -284,6 +284,12 @@ export function authorProse(article) {
   return visibleTexts(article).filter(([field]) => /^intro\[|\.paragraphs\[|^table\.(intro|after)$|\.(lead|after)$|^steps\.intro$|^steps\.items\[\d+\]\.text$|^faq\[\d+\]\.answer$|^checklist\.(note|doneNote)$/.test(field));
 }
 /** The text opens with an imperative («Посчитайте…», «Не ставьте…»). */
+/** Step titles start with an infinitive: «Посчитать», «Провести», «Зайти», «Беречь», «Договориться». */
+export function startsInfinitive(text) {
+  const first = String(text).trim().split(/[\s,.:;!?«»()–-]+/)[0]?.toLowerCase() ?? "";
+  return /(ть|ти|чь)(ся)?$/.test(first);
+}
+
 export function startsImperative(text) {
   const idx = imperativeIndexes(text);
   const list = sentenceWords(text);
@@ -463,7 +469,9 @@ export function checkCoffeeArticle(article, brief, env) {
   }
   if (article.steps.items.length !== 3) error("steps", "ровно 3 шага");
   // Steps and checklist without the imperative (SEO audit 30.10.2026): «Посчитать расход», «На пачке есть дата обжарки».
-  for (const [i, item] of article.steps.items.entries()) if (startsImperative(item.title)) warn(`steps.items[${i}].title`, `«${item.title}» – заголовок шага инфинитивом («Посчитать расход»), без повелительного наклонения`);
+  for (const [i, item] of article.steps.items.entries()) {
+    if (!startsInfinitive(item.title)) error(`steps.items[${i}].title`, `«${item.title}» – заголовок шага начинается с инфинитива, без повелительного наклонения («Посчитать расход», «Провести дегустацию»)`);
+  }
   for (const [i, item] of article.checklist.items.entries()) if (startsImperative(item.text)) warn(`checklist.items[${i}]`, `«${item.text}» – пункт чек-листа готовым результатом («Объём заказа рассчитан…»), без повелительного наклонения`);
   if (!/^Три шага/.test(article.steps.heading)) warn("steps.heading", "заголовок обычно начинается с «Три шага»");
   if (article.checklist.items.length !== L.checklist) error("checklist", `ровно ${L.checklist} пунктов`);
@@ -478,7 +486,7 @@ export function checkCoffeeArticle(article, brief, env) {
   // Links: only from the brief, only allowed hosts; the page opens every one in a new tab.
   const allowed = new Set(brief.links);
   for (const link of textLinks(article)) {
-    if (!isAllowedTextHref(link.href)) error("links", `запрещённая ссылка ${link.href} – только audiolad.ru, статьи sergey-zoya.ru и MAX`);
+    if (!isAllowedTextHref(link.href)) error("links", `запрещённая ссылка ${link.href} – только страницы audiolad.ru и MAX`);
     else if (!allowed.has(link.href)) error("links", `ссылки ${link.href} нет в брифе`);
   }
   for (const link of article.readMore) if (!isInternalHref(link.href)) error("readMore", `только внутренние ссылки: ${link.href}`);

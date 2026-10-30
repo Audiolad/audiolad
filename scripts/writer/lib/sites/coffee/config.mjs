@@ -29,8 +29,6 @@ export const COFFEE = {
   ogSize: { width: 1200, height: 630 },
   /** The only outgoing link the owner allowed (rendered by the page as a button, not by the text). */
   maxUrl: "https://max-potok.ru/r/gqwvf",
-  /** Absolute links allowed inside the text: cross-links to sergey-zoya.ru articles. */
-  crossSiteHosts: ["sergey-zoya.ru"],
   /**
    * Default note for relatedQueries (not printed on the page). A pack may pass its own `wordstatNote`.
    * Topics and frequencies come only from Sergey's task for the pack (`task` + `articles[]`);

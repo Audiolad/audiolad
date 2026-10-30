@@ -71,6 +71,8 @@ export function collectArticleText(article: VerticalGuideArticle): string[] {
     article.title,
     article.seoTitle,
     article.description,
+    ...article.summary,
+    article.ogImage.alt,
     article.question,
     article.hero.caption,
     article.hero.alt,
