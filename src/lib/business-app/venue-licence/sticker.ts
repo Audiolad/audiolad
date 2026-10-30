@@ -12,7 +12,7 @@ export const STICKER_SCOPE = "на публичное исполнение му�
 
 export const STICKER_BRAND = "АудиоЛад Бизнес";
 
-export const STICKER_CAPTION = "Страница лицензии точки";
+export const STICKER_CAPTION = "Страница лицензии кофейни";
 
 export type StickerFormat = "square80" | "a6";
 

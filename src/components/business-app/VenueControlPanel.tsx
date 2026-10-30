@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import PointPairingCard from "@/components/business-app/PointPairingCard";
 import VenueConfirmDialog from "@/components/business-app/VenueConfirmDialog";
+import VenueLicenceStickerCard from "@/components/business-app/venue-licence/VenueLicenceStickerCard";
 import type { PointCommandType } from "@/lib/business-app/point-commands";
 
 /** Settings page with the atmosphere picker opened under «Изменить звучание». */
@@ -22,6 +23,7 @@ export default function VenueControlPanel({
   pointCanEdit,
   soundSlot = null,
   soundInitiallyOpen = false,
+  licenceSticker = null,
 }: {
   locationId: string;
   locationName: string;
@@ -29,6 +31,8 @@ export default function VenueControlPanel({
   /** Atmosphere picker. It opens right under «Изменить звучание». Without it the button links to the settings page. */
   soundSlot?: ReactNode;
   soundInitiallyOpen?: boolean;
+  /** The venue's own QR sticker. Null while the licence flag is off. */
+  licenceSticker?: { publicId: string } | null;
 }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(pointCanEdit);
@@ -206,6 +210,9 @@ export default function VenueControlPanel({
           }}
           onNo={() => setConfirm(null)}
         />
+      ) : null}
+      {licenceSticker ? (
+        <VenueLicenceStickerCard locationId={locationId} publicId={licenceSticker.publicId} placement="venue" />
       ) : null}
       <PointPairingCard locationId={locationId} />
     </section>
