@@ -6,6 +6,10 @@ import {
   requireAuthorMutationMembership,
   requireAuthenticatedUser,
 } from "@/lib/author-products/auth";
+import {
+  isAuthorSupportAuditError,
+  recordAuthorSupportAudit,
+} from "@/lib/author-support/audit";
 import { hasPermission } from "@/lib/auth/platform-access";
 import { productSeoAiHttpStatus } from "@/lib/seo/product-autofill/errors";
 import { isAuthorProductQualityReviewEnabled } from "@/lib/seo/product-quality-review/beta";
@@ -69,6 +73,12 @@ export async function POST(request: Request) {
     }
 
     await requireQualityReviewAccess(authorId);
+    // Support mode: fail-closed audit row before the paid AI review call.
+    await recordAuthorSupportAudit({
+      action: "author_seo_tool_used",
+      resourceType: "author_seo",
+      metadata: { tool: "product_quality_review" },
+    });
 
     const result = await reviewProductTextQuality(body);
     if (!result.ok) {
@@ -111,7 +121,7 @@ export async function POST(request: Request) {
       positiveNotes: result.result.positiveNotes,
     });
   } catch (error) {
-    if (error instanceof AuthorAccessError) {
+    if (error instanceof AuthorAccessError || isAuthorSupportAuditError(error)) {
       return handleAuthorRouteError(error);
     }
 

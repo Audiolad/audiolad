@@ -5,6 +5,13 @@ import {
   requireAuthorMutationMembership,
 } from "@/lib/author-products/auth";
 
+// Both sides of a transfer change: each gets a fail-closed support audit row
+// (resource_id = that author) before the transfer RPC.
+const SEO_RESERVATION_TRANSFER_SUPPORT_AUDIT = {
+  action: "author_seo_reservation_updated",
+  resourceType: "author_seo",
+} as const;
+
 function readString(body: Record<string, unknown>, key: string): string {
   return typeof body[key] === "string" ? body[key].trim() : "";
 }
@@ -112,11 +119,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Support mode: fail-closed audit row before the transfer RPC.
-    const targetContext = await requireAuthorMutationMembership(targetAuthorId, {
-      action: "author_seo_reservation_updated",
-      resourceType: "author_seo",
-    });
+    // Support mode: fail-closed audit row (target author) before the transfer RPC.
+    const targetContext = await requireAuthorMutationMembership(
+      targetAuthorId,
+      SEO_RESERVATION_TRANSFER_SUPPORT_AUDIT,
+    );
     const { data: reservation, error: reservationError } =
       await targetContext.supabase
         .from("seo_query_reservations")
@@ -135,10 +142,12 @@ export async function POST(request: Request) {
       );
     }
 
+    // Support mode: fail-closed audit row (source author) before the transfer RPC.
     const sourceAuthorId = String(reservation.author_id);
-    if (sourceAuthorId !== targetAuthorId) {
-      await requireAuthorMutationMembership(sourceAuthorId);
-    }
+    await requireAuthorMutationMembership(
+      sourceAuthorId,
+      SEO_RESERVATION_TRANSFER_SUPPORT_AUDIT,
+    );
 
     const { data, error } = await targetContext.supabase.rpc(
       "transfer_seo_query_reservation",

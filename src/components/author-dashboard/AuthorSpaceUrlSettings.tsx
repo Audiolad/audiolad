@@ -27,6 +27,19 @@ type EligibilityResponse = {
 
 const SITE_HOST = "audiolad.ru";
 
+const SUPPORT_MODE_SPACE_BLOCKED_MESSAGE =
+  "В режиме сопровождения нельзя менять адрес пространства или удалять его. Это может сделать только сам автор.";
+
+function spaceMutationErrorMessage(
+  payload: { error?: string; message?: string },
+  fallback: string,
+): string {
+  if (payload.error === "support_mutation_blocked") {
+    return SUPPORT_MODE_SPACE_BLOCKED_MESSAGE;
+  }
+  return payload.message || payload.error || fallback;
+}
+
 export default function AuthorSpaceUrlSettings({
   authorId,
   authorName,
@@ -109,7 +122,7 @@ export default function AuthorSpaceUrlSettings({
         noop?: boolean;
       };
       if (!response.ok) {
-        throw new Error(payload.message || payload.error || "save_failed");
+        throw new Error(spaceMutationErrorMessage(payload, "save_failed"));
       }
       const nextSlug = payload.slug ?? draftSlug;
       setAuthorProjectCookieClient(nextSlug);
@@ -143,7 +156,7 @@ export default function AuthorSpaceUrlSettings({
         message?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.message || payload.error || "delete_failed");
+        throw new Error(spaceMutationErrorMessage(payload, "delete_failed"));
       }
       clearAuthorProjectCookieClient();
       setDeleteConfirmOpen(false);

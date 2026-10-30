@@ -35,8 +35,6 @@ export const AUTHOR_SUPPORT_MUTATION_ACTIONS = [
   "author_seo_tool_used",
   "author_seo_query_proposed",
   "author_seo_reservation_updated",
-  "author_space_slug_updated",
-  "author_space_deleted",
   "author_terms_accepted",
   "commercial_application_updated",
   "author_onboarding_updated",
@@ -140,6 +138,43 @@ function isBlockedAuthorListenerNoticeRead(pathname: string, method: string | un
   return verb === "POST" || verb === "PUT" || verb === "PATCH" || verb === "DELETE";
 }
 
+/**
+ * Author space slug change and space deletion are irreversible owner
+ * decisions (public URLs, the whole space). Blocked in support mode at the
+ * proxy (403) and again in the route.
+ */
+export const AUTHOR_SUPPORT_BLOCKED_SPACE_PATH = "/api/author/space" as const;
+
+export function isAuthorSupportBlockedSpaceMutation(
+  pathname: string,
+  method: string | undefined,
+): boolean {
+  const path = (pathname.split("?")[0] ?? pathname).replace(/\/+$/, "");
+  if (path !== AUTHOR_SUPPORT_BLOCKED_SPACE_PATH) return false;
+  const verb = (method ?? "").toUpperCase();
+  return verb === "POST" || verb === "PUT" || verb === "PATCH" || verb === "DELETE";
+}
+
+/**
+ * Route-level decision for author space mutations.
+ * No support cookie → ordinary author, never blocked. Support cookie present →
+ * blocked unless the resolved context is a plain (non-support) session of the
+ * same real user; an unresolved context blocks (fail-closed).
+ */
+export function evaluateAuthorSupportSpaceMutationBlock(input: {
+  hasSupportCookie: boolean;
+  context: {
+    isSupportMode: boolean;
+    realUserId: string;
+    actingUserId: string;
+  } | null;
+}): boolean {
+  if (!input.hasSupportCookie) return false;
+  if (!input.context) return true;
+  if (input.context.isSupportMode) return true;
+  return input.context.realUserId !== input.context.actingUserId;
+}
+
 export function isAuthorSupportBlockedMutation(input: {
   pathname: string;
   method?: string;
@@ -154,7 +189,8 @@ export function isAuthorSupportBlockedMutation(input: {
   return (
     isAuthorSupportSensitivePath(path) ||
     isAuthorSupportConsentPath(path) ||
-    isBlockedAuthorListenerNoticeRead(path, input.method)
+    isBlockedAuthorListenerNoticeRead(path, input.method) ||
+    isAuthorSupportBlockedSpaceMutation(path, input.method)
   );
 }
 

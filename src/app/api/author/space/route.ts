@@ -5,7 +5,7 @@ import {
   handleAuthorRouteError,
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
-import { recordAuthorSupportAudit } from "@/lib/author-support/audit";
+import { isAuthorSpaceMutationBlockedForRequest } from "@/lib/author-support/space-guard";
 import {
   buildAuthorProjectCookie,
   buildClearedAuthorProjectCookie,
@@ -29,6 +29,10 @@ import {
 import { INDEXNOW_REASONS } from "@/lib/seo/indexnow/reasons";
 import { scheduleYandexRecrawlNotification } from "@/lib/seo/yandex-webmaster/hooks";
 import { YANDEX_RECRAWL_REASONS } from "@/lib/seo/yandex-webmaster/planner";
+
+function supportMutationBlockedResponse() {
+  return NextResponse.json({ error: "support_mutation_blocked" }, { status: 403 });
+}
 
 export async function GET(request: Request) {
   try {
@@ -60,6 +64,10 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    // Slug change and space deletion are not available in support mode.
+    if (await isAuthorSpaceMutationBlockedForRequest()) {
+      return supportMutationBlockedResponse();
+    }
     const body = (await request.json()) as Record<string, unknown>;
     const authorId =
       typeof body.author_id === "string" ? body.author_id.trim() : "";
@@ -73,12 +81,6 @@ export async function PATCH(request: Request) {
     }
 
     const { supabase, role } = await requireAuthorMembership(authorId);
-    // Support mode: fail-closed audit row before the slug change.
-    await recordAuthorSupportAudit({
-      action: "author_space_slug_updated",
-      resourceType: "author",
-      resourceId: authorId,
-    });
     const result = await changeAuthorSlug(supabase, authorId, normalized);
 
     if (!result.ok) {
@@ -154,6 +156,10 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    // Slug change and space deletion are not available in support mode.
+    if (await isAuthorSpaceMutationBlockedForRequest()) {
+      return supportMutationBlockedResponse();
+    }
     const url = new URL(request.url);
     let authorId = url.searchParams.get("author_id")?.trim() ?? "";
     if (!authorId) {
@@ -171,12 +177,6 @@ export async function DELETE(request: Request) {
     }
 
     const { supabase } = await requireAuthorMembership(authorId);
-    // Support mode: fail-closed audit row before the space delete.
-    await recordAuthorSupportAudit({
-      action: "author_space_deleted",
-      resourceType: "author",
-      resourceId: authorId,
-    });
     const result = await deleteEmptyAuthorSpace(supabase, authorId);
 
     if (!result.ok) {

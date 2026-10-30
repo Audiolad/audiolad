@@ -454,17 +454,11 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       ],
     },
     {
-      key: "author_space_slug",
-      group: "cabinet",
-      disposition: "allowed_audited",
-      action: "author_space_slug_updated",
-      routePatterns: ["src/app/api/author/space/route.ts"],
-    },
-    {
-      key: "author_space_delete",
-      group: "cabinet",
-      disposition: "allowed_audited",
-      action: "author_space_deleted",
+      // Slug change (PATCH) and space deletion (DELETE) are irreversible owner
+      // decisions: blocked in support mode (proxy 403 + route 403).
+      key: "author_space",
+      group: "blocked",
+      disposition: "blocked",
       routePatterns: ["src/app/api/author/space/route.ts"],
     },
     {
@@ -496,10 +490,12 @@ export const AUTHOR_SUPPORT_MUTATION_INVENTORY: AuthorSupportMutationInventoryIt
       routePatterns: ["src/app/api/author/studio-music/[practiceId]/route.ts"],
     },
     {
-      // POST for search/analysis only: no author data is written.
-      key: "author_seo_read_only_analysis",
+      // No author data is written, but each call spends a paid external
+      // service (Wordstat / AI review): audited like wordstat/suggestions.
+      key: "author_seo_paid_analysis",
       group: "cabinet",
-      disposition: "read_only",
+      disposition: "allowed_audited",
+      action: "author_seo_tool_used",
       routePatterns: [
         "src/app/api/author/seo/discovery/route.ts",
         "src/app/api/author/seo/product-quality-review/route.ts",

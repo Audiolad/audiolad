@@ -6,6 +6,10 @@ import {
   requireAuthorMembership,
 } from "@/lib/author-products/auth";
 import {
+  isAuthorSupportAuditError,
+  recordAuthorSupportAudit,
+} from "@/lib/author-support/audit";
+import {
   reconcileAuthorDiscoverySuggestion,
 } from "@/lib/seo-queries/author-discovery";
 import {
@@ -144,6 +148,13 @@ export async function POST(request: Request) {
     }
 
     if (seedNormalized) databaseNormalized.add(seedNormalized);
+
+    // Support mode: fail-closed audit row before the paid Wordstat call.
+    await recordAuthorSupportAudit({
+      action: "author_seo_tool_used",
+      resourceType: "author_seo",
+      metadata: { tool: "seo_discovery" },
+    });
 
     let wordstat: Awaited<ReturnType<typeof fetchWordstatSuggestions>>;
     try {
@@ -287,7 +298,7 @@ export async function POST(request: Request) {
       results,
     });
   } catch (error) {
-    if (error instanceof AuthorAccessError) {
+    if (error instanceof AuthorAccessError || isAuthorSupportAuditError(error)) {
       return handleAuthorRouteError(error);
     }
     if (

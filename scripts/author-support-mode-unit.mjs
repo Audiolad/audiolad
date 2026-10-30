@@ -15,6 +15,7 @@ import { readdirSync } from "node:fs";
 import {
   AUTHOR_SUPPORT_ALLOWED_MUTATION_PREFIXES,
   AUTHOR_SUPPORT_MUTATION_ACTIONS,
+  evaluateAuthorSupportSpaceMutationBlock,
   AUTHOR_SUPPORT_COOKIE_NAME,
   AUTHOR_SUPPORT_TTL_SECONDS,
   assertSupportAuthorScope,
@@ -1097,19 +1098,156 @@ assert.equal(
 );
 assert.match(seoReservationsRoute, /action: "author_seo_reservation_updated"/);
 const seoTransferRoute = read("src/app/api/author/seo-reservations/transfer/route.ts");
-assert.ok(
-  seoTransferRoute.indexOf('action: "author_seo_reservation_updated"') <
-    seoTransferRoute.indexOf('"transfer_seo_query_reservation"'),
+assert.match(seoTransferRoute, /action: "author_seo_reservation_updated"/);
+const transferAuditCalls = [
+  ...seoTransferRoute.matchAll(
+    /requireAuthorMutationMembership\(\s*(\w+),\s*SEO_RESERVATION_TRANSFER_SUPPORT_AUDIT,\s*\)/g,
+  ),
+];
+assert.deepEqual(
+  transferAuditCalls.map((match) => match[1]),
+  ["targetAuthorId", "sourceAuthorId"],
+  "transfer audits both target and source author",
 );
+assert.doesNotMatch(seoTransferRoute, /requireAuthorMutationMembership\(\s*sourceAuthorId\s*\)/);
+assert.doesNotMatch(seoTransferRoute, /if \(sourceAuthorId !== targetAuthorId\)/);
+const transferRpcAt = seoTransferRoute.indexOf('"transfer_seo_query_reservation"');
+for (const match of transferAuditCalls) {
+  assert.ok(match.index < transferRpcAt, `${match[1]} audit before transfer RPC`);
+}
+
+// Author space slug change / delete: blocked in support mode (proxy + route).
 const authorSpaceRoute = read("src/app/api/author/space/route.ts");
-assert.ok(
-  authorSpaceRoute.indexOf('action: "author_space_slug_updated"') <
-    authorSpaceRoute.indexOf("changeAuthorSlug(supabase"),
+assert.doesNotMatch(authorSpaceRoute, /recordAuthorSupportAudit/);
+assert.doesNotMatch(authorSpaceRoute, /author_space_slug_updated|author_space_deleted/);
+assert.match(
+  authorSpaceRoute,
+  /NextResponse\.json\(\{ error: "support_mutation_blocked" \}, \{ status: 403 \}\)/,
 );
-assert.ok(
-  authorSpaceRoute.indexOf('action: "author_space_deleted"') <
-    authorSpaceRoute.indexOf("deleteEmptyAuthorSpace(supabase"),
+for (const method of ["PATCH", "DELETE"]) {
+  const start = authorSpaceRoute.indexOf(`export async function ${method}(`);
+  assert.ok(start > 0, method);
+  const nextExport = authorSpaceRoute.indexOf("export async function", start + 10);
+  const body = authorSpaceRoute.slice(start, nextExport === -1 ? undefined : nextExport);
+  const guardAt = body.indexOf("await isAuthorSpaceMutationBlockedForRequest()");
+  assert.ok(guardAt > 0, `${method} checks support block`);
+  assert.ok(guardAt < body.indexOf("request.json()"), `${method} blocks before parsing`);
+  assert.ok(guardAt < body.indexOf("requireAuthorMembership("), `${method} blocks before auth`);
+  assert.ok(
+    guardAt < body.indexOf(method === "PATCH" ? "changeAuthorSlug(" : "deleteEmptyAuthorSpace("),
+    `${method} blocks before the write`,
+  );
+}
+const getStart = authorSpaceRoute.indexOf("export async function GET(");
+assert.doesNotMatch(
+  authorSpaceRoute.slice(getStart, authorSpaceRoute.indexOf("export async function PATCH(")),
+  /isAuthorSpaceMutationBlockedForRequest/,
+  "GET (eligibility read) stays available",
 );
+const spaceGuard = read("src/lib/author-support/space-guard.ts");
+assert.match(spaceGuard, /readAuthorSupportCookie\(\)/);
+assert.match(spaceGuard, /evaluateAuthorSupportSpaceMutationBlock\(\{ hasSupportCookie, context \}\)/);
+
+for (const method of ["PATCH", "DELETE", "POST", "PUT"]) {
+  assert.equal(
+    isAuthorSupportBlockedMutation({ pathname: "/api/author/space", method }),
+    true,
+    `support ${method} /api/author/space blocked`,
+  );
+  assert.equal(
+    isAuthorSupportBlockedMutation({ pathname: "/api/author/space/?x=1", method }),
+    true,
+  );
+}
+assert.equal(isAuthorSupportBlockedMutation({ pathname: "/api/author/space", method: "GET" }), false);
+assert.equal(isAuthorSupportBlockedMutation({ pathname: "/api/author/space", method: "patch" }), true);
+assert.equal(isAuthorSupportBlockedMutation({ pathname: "/api/author/spaces", method: "PATCH" }), false);
+assert.equal(
+  isAuthorSupportBlockedMutation({ pathname: "/api/author/seo-reservations", method: "PATCH" }),
+  false,
+);
+
+const ownerContext = { isSupportMode: false, realUserId: "u1", actingUserId: "u1" };
+// Ordinary author owner (no support cookie): never blocked.
+assert.equal(
+  evaluateAuthorSupportSpaceMutationBlock({ hasSupportCookie: false, context: null }),
+  false,
+);
+assert.equal(
+  evaluateAuthorSupportSpaceMutationBlock({ hasSupportCookie: false, context: ownerContext }),
+  false,
+);
+// Support cookie with a plain session of the same user (expired support): allowed.
+assert.equal(
+  evaluateAuthorSupportSpaceMutationBlock({ hasSupportCookie: true, context: ownerContext }),
+  false,
+);
+// Active support mode, unresolved context, or user mismatch: blocked.
+assert.equal(
+  evaluateAuthorSupportSpaceMutationBlock({
+    hasSupportCookie: true,
+    context: { isSupportMode: true, realUserId: "owner", actingUserId: "author" },
+  }),
+  true,
+);
+assert.equal(
+  evaluateAuthorSupportSpaceMutationBlock({ hasSupportCookie: true, context: null }),
+  true,
+);
+assert.equal(
+  evaluateAuthorSupportSpaceMutationBlock({
+    hasSupportCookie: true,
+    context: { isSupportMode: false, realUserId: "owner", actingUserId: "author" },
+  }),
+  true,
+);
+
+const authorSpaceSettings = read("src/components/author-dashboard/AuthorSpaceUrlSettings.tsx");
+assert.match(authorSpaceSettings, /payload\.error === "support_mutation_blocked"/);
+assert.equal(
+  authorSpaceSettings.match(/spaceMutationErrorMessage\(payload, "(save|delete)_failed"\)/g)?.length,
+  2,
+);
+
+const authorSpaceInventory = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "author_space",
+);
+assert.equal(authorSpaceInventory?.disposition, "blocked");
+assert.equal(authorSpaceInventory?.group, "blocked");
+assert.ok(!AUTHOR_SUPPORT_MUTATION_ACTIONS.includes("author_space_slug_updated"));
+assert.ok(!AUTHOR_SUPPORT_MUTATION_ACTIONS.includes("author_space_deleted"));
+
+// Paid analysis tools (Wordstat / AI review) write no author data but are
+// audited before the external call, like wordstat/suggestions.
+const paidAnalysis = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "author_seo_paid_analysis",
+);
+assert.equal(paidAnalysis?.disposition, "allowed_audited");
+assert.equal(paidAnalysis?.action, "author_seo_tool_used");
+for (const [routePath, tool, paidCall] of [
+  ["src/app/api/author/seo/discovery/route.ts", "seo_discovery", "await fetchWordstatSuggestions("],
+  [
+    "src/app/api/author/seo/product-quality-review/route.ts",
+    "product_quality_review",
+    "await reviewProductTextQuality(",
+  ],
+]) {
+  const source = read(routePath);
+  const auditAt = source.indexOf("await recordAuthorSupportAudit({");
+  assert.ok(auditAt > 0, `${routePath} records support audit`);
+  assert.ok(auditAt < source.indexOf(paidCall), `${routePath} audits before the paid call`);
+  assert.match(source, new RegExp(`tool: "${tool}"`));
+  assert.match(source, /action: "author_seo_tool_used"/);
+  assert.match(
+    source,
+    /error instanceof AuthorAccessError \|\| isAuthorSupportAuditError\(error\)/,
+    `${routePath} returns the audit failure instead of a fallback`,
+  );
+}
+const nameAvailability = AUTHOR_SUPPORT_MUTATION_INVENTORY.find(
+  (item) => item.key === "author_name_availability",
+);
+assert.equal(nameAvailability?.disposition, "read_only");
 
 assert.match(proxy, /isAuthorSupportBlockedMutation/);
 assert.match(proxy, /support_mutation_blocked/);
