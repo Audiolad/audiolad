@@ -27,16 +27,28 @@ SELECT '00000000-0000-0000-0000-000000000001'::uuid,
 FROM generate_series(1,20000) i;
 ANALYZE public.business_player_listening_history;
 EXPLAIN (FORMAT JSON) SELECT h.id FROM public.business_player_listening_history h
-WHERE h.last_confirmed_at < statement_timestamp() - interval '9600 hours'
+WHERE h.last_confirmed_at < statement_timestamp() - 400 * 24 * interval '1 hour'
 ORDER BY h.last_confirmed_at, h.id LIMIT 500 FOR UPDATE SKIP LOCKED;
 EXPLAIN (FORMAT JSON) SELECT count(*) FROM public.business_player_listening_history h
-WHERE h.last_confirmed_at < statement_timestamp() - interval '9600 hours';
+WHERE h.last_confirmed_at < statement_timestamp() - 400 * 24 * interval '1 hour';
 """
 with tempfile.TemporaryDirectory(prefix='audiolad-player-retention-') as tmp:
     data = Path(tmp) / 'data'
     subprocess.run([str(pg / 'initdb'), '-D', str(data), '-A', 'trust', '--locale=C.UTF-8', '--encoding=UTF8'],
                    check=True, capture_output=True)
-    blocks = [stub, tables, migration.read_text(), smoke.read_text(), plan_sql]
+    # Match the official psql stdin runner: concurrent index is its own command,
+    # outside the function transaction. Reapply after privilege drift to verify
+    # IF NOT EXISTS, CREATE OR REPLACE and repeated REVOKE/GRANT together.
+    index_sql, function_sql = migration.read_text().split('\nBEGIN;', 1)
+    migration_blocks = [index_sql, 'BEGIN;' + function_sql]
+    privilege_drift = (
+        'GRANT EXECUTE ON FUNCTION public.cleanup_business_player_listening_history'
+        '(boolean,boolean,integer,integer,integer) TO PUBLIC, anon, authenticated; '
+        'REVOKE EXECUTE ON FUNCTION public.cleanup_business_player_listening_history'
+        '(boolean,boolean,integer,integer,integer) FROM service_role;'
+    )
+    blocks = [stub, tables, *migration_blocks, privilege_drift,
+              *migration_blocks, smoke.read_text(), plan_sql]
     # Single-user mode consumes one SQL block per line.
     sql = '\n'.join(' '.join(line for line in block.splitlines()
                              if not line.lstrip().startswith('--')) for block in blocks) + '\n'

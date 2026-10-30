@@ -1,6 +1,6 @@
 /** One bounded pass. No scheduler is registered. Disabled without explicit opt-in. */
 import { createClient } from "@supabase/supabase-js";
-import { runPlayerRetention } from "../src/lib/business-app/player-retention";
+import { BUSINESS_PLAYER_RETENTION_DAYS_ERROR, runPlayerRetention } from "../src/lib/business-app/player-retention";
 
 void runPlayerRetention(process.env, async (args) => {
   // Even credentials/client creation are skipped when the job is disabled.
@@ -14,8 +14,11 @@ void runPlayerRetention(process.env, async (args) => {
     .abortSignal(AbortSignal.timeout(60_000));
   if (error || !data?.[0]) throw new Error("business_player_retention_rpc_failed");
   return data[0];
-}, (entry) => console.log(JSON.stringify(entry))).catch(() => {
+}, (entry) => console.log(JSON.stringify(entry))).catch((error: unknown) => {
   // Do not print credentials, URLs, row identifiers or upstream error details.
-  console.error(JSON.stringify({ event: "business_player_retention", status: "failed" }));
+  console.error(JSON.stringify({ event: "business_player_retention", status: "failed",
+    ...(error instanceof Error && error.message === BUSINESS_PLAYER_RETENTION_DAYS_ERROR
+      ? { error: BUSINESS_PLAYER_RETENTION_DAYS_ERROR } : {}),
+  }));
   process.exitCode = 1;
 });

@@ -1,8 +1,9 @@
 -- Synthetic fixtures only, run by business-player-retention-isolated.py.
 DO $$
 DECLARE
-  t timestamptz := statement_timestamp() - interval '9600 hours';
+  t timestamptz := statement_timestamp() - 400 * 24 * interval '1 hour';
   r record;
+  days integer;
   before_live jsonb;
   after_live jsonb;
 BEGIN
@@ -32,6 +33,23 @@ BEGIN
   IF r.candidates <> 3 OR r.deleted <> 0 OR (SELECT count(*) FROM public.business_player_listening_history) <> 5 THEN
     RAISE EXCEPTION 'dry-run must only count strict older candidates';
   END IF;
+  SELECT * INTO r FROM public.cleanup_business_player_listening_history(true, true, 500, 20, 401);
+  IF r.candidates <> 0 OR r.deleted <> 0
+     OR r.cutoff <> statement_timestamp() - 401 * 24 * interval '1 hour' THEN
+    RAISE EXCEPTION 'alternate retention must change cutoff and preserve younger rows';
+  END IF;
+  FOREACH days IN ARRAY ARRAY[NULL::integer, 0, -1, 29, 3651] LOOP
+    BEGIN
+      PERFORM public.cleanup_business_player_listening_history(true, true, 500, 20, days);
+      RAISE EXCEPTION 'invalid retention days accepted';
+    EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  END LOOP;
+  FOREACH days IN ARRAY ARRAY[30, 3650] LOOP
+    SELECT * INTO r FROM public.cleanup_business_player_listening_history(true, false, 500, 20, days);
+    IF r.deleted <> 0 OR r.cutoff <> statement_timestamp() - days * 24 * interval '1 hour' THEN
+      RAISE EXCEPTION 'valid retention boundary';
+    END IF;
+  END LOOP;
   SELECT * INTO r FROM public.cleanup_business_player_listening_history(true, true, 1, 2);
   IF r.deleted <> 2 OR r.batches <> 2 OR (SELECT count(*) FROM public.business_player_listening_history) <> 3 THEN
     RAISE EXCEPTION 'batch/loop limit';
@@ -56,9 +74,13 @@ BEGIN
     PERFORM public.cleanup_business_player_listening_history(true, true, 500, 21);
     RAISE EXCEPTION 'invalid loop accepted';
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
-  IF has_function_privilege('anon', 'public.cleanup_business_player_listening_history(boolean,boolean,integer,integer)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'public.cleanup_business_player_listening_history(boolean,boolean,integer,integer)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'public.cleanup_business_player_listening_history(boolean,boolean,integer,integer)', 'EXECUTE') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_index
+    WHERE indexrelid = 'public.business_player_listening_history_retention_idx'::regclass AND indisvalid) THEN
+    RAISE EXCEPTION 'retention index must be valid after migration reapply';
+  END IF;
+  IF has_function_privilege('anon', 'public.cleanup_business_player_listening_history(boolean,boolean,integer,integer,integer)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.cleanup_business_player_listening_history(boolean,boolean,integer,integer,integer)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.cleanup_business_player_listening_history(boolean,boolean,integer,integer,integer)', 'EXECUTE') THEN
     RAISE EXCEPTION 'cleanup role permissions';
   END IF;
 END;

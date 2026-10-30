@@ -31,8 +31,8 @@ Removing intervals is irreversible and would limit future raw-history reports.
 ## Three independent lifecycles
 
 - History: delete **only** `last_confirmed_at < cutoff`, where cutoff is server
-  statement time minus 9600 hours. Equality survives; `first_confirmed_at` is never
-  a deletion criterion. A long session with a recent last confirmation survives.
+  statement time minus `p_retention_days × 24` hours (default 400 days). Equality
+  survives; `first_confirmed_at` is never a deletion criterion. A long session with a recent last confirmation survives.
 - Heartbeat: proposal for a future separately approved cleanup is **stale only**,
   `last_seen_at < server time - 30 days`; never infer age from `claimed_at`.
   Active claims use a five-minute freshness window. Heartbeats are one upserted
@@ -53,8 +53,11 @@ Removing intervals is irreversible and would limit future raw-history reports.
 `cleanup_business_player_listening_history`. No data is deleted when it is applied.
 Public, anonymous and authenticated execution are revoked. RPC defaults are
 `p_enabled=false`, `p_delete_enabled=false`, batch size 500, maximum batches 20.
-SQL validates hard limits (1–500 and 1–20). Disabled RPC calls do not count or
-mutate history. Dry-run counts all candidates without row locks or deletes.
+The optional `p_retention_days` integer defaults to 400; SQL rejects NULL or values
+outside 30–3650 days. These bounds are configuration safeguards, not an approved
+retention policy. Duration is exact hours, independent of timezone/DST.
+SQL also validates batch hard limits (1–500 and 1–20). Disabled RPC calls do not
+count or mutate history. Dry-run counts all candidates without row locks or deletes.
 
 The one-shot `scripts/run-business-player-retention.mts` follows the existing
 Studio guest cleanup pattern (tsx + Supabase service client + structured stdout).
@@ -65,8 +68,15 @@ Flags accept only literal `true`:
 
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
+| `BUSINESS_PLAYER_RETENTION_DAYS` | 400 | Integer 30–3650; overrides the proposed period |
 | `BUSINESS_PLAYER_RETENTION_ENABLED` | off | Enables counting/RPC connection |
 | `BUSINESS_PLAYER_RETENTION_DELETE_ENABLED` | off | Allows deletion when also enabled; requires Sergey's confirmation |
+
+`BUSINESS_PLAYER_RETENTION_DEFAULT_DAYS = 400` is the named library default.
+Invalid values (including empty strings, fractions or out-of-range values) fail
+closed before any RPC, even when disabled. The runner logs the fixed validation
+error without echoing the supplied value. Changing the period still needs owner
+approval; configuration does not approve deletion or the proposed 400 days.
 
 With both flags absent the runner logs zero counts and does not even create a
 client. It needs no credentials in this mode:
@@ -116,10 +126,11 @@ The isolated test follows the existing single-user PostgreSQL test convention:
 private temporary initdb cluster, no DB URLs, network sockets, Docker or live data.
 Set `PG_BIN` if the PostgreSQL binaries are outside `/usr/lib/postgresql/17/bin`.
 The test asserts the index definition is present in the new migration and executes
-it against the original live-state table definitions with synthetic parent rows.
+it twice against the original live-state table definitions with synthetic parent rows.
 It tests exact-cutoff/±1 microsecond, old-first/recent-last confirmation, dry-run,
-disabled RPC/runner, batch size and loop limits, idempotency, permissions and
-unchanged playback/active heartbeat rows.
+disabled RPC/runner, batch size and loop limits, cleanup/migration idempotency,
+alternate retention and invalid values, permission restoration after deliberate
+synthetic grant drift, and unchanged playback/active heartbeat rows.
 
 Local PostgreSQL 17 EXPLAIN on a selective synthetic fixture (20000 fresh rows,
 20 expired) uses, with default planner settings:
@@ -131,9 +142,31 @@ Local PostgreSQL 17 EXPLAIN on a selective synthetic fixture (20000 fresh rows,
 
 The isolated test requires both plans to name the index. PostgreSQL can choose a
 sequential scan for a large expired fraction; an index cannot force every plan.
-Index creation is transactional (consistent with existing migrations), and can
-block writers on a large table. Review table size and migration timing before
-any separately authorized apply.
+The index uses `CREATE INDEX CONCURRENTLY IF NOT EXISTS` before `BEGIN`; the
+function and repeated privilege statements stay in the following transaction.
+The official runner feeds files to psql without `--single-transaction` or an outer
+BEGIN (`deploy/scripts/lib/self-hosted-db.sh:129–138`), called by
+`deploy/scripts/lib/database-migrations.sh:149`; this follows the documented
+stdin apply mechanism in `docs/database-migration-safety.md`. No new runner marker,
+feature or migration file is needed. No earlier concurrent-index migration or
+invalid-index repair convention was found. Concurrent creation permits normal
+writes during the build; it can still wait on transactions and consume resources.
+
+`IF NOT EXISTS` alone does not repair an invalid index after a failed concurrent
+build. Before an authorized retry, an operator must check its definition and
+validity (manual check only; not executed by this task):
+
+```sql
+SELECT i.indisvalid, i.indisready, pg_get_indexdef(i.indexrelid)
+FROM pg_index i
+WHERE i.indexrelid = to_regclass('public.business_player_listening_history_retention_idx');
+```
+
+No row means creation is still needed. An existing index must be valid/ready and
+match `(last_confirmed_at, id)` on the history table. Otherwise stop the retry and
+have an authorized DBA approve repair (for an invalid index, concurrent removal
+and recreation outside a transaction). Do not treat an `IF NOT EXISTS` notice as
+proof of a successful build. There is no automatic destructive repair here.
 
 ## Decisions and continuation
 
@@ -168,3 +201,24 @@ from that review; nothing in this task enables production deletion.
 - No UI changed, so no browser scenario was exercised. The disabled one-shot was
   run manually and logged zero counts without a database connection.
 - No commit, push, PR, production access or production operation was performed.
+
+## Review fixes validation (2026-10-30)
+
+The earlier validation record above belongs to the initial draft. For this revision,
+`node --import tsx scripts/business-player-retention-unit.mts`: PASS.
+Targeted `node_modules/.bin/eslint` and strict `node_modules/.bin/tsc --noEmit`
+on the library, runner and unit file: PASS. Python harness syntax and
+`git diff --check`: PASS. Direct `node scripts/database-migrations-plan-unit.mjs`
+hangs in CLI subprocess checks (15-second timeout, exit 124); all remaining
+planner assertions pass in a temporary diagnostic copy with only `testCliModes`
+omitted. No full CLI planner success is claimed, and its repository file is
+unchanged because the migration file set did not change. Full lint/build and
+browser checks were not run: npm is unavailable, the shared node_modules symlink
+blocks the existing build setup, and no UI changed.
+SQL smoke and the isolated harness now cover the parameter and migration reapply,
+including privilege restoration; they were not executed because this session
+forbids database access. No production/DB/Supabase access, env-file reads, dependency
+changes, scheduling, commit, push or deploy. Owner decisions remain pending:
+400 days, archive yes/no, and removal of heartbeats older than 30 days.
+Continue with coordinator diff review, then separately authorized isolated SQL
+validation and the owner's policy decisions before any migration application.
