@@ -16,7 +16,7 @@ type CoffeeAtlasListenProps = {
 /**
  * Music examples of one coffee shop. Every item is a published catalogue
  * track played by the existing global AudioLad player. With no resolved
- * tracks we say so honestly — there is no placeholder playback.
+ * tracks we say so honestly – there is no placeholder playback.
  */
 export default function CoffeeAtlasListen({ shopName, tracks }: CoffeeAtlasListenProps) {
   if (tracks.length === 0) {
@@ -42,34 +42,35 @@ export default function CoffeeAtlasListen({ shopName, tracks }: CoffeeAtlasListe
           <div className="atlas-track__cover">
             <ProductCoverThumbnail
               slug={track.slug}
-              title={track.title}
+              title={track.trackTitle}
               coverUrl={track.coverUrl}
               coverImage={track.coverImage}
               updatedAt={track.updatedAt}
-              authorName={track.authorName}
+              authorName={null}
               format={track.format}
               className="aspect-square w-full rounded-[16px]"
             />
           </div>
           <div className="atlas-track__meta">
             {track.label ? <span className="atlas-track__label">{track.label}</span> : null}
-            <Link href={track.href} className="atlas-track__title">
-              {track.title}
+            {/* Track title large, album title below; the artist is never shown (Sergey 30.10). */}
+            <span className="atlas-track__title">{track.trackTitle}</span>
+            <Link href={track.href} className="atlas-track__album">
+              {track.albumTitle}
             </Link>
-            {track.authorName ? (
-              <span className="atlas-track__author">{track.authorName}</span>
-            ) : null}
           </div>
           {/* The button keeps the player's own dynamic label («Слушать» / «Пауза»). */}
           <span
             data-atlas-play="true"
             className="atlas-track__play-wrap"
-            title={`${track.title} – пример для ${shopName}`}
+            title={`${track.trackTitle} – пример для ${shopName}`}
           >
             <HomeProductPlayButton
               practiceId={track.id}
               authorSlug={track.authorSlug}
               productSlug={track.slug}
+              audioItemId={track.audioItemId}
+              hideAuthor
               className="atlas-track__play"
             >
               <PlayIcon />

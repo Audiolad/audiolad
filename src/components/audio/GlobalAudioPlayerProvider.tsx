@@ -25,6 +25,7 @@ import {
   syncMediaSessionPositionState,
 } from "@/lib/audio/playback-recovery";
 import { ensureSharedAudioAudible } from "@/lib/audio/shared-audio-audibility";
+import { isExactTrackReplacement } from "@/lib/catalog/exact-track-session";
 import { createPlayerEngineBridge } from "@/lib/audio/player-engine-bridge";
 import { createSharedAudioWarmupController } from "@/lib/audio/shared-audio-warmup";
 import { requestStopLocalAudioPlayers } from "@/lib/audio/local-audio-coordination";
@@ -763,8 +764,9 @@ export function GlobalAudioPlayerProvider({ children }: { children: ReactNode })
 
     if (current && currentKey === inputKey) {
       const trackSelectionChanged =
-        Boolean(input.initialTrackId) &&
-        input.initialTrackId !== current.initialTrackId;
+        (Boolean(input.initialTrackId) &&
+          input.initialTrackId !== current.initialTrackId) ||
+        isExactTrackReplacement(current, nextSession);
       const sameKeyAction = resolveSameKeySessionAction({
         trackSelectionChanged,
         requestAutoplay,

@@ -43,6 +43,12 @@ type GlobalPlayerSessionBase = {
   forceStartAtBeginning?: boolean;
   /** Start playback on this track (position 0) instead of resume position. */
   initialTrackId?: string | null;
+  /**
+   * Exact-track payload (e.g. the coffee atlas: one track, no artist). For the same
+   * session key the provider installs it whenever its track list or artist differs
+   * from the loaded session instead of treating it as a no-op.
+   */
+  exactTrackSelection?: boolean;
   /** Keep the current route when autoplay starts (e.g. product page contents). */
   suppressListenUrlSync?: boolean;
   /**
