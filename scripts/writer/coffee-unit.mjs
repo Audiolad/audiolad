@@ -19,15 +19,16 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { COFFEE_ALT_MODEL, COFFEE_DEFAULT_MODEL, DEFAULT_MODEL, TARIFF, costRub, estimatePromptTokens, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
+import { COFFEE_DEFAULT_MODEL, DEFAULT_MODEL, TARIFF, costRub, estimatePromptTokens, SZ_DEFAULT_MODEL, SUPPORTED_MODELS, defaultModelFor } from "./lib/cost.mjs";
 import { applyCoffeePack, registerArticles } from "./lib/sites/coffee/apply.mjs";
 import { assembleCoffeeArticle, normalizeText, parseInline, toTsModule } from "./lib/sites/coffee/assemble.mjs";
-import { CoffeeBriefError, expertSlotProblems, isAllowedTextHref, isInternalHref, loadCoffeeExperts, loadCoffeePack, normalizeCoffeePack } from "./lib/sites/coffee/brief.mjs";
+import { CoffeeBriefError, quoteFitWarnings, expertSlotProblems, isAllowedTextHref, isInternalHref, loadCoffeeExperts, loadCoffeePack, normalizeCoffeePack } from "./lib/sites/coffee/brief.mjs";
 import { COFFEE } from "./lib/sites/coffee/config.mjs";
 import { LESSONS, corrections, toneSample } from "./lib/sites/coffee/knowledge.mjs";
 import { CoffeeStop, draftTokenWindow, prBody, runCoffeePipeline } from "./lib/sites/coffee/pipeline.mjs";
 import { buildCoffeeMessages, buildCoffeeRepairMessages, coffeeArticleSchema } from "./lib/sites/coffee/prompt.mjs";
-import { capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords } from "./lib/sites/coffee/rules.mjs";
+import { capitalisedMidSentence, checkCoffeeArticle, dialogueLines, hasQueryWords, ordinalAgreementSlips } from "./lib/sites/coffee/rules.mjs";
+import { buildRequest } from "./lib/prompt.mjs";
 import { COFFEE_TEMPLATE_ID, packTemplateMismatch } from "./lib/template-guard.mjs";
 import { LOCK_FILE, szHashes } from "./sz-template-lock.mjs";
 
@@ -153,8 +154,6 @@ test("per-draft cap: a call never makes one draft cost more than 10 ₽", () => 
   assert.ok(worst("openai/gpt-5.4-mini", mini) <= 10);
   assert.ok(worst("openai/gpt-5.4-mini", mini + 50) > 10, "окно не меньше, чем позволяет лимит");
   assert.equal(window("openai/gpt-5.4-mini", 6), 0, "после 6 ₽ второй полный вызов mini не помещается");
-  assert.equal(window("openai/gpt-oss-120b"), 16000);
-  assert.ok(worst("openai/gpt-oss-120b", 16000, 8) <= 10);
   assert.equal(window("openai/gpt-5.5"), 0, "gpt-5.5 в лимит черновика не помещается");
   assert.throws(() => window("no/such-model"), /нет тарифа/);
 });
@@ -174,11 +173,9 @@ test("model defaults: sz unchanged, coffee explicit", () => {
   assert.equal(SZ_DEFAULT_MODEL, "openai/gpt-5.5");
   assert.equal(defaultModelFor("audiolad"), DEFAULT_MODEL);
   assert.equal(defaultModelFor("coffee"), COFFEE_DEFAULT_MODEL);
-  assert.equal(defaultModelFor("coffee", "openai/gpt-oss-120b"), "openai/gpt-oss-120b");
   assert.ok(SUPPORTED_MODELS.includes(COFFEE_DEFAULT_MODEL));
   assert.equal(COFFEE_DEFAULT_MODEL, "openai/gpt-5.4-mini");
-  assert.equal(COFFEE_ALT_MODEL, "openai/gpt-oss-120b");
-  assert.ok(SUPPORTED_MODELS.includes(COFFEE_ALT_MODEL));
+  assert.equal(COFFEE.draft.model, COFFEE_DEFAULT_MODEL);
   assert.deepEqual(TARIFF["openai/gpt-5.4-mini"], { inputPer1M: 147.315, outputPer1M: 883.89 });
 });
 
@@ -330,6 +327,16 @@ const NEGATIVES = [
   ["4 checklist items", (f) => { f.checklist.items = f.checklist.items.slice(0, 4); }, /пунктов/],
   ["one section in part two missing", (f) => { f.partTwo = f.partTwo.slice(0, 2); }, /3 раздела/],
   ["seoTitle without the query at start", (f) => { f.seoTitle = "Как выбрать зерно для кофейни"; }, /seoTitle/],
+  // Round 2 of the pilot (30.10.2026): slips that got through round 1.
+  ["ordinal/noun gender slip «Третий место»", (f) => { f.partOne[0].paragraphs[0] += " Третий место в зале – у окна."; }, /не согласовано: «Третий место»/],
+  ["ordinal/noun gender slip «первая шаг»", (f) => { f.faq[0].answer += " Это первая шаг к выбору."; }, /не согласовано/],
+  ["expert lead without the expert's name", (f) => { f.expertOne.lead = "Эксперт ответил на вопрос о том, с чего начинался его бизнес."; }, /lead называет эксперта/],
+  ["exclamation mark", (f) => { f.partTwo[0].paragraphs[0] += " Так зерно раскроется лучше!"; }, /восклицательный тон/],
+  ["filler opener «Отлично»", (f) => { f.faq[1].answer = "Отлично, если поставщик присылает дату обжарки. " + f.faq[1].answer; }, /восклицательный тон/],
+  ["numeric column without numbers", (f) => { f.table.columns[1] = "Размер"; }, /обещает цифры/],
+  ["seoTitle in lowercase", (f) => { f.seoTitle = f.seoTitle.charAt(0).toLowerCase() + f.seoTitle.slice(1); }, /заглавной/],
+  ["description without the exact query form", (f) => { f.description = "Как выбрать кофе в зёрнах для кофеен: свежесть обжарки, вкус в чашке, расчёт стоимости порции и вопросы поставщику перед первой закупкой."; }, /дословно/],
+  ["description too long", (f) => { f.description = "Кофе в зёрнах для кофейни: " + "свежесть обжарки, вкус, ".repeat(8); }, /description 120–170 символов/],
 ];
 for (const [name, mutate, expected] of NEGATIVES) {
   test(`negative: ${name}`, () => {
@@ -350,14 +357,15 @@ test("statistic with a sourced brief fact passes; the brief refuses a fact witho
   unnamed.partTwo[1].paragraphs[0] += " По данным опроса, 64 % гостей кофеен заказывают напитки на основе эспрессо.";
   assert.match(errorsOf(check(unnamed, sourced)).map((e) => e.message).join("\n"), /статистика или исследование без источника/);
   const raw = readJson(packFile);
-  raw.articles[0].facts = ["64 % гостей заказывают эспрессо"];
+  const real = raw.articles[0].facts;
+  raw.articles[0].facts = [...real, "64 % гостей заказывают эспрессо"];
   assert.throws(() => normalizeCoffeePack(raw, { experts, repoDir: root }), /нужен реальный источник/);
-  raw.articles[0].facts = ["64 % гостей заказывают эспрессо. Источник: опрос Национальной кофейной ассоциации США, 2024 год"];
+  raw.articles[0].facts = [...real, "64 % гостей заказывают эспрессо. Источник: опрос Национальной кофейной ассоциации США, 2024 год"];
   assert.doesNotThrow(() => normalizeCoffeePack(raw, { experts, repoDir: root }));
 });
 
 test("prompt has no «общеизвестное» allowance for numbers", () => {
-  const text = buildCoffeeMessages(brief, { experts }).map((m) => m.content).join("\n");
+  const text = buildCoffeeMessages({ ...brief, facts: [] }, { experts }).map((m) => m.content).join("\n");
   assert.doesNotMatch(text, /общеизвест/i);
   assert.doesNotMatch(LESSONS.join("\n"), /общеизвест/i);
   assert.match(text, /никаких цифр статистики/);
@@ -431,6 +439,53 @@ test("applyCoffeePack writes into a scratch tree only", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("ordinal agreement helper: slips only, correct pairs pass", () => {
+  assert.deepEqual(ordinalAgreementSlips("Третий место и вторая зона, первый шаг, третье место, последняя стойка").map((s) => s.text), ["Третий место"]);
+  assert.equal(ordinalAgreementSlips("Второй стол, второе правило, вторая стойка.").length, 0);
+  assert.equal(ordinalAgreementSlips("Первое решение и первый вопрос").length, 0);
+  assert.equal(ordinalAgreementSlips("Последний зона").length, 1);
+});
+
+test("facts block is required: 3–6 sourced facts; the reference fixture brief carries 3 real ones", () => {
+  assert.deepEqual(COFFEE.facts, [3, 6]);
+  assert.ok(brief.facts.length >= 3 && brief.facts.length <= 6);
+  for (const fact of brief.facts) assert.match(fact, /Источник: [А-ЯЁа-яё«]/);
+  const raw = readJson(packFile);
+  for (const facts of [[], raw.articles[0].facts.slice(0, 2), [...raw.articles[0].facts, ...raw.articles[0].facts, raw.articles[0].facts[0]]]) {
+    const copy = clone(raw);
+    copy.articles[0].facts = facts;
+    assert.throws(() => normalizeCoffeePack(copy, { experts, repoDir: root }), /facts – нужно 3–6/);
+  }
+  const text = buildCoffeeMessages(brief, { experts }).map((m) => m.content).join("\n");
+  assert.match(text, /ФАКТЫ \(используй каждый/);
+  assert.match(text, /около 1600 слов/);
+  assert.match(text, /КОНКРЕТИКА/);
+  assert.match(text, /без восклицательных знаков/);
+  assert.match(text, /начинается с имени и фамилии эксперта/);
+});
+
+test("quote fit: a better registry quote of the same expert is suggested, never an invented one", () => {
+  const bar = { slug: "barnaya-stoyka-dlya-kofeyni", title: "Барная стойка для кофейни: размеры, зоны и материалы", primaryQuery: "барная стойка для кофейни", intent: "Владелец планирует рабочее место бариста и оборудование стойки", sectionsHint: ["оборудованная рабочая площадка бариста"], tableHint: "", experts: [{ id: "anna-tsfasman", quoteIndex: 0 }, { id: "howard-schultz", quoteIndex: 0, translation: "Я был очарован итальянскими кофейными барами." }] };
+  const warnings = quoteFitWarnings(bar, experts);
+  assert.match(warnings.join("\n"), /anna-tsfasman цитата №1 ближе к теме/);
+  assert.equal(quoteFitWarnings({ ...bar, experts: [{ id: "anna-tsfasman", quoteIndex: 1 }, bar.experts[1]] }, experts).filter((w) => /anna/.test(w)).length, 0);
+  // Warnings never block the brief and never add quotes.
+  assert.equal(experts.get("anna-tsfasman").quotes.length, 2);
+});
+
+test("draft setup mirrors sz pack 17: gpt-5.4-mini only, max_tokens 9000, temperature 0.4, no repair", async () => {
+  assert.deepEqual(COFFEE.draft, { model: "openai/gpt-5.4-mini", maxTokens: 9000, temperature: 0.4, repair: false });
+  assert.equal(buildRequest(COFFEE.draft.model, [], {}, { maxTokens: 9000, schemaName: COFFEE.schemaName }).temperature, COFFEE.draft.temperature);
+  const generate = () => { throw new Error("не должно вызываться"); };
+  for (const model of ["openai/gpt-oss-120b", "openai/gpt-5.5"]) {
+    await assert.rejects(runCoffeePipeline({ briefs: packFile, repo: root, "dry-run": true }, { model, maxRub: 10, maxTokens: 9000, generate }), /только моделью openai\/gpt-5\.4-mini/);
+  }
+  await assert.rejects(runCoffeePipeline({ briefs: packFile, repo: root, base: "HEAD" }, { model: COFFEE.draft.model, maxRub: 10, maxTokens: 9000, generate }), /--base только вместе с --dry-run/);
+  const source = readFileSync(join(here, "lib/sites/coffee/pipeline.mjs"), "utf8");
+  assert.match(source, /COFFEE\.draft\.repair && !args\["no-repair"\]/);
+  assert.doesNotMatch(readFileSync(join(here, "lib/cost.mjs"), "utf8"), /COFFEE_ALT_MODEL/);
 });
 
 test("pipeline refuses an sz pack before any Cloud.ru call", async () => {

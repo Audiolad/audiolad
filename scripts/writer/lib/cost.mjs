@@ -14,10 +14,9 @@ export const TARIFF = {
 export const DEFAULT_MODEL = "openai/gpt-oss-120b";
 // --site sz default: winner of the pack-07 model trial (c62ac1d5): 0 gate errors on 5/5, ≈300 ₽ per pack.
 export const SZ_DEFAULT_MODEL = "openai/gpt-5.5";
-// --site coffee default (Sergey, 30.10.2026): Райтер writes a cheap DRAFT (≤10 ₽, target ~6 ₽ per article)
-// that Codex polishes and publishes. Alternative: --model openai/gpt-oss-120b.
+// --site coffee (Sergey, 30.10.2026): the proven sz draft setup of pack 17 (task 354517de) – gpt-5.4-mini,
+// one draft call per article, no repair, Codex polishes and publishes. The only model coffee accepts.
 export const COFFEE_DEFAULT_MODEL = "openai/gpt-5.4-mini";
-export const COFFEE_ALT_MODEL = "openai/gpt-oss-120b";
 
 /** Model for a run: an explicit --model wins, otherwise the site default. */
 export function defaultModelFor(site, explicit) {

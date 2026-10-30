@@ -116,6 +116,34 @@ export const words = (text) => String(text).match(WORD)?.length ?? 0;
 const partText = (paragraph) => paragraph.map((part) => (typeof part === "string" ? part : part.label)).join("");
 const partLinks = (paragraph) => paragraph.filter((part) => typeof part !== "string");
 
+// Ordinal + noun in the nominative that disagree in gender («Третий место», «первая шаг»).
+const ORDINAL = /^(перв|втор|трет|четв[её]рт|пят|шест|седьм|восьм|девят|десят|последн|следующ)(ый|ой|ий|ая|ья|яя|ое|ье|ее)$/;
+const ORDINAL_GENDER = { ый: "m", ой: "m", ий: "m", ая: "f", ья: "f", яя: "f", ое: "n", ье: "n", ее: "n" };
+const NOUN_GENDER = new Map([
+  ..."место правило решение условие помещение оборудование окно дело пространство освещение меню".split(" ").map((w) => [w, "n"]),
+  ..."зона стойка часть задача ошибка чашка линия позиция поверхность столешница полка станция кофемашина кофемолка касса витрина".split(" ").map((w) => [w, "f"]),
+  ..."шаг этап вариант стол модуль уровень раздел ряд вопрос ящик блок прилавок проход гость".split(" ").map((w) => [w, "m"]),
+]);
+const GENDER_WORD = { m: "мужской", f: "женский", n: "средний" };
+/** Obvious agreement slips of an ordinal and the next noun: ["Третий место", …]. */
+export function ordinalAgreementSlips(text) {
+  const tokens = String(text).split(/[^А-Яа-яЁё]+/).filter(Boolean);
+  const slips = [];
+  for (let i = 0; i + 1 < tokens.length; i++) {
+    const match = norm(tokens[i]).match(ORDINAL);
+    if (!match) continue;
+    const gender = ORDINAL_GENDER[match[2]];
+    const noun = NOUN_GENDER.get(norm(tokens[i + 1]));
+    if (gender && noun && gender !== noun) slips.push({ text: `${tokens[i]} ${tokens[i + 1]}`, noun: GENDER_WORD[noun] });
+  }
+  return slips;
+}
+
+// Columns whose header promises figures: every cell must carry a number.
+export const NUMERIC_COLUMN = /размер|высот|глубин|ширин|длин|габарит|цен[аы]|стоимост|сумм|бюджет|₽|руб|(^|[^а-яё])(см|мм|м|кг|г|л)(?![а-яё])|количеств|сколько|срок|объ[её]м|вес(?![её]л)|процент|%|норм[аы]|расстояни/i;
+// Exclamatory filler: guides keep a calm business tone.
+const EXCLAMATORY = /!|(^|[.?…]\s+)(отлично|супер|здорово|ура|поздравляем|вуаля)(?![а-яё])/i;
+
 /** [field, text] for every visible string the data module renders. */
 export function visibleTexts(article) {
   const out = [
@@ -186,6 +214,8 @@ export function checkCoffeeArticle(article, brief, env) {
     for (const rule of FORBIDDEN) if (rule.re.test(rule.strip ? rule.strip(text) : text)) error(field, rule.message);
     if (MUSIC.test(text)) error(field, "музыка в тексте статьи – по правилу владельца статьи о кофейнях без музыки, плееров и плейлистов");
     for (const re of NEGATIVE) if (re.test(text)) { error(field, `негативная формулировка («${String(text).match(re)[0]}…») – правило: не настраивать на неприятный опыт`); break; }
+    if (!/\.translation$/.test(field) && EXCLAMATORY.test(text)) error(field, `восклицательный тон («${String(text).match(EXCLAMATORY)[0].trim()}») – спокойный деловой тон, без «Отлично!» и восклицаний`);
+    for (const slip of ordinalAgreementSlips(text)) error(field, `не согласовано: «${slip.text}» – существительное ${slip.noun} рода`);
   }
 
   // Intro: no opening story (owner rule 2026-10-30) – straight to the practical topic, query first.
@@ -207,8 +237,9 @@ export function checkCoffeeArticle(article, brief, env) {
   const q = brief.primaryQuery;
   if (article.seoTitle.length > L.seoTitleMax) error("seoTitle", `seoTitle ≤ ${L.seoTitleMax} символов, сейчас ${article.seoTitle.length}`);
   if (!norm(article.seoTitle).startsWith(norm(q))) error("seoTitle", `seoTitle начинается с «${q}»`);
+  if (!/^[А-ЯЁ]/.test(article.seoTitle)) error("seoTitle", "seoTitle начинается с заглавной буквы");
   if (article.description.length < L.description[0] || article.description.length > L.description[1]) error("description", `description ${L.description[0]}–${L.description[1]} символов, сейчас ${article.description.length}`);
-  if (!countQuery(article.description, q)) error("description", `description содержит «${q}»`);
+  if (!countQuery(article.description, q)) error("description", `description должна содержать запрос «${q}» дословно, в той же форме и падеже`);
   if (!countQuery(article.hero.alt, q)) error("hero.alt", `alt картинки содержит «${q}»`);
   if (![...article.partOne, ...article.partTwo].some((s) => hasQueryWords(s.heading, q))) error("partOne", `хотя бы один H2 содержит слова запроса «${q}»`);
   const body = texts.filter(([field]) => !/^(title|seoTitle|description|hero\.)/.test(field)).map(([, text]) => text).join("\n");
@@ -231,6 +262,11 @@ export function checkCoffeeArticle(article, brief, env) {
   if (article.table.rows.length < L.tableRows[0] || article.table.rows.length > L.tableRows[1]) error("table.rows", `${L.tableRows[0]}–${L.tableRows[1]} строк`);
   const firstCells = article.table.rows.map((row) => row[0]);
   if (new Set(firstCells).size !== firstCells.length) error("table.rows", "первые значения строк должны быть разными – на телефоне это заголовки карточек");
+  for (const [c, header] of article.table.columns.entries()) {
+    if (!NUMERIC_COLUMN.test(header)) continue;
+    const empty = article.table.rows.filter((row) => row[c] !== undefined && !/\d/.test(row[c]));
+    if (empty.length) error("table.columns", `столбец «${header}» обещает цифры, но в ${empty.length} из ${article.table.rows.length} строк их нет – возьмите числа из фактов брифа или переименуйте столбец`);
+  }
   for (const [i, row] of article.table.rows.entries()) {
     if (row.length !== cols) error(`table.rows[${i}]`, `в строке ${row.length} значений, столбцов ${cols}`);
     for (const cell of row) if (words(cell) > 25) warn(`table.rows[${i}]`, "длинное значение – на телефоне карточка станет тяжёлой");
@@ -263,6 +299,12 @@ export function checkCoffeeArticle(article, brief, env) {
     if (slot.expertId !== briefSlot?.id) error(key, `эксперт должен быть ${briefSlot?.id}`);
     for (const message of expertSlotProblems({ id: slot.expertId, quoteIndex: slot.quoteIndex, translation: slot.translation }, env.experts, { repoDir: env.repoDir })) error(key, message);
     if (!slot.heading || !partText(slot.lead[0] ?? [])) error(key, "нужны heading и lead");
+    const expert = env.experts?.get(slot.expertId);
+    if (expert) {
+      const surname = norm(expert.name.split(/\s+/).pop());
+      const lead = norm(slot.lead.map(partText).join(" "));
+      if (!lead.includes(surname.slice(0, Math.max(4, surname.length - 1)))) error(`${key}.lead`, `lead называет эксперта: «${expert.name} …», а не «эксперт ответил»`);
+    }
   }
 
   // Uniqueness against the section and the other articles of the pack.

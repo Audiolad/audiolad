@@ -36,6 +36,16 @@ export const COFFEE = {
   maxRubPerDraft: 10,
   // A full article needs at least this many completion tokens; a smaller window is not worth a call.
   draftMinTokens: 6000,
+  /**
+   * Draft call = the sz pack 17 setup (task 354517de, 28.10.2026): model gpt-5.4-mini only, one call per
+   * article, no repair call (--no-repair; Codex polishes), max_tokens 9000 (trimmed further by the
+   * per-draft cap), temperature 0.4 (the shared buildRequest default, same request as sz), json_schema strict. gpt-oss-120b is not used for coffee.
+   */
+  draft: { model: "openai/gpt-5.4-mini", maxTokens: 9000, temperature: 0.4, repair: false },
+  /** Every topic brief carries 3–6 verified facts, each with «Источник: …» in words (round 2 of the pilot). */
+  facts: [3, 6],
+  /** The prompt aims here; rules accept limits.totalWords. */
+  targetWords: 1600,
   limits: {
     seoTitleMax: 70,
     description: [120, 170],

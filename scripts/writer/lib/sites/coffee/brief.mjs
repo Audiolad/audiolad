@@ -85,6 +85,8 @@ export function normalizeCoffeePack(raw, { experts, repoDir } = {}) {
     if (!brief.title || LATIN.test(brief.title)) problems.push(`${at}: title обязателен и без латиницы`);
     if (!brief.primaryQuery || LATIN.test(brief.primaryQuery)) problems.push(`${at}: primaryQuery обязателен и без латиницы`);
     for (const href of brief.links) if (!isAllowedTextHref(href)) problems.push(`${at}: ссылка ${href} – разрешены только адреса audiolad.ru («/…»), статьи ${COFFEE.crossSiteHosts.join(", ")} и ${COFFEE.maxUrl}`);
+    // Facts are required: 3–6 verified facts give the model legal numbers and norms (round 2 of the pilot).
+    if (brief.facts.length < COFFEE.facts[0] || brief.facts.length > COFFEE.facts[1]) problems.push(`${at}: facts – нужно ${COFFEE.facts[0]}–${COFFEE.facts[1]} проверенных факта с «Источник: …» словами (цифры, нормы, размеры), сейчас ${brief.facts.length}`);
     for (const fact of brief.facts) if (!/[а-яё]{4,}/i.test(fact.split(/Источник:/i)[1] ?? "")) problems.push(`${at}: факт «${fact.slice(0, 60)}» – нужен реальный источник словами: «… Источник: название, дата»`);
     if (!brief.readMore.length) problems.push(`${at}: readMore – нужна хотя бы одна внутренняя ссылка`);
     for (const link of brief.readMore) if (!isInternalHref(link.href) || LATIN.test(link.label)) problems.push(`${at}: readMore ${link.href} – только внутренние адреса и подписи без латиницы`);
@@ -97,10 +99,43 @@ export function normalizeCoffeePack(raw, { experts, repoDir } = {}) {
         if ((a.origin === "ru") === (b.origin === "ru")) problems.push(`${at}: эксперты – один русскоязычный и один иностранный`);
       }
     }
+    brief.warnings = brief.experts.length === 2 ? quoteFitWarnings(brief, experts) : [];
     return brief;
   });
   if (problems.length) throw new CoffeeBriefError(`бриф coffee не прошёл проверку:\n- ${problems.join("\n- ")}`);
   return { site: COFFEE.site, template: COFFEE.templateId, pack: String(raw.pack), task: String(raw.task).trim(), maxRub: raw.maxRub, articles: out };
+}
+
+// Topic words that every coffee brief shares and that therefore say nothing about fit.
+const FIT_STOP = /^(кофей|кофе|котор|котор|этого|чтобы|когда|можно|очень|также|более|какой|какие|гость|гостя|гостей|владе)/;
+const fitStems = (text) => new Set((String(text).toLowerCase().replace(/ё/g, "е").match(/[а-я]{5,}/g) ?? []).map((w) => w.slice(0, 5)).filter((s) => !FIT_STOP.test(s)));
+/** How many topic stems (title, query, intent, section ideas) a quote shares, by its Russian text and context. */
+export function quoteFitScore(brief, quote, translation) {
+  const topic = fitStems([brief.title, brief.primaryQuery, brief.intent, ...(brief.sectionsHint ?? []), brief.tableHint].join(" "));
+  const own = fitStems([translation ?? (quote.language === "ru" ? quote.text : ""), quote.context].join(" "));
+  return [...own].filter((stem) => topic.has(stem)).length;
+}
+/**
+ * Prefer the registry quote that fits the topic best (never an invented one): a warning when another quote
+ * of the same expert shares more topic words, or when the chosen quote shares none.
+ */
+export function quoteFitWarnings(brief, experts) {
+  const out = [];
+  for (const slot of brief.experts) {
+    const expert = experts.get(slot.id);
+    const quote = expert?.quotes?.[slot.quoteIndex];
+    if (!quote) continue;
+    const chosen = quoteFitScore(brief, quote, slot.translation);
+    let best = { index: slot.quoteIndex, score: chosen };
+    expert.quotes.forEach((other, index) => {
+      // Foreign quotes without a ready translation are judged by their context only.
+      const score = quoteFitScore(brief, other, index === slot.quoteIndex ? slot.translation : undefined);
+      if (score > best.score) best = { index, score };
+    });
+    if (best.index !== slot.quoteIndex) out.push(`${brief.slug}: у эксперта ${slot.id} цитата №${best.index} ближе к теме (${best.score} общих слов против ${chosen}) – возьмите её, если она подходит по смыслу`);
+    else if (chosen === 0) out.push(`${brief.slug}: цитата ${slot.id} №${slot.quoteIndex} не пересекается с темой – lead и after должны честно связать её с темой или нужен другой эксперт из реестра`);
+  }
+  return out;
 }
 
 export function loadCoffeePack(path, options) {

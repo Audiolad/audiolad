@@ -47,10 +47,10 @@ export class CoffeeStop extends Error {
   }
 }
 
-function prepareWorktree(repo, worktree) {
+function prepareWorktree(repo, worktree, base = "origin/main") {
   mustRun("git", ["fetch", "-q", "origin", "main"], { cwd: repo });
   if (existsSync(worktree)) throw new Error(`worktree уже существует: ${worktree}`);
-  mustRun("git", ["worktree", "add", "-q", "--detach", worktree, "origin/main"], { cwd: repo });
+  mustRun("git", ["worktree", "add", "-q", "--detach", worktree, base], { cwd: repo });
   const modules = join(repo, "node_modules");
   if (existsSync(modules)) symlinkSync(realpathSync(modules), join(worktree, "node_modules"));
   return mustRun("git", ["rev-parse", "HEAD"], { cwd: worktree }).trim();
@@ -84,10 +84,16 @@ function sectionKeys(worktree) {
   }
 }
 
-export async function runCoffeePipeline(args, { model, maxRub, maxTokens, generate }) {
+export async function runCoffeePipeline(args, { model, maxRub, maxTokens: cliMaxTokens, generate }) {
+  let maxTokens = cliMaxTokens;
   const repo = resolve(args.repo ?? mustRun("git", ["rev-parse", "--show-toplevel"]).trim());
   const experts = loadCoffeeExperts(repo);
   const pack = loadCoffeePack(resolve(args.briefs ?? args.brief), { experts, repoDir: repo });
+  // Same draft setup as sz pack 17: only gpt-5.4-mini, max_tokens ≤ 9000, no repair call.
+  if (!args.offline && model !== COFFEE.draft.model) throw new CoffeeStop(1, `coffee пишет черновики только моделью ${COFFEE.draft.model} (схема пакета 17 sz), получено ${model}`);
+  maxTokens = Math.min(maxTokens, COFFEE.draft.maxTokens);
+  // --base: a pilot draft against an unmerged branch (its expert registry); never for a real PR.
+  if (args.base && !args["dry-run"]) throw new CoffeeStop(1, "--base только вместе с --dry-run: настоящий черновик всегда строится от origin/main");
   const today = mskDate();
   const stamp = mskNow().slice(11, 16).replace(":", "");
   const runId = `${today}-${stamp}-coffee-${pack.pack}`.slice(0, 100);
@@ -114,7 +120,8 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
   let code = 0;
   try {
     log(`coffee: старт ${runId}, ${articlesWord(pack.articles.length)}, модель ${model}, бюджет ${formatRub(budget)}`);
-    state.baseSha = prepareWorktree(repo, worktree);
+    for (const brief of pack.articles) for (const warning of brief.warnings ?? []) log(`  ⚠ бриф ${warning}`);
+    state.baseSha = prepareWorktree(repo, worktree, args.base);
     const live = loadCoffeeExperts(worktree);
     const avoid = new Set(sectionKeys(worktree).map((text) => text.toLowerCase().replace(/ё/g, "е")));
     for (const brief of pack.articles) {
@@ -145,7 +152,7 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
       let result = build(raw);
       let errors = result.problems.filter((problem) => problem.severity === "error");
       log(`${brief.slug}: ошибок ${errors.length}, предупреждений ${result.problems.length - errors.length}`);
-      if (errors.length && !args.offline && !args["no-repair"]) {
+      if (errors.length && !args.offline && COFFEE.draft.repair && !args["no-repair"]) {
         const call = draftCall(brief.slug, `${brief.slug}-repair`, buildCoffeeRepairMessages(messages, raw, result.problems), schema);
         if (call.skipped) log(`${brief.slug}: исправление пропущено – не помещается в лимит ${formatRub(COFFEE.maxRubPerDraft)} на статью (потрачено ${formatRub(call.spentOnDraft)})`);
         const repaired = call.article;
@@ -159,7 +166,8 @@ export async function runCoffeePipeline(args, { model, maxRub, maxTokens, genera
       writeJson(join(outDir, brief.slug, "fields.json"), raw);
       writeText(join(outDir, brief.slug, `${brief.slug}.ts`), toTsModule(result.article, { packId: pack.pack, model }));
       for (const problem of result.problems) log(`  ${problem.severity === "error" ? "✗" : "⚠"} ${brief.slug} ${problem.field}: ${problem.message}`);
-      state.articles.push({ slug: brief.slug, errors, warnings: result.problems.filter((problem) => problem.severity !== "error") });
+      const briefWarnings = (brief.warnings ?? []).map((message) => ({ field: "experts", severity: "warning", message }));
+      state.articles.push({ slug: brief.slug, errors, warnings: [...briefWarnings, ...result.problems.filter((problem) => problem.severity !== "error")] });
       for (const key of uniqueKeys(result.article)) avoid.add(key);
       items.push({ brief, article: result.article });
     }
