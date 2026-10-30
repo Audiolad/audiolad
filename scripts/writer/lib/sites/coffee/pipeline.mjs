@@ -2,7 +2,7 @@
 // Flow: coffee pack brief (site/template id checked) → clean worktree of origin/main → per article:
 // prompt (fields JSON) → assemble VerticalGuideArticle → coffee rules → one repair → apply
 // (article modules + registry) → type check → commit → secret scan → draft PR.
-// Never merges, deploys or publishes. Shares only the generic Cloud.ru caller and git helpers
+// Output is a DRAFT for Codex: Codex polishes it in the same branch and publishes. Райтер never merges, deploys or publishes. Shares only the generic Cloud.ru caller and git helpers
 // with other modes; nothing from the sz template folder is imported.
 import { existsSync, mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -180,6 +180,8 @@ export function prBody(state, items, pack) {
   return [
     `Пакет **${pack.pack}** раздела «${COFFEE.byline}» (audiolad.ru/b/coffee): ${articlesWord(items.length)}. Темы – из задачи Сергея: ${pack.task}. Шаблон Райтера \`${COFFEE.templateId}\` (\`--site coffee\`), подпись – «${COFFEE.byline}», эталон – ${COFFEE.referenceUrl}.`,
     "",
+    "**Это черновик Райтера, не публикация.** С пакета №2 Райтер пишет черновик по шаблону coffee, а Codex делает финальную доводку и публикует.",
+    "",
     "## Статьи",
     ...items.map(({ brief }) => `- \`/b/coffee/${brief.slug}\` – «${brief.title}» (запрос «${brief.primaryQuery}»; эксперты: ${brief.experts.map((slot) => slot.id).join(", ")})`),
     "",
@@ -189,9 +191,10 @@ export function prBody(state, items, pack) {
     `- секреты: ${state.secretScan?.ok ? "чисто" : "–"}`,
     `- Cloud.ru: ${formatRub(state.spentRub)} за ${state.calls.length} вызовов (${state.model})`,
     "",
-    "## Перед merge",
+    "## Доводка Codex (перед merge)",
+    "- Codex дорабатывает тексты в этой ветке обычными коммитами, без force-push;",
     "- обновить ожидания scripts/business-coffee-guide-unit.mts (сейчас тест считает эталон единственной статьёй и сверяет sitemap);",
     "- независимая вычитка: факты, вступление сразу по теме (без истории), эксперты по источникам, ссылки;",
-    "- merge и деплой – вручную, Райтер их не делает.",
+    "- публикацию (merge и деплой) делает Codex после доводки; Райтер не публикует.",
   ].join("\n");
 }

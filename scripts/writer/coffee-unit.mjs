@@ -416,6 +416,8 @@ test("PR body names template, byline and the coffee guide test to update", () =>
   assert.match(body, /audiolad-coffee-guide-v1/);
   assert.match(body, /АудиоЛад Кофейни/);
   assert.match(body, /business-coffee-guide-unit/);
+  assert.match(body, /черновик Райтера, не публикация/);
+  assert.match(body, /Codex делает финальную доводку и публикует/);
   assert.doesNotMatch(body, /\u2014/);
 });
 
