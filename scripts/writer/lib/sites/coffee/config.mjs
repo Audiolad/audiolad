@@ -20,10 +20,15 @@ export const COFFEE = {
   expertsRegistry: "src/content/business/coffee-experts.registry.json",
   expertsPublicDir: "public",
   heroSrc: "/images/b/coffee/four-cups/06-all-cups.jpg",
+  /**
+   * og:image and JSON-LD image: a generated text card (own artwork, not a photo) per article,
+   * written by og-card.mjs at apply time. Dates are markup-only (JSON-LD, OG meta, sitemap), never visible.
+   */
+  ogDir: "public/images/b/coffee/og",
+  ogSrc: (slug) => `/images/b/coffee/og/${slug}.jpg`,
+  ogSize: { width: 1200, height: 630 },
   /** The only outgoing link the owner allowed (rendered by the page as a button, not by the text). */
   maxUrl: "https://max-potok.ru/r/gqwvf",
-  /** Absolute links allowed inside the text: cross-links to sergey-zoya.ru articles. */
-  crossSiteHosts: ["sergey-zoya.ru"],
   /**
    * Default note for relatedQueries (not printed on the page). A pack may pass its own `wordstatNote`.
    * Topics and frequencies come only from Sergey's task for the pack (`task` + `articles[]`);
@@ -55,7 +60,13 @@ export const COFFEE = {
     sectionParagraphs: [2, 4],
     tableRows: [3, 6],
     tableColumns: [3, 4],
-    faq: [5, 7],
+    /** 7–8 questions (SEO audit 30.10.2026: FAQ covers the related queries). */
+    faq: [7, 8],
+    /** «Коротко» block under the intro: 3–5 short takeaways. */
+    summary: [3, 5],
+    summaryItemWords: [6, 30],
+    /** In-text links to other guides of the section (intro, sections, table, expert lead/after). */
+    textLinksMin: 3,
     faqAnswerWords: [15, 90],
     checklist: 5,
     totalWords: [1300, 2600],

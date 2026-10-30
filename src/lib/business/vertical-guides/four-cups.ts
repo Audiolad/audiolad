@@ -40,5 +40,5 @@ export const FOUR_CUPS_SLIDES = [
 /** The single picture of the bottom block: all four cups side by side. */
 export const FOUR_CUPS_FINAL_IMAGE = {
   src: "/images/b/coffee/four-cups/06-all-cups.jpg",
-  alt: "Кофе в зёрнах для кофейни – четыре чашки, четыре характера: светлая кружка, зелёный стакан, фарфор с золотом и голубая керамика.",
+  alt: "Четыре чашки – четыре характера кофейни: светлая кружка, зелёный стакан, фарфор с золотом и голубая керамика.",
 } as const;

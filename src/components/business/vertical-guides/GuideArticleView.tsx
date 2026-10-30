@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { COFFEE_ATLAS_PATH } from "@/lib/business/coffee-atlas/constants";
-import { articlePath } from "@/lib/business/vertical-guides/registry";
 import type { VerticalGuideArticle } from "@/lib/business/vertical-guides/types";
 import { getVertical } from "@/lib/business/vertical-guides/verticals";
 
@@ -11,8 +10,10 @@ import GuideChecklist from "./GuideChecklist";
 import GuideExpertCard from "./GuideExpertCard";
 import GuideFaq from "./GuideFaq";
 import GuideFinalCups from "./GuideFinalCups";
+import GuideFooter from "./GuideFooter";
 import GuideFourCups from "./GuideFourCups";
 import GuideReadMore from "./GuideReadMore";
+import { GuideRichText } from "./GuideRichText";
 import GuideSections from "./GuideSections";
 import GuideSteps from "./GuideSteps";
 import GuideTable from "./GuideTable";
@@ -25,7 +26,6 @@ import GuideTable from "./GuideTable";
 export default function GuideArticleView({ article }: { article: VerticalGuideArticle }) {
   const vertical = getVertical(article.verticalId);
   const verticalPath = vertical?.path ?? "/b";
-  const path = articlePath(article);
 
   return (
     <article className="b2b-guide" data-coffee-guide="article" data-guide-slug={article.slug}>
@@ -58,22 +58,43 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
             <h1 id="guide-title" className="guide-display">
               {article.title}
             </h1>
-            {vertical?.byline && <p className="guide-byline">{vertical.byline}</p>}
+            {vertical?.byline && (
+              <p className="guide-byline">
+                {/* No visible dates (owner decision): dates live only in JSON-LD, sitemap and meta. */}
+                <Link href={`${verticalPath}#o-razdele`} target="_blank" rel="noopener">
+                  {vertical.byline}
+                </Link>
+              </p>
+            )}
           </div>
         </section>
 
         <div className="guide-wrap guide-prose guide-intro">
-          {article.intro.map((paragraph) => (
-            <p key={paragraph.slice(0, 32)}>{paragraph}</p>
+          {article.intro.map((paragraph, index) => (
+            <p key={`intro-${index}`}>
+              <GuideRichText parts={paragraph} />
+            </p>
           ))}
         </div>
 
+        <aside className="guide-wrap guide-summary" aria-labelledby="guide-summary-title">
+          <p id="guide-summary-title" className="guide-summary__title">
+            Коротко
+          </p>
+          <ul>
+            {article.summary.map((item) => (
+              <li key={item.slice(0, 32)}>{item}</li>
+            ))}
+          </ul>
+        </aside>
+
+        <GuideSections sections={[article.partOne[0]]} />
+
+        {/* The quiz follows the first answer block, so the reader gets content before the pause. */}
         <section className="guide-wrap guide-block guide-block--cups" aria-labelledby="guide-cups-title">
           <GuideFourCups question={article.question} />
         </section>
 
-        <GuideSections sections={[article.partOne[0]]} />
-        <GuideAtlasHeroBanner />
         <GuideSections sections={[article.partOne[1]]} />
         <GuideTable table={article.table} />
         <GuideSections sections={[article.partTwo[0]]} />
@@ -83,6 +104,7 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
         <GuideSections sections={[article.partTwo[2]]} />
         <GuideExpertCard slot={article.expertTwo} />
         <GuideSteps steps={article.steps} />
+        <GuideAtlasHeroBanner />
 
         <section className="guide-wrap guide-block">
           <GuideChecklist
@@ -99,13 +121,7 @@ export default function GuideArticleView({ article }: { article: VerticalGuideAr
         <GuideReadMore links={article.readMore} />
       </main>
 
-      <footer className="guide-footer">
-        <div className="guide-wrap">
-          <p>
-            Адрес материала: {path}. АудиоЛад не связан с кофейнями атласа. Их названия принадлежат владельцам.
-          </p>
-        </div>
-      </footer>
+      <GuideFooter />
     </article>
   );
 }

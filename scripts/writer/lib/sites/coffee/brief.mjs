@@ -75,6 +75,9 @@ export function normalizeCoffeePack(raw, { experts, repoDir } = {}) {
       tableHint: item?.tableHint ? String(item.tableHint) : "",
       forbiddenPhrases: strings(item?.forbiddenPhrases),
       links: strings(item?.links),
+      // Optional markup dates (YYYY-MM-DD); default is the draft day in Moscow. Never printed on the page.
+      ...(item?.publishedAt ? { publishedAt: String(item.publishedAt) } : {}),
+      ...(item?.updatedAt ? { updatedAt: String(item.updatedAt) } : {}),
       readMore: Array.isArray(item?.readMore) ? item.readMore.map((link) => ({ href: String(link.href), label: String(link.label) })) : [],
       experts: Array.isArray(item?.experts) ? item.experts.map((slot) => ({ id: String(slot.id), quoteIndex: Number(slot.quoteIndex ?? 0), ...(slot.translation ? { translation: String(slot.translation) } : {}) })) : [],
     };
@@ -84,7 +87,11 @@ export function normalizeCoffeePack(raw, { experts, repoDir } = {}) {
     if (brief.slug === COFFEE.referenceSlug) problems.push(`${at}: это эталонная статья, её не переписывают`);
     if (!brief.title || LATIN.test(brief.title)) problems.push(`${at}: title обязателен и без латиницы`);
     if (!brief.primaryQuery || LATIN.test(brief.primaryQuery)) problems.push(`${at}: primaryQuery обязателен и без латиницы`);
-    for (const href of brief.links) if (!isAllowedTextHref(href)) problems.push(`${at}: ссылка ${href} – разрешены только адреса audiolad.ru («/…»), статьи ${COFFEE.crossSiteHosts.join(", ")} и ${COFFEE.maxUrl}`);
+    for (const href of brief.links) if (!isAllowedTextHref(href)) problems.push(`${at}: ссылка ${href} – разрешены только адреса audiolad.ru («/…») и ${COFFEE.maxUrl}`);
+    for (const key of ["publishedAt", "updatedAt"]) if (brief[key] && !/^\d{4}-\d{2}-\d{2}$/.test(brief[key])) problems.push(`${at}: ${key} – дата в формате ГГГГ-ММ-ДД (только для разметки, на странице её нет)`);
+    // At least 3 in-text links to sibling guides (SEO audit 30.10.2026): the brief brings them.
+    const guideLinks = new Set(brief.links.filter((href) => href.startsWith(`${COFFEE.verticalPath}/`)));
+    if (guideLinks.size < COFFEE.limits.textLinksMin) problems.push(`${at}: links – нужно не меньше ${COFFEE.limits.textLinksMin} адресов статей раздела (${COFFEE.verticalPath}/…) для ссылок в тексте, сейчас ${guideLinks.size}`);
     // Facts are required: 3–6 verified facts give the model legal numbers and norms (round 2 of the pilot).
     if (brief.facts.length < COFFEE.facts[0] || brief.facts.length > COFFEE.facts[1]) problems.push(`${at}: facts – нужно ${COFFEE.facts[0]}–${COFFEE.facts[1]} проверенных факта с «Источник: …» словами (цифры, нормы, размеры), сейчас ${brief.facts.length}`);
     for (const fact of brief.facts) if (!/[а-яё]{4,}/i.test(fact.split(/Источник:/i)[1] ?? "")) problems.push(`${at}: факт «${fact.slice(0, 60)}» – нужен реальный источник словами: «… Источник: название, дата»`);
@@ -170,11 +177,6 @@ export function isInternalHref(href) {
 
 export function isAllowedTextHref(href) {
   if (typeof href !== "string" || UNSAFE_HREF.test(href)) return false;
-  if (isInternalHref(href) || href === COFFEE.maxUrl) return true;
-  try {
-    const url = new URL(href);
-    return url.protocol === "https:" && COFFEE.crossSiteHosts.includes(url.hostname) && !url.port && !url.username && !url.password && url.href.startsWith(`https://${url.hostname}/`) && href.startsWith(`https://${url.hostname}/`);
-  } catch {
-    return false;
-  }
+  // Only audiolad.ru pages; the MAX quiz is the single owner-approved outbound address (no other sites).
+  return isInternalHref(href) || href === COFFEE.maxUrl;
 }

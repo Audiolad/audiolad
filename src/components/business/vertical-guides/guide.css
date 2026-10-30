@@ -115,6 +115,10 @@
   line-height: 1.5;
 }
 
+.guide-byline a {
+  color: inherit;
+}
+
 .guide-index__intro {
   max-width: 62ch;
   font-size: 1.12rem;
@@ -633,10 +637,11 @@
   opacity: 0.75;
 }
 
+/* Readable credit: no opacity, muted ink passes WCAG AA on the card surface. */
 .guide-block p.guide-expert__credit {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
-  opacity: 0.55;
+  color: var(--guide-muted);
 }
 
 .guide-expert__heading {
@@ -866,6 +871,57 @@
 .guide-footer {
   padding: 28px 0 48px;
   color: var(--guide-muted);
+  border-top: 1px solid var(--guide-line);
+}
+
+.guide-footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+}
+
+.guide-summary {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.guide-summary > * {
+  max-width: 680px;
+}
+
+.guide-summary__title {
+  margin: 0 0 8px;
+  font-family: var(--guide-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--guide-deep);
+}
+
+.guide-summary ul {
+  margin: 0;
+  padding: 16px 18px 16px 34px;
+  background: var(--guide-surface);
+  border: 1px solid var(--guide-cream-border);
+  border-radius: 16px;
+  line-height: 1.55;
+}
+
+.guide-summary li + li {
+  margin-top: 6px;
+}
+
+.guide-index__about {
+  max-width: 680px;
+  margin-top: 40px;
+  line-height: 1.6;
+}
+
+.guide-index__about h2 {
+  font-family: var(--guide-display);
+  font-size: 1.5rem;
+  margin: 0 0 10px;
 }
 
 .guide-index {
@@ -880,7 +936,7 @@
   text-wrap: balance;
 }
 
-/* Desktop: the rubric title stays on one line (the old 12ch limit broke «Музыка для кофейни» in two). */
+/* Desktop: the rubric title stays on one line (the old 12ch limit broke the title in two). */
 @media (min-width: 900px) {
   .guide-index h1 {
     white-space: nowrap;
