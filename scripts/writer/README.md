@@ -154,6 +154,7 @@ JSON-файл, пример – `examples/pilot-brief.json`. Поля:
 
 - свои файлы – `lib/sites/coffee/` (config, knowledge, prompt, brief, assemble, rules, apply, pipeline), свой id `audiolad-coffee-guide-v1`, своё имя схемы `audiolad_coffee_guide_article`, свои ветки `writer/coffee-<pack>`;
 - режим выбирается явно: `--site coffee`; пакет обязан содержать `"site": "coffee"` и `"template": "audiolad-coffee-guide-v1"`. `--site sz` (и одиночный режим) пакет кофеен не примут, `--site coffee` не примет пакет sz – отказ до любого вызова Cloud.ru (`lib/template-guard.mjs`);
+- запуски coffee и sz делаются **по очереди, а не одновременно** (решение Сергея, 30.10.2026): у них общие журнал расходов `~/.cache/writer/ledger.jsonl` и рабочий репозиторий, параллельный запуск не проверялся и не поддерживается;
 - файлы шаблона sz закреплены хешами в `sz-template.lock.json`; `coffee-unit.mjs` падает, если они изменились или если между `lib/sites/coffee` и `lib/sites/sz` появился импорт.
 
 ```bash
