@@ -8,10 +8,14 @@ import { GuideParagraphs } from "./GuideSections";
 /**
  * One expert block: real portrait (required, the registry rejects experts without one),
  * name and role, the editor's heading, a plain-text source line, the lead, the verbatim
- * quote (a foreign quote is shown only as a Russian translation with a «Перевод с
- * английского» note; the original stays in the registry, never on the page) and the
+ * quote (a foreign quote is shown only as a Russian translation with a note in the quote's
+ * language: «Перевод с английского», «Перевод с чешского»; the original stays in the registry,
+ * never on the page) and the
  * editor's explanation. Everything printed is Russian. No outgoing links.
  */
+/** Genitive language names for the «Перевод с …» note (registry `language`). */
+const TRANSLATED_FROM: Record<string, string> = { en: "английского", cs: "чешского", it: "итальянского", fr: "французского", de: "немецкого", es: "испанского" };
+
 export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
   const expert = getCoffeeExpert(slot.expertId);
   if (!expert) {
@@ -52,7 +56,7 @@ export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
         <blockquote className="guide-expert__quote" lang="ru">
           <p>{translated ? slot.translation : quote.text}</p>
         </blockquote>
-        {translated ? <p className="guide-expert__translation-note">Перевод с английского</p> : null}
+        {translated ? <p className="guide-expert__translation-note">Перевод с {TRANSLATED_FROM[quote.language ?? "en"] ?? "иностранного"}</p> : null}
         <div className="guide-prose">
           <GuideParagraphs paragraphs={slot.after} keyPrefix={`${expert.id}-after`} />
         </div>
