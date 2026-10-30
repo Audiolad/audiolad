@@ -77,71 +77,97 @@ for (const slug of slugs) {
   for (const ref of refs) {
     assert.match(ref.authorSlug, /^[a-z0-9-]+$/);
     assert.match(ref.productSlug, /^[a-z0-9-]+$/);
-    // 17.10.2026 owner decision: start with Jazz Relax.
-    assert.equal(ref.authorSlug, "jazz-relax", `${slug}: initial examples are Jazz Relax`);
+    assert.match(ref.audioItemId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, `${slug}: exact track id`);
   }
 }
 assert.deepEqual(getCoffeeAtlasTrackRefs("nope"), []);
+
+// 30.10.2026 (Sergey): one dedicated track per coffee shop – album page + exact track.
+const EXPECTED_TRACKS: Record<string, [string, string, string]> = {
+  "caffe-florian": ["kofeynik", "italyanskiy-restorannyy-dzhaz", "576ac613-b9e2-465c-9ff9-2644394bf44a"],
+  "cafe-de-flore": ["kofeynik", "frantsuzskiy-utrenniy-dzhaz", "b81807c0-7147-437c-937c-e963437e9352"],
+  "coffee-collective": ["kofeynik", "skandinavskiy-dzhaz", "ddda47ed-f2be-468e-ac4e-226a34e78d2f"],
+  "fuglen-tokyo": ["jazz-relax", "vintazhnyy-dzhaz", "1b698d19-c582-431e-b6d4-e40c24b6a1bf"],
+  "starbucks-reserve-shanghai": ["djazmanov", "sovremennyy-dzhaz", "e40b5889-ce4b-4e16-b10d-808e623f6693"],
+  "cafe-tortoni": ["jazz-relax", "argentinskoe-tango-muzyka", "a7dbfb7b-f9ae-485f-9f70-d72f18d790f3"],
+  "cafe-san-alberto": ["kofeynik", "latinoamerikanskiy-dzhaz", "a496b83c-4d67-45e6-b669-2b9f12e7c4f3"],
+  "truth-coffee-roasting": ["jazz-relax", "nuar-dzhaz", "3a9040fb-515d-4796-a892-c919e6f0a933"],
+  "single-o-surry-hills": ["djazmanov", "legkiy-fank", "7ea01dd5-9e5d-458f-9641-901c587949d3"],
+  "la-colombe": ["djazmanov", "fortepiannyy-dzhaz", "8a1642df-677f-4e11-8db5-af1f5230fc9f"],
+};
+for (const slug of slugs) {
+  const [authorSlug, productSlug, audioItemId] = EXPECTED_TRACKS[slug];
+  assert.deepEqual(getCoffeeAtlasTrackRefs(slug), [{ authorSlug, productSlug, audioItemId }], `${slug}: dedicated track`);
+}
 
 const published = [
   { id: "a", title: "Итальянский джаз", slug: "italyanskiy-dzhaz", authorSlug: "jazz-relax", authorName: "Jazz Relax", href: "/practice/jazz-relax/italyanskiy-dzhaz", coverUrl: null },
   { id: "b", title: "Другой автор", slug: "italyanskiy-dzhaz", authorSlug: "someone", authorName: "X", href: "/x", coverUrl: null },
   { id: "c", title: "Без аудио", slug: "silent", authorSlug: "jazz-relax", authorName: "Jazz Relax", href: "/y", coverUrl: null, audioCount: 0 },
 ];
+const ref = (productSlug: string, audioItemId = "t1", label?: string) => ({
+  authorSlug: "jazz-relax",
+  productSlug,
+  audioItemId,
+  ...(label ? { label } : {}),
+});
 const resolved = resolveCoffeeAtlasTracks(
-  [
-    { authorSlug: "jazz-relax", productSlug: "missing-unpublished" },
-    { authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz", label: "Днём" },
-    { authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" },
-    { authorSlug: "jazz-relax", productSlug: "silent" },
-  ],
+  [ref("missing-unpublished"), ref("italyanskiy-dzhaz", "t1", "Днём"), ref("italyanskiy-dzhaz"), ref("silent")],
   published,
 );
 assert.equal(resolved.length, 1, "unpublished, duplicate and silent refs are skipped (no fake playback)");
 assert.equal(resolved[0].id, "a", "author slug must match too");
 assert.equal(resolved[0].label, "Днём");
+assert.equal(resolved[0].albumTitle, "Итальянский джаз", "album title comes from the catalogue product");
+assert.equal(resolved[0].audioItemId, "t1");
+assert.ok(!("authorName" in resolved[0]), "resolved example carries no artist name");
+assert.equal(resolveCoffeeAtlasTracks([ref("italyanskiy-dzhaz", "t1"), ref("italyanskiy-dzhaz", "t2")], published).length, 2, "two tracks of one album are two examples");
+assert.deepEqual(resolveCoffeeAtlasTracks([ref("italyanskiy-dzhaz", "")], published), [], "no track id → not shown");
 const vocalFeature = (source: string, value: string | null = "instrumental") => ({ value, source, status: "candidate" });
 const instrumental = vocalFeature("analyzer:vocal.detector:panns-voice:2");
 const legacyClap = vocalFeature("analyzer:vocal.scores:conservative-v2");
-assert.equal(resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" }], published, new Map([["a", instrumental]])).length, 1);
-assert.deepEqual(resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" }], published, new Map([["a", legacyClap]])), []);
-assert.deepEqual(resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" }], published, new Map([["a", null]])), []);
+assert.equal(resolveCoffeeAtlasTracks([ref("italyanskiy-dzhaz")], published, new Map([["a", instrumental]])).length, 1);
+assert.deepEqual(resolveCoffeeAtlasTracks([ref("italyanskiy-dzhaz")], published, new Map([["a", legacyClap]])), []);
+assert.deepEqual(resolveCoffeeAtlasTracks([ref("italyanskiy-dzhaz")], published, new Map([["a", null]])), []);
 assert.deepEqual(resolveCoffeeAtlasTracks(getCoffeeAtlasTrackRefs("caffe-florian"), []), []);
-assert.deepEqual(
-  resolveCoffeeAtlasTracks([{ authorSlug: "jazz-relax", productSlug: "silent" }], published),
-  [],
-  "published product without audio is never shown",
-);
+assert.deepEqual(resolveCoffeeAtlasTracks([ref("silent")], published), [], "published product without audio is never shown");
 assert.equal(
-  resolveCoffeeAtlasTracks(
-    [1, 2, 3, 4].map(() => ({ authorSlug: "jazz-relax", productSlug: "italyanskiy-dzhaz" })),
-    published,
-  ).length,
+  resolveCoffeeAtlasTracks([1, 2, 3, 4].map(() => ref("italyanskiy-dzhaz")), published).length,
   1,
   "duplicates collapse",
 );
 
-// --- player: existing catalogue player only, honest empty state ---
+// --- player: existing catalogue player only, exact track, no artist, honest empty state ---
 const listen = read("src/components/business/coffee-atlas/CoffeeAtlasListen.tsx");
 assert.match(listen, /HomeProductPlayButton/, "plays through the existing global player");
+assert.match(listen, /audioItemId=\{track\.audioItemId\}/, "plays exactly the configured track");
 assert.doesNotMatch(listen, /<audio|new Audio\(|\.mp3/, "no own audio element or hardcoded files");
 assert.match(listen, /скоро появится/, "honest empty state");
 assert.doesNotMatch(listen, /ariaLabel=/, "keeps the player's dynamic «Слушать» / «Пауза» label");
+assert.doesNotMatch(listen, /track\.authorName|atlas-track__author/, "artist name is never shown");
+assert.match(
+  listen,
+  /className="atlas-track__title">\{track\.trackTitle\}[\s\S]*className="atlas-track__album"[\s\S]*\{track\.albumTitle\}/,
+  "track title first (large), album title below",
+);
+const playButton = read("src/components/home/HomeProductPlayButton.tsx");
+assert.match(playButton, /fetchCatalogPlaySession\(\s*authorSlug,\s*productSlug,\s*audioItemId/, "requests the exact track");
+assert.match(playButton, /tracks: only/, "session is narrowed to that one track");
 const loader = read("src/lib/business/coffee-atlas/load-music.ts");
 assert.match(loader, /getPublishedCatalogProducts/, "resolves against the published catalogue");
 assert.match(loader, /loadCatalogPlaySession/, "checks playability with the /api/catalog/play loader");
 assert.doesNotMatch(loader, /\.(insert|update|upsert|delete|rpc)\(/, "loader is read-only");
 
-// --- loader: only playable examples, failures hide examples ---
+// --- loader: only playable tracks, title from the play session, failures hide examples ---
 const allPublished = Object.values(COFFEE_ATLAS_MUSIC)
   .flat()
-  .map((ref) => ({
-    id: `${ref.authorSlug}/${ref.productSlug}`,
-    title: ref.productSlug,
-    authorName: "Jazz Relax",
-    authorSlug: ref.authorSlug,
-    slug: ref.productSlug,
-    href: `/practice/${ref.authorSlug}/${ref.productSlug}`,
+  .map((item) => ({
+    id: `${item.authorSlug}/${item.productSlug}`,
+    title: `Альбом ${item.productSlug}`,
+    authorName: "Artist",
+    authorSlug: item.authorSlug,
+    slug: item.productSlug,
+    href: `/practice/${item.authorSlug}/${item.productSlug}`,
     coverUrl: null,
     coverImage: null,
     updatedAt: null,
@@ -151,23 +177,30 @@ const allPublished = Object.values(COFFEE_ATLAS_MUSIC)
 const checked: string[] = [];
 const playableBuilt = await buildCoffeeAtlasMusic({
   loadPublishedProducts: async () => allPublished,
-  isPlayable: async (track) => {
+  loadPlayableTracks: async (track) => {
     checked.push(track.id);
-    if (track.slug === "dzhaz-dlya-raboty") throw new Error("storage down");
-    return track.slug !== "italyanskiy-dzhaz";
+    if (track.slug === "sovremennyy-dzhaz") throw new Error("storage down");
+    if (track.slug === "italyanskiy-restorannyy-dzhaz") return null;
+    if (track.slug === "nuar-dzhaz") return [{ id: "other-track", title: "Другой трек" }];
+    return [
+      { id: "first", title: "Первый трек альбома" },
+      { id: track.audioItemId, title: `Трек ${track.slug}` },
+    ];
   },
 });
-assert.deepEqual(playableBuilt["caffe-florian"], [], "published but unplayable track is hidden");
+assert.deepEqual(playableBuilt["caffe-florian"], [], "published but unplayable album is hidden");
 assert.deepEqual(playableBuilt["starbucks-reserve-shanghai"], [], "play-check failure hides the example");
-assert.equal(playableBuilt["fuglen-tokyo"]?.length, 2, "playable examples stay");
-assert.equal(playableBuilt["la-colombe"]?.[0]?.slug, "dzhaz-launzh");
-assert.equal(new Set(checked).size, checked.length, "each track is checked once");
+assert.deepEqual(playableBuilt["truth-coffee-roasting"], [], "track missing from the session is hidden – never another track");
+assert.equal(playableBuilt["la-colombe"]?.length, 1, "playable example stays");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.trackTitle, "Трек fortepiannyy-dzhaz", "track title of the exact track");
+assert.equal(playableBuilt["la-colombe"]?.[0]?.albumTitle, "Альбом fortepiannyy-dzhaz", "album title below");
+assert.equal(new Set(checked).size, checked.length, "each album is checked once");
 assert.deepEqual(
   await buildCoffeeAtlasMusic({
     loadPublishedProducts: async () => {
       throw new Error("catalogue down");
     },
-    isPlayable: async () => true,
+    loadPlayableTracks: async () => [],
   }),
   {},
   "catalogue failure → no examples",

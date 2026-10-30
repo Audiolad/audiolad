@@ -17,6 +17,11 @@ type HomeProductPlayButtonProps = {
   className: string;
   children: ReactNode;
   ariaLabel?: string;
+  /**
+   * Optional: play exactly this one track of the product (the session is narrowed to it).
+   * When the track is not in the play session nothing starts – never another track instead.
+   */
+  audioItemId?: string | null;
 };
 
 /**
@@ -30,6 +35,7 @@ export default function HomeProductPlayButton({
   className,
   children,
   ariaLabel,
+  audioItemId,
 }: HomeProductPlayButtonProps) {
   const { session, loadSession, prepareSharedAudioGesture, clearPlaylistQueue } =
     useGlobalAudioPlayer();
@@ -69,15 +75,34 @@ export default function HomeProductPlayButton({
       setIsStarting(true);
 
       try {
-        const loaded = await fetchCatalogPlaySession(authorSlug, productSlug);
+        const loaded = await fetchCatalogPlaySession(
+          authorSlug,
+          productSlug,
+          audioItemId ?? null,
+        );
 
         if (!loaded.ok) {
           return;
         }
 
+        let session = loaded.session;
+        if (audioItemId) {
+          const only = session.tracks.filter((track) => track.id === audioItemId);
+          if (only.length === 0) {
+            return;
+          }
+          session = {
+            ...session,
+            tracks: only,
+            initialProgress: session.initialProgress.filter(
+              (entry) => entry.audioItemId === audioItemId,
+            ),
+          };
+        }
+
         clearPlaylistQueue();
         loadSession({
-          ...loaded.session,
+          ...session,
           sourceType: "catalog",
           entrySurface: "home",
           requestAutoplay: true,
@@ -88,6 +113,7 @@ export default function HomeProductPlayButton({
       }
     },
     [
+      audioItemId,
       authorSlug,
       clearPlaylistQueue,
       engine,
