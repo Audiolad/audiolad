@@ -4,17 +4,15 @@ import { BARNAYA_STOYKA_DLYA_KOFEYNI } from "./articles/barnaya-stoyka-dlya-kofe
 import { OPISANIE_BIZNESA_KOFEYNI } from "./articles/opisanie-biznesa-kofeyni";
 import { PECHENE_DLYA_KOFEYNI } from "./articles/pechene-dlya-kofeyni";
 import { KOFE_V_ZERNAH_DLYA_KOFEYNI } from "./articles/kofe-v-zernah-dlya-kofeyni";
+import { STOLIKI_DLYA_KOFEYNI } from "./articles/stoliki-dlya-kofeyni";
+import { KAK_VYBRAT_KOFEMASHINU_DLYA_KOFEYNI } from "./articles/kak-vybrat-kofemashinu-dlya-kofeyni";
+import { STAKANCHIKI_DLYA_KOFEYNI } from "./articles/stakanchiki-dlya-kofeyni";
+import { KOFEYNYA_SAMOOBSLUZHIVANIYA } from "./articles/kofeynya-samoobsluzhivaniya";
+import { CHTO_ZAKUPIT_DLYA_KOFEYNI } from "./articles/chto-zakupit-dlya-kofeyni";
 import type { GuideParagraph, TextPart, VerticalGuideArticle } from "./types";
 import { getVertical } from "./verticals";
 
-const ARTICLES: readonly VerticalGuideArticle[] = [
-  KOFE_V_ZERNAH_DLYA_KOFEYNI,
-  BIZNES_PLAN_KOFEYNI,
-  CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI,
-  BARNAYA_STOYKA_DLYA_KOFEYNI,
-  OPISANIE_BIZNESA_KOFEYNI,
-  PECHENE_DLYA_KOFEYNI,
-];
+const ARTICLES: readonly VerticalGuideArticle[] = [KOFE_V_ZERNAH_DLYA_KOFEYNI, BIZNES_PLAN_KOFEYNI, CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI, BARNAYA_STOYKA_DLYA_KOFEYNI, OPISANIE_BIZNESA_KOFEYNI, PECHENE_DLYA_KOFEYNI, STOLIKI_DLYA_KOFEYNI, KAK_VYBRAT_KOFEMASHINU_DLYA_KOFEYNI, STAKANCHIKI_DLYA_KOFEYNI, KOFEYNYA_SAMOOBSLUZHIVANIYA, CHTO_ZAKUPIT_DLYA_KOFEYNI];
 
 export function listVerticalArticles(verticalId?: string): VerticalGuideArticle[] {
   return ARTICLES.filter((article) => !verticalId || article.verticalId === verticalId);
