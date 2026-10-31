@@ -9,10 +9,15 @@ import { KAK_VYBRAT_KOFEMASHINU_DLYA_KOFEYNI } from "./articles/kak-vybrat-kofem
 import { STAKANCHIKI_DLYA_KOFEYNI } from "./articles/stakanchiki-dlya-kofeyni";
 import { KOFEYNYA_SAMOOBSLUZHIVANIYA } from "./articles/kofeynya-samoobsluzhivaniya";
 import { CHTO_ZAKUPIT_DLYA_KOFEYNI } from "./articles/chto-zakupit-dlya-kofeyni";
+import { OSENNIE_NAPITKI_DLYA_KOFEYNI } from "./articles/osennie-napitki-dlya-kofeyni";
+import { KAK_OTKRYT_KOFEYNYU_V_MOSKVE } from "./articles/kak-otkryt-kofeynyu-v-moskve";
+import { KOFEYNYA_V_BIZNES_TSENTRE } from "./articles/kofeynya-v-biznes-tsentre";
+import { CHASHKI_DLYA_KOFEYNI } from "./articles/chashki-dlya-kofeyni";
+import { KAK_GOTOVYAT_KOFE_V_KOFEYNE } from "./articles/kak-gotovyat-kofe-v-kofeyne";
 import type { GuideParagraph, TextPart, VerticalGuideArticle } from "./types";
 import { getVertical } from "./verticals";
 
-const ARTICLES: readonly VerticalGuideArticle[] = [KOFE_V_ZERNAH_DLYA_KOFEYNI, BIZNES_PLAN_KOFEYNI, CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI, BARNAYA_STOYKA_DLYA_KOFEYNI, OPISANIE_BIZNESA_KOFEYNI, PECHENE_DLYA_KOFEYNI, STOLIKI_DLYA_KOFEYNI, KAK_VYBRAT_KOFEMASHINU_DLYA_KOFEYNI, STAKANCHIKI_DLYA_KOFEYNI, KOFEYNYA_SAMOOBSLUZHIVANIYA, CHTO_ZAKUPIT_DLYA_KOFEYNI];
+const ARTICLES: readonly VerticalGuideArticle[] = [KOFE_V_ZERNAH_DLYA_KOFEYNI, BIZNES_PLAN_KOFEYNI, CHTO_NUZHNO_DLYA_OTKRYTIYA_KOFEYNI, BARNAYA_STOYKA_DLYA_KOFEYNI, OPISANIE_BIZNESA_KOFEYNI, PECHENE_DLYA_KOFEYNI, STOLIKI_DLYA_KOFEYNI, KAK_VYBRAT_KOFEMASHINU_DLYA_KOFEYNI, STAKANCHIKI_DLYA_KOFEYNI, KOFEYNYA_SAMOOBSLUZHIVANIYA, CHTO_ZAKUPIT_DLYA_KOFEYNI, OSENNIE_NAPITKI_DLYA_KOFEYNI, KAK_OTKRYT_KOFEYNYU_V_MOSKVE, KOFEYNYA_V_BIZNES_TSENTRE, CHASHKI_DLYA_KOFEYNI, KAK_GOTOVYAT_KOFE_V_KOFEYNE];
 
 export function listVerticalArticles(verticalId?: string): VerticalGuideArticle[] {
   return ARTICLES.filter((article) => !verticalId || article.verticalId === verticalId);
