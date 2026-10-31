@@ -61,6 +61,21 @@ const SET_01_SLUGS = [
   "opisanie-biznesa-kofeyni", "pechene-dlya-kofeyni",
 ];
 
+const SET_02_SLUGS = [
+  "stoliki-dlya-kofeyni", "kak-vybrat-kofemashinu-dlya-kofeyni", "stakanchiki-dlya-kofeyni",
+  "kofeynya-samoobsluzhivaniya", "chto-zakupit-dlya-kofeyni",
+];
+const SET_SLUGS = [...SET_01_SLUGS, ...SET_02_SLUGS];
+// Set 02 uses Sergey's supplied pack, rather than the earlier discovery CSV.
+const set02Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-02-9be20bf8.json")) as {
+  articles: Array<{
+    slug: string; title: string; primaryQuery: string;
+    relatedQueries: Array<{ phrase: string; frequency: number | null }>;
+    experts: Array<{ id: string; quoteIndex: number; translation?: string }>;
+  }>;
+};
+assert.deepEqual(set02Pack.articles.map((brief) => brief.slug), SET_02_SLUGS);
+
 // ---------- Expert registry ----------
 assertCoffeeExpertRegistry();
 const counts = countExperts();
@@ -86,7 +101,7 @@ assert.equal(getCoffeeExpert("dmitry-borodai"), null, "no expert without a portr
 assert.equal(read("src/content/business/coffee-experts.registry.json").includes(EM_DASH), false);
 
 // ---------- Routing ----------
-assert.equal(listVerticalArticles().length, 6, "reference and five articles of set 01");
+assert.equal(listVerticalArticles().length, 11, "reference, five articles of set 01 and five of set 02");
 assert.equal(listVerticalArticles("restaurants").length, 0);
 assert.deepEqual(getVerticalArticle("coffee", "kofe-v-zernah-dlya-kofeyni"), ARTICLE);
 assert.equal(getVerticalArticle("coffee", "muzyka-dlya-kofeyni"), null, "old slug is only a redirect");
@@ -449,8 +464,9 @@ assert.match(seriesPlan, /3 558/);
 assert.match(seriesPlan, /1 829/);
 assert.match(seriesPlan, /1 729/);
 assert.match(seriesPlan, /838/);
-for (const slug of SET_01_SLUGS) {
-  assert.ok(seriesPlan.includes(`/b/coffee/${slug}`));
+for (const slug of SET_SLUGS) {
+  if (SET_02_SLUGS.includes(slug)) assert.ok(set02Pack.articles.some((brief) => brief.slug === slug));
+  else assert.ok(seriesPlan.includes(`/b/coffee/${slug}`));
 }
 assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/page.tsx")));
 assert.ok(existsSync(join(root, "src/app/(platform)/b/coffee/[slug]/page.tsx")));
@@ -537,7 +553,7 @@ for (const [, value] of pageHtml.matchAll(/\s(?:alt|title|aria-label|placeholder
 }
 
 
-// Set 01: every article uses the reference renderer and the same publication sources.
+// Sets 01 and 02: every article uses the reference renderer and the same publication sources.
 const allArticles = listVerticalArticles("coffee");
 const knownTargets = new Set([
   "/", "/b", "/b/coffee", "/b/coffee#o-razdele", "/b/prava", "/b/atlas-kofeen", "/about", "/help",
@@ -546,15 +562,25 @@ const knownTargets = new Set([
 ]);
 assert.equal(new Set(allArticles.map((article) => article.slug)).size, allArticles.length);
 assert.equal(new Set(allArticles.map((article) => article.checklist.storageKey)).size, allArticles.length);
-assert.deepEqual(allArticles.map((article) => article.slug).sort(), [ARTICLE.slug, ...SET_01_SLUGS].sort());
-for (const slug of SET_01_SLUGS) {
+assert.deepEqual(allArticles.map((article) => article.slug).sort(), [ARTICLE.slug, ...SET_SLUGS].sort());
+for (const slug of SET_SLUGS) {
   const article = getVerticalArticle("coffee", slug);
   assert.ok(article, `registered: ${slug}`);
-  for (const related of article.relatedQueries) {
-    const row = candidateRows.find((candidate) => candidate.query === related.phrase);
-    assert.equal(related.frequency, row?.frequency ?? null, related.phrase);
+  const brief = set02Pack.articles.find((brief) => brief.slug === slug);
+  if (brief) {
+    assert.deepEqual(article.relatedQueries.map(({ phrase, frequency }) => ({ phrase, frequency })), brief.relatedQueries);
+    for (const [index, slot] of [article.expertOne, article.expertTwo].entries()) {
+      assert.equal(slot.expertId, brief.experts[index]?.id, `${slug}: expert from pack`);
+      assert.equal(slot.quoteIndex, brief.experts[index]?.quoteIndex, `${slug}: quote from pack`);
+      assert.equal(slot.translation, brief.experts[index]?.translation, `${slug}: translation from pack`);
+    }
+  } else {
+    for (const related of article.relatedQueries) {
+      const row = candidateRows.find((candidate) => candidate.query === related.phrase);
+      assert.equal(related.frequency, row?.frequency ?? null, related.phrase);
+    }
+    assert.ok(article.relatedQueries.some((related) => related.phrase === article.primaryQuery));
   }
-  assert.ok(article.relatedQueries.some((related) => related.phrase === article.primaryQuery));
   assert.equal(atlasSlugs.has(slug), false);
   assert.equal(article.partOne.length, 2);
   assert.equal(article.partTwo.length, 3);
@@ -576,16 +602,21 @@ for (const slug of SET_01_SLUGS) {
   }
   assert.ok([...article.partOne, ...article.partTwo].some((section) => section.heading.toLocaleLowerCase("ru").includes(keyword)));
   assert.ok(article.seoTitle.length <= 70);
-  assert.ok(article.description.length >= 80 && article.description.length <= 180);
+  assert.ok(article.description.length >= 120 && article.description.length <= 170);
   assert.ok(existsSync(join(root, "public", article.hero.src)));
   const links = collectArticleHrefs(article);
-  assert.ok(links.includes("/b/atlas-kofeen"));
-  assert.ok(links.includes(articlePath(ARTICLE)));
+  if (SET_01_SLUGS.includes(slug)) assert.ok(links.includes("/b/atlas-kofeen"));
+  if (SET_01_SLUGS.includes(slug)) assert.ok(links.includes(articlePath(ARTICLE)));
   for (const href of links) assert.ok(knownTargets.has(href), `${slug}: resolves internally: ${href}`);
-  for (const other of allArticles.filter((other) => other.slug !== slug)) {
-    assert.ok(article.readMore.some((link) => link.href === articlePath(other)), `${slug}: links to ${other.slug}`);
+  // Keep the original set-01 footer mesh; new packs need valid related pages, not links to every article.
+  if (SET_01_SLUGS.includes(slug)) {
+    for (const other of allArticles.filter((other) => other.slug === ARTICLE.slug || (SET_01_SLUGS.includes(other.slug) && other.slug !== slug))) {
+      assert.ok(article.readMore.some((link) => link.href === articlePath(other)), `${slug}: links to ${other.slug}`);
+    }
+    assert.ok(ARTICLE.readMore.some((link) => link.href === articlePath(article)), `reference links to ${slug}`);
   }
-  assert.ok(ARTICLE.readMore.some((link) => link.href === articlePath(article)), `reference links to ${slug}`);
+  assert.ok(article.readMore.length >= 3, `${slug}: related reading`);
+  for (const link of article.readMore) assert.ok(knownTargets.has(link.href), `${slug}: related page exists`);
   const experts = [article.expertOne, article.expertTwo].map((slot) => {
     const expert = getCoffeeExpert(slot.expertId);
     assert.ok(expert);
@@ -610,6 +641,7 @@ for (const slug of SET_01_SLUGS) {
   const html = renderToStaticMarkup(createElement(GuideArticleView, { article }));
   const plain = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/&[a-z]+;|&#\d+;/g, " ");
   assert.ok(html.includes("АудиоЛад Кофейни"));
+  assert.ok(html.includes('href="/b/atlas-kofeen"'), `${slug}: common atlas banner`);
   assert.doesNotMatch(withoutPaths(plain), /(?:^|[^\p{L}])точк[\p{L}]*/iu, `${slug}: no replacement for кофейня`);
   assert.doesNotMatch(withoutPaths(plain), /[A-Za-z\u2014]|--/u, `${slug}: rendered visible text`);
   const internalIds = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
@@ -695,12 +727,13 @@ const approvedTopics = [
   ["Описание бизнеса кофейни", "описание бизнеса кофейни"],
   ["Печенье для кофейни: ассортимент и поставки", "печенье для кофейни"],
 ];
-for (const [index, slug] of SET_01_SLUGS.entries()) {
+const approvedSetTopics = [...approvedTopics, ...set02Pack.articles.map((brief) => [brief.title, brief.primaryQuery])];
+for (const [index, slug] of SET_SLUGS.entries()) {
   const article = getVerticalArticle("coffee", slug)!;
-  assert.equal(article.title, approvedTopics[index]?.[0]);
+  assert.equal(article.title, approvedSetTopics[index]?.[0]);
   assert.ok(article.seoTitle.toLocaleLowerCase("ru").startsWith(article.primaryQuery), `${slug}: seoTitle opens with the query`);
   assert.doesNotMatch(article.seoTitle, /20\d\d/, `${slug}: no year in the title`);
-  assert.equal(article.primaryQuery, approvedTopics[index]?.[1]);
+  assert.equal(article.primaryQuery, approvedSetTopics[index]?.[1]);
 }
 
 // Compare authored prose, including intros, table lead-ins, expert lead/after text,
@@ -773,16 +806,16 @@ assert.throws(() => assertUniqueProse([
 assertUniqueProse(allArticles.map((article) => ({ slug: article.slug, paragraphs: editorialParagraphs(article) })));
 
 // ---------- Expert rotation (owner rule 2026-10-30) ----------
-// Every set-01 article has its own two experts: ten distinct people, none taken from the reference,
+// Both sets have their own experts, none taken from the reference,
 // and no registry quote (expert#quoteIndex) or displayed quote text appears twice on the site.
-const setSlots = SET_01_SLUGS.flatMap((slug) => {
+const setSlots = SET_SLUGS.flatMap((slug) => {
   const article = getVerticalArticle("coffee", slug)!;
   return [article.expertOne, article.expertTwo].map((slot) => ({ slug, slot }));
 });
 const setExpertIds = setSlots.map(({ slot }) => slot.expertId);
-assert.equal(new Set(setExpertIds).size, setExpertIds.length, `set-01 repeats an expert: ${setExpertIds.join(", ")}`);
+assert.equal(new Set(setExpertIds).size, setExpertIds.length, `sets 01/02 repeat an expert: ${setExpertIds.join(", ")}`);
 for (const id of [ARTICLE.expertOne.expertId, ARTICLE.expertTwo.expertId]) {
-  assert.equal(setExpertIds.includes(id), false, `set-01 reuses the reference expert ${id}`);
+  assert.equal(setExpertIds.includes(id), false, `sets 01/02 reuse the reference expert ${id}`);
 }
 const siteQuotes = new Map<string, string>();
 const siteQuoteTexts = new Map<string, string>();
@@ -811,4 +844,4 @@ for (const article of allArticles) {
   assert.ok(m.explanatoryShare >= TONE.explanatoryShareMin, `${article.slug}: explanatory share ${m.explanatoryShare}`);
   assert.ok(m.kanceliaritPer1000 <= TONE.kanceliaritPer1000, `${article.slug}: канцелярит ${m.kanceliarit.map(([, w]) => w).join(", ")}`);
 }
-console.log("business-coffee-guide: reference and five set-01 articles passed");
+console.log("business-coffee-guide: reference and ten set-01/set-02 articles passed");
