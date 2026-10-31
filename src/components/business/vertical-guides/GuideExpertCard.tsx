@@ -39,6 +39,11 @@ export default function GuideExpertCard({ slot }: { slot: GuideExpertSlot }) {
             alt={`${expert.name}, портрет`}
             width={80}
             height={80}
+            // Served as the static 600×600 webp, not through /_next/image: on next 16.3.x a
+            // client that aborts a cold transform (lazy avatar scrolled past on a phone) wedges
+            // that exact url+w+q key until restart (vercel/next.js#96538, fixed in 16.4 by #98168),
+            // and the 2x avatar (w=256) came back 504 – an empty circle on mobile.
+            unoptimized
           />
           <div>
             <p className="guide-expert__name">{expert.name}</p>

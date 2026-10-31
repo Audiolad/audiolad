@@ -440,6 +440,8 @@ assert.match(expertCard, /Источник: /);
 assert.match(expertCard, /Перевод с английского/);
 assert.doesNotMatch(expertCard, /expertInitials|guide-expert__initials|Оригинал/);
 assert.match(expertCard, /lang="ru"/);
+// Avatars skip /_next/image: aborted cold transforms wedge a key on next 16.3.x (504 → empty circle on mobile).
+assert.match(expertCard, /\n\s*unoptimized\n/);
 
 const seriesPlan = read("docs/business/coffee-guides/SERIES-PLAN.md");
 assert.equal(seriesPlan.includes("\u2014"), false);
