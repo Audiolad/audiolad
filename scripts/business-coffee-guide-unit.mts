@@ -69,8 +69,12 @@ const SET_03_SLUGS = [
   "osennie-napitki-dlya-kofeyni", "kak-otkryt-kofeynyu-v-moskve", "kofeynya-v-biznes-tsentre",
   "chashki-dlya-kofeyni", "kak-gotovyat-kofe-v-kofeyne",
 ];
-const SET_SLUGS = [...SET_01_SLUGS, ...SET_02_SLUGS, ...SET_03_SLUGS];
-// Sets 02 and 03 use Sergey's supplied packs, rather than the earlier discovery CSV.
+const SET_04_SLUGS = [
+  "foto-dlya-kofeyni", "kak-nazvat-kofeynyu", "franshiza-kofeyni-samoobsluzhivaniya",
+  "gotovaya-eda-dlya-kofeyni", "vidy-kofe-v-kofeyne",
+];
+const SET_SLUGS = [...SET_01_SLUGS, ...SET_02_SLUGS, ...SET_03_SLUGS, ...SET_04_SLUGS];
+// Sets 02, 03 and 04 use Sergey's supplied packs, rather than the earlier discovery CSV.
 const set02Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-02-9be20bf8.json")) as {
   articles: Array<{
     slug: string; title: string; primaryQuery: string;
@@ -81,6 +85,8 @@ const set02Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-02-9be2
 assert.deepEqual(set02Pack.articles.map((brief) => brief.slug), SET_02_SLUGS);
 const set03Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-03-a8ec0f52.json")) as typeof set02Pack;
 assert.deepEqual(set03Pack.articles.map((brief) => brief.slug), SET_03_SLUGS);
+const set04Pack = JSON.parse(read("docs/business/coffee-guides/packs/set-04-3f142447.json")) as typeof set02Pack;
+assert.deepEqual(set04Pack.articles.map((brief) => brief.slug), SET_04_SLUGS);
 
 // ---------- Expert registry ----------
 assertCoffeeExpertRegistry();
@@ -107,7 +113,7 @@ assert.equal(getCoffeeExpert("dmitry-borodai"), null, "no expert without a portr
 assert.equal(read("src/content/business/coffee-experts.registry.json").includes(EM_DASH), false);
 
 // ---------- Routing ----------
-assert.equal(listVerticalArticles().length, 16, "reference and five articles each of sets 01, 02 and 03");
+assert.equal(listVerticalArticles().length, 21, "reference and five articles each of sets 01, 02, 03 and 04");
 assert.equal(listVerticalArticles("restaurants").length, 0);
 assert.deepEqual(getVerticalArticle("coffee", "kofe-v-zernah-dlya-kofeyni"), ARTICLE);
 assert.equal(getVerticalArticle("coffee", "muzyka-dlya-kofeyni"), null, "old slug is only a redirect");
@@ -471,7 +477,8 @@ assert.match(seriesPlan, /1 829/);
 assert.match(seriesPlan, /1 729/);
 assert.match(seriesPlan, /838/);
 for (const slug of SET_SLUGS) {
-  if (SET_03_SLUGS.includes(slug)) assert.ok(set03Pack.articles.some((brief) => brief.slug === slug));
+  if (SET_04_SLUGS.includes(slug)) assert.ok(set04Pack.articles.some((brief) => brief.slug === slug));
+  else if (SET_03_SLUGS.includes(slug)) assert.ok(set03Pack.articles.some((brief) => brief.slug === slug));
   else if (SET_02_SLUGS.includes(slug)) assert.ok(set02Pack.articles.some((brief) => brief.slug === slug));
   else assert.ok(seriesPlan.includes(`/b/coffee/${slug}`));
 }
@@ -560,7 +567,7 @@ for (const [, value] of pageHtml.matchAll(/\s(?:alt|title|aria-label|placeholder
 }
 
 
-// Sets 01, 02 and 03: every article uses the reference renderer and the same publication sources.
+// Sets 01, 02, 03 and 04: every article uses the reference renderer and the same publication sources.
 const allArticles = listVerticalArticles("coffee");
 const knownTargets = new Set([
   "/", "/b", "/b/coffee", "/b/coffee#o-razdele", "/b/prava", "/b/atlas-kofeen", "/about", "/help",
@@ -573,7 +580,7 @@ assert.deepEqual(allArticles.map((article) => article.slug).sort(), [ARTICLE.slu
 for (const slug of SET_SLUGS) {
   const article = getVerticalArticle("coffee", slug);
   assert.ok(article, `registered: ${slug}`);
-  const brief = [...set02Pack.articles, ...set03Pack.articles].find((brief) => brief.slug === slug);
+  const brief = [...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles].find((brief) => brief.slug === slug);
   if (brief) {
     assert.deepEqual(article.relatedQueries.map(({ phrase, frequency }) => ({ phrase, frequency })), brief.relatedQueries);
     for (const [index, slot] of [article.expertOne, article.expertTwo].entries()) {
@@ -734,7 +741,7 @@ const approvedTopics = [
   ["Описание бизнеса кофейни", "описание бизнеса кофейни"],
   ["Печенье для кофейни: ассортимент и поставки", "печенье для кофейни"],
 ];
-const approvedSetTopics = [...approvedTopics, ...[...set02Pack.articles, ...set03Pack.articles].map((brief) => [brief.title, brief.primaryQuery])];
+const approvedSetTopics = [...approvedTopics, ...[...set02Pack.articles, ...set03Pack.articles, ...set04Pack.articles].map((brief) => [brief.title, brief.primaryQuery])];
 for (const [index, slug] of SET_SLUGS.entries()) {
   const article = getVerticalArticle("coffee", slug)!;
   assert.equal(article.title, approvedSetTopics[index]?.[0]);
@@ -819,15 +826,17 @@ const setSlots = SET_SLUGS.flatMap((slug) => {
   const article = getVerticalArticle("coffee", slug)!;
   return [article.expertOne, article.expertTwo].map((slot) => ({ slug, slot }));
 });
-const setExpertIds = setSlots.map(({ slot }) => slot.expertId);
+// Set 04 explicitly assigns fresh quotes by reference experts Kotov and Menon.
+// Keep the original person-level restriction for sets 01–03; quote uniqueness below covers every set.
+const earlierSetExpertIds = setSlots.filter(({ slug }) => !SET_04_SLUGS.includes(slug)).map(({ slot }) => slot.expertId);
 // Set 03 deliberately reuses people with fresh quotes (approved pack report, «Правки брифа»).
-// Preserve the accepted cross-set 01/02 check and check distinct people within set 03.
-for (const slugs of [[...SET_01_SLUGS, ...SET_02_SLUGS], SET_03_SLUGS]) {
+// Preserve the accepted cross-set 01/02 check and check distinct people within each of sets 03 and 04.
+for (const slugs of [[...SET_01_SLUGS, ...SET_02_SLUGS], SET_03_SLUGS, SET_04_SLUGS]) {
   const ids = setSlots.filter(({ slug }) => slugs.includes(slug)).map(({ slot }) => slot.expertId);
   assert.equal(new Set(ids).size, ids.length, `expert repeats in the checked group: ${ids.join(", ")}`);
 }
 for (const id of [ARTICLE.expertOne.expertId, ARTICLE.expertTwo.expertId]) {
-  assert.equal(setExpertIds.includes(id), false, `sets 01/02/03 reuse the reference expert ${id}`);
+  assert.equal(earlierSetExpertIds.includes(id), false, `sets 01/02/03 reuse the reference expert ${id}`);
 }
 const siteQuotes = new Map<string, string>();
 const siteQuoteTexts = new Map<string, string>();
@@ -856,4 +865,4 @@ for (const article of allArticles) {
   assert.ok(m.explanatoryShare >= TONE.explanatoryShareMin, `${article.slug}: explanatory share ${m.explanatoryShare}`);
   assert.ok(m.kanceliaritPer1000 <= TONE.kanceliaritPer1000, `${article.slug}: канцелярит ${m.kanceliarit.map(([, w]) => w).join(", ")}`);
 }
-console.log("business-coffee-guide: reference and fifteen set-01/set-02/set-03 articles passed");
+console.log("business-coffee-guide: reference and twenty set-01/set-02/set-03/set-04 articles passed");
