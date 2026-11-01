@@ -373,6 +373,73 @@ export function rotationProblems(article, env = {}) {
   return out;
 }
 
+// ── Retro of sets 2–7 (01.11.2026): what Codex fixed by hand in 30 drafts, made machine-checkable ─────
+// Errors only where the text is unambiguously wrong; style patterns stay warnings for the polish pass.
+
+/** Service words of the pipeline that leaked into the page: «бриф», «в источниках не дано», «набор №3». */
+export const SERVICE_WORDS = [
+  /(^|[^а-яё])бриф/i,
+  /в источник(?:ах|е) (?:не|нет)(?![а-яё])/i,
+  /(^|[^а-яё])набор[а-яё]* №/i,
+];
+/** City names written in lowercase (the query is lowercase, the page is not): «в москве», «спб». */
+export const LOWERCASE_CITY = /(^|[^а-яёА-ЯЁ])(москв(?:а|е|у|ы|ой|ою)|спб|петербург(?:а|е|у|ом)?)(?![а-яё])/;
+/** A markdown link the assembler could not parse is printed as is: «[анкор]( /b/…)». */
+export const RAW_MARKDOWN = /\[[^\]]*\]\s*\(|\]\(/;
+const QUESTION_LABEL = /^(?:как|что|чем|какой|какая|какое|какие|какую|каким|сколько|где|зачем|почему|когда|куда|нужн[а-яё]* ли|можно ли|стоит ли)(?![а-яё])/i;
+const PREPOSITION_END = /(?:^|[^а-яё])(?:с|со|в|во|на|про|о|об|обо|к|ко|по|из|для|у|от|за|при|без|до|под|над|перед|между)\s*$/i;
+const ABOUT_THAT_END = /о\s+том,?\s*$/i;
+const richParagraphs = (article) => [
+  ...article.intro.map((p, i) => [`intro[${i}]`, p]),
+  ...[...article.partOne.map((s, i) => [`partOne[${i}]`, s]), ...article.partTwo.map((s, i) => [`partTwo[${i}]`, s])].flatMap(([field, s]) => [
+    ...s.paragraphs.map((p, i) => [`${field}.paragraphs[${i}]`, p]),
+    ...(s.subsections ?? []).flatMap((sub, j) => sub.paragraphs.map((p, i) => [`${field}.subsections[${j}].paragraphs[${i}]`, p])),
+  ]),
+  ...article.table.intro.map((p) => ["table.intro", p]), ...article.table.after.map((p) => ["table.after", p]),
+  ...["expertOne", "expertTwo"].flatMap((key) => [...article[key].lead.map((p) => [`${key}.lead`, p]), ...article[key].after.map((p) => [`${key}.after`, p])]),
+];
+
+/**
+ * Link anchors that break the sentence (retro 2–7: 34 in raw drafts, the most frequent link fix):
+ * a question-like title as an anchor right after a preposition – «сверить с [что нужно для открытия]» – is an
+ * error; elsewhere without «о том, …» it is a warning.
+ */
+export function linkGrammarProblems(article) {
+  const out = [];
+  for (const [field, paragraph] of richParagraphs(article)) {
+    paragraph.forEach((part, k) => {
+      if (typeof part === "string" || !QUESTION_LABEL.test(part.label.trim())) return;
+      const before = typeof paragraph[k - 1] === "string" ? paragraph[k - 1] : "";
+      if (ABOUT_THAT_END.test(before)) return;
+      if (PREPOSITION_END.test(before)) out.push(["error", field, `анкор-вопрос после предлога: «…${before.slice(-20)}[${part.label}]» – вопрос в анкоре только после «о том, …», иначе слова фразы в нужном падеже`]);
+      else out.push(["warning", field, `анкор-вопрос «${part.label}» без «о том, …» – проверьте, что фраза читается`]);
+    });
+  }
+  return out;
+}
+
+/** Expert formulas Codex rewrote in 27 of 30 drafts, and experts retold outside their slot. Warnings. */
+export function expertSlotStyleProblems(article, experts) {
+  const out = [];
+  for (const key of ["expertOne", "expertTwo"]) {
+    const slot = article[key];
+    const lead = slot.lead.map(partText).join(" ");
+    const after = slot.after.map(partText).join(" ");
+    if (/отвеча[а-яё]* на вопрос/i.test(lead)) out.push([`${key}.lead`, "lead без формулы «отвечает на вопрос» – источник и тема разговора: «… в интервью … рассказывает о …»"]);
+    if (/^\s*Для (?:вашей |вас и )?кофейн[а-яё]*[^.]{0,25}?(?:значит|означает)/i.test(after)) out.push([`${key}.after`, "after без зачина «Для кофейни это значит» – сразу конкретный вывод по теме"]);
+    const expert = experts?.get(slot.expertId);
+    if (!expert) continue;
+    // Capitalised surname plus a short case ending: «Котова», «Шульцем» – never «которые».
+    const surname = expert.name.split(/\s+/).pop().replace(/ё/g, "е");
+    const stem = surname.length > 5 ? surname.slice(0, -1) : surname;
+    const mention = new RegExp(`(^|[^А-ЯЁа-яё])${stem}[а-я]{0,3}(?![а-яё])`);
+    const outside = visibleTexts(article).filter(([field]) => !/^(expertOne|expertTwo)\./.test(field) && !/^readMore/.test(field));
+    const hit = outside.find(([, text]) => mention.test(String(text).replace(/ё/g, "е")));
+    if (hit) out.push([hit[0], `${expert.name} упоминается вне блока эксперта – эксперт только в своём lead/after, в разделах его не пересказывают`]);
+  }
+  return out;
+}
+
 /**
  * @param article assembled VerticalGuideArticle
  * @param brief   normalized pack article (brief.mjs)
@@ -393,6 +460,9 @@ export function checkCoffeeArticle(article, brief, env) {
     for (const re of NEGATIVE) if (re.test(text)) { error(field, `негативная формулировка («${String(text).match(re)[0]}…») – правило: не настраивать на неприятный опыт`); break; }
     if (!/\.translation$/.test(field) && EXCLAMATORY.test(text)) error(field, `восклицательный тон («${String(text).match(EXCLAMATORY)[0].trim()}») – спокойный деловой тон, без «Отлично!» и восклицаний`);
     for (const slip of ordinalAgreementSlips(text)) error(field, `не согласовано: «${slip.text}» – существительное ${slip.noun} рода`);
+    for (const re of SERVICE_WORDS) if (re.test(text)) { error(field, `служебное слово в тексте («${String(text).match(re)[0].trim()}…») – читатель не знает про бриф, источники и наборы`); break; }
+    if (LOWERCASE_CITY.test(text)) error(field, `город со строчной буквы: «${String(text).match(LOWERCASE_CITY)[2]}» – «Москва», «СПб», «Петербург»`);
+    if (RAW_MARKDOWN.test(text)) error(field, "неразобранная markdown-ссылка – формат строго [анкор](/b/coffee/…), без пробела после «(»");
   }
 
   // Intro: no opening story (owner rule 2026-10-30) – straight to the practical topic, query first.
@@ -480,6 +550,7 @@ export function checkCoffeeArticle(article, brief, env) {
     const n = words(item.answer);
     if (n < L.faqAnswerWords[0] || n > L.faqAnswerWords[1]) error(`faq[${i}]`, `ответ ${L.faqAnswerWords[0]}–${L.faqAnswerWords[1]} слов, сейчас ${n}`);
     if (!item.question.endsWith("?")) error(`faq[${i}]`, "вопрос заканчивается «?»");
+    if (/^(?:Да|Нет)(?![а-яё])/.test(item.answer.trim())) warn(`faq[${i}]`, "ответ начинается с сути, а не с голого «Да»/«Нет» (так правили 22 ответа в наборах 2–7)");
   }
   for (const field of ["question", "finalQuestion"]) if (!String(article[field]).endsWith("?")) error(field, "вопрос заканчивается «?»");
 
@@ -509,6 +580,11 @@ export function checkCoffeeArticle(article, brief, env) {
       if (!lead.includes(surname.slice(0, Math.max(4, surname.length - 1)))) error(`${key}.lead`, `lead называет эксперта: «${expert.name} …», а не «эксперт ответил»`);
     }
   }
+
+  for (const [field, message] of expertSlotStyleProblems(article, env.experts)) warn(field, message);
+
+  // Link anchors that break the sentence.
+  for (const [severity, field, message] of linkGrammarProblems(article)) (severity === "error" ? error : warn)(field, message);
 
   // Rotation: one expert once per set, one quote once on the site.
   for (const [field, message] of rotationProblems(article, env)) error(field, message);
